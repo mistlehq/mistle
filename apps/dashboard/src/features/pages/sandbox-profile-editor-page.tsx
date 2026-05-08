@@ -28,12 +28,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@mistle/ui";
-import {
-  SidebarSimpleIcon,
-  SpinnerGapIcon,
-  TerminalIcon,
-  WarningCircleIcon,
-} from "@phosphor-icons/react";
+import { SidebarSimpleIcon, SpinnerGapIcon, TerminalIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   useCallback,
@@ -78,6 +73,7 @@ import {
   publishSandboxProfileVersion,
   putSandboxProfileVersionDraft,
   refreshSandboxProfileVersion,
+  retrySandboxProfileVersionPublishSnapshot,
   startSandboxProfileSetupAssistant,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type {
@@ -141,7 +137,6 @@ import {
 import {
   SandboxProfileSnapshotPanel,
   resolveSnapshotPanelState,
-  shouldShowMissingSnapshotAlert,
   type SnapshotPanelState,
 } from "./sandbox-profile-snapshot-panel.js";
 import { SandboxSetupScriptEditor } from "./sandbox-setup-script-editor.js";
@@ -889,6 +884,48 @@ function LoadedSandboxProfileEditorPage(
       );
     },
   });
+  const retryPublishSnapshotMutation = useMutation({
+    mutationFn: async (version: number) =>
+      retrySandboxProfileVersionPublishSnapshot({
+        profileId: input.profileId,
+        version,
+      }),
+    onSuccess: async (result) => {
+      setVersionActionError(null);
+      queryClient.setQueryData<SandboxProfile | undefined>(
+        sandboxProfileDetailQueryKey(input.profileId),
+        (currentProfile) =>
+          applyPublishedSandboxProfileVersionToProfile({
+            profile: currentProfile,
+            result,
+          }),
+      );
+      queryClient.setQueryData<{ versions: readonly SandboxProfileVersion[] } | undefined>(
+        sandboxProfileVersionsQueryKey(input.profileId),
+        (currentVersions) => {
+          const nextVersions = applyPublishedSandboxProfileVersionToVersions({
+            versions: currentVersions?.versions,
+            result,
+          });
+
+          return nextVersions === undefined ? currentVersions : { versions: nextVersions };
+        },
+      );
+      void Promise.all([
+        input.invalidateProfileVersions(input.profileId),
+        input.invalidateSandboxProfiles(),
+        input.invalidateProfileDetail(input.profileId),
+      ]);
+    },
+    onError: (error: unknown) => {
+      setVersionActionError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not retry sandbox profile snapshot creation.",
+        }),
+      );
+    },
+  });
   const deleteProfileMutation = useMutation({
     mutationFn: async () =>
       deleteSandboxProfile({
@@ -986,6 +1023,9 @@ function LoadedSandboxProfileEditorPage(
       onRefreshSnapshot={(version) => {
         refreshSnapshotMutation.mutate(version);
       }}
+      onRetryPublishSnapshot={(version) => {
+        retryPublishSnapshotMutation.mutate(version);
+      }}
       routeSectionId={input.routeSectionId}
       publishSuccessNavigationKey={input.publishSuccessNavigationKey}
       onPublishSuccessNavigationConsumed={onPublishSuccessNavigationConsumed}
@@ -1046,7 +1086,8 @@ function LoadedSandboxProfileEditorPage(
         publishMutation.isPending ||
         createDraftMutation.isPending ||
         discardDraftMutation.isPending ||
-        refreshSnapshotMutation.isPending
+        refreshSnapshotMutation.isPending ||
+        retryPublishSnapshotMutation.isPending
       }
       invalidateSandboxProfiles={input.invalidateSandboxProfiles}
       invalidateProfileDetail={input.invalidateProfileDetail}
@@ -1080,6 +1121,7 @@ function ReadySandboxProfileEditorPage(input: {
   isDeleteProfileDialogOpen: boolean;
   onPublish: (version: number) => Promise<void>;
   onRefreshSnapshot: (version: number) => void;
+  onRetryPublishSnapshot: (version: number) => void;
   onDiscardChangesAndLeaveDraft: (input: { draftVersion: number }) => void;
   onConfirmDeleteProfile: () => void;
   onDeleteProfileDialogOpenChange: (open: boolean) => void;
@@ -1123,10 +1165,11 @@ function ReadySandboxProfileEditorPage(input: {
   const draftFieldsAreReadOnly =
     input.mode.kind !== "draft" || publishRequestIsPending || saveDraftRequestIsPending;
   const snapshotVersion = resolveLatestPublishedSandboxProfileVersion(input.versions);
-  const snapshotPanelState = resolveSnapshotPanelState(snapshotVersion);
-  const editorSections = createSandboxProfileEditorSections({
-    snapshotState: snapshotPanelState,
-  });
+  const snapshotPanelState = resolveSnapshotPanelState(
+    snapshotVersion,
+    input.profile.activeVersion,
+  );
+  const editorSections = SandboxProfileEditorTabs;
   const setupAssistantIntegrationRows = resolveSandboxProfileSetupScriptIntegrationRows(
     integrationsLoader.initialRows,
     integrationDraftState.integrationRows,
@@ -1425,6 +1468,7 @@ function ReadySandboxProfileEditorPage(input: {
             setShowPublishSuccessMessage(false);
           }}
           onRefreshSnapshot={input.onRefreshSnapshot}
+          onRetryPublishSnapshot={input.onRetryPublishSnapshot}
           onSetupScriptDraftStateChange={setSetupScriptDraftState}
           setupAssistantControl={setupAssistantControl}
           profileId={input.profileId}
@@ -1756,6 +1800,7 @@ function SandboxProfileEditorSectionPanels(input: {
   onIntegrationDraftStateChange: (state: SandboxProfileDraftSectionState) => void;
   onPublishSuccessMessageDismiss: () => void;
   onRefreshSnapshot: (version: number) => void;
+  onRetryPublishSnapshot: (version: number) => void;
   onSetupScriptDraftStateChange: (state: SandboxProfileDraftSectionState) => void;
   setupAssistantControl: SetupScriptAssistantControl;
   profileId: string;
@@ -1774,6 +1819,11 @@ function SandboxProfileEditorSectionPanels(input: {
         onRefreshSnapshot={() => {
           if (input.snapshotVersion !== null) {
             input.onRefreshSnapshot(input.snapshotVersion.version);
+          }
+        }}
+        onRetryPublishSnapshot={() => {
+          if (input.snapshotVersion !== null) {
+            input.onRetryPublishSnapshot(input.snapshotVersion.version);
           }
         }}
         onPublishSuccessMessageDismiss={input.onPublishSuccessMessageDismiss}
@@ -1949,29 +1999,6 @@ const SandboxProfileEditorTabs = [
     label: "Snapshots",
   },
 ] as const satisfies readonly SandboxProfileEditorSection<SandboxProfileEditorSectionId>[];
-
-function createSandboxProfileEditorSections(input: {
-  snapshotState: SnapshotPanelState;
-}): readonly SandboxProfileEditorSection<SandboxProfileEditorSectionId>[] {
-  return SandboxProfileEditorTabs.map((section) =>
-    section.id === SandboxProfileEditorSectionIds.SNAPSHOT
-      ? {
-          ...section,
-          sideLabel: (
-            <span className="inline-flex items-center gap-1.5">
-              <span>Snapshots</span>
-              {shouldShowMissingSnapshotAlert(input.snapshotState) ? (
-                <WarningCircleIcon
-                  aria-hidden="true"
-                  className="size-4 shrink-0 text-destructive"
-                />
-              ) : null}
-            </span>
-          ),
-        }
-      : section,
-  );
-}
 
 const DraftSaveErrorMessage = "Saving draft failed. Please try again later.";
 

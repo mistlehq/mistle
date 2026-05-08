@@ -645,6 +645,43 @@ export async function refreshSandboxProfileVersion(input: {
   }
 }
 
+export async function retrySandboxProfileVersionPublishSnapshot(input: {
+  profileId: string;
+  version: number;
+}): Promise<PublishSandboxProfileVersionResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "retrySandboxProfileVersionPublishSnapshot",
+      method: "POST",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/retry-publish-snapshot`,
+      fallbackMessage: "Could not retry sandbox profile snapshot creation.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = PublishSandboxProfileVersionResultSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "retrySandboxProfileVersionPublishSnapshot",
+        status: 500,
+        body: responseBody,
+        message: "Retry sandbox profile publish snapshot response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "retrySandboxProfileVersionPublishSnapshot",
+        error,
+        fallbackMessage: "Could not retry sandbox profile snapshot creation.",
+      }),
+    );
+  }
+}
+
 export async function putSandboxProfileVersionRefreshSchedule(
   input: PutSandboxProfileVersionRefreshScheduleInput,
 ): Promise<SandboxProfileVersionRefreshSchedule> {

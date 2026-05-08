@@ -92,6 +92,8 @@ type SandboxProfileEditorTestVersionState =
   | "published-manual-refresh-no-snapshot"
   | "published-no-snapshot"
   | "published-pending"
+  | "published-manual-refresh-failed-no-snapshot"
+  | "published-failed-with-older-active"
   | "published-failed";
 
 type SandboxProfileEditorTestRouteView = "published" | "draft" | "default";
@@ -117,6 +119,21 @@ function createFailedSnapshotJobFixture(): NonNullable<SandboxProfileVersion["la
   return {
     id: "ssj_failed_initial_materialization",
     trigger: "publish",
+    state: "failed",
+    errorCode: "snapshot_materialization_failed",
+    errorMessage: "Snapshot materialization failed.",
+    createdAt: "2026-04-23T00:01:00.000Z",
+    startedAt: "2026-04-23T00:01:05.000Z",
+    finishedAt: "2026-04-23T00:01:30.000Z",
+  };
+}
+
+function createFailedManualSnapshotJobFixture(): NonNullable<
+  SandboxProfileVersion["latestSnapshotJob"]
+> {
+  return {
+    id: "ssj_failed_manual_materialization",
+    trigger: "manual_refresh",
     state: "failed",
     errorCode: "snapshot_materialization_failed",
     errorMessage: "Snapshot materialization failed.",
@@ -201,6 +218,19 @@ function createSandboxProfileVersionsForTest(input: {
           }),
         }),
       ];
+    case "published-failed-with-older-active":
+      return [
+        createVersion({
+          version: input.version - 1,
+          state: "published",
+          isActive: true,
+        }),
+        createVersion({
+          state: "published",
+          usable: false,
+          latestSnapshotJob: createFailedSnapshotJobFixture(),
+        }),
+      ];
     case "published-manual-refresh-no-snapshot":
       return [
         createVersion({
@@ -238,6 +268,14 @@ function createSandboxProfileVersionsForTest(input: {
           latestSnapshotJob: createFailedSnapshotJobFixture(),
         }),
       ];
+    case "published-manual-refresh-failed-no-snapshot":
+      return [
+        createVersion({
+          state: "published",
+          usable: false,
+          latestSnapshotJob: createFailedManualSnapshotJobFixture(),
+        }),
+      ];
     case "published":
       return [
         createVersion({
@@ -266,9 +304,11 @@ function resolveSandboxProfileEditorTestRouteView(input: {
     case "published":
     case "published-with-draft":
     case "published-pending-with-older-active":
+    case "published-failed-with-older-active":
     case "published-manual-refresh-no-snapshot":
     case "published-no-snapshot":
     case "published-pending":
+    case "published-manual-refresh-failed-no-snapshot":
     case "published-failed":
       return "published";
     case "draft":
@@ -323,7 +363,8 @@ function renderSandboxProfileEditor(input?: {
   const activeVersion =
     input?.versionState === "published" || input?.versionState === "published-with-draft"
       ? version
-      : input?.versionState === "published-pending-with-older-active"
+      : input?.versionState === "published-pending-with-older-active" ||
+          input?.versionState === "published-failed-with-older-active"
         ? version - 1
         : input?.versionState === "draft-with-published"
           ? version - 1
@@ -831,9 +872,28 @@ describe("SandboxProfileEditorPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Snapshots" }));
 
     expect(screen.getByText("Creating snapshot")).toBeDefined();
+    expect(screen.getByText("Sandbox Profile v3's snapshot is being created")).toBeDefined();
+    expect(
+      screen.getByText(
+        "New sessions and automations will be available after snapshot creation succeeds.",
+      ),
+    ).toBeDefined();
     const status = screen.getByRole("status", { name: "Creating snapshot" });
     expect(status.className).toContain("sm:justify-end");
     expect(status.querySelector(".text-right")?.textContent).toContain("Creating snapshot");
+  });
+
+  it("shows the interim runnable snapshot while a newer published snapshot is being created", () => {
+    renderSandboxProfileEditor({
+      versionState: "published-pending-with-older-active",
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Snapshots" }));
+
+    expect(screen.getByText("Sandbox Profile v3's snapshot is being created")).toBeDefined();
+    expect(
+      screen.getByText("Interim, v2's snapshot will be used for new sessions and automations."),
+    ).toBeDefined();
   });
 
   it("shows creating while the first snapshot is materializing from a manual job", () => {
@@ -847,30 +907,66 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.queryByText("Refreshing")).toBeNull();
   });
 
-  it("shows snapshot failure feedback when initial materialization fails", () => {
+  it("shows publish snapshot recovery details when initial materialization fails", () => {
     renderSandboxProfileEditor({
-      versionState: "published-failed",
+      versionState: "published-failed-with-older-active",
     });
 
     fireEvent.click(screen.getByRole("tab", { name: "Snapshots" }));
 
-    expect(screen.getByText("Snapshot failed")).toBeDefined();
-    expect(screen.getByText("Snapshot materialization failed.")).toBeDefined();
+    expect(screen.getByText("Snapshot creation failed")).toBeDefined();
+    expect(
+      screen.getByText(
+        "Version v3 was published, but its snapshot could not be created. New sessions and automations will continue using v2 until the snapshot is retried successfully.",
+      ),
+    ).toBeDefined();
+    expect(screen.queryByText("Snapshot materialization failed.")).toBeNull();
+    expect(screen.getByText("Sandbox Profile v3's snapshot is unavailable")).toBeDefined();
+    expect(
+      screen.getByText("v2's snapshot will be used for new sessions and automations."),
+    ).toBeDefined();
+    expect(screen.getByRole("button", { name: "Retry snapshot creation" })).toBeDefined();
   });
 
-  it("asks users to create a snapshot when a published version has no snapshot", () => {
+  it("asks users to retry snapshot creation when a published version has no snapshot", () => {
     renderSandboxProfileEditor({
       versionState: "published-no-snapshot",
     });
 
     fireEvent.click(screen.getByRole("tab", { name: "Snapshots" }));
 
+    expect(screen.getByText("Sandbox Profile v3's snapshot is unavailable")).toBeDefined();
     expect(
-      screen.getByText("Create a snapshot to start sessions from this profile."),
+      screen.getByText("Sessions and automations are blocked until snapshot creation succeeds."),
     ).toBeDefined();
-    expect(screen.getByText("Latest snapshot")).toBeDefined();
-    expect(screen.getByText("N/A")).toBeDefined();
-    expect(screen.getByRole("button", { name: "Create snapshot" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Retry snapshot creation" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Create snapshot" })).toBeNull();
+  });
+
+  it("keeps retry available when the latest failed job is a manual refresh and the version has no snapshot", () => {
+    renderSandboxProfileEditor({
+      versionState: "published-manual-refresh-failed-no-snapshot",
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Snapshots" }));
+
+    expect(screen.getByText("Sandbox Profile v3's snapshot is unavailable")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Retry snapshot creation" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Create snapshot" })).toBeNull();
+  });
+
+  it("shows ready snapshots as the version used for new sessions and automations", () => {
+    renderSandboxProfileEditor({
+      routeSection: "snapshot",
+      versionState: "published",
+    });
+
+    expect(screen.getByText("Sandbox Profile v3's snapshot is ready")).toBeDefined();
+    expect(
+      screen.queryByText("This snapshot will be used for new sessions and automations."),
+    ).toBeNull();
+    expect(screen.getByText("Latest snapshot: N/A")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Refresh snapshot" })).toBeDefined();
   });
 
   it("shows automatic snapshot refresh as disabled when it is not configured", () => {

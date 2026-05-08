@@ -18231,6 +18231,343 @@
         }
       }
     },
+    "/v1/sandbox/profiles/{profileId}/versions/{version}/retry-publish-snapshot": {
+      "post": {
+        "tags": ["Sandbox Profiles"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^sbp_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "profileId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "required": true,
+            "name": "version",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Queue publish snapshot materialization for a published sandbox profile version without a usable snapshot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "object",
+                      "properties": {
+                        "sandboxProfileId": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": ["draft", "published"]
+                        },
+                        "defaultPersistenceMode": {
+                          "type": "string",
+                          "enum": ["ephemeral", "persistent"]
+                        },
+                        "isActive": {
+                          "type": "boolean"
+                        },
+                        "usable": {
+                          "type": "boolean"
+                        },
+                        "refreshSchedule": {
+                          "type": ["object", "null"],
+                          "properties": {
+                            "scheduleId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "cronExpression": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "timezone": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "nextScheduledAt": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "scheduleId",
+                            "name",
+                            "cronExpression",
+                            "timezone",
+                            "enabled",
+                            "nextScheduledAt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "latestSnapshotJob": {
+                          "type": ["object", "null"],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "trigger": {
+                              "type": "string",
+                              "enum": ["publish", "manual_refresh", "scheduled_refresh"]
+                            },
+                            "state": {
+                              "type": "string",
+                              "enum": ["queued", "running", "succeeded", "failed"]
+                            },
+                            "errorCode": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            },
+                            "errorMessage": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "startedAt": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            },
+                            "finishedAt": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "trigger",
+                            "state",
+                            "errorCode",
+                            "errorMessage",
+                            "createdAt",
+                            "startedAt",
+                            "finishedAt"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "sandboxProfileId",
+                        "version",
+                        "state",
+                        "defaultPersistenceMode",
+                        "isActive",
+                        "usable",
+                        "refreshSchedule",
+                        "latestSnapshotJob"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "activeVersion": {
+                      "type": ["integer", "null"],
+                      "minimum": 1
+                    },
+                    "snapshotJob": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "trigger": {
+                          "type": "string",
+                          "enum": ["publish", "manual_refresh", "scheduled_refresh"]
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": ["queued", "running", "succeeded", "failed"]
+                        },
+                        "errorCode": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "errorMessage": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "startedAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "finishedAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "trigger",
+                        "state",
+                        "errorCode",
+                        "errorMessage",
+                        "createdAt",
+                        "startedAt",
+                        "finishedAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["version", "activeVersion", "snapshotJob"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sandbox profile or version was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROFILE_NOT_FOUND", "PROFILE_VERSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Sandbox profile publish snapshot cannot be retried.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROFILE_VERSION_NOT_USABLE", "PROFILE_VERSION_SNAPSHOT_IN_PROGRESS"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/sandbox/profiles/{profileId}/versions/{version}/setup-script/test-runs": {
       "post": {
         "tags": ["Sandbox Profiles"],

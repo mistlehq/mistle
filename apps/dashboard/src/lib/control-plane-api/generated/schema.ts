@@ -9498,6 +9498,162 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/sandbox/profiles/{profileId}/versions/{version}/retry-publish-snapshot": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          profileId: string;
+          version: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Queue publish snapshot materialization for a published sandbox profile version without a usable snapshot. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              activeVersion: number | null;
+              snapshotJob: {
+                createdAt: string;
+                errorCode: string | null;
+                errorMessage: string | null;
+                finishedAt: string | null;
+                id: string;
+                startedAt: string | null;
+                /** @enum {string} */
+                state: "queued" | "running" | "succeeded" | "failed";
+                /** @enum {string} */
+                trigger: "publish" | "manual_refresh" | "scheduled_refresh";
+              };
+              version: {
+                /** @enum {string} */
+                defaultPersistenceMode: "ephemeral" | "persistent";
+                isActive: boolean;
+                latestSnapshotJob: {
+                  createdAt: string;
+                  errorCode: string | null;
+                  errorMessage: string | null;
+                  finishedAt: string | null;
+                  id: string;
+                  startedAt: string | null;
+                  /** @enum {string} */
+                  state: "queued" | "running" | "succeeded" | "failed";
+                  /** @enum {string} */
+                  trigger: "publish" | "manual_refresh" | "scheduled_refresh";
+                } | null;
+                refreshSchedule: {
+                  cronExpression: string;
+                  enabled: boolean;
+                  name: string;
+                  nextScheduledAt: string | null;
+                  scheduleId: string;
+                  timezone: string;
+                } | null;
+                sandboxProfileId: string;
+                /** @enum {string} */
+                state: "draft" | "published";
+                usable: boolean;
+                version: number;
+              };
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile or version was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_NOT_FOUND" | "PROFILE_VERSION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile publish snapshot cannot be retried. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_VERSION_NOT_USABLE" | "PROFILE_VERSION_SNAPSHOT_IN_PROGRESS";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/sandbox/profiles/{profileId}/versions/{version}/setup-script": {
     parameters: {
       query?: never;

@@ -11,13 +11,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@mistle/ui";
-import {
-  PlayIcon,
-  SidebarSimpleIcon,
-  SpinnerGapIcon,
-  TerminalIcon,
-  WarningCircleIcon,
-} from "@phosphor-icons/react";
+import { PlayIcon, SidebarSimpleIcon, SpinnerGapIcon, TerminalIcon } from "@phosphor-icons/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } from "react-router";
@@ -62,7 +56,6 @@ import {
 import {
   SandboxProfileSnapshotPanelView,
   SandboxProfileSnapshotRefreshScheduleForm,
-  shouldShowMissingSnapshotAlert,
   type SnapshotPanelState,
   type SnapshotRefreshSchedule,
 } from "./sandbox-profile-snapshot-panel.js";
@@ -94,7 +87,8 @@ export type SandboxProfileEditorPageStoryArgs = {
   publishSuccessMessage?: boolean;
   snapshotState?:
     | "draft-unavailable"
-    | "no-snapshot"
+    | "snapshot-unavailable-no-previous"
+    | "creating-first-snapshot"
     | "creating-snapshot"
     | "snapshot-ready"
     | "snapshot-failed"
@@ -135,29 +129,6 @@ const StorySections = [
     label: "Snapshots",
   },
 ] as const satisfies readonly SandboxProfileEditorSection<StorySectionId>[];
-
-function createStorySections(input: {
-  showMissingSnapshotAlert: boolean;
-}): readonly SandboxProfileEditorSection<StorySectionId>[] {
-  return StorySections.map((section) =>
-    section.id === "snapshot"
-      ? {
-          ...section,
-          sideLabel: (
-            <span className="inline-flex items-center gap-1.5">
-              <span>Snapshots</span>
-              {input.showMissingSnapshotAlert ? (
-                <WarningCircleIcon
-                  aria-hidden="true"
-                  className="size-4 shrink-0 text-destructive"
-                />
-              ) : null}
-            </span>
-          ),
-        }
-      : section,
-  );
-}
 
 export const StoryBindings = [
   {
@@ -263,22 +234,35 @@ function createSnapshotPanelState(status: SnapshotStoryStatus): SnapshotPanelSta
     };
   }
 
-  if (status === "no-snapshot") {
+  if (status === "snapshot-unavailable-no-previous") {
     return {
-      kind: "no-snapshot",
+      kind: "publish-snapshot-error",
+      publishedVersion: 1,
+      runnableVersion: null,
     };
   }
 
   if (status === "creating-snapshot") {
     return {
       kind: "creating",
+      publishedVersion: 4,
+      runnableVersion: 3,
+    };
+  }
+
+  if (status === "creating-first-snapshot") {
+    return {
+      kind: "creating",
+      publishedVersion: 1,
+      runnableVersion: null,
     };
   }
 
   if (status === "snapshot-failed") {
     return {
-      kind: "snapshot-error",
-      message: "Snapshot materialization failed.",
+      kind: "publish-snapshot-error",
+      publishedVersion: 4,
+      runnableVersion: 3,
     };
   }
 
@@ -596,9 +580,6 @@ function SandboxProfileEditorPageStoryView(
   const snapshotRefreshScheduleInitialDraft = createSnapshotRefreshScheduleInitialDraft(
     snapshotRefreshScheduleState,
   );
-  const storySections = createStorySections({
-    showMissingSnapshotAlert: shouldShowMissingSnapshotAlert(snapshotPanelState),
-  });
   const setupScriptTestStatus =
     input.setupScriptTestStatus ?? (setupScriptDraft.trim().length === 0 ? "blank" : "idle");
   function handleToggleSetupAssistant(): void {
@@ -731,6 +712,7 @@ function SandboxProfileEditorPageStoryView(
               isActionPending={false}
               onPublishSuccessMessageDismiss={() => {}}
               onRefreshSnapshot={() => {}}
+              onRetryPublishSnapshot={() => {}}
               publishSuccessMessage={input.publishSuccessMessage === true}
               publishSuccessMessageKey={input.publishSuccessMessage === true ? "visible" : "idle"}
               refreshScheduleSection={
@@ -753,14 +735,17 @@ function SandboxProfileEditorPageStoryView(
                 )
               }
               state={snapshotPanelState}
-              version={snapshotStatus === "draft-unavailable" ? null : 1}
+              version={resolveSnapshotStoryVersion({
+                snapshotPanelState,
+                snapshotStatus,
+              })}
             />
           );
         }
 
         throw new Error("Unhandled story section.");
       }}
-      sections={storySections}
+      sections={StorySections}
     />
   );
 
@@ -793,6 +778,24 @@ function SandboxProfileEditorPageStoryView(
       )}
     </QueryClientProvider>
   );
+}
+
+function resolveSnapshotStoryVersion(input: {
+  snapshotPanelState: SnapshotPanelState;
+  snapshotStatus: SnapshotStoryStatus;
+}): number | null {
+  if (input.snapshotStatus === "draft-unavailable") {
+    return null;
+  }
+
+  if (
+    input.snapshotPanelState.kind === "creating" ||
+    input.snapshotPanelState.kind === "publish-snapshot-error"
+  ) {
+    return input.snapshotPanelState.publishedVersion;
+  }
+
+  return 1;
 }
 
 export function SandboxProfileEditorPageStory(

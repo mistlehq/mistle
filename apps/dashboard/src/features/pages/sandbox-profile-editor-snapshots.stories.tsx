@@ -28,15 +28,23 @@ export const UnavailableNoPublishedVersion: Story = {
   },
 };
 
-export const NoSnapshot: Story = {
+export const SnapshotUnavailableNoPreviousSnapshot: Story = {
   args: {
     initialSectionId: "snapshot",
     lifecycleState: "published",
-    snapshotState: "no-snapshot",
+    snapshotState: "snapshot-unavailable-no-previous",
   },
 };
 
-export const Creating: Story = {
+export const CreatingFirstSnapshot: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotState: "creating-first-snapshot",
+  },
+};
+
+export const CreatingWithPreviousSnapshot: Story = {
   args: {
     initialSectionId: "snapshot",
     lifecycleState: "published",
@@ -97,7 +105,7 @@ export const RefreshScheduleSaveFailure: Story = {
   },
 };
 
-export const SnapshotFailed: Story = {
+export const PublishSnapshotFailed: Story = {
   args: {
     initialSectionId: "snapshot",
     lifecycleState: "published",

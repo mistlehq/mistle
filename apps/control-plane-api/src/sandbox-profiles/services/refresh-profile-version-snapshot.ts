@@ -29,6 +29,16 @@ type RefreshProfileVersionSnapshotInput = {
   profileVersion: number;
 };
 
+type SnapshotRefreshIntent =
+  | {
+      trigger: typeof SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH;
+      requireMissingSnapshot: false;
+    }
+  | {
+      trigger: typeof SandboxProfileVersionSnapshotJobTriggers.PUBLISH;
+      requireMissingSnapshot: true;
+    };
+
 type RefreshProfileVersionSnapshotOutput = {
   version: {
     sandboxProfileId: string;
@@ -71,6 +81,55 @@ export async function refreshProfileVersionSnapshot(
     defaultBaseImage: string;
   },
   input: RefreshProfileVersionSnapshotInput,
+): Promise<RefreshProfileVersionSnapshotOutput> {
+  return await queueProfileVersionSnapshot(
+    {
+      db,
+      dataPlaneClient,
+      defaultBaseImage,
+    },
+    input,
+    {
+      trigger: SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH,
+      requireMissingSnapshot: false,
+    },
+  );
+}
+
+export async function retryPublishProfileVersionSnapshot(
+  {
+    db,
+    dataPlaneClient,
+    defaultBaseImage,
+  }: Pick<CreateSandboxProfilesServiceInput, "db" | "dataPlaneClient"> & {
+    defaultBaseImage: string;
+  },
+  input: RefreshProfileVersionSnapshotInput,
+): Promise<RefreshProfileVersionSnapshotOutput> {
+  return await queueProfileVersionSnapshot(
+    {
+      db,
+      dataPlaneClient,
+      defaultBaseImage,
+    },
+    input,
+    {
+      trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+      requireMissingSnapshot: true,
+    },
+  );
+}
+
+async function queueProfileVersionSnapshot(
+  {
+    db,
+    dataPlaneClient,
+    defaultBaseImage,
+  }: Pick<CreateSandboxProfilesServiceInput, "db" | "dataPlaneClient"> & {
+    defaultBaseImage: string;
+  },
+  input: RefreshProfileVersionSnapshotInput,
+  intent: SnapshotRefreshIntent,
 ): Promise<RefreshProfileVersionSnapshotOutput> {
   const sandboxInstanceId = typeid("sbi").toString();
 
@@ -135,6 +194,24 @@ export async function refreshProfileVersionSnapshot(
         );
       }
 
+      const versionHasUsableSnapshot =
+        sandboxProfileVersion.snapshotImageProvider !== null &&
+        sandboxProfileVersion.snapshotImageId !== null;
+
+      if (intent.requireMissingSnapshot) {
+        if (versionHasUsableSnapshot) {
+          throw new SandboxProfilesConflictError(
+            SandboxProfilesConflictCodes.PROFILE_VERSION_NOT_USABLE,
+            `Sandbox profile version '${String(input.profileVersion)}' already has a usable snapshot.`,
+          );
+        }
+      } else if (!versionHasUsableSnapshot) {
+        throw new SandboxProfilesConflictError(
+          SandboxProfilesConflictCodes.PROFILE_VERSION_NOT_USABLE,
+          `Sandbox profile version '${String(input.profileVersion)}' does not have a usable snapshot. Retry snapshot creation from the publish recovery action.`,
+        );
+      }
+
       const refreshSchedulesByVersion = await loadActiveRefreshSchedulesByVersion({
         db: tx,
         profileId: input.profileId,
@@ -144,7 +221,7 @@ export async function refreshProfileVersionSnapshot(
         .values({
           sandboxProfileId: input.profileId,
           sandboxProfileVersion: input.profileVersion,
-          trigger: SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH,
+          trigger: intent.trigger,
           state: SandboxProfileVersionSnapshotJobStates.QUEUED,
         })
         .returning({
@@ -171,9 +248,7 @@ export async function refreshProfileVersionSnapshot(
           state: sandboxProfileVersion.state,
           defaultPersistenceMode: resolvedDefaultPersistenceMode,
           isActive: sandboxProfileVersion.activeVersion === input.profileVersion,
-          usable:
-            sandboxProfileVersion.snapshotImageProvider !== null &&
-            sandboxProfileVersion.snapshotImageId !== null,
+          usable: versionHasUsableSnapshot,
           refreshSchedule: refreshSchedulesByVersion.get(resolvedSandboxProfileVersion) ?? null,
           latestSnapshotJob: snapshotJob,
         },
