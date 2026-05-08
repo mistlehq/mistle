@@ -104,11 +104,11 @@ export function SandboxProfileEditorSections<TSectionId extends string>(input: {
           </div>
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-4 bg-muted/30">
           {input.sections.map((section) => (
             <div
               aria-labelledby={`sandbox-profile-editor-tab-${section.id}`}
-              className="flex-1 bg-muted/30 px-4 py-6"
+              className="flex-1 px-4 py-6"
               hidden={section.id !== activeSection.id}
               id={`sandbox-profile-editor-panel-${section.id}`}
               key={section.id}

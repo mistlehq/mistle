@@ -812,10 +812,18 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByRole("tab", { name: "Snapshots" })).toBeDefined();
     expect(screen.getByLabelText("Profile sections").className).toContain("max-w-5xl");
     expect(screen.getByLabelText("Profile sections").parentElement?.className).toContain("px-4");
-    expect(screen.getByRole("tabpanel", { name: "Sandbox Profile" }).className).toContain(
-      "bg-muted/30",
-    );
-    expect(screen.getByRole("tabpanel", { name: "Sandbox Profile" }).className).toContain("flex-1");
+    const sandboxProfileTabPanel = screen.getByRole("tabpanel", { name: "Sandbox Profile" });
+    const tabPanelRegion = sandboxProfileTabPanel.parentElement;
+    expect(tabPanelRegion?.className).toContain("bg-muted/30");
+    expect(sandboxProfileTabPanel.className).not.toContain("bg-muted/30");
+    expect(sandboxProfileTabPanel.className).toContain("flex-1");
+    const snapshotsPanelId = screen
+      .getByRole("tab", { name: "Snapshots" })
+      .getAttribute("aria-controls");
+    if (snapshotsPanelId === null) {
+      throw new Error("Expected the Snapshots tab to control a tabpanel.");
+    }
+    expect(document.getElementById(snapshotsPanelId)?.parentElement).toBe(tabPanelRegion);
     expect(screen.queryByRole("heading", { name: "Integrations" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Resources & Tools" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Configurations" })).toBeNull();
