@@ -78,8 +78,7 @@ describe("AutomationsPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(markup).not.toContain(">Previous<");
-    expect(markup).not.toContain(">Next<");
+    expect(markup).not.toContain('aria-label="pagination"');
   });
 
   it("uses the expected page header and table styling", () => {
@@ -254,7 +253,7 @@ describe("AutomationsPage", () => {
     );
 
     expect(markup).not.toContain("Showing 1 of 1");
-    expect(markup).toContain(">Next<");
+    expect(markup).toContain('aria-label="pagination"');
   });
 
   it("updates the result summary when the list is filtered client-side", async () => {

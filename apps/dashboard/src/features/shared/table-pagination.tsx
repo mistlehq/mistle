@@ -9,6 +9,37 @@ import {
 const DisabledPaginationLinkClassName =
   "aria-disabled:pointer-events-none aria-disabled:opacity-50";
 
+type TablePaginationLinkProps = {
+  direction: "next" | "previous";
+  disabled: boolean;
+  onClick: () => void;
+};
+
+function TablePaginationLink(input: TablePaginationLinkProps): React.JSX.Element {
+  function handleClick(event: React.MouseEvent<HTMLAnchorElement>): void {
+    event.preventDefault();
+    if (input.disabled) {
+      return;
+    }
+
+    input.onClick();
+  }
+
+  const PaginationControl = input.direction === "previous" ? PaginationPrevious : PaginationNext;
+
+  return (
+    <PaginationItem>
+      <PaginationControl
+        aria-disabled={input.disabled}
+        className={DisabledPaginationLinkClassName}
+        href="#"
+        onClick={handleClick}
+        tabIndex={input.disabled ? -1 : undefined}
+      />
+    </PaginationItem>
+  );
+}
+
 export function TablePagination(input: {
   hasPreviousPage: boolean;
   hasNextPage: boolean;
@@ -25,45 +56,19 @@ export function TablePagination(input: {
   const isPreviousDisabled = !input.hasPreviousPage || input.previousPageDisabled === true;
   const isNextDisabled = !input.hasNextPage || input.nextPageDisabled === true;
 
-  function handlePreviousPageClick(event: React.MouseEvent<HTMLAnchorElement>): void {
-    event.preventDefault();
-    if (isPreviousDisabled) {
-      return;
-    }
-
-    input.onPreviousPage();
-  }
-
-  function handleNextPageClick(event: React.MouseEvent<HTMLAnchorElement>): void {
-    event.preventDefault();
-    if (isNextDisabled) {
-      return;
-    }
-
-    input.onNextPage();
-  }
-
   return (
     <Pagination className="mx-0 w-auto justify-end">
       <PaginationContent>
-        <PaginationItem>
-          <PaginationPrevious
-            aria-disabled={isPreviousDisabled}
-            className={DisabledPaginationLinkClassName}
-            href="#"
-            onClick={handlePreviousPageClick}
-            tabIndex={isPreviousDisabled ? -1 : undefined}
-          />
-        </PaginationItem>
-        <PaginationItem>
-          <PaginationNext
-            aria-disabled={isNextDisabled}
-            className={DisabledPaginationLinkClassName}
-            href="#"
-            onClick={handleNextPageClick}
-            tabIndex={isNextDisabled ? -1 : undefined}
-          />
-        </PaginationItem>
+        <TablePaginationLink
+          direction="previous"
+          disabled={isPreviousDisabled}
+          onClick={input.onPreviousPage}
+        />
+        <TablePaginationLink
+          direction="next"
+          disabled={isNextDisabled}
+          onClick={input.onNextPage}
+        />
       </PaginationContent>
     </Pagination>
   );
