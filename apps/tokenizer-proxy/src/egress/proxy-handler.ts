@@ -1127,6 +1127,59 @@ function truncateForDebug(value: string, maxLength: number): string {
   return value.length <= maxLength ? value : `${value.slice(0, maxLength)}...`;
 }
 
+function createUrlLogFields(input: { fieldPrefix: string; url: URL }): Record<string, string> {
+  const searchKeys = [...input.url.searchParams.keys()].sort().join(",");
+  return {
+    [`${input.fieldPrefix}Protocol`]: input.url.protocol,
+    [`${input.fieldPrefix}Host`]: input.url.host,
+    [`${input.fieldPrefix}Path`]: input.url.pathname,
+    ...(searchKeys.length === 0 ? {} : { [`${input.fieldPrefix}SearchKeys`]: searchKeys }),
+  };
+}
+
+function createEgressRequestDiagnosticLogFields(input: {
+  egressGrant: AuthorizedEgressGrant;
+  outgoingRequest: ProxyMutableRequest;
+  primaryResolver: CredentialResolverInput;
+  proxyTraceId: string;
+  requestPath: string;
+  targetPath: string;
+  testEnvironmentId?: string;
+}): Record<string, string> {
+  return {
+    proxyTraceId: input.proxyTraceId,
+    sandboxInstanceId: input.egressGrant.sub,
+    egressRuleId: input.egressGrant.egressRuleId,
+    bindingId: input.egressGrant.bindingId,
+    familyId: input.egressGrant.familyId,
+    variantId: input.egressGrant.variantId,
+    requestPath: input.requestPath,
+    targetPath: input.targetPath,
+    httpMethod: input.outgoingRequest.method,
+    authInjectionType: input.egressGrant.authInjectionType,
+    credentialResolverKind: input.primaryResolver.credentialResolverKind,
+    ...(input.testEnvironmentId === undefined
+      ? {}
+      : { testEnvironmentId: input.testEnvironmentId }),
+    ...createResolverLogFields({
+      resolver: input.primaryResolver,
+    }),
+    ...createUrlLogFields({
+      fieldPrefix: "upstream",
+      url: input.outgoingRequest.url,
+    }),
+  };
+}
+
+function isGitSmartHttpEgressRequest(input: { targetPath: string; upstreamUrl: URL }): boolean {
+  return (
+    input.targetPath.includes(".git/") ||
+    input.targetPath.endsWith(".git") ||
+    input.upstreamUrl.pathname.includes(".git/") ||
+    input.upstreamUrl.pathname.endsWith(".git")
+  );
+}
+
 function createSessionLinkUrl(input: {
   controlPlanePublicBaseUrl: string;
   sandboxInstanceId: string;
@@ -1738,6 +1791,26 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
           });
         }
 
+        if (
+          isGitSmartHttpEgressRequest({
+            targetPath,
+            upstreamUrl: outgoingRequest.url,
+          })
+        ) {
+          logger.info(
+            createEgressRequestDiagnosticLogFields({
+              egressGrant,
+              outgoingRequest,
+              primaryResolver,
+              proxyTraceId: traceId,
+              requestPath: ctx.req.path,
+              targetPath,
+              ...(testEnvironmentId === undefined ? {} : { testEnvironmentId }),
+            }),
+            "Forwarding Git smart HTTP egress request to upstream",
+          );
+        }
+
         let upstreamResponse: Response;
         try {
           upstreamResponse = await EgressTracer.startActiveSpan(
@@ -1783,9 +1856,15 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
           logger.error(
             {
               err: error,
-              proxyTraceId: traceId,
-              egressRuleId: egressGrant.egressRuleId,
-              upstreamBaseUrl: outgoingRequest.url.toString(),
+              ...createEgressRequestDiagnosticLogFields({
+                egressGrant,
+                outgoingRequest,
+                primaryResolver,
+                proxyTraceId: traceId,
+                requestPath: ctx.req.path,
+                targetPath,
+                ...(testEnvironmentId === undefined ? {} : { testEnvironmentId }),
+              }),
               ...createErrorTelemetryFields(error),
             },
             "Failed to forward egress request to upstream",
@@ -1840,16 +1919,18 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
           logger.warn(
             {
               statusCode: upstreamResponse.status,
-              proxyTraceId: traceId,
-              upstreamUrl: outgoingRequest.url.toString(),
+              ...createEgressRequestDiagnosticLogFields({
+                egressGrant,
+                outgoingRequest,
+                primaryResolver,
+                proxyTraceId: traceId,
+                requestPath: ctx.req.path,
+                targetPath,
+                ...(testEnvironmentId === undefined ? {} : { testEnvironmentId }),
+              }),
               outgoingHeaders: extractDebugHeaders(outgoingRequest.headers),
               outgoingBody: outgoingBodyText,
               upstreamResponseBody,
-              egressRuleId: egressGrant.egressRuleId,
-              bindingId: egressGrant.bindingId,
-              ...createResolverLogFields({
-                resolver: primaryResolver,
-              }),
               ...(egressGrant.authInjectionType !== "aws_sigv4"
                 ? {}
                 : {

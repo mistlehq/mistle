@@ -41,6 +41,7 @@ const LOOPBACK_DIRECT_MARKER = "MISTLE_TRANSPARENT_LOOPBACK_DIRECT_OK";
 const COMMAND_CONTROL_MARKER = "MISTLE_TRANSPARENT_COMMAND_CONTROL_OK";
 const TRANSPARENT_COUNTER_MARKER = "MISTLE_TRANSPARENT_COUNTER_OBSERVED";
 const TRANSPARENT_DIRECT_TLS_CLIENT_MARKER = "MISTLE_TRANSPARENT_DIRECT_TLS_CLIENT_OK";
+const TRANSPARENT_COUNTER_COMMENT = "mistle-transparent-smoke-counter";
 const HTTPS_TRANSPARENT_SMOKE_URL = "https://example.com/";
 const HTTPS_TRANSPARENT_SMOKE_HOST = "example.com";
 
@@ -222,6 +223,7 @@ function transparentDirectTlsClientInterceptionScript(): string {
 function transparentPacketRuleAssertionScript(): string {
   return [
     "set -euo pipefail",
+    transparentCounterDiagnosticsFunctionScript(),
     "unset HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY http_proxy https_proxy all_proxy no_proxy",
     `nft list table ip ${TRANSPARENT_PROXY_TABLE_NAME} > /tmp/mistle-transparent-egress-rules.txt`,
     `grep -q 'table ip ${TRANSPARENT_PROXY_TABLE_NAME}' /tmp/mistle-transparent-egress-rules.txt`,
@@ -231,16 +233,62 @@ function transparentPacketRuleAssertionScript(): string {
     `ss -ltn | grep -q ':${TRANSPARENT_PROXY_PORT} '`,
     "redirect_handle=$(nft -a list chain ip mistle_transparent_egress output | awk '/redirect to :38514/ { print $NF; exit }')",
     'if [ -z "${redirect_handle}" ]; then printf "failed to find transparent redirect rule handle\\n" >&2; nft -a list chain ip mistle_transparent_egress output >&2; exit 1; fi',
-    'nft insert rule ip mistle_transparent_egress output position "${redirect_handle}" tcp dport 1-65535 counter comment "mistle-transparent-smoke-counter"',
+    [
+      "nft insert rule ip",
+      TRANSPARENT_PROXY_TABLE_NAME,
+      'output position "${redirect_handle}" tcp dport 1-65535 counter comment',
+      shellQuote(TRANSPARENT_COUNTER_COMMENT),
+    ].join(" "),
+    "nft -a list chain ip mistle_transparent_egress output > /tmp/mistle-transparent-egress-output-chain-with-counter.txt",
+    `grep -q ${shellQuote(TRANSPARENT_COUNTER_COMMENT)} /tmp/mistle-transparent-egress-output-chain-with-counter.txt`,
   ].join("\n");
 }
 
 function transparentCounterAssertionScript(): string {
   return [
-    "counter_packets=$(nft -a list chain ip mistle_transparent_egress output | awk '/mistle-transparent-smoke-counter/ { for (i = 1; i <= NF; i += 1) if ($i == \"packets\") { print $(i + 1); exit } }')",
-    'if [ -z "${counter_packets}" ]; then printf "failed to read transparent smoke counter\\n" >&2; nft -a list chain ip mistle_transparent_egress output >&2; exit 1; fi',
-    'if [ "${counter_packets}" -le 0 ]; then printf "transparent smoke counter did not observe redirected traffic\\n" >&2; nft -a list chain ip mistle_transparent_egress output >&2; exit 1; fi',
+    "read_transparent_counter_packets() {",
+    `  nft -a list chain ip ${TRANSPARENT_PROXY_TABLE_NAME} output | awk '/${TRANSPARENT_COUNTER_COMMENT}/ { for (i = 1; i <= NF; i += 1) if ($i == "packets") { print $(i + 1); exit } }'`,
+    "}",
+    "counter_packets=",
+    "for counter_attempt in 1 2 3 4 5 6 7 8 9 10; do",
+    "  counter_packets=$(read_transparent_counter_packets)",
+    '  if [ -n "${counter_packets}" ] && [ "${counter_packets}" -gt 0 ]; then',
+    "    break",
+    "  fi",
+    "  sleep 0.25",
+    "done",
+    'if [ -z "${counter_packets}" ]; then',
+    '  printf "failed to read transparent smoke counter; nft output did not contain a packets field for the smoke counter\\n" >&2',
+    "  dumpTransparentCounterDiagnostics >&2",
+    "  exit 1",
+    "fi",
+    'if [ "${counter_packets}" -le 0 ]; then',
+    '  printf "transparent smoke counter did not observe redirected traffic; packets=%s\\n" "${counter_packets}" >&2',
+    "  dumpTransparentCounterDiagnostics >&2",
+    "  exit 1",
+    "fi",
     `printf '%s\\n' ${shellQuote(TRANSPARENT_COUNTER_MARKER)}`,
+  ].join("\n");
+}
+
+function transparentCounterDiagnosticsFunctionScript(): string {
+  return [
+    "dumpTransparentCounterDiagnostics() {",
+    "  printf '%s\\n' '--- transparent egress nft table ---'",
+    `  nft -a list table ip ${TRANSPARENT_PROXY_TABLE_NAME} || true`,
+    "  printf '%s\\n' '--- transparent egress output chain ---'",
+    `  nft -a list chain ip ${TRANSPARENT_PROXY_TABLE_NAME} output || true`,
+    "  printf '%s\\n' '--- transparent egress saved initial table ---'",
+    "  cat /tmp/mistle-transparent-egress-rules.txt 2>/dev/null || true",
+    "  printf '%s\\n' '--- transparent egress saved output chain with counter ---'",
+    "  cat /tmp/mistle-transparent-egress-output-chain-with-counter.txt 2>/dev/null || true",
+    "  printf '%s\\n' '--- process and route diagnostics ---'",
+    "  id || true",
+    "  ip -4 route || true",
+    "  ss -ltn || true",
+    "  printf '%s\\n' '--- openssl stderr ---'",
+    "  cat /tmp/mistle-transparent-openssl-stderr.txt 2>/dev/null || true",
+    "}",
   ].join("\n");
 }
 

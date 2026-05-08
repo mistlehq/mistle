@@ -1,5 +1,6 @@
 import type { SandboxProvider } from "@mistle/sandbox";
 import {
+  type StartSandboxInstanceWorkflowInput,
   StartSandboxInstanceWorkflowSpec,
   type StartSandboxInstanceWorkflowOutput,
 } from "@mistle/workflow-registry/data-plane";
@@ -517,6 +518,8 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         logger.info(
           {
             providerSandboxId: startedSandbox.providerSandboxId,
+            runtimePlan: createRuntimePlanStartupLogFields(workflowInput.runtimePlan),
+            tokenizerProxyEgressBaseUrl: ctx.config.app.sandbox.tokenizerProxyEgressBaseUrl,
           },
           "Initializing sandbox runtime.",
         );
@@ -790,3 +793,64 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
     };
   },
 );
+
+function createRuntimePlanStartupLogFields(
+  runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"],
+): {
+  workspaceSourceCount: number;
+  workspaceSources: {
+    sourceKind: string;
+    resourceKind: string;
+    path: string;
+    originHost: string;
+    originPath: string;
+  }[];
+  egressRouteCount: number;
+  egressRoutes: {
+    egressRuleId: string;
+    bindingId: string;
+    familyId: string;
+    variantId: string;
+    hosts: readonly string[];
+    pathPrefixes?: readonly string[];
+    upstreamHost: string;
+    upstreamPath: string;
+    credentialResolverKind: string;
+    credentialConnectionId?: string;
+    credentialProviderFamily?: string;
+  }[];
+} {
+  return {
+    workspaceSourceCount: runtimePlan.workspaceSources.length,
+    workspaceSources: runtimePlan.workspaceSources.map((workspaceSource) => {
+      const originUrl = new URL(workspaceSource.originUrl);
+      return {
+        sourceKind: workspaceSource.sourceKind,
+        resourceKind: workspaceSource.resourceKind,
+        path: workspaceSource.path,
+        originHost: originUrl.host,
+        originPath: originUrl.pathname,
+      };
+    }),
+    egressRouteCount: runtimePlan.egressRoutes.length,
+    egressRoutes: runtimePlan.egressRoutes.map((egressRoute) => {
+      const upstreamUrl = new URL(egressRoute.upstream.baseUrl);
+      return {
+        egressRuleId: egressRoute.egressRuleId,
+        bindingId: egressRoute.bindingId,
+        familyId: egressRoute.familyId,
+        variantId: egressRoute.variantId,
+        hosts: egressRoute.match.hosts,
+        ...(egressRoute.match.pathPrefixes === undefined
+          ? {}
+          : { pathPrefixes: egressRoute.match.pathPrefixes }),
+        upstreamHost: upstreamUrl.host,
+        upstreamPath: upstreamUrl.pathname,
+        credentialResolverKind: egressRoute.credentialResolver.kind,
+        ...(egressRoute.credentialResolver.kind === "integration_connection"
+          ? { credentialConnectionId: egressRoute.credentialResolver.connectionId }
+          : { credentialProviderFamily: egressRoute.credentialResolver.providerFamily }),
+      };
+    }),
+  };
+}

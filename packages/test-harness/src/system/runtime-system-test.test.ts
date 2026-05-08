@@ -1,3 +1,4 @@
+import { SandboxResourceNotFoundError } from "@mistle/sandbox";
 import { describe, expect, it } from "vitest";
 
 import { ServiceIds } from "../integration/services/service-ids.js";
@@ -10,6 +11,7 @@ import {
   createRuntimeSystemServiceOptions,
   resolveRuntimeSystemIntegrationConfigPathInContainer,
   selectProviderSandboxIdsCreatedByTest,
+  shouldIgnoreRuntimeSystemProviderSandboxCleanupError,
 } from "./runtime-system-test.js";
 
 describe("resolveRuntimeSystemIntegrationConfigPathInContainer", () => {
@@ -89,6 +91,23 @@ describe("selectProviderSandboxIdsCreatedByTest", () => {
         ]),
       }),
     ).toEqual(["provider-new-a", "provider-new-b"]);
+  });
+});
+
+describe("shouldIgnoreRuntimeSystemProviderSandboxCleanupError", () => {
+  it("treats already-destroyed provider sandboxes as successful runtime system cleanup", () => {
+    expect(
+      shouldIgnoreRuntimeSystemProviderSandboxCleanupError(
+        new SandboxResourceNotFoundError({
+          resourceType: "sandbox",
+          resourceId: "provider-gone",
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps unexpected provider cleanup errors fatal", () => {
+    expect(shouldIgnoreRuntimeSystemProviderSandboxCleanupError(new Error("boom"))).toBe(false);
   });
 });
 

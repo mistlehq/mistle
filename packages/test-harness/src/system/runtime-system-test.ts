@@ -12,7 +12,12 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import type { DataPlaneDatabase } from "@mistle/db/data-plane";
-import { createSandboxAdapter, SandboxProvider } from "@mistle/sandbox";
+import {
+  createSandboxAdapter,
+  isSandboxResourceNotFoundError,
+  SandboxProvider,
+  type SandboxAdapter,
+} from "@mistle/sandbox";
 import { systemClock, systemSleeper } from "@mistle/time";
 
 import { runCleanupTasks, type CleanupTask } from "../cleanup/index.js";
@@ -313,8 +318,9 @@ async function createDockerProviderSandboxCleanup(input: {
 
     await Promise.all(
       providerSandboxIds.map(async (providerSandboxId) => {
-        await sandboxAdapter.destroy({
-          id: providerSandboxId,
+        await destroyProviderSandboxForRuntimeSystemCleanup({
+          sandboxAdapter,
+          providerSandboxId,
         });
       }),
     );
@@ -345,12 +351,34 @@ async function createE2BProviderSandboxCleanup(input: {
 
     await Promise.all(
       providerSandboxIds.map(async (providerSandboxId) => {
-        await sandboxAdapter.destroy({
-          id: providerSandboxId,
+        await destroyProviderSandboxForRuntimeSystemCleanup({
+          sandboxAdapter,
+          providerSandboxId,
         });
       }),
     );
   };
+}
+
+export async function destroyProviderSandboxForRuntimeSystemCleanup(input: {
+  sandboxAdapter: SandboxAdapter;
+  providerSandboxId: string;
+}): Promise<void> {
+  try {
+    await input.sandboxAdapter.destroy({
+      id: input.providerSandboxId,
+    });
+  } catch (error) {
+    if (shouldIgnoreRuntimeSystemProviderSandboxCleanupError(error)) {
+      return;
+    }
+
+    throw error;
+  }
+}
+
+export function shouldIgnoreRuntimeSystemProviderSandboxCleanupError(error: unknown): boolean {
+  return isSandboxResourceNotFoundError(error);
 }
 
 async function listPersistedProviderSandboxIds(
