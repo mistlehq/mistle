@@ -206,8 +206,9 @@ export function useSessionWorkbenchController(input: {
     queryClient,
   });
   const sandboxStatus = workbenchLifecycleState.sandboxStatusQuery.data;
+  const activeThreadCwd = sessionState.lifecycle.sessionSnapshot?.activeThreadCwd;
   const initialSelectedRepositoryPath = resolveInitialSelectedRepositoryPath({
-    activeThreadCwd: sessionState.lifecycle.sessionSnapshot?.activeThreadCwd ?? undefined,
+    activeThreadCwd: activeThreadCwd ?? undefined,
     runtimePrimaryRepositoryRoot: sandboxStatus?.runtimeContext?.primaryRepositoryRoot,
   });
   const primaryRepositoryState = useSessionPrimaryRepositoryState({
@@ -216,21 +217,22 @@ export function useSessionWorkbenchController(input: {
     initialSelectedRepositoryPath,
     sandboxInstanceId: input.sandboxInstanceId,
   });
-  selectedRepositoryPathRef.current = primaryRepositoryState.selectedRepositoryPath;
+  const selectedRepositoryPath = primaryRepositoryState.selectedRepositoryPath;
+  selectedRepositoryPathRef.current = selectedRepositoryPath;
   const activeCwd = resolveSessionWorkbenchCwd({
-    activeThreadCwd: sessionState.lifecycle.sessionSnapshot?.activeThreadCwd,
-    selectedRepositoryPath: primaryRepositoryState.selectedRepositoryPath,
+    activeThreadCwd,
+    selectedRepositoryPath,
   });
   const isPrimaryRepositorySwitchBlockedByCli = handoff.isCliToggleActive;
   const branchDiffState = useSessionBranchDiff({
-    cwd: primaryRepositoryState.selectedRepositoryPath,
+    cwd: selectedRepositoryPath,
     enabled: diffPanelState.isVisible && workbenchLifecycleState.connectionReadiness.canConnect,
     ensureTransportConnected: transportManager.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
   });
   const repositoryStatus = useSessionRepositoryStatus({
     connectedAtIso: workbenchLifecycleState.sessionSnapshot?.connectedAtIso ?? null,
-    cwd: primaryRepositoryState.selectedRepositoryPath,
+    cwd: selectedRepositoryPath,
     enabled: workbenchLifecycleState.connectionReadiness.canConnect,
     ensureTransportConnected: transportManager.ensureTransportConnected,
     refreshEpoch: sessionState.repositoryStatusRefreshEpoch,
@@ -273,7 +275,7 @@ export function useSessionWorkbenchController(input: {
   });
   const switchPrimaryRepository = useCallback(
     async (nextSelectedRepositoryPath: string | null): Promise<void> => {
-      if (nextSelectedRepositoryPath === primaryRepositoryState.selectedRepositoryPath) {
+      if (nextSelectedRepositoryPath === selectedRepositoryPath) {
         return;
       }
 
@@ -281,8 +283,8 @@ export function useSessionWorkbenchController(input: {
       primaryRepositoryState.setSelectedRepositoryPath(nextSelectedRepositoryPath);
     },
     [
-      primaryRepositoryState.selectedRepositoryPath,
       primaryRepositoryState.setSelectedRepositoryPath,
+      selectedRepositoryPath,
       sessionState.threads.ensureCanSwitchPrimaryRepository,
     ],
   );
@@ -297,7 +299,7 @@ export function useSessionWorkbenchController(input: {
 
       await chat.startTurn({
         ...turnInput,
-        cwd: resolvePrimaryRepositoryTurnStartCwd(primaryRepositoryState.selectedRepositoryPath),
+        cwd: resolvePrimaryRepositoryTurnStartCwd(selectedRepositoryPath),
       });
 
       if (!shouldGenerateSessionTitle || sandboxInstanceId === null) {
@@ -305,7 +307,7 @@ export function useSessionWorkbenchController(input: {
       }
 
       void generateSessionTitleWithSandboxCodexExec({
-        cwd: primaryRepositoryState.selectedRepositoryPath,
+        cwd: selectedRepositoryPath,
         ensureTransportConnected: transportManager.ensureTransportConnected,
         messagePayload: turnInput.transcriptPrompt ?? turnInput.submittedPrompt,
         sandboxInstanceId,
@@ -322,9 +324,9 @@ export function useSessionWorkbenchController(input: {
     [
       chat,
       input.sandboxInstanceId,
-      primaryRepositoryState.selectedRepositoryPath,
       queryClient,
       sandboxStatus?.title,
+      selectedRepositoryPath,
       transportManager.ensureTransportConnected,
     ],
   );

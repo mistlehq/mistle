@@ -15,21 +15,6 @@ const ResetInfo = {
 } as const;
 
 describe("buildTerminalPtyOpenInput", () => {
-  it("includes the selected repository path as cwd", () => {
-    expect(
-      buildTerminalPtyOpenInput({
-        cwd: "/root/acme/repo-2",
-        sandboxInstanceId: "sandbox_123",
-      }),
-    ).toEqual({
-      cols: 120,
-      cwd: "/root/acme/repo-2",
-      ptySessionId: "terminal",
-      rows: 20,
-      sandboxInstanceId: "sandbox_123",
-    });
-  });
-
   it("includes the resolved workbench cwd", () => {
     expect(
       buildTerminalPtyOpenInput({
