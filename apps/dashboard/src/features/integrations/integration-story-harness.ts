@@ -972,6 +972,10 @@ export function createLinearDetailViewStoryProps(): IntegrationConnectionDetailV
 }
 
 export function createSlackDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
+  const definition = getDefinitionOrThrow({
+    familyId: "slack",
+    variantId: "slack-default",
+  });
   const storyProps = [
     {
       bindingCount: 2,
@@ -1107,7 +1111,7 @@ export function createSlackDetailViewStoryProps(): IntegrationConnectionDetailVi
         Array.from(story.webhookSourceStateByConnectionId?.entries() ?? []),
       ),
     ),
-    supportedWebhookEvents: storyProps[0]?.supportedWebhookEvents ?? [],
+    supportedWebhookEvents: definition.supportedWebhookEvents ?? [],
   };
 }
 

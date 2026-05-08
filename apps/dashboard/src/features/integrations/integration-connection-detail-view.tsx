@@ -1054,7 +1054,7 @@ function WebhookTriggerProviderRequirementSet(input: {
       ) : null}
       <WebhookTriggerProviderEventsRequirement
         capabilities={input.capabilities}
-        events={input.requirementSet.event === undefined ? [] : [input.requirementSet.event]}
+        event={input.requirementSet.event}
       />
       {(input.requirementSet.permissions ?? []).length === 0 ? null : (
         <WebhookTriggerProviderPermissionsRequirement
@@ -1068,22 +1068,24 @@ function WebhookTriggerProviderRequirementSet(input: {
 
 function WebhookTriggerProviderEventsRequirement(input: {
   capabilities: IntegrationWebhookTriggerCapabilities | undefined;
-  events: readonly string[];
+  event: string | undefined;
 }): React.JSX.Element | null {
-  if (input.events.length === 0) {
+  if (input.event === undefined) {
     return null;
   }
 
   return (
     <WebhookTriggerProviderRequirementChipGroup
-      items={input.events.map((event) => ({
-        id: event,
-        isPresent: hasWebhookTriggerEventCapability({
-          capabilities: input.capabilities,
-          event,
-        }),
-        value: event,
-      }))}
+      items={[
+        {
+          id: input.event,
+          isPresent: hasWebhookTriggerEventCapability({
+            capabilities: input.capabilities,
+            event: input.event,
+          }),
+          value: input.event,
+        },
+      ]}
       label="Events"
     />
   );
