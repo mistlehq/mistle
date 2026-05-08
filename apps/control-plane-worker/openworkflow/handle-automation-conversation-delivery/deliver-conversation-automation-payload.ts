@@ -169,6 +169,7 @@ export async function deliverConversationAutomationPayload(
         runtimeId: input.resolvedAutomationConversationRoute.runtimeId,
         connectionUrl: input.acquiredAutomationConnection.url,
         inputText: input.preparedAutomationRun.renderedInput,
+        workingDirectory: input.preparedAutomationRun.workingDirectory,
         deliveryContext: {
           source: input.preparedAutomationRun.sourceKind,
           ...(input.preparedAutomationRun.sourceWebhookEventId === undefined

@@ -96,6 +96,7 @@ function createPreparedAutomationRun(input: {
     sandboxProfileId: `sbp_acquire_connection_${input.suffix}`,
     sandboxProfileVersion: 1,
     primaryRepositoryId: null,
+    workingDirectory: "/root",
     sourceKind: "webhook",
     sourceOrderKey: "2026-04-23T00:00:00Z#0001",
     sourceWebhookEventId: `iwe_acquire_connection_${input.suffix}`,

@@ -820,6 +820,7 @@ export function createOpenAiConversationProvider(): AgentConversationProvider {
           method: CodexMethodNames.THREAD_START,
           params: {
             model: modelSelection.model,
+            ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
             ...(modelSelection.modelReasoningEffort === undefined
               ? {}
               : { modelReasoningEffort: modelSelection.modelReasoningEffort }),

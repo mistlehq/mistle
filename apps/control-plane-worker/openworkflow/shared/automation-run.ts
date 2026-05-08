@@ -10,6 +10,7 @@ import {
   ScheduleTargetTypes,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
+import { DefaultSandboxWorkspaceDir } from "@mistle/integrations-core";
 import { and, eq, sql } from "drizzle-orm";
 
 import type {
@@ -227,6 +228,9 @@ function resolvePersistedPreparedAutomationRunSnapshot(input: {
     sandboxProfileId: input.automationTarget.sandboxProfileId,
     sandboxProfileVersion: input.automationTarget.sandboxProfileVersion,
     primaryRepositoryId: input.automationTarget.primaryRepositoryId,
+    workingDirectory: resolveAutomationRunWorkingDirectory({
+      primaryRepositoryId: input.automationTarget.primaryRepositoryId,
+    }),
     sourceKind: "webhook",
     sourceOrderKey: input.webhookEvent.sourceOrderKey ?? "",
     sourceWebhookEventId: input.webhookEvent.id,
@@ -268,6 +272,23 @@ function readAgentBindingRuntimeId(input: {
   }
 
   return runtime.runtimeId;
+}
+
+function resolveAutomationRunWorkingDirectory(input: {
+  primaryRepositoryId: string | null;
+}): string {
+  if (input.primaryRepositoryId === null) {
+    return DefaultSandboxWorkspaceDir;
+  }
+
+  if (input.primaryRepositoryId.trim().length === 0) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
+      message: "Automation target primary repository id must not be empty.",
+    });
+  }
+
+  return `${DefaultSandboxWorkspaceDir}/${input.primaryRepositoryId}`;
 }
 
 async function resolveAutomationConversationBindingContext(
@@ -587,6 +608,9 @@ export async function prepareAutomationRun(
     sandboxProfileId: automationTarget.sandboxProfileId,
     sandboxProfileVersion,
     primaryRepositoryId: automationTarget.primaryRepositoryId,
+    workingDirectory: resolveAutomationRunWorkingDirectory({
+      primaryRepositoryId: automationTarget.primaryRepositoryId,
+    }),
     sourceKind: "webhook",
     sourceOrderKey,
     sourceWebhookEventId: webhookEvent.id,
@@ -710,6 +734,9 @@ async function prepareScheduledAutomationRun(
     sandboxProfileId: input.automationTarget.sandboxProfileId,
     sandboxProfileVersion: input.sandboxProfileVersion,
     primaryRepositoryId: input.automationTarget.primaryRepositoryId,
+    workingDirectory: resolveAutomationRunWorkingDirectory({
+      primaryRepositoryId: input.automationTarget.primaryRepositoryId,
+    }),
     sourceKind: "schedule",
     sourceOrderKey,
     sourceWebhookEventId: undefined,

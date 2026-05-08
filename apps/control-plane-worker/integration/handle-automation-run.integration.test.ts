@@ -89,6 +89,7 @@ describe.concurrent("control-plane worker automation run handling", () => {
       sandboxProfileId: scope.sandboxProfileId,
       sandboxProfileVersion: 7,
       primaryRepositoryId: "mistlehq/platform",
+      workingDirectory: "/root/mistlehq/platform",
       sourceKind: "webhook",
       sourceOrderKey: "2026-03-09T00:00:00Z#0001",
       sourceWebhookEventId: scope.webhookEventId,

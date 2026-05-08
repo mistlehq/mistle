@@ -151,6 +151,7 @@ export async function executeConversationProviderDelivery(
     if (providerConversationId === null) {
       const createdConversation = await adapter.createAutomationConversation({
         connection,
+        cwd: input.workingDirectory,
       });
       providerConversationId = createdConversation.providerConversationId;
       createdConversationState = createdConversation.providerState;

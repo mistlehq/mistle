@@ -49,6 +49,7 @@ export type ProviderInspectConversationInput = {
 
 export type ProviderCreateConversationInput = {
   connection: ProviderConnection;
+  cwd?: string;
   options?: Record<string, unknown>;
 };
 

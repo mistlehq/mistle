@@ -35,6 +35,7 @@ export type ExecuteConversationProviderDeliveryInput = {
   runtimeId: string;
   connectionUrl: string;
   inputText: string;
+  workingDirectory: string;
   deliveryContext: {
     source: "webhook" | "schedule";
     webhookEventId?: string | undefined;

@@ -23,6 +23,10 @@ export type SimulatedCodexRuntimeServer = {
   url: string;
 };
 
+export type SimulatedCodexRuntimeServerOptions = {
+  expectedThreadStartCwd?: string;
+};
+
 export type DeliveryContextMessage = {
   method: string;
   params: Record<string, unknown>;
@@ -236,6 +240,7 @@ function readDeliveryContextMessage(value: unknown): DeliveryContextMessage {
 // and packages/integrations-definitions/src/agent-runtimes/codex/codex-json-rpc.ts.
 export async function startSimulatedCodexRuntimeServer(
   scenario: SimulatedCodexRuntimeScenario,
+  options: SimulatedCodexRuntimeServerOptions = {},
 ): Promise<SimulatedCodexRuntimeServer> {
   const deliveryContextDeferred = createDeferred<DeliveryContextMessage>();
   const methodSequenceDeferred = createDeferred<string[]>();
@@ -389,6 +394,13 @@ export async function startSimulatedCodexRuntimeServer(
             params: methodPayload.params,
             expectedModel: DefaultCodexModel,
           });
+          if (options.expectedThreadStartCwd !== undefined) {
+            if (methodPayload.params?.cwd !== options.expectedThreadStartCwd) {
+              throw new Error(
+                `Expected thread/start cwd '${options.expectedThreadStartCwd}', received '${String(methodPayload.params?.cwd)}'.`,
+              );
+            }
+          }
 
           sendAgentPayload(socket, {
             streamId: activeStreamId,

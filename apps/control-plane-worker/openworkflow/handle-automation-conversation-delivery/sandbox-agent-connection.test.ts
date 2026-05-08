@@ -270,6 +270,7 @@ function createDeliverInput(connectionUrl: string): DeliverAutomationPayloadInpu
       sandboxProfileId: "sbp_test_001",
       sandboxProfileVersion: 1,
       primaryRepositoryId: null,
+      workingDirectory: "/root",
       sourceKind: "webhook",
       sourceOrderKey: "2026-03-05T00:00:00Z#0001",
       sourceWebhookEventId: "iwe_test_001",

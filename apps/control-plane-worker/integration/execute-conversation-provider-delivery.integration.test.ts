@@ -57,6 +57,7 @@ describe("executeConversationProviderDelivery", () => {
             runtimeId: "codex",
             connectionUrl: server.url,
             inputText: "Handle the webhook payload.",
+            workingDirectory: "/root",
             deliveryContext: {
               source: "webhook",
               webhookEventId: "iwe_123",
@@ -126,6 +127,7 @@ describe("executeConversationProviderDelivery", () => {
             runtimeId: "codex",
             connectionUrl: server.url,
             inputText: "Handle the webhook payload.",
+            workingDirectory: "/root",
             deliveryContext: {
               source: "webhook",
               webhookEventId: "iwe_123",
@@ -161,7 +163,9 @@ describe("executeConversationProviderDelivery", () => {
   });
 
   it("sends delivery context before creating a new Codex conversation", async () => {
-    const server = await startSimulatedCodexRuntimeServer("create_conversation");
+    const server = await startSimulatedCodexRuntimeServer("create_conversation", {
+      expectedThreadStartCwd: "/root/mistlehq/platform",
+    });
 
     try {
       const activeContext = trace.setSpan(
@@ -178,6 +182,7 @@ describe("executeConversationProviderDelivery", () => {
             runtimeId: "codex",
             connectionUrl: server.url,
             inputText: "Handle the webhook payload.",
+            workingDirectory: "/root/mistlehq/platform",
             deliveryContext: {
               source: "webhook",
               webhookEventId: "iwe_123",
@@ -230,6 +235,7 @@ describe("executeConversationProviderDelivery", () => {
             runtimeId: "codex",
             connectionUrl: server.url,
             inputText: "Handle the webhook payload.",
+            workingDirectory: "/root",
             deliveryContext: {
               source: "webhook",
               webhookEventId: "iwe_123",
@@ -270,6 +276,7 @@ describe("executeConversationProviderDelivery", () => {
             runtimeId: "codex",
             connectionUrl: server.url,
             inputText: "Handle the webhook payload.",
+            workingDirectory: "/root",
             deliveryContext: {
               source: "webhook",
               webhookEventId: "iwe_123",

@@ -10,6 +10,7 @@ export type PreparedAutomationRun = {
   sandboxProfileId: string;
   sandboxProfileVersion: number;
   primaryRepositoryId: string | null;
+  workingDirectory: string;
   sourceKind: "webhook" | "schedule";
   sourceOrderKey: string;
   sourceWebhookEventId: string | undefined;

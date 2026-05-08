@@ -23,6 +23,7 @@ export type AgentConversationConnectInput = {
 
 export type AgentConversationCreateInput = {
   connection: AgentConversationConnection;
+  cwd?: string;
   options?: Readonly<Record<string, unknown>>;
 };
 

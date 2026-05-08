@@ -265,6 +265,7 @@ function createPreparedAutomationRun(input: {
     sandboxProfileId: input.sandboxProfileId,
     sandboxProfileVersion: 1,
     primaryRepositoryId: null,
+    workingDirectory: "/root",
     sourceKind: "webhook",
     sourceOrderKey: "2026-03-09T00:00:00Z#0001",
     sourceWebhookEventId: input.webhookEventId,
