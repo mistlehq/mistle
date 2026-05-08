@@ -155,6 +155,13 @@
       "when": 1777968517840,
       "tag": "0021_prepare-scheduled-automation-sources",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1778259436043,
+      "tag": "0022_add-sandbox-profile-version-runtime-config",
+      "breakpoints": true
     }
   ]
 }
