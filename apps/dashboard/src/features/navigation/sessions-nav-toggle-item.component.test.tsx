@@ -17,25 +17,7 @@ function renderItem(input: { checked: boolean }): void {
   );
 }
 
-function installMatchMediaStub(): void {
-  Object.defineProperty(window, "matchMedia", {
-    configurable: true,
-    value: (query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }),
-  });
-}
-
 describe("SessionsNavToggleItem", () => {
-  installMatchMediaStub();
-
   it("routes to the sessions list page when sidebar mode is disabled", () => {
     renderItem({
       checked: false,

@@ -51,6 +51,8 @@
 }
 
 @theme inline {
+  --breakpoint-sm: 40rem;
+  --breakpoint-md: 48rem;
   --font-sans:
     "Inter Variable", Inter, "Aptos", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono:

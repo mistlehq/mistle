@@ -100,17 +100,6 @@
   padding-inline: 0.1875rem;
 }
 
-@media (max-width: 767px) {
-  .chat-markdown-content p {
-    line-height: 1.5rem;
-  }
-
-  .chat-markdown-content [data-streamdown="list-item"],
-  .chat-markdown-content [data-streamdown="list-item"] > p {
-    line-height: 1.5rem;
-  }
-}
-
 .chat-markdown-content > :first-child,
 .chat-markdown-content li > p:first-child {
   margin-top: 0;

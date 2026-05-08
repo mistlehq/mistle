@@ -23,7 +23,12 @@ export function ChatMarkdownMessage(props: ChatMarkdownMessageProps): JSX.Elemen
     >
       <Streamdown
         animated
-        className={["chat-markdown-content", props.contentClassName].filter(Boolean).join(" ")}
+        className={[
+          "chat-markdown-content max-md:[&_[data-streamdown=list-item]]:leading-6 max-md:[&_[data-streamdown=list-item]>p]:leading-6 max-md:[&_p]:leading-6",
+          props.contentClassName,
+        ]
+          .filter(Boolean)
+          .join(" ")}
         isAnimating={props.isStreaming}
         linkSafety={{
           enabled: true,

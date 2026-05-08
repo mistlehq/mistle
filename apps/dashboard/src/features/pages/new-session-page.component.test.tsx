@@ -12,22 +12,6 @@ import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbo
 import { NewSessionPage, shouldClearSelectedProfile } from "./new-session-page.js";
 import { buildStoryLaunchableSandboxProfile } from "./sessions-page.story-fixtures.js";
 
-function installMatchMediaStub(): void {
-  Object.defineProperty(window, "matchMedia", {
-    configurable: true,
-    value: (query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }),
-  });
-}
-
 function createNewSessionPageQueryClient(input?: {
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
 }): ReturnType<typeof createTestQueryClient> {
@@ -81,8 +65,6 @@ function renderNewSessionPage(input?: {
 }
 
 describe("NewSessionPage", () => {
-  installMatchMediaStub();
-
   afterEach(() => {
     cleanup();
   });

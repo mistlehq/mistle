@@ -67,12 +67,51 @@ Object.assign(import.meta.env, {
   VITE_CONTROL_PLANE_API_ORIGIN: "http://localhost:3000",
 });
 
+document.documentElement.style.setProperty("--breakpoint-sm", "40rem");
+document.documentElement.style.setProperty("--breakpoint-md", "48rem");
+document.documentElement.style.fontSize = "16px";
+
+Object.defineProperty(window, "matchMedia", {
+  configurable: true,
+  value: createMatchMedia,
+  writable: true,
+});
+
 if (typeof HTMLCanvasElement !== "undefined") {
   Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
     configurable: true,
     value: createCanvasContext,
     writable: true,
   });
+}
+
+function createMatchMedia(query: string): MediaQueryList {
+  return {
+    matches: matchesMediaQuery(query),
+    media: query,
+    onchange: null,
+    addEventListener() {},
+    removeEventListener() {},
+    addListener() {},
+    removeListener() {},
+    dispatchEvent() {
+      return false;
+    },
+  };
+}
+
+function matchesMediaQuery(query: string): boolean {
+  const maxWidthMatch = /^\(max-width: ([0-9.]+)px\)$/.exec(query);
+  if (maxWidthMatch !== null) {
+    return window.innerWidth <= Number(maxWidthMatch[1]);
+  }
+
+  const minWidthMatch = /^\(min-width: ([0-9.]+)px\)$/.exec(query);
+  if (minWidthMatch !== null) {
+    return window.innerWidth >= Number(minWidthMatch[1]);
+  }
+
+  return false;
 }
 
 resetDashboardConfigForTest();

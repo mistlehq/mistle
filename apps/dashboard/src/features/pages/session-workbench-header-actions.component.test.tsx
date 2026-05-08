@@ -18,7 +18,14 @@ const StoryButtonControl = {
   title: "Open control",
 } satisfies HeaderActionsProps["cliControl"];
 
-function renderHeaderActions(overrides?: Partial<HeaderActionsProps>): void {
+function renderHeaderActions(
+  overrides?: Partial<HeaderActionsProps>,
+  input?: {
+    viewportWidth?: number;
+  },
+): void {
+  setViewportWidth(input?.viewportWidth ?? 1024);
+
   render(
     <SessionWorkbenchHeaderActions
       cliControl={{
@@ -43,6 +50,14 @@ function renderHeaderActions(overrides?: Partial<HeaderActionsProps>): void {
       {...overrides}
     />,
   );
+}
+
+function setViewportWidth(width: number): void {
+  Object.defineProperty(window, "innerWidth", {
+    configurable: true,
+    value: width,
+    writable: true,
+  });
 }
 
 describe("SessionWorkbenchHeaderActions", () => {
@@ -99,6 +114,37 @@ describe("SessionWorkbenchHeaderActions", () => {
     });
 
     expect(screen.getByRole("button", { name: "Open processes" })).toBeDefined();
+  });
+
+  it("keeps the desktop processes control mounted until the sm action layout breakpoint", () => {
+    renderHeaderActions(
+      {
+        portAccessControl: <button type="button">Open processes</button>,
+      },
+      { viewportWidth: 700 },
+    );
+
+    expect(screen.getByRole("button", { name: "Open processes" })).toBeDefined();
+  });
+
+  it("uses the mobile processes surface below the sm action layout breakpoint", () => {
+    renderHeaderActions(
+      {
+        mobilePortAccessControl: {
+          disabled: false,
+          onOpen: () => {
+            return;
+          },
+          surface: <section aria-label="Mobile processes">Mobile processes sheet</section>,
+          title: "Open processes",
+        },
+        portAccessControl: <button type="button">Desktop processes</button>,
+      },
+      { viewportWidth: 500 },
+    );
+
+    expect(screen.queryByRole("button", { name: "Desktop processes" })).toBeNull();
+    expect(screen.getByRole("region", { name: "Mobile processes" })).toBeDefined();
   });
 
   it("exposes secondary workbench tools from the mobile tools menu", () => {

@@ -50,26 +50,8 @@ function renderSessionWorkbenchPage(input?: {
   };
 }
 
-function installMatchMedia(): void {
-  Object.defineProperty(window, "matchMedia", {
-    configurable: true,
-    value: (query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }),
-  });
-}
-
 describe("SessionWorkbenchPage", () => {
   beforeAll(() => {
-    installMatchMedia();
-
     Object.defineProperty(globalThis, "ResizeObserver", {
       configurable: true,
       value: class ResizeObserver {

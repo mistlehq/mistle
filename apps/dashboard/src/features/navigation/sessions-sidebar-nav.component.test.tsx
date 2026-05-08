@@ -51,24 +51,7 @@ function getSearchInput(): HTMLElement {
   return screen.getByRole("textbox", { name: "Search sessions" });
 }
 
-function installMatchMediaStub(): void {
-  Object.defineProperty(window, "matchMedia", {
-    configurable: true,
-    value: (query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-      addListener: () => {},
-      removeListener: () => {},
-      dispatchEvent: () => false,
-    }),
-  });
-}
-
 describe("SessionsSidebarNav", () => {
-  installMatchMediaStub();
   afterEach(() => {
     cleanup();
   });

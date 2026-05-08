@@ -14,6 +14,8 @@ import {
   Spinner,
   SelectTrigger,
   SelectValue,
+  CssBreakpointVariables,
+  useIsBelowBreakpoint,
 } from "@mistle/ui";
 import {
   CpuIcon,
@@ -22,12 +24,10 @@ import {
   GitDiffIcon,
   TerminalIcon,
 } from "@phosphor-icons/react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { resolveSelectableValue } from "../shared/select-value.js";
-
-const MobileHeaderBreakpointPx = 768;
 
 export type SessionWorkbenchHeaderRepositoryOption = {
   value: string;
@@ -248,28 +248,7 @@ export function SessionWorkbenchHeaderActions(input: {
 }
 
 function useIsMobileHeaderLayout(): boolean {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    if (typeof window.matchMedia !== "function") {
-      return;
-    }
-
-    const mediaQuery = window.matchMedia(`(max-width: ${String(MobileHeaderBreakpointPx - 1)}px)`);
-
-    const updateIsMobile = (): void => {
-      setIsMobile(mediaQuery.matches);
-    };
-
-    updateIsMobile();
-    mediaQuery.addEventListener("change", updateIsMobile);
-
-    return () => {
-      mediaQuery.removeEventListener("change", updateIsMobile);
-    };
-  }, []);
-
-  return isMobile;
+  return useIsBelowBreakpoint(CssBreakpointVariables.SM);
 }
 
 function HeaderIconButton(input: {
