@@ -69,7 +69,7 @@ Object.assign(import.meta.env, {
 });
 
 if (typeof document !== "undefined" && typeof window !== "undefined") {
-  installResponsiveBreakpointTestVariables({ document });
+  installResponsiveBreakpointTestVariables(document);
 
   Object.defineProperty(window, "matchMedia", {
     configurable: true,

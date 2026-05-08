@@ -1,20 +1,18 @@
 import { CssBreakpointVariables } from "../components/hooks/use-breakpoint.js";
+import type { CssBreakpointVariable } from "../components/hooks/use-breakpoint.js";
 
-const ResponsiveBreakpointTestValues: Record<
-  (typeof CssBreakpointVariables)[keyof typeof CssBreakpointVariables],
-  string
-> = {
+const ResponsiveBreakpointTestValues: Record<CssBreakpointVariable, string> = {
   [CssBreakpointVariables.MD]: "48rem",
   [CssBreakpointVariables.SM]: "40rem",
 };
 
-export function installResponsiveBreakpointTestVariables(input: { document: Document }): void {
+export function installResponsiveBreakpointTestVariables(targetDocument: Document): void {
   for (const breakpoint of Object.values(CssBreakpointVariables)) {
-    input.document.documentElement.style.setProperty(
+    targetDocument.documentElement.style.setProperty(
       breakpoint,
       ResponsiveBreakpointTestValues[breakpoint],
     );
   }
 
-  input.document.documentElement.style.fontSize = "16px";
+  targetDocument.documentElement.style.fontSize = "16px";
 }

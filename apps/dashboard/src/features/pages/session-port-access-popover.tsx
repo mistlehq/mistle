@@ -12,9 +12,7 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
   Spinner,
-  cn,
 } from "@mistle/ui";
 import { CpuIcon } from "@phosphor-icons/react";
 
@@ -101,51 +99,13 @@ function createOpenLabel(process: ProcessEntry): string {
 }
 
 export function SessionPortAccessPopover(input: {
-  appearance?: "icon" | "menu";
   state: SessionPortAccessState;
 }): React.JSX.Element {
-  const appearance = input.appearance ?? "icon";
   const isButtonDisabled = input.state.buttonDisabledReason !== null;
   const listenerEntries = createProcessListenerEntries(input.state.processes);
   const buttonClassName = input.state.isPanelOpen
     ? "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300"
     : "bg-transparent text-foreground shadow-none hover:bg-stone-100";
-
-  if (appearance === "menu") {
-    return (
-      <Sheet onOpenChange={input.state.setPanelOpen} open={input.state.isPanelOpen}>
-        <SheetTrigger
-          render={
-            <Button
-              aria-label="Open processes"
-              aria-pressed={input.state.isPanelOpen}
-              className={cn(
-                buttonClassName,
-                "h-auto w-full justify-start gap-2 px-2 py-1.5 text-left",
-              )}
-              disabled={isButtonDisabled}
-              size="sm"
-              title={input.state.buttonDisabledReason ?? "Show running processes"}
-              type="button"
-              variant="ghost"
-            />
-          }
-        >
-          <CpuIcon className="size-4" />
-          <span className="truncate">Processes</span>
-        </SheetTrigger>
-        <SheetContent className="!h-[100dvh] max-h-[100dvh] gap-0 p-0" side="bottom">
-          <SheetHeader className="shrink-0 border-b border-stone-200 px-4 py-3 pr-12 text-left">
-            <SheetTitle>Processes</SheetTitle>
-            <SheetDescription>
-              Select a process to open its HTTP port in a new tab.
-            </SheetDescription>
-          </SheetHeader>
-          <ProcessAccessList listenerEntries={listenerEntries} state={input.state} />
-        </SheetContent>
-      </Sheet>
-    );
-  }
 
   return (
     <Popover onOpenChange={input.state.setPanelOpen} open={input.state.isPanelOpen}>

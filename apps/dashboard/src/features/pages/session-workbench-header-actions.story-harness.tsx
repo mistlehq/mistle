@@ -33,7 +33,10 @@ const StoryActionButtonControl = {
     return;
   },
   pressed: false,
-} as const;
+} satisfies Pick<
+  React.ComponentProps<typeof SessionWorkbenchHeaderActions>["cliControl"],
+  "className" | "disabled" | "onClick" | "pressed"
+>;
 
 const StoryDiffPatch = [
   "diff --git a/apps/dashboard/src/features/pages/session-workbench-header-actions.tsx b/apps/dashboard/src/features/pages/session-workbench-header-actions.tsx",

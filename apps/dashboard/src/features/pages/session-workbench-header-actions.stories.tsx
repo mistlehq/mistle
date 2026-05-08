@@ -48,7 +48,7 @@ const StorybookArgs = {
     title: "Open changes",
   },
   status: {
-    kind: "not_connected" as const,
+    kind: "not_connected",
     label: "Not connected",
   },
   terminalControl: {
