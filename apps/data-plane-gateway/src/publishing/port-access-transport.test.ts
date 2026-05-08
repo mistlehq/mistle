@@ -400,10 +400,6 @@ function createTunnelSessionRegistryWithBootstrap(input: {
   return registry;
 }
 
-function createEmptyTunnelSessionRegistry(): TunnelSessionRegistry {
-  return new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter());
-}
-
 afterEach(async () => {
   while (openTcpSocketPairs.length > 0) {
     await openTcpSocketPairs.pop()?.closeAll();
@@ -529,6 +525,55 @@ describe("port access transport session fencing", () => {
       type: "ports.tcp.open",
       streamId: 2,
     });
+  });
+
+  it("allocates HTTP stream IDs from the shared bootstrap session namespace", async () => {
+    const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
+    const bootstrapTarget = createBootstrapTarget({
+      sessionId: "sess_bootstrap_http_namespace",
+    });
+    const tunnelSessionRegistry = createTunnelSessionRegistryWithBootstrap({
+      bootstrapTarget,
+    });
+    const interactiveBinding = tunnelSessionRegistry.bindClientStream({
+      sandboxInstanceId: SandboxInstanceId,
+      channelKind: "pty",
+      clientSessionId: "conn_interactive",
+      clientStreamId: 1,
+    });
+    const service = new PortAccessTransportService(relayCoordinator, tunnelSessionRegistry);
+    const bootstrap = await createWebSocketPair();
+    openWebSocketPairs.push(bootstrap);
+
+    relayCoordinator.attachPeer({
+      ...bootstrapTarget,
+      socket: bootstrap.peerSocket,
+    });
+
+    const handle = await service.openHttpStream({
+      sandboxInstanceId: SandboxInstanceId,
+      target: {
+        kind: "port",
+        port: 5173,
+      },
+      upstreamProtocol: "http",
+      request: {
+        method: "GET",
+        path: "/sb-manager/runtime.js",
+        headers: {},
+      },
+    });
+    const openMessage = JSON.parse(
+      String((await waitForWebSocketMessage(bootstrap.clientSocket)).data),
+    );
+
+    expect(interactiveBinding.tunnelStreamId).toBe(1);
+    expect(openMessage).toMatchObject({
+      type: "ports.http.open",
+      streamId: 2,
+    });
+
+    await handle.close();
   });
 
   it("waits for TCP connected before sending initial and client bytes as raw data frames", async () => {
@@ -1085,18 +1130,19 @@ describe("port access transport session fencing", () => {
 
   it("does not send follow-up HTTP request body messages to a replacement bootstrap", async () => {
     const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
-    const service = new PortAccessTransportService(
-      relayCoordinator,
-      createEmptyTunnelSessionRegistry(),
-    );
+    const firstBootstrapTarget = createBootstrapTarget({
+      sessionId: "sess_bootstrap_a",
+    });
+    const tunnelSessionRegistry = createTunnelSessionRegistryWithBootstrap({
+      bootstrapTarget: firstBootstrapTarget,
+    });
+    const service = new PortAccessTransportService(relayCoordinator, tunnelSessionRegistry);
     const firstBootstrap = await createWebSocketPair();
     const replacementBootstrap = await createWebSocketPair();
     openWebSocketPairs.push(firstBootstrap, replacementBootstrap);
 
     relayCoordinator.attachPeer({
-      ...createBootstrapTarget({
-        sessionId: "sess_bootstrap_a",
-      }),
+      ...firstBootstrapTarget,
       socket: firstBootstrap.peerSocket,
     });
 
@@ -1146,18 +1192,19 @@ describe("port access transport session fencing", () => {
 
   it("ignores stale HTTP responses from the bootstrap session that no longer owns the stream", async () => {
     const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
-    const service = new PortAccessTransportService(
-      relayCoordinator,
-      createEmptyTunnelSessionRegistry(),
-    );
+    const firstBootstrapTarget = createBootstrapTarget({
+      sessionId: "sess_bootstrap_a",
+    });
+    const tunnelSessionRegistry = createTunnelSessionRegistryWithBootstrap({
+      bootstrapTarget: firstBootstrapTarget,
+    });
+    const service = new PortAccessTransportService(relayCoordinator, tunnelSessionRegistry);
     const firstBootstrap = await createWebSocketPair();
     const replacementBootstrap = await createWebSocketPair();
     openWebSocketPairs.push(firstBootstrap, replacementBootstrap);
 
     relayCoordinator.attachPeer({
-      ...createBootstrapTarget({
-        sessionId: "sess_bootstrap_a",
-      }),
+      ...firstBootstrapTarget,
       socket: firstBootstrap.peerSocket,
     });
 
@@ -1200,18 +1247,19 @@ describe("port access transport session fencing", () => {
 
   it("does not reject replacement bootstrap streams when the old bootstrap closes", async () => {
     const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
-    const service = new PortAccessTransportService(
-      relayCoordinator,
-      createEmptyTunnelSessionRegistry(),
-    );
+    const firstBootstrapTarget = createBootstrapTarget({
+      sessionId: "sess_bootstrap_a",
+    });
+    const tunnelSessionRegistry = createTunnelSessionRegistryWithBootstrap({
+      bootstrapTarget: firstBootstrapTarget,
+    });
+    const service = new PortAccessTransportService(relayCoordinator, tunnelSessionRegistry);
     const firstBootstrap = await createWebSocketPair();
     const replacementBootstrap = await createWebSocketPair();
     openWebSocketPairs.push(firstBootstrap, replacementBootstrap);
 
     relayCoordinator.attachPeer({
-      ...createBootstrapTarget({
-        sessionId: "sess_bootstrap_a",
-      }),
+      ...firstBootstrapTarget,
       socket: firstBootstrap.peerSocket,
     });
 
@@ -1230,10 +1278,12 @@ describe("port access transport session fencing", () => {
     });
     await waitForWebSocketMessage(firstBootstrap.clientSocket);
 
+    const replacementBootstrapTarget = createBootstrapTarget({
+      sessionId: "sess_bootstrap_b",
+    });
+    tunnelSessionRegistry.attachBootstrapSession(replacementBootstrapTarget);
     relayCoordinator.attachPeer({
-      ...createBootstrapTarget({
-        sessionId: "sess_bootstrap_b",
-      }),
+      ...replacementBootstrapTarget,
       socket: replacementBootstrap.peerSocket,
     });
 

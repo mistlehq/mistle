@@ -359,7 +359,6 @@ export class PortAccessTransportService {
     Map<number, ActivePortAccessTcpStream>
   >();
   readonly #activeTcpStreamCountsByPortAccessSessionKey = new Map<string, number>();
-  #nextStreamId = 1;
   readonly #clock: Clock;
   readonly #connectTimeoutMs: number;
   readonly #idleTimeoutMs: number;
@@ -402,7 +401,9 @@ export class PortAccessTransportService {
       sandboxInstanceId: input.sandboxInstanceId,
     });
 
-    const streamId = this.allocateStreamId();
+    const streamId = this.reserveHttpStreamId({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
     const openedAtMs = this.#clock.nowMs();
     const streamAttributes = buildPortAccessStreamAttributes({
       sandboxInstanceId: input.sandboxInstanceId,
@@ -472,6 +473,10 @@ export class PortAccessTransportService {
         sandboxInstanceId: input.sandboxInstanceId,
         streamId,
       });
+      this.releaseHttpStreamId({
+        sandboxInstanceId: input.sandboxInstanceId,
+        streamId,
+      });
       await responseBodyWriter.abort(error);
       const streamError = error instanceof Error ? error : new Error(String(error));
       finishPortAccessStream({
@@ -502,6 +507,12 @@ export class PortAccessTransportService {
           sandboxInstanceId: input.sandboxInstanceId,
           streamId,
         });
+        if (activeStream !== undefined) {
+          this.releaseHttpStreamId({
+            sandboxInstanceId: input.sandboxInstanceId,
+            streamId,
+          });
+        }
         await responseBodyWriter.abort();
         if (activeStream !== undefined) {
           this.finishHttpStreamObservability({
@@ -781,6 +792,10 @@ export class PortAccessTransportService {
           sandboxInstanceId: input.sandboxInstanceId,
           streamId: input.message.streamId,
         });
+        this.releaseHttpStreamId({
+          sandboxInstanceId: input.sandboxInstanceId,
+          streamId: input.message.streamId,
+        });
         await activeHttpStream.responseBodyWriter.close();
         this.finishHttpStreamObservability({
           outcome: "completed",
@@ -961,6 +976,10 @@ export class PortAccessTransportService {
         }
 
         activeStreams.delete(streamId);
+        this.releaseHttpStreamId({
+          sandboxInstanceId: input.sandboxInstanceId,
+          streamId,
+        });
         const disconnectError = new PortAccessTransportBootstrapDisconnectedError(
           input.sandboxInstanceId,
         );
@@ -1013,12 +1032,6 @@ export class PortAccessTransportService {
     }
   }
 
-  private allocateStreamId(): number {
-    const streamId = this.#nextStreamId;
-    this.#nextStreamId += 1;
-    return streamId;
-  }
-
   private deleteActiveHttpStream(input: { sandboxInstanceId: string; streamId: number }): void {
     const sandboxStreams = this.#activeHttpStreamsBySandboxInstanceId.get(input.sandboxInstanceId);
     if (sandboxStreams === undefined) {
@@ -1029,6 +1042,33 @@ export class PortAccessTransportService {
     if (sandboxStreams.size === 0) {
       this.#activeHttpStreamsBySandboxInstanceId.delete(input.sandboxInstanceId);
     }
+  }
+
+  private reserveHttpStreamId(input: { sandboxInstanceId: string }): number {
+    let reservedStream = this.tunnelSessionRegistry.reserveTunnelStream({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+    const activeHttpStreams = this.#activeHttpStreamsBySandboxInstanceId.get(
+      input.sandboxInstanceId,
+    );
+    while (activeHttpStreams?.has(reservedStream.tunnelStreamId)) {
+      this.tunnelSessionRegistry.releaseReservedTunnelStream({
+        sandboxInstanceId: input.sandboxInstanceId,
+        tunnelStreamId: reservedStream.tunnelStreamId,
+      });
+      reservedStream = this.tunnelSessionRegistry.reserveTunnelStream({
+        sandboxInstanceId: input.sandboxInstanceId,
+      });
+    }
+
+    return reservedStream.tunnelStreamId;
+  }
+
+  private releaseHttpStreamId(input: { sandboxInstanceId: string; streamId: number }): void {
+    this.tunnelSessionRegistry.releaseReservedTunnelStream({
+      sandboxInstanceId: input.sandboxInstanceId,
+      tunnelStreamId: input.streamId,
+    });
   }
 
   private finishHttpStreamObservability(input: {
@@ -1061,6 +1101,7 @@ export class PortAccessTransportService {
     }
 
     this.deleteActiveHttpStream(input);
+    this.releaseHttpStreamId(input);
     if (!activeStream.responseStarted) {
       activeStream.rejectResponseStart(input.error);
     }
