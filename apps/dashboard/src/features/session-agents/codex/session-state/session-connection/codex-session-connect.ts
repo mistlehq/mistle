@@ -62,6 +62,7 @@ export type CodexConnectionBootstrapResult = {
   sandboxInstanceId: string;
   resolvedThreadId: string | null;
   threadId: string;
+  cwd: string;
 };
 
 export type EstablishedCodexThreadResult = {
@@ -69,6 +70,7 @@ export type EstablishedCodexThreadResult = {
   sandboxInstanceId: string;
   resolvedThreadId: string | null;
   threadId: string;
+  cwd: string;
 };
 
 export function resolveInitialCodexThreadAction(input: {
@@ -142,6 +144,7 @@ export async function establishCodexThread(input: {
           sandboxInstanceId: input.sandboxInstanceId,
           resolvedThreadId,
           threadId: startedThread.threadId,
+          cwd: startedThread.cwd,
         };
       }
 
@@ -154,6 +157,7 @@ export async function establishCodexThread(input: {
       sandboxInstanceId: input.sandboxInstanceId,
       resolvedThreadId,
       threadId: resumedThread.threadId,
+      cwd: resumedThread.cwd,
     };
   }
 
@@ -171,6 +175,7 @@ export async function establishCodexThread(input: {
     sandboxInstanceId: input.sandboxInstanceId,
     resolvedThreadId,
     threadId: startedThread.threadId,
+    cwd: startedThread.cwd,
   };
 }
 
@@ -193,11 +198,13 @@ export function createConnectedCodexSession(input: {
   connectedAtIso: string;
   providerThreadId: string | null;
   activeThreadId: string;
+  activeThreadCwd: string;
 }): ConnectedCodexSession {
   return {
     sandboxInstanceId: input.sandboxInstanceId,
     connectedAtIso: input.connectedAtIso,
     providerThreadId: input.providerThreadId,
     activeThreadId: input.activeThreadId,
+    activeThreadCwd: input.activeThreadCwd,
   };
 }

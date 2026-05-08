@@ -183,12 +183,14 @@ describe("codex session connect", () => {
         connectedAtIso: "2026-03-20T00:00:00.000Z",
         providerThreadId: null,
         activeThreadId: "thread_123",
+        activeThreadCwd: "/root/acme/repo-2",
       }),
     ).toEqual({
       sandboxInstanceId: "sandbox_123",
       connectedAtIso: "2026-03-20T00:00:00.000Z",
       providerThreadId: null,
       activeThreadId: "thread_123",
+      activeThreadCwd: "/root/acme/repo-2",
     });
   });
 });

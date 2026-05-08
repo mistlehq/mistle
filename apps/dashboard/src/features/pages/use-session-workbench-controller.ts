@@ -19,7 +19,6 @@ import {
 } from "./session-composer/index.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import {
-  resolveActiveThreadCwd,
   resolveInitialSelectedRepositoryPath,
   resolvePrimaryRepositoryTurnStartCwd,
 } from "./session-primary-repository-policy.js";
@@ -206,12 +205,8 @@ export function useSessionWorkbenchController(input: {
     queryClient,
   });
   const sandboxStatus = workbenchLifecycleState.sandboxStatusQuery.data;
-  const activeThreadCwd = resolveActiveThreadCwd({
-    activeThreadId: sessionState.lifecycle.sessionSnapshot?.activeThreadId ?? null,
-    availableThreads: sessionState.threads.availableThreads,
-  });
   const initialSelectedRepositoryPath = resolveInitialSelectedRepositoryPath({
-    activeThreadCwd,
+    activeThreadCwd: sessionState.lifecycle.sessionSnapshot?.activeThreadCwd ?? undefined,
     runtimePrimaryRepositoryRoot: sandboxStatus?.runtimeContext?.primaryRepositoryRoot,
   });
   const primaryRepositoryState = useSessionPrimaryRepositoryState({

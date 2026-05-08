@@ -373,7 +373,10 @@ export function useCodexSessionState(input: {
       return threadStart;
     },
     onSuccess: (threadStart) => {
-      updateActiveThread(threadStart.threadId);
+      updateActiveThread({
+        threadId: threadStart.threadId,
+        cwd: threadStart.cwd,
+      });
       resetChat();
       setLifecycleErrorMessage(null);
       refreshThreadCollectionsWithErrorHandling();
@@ -396,7 +399,10 @@ export function useCodexSessionState(input: {
       });
     },
     onSuccess: (result) => {
-      updateActiveThread(result.threadId);
+      updateActiveThread({
+        threadId: result.threadId,
+        cwd: result.cwd,
+      });
       resetChat();
       setLifecycleErrorMessage(null);
       void hydrateChatFromThread();
@@ -468,7 +474,10 @@ export function useCodexSessionState(input: {
       });
     },
     onSuccess: (result) => {
-      updateActiveThread(result.threadId);
+      updateActiveThread({
+        threadId: result.threadId,
+        cwd: result.cwd,
+      });
       resetChat();
       void hydrateChatFromThread();
       refreshThreadCollectionsWithErrorHandling();
@@ -514,7 +523,9 @@ export function useCodexSessionState(input: {
       });
     },
     onSuccess: (result) => {
-      updateActiveThread(result.threadId);
+      updateActiveThread({
+        threadId: result.threadId,
+      });
       resetChat();
       void hydrateChatFromThread();
       refreshThreadCollectionsWithErrorHandling();
@@ -576,7 +587,9 @@ export function useCodexSessionState(input: {
       });
     },
     onSuccess: (result) => {
-      updateActiveThread(result.threadId);
+      updateActiveThread({
+        threadId: result.threadId,
+      });
       resetChat();
       void hydrateChatFromThread();
       refreshThreadCollectionsWithErrorHandling();
@@ -750,7 +763,9 @@ export function useCodexSessionState(input: {
       // Returning from CLI reconnects local sessions using the
       // "most_recently_updated" thread policy instead of trying to preserve the
       // pre-CLI active thread id.
-      updateActiveThread(null);
+      updateActiveThread({
+        threadId: null,
+      });
     },
     [lifecycle.sessionSnapshot?.providerThreadId, updateActiveThread],
   );

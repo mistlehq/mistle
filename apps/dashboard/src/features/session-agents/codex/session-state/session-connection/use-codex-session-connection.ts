@@ -75,7 +75,7 @@ export type CodexSessionConnectionLifecycleState = {
 
 export type CodexSessionConnectionStateResult = {
   lifecycle: CodexSessionConnectionLifecycleState;
-  updateActiveThread: (threadId: string | null) => void;
+  updateActiveThread: (input: { threadId: string | null; cwd?: string | null }) => void;
 };
 
 export function useCodexSessionConnection(input: {
@@ -119,7 +119,8 @@ export function useCodexSessionConnection(input: {
   const reconnectTargetThreadIdRef = useRef<string | null>(null);
 
   const updateActiveThread = useCallback(
-    (threadId: string | null): void => {
+    (activeThreadInput: { threadId: string | null; cwd?: string | null }): void => {
+      const threadId = activeThreadInput.threadId;
       input.threadIdRef.current = threadId;
       reconnectTargetThreadIdRef.current = threadId;
       setSessionSnapshot((currentSession) => {
@@ -130,6 +131,7 @@ export function useCodexSessionConnection(input: {
         return {
           ...currentSession,
           activeThreadId: threadId,
+          activeThreadCwd: threadId === null ? null : (activeThreadInput.cwd ?? null),
         };
       });
     },
@@ -386,12 +388,16 @@ export function useCodexSessionConnection(input: {
         return;
       }
 
-      updateActiveThread(result.threadId);
+      updateActiveThread({
+        threadId: result.threadId,
+        cwd: result.cwd,
+      });
       const nextConnectedSession = createConnectedCodexSession({
         sandboxInstanceId: result.sandboxInstanceId,
         connectedAtIso: new Date().toISOString(),
         providerThreadId: result.providerThreadId,
         activeThreadId: result.threadId,
+        activeThreadCwd: result.cwd,
       });
       lastConnectedSessionRef.current = nextConnectedSession;
       setSessionSnapshot(nextConnectedSession);
@@ -476,11 +482,15 @@ export function useCodexSessionConnection(input: {
         return;
       }
 
-      updateActiveThread(result.recoveredThread.threadId);
+      updateActiveThread({
+        threadId: result.recoveredThread.threadId,
+        cwd: result.recoveredThread.cwd,
+      });
       const nextConnectedSession = {
         ...result.previousConnectedSession,
         connectedAtIso: new Date().toISOString(),
         activeThreadId: result.recoveredThread.threadId,
+        activeThreadCwd: result.recoveredThread.cwd,
       };
       lastConnectedSessionRef.current = nextConnectedSession;
       setSessionSnapshot(nextConnectedSession);
