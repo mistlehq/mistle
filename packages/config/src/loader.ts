@@ -108,6 +108,13 @@ function loadControlPlaneMaintenanceConfigFromEnv(
     database: {
       migrationUrl,
     },
+    ...(env.MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL === undefined
+      ? {}
+      : {
+          dataPlaneDatabase: {
+            migrationUrl: env.MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL,
+          },
+        }),
     telemetry: loadControlPlaneMaintenanceTelemetryConfigFromEnv(env),
   });
 }

@@ -6,6 +6,10 @@ import {
   PruneExpiredIntegrationAuthStateCommand,
   PruneExpiredIntegrationAuthStateCommandName,
 } from "./prune-expired-integration-auth-state.js";
+import {
+  PruneStaleOpenWorkflowRunsCommand,
+  PruneStaleOpenWorkflowRunsCommandName,
+} from "./prune-stale-openworkflow-runs.js";
 import type { MaintenanceCommandDefinition } from "./types.js";
 
 export function resolveMaintenanceCommand(commandName: string): MaintenanceCommandDefinition {
@@ -15,6 +19,10 @@ export function resolveMaintenanceCommand(commandName: string): MaintenanceComma
 
   if (commandName === PruneExpiredIntegrationAuthStateCommandName) {
     return PruneExpiredIntegrationAuthStateCommand;
+  }
+
+  if (commandName === PruneStaleOpenWorkflowRunsCommandName) {
+    return PruneStaleOpenWorkflowRunsCommand;
   }
 
   throw new Error(`Unknown maintenance command '${commandName}'.`);
@@ -28,6 +36,10 @@ export {
   PruneExpiredIntegrationAuthStateCommand,
   PruneExpiredIntegrationAuthStateCommandName,
 } from "./prune-expired-integration-auth-state.js";
+export {
+  PruneStaleOpenWorkflowRunsCommand,
+  PruneStaleOpenWorkflowRunsCommandName,
+} from "./prune-stale-openworkflow-runs.js";
 export type {
   MaintenanceCommandContext,
   MaintenanceCommandDefinition,

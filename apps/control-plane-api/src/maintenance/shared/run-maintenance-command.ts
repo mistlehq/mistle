@@ -9,6 +9,7 @@ import { recordMaintenanceCommandCompleted } from "./telemetry.js";
 export async function runMaintenanceCommand(input: {
   command: MaintenanceCommandDefinition;
   pool: Pool;
+  dataPlanePool?: Pool;
   clock?: Clock;
 }): Promise<MaintenanceCommandResult> {
   const clock = input.clock ?? systemClock;
@@ -25,6 +26,8 @@ export async function runMaintenanceCommand(input: {
 
     const result = await input.command.execute({
       db: createControlPlaneDatabase(input.pool),
+      controlPlanePool: input.pool,
+      ...(input.dataPlanePool === undefined ? {} : { dataPlanePool: input.dataPlanePool }),
       clock,
     });
 

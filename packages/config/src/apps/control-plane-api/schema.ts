@@ -168,6 +168,12 @@ export const ControlPlaneApiMaintenanceConfigSchema = z
         migrationUrl: z.string().min(1),
       })
       .strict(),
+    dataPlaneDatabase: z
+      .object({
+        migrationUrl: z.string().min(1),
+      })
+      .strict()
+      .optional(),
     telemetry: GlobalTelemetryConfigSchema,
   })
   .strict();

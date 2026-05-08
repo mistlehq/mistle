@@ -8,10 +8,14 @@ import {
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
 import type { Clock } from "@mistle/time";
+import { sql, type SQL } from "drizzle-orm";
+import { BackendPostgres } from "openworkflow/postgres";
+import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
 import { pruneExpiredAuthState } from "../src/maintenance/commands/prune-expired-auth-state.js";
 import { pruneExpiredIntegrationAuthState } from "../src/maintenance/commands/prune-expired-integration-auth-state.js";
+import { pruneStaleOpenWorkflowRuns } from "../src/maintenance/commands/prune-stale-openworkflow-runs.js";
 
 const FixedNowMs = Date.UTC(2026, 3, 29, 0, 0, 0);
 const FixedClock: Clock = {
@@ -253,7 +257,397 @@ describe.concurrent("maintenance commands", () => {
       expectedIds: [recentTerminalAttemptId, recentPendingAttemptId, pendingWithoutExpiryAttemptId],
     });
   });
+
+  it("prunes stale terminal OpenWorkflow runs in both planes", async ({ env }) => {
+    const controlPlaneNamespaceId = `maintenance_control_${env.id}`;
+    const dataPlaneNamespaceId = `maintenance_data_${env.id}`;
+    const oldFinishedAt = new Date(FixedNowMs - days(31));
+    const recentFinishedAt = new Date(FixedNowMs - days(29));
+    const oldAvailableAt = new Date(FixedNowMs - days(31));
+    const dataPlaneWorkflowBackend = await BackendPostgres.connect(
+      env.controlPlaneDatabase.directUrl,
+      {
+        namespaceId: dataPlaneNamespaceId,
+        runMigrations: true,
+        schema: "data_plane_openworkflow",
+      },
+    );
+    await dataPlaneWorkflowBackend.stop();
+
+    await seedWorkflowRun({
+      env,
+      schemaName: "control_plane_openworkflow",
+      namespaceId: controlPlaneNamespaceId,
+      id: "owr_control_stale_completed",
+      status: "completed",
+      finishedAt: oldFinishedAt,
+    });
+    await seedWorkflowRun({
+      env,
+      schemaName: "control_plane_openworkflow",
+      namespaceId: controlPlaneNamespaceId,
+      id: "owr_control_recent_completed",
+      status: "completed",
+      finishedAt: recentFinishedAt,
+    });
+    await seedWorkflowRun({
+      env,
+      schemaName: "control_plane_openworkflow",
+      namespaceId: controlPlaneNamespaceId,
+      id: "owr_control_old_pending",
+      status: "pending",
+      availableAt: oldAvailableAt,
+    });
+    await seedWorkflowRun({
+      env,
+      schemaName: "control_plane_openworkflow",
+      namespaceId: controlPlaneNamespaceId,
+      id: "owr_control_running_parent",
+      status: "running",
+      availableAt: oldAvailableAt,
+    });
+    await seedWorkflowRun({
+      env,
+      schemaName: "control_plane_openworkflow",
+      namespaceId: controlPlaneNamespaceId,
+      id: "owr_control_old_child_of_running_parent",
+      status: "completed",
+      finishedAt: oldFinishedAt,
+    });
+    await seedWorkflowStepAttempt({
+      env,
+      schemaName: "control_plane_openworkflow",
+      namespaceId: controlPlaneNamespaceId,
+      id: "osa_control_stale_completed_step",
+      workflowRunId: "owr_control_stale_completed",
+      childWorkflowRunId: null,
+    });
+    await seedWorkflowStepAttempt({
+      env,
+      schemaName: "control_plane_openworkflow",
+      namespaceId: controlPlaneNamespaceId,
+      id: "osa_control_running_parent_child_step",
+      workflowRunId: "owr_control_running_parent",
+      childWorkflowRunId: "owr_control_old_child_of_running_parent",
+    });
+    await seedWorkflowSignal({
+      env,
+      schemaName: "control_plane_openworkflow",
+      namespaceId: controlPlaneNamespaceId,
+      id: "ows_control_stale_completed_signal",
+      workflowRunId: "owr_control_stale_completed",
+      stepAttemptId: "osa_control_stale_completed_step",
+    });
+
+    await seedWorkflowRun({
+      env,
+      schemaName: "data_plane_openworkflow",
+      namespaceId: dataPlaneNamespaceId,
+      id: "owr_data_stale_failed",
+      status: "failed",
+      finishedAt: oldFinishedAt,
+    });
+    await seedWorkflowRun({
+      env,
+      schemaName: "data_plane_openworkflow",
+      namespaceId: dataPlaneNamespaceId,
+      id: "owr_data_old_running",
+      status: "running",
+      availableAt: oldAvailableAt,
+    });
+
+    const controlPlanePool = new Pool({
+      connectionString: env.controlPlaneDatabase.directUrl,
+    });
+    const dataPlanePool = new Pool({
+      connectionString: env.controlPlaneDatabase.directUrl,
+    });
+
+    try {
+      await expect(
+        pruneStaleOpenWorkflowRuns({
+          controlPlanePool,
+          dataPlanePool,
+          clock: FixedClock,
+        }),
+      ).resolves.toEqual({
+        deletedRowCounts: {
+          "control_plane_openworkflow.workflow_runs": 1,
+          "data_plane_openworkflow.workflow_runs": 1,
+        },
+        reachedMaxBatches: false,
+      });
+    } finally {
+      await Promise.all([controlPlanePool.end(), dataPlanePool.end()]);
+    }
+
+    await expectWorkflowRunIds({
+      env,
+      schemaName: "control_plane_openworkflow",
+      namespaceId: controlPlaneNamespaceId,
+      expectedIds: [
+        "owr_control_old_child_of_running_parent",
+        "owr_control_old_pending",
+        "owr_control_recent_completed",
+        "owr_control_running_parent",
+      ],
+    });
+    await expectWorkflowRunIds({
+      env,
+      schemaName: "data_plane_openworkflow",
+      namespaceId: dataPlaneNamespaceId,
+      expectedIds: ["owr_data_old_running"],
+    });
+    await expectWorkflowStepAttemptIds({
+      env,
+      schemaName: "control_plane_openworkflow",
+      namespaceId: controlPlaneNamespaceId,
+      expectedIds: ["osa_control_running_parent_child_step"],
+    });
+    await expectWorkflowSignalIds({
+      env,
+      schemaName: "control_plane_openworkflow",
+      namespaceId: controlPlaneNamespaceId,
+      expectedIds: [],
+    });
+  });
 });
+
+type OpenWorkflowSchemaName = "control_plane_openworkflow" | "data_plane_openworkflow";
+
+async function seedWorkflowRun(input: {
+  env: IntegrationTestEnvironment;
+  schemaName: OpenWorkflowSchemaName;
+  namespaceId: string;
+  id: string;
+  status: string;
+  finishedAt?: Date;
+  availableAt?: Date;
+}): Promise<void> {
+  const workflowRunsTable = workflowTable(input.schemaName, "workflow_runs");
+  const statement = sql`
+    insert into ${workflowRunsTable} (
+      namespace_id,
+      id,
+      workflow_name,
+      version,
+      status,
+      idempotency_key,
+      config,
+      context,
+      input,
+      attempts,
+      available_at,
+      deadline_at,
+      started_at,
+      finished_at,
+      created_at,
+      updated_at
+    )
+    values (
+      ${input.namespaceId},
+      ${input.id},
+      ${`maintenance.${input.id}`},
+      ${"1"},
+      ${input.status},
+      ${null},
+      ${JSON.stringify({})}::jsonb,
+      ${null},
+      ${JSON.stringify({ id: input.id })}::jsonb,
+      ${0},
+      ${input.availableAt ?? null},
+      ${null},
+      ${null},
+      ${input.finishedAt ?? null},
+      ${new Date(FixedNowMs - days(31))},
+      ${new Date(FixedNowMs - days(31))}
+    )
+  `;
+
+  await executeWorkflowStatement({
+    env: input.env,
+    statement,
+  });
+}
+
+async function seedWorkflowStepAttempt(input: {
+  env: IntegrationTestEnvironment;
+  schemaName: OpenWorkflowSchemaName;
+  namespaceId: string;
+  id: string;
+  workflowRunId: string;
+  childWorkflowRunId: string | null;
+}): Promise<void> {
+  const stepAttemptsTable = workflowTable(input.schemaName, "step_attempts");
+  const statement = sql`
+    insert into ${stepAttemptsTable} (
+      namespace_id,
+      id,
+      workflow_run_id,
+      step_name,
+      kind,
+      status,
+      config,
+      context,
+      output,
+      error,
+      child_workflow_run_namespace_id,
+      child_workflow_run_id,
+      started_at,
+      finished_at,
+      created_at,
+      updated_at
+    )
+    values (
+      ${input.namespaceId},
+      ${input.id},
+      ${input.workflowRunId},
+      ${`maintenance.${input.id}`},
+      ${"workflow"},
+      ${"running"},
+      ${JSON.stringify({})}::jsonb,
+      ${null},
+      ${null},
+      ${null},
+      ${input.childWorkflowRunId === null ? null : input.namespaceId},
+      ${input.childWorkflowRunId},
+      ${new Date(FixedNowMs - days(31))},
+      ${null},
+      ${new Date(FixedNowMs - days(31))},
+      ${new Date(FixedNowMs - days(31))}
+    )
+  `;
+
+  await executeWorkflowStatement({
+    env: input.env,
+    statement,
+  });
+}
+
+async function seedWorkflowSignal(input: {
+  env: IntegrationTestEnvironment;
+  schemaName: OpenWorkflowSchemaName;
+  namespaceId: string;
+  id: string;
+  workflowRunId: string;
+  stepAttemptId: string;
+}): Promise<void> {
+  const workflowSignalsTable = workflowTable(input.schemaName, "workflow_signals");
+  const statement = sql`
+    insert into ${workflowSignalsTable} (
+      namespace_id,
+      id,
+      signal,
+      data,
+      sender_idempotency_key,
+      workflow_run_id,
+      step_attempt_id,
+      created_at
+    )
+    values (
+      ${input.namespaceId},
+      ${input.id},
+      ${"maintenance.signal"},
+      ${JSON.stringify({ id: input.id })}::jsonb,
+      ${null},
+      ${input.workflowRunId},
+      ${input.stepAttemptId},
+      ${new Date(FixedNowMs - days(31))}
+    )
+  `;
+
+  await executeWorkflowStatement({
+    env: input.env,
+    statement,
+  });
+}
+
+async function expectWorkflowRunIds(input: {
+  env: IntegrationTestEnvironment;
+  schemaName: OpenWorkflowSchemaName;
+  namespaceId: string;
+  expectedIds: string[];
+}): Promise<void> {
+  const rows = await selectWorkflowIds({
+    env: input.env,
+    schemaName: input.schemaName,
+    tableName: "workflow_runs",
+    namespaceId: input.namespaceId,
+  });
+  expect(rows.map((row) => row.id).sort()).toEqual(input.expectedIds.toSorted());
+}
+
+async function expectWorkflowStepAttemptIds(input: {
+  env: IntegrationTestEnvironment;
+  schemaName: OpenWorkflowSchemaName;
+  namespaceId: string;
+  expectedIds: string[];
+}): Promise<void> {
+  const rows = await selectWorkflowIds({
+    env: input.env,
+    schemaName: input.schemaName,
+    tableName: "step_attempts",
+    namespaceId: input.namespaceId,
+  });
+  expect(rows.map((row) => row.id).sort()).toEqual(input.expectedIds.toSorted());
+}
+
+async function expectWorkflowSignalIds(input: {
+  env: IntegrationTestEnvironment;
+  schemaName: OpenWorkflowSchemaName;
+  namespaceId: string;
+  expectedIds: string[];
+}): Promise<void> {
+  const rows = await selectWorkflowIds({
+    env: input.env,
+    schemaName: input.schemaName,
+    tableName: "workflow_signals",
+    namespaceId: input.namespaceId,
+  });
+  expect(rows.map((row) => row.id).sort()).toEqual(input.expectedIds.toSorted());
+}
+
+async function selectWorkflowIds(input: {
+  env: IntegrationTestEnvironment;
+  schemaName: OpenWorkflowSchemaName;
+  tableName: "step_attempts" | "workflow_runs" | "workflow_signals";
+  namespaceId: string;
+}): Promise<Array<{ id: string }>> {
+  const table = workflowTable(input.schemaName, input.tableName);
+  const statement = sql<{ id: string }>`
+    select id
+    from ${table}
+    where namespace_id = ${input.namespaceId}
+  `;
+  const result = await input.env.controlPlaneDb.execute(statement);
+  return parseWorkflowIdRows(result.rows);
+}
+
+function parseWorkflowIdRows(rows: ReadonlyArray<Record<string, unknown>>): Array<{ id: string }> {
+  return rows.map((row) => {
+    if (typeof row.id !== "string") {
+      throw new Error("Expected OpenWorkflow id query to return string ids.");
+    }
+
+    return {
+      id: row.id,
+    };
+  });
+}
+
+async function executeWorkflowStatement(input: {
+  env: IntegrationTestEnvironment;
+  statement: SQL;
+}): Promise<void> {
+  await input.env.controlPlaneDb.execute(input.statement);
+}
+
+function workflowTable(
+  schemaName: OpenWorkflowSchemaName,
+  tableName: "step_attempts" | "workflow_runs" | "workflow_signals",
+): SQL {
+  return sql.raw(`${schemaName}.${tableName}`);
+}
 
 async function seedUser(env: IntegrationTestEnvironment, label: string): Promise<{ id: string }> {
   const id = `usr_maintenance_new_${label.replaceAll("-", "_")}`;

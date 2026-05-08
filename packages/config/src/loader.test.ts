@@ -94,7 +94,7 @@ describe("parseConfigRecord", () => {
 });
 
 describe("loadControlPlaneMaintenanceConfig", () => {
-  it("loads only the control-plane direct database URL from the new env surface", () => {
+  it("loads existing control-plane-only maintenance config from env", () => {
     const loadedConfig = loadControlPlaneMaintenanceConfig({
       env: {
         MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: "postgresql://direct.example/mistle",
@@ -112,10 +112,33 @@ describe("loadControlPlaneMaintenanceConfig", () => {
     });
   });
 
+  it("loads maintenance database URLs from the new env surface", () => {
+    const loadedConfig = loadControlPlaneMaintenanceConfig({
+      env: {
+        MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: "postgresql://direct.example/mistle",
+        MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL: "postgresql://data-direct.example/mistle",
+      },
+    });
+
+    expect(loadedConfig.app).toEqual({
+      database: {
+        migrationUrl: "postgresql://direct.example/mistle",
+      },
+      dataPlaneDatabase: {
+        migrationUrl: "postgresql://data-direct.example/mistle",
+      },
+      telemetry: {
+        enabled: false,
+        debug: false,
+      },
+    });
+  });
+
   it("loads maintenance telemetry from the new env surface", () => {
     const loadedConfig = loadControlPlaneMaintenanceConfig({
       env: {
         MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: "postgresql://direct.example/mistle",
+        MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL: "postgresql://data-direct.example/mistle",
         MISTLE_TELEMETRY_ENABLED: "1",
         MISTLE_TELEMETRY_DEBUG: "true",
         MISTLE_TELEMETRY_TRACES_ENDPOINT: "http://otel.example/v1/traces",
@@ -169,6 +192,9 @@ describe("loadControlPlaneMaintenanceConfig", () => {
 
     expect(loadedConfig.app).toEqual({
       database: {
+        migrationUrl: "postgresql://mistle:replace-with-password@db:5432/mistle",
+      },
+      dataPlaneDatabase: {
         migrationUrl: "postgresql://mistle:replace-with-password@db:5432/mistle",
       },
       telemetry: {

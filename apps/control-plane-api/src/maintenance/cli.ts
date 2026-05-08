@@ -26,11 +26,18 @@ async function main(): Promise<void> {
   const pool = new Pool({
     connectionString: loadedConfig.app.database.migrationUrl,
   });
+  const dataPlanePool =
+    loadedConfig.app.dataPlaneDatabase === undefined
+      ? undefined
+      : new Pool({
+          connectionString: loadedConfig.app.dataPlaneDatabase.migrationUrl,
+        });
 
   try {
     const result = await runMaintenanceCommand({
       command,
       pool,
+      ...(dataPlanePool === undefined ? {} : { dataPlanePool }),
     });
     logger.info(
       {
@@ -41,7 +48,7 @@ async function main(): Promise<void> {
       "Maintenance command completed.",
     );
   } finally {
-    await pool.end();
+    await Promise.all([pool.end(), dataPlanePool?.end() ?? Promise.resolve()]);
   }
 }
 
