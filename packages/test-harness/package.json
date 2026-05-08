@@ -47,7 +47,7 @@
     "redis": "^5.12.1",
     "testcontainers": "^11.14.0",
     "undici": "^7.24.6",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/pg": "^8.20.0"

@@ -40,7 +40,7 @@
     "pg": "^8.20.0",
     "typeid-js": "^1.2.0",
     "ws": "^8.20.0",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@mistle/test-harness": "workspace:*",

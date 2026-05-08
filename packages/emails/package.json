@@ -49,6 +49,6 @@
   "devDependencies": {
     "@mistle/test-harness": "workspace:*",
     "@types/nodemailer": "^7.0.11",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   }
 }

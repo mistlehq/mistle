@@ -70,7 +70,7 @@
     "smol-toml": "^1.6.1",
     "sshpk": "^1.18.0",
     "typeid-js": "^1.2.0",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@mistle/gateway-tunnel-auth": "workspace:*",
