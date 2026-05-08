@@ -7,7 +7,7 @@ type SessionPrimaryRepositorySelection =
   | { kind: "available"; path: string }
   | { kind: "unavailable"; path: string; option: SessionWorkbenchHeaderRepositoryOption };
 
-export function normalizeRepositoryPath(path: string): string {
+function normalizeRepositoryPath(path: string): string {
   return path.replace(/\/+$/, "");
 }
 
