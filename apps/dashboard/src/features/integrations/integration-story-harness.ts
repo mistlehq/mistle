@@ -70,8 +70,6 @@ function collectSupportedWebhookCapabilityEvents(
   const events = new Set<string>();
 
   for (const eventDefinition of definition.supportedWebhookEvents ?? []) {
-    events.add(eventDefinition.providerEventType);
-
     for (const requirementSet of eventDefinition.requirements?.anyOf ?? []) {
       if (requirementSet.event !== undefined) {
         events.add(requirementSet.event);
@@ -116,7 +114,7 @@ export function createStoryWebhookTriggerCapabilitiesProviderMetadata(input: {
   for (const permission of input.permissions ?? []) {
     if (!supportedPermissionKeys.has(createPermissionKey(permission))) {
       throw new Error(
-        `Story webhook capability permission '${permission.permission}' is not referenced by '${input.definition.familyId}/${input.definition.variantId}' supported webhook events.`,
+        `Story webhook capability permission '${formatStoryPermissionRequirement(permission)}' is not referenced by '${input.definition.familyId}/${input.definition.variantId}' supported webhook events.`,
       );
     }
   }
@@ -127,6 +125,12 @@ export function createStoryWebhookTriggerCapabilitiesProviderMetadata(input: {
       ...(input.permissions === undefined ? {} : { permissions: [...input.permissions] }),
     },
   };
+}
+
+function formatStoryPermissionRequirement(
+  input: IntegrationWebhookTriggerProviderPermissionRequirement,
+): string {
+  return input.access === undefined ? input.permission : `${input.permission}:${input.access}`;
 }
 
 function resolveAuthMethodOrThrow(input: StoryAuthMethodSpec): StoryResolvedAuthMethod {
