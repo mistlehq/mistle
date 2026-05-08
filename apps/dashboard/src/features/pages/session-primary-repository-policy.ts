@@ -98,6 +98,12 @@ export function resolvePrimaryRepositorySelection(input: {
   };
 }
 
+export function resolvePrimaryRepositoryTurnStartCwd(input: {
+  selectedRepositoryPath: string | null;
+}): string {
+  return input.selectedRepositoryPath ?? DefaultSandboxWorkspaceDir;
+}
+
 export function resolvePrimaryRepositoryPresentation(input: {
   repositoryOptions: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
   selectedRepositoryPath: string | null;

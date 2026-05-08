@@ -185,7 +185,7 @@ function SessionWorkbenchPageContent(input: {
               ? (workbench.stoppedSessionMessage ??
                 "Primary repository is available only when the sandbox is running.")
               : workbench.primaryRepositoryControlState.isSwitching
-                ? "Switching the active chat thread for the selected repository."
+                ? "Updating the active chat thread working directory."
                 : workbench.primaryRepositoryState.isInitialLoading
                   ? "Loading repositories from the active sandbox."
                   : workbench.primaryRepositoryState.isRefreshing

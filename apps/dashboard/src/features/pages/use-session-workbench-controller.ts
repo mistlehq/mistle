@@ -18,6 +18,7 @@ import {
   type SessionComposerStateInput,
 } from "./session-composer/index.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
+import { resolvePrimaryRepositoryTurnStartCwd } from "./session-primary-repository-policy.js";
 import type { SessionStartupState } from "./session-startup-status.js";
 import {
   hasAutomationSessionPreparationTimedOut,
@@ -284,7 +285,12 @@ export function useSessionWorkbenchController(input: {
         chat.chatState.turnOrder.length === 0 &&
         !(cachedTitle !== undefined && cachedTitle !== null);
 
-      await chat.startTurn(turnInput);
+      await chat.startTurn({
+        ...turnInput,
+        cwd: resolvePrimaryRepositoryTurnStartCwd({
+          selectedRepositoryPath: primaryRepositoryState.selectedRepositoryPath,
+        }),
+      });
 
       if (!shouldGenerateSessionTitle || sandboxInstanceId === null) {
         return;

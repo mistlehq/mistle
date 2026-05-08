@@ -185,6 +185,7 @@ export type CodexTurnCollaborationModeSettings = {
 type CodexTurnStartRequest = {
   threadId: string;
   input: readonly CodexTurnInputItem[];
+  cwd?: string;
   collaborationMode?: {
     mode: "default";
     settings: {
@@ -222,11 +223,13 @@ export function buildCodexTurnInputItems(input: {
 export function buildCodexTurnStartRequest(input: {
   threadId: string;
   input: readonly CodexTurnInputItem[];
+  cwd?: string;
   collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
 }): CodexTurnStartRequest {
   return {
     threadId: input.threadId,
     input: input.input,
+    ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
     ...(input.collaborationModeSettings === undefined
       ? {}
       : {
@@ -270,6 +273,7 @@ export async function startCodexTurn(input: {
   rpcClient: CodexJsonRpcClient;
   threadId: string;
   input: readonly CodexTurnInputItem[];
+  cwd?: string;
   collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
 }): Promise<{ turnId: string; status: string; response: unknown }> {
   const response = await input.rpcClient.call("turn/start", buildCodexTurnStartRequest(input));

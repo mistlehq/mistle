@@ -112,4 +112,28 @@ describe("buildCodexTurnStartRequest", () => {
       ],
     });
   });
+
+  it("includes cwd when the caller supplies a turn working directory", () => {
+    expect(
+      buildCodexTurnStartRequest({
+        threadId: "thread_123",
+        cwd: "/root/acme/repo-2",
+        input: [
+          {
+            type: "text",
+            text: "Explain the repo",
+          },
+        ],
+      }),
+    ).toEqual({
+      threadId: "thread_123",
+      cwd: "/root/acme/repo-2",
+      input: [
+        {
+          type: "text",
+          text: "Explain the repo",
+        },
+      ],
+    });
+  });
 });

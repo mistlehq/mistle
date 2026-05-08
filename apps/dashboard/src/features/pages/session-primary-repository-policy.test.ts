@@ -5,6 +5,7 @@ import {
   DefaultSandboxWorkspaceDir,
   parseRepositoryPaths,
   resolvePrimaryRepositoryPresentation,
+  resolvePrimaryRepositoryTurnStartCwd,
   toRepositoryOptions,
 } from "./session-primary-repository-policy.js";
 
@@ -78,5 +79,21 @@ describe("session primary repository policy", () => {
         option: { value: "/root/acme/repo-1", label: "acme/repo-1 (unavailable)" },
       },
     });
+  });
+
+  it("uses the selected repository as the Codex turn cwd", () => {
+    expect(
+      resolvePrimaryRepositoryTurnStartCwd({
+        selectedRepositoryPath: "/root/acme/repo-2",
+      }),
+    ).toBe("/root/acme/repo-2");
+  });
+
+  it("uses the workspace root as the Codex turn cwd when None is selected", () => {
+    expect(
+      resolvePrimaryRepositoryTurnStartCwd({
+        selectedRepositoryPath: null,
+      }),
+    ).toBe(DefaultSandboxWorkspaceDir);
   });
 });
