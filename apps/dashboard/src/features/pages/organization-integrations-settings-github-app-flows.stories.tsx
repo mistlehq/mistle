@@ -1,4 +1,7 @@
-import type { AnyIntegrationDefinition } from "@mistle/integrations-core";
+import {
+  IntegrationWebhookTriggerCapabilitiesProviderMetadataKey,
+  type AnyIntegrationDefinition,
+} from "@mistle/integrations-core";
 import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -147,7 +150,16 @@ function createWebhookSourceFixture(): IntegrationWebhookSource {
     callbackUrl:
       "https://control-plane.example.com/p/integration/webhooks/github-cloud/eps_github_story",
     status: "active",
-    providerMetadata: {},
+    providerMetadata: {
+      [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+        events: ["issues", "pull_request", "check_suite"],
+        permissions: [
+          { permission: "issues", access: "read" },
+          { permission: "pull_requests", access: "read" },
+          { permission: "checks", access: "read" },
+        ],
+      },
+    },
     createdAt: "2026-04-23T00:00:00.000Z",
     updatedAt: "2026-04-23T00:00:00.000Z",
   };

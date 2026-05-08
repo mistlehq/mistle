@@ -4,6 +4,7 @@ import { IntegrationWebhookTriggerCapabilitiesProviderMetadataKey } from "../typ
 import {
   isWebhookTriggerSupportedByCapabilities,
   parseWebhookTriggerCapabilitiesProviderMetadata,
+  resolveWebhookTriggerCapabilityEvents,
 } from "./index.js";
 
 describe("webhook trigger capabilities", () => {
@@ -127,5 +128,72 @@ describe("webhook trigger capabilities", () => {
       events: ["issues"],
       permissions: [{ permission: "issues", access: "read" }],
     });
+  });
+
+  it("returns every supported event with enabled status from current capabilities", () => {
+    const events = resolveWebhookTriggerCapabilityEvents({
+      capabilities: {
+        events: ["pull_request"],
+        permissions: [{ permission: "pull_requests", access: "read" }],
+      },
+      supportedWebhookEvents: [
+        {
+          displayName: "Pull request opened",
+          eventType: "github.pull_request.opened",
+          providerEventType: "pull_request",
+          requirements: {
+            anyOf: [
+              {
+                event: "pull_request",
+                permissions: [{ permission: "pull_requests", access: "read" }],
+              },
+            ],
+          },
+        },
+        {
+          displayName: "Push",
+          eventType: "github.push.pushed",
+          providerEventType: "push",
+          requirements: {
+            anyOf: [
+              {
+                event: "push",
+                permissions: [{ permission: "contents", access: "read" }],
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(
+      events.map((event) => ({
+        eventType: event.eventDefinition.eventType,
+        missingRequirementSets: event.missingRequirementSets,
+        satisfiedRequirementSet: event.satisfiedRequirementSet,
+        status: event.status,
+      })),
+    ).toEqual([
+      {
+        eventType: "github.pull_request.opened",
+        missingRequirementSets: [],
+        satisfiedRequirementSet: {
+          event: "pull_request",
+          permissions: [{ permission: "pull_requests", access: "read" }],
+        },
+        status: "enabled",
+      },
+      {
+        eventType: "github.push.pushed",
+        missingRequirementSets: [
+          {
+            event: "push",
+            permissions: [{ permission: "contents", access: "read" }],
+          },
+        ],
+        satisfiedRequirementSet: undefined,
+        status: "not_enabled",
+      },
+    ]);
   });
 });

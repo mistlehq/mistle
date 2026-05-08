@@ -1151,6 +1151,124 @@ describe("IntegrationConnectionDetailView", () => {
     expect(createdConnectionId).toBeNull();
   });
 
+  it("renders every supported webhook event with current source capability status", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_webhook_capabilities",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "GitHub App",
+            authMethodId: "github-app-installation",
+            authMethodLabel: "GitHub App installation",
+            status: "active",
+            resources: [],
+          },
+        ]}
+        supportedWebhookEvents={[
+          {
+            eventType: "github.pull_request.opened",
+            providerEventType: "pull_request",
+            displayName: "Pull request opened",
+            category: "Pull request",
+            requirements: {
+              anyOf: [
+                {
+                  event: "pull_request",
+                  permissions: [{ permission: "pull_requests", access: "read" }],
+                },
+              ],
+            },
+          },
+          {
+            eventType: "github.push.pushed",
+            providerEventType: "push",
+            displayName: "Push",
+            category: "Branch",
+            requirements: {
+              anyOf: [
+                {
+                  event: "push",
+                  permissions: [
+                    { permission: "contents", access: "read" },
+                    { permission: "metadata", access: "read" },
+                  ],
+                },
+              ],
+            },
+          },
+        ]}
+        webhookPolicy={ImplicitWebhookPolicy}
+        webhookSourceStateByConnectionId={
+          new Map([
+            [
+              "icn_webhook_capabilities",
+              {
+                createErrorMessage: null,
+                deleteErrorMessage: null,
+                deletingWebhookSourceId: null,
+                isCreating: false,
+                isLoading: false,
+                items: [
+                  {
+                    id: "iws_github_capabilities",
+                    targetKey: "github-cloud",
+                    integrationConnectionId: "icn_webhook_capabilities",
+                    displayName: "GitHub App webhook",
+                    endpointKey: "ep_github",
+                    callbackUrl:
+                      "https://control-plane.example.com/p/integration/webhooks/github-cloud/ep_github",
+                    status: "active",
+                    providerMetadata: {
+                      webhookTriggerCapabilities: {
+                        events: ["pull_request", "push"],
+                        permissions: [
+                          { permission: "pull_requests", access: "read" },
+                          { permission: "metadata", access: "read" },
+                        ],
+                      },
+                    },
+                    createdAt: "2026-04-03T00:00:00.000Z",
+                    updatedAt: "2026-04-03T00:00:00.000Z",
+                  },
+                ],
+                loadErrorMessage: null,
+                revealedWebhookSecret: null,
+              },
+            ],
+          ])
+        }
+      />,
+    );
+
+    const webhookSection = screen.getByText("Webhook").closest("section");
+    if (webhookSection === null) {
+      throw new Error("Expected webhook section to render.");
+    }
+
+    expect(within(webhookSection).getByText("Webhook events")).toBeTruthy();
+    expect(within(webhookSection).getByText("Pull request opened")).toBeTruthy();
+    expect(within(webhookSection).queryByText("Pull request")).toBeNull();
+    expect(within(webhookSection).queryByText("github.pull_request.opened")).toBeNull();
+    expect(within(webhookSection).getAllByText("Events")).toHaveLength(2);
+    expect(within(webhookSection).getByText("pull_request")).toBeTruthy();
+    expect(within(webhookSection).getAllByText("Permissions")).toHaveLength(2);
+    expect(within(webhookSection).getByText("pull_requests:read")).toBeTruthy();
+    expect(within(webhookSection).getByText("Push")).toBeTruthy();
+    expect(within(webhookSection).queryByText("Branch")).toBeNull();
+    expect(within(webhookSection).queryByText("github.push.pushed")).toBeNull();
+    expect(within(webhookSection).queryByText("Provider settings")).toBeNull();
+    expect(within(webhookSection).getByText("push")).toBeTruthy();
+    expect(within(webhookSection).getByText("contents:read")).toBeTruthy();
+    expect(within(webhookSection).getByText("metadata:read")).toBeTruthy();
+    expect(within(webhookSection).getAllByLabelText("Present")).toHaveLength(4);
+    expect(within(webhookSection).getAllByLabelText("Missing")).toHaveLength(1);
+    expect(within(webhookSection).queryByText("Enabled")).toBeNull();
+    expect(within(webhookSection).queryByText("Not enabled")).toBeNull();
+    expect(within(webhookSection).getByLabelText("Not enabled")).toBeTruthy();
+  });
+
   it.each([
     ["active", "Active"],
     ["disabled", "Disabled"],

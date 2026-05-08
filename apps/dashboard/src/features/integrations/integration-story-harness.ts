@@ -1,4 +1,7 @@
-import type { AnyIntegrationDefinition } from "@mistle/integrations-core";
+import {
+  IntegrationWebhookTriggerCapabilitiesProviderMetadataKey,
+  type AnyIntegrationDefinition,
+} from "@mistle/integrations-core";
 import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
 
 import {
@@ -351,6 +354,10 @@ export function createRefreshingDetailViewStoryProps() {
 
 export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDetailViewProps {
   const connectionId = "icn_github_dense";
+  const definition = getDefinitionOrThrow({
+    familyId: "github",
+    variantId: "github-cloud",
+  });
 
   return {
     connections: [
@@ -541,7 +548,16 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
               endpointKey: "github-cloud",
               id: "iws_01densegithubsource",
               integrationConnectionId: connectionId,
-              providerMetadata: {},
+              providerMetadata: {
+                [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+                  events: ["issues", "pull_request", "check_suite"],
+                  permissions: [
+                    { permission: "issues", access: "read" },
+                    { permission: "pull_requests", access: "read" },
+                    { permission: "checks", access: "read" },
+                  ],
+                },
+              },
               status: "active",
               targetKey: "github-cloud",
               updatedAt: "2026-04-13T15:37:00.000Z",
@@ -552,6 +568,7 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
         },
       ],
     ]),
+    supportedWebhookEvents: definition.supportedWebhookEvents ?? [],
   };
 }
 
@@ -763,6 +780,13 @@ function createScenarioDetailViewStoryProps(
   const webhookSourceStateByConnectionId = createWebhookSourceSectionState(input);
   const automationCount = input.automationCount ?? 0;
   const bindingCount = input.bindingCount ?? 0;
+  const supportedWebhookEvents =
+    input.authMethod === undefined
+      ? []
+      : (getDefinitionOrThrow({
+          familyId: input.authMethod.familyId,
+          variantId: input.authMethod.variantId,
+        }).supportedWebhookEvents ?? []);
 
   return {
     connections: [
@@ -791,6 +815,7 @@ function createScenarioDetailViewStoryProps(
     onEditAuthentication: () => {},
     onRefreshResource: () => {},
     ...(resourceItemsByKey === undefined ? {} : { resourceItemsByKey }),
+    ...(supportedWebhookEvents.length === 0 ? {} : { supportedWebhookEvents }),
     ...(webhookSourceStateByConnectionId === undefined
       ? {}
       : {
@@ -851,7 +876,15 @@ export function createGitHubEnterpriseServerDetailViewStoryProps(): IntegrationC
         endpointKey: "github-enterprise-server",
         id: "iws_ghes_123",
         integrationConnectionId: "icn_github_ghes_dense",
-        providerMetadata: {},
+        providerMetadata: {
+          [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+            events: ["issues", "pull_request"],
+            permissions: [
+              { permission: "issues", access: "read" },
+              { permission: "pull_requests", access: "read" },
+            ],
+          },
+        },
         status: "active",
         targetKey: "github-enterprise-server",
         updatedAt: DenseStoryLastSyncedAt,
@@ -892,6 +925,10 @@ export function createJiraDetailViewStoryProps(): IntegrationConnectionDetailVie
             "comment_created",
             "comment_updated",
           ],
+          [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+            events: ["jira:issue_created", "jira:issue_updated", "comment_created"],
+            permissions: [{ permission: "read:jira-work" }, { permission: "manage:jira-webhook" }],
+          },
         },
         remoteRegistrationId: "10001",
         status: "active",
@@ -1034,7 +1071,15 @@ export function createSlackDetailViewStoryProps(): IntegrationConnectionDetailVi
           endpointKey: connection.endpointKey,
           id: connection.webhookSourceId,
           integrationConnectionId: connection.connectionId,
-          providerMetadata: {},
+          providerMetadata: {
+            [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+              events: ["message.channels", "app_mention"],
+              permissions: [
+                { permission: "channels:history" },
+                { permission: "app_mentions:read" },
+              ],
+            },
+          },
           status: "active",
           targetKey: "slack-default",
           updatedAt: DenseStoryLastSyncedAt,
@@ -1062,6 +1107,7 @@ export function createSlackDetailViewStoryProps(): IntegrationConnectionDetailVi
         Array.from(story.webhookSourceStateByConnectionId?.entries() ?? []),
       ),
     ),
+    supportedWebhookEvents: storyProps[0]?.supportedWebhookEvents ?? [],
   };
 }
 

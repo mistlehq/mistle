@@ -1,4 +1,7 @@
-import type { AnyIntegrationDefinition } from "@mistle/integrations-core";
+import {
+  IntegrationWebhookTriggerCapabilitiesProviderMetadataKey,
+  type AnyIntegrationDefinition,
+} from "@mistle/integrations-core";
 import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -147,7 +150,12 @@ function createWebhookSourceFixture(): IntegrationWebhookSource {
     callbackUrl:
       "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_slack_story",
     status: "active",
-    providerMetadata: {},
+    providerMetadata: {
+      [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+        events: ["message.channels", "app_mention"],
+        permissions: [{ permission: "channels:history" }, { permission: "app_mentions:read" }],
+      },
+    },
     createdAt: "2026-04-26T00:00:00.000Z",
     updatedAt: "2026-04-26T00:00:00.000Z",
   };

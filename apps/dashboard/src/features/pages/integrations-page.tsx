@@ -336,6 +336,12 @@ export function IntegrationsPage() {
             </Notice>
           ) : undefined
         }
+        {...(directoryState.selectedDetailCard?.target.supportedWebhookEvents === undefined
+          ? {}
+          : {
+              supportedWebhookEvents:
+                directoryState.selectedDetailCard.target.supportedWebhookEvents,
+            })}
         webhookSourceStateByConnectionId={webhookSourceState.webhookSourceStateByConnectionId}
         onCreateWebhookSource={({ connectionId }) => {
           webhookSourceState.createWebhookSource({ connectionId });

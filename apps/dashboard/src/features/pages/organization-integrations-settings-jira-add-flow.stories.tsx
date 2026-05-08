@@ -1,4 +1,7 @@
-import type { AnyIntegrationDefinition } from "@mistle/integrations-core";
+import {
+  IntegrationWebhookTriggerCapabilitiesProviderMetadataKey,
+  type AnyIntegrationDefinition,
+} from "@mistle/integrations-core";
 import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -137,6 +140,10 @@ function createJiraWebhookSource(input?: { connectionId?: string }): Integration
         "comment_created",
         "comment_updated",
       ],
+      [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+        events: ["jira:issue_created", "jira:issue_updated", "comment_created"],
+        permissions: [{ permission: "read:jira-work" }, { permission: "manage:jira-webhook" }],
+      },
     },
     createdAt: StoryNow,
     updatedAt: StoryNow,

@@ -1,9 +1,21 @@
 import type {
+  IntegrationWebhookEventDefinition,
   IntegrationWebhookTriggerCapabilities,
   IntegrationWebhookTriggerProviderPermissionRequirement,
+  IntegrationWebhookTriggerRequirementSet,
   IntegrationWebhookTriggerRequirements,
 } from "../types/index.js";
 import { IntegrationWebhookTriggerCapabilitiesProviderMetadataKey } from "../types/index.js";
+
+export type IntegrationWebhookTriggerCapabilityEventStatus = "enabled" | "not_enabled";
+
+export type IntegrationWebhookTriggerCapabilityEvent = {
+  eventDefinition: IntegrationWebhookEventDefinition;
+  capabilities?: IntegrationWebhookTriggerCapabilities | undefined;
+  missingRequirementSets: readonly IntegrationWebhookTriggerRequirementSet[];
+  satisfiedRequirementSet?: IntegrationWebhookTriggerRequirementSet | undefined;
+  status: IntegrationWebhookTriggerCapabilityEventStatus;
+};
 
 function toRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -113,6 +125,34 @@ function hasPermissionCapability(input: {
   );
 }
 
+export function hasWebhookTriggerEventCapability(input: {
+  capabilities: IntegrationWebhookTriggerCapabilities | undefined;
+  event: string;
+}): boolean {
+  if (input.capabilities === undefined) {
+    return false;
+  }
+
+  return hasEventCapability({
+    capabilities: input.capabilities,
+    event: input.event,
+  });
+}
+
+export function hasWebhookTriggerPermissionCapability(input: {
+  capabilities: IntegrationWebhookTriggerCapabilities | undefined;
+  permission: IntegrationWebhookTriggerProviderPermissionRequirement;
+}): boolean {
+  if (input.capabilities === undefined) {
+    return false;
+  }
+
+  return hasPermissionCapability({
+    capabilities: input.capabilities,
+    permission: input.permission,
+  });
+}
+
 function isRequirementSetSatisfied(input: {
   capabilities: IntegrationWebhookTriggerCapabilities;
   requirementSet: IntegrationWebhookTriggerRequirements["anyOf"][number];
@@ -155,4 +195,54 @@ export function isWebhookTriggerSupportedByCapabilities(input: {
       requirementSet,
     }),
   );
+}
+
+export function resolveWebhookTriggerCapabilityEvents(input: {
+  capabilities: IntegrationWebhookTriggerCapabilities | undefined;
+  supportedWebhookEvents: readonly IntegrationWebhookEventDefinition[];
+}): readonly IntegrationWebhookTriggerCapabilityEvent[] {
+  return input.supportedWebhookEvents.map((eventDefinition) => {
+    const requirements = eventDefinition.requirements;
+    if (requirements === undefined) {
+      return {
+        eventDefinition,
+        ...(input.capabilities === undefined ? {} : { capabilities: input.capabilities }),
+        missingRequirementSets: [],
+        status: "enabled",
+      };
+    }
+
+    if (input.capabilities === undefined) {
+      return {
+        eventDefinition,
+        missingRequirementSets: requirements.anyOf,
+        status: "not_enabled",
+      };
+    }
+
+    const capabilities = input.capabilities;
+    const satisfiedRequirementSet = requirements.anyOf.find((requirementSet) =>
+      isRequirementSetSatisfied({
+        capabilities,
+        requirementSet,
+      }),
+    );
+
+    if (satisfiedRequirementSet !== undefined) {
+      return {
+        eventDefinition,
+        capabilities,
+        missingRequirementSets: [],
+        satisfiedRequirementSet,
+        status: "enabled",
+      };
+    }
+
+    return {
+      eventDefinition,
+      capabilities,
+      missingRequirementSets: requirements.anyOf,
+      status: "not_enabled",
+    };
+  });
 }

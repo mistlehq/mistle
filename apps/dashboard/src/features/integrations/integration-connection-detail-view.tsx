@@ -1,3 +1,13 @@
+import {
+  hasWebhookTriggerEventCapability,
+  hasWebhookTriggerPermissionCapability,
+  parseWebhookTriggerCapabilitiesProviderMetadata,
+  resolveWebhookTriggerCapabilityEvents,
+  type IntegrationWebhookEventDefinition,
+  type IntegrationWebhookTriggerCapabilityEvent,
+  type IntegrationWebhookTriggerProviderPermissionRequirement,
+  type IntegrationWebhookTriggerRequirementSet,
+} from "@mistle/integrations-core";
 import { JiraWebhookEventDisplayNameByType } from "@mistle/integrations-definitions";
 import {
   Badge,
@@ -17,7 +27,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@mistle/ui";
-import { ArrowSquareOutIcon, TrashIcon } from "@phosphor-icons/react";
+import {
+  ArrowSquareOutIcon,
+  CheckCircleIcon,
+  CircleDashedIcon,
+  TrashIcon,
+} from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
@@ -33,6 +48,8 @@ import {
   type IntegrationResourceListItemResourceSummary,
 } from "./integration-resource-row.js";
 import type { IntegrationWebhookSource } from "./integrations-service.js";
+
+type IntegrationSupportedWebhookEvent = IntegrationWebhookEventDefinition;
 
 export type IntegrationConnectionDetailResourceSummary = IntegrationResourceListItemResourceSummary;
 
@@ -88,6 +105,7 @@ export type IntegrationConnectionDetailViewProps = {
   selectedConnectionId?: string | null;
   selectedConnectionBody?: ReactNode;
   selectedConnectionNotice?: ReactNode;
+  supportedWebhookEvents?: readonly IntegrationSupportedWebhookEvent[];
   titleEditor?:
     | {
         disabled: boolean;
@@ -321,6 +339,9 @@ export function IntegrationConnectionDetailView(
             {...(props.selectedConnectionNotice === undefined
               ? {}
               : { selectedConnectionNotice: props.selectedConnectionNotice })}
+            {...(props.supportedWebhookEvents === undefined
+              ? {}
+              : { supportedWebhookEvents: props.supportedWebhookEvents })}
             {...(selectedWebhookSourceState === undefined
               ? {}
               : { webhookSourceState: selectedWebhookSourceState })}
@@ -342,6 +363,7 @@ function ConnectionDetailPane(input: {
   resourceItemsByKey?: IntegrationConnectionDetailViewProps["resourceItemsByKey"];
   customBody?: ReactNode;
   selectedConnectionNotice?: ReactNode;
+  supportedWebhookEvents?: readonly IntegrationSupportedWebhookEvent[];
   titleEditor?: IntegrationConnectionDetailViewProps["titleEditor"];
   webhookPolicy?: IntegrationConnectionDetailViewProps["webhookPolicy"];
   webhookSourceState?: IntegrationWebhookSourceSectionState;
@@ -583,6 +605,7 @@ function ConnectionDetailPane(input: {
                 onCreateWebhookSource={undefined}
                 onDeleteWebhookSource={input.onDeleteWebhookSource}
                 state={webhookSourceState}
+                supportedWebhookEvents={input.supportedWebhookEvents ?? []}
               />
             </SectionBlock>
           ) : null}
@@ -785,6 +808,7 @@ function WebhookSourcesSection(input: {
     | ((input: { connectionId: string; webhookSourceId: string }) => void)
     | undefined;
   state: IntegrationWebhookSourceSectionState;
+  supportedWebhookEvents: readonly IntegrationSupportedWebhookEvent[];
 }): React.JSX.Element {
   return (
     <div className="gap-3 pt-2 flex flex-col">
@@ -824,11 +848,21 @@ function WebhookSourcesSection(input: {
       {input.state.isLoading ? (
         <p className="text-muted-foreground text-sm">Loading webhook sources...</p>
       ) : input.state.items.length === 0 ? (
-        <Notice>
-          {input.onCreateWebhookSource === undefined
-            ? "No webhook is configured for this connection."
-            : "Create a webhook to receive events."}
-        </Notice>
+        <>
+          <Notice>
+            {input.onCreateWebhookSource === undefined
+              ? "No webhook is configured for this connection."
+              : "Create a webhook to receive events."}
+          </Notice>
+          {input.supportedWebhookEvents.length === 0 ? null : (
+            <WebhookTriggerCapabilityEventList
+              events={resolveWebhookTriggerCapabilityEvents({
+                capabilities: undefined,
+                supportedWebhookEvents: input.supportedWebhookEvents,
+              })}
+            />
+          )}
+        </>
       ) : (
         <div className="gap-3 flex flex-col">
           {input.state.items.map((source) => (
@@ -839,6 +873,7 @@ function WebhookSourcesSection(input: {
               key={source.id}
               onDeleteWebhookSource={input.onDeleteWebhookSource}
               source={source}
+              supportedWebhookEvents={input.supportedWebhookEvents}
             />
           ))}
         </div>
@@ -855,6 +890,7 @@ function WebhookSourceCard(input: {
     | ((input: { connectionId: string; webhookSourceId: string }) => void)
     | undefined;
   source: IntegrationWebhookSource;
+  supportedWebhookEvents: readonly IntegrationSupportedWebhookEvent[];
 }): React.JSX.Element {
   const isDeleting = input.deletingWebhookSourceId === input.source.id;
   const isDeleteSupported =
@@ -862,6 +898,10 @@ function WebhookSourceCard(input: {
     input.onDeleteWebhookSource !== undefined &&
     input.source.remoteRegistrationId !== undefined;
   const registeredEventLabels = resolveWebhookRegisteredEventLabels(input.source.providerMetadata);
+  const webhookTriggerCapabilityEvents = resolveWebhookTriggerCapabilityEvents({
+    capabilities: parseWebhookTriggerCapabilitiesProviderMetadata(input.source.providerMetadata),
+    supportedWebhookEvents: input.supportedWebhookEvents,
+  });
   const shouldShowHeaderText = !input.hideDeleteAction && input.source.displayName !== "";
   const shouldShowHeaderRow = shouldShowHeaderText || isDeleteSupported;
 
@@ -922,9 +962,212 @@ function WebhookSourceCard(input: {
         {input.source.callbackUrl === undefined ? null : (
           <CopyableValue label="Webhook URL" value={input.source.callbackUrl} />
         )}
+        {webhookTriggerCapabilityEvents.length === 0 ? null : (
+          <WebhookTriggerCapabilityEventList events={webhookTriggerCapabilityEvents} />
+        )}
       </div>
     </div>
   );
+}
+
+function WebhookTriggerCapabilityEventList(input: {
+  events: readonly IntegrationWebhookTriggerCapabilityEvent[];
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-2">
+      <DetailLabel as="p">Webhook events</DetailLabel>
+      <div className="divide-border overflow-hidden rounded-md border">
+        {input.events.map((event) => (
+          <WebhookTriggerCapabilityEventRow event={event} key={event.eventDefinition.eventType} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WebhookTriggerCapabilityEventRow(input: {
+  event: IntegrationWebhookTriggerCapabilityEvent;
+}): React.JSX.Element {
+  const providerRequirementSets =
+    input.event.status === "enabled" && input.event.satisfiedRequirementSet !== undefined
+      ? [input.event.satisfiedRequirementSet]
+      : input.event.missingRequirementSets;
+
+  return (
+    <div className="border-b px-3 py-3 last:border-b-0">
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-1.5">
+          {input.event.status === "enabled" ? null : (
+            <CircleDashedIcon
+              aria-label="Not enabled"
+              className="text-muted-foreground size-3.5 shrink-0"
+            />
+          )}
+          <span
+            className={`truncate text-sm font-medium ${
+              input.event.status === "enabled" ? "text-foreground" : "text-muted-foreground"
+            }`}
+          >
+            {input.event.eventDefinition.displayName}
+          </span>
+        </div>
+      </div>
+      {providerRequirementSets.length === 0 ? null : (
+        <div className="mt-2 flex flex-col gap-1.5">
+          {providerRequirementSets.map((requirementSet, index) => (
+            <WebhookTriggerProviderRequirementSet
+              capabilities={input.event.capabilities}
+              index={index}
+              key={formatRequirementSetKey(requirementSet, index)}
+              requirementSet={requirementSet}
+              showAlternativeLabel={providerRequirementSets.length > 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WebhookTriggerProviderRequirementSet(input: {
+  capabilities: IntegrationWebhookTriggerCapabilityEvent["capabilities"];
+  index: number;
+  requirementSet: IntegrationWebhookTriggerRequirementSet;
+  showAlternativeLabel: boolean;
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-1">
+      {input.showAlternativeLabel ? (
+        <p className="text-muted-foreground text-xs">Option {input.index + 1}</p>
+      ) : null}
+      <WebhookTriggerProviderEventsRequirement
+        capabilities={input.capabilities}
+        events={input.requirementSet.event === undefined ? [] : [input.requirementSet.event]}
+      />
+      {(input.requirementSet.permissions ?? []).length === 0 ? null : (
+        <WebhookTriggerProviderPermissionsRequirement
+          capabilities={input.capabilities}
+          permissions={input.requirementSet.permissions ?? []}
+        />
+      )}
+    </div>
+  );
+}
+
+function WebhookTriggerProviderEventsRequirement(input: {
+  capabilities: IntegrationWebhookTriggerCapabilityEvent["capabilities"];
+  events: readonly string[];
+}): React.JSX.Element {
+  if (input.events.length === 0) {
+    return <WebhookTriggerProviderRequirementChipGroup items={[]} label="Events" />;
+  }
+
+  return (
+    <WebhookTriggerProviderRequirementChipGroup
+      items={input.events.map((event) => ({
+        id: event,
+        isPresent: hasWebhookTriggerEventCapability({
+          capabilities: input.capabilities,
+          event,
+        }),
+        value: event,
+      }))}
+      label="Events"
+    />
+  );
+}
+
+function WebhookTriggerProviderRequirementChipGroup(input: {
+  items: readonly {
+    id: string;
+    isPresent: boolean;
+    value: string;
+  }[];
+  label: string;
+}): React.JSX.Element {
+  return (
+    <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-2 text-xs">
+      <span className="text-muted-foreground">{input.label}</span>
+      {input.items.length === 0 ? (
+        <span className="text-muted-foreground">None required</span>
+      ) : (
+        <div className="flex min-w-0 flex-wrap gap-1.5">
+          {input.items.map((item) => (
+            <WebhookTriggerProviderRequirementChip
+              isPresent={item.isPresent}
+              key={item.id}
+              value={item.value}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WebhookTriggerProviderPermissionsRequirement(input: {
+  capabilities: IntegrationWebhookTriggerCapabilityEvent["capabilities"];
+  permissions: readonly IntegrationWebhookTriggerProviderPermissionRequirement[];
+}): React.JSX.Element {
+  return (
+    <WebhookTriggerProviderRequirementChipGroup
+      items={input.permissions.map((permission) => {
+        const formattedPermission = formatProviderPermissionRequirement(permission);
+
+        return {
+          id: formattedPermission,
+          isPresent: hasWebhookTriggerPermissionCapability({
+            capabilities: input.capabilities,
+            permission,
+          }),
+          value: formattedPermission,
+        };
+      })}
+      label="Permissions"
+    />
+  );
+}
+
+function WebhookTriggerProviderRequirementChip(input: {
+  isPresent: boolean;
+  value: string;
+}): React.JSX.Element {
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5">
+      {input.isPresent ? (
+        <CheckCircleIcon
+          aria-label="Present"
+          className="size-3.5 shrink-0 text-emerald-700"
+          weight="fill"
+        />
+      ) : (
+        <CircleDashedIcon
+          aria-label="Missing"
+          className="text-muted-foreground size-3.5 shrink-0"
+        />
+      )}
+      <code className="min-w-0 break-all text-foreground">{input.value}</code>
+    </span>
+  );
+}
+
+function formatProviderPermissionRequirement(
+  permission: IntegrationWebhookTriggerProviderPermissionRequirement,
+): string {
+  return permission.access === undefined
+    ? permission.permission
+    : `${permission.permission}:${permission.access}`;
+}
+
+function formatRequirementSetKey(
+  requirementSet: IntegrationWebhookTriggerRequirementSet,
+  index: number,
+): string {
+  const permissionKey = (requirementSet.permissions ?? [])
+    .map((permission) => `${permission.permission}:${permission.access ?? ""}`)
+    .join("|");
+
+  return `${requirementSet.event ?? ""}:${permissionKey}:${index}`;
 }
 
 function isStringArray(input: unknown): input is string[] {
