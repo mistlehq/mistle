@@ -134,10 +134,10 @@ describe("buildProviderRow", () => {
             updatedAt: "2026-01-02T00:00:00.000Z",
           },
         ],
-        configurationStatus: "disabled",
+        configurationStatus: "unconfigured",
         selectedConnection: null,
         configuredAt: null,
-        updatedAt: "2026-01-02T00:00:00.000Z",
+        updatedAt: null,
       },
       providerLinksQuery: null,
       selectedConnectionIdByProviderFamily: {
