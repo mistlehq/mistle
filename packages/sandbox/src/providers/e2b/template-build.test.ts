@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { systemSleeper } from "@mistle/time";
-import { TemplateError } from "e2b";
+import { BuildError, TemplateError } from "e2b";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -83,6 +83,14 @@ describe("withE2BTemplateAliasLock", () => {
 describe("isE2BTemplateAliasDuplicateRaceError", () => {
   it("recognizes the remote E2B alias uniqueness race", () => {
     const error = new TemplateError(
+      "500: Error when inserting alias 'mistle-sandbox-base-test': ERROR: duplicate key value violates unique constraint \"idx_env_aliases_alias_namespace_unique\" (SQLSTATE 23505)",
+    );
+
+    expect(isE2BTemplateAliasDuplicateRaceError(error)).toBe(true);
+  });
+
+  it("recognizes the remote E2B alias uniqueness race from build requests", () => {
+    const error = new BuildError(
       "500: Error when inserting alias 'mistle-sandbox-base-test': ERROR: duplicate key value violates unique constraint \"idx_env_aliases_alias_namespace_unique\" (SQLSTATE 23505)",
     );
 

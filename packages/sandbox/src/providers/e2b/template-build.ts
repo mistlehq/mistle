@@ -2,7 +2,14 @@ import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { systemClock, systemSleeper } from "@mistle/time";
-import { Template, TemplateError, type BuildInfo, type ConnectionOpts, type LogEntry } from "e2b";
+import {
+  BuildError,
+  Template,
+  TemplateError,
+  type BuildInfo,
+  type ConnectionOpts,
+  type LogEntry,
+} from "e2b";
 
 import { E2BClientOperationIds, mapE2BClientError } from "./client-errors.js";
 import { E2BDefaultTemplateCpuCount, E2BDefaultTemplateMemoryMb } from "./schemas.js";
@@ -137,7 +144,7 @@ async function resolveOrBuildE2BTemplateAlias(input: {
 }
 
 export function isE2BTemplateAliasDuplicateRaceError(error: unknown): boolean {
-  if (!(error instanceof TemplateError)) {
+  if (!(error instanceof TemplateError) && !(error instanceof BuildError)) {
     return false;
   }
 
