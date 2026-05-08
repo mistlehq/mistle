@@ -4,6 +4,8 @@ import {
   buildRepositoryDiscoveryFindArgs,
   DefaultSandboxWorkspaceDir,
   parseRepositoryPaths,
+  resolveActiveThreadCwd,
+  resolveInitialSelectedRepositoryPath,
   resolvePrimaryRepositoryPresentation,
   resolvePrimaryRepositoryTurnStartCwd,
   toRepositoryOptions,
@@ -95,5 +97,73 @@ describe("session primary repository policy", () => {
         selectedRepositoryPath: null,
       }),
     ).toBe(DefaultSandboxWorkspaceDir);
+  });
+
+  it("finds the active Codex thread cwd from available thread summaries", () => {
+    expect(
+      resolveActiveThreadCwd({
+        activeThreadId: "thread_2",
+        availableThreads: [
+          {
+            id: "thread_1",
+            cwd: "/root/acme/repo-1",
+          },
+          {
+            id: "thread_2",
+            cwd: "/root/acme/repo-2",
+          },
+        ],
+      }),
+    ).toBe("/root/acme/repo-2");
+  });
+
+  it("returns no active thread cwd when the active thread is missing from summaries", () => {
+    expect(
+      resolveActiveThreadCwd({
+        activeThreadId: "thread_3",
+        availableThreads: [
+          {
+            id: "thread_1",
+            cwd: "/root/acme/repo-1",
+          },
+        ],
+      }),
+    ).toBeUndefined();
+  });
+
+  it("restores the selected repository from the active Codex thread cwd before the launch primary repository", () => {
+    expect(
+      resolveInitialSelectedRepositoryPath({
+        activeThreadCwd: "/root/acme/repo-2",
+        runtimePrimaryRepositoryRoot: "/root/acme/repo-1",
+      }),
+    ).toBe("/root/acme/repo-2");
+  });
+
+  it("restores None when the active Codex thread cwd is the workspace root", () => {
+    expect(
+      resolveInitialSelectedRepositoryPath({
+        activeThreadCwd: DefaultSandboxWorkspaceDir,
+        runtimePrimaryRepositoryRoot: "/root/acme/repo-1",
+      }),
+    ).toBeNull();
+  });
+
+  it("falls back to the launch primary repository when no active Codex thread cwd is available", () => {
+    expect(
+      resolveInitialSelectedRepositoryPath({
+        activeThreadCwd: undefined,
+        runtimePrimaryRepositoryRoot: "/root/acme/repo-1",
+      }),
+    ).toBe("/root/acme/repo-1");
+  });
+
+  it("restores None when neither active Codex thread cwd nor launch primary repository is available", () => {
+    expect(
+      resolveInitialSelectedRepositoryPath({
+        activeThreadCwd: undefined,
+        runtimePrimaryRepositoryRoot: null,
+      }),
+    ).toBeNull();
   });
 });

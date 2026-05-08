@@ -18,7 +18,11 @@ import {
   type SessionComposerStateInput,
 } from "./session-composer/index.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
-import { resolvePrimaryRepositoryTurnStartCwd } from "./session-primary-repository-policy.js";
+import {
+  resolveActiveThreadCwd,
+  resolveInitialSelectedRepositoryPath,
+  resolvePrimaryRepositoryTurnStartCwd,
+} from "./session-primary-repository-policy.js";
 import type { SessionStartupState } from "./session-startup-status.js";
 import {
   hasAutomationSessionPreparationTimedOut,
@@ -202,11 +206,18 @@ export function useSessionWorkbenchController(input: {
     queryClient,
   });
   const sandboxStatus = workbenchLifecycleState.sandboxStatusQuery.data;
-  const initialSelectedRepositoryPath = sandboxStatus?.runtimeContext?.primaryRepositoryRoot;
+  const activeThreadCwd = resolveActiveThreadCwd({
+    activeThreadId: sessionState.lifecycle.sessionSnapshot?.activeThreadId ?? null,
+    availableThreads: sessionState.threads.availableThreads,
+  });
+  const initialSelectedRepositoryPath = resolveInitialSelectedRepositoryPath({
+    activeThreadCwd,
+    runtimePrimaryRepositoryRoot: sandboxStatus?.runtimeContext?.primaryRepositoryRoot,
+  });
   const primaryRepositoryState = useSessionPrimaryRepositoryState({
     enabled: workbenchLifecycleState.connectionReadiness.canConnect,
     ensureTransportConnected: transportManager.ensureTransportConnected,
-    ...(initialSelectedRepositoryPath === undefined ? {} : { initialSelectedRepositoryPath }),
+    initialSelectedRepositoryPath,
     sandboxInstanceId: input.sandboxInstanceId,
   });
   selectedRepositoryPathRef.current = primaryRepositoryState.selectedRepositoryPath;

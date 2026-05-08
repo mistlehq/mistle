@@ -2,6 +2,11 @@ import { DefaultSandboxWorkspaceDir } from "@mistle/integrations-core";
 
 import type { SessionWorkbenchHeaderRepositoryOption } from "./session-workbench-header-actions.js";
 
+type SessionPrimaryRepositoryThreadSummary = {
+  id: string;
+  cwd: string;
+};
+
 export type SessionPrimaryRepositorySelection =
   | { kind: "none" }
   | { kind: "available"; path: string }
@@ -102,6 +107,39 @@ export function resolvePrimaryRepositoryTurnStartCwd(input: {
   selectedRepositoryPath: string | null;
 }): string {
   return input.selectedRepositoryPath ?? DefaultSandboxWorkspaceDir;
+}
+
+export function resolveActiveThreadCwd(input: {
+  activeThreadId: string | null;
+  availableThreads: readonly SessionPrimaryRepositoryThreadSummary[];
+}): string | undefined {
+  if (input.activeThreadId === null) {
+    return undefined;
+  }
+
+  return input.availableThreads.find((thread) => thread.id === input.activeThreadId)?.cwd;
+}
+
+function resolveSelectedRepositoryPathFromCwd(input: {
+  cwd: string;
+  workspaceRoot?: string;
+}): string | null {
+  return input.cwd === (input.workspaceRoot ?? DefaultSandboxWorkspaceDir) ? null : input.cwd;
+}
+
+export function resolveInitialSelectedRepositoryPath(input: {
+  activeThreadCwd: string | undefined;
+  runtimePrimaryRepositoryRoot: string | null | undefined;
+  workspaceRoot?: string;
+}): string | null {
+  if (input.activeThreadCwd !== undefined) {
+    return resolveSelectedRepositoryPathFromCwd({
+      cwd: input.activeThreadCwd,
+      ...(input.workspaceRoot === undefined ? {} : { workspaceRoot: input.workspaceRoot }),
+    });
+  }
+
+  return input.runtimePrimaryRepositoryRoot ?? null;
 }
 
 export function resolvePrimaryRepositoryPresentation(input: {
