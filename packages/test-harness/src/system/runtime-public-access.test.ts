@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createRuntimePublicAccessProxyScript,
   createRuntimePublicAccessProxyPoolKey,
   createRuntimePublicAccessRouteHealthUrl,
   createRuntimePublicAccessRouteUpgradeProbeUrl,
@@ -14,6 +15,19 @@ describe("createRuntimePublicAccessProxyPoolKey", () => {
     expect(createRuntimePublicAccessProxyPoolKey({ tunnelId: "tun_123" })).toBe(
       "runtime-public-access:tun_123",
     );
+  });
+});
+
+describe("createRuntimePublicAccessProxyScript", () => {
+  it("binds the proxy to the harness-reserved port and logs startup failures", () => {
+    const script = createRuntimePublicAccessProxyScript();
+
+    expect(script).toContain(
+      'const proxyPort = Number(readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_PROXY_PORT"));',
+    );
+    expect(script).toContain('server.listen(proxyPort, "0.0.0.0"');
+    expect(script).toContain('server.once("error", (error) => {');
+    expect(script).toContain("runtime public access proxy startup failed:");
   });
 });
 

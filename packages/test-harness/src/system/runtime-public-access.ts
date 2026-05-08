@@ -3,17 +3,20 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { connect as connectTls } from "node:tls";
 
-import { systemSleeper } from "@mistle/time";
+import { systemScheduler, systemSleeper } from "@mistle/time";
 
 import { resolveRunnerPoolSession } from "../environment/runner-pool-session.js";
 import { acquireRunnerServicePoolLease } from "../environment/runner-service-pool.js";
 import type { TestServiceRuntime } from "../environment/types.js";
+import { releaseReservedPort, reserveAvailablePort } from "../network/reserve-available-port.js";
 import { parseCloudflaredTunnelCredentialsJson } from "./cloudflared-config.js";
 
 const CloudflaredImageReference = "cloudflare/cloudflared:latest";
 const CloudflaredTunnelPollIntervalMs = 500;
 const CloudflaredTunnelStartupTimeoutMs = 180_000;
 const RuntimePublicAccessTunnelLabel = "mistle.runtime-public-access.tunnel-id";
+const RuntimePublicAccessProxyHost = "0.0.0.0";
+const RuntimePublicAccessProxyExitTimeoutMs = 10_000;
 const RuntimePublicAccessProxyReadyTimeoutMs = 30_000;
 const RuntimePublicAccessProxyPoolLockTimeoutMs = 240_000;
 const RuntimePublicAccessRouteReadyTimeoutMs = 30_000;
@@ -166,6 +169,10 @@ async function startRuntimePublicAccessProxy(input: {
   const readyPath = join(workDirectoryPath, "ready.json");
   const logPath = join(workDirectoryPath, "proxy.log");
   await writeFile(scriptPath, createRuntimePublicAccessProxyScript(), "utf8");
+  const proxyPort = await reserveAvailablePort({
+    host: RuntimePublicAccessProxyHost,
+    coordinatorDir: input.coordinatorDir,
+  });
 
   const child = spawn(process.execPath, [scriptPath], {
     detached: false,
@@ -178,11 +185,17 @@ async function startRuntimePublicAccessProxy(input: {
       MISTLE_RUNTIME_PUBLIC_ACCESS_OWNER_PID: String(input.ownerPid),
       MISTLE_RUNTIME_PUBLIC_ACCESS_READY_PATH: readyPath,
       MISTLE_RUNTIME_PUBLIC_ACCESS_LOG_PATH: logPath,
+      MISTLE_RUNTIME_PUBLIC_ACCESS_PROXY_PORT: String(proxyPort),
       MISTLE_RUNTIME_PUBLIC_ACCESS_CLOUDFLARED_IMAGE: CloudflaredImageReference,
       MISTLE_RUNTIME_PUBLIC_ACCESS_TUNNEL_LABEL: RuntimePublicAccessTunnelLabel,
     },
   });
   if (child.pid === undefined) {
+    await releaseReservedPort({
+      host: RuntimePublicAccessProxyHost,
+      port: proxyPort,
+      coordinatorDir: input.coordinatorDir,
+    });
     throw new Error("Failed to start runtime public access proxy process.");
   }
 
@@ -207,12 +220,30 @@ async function startRuntimePublicAccessProxy(input: {
       },
       pid: child.pid,
       stop: async () => {
-        child.kill("SIGTERM");
-        await rm(workDirectoryPath, { recursive: true, force: true });
+        try {
+          child.kill("SIGTERM");
+          await waitForRuntimePublicAccessProxyExit(child);
+          await rm(workDirectoryPath, { recursive: true, force: true });
+        } finally {
+          await releaseReservedPort({
+            host: RuntimePublicAccessProxyHost,
+            port: proxyPort,
+            coordinatorDir: input.coordinatorDir,
+          });
+        }
       },
     };
   } catch (error) {
-    child.kill("SIGTERM");
+    try {
+      child.kill("SIGTERM");
+      await waitForRuntimePublicAccessProxyExit(child);
+    } finally {
+      await releaseReservedPort({
+        host: RuntimePublicAccessProxyHost,
+        port: proxyPort,
+        coordinatorDir: input.coordinatorDir,
+      });
+    }
     const logs = await readFile(logPath, "utf8").catch(() => "");
     await rm(workDirectoryPath, { recursive: true, force: true });
     throw new Error(
@@ -221,6 +252,22 @@ async function startRuntimePublicAccessProxy(input: {
       } Logs: ${logs}`,
     );
   }
+}
+
+function waitForRuntimePublicAccessProxyExit(child: ReturnType<typeof spawn>): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const timeout = systemScheduler.schedule(() => {
+      reject(new Error("Timed out waiting for runtime public access proxy process to exit."));
+    }, RuntimePublicAccessProxyExitTimeoutMs);
+    child.once("exit", () => {
+      systemScheduler.cancel(timeout);
+      resolve();
+    });
+  });
 }
 
 async function waitForRuntimePublicAccessProxyReady(input: {
@@ -685,7 +732,7 @@ export function readRuntimePublicAccessEnvironmentIdFromPath(
   return decodeURIComponent(pathWithoutPrefix.slice(0, separatorIndex));
 }
 
-function createRuntimePublicAccessProxyScript(): string {
+export function createRuntimePublicAccessProxyScript(): string {
   return String.raw`
 import { spawn, spawnSync } from "node:child_process";
 import { createWriteStream } from "node:fs";
@@ -713,23 +760,35 @@ const publicHostnames = JSON.parse(readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS
 if (!Array.isArray(publicHostnames) || publicHostnames.some((value) => typeof value !== "string" || value.length === 0)) {
   throw new Error("Runtime public access proxy requires public hostnames.");
 }
+const proxyPort = Number(readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_PROXY_PORT"));
+if (!Number.isSafeInteger(proxyPort) || proxyPort <= 0) {
+  throw new Error("Runtime public access proxy requires a positive proxy port.");
+}
 
+const logStream = createWriteStream(logPath, { flags: "a" });
 const routes = new Map();
 const recentUpgradeFailures = [];
 const server = http.createServer(handleRequest);
 server.on("upgrade", handleUpgrade);
-server.listen(0, "0.0.0.0", async () => {
+server.once("error", (error) => {
+  startupFailed(error);
+});
+server.listen(proxyPort, "0.0.0.0", async () => {
   const address = server.address();
   if (address === null || typeof address === "string") {
-    throw new Error("Runtime public access proxy did not listen on a TCP port.");
+    startupFailed(new Error("Runtime public access proxy did not listen on a TCP port."));
+    return;
   }
 
   const proxyBaseUrl = "http://127.0.0.1:" + String(address.port);
-  await startCloudflared(proxyBaseUrl);
-  await writeFile(readyPath, JSON.stringify({ baseUrl: proxyBaseUrl }), "utf8");
+  try {
+    await startCloudflared(proxyBaseUrl);
+    await writeFile(readyPath, JSON.stringify({ baseUrl: proxyBaseUrl }), "utf8");
+  } catch (error) {
+    startupFailed(error);
+  }
 });
 
-const logStream = createWriteStream(logPath, { flags: "a" });
 let cloudflared;
 let cloudflaredContainerName;
 const ownerWatchdog = setInterval(() => {
@@ -740,6 +799,13 @@ const ownerWatchdog = setInterval(() => {
 }, 1000);
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
+
+function startupFailed(error) {
+  const message = error instanceof Error ? error.stack ?? error.message : String(error);
+  logStream.write("runtime public access proxy startup failed: " + message + "\n", () => {
+    process.exit(1);
+  });
+}
 
 async function handleRequest(request, response) {
   if (request.url === "/__healthz") {
