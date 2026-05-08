@@ -396,7 +396,7 @@ function SessionWorkbenchPageContent(input: {
         bottomPanel={
           <SessionTerminalWorkspace
             key={terminalPanelKey}
-            cwd={workbench.activeCwd}
+            cwd={workbench.terminalCwd}
             ensureTransportConnected={workbench.ensureTransportConnected}
             isConnectionReady={workbench.connectionReadiness.canConnect}
             isVisible={workbench.terminalPanelState.isVisible}

@@ -15,7 +15,7 @@ const ResetInfo = {
 } as const;
 
 describe("buildTerminalPtyOpenInput", () => {
-  it("includes the resolved workbench cwd", () => {
+  it("includes the provided cwd", () => {
     expect(
       buildTerminalPtyOpenInput({
         cwd: "/root",

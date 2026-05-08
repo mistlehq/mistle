@@ -51,7 +51,7 @@ import { useSessionWorkbenchLifecycleState } from "./use-session-workbench-lifec
 import { useSessionWorkbenchTransport } from "./use-session-workbench-transport.js";
 
 type SessionWorkbenchState = {
-  activeCwd: string;
+  terminalCwd: string;
   ensureTransportConnected: (input: { sandboxInstanceId: string }) => Promise<{
     sandboxInstanceId: string;
     transport: SandboxSessionTransport;
@@ -219,7 +219,7 @@ export function useSessionWorkbenchController(input: {
   });
   const selectedRepositoryPath = primaryRepositoryState.selectedRepositoryPath;
   selectedRepositoryPathRef.current = selectedRepositoryPath;
-  const activeCwd = resolveSessionWorkbenchCwd({
+  const terminalCwd = resolveSessionWorkbenchCwd({
     activeThreadCwd,
     selectedRepositoryPath,
   });
@@ -333,7 +333,7 @@ export function useSessionWorkbenchController(input: {
 
   return {
     workbench: {
-      activeCwd,
+      terminalCwd,
       ensureTransportConnected: transportManager.ensureTransportConnected,
       connectionReadiness: workbenchLifecycleState.connectionReadiness,
       handleTerminalWorkspaceReset: workbenchLifecycleState.handleTerminalWorkspaceReset,
