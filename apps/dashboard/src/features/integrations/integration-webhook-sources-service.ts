@@ -63,7 +63,7 @@ export async function createIntegrationWebhookSource(input: {
 }
 
 export async function refreshIntegrationWebhookTriggerCapabilities(input: {
-  appConfigToken: string;
+  body: Readonly<Record<string, unknown>>;
   connectionId: string;
 }): Promise<IntegrationWebhookSource> {
   try {
@@ -71,9 +71,7 @@ export async function refreshIntegrationWebhookTriggerCapabilities(input: {
       operation: "refreshIntegrationWebhookTriggerCapabilities",
       method: "POST",
       pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/webhook-sources/trigger-capabilities/refresh`,
-      body: {
-        appConfigToken: input.appConfigToken,
-      },
+      body: input.body,
       fallbackMessage: "Could not sync webhook events.",
     });
 

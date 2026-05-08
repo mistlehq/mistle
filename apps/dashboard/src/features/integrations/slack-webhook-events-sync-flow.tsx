@@ -2,17 +2,13 @@ import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browse
 import { Button } from "@mistle/ui";
 import { useCallback, useState, type ReactNode } from "react";
 
+import type { IntegrationWebhookEventsSyncFlowRefresh } from "./integration-webhook-events-sync-flow-types.js";
 import type { IntegrationConnection } from "./integrations-service.js";
 import { SlackWebhookEventsSyncDialog } from "./slack-webhook-events-sync-dialog.js";
 
-export type SlackWebhookEventsSyncFlowRefresh = (
-  input: { appConfigToken: string; connectionId: string },
-  options?: { onSuccess?: () => void },
-) => void;
-
 export function useSlackWebhookEventsSyncFlow(input: {
   connections: readonly IntegrationConnection[];
-  refreshTriggerCapabilities: SlackWebhookEventsSyncFlowRefresh;
+  refreshTriggerCapabilities: IntegrationWebhookEventsSyncFlowRefresh;
   refreshTriggerCapabilitiesError: { connectionId: string; message: string } | null;
   refreshingTriggerCapabilitiesConnectionId: string | null;
 }): {
@@ -67,7 +63,7 @@ export function useSlackWebhookEventsSyncFlow(input: {
 
           input.refreshTriggerCapabilities(
             {
-              appConfigToken,
+              body: { appConfigToken },
               connectionId: syncConnectionId,
             },
             {

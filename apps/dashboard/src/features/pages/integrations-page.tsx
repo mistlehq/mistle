@@ -1,5 +1,3 @@
-import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
 import { Notice, NoticeAutoHideDurationsMs } from "@mistle/ui";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
@@ -11,13 +9,17 @@ import { IntegrationConnectionApiKeyDialog } from "../integrations/integration-c
 import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
 import { resolveFormConnectionMethodManagedWebhookSourcePostCreate } from "../integrations/integration-connection-method-metadata.js";
 import {
+  resolveInstalledIntegrationConnectionNotice,
+  type IntegrationConnectionNotice,
+} from "../integrations/integration-connection-notices.js";
+import { useIntegrationWebhookEventsSyncFlow } from "../integrations/integration-webhook-events-sync-flow.js";
+import {
   ManagedWebhookSetupResultSchema,
   type IntegrationConnectionMethod,
   type IntegrationManagedWebhookSourcePostCreate,
   type ManagedWebhookSetupResult,
 } from "../integrations/integrations-service-shared.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
-import { useSlackWebhookEventsSyncFlow } from "../integrations/slack-webhook-events-sync-flow.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import { renderIntegrationConnectionSetupPane } from "./integration-connection-setup-pane-registry.js";
 import {
@@ -42,14 +44,6 @@ type GitHubAppInstallationState = {
 };
 
 type GitHubAppInstallationStateEntry = [string, GitHubAppInstallationState];
-
-type ConnectionNotice = {
-  connectionId: string;
-  message?: string;
-  resetKey: string;
-  title: string;
-  variant: "alert" | "success";
-};
 
 function buildGitHubAppInstallationStateByConnectionId(input: {
   connections: readonly {
@@ -79,52 +73,12 @@ function clearUrlConnectionNoticeParams(searchParams: URLSearchParams): URLSearc
   return nextSearchParams;
 }
 
-function resolveUrlConnectionNotice(input: {
-  detailConnectionId: string | null;
-  searchParams: URLSearchParams;
-  selectedConnection: Pick<IntegrationConnection, "connectionMethodId" | "id"> | undefined;
-}): ConnectionNotice | null {
-  if (
-    input.detailConnectionId === null ||
-    input.selectedConnection?.id !== input.detailConnectionId
-  ) {
-    return null;
-  }
-
-  if (input.searchParams.get("connectionNotice") !== "installed") {
-    return null;
-  }
-
-  if (input.selectedConnection.connectionMethodId === SlackConnectionMethodId) {
-    return {
-      connectionId: input.detailConnectionId,
-      resetKey: `slack-installed:${input.detailConnectionId}`,
-      title: "The Slack app was created and connected to Mistle successfully",
-      variant: "success",
-    };
-  }
-
-  if (
-    input.selectedConnection.connectionMethodId ===
-    IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
-  ) {
-    return {
-      connectionId: input.detailConnectionId,
-      resetKey: `github-installed:${input.detailConnectionId}`,
-      title: "GitHub App connected to Mistle successfully",
-      variant: "success",
-    };
-  }
-
-  return null;
-}
-
 function resolveRouteStateConnectionNotice(input: {
   connectionMethods: readonly IntegrationConnectionMethod[] | undefined;
   detailConnectionId: string | null;
   locationState: unknown;
   selectedConnection: Pick<IntegrationConnection, "connectionMethodId" | "id"> | undefined;
-}): ConnectionNotice | null {
+}): IntegrationConnectionNotice | null {
   if (
     input.detailConnectionId === null ||
     input.selectedConnection?.id !== input.detailConnectionId
@@ -187,7 +141,8 @@ export function IntegrationsPage() {
   const navigate = useNavigate();
   const params = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [urlConnectionNotice, setUrlConnectionNotice] = useState<ConnectionNotice | null>(null);
+  const [urlConnectionNotice, setUrlConnectionNotice] =
+    useState<IntegrationConnectionNotice | null>(null);
   useRequiredOrganizationId();
   const detailTargetKey = params["targetKey"] ?? null;
   const detailConnectionId = searchParams.get("connectionId");
@@ -204,7 +159,7 @@ export function IntegrationsPage() {
   const webhookSourceState = useIntegrationWebhookSourceState({
     detailConnections: directoryState.selectedDetailConnections,
   });
-  const slackWebhookEventsSyncFlow = useSlackWebhookEventsSyncFlow({
+  const webhookEventsSyncFlow = useIntegrationWebhookEventsSyncFlow({
     connections: directoryState.selectedDetailConnections,
     refreshTriggerCapabilities: webhookSourceState.refreshTriggerCapabilities,
     refreshTriggerCapabilitiesError: webhookSourceState.refreshTriggerCapabilitiesError,
@@ -257,7 +212,7 @@ export function IntegrationsPage() {
         });
 
   useEffect(() => {
-    const resolvedUrlNotice = resolveUrlConnectionNotice({
+    const resolvedUrlNotice = resolveInstalledIntegrationConnectionNotice({
       detailConnectionId,
       searchParams,
       selectedConnection: selectedDetailConnection,
@@ -360,7 +315,7 @@ export function IntegrationsPage() {
             webhookSourceId,
           });
         }}
-        webhookEventsSyncAction={slackWebhookEventsSyncFlow.webhookEventsSyncAction}
+        webhookEventsSyncAction={webhookEventsSyncFlow.webhookEventsSyncAction}
         webhookPolicy={selectedWebhookPolicy}
         titleEditor={connectionEditors.titleEditor}
       />
@@ -374,7 +329,7 @@ export function IntegrationsPage() {
         <>
           <IntegrationConnectionApiKeyDialog {...connectionEditors.apiKeyDialog} />
           <DeleteIntegrationConnectionDialog {...connectionEditors.deleteDialog} />
-          {slackWebhookEventsSyncFlow.dialog}
+          {webhookEventsSyncFlow.dialog}
         </>
       }
       detailSurface={detailSurface}

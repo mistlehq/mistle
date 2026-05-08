@@ -92,8 +92,10 @@ export function useIntegrationWebhookSourceState(input: {
   });
 
   const refreshTriggerCapabilitiesMutation = useMutation({
-    mutationFn: async (payload: { appConfigToken: string; connectionId: string }) =>
-      refreshIntegrationWebhookTriggerCapabilities(payload),
+    mutationFn: async (payload: {
+      body: Readonly<Record<string, unknown>>;
+      connectionId: string;
+    }) => refreshIntegrationWebhookTriggerCapabilities(payload),
     onSuccess: async (_source, variables) => {
       await queryClient.invalidateQueries({
         queryKey: [

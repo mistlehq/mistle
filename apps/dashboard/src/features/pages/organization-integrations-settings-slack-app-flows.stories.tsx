@@ -548,7 +548,7 @@ function SlackConnectedWebhookVerifiedRefreshStory(): React.JSX.Element {
     }),
   );
   const refreshMutation = useMutation({
-    mutationFn: (payload: { appConfigToken: string; connectionId: string }) =>
+    mutationFn: (payload: { body: Readonly<Record<string, unknown>>; connectionId: string }) =>
       refreshIntegrationWebhookTriggerCapabilities(payload),
     onSuccess: (source) => {
       setWebhookSources((currentSources) =>

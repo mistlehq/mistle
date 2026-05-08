@@ -13,7 +13,7 @@ function SlackWebhookEventsSyncFlowHarness(input: { connection: IntegrationConne
   const flow = useSlackWebhookEventsSyncFlow({
     connections: [input.connection],
     refreshTriggerCapabilities: (payload, options) => {
-      setSyncedValue(`${payload.connectionId}:${payload.appConfigToken}`);
+      setSyncedValue(`${payload.connectionId}:${String(payload.body["appConfigToken"])}`);
       options?.onSuccess?.();
     },
     refreshTriggerCapabilitiesError: null,
