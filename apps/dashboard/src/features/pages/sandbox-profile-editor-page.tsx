@@ -2233,7 +2233,9 @@ function SandboxProfileVersionStatusBadge(input: {
           : "inline-flex h-6 items-center rounded-sm border border-blue-200 bg-blue-50 px-2 text-xs font-medium text-blue-700"
       }
     >
-      {input.mode.kind === "draft" ? "Viewing: Draft" : "Viewing: Published"}
+      {input.mode.kind === "draft"
+        ? "Viewing: Draft"
+        : `Viewing: Published (v${String(input.mode.version)})`}
     </span>
   );
 }

@@ -1649,7 +1649,7 @@ describe("SandboxProfileEditorPage", () => {
       name: "Setup script",
     });
 
-    expect(screen.getByText("Viewing: Published")).toBeDefined();
+    expect(screen.getByText("Viewing: Published (v3)")).toBeDefined();
     expect(editor.textContent).toContain("pnpm install");
     expect(editor.textContent).toContain("pnpm test:setup");
   });
@@ -1919,7 +1919,7 @@ describe("SandboxProfileEditorPage", () => {
       ],
     });
 
-    expect(screen.getByText("Viewing: Published")).toBeDefined();
+    expect(screen.getByText("Viewing: Published (v3)")).toBeDefined();
     expect(screen.getByRole("button", { name: "Edit" })).toBeDefined();
     expect(screen.queryByRole("combobox", { name: "agent harness connection" })).toBeNull();
     expect(screen.getByText("Codex connection")).toBeDefined();
@@ -1932,7 +1932,7 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "published-with-draft",
     });
 
-    expect(screen.getByText("Viewing: Published")).toBeDefined();
+    expect(screen.getByText("Viewing: Published (v3)")).toBeDefined();
     expect(screen.getByRole("button", { name: "Resume editing" })).toBeDefined();
   });
 
@@ -2100,7 +2100,7 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "published",
     });
 
-    expect(await screen.findByText("Viewing: Published")).toBeDefined();
+    expect(await screen.findByText("Viewing: Published (v3)")).toBeDefined();
     expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/sandbox-profile`);
   });
 
@@ -2132,7 +2132,7 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "published",
     });
 
-    expect(await screen.findByText("Viewing: Published")).toBeDefined();
+    expect(await screen.findByText("Viewing: Published (v3)")).toBeDefined();
     expect(router.state.location.pathname).toBe(
       `/sandbox-profiles/${profileId}/sandbox-profile/published`,
     );
