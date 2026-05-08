@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { IntegrationWebhookTriggerCapabilitiesProviderMetadataKey } from "@mistle/integrations-core";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -1221,7 +1222,7 @@ describe("IntegrationConnectionDetailView", () => {
                       "https://control-plane.example.com/p/integration/webhooks/github-cloud/ep_github",
                     status: "active",
                     providerMetadata: {
-                      webhookTriggerCapabilities: {
+                      [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
                         events: ["pull_request", "push"],
                         permissions: [
                           { permission: "pull_requests", access: "read" },

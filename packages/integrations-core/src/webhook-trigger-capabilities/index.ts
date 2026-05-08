@@ -175,6 +175,18 @@ function isRequirementSetSatisfied(input: {
   return true;
 }
 
+function findSatisfiedRequirementSet(input: {
+  capabilities: IntegrationWebhookTriggerCapabilities;
+  requirements: IntegrationWebhookTriggerRequirements;
+}): IntegrationWebhookTriggerRequirementSet | undefined {
+  return input.requirements.anyOf.find((requirementSet) =>
+    isRequirementSetSatisfied({
+      capabilities: input.capabilities,
+      requirementSet,
+    }),
+  );
+}
+
 export function isWebhookTriggerSupportedByCapabilities(input: {
   capabilities: IntegrationWebhookTriggerCapabilities | undefined;
   requirements: IntegrationWebhookTriggerRequirements | undefined;
@@ -187,12 +199,11 @@ export function isWebhookTriggerSupportedByCapabilities(input: {
     return false;
   }
 
-  const capabilities = input.capabilities;
-  return input.requirements.anyOf.some((requirementSet) =>
-    isRequirementSetSatisfied({
-      capabilities,
-      requirementSet,
-    }),
+  return (
+    findSatisfiedRequirementSet({
+      capabilities: input.capabilities,
+      requirements: input.requirements,
+    }) !== undefined
   );
 }
 
@@ -218,13 +229,10 @@ export function resolveWebhookTriggerCapabilityEvents(input: {
       };
     }
 
-    const capabilities = input.capabilities;
-    const satisfiedRequirementSet = requirements.anyOf.find((requirementSet) =>
-      isRequirementSetSatisfied({
-        capabilities,
-        requirementSet,
-      }),
-    );
+    const satisfiedRequirementSet = findSatisfiedRequirementSet({
+      capabilities: input.capabilities,
+      requirements,
+    });
 
     if (satisfiedRequirementSet !== undefined) {
       return {
