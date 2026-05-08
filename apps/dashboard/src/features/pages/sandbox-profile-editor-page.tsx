@@ -2553,7 +2553,6 @@ function ReadySandboxProfileSetupScriptSection(input: {
       )}
       <SandboxProfileSetupScriptPanel
         errorMessage={setupScriptState.errorMessage}
-        isSaving={false}
         onChange={setupScriptState.onChange}
         testControl={
           <SandboxProfileSetupScriptTestButton
@@ -2608,7 +2607,6 @@ function SetupScriptContextGroupRows(input: { group: SetupScriptContextGroup }):
 export function SandboxProfileSetupScriptPanel(input: {
   value: string;
   disabled?: boolean;
-  isSaving?: boolean;
   errorMessage?: string | null;
   onChange?: (nextValue: string) => void;
   repositoryHandles?: readonly string[];
@@ -2632,7 +2630,7 @@ export function SandboxProfileSetupScriptPanel(input: {
           <div className="gap-2 flex flex-col">
             <SandboxSetupScriptEditor
               ariaLabelledBy="sandbox-setup-script-label"
-              disabled={input.disabled === true || input.isSaving === true}
+              disabled={input.disabled === true}
               onChange={(nextValue) => {
                 input.onChange?.(nextValue);
               }}

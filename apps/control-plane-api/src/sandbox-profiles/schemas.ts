@@ -202,7 +202,7 @@ export const discardSandboxProfileVersionDraftResponseSchema = z
   })
   .strict();
 
-export const putSandboxProfileVersionIntegrationBindingsBodySchema = z
+export const sandboxProfileVersionIntegrationBindingsWriteBodySchema = z
   .object({
     bindings: z.array(
       z
@@ -218,14 +218,14 @@ export const putSandboxProfileVersionIntegrationBindingsBodySchema = z
   })
   .strict();
 
-export const putSandboxProfileVersionIntegrationBindingsResponseSchema = z
+export const sandboxProfileVersionIntegrationBindingsResponseSchema = z
   .object({
     bindings: z.array(sandboxProfileVersionIntegrationBindingSchema),
   })
   .strict();
 
 export const getSandboxProfileVersionIntegrationBindingsResponseSchema =
-  putSandboxProfileVersionIntegrationBindingsResponseSchema;
+  sandboxProfileVersionIntegrationBindingsResponseSchema;
 
 export const getSandboxProfileVersionAutomationConfigResponseSchema = z
   .object({
@@ -241,7 +241,7 @@ export const putSandboxProfileVersionDraftBodySchema = z
   .object({
     setupScript: z.string().min(1).nullable().optional(),
     defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema.optional(),
-    integrationBindings: putSandboxProfileVersionIntegrationBindingsBodySchema.optional(),
+    integrationBindings: sandboxProfileVersionIntegrationBindingsWriteBodySchema.optional(),
   })
   .strict()
   .refine(
@@ -260,7 +260,7 @@ export const putSandboxProfileVersionDraftResponseSchema = z
     version: z.number().int().min(1),
     setupScript: z.string().nullable(),
     defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema,
-    integrationBindings: putSandboxProfileVersionIntegrationBindingsResponseSchema,
+    integrationBindings: sandboxProfileVersionIntegrationBindingsResponseSchema,
   })
   .strict();
 
