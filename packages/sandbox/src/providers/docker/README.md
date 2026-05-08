@@ -51,7 +51,6 @@ const runtimeControl = createSandboxRuntimeControl({
 
 - `init({ id, payload })` runs `/opt/mistle/bin/sandboxd init` as `root` in the container, writes `payload` to stdin, waits for process exit, and includes stdout/stderr in failures.
 - `resume({ id, payload })` currently delegates to `init(...)`; the worker passes Docker resume startup mode as a new runtime startup.
-- `refreshEgressGrants({ id, payload })` runs `/opt/mistle/bin/sandboxd refresh-egress-grants` as `root` and writes the refreshed runtime-plan/grant payload to stdin.
 - `readOperationLog({ id, operation })` reads `/run/mistle/init.log` or `/run/mistle/resume.log` from the container and returns `null` when the log is absent or empty.
 - `close()` is currently a no-op.
 
@@ -66,7 +65,7 @@ Docker persistent storage uses the `docker_volume` backend. The data-plane worke
 Docker API errors are mapped to `DockerClientError` with:
 
 - `code`: `not_found`, `conflict`, `invalid_argument`, `unauthenticated`, `unknown`
-- `operation`: identifies the failing operation, for example `pull_image`, `create_container`, `init`, `refresh_egress_grants`, or `read_operation_log`
+- `operation`: identifies the failing operation, for example `pull_image`, `create_container`, `init`, or `read_operation_log`
 - `retryable`: retry hint for caller policy
 
 Adapter and runtime-control methods translate Docker not-found errors for sandbox compute into `SandboxResourceNotFoundError`.

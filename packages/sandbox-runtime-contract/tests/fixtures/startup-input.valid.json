@@ -15,6 +15,5 @@
     "runtimeClients": [],
     "workspaceSources": [],
     "agentRuntimes": []
-  },
-  "egressGrantByRuleId": {}
+  }
 }

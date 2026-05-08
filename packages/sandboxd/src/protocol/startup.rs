@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -83,7 +81,6 @@ pub struct StartupInput {
     pub tunnel_gateway_ws_url: String,
     pub runtime_plan: serde_json::Value,
     pub acting_user_id: Option<String>,
-    pub egress_grant_by_rule_id: BTreeMap<String, String>,
     pub git_identity: Option<GitIdentity>,
     #[serde(default)]
     pub transparent_proxy: Option<TransparentProxyConfiguration>,
@@ -138,8 +135,7 @@ mod tests {
                 "workspaceSources": [],
                 "runtimeClients": [],
                 "agentRuntimes": []
-            },
-            "egressGrantByRuleId": {}
+            }
         }))
         .expect("startup input should deserialize");
 
@@ -168,8 +164,7 @@ mod tests {
                 "workspaceSources": [],
                 "runtimeClients": [],
                 "agentRuntimes": []
-            },
-            "egressGrantByRuleId": {}
+            }
         }))
         .expect("startup input should deserialize");
 

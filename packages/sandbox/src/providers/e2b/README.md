@@ -54,7 +54,6 @@ const runtimeControl = createSandboxRuntimeControl({
 
 - `init({ id, payload, env })` connects to the sandbox, ensures `/opt/mistle/bin/sandboxd` is running as `root` through `/usr/bin/tini`, waits for daemon readiness, then runs `/opt/mistle/bin/sandboxd init` with `payload` on stdin.
 - `resume({ id, payload, env })` uses the same daemon readiness path, then runs `/opt/mistle/bin/sandboxd resume` so a paused daemon can reattach its bootstrap tunnel.
-- `refreshEgressGrants({ id, payload, env })` ensures daemon readiness, then runs `/opt/mistle/bin/sandboxd refresh-egress-grants`.
 - `readOperationLog({ id, operation })` reads `/run/mistle/init.log` or `/run/mistle/resume.log` and returns `null` when the log is absent or empty.
 - `close()` is currently a no-op.
 

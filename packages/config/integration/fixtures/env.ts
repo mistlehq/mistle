@@ -73,7 +73,6 @@ const baseIntegrationEnv: NodeJS.ProcessEnv = {
   MISTLE_KV_DATA_PLANE_URL: "redis://127.0.0.1:6379",
   MISTLE_KV_DATA_PLANE_KEY_PREFIX: "mistle:runtime-state:integration",
   MISTLE_SERVICES_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY: "1",
-  MISTLE_SERVICES_TOKENIZER_PROXY_EGRESS_URL: "http://127.0.0.1:5004/tokenizer-proxy/egress",
   MISTLE_SANDBOX_DOCKER_NETWORK_NAME: "mistle-sandbox-dev",
   MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY: "fixture-archil-api-key",
   MISTLE_SANDBOX_STORAGE_ARCHIL_REGION: "gcp-us-central1",

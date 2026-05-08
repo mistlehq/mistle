@@ -133,13 +133,11 @@ mod tests {
     use crate::init::run_init;
 
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
-    const TOKENIZER_PROXY_EGRESS_BASE_URL_ENV: &str =
-        "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
+    const GATEWAY_PROXY_ENABLED_ENV: &str = "GATEWAY_PROXY_ENABLED";
 
     #[test]
     fn submits_startup_input_and_writes_ok_response() {
-        let _env_guard =
-            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("init_ok");
         let control_socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
@@ -200,7 +198,7 @@ mod tests {
 
     #[test]
     fn writes_error_response_when_daemon_initialization_fails() {
-        let _env_guard = TestEnvVarGuard::unset(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV);
+        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "invalid");
         let test_dir = create_temp_test_dir("init_runtime_failure");
         let control_socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
@@ -223,7 +221,7 @@ mod tests {
             StartupInitResponse::Error(error_response) => {
                 assert!(
                     error_response.error.contains(
-                        "failed to initialize sandboxd state: failed to start runtime client processes: required sandbox env 'SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL' is missing"
+                        "failed to initialize sandboxd state: failed to start local egress proxy: GATEWAY_PROXY_ENABLED must be '1' when set, got 'invalid'"
                     )
                 );
             }
@@ -303,7 +301,6 @@ mod tests {
                 "runtimeClients": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: std::collections::BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         }

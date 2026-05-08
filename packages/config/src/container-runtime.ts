@@ -87,10 +87,6 @@ function readProfile(env: NodeJS.ProcessEnv): ContainerProfile {
   );
 }
 
-function trimTrailingSlash(value: string): string {
-  return value.endsWith("/") ? value.slice(0, -1) : value;
-}
-
 function requireProfileEnv(input: { profile: ContainerProfile; env: NodeJS.ProcessEnv }): void {
   const requiredEnvVars =
     input.profile === "remote-sandbox"
@@ -302,11 +298,6 @@ function buildDockerSandboxBaseConfig(env: NodeJS.ProcessEnv): ConfigRecord {
           readOptionalEnv(env, "MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL") ??
           "ws://mistle-single-container:5202/tunnel/sandbox",
       },
-      tokenizer_proxy: {
-        egress_url:
-          readOptionalEnv(env, "MISTLE_SERVICES_TOKENIZER_PROXY_EGRESS_URL") ??
-          "http://mistle-single-container:5205/tokenizer-proxy/egress",
-      },
     },
     sandbox: {
       provider: "docker",
@@ -325,9 +316,6 @@ function buildDockerSandboxBaseConfig(env: NodeJS.ProcessEnv): ConfigRecord {
 }
 
 function buildRemoteSandboxBaseConfig(env: NodeJS.ProcessEnv): ConfigRecord {
-  const tokenizerProxyPublicUrl = trimTrailingSlash(
-    readRequiredEnv(env, "MISTLE_SERVICES_TOKENIZER_PROXY_PUBLIC_URL"),
-  );
   const sandboxGatewayPublicUrl = readRequiredEnv(
     env,
     "MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL",
@@ -339,11 +327,6 @@ function buildRemoteSandboxBaseConfig(env: NodeJS.ProcessEnv): ConfigRecord {
         sandbox_ws_internal_url:
           readOptionalEnv(env, "MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL") ??
           sandboxGatewayPublicUrl,
-      },
-      tokenizer_proxy: {
-        egress_url:
-          readOptionalEnv(env, "MISTLE_SERVICES_TOKENIZER_PROXY_EGRESS_URL") ??
-          `${tokenizerProxyPublicUrl}/tokenizer-proxy/egress`,
       },
     },
     object_store: {

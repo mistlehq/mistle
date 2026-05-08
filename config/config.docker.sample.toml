@@ -56,7 +56,6 @@ host = "0.0.0.0"
 port = 5205
 public_url = "https://replace-with-tokenizer-proxy-public-host"
 internal_url = "http://127.0.0.1:5205"
-egress_url = "http://mistle-single-container:5205/tokenizer-proxy/egress"
 
 [services.control_plane_worker]
 workflow_concurrency = 4

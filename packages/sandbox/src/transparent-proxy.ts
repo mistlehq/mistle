@@ -34,7 +34,6 @@ const GenericTransparentProxyCidrExclusions = [
 export function createRuntimeDestinationTransparentProxyExclusions(input: {
   dnsServerIps: readonly string[];
   gatewayTunnelUrl: string;
-  tokenizerProxyEgressUrl?: string;
 }): readonly SandboxTransparentProxyExclusion[] {
   return [
     ...input.dnsServerIps.map(createDnsServerExclusion),
@@ -42,15 +41,6 @@ export function createRuntimeDestinationTransparentProxyExclusions(input: {
       reason: "gateway tunnel traffic must not be redirected into sandboxd",
       url: input.gatewayTunnelUrl,
     }),
-    ...(input.tokenizerProxyEgressUrl === undefined
-      ? []
-      : [
-          createRuntimeUrlHostExclusion({
-            reason:
-              "legacy tokenizer-proxy traffic must remain direct while grant-backed egress exists",
-            url: input.tokenizerProxyEgressUrl,
-          }),
-        ]),
   ];
 }
 

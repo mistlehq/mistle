@@ -10,12 +10,6 @@ describe("DataPlaneApiSandboxConfigSchema", () => {
   it("defaults the E2B domain to the hosted cloud domain", () => {
     const parsed = DataPlaneApiSandboxConfigSchema.parse({
       provider: "e2b",
-      egress: {
-        tokenSecret: "egress-secret",
-        tokenIssuer: "mistle",
-        tokenAudience: "tokenizer-proxy",
-      },
-      tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       e2b: {
         apiKey: "test-api-key",
       },
@@ -23,12 +17,6 @@ describe("DataPlaneApiSandboxConfigSchema", () => {
 
     expect(parsed).toEqual({
       provider: "e2b",
-      egress: {
-        tokenSecret: "egress-secret",
-        tokenIssuer: "mistle",
-        tokenAudience: "tokenizer-proxy",
-      },
-      tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       e2b: {
         apiKey: "test-api-key",
         domain: "e2b.app",
@@ -58,12 +46,6 @@ describe("DataPlaneApiSandboxConfigSchema", () => {
       },
       sandbox: {
         provider: "docker",
-        egress: {
-          tokenSecret: "egress-secret",
-          tokenIssuer: "mistle",
-          tokenAudience: "tokenizer-proxy",
-        },
-        tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
         docker: {
           socketPath: "/var/run/docker.sock",
         },
@@ -98,12 +80,6 @@ describe("DataPlaneApiSandboxConfigSchema", () => {
         },
         sandbox: {
           provider: "docker",
-          egress: {
-            tokenSecret: "egress-secret",
-            tokenIssuer: "mistle",
-            tokenAudience: "tokenizer-proxy",
-          },
-          tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
           docker: {
             socketPath: "/var/run/docker.sock",
           },

@@ -14,12 +14,6 @@ function createTestRuntimeConfig(input: {
       tokenIssuer: "issuer",
       tokenAudience: "audience",
     },
-    egress: {
-      tokenSecret: "egress-secret",
-      tokenIssuer: "issuer",
-      tokenAudience: "audience",
-    },
-    tokenizerProxyEgressBaseUrl: "http://tokenizer-proxy/tokenizer-proxy/egress",
     ...(input.sandboxdTestFaultsEnabled === undefined
       ? {}
       : { sandboxdTestFaultsEnabled: input.sandboxdTestFaultsEnabled }),
@@ -66,8 +60,6 @@ describe("createSandboxRuntimeEnv", () => {
     });
 
     expect(runtimeEnv).toEqual({
-      SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL:
-        "http://tokenizer-proxy/tokenizer-proxy/egress",
       SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID: "sbi_123",
       MISTLE_SANDBOXD_ENABLE_TEST_FAULTS: "1",
     });
@@ -81,8 +73,6 @@ describe("createSandboxRuntimeEnv", () => {
     });
 
     expect(runtimeEnv).toEqual({
-      SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL:
-        "http://tokenizer-proxy/tokenizer-proxy/egress",
       SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID: "sbi_123",
     });
   });
@@ -95,8 +85,6 @@ describe("createSandboxRuntimeEnv", () => {
     });
 
     expect(runtimeEnv).toEqual({
-      SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL:
-        "http://tokenizer-proxy/tokenizer-proxy/egress",
       SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID: "sbi_123",
       GATEWAY_PROXY_ENABLED: "1",
     });

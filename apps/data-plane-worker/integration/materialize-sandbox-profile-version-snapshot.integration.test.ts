@@ -186,12 +186,6 @@ function createWorkerConfig(env: IntegrationTestEnvironment): DataPlaneWorkerCon
         tokenIssuer: "integration-new-data-plane-worker",
         tokenAudience: "integration-new-data-plane-gateway",
       },
-      egress: {
-        tokenSecret: "integration-new-egress-token-secret",
-        tokenIssuer: "integration-new-data-plane-worker",
-        tokenAudience: "integration-new-tokenizer-proxy",
-      },
-      tokenizerProxyEgressBaseUrl: "http://tokenizer-proxy/tokenizer-proxy/egress",
       docker: {
         socketPath: DockerSocketPath,
       },

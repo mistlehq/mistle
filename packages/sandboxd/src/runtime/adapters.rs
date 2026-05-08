@@ -338,7 +338,6 @@ fn start_codex_runtime_adapter(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
     use std::sync::{Arc, Mutex};
 
     use crate::keepalive::KeepaliveManager;
@@ -377,7 +376,6 @@ mod tests {
                     }
                 ]
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         };

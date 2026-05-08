@@ -34,7 +34,6 @@ export type SandboxStartupInput = {
   tunnelGatewayWsUrl: string;
   runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
   actingUserId?: StartSandboxInstanceWorkflowInput["actingUserId"];
-  egressGrantByRuleId: Record<string, string>;
   gitIdentity?: SandboxdStartupInput["gitIdentity"];
   transparentProxy?: SandboxdTransparentProxyConfiguration;
 };

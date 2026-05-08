@@ -314,12 +314,6 @@ export function selectDataPlaneApiConfig(config: Config): DataPlaneApiConfig {
           : {
               backend: config.sandbox.storage.backend,
             },
-      egress: {
-        tokenSecret: config.sandbox.tokens.egress.secret,
-        tokenIssuer: config.sandbox.tokens.egress.issuer,
-        tokenAudience: config.sandbox.tokens.egress.audience,
-      },
-      tokenizerProxyEgressBaseUrl: config.services.tokenizer_proxy.egress_url,
       docker: config.sandbox.docker
         ? {
             socketPath: config.sandbox.docker.socket_path,
@@ -403,12 +397,6 @@ export function selectDataPlaneWorkerConfig(config: Config): DataPlaneWorkerConf
         tokenIssuer: config.sandbox.tokens.bootstrap.issuer,
         tokenAudience: config.sandbox.tokens.bootstrap.audience,
       },
-      egress: {
-        tokenSecret: config.sandbox.tokens.egress.secret,
-        tokenIssuer: config.sandbox.tokens.egress.issuer,
-        tokenAudience: config.sandbox.tokens.egress.audience,
-      },
-      tokenizerProxyEgressBaseUrl: config.services.tokenizer_proxy.egress_url,
       ...(config.sandbox.sandboxd_test_faults_enabled === undefined
         ? {}
         : { sandboxdTestFaultsEnabled: config.sandbox.sandboxd_test_faults_enabled }),

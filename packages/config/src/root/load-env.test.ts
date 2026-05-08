@@ -74,7 +74,6 @@ describe("loadRootConfigFromEnv", () => {
       MISTLE_SERVICES_TOKENIZER_PROXY_PORT: "8085",
       MISTLE_SERVICES_TOKENIZER_PROXY_PUBLIC_URL: "https://api.example.com",
       MISTLE_SERVICES_TOKENIZER_PROXY_INTERNAL_URL: "http://tokenizer-proxy:8085",
-      MISTLE_SERVICES_TOKENIZER_PROXY_EGRESS_URL: "https://api.example.com/tokenizer-proxy/egress",
       MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY: "4",
       MISTLE_SERVICES_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY: "5",
       MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: "control",
@@ -233,7 +232,6 @@ describe("loadRootConfigFromEnv", () => {
           port: 8085,
           public_url: "https://api.example.com",
           internal_url: "http://tokenizer-proxy:8085",
-          egress_url: "https://api.example.com/tokenizer-proxy/egress",
         },
         control_plane_worker: {
           workflow_concurrency: 4,

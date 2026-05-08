@@ -18,7 +18,6 @@ fn decodes_startup_input_fixture() {
         startup_input.tunnel_gateway_ws_url,
         "ws://127.0.0.1:5003/tunnel/sandbox"
     );
-    assert!(startup_input.egress_grant_by_rule_id.is_empty());
     assert_eq!(startup_input.runtime_plan["sandboxProfileId"], "sbp_123");
 }
 

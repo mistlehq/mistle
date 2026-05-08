@@ -7787,7 +7787,6 @@ mod tests {
                     }
                 ]
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         };
@@ -8144,7 +8143,6 @@ mod tests {
                     }
                 ]
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         };
@@ -8323,7 +8321,6 @@ mod tests {
                 "runtimeClients": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         };
@@ -8435,7 +8432,6 @@ mod tests {
                 "runtimeClients": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         };
@@ -8556,7 +8552,6 @@ mod tests {
                 "runtimeClients": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         };
@@ -8682,7 +8677,6 @@ mod tests {
                 "runtimeClients": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         };
@@ -8772,7 +8766,6 @@ mod tests {
                 "runtimeClients": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         };
@@ -8860,7 +8853,6 @@ mod tests {
             tunnel_gateway_ws_url: "wss://gateway.example.test/tunnel/sandbox/sbi_123".to_string(),
             acting_user_id: None,
             runtime_plan: json!({}),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
             transparent_proxy: Some(TransparentProxyConfiguration {
                 passthrough_bypass: TransparentProxyBypass {
@@ -9028,7 +9020,6 @@ mod tests {
                 "runtimeClients": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         };
@@ -9284,7 +9275,6 @@ mod tests {
                 "runtimeClients": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         };
@@ -9394,7 +9384,6 @@ mod tests {
                     "runtimeClients": [],
                     "agentRuntimes": []
                 }),
-                egress_grant_by_rule_id: BTreeMap::new(),
                 git_identity: None,
                 transparent_proxy: None,
             };
@@ -9603,7 +9592,6 @@ mod tests {
                 "runtimeClients": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         };
@@ -9748,7 +9736,6 @@ mod tests {
                 "runtimeClients": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         };
@@ -9960,7 +9947,6 @@ mod tests {
                 "runtimeClients": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         };
@@ -10165,7 +10151,6 @@ mod tests {
                 "runtimeClients": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         };
@@ -10293,7 +10278,6 @@ mod tests {
                 "runtimeClients": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         };
@@ -10497,7 +10481,6 @@ mod tests {
                 "runtimeClients": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         };
@@ -10638,7 +10621,6 @@ mod tests {
                 "runtimeClients": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         };
@@ -10789,7 +10771,6 @@ mod tests {
                 "runtimeClients": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         };
@@ -10982,7 +10963,6 @@ mod tests {
                 "runtimeClients": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         };

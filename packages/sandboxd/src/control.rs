@@ -21,7 +21,6 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-use crate::protocol::egress_refresh::EgressGrantRefreshInput;
 use crate::protocol::startup::StartupInput;
 use crate::sandboxd_state::SandboxdState;
 use crate::security;
@@ -226,10 +225,6 @@ enum ControlRequest {
     Init { startup_input: StartupInput },
     #[serde(rename = "resume")]
     Resume { startup_input: StartupInput },
-    #[serde(rename = "refreshEgressGrants")]
-    RefreshEgressGrants {
-        refresh_input: EgressGrantRefreshInput,
-    },
     #[serde(rename = "sign")]
     Sign { sign_request: ControlSignRequest },
 }
@@ -518,18 +513,6 @@ pub fn submit_resume(socket_path: &Path, startup_input: &StartupInput) -> Result
         socket_path,
         ControlRequest::Resume {
             startup_input: startup_input.clone(),
-        },
-    )
-}
-
-pub fn submit_egress_grant_refresh(
-    socket_path: &Path,
-    refresh_input: &EgressGrantRefreshInput,
-) -> Result<(), ControlError> {
-    submit_startup_request(
-        socket_path,
-        ControlRequest::RefreshEgressGrants {
-            refresh_input: refresh_input.clone(),
         },
     )
 }
@@ -845,10 +828,6 @@ fn handle_connection(
             begin_resume(startup_input, state)?;
             Ok(None)
         }
-        ControlRequest::RefreshEgressGrants { refresh_input } => {
-            begin_egress_grant_refresh(refresh_input, state)?;
-            Ok(None)
-        }
         ControlRequest::Sign { sign_request } => begin_sign(sign_request, state).map(Some),
     }
 }
@@ -1113,50 +1092,6 @@ fn begin_resume(
     resume_result
 }
 
-fn begin_egress_grant_refresh(
-    refresh_input: EgressGrantRefreshInput,
-    state: &Arc<Mutex<ControlServerState>>,
-) -> Result<(), ControlError> {
-    let mut sandboxd_state = {
-        let mut state_guard = state
-            .lock()
-            .expect("control server state lock should not be poisoned");
-        match &state_guard.init_phase {
-            InitPhase::Uninitialized => {
-                return Err(ControlError::StartupRequestRejected(
-                    "sandboxd has not completed initialization".to_string(),
-                ));
-            }
-            InitPhase::Initializing => {
-                return Err(ControlError::StartupRequestRejected(
-                    "sandboxd is still initializing".to_string(),
-                ));
-            }
-            InitPhase::Initialized => state_guard.sandboxd_state.take().ok_or_else(|| {
-                ControlError::ResumeSandboxdState(
-                    "sandboxd state is missing for an initialized daemon".to_string(),
-                )
-            })?,
-            InitPhase::Failed(error) => {
-                return Err(ControlError::StartupRequestRejected(format!(
-                    "sandboxd initialization already failed: {error}"
-                )));
-            }
-        }
-    };
-
-    let refresh_result = sandboxd_state
-        .refresh_egress_grants(&refresh_input, None)
-        .map_err(|error| ControlError::ResumeSandboxdState(error.to_string()));
-
-    state
-        .lock()
-        .expect("control server state lock should not be poisoned")
-        .sandboxd_state = Some(sandboxd_state);
-
-    refresh_result
-}
-
 fn build_health_response(
     state: &Arc<Mutex<ControlServerState>>,
 ) -> Result<SandboxdHealthResponse, ControlError> {
@@ -1380,14 +1315,12 @@ mod tests {
     use crate::time::{Sleeper, ThreadSleeper};
 
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
-    const TOKENIZER_PROXY_EGRESS_BASE_URL_ENV: &str =
-        "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
+    const GATEWAY_PROXY_ENABLED_ENV: &str = "GATEWAY_PROXY_ENABLED";
     const TEST_PUBLIC_KEY: &str = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE";
 
     #[test]
     fn accepts_one_init_request_from_the_control_socket() {
-        let _env_guard =
-            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("control_init");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
@@ -1409,8 +1342,7 @@ mod tests {
 
     #[test]
     fn rejects_second_init_requests_after_initialization_begins() {
-        let _env_guard =
-            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("control_second_init");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
@@ -1439,8 +1371,7 @@ mod tests {
 
     #[test]
     fn resumes_after_initialization_completes() {
-        let _env_guard =
-            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("control_resume");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
@@ -1469,8 +1400,7 @@ mod tests {
 
     #[test]
     fn rejects_resume_before_initialization_completes() {
-        let _env_guard =
-            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("control_resume_before_init");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
@@ -1499,8 +1429,7 @@ mod tests {
 
     #[test]
     fn accepts_signing_requests_after_initialization() {
-        let _env_guard =
-            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("control_sign_ok");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_signing_gateway();
@@ -1534,8 +1463,7 @@ mod tests {
 
     #[test]
     fn rejects_signing_requests_for_a_different_key_ref() {
-        let _env_guard =
-            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("control_sign_wrong_key");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_signing_gateway();
@@ -1568,35 +1496,30 @@ mod tests {
 
     #[test]
     fn returns_init_failure_to_the_control_socket_client() {
-        let _env_guard = TestEnvVarGuard::unset(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV);
+        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("control_init_failure");
         let socket_path = test_dir.join("control.sock");
-        let gateway = start_bootstrap_gateway();
-        let startup_input =
-            valid_startup_input(StartupMode::New, "bootstrap-token-value", &gateway.ws_url);
+        let startup_input = valid_startup_input(
+            StartupMode::New,
+            "bootstrap-token-value",
+            "ws://127.0.0.1:9/bootstrap",
+        );
         let server = start_test_control_server(&socket_path, ThreadSleeper);
 
         let error = submit_init(&socket_path, &startup_input)
-            .expect_err("init submission should fail when required env is missing");
+            .expect_err("init submission should fail when bootstrap tunnel cannot connect");
 
-        assert!(
-            error
-                .to_string()
-                .contains(
-                    "failed to initialize sandboxd state: failed to start runtime client processes: required sandbox env 'SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL' is missing"
-                )
-        );
-        assert_eq!(
-            server.init_phase(),
-            InitPhase::Failed(
-                "failed to start runtime client processes: required sandbox env 'SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL' is missing".to_string()
-            )
-        );
+        assert!(error.to_string().contains(
+            "failed to initialize sandboxd state: failed to start bootstrap tunnel session"
+        ));
+        match server.init_phase() {
+            InitPhase::Failed(message) => {
+                assert!(message.contains("failed to start bootstrap tunnel session"));
+            }
+            phase => panic!("init phase should be failed, got {phase:?}"),
+        }
 
         server.close().expect("control server should stop cleanly");
-        gateway
-            .close()
-            .expect("bootstrap gateway should stop cleanly");
         std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
 
@@ -1647,8 +1570,7 @@ mod tests {
 
     #[test]
     fn serves_initialized_health_snapshot_over_loopback_http() {
-        let _env_guard =
-            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("control_health_initialized");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
@@ -1684,18 +1606,18 @@ mod tests {
 
     #[test]
     fn snapshot_materialization_init_applies_runtime_plan_and_exits_after_init() {
-        let _env_guard =
-            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("control_snapshot_materialization");
         let socket_path = test_dir.join("control.sock");
         let startup_output_path = test_dir.join("snapshot-artifact-output.txt");
+        let gateway = start_bootstrap_gateway();
         let server = start_test_control_server(&socket_path, ThreadSleeper);
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
             execution_mode: StartupExecutionMode::Snapshot,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
-            tunnel_gateway_ws_url: "ws://127.0.0.1:9/bootstrap".to_string(),
+            tunnel_gateway_ws_url: gateway.ws_url.clone(),
             acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
@@ -1754,7 +1676,6 @@ mod tests {
                 "workspaceSources": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: std::collections::BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         };
@@ -1770,6 +1691,9 @@ mod tests {
                 .expect("snapshot runtime-plan artifact output should exist"),
             "snapshot-artifact"
         );
+        gateway
+            .close()
+            .expect("bootstrap gateway should stop cleanly");
         std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
 
@@ -1931,7 +1855,6 @@ mod tests {
                 "runtimeClients": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: std::collections::BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         }
@@ -1958,7 +1881,6 @@ mod tests {
                 "runtimeClients": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: std::collections::BTreeMap::new(),
             git_identity: Some(GitIdentity {
                 name: "Mistle User".to_string(),
                 email: "mistle-user@example.com".to_string(),

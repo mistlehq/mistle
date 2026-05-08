@@ -7,8 +7,6 @@ import type { StartSandboxInstanceWorkflowImageInput } from "@mistle/workflow-re
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 
-const SandboxRuntimeTokenizerProxyEgressBaseURLEnv =
-  "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
 const SandboxRuntimeSandboxInstanceIDEnv = "SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID";
 const SandboxdTestFaultsEnabledEnv = "MISTLE_SANDBOXD_ENABLE_TEST_FAULTS";
 const GatewayProxyEnabledEnv = "GATEWAY_PROXY_ENABLED";
@@ -20,8 +18,6 @@ export function createSandboxRuntimeEnv(input: {
 }): Record<string, string> {
   const gatewayProxyEnabled = readGatewayProxyEnabled(input.processEnv ?? process.env);
   return {
-    [SandboxRuntimeTokenizerProxyEgressBaseURLEnv]:
-      input.config.app.sandbox.tokenizerProxyEgressBaseUrl,
     [SandboxRuntimeSandboxInstanceIDEnv]: input.sandboxInstanceId,
     ...(gatewayProxyEnabled
       ? {

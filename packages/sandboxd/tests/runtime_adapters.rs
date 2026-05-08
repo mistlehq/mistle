@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
@@ -226,7 +225,6 @@ fn runtime_adapter_registry_starts_codex_proxy_adapter() {
                 }
             ]
         }),
-        egress_grant_by_rule_id: BTreeMap::new(),
         git_identity: None,
         transparent_proxy: None,
     };

@@ -45,8 +45,6 @@ function createWorkerConfig(input: {
       storage: undefined,
       internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
       bootstrap: SandboxTokenConfig,
-      egress: SandboxTokenConfig,
-      tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       ...input.sandbox,
     },
     sandboxStorage: input.sandboxStorage,
@@ -63,8 +61,6 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
       provider: "e2b",
       internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
       bootstrap: SandboxTokenConfig,
-      egress: SandboxTokenConfig,
-      tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       e2b: {
         apiKey: "test-api-key",
       },
@@ -74,8 +70,6 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
       provider: "e2b",
       internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
       bootstrap: SandboxTokenConfig,
-      egress: SandboxTokenConfig,
-      tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       e2b: {
         apiKey: "test-api-key",
         domain: "e2b.app",
@@ -90,8 +84,6 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
       provider: "e2b",
       internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
       bootstrap: SandboxTokenConfig,
-      egress: SandboxTokenConfig,
-      tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       sandboxdTestFaultsEnabled: true,
       e2b: {
         apiKey: "test-api-key",
@@ -105,8 +97,6 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
       provider: "e2b",
       internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
       bootstrap: SandboxTokenConfig,
-      egress: SandboxTokenConfig,
-      tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       sandboxdTestFaultsEnabled: true,
       e2b: {
         apiKey: "test-api-key",
@@ -122,8 +112,6 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
       provider: "docker",
       internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
       bootstrap: SandboxTokenConfig,
-      egress: SandboxTokenConfig,
-      tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       sandboxdTestFaultsEnabled: true,
     });
 
@@ -131,8 +119,6 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
       provider: "docker",
       internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
       bootstrap: SandboxTokenConfig,
-      egress: SandboxTokenConfig,
-      tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       sandboxdTestFaultsEnabled: true,
     });
   });
@@ -156,8 +142,6 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
           provider: "docker",
           internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
           bootstrap: SandboxTokenConfig,
-          egress: SandboxTokenConfig,
-          tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
         },
         internalAuth: {
           serviceToken: "internal-service-token",
@@ -234,8 +218,6 @@ describe("getDataPlaneWorkerSandboxProviderValidationIssue", () => {
         provider: "e2b",
         internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
         bootstrap: SandboxTokenConfig,
-        egress: SandboxTokenConfig,
-        tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       },
     });
 

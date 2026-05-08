@@ -47,22 +47,6 @@ describe("startup contracts", () => {
     ).toThrow("Unrecognized key");
   });
 
-  it("accepts startup input with non-empty egress grant values", () => {
-    expect(
-      SandboxdStartupInputSchema.parse({
-        ...startupInputFixture,
-        egressGrantByRuleId: {
-          egress_rule_allow_all: "grant-token",
-        },
-      }),
-    ).toEqual({
-      ...startupInputFixture,
-      egressGrantByRuleId: {
-        egress_rule_allow_all: "grant-token",
-      },
-    });
-  });
-
   it("accepts startup input with optional git identity", () => {
     expect(
       SandboxdStartupInputSchema.parse({

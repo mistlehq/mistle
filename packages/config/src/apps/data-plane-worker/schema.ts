@@ -74,19 +74,12 @@ export const DataPlaneWorkerSandboxE2BConfigSchema = z
   })
   .strict();
 
-const DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema = z.url().refine((value) => {
-  const parsedUrl = new URL(value);
-  return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
-}, "sandbox.tokenizerProxyEgressBaseUrl must use http or https.");
-
 export const DataPlaneWorkerSandboxConfigSchema = z
   .object({
     provider: z.enum(SandboxProviders),
     storage: GlobalSandboxStorageConfigSchema.optional(),
     internalGatewayWsUrl: z.string().trim().min(1),
     bootstrap: GlobalSandboxTokenConfigSchema,
-    egress: GlobalSandboxTokenConfigSchema,
-    tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema,
     sandboxdTestFaultsEnabled: z.boolean().optional(),
     docker: DataPlaneWorkerSandboxDockerConfigSchema.optional(),
     e2b: DataPlaneWorkerSandboxE2BConfigSchema.optional(),
@@ -99,8 +92,6 @@ export const PartialDataPlaneWorkerSandboxConfigSchema = z
     storage: GlobalSandboxStorageConfigSchema.partial().optional(),
     internalGatewayWsUrl: z.string().trim().min(1).optional(),
     bootstrap: GlobalSandboxTokenConfigSchema.partial().optional(),
-    egress: GlobalSandboxTokenConfigSchema.partial().optional(),
-    tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema.optional(),
     sandboxdTestFaultsEnabled: z.boolean().optional(),
     docker: DataPlaneWorkerSandboxDockerConfigSchema.partial().optional(),
     e2b: DataPlaneWorkerSandboxE2BConfigSchema.partial().optional(),

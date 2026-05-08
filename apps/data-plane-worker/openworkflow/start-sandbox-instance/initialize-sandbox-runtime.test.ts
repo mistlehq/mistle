@@ -6,15 +6,6 @@ import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import { createSandboxStartupInput } from "./initialize-sandbox-runtime.js";
 import { SandboxStartupModes } from "./sandbox-startup-input.js";
 
-function decodeJwtPayload(token: string): Record<string, unknown> {
-  const [, payload] = token.split(".");
-  if (payload === undefined) {
-    throw new Error("Expected JWT payload segment.");
-  }
-
-  return JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-}
-
 function createTestRuntimeConfig(): DataPlaneWorkerRuntimeConfig {
   const sandbox: DataPlaneWorkerRuntimeConfig["sandbox"] = {
     provider: SandboxProvider.DOCKER,
@@ -24,12 +15,6 @@ function createTestRuntimeConfig(): DataPlaneWorkerRuntimeConfig {
       tokenIssuer: "issuer",
       tokenAudience: "audience",
     },
-    egress: {
-      tokenSecret: "egress-secret",
-      tokenIssuer: "issuer",
-      tokenAudience: "audience",
-    },
-    tokenizerProxyEgressBaseUrl: "http://tokenizer-proxy/tokenizer-proxy/egress",
     docker: {
       socketPath: "/var/run/docker.sock",
       networkName: "mistle-sandbox-dev",
@@ -107,7 +92,7 @@ describe("createSandboxStartupInput", () => {
     expect(startupInput.transparentProxy).toBeUndefined();
   });
 
-  it("keeps acting-user context out of legacy sandbox startup input when gateway proxy mode is disabled", async () => {
+  it("keeps acting-user context out of sandbox startup input when gateway proxy mode is disabled", async () => {
     const startupInput = await createSandboxStartupInput({
       config: createTestRuntimeConfig(),
       organizationId: "org_123",
@@ -144,13 +129,6 @@ describe("createSandboxStartupInput", () => {
     });
 
     expect(startupInput.actingUserId).toBeUndefined();
-    const egressGrant = startupInput.egressGrantByRuleId.egress_rule_1;
-    if (egressGrant === undefined) {
-      throw new Error("Expected test runtime plan to include egress_rule_1 grant.");
-    }
-    expect(decodeJwtPayload(egressGrant)).toMatchObject({
-      actingUserId: "usr_123",
-    });
   });
 
   it("includes acting-user context in gateway proxy startup input when the workflow has one", async () => {
@@ -230,12 +208,6 @@ describe("createSandboxStartupInput", () => {
           kind: "host",
           value: "gateway",
           reason: "gateway tunnel traffic must not be redirected into sandboxd",
-        },
-        {
-          kind: "host",
-          value: "tokenizer-proxy",
-          reason:
-            "legacy tokenizer-proxy traffic must remain direct while grant-backed egress exists",
         },
       ],
     });

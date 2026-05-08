@@ -161,7 +161,6 @@ export const ConfigSchema = z
             port: z.number().int().min(1).max(65535),
             internal_url: UrlSchema.optional(),
             public_url: UrlSchema.optional(),
-            egress_url: UrlSchema,
           })
           .strict(),
         control_plane_worker: z

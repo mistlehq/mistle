@@ -25,7 +25,6 @@ Persistent sandbox behavior across data-plane workflows is documented in [`docs/
 - capture a new provider image or snapshot handle from a running sandbox
 - attach and clean up provider-mounted persistent storage
 - initialize or resume the in-sandbox `sandboxd` runtime
-- refresh runtime egress grants
 - read `sandboxd` init/resume operation logs for startup diagnostics
 
 It does not decide whether a sandbox instance is ephemeral or persistent, provision durable storage records, choose organization storage settings, compile runtime plans, mint tunnel tokens, or manage provider platform infrastructure such as autoscaling, cluster/node lifecycle, scheduling policy, and capacity management. Those decisions live in the data-plane/control-plane application layers. This package receives already-resolved provider config, image handles, runtime payloads, and storage attachment handles.
@@ -53,7 +52,6 @@ The main entrypoints are:
 
 - `init(request)`
 - `resume(request)`
-- `refreshEgressGrants(request)`
 - `readOperationLog(request)`
 - `close()`
 
@@ -175,7 +173,6 @@ Current high-level flows:
 - resume workflow: mark starting, try provider `resume`, attach storage, runtime `resume`, wait for readiness; persistent sandboxes may replace compute when provider state is missing
 - stop/destroy workflows: call storage cleanup around provider compute teardown
 - snapshot materialization: start an ephemeral setup sandbox, initialize runtime, capture a snapshot handle, then destroy compute
-- egress refresh: data-plane API mints new grants and calls runtime `refreshEgressGrants`
 - startup diagnostics: worker reads provider operation logs with `readOperationLog({ operation: "init" | "resume" })` after init/resume failures
 
 ## Integration Tests
@@ -220,7 +217,7 @@ Use the current Docker and E2B providers as reference implementations; neither p
 11. Add unit tests next to provider modules, including config, errors, factory wiring, adapter behavior, storage commands, and runtime-control construction.
 12. Add provider integration tests in `integration/<provider>/`.
 
-Integration tests should cover the provider lifecycle surface, snapshot capture, runtime-control init/resume behavior, egress-grant refresh, operation-log reads, and any provider-specific storage behavior exposed by the package.
+Integration tests should cover the provider lifecycle surface, snapshot capture, runtime-control init/resume behavior, operation-log reads, and any provider-specific storage behavior exposed by the package.
 
 Design expectations:
 

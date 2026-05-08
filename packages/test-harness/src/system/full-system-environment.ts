@@ -50,7 +50,6 @@ const CONTROL_PLANE_API_CONTAINER_BASE_URL = "http://control-plane-api:5100";
 const DATA_PLANE_API_CONTAINER_BASE_URL = "http://data-plane-api:5200";
 const DATA_PLANE_GATEWAY_CONTAINER_BASE_URL = "http://data-plane-gateway:5202";
 const TOKENIZER_PROXY_CONTAINER_BASE_URL = "http://tokenizer-proxy:5205";
-const TOKENIZER_PROXY_EGRESS_CONTAINER_BASE_URL = `${TOKENIZER_PROXY_CONTAINER_BASE_URL}/tokenizer-proxy/egress`;
 const DATA_PLANE_GATEWAY_TUNNEL_WS_URL = "ws://data-plane-gateway:5202/tunnel/sandbox";
 const DataPlaneGatewayIdleTimeoutMs = 300_000;
 const DataPlaneGatewayBootstrapDisconnectGraceMs = 60_000;
@@ -726,10 +725,6 @@ export async function startFullSystemEnvironment(
     cleanupTasks.unshift(async () => {
       await withStepTiming("stop tokenizer-proxy", async () => tokenizerProxy.stop());
     });
-    const tokenizerProxyEgressBaseUrl =
-      input.sandboxPublicTokenizerProxyTunnel === undefined
-        ? TOKENIZER_PROXY_EGRESS_CONTAINER_BASE_URL
-        : `https://${input.sandboxPublicTokenizerProxyTunnel.publicHostname}/tokenizer-proxy/egress`;
     const dataPlaneWorker = await withStepTiming("start data-plane-worker", async () => {
       return startDataPlaneWorker({
         buildContextHostPath: input.buildContextHostPath,
@@ -756,7 +751,6 @@ export async function startFullSystemEnvironment(
           MISTLE_SANDBOX_PROVIDER: input.sandboxProvider,
           MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL: gatewayWsUrl,
           MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL: gatewayWsUrl,
-          MISTLE_SERVICES_TOKENIZER_PROXY_EGRESS_URL: tokenizerProxyEgressBaseUrl,
         },
       });
     });

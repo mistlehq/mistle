@@ -1,11 +1,11 @@
 //! Sandbox-local egress proxy for runtime tools and interactive shells.
 //!
 //! Runtime tools like `gh` and `git` expect standard `HTTP[S]_PROXY` semantics,
-//! while tokenizer-proxy expects route-relative requests plus an egress grant.
-//! This module bridges those models: it exposes one local forward proxy inside
-//! the sandbox, terminates proxied HTTPS sessions with an ephemeral CA, matches
-//! each decrypted request against the compiled runtime-plan egress routes, and
-//! then forwards the request to tokenizer-proxy with the matching grant header.
+//! while Mistle keeps credential-bearing egress decisions in the data-plane
+//! gateway. This module exposes one local forward proxy inside the sandbox,
+//! terminates proxied HTTPS sessions with an ephemeral CA, matches each
+//! decrypted request against the compiled runtime-plan egress routes, and
+//! forwards the request through the bootstrap tunnel.
 
 use std::collections::BTreeMap;
 use std::convert::Infallible;
@@ -34,10 +34,7 @@ use hyper::header::{HOST, HeaderName, HeaderValue};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode, Uri};
-use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
-use hyper_util::client::legacy::Client;
-use hyper_util::client::legacy::connect::HttpConnector;
-use hyper_util::rt::{TokioExecutor, TokioIo};
+use hyper_util::rt::TokioIo;
 use rustls_pki_types::pem::PemObject;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use serde_json::{Map, Value};
@@ -61,7 +58,6 @@ use crate::tunnel::session::{
     GatewayEgressForwarder, TunnelEgressHttpRequest, TunnelEgressHttpResponse, TunnelSessionError,
 };
 
-const TOKENIZER_PROXY_EGRESS_GRANT_HEADER_NAME: &str = "X-Mistle-Egress-Grant";
 const RUNTIME_PROXY_CA_CERT_PATH: &str = "/run/mistle/sandboxd/egress-proxy-ca.pem";
 const RUNTIME_PROXY_CA_BUNDLE_PATH: &str = "/run/mistle/sandboxd/egress-proxy-ca-bundle.pem";
 const RUNTIME_PROXY_CA_TRUST_STORE_PATH: &str =
@@ -100,8 +96,6 @@ const MANAGED_PROXY_ENV_KEYS: [&str; 16] = [
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 type HyperBody = BoxBody<Bytes, BoxError>;
-type EgressConnector = HttpsConnector<HttpConnector>;
-
 #[derive(Clone, Copy)]
 struct ProxyCaConfig<'a> {
     runtime_certificate_path: &'a Path,
@@ -120,7 +114,6 @@ struct EgressProxyLogContext<'a> {
 #[derive(Debug)]
 pub struct EgressProxy {
     runtime_env: BTreeMap<String, String>,
-    routes: Arc<RwLock<Vec<EgressProxyRoute>>>,
     shutdown_requested: Arc<AtomicBool>,
     supervisor_thread: Option<JoinHandle<Result<(), EgressProxyError>>>,
     transparent_server: Option<ActiveEgressProxyServer>,
@@ -139,21 +132,14 @@ pub struct EgressProxyError {
 #[derive(Debug, Clone)]
 struct EgressProxyRoute {
     egress_rule_id: String,
-    upstream_base_url: String,
     host: String,
     path_prefixes: Vec<String>,
     methods: Option<Vec<String>>,
-    grant: Option<String>,
 }
 
 #[derive(Clone)]
 enum EgressProxyForwardingMode {
-    TokenizerProxy {
-        tokenizer_proxy_egress_base_url: String,
-    },
-    Gateway {
-        forwarder: GatewayEgressForwarder,
-    },
+    Gateway { forwarder: GatewayEgressForwarder },
 }
 
 #[derive(Clone)]
@@ -161,7 +147,6 @@ struct EgressProxyState {
     sandbox_instance_id: String,
     forwarding_mode: EgressProxyForwardingMode,
     routes: Arc<RwLock<Vec<EgressProxyRoute>>>,
-    client: Client<EgressConnector, Incoming>,
     proxy_ca_certificate_pem: Arc<String>,
     proxy_ca_private_key_pem: Arc<String>,
     clock: Arc<dyn Clock>,
@@ -599,17 +584,19 @@ impl EgressProxy {
     pub fn start(
         runtime_plan: &CompiledRuntimePlan,
         startup_input: &StartupInput,
-        tokenizer_proxy_egress_base_url: &str,
         gateway_egress_forwarder: Option<GatewayEgressForwarder>,
         clock: Arc<dyn Clock>,
         supervisor_handle: SandboxdSupervisorHandle,
     ) -> Result<Option<Self>, EgressProxyError> {
-        let forwarding_mode = match gateway_egress_forwarder {
-            Some(forwarder) => EgressProxyForwardingMode::Gateway { forwarder },
-            None => EgressProxyForwardingMode::TokenizerProxy {
-                tokenizer_proxy_egress_base_url: tokenizer_proxy_egress_base_url.to_string(),
-            },
+        if runtime_plan.egress_routes.is_empty() && startup_input.transparent_proxy.is_none() {
+            return Ok(None);
         };
+        let Some(forwarder) = gateway_egress_forwarder else {
+            return Err(EgressProxyError::new(
+                "gateway proxying must be enabled before starting sandbox egress proxy",
+            ));
+        };
+        let forwarding_mode = EgressProxyForwardingMode::Gateway { forwarder };
         Self::start_with_options(
             runtime_plan,
             startup_input,
@@ -648,12 +635,7 @@ impl EgressProxy {
         let routes = runtime_plan
             .egress_routes
             .iter()
-            .map(|route| match &forwarding_mode {
-                EgressProxyForwardingMode::TokenizerProxy { .. } => {
-                    build_proxy_route(route, startup_input)
-                }
-                EgressProxyForwardingMode::Gateway { .. } => build_gateway_proxy_route(route),
-            })
+            .map(build_gateway_proxy_route)
             .collect::<Result<Vec<_>, _>>()?;
 
         let generated_proxy_ca = generate_proxy_ca(clock.as_ref())
@@ -716,46 +698,25 @@ impl EgressProxy {
             ]),
         );
 
-        let mut http_connector = HttpConnector::new();
-        http_connector.enforce_http(false);
-        let https_connector = match HttpsConnectorBuilder::new().with_native_roots() {
-            Ok(https_connector_builder) => https_connector_builder,
-            Err(error) => {
-                let cleanup_suffix = cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
-                    .err()
-                    .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
-                    .unwrap_or_default();
-                return Err(EgressProxyError::new(format!(
-                    "failed to load system certificate roots for local egress proxy: {error}{cleanup_suffix}"
-                )));
-            }
-        }
-            .https_or_http()
-            .enable_http1()
-            .wrap_connector(http_connector);
         let routes = Arc::new(RwLock::new(routes));
         let state = EgressProxyState {
             sandbox_instance_id: supervisor_handle.sandbox_instance_id().to_string(),
             forwarding_mode: forwarding_mode.clone(),
             routes: routes.clone(),
-            client: Client::builder(TokioExecutor::new()).build(https_connector),
             proxy_ca_certificate_pem: Arc::new(generated_proxy_ca.certificate_pem.clone()),
             proxy_ca_private_key_pem: Arc::new(generated_proxy_ca.private_key_pem),
             clock,
             next_request_id: Arc::new(AtomicU64::new(1)),
         };
-        let transparent_listener_address =
-            transparent_proxy_listener_address_for_forwarding_mode(&forwarding_mode)?;
+        let transparent_listener_address = if startup_input.transparent_proxy.is_some() {
+            transparent_proxy_listener_address_for_forwarding_mode(&forwarding_mode)?
+        } else {
+            None
+        };
 
         let runtime_env = match build_managed_proxy_env(
             listener_address,
             proxy_ca_config.runtime_certificate_bundle_path,
-            match &forwarding_mode {
-                EgressProxyForwardingMode::TokenizerProxy {
-                    tokenizer_proxy_egress_base_url,
-                } => Some(tokenizer_proxy_egress_base_url.as_str()),
-                EgressProxyForwardingMode::Gateway { .. } => None,
-            },
         ) {
             Ok(runtime_env) => runtime_env,
             Err(error) => {
@@ -923,7 +884,6 @@ impl EgressProxy {
 
         Ok(Some(Self {
             runtime_env,
-            routes,
             shutdown_requested,
             supervisor_thread: Some(supervisor_thread),
             transparent_server,
@@ -937,80 +897,6 @@ impl EgressProxy {
 
     pub fn runtime_env(&self) -> &BTreeMap<String, String> {
         &self.runtime_env
-    }
-
-    pub fn refresh_grants(
-        &self,
-        runtime_plan: &CompiledRuntimePlan,
-        egress_grant_by_rule_id: &BTreeMap<String, String>,
-    ) -> Result<(), EgressProxyError> {
-        let log_context = EgressProxyLogContext {
-            clock: &SystemClock,
-            sandbox_instance_id: self.supervisor_handle.sandbox_instance_id(),
-        };
-        let route_count = runtime_plan.egress_routes.len();
-        emit_egress_proxy_log(
-            log_context.clock,
-            log_context.sandbox_instance_id,
-            "egress_proxy_grant_refresh_started",
-            &[("routeCount", Value::from(route_count))],
-        );
-
-        let refreshed_routes = runtime_plan
-            .egress_routes
-            .iter()
-            .map(|route| build_proxy_route_with_grants(route, egress_grant_by_rule_id))
-            .collect::<Result<Vec<_>, _>>();
-
-        let refreshed_routes = match refreshed_routes {
-            Ok(refreshed_routes) => refreshed_routes,
-            Err(error) => {
-                emit_egress_proxy_log(
-                    log_context.clock,
-                    log_context.sandbox_instance_id,
-                    "egress_proxy_grant_refresh_failed",
-                    &[
-                        ("routeCount", Value::from(route_count)),
-                        ("error", Value::String(error.to_string())),
-                    ],
-                );
-                return Err(error);
-            }
-        };
-
-        let refresh_result = {
-            let mut routes = self
-                .routes
-                .write()
-                .map_err(|_| EgressProxyError::new("egress proxy route table lock is poisoned"))?;
-            validate_refresh_routes_are_compatible(&routes, &refreshed_routes)?;
-            *routes = refreshed_routes;
-            Ok::<(), EgressProxyError>(())
-        };
-
-        match refresh_result {
-            Ok(()) => {
-                emit_egress_proxy_log(
-                    log_context.clock,
-                    log_context.sandbox_instance_id,
-                    "egress_proxy_grant_refresh_completed",
-                    &[("routeCount", Value::from(route_count))],
-                );
-                Ok(())
-            }
-            Err(error) => {
-                emit_egress_proxy_log(
-                    log_context.clock,
-                    log_context.sandbox_instance_id,
-                    "egress_proxy_grant_refresh_failed",
-                    &[
-                        ("routeCount", Value::from(route_count)),
-                        ("error", Value::String(error.to_string())),
-                    ],
-                );
-                Err(error)
-            }
-        }
     }
 
     pub fn managed_env_keys() -> &'static [&'static str] {
@@ -1728,58 +1614,6 @@ fn socket_addr_from_sockaddr_storage(
     }
 }
 
-fn build_proxy_route(
-    route: &CompiledEgressRoute,
-    startup_input: &StartupInput,
-) -> Result<EgressProxyRoute, EgressProxyError> {
-    build_proxy_route_with_grants(route, &startup_input.egress_grant_by_rule_id)
-}
-
-fn build_proxy_route_with_grants(
-    route: &CompiledEgressRoute,
-    egress_grant_by_rule_id: &BTreeMap<String, String>,
-) -> Result<EgressProxyRoute, EgressProxyError> {
-    let upstream_url = url::Url::parse(&route.upstream.base_url).map_err(|error| {
-        EgressProxyError::new(format!(
-            "runtime plan egress route '{}' has invalid upstream base url '{}': {error}",
-            route.egress_rule_id, route.upstream.base_url
-        ))
-    })?;
-    let host = upstream_url.host_str().ok_or_else(|| {
-        EgressProxyError::new(format!(
-            "runtime plan egress route '{}' upstream '{}' must include a host",
-            route.egress_rule_id, route.upstream.base_url
-        ))
-    })?;
-    let grant = egress_grant_by_rule_id
-        .get(&route.egress_rule_id)
-        .ok_or_else(|| {
-            EgressProxyError::new(format!(
-                "missing egress grant for route '{}'",
-                route.egress_rule_id
-            ))
-        })?
-        .clone();
-
-    Ok(EgressProxyRoute {
-        egress_rule_id: route.egress_rule_id.clone(),
-        upstream_base_url: route.upstream.base_url.clone(),
-        host: host.to_string(),
-        path_prefixes: route
-            .r#match
-            .path_prefixes
-            .clone()
-            .unwrap_or_else(|| vec!["/".to_string()]),
-        methods: route.r#match.methods.clone().map(|methods| {
-            methods
-                .into_iter()
-                .map(|method| method.to_ascii_uppercase())
-                .collect()
-        }),
-        grant: Some(grant),
-    })
-}
-
 fn build_gateway_proxy_route(
     route: &CompiledEgressRoute,
 ) -> Result<EgressProxyRoute, EgressProxyError> {
@@ -1798,7 +1632,6 @@ fn build_gateway_proxy_route(
 
     Ok(EgressProxyRoute {
         egress_rule_id: route.egress_rule_id.clone(),
-        upstream_base_url: route.upstream.base_url.clone(),
         host: host.to_string(),
         path_prefixes: route
             .r#match
@@ -1811,7 +1644,6 @@ fn build_gateway_proxy_route(
                 .map(|method| method.to_ascii_uppercase())
                 .collect()
         }),
-        grant: None,
     })
 }
 
@@ -1891,11 +1723,10 @@ fn run_update_ca_certificates(command_path: &Path) -> Result<(), EgressProxyErro
 fn build_managed_proxy_env(
     listener_address: SocketAddr,
     ca_certificate_path: &Path,
-    tokenizer_proxy_egress_base_url: Option<&str>,
 ) -> Result<BTreeMap<String, String>, EgressProxyError> {
     let proxy_url = format!("http://{listener_address}");
     let certificate_path = ca_certificate_path.display().to_string();
-    let no_proxy_value = build_no_proxy_value(tokenizer_proxy_egress_base_url)?;
+    let no_proxy_value = RUNTIME_NO_PROXY_DEFAULTS.join(",");
 
     Ok(BTreeMap::from([
         ("HTTP_PROXY".to_string(), proxy_url.clone()),
@@ -1915,41 +1746,10 @@ fn build_managed_proxy_env(
     ]))
 }
 
-fn build_no_proxy_value(
-    tokenizer_proxy_egress_base_url: Option<&str>,
-) -> Result<String, EgressProxyError> {
-    let mut no_proxy_hosts = RUNTIME_NO_PROXY_DEFAULTS
-        .iter()
-        .map(|value| (*value).to_string())
-        .collect::<Vec<_>>();
-    let Some(tokenizer_proxy_egress_base_url) = tokenizer_proxy_egress_base_url else {
-        return Ok(no_proxy_hosts.join(","));
-    };
-
-    let tokenizer_proxy_url = url::Url::parse(tokenizer_proxy_egress_base_url).map_err(|error| {
-            EgressProxyError::new(format!(
-                "sandbox tokenizer proxy egress base url '{tokenizer_proxy_egress_base_url}' is invalid: {error}"
-            ))
-        })?;
-    let tokenizer_proxy_host = tokenizer_proxy_url.host_str().ok_or_else(|| {
-        EgressProxyError::new(format!(
-            "sandbox tokenizer proxy egress base url '{tokenizer_proxy_egress_base_url}' must include a host"
-        ))
-    })?;
-
-    no_proxy_hosts.push(tokenizer_proxy_host.to_string());
-    if let Some(port) = tokenizer_proxy_url.port() {
-        no_proxy_hosts.push(format!("{tokenizer_proxy_host}:{port}"));
-    }
-
-    Ok(no_proxy_hosts.join(","))
-}
-
 fn transparent_proxy_listener_address_for_forwarding_mode(
     forwarding_mode: &EgressProxyForwardingMode,
 ) -> Result<Option<SocketAddr>, EgressProxyError> {
     match forwarding_mode {
-        EgressProxyForwardingMode::TokenizerProxy { .. } => Ok(None),
         EgressProxyForwardingMode::Gateway { .. } => {
             #[cfg(target_os = "linux")]
             {
@@ -2370,6 +2170,39 @@ async fn forward_upgrade_request(
     target_override: Option<RequestTargetOverride>,
     downstream_upgrade: hyper::upgrade::OnUpgrade,
 ) -> Result<Response<HyperBody>, EgressProxyError> {
+    let (parts, _) = request.into_parts();
+    let request_method = parts.method.clone();
+    let request_target = resolve_request_target(&parts, target_override.as_ref())?;
+    let request_path_and_query = request_target
+        .uri
+        .path_and_query()
+        .map_or("/", |path_and_query| path_and_query.as_str())
+        .to_string();
+    let route = match_state_route(
+        &state,
+        &request_target.host,
+        &request_path_and_query,
+        request_method.as_str(),
+    )?;
+    let EgressProxyForwardingMode::Gateway { forwarder } = &state.forwarding_mode;
+    let forwarder = forwarder.clone();
+    forward_upgrade_request_through_gateway(
+        parts,
+        state,
+        request_target,
+        request_path_and_query,
+        route,
+        forwarder,
+        downstream_upgrade,
+    )
+    .await
+}
+
+async fn forward_request(
+    request: Request<Incoming>,
+    state: EgressProxyState,
+    target_override: Option<RequestTargetOverride>,
+) -> Result<Response<HyperBody>, EgressProxyError> {
     let (parts, body) = request.into_parts();
     let request_method = parts.method.clone();
     let request_target = resolve_request_target(&parts, target_override.as_ref())?;
@@ -2384,181 +2217,18 @@ async fn forward_upgrade_request(
         &request_path_and_query,
         request_method.as_str(),
     )?;
-    if let EgressProxyForwardingMode::Gateway { forwarder } = &state.forwarding_mode {
-        let forwarder = forwarder.clone();
-        return forward_upgrade_request_through_gateway(
-            parts,
-            state,
-            request_target,
-            request_path_and_query,
-            route,
-            forwarder,
-            downstream_upgrade,
-        )
-        .await;
-    }
-    let EgressProxyForwardingMode::TokenizerProxy {
-        tokenizer_proxy_egress_base_url,
-    } = &state.forwarding_mode
-    else {
-        return Err(EgressProxyError::new(
-            "egress proxy forwarding mode changed while handling websocket upgrade",
-        ));
-    };
-    let upstream_uri = match route {
-        Some(_) => build_tokenizer_proxy_forward_uri(
-            tokenizer_proxy_egress_base_url,
-            &request_path_and_query,
-        )?,
-        None => request_target.uri.clone(),
-    };
-    let request_context = Arc::new(EgressProxyRequestContext {
-        sandbox_instance_id: state.sandbox_instance_id.clone(),
-        request_id: format!(
-            "egp_{}",
-            state.next_request_id.fetch_add(1, Ordering::Relaxed)
-        ),
-        method: request_method.to_string(),
-        authority: request_target.authority.clone(),
-        host: request_target.host.clone(),
-        path_and_query: request_path_and_query,
-        route_mode: if route.is_some() { "managed" } else { "direct" },
-        egress_rule_id: route
-            .as_ref()
-            .map(|matched_route| matched_route.egress_rule_id.clone()),
-        upstream_url: upstream_uri.to_string(),
-        started_at_ms: state.clock.now_ms(),
-        clock: state.clock.clone(),
-    });
-    let mut request_started_fields = request_context.common_fields();
-    request_started_fields.push(("upgrade", Value::String("websocket".to_string())));
-    emit_egress_proxy_log(
-        request_context.clock.as_ref(),
-        &request_context.sandbox_instance_id,
-        "egress_proxy_upgrade_started",
-        &request_started_fields,
-    );
-
-    let mut outbound_request = Request::builder().method(request_method).uri(upstream_uri);
-    for (header_name, header_value) in filter_upgrade_request_headers(&parts.headers) {
-        outbound_request = outbound_request.header(header_name, header_value);
-    }
-    let outbound_request = match &route {
-        Some(route) => {
-            let grant = route.grant.as_deref().ok_or_else(|| {
-                EgressProxyError::new(format!(
-                    "route '{}' is missing an egress grant for tokenizer-proxy forwarding",
-                    route.egress_rule_id
-                ))
-            })?;
-            outbound_request
-                .header(TOKENIZER_PROXY_EGRESS_GRANT_HEADER_NAME, grant)
-                .body(body)
-                .map_err(|error| {
-                    EgressProxyError::new(format!(
-                        "failed to build proxied upgrade request: {error}"
-                    ))
-                })?
-        }
-        None => outbound_request.body(body).map_err(|error| {
-            EgressProxyError::new(format!("failed to build direct upgrade request: {error}"))
-        })?,
-    };
-
-    let mut upstream_response =
-        state
-            .client
-            .request(outbound_request)
-            .await
-            .map_err(|error| match &route {
-                Some(route) => EgressProxyError::new(format!(
-                    "failed to forward upgrade request for '{}' through tokenizer-proxy route '{}': {error}",
-                    route.host, route.upstream_base_url
-                )),
-                None => EgressProxyError::new(format!(
-                    "failed to forward upgrade request directly to '{}': {error}",
-                    request_target.authority
-                )),
-            })?;
-
-    let upstream_status = upstream_response.status();
-    let upstream_headers = upstream_response.headers().clone();
-    if upstream_status != StatusCode::SWITCHING_PROTOCOLS {
-        let (parts, body) = upstream_response.into_parts();
-        let mut response_builder = Response::builder().status(parts.status);
-        for (header_name, header_value) in filter_outbound_response_headers(&parts.headers) {
-            response_builder = response_builder.header(header_name, header_value);
-        }
-        response_builder = response_builder.header(
-            SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME,
-            request_context.request_id.as_str(),
-        );
-        return response_builder
-            .body(box_body(InstrumentedResponseBody {
-                inner: box_body(body),
-                context: request_context,
-                upstream_status,
-                upstream_trace_id: header_value_to_string(
-                    upstream_headers.get("x-mistle-trace-id"),
-                ),
-                chunk_count: 0,
-                forwarded_bytes: 0,
-                first_chunk_at_ms: None,
-                ended: false,
-            }))
-            .map_err(|error| {
-                EgressProxyError::new(format!("failed to build upgrade error response: {error}"))
-            });
-    }
-
-    let upstream_upgrade = hyper::upgrade::on(&mut upstream_response);
-    let mut response_builder = Response::builder().status(upstream_status);
-    for (header_name, header_value) in filter_upgrade_response_headers(&upstream_headers) {
-        response_builder = response_builder.header(header_name, header_value);
-    }
-    response_builder = response_builder.header(
-        SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME,
-        request_context.request_id.as_str(),
-    );
-
-    let tunnel_context = request_context.clone();
-    tokio::spawn(async move {
-        let tunnel_result = async {
-            let downstream = downstream_upgrade.await.map_err(|error| {
-                EgressProxyError::new(format!("failed to upgrade downstream websocket: {error}"))
-            })?;
-            let upstream = upstream_upgrade.await.map_err(|error| {
-                EgressProxyError::new(format!("failed to upgrade upstream websocket: {error}"))
-            })?;
-            let mut downstream = TokioIo::new(downstream);
-            let mut upstream = TokioIo::new(upstream);
-            copy_bidirectional(&mut downstream, &mut upstream)
-                .await
-                .map_err(|error| {
-                    EgressProxyError::new(format!("websocket tunnel copy failed: {error}"))
-                })?;
-            Ok::<(), EgressProxyError>(())
-        }
-        .await;
-
-        if let Err(error) = tunnel_result {
-            let mut fields = tunnel_context.common_fields();
-            fields.push(("outcome", Value::String("tunnel_failed".to_string())));
-            fields.push(("error", Value::String(error.to_string())));
-            emit_egress_proxy_log(
-                tunnel_context.clock.as_ref(),
-                &tunnel_context.sandbox_instance_id,
-                "egress_proxy_upgrade_failed",
-                &fields,
-            );
-        }
-    });
-
-    response_builder.body(empty_body()).map_err(|error| {
-        EgressProxyError::new(format!(
-            "failed to build websocket upgrade response: {error}"
-        ))
-    })
+    let EgressProxyForwardingMode::Gateway { forwarder } = &state.forwarding_mode;
+    let forwarder = forwarder.clone();
+    forward_request_through_gateway(
+        parts,
+        body,
+        state,
+        request_target,
+        request_path_and_query,
+        route,
+        forwarder,
+    )
+    .await
 }
 
 async fn forward_upgrade_request_through_gateway(
@@ -2681,188 +2351,6 @@ async fn forward_upgrade_request_through_gateway(
             "failed to build gateway websocket upgrade response: {error}"
         ))
     })
-}
-
-async fn forward_request(
-    request: Request<Incoming>,
-    state: EgressProxyState,
-    target_override: Option<RequestTargetOverride>,
-) -> Result<Response<HyperBody>, EgressProxyError> {
-    let (parts, body) = request.into_parts();
-    let request_method = parts.method.clone();
-    let request_target = resolve_request_target(&parts, target_override.as_ref())?;
-    let request_path_and_query = request_target
-        .uri
-        .path_and_query()
-        .map_or("/", |path_and_query| path_and_query.as_str())
-        .to_string();
-    let route = match_state_route(
-        &state,
-        &request_target.host,
-        &request_path_and_query,
-        request_method.as_str(),
-    )?;
-    if let EgressProxyForwardingMode::Gateway { forwarder } = &state.forwarding_mode {
-        let forwarder = forwarder.clone();
-        return forward_request_through_gateway(
-            parts,
-            body,
-            state,
-            request_target,
-            request_path_and_query,
-            route,
-            forwarder,
-        )
-        .await;
-    }
-    let EgressProxyForwardingMode::TokenizerProxy {
-        tokenizer_proxy_egress_base_url,
-    } = &state.forwarding_mode
-    else {
-        return Err(EgressProxyError::new(
-            "egress proxy forwarding mode changed while handling request",
-        ));
-    };
-    let upstream_uri = match route {
-        Some(_) => build_tokenizer_proxy_forward_uri(
-            tokenizer_proxy_egress_base_url,
-            &request_path_and_query,
-        )?,
-        None => request_target.uri.clone(),
-    };
-    let request_context = Arc::new(EgressProxyRequestContext {
-        sandbox_instance_id: state.sandbox_instance_id.clone(),
-        request_id: format!(
-            "egp_{}",
-            state.next_request_id.fetch_add(1, Ordering::Relaxed)
-        ),
-        method: request_method.to_string(),
-        authority: request_target.authority.clone(),
-        host: request_target.host.clone(),
-        path_and_query: request_path_and_query,
-        route_mode: if route.is_some() { "managed" } else { "direct" },
-        egress_rule_id: route
-            .as_ref()
-            .map(|matched_route| matched_route.egress_rule_id.clone()),
-        upstream_url: upstream_uri.to_string(),
-        started_at_ms: state.clock.now_ms(),
-        clock: state.clock.clone(),
-    });
-    let mut request_started_fields = request_context.common_fields();
-    request_started_fields.push((
-        "hasRequestBody",
-        Value::Bool(body.size_hint().lower() > 0 || body.size_hint().upper().unwrap_or(1) > 0),
-    ));
-    emit_egress_proxy_log(
-        request_context.clock.as_ref(),
-        &request_context.sandbox_instance_id,
-        "egress_proxy_request_started",
-        &request_started_fields,
-    );
-
-    let mut outbound_request = Request::builder().method(request_method).uri(upstream_uri);
-    for (header_name, header_value) in filter_outbound_request_headers(&parts.headers) {
-        outbound_request = outbound_request.header(header_name, header_value);
-    }
-    let outbound_request = match &route {
-        Some(route) => {
-            let grant = route.grant.as_deref().ok_or_else(|| {
-                EgressProxyError::new(format!(
-                    "route '{}' is missing an egress grant for tokenizer-proxy forwarding",
-                    route.egress_rule_id
-                ))
-            })?;
-            outbound_request
-                .header(TOKENIZER_PROXY_EGRESS_GRANT_HEADER_NAME, grant)
-                .body(body)
-                .map_err(|error| {
-                    EgressProxyError::new(format!("failed to build proxied request: {error}"))
-                })?
-        }
-        None => outbound_request.body(body).map_err(|error| {
-            EgressProxyError::new(format!("failed to build direct proxied request: {error}"))
-        })?,
-    };
-
-    let upstream_response = match state.client.request(outbound_request).await {
-        Ok(upstream_response) => upstream_response,
-        Err(error) => {
-            let error_text = error.to_string();
-            let mut request_failed_fields = request_context.common_fields();
-            request_failed_fields.push(("outcome", Value::String("request_failed".to_string())));
-            request_failed_fields.push(("error", Value::String(error_text.clone())));
-            emit_egress_proxy_log(
-                request_context.clock.as_ref(),
-                &request_context.sandbox_instance_id,
-                "egress_proxy_request_failed",
-                &request_failed_fields,
-            );
-            return Err(match &route {
-                Some(route) => EgressProxyError::new(format!(
-                    "failed to forward request for '{}' through tokenizer-proxy route '{}': {error_text}",
-                    route.host, route.upstream_base_url
-                )),
-                None => EgressProxyError::new(format!(
-                    "failed to forward proxied request directly to '{}': {error_text}",
-                    request_target.authority
-                )),
-            });
-        }
-    };
-
-    let upstream_status = upstream_response.status();
-    let upstream_headers = upstream_response.headers().clone();
-    let upstream_trace_id = header_value_to_string(upstream_headers.get("x-mistle-trace-id"));
-    let mut response_headers_fields = request_context.common_fields();
-    response_headers_fields.push((
-        "upstreamStatus",
-        Value::from(u64::from(upstream_status.as_u16())),
-    ));
-    if let Some(content_type) = header_value_to_string(upstream_headers.get("content-type")) {
-        response_headers_fields.push(("contentType", Value::String(content_type)));
-    }
-    if let Some(content_length) = header_value_to_string(upstream_headers.get("content-length")) {
-        response_headers_fields.push(("contentLength", Value::String(content_length)));
-    }
-    if let Some(transfer_encoding) =
-        header_value_to_string(upstream_headers.get("transfer-encoding"))
-    {
-        response_headers_fields.push(("transferEncoding", Value::String(transfer_encoding)));
-    }
-    if let Some(upstream_trace_id) = &upstream_trace_id {
-        response_headers_fields.push(("upstreamTraceId", Value::String(upstream_trace_id.clone())));
-    }
-    emit_egress_proxy_log(
-        request_context.clock.as_ref(),
-        &request_context.sandbox_instance_id,
-        "egress_proxy_upstream_headers_received",
-        &response_headers_fields,
-    );
-
-    let (parts, body) = upstream_response.into_parts();
-    let mut response_builder = Response::builder().status(parts.status);
-    for (header_name, header_value) in filter_outbound_response_headers(&parts.headers) {
-        response_builder = response_builder.header(header_name, header_value);
-    }
-    response_builder = response_builder.header(
-        SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME,
-        request_context.request_id.as_str(),
-    );
-
-    response_builder
-        .body(box_body(InstrumentedResponseBody {
-            inner: box_body(body),
-            context: request_context,
-            upstream_status,
-            upstream_trace_id,
-            chunk_count: 0,
-            forwarded_bytes: 0,
-            first_chunk_at_ms: None,
-            ended: false,
-        }))
-        .map_err(|error| {
-            EgressProxyError::new(format!("failed to build proxied response: {error}"))
-        })
 }
 
 async fn forward_request_through_gateway(
@@ -3255,83 +2743,6 @@ fn match_route<'a>(
     }
 }
 
-fn validate_refresh_routes_are_compatible(
-    current_routes: &[EgressProxyRoute],
-    refreshed_routes: &[EgressProxyRoute],
-) -> Result<(), EgressProxyError> {
-    if current_routes.len() != refreshed_routes.len() {
-        return Err(EgressProxyError::new(format!(
-            "egress proxy grant refresh expected {} routes but received {} routes",
-            current_routes.len(),
-            refreshed_routes.len()
-        )));
-    }
-
-    for (current_route, refreshed_route) in current_routes.iter().zip(refreshed_routes) {
-        if current_route.egress_rule_id != refreshed_route.egress_rule_id
-            || current_route.upstream_base_url != refreshed_route.upstream_base_url
-            || current_route.host != refreshed_route.host
-            || current_route.path_prefixes != refreshed_route.path_prefixes
-            || current_route.methods != refreshed_route.methods
-        {
-            return Err(EgressProxyError::new(format!(
-                "egress proxy grant refresh cannot change route '{}' definition",
-                current_route.egress_rule_id
-            )));
-        }
-    }
-
-    Ok(())
-}
-
-fn build_tokenizer_proxy_forward_uri(
-    tokenizer_proxy_egress_base_url: &str,
-    path_and_query: &str,
-) -> Result<Uri, EgressProxyError> {
-    let mut tokenizer_proxy_url = url::Url::parse(tokenizer_proxy_egress_base_url).map_err(|error| {
-        EgressProxyError::new(format!(
-            "sandbox tokenizer proxy egress base url '{tokenizer_proxy_egress_base_url}' is invalid: {error}"
-        ))
-    })?;
-    let path_and_query_url = url::Url::parse(&format!("http://proxy.internal{path_and_query}"))
-        .map_err(|error| {
-            EgressProxyError::new(format!(
-                "proxied request target '{path_and_query}' is invalid: {error}"
-            ))
-        })?;
-    tokenizer_proxy_url.set_path(&join_url_path(
-        tokenizer_proxy_url.path(),
-        path_and_query_url.path(),
-    ));
-    tokenizer_proxy_url.set_query(path_and_query_url.query());
-    tokenizer_proxy_url.set_fragment(None);
-
-    tokenizer_proxy_url.to_string().parse().map_err(|error| {
-        EgressProxyError::new(format!(
-            "failed to build tokenizer-proxy forward uri: {error}"
-        ))
-    })
-}
-
-fn join_url_path(base_path: &str, suffix_path: &str) -> String {
-    let normalized_base_path = base_path.strip_suffix('/').unwrap_or(base_path);
-    let normalized_suffix_path = suffix_path.strip_prefix('/').unwrap_or(suffix_path);
-
-    if normalized_base_path.is_empty() || normalized_base_path == "/" {
-        if normalized_suffix_path.is_empty() {
-            return "/".to_string();
-        }
-
-        return format!("/{normalized_suffix_path}");
-    }
-
-    if normalized_suffix_path.is_empty() {
-        return normalized_base_path.to_string();
-    }
-
-    format!("{normalized_base_path}/{normalized_suffix_path}")
-}
-
 fn filter_outbound_request_headers(
     headers: &hyper::HeaderMap<HeaderValue>,
 ) -> Vec<(HeaderName, HeaderValue)> {
@@ -3350,30 +2761,6 @@ fn filter_outbound_request_headers(
                     | "transfer-encoding"
                     | "upgrade"
                     | "host"
-            );
-            if blocked {
-                return None;
-            }
-            Some((name.clone(), value.clone()))
-        })
-        .collect()
-}
-
-fn filter_upgrade_request_headers(
-    headers: &hyper::HeaderMap<HeaderValue>,
-) -> Vec<(HeaderName, HeaderValue)> {
-    headers
-        .iter()
-        .filter_map(|(name, value)| {
-            let blocked = matches!(
-                name.as_str().to_ascii_lowercase().as_str(),
-                "host"
-                    | "proxy-authenticate"
-                    | "proxy-authorization"
-                    | "proxy-connection"
-                    | "te"
-                    | "trailer"
-                    | "transfer-encoding"
             );
             if blocked {
                 return None;
@@ -3472,6 +2859,30 @@ fn filtered_upgrade_response_headers_from_repeated_headers(
     Ok(filter_upgrade_response_headers(&header_map))
 }
 
+fn filter_upgrade_request_headers(
+    headers: &hyper::HeaderMap<HeaderValue>,
+) -> Vec<(HeaderName, HeaderValue)> {
+    headers
+        .iter()
+        .filter_map(|(name, value)| {
+            let blocked = matches!(
+                name.as_str().to_ascii_lowercase().as_str(),
+                "host"
+                    | "proxy-authenticate"
+                    | "proxy-authorization"
+                    | "proxy-connection"
+                    | "te"
+                    | "trailer"
+                    | "transfer-encoding"
+            );
+            if blocked {
+                return None;
+            }
+            Some((name.clone(), value.clone()))
+        })
+        .collect()
+}
+
 fn filter_upgrade_response_headers(
     headers: &hyper::HeaderMap<HeaderValue>,
 ) -> Vec<(HeaderName, HeaderValue)> {
@@ -3533,10 +2944,6 @@ fn load_private_key(private_key_pem: &str) -> Result<PrivateKeyDer<'static>, Egr
             "failed to parse local egress proxy private key: {error}"
         ))
     })
-}
-
-fn header_value_to_string(header_value: Option<&HeaderValue>) -> Option<String> {
-    header_value.and_then(|header_value| header_value.to_str().ok().map(ToString::to_string))
 }
 
 fn infallible_to_box_error(error: Infallible) -> BoxError {
@@ -3675,15 +3082,13 @@ fn text_response(status: StatusCode, message: impl Into<String>) -> Response<Hyp
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{BTreeMap, BTreeSet};
+    use std::collections::BTreeSet;
     use std::fs;
-    use std::io::{Read, Write};
     use std::net::{SocketAddr, TcpListener as StdTcpListener};
     use std::os::unix::fs::PermissionsExt;
     use std::path::PathBuf;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicU64, Ordering};
-    use std::sync::mpsc;
     use std::thread;
     use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -3691,9 +3096,9 @@ mod tests {
     use crate::egress_proxy::socket_addr_from_sockaddr_storage;
     use crate::egress_proxy::{
         EgressProxy, EgressProxyForwardingMode, EgressProxyRoute, ProxyCaConfig,
-        RequestTargetOverride, SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME, TransparentProxyProtocol,
-        build_direct_forward_uri, build_managed_proxy_env, classify_transparent_proxy_first_byte,
-        join_url_path, match_route, resolve_request_target, serialize_egress_proxy_log_line,
+        RequestTargetOverride, TransparentProxyProtocol, build_direct_forward_uri,
+        build_gateway_proxy_route, build_managed_proxy_env, classify_transparent_proxy_first_byte,
+        match_route, resolve_request_target, serialize_egress_proxy_log_line,
     };
     #[cfg(target_os = "linux")]
     use crate::egress_proxy::{
@@ -3713,11 +3118,8 @@ mod tests {
     use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
     use crate::time::SystemClock;
     use crate::time::testing::MutableClock;
-    use reqwest::Proxy;
-    use rustls_pki_types::pem::PemObject;
-    use rustls_pki_types::{CertificateDer, ServerName};
+    use crate::tunnel::session::GatewayEgressForwarder;
     use serde_json::Value;
-    use tokio_rustls::rustls::{ClientConfig, ClientConnection, RootCertStore, StreamOwned};
 
     struct TestProxyCaPaths {
         root_directory: PathBuf,
@@ -3732,35 +3134,19 @@ mod tests {
     static TEST_PROXY_CA_PATH_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     #[test]
-    fn joins_proxy_forward_paths_without_duplicate_slashes() {
-        assert_eq!(
-            join_url_path("/tokenizer-proxy/egress", "/graphql"),
-            "/tokenizer-proxy/egress/graphql"
-        );
-        assert_eq!(
-            join_url_path("/tokenizer-proxy/egress/", "/mistlehq/repo.git"),
-            "/tokenizer-proxy/egress/mistlehq/repo.git"
-        );
-    }
-
-    #[test]
     fn matches_route_by_host_path_and_method() {
         let routes = vec![
             EgressProxyRoute {
                 egress_rule_id: "egress-rule-a".to_string(),
-                upstream_base_url: "https://api.github.com".to_string(),
                 host: "api.github.com".to_string(),
                 path_prefixes: vec!["/graphql".to_string()],
                 methods: Some(vec!["POST".to_string()]),
-                grant: Some("grant-a".to_string()),
             },
             EgressProxyRoute {
                 egress_rule_id: "egress-rule-b".to_string(),
-                upstream_base_url: "https://github.com".to_string(),
                 host: "github.com".to_string(),
                 path_prefixes: vec!["/mistlehq/mistle.git".to_string()],
                 methods: Some(vec!["GET".to_string()]),
-                grant: Some("grant-b".to_string()),
             },
         ];
 
@@ -3769,9 +3155,8 @@ mod tests {
         assert_eq!(
             graphql_route
                 .expect("graphql route should resolve exactly one match")
-                .grant
-                .as_deref(),
-            Some("grant-a")
+                .egress_rule_id,
+            "egress-rule-a"
         );
 
         let git_route = match_route(
@@ -3784,9 +3169,8 @@ mod tests {
         assert_eq!(
             git_route
                 .expect("git route should resolve exactly one match")
-                .grant
-                .as_deref(),
-            Some("grant-b")
+                .egress_rule_id,
+            "egress-rule-b"
         );
     }
 
@@ -3794,11 +3178,9 @@ mod tests {
     fn leaves_unmatched_requests_for_direct_passthrough() {
         let routes = vec![EgressProxyRoute {
             egress_rule_id: "egress-rule-a".to_string(),
-            upstream_base_url: "https://api.openai.com".to_string(),
             host: "api.openai.com".to_string(),
             path_prefixes: vec!["/v1/responses".to_string()],
             methods: Some(vec!["POST".to_string()]),
-            grant: Some("grant-a".to_string()),
         }];
 
         let route = match_route(
@@ -3816,9 +3198,9 @@ mod tests {
     fn builds_https_direct_forward_uris_for_tunneled_requests() {
         let direct_uri = build_direct_forward_uri(
             "https",
-            "tokenizer-proxy-dev_thomas.mistle.dev",
+            "api.example.test",
             Some(
-                &"/tokenizer-proxy/egress/v1/responses?stream=true"
+                &"/v1/responses?stream=true"
                     .parse()
                     .expect("path and query should parse"),
             ),
@@ -3827,7 +3209,7 @@ mod tests {
 
         assert_eq!(
             direct_uri.to_string(),
-            "https://tokenizer-proxy-dev_thomas.mistle.dev/tokenizer-proxy/egress/v1/responses?stream=true"
+            "https://api.example.test/v1/responses?stream=true"
         );
     }
 
@@ -4069,7 +3451,6 @@ mod tests {
                 .parse()
                 .expect("socket address should parse"),
             std::path::Path::new("/run/mistle/sandboxd/egress-proxy-ca-bundle.pem"),
-            Some("http://tokenizer-proxy:5205/tokenizer-proxy/egress"),
         )
         .expect("managed proxy environment should build");
 
@@ -4079,7 +3460,7 @@ mod tests {
         );
         assert_eq!(
             env.get("NO_PROXY"),
-            Some(&"127.0.0.1,localhost,tokenizer-proxy,tokenizer-proxy:5205".to_string())
+            Some(&"127.0.0.1,localhost".to_string())
         );
         assert_eq!(
             env.get("SSL_CERT_FILE"),
@@ -4101,7 +3482,6 @@ mod tests {
                 .parse()
                 .expect("socket address should parse"),
             std::path::Path::new("/run/mistle/sandboxd/egress-proxy-ca-bundle.pem"),
-            None,
         )
         .expect("managed proxy environment should build");
 
@@ -4114,123 +3494,11 @@ mod tests {
     #[test]
     fn gateway_proxy_routes_do_not_require_local_egress_grants() {
         let runtime_plan = sample_runtime_plan();
-        let route = super::build_gateway_proxy_route(&runtime_plan.egress_routes[0])
+        let route = build_gateway_proxy_route(&runtime_plan.egress_routes[0])
             .expect("gateway proxy route should build");
 
         assert_eq!(route.egress_rule_id, "egress-rule-1");
         assert_eq!(route.host, "api.openai.com");
-        assert_eq!(route.grant, None);
-    }
-
-    #[test]
-    fn refresh_grants_replaces_route_grants_without_restarting_proxy() {
-        let listener_address = reserve_test_listener_address();
-        let proxy_ca_paths = test_proxy_ca_paths();
-        let runtime_plan = sample_runtime_plan();
-        let startup_input = sample_startup_input();
-        let supervisor_handle = SandboxdSupervisorHandle::new(
-            "sandbox-123",
-            Arc::new(SystemClock),
-            BTreeSet::from([SupervisedComponent::EgressProxy]),
-        );
-
-        let proxy = EgressProxy::start_with_options(
-            &runtime_plan,
-            &startup_input,
-            EgressProxyForwardingMode::TokenizerProxy {
-                tokenizer_proxy_egress_base_url:
-                    "http://tokenizer-proxy:5205/tokenizer-proxy/egress".to_string(),
-            },
-            listener_address,
-            test_proxy_ca_config(&proxy_ca_paths),
-            Arc::new(SystemClock),
-            supervisor_handle,
-        )
-        .expect("egress proxy start should succeed")
-        .expect("egress proxy should be configured");
-        let stable_proxy_url = proxy
-            .runtime_env()
-            .get("HTTPS_PROXY")
-            .cloned()
-            .expect("proxy env should include HTTPS_PROXY");
-        let refreshed_startup_input = startup_input_with_grant("grant-2");
-
-        proxy
-            .refresh_grants(
-                &runtime_plan,
-                &refreshed_startup_input.egress_grant_by_rule_id,
-            )
-            .expect("grant refresh should succeed for unchanged route definitions");
-
-        let routes = proxy
-            .routes
-            .read()
-            .expect("route table should not be poisoned");
-        assert_eq!(routes.len(), 1);
-        assert_eq!(routes[0].grant.as_deref(), Some("grant-2"));
-        assert_eq!(
-            proxy.runtime_env().get("HTTPS_PROXY"),
-            Some(&stable_proxy_url),
-            "refresh should not replace the local proxy listener"
-        );
-        drop(routes);
-
-        proxy.close().expect("egress proxy close should succeed");
-        let _ = fs::remove_dir_all(&proxy_ca_paths.root_directory);
-    }
-
-    #[test]
-    fn refresh_grants_rejects_route_definition_changes() {
-        let listener_address = reserve_test_listener_address();
-        let proxy_ca_paths = test_proxy_ca_paths();
-        let runtime_plan = sample_runtime_plan();
-        let startup_input = sample_startup_input();
-        let supervisor_handle = SandboxdSupervisorHandle::new(
-            "sandbox-123",
-            Arc::new(SystemClock),
-            BTreeSet::from([SupervisedComponent::EgressProxy]),
-        );
-
-        let proxy = EgressProxy::start_with_options(
-            &runtime_plan,
-            &startup_input,
-            EgressProxyForwardingMode::TokenizerProxy {
-                tokenizer_proxy_egress_base_url:
-                    "http://tokenizer-proxy:5205/tokenizer-proxy/egress".to_string(),
-            },
-            listener_address,
-            test_proxy_ca_config(&proxy_ca_paths),
-            Arc::new(SystemClock),
-            supervisor_handle,
-        )
-        .expect("egress proxy start should succeed")
-        .expect("egress proxy should be configured");
-        let mut changed_runtime_plan = sample_runtime_plan();
-        changed_runtime_plan.egress_routes[0].r#match.path_prefixes = Some(vec!["/v2".to_string()]);
-        let refreshed_startup_input = startup_input_with_grant("grant-2");
-
-        let error = proxy
-            .refresh_grants(
-                &changed_runtime_plan,
-                &refreshed_startup_input.egress_grant_by_rule_id,
-            )
-            .expect_err("grant refresh should reject route definition changes");
-
-        assert!(
-            error
-                .to_string()
-                .contains("cannot change route 'egress-rule-1' definition"),
-            "unexpected refresh error: {error}"
-        );
-        let routes = proxy
-            .routes
-            .read()
-            .expect("route table should not be poisoned");
-        assert_eq!(routes[0].grant.as_deref(), Some("grant-1"));
-        drop(routes);
-
-        proxy.close().expect("egress proxy close should succeed");
-        let _ = fs::remove_dir_all(&proxy_ca_paths.root_directory);
     }
 
     #[test]
@@ -4255,520 +3523,6 @@ mod tests {
     }
 
     #[test]
-    fn streams_managed_proxy_responses_without_buffering_the_full_body() {
-        let tokenizer_listener =
-            StdTcpListener::bind(("127.0.0.1", 0)).expect("tokenizer listener should bind");
-        let tokenizer_address = tokenizer_listener
-            .local_addr()
-            .expect("tokenizer listener should expose its address");
-        let (request_sender, request_receiver) = mpsc::channel();
-        let (release_second_chunk_sender, release_second_chunk_receiver) = mpsc::channel();
-        let tokenizer_thread = thread::spawn(move || {
-            let (mut stream, _) = tokenizer_listener
-                .accept()
-                .expect("tokenizer listener should accept one connection");
-            stream
-                .set_read_timeout(Some(Duration::from_secs(5)))
-                .expect("tokenizer stream read timeout should set");
-            let request_head = read_http_head(&mut stream);
-            request_sender
-                .send(request_head.clone())
-                .expect("request head should send");
-
-            stream
-                .write_all(
-                    concat!(
-                        "HTTP/1.1 200 OK\r\n",
-                        "content-type: text/event-stream\r\n",
-                        "x-mistle-trace-id: trace_123\r\n",
-                        "transfer-encoding: chunked\r\n",
-                        "\r\n"
-                    )
-                    .as_bytes(),
-                )
-                .expect("response headers should write");
-            stream
-                .write_all(b"6\r\nhello \r\n")
-                .expect("first chunk should write");
-            stream.flush().expect("first chunk should flush");
-
-            release_second_chunk_receiver
-                .recv_timeout(Duration::from_secs(5))
-                .expect("test should release second chunk");
-
-            stream
-                .write_all(b"5\r\nworld\r\n0\r\n\r\n")
-                .expect("remaining chunks should write");
-            stream.flush().expect("remaining chunks should flush");
-        });
-
-        let listener_address = reserve_test_listener_address();
-        let proxy_ca_paths = test_proxy_ca_paths();
-        let runtime_plan = sample_runtime_plan();
-        let startup_input = sample_startup_input();
-        let supervisor_handle = SandboxdSupervisorHandle::new(
-            "sandbox-123",
-            Arc::new(SystemClock),
-            BTreeSet::from([SupervisedComponent::EgressProxy]),
-        );
-
-        let proxy = EgressProxy::start_with_options(
-            &runtime_plan,
-            &startup_input,
-            EgressProxyForwardingMode::TokenizerProxy {
-                tokenizer_proxy_egress_base_url: format!(
-                    "http://{tokenizer_address}/tokenizer-proxy/egress"
-                ),
-            },
-            listener_address,
-            test_proxy_ca_config(&proxy_ca_paths),
-            Arc::new(SystemClock),
-            supervisor_handle,
-        )
-        .expect("egress proxy start should succeed")
-        .expect("egress proxy should be configured");
-
-        let proxy_url = proxy
-            .runtime_env()
-            .get("HTTPS_PROXY")
-            .cloned()
-            .expect("proxy env should include HTTPS_PROXY");
-        let ca_certificate_pem = fs::read(&proxy_ca_paths.runtime_certificate_path)
-            .expect("proxy CA certificate should be readable");
-        let ca_certificate =
-            reqwest::Certificate::from_pem(&ca_certificate_pem).expect("proxy CA should parse");
-        let client = reqwest::blocking::Client::builder()
-            .proxy(Proxy::https(&proxy_url).expect("proxy url should parse"))
-            .add_root_certificate(ca_certificate)
-            .build()
-            .expect("reqwest client should build");
-
-        let mut response = client
-            .post("https://api.openai.com/v1/responses?stream=true")
-            .body(r#"{"stream":true}"#)
-            .send()
-            .expect("managed request should succeed");
-        assert_eq!(response.status(), reqwest::StatusCode::OK);
-        assert_eq!(
-            response
-                .headers()
-                .get("x-mistle-trace-id")
-                .and_then(|value| value.to_str().ok()),
-            Some("trace_123")
-        );
-        assert!(
-            response
-                .headers()
-                .contains_key(SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME),
-            "response should include a sandbox egress correlation header"
-        );
-
-        let forwarded_request = request_receiver
-            .recv_timeout(Duration::from_secs(5))
-            .expect("tokenizer server should receive the proxied request");
-        assert!(
-            forwarded_request
-                .starts_with("POST /tokenizer-proxy/egress/v1/responses?stream=true HTTP/1.1"),
-            "expected managed route rewrite, got: {forwarded_request}"
-        );
-        assert!(
-            forwarded_request
-                .to_ascii_lowercase()
-                .contains("x-mistle-egress-grant: grant-1"),
-            "expected egress grant header in forwarded request, got: {forwarded_request}"
-        );
-
-        let mut first_chunk = [0_u8; 6];
-        response
-            .read_exact(&mut first_chunk)
-            .expect("first streamed chunk should be readable before upstream completes");
-        assert_eq!(&first_chunk, b"hello ");
-
-        release_second_chunk_sender
-            .send(())
-            .expect("second chunk release should send");
-        let mut rest = String::new();
-        response
-            .read_to_string(&mut rest)
-            .expect("remaining streamed response should read");
-        assert_eq!(rest, "world");
-
-        proxy.close().expect("egress proxy close should succeed");
-        tokenizer_thread
-            .join()
-            .expect("tokenizer thread should exit cleanly");
-        let _ = fs::remove_dir_all(&proxy_ca_paths.root_directory);
-    }
-
-    #[test]
-    fn tunnels_managed_websocket_upgrade_requests() {
-        let tokenizer_listener =
-            StdTcpListener::bind(("127.0.0.1", 0)).expect("tokenizer listener should bind");
-        let tokenizer_address = tokenizer_listener
-            .local_addr()
-            .expect("tokenizer listener should expose its address");
-        let (request_sender, request_receiver) = mpsc::channel();
-        let tokenizer_thread = thread::spawn(move || {
-            let (mut stream, _) = tokenizer_listener
-                .accept()
-                .expect("tokenizer listener should accept one connection");
-            stream
-                .set_read_timeout(Some(Duration::from_secs(5)))
-                .expect("tokenizer stream read timeout should set");
-            let request_head = read_http_head(&mut stream);
-            request_sender
-                .send(request_head.clone())
-                .expect("request head should send");
-
-            stream
-                .write_all(
-                    concat!(
-                        "HTTP/1.1 101 Switching Protocols\r\n",
-                        "connection: Upgrade\r\n",
-                        "upgrade: websocket\r\n",
-                        "sec-websocket-accept: test-accept\r\n",
-                        "\r\n"
-                    )
-                    .as_bytes(),
-                )
-                .expect("upgrade response should write");
-            stream.flush().expect("upgrade response should flush");
-
-            let mut tunneled_payload = [0_u8; 12];
-            stream
-                .read_exact(&mut tunneled_payload)
-                .expect("tunneled client payload should be readable");
-            assert_eq!(&tunneled_payload, b"ping-through");
-            stream
-                .write_all(b"pong-through")
-                .expect("tunneled server payload should write");
-            stream
-                .flush()
-                .expect("tunneled server payload should flush");
-        });
-
-        let listener_address = reserve_test_listener_address();
-        let proxy_ca_paths = test_proxy_ca_paths();
-        let mut runtime_plan = sample_runtime_plan();
-        runtime_plan.egress_routes[0].r#match.methods = Some(vec!["GET".to_string()]);
-        let startup_input = sample_startup_input();
-        let supervisor_handle = SandboxdSupervisorHandle::new(
-            "sandbox-123",
-            Arc::new(SystemClock),
-            BTreeSet::from([SupervisedComponent::EgressProxy]),
-        );
-
-        let proxy = EgressProxy::start_with_options(
-            &runtime_plan,
-            &startup_input,
-            EgressProxyForwardingMode::TokenizerProxy {
-                tokenizer_proxy_egress_base_url: format!(
-                    "http://{tokenizer_address}/tokenizer-proxy/egress"
-                ),
-            },
-            listener_address,
-            test_proxy_ca_config(&proxy_ca_paths),
-            Arc::new(SystemClock),
-            supervisor_handle,
-        )
-        .expect("egress proxy start should succeed")
-        .expect("egress proxy should be configured");
-
-        let proxy_url = proxy
-            .runtime_env()
-            .get("HTTP_PROXY")
-            .cloned()
-            .expect("proxy env should include HTTP_PROXY");
-        let proxy_address = proxy_url
-            .strip_prefix("http://")
-            .expect("proxy url should use http scheme");
-        let mut client_stream =
-            std::net::TcpStream::connect(proxy_address).expect("client should connect to proxy");
-        client_stream
-            .set_read_timeout(Some(Duration::from_secs(5)))
-            .expect("client stream read timeout should set");
-        client_stream
-            .write_all(
-                concat!(
-                    "GET http://api.openai.com/v1/responses HTTP/1.1\r\n",
-                    "host: api.openai.com\r\n",
-                    "connection: Upgrade\r\n",
-                    "upgrade: websocket\r\n",
-                    "sec-websocket-key: test-key\r\n",
-                    "sec-websocket-version: 13\r\n",
-                    "\r\n"
-                )
-                .as_bytes(),
-            )
-            .expect("upgrade request should write");
-
-        let response_head = read_http_head(&mut client_stream);
-        assert!(
-            response_head.starts_with("HTTP/1.1 101 Switching Protocols\r\n"),
-            "expected switching protocols response, got: {response_head}"
-        );
-        assert!(
-            response_head
-                .to_ascii_lowercase()
-                .contains("upgrade: websocket"),
-            "expected websocket upgrade header, got: {response_head}"
-        );
-        assert!(
-            response_head
-                .to_ascii_lowercase()
-                .contains(SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME),
-            "expected sandbox egress correlation header, got: {response_head}"
-        );
-
-        let forwarded_request = request_receiver
-            .recv_timeout(Duration::from_secs(5))
-            .expect("tokenizer server should receive the proxied websocket request");
-        assert!(
-            forwarded_request.starts_with("GET /tokenizer-proxy/egress/v1/responses HTTP/1.1"),
-            "expected managed route rewrite, got: {forwarded_request}"
-        );
-        assert!(
-            forwarded_request
-                .to_ascii_lowercase()
-                .contains("connection: upgrade"),
-            "expected connection upgrade header in forwarded request, got: {forwarded_request}"
-        );
-        assert!(
-            forwarded_request
-                .to_ascii_lowercase()
-                .contains("upgrade: websocket"),
-            "expected websocket upgrade header in forwarded request, got: {forwarded_request}"
-        );
-        assert!(
-            forwarded_request
-                .to_ascii_lowercase()
-                .contains("x-mistle-egress-grant: grant-1"),
-            "expected egress grant header in forwarded request, got: {forwarded_request}"
-        );
-
-        client_stream
-            .write_all(b"ping-through")
-            .expect("tunneled client payload should write");
-        client_stream
-            .flush()
-            .expect("tunneled client payload should flush");
-        let mut tunneled_response = [0_u8; 12];
-        client_stream
-            .read_exact(&mut tunneled_response)
-            .expect("tunneled server payload should be readable");
-        assert_eq!(&tunneled_response, b"pong-through");
-
-        proxy.close().expect("egress proxy close should succeed");
-        tokenizer_thread
-            .join()
-            .expect("tokenizer thread should exit cleanly");
-        let _ = fs::remove_dir_all(&proxy_ca_paths.root_directory);
-    }
-
-    #[test]
-    fn tunnels_managed_websocket_upgrade_requests_through_connect_tls() {
-        let tokenizer_listener =
-            StdTcpListener::bind(("127.0.0.1", 0)).expect("tokenizer listener should bind");
-        let tokenizer_address = tokenizer_listener
-            .local_addr()
-            .expect("tokenizer listener should expose its address");
-        let (request_sender, request_receiver) = mpsc::channel();
-        let tokenizer_thread = thread::spawn(move || {
-            let (mut stream, _) = tokenizer_listener
-                .accept()
-                .expect("tokenizer listener should accept one connection");
-            stream
-                .set_read_timeout(Some(Duration::from_secs(5)))
-                .expect("tokenizer stream read timeout should set");
-            let request_head = read_http_head(&mut stream);
-            request_sender
-                .send(request_head.clone())
-                .expect("request head should send");
-
-            stream
-                .write_all(
-                    concat!(
-                        "HTTP/1.1 101 Switching Protocols\r\n",
-                        "connection: Upgrade\r\n",
-                        "upgrade: websocket\r\n",
-                        "sec-websocket-accept: test-accept\r\n",
-                        "\r\n"
-                    )
-                    .as_bytes(),
-                )
-                .expect("upgrade response should write");
-            stream.flush().expect("upgrade response should flush");
-
-            let mut tunneled_payload = [0_u8; 12];
-            stream
-                .read_exact(&mut tunneled_payload)
-                .expect("tunneled client payload should be readable");
-            assert_eq!(&tunneled_payload, b"ping-through");
-            stream
-                .write_all(b"pong-through")
-                .expect("tunneled server payload should write");
-            stream
-                .flush()
-                .expect("tunneled server payload should flush");
-        });
-
-        let listener_address = reserve_test_listener_address();
-        let proxy_ca_paths = test_proxy_ca_paths();
-        let mut runtime_plan = sample_runtime_plan();
-        runtime_plan.egress_routes[0].r#match.methods = Some(vec!["GET".to_string()]);
-        let startup_input = sample_startup_input();
-        let supervisor_handle = SandboxdSupervisorHandle::new(
-            "sandbox-123",
-            Arc::new(SystemClock),
-            BTreeSet::from([SupervisedComponent::EgressProxy]),
-        );
-
-        let proxy = EgressProxy::start_with_options(
-            &runtime_plan,
-            &startup_input,
-            EgressProxyForwardingMode::TokenizerProxy {
-                tokenizer_proxy_egress_base_url: format!(
-                    "http://{tokenizer_address}/tokenizer-proxy/egress"
-                ),
-            },
-            listener_address,
-            test_proxy_ca_config(&proxy_ca_paths),
-            Arc::new(SystemClock),
-            supervisor_handle,
-        )
-        .expect("egress proxy start should succeed")
-        .expect("egress proxy should be configured");
-
-        let proxy_url = proxy
-            .runtime_env()
-            .get("HTTPS_PROXY")
-            .cloned()
-            .expect("proxy env should include HTTPS_PROXY");
-        let proxy_address = proxy_url
-            .strip_prefix("http://")
-            .expect("proxy url should use http scheme");
-        let mut client_stream =
-            std::net::TcpStream::connect(proxy_address).expect("client should connect to proxy");
-        client_stream
-            .set_read_timeout(Some(Duration::from_secs(5)))
-            .expect("client stream read timeout should set");
-        client_stream
-            .set_write_timeout(Some(Duration::from_secs(5)))
-            .expect("client stream write timeout should set");
-        client_stream
-            .write_all(
-                concat!(
-                    "CONNECT api.openai.com:443 HTTP/1.1\r\n",
-                    "host: api.openai.com:443\r\n",
-                    "\r\n"
-                )
-                .as_bytes(),
-            )
-            .expect("CONNECT request should write");
-
-        let connect_response = read_http_head(&mut client_stream);
-        assert!(
-            connect_response.starts_with("HTTP/1.1 200 "),
-            "expected CONNECT acknowledgement, got: {connect_response}"
-        );
-
-        let ca_certificate_pem = fs::read(&proxy_ca_paths.runtime_certificate_path)
-            .expect("proxy CA certificate should be readable");
-        let ca_certificate = CertificateDer::from_pem_slice(&ca_certificate_pem)
-            .expect("proxy CA certificate should parse");
-        let mut root_store = RootCertStore::empty();
-        root_store
-            .add(ca_certificate)
-            .expect("proxy CA certificate should install in test root store");
-        let client_config = ClientConfig::builder()
-            .with_root_certificates(root_store)
-            .with_no_client_auth();
-        let server_name = ServerName::try_from("api.openai.com")
-            .expect("server name should parse")
-            .to_owned();
-        let client_connection = ClientConnection::new(Arc::new(client_config), server_name)
-            .expect("TLS client connection should build");
-        let mut tls_stream = StreamOwned::new(client_connection, client_stream);
-
-        tls_stream
-            .write_all(
-                concat!(
-                    "GET /v1/responses HTTP/1.1\r\n",
-                    "host: api.openai.com\r\n",
-                    "connection: Upgrade\r\n",
-                    "upgrade: websocket\r\n",
-                    "sec-websocket-key: test-key\r\n",
-                    "sec-websocket-version: 13\r\n",
-                    "\r\n"
-                )
-                .as_bytes(),
-            )
-            .expect("upgrade request should write");
-
-        let response_head = read_http_head(&mut tls_stream);
-        assert!(
-            response_head.starts_with("HTTP/1.1 101 Switching Protocols\r\n"),
-            "expected switching protocols response, got: {response_head}"
-        );
-        assert!(
-            response_head
-                .to_ascii_lowercase()
-                .contains("upgrade: websocket"),
-            "expected websocket upgrade header, got: {response_head}"
-        );
-        assert!(
-            response_head
-                .to_ascii_lowercase()
-                .contains(SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME),
-            "expected sandbox egress correlation header, got: {response_head}"
-        );
-
-        let forwarded_request = request_receiver
-            .recv_timeout(Duration::from_secs(5))
-            .expect("tokenizer server should receive the proxied websocket request");
-        assert!(
-            forwarded_request.starts_with("GET /tokenizer-proxy/egress/v1/responses HTTP/1.1"),
-            "expected managed route rewrite, got: {forwarded_request}"
-        );
-        assert!(
-            forwarded_request
-                .to_ascii_lowercase()
-                .contains("connection: upgrade"),
-            "expected connection upgrade header in forwarded request, got: {forwarded_request}"
-        );
-        assert!(
-            forwarded_request
-                .to_ascii_lowercase()
-                .contains("upgrade: websocket"),
-            "expected websocket upgrade header in forwarded request, got: {forwarded_request}"
-        );
-        assert!(
-            forwarded_request
-                .to_ascii_lowercase()
-                .contains("x-mistle-egress-grant: grant-1"),
-            "expected egress grant header in forwarded request, got: {forwarded_request}"
-        );
-
-        tls_stream
-            .write_all(b"ping-through")
-            .expect("tunneled client payload should write");
-        tls_stream
-            .flush()
-            .expect("tunneled client payload should flush");
-        let mut tunneled_response = [0_u8; 12];
-        tls_stream
-            .read_exact(&mut tunneled_response)
-            .expect("tunneled server payload should be readable");
-        assert_eq!(&tunneled_response, b"pong-through");
-
-        proxy.close().expect("egress proxy close should succeed");
-        tokenizer_thread
-            .join()
-            .expect("tokenizer thread should exit cleanly");
-        let _ = fs::remove_dir_all(&proxy_ca_paths.root_directory);
-    }
-
-    #[test]
     fn keeps_a_stable_proxy_address_across_close_and_restart() {
         let listener_address = reserve_test_listener_address();
         let proxy_ca_paths = test_proxy_ca_paths();
@@ -4783,9 +3537,8 @@ mod tests {
         let proxy_one = EgressProxy::start_with_options(
             &runtime_plan,
             &startup_input,
-            EgressProxyForwardingMode::TokenizerProxy {
-                tokenizer_proxy_egress_base_url:
-                    "http://tokenizer-proxy:5205/tokenizer-proxy/egress".to_string(),
+            EgressProxyForwardingMode::Gateway {
+                forwarder: GatewayEgressForwarder::new(),
             },
             listener_address,
             test_proxy_ca_config(&proxy_ca_paths),
@@ -4807,9 +3560,8 @@ mod tests {
         let proxy_two = EgressProxy::start_with_options(
             &runtime_plan,
             &startup_input,
-            EgressProxyForwardingMode::TokenizerProxy {
-                tokenizer_proxy_egress_base_url:
-                    "http://tokenizer-proxy:5205/tokenizer-proxy/egress".to_string(),
+            EgressProxyForwardingMode::Gateway {
+                forwarder: GatewayEgressForwarder::new(),
             },
             listener_address,
             test_proxy_ca_config(&proxy_ca_paths),
@@ -4856,9 +3608,8 @@ mod tests {
         let proxy = EgressProxy::start_with_options(
             &runtime_plan,
             &startup_input,
-            EgressProxyForwardingMode::TokenizerProxy {
-                tokenizer_proxy_egress_base_url:
-                    "http://tokenizer-proxy:5205/tokenizer-proxy/egress".to_string(),
+            EgressProxyForwardingMode::Gateway {
+                forwarder: GatewayEgressForwarder::new(),
             },
             listener_address,
             test_proxy_ca_config(&proxy_ca_paths),
@@ -4905,9 +3656,8 @@ mod tests {
         let proxy = EgressProxy::start_with_options(
             &runtime_plan,
             &startup_input,
-            EgressProxyForwardingMode::TokenizerProxy {
-                tokenizer_proxy_egress_base_url:
-                    "http://tokenizer-proxy:5205/tokenizer-proxy/egress".to_string(),
+            EgressProxyForwardingMode::Gateway {
+                forwarder: GatewayEgressForwarder::new(),
             },
             listener_address,
             test_proxy_ca_config(&proxy_ca_paths),
@@ -5020,10 +3770,6 @@ mod tests {
     }
 
     fn sample_startup_input() -> StartupInput {
-        startup_input_with_grant("grant-1")
-    }
-
-    fn startup_input_with_grant(grant: &str) -> StartupInput {
         StartupInput {
             startup_mode: StartupMode::New,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
@@ -5032,10 +3778,6 @@ mod tests {
             tunnel_gateway_ws_url: "ws://127.0.0.1:4500/tunnel/sandbox/sandbox-123".to_string(),
             acting_user_id: None,
             runtime_plan: serde_json::json!({}),
-            egress_grant_by_rule_id: BTreeMap::from([(
-                "egress-rule-1".to_string(),
-                grant.to_string(),
-            )]),
             git_identity: None,
             transparent_proxy: None,
         }
@@ -5137,17 +3879,5 @@ mod tests {
             );
             thread::sleep(Duration::from_millis(25));
         }
-    }
-
-    fn read_http_head(stream: &mut impl Read) -> String {
-        let mut buffer = Vec::new();
-        let mut byte = [0_u8; 1];
-        while !buffer.ends_with(b"\r\n\r\n") {
-            stream
-                .read_exact(&mut byte)
-                .expect("http request head should be readable");
-            buffer.push(byte[0]);
-        }
-        String::from_utf8(buffer).expect("http request head should be utf-8")
     }
 }

@@ -519,7 +519,6 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           {
             providerSandboxId: startedSandbox.providerSandboxId,
             runtimePlan: createRuntimePlanStartupLogFields(workflowInput.runtimePlan),
-            tokenizerProxyEgressBaseUrl: ctx.config.app.sandbox.tokenizerProxyEgressBaseUrl,
           },
           "Initializing sandbox runtime.",
         );

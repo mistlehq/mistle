@@ -50,7 +50,6 @@ describe("createE2BDaemonCommandOptions", () => {
     const options = createE2BDaemonCommandOptions({
       MISTLE_SANDBOXD_ENABLE_TEST_FAULTS: "1",
       SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID: "sbi_test",
-      SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL: "http://tokenizer-proxy:8085",
     });
 
     expect(options).toEqual({
@@ -59,7 +58,6 @@ describe("createE2BDaemonCommandOptions", () => {
         MISTLE_SANDBOXD_ENABLE_TEST_FAULTS: "1",
         SANDBOX_RUNTIME_LISTEN_ADDR: "127.0.0.1:8090",
         SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID: "sbi_test",
-        SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL: "http://tokenizer-proxy:8085",
       },
       timeoutMs: 0,
       user: "root",

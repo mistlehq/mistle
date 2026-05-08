@@ -249,7 +249,6 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
         port: 5205,
         public_url: controlPlaneApiUrl,
         internal_url: tokenizerProxyUrl,
-        egress_url: "http://tokenizer-proxy-relay:5025/tokenizer-proxy/egress",
       },
       control_plane_worker: {
         workflow_concurrency: 1,
@@ -412,11 +411,6 @@ export function buildIntegrationTomlConfig(input: {
         name_prefix: "it-system-",
       },
     });
-    configRoot = setValueAtPath(
-      configRoot,
-      ["services", "tokenizer_proxy", "egress_url"],
-      "http://tokenizer-proxy:5205/tokenizer-proxy/egress",
-    );
     configRoot = deleteValueAtPath(configRoot, ["object_store", "sandbox_storage"]);
     configRoot = deleteValueAtPath(configRoot, ["sandbox", "e2b"]);
     return configRoot;
@@ -452,11 +446,6 @@ export function buildIntegrationTomlConfig(input: {
     configRoot,
     ["object_store", "sandbox_storage"],
     readSandboxObjectStoreFromEnv(input.environment),
-  );
-  configRoot = setValueAtPath(
-    configRoot,
-    ["services", "tokenizer_proxy", "egress_url"],
-    "https://api.mistle.example/tokenizer-proxy/egress",
   );
   configRoot = setValueAtPath(
     configRoot,

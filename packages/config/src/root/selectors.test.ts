@@ -63,7 +63,6 @@ function createRootConfig(input: {
         port: 8085,
         internal_url: "http://tokenizer-proxy:8085",
         public_url: "https://api.example.com",
-        egress_url: "https://api.example.com/tokenizer-proxy/egress",
       },
       control_plane_worker: {
         workflow_concurrency: 4,

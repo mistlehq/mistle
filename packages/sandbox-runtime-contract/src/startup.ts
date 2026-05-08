@@ -100,7 +100,6 @@ export const SandboxdStartupInputSchema = z
     tunnelGatewayWsUrl: z.string().min(1),
     runtimePlan: CompiledRuntimePlanSchema,
     actingUserId: z.string().min(1).optional(),
-    egressGrantByRuleId: z.record(z.string(), z.string().min(1)),
     gitIdentity: SandboxdGitIdentitySchema.optional(),
     transparentProxy: SandboxdTransparentProxyConfigurationSchema.optional(),
   })

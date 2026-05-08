@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
@@ -45,7 +44,6 @@ fn applies_typed_mise_install_steps() {
           "workspaceSources": [],
           "agentRuntimes": []
         }),
-        egress_grant_by_rule_id: BTreeMap::new(),
         git_identity: None,
         transparent_proxy: None,
     };
@@ -115,7 +113,6 @@ fn applies_github_release_artifact_install_steps_from_pinned_public_release() {
           "workspaceSources": [],
           "agentRuntimes": []
         }),
-        egress_grant_by_rule_id: BTreeMap::new(),
         git_identity: None,
         transparent_proxy: None,
     };

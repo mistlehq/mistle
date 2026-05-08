@@ -16,7 +16,6 @@ import {
   SandboxInstancesNotFoundCodes,
   SandboxInstancesNotFoundError,
 } from "../../../sandbox-instances/errors.js";
-import { refreshEgressGrantsForConnectableSandbox } from "../../../sandbox-instances/services/refresh-egress-grants-for-connectable-sandbox.js";
 import { resolveActingUserGitIdentity } from "../../../sandbox-profiles/services/resolve-acting-user-git-identity.js";
 import { withSandboxRuntimeSpan } from "../telemetry.js";
 
@@ -171,7 +170,7 @@ export async function mintConnectionToken(
     db: ControlPlaneDatabase;
     dataPlaneClient: Pick<
       DataPlaneSandboxInstancesClient,
-      "getSandboxInstance" | "refreshSandboxEgressGrants" | "resumeSandboxInstance"
+      "getSandboxInstance" | "resumeSandboxInstance"
     >;
     gatewayWebsocketUrl: string;
     tokenTtlSeconds: number;
@@ -232,8 +231,6 @@ export async function mintConnectionToken(
           organizationId: input.organizationId,
           instanceId: input.instanceId,
         });
-        const wasAlreadyRunning = sandboxInstance.status === "running";
-
         if (sandboxInstance.status === "failed") {
           throw createInstanceFailedError(sandboxInstance);
         }
@@ -271,14 +268,6 @@ export async function mintConnectionToken(
           sandboxInstance = await waitForRunningSandboxInstance(dataPlaneClient, {
             organizationId: input.organizationId,
             instanceId: input.instanceId,
-          });
-        }
-
-        if (wasAlreadyRunning) {
-          await refreshEgressGrantsForConnectableSandbox(dataPlaneClient, {
-            organizationId: input.organizationId,
-            sandboxInstance,
-            ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
           });
         }
 

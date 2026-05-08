@@ -29,12 +29,6 @@ const TestConfig: DataPlaneWorkerRuntimeConfig = {
         tokenIssuer: "integration-data-plane-worker",
         tokenAudience: "integration-data-plane-gateway",
       },
-      egress: {
-        tokenSecret: "integration-egress-secret",
-        tokenIssuer: "integration-data-plane-worker",
-        tokenAudience: "integration-tokenizer-proxy",
-      },
-      tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       docker: {
         socketPath: "/var/run/docker.sock",
         networkName: "mistle-sandbox-dev",
@@ -56,12 +50,6 @@ const TestConfig: DataPlaneWorkerRuntimeConfig = {
       tokenIssuer: "integration-data-plane-worker",
       tokenAudience: "integration-data-plane-gateway",
     },
-    egress: {
-      tokenSecret: "integration-egress-secret",
-      tokenIssuer: "integration-data-plane-worker",
-      tokenAudience: "integration-tokenizer-proxy",
-    },
-    tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
     docker: {
       socketPath: "/var/run/docker.sock",
       networkName: "mistle-sandbox-dev",

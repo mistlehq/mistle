@@ -54,12 +54,11 @@ describe("createTransparentProxyConfiguration", () => {
 });
 
 describe("createRuntimeDestinationTransparentProxyExclusions", () => {
-  it("derives host exclusions from gateway and legacy tokenizer-proxy runtime URLs", () => {
+  it("derives host exclusions from gateway runtime URLs", () => {
     expect(
       createRuntimeDestinationTransparentProxyExclusions({
         dnsServerIps: ["8.8.8.8", "1.1.1.1"],
         gatewayTunnelUrl: "wss://gateway.mistlestag.ing/tunnel/sandbox",
-        tokenizerProxyEgressUrl: "https://proxy.mistlestag.ing/tokenizer-proxy/egress",
       }),
     ).toEqual([
       {
@@ -77,16 +76,10 @@ describe("createRuntimeDestinationTransparentProxyExclusions", () => {
         value: "gateway.mistlestag.ing",
         reason: "gateway tunnel traffic must not be redirected into sandboxd",
       },
-      {
-        kind: SandboxTransparentProxyExclusionKinds.HOST,
-        value: "proxy.mistlestag.ing",
-        reason:
-          "legacy tokenizer-proxy traffic must remain direct while grant-backed egress exists",
-      },
     ]);
   });
 
-  it("omits the tokenizer-proxy exclusion when the legacy path is not configured", () => {
+  it("supports local gateway URLs", () => {
     expect(
       createRuntimeDestinationTransparentProxyExclusions({
         dnsServerIps: [],

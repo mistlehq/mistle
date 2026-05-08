@@ -365,10 +365,6 @@ const RootEnvDescriptors = [
     path: ["services", "tokenizer_proxy", "internal_url"],
   },
   {
-    envVar: "MISTLE_SERVICES_TOKENIZER_PROXY_EGRESS_URL",
-    path: ["services", "tokenizer_proxy", "egress_url"],
-  },
-  {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY",
     path: ["services", "control_plane_worker", "workflow_concurrency"],
     parse: parseNumberEnv,

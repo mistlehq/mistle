@@ -15,8 +15,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
-use url::Url;
-
 use crate::codex_proxy::CodexProxyControlHandle;
 use crate::command::{
     CommandFailure, CommandSpec, DEFAULT_COMMAND_POLL_INTERVAL, run_command_with_details,
@@ -25,7 +23,6 @@ use crate::egress_proxy::EgressProxy;
 use crate::keepalive::KeepaliveManager;
 use crate::process;
 use crate::process::{CodexAppServerControlHandle, CodexAppServerObservationHandle};
-use crate::protocol::egress_refresh::EgressGrantRefreshInput;
 use crate::protocol::startup::{StartupExecutionMode, StartupInput, StartupMode};
 use crate::pty::{DEFAULT_PTY_SHELL, DEFAULT_PTY_TERM};
 use crate::runtime;
@@ -104,7 +101,6 @@ impl fmt::Display for SandboxdStateError {
 
 impl std::error::Error for SandboxdStateError {}
 
-const TOKENIZER_PROXY_EGRESS_BASE_URL_ENV: &str = "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
 const GATEWAY_PROXY_ENABLED_ENV: &str = "GATEWAY_PROXY_ENABLED";
 pub(crate) const GLOBAL_GIT_CONFIG_ENV_NAME: &str = "GIT_CONFIG_GLOBAL";
 pub(crate) const DEFAULT_GLOBAL_GIT_CONFIG_PATH: &str = "/root/.gitconfig";
@@ -147,7 +143,7 @@ impl SandboxdState {
         sleeper: Arc<dyn Sleeper>,
         diagnostics_logger: Option<StartupDiagnosticsLogger>,
     ) -> Result<Self, SandboxdStateError> {
-        let mut runtime_plan: runtime::CompiledRuntimePlan =
+        let runtime_plan: runtime::CompiledRuntimePlan =
             serde_json::from_value(startup_input.runtime_plan.clone()).map_err(|error| {
                 let error_text = error.to_string();
                 record_runtime_plan_apply_failure(
@@ -156,12 +152,6 @@ impl SandboxdState {
                 );
                 SandboxdStateError::ApplyRuntimePlan(error_text)
             })?;
-        let tokenizer_proxy_egress_base_url = resolve_tokenizer_proxy_egress_base_url()?;
-        apply_runtime_startup_overrides(
-            &mut runtime_plan,
-            startup_input,
-            &tokenizer_proxy_egress_base_url,
-        )?;
         let uses_pre_materialized_snapshot = startup_input.startup_mode == StartupMode::New
             && startup_input.execution_mode == StartupExecutionMode::Session
             && runtime_plan.image.source == CompiledRuntimePlanImageSource::Snapshot;
@@ -206,7 +196,6 @@ impl SandboxdState {
         let mut egress_proxy = EgressProxy::start(
             &runtime_plan,
             startup_input,
-            &tokenizer_proxy_egress_base_url,
             gateway_egress_forwarder.clone(),
             clock.clone(),
             supervisor_handle.clone(),
@@ -544,13 +533,6 @@ impl SandboxdState {
             },
         )?;
         record_operation_phase_completed(&diagnostics_logger, "apply_git_identity");
-        self.refresh_egress_grants(
-            &EgressGrantRefreshInput {
-                runtime_plan: startup_input.runtime_plan.clone(),
-                egress_grant_by_rule_id: startup_input.egress_grant_by_rule_id.clone(),
-            },
-            diagnostics_logger.clone(),
-        )?;
         if let Some(tunnel_session) = self.tunnel_session.take() {
             tunnel_session.close();
         }
@@ -589,49 +571,6 @@ impl SandboxdState {
         }
         self.tunnel_session = Some(tunnel_session);
         record_operation_phase_completed(&diagnostics_logger, "start_tunnel_session");
-
-        Ok(())
-    }
-
-    pub fn refresh_egress_grants(
-        &mut self,
-        input: &EgressGrantRefreshInput,
-        diagnostics_logger: Option<StartupDiagnosticsLogger>,
-    ) -> Result<(), SandboxdStateError> {
-        let runtime_plan: runtime::CompiledRuntimePlan =
-            serde_json::from_value(input.runtime_plan.clone()).map_err(|error| {
-                let error_text = error.to_string();
-                SandboxdStateError::ApplyRuntimePlan(error_text)
-            })?;
-
-        record_operation_phase_started(&diagnostics_logger, "refresh_egress_proxy_grants");
-        if let Some(egress_proxy) = &self.egress_proxy {
-            egress_proxy
-                .refresh_grants(&runtime_plan, &input.egress_grant_by_rule_id)
-                .map_err(|error| {
-                    record_operation_phase_failure(
-                        &diagnostics_logger,
-                        "refresh_egress_proxy_grants",
-                        BTreeMap::from([(
-                            "error".to_string(),
-                            startup_diagnostics_string(error.to_string()),
-                        )]),
-                    );
-                    SandboxdStateError::StartEgressProxy(error.to_string())
-                })?;
-        } else if !runtime_plan.egress_routes.is_empty() {
-            let error = "egress grant refresh input includes egress routes, but local egress proxy is not running";
-            record_operation_phase_failure(
-                &diagnostics_logger,
-                "refresh_egress_proxy_grants",
-                BTreeMap::from([(
-                    "error".to_string(),
-                    startup_diagnostics_string(error.to_string()),
-                )]),
-            );
-            return Err(SandboxdStateError::StartEgressProxy(error.to_string()));
-        }
-        record_operation_phase_completed(&diagnostics_logger, "refresh_egress_proxy_grants");
 
         Ok(())
     }
@@ -1214,14 +1153,6 @@ fn collect_tracked_components(
     tracked_components
 }
 
-fn resolve_tokenizer_proxy_egress_base_url() -> Result<String, SandboxdStateError> {
-    std::env::var(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV).map_err(|_| {
-        SandboxdStateError::StartRuntimeProcesses(format!(
-            "required sandbox env '{TOKENIZER_PROXY_EGRESS_BASE_URL_ENV}' is missing"
-        ))
-    })
-}
-
 fn gateway_proxy_enabled() -> Result<bool, SandboxdStateError> {
     match std::env::var(GATEWAY_PROXY_ENABLED_ENV) {
         Ok(value) if value == "1" => Ok(true),
@@ -1477,143 +1408,6 @@ fn build_setup_script_environment(
     environment
 }
 
-fn apply_runtime_startup_overrides(
-    runtime_plan: &mut runtime::CompiledRuntimePlan,
-    startup_input: &StartupInput,
-    tokenizer_proxy_egress_base_url: &str,
-) -> Result<(), SandboxdStateError> {
-    for workspace_source in &mut runtime_plan.workspace_sources {
-        apply_workspace_source_startup_overrides(
-            workspace_source,
-            &runtime_plan.egress_routes,
-            &startup_input.egress_grant_by_rule_id,
-            tokenizer_proxy_egress_base_url,
-        )?;
-    }
-
-    Ok(())
-}
-
-fn apply_workspace_source_startup_overrides(
-    workspace_source: &mut runtime::CompiledWorkspaceSource,
-    egress_routes: &[runtime::CompiledEgressRoute],
-    egress_grant_by_rule_id: &std::collections::BTreeMap<String, String>,
-    tokenizer_proxy_egress_base_url: &str,
-) -> Result<(), SandboxdStateError> {
-    match workspace_source {
-        runtime::CompiledWorkspaceSource::GitClone {
-            path,
-            origin_url,
-            clone_url,
-            egress_grant_token,
-            ..
-        } => {
-            let route = resolve_workspace_source_egress_route(origin_url, egress_routes).ok_or_else(
-                || {
-                    SandboxdStateError::StartRuntimeProcesses(format!(
-                        "workspace source '{path}' must resolve exactly one egress route for '{origin_url}'"
-                    ))
-                },
-            )?;
-            let egress_grant = egress_grant_by_rule_id
-                .get(&route.egress_rule_id)
-                .ok_or_else(|| {
-                    SandboxdStateError::StartRuntimeProcesses(format!(
-                        "missing egress grant for route '{}'",
-                        route.egress_rule_id
-                    ))
-                })?;
-            *clone_url = Some(
-                resolve_tokenizer_proxy_forward_url(tokenizer_proxy_egress_base_url, origin_url)
-                    .map_err(SandboxdStateError::StartRuntimeProcesses)?,
-            );
-            *egress_grant_token = Some(egress_grant.clone());
-        }
-    }
-
-    Ok(())
-}
-
-fn resolve_tokenizer_proxy_forward_url(
-    tokenizer_proxy_egress_base_url: &str,
-    forward_url: &str,
-) -> Result<String, String> {
-    let mut tokenizer_proxy_url = Url::parse(tokenizer_proxy_egress_base_url).map_err(|error| {
-        format!(
-            "sandbox tokenizer proxy egress base url '{tokenizer_proxy_egress_base_url}' is invalid: {error}"
-        )
-    })?;
-    let forward_url = Url::parse(forward_url).map_err(|error| {
-        format!("workspace source origin url '{forward_url}' is invalid: {error}")
-    })?;
-
-    tokenizer_proxy_url.set_path(&join_url_path(
-        tokenizer_proxy_url.path(),
-        forward_url.path(),
-    ));
-    let tokenizer_proxy_query = tokenizer_proxy_url.query().map(str::to_string);
-    let forward_query = forward_url.query();
-    let resolved_query = match (tokenizer_proxy_query, forward_query) {
-        (Some(base_query), Some(forward_query)) => Some(format!("{base_query}&{forward_query}")),
-        (Some(base_query), None) => Some(base_query),
-        (None, Some(forward_query)) => Some(forward_query.to_string()),
-        (None, None) => None,
-    };
-    tokenizer_proxy_url.set_query(resolved_query.as_deref());
-    tokenizer_proxy_url.set_fragment(None);
-
-    Ok(tokenizer_proxy_url.to_string())
-}
-
-fn resolve_workspace_source_egress_route<'a>(
-    origin_url: &str,
-    egress_routes: &'a [runtime::CompiledEgressRoute],
-) -> Option<&'a runtime::CompiledEgressRoute> {
-    let origin_url = Url::parse(origin_url).ok()?;
-    let origin_host = origin_url.host_str()?;
-    let origin_path = origin_url.path();
-    let matching_routes = egress_routes
-        .iter()
-        .filter(|route| {
-            route.r#match.hosts.iter().any(|host| host == origin_host)
-                && route
-                    .r#match
-                    .path_prefixes
-                    .as_ref()
-                    .is_some_and(|path_prefixes| {
-                        path_prefixes
-                            .iter()
-                            .any(|path_prefix| origin_path.starts_with(path_prefix))
-                    })
-        })
-        .collect::<Vec<_>>();
-
-    let [route] = matching_routes.as_slice() else {
-        return None;
-    };
-
-    Some(*route)
-}
-
-fn join_url_path(base_path: &str, suffix_path: &str) -> String {
-    let normalized_base_path = base_path.strip_suffix('/').unwrap_or(base_path);
-    let normalized_suffix_path = suffix_path.strip_prefix('/').unwrap_or(suffix_path);
-
-    if normalized_base_path.is_empty() || normalized_base_path == "/" {
-        if normalized_suffix_path.is_empty() {
-            return "/".to_string();
-        }
-
-        return format!("/{normalized_suffix_path}");
-    }
-
-    if normalized_suffix_path.is_empty() {
-        return normalized_base_path.to_string();
-    }
-
-    format!("{normalized_base_path}/{normalized_suffix_path}")
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::{BTreeMap, BTreeSet};
@@ -1630,357 +1424,20 @@ mod tests {
     use crate::protocol::startup::{GitIdentity, StartupExecutionMode, StartupInput, StartupMode};
     use crate::runtime::readiness::{RuntimeReadinessManager, RuntimeReadinessMode};
     use crate::runtime::{
-        CompiledRuntimePlan, RuntimeClient, RuntimeClientEndpoint, RuntimeClientEndpointTransport,
-        RuntimeClientProcess, RuntimeClientProcessReadiness, RuntimeClientProcessStopPolicy,
-        RuntimeClientProcessStopSignal, RuntimeClientSetup, RuntimeClientSetupFile,
-        RuntimeExecCommand,
+        CompiledRuntimePlan, RuntimeClientProcessReadiness, RuntimeClientProcessStopPolicy,
+        RuntimeClientProcessStopSignal, RuntimeExecCommand,
     };
     use crate::sandboxd_state::{
         DEFAULT_GLOBAL_GIT_CONFIG_PATH, GATEWAY_PROXY_ENABLED_ENV, GLOBAL_GIT_CONFIG_ENV_NAME,
-        SETUP_SCRIPT_WORKING_DIRECTORY, SandboxdState, TOKENIZER_PROXY_EGRESS_BASE_URL_ENV,
-        apply_runtime_startup_overrides, build_setup_script_environment,
-        collect_runtime_environment, merge_managed_runtime_environment,
-        resolve_tokenizer_proxy_forward_url, run_setup_script, run_setup_script_in_directory,
-        scrub_snapshot_runtime_artifacts_at_paths, spawn_codex_coordination_thread,
-        spawn_runtime_readiness_projection_thread,
+        SETUP_SCRIPT_WORKING_DIRECTORY, SandboxdState, build_setup_script_environment,
+        collect_runtime_environment, merge_managed_runtime_environment, run_setup_script,
+        run_setup_script_in_directory, scrub_snapshot_runtime_artifacts_at_paths,
+        spawn_codex_coordination_thread, spawn_runtime_readiness_projection_thread,
     };
     use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
-    use crate::test_support::{TestEnvVarGuard, TestEnvVarsGuard};
+    use crate::test_support::TestEnvVarGuard;
     use crate::time::{SystemClock, ThreadSleeper};
     use tungstenite::{Message, WebSocket, accept};
-
-    #[test]
-    fn preserves_codex_runtime_client_config_while_rewriting_workspace_sources() {
-        let mut runtime_plan = CompiledRuntimePlan {
-            image: test_runtime_plan_image(crate::runtime::CompiledRuntimePlanImageSource::Base),
-            setup_script: None,
-            egress_routes: vec![
-                crate::runtime::CompiledEgressRoute {
-                    egress_rule_id: "egress_rule_bind_openai_agent".to_string(),
-                    binding_id: "bind_openai_agent".to_string(),
-                    family_id: "openai".to_string(),
-                    variant_id: "openai-default".to_string(),
-                    r#match: crate::runtime::CompiledEgressRouteMatch {
-                        hosts: vec!["api.openai.com".to_string()],
-                        path_prefixes: Some(vec!["/v1/responses".to_string()]),
-                        methods: Some(vec!["POST".to_string()]),
-                    },
-                    upstream: crate::runtime::CompiledEgressRouteUpstream {
-                        base_url: "https://api.openai.com/v1".to_string(),
-                    },
-                    auth_injection: crate::runtime::CompiledEgressRouteAuthInjection {
-                        r#type: crate::runtime::CompiledEgressRouteAuthInjectionType::Bearer,
-                        target: Some("authorization".to_string()),
-                        username: None,
-                        service: None,
-                        region: None,
-                    },
-                    additional_headers: None,
-                    additional_credential_headers: None,
-                    credential_resolver:
-                        crate::runtime::CompiledEgressRouteCredentialResolver::IntegrationConnection {
-                        connection_id: "icn_test".to_string(),
-                        secret_type: "api_key".to_string(),
-                        slot_key: None,
-                        resolver_key: None,
-                    },
-                    request_middleware: None,
-                },
-                crate::runtime::CompiledEgressRoute {
-                    egress_rule_id: "egress_rule_bind_github".to_string(),
-                    binding_id: "bind_github".to_string(),
-                    family_id: "github".to_string(),
-                    variant_id: "github-default".to_string(),
-                    r#match: crate::runtime::CompiledEgressRouteMatch {
-                        hosts: vec!["github.com".to_string()],
-                        path_prefixes: Some(vec!["/mistlehq/private-repo.git".to_string()]),
-                        methods: Some(vec!["GET".to_string(), "POST".to_string()]),
-                    },
-                    upstream: crate::runtime::CompiledEgressRouteUpstream {
-                        base_url: "https://github.com".to_string(),
-                    },
-                    auth_injection: crate::runtime::CompiledEgressRouteAuthInjection {
-                        r#type: crate::runtime::CompiledEgressRouteAuthInjectionType::Basic,
-                        target: Some("authorization".to_string()),
-                        username: Some("x-access-token".to_string()),
-                        service: None,
-                        region: None,
-                    },
-                    additional_headers: None,
-                    additional_credential_headers: None,
-                    credential_resolver:
-                        crate::runtime::CompiledEgressRouteCredentialResolver::IntegrationConnection {
-                        connection_id: "icn_github".to_string(),
-                        secret_type: "github_app_installation_token".to_string(),
-                        slot_key: None,
-                        resolver_key: Some("github_app_installation_token".to_string()),
-                    },
-                    request_middleware: None,
-                },
-            ],
-            artifacts: Vec::new(),
-            workspace_sources: vec![crate::runtime::CompiledWorkspaceSource::GitClone {
-                resource_kind: crate::runtime::WorkspaceSourceResourceKind::Repository,
-                path: "/workspace/mistlehq/private-repo".to_string(),
-                origin_url: "https://github.com/mistlehq/private-repo.git".to_string(),
-                clone_url: None,
-                egress_grant_token: None,
-            }],
-            runtime_clients: vec![RuntimeClient {
-                client_id: "codex-cli".to_string(),
-                setup: RuntimeClientSetup {
-                    env: BTreeMap::new(),
-                    files: vec![RuntimeClientSetupFile {
-                        file_id: "codex_config".to_string(),
-                        path: "/etc/codex/config.toml".to_string(),
-                        mode: 0o600,
-                        content: r#"
-model = "gpt-5.4-codex"
-model_provider = "proxy"
-
-[model_providers.proxy]
-name = "OpenAI"
-base_url = "https://api.openai.com/v1"
-wire_api = "responses"
-requires_openai_auth = false
-supports_websockets = false
-"#
-                        .trim()
-                        .to_string(),
-                        write_mode: None,
-                    }],
-                    launch_args: None,
-                },
-                processes: vec![RuntimeClientProcess {
-                    process_key: "codex-app-server".to_string(),
-                    command: crate::runtime::RuntimeExecCommand {
-                        args: vec![
-                            "/usr/local/bin/codex".to_string(),
-                            "app-server".to_string(),
-                            "--listen".to_string(),
-                            "ws://127.0.0.1:4501".to_string(),
-                        ],
-                        env: None,
-                        cwd: None,
-                        timeout_ms: None,
-                    },
-                    readiness: RuntimeClientProcessReadiness::Ws {
-                        url: "ws://127.0.0.1:4501".to_string(),
-                        timeout_ms: 5_000,
-                    },
-                    stop: RuntimeClientProcessStopPolicy {
-                        signal: RuntimeClientProcessStopSignal::Sigterm,
-                        timeout_ms: 10_000,
-                        grace_period_ms: Some(2_000),
-                    },
-                }],
-                endpoints: vec![RuntimeClientEndpoint {
-                    endpoint_key: "app-server".to_string(),
-                    process_key: Some("codex-app-server".to_string()),
-                    transport: RuntimeClientEndpointTransport::Ws {
-                        url: "ws://127.0.0.1:4500".to_string(),
-                    },
-                    connection_mode: crate::runtime::RuntimeClientConnectionMode::Dedicated,
-                }],
-            }],
-            agent_runtimes: vec![crate::runtime::CompiledAgentRuntime {
-                binding_id: "bind_openai_agent".to_string(),
-                runtime_id: "codex".to_string(),
-                runtime_key: "codex-app-server".to_string(),
-                client_id: "codex-cli".to_string(),
-                endpoint_key: "app-server".to_string(),
-                pty_launch: serde_json::json!({}),
-            }],
-        };
-        let startup_input = StartupInput {
-            startup_mode: StartupMode::New,
-            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
-            bootstrap_token: "bootstrap-token-value".to_string(),
-            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
-            tunnel_gateway_ws_url: "ws://127.0.0.1:5000/bootstrap".to_string(),
-            acting_user_id: None,
-            runtime_plan: serde_json::json!({
-                "egressRoutes": [
-                    {
-                        "egressRuleId": "egress_rule_bind_openai_agent",
-                        "bindingId": "bind_openai_agent",
-                        "upstream": {
-                            "baseUrl": "https://api.openai.com/v1"
-                        }
-                    },
-                    {
-                        "egressRuleId": "egress_rule_bind_github",
-                        "bindingId": "bind_github",
-                        "upstream": {
-                            "baseUrl": "https://github.com"
-                        }
-                    }
-                ],
-                "artifacts": [],
-                "workspaceSources": [
-                    {
-                        "sourceKind": "git-clone",
-                        "resourceKind": "repository",
-                        "path": "/workspace/mistlehq/private-repo",
-                        "originUrl": "https://github.com/mistlehq/private-repo.git"
-                    }
-                ],
-                "runtimeClients": [
-                    {
-                        "clientId": "codex-cli",
-                        "setup": {
-                            "env": {},
-                            "files": []
-                        },
-                        "processes": [
-                            {
-                                "processKey": "codex-app-server",
-                                "command": {
-                                    "args": [
-                                        "/usr/local/bin/codex",
-                                        "app-server",
-                                        "--listen",
-                                        "ws://127.0.0.1:4501"
-                                    ]
-                                },
-                                "readiness": {
-                                    "type": "ws",
-                                    "url": "ws://127.0.0.1:4501",
-                                    "timeoutMs": 5000
-                                },
-                                "stop": {
-                                    "signal": "sigterm",
-                                    "timeoutMs": 10000,
-                                    "gracePeriodMs": 2000
-                                }
-                            }
-                        ],
-                        "endpoints": [
-                            {
-                                "endpointKey": "app-server",
-                                "processKey": "codex-app-server",
-                                "transport": {
-                                    "type": "ws",
-                                    "url": "ws://127.0.0.1:4500"
-                                },
-                                "connectionMode": "dedicated"
-                            }
-                        ]
-                    }
-                ],
-                "agentRuntimes": [
-                    {
-                        "bindingId": "bind_openai_agent",
-                        "runtimeId": "codex",
-                        "runtimeKey": "codex-app-server",
-                        "clientId": "codex-cli",
-                        "endpointKey": "app-server",
-                        "ptyLaunch": {}
-                    }
-                ]
-            }),
-            egress_grant_by_rule_id: BTreeMap::from([
-                (
-                    "egress_rule_bind_openai_agent".to_string(),
-                    "signed-egress-grant".to_string(),
-                ),
-                (
-                    "egress_rule_bind_github".to_string(),
-                    "signed-github-egress-grant".to_string(),
-                ),
-            ]),
-            git_identity: None,
-            transparent_proxy: None,
-        };
-        let original_config = runtime_plan
-            .runtime_clients
-            .first()
-            .expect("runtime client should exist")
-            .setup
-            .files
-            .first()
-            .expect("codex config file should exist")
-            .content
-            .clone();
-
-        apply_runtime_startup_overrides(
-            &mut runtime_plan,
-            &startup_input,
-            "http://127.0.0.1:5205/tokenizer-proxy/egress",
-        )
-        .expect("workspace source startup overrides should apply");
-
-        let runtime_client = runtime_plan
-            .runtime_clients
-            .first()
-            .expect("runtime client should exist");
-        let config = &runtime_client
-            .setup
-            .files
-            .first()
-            .expect("codex config file should exist")
-            .content;
-        assert_eq!(config, &original_config);
-        let workspace_source = runtime_plan
-            .workspace_sources
-            .first()
-            .expect("workspace source should exist");
-        let (
-            workspace_source_origin_url,
-            workspace_source_clone_url,
-            workspace_source_egress_grant_token,
-        ) = match workspace_source {
-            crate::runtime::CompiledWorkspaceSource::GitClone {
-                origin_url,
-                clone_url,
-                egress_grant_token,
-                ..
-            } => (origin_url, clone_url, egress_grant_token),
-        };
-        assert_eq!(
-            workspace_source_origin_url,
-            "https://github.com/mistlehq/private-repo.git"
-        );
-        assert_eq!(
-            workspace_source_clone_url,
-            &Some(
-                "http://127.0.0.1:5205/tokenizer-proxy/egress/mistlehq/private-repo.git"
-                    .to_string()
-            )
-        );
-        assert_eq!(
-            workspace_source_egress_grant_token,
-            &Some("signed-github-egress-grant".to_string())
-        );
-    }
-
-    #[test]
-    fn preserves_tokenizer_proxy_query_when_rewriting_workspace_source_urls() {
-        let clone_url = resolve_tokenizer_proxy_forward_url(
-            "http://127.0.0.1:5205/tokenizer-proxy/egress?x-mistle-test-environment-id=test_env_123",
-            "https://github.com/mistlehq/private-repo.git",
-        )
-        .expect("tokenizer proxy URL should resolve");
-
-        assert_eq!(
-            clone_url,
-            "http://127.0.0.1:5205/tokenizer-proxy/egress/mistlehq/private-repo.git?x-mistle-test-environment-id=test_env_123",
-        );
-    }
-
-    #[test]
-    fn preserves_tokenizer_proxy_path_prefix_when_rewriting_workspace_source_urls() {
-        let clone_url = resolve_tokenizer_proxy_forward_url(
-            "http://127.0.0.1:5205/__test-environments/test_env_123/tokenizer-proxy/egress",
-            "https://github.com/mistlehq/private-repo.git",
-        )
-        .expect("tokenizer proxy URL should resolve");
-
-        assert_eq!(
-            clone_url,
-            "http://127.0.0.1:5205/__test-environments/test_env_123/tokenizer-proxy/egress/mistlehq/private-repo.git",
-        );
-    }
 
     #[test]
     fn collects_runtime_environment_from_artifacts() {
@@ -2388,8 +1845,6 @@ supports_websockets = false
     #[test]
     fn snapshot_materialization_initialization_applies_runtime_plan_and_skips_session_runtime_resources()
      {
-        let _tokenizer_proxy_env_guard =
-            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
         let output_path = std::env::temp_dir().join(format!(
             "mistle-snapshot-materialization-artifact-output-{}",
             SystemTime::now()
@@ -2499,13 +1954,7 @@ supports_websockets = false
 
     #[test]
     fn snapshot_materialization_gateway_proxy_uses_temporary_bootstrap_tunnel_for_setup() {
-        let _env_guard = TestEnvVarsGuard::set([
-            (
-                TOKENIZER_PROXY_EGRESS_BASE_URL_ENV,
-                "http://127.0.0.1:5205".to_string(),
-            ),
-            (GATEWAY_PROXY_ENABLED_ENV, "1".to_string()),
-        ]);
+        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let output_path = std::env::temp_dir().join(format!(
             "mistle-snapshot-materialization-gateway-output-{}",
             SystemTime::now()
@@ -2608,8 +2057,6 @@ supports_websockets = false
 
     #[test]
     fn snapshot_materialization_state_rejects_resume() {
-        let _tokenizer_proxy_env_guard =
-            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
         let mut state = SandboxdState::initialize(
             &build_startup_input(
                 StartupMode::New,
@@ -2704,7 +2151,6 @@ supports_websockets = false
             tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),
             acting_user_id: None,
             runtime_plan,
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity,
             transparent_proxy: None,
         }

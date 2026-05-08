@@ -1,6 +1,5 @@
 #![cfg(target_os = "linux")]
 
-use std::collections::BTreeMap;
 use std::fs;
 use std::net::TcpListener;
 use std::path::PathBuf;
@@ -16,12 +15,11 @@ use sandboxd::time::{Duration, Sleeper, ThreadSleeper};
 use tungstenite::{Message, accept};
 
 static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
-const TOKENIZER_PROXY_EGRESS_BASE_URL_ENV: &str = "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
+const GATEWAY_PROXY_ENABLED_ENV: &str = "GATEWAY_PROXY_ENABLED";
 
 #[test]
 fn daemon_applies_startup_input_after_init_submission() {
-    let _env_guard =
-        TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+    let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
     let test_dir = create_temp_test_dir("serve_runtime_apply");
     let _attachment_root_guard = TestAttachmentRootGuard::set(test_dir.join("attachments"));
     let control_socket_path = test_dir.join("control.sock");
@@ -63,7 +61,6 @@ fn daemon_applies_startup_input_after_init_submission() {
           "workspaceSources": [],
           "agentRuntimes": []
         }),
-        egress_grant_by_rule_id: BTreeMap::new(),
         git_identity: None,
         acting_user_id: None,
         transparent_proxy: None,

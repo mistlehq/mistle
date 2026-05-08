@@ -85,20 +85,6 @@ export type ResumeSandboxInstanceInput = {
 };
 export type ResumeSandboxInstanceAcceptedResponse =
   paths["/internal/sandbox/instances/:id/resume"]["post"]["responses"]["200"]["content"]["application/json"];
-export type RefreshSandboxEgressGrantsInput = {
-  organizationId: string;
-  instanceId: string;
-  actingUserId?: string;
-};
-const RefreshSandboxEgressGrantsResponseSchema = z
-  .object({
-    status: z.literal("ok"),
-    sandboxInstanceId: z.string().min(1),
-  })
-  .strict();
-export type RefreshSandboxEgressGrantsResponse = z.infer<
-  typeof RefreshSandboxEgressGrantsResponseSchema
->;
 export type StopSandboxInstanceInput = {
   sandboxInstanceId: string;
   stopReason: "idle";
@@ -228,9 +214,6 @@ export type DataPlaneSandboxInstancesClient = {
   resumeSandboxInstance: (
     input: ResumeSandboxInstanceInput,
   ) => Promise<ResumeSandboxInstanceAcceptedResponse>;
-  refreshSandboxEgressGrants: (
-    input: RefreshSandboxEgressGrantsInput,
-  ) => Promise<RefreshSandboxEgressGrantsResponse>;
   stopSandboxInstance: (
     input: StopSandboxInstanceInput,
   ) => Promise<StopSandboxInstanceAcceptedResponse>;
@@ -286,7 +269,6 @@ function createClientError(input: {
     | "start"
     | "materialize"
     | "resume"
-    | "refresh"
     | "stop"
     | "reconcile"
     | "putDeadline"
@@ -299,7 +281,6 @@ function createClientError(input: {
     start: "start",
     materialize: "materialize",
     resume: "resume",
-    refresh: "refresh egress grants",
     stop: "stop",
     reconcile: "reconcile",
     putDeadline: "put deadline",
@@ -516,47 +497,6 @@ export function createDataPlaneSandboxInstancesClient(
         status: response.status,
         error: errorBody,
         operation: "resume",
-      });
-    },
-
-    async refreshSandboxEgressGrants(refreshInput) {
-      const response = await fetch(
-        createSandboxInstanceMemberUrl({
-          baseUrl: internalClient.baseUrl,
-          instanceId: refreshInput.instanceId,
-          suffix: "/refresh-egress-grants",
-        }),
-        {
-          method: "POST",
-          headers: createTestHeaders({
-            serviceToken: internalClient.serviceToken,
-            ...(internalClient.testEnvironmentId === undefined
-              ? {}
-              : { testEnvironmentId: internalClient.testEnvironmentId }),
-            ...(internalClient.testEnvironmentIdHeader === undefined
-              ? {}
-              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
-          }),
-          body: JSON.stringify({
-            organizationId: refreshInput.organizationId,
-            ...(refreshInput.actingUserId === undefined
-              ? {}
-              : { actingUserId: refreshInput.actingUserId }),
-          }),
-          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
-        },
-      );
-
-      if (response.status === 200) {
-        return RefreshSandboxEgressGrantsResponseSchema.parse(await response.json());
-      }
-
-      const errorBody = await readResponseBody(response);
-
-      throw createClientError({
-        status: response.status,
-        error: errorBody,
-        operation: "refresh",
       });
     },
 

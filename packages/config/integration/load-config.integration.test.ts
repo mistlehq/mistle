@@ -408,8 +408,6 @@ const dataPlaneWorkerEnvConfig = {
     },
     internalGatewayWsUrl: globalDevelopmentConfig.sandbox.internalGatewayWsUrl,
     bootstrap: globalDevelopmentConfig.sandbox.bootstrap,
-    egress: globalDevelopmentConfig.sandbox.egress,
-    tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
     docker: {
       socketPath: "/var/run/docker.sock",
       networkName: "mistle-sandbox-dev",
@@ -475,8 +473,6 @@ const dataPlaneWorkerDockerFixtureConfig = {
     },
     internalGatewayWsUrl: globalDevelopmentConfig.sandbox.internalGatewayWsUrl,
     bootstrap: globalDevelopmentConfig.sandbox.bootstrap,
-    egress: globalDevelopmentConfig.sandbox.egress,
-    tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
     sandboxdTestFaultsEnabled: true,
     docker: {
       socketPath: "/var/run/docker.sock",

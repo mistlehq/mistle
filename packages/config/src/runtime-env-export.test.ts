@@ -178,10 +178,6 @@ describe("exportServiceConfigToEnv", () => {
       value: "postgresql://mistle:replace-with-password@db:5432/mistle",
     });
     expectEntry(entries, {
-      name: "MISTLE_SERVICES_TOKENIZER_PROXY_EGRESS_URL",
-      value: "https://api.mistle.example/tokenizer-proxy/egress",
-    });
-    expectEntry(entries, {
       name: "MISTLE_SANDBOX_E2B_CPU_COUNT",
       value: 4,
     });

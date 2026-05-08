@@ -47,7 +47,6 @@ export const DockerClientOperationIds = {
    */
   STOP_CONTAINER: "stop_container",
   INIT: "init",
-  REFRESH_EGRESS_GRANTS: "refresh_egress_grants",
   /**
    * `container.inspect(...)`.
    * Source:

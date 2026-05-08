@@ -14,7 +14,6 @@ import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registr
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import { DataPlaneWorkerTunnelTokenDurations } from "../core/tunnel-token-durations.js";
-import { createEgressGrantByRuleId } from "./egress-grants.js";
 import {
   createSandboxTunnelGatewayWsUrl,
   encodeSandboxStartupInput,
@@ -44,43 +43,35 @@ export async function createSandboxStartupInput(input: {
     sandboxInstanceId: input.sandboxInstanceId,
   });
 
-  const [bootstrapToken, tunnelExchangeToken, egressGrantByRuleId, signingGrant] =
-    await Promise.all([
-      mintBootstrapToken({
-        config: {
-          bootstrapTokenSecret: input.config.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: input.config.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: input.config.sandbox.bootstrap.tokenAudience,
-        },
-        jti: bootstrapTokenJti,
-        sandboxInstanceId: input.sandboxInstanceId,
-        ttlSeconds: DataPlaneWorkerTunnelTokenDurations.BOOTSTRAP_TOKEN_TTL_SECONDS,
-      }),
-      mintTunnelExchangeToken({
-        config: {
-          tokenSecret: input.config.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: input.config.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: input.config.sandbox.bootstrap.tokenAudience,
-        },
-        jti: tunnelExchangeTokenJti,
-        sandboxInstanceId: input.sandboxInstanceId,
-        bootstrapTokenTtlSeconds: DataPlaneWorkerTunnelTokenDurations.BOOTSTRAP_TOKEN_TTL_SECONDS,
-        exchangeTokenTtlSeconds: DataPlaneWorkerTunnelTokenDurations.EXCHANGE_TOKEN_TTL_SECONDS,
-        ttlSeconds: DataPlaneWorkerTunnelTokenDurations.EXCHANGE_TOKEN_TTL_SECONDS,
-      }),
-      createEgressGrantByRuleId({
-        config: input.config,
-        organizationId: input.organizationId,
-        sandboxInstanceId: input.sandboxInstanceId,
-        runtimePlan: input.runtimePlan,
-        ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
-      }),
-      createSigningGrant({
-        config: input.config,
-        sandboxInstanceId: input.sandboxInstanceId,
-        ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
-      }),
-    ]);
+  const [bootstrapToken, tunnelExchangeToken, signingGrant] = await Promise.all([
+    mintBootstrapToken({
+      config: {
+        bootstrapTokenSecret: input.config.sandbox.bootstrap.tokenSecret,
+        tokenIssuer: input.config.sandbox.bootstrap.tokenIssuer,
+        tokenAudience: input.config.sandbox.bootstrap.tokenAudience,
+      },
+      jti: bootstrapTokenJti,
+      sandboxInstanceId: input.sandboxInstanceId,
+      ttlSeconds: DataPlaneWorkerTunnelTokenDurations.BOOTSTRAP_TOKEN_TTL_SECONDS,
+    }),
+    mintTunnelExchangeToken({
+      config: {
+        tokenSecret: input.config.sandbox.bootstrap.tokenSecret,
+        tokenIssuer: input.config.sandbox.bootstrap.tokenIssuer,
+        tokenAudience: input.config.sandbox.bootstrap.tokenAudience,
+      },
+      jti: tunnelExchangeTokenJti,
+      sandboxInstanceId: input.sandboxInstanceId,
+      bootstrapTokenTtlSeconds: DataPlaneWorkerTunnelTokenDurations.BOOTSTRAP_TOKEN_TTL_SECONDS,
+      exchangeTokenTtlSeconds: DataPlaneWorkerTunnelTokenDurations.EXCHANGE_TOKEN_TTL_SECONDS,
+      ttlSeconds: DataPlaneWorkerTunnelTokenDurations.EXCHANGE_TOKEN_TTL_SECONDS,
+    }),
+    createSigningGrant({
+      config: input.config,
+      sandboxInstanceId: input.sandboxInstanceId,
+      ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
+    }),
+  ]);
 
   let gitIdentity: SandboxStartupInput["gitIdentity"];
   if (input.gitIdentity === undefined) {
@@ -127,7 +118,6 @@ export async function createSandboxStartupInput(input: {
     ...(gatewayProxyStartupActingUserId === undefined
       ? {}
       : { actingUserId: gatewayProxyStartupActingUserId }),
-    egressGrantByRuleId,
     ...(gitIdentity === undefined ? {} : { gitIdentity }),
     ...(transparentProxy === undefined ? {} : { transparentProxy }),
   };
@@ -202,7 +192,6 @@ function createTransparentProxyStartupConfiguration(input: {
       ...createRuntimeDestinationTransparentProxyExclusions({
         dnsServerIps: [],
         gatewayTunnelUrl: input.tunnelGatewayWsUrl,
-        tokenizerProxyEgressUrl: input.config.app.sandbox.tokenizerProxyEgressBaseUrl,
       }),
     ],
   };

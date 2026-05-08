@@ -138,13 +138,11 @@ mod tests {
     use crate::time::{Sleeper, ThreadSleeper};
 
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
-    const TOKENIZER_PROXY_EGRESS_BASE_URL_ENV: &str =
-        "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
+    const GATEWAY_PROXY_ENABLED_ENV: &str = "GATEWAY_PROXY_ENABLED";
 
     #[test]
     fn submits_resume_request_and_writes_ok_response() {
-        let _env_guard =
-            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("resume_ok");
         let control_socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
@@ -205,8 +203,7 @@ mod tests {
 
     #[test]
     fn writes_error_response_when_resume_is_submitted_before_init() {
-        let _env_guard =
-            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("resume_before_init");
         let control_socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
@@ -274,7 +271,6 @@ mod tests {
                 "runtimeClients": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: std::collections::BTreeMap::new(),
             git_identity: None,
             transparent_proxy: None,
         }

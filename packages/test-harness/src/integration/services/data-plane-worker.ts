@@ -243,7 +243,6 @@ function createDataPlaneWorkerEnv(input: {
     MISTLE_SERVICES_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY: "2",
     MISTLE_SERVICES_DATA_PLANE_GATEWAY_INTERNAL_URL: input.peer.url(ServiceIds.DATA_PLANE_GATEWAY),
     MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL: input.sandboxEndpoints.gatewayWsUrl,
-    MISTLE_SERVICES_TOKENIZER_PROXY_EGRESS_URL: input.sandboxEndpoints.tokenizerProxyEgressUrl,
     MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: input.peer.url(ServiceIds.CONTROL_PLANE_API),
     MISTLE_INTERNAL_AUTH_SHARED_TOKEN: "integration-new-internal-service-token",
     MISTLE_SANDBOX_PROVIDER: provider,
@@ -287,7 +286,6 @@ function createDataPlaneWorkerEnv(input: {
 
 type SandboxReachableEndpoints = {
   gatewayWsUrl: string;
-  tokenizerProxyEgressUrl: string;
   dockerNetworkName?: string;
 };
 
@@ -301,10 +299,6 @@ async function createSandboxReachableEndpoints(input: {
     url: input.peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
     environmentId: input.environmentId,
   });
-  const tokenizerProxyEgressUrl = createTokenizerProxyEgressUrl({
-    baseUrl: input.peer.url(ServiceIds.TOKENIZER_PROXY),
-    environmentId: input.environmentId,
-  });
   if (input.sandbox?.provider === "e2b") {
     return createPublicSandboxReachableEndpoints({
       environmentId: input.environmentId,
@@ -315,19 +309,14 @@ async function createSandboxReachableEndpoints(input: {
   if (input.sandboxDockerNetwork === undefined) {
     return {
       gatewayWsUrl,
-      tokenizerProxyEgressUrl,
     };
   }
 
   const sandboxGatewayWsUrl = createDockerSandboxReachableHostUrl(gatewayWsUrl);
-  const sandboxTokenizerProxyEgressUrl =
-    createDockerSandboxReachableHostUrl(tokenizerProxyEgressUrl);
   readUrlPort(sandboxGatewayWsUrl, "data-plane gateway sandbox websocket URL");
-  readUrlPort(sandboxTokenizerProxyEgressUrl, "tokenizer proxy egress URL");
 
   return {
     gatewayWsUrl: sandboxGatewayWsUrl,
-    tokenizerProxyEgressUrl: sandboxTokenizerProxyEgressUrl,
     dockerNetworkName: infraValue(input.sandboxDockerNetwork, DockerNetworkValues.NETWORK_NAME),
   };
 }
@@ -339,22 +328,13 @@ function createPublicSandboxReachableEndpoints(input: {
   const publicGatewayBaseUrl = input.sandbox.publicServiceBaseUrls?.get(
     ServiceIds.DATA_PLANE_GATEWAY,
   );
-  const publicTokenizerProxyBaseUrl = input.sandbox.publicServiceBaseUrls?.get(
-    ServiceIds.TOKENIZER_PROXY,
-  );
-  if (publicGatewayBaseUrl === undefined || publicTokenizerProxyBaseUrl === undefined) {
-    throw new Error(
-      "E2B runtime system tests require public access for data-plane-gateway and tokenizer-proxy.",
-    );
+  if (publicGatewayBaseUrl === undefined) {
+    throw new Error("E2B runtime system tests require public access for data-plane-gateway.");
   }
 
   return {
     gatewayWsUrl: withTestEnvironmentIdQueryParam({
       url: createPublicGatewayWsUrl(publicGatewayBaseUrl),
-      environmentId: input.environmentId,
-    }),
-    tokenizerProxyEgressUrl: createTokenizerProxyEgressUrl({
-      baseUrl: publicTokenizerProxyBaseUrl,
       environmentId: input.environmentId,
     }),
   };
@@ -405,15 +385,6 @@ function withTestEnvironmentIdQueryParam(input: { url: string; environmentId: st
   const url = new URL(input.url);
   url.searchParams.set(TestEnvironmentIdHeader, input.environmentId);
   return url.toString();
-}
-
-function createTokenizerProxyEgressUrl(input: { baseUrl: string; environmentId: string }): string {
-  return new URL(
-    `/__test-environments/${encodeURIComponent(input.environmentId)}/tokenizer-proxy/egress`,
-    input.baseUrl,
-  )
-    .toString()
-    .replace(/\/$/u, "");
 }
 
 function readUrlPort(value: string, description: string): number {

@@ -10,7 +10,6 @@ import {
   SandboxInstancesNotFoundCodes,
   SandboxInstancesNotFoundError,
 } from "../errors.js";
-import { refreshEgressGrantsForConnectableSandbox } from "./refresh-egress-grants-for-connectable-sandbox.js";
 import type {
   MintSandboxInstanceConnectionTokenInput,
   SandboxInstanceConnectionToken,
@@ -100,10 +99,7 @@ export async function mintConnectionToken(
   {
     dataPlaneClient,
   }: {
-    dataPlaneClient: Pick<
-      DataPlaneSandboxInstancesClient,
-      "getSandboxInstance" | "refreshSandboxEgressGrants"
-    >;
+    dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "getSandboxInstance">;
   },
   input: MintSandboxInstanceConnectionTokenInput,
 ): Promise<SandboxInstanceConnectionToken> {
@@ -119,11 +115,6 @@ export async function mintConnectionToken(
   if (!sandboxInstance.connectable) {
     throw createInstanceNotConnectableError(sandboxInstance);
   }
-
-  await refreshEgressGrantsForConnectableSandbox(dataPlaneClient, {
-    organizationId: input.organizationId,
-    sandboxInstance,
-  });
 
   const token = await mintGatewayConnectionToken({
     config: input.tokenConfig,

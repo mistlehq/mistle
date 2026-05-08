@@ -1207,16 +1207,6 @@
       "type": "string",
       "minLength": 1
     },
-    "egressGrantByRuleId": {
-      "type": "object",
-      "propertyNames": {
-        "type": "string"
-      },
-      "additionalProperties": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
     "gitIdentity": {
       "type": "object",
       "properties": {
@@ -1350,8 +1340,7 @@
     "bootstrapToken",
     "tunnelExchangeToken",
     "tunnelGatewayWsUrl",
-    "runtimePlan",
-    "egressGrantByRuleId"
+    "runtimePlan"
   ],
   "additionalProperties": false
 }

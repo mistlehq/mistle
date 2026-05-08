@@ -107,7 +107,6 @@ fn unset_global_git_config(global_config_path: &Path, key: &str) -> Result<(), S
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
     use std::fs;
     use std::path::Path;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -144,7 +143,6 @@ mod tests {
                 "workspaceSources": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: Some(GitIdentity {
                 name: "Mistle User".to_string(),
                 email: "mistle-user@example.com".to_string(),
@@ -201,7 +199,6 @@ mod tests {
                     "workspaceSources": [],
                     "agentRuntimes": []
                 }),
-                egress_grant_by_rule_id: BTreeMap::new(),
                 git_identity: Some(GitIdentity {
                     name: "Mistle User".to_string(),
                     email: "mistle-user@example.com".to_string(),
@@ -246,7 +243,6 @@ mod tests {
                 "workspaceSources": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: Some(GitIdentity {
                 name: "Mistle User".to_string(),
                 email: "mistle-user@example.com".to_string(),
@@ -316,7 +312,6 @@ mod tests {
                 "workspaceSources": [],
                 "agentRuntimes": []
             }),
-            egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: Some(GitIdentity {
                 name: "Mistle User".to_string(),
                 email: "mistle-user@example.com".to_string(),

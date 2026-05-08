@@ -206,16 +206,6 @@ const DataPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor
   },
   { path: ["sandbox", "provider"], envVar: "MISTLE_SANDBOX_PROVIDER" },
   { path: ["sandbox", "storage", "backend"], envVar: "MISTLE_SANDBOX_STORAGE_BACKEND" },
-  { path: ["sandbox", "egress", "tokenSecret"], envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_SECRET" },
-  { path: ["sandbox", "egress", "tokenIssuer"], envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_ISSUER" },
-  {
-    path: ["sandbox", "egress", "tokenAudience"],
-    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_AUDIENCE",
-  },
-  {
-    path: ["sandbox", "tokenizerProxyEgressBaseUrl"],
-    envVar: "MISTLE_SERVICES_TOKENIZER_PROXY_EGRESS_URL",
-  },
   { path: ["sandbox", "docker", "socketPath"], envVar: "MISTLE_SANDBOX_DOCKER_SOCKET_PATH" },
   { path: ["sandbox", "e2b", "apiKey"], envVar: "MISTLE_SANDBOX_E2B_API_KEY" },
   { path: ["sandbox", "e2b", "domain"], envVar: "MISTLE_SANDBOX_E2B_DOMAIN" },
@@ -286,22 +276,6 @@ const DataPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
   {
     path: ["sandbox", "bootstrap", "tokenAudience"],
     envVar: "MISTLE_SANDBOX_TOKENS_BOOTSTRAP_AUDIENCE",
-  },
-  {
-    path: ["sandbox", "egress", "tokenSecret"],
-    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_SECRET",
-  },
-  {
-    path: ["sandbox", "egress", "tokenIssuer"],
-    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_ISSUER",
-  },
-  {
-    path: ["sandbox", "egress", "tokenAudience"],
-    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_AUDIENCE",
-  },
-  {
-    path: ["sandbox", "tokenizerProxyEgressBaseUrl"],
-    envVar: "MISTLE_SERVICES_TOKENIZER_PROXY_EGRESS_URL",
   },
   {
     path: ["sandbox", "sandboxdTestFaultsEnabled"],

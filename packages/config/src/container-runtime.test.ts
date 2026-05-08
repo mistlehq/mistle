@@ -83,9 +83,6 @@ describe("generateContainerRuntimeConfig", () => {
       expect(
         getValueAtPath(config, ["services", "data_plane_gateway", "sandbox_ws_internal_url"]),
       ).toBe("ws://mistle-single-container:5202/tunnel/sandbox");
-      expect(getValueAtPath(config, ["services", "tokenizer_proxy", "egress_url"])).toBe(
-        "http://mistle-single-container:5205/tokenizer-proxy/egress",
-      );
     } finally {
       cleanupTempDir(tempDir);
     }
@@ -108,9 +105,6 @@ describe("generateContainerRuntimeConfig", () => {
       expect(
         getValueAtPath(config, ["services", "data_plane_gateway", "sandbox_ws_internal_url"]),
       ).toBe("wss://gateway.example.test/tunnel/sandbox");
-      expect(getValueAtPath(config, ["services", "tokenizer_proxy", "egress_url"])).toBe(
-        "https://tokenizer.example.test/tokenizer-proxy/egress",
-      );
     } finally {
       cleanupTempDir(tempDir);
     }

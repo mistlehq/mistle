@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -96,7 +95,6 @@ fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
           ],
           "agentRuntimes": []
         }),
-        egress_grant_by_rule_id: BTreeMap::new(),
         git_identity: None,
         transparent_proxy: None,
     };
@@ -525,7 +523,6 @@ fn applies_typed_exec_artifact_install_steps() {
           "workspaceSources": [],
           "agentRuntimes": []
         }),
-        egress_grant_by_rule_id: BTreeMap::new(),
         git_identity: None,
         transparent_proxy: None,
     };
@@ -591,7 +588,6 @@ fn accepts_runtime_plan_egress_routes_with_additional_headers_and_slot_key_crede
           "workspaceSources": [],
           "agentRuntimes": []
         }),
-        egress_grant_by_rule_id: BTreeMap::new(),
         git_identity: None,
         transparent_proxy: None,
     };
@@ -645,7 +641,6 @@ fn create_runtime_plan_apply_input(
           ],
           "agentRuntimes": []
         }),
-        egress_grant_by_rule_id: BTreeMap::new(),
         git_identity: None,
         transparent_proxy: None,
     }

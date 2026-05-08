@@ -1,5 +1,3 @@
-#[cfg(target_os = "linux")]
-use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fs;
 #[cfg(target_os = "linux")]
@@ -36,7 +34,7 @@ use tungstenite::{Message, accept};
 static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 static ENV_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 #[cfg(target_os = "linux")]
-const TOKENIZER_PROXY_EGRESS_BASE_URL_ENV: &str = "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
+const GATEWAY_PROXY_ENABLED_ENV: &str = "GATEWAY_PROXY_ENABLED";
 #[cfg(target_os = "linux")]
 const TEST_PUBLIC_KEY: &str = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE";
 #[cfg(target_os = "linux")]
@@ -55,10 +53,7 @@ fn git_commit_s_succeeds_via_the_real_sandboxd_signer_alias() {
     let global_git_config_path = home_dir.join(".gitconfig");
     let _attachment_root_guard = TestAttachmentRootGuard::set(attachment_root.clone());
     let _env_guard = MultiEnvGuard::set([
-        (
-            TOKENIZER_PROXY_EGRESS_BASE_URL_ENV,
-            "http://127.0.0.1:5205".to_string(),
-        ),
+        (GATEWAY_PROXY_ENABLED_ENV, "1".to_string()),
         (
             "HOME",
             home_dir
@@ -160,12 +155,11 @@ fn git_commit_s_succeeds_via_the_real_sandboxd_signer_alias() {
 fn snapshot_materialization_init_does_not_write_global_git_identity_config() {
     let test_dir = create_temp_test_dir("git_signing_snapshot_materialization");
     let home_dir = test_dir.join("home");
+    let attachment_root = test_dir.join("attachments");
     let global_git_config_path = home_dir.join(".gitconfig");
+    let _attachment_root_guard = TestAttachmentRootGuard::set(attachment_root);
     let _env_guard = MultiEnvGuard::set([
-        (
-            TOKENIZER_PROXY_EGRESS_BASE_URL_ENV,
-            "http://127.0.0.1:5205".to_string(),
-        ),
+        (GATEWAY_PROXY_ENABLED_ENV, "1".to_string()),
         (
             "HOME",
             home_dir
@@ -191,10 +185,9 @@ fn snapshot_materialization_init_does_not_write_global_git_identity_config() {
         &global_git_config_path,
     )
     .expect("control server should start");
-    let mut startup_input = valid_signing_startup_input(
-        "ws://127.0.0.1:9/bootstrap",
-        "/opt/mistle/bin/mistle-ssh-sign",
-    );
+    let bootstrap_gateway = start_signing_gateway();
+    let mut startup_input =
+        valid_signing_startup_input(&bootstrap_gateway.ws_url, "/opt/mistle/bin/mistle-ssh-sign");
     startup_input.execution_mode = sandboxd::protocol::startup::StartupExecutionMode::Snapshot;
 
     control::submit_init(&control_socket_path, &startup_input)
@@ -203,6 +196,9 @@ fn snapshot_materialization_init_does_not_write_global_git_identity_config() {
     server
         .wait()
         .expect("control server should exit after snapshot materialization init");
+    bootstrap_gateway
+        .close()
+        .expect("signing gateway should stop cleanly");
     assert!(
         !global_git_config_path.exists(),
         "snapshot materialization should not write acting-user git identity into the global git config"
@@ -490,7 +486,6 @@ fn valid_signing_startup_input(tunnel_gateway_ws_url: &str, signer_program: &str
             "workspaceSources": [],
             "agentRuntimes": []
         }),
-        egress_grant_by_rule_id: BTreeMap::new(),
         git_identity: Some(GitIdentity {
             name: "Mistle User".to_string(),
             email: "mistle-user@example.com".to_string(),
