@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useCallback, useRef, useState } from "react";
 import { z } from "zod";
 
@@ -9,10 +9,7 @@ import {
   sandboxProfileIntegrationDirectoryQueryKey,
   sandboxProfileVersionIntegrationBindingsQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
-import {
-  getSandboxProfileVersionIntegrationBindings,
-  putSandboxProfileVersionIntegrationBindings,
-} from "../sandbox-profiles/sandbox-profiles-service.js";
+import { getSandboxProfileVersionIntegrationBindings } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { resolveBindingConfigUiModel } from "./sandbox-profile-binding-config-editor.js";
 import type {
@@ -214,19 +211,6 @@ function sandboxProfileBindingEditorRowsEqual(
   );
 }
 
-function sandboxProfileBindingEditorRowListsEqual(
-  left: readonly SandboxProfileBindingEditorRow[],
-  right: readonly SandboxProfileBindingEditorRow[],
-): boolean {
-  return (
-    left.length === right.length &&
-    left.every((leftRow, index) => {
-      const rightRow = right[index];
-      return rightRow !== undefined && sandboxProfileBindingEditorRowsEqual(leftRow, rightRow);
-    })
-  );
-}
-
 export function applySandboxProfileBindingEditorRowChanges(input: {
   rows: readonly SandboxProfileBindingEditorRow[];
   clientId: string;
@@ -329,7 +313,9 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
   hasUnsavedChanges: boolean;
-  flushDraftChanges: () => Promise<boolean>;
+  applyDraftSaveError: (error: unknown) => void;
+  applySavedBindings: (bindings: readonly PersistedBindingRecord[]) => void;
+  buildDraftChanges: () => SubmittedBindingRecord[] | null;
   onAddIntegrationBindingRow: (input: {
     kind: SandboxIntegrationBindingKind;
     connectionId: string;
@@ -348,7 +334,6 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
   const [integrationRowErrorsByClientId, setIntegrationRowErrorsByClientId] = useState<
     Record<string, string>
   >({});
-  const pendingSavePromiseRef = useRef<Promise<boolean> | null>(null);
   const integrationRowsRef = useRef(integrationRows);
   const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
   integrationRowsRef.current = integrationRows;
@@ -387,135 +372,110 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
     setIntegrationSaveError(null);
   }
 
-  const putIntegrationBindingsMutation = useMutation({
-    mutationFn: async (mutationInput: { bindings: SubmittedBindingRecord[] }) =>
-      putSandboxProfileVersionIntegrationBindings({
-        profileId: input.profileId,
-        version: input.version,
-        bindings: mutationInput.bindings,
-      }),
-    onError: (error: unknown) => {
-      const issues = readInvalidBindingConfigIssues(error);
-      if (issues !== null) {
-        const rowErrors: Record<string, string> = {};
-        const rowsByPersistedId = new Map<string, SandboxProfileBindingEditorRow>();
-        for (const row of integrationRows) {
-          if (row.id !== undefined) {
-            rowsByPersistedId.set(row.id, row);
-          }
+  const applyDraftSaveError = useCallback((error: unknown): void => {
+    const issues = readInvalidBindingConfigIssues(error);
+    if (issues !== null) {
+      const rowErrors: Record<string, string> = {};
+      const rowsByPersistedId = new Map<string, SandboxProfileBindingEditorRow>();
+      for (const row of integrationRowsRef.current) {
+        if (row.id !== undefined) {
+          rowsByPersistedId.set(row.id, row);
         }
-        for (const issue of issues) {
-          const clientId =
-            issue.clientRef ?? rowsByPersistedId.get(issue.bindingIdOrDraftIndex)?.clientId;
-          if (clientId === undefined || rowErrors[clientId] !== undefined) {
-            continue;
-          }
-          rowErrors[clientId] = issue.safeMessage;
-        }
-        setIntegrationRowErrorsByClientId(rowErrors);
-      } else {
-        setIntegrationRowErrorsByClientId({});
       }
-      setIntegrationSaveError(
-        issues?.[0]?.safeMessage ??
-          resolveApiErrorMessage({
-            error,
-            fallbackMessage: "Could not save sandbox profile integrations.",
-          }),
-      );
-    },
-  });
+      for (const issue of issues) {
+        const clientId =
+          issue.clientRef ?? rowsByPersistedId.get(issue.bindingIdOrDraftIndex)?.clientId;
+        if (clientId === undefined || rowErrors[clientId] !== undefined) {
+          continue;
+        }
+        rowErrors[clientId] = issue.safeMessage;
+      }
+      setIntegrationRowErrorsByClientId(rowErrors);
+    } else {
+      setIntegrationRowErrorsByClientId({});
+    }
+    setIntegrationSaveError(
+      issues?.[0]?.safeMessage ??
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not save sandbox profile integrations.",
+        }),
+    );
+  }, []);
 
   function setNeutralSaveState(): void {
     setIntegrationSaveError(null);
     setIntegrationRowErrorsByClientId({});
   }
 
-  async function persistIntegrationRows(
-    rowsToPersist: readonly SandboxProfileBindingEditorRow[],
-  ): Promise<boolean> {
-    if (putIntegrationBindingsMutation.isPending) {
-      return pendingSavePromiseRef.current ?? false;
-    }
+  const buildSubmittedBindings = useCallback(
+    (rowsToPersist: readonly SandboxProfileBindingEditorRow[]): SubmittedBindingRecord[] | null => {
+      const parsedBindings: SubmittedBindingRecord[] = [];
 
-    const parsedBindings: SubmittedBindingRecord[] = [];
-
-    for (const row of rowsToPersist) {
-      const normalizedConnectionId = row.connectionId.trim();
-      if (normalizedConnectionId.length === 0) {
-        setIntegrationSaveFailure("Each integration binding must select a connection.");
-        return false;
-      }
-
-      const configUiModel = resolveBindingConfigUiModel({
-        row,
-        connections: input.availableConnections,
-        targets: input.availableTargets,
-      });
-      if (configUiModel.mode === "missing-connection") {
-        setIntegrationSaveFailure("Each integration binding must select a connection.");
-        return false;
-      }
-      if (configUiModel.mode === "unsupported") {
-        setIntegrationSaveFailure(configUiModel.message);
-        return false;
-      }
-
-      parsedBindings.push({
-        ...(row.id === undefined ? {} : { id: row.id }),
-        clientRef: row.clientId,
-        connectionId: normalizedConnectionId,
-        kind: row.kind,
-        config: configUiModel.mode === "form" ? configUiModel.value : {},
-      });
-    }
-
-    setNeutralSaveState();
-
-    const savePromise = putIntegrationBindingsMutation
-      .mutateAsync({
-        bindings: parsedBindings,
-      })
-      .then((updatedBindings) => {
-        if (!sandboxProfileBindingEditorRowListsEqual(integrationRowsRef.current, rowsToPersist)) {
-          setIntegrationSaveError(null);
-          setIntegrationRowErrorsByClientId({});
-          return false;
+      for (const row of rowsToPersist) {
+        const normalizedConnectionId = row.connectionId.trim();
+        if (normalizedConnectionId.length === 0) {
+          setIntegrationSaveFailure("Each integration binding must select a connection.");
+          return null;
         }
 
-        setIntegrationRows(
-          reconcileBindingsToEditorRows({
-            currentRows: integrationRowsRef.current,
-            submittedBindings: parsedBindings,
-            bindings: updatedBindings.bindings,
-          }),
-        );
-        setIntegrationSaveError(null);
-        setHasUnsavedChanges(false);
-        setIntegrationRowErrorsByClientId({});
-        return true;
-      })
-      .catch(() => false)
-      .finally(() => {
-        if (pendingSavePromiseRef.current === savePromise) {
-          pendingSavePromiseRef.current = null;
+        const configUiModel = resolveBindingConfigUiModel({
+          row,
+          connections: input.availableConnections,
+          targets: input.availableTargets,
+        });
+        if (configUiModel.mode === "missing-connection") {
+          setIntegrationSaveFailure("Each integration binding must select a connection.");
+          return null;
         }
-      });
-    pendingSavePromiseRef.current = savePromise;
-    return savePromise;
-  }
+        if (configUiModel.mode === "unsupported") {
+          setIntegrationSaveFailure(configUiModel.message);
+          return null;
+        }
 
-  const flushDraftChanges = useCallback(async (): Promise<boolean> => {
-    if (putIntegrationBindingsMutation.isPending) {
-      return pendingSavePromiseRef.current ?? false;
-    }
+        parsedBindings.push({
+          ...(row.id === undefined ? {} : { id: row.id }),
+          clientRef: row.clientId,
+          connectionId: normalizedConnectionId,
+          kind: row.kind,
+          config: configUiModel.mode === "form" ? configUiModel.value : {},
+        });
+      }
 
+      setNeutralSaveState();
+      return parsedBindings;
+    },
+    [input.availableConnections, input.availableTargets],
+  );
+
+  const buildDraftChanges = useCallback((): SubmittedBindingRecord[] | null => {
     if (!hasUnsavedChangesRef.current) {
-      return true;
+      return [];
     }
 
-    return persistIntegrationRows(integrationRowsRef.current);
-  }, [putIntegrationBindingsMutation.isPending]);
+    return buildSubmittedBindings(integrationRowsRef.current);
+  }, [buildSubmittedBindings]);
+
+  const applySavedBindings = useCallback(
+    (bindings: readonly PersistedBindingRecord[]): void => {
+      const submittedBindings = buildSubmittedBindings(integrationRowsRef.current);
+      if (submittedBindings === null) {
+        return;
+      }
+
+      setIntegrationRows(
+        reconcileBindingsToEditorRows({
+          currentRows: integrationRowsRef.current,
+          submittedBindings,
+          bindings,
+        }),
+      );
+      setIntegrationSaveError(null);
+      setHasUnsavedChanges(false);
+      setIntegrationRowErrorsByClientId({});
+    },
+    [buildSubmittedBindings],
+  );
 
   async function onAddIntegrationBindingRow(inputValue: {
     kind: SandboxIntegrationBindingKind;
@@ -565,8 +525,10 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
     integrationRowErrorsByClientId,
     availableConnections: input.availableConnections,
     availableTargets: input.availableTargets,
+    applyDraftSaveError,
+    applySavedBindings,
+    buildDraftChanges,
     hasUnsavedChanges,
-    flushDraftChanges,
     onAddIntegrationBindingRow,
     onRemoveIntegrationBindingRow,
     onIntegrationBindingRowChange,

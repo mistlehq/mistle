@@ -7,7 +7,7 @@ import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
 import {
-  PutSandboxProfileVersionIntegrationBindingsResponseSchema,
+  GetSandboxProfileVersionIntegrationBindingsResponseSchema,
   SandboxProfileVersionNotFoundResponseSchema,
 } from "../src/sandbox-profiles/index.js";
 import {
@@ -87,7 +87,7 @@ describe.concurrent("sandbox profile version integration bindings get integratio
     );
 
     expect(response.status).toBe(200);
-    const body = PutSandboxProfileVersionIntegrationBindingsResponseSchema.parse(
+    const body = GetSandboxProfileVersionIntegrationBindingsResponseSchema.parse(
       await response.json(),
     );
     expect(body.bindings).toHaveLength(1);

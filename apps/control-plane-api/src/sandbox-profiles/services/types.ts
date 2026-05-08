@@ -1,7 +1,6 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import type {
   ControlPlaneDatabase,
-  IntegrationBindingKind,
   SandboxProfile,
   SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionState,
@@ -80,29 +79,6 @@ export type SandboxProfilesService = {
     profileVersion: number;
   }) => Promise<{
     bindings: SandboxProfileVersionIntegrationBinding[];
-  }>;
-  putProfileVersionIntegrationBindings: (input: {
-    organizationId: string;
-    profileId: string;
-    profileVersion: number;
-    bindings: Array<{
-      id?: string;
-      connectionId: string;
-      kind: IntegrationBindingKind;
-      config: Record<string, unknown>;
-    }>;
-  }) => Promise<{
-    bindings: SandboxProfileVersionIntegrationBinding[];
-  }>;
-  putProfileVersionPersistenceMode: (input: {
-    organizationId: string;
-    profileId: string;
-    profileVersion: number;
-    defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
-  }) => Promise<{
-    sandboxProfileId: string;
-    version: number;
-    defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
   }>;
   startProfileInstance: (input: {
     organizationId: string;

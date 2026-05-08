@@ -76,13 +76,15 @@ import {
   getSandboxProfileVersionPublishability,
   listSandboxProfileVersions,
   publishSandboxProfileVersion,
-  putSandboxProfileVersionPersistenceMode,
+  putSandboxProfileVersionDraft,
   refreshSandboxProfileVersion,
   startSandboxProfileSetupAssistant,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type {
+  SandboxIntegrationBindingKind,
   SandboxProfile,
   SandboxProfileVersion,
+  SandboxProfileVersionIntegrationBinding,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import {
   getOrganizationSandboxStorageSettings,
@@ -173,13 +175,27 @@ type SandboxProfileEditorNavigationState = {
   notice: "publish-success" | null;
 };
 type SandboxProfileDraftSectionState = {
-  flushDraftChanges: () => Promise<boolean>;
   hasUnpersistedChanges: boolean;
+  applyDraftSaveError?: (error: unknown) => void;
+  applySavedBindings?: (bindings: readonly SandboxProfileVersionIntegrationBinding[]) => void;
+  applySavedSetupScript?: (setupScript: string | null) => void;
+  buildDraftChanges?: () => string | null;
+  buildIntegrationBindingChanges?: () => Array<{
+    id?: string;
+    clientRef?: string;
+    connectionId: string;
+    kind: SandboxIntegrationBindingKind;
+    config: Record<string, unknown>;
+  }> | null;
   integrationRows?: readonly SandboxProfileBindingEditorRow[] | null;
 };
 type SandboxProfilePersistenceDraftState = {
-  flushDraftChanges: () => Promise<boolean>;
   hasUnpersistedChanges: boolean;
+  applyDraftSaveError?: (error: unknown) => void;
+  applySavedPersistenceMode?: (
+    defaultPersistenceMode: SandboxProfileVersion["defaultPersistenceMode"],
+  ) => void;
+  buildDraftChanges?: () => SandboxProfileVersion["defaultPersistenceMode"];
 };
 type SetupScriptAssistantControl = {
   disabled: boolean;
@@ -196,14 +212,12 @@ type SetupScriptAssistantPanelState = {
 
 function createIdleSandboxProfileDraftSectionState(): SandboxProfileDraftSectionState {
   return {
-    flushDraftChanges: async () => true,
     hasUnpersistedChanges: false,
   };
 }
 
 function createIdleSandboxProfilePersistenceDraftState(): SandboxProfilePersistenceDraftState {
   return {
-    flushDraftChanges: async () => true,
     hasUnpersistedChanges: false,
   };
 }
@@ -1106,7 +1120,8 @@ function ReadySandboxProfileEditorPage(input: {
   const [setupAssistantPanelState, setSetupAssistantPanelState] =
     useState<SetupScriptAssistantPanelState | null>(null);
   const activeSectionId = input.routeSectionId;
-  const draftFieldsAreReadOnly = input.mode.kind !== "draft" || publishRequestIsPending;
+  const draftFieldsAreReadOnly =
+    input.mode.kind !== "draft" || publishRequestIsPending || saveDraftRequestIsPending;
   const snapshotVersion = resolveLatestPublishedSandboxProfileVersion(input.versions);
   const snapshotPanelState = resolveSnapshotPanelState(snapshotVersion);
   const editorSections = createSandboxProfileEditorSections({
@@ -1253,18 +1268,58 @@ function ReadySandboxProfileEditorPage(input: {
       return true;
     }
 
-    const [persistenceSaved, integrationsSaved, setupScriptSaved] = await Promise.all([
-      shouldSavePersistence ? persistenceDraftState.flushDraftChanges() : Promise.resolve(true),
-      shouldSaveIntegrations ? integrationDraftState.flushDraftChanges() : Promise.resolve(true),
-      shouldSaveSetupScript ? setupScriptDraftState.flushDraftChanges() : Promise.resolve(true),
-    ]);
-
-    if (!persistenceSaved || !integrationsSaved || !setupScriptSaved) {
+    const integrationBindings = shouldSaveIntegrations
+      ? integrationDraftState.buildIntegrationBindingChanges?.()
+      : undefined;
+    if (integrationBindings === null) {
       setPublishFlushError(DraftSaveErrorMessage);
       return false;
     }
+    const setupScript = shouldSaveSetupScript
+      ? (setupScriptDraftState.buildDraftChanges?.() ?? null)
+      : undefined;
+    const defaultPersistenceMode = shouldSavePersistence
+      ? persistenceDraftState.buildDraftChanges?.()
+      : undefined;
 
-    return true;
+    try {
+      const savedDraft = await putSandboxProfileVersionDraft({
+        profileId: input.profileId,
+        version: input.mode.version,
+        ...(setupScript === undefined ? {} : { setupScript }),
+        ...(defaultPersistenceMode === undefined ? {} : { defaultPersistenceMode }),
+        ...(shouldSaveIntegrations && integrationBindings !== undefined
+          ? { integrationBindings: { bindings: integrationBindings } }
+          : {}),
+      });
+
+      if (shouldSaveIntegrations) {
+        integrationDraftState.applySavedBindings?.(savedDraft.integrationBindings.bindings);
+        await input.invalidateVersionBindings({
+          profileId: input.profileId,
+          version: input.mode.version,
+        });
+      }
+      if (shouldSaveSetupScript) {
+        setupScriptDraftState.applySavedSetupScript?.(savedDraft.setupScript);
+        await input.invalidateVersionSetupScript({
+          profileId: input.profileId,
+          version: input.mode.version,
+        });
+      }
+      if (shouldSavePersistence) {
+        persistenceDraftState.applySavedPersistenceMode?.(savedDraft.defaultPersistenceMode);
+        await input.invalidateProfileVersions(input.profileId);
+      }
+
+      return true;
+    } catch (error: unknown) {
+      integrationDraftState.applyDraftSaveError?.(error);
+      setupScriptDraftState.applyDraftSaveError?.(error);
+      persistenceDraftState.applyDraftSaveError?.(error);
+      setPublishFlushError(DraftSaveErrorMessage);
+      return false;
+    }
   }
 
   async function handleSaveDraft(): Promise<void> {
@@ -1787,9 +1842,7 @@ function SandboxProfilePersistenceModeSection(input: {
   version: SandboxProfileVersion;
 }): React.JSX.Element | null {
   const activeOrganizationId = useRequiredOrganizationId();
-  const queryClient = useQueryClient();
-  const { disabled, invalidateProfileVersions, isDraft, onDraftStateChange, profileId, version } =
-    input;
+  const { disabled, isDraft, onDraftStateChange, version } = input;
   const [draftPersistenceMode, setDraftPersistenceMode] = useState(version.defaultPersistenceMode);
   const [persistedPersistenceMode, setPersistedPersistenceMode] = useState(
     version.defaultPersistenceMode,
@@ -1803,66 +1856,26 @@ function SandboxProfilePersistenceModeSection(input: {
     queryKey: organizationSandboxStorageSettingsQueryKey(activeOrganizationId),
     queryFn: async () => getOrganizationSandboxStorageSettings(),
   });
-  const persistenceModeMutation = useMutation({
-    mutationFn: async (defaultPersistenceMode: SandboxProfileVersion["defaultPersistenceMode"]) =>
-      putSandboxProfileVersionPersistenceMode({
-        profileId,
-        version: version.version,
-        defaultPersistenceMode,
-      }),
-  });
-  const persistenceModeMutationIsPending = persistenceModeMutation.isPending;
-  const persistenceModeMutationMutateAsync = persistenceModeMutation.mutateAsync;
-  const persistDraftChanges = useCallback(async (): Promise<boolean> => {
-    if (persistenceModeMutationIsPending) {
-      return false;
-    }
-
-    const nextPersistenceMode = draftPersistenceModeRef.current;
-    if (nextPersistenceMode === persistedPersistenceModeRef.current) {
+  const buildDraftChanges = useCallback(
+    (): SandboxProfileVersion["defaultPersistenceMode"] => draftPersistenceModeRef.current,
+    [],
+  );
+  const applySavedPersistenceMode = useCallback(
+    (defaultPersistenceMode: SandboxProfileVersion["defaultPersistenceMode"]): void => {
+      setDraftPersistenceMode(defaultPersistenceMode);
+      setPersistedPersistenceMode(defaultPersistenceMode);
       setSaveErrorMessage(null);
-      return true;
-    }
-
-    setSaveErrorMessage(null);
-    try {
-      const result = await persistenceModeMutationMutateAsync(nextPersistenceMode);
-      if (draftPersistenceModeRef.current !== nextPersistenceMode) {
-        return false;
-      }
-
-      setPersistedPersistenceMode(result.defaultPersistenceMode);
-      queryClient.setQueryData(
-        sandboxProfileVersionsQueryKey(profileId),
-        (currentData: { versions: SandboxProfileVersion[] } | undefined) =>
-          currentData === undefined
-            ? currentData
-            : {
-                versions: currentData.versions.map((version) =>
-                  version.version === result.version
-                    ? { ...version, defaultPersistenceMode: result.defaultPersistenceMode }
-                    : version,
-                ),
-              },
-      );
-      await invalidateProfileVersions(profileId);
-      return true;
-    } catch (error: unknown) {
-      setSaveErrorMessage(
-        resolveApiErrorMessage({
-          error,
-          fallbackMessage: "Could not save sandbox profile persistence mode.",
-        }),
-      );
-      return false;
-    }
-  }, [
-    invalidateProfileVersions,
-    persistenceModeMutationIsPending,
-    persistenceModeMutationMutateAsync,
-    profileId,
-    queryClient,
-  ]);
+    },
+    [],
+  );
+  const applyDraftSaveError = useCallback((error: unknown): void => {
+    setSaveErrorMessage(
+      resolveApiErrorMessage({
+        error,
+        fallbackMessage: "Could not save sandbox profile persistence mode.",
+      }),
+    );
+  }, []);
 
   useEffect(() => {
     setDraftPersistenceMode(version.defaultPersistenceMode);
@@ -1872,10 +1885,19 @@ function SandboxProfilePersistenceModeSection(input: {
 
   useEffect(() => {
     onDraftStateChange({
-      flushDraftChanges: persistDraftChanges,
+      applyDraftSaveError,
+      applySavedPersistenceMode,
+      buildDraftChanges,
       hasUnpersistedChanges: draftPersistenceMode !== persistedPersistenceMode,
     });
-  }, [draftPersistenceMode, onDraftStateChange, persistDraftChanges, persistedPersistenceMode]);
+  }, [
+    applyDraftSaveError,
+    applySavedPersistenceMode,
+    buildDraftChanges,
+    draftPersistenceMode,
+    onDraftStateChange,
+    persistedPersistenceMode,
+  ]);
 
   const persistentModeIsEnabled = draftPersistenceMode === "persistent";
   const fieldIsReadOnly = disabled || !isDraft;
@@ -2413,16 +2435,13 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
 
   useEffect(() => {
     onDraftStateChange?.({
-      flushDraftChanges: integrationsState.flushDraftChanges,
+      applyDraftSaveError: integrationsState.applyDraftSaveError,
+      applySavedBindings: integrationsState.applySavedBindings,
+      buildIntegrationBindingChanges: integrationsState.buildDraftChanges,
       hasUnpersistedChanges: integrationsState.hasUnsavedChanges,
       integrationRows: integrationsState.integrationRows,
     });
-  }, [
-    onDraftStateChange,
-    integrationsState.flushDraftChanges,
-    integrationsState.hasUnsavedChanges,
-    integrationsState.integrationRows,
-  ]);
+  }, [onDraftStateChange, integrationsState.hasUnsavedChanges, integrationsState.integrationRows]);
 
   return (
     <>
@@ -2520,10 +2539,12 @@ function ReadySandboxProfileSetupScriptSection(input: {
 
   useEffect(() => {
     onDraftStateChange?.({
-      flushDraftChanges: setupScriptState.flushDraftChanges,
+      applyDraftSaveError: setupScriptState.applyDraftSaveError,
+      applySavedSetupScript: setupScriptState.applySavedSetupScript,
+      buildDraftChanges: setupScriptState.buildDraftChanges,
       hasUnpersistedChanges: setupScriptState.hasUnsavedChanges,
     });
-  }, [onDraftStateChange, setupScriptState.flushDraftChanges, setupScriptState.hasUnsavedChanges]);
+  }, [onDraftStateChange, setupScriptState.hasUnsavedChanges]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -2532,7 +2553,7 @@ function ReadySandboxProfileSetupScriptSection(input: {
       )}
       <SandboxProfileSetupScriptPanel
         errorMessage={setupScriptState.errorMessage}
-        isSaving={setupScriptState.isSaving}
+        isSaving={false}
         onChange={setupScriptState.onChange}
         testControl={
           <SandboxProfileSetupScriptTestButton

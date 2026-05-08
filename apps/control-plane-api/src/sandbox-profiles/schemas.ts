@@ -234,26 +234,35 @@ export const getSandboxProfileVersionAutomationConfigResponseSchema = z
   })
   .strict();
 
-export const putSandboxProfileVersionSetupScriptBodySchema = z
-  .object({
-    setupScript: z.string().min(1).nullable(),
-  })
-  .strict();
-
 export const getSandboxProfileVersionSetupScriptResponseSchema =
   sandboxProfileVersionSetupScriptSchema;
 
-export const putSandboxProfileVersionSetupScriptResponseSchema =
-  sandboxProfileVersionSetupScriptSchema;
-
-export const putSandboxProfileVersionPersistenceModeBodySchema = z
+export const putSandboxProfileVersionDraftBodySchema = z
   .object({
+    setupScript: z.string().min(1).nullable().optional(),
+    defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema.optional(),
+    integrationBindings: putSandboxProfileVersionIntegrationBindingsBodySchema.optional(),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      value.setupScript !== undefined ||
+      value.defaultPersistenceMode !== undefined ||
+      value.integrationBindings !== undefined,
+    {
+      message: "At least one draft field must be provided.",
+    },
+  );
+
+export const putSandboxProfileVersionDraftResponseSchema = z
+  .object({
+    sandboxProfileId: z.string().min(1),
+    version: z.number().int().min(1),
+    setupScript: z.string().nullable(),
     defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema,
+    integrationBindings: putSandboxProfileVersionIntegrationBindingsResponseSchema,
   })
   .strict();
-
-export const putSandboxProfileVersionPersistenceModeResponseSchema =
-  sandboxProfileVersionPersistenceModeSchema;
 
 export const putSandboxProfileVersionRefreshScheduleBodySchema = z
   .object({

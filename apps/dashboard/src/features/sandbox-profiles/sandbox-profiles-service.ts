@@ -9,10 +9,9 @@ import type {
   DeleteSandboxProfileResult,
   DeleteSandboxProfileVersionRefreshScheduleResult,
   LaunchableSandboxProfilesResult,
-  PutSandboxProfileVersionPersistenceModeInput,
-  PutSandboxProfileVersionPersistenceModeResult,
+  PutSandboxProfileVersionDraftInput,
+  PutSandboxProfileVersionDraftResult,
   PutSandboxProfileVersionRefreshScheduleInput,
-  SandboxIntegrationBindingKind,
   SandboxProfile,
   SandboxProfileVersion,
   SandboxProfileVersionPublishability,
@@ -381,14 +380,6 @@ const DeleteSandboxProfileVersionRefreshScheduleResultSchema = z
   })
   .strict();
 
-const PutSandboxProfileVersionPersistenceModeResultSchema = z
-  .object({
-    sandboxProfileId: z.string().min(1),
-    version: z.number().int().min(1),
-    defaultPersistenceMode: z.enum(["ephemeral", "persistent"]),
-  })
-  .strict();
-
 function normalizeSandboxProfileVersionPublishability(
   input: z.infer<typeof SandboxProfileVersionPublishabilitySchema>,
 ): SandboxProfileVersionPublishability {
@@ -424,6 +415,16 @@ const SandboxProfileVersionIntegrationBindingSchema = z
 const SandboxProfileVersionIntegrationBindingsResponseSchema = z
   .object({
     bindings: z.array(SandboxProfileVersionIntegrationBindingSchema),
+  })
+  .strict();
+
+const PutSandboxProfileVersionDraftResultSchema = z
+  .object({
+    sandboxProfileId: z.string().min(1),
+    version: z.number().int().min(1),
+    setupScript: z.string().nullable(),
+    defaultPersistenceMode: z.enum(["ephemeral", "persistent"]),
+    integrationBindings: SandboxProfileVersionIntegrationBindingsResponseSchema,
   })
   .strict();
 
@@ -880,39 +881,36 @@ export async function getSandboxProfileVersionSetupScript(input: {
   }
 }
 
-export async function putSandboxProfileVersionIntegrationBindings(input: {
-  profileId: string;
-  version: number;
-  bindings: Array<{
-    id?: string;
-    clientRef?: string;
-    connectionId: string;
-    kind: SandboxIntegrationBindingKind;
-    config: Record<string, unknown>;
-  }>;
-}): Promise<{ bindings: SandboxProfileVersionIntegrationBinding[] }> {
+export async function putSandboxProfileVersionDraft(
+  input: PutSandboxProfileVersionDraftInput,
+): Promise<PutSandboxProfileVersionDraftResult> {
   try {
     const response = await requestControlPlane({
-      operation: "putSandboxProfileVersionIntegrationBindings",
+      operation: "putSandboxProfileVersionDraft",
       method: "PUT",
       pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
         input.version,
-      )}/integration-bindings`,
+      )}/draft`,
       body: {
-        bindings: input.bindings,
+        ...(input.setupScript === undefined ? {} : { setupScript: input.setupScript }),
+        ...(input.defaultPersistenceMode === undefined
+          ? {}
+          : { defaultPersistenceMode: input.defaultPersistenceMode }),
+        ...(input.integrationBindings === undefined
+          ? {}
+          : { integrationBindings: input.integrationBindings }),
       },
-      fallbackMessage: "Could not save sandbox profile integration bindings.",
+      fallbackMessage: "Could not save sandbox profile draft.",
     });
 
     const responseBody = await response.json();
-    const parsedResponse =
-      SandboxProfileVersionIntegrationBindingsResponseSchema.safeParse(responseBody);
+    const parsedResponse = PutSandboxProfileVersionDraftResultSchema.safeParse(responseBody);
     if (!parsedResponse.success) {
       throw new SandboxProfilesApiError({
-        operation: "putSandboxProfileVersionIntegrationBindings",
+        operation: "putSandboxProfileVersionDraft",
         status: 500,
         body: responseBody,
-        message: "Sandbox profile integration bindings response payload is invalid.",
+        message: "Sandbox profile draft response payload is invalid.",
       });
     }
 
@@ -920,90 +918,9 @@ export async function putSandboxProfileVersionIntegrationBindings(input: {
   } catch (error) {
     throw new SandboxProfilesApiError(
       normalizeHttpApiError({
-        operation: "putSandboxProfileVersionIntegrationBindings",
+        operation: "putSandboxProfileVersionDraft",
         error,
-        fallbackMessage: "Could not save sandbox profile integration bindings.",
-      }),
-    );
-  }
-}
-
-export async function putSandboxProfileVersionSetupScript(input: {
-  profileId: string;
-  version: number;
-  setupScript: string | null;
-}): Promise<SandboxProfileVersionSetupScript> {
-  try {
-    const response = await requestControlPlane({
-      operation: "putSandboxProfileVersionSetupScript",
-      method: "PUT",
-      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
-        input.version,
-      )}/setup-script`,
-      body: {
-        setupScript: input.setupScript,
-      },
-      fallbackMessage: "Could not save sandbox profile setup script.",
-    });
-
-    const responseBody = await response.json();
-    const parsedResponse = SandboxProfileVersionSetupScriptResponseSchema.safeParse(responseBody);
-    if (!parsedResponse.success) {
-      throw new SandboxProfilesApiError({
-        operation: "putSandboxProfileVersionSetupScript",
-        status: 500,
-        body: responseBody,
-        message: "Sandbox profile setup script response payload is invalid.",
-      });
-    }
-
-    return parsedResponse.data;
-  } catch (error) {
-    throw new SandboxProfilesApiError(
-      normalizeHttpApiError({
-        operation: "putSandboxProfileVersionSetupScript",
-        error,
-        fallbackMessage: "Could not save sandbox profile setup script.",
-      }),
-    );
-  }
-}
-
-export async function putSandboxProfileVersionPersistenceMode(
-  input: PutSandboxProfileVersionPersistenceModeInput,
-): Promise<PutSandboxProfileVersionPersistenceModeResult> {
-  try {
-    const response = await requestControlPlane({
-      operation: "putSandboxProfileVersionPersistenceMode",
-      method: "PUT",
-      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
-        input.version,
-      )}/persistence-mode`,
-      body: {
-        defaultPersistenceMode: input.defaultPersistenceMode,
-      },
-      fallbackMessage: "Could not save sandbox profile persistence mode.",
-    });
-
-    const responseBody = await response.json();
-    const parsedResponse =
-      PutSandboxProfileVersionPersistenceModeResultSchema.safeParse(responseBody);
-    if (!parsedResponse.success) {
-      throw new SandboxProfilesApiError({
-        operation: "putSandboxProfileVersionPersistenceMode",
-        status: 500,
-        body: responseBody,
-        message: "Sandbox profile persistence mode response payload is invalid.",
-      });
-    }
-
-    return parsedResponse.data;
-  } catch (error) {
-    throw new SandboxProfilesApiError(
-      normalizeHttpApiError({
-        operation: "putSandboxProfileVersionPersistenceMode",
-        error,
-        fallbackMessage: "Could not save sandbox profile persistence mode.",
+        fallbackMessage: "Could not save sandbox profile draft.",
       }),
     );
   }

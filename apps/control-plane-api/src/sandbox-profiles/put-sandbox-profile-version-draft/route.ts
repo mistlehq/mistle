@@ -6,22 +6,26 @@ import {
 } from "@mistle/http/errors.js";
 
 import {
-  putSandboxProfileVersionPersistenceModeBodySchema,
-  putSandboxProfileVersionPersistenceModeResponseSchema,
+  putSandboxProfileVersionDraftBodySchema,
+  putSandboxProfileVersionDraftResponseSchema,
   sandboxProfileVersionParamsSchema,
 } from "../schemas.js";
-import { conflictResponseSchema, notFoundResponseSchema } from "./schema.js";
+import {
+  badRequestResponseSchema,
+  conflictResponseSchema,
+  notFoundResponseSchema,
+} from "./schema.js";
 
 export const route = createRoute({
   method: "put",
-  path: "/{profileId}/versions/{version}/persistence-mode",
+  path: "/{profileId}/versions/{version}/draft",
   tags: ["Sandbox Profiles"],
   request: {
     params: sandboxProfileVersionParamsSchema,
     body: {
       content: {
         "application/json": {
-          schema: putSandboxProfileVersionPersistenceModeBodySchema,
+          schema: putSandboxProfileVersionDraftBodySchema,
         },
       },
       required: true,
@@ -29,11 +33,10 @@ export const route = createRoute({
   },
   responses: {
     200: {
-      description:
-        "Replace the default persistence mode for the specified sandbox profile version.",
+      description: "Update draft fields for the specified sandbox profile version atomically.",
       content: {
         "application/json": {
-          schema: putSandboxProfileVersionPersistenceModeResponseSchema,
+          schema: putSandboxProfileVersionDraftResponseSchema,
         },
       },
     },
@@ -41,7 +44,7 @@ export const route = createRoute({
       description: "Invalid request.",
       content: {
         "application/json": {
-          schema: ValidationErrorResponseSchema,
+          schema: z.union([ValidationErrorResponseSchema, badRequestResponseSchema]),
         },
       },
     },

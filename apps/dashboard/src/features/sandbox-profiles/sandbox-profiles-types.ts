@@ -22,10 +22,10 @@ type PutSandboxProfileVersionRefreshScheduleResponse =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/refresh-schedule"]["put"]["responses"][200]["content"]["application/json"];
 type DeleteSandboxProfileVersionRefreshScheduleResponse =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/refresh-schedule"]["delete"]["responses"][200]["content"]["application/json"];
-type PutSandboxProfileVersionPersistenceModeRequest =
-  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/persistence-mode"]["put"]["requestBody"]["content"]["application/json"];
-type PutSandboxProfileVersionPersistenceModeResponse =
-  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/persistence-mode"]["put"]["responses"][200]["content"]["application/json"];
+type PutSandboxProfileVersionDraftRequest =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/draft"]["put"]["requestBody"]["content"]["application/json"];
+type PutSandboxProfileVersionDraftResponse =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/draft"]["put"]["responses"][200]["content"]["application/json"];
 
 export type SandboxProfile = GetSandboxProfileResponse;
 export type SandboxProfileStatus = SandboxProfile["status"];
@@ -60,13 +60,11 @@ export type PutSandboxProfileVersionRefreshScheduleInput =
   };
 export type DeleteSandboxProfileVersionRefreshScheduleResult =
   DeleteSandboxProfileVersionRefreshScheduleResponse;
-export type PutSandboxProfileVersionPersistenceModeInput =
-  PutSandboxProfileVersionPersistenceModeRequest & {
-    profileId: string;
-    version: number;
-  };
-export type PutSandboxProfileVersionPersistenceModeResult =
-  PutSandboxProfileVersionPersistenceModeResponse;
+export type PutSandboxProfileVersionDraftInput = PutSandboxProfileVersionDraftRequest & {
+  profileId: string;
+  version: number;
+};
+export type PutSandboxProfileVersionDraftResult = PutSandboxProfileVersionDraftResponse;
 
 export type SandboxProfileVersionPublishability =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/publishability"]["get"]["responses"][200]["content"]["application/json"];

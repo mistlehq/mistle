@@ -1,4 +1,5 @@
 import type {
+  ControlPlaneTransaction,
   IntegrationBindingKind,
   SandboxProfileVersionIntegrationBinding,
 } from "@mistle/db/control-plane";
@@ -18,11 +19,10 @@ import {
   SandboxProfilesNotFoundCodes,
   SandboxProfilesNotFoundError,
 } from "../errors.js";
-import { lockProfileVersionForUpdateOrThrow } from "./lock-profile-version-for-update.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 import { validateBindingResources } from "./validate-binding-resources.js";
 
-type PutProfileVersionIntegrationBindingsInput = {
+type ProfileVersionIntegrationBindingsWriteInput = {
   organizationId: string;
   profileId: string;
   profileVersion: number;
@@ -35,7 +35,7 @@ type PutProfileVersionIntegrationBindingsInput = {
   }>;
 };
 
-type PutProfileVersionIntegrationBindingsResult = {
+type ProfileVersionIntegrationBindingsWriteResult = {
   bindings: SandboxProfileVersionIntegrationBinding[];
 };
 
@@ -50,6 +50,13 @@ type ValidatedIntegrationBinding = {
   bindingConfig: Record<string, unknown>;
   connectionId: string;
   definition: ReturnType<typeof IntegrationRegistry.getDefinitionOrThrow>;
+};
+
+type ReplaceProfileVersionIntegrationBindingsInput = {
+  profileId: string;
+  profileVersion: number;
+  bindings: ProfileVersionIntegrationBindingsWriteInput["bindings"];
+  validatedBindings: ValidatedIntegrationBinding[];
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -111,7 +118,7 @@ function toRecord(value: unknown): Record<string, unknown> {
 }
 
 function findDuplicateBindingId(
-  bindings: PutProfileVersionIntegrationBindingsInput["bindings"],
+  bindings: ProfileVersionIntegrationBindingsWriteInput["bindings"],
 ): string | undefined {
   const seenBindingIds = new Set<string>();
 
@@ -177,10 +184,10 @@ function findGitFamilyConflictIssues(
   return issues;
 }
 
-export async function putProfileVersionIntegrationBindings(
+export async function validateProfileVersionIntegrationBindings(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
-  input: PutProfileVersionIntegrationBindingsInput,
-): Promise<PutProfileVersionIntegrationBindingsResult> {
+  input: ProfileVersionIntegrationBindingsWriteInput,
+): Promise<ValidatedIntegrationBinding[]> {
   const duplicateBindingId = findDuplicateBindingId(input.bindings);
   if (duplicateBindingId !== undefined) {
     throw new SandboxProfilesIntegrationBindingsBadRequestError(
@@ -415,134 +422,120 @@ export async function putProfileVersionIntegrationBindings(
     );
   }
 
-  return db.transaction(async (tx) => {
-    const tables = getControlPlaneDatabaseSchema(tx);
-
-    const lockedVersion = await lockProfileVersionForUpdateOrThrow({
-      db: tx,
-      tables,
-      profileId: input.profileId,
-      profileVersion: input.profileVersion,
-    });
-
-    if (lockedVersion.state !== SandboxProfileVersionStates.DRAFT) {
-      throw new SandboxProfilesConflictError(
-        SandboxProfilesConflictCodes.PROFILE_VERSION_NOT_DRAFT,
-        `Sandbox profile version '${String(input.profileVersion)}' is not a draft.`,
-      );
-    }
-
-    const existingBindings = await tx.query.sandboxProfileVersionIntegrationBindings.findMany({
-      where: (table, { and, eq }) =>
-        and(
-          eq(table.sandboxProfileId, input.profileId),
-          eq(table.sandboxProfileVersion, input.profileVersion),
-        ),
-      orderBy: (table, { asc }) => [asc(table.id)],
-    });
-    const existingBindingsById = new Map(existingBindings.map((binding) => [binding.id, binding]));
-    const requestedBindingIds = new Set(
-      input.bindings.flatMap((binding) => (binding.id === undefined ? [] : [binding.id])),
-    );
-
-    for (const binding of input.bindings) {
-      if (binding.id === undefined) {
-        continue;
-      }
-
-      if (!existingBindingsById.has(binding.id)) {
-        throw new SandboxProfilesIntegrationBindingsBadRequestError(
-          SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_REFERENCE,
-          `Binding '${binding.id}' does not exist on sandbox profile version '${input.profileVersion}'.`,
-        );
-      }
-    }
-
-    const bindingIdsToDelete = existingBindings
-      .filter((binding) => !requestedBindingIds.has(binding.id))
-      .map((binding) => binding.id);
-
-    if (bindingIdsToDelete.length > 0) {
-      await tx
-        .delete(tables.sandboxProfileVersionIntegrationBindings)
-        .where(
-          and(
-            eq(tables.sandboxProfileVersionIntegrationBindings.sandboxProfileId, input.profileId),
-            eq(
-              tables.sandboxProfileVersionIntegrationBindings.sandboxProfileVersion,
-              input.profileVersion,
-            ),
-            inArray(tables.sandboxProfileVersionIntegrationBindings.id, bindingIdsToDelete),
-          ),
-        );
-    }
-
-    const bindingsToInsert = validatedBindings.filter((binding) => binding.id === undefined);
-    if (bindingsToInsert.length > 0) {
-      await tx.insert(tables.sandboxProfileVersionIntegrationBindings).values(
-        bindingsToInsert.map((binding) => ({
-          sandboxProfileId: input.profileId,
-          sandboxProfileVersion: input.profileVersion,
-          connectionId: binding.connectionId,
-          kind: binding.kind,
-          config: binding.bindingConfig,
-        })),
-      );
-    }
-
-    for (const binding of validatedBindings) {
-      if (binding.id === undefined) {
-        continue;
-      }
-
-      const existingBinding = existingBindingsById.get(binding.id);
-      if (existingBinding === undefined) {
-        throw new SandboxProfilesIntegrationBindingsBadRequestError(
-          SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_REFERENCE,
-          `Binding '${binding.id}' does not exist on sandbox profile version '${input.profileVersion}'.`,
-        );
-      }
-
-      if (!integrationBindingValuesChanged(existingBinding, binding)) {
-        continue;
-      }
-
-      await tx
-        .update(tables.sandboxProfileVersionIntegrationBindings)
-        .set({
-          connectionId: binding.connectionId,
-          kind: binding.kind,
-          config: binding.bindingConfig,
-          updatedAt: sql`now()`,
-        })
-        .where(
-          and(
-            eq(tables.sandboxProfileVersionIntegrationBindings.sandboxProfileId, input.profileId),
-            eq(
-              tables.sandboxProfileVersionIntegrationBindings.sandboxProfileVersion,
-              input.profileVersion,
-            ),
-            eq(tables.sandboxProfileVersionIntegrationBindings.id, binding.id),
-          ),
-        );
-    }
-
-    const persistedBindings = await tx.query.sandboxProfileVersionIntegrationBindings.findMany({
-      where: (table, { and, eq }) =>
-        and(
-          eq(table.sandboxProfileId, input.profileId),
-          eq(table.sandboxProfileVersion, input.profileVersion),
-        ),
-      orderBy: (table, { asc }) => [asc(table.id)],
-    });
-
-    return {
-      bindings: persistedBindings,
-    };
-  });
+  return validatedBindings;
 }
 
-export type {
-  PutProfileVersionIntegrationBindingsInput,
-  PutProfileVersionIntegrationBindingsResult,
-};
+export async function replaceProfileVersionIntegrationBindings(
+  tx: ControlPlaneTransaction,
+  input: ReplaceProfileVersionIntegrationBindingsInput,
+): Promise<ProfileVersionIntegrationBindingsWriteResult> {
+  const tables = getControlPlaneDatabaseSchema(tx);
+
+  const existingBindings = await tx.query.sandboxProfileVersionIntegrationBindings.findMany({
+    where: (table, { and: whereAnd, eq: whereEq }) =>
+      whereAnd(
+        whereEq(table.sandboxProfileId, input.profileId),
+        whereEq(table.sandboxProfileVersion, input.profileVersion),
+      ),
+    orderBy: (table, { asc }) => [asc(table.id)],
+  });
+  const existingBindingsById = new Map(existingBindings.map((binding) => [binding.id, binding]));
+  const requestedBindingIds = new Set(
+    input.bindings.flatMap((binding) => (binding.id === undefined ? [] : [binding.id])),
+  );
+
+  for (const binding of input.bindings) {
+    if (binding.id === undefined) {
+      continue;
+    }
+
+    if (!existingBindingsById.has(binding.id)) {
+      throw new SandboxProfilesIntegrationBindingsBadRequestError(
+        SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_REFERENCE,
+        `Binding '${binding.id}' does not exist on sandbox profile version '${input.profileVersion}'.`,
+      );
+    }
+  }
+
+  const bindingIdsToDelete = existingBindings
+    .filter((binding) => !requestedBindingIds.has(binding.id))
+    .map((binding) => binding.id);
+
+  if (bindingIdsToDelete.length > 0) {
+    await tx
+      .delete(tables.sandboxProfileVersionIntegrationBindings)
+      .where(
+        and(
+          eq(tables.sandboxProfileVersionIntegrationBindings.sandboxProfileId, input.profileId),
+          eq(
+            tables.sandboxProfileVersionIntegrationBindings.sandboxProfileVersion,
+            input.profileVersion,
+          ),
+          inArray(tables.sandboxProfileVersionIntegrationBindings.id, bindingIdsToDelete),
+        ),
+      );
+  }
+
+  const bindingsToInsert = input.validatedBindings.filter((binding) => binding.id === undefined);
+  if (bindingsToInsert.length > 0) {
+    await tx.insert(tables.sandboxProfileVersionIntegrationBindings).values(
+      bindingsToInsert.map((binding) => ({
+        sandboxProfileId: input.profileId,
+        sandboxProfileVersion: input.profileVersion,
+        connectionId: binding.connectionId,
+        kind: binding.kind,
+        config: binding.bindingConfig,
+      })),
+    );
+  }
+
+  for (const binding of input.validatedBindings) {
+    if (binding.id === undefined) {
+      continue;
+    }
+
+    const existingBinding = existingBindingsById.get(binding.id);
+    if (existingBinding === undefined) {
+      throw new SandboxProfilesIntegrationBindingsBadRequestError(
+        SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_REFERENCE,
+        `Binding '${binding.id}' does not exist on sandbox profile version '${input.profileVersion}'.`,
+      );
+    }
+
+    if (!integrationBindingValuesChanged(existingBinding, binding)) {
+      continue;
+    }
+
+    await tx
+      .update(tables.sandboxProfileVersionIntegrationBindings)
+      .set({
+        connectionId: binding.connectionId,
+        kind: binding.kind,
+        config: binding.bindingConfig,
+        updatedAt: sql`now()`,
+      })
+      .where(
+        and(
+          eq(tables.sandboxProfileVersionIntegrationBindings.sandboxProfileId, input.profileId),
+          eq(
+            tables.sandboxProfileVersionIntegrationBindings.sandboxProfileVersion,
+            input.profileVersion,
+          ),
+          eq(tables.sandboxProfileVersionIntegrationBindings.id, binding.id),
+        ),
+      );
+  }
+
+  const persistedBindings = await tx.query.sandboxProfileVersionIntegrationBindings.findMany({
+    where: (table, { and: whereAnd, eq: whereEq }) =>
+      whereAnd(
+        whereEq(table.sandboxProfileId, input.profileId),
+        whereEq(table.sandboxProfileVersion, input.profileVersion),
+      ),
+    orderBy: (table, { asc }) => [asc(table.id)],
+  });
+
+  return {
+    bindings: persistedBindings,
+  };
+}

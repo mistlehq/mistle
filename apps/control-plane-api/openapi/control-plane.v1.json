@@ -16452,197 +16452,6 @@
             }
           }
         }
-      },
-      "put": {
-        "tags": ["Sandbox Profiles"],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "pattern": "^sbp_[a-zA-Z0-9_-]+$"
-            },
-            "required": true,
-            "name": "profileId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "integer",
-              "minimum": 1
-            },
-            "required": true,
-            "name": "version",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "setupScript": {
-                    "type": ["string", "null"],
-                    "minLength": 1
-                  }
-                },
-                "required": ["setupScript"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Replace the setup script for the specified sandbox profile version.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "sandboxProfileId": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "version": {
-                      "type": "integer",
-                      "minimum": 1
-                    },
-                    "setupScript": {
-                      "type": ["string", "null"],
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["sandboxProfileId", "version", "setupScript"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["VALIDATION_ERROR"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["UNAUTHORIZED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Active organization is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["FORBIDDEN"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Sandbox profile or profile version was not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["PROFILE_NOT_FOUND", "PROFILE_VERSION_NOT_FOUND"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Sandbox profile version is not editable.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["PROFILE_VERSION_NOT_DRAFT"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            }
-          }
-        }
       }
     },
     "/v1/sandbox/profiles/{profileId}/versions/{version}/integration-bindings": {
@@ -16833,7 +16642,9 @@
             }
           }
         }
-      },
+      }
+    },
+    "/v1/sandbox/profiles/{profileId}/versions/{version}/draft": {
       "put": {
         "tags": ["Sandbox Profiles"],
         "parameters": [
@@ -16864,38 +16675,52 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "bindings": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "clientRef": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "connectionId": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "kind": {
-                          "type": "string",
-                          "enum": ["agent", "git", "connector"]
-                        },
-                        "config": {
+                  "setupScript": {
+                    "type": ["string", "null"],
+                    "minLength": 1
+                  },
+                  "defaultPersistenceMode": {
+                    "type": "string",
+                    "enum": ["ephemeral", "persistent"]
+                  },
+                  "integrationBindings": {
+                    "type": "object",
+                    "properties": {
+                      "bindings": {
+                        "type": "array",
+                        "items": {
                           "type": "object",
-                          "additionalProperties": {}
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "clientRef": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "connectionId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": ["agent", "git", "connector"]
+                            },
+                            "config": {
+                              "type": "object",
+                              "additionalProperties": {}
+                            }
+                          },
+                          "required": ["connectionId", "kind", "config"],
+                          "additionalProperties": false
                         }
-                      },
-                      "required": ["connectionId", "kind", "config"],
-                      "additionalProperties": false
-                    }
+                      }
+                    },
+                    "required": ["bindings"],
+                    "additionalProperties": false
                   }
                 },
-                "required": ["bindings"],
                 "additionalProperties": false
               }
             }
@@ -16903,63 +16728,91 @@
         },
         "responses": {
           "200": {
-            "description": "Replace integration bindings for the specified sandbox profile version.",
+            "description": "Update draft fields for the specified sandbox profile version atomically.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "bindings": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "sandboxProfileId": {
-                            "type": "string"
-                          },
-                          "sandboxProfileVersion": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "connectionId": {
-                            "type": "string"
-                          },
-                          "kind": {
-                            "type": "string",
-                            "enum": ["agent", "git", "connector"]
-                          },
-                          "config": {
+                    "sandboxProfileId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "setupScript": {
+                      "type": ["string", "null"]
+                    },
+                    "defaultPersistenceMode": {
+                      "type": "string",
+                      "enum": ["ephemeral", "persistent"]
+                    },
+                    "integrationBindings": {
+                      "type": "object",
+                      "properties": {
+                        "bindings": {
+                          "type": "array",
+                          "items": {
                             "type": "object",
-                            "additionalProperties": {}
-                          },
-                          "createdAt": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "updatedAt": {
-                            "type": "string",
-                            "minLength": 1
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "sandboxProfileId": {
+                                "type": "string"
+                              },
+                              "sandboxProfileVersion": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "connectionId": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": ["agent", "git", "connector"]
+                              },
+                              "config": {
+                                "type": "object",
+                                "additionalProperties": {}
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "updatedAt": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "sandboxProfileId",
+                              "sandboxProfileVersion",
+                              "connectionId",
+                              "kind",
+                              "config",
+                              "createdAt",
+                              "updatedAt"
+                            ],
+                            "additionalProperties": false
                           }
-                        },
-                        "required": [
-                          "id",
-                          "sandboxProfileId",
-                          "sandboxProfileVersion",
-                          "connectionId",
-                          "kind",
-                          "config",
-                          "createdAt",
-                          "updatedAt"
-                        ],
-                        "additionalProperties": false
-                      }
+                        }
+                      },
+                      "required": ["bindings"],
+                      "additionalProperties": false
                     }
                   },
-                  "required": ["bindings"],
+                  "required": [
+                    "sandboxProfileId",
+                    "version",
+                    "setupScript",
+                    "defaultPersistenceMode",
+                    "integrationBindings"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -16975,16 +16828,8 @@
                       "type": "object",
                       "properties": {
                         "code": {
-                          "anyOf": [
-                            {
-                              "type": "string",
-                              "enum": ["INVALID_BINDING_REFERENCE"]
-                            },
-                            {
-                              "type": "string",
-                              "enum": ["INVALID_BINDING_CONNECTION_REFERENCE"]
-                            }
-                          ]
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
                         },
                         "message": {
                           "type": "string",
@@ -16999,7 +16844,11 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": ["INVALID_BINDING_CONFIG_REFERENCE"]
+                          "enum": [
+                            "INVALID_BINDING_REFERENCE",
+                            "INVALID_BINDING_CONNECTION_REFERENCE",
+                            "INVALID_BINDING_CONFIG_REFERENCE"
+                          ]
                         },
                         "message": {
                           "type": "string",
@@ -17041,226 +16890,17 @@
                                   "safeMessage"
                                 ],
                                 "additionalProperties": false
-                              },
-                              "minItems": 1
+                              }
                             }
                           },
                           "required": ["issues"],
                           "additionalProperties": false
                         }
                       },
-                      "required": ["code", "message", "details"],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "enum": ["VALIDATION_ERROR"]
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
                       "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["UNAUTHORIZED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Active organization is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["FORBIDDEN"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Sandbox profile or profile version was not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["PROFILE_NOT_FOUND", "PROFILE_VERSION_NOT_FOUND"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Sandbox profile version is not editable.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["PROFILE_VERSION_NOT_DRAFT"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/sandbox/profiles/{profileId}/versions/{version}/persistence-mode": {
-      "put": {
-        "tags": ["Sandbox Profiles"],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "pattern": "^sbp_[a-zA-Z0-9_-]+$"
-            },
-            "required": true,
-            "name": "profileId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "integer",
-              "minimum": 1
-            },
-            "required": true,
-            "name": "version",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "defaultPersistenceMode": {
-                    "type": "string",
-                    "enum": ["ephemeral", "persistent"]
-                  }
-                },
-                "required": ["defaultPersistenceMode"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Replace the default persistence mode for the specified sandbox profile version.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "sandboxProfileId": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "version": {
-                      "type": "integer",
-                      "minimum": 1
-                    },
-                    "defaultPersistenceMode": {
-                      "type": "string",
-                      "enum": ["ephemeral", "persistent"]
-                    }
-                  },
-                  "required": ["sandboxProfileId", "version", "defaultPersistenceMode"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["VALIDATION_ERROR"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
                 }
               }
             }

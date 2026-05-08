@@ -8,7 +8,7 @@ import {
   SandboxProfilesIntegrationBindingsBadRequestError,
   SandboxProfilesNotFoundError,
 } from "../errors.js";
-import { putProfileVersionIntegrationBindings } from "../services/put-profile-version-integration-bindings.js";
+import { putProfileVersionDraft } from "../services/put-profile-version-draft.js";
 import { route } from "./route.js";
 import { badRequestResponseSchema, notFoundResponseSchema } from "./schema.js";
 
@@ -21,38 +21,33 @@ const routeHandler = async (
   const body = ctx.req.valid("json");
 
   try {
-    const normalizedBindings = body.bindings.map((binding) => {
-      if (binding.id === undefined) {
-        return {
-          ...(binding.clientRef === undefined ? {} : { clientRef: binding.clientRef }),
-          connectionId: binding.connectionId,
-          kind: binding.kind,
-          config: binding.config,
-        };
-      }
-
-      return {
-        id: binding.id,
-        ...(binding.clientRef === undefined ? {} : { clientRef: binding.clientRef }),
-        connectionId: binding.connectionId,
-        kind: binding.kind,
-        config: binding.config,
-      };
-    });
-
-    const updatedBindings = await putProfileVersionIntegrationBindings(
-      {
-        db,
-      },
+    const updatedDraft = await putProfileVersionDraft(
+      { db },
       {
         organizationId: session.activeOrganizationId,
         profileId,
         profileVersion: version,
-        bindings: normalizedBindings,
+        ...(body.setupScript === undefined ? {} : { setupScript: body.setupScript }),
+        ...(body.defaultPersistenceMode === undefined
+          ? {}
+          : { defaultPersistenceMode: body.defaultPersistenceMode }),
+        ...(body.integrationBindings === undefined
+          ? {}
+          : {
+              integrationBindings: {
+                bindings: body.integrationBindings.bindings.map((binding) => ({
+                  ...(binding.id === undefined ? {} : { id: binding.id }),
+                  ...(binding.clientRef === undefined ? {} : { clientRef: binding.clientRef }),
+                  connectionId: binding.connectionId,
+                  kind: binding.kind,
+                  config: binding.config,
+                })),
+              },
+            }),
       },
     );
 
-    return ctx.json(updatedBindings, 200);
+    return ctx.json(updatedDraft, 200);
   } catch (error) {
     if (
       error instanceof SandboxProfilesIntegrationBindingsBadRequestError &&
@@ -81,13 +76,6 @@ const routeHandler = async (
     }
 
     if (error instanceof SandboxProfilesIntegrationBindingsBadRequestError) {
-      if (
-        error.code ===
-        SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONFIG_REFERENCE
-      ) {
-        throw new Error("Expected detailed invalid binding config errors to be handled earlier.");
-      }
-
       const responseBody: z.infer<typeof badRequestResponseSchema> = {
         code: error.code,
         message: error.message,
