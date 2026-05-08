@@ -214,9 +214,23 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
           providersError: providersQuery.isError ? providersQuery.error : null,
         })}
         onEnabledChange={async ({ providerFamily, enabled }) => {
+          const updatePlan = buildProviderStatusUpdatePlan({
+            enabled,
+            providerFamily,
+            providers,
+            selectedConnectionIdByProviderFamily,
+          });
+
+          if (updatePlan.configureIntegrationConnectionId !== null) {
+            await configureMutation.mutateAsync({
+              providerFamily,
+              integrationConnectionId: updatePlan.configureIntegrationConnectionId,
+            });
+          }
+
           await statusMutation.mutateAsync({
             providerFamily,
-            status: enabled ? "active" : "disabled",
+            status: updatePlan.status,
           });
         }}
         onProviderConnectionChange={async ({ providerFamily, integrationConnectionId }) => {
@@ -336,6 +350,48 @@ export function buildProviderRow(input: {
         }),
         updatedAt: link.updatedAt,
       })) ?? [],
+  };
+}
+
+export function buildProviderStatusUpdatePlan(input: {
+  providerFamily: string;
+  enabled: boolean;
+  providers: readonly OrganizationIdentityLinkProvider[];
+  selectedConnectionIdByProviderFamily: Readonly<Record<string, string | undefined>>;
+}): {
+  status: "active" | "disabled";
+  configureIntegrationConnectionId: string | null;
+} {
+  const provider =
+    input.providers.find((candidate) => candidate.providerFamily === input.providerFamily) ?? null;
+
+  if (provider === null) {
+    throw new Error(`Identity-linking provider '${input.providerFamily}' was not loaded.`);
+  }
+
+  const status = input.enabled ? "active" : "disabled";
+
+  if (!input.enabled || provider.configurationStatus !== "unconfigured") {
+    return {
+      status,
+      configureIntegrationConnectionId: null,
+    };
+  }
+
+  const integrationConnectionId = resolveProviderDisplayedConnectionId({
+    provider,
+    selectedConnectionIdByProviderFamily: input.selectedConnectionIdByProviderFamily,
+  });
+
+  if (integrationConnectionId === null) {
+    throw new Error(
+      `Identity-linking provider '${input.providerFamily}' cannot be enabled without a selected connection.`,
+    );
+  }
+
+  return {
+    status,
+    configureIntegrationConnectionId: integrationConnectionId,
   };
 }
 

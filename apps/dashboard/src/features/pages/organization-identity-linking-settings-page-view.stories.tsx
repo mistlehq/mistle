@@ -203,6 +203,36 @@ export const NoProvidersAvailable: Story = {
   },
 };
 
+export const UnconfiguredProviderWithDisplayedConnection: Story = {
+  args: {
+    providers: [
+      {
+        providerFamily: "github",
+        displayName: "GitHub",
+        logoKey: "github",
+        connectionOptions: [
+          {
+            id: "conn_github_primary",
+            label: "GitHub Engineering",
+          },
+          {
+            id: "conn_github_platform",
+            label: "GitHub Platform",
+          },
+        ],
+        selectedConnectionId: "conn_github_primary",
+        connectionPending: false,
+        enablePending: false,
+        enabled: false,
+        linkedUsersCount: 0,
+        memberLinksLoading: false,
+        memberLinksErrorMessage: null,
+        memberLinks: [],
+      },
+    ],
+  },
+};
+
 export const LinkedUsersDialogError: Story = {
   args: {
     providers: [

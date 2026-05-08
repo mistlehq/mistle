@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { buildProviderRow } from "./organization-identity-linking-settings-page.js";
+import {
+  buildProviderRow,
+  buildProviderStatusUpdatePlan,
+} from "./organization-identity-linking-settings-page.js";
 
 describe("buildProviderRow", () => {
   it("returns an autosave row model when the selected connection differs from the saved config", () => {
@@ -153,5 +156,92 @@ describe("buildProviderRow", () => {
         label: "Slack Second · Slack bot token",
       },
     ]);
+  });
+});
+
+describe("buildProviderStatusUpdatePlan", () => {
+  it("saves the displayed eligible connection before enabling an unconfigured provider", () => {
+    const updatePlan = buildProviderStatusUpdatePlan({
+      providerFamily: "github",
+      enabled: true,
+      providers: [
+        {
+          providerFamily: "github",
+          displayName: "GitHub",
+          logoKey: "github",
+          eligibleTargetKeys: ["github-cloud"],
+          eligibleConnectionMethodIds: ["github-app-installation"],
+          eligibleConnections: [
+            {
+              id: "icn_github_engineering",
+              targetKey: "github-cloud",
+              displayName: "GitHub Engineering",
+              status: "active",
+              connectionMethodId: "github-app-installation",
+              connectionMethodLabel: "GitHub App installation",
+              createdAt: "2026-01-01T00:00:00.000Z",
+              updatedAt: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+          configurationStatus: "unconfigured",
+          selectedConnection: null,
+          configuredAt: null,
+          updatedAt: null,
+        },
+      ],
+      selectedConnectionIdByProviderFamily: {},
+    });
+
+    expect(updatePlan).toEqual({
+      status: "active",
+      configureIntegrationConnectionId: "icn_github_engineering",
+    });
+  });
+
+  it("updates status directly when the provider already has a saved configuration", () => {
+    const updatePlan = buildProviderStatusUpdatePlan({
+      providerFamily: "github",
+      enabled: true,
+      providers: [
+        {
+          providerFamily: "github",
+          displayName: "GitHub",
+          logoKey: "github",
+          eligibleTargetKeys: ["github-cloud"],
+          eligibleConnectionMethodIds: ["github-app-installation"],
+          eligibleConnections: [
+            {
+              id: "icn_github_engineering",
+              targetKey: "github-cloud",
+              displayName: "GitHub Engineering",
+              status: "active",
+              connectionMethodId: "github-app-installation",
+              connectionMethodLabel: "GitHub App installation",
+              createdAt: "2026-01-01T00:00:00.000Z",
+              updatedAt: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+          configurationStatus: "disabled",
+          selectedConnection: {
+            id: "icn_github_engineering",
+            targetKey: "github-cloud",
+            displayName: "GitHub Engineering",
+            status: "active",
+            connectionMethodId: "github-app-installation",
+            connectionMethodLabel: "GitHub App installation",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+          configuredAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+      selectedConnectionIdByProviderFamily: {},
+    });
+
+    expect(updatePlan).toEqual({
+      status: "active",
+      configureIntegrationConnectionId: null,
+    });
   });
 });
