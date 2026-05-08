@@ -1122,8 +1122,8 @@ importers:
         specifier: ^1.9.1
         version: 1.9.1
       '@opentelemetry/api-logs':
-        specifier: ^0.215.0
-        version: 0.215.0
+        specifier: ^0.216.0
+        version: 0.216.0
       '@opentelemetry/auto-instrumentations-node':
         specifier: ^0.73.0
         version: 0.73.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.7.0(@opentelemetry/api@1.9.1))

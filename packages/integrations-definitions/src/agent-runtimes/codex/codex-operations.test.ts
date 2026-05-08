@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCodexTurnInputItems, buildCodexTurnStartRequest } from "./codex-operations.js";
+import {
+  buildCodexTurnInputItems,
+  buildCodexTurnStartRequest,
+  parseCodexThreadSessionResponse,
+} from "./codex-operations.js";
 
 describe("buildCodexTurnInputItems", () => {
   it("prepends trimmed text ahead of local image items", () => {
@@ -111,5 +115,61 @@ describe("buildCodexTurnStartRequest", () => {
         },
       ],
     });
+  });
+
+  it("includes cwd when the caller supplies a turn working directory", () => {
+    expect(
+      buildCodexTurnStartRequest({
+        threadId: "thread_123",
+        cwd: "/root/acme/repo-2",
+        input: [
+          {
+            type: "text",
+            text: "Explain the repo",
+          },
+        ],
+      }),
+    ).toEqual({
+      threadId: "thread_123",
+      cwd: "/root/acme/repo-2",
+      input: [
+        {
+          type: "text",
+          text: "Explain the repo",
+        },
+      ],
+    });
+  });
+});
+
+describe("parseCodexThreadSessionResponse", () => {
+  it("reads the live Codex session cwd from thread session responses", () => {
+    expect(
+      parseCodexThreadSessionResponse({
+        method: "thread/resume",
+        response: {
+          thread: {
+            id: "thread_123",
+          },
+          cwd: "/root/acme/repo-2",
+        },
+      }),
+    ).toEqual({
+      threadId: "thread_123",
+      cwd: "/root/acme/repo-2",
+    });
+  });
+
+  it("rejects thread start responses that do not include the live Codex session cwd", () => {
+    expect(() =>
+      parseCodexThreadSessionResponse({
+        method: "thread/start",
+        response: {
+          thread: {
+            id: "thread_123",
+          },
+        },
+      }),
+    ).toThrow("thread/start response payload is invalid.");
   });
 });

@@ -31,14 +31,10 @@ type SessionWorkbenchPageViewStoryArgs = React.ComponentProps<typeof SessionWork
   headerStatusUi: SandboxStatusBadgeUi;
 };
 
-function buildPageViewTerminalOutput(cwd: string | null): string {
-  return [
-    "root@sandbox:~# pwd",
-    cwd ?? "/root",
-    "root@sandbox:~# ls",
-    "apps  packages  README.md",
-    "",
-  ].join("\n");
+function buildPageViewTerminalOutput(cwd: string): string {
+  return ["root@sandbox:~# pwd", cwd, "root@sandbox:~# ls", "apps  packages  README.md", ""].join(
+    "\n",
+  );
 }
 
 const FailedSandboxSetupMessage =
@@ -78,7 +74,7 @@ function StoryPageViewHeaderToggleTerminalWorkspace(): React.JSX.Element {
         alert={null}
         bottomPanel={
           <SessionTerminalWorkspaceView
-            cwd={null}
+            cwd="/root"
             isVisible={isBottomPanelVisible}
             onWorkspaceEmpty={noop}
             renderTerminalPanel={(panelInput) => (
@@ -261,7 +257,7 @@ export const CliSplitWithTerminal: Story = {
     primaryBottomPanel: null,
     bottomPanel: (
       <SessionTerminalWorkspaceView
-        cwd={null}
+        cwd="/root"
         isVisible
         onWorkspaceEmpty={noop}
         renderTerminalPanel={(panelInput) => (
@@ -288,7 +284,7 @@ export const CliSplitWithTerminalAndSecondaryPane: Story = {
     primaryBottomPanel: null,
     bottomPanel: (
       <SessionTerminalWorkspaceView
-        cwd={null}
+        cwd="/root"
         isVisible
         onWorkspaceEmpty={noop}
         renderTerminalPanel={(panelInput) => (

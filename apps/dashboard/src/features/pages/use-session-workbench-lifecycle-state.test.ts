@@ -11,6 +11,7 @@ describe("resolveInitialEntryStartupState", () => {
         sandboxStatusReadState: "loading",
         sessionSnapshot: {
           activeThreadId: "thread_test",
+          activeThreadCwd: "/root",
           connectedAtIso: "2026-04-21T00:00:00.000Z",
           providerThreadId: null,
           sandboxInstanceId: "sbi_test",

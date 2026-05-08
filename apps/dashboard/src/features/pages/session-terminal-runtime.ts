@@ -228,7 +228,7 @@ export function shouldAttemptTerminalReconnect(input: {
 }
 
 export function buildTerminalPtyOpenInput(input: {
-  cwd: string | null;
+  cwd: string;
   ptySessionId?: string;
   sandboxInstanceId: string;
 }): {
@@ -236,12 +236,12 @@ export function buildTerminalPtyOpenInput(input: {
   ptySessionId: string;
   cols: number;
   rows: number;
-  cwd?: string;
+  cwd: string;
 } {
   return {
     sandboxInstanceId: input.sandboxInstanceId,
     ptySessionId: input.ptySessionId ?? "terminal",
     ...INITIAL_PTY_DIMENSIONS,
-    ...(input.cwd === null ? {} : { cwd: input.cwd }),
+    cwd: input.cwd,
   };
 }

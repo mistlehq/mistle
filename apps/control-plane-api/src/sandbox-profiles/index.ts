@@ -12,6 +12,7 @@ export {
   listSandboxProfileVersionsResponseSchema as ListSandboxProfileVersionsResponseSchema,
   createSandboxProfileVersionResponseSchema as CreateSandboxProfileVersionResponseSchema,
   getSandboxProfileVersionPublishabilityResponseSchema as GetSandboxProfileVersionPublishabilityResponseSchema,
+  getSandboxProfileVersionDraftAutomationImpactResponseSchema as GetSandboxProfileVersionDraftAutomationImpactResponseSchema,
   publishSandboxProfileVersionResponseSchema as PublishSandboxProfileVersionResponseSchema,
   discardSandboxProfileVersionDraftResponseSchema as DiscardSandboxProfileVersionDraftResponseSchema,
   getSandboxProfileVersionIntegrationBindingsResponseSchema as GetSandboxProfileVersionIntegrationBindingsResponseSchema,
@@ -43,6 +44,7 @@ export { route as updateSandboxProfileRoute } from "./update-sandbox-profile/rou
 export { route as deleteSandboxProfileRoute } from "./delete-sandbox-profile/route.js";
 export { route as listSandboxProfileVersionsRoute } from "./list-sandbox-profile-versions/route.js";
 export { route as getSandboxProfileVersionPublishabilityRoute } from "./get-sandbox-profile-version-publishability/route.js";
+export { route as getSandboxProfileVersionDraftAutomationImpactRoute } from "./get-sandbox-profile-version-draft-automation-impact/route.js";
 export { route as getSandboxProfileVersionAutomationConfigRoute } from "./get-sandbox-profile-version-automation-config/route.js";
 export { route as getSandboxProfileVersionSetupScriptRoute } from "./get-sandbox-profile-version-setup-script/route.js";
 export { route as getSandboxProfileVersionIntegrationBindingsRoute } from "./get-sandbox-profile-version-integration-bindings/route.js";
@@ -69,6 +71,7 @@ export {
   notFoundResponseSchema as CreateSandboxProfileVersionNotFoundResponseSchema,
 } from "./create-sandbox-profile-version/schema.js";
 export { notFoundResponseSchema as GetSandboxProfileVersionPublishabilityNotFoundResponseSchema } from "./get-sandbox-profile-version-publishability/schema.js";
+export { notFoundResponseSchema as GetSandboxProfileVersionDraftAutomationImpactNotFoundResponseSchema } from "./get-sandbox-profile-version-draft-automation-impact/schema.js";
 export {
   conflictResponseSchema as PublishSandboxProfileVersionConflictResponseSchema,
   notFoundResponseSchema as PublishSandboxProfileVersionNotFoundResponseSchema,
@@ -106,5 +109,6 @@ export {
   SandboxProfilesIntegrationBindingsBadRequestError,
   SandboxProfilesNotFoundCodes,
   SandboxProfilesNotFoundError,
+  SandboxProfileAutomationImpactIssueCodes,
   SandboxProfilePublishabilityIssueCodes,
 } from "./errors.js";

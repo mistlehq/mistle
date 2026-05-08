@@ -34,7 +34,7 @@ describe("SessionTerminalWorkspaceView", () => {
 
     render(
       <SessionTerminalWorkspaceView
-        cwd={null}
+        cwd="/root"
         isVisible={false}
         onApiReady={(api) => {
           resolveApi?.(api);
@@ -61,7 +61,7 @@ describe("SessionTerminalWorkspaceView", () => {
 
     render(
       <SessionTerminalWorkspaceView
-        cwd={null}
+        cwd="/root/acme/repo-1"
         isVisible={false}
         onApiReady={(api) => {
           resolveApi?.(api);
@@ -70,7 +70,7 @@ describe("SessionTerminalWorkspaceView", () => {
         ref={(value) => {
           workspaceRef.current = value;
         }}
-        renderTerminalPanel={({ panelId }) => <div>{`panel:${panelId}`}</div>}
+        renderTerminalPanel={({ cwd, panelId }) => <div>{`panel:${panelId}:${cwd}`}</div>}
       />,
     );
 
@@ -80,10 +80,10 @@ describe("SessionTerminalWorkspaceView", () => {
     await waitFor(() => {
       expect(readyApi.totalPanels).toBe(1);
     });
-    expect(await screen.findByText("panel:terminal")).toBeDefined();
+    expect(await screen.findByText("panel:terminal:/root/acme/repo-1")).toBeDefined();
   });
 
-  it("creates the first terminal panel when the workspace becomes visible", async () => {
+  it("creates the first terminal panel with the latest cwd when the workspace becomes visible", async () => {
     let resolveApi: ((api: DockviewApi) => void) | null = null;
     const readyApiPromise = new Promise<DockviewApi>((resolve) => {
       resolveApi = resolve;
@@ -91,13 +91,13 @@ describe("SessionTerminalWorkspaceView", () => {
 
     const view = render(
       <SessionTerminalWorkspaceView
-        cwd={null}
+        cwd="/root/acme/repo-1"
         isVisible={false}
         onApiReady={(api) => {
           resolveApi?.(api);
         }}
         onWorkspaceEmpty={() => {}}
-        renderTerminalPanel={({ panelId }) => <div>{`panel:${panelId}`}</div>}
+        renderTerminalPanel={({ cwd, panelId }) => <div>{`panel:${panelId}:${cwd}`}</div>}
       />,
     );
 
@@ -108,17 +108,17 @@ describe("SessionTerminalWorkspaceView", () => {
 
     view.rerender(
       <SessionTerminalWorkspaceView
-        cwd={null}
+        cwd="/root/acme/repo-2"
         isVisible
         onApiReady={() => {}}
         onWorkspaceEmpty={() => {}}
-        renderTerminalPanel={({ panelId }) => <div>{`panel:${panelId}`}</div>}
+        renderTerminalPanel={({ cwd, panelId }) => <div>{`panel:${panelId}:${cwd}`}</div>}
       />,
     );
 
     await waitFor(() => {
       expect(readyApi.totalPanels).toBe(1);
     });
-    expect(await screen.findByText("panel:terminal")).toBeDefined();
+    expect(await screen.findByText("panel:terminal:/root/acme/repo-2")).toBeDefined();
   });
 });

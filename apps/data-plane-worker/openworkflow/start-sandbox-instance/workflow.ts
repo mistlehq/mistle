@@ -4,6 +4,7 @@ import {
   StartSandboxInstanceWorkflowSpec,
   type StartSandboxInstanceWorkflowOutput,
 } from "@mistle/workflow-registry/data-plane";
+import { shouldRethrowDurableStepErrorForRetry } from "@mistle/workflow-registry/durable-step-retry.js";
 
 import { getWorkflowContext } from "../core/context.js";
 import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
@@ -252,6 +253,12 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       }
     }
 
+    function rethrowDurableStepErrorForRetry(error: unknown): void {
+      if (shouldRethrowDurableStepErrorForRetry(error)) {
+        throw error;
+      }
+    }
+
     const ensuredSandboxInstance = await step.run({ name: "ensure-sandbox-instance" }, async () => {
       logger.info("Ensuring sandbox instance exists before sandbox startup.");
       const persisted = await ensureSandboxInstance(
@@ -299,6 +306,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         });
         logger.info("Provisioned persistent sandbox storage.");
       } catch (error) {
+        rethrowDurableStepErrorForRetry(error);
         logger.error({ err: error }, "Persistent sandbox storage provisioning failed.");
         await markSandboxInstanceFailedStep({
           sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
@@ -345,6 +353,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       );
       logger.info("Prepared sandbox storage before provider start.");
     } catch (error) {
+      rethrowDurableStepErrorForRetry(error);
       logger.error({ err: error }, "Sandbox storage preparation failed before provider start.");
       await handleFailedStartup({
         sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
@@ -388,6 +397,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         "Sandbox provider start completed.",
       );
     } catch (error) {
+      rethrowDurableStepErrorForRetry(error);
       logger.error({ err: error }, "Sandbox provider start failed.");
       await handleFailedStartup({
         sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
@@ -430,6 +440,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       });
       logger.info("Attached sandbox storage before runtime initialization.");
     } catch (error) {
+      rethrowDurableStepErrorForRetry(error);
       logger.error({ err: error }, "Sandbox storage attach failed before runtime initialization.");
       await handleFailedStartup({
         sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
@@ -474,6 +485,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         "Persisted sandbox provisioning metadata.",
       );
     } catch (error) {
+      rethrowDurableStepErrorForRetry(error);
       logger.error(
         {
           err: error,
@@ -552,6 +564,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         "Initialized sandbox runtime.",
       );
     } catch (error) {
+      rethrowDurableStepErrorForRetry(error);
       logger.error(
         {
           err: error,
@@ -634,6 +647,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         "Finished waiting for sandbox runtime readiness.",
       );
     } catch (error) {
+      rethrowDurableStepErrorForRetry(error);
       logger.error(
         {
           err: error,
@@ -747,6 +761,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         "Sandbox start workflow completed successfully.",
       );
     } catch (error) {
+      rethrowDurableStepErrorForRetry(error);
       logger.error(
         {
           err: error,

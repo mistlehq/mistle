@@ -30,14 +30,15 @@ describe("buildTerminalPtyOpenInput", () => {
     });
   });
 
-  it("omits cwd when no repository is selected", () => {
+  it("includes the resolved workbench cwd", () => {
     expect(
       buildTerminalPtyOpenInput({
-        cwd: null,
+        cwd: "/root",
         sandboxInstanceId: "sandbox_123",
       }),
     ).toEqual({
       cols: 120,
+      cwd: "/root",
       ptySessionId: "terminal",
       rows: 20,
       sandboxInstanceId: "sandbox_123",
@@ -47,12 +48,13 @@ describe("buildTerminalPtyOpenInput", () => {
   it("uses a custom PTY session id when one is provided", () => {
     expect(
       buildTerminalPtyOpenInput({
-        cwd: null,
+        cwd: "/root/acme/repo-2",
         ptySessionId: "terminal-2",
         sandboxInstanceId: "sandbox_123",
       }),
     ).toEqual({
       cols: 120,
+      cwd: "/root/acme/repo-2",
       ptySessionId: "terminal-2",
       rows: 20,
       sandboxInstanceId: "sandbox_123",

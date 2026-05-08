@@ -16,29 +16,25 @@ import {
 import { SessionTerminalWorkspaceView } from "./session-terminal-workspace.js";
 
 type TerminalWorkspaceStoryArgs = {
-  initialCwd: string | null;
+  initialCwd: string;
 };
 
-function buildInitialTerminalOutput(input: { cwd: string | null }): string {
-  const promptCwd = input.cwd ?? "/root";
-
+function buildInitialTerminalOutput(input: { cwd: string }): string {
   return [
-    `root@sandbox:${promptCwd}# printf 'terminal ready\\n'`,
+    `root@sandbox:${input.cwd}# printf 'terminal ready\\n'`,
     "terminal ready",
-    `root@sandbox:${promptCwd}# git status --short`,
+    `root@sandbox:${input.cwd}# git status --short`,
     " M apps/dashboard/src/features/pages/session-terminal-workspace.stories.tsx",
     " M apps/dashboard/src/features/pages/session-terminal-workspace.tsx",
     "",
   ].join("\n");
 }
 
-function buildLongTerminalOutput(input: { cwd: string | null }): string {
-  const promptCwd = input.cwd ?? "/root";
-
+function buildLongTerminalOutput(input: { cwd: string }): string {
   return [
-    `root@sandbox:${promptCwd}# pwd`,
-    promptCwd,
-    `root@sandbox:${promptCwd}# ${createStoryLongCliOutput("terminal")}`,
+    `root@sandbox:${input.cwd}# pwd`,
+    input.cwd,
+    `root@sandbox:${input.cwd}# ${createStoryLongCliOutput("terminal")}`,
     "",
   ].join("\n");
 }
@@ -118,7 +114,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Interactive: Story = {};
 
-function seedSplitTerminalExample(input: { api: DockviewApi; cwd: string | null }): void {
+function seedSplitTerminalExample(input: { api: DockviewApi; cwd: string }): void {
   if (input.api.totalPanels !== 1 || input.api.activeGroup === undefined) {
     return;
   }

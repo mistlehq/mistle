@@ -1,5 +1,6 @@
 import { z } from "@hono/zod-openapi";
 import {
+  AutomationKinds,
   IntegrationBindingKinds,
   SandboxProfileStatuses,
   SandboxProfileVersionDefaultPersistenceModes,
@@ -16,7 +17,10 @@ import {
 } from "@mistle/http/pagination";
 import { createSelectSchema } from "drizzle-zod";
 
-import { SandboxProfilePublishabilityIssueCodes } from "./errors.js";
+import {
+  SandboxProfileAutomationImpactIssueCodes,
+  SandboxProfilePublishabilityIssueCodes,
+} from "./errors.js";
 
 const sandboxProfileStatusSchema = z.enum([
   SandboxProfileStatuses.ACTIVE,
@@ -68,6 +72,7 @@ const sandboxProfileVersionRefreshScheduleSummarySchema = z
     nextScheduledAt: z.string().min(1).nullable(),
   })
   .strict();
+const automationKindSchema = z.enum([AutomationKinds.WEBHOOK, AutomationKinds.SCHEDULE]);
 
 export const sandboxProfileSchema = createSelectSchema(sandboxProfiles, {
   activeVersion: z.number().int().min(1).nullable(),
@@ -168,6 +173,44 @@ export const getSandboxProfileVersionPublishabilityResponseSchema = z
           bindingId: z.string().min(1).optional(),
           connectionId: z.string().min(1).optional(),
           targetKey: z.string().min(1).optional(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+export const getSandboxProfileVersionDraftAutomationImpactResponseSchema = z
+  .object({
+    hasBreakingChanges: z.boolean(),
+    affectedAutomations: z.array(
+      z
+        .object({
+          id: z.string().min(1),
+          name: z.string().min(1),
+          kind: automationKindSchema,
+          enabled: z.boolean(),
+          issues: z.array(
+            z
+              .object({
+                code: z.enum([
+                  SandboxProfileAutomationImpactIssueCodes.AGENT_BINDING_REQUIRED,
+                  SandboxProfileAutomationImpactIssueCodes.AGENT_BINDING_AMBIGUOUS,
+                  SandboxProfileAutomationImpactIssueCodes.AGENT_BINDING_RUNTIME_INVALID,
+                  SandboxProfileAutomationImpactIssueCodes.INVALID_BINDING_CONNECTION_REFERENCE,
+                  SandboxProfileAutomationImpactIssueCodes.CONNECTION_NOT_ACTIVE,
+                  SandboxProfileAutomationImpactIssueCodes.TARGET_DISABLED,
+                  SandboxProfileAutomationImpactIssueCodes.TARGET_MISSING,
+                  SandboxProfileAutomationImpactIssueCodes.WEBHOOK_SOURCE_CONNECTION_NOT_BOUND,
+                  SandboxProfileAutomationImpactIssueCodes.PRIMARY_REPOSITORY_UNAVAILABLE,
+                ]),
+                message: z.string().min(1),
+                bindingId: z.string().min(1).optional(),
+                connectionId: z.string().min(1).optional(),
+                targetKey: z.string().min(1).optional(),
+                primaryRepositoryId: z.string().min(1).optional(),
+              })
+              .strict(),
+          ),
         })
         .strict(),
     ),

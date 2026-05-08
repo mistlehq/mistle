@@ -39,7 +39,7 @@ import { SessionTerminalSurface } from "./session-terminal-surface.js";
 import type { WorkbenchSandboxLifecycleStatus } from "./session-workbench-state.js";
 
 type SessionTerminalWorkspaceProps = {
-  cwd: string | null;
+  cwd: string;
   ensureTransportConnected: (input: { sandboxInstanceId: string }) => Promise<{
     sandboxInstanceId: string;
     transport: SandboxSessionTransport;
@@ -53,13 +53,13 @@ type SessionTerminalWorkspaceProps = {
 };
 
 type SessionTerminalWorkspaceViewProps = {
-  cwd: string | null;
+  cwd: string;
   isVisible: boolean;
   onApiReady?: (api: DockviewApi) => void;
   onWorkspaceEmpty: () => void;
   renderTerminalPanel: (input: {
     closePanel: () => void;
-    cwd: string | null;
+    cwd: string;
     isPanelVisible: boolean;
     panelId: string;
   }) => ReactElement;
@@ -71,7 +71,7 @@ export type SessionTerminalWorkspaceHandle = {
 };
 
 type SessionTerminalDockviewParams = {
-  cwd: string | null;
+  cwd: string;
 };
 
 type SessionTerminalWorkspaceContextValue = {
@@ -157,27 +157,27 @@ function DockviewTerminalNewTabAction(input: IDockviewHeaderActionsProps): React
   );
 }
 
+function readRequiredTerminalPanelCwd(parameters: unknown): string {
+  if (typeof parameters !== "object" || parameters === null || Array.isArray(parameters)) {
+    throw new Error("Terminal panel parameters must include cwd.");
+  }
+
+  const cwd = Reflect.get(parameters, "cwd");
+  if (typeof cwd !== "string" || cwd.length === 0) {
+    throw new Error("Terminal panel cwd must be a non-empty string.");
+  }
+
+  return cwd;
+}
+
 function DockviewTerminalPanel(input: SessionDockviewTerminalPanelProps): ReactElement {
   const { renderTerminalPanel } = useTerminalWorkspaceContext();
-  const initialParameters = input.api.getParameters<SessionTerminalDockviewParams>();
-  const [cwd, setCwd] = useState<string | null>(
-    typeof initialParameters.cwd === "string" ? initialParameters.cwd : null,
-  );
+  const [cwd, setCwd] = useState<string>(() => readRequiredTerminalPanelCwd(input.params));
   const [isPanelVisible, setIsPanelVisible] = useState(input.api.isVisible);
 
   useEffect(() => {
     const disposable = input.api.onDidParametersChange((nextParameters) => {
-      if (
-        typeof nextParameters !== "object" ||
-        nextParameters === null ||
-        Array.isArray(nextParameters)
-      ) {
-        setCwd(null);
-        return;
-      }
-
-      const nextCwd = Reflect.get(nextParameters, "cwd");
-      setCwd(typeof nextCwd === "string" ? nextCwd : null);
+      setCwd(readRequiredTerminalPanelCwd(nextParameters));
     });
 
     return () => {
@@ -207,7 +207,7 @@ function DockviewTerminalPanel(input: SessionDockviewTerminalPanelProps): ReactE
 
 function PtyBackedDockviewTerminalPanel(input: {
   closePanel: () => void;
-  cwd: string | null;
+  cwd: string;
   ensureTransportConnected: SessionTerminalWorkspaceProps["ensureTransportConnected"];
   isConnectionReady: boolean;
   isPanelVisible: boolean;

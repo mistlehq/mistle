@@ -31,11 +31,31 @@ type QueuedSteerRequest = {
   status: "queued" | "sending";
 };
 
+export type TurnCwdCommit = {
+  threadId: string;
+  cwd: string;
+};
+
+export function resolveTurnCwdCommit(input: {
+  threadId: string;
+  cwd?: string;
+}): TurnCwdCommit | null {
+  if (input.cwd === undefined) {
+    return null;
+  }
+
+  return {
+    threadId: input.threadId,
+    cwd: input.cwd,
+  };
+}
+
 function buildTurnRequest(input: {
   submittedPrompt: string;
   submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
   transcriptPrompt?: string;
   displayAttachments?: readonly ChatAttachment[];
+  cwd?: string;
   collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
 }): {
   submittedPrompt: string;
@@ -43,6 +63,7 @@ function buildTurnRequest(input: {
   submittedAttachments: readonly CodexTurnInputLocalImageItem[];
   displayAttachments: readonly ChatAttachment[];
   items: ReturnType<typeof buildCodexTurnInputItems>;
+  cwd?: string;
   collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
 } {
   const submittedPrompt = input.submittedPrompt.trim();
@@ -61,6 +82,7 @@ function buildTurnRequest(input: {
       text: submittedPrompt,
       attachments: submittedAttachments,
     }),
+    ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
     ...(input.collaborationModeSettings === undefined
       ? {}
       : { collaborationModeSettings: input.collaborationModeSettings }),
@@ -70,6 +92,7 @@ function buildTurnRequest(input: {
 export function useCodexChatController(input: {
   rpcClientRef: RefObject<CodexJsonRpcClient | null>;
   threadIdRef: RefObject<string | null>;
+  onTurnCwdCommitted: (input: TurnCwdCommit) => void;
   setSessionErrorMessage: (message: string | null) => void;
 }) {
   const [chatState, dispatchChatAction] = useReducer(
@@ -168,6 +191,7 @@ export function useCodexChatController(input: {
       submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
       transcriptPrompt?: string;
       displayAttachments?: readonly ChatAttachment[];
+      cwd?: string;
       collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
     }) => {
       const rpcClient = input.rpcClientRef.current;
@@ -183,6 +207,7 @@ export function useCodexChatController(input: {
         rpcClient,
         threadId,
         input: turnRequest.items,
+        ...(turnRequest.cwd === undefined ? {} : { cwd: turnRequest.cwd }),
         ...(turnRequest.collaborationModeSettings === undefined
           ? {}
           : { collaborationModeSettings: turnRequest.collaborationModeSettings }),
@@ -194,6 +219,13 @@ export function useCodexChatController(input: {
         prompt: turnRequest.transcriptPrompt,
         attachments: turnRequest.displayAttachments,
       });
+      const turnCwdCommit = resolveTurnCwdCommit({
+        threadId,
+        ...(turnRequest.cwd === undefined ? {} : { cwd: turnRequest.cwd }),
+      });
+      if (turnCwdCommit !== null) {
+        input.onTurnCwdCommitted(turnCwdCommit);
+      }
     },
   });
 

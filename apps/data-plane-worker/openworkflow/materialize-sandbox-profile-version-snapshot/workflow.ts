@@ -10,6 +10,7 @@ import {
   type MaterializeSandboxProfileVersionSnapshotWorkflowInput,
   type MaterializeSandboxProfileVersionSnapshotWorkflowOutput,
 } from "@mistle/workflow-registry/data-plane";
+import { shouldRethrowDurableStepErrorForRetry } from "@mistle/workflow-registry/durable-step-retry.js";
 
 import { getWorkflowContext, type WorkflowContext } from "../core/context.js";
 import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
@@ -434,6 +435,10 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
       image: capturedSnapshot,
     };
   } catch (error) {
+    if (shouldRethrowDurableStepErrorForRetry(error)) {
+      throw error;
+    }
+
     const failure = mapSnapshotFailure({
       phase: currentPhase,
     });

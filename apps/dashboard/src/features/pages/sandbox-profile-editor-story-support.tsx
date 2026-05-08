@@ -19,6 +19,7 @@ import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } f
 import type { ChatEntry } from "../chat/chat-types.js";
 import { ChatComposer } from "../chat/components/chat-composer.js";
 import { noopRespondToServerRequest } from "../chat/components/chat-story-support.js";
+import type { SandboxProfileVersionDraftAutomationImpactAutomation } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { SessionComposerFixtureProps } from "../session-agents/codex/fixtures/session-fixtures.js";
 import {
   createIntegrationsEditorSectionStoryQueryClient,
@@ -100,6 +101,8 @@ export type SandboxProfileEditorPageStoryArgs = {
     kind: "error";
   };
   draftSaveErrorMessage?: string;
+  draftAutomationImpactError?: string;
+  draftAutomationImpactAffectedAutomations?: readonly SandboxProfileVersionDraftAutomationImpactAutomation[];
   initialBindings?: readonly {
     id: string;
     connectionId: string;
@@ -600,6 +603,11 @@ function SandboxProfileEditorPageStoryView(
       deleteProfileAutomationUsagesIsPending={false}
       deleteProfileError={null}
       deleteProfileIsPending={false}
+      draftAutomationImpactError={input.draftAutomationImpactError ?? null}
+      draftAutomationImpactAffectedAutomations={
+        input.draftAutomationImpactAffectedAutomations ?? null
+      }
+      onDraftAutomationImpactErrorDismiss={() => {}}
       hasUnpersistedSetupScriptChanges={setupScriptDraft !== persistedSetupScript}
       isDeleteProfileDialogOpen={false}
       mode={mode}
