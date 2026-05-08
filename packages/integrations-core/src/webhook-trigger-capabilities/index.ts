@@ -12,9 +12,9 @@ export type IntegrationWebhookTriggerCapabilityEventStatus = "enabled" | "not_en
 export type IntegrationWebhookTriggerCapabilityEvent = {
   eventDefinition: IntegrationWebhookEventDefinition;
   capabilities?: IntegrationWebhookTriggerCapabilities | undefined;
-  missingRequirementSets: readonly IntegrationWebhookTriggerRequirementSet[];
   satisfiedRequirementSet?: IntegrationWebhookTriggerRequirementSet | undefined;
   status: IntegrationWebhookTriggerCapabilityEventStatus;
+  unsatisfiedRequirementSets: readonly IntegrationWebhookTriggerRequirementSet[];
 };
 
 function toRecord(value: unknown): Record<string, unknown> | null {
@@ -207,16 +207,16 @@ export function resolveWebhookTriggerCapabilityEvents(input: {
       return {
         eventDefinition,
         ...(input.capabilities === undefined ? {} : { capabilities: input.capabilities }),
-        missingRequirementSets: [],
         status: "enabled",
+        unsatisfiedRequirementSets: [],
       };
     }
 
     if (input.capabilities === undefined) {
       return {
         eventDefinition,
-        missingRequirementSets: requirements.anyOf,
         status: "not_enabled",
+        unsatisfiedRequirementSets: requirements.anyOf,
       };
     }
 
@@ -232,17 +232,17 @@ export function resolveWebhookTriggerCapabilityEvents(input: {
       return {
         eventDefinition,
         capabilities,
-        missingRequirementSets: [],
         satisfiedRequirementSet,
         status: "enabled",
+        unsatisfiedRequirementSets: [],
       };
     }
 
     return {
       eventDefinition,
       capabilities,
-      missingRequirementSets: requirements.anyOf,
       status: "not_enabled",
+      unsatisfiedRequirementSets: requirements.anyOf,
     };
   });
 }

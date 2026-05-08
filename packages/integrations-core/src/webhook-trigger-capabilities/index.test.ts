@@ -169,30 +169,30 @@ describe("webhook trigger capabilities", () => {
     expect(
       events.map((event) => ({
         eventType: event.eventDefinition.eventType,
-        missingRequirementSets: event.missingRequirementSets,
         satisfiedRequirementSet: event.satisfiedRequirementSet,
         status: event.status,
+        unsatisfiedRequirementSets: event.unsatisfiedRequirementSets,
       })),
     ).toEqual([
       {
         eventType: "github.pull_request.opened",
-        missingRequirementSets: [],
         satisfiedRequirementSet: {
           event: "pull_request",
           permissions: [{ permission: "pull_requests", access: "read" }],
         },
         status: "enabled",
+        unsatisfiedRequirementSets: [],
       },
       {
         eventType: "github.push.pushed",
-        missingRequirementSets: [
+        satisfiedRequirementSet: undefined,
+        status: "not_enabled",
+        unsatisfiedRequirementSets: [
           {
             event: "push",
             permissions: [{ permission: "contents", access: "read" }],
           },
         ],
-        satisfiedRequirementSet: undefined,
-        status: "not_enabled",
       },
     ]);
   });

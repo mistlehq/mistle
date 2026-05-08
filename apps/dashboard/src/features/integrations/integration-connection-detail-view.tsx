@@ -49,8 +49,6 @@ import {
 } from "./integration-resource-row.js";
 import type { IntegrationWebhookSource } from "./integrations-service.js";
 
-type IntegrationSupportedWebhookEvent = IntegrationWebhookEventDefinition;
-
 export type IntegrationConnectionDetailResourceSummary = IntegrationResourceListItemResourceSummary;
 
 export type IntegrationConnectionDetailItem = {
@@ -105,7 +103,7 @@ export type IntegrationConnectionDetailViewProps = {
   selectedConnectionId?: string | null;
   selectedConnectionBody?: ReactNode;
   selectedConnectionNotice?: ReactNode;
-  supportedWebhookEvents?: readonly IntegrationSupportedWebhookEvent[];
+  supportedWebhookEvents?: readonly IntegrationWebhookEventDefinition[];
   titleEditor?:
     | {
         disabled: boolean;
@@ -363,7 +361,7 @@ function ConnectionDetailPane(input: {
   resourceItemsByKey?: IntegrationConnectionDetailViewProps["resourceItemsByKey"];
   customBody?: ReactNode;
   selectedConnectionNotice?: ReactNode;
-  supportedWebhookEvents?: readonly IntegrationSupportedWebhookEvent[];
+  supportedWebhookEvents?: readonly IntegrationWebhookEventDefinition[];
   titleEditor?: IntegrationConnectionDetailViewProps["titleEditor"];
   webhookPolicy?: IntegrationConnectionDetailViewProps["webhookPolicy"];
   webhookSourceState?: IntegrationWebhookSourceSectionState;
@@ -808,7 +806,7 @@ function WebhookSourcesSection(input: {
     | ((input: { connectionId: string; webhookSourceId: string }) => void)
     | undefined;
   state: IntegrationWebhookSourceSectionState;
-  supportedWebhookEvents: readonly IntegrationSupportedWebhookEvent[];
+  supportedWebhookEvents: readonly IntegrationWebhookEventDefinition[];
 }): React.JSX.Element {
   return (
     <div className="gap-3 pt-2 flex flex-col">
@@ -890,7 +888,7 @@ function WebhookSourceCard(input: {
     | ((input: { connectionId: string; webhookSourceId: string }) => void)
     | undefined;
   source: IntegrationWebhookSource;
-  supportedWebhookEvents: readonly IntegrationSupportedWebhookEvent[];
+  supportedWebhookEvents: readonly IntegrationWebhookEventDefinition[];
 }): React.JSX.Element {
   const isDeleting = input.deletingWebhookSourceId === input.source.id;
   const isDeleteSupported =
@@ -991,7 +989,7 @@ function WebhookTriggerCapabilityEventRow(input: {
   const providerRequirementSets =
     input.event.status === "enabled" && input.event.satisfiedRequirementSet !== undefined
       ? [input.event.satisfiedRequirementSet]
-      : input.event.missingRequirementSets;
+      : input.event.unsatisfiedRequirementSets;
 
   return (
     <div className="border-b px-3 py-3 last:border-b-0">
