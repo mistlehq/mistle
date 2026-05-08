@@ -184,7 +184,6 @@ export function SandboxProfileSnapshotPanelView(input: {
 
   const actionLabel = resolveSnapshotActionLabel(input.state);
   const activityLabel = resolveSnapshotActivityLabel(input.state);
-  const latestSnapshotCreatedAt = resolveLatestSnapshotCreatedAt(input.state);
 
   return (
     <SandboxProfileEditorHorizontalTabContent>
@@ -214,33 +213,7 @@ export function SandboxProfileSnapshotPanelView(input: {
       <FormPageSection>
         <div className="flex flex-col gap-4 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            {input.state.kind === "publish-snapshot-error" ||
-            input.state.kind === "creating" ||
-            input.state.kind === "ready" ||
-            input.state.kind === "refresh-error" ? (
-              <SnapshotVersionStatusSummary state={input.state} version={input.version} />
-            ) : (
-              <DefinitionList
-                className="min-w-0 flex-1 md:grid-cols-1"
-                items={[
-                  {
-                    id: "current-version",
-                    label: "Current version",
-                    value: `v${String(input.version)}`,
-                  },
-                  {
-                    id: "runnable-version",
-                    label: "Runnable version",
-                    value: resolveRunnableVersionLabel(input.state, input.version),
-                  },
-                  {
-                    id: "snapshot-created",
-                    label: "Latest snapshot",
-                    value: latestSnapshotCreatedAt ?? "N/A",
-                  },
-                ]}
-              />
-            )}
+            <SnapshotVersionStatusSummary state={input.state} version={input.version} />
 
             {activityLabel === null ? null : (
               <ActivityStatus
@@ -293,18 +266,6 @@ function formatPublishSnapshotFailureMessage(input: {
   }
 
   return `Version ${publishedVersion} was published, but its snapshot could not be created. New sessions and automations will continue using v${String(input.runnableVersion)} until the snapshot is retried successfully.`;
-}
-
-function resolveRunnableVersionLabel(state: SnapshotPanelState, version: number): string {
-  if (state.kind === "publish-snapshot-error") {
-    return state.runnableVersion === null ? "None" : `v${String(state.runnableVersion)}`;
-  }
-
-  if (state.kind === "ready" || state.kind === "refresh-error") {
-    return `v${String(version)}`;
-  }
-
-  return "Not ready";
 }
 
 function SnapshotVersionStatusSummary(input: {
@@ -714,14 +675,6 @@ function resolveSnapshotActionLabel(state: SnapshotPanelState): string | null {
 function resolveSnapshotActivityLabel(state: SnapshotPanelState): string | null {
   if (state.kind === "creating") {
     return "Creating snapshot";
-  }
-
-  return null;
-}
-
-function resolveLatestSnapshotCreatedAt(state: SnapshotPanelState): string | null {
-  if (state.kind === "ready" || state.kind === "refresh-error") {
-    return state.latestSnapshotCreatedAt;
   }
 
   return null;
