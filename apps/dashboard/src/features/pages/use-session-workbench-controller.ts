@@ -105,7 +105,6 @@ type SessionWorkbenchState = {
   primaryRepositoryState: ReturnType<typeof useSessionPrimaryRepositoryState>;
   primaryRepositoryControlState: {
     disabledReason: string | null;
-    isSwitching: boolean;
     switchPrimaryRepository: (nextSelectedRepositoryPath: string | null) => Promise<void>;
   };
   portAccessState: ReturnType<typeof useSessionPortAccess>;
@@ -217,7 +216,6 @@ export function useSessionWorkbenchController(input: {
   });
   selectedRepositoryPathRef.current = primaryRepositoryState.selectedRepositoryPath;
   const isPrimaryRepositorySwitchBlockedByCli = handoff.isCliToggleActive;
-  const isSwitchingPrimaryRepository = sessionState.threads.isSwitchingPrimaryRepository;
   const branchDiffState = useSessionBranchDiff({
     cwd: primaryRepositoryState.selectedRepositoryPath,
     enabled: diffPanelState.isVisible && workbenchLifecycleState.connectionReadiness.canConnect,
@@ -366,7 +364,6 @@ export function useSessionWorkbenchController(input: {
         disabledReason: isPrimaryRepositorySwitchBlockedByCli
           ? "Exit Codex TUI before switching the primary repository."
           : null,
-        isSwitching: isSwitchingPrimaryRepository,
         switchPrimaryRepository,
       },
     },

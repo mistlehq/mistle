@@ -163,7 +163,6 @@ function SessionWorkbenchPageContent(input: {
             !workbench.connectionReadiness.canConnect ||
             (workbench.primaryRepositoryState.isInitialLoading &&
               workbench.primaryRepositoryState.options.length === 1) ||
-            workbench.primaryRepositoryControlState.isSwitching ||
             workbench.primaryRepositoryControlState.disabledReason !== null,
           ...(primaryRepositoryErrorMessage === null
             ? {}
@@ -189,13 +188,11 @@ function SessionWorkbenchPageContent(input: {
             (!workbench.connectionReadiness.canConnect
               ? (workbench.stoppedSessionMessage ??
                 "Primary repository is available only when the sandbox is running.")
-              : workbench.primaryRepositoryControlState.isSwitching
-                ? "Updating the active chat thread working directory."
-                : workbench.primaryRepositoryState.isInitialLoading
-                  ? "Loading repositories from the active sandbox."
-                  : workbench.primaryRepositoryState.isRefreshing
-                    ? "Refreshing repositories from the active sandbox."
-                    : "Primary repository"),
+              : workbench.primaryRepositoryState.isInitialLoading
+                ? "Loading repositories from the active sandbox."
+                : workbench.primaryRepositoryState.isRefreshing
+                  ? "Refreshing repositories from the active sandbox."
+                  : "Primary repository"),
         }}
         status={{
           kind: headerStatusKind,
@@ -242,7 +239,6 @@ function SessionWorkbenchPageContent(input: {
       workbench.primaryRepositoryState.refreshRepositories,
       workbench.primaryRepositoryState.selectedRepositoryPath,
       primaryRepositoryErrorMessage,
-      workbench.primaryRepositoryControlState.isSwitching,
       workbench.primaryRepositoryControlState.switchPrimaryRepository,
       workbench.sandboxLifecycleStatus,
       workbench.primaryPanelState.canEnterCli,

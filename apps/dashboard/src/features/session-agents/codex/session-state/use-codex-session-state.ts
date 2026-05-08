@@ -64,7 +64,6 @@ type CodexSessionThreadState = {
   isRefreshingArchivedThreads: boolean;
   isStartingNewThread: boolean;
   isResumingThread: boolean;
-  isSwitchingPrimaryRepository: boolean;
   isForkingThread: boolean;
   isArchivingThread: boolean;
   isUnarchivingThread: boolean;
@@ -778,7 +777,6 @@ export function useCodexSessionState(input: {
       isRefreshingArchivedThreads,
       isStartingNewThread,
       isResumingThread,
-      isSwitchingPrimaryRepository: false,
       isForkingThread,
       isArchivingThread,
       isUnarchivingThread,
