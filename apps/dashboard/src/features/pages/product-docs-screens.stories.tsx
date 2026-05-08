@@ -386,6 +386,7 @@ function DocsSessionHeaderActions(input: {
 }): React.JSX.Element {
   const headerButtonClassName = "bg-transparent text-foreground shadow-none hover:bg-stone-100";
   const pressedButtonClassName = "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300";
+  const portAccessState = input.portAccessState ?? DocsSessionPortAccessClosedState;
 
   return (
     <SessionWorkbenchHeaderActions
@@ -409,25 +410,14 @@ function DocsSessionHeaderActions(input: {
         pressed: input.isDiffVisible === true,
         title: input.isDiffVisible === true ? "Changes" : "Open changes",
       }}
-      portAccessControl={
-        <SessionPortAccessPopover
-          state={input.portAccessState ?? DocsSessionPortAccessClosedState}
-        />
-      }
+      portAccessControl={<SessionPortAccessPopover state={portAccessState} />}
       mobilePortAccessControl={{
-        disabled:
-          (input.portAccessState ?? DocsSessionPortAccessClosedState).buttonDisabledReason !== null,
+        disabled: portAccessState.buttonDisabledReason !== null,
         onOpen: () => {
-          (input.portAccessState ?? DocsSessionPortAccessClosedState).setPanelOpen(true);
+          portAccessState.setPanelOpen(true);
         },
-        surface: (
-          <SessionPortAccessSheet
-            state={input.portAccessState ?? DocsSessionPortAccessClosedState}
-          />
-        ),
-        title:
-          (input.portAccessState ?? DocsSessionPortAccessClosedState).buttonDisabledReason ??
-          "Show running processes",
+        surface: <SessionPortAccessSheet state={portAccessState} />,
+        title: portAccessState.buttonDisabledReason ?? "Show running processes",
       }}
       repositoryControl={{
         ariaLabel: "Primary repository",
