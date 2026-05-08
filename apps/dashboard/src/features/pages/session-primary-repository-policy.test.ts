@@ -1,8 +1,8 @@
+import { DefaultSandboxWorkspaceDir } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import {
   buildRepositoryDiscoveryFindArgs,
-  DefaultSandboxWorkspaceDir,
   parseRepositoryPaths,
   resolveInitialSelectedRepositoryPath,
   resolvePrimaryRepositoryPresentation,

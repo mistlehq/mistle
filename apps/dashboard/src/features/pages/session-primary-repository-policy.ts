@@ -190,5 +190,3 @@ export function resolvePrimaryRepositoryPresentation(input: {
     selection,
   };
 }
-
-export { DefaultSandboxWorkspaceDir };
