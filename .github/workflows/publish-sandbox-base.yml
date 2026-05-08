@@ -107,7 +107,7 @@ jobs:
 
     steps:
       - name: Fetch Infisical secrets
-        uses: Infisical/secrets-action@v1.0.11
+        uses: Infisical/secrets-action@v1.0.16
         with:
           method: oidc
           identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
