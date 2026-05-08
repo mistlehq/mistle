@@ -82,12 +82,6 @@ const IntegrationVitestProjects = [
     packageDir: "apps/data-plane-worker",
     appServicePrewarm: "worker",
   },
-  {
-    projectName: "@mistle/tokenizer-proxy",
-    packageName: "@mistle/tokenizer-proxy",
-    packageDir: "apps/tokenizer-proxy",
-    appServicePrewarm: "none",
-  },
 ] satisfies IntegrationVitestProject[];
 
 const RequiredBuildPackages = [
@@ -98,7 +92,6 @@ const RequiredBuildPackages = [
   "@mistle/data-plane-worker",
   "@mistle/db",
   "@mistle/test-harness",
-  "@mistle/tokenizer-proxy",
 ] as const;
 
 const TimingEnabledValue = "1";

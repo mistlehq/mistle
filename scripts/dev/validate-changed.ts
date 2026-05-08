@@ -58,7 +58,6 @@ const AFFECTED_INTEGRATION_TEST_PACKAGE_NAMES = new Set([
   "@mistle/object-store",
   "@mistle/sandbox",
   "@mistle/test-harness",
-  "@mistle/tokenizer-proxy",
 ]);
 const AFFECTED_RUST_TEST_PACKAGE_NAMES = new Set(["@mistle/commit-sign", "@mistle/sandboxd"]);
 

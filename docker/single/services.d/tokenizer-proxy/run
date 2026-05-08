@@ -1,5 +1,0 @@
-#!/bin/sh
-set -eu
-
-cd /app
-exec /usr/local/bin/mistle-tokenizer-proxy-entrypoint

@@ -40,16 +40,6 @@ export default defineConfig({
         find: /^@mistle\/data-plane-gateway\/types$/,
         replacement: fileURLToPath(new URL("../data-plane-gateway/src/types.ts", import.meta.url)),
       },
-      {
-        find: /^@mistle\/tokenizer-proxy\/runtime$/,
-        replacement: fileURLToPath(
-          new URL("../tokenizer-proxy/src/runtime/index.ts", import.meta.url),
-        ),
-      },
-      {
-        find: /^@mistle\/tokenizer-proxy\/types$/,
-        replacement: fileURLToPath(new URL("../tokenizer-proxy/src/types.ts", import.meta.url)),
-      },
     ],
   },
   test: {

@@ -180,7 +180,6 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
   const controlPlaneApiUrl = "http://localhost:5100";
   const dataPlaneApiUrl = "http://localhost:5200";
   const dataPlaneGatewayUrl = "http://127.0.0.1:5202";
-  const tokenizerProxyUrl = "http://localhost:5205";
 
   return {
     global: {
@@ -243,12 +242,6 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
         internal_url: dataPlaneGatewayUrl,
         sandbox_ws_public_url: "ws://localhost:5202/tunnel/sandbox",
         sandbox_ws_internal_url: "ws://data-plane-gateway-relay:5202/tunnel/sandbox",
-      },
-      tokenizer_proxy: {
-        host: "127.0.0.1",
-        port: 5205,
-        public_url: controlPlaneApiUrl,
-        internal_url: tokenizerProxyUrl,
       },
       control_plane_worker: {
         workflow_concurrency: 1,
@@ -346,11 +339,6 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
           issuer: "data-plane-worker",
           audience: "data-plane-gateway",
         },
-        egress: {
-          secret: createSecret(),
-          issuer: "data-plane-worker",
-          audience: "tokenizer-proxy",
-        },
       },
       publish: {
         access_token: {
@@ -397,12 +385,6 @@ export function buildIntegrationTomlConfig(input: {
     ["services", "data_plane_gateway", "sandbox_ws_internal_url"],
     "ws://data-plane-gateway:5202/tunnel/sandbox",
   );
-  configRoot = setValueAtPath(
-    configRoot,
-    ["services", "tokenizer_proxy", "internal_url"],
-    "http://tokenizer-proxy:5205",
-  );
-
   if (input.provider === "docker") {
     configRoot = setValueAtPath(configRoot, ["sandbox", "provider"], "docker");
     configRoot = setValueAtPath(configRoot, ["sandbox", "storage"], {

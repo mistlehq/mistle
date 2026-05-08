@@ -12,7 +12,7 @@ describe("createProviderSystemTestInput", () => {
       sandboxProviders: ["docker", "e2b"],
       publicAccess: {
         provider: "cloudflare",
-        services: ["data-plane-gateway", "tokenizer-proxy"],
+        services: ["data-plane-gateway"],
       },
     } satisfies CreateSandboxSystemTestInput;
 

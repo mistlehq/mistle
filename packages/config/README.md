@@ -72,7 +72,6 @@ Return shape:
 - [Data Plane API module](./src/apps/data-plane-api/README.md)
 - [Data Plane Gateway module](./src/apps/data-plane-gateway/README.md)
 - [Data Plane Worker module](./src/apps/data-plane-worker/README.md)
-- [Tokenizer Proxy module](./src/apps/tokenizer-proxy/README.md)
 
 ## Adding And Managing Config
 

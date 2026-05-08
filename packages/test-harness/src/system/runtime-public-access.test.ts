@@ -88,16 +88,16 @@ describe("isRuntimePublicAccessUpgradeProbeReadyStatus", () => {
 });
 
 describe("readRuntimePublicAccessEnvironmentIdFromPath", () => {
-  it("reads path-carried environment ids used by public tokenizer egress URLs", () => {
+  it("reads path-carried environment ids used by public service URLs", () => {
     expect(
       readRuntimePublicAccessEnvironmentIdFromPath(
-        "/__test-environments/test_env_123/tokenizer-proxy/egress/mistlehq/repo.git",
+        "/__test-environments/test_env_123/tunnel/sandbox/sbi_runtime_public_access_probe",
       ),
     ).toBe("test_env_123");
   });
 
   it("ignores requests without a complete test-environment path prefix", () => {
-    expect(readRuntimePublicAccessEnvironmentIdFromPath("/tokenizer-proxy/egress")).toBeUndefined();
+    expect(readRuntimePublicAccessEnvironmentIdFromPath("/tunnel/sandbox")).toBeUndefined();
     expect(readRuntimePublicAccessEnvironmentIdFromPath("/__test-environments")).toBeUndefined();
     expect(readRuntimePublicAccessEnvironmentIdFromPath("/__test-environments/")).toBeUndefined();
   });

@@ -9,9 +9,7 @@
       "@mistle/data-plane-api/runtime": ["../../apps/data-plane-api/src/main.ts"],
       "@mistle/data-plane-api/types": ["../../apps/data-plane-api/src/types.ts"],
       "@mistle/data-plane-gateway/runtime": ["../../apps/data-plane-gateway/src/runtime/index.ts"],
-      "@mistle/data-plane-gateway/types": ["../../apps/data-plane-gateway/src/types.ts"],
-      "@mistle/tokenizer-proxy/runtime": ["../../apps/tokenizer-proxy/src/runtime/index.ts"],
-      "@mistle/tokenizer-proxy/types": ["../../apps/tokenizer-proxy/src/types.ts"]
+      "@mistle/data-plane-gateway/types": ["../../apps/data-plane-gateway/src/types.ts"]
     }
   },
   "include": ["src/**/*.ts", "integration/**/*.ts", "vitest.integration.config.ts"]

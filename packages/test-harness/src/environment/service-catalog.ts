@@ -26,7 +26,6 @@ import { startControlPlaneWorker } from "../apps/control-plane-worker.js";
 import { startDataPlaneApi } from "../apps/data-plane-api.js";
 import { startDataPlaneGateway } from "../apps/data-plane-gateway.js";
 import { startDataPlaneWorker } from "../apps/data-plane-worker.js";
-import { startTokenizerProxy } from "../apps/tokenizer-proxy.js";
 import { registerProcessCleanupTask } from "../cleanup/index.js";
 import { startDockerNetwork } from "../network/start-docker-network.js";
 import { startOtlpTestCollector } from "../services/otlp-test-collector.js";
@@ -212,8 +211,7 @@ export type MistleTestServiceId =
   | "control-plane-worker"
   | "data-plane-api"
   | "data-plane-gateway"
-  | "data-plane-worker"
-  | "tokenizer-proxy";
+  | "data-plane-worker";
 
 export type MistleTestExtraInfraId = "mailpit" | "otlp" | "seaweedfs";
 
@@ -223,7 +221,6 @@ export type MistleTestRegistry = TestServiceRegistry & {
   "data-plane-api": TestServiceDefinition;
   "data-plane-gateway": TestServiceDefinition;
   "data-plane-worker": TestServiceDefinition;
-  "tokenizer-proxy": TestServiceDefinition;
 };
 
 export type CreateTestRegistryInput = {
@@ -286,9 +283,6 @@ export function createTestRegistry(input: CreateTestRegistryInput = {}): MistleT
       "data-plane-worker": createDataPlaneWorkerService({
         context,
         postgres: dataPlanePostgres,
-      }),
-      "tokenizer-proxy": createTokenizerProxyService({
-        context,
       }),
     },
     ...(input.__dangerouslyIsolatedServices === undefined
@@ -1234,49 +1228,6 @@ async function startDataPlaneGatewayDockerService(input: {
   };
 }
 
-function createTokenizerProxyService(input: {
-  context: MistleRegistryContext;
-}): TestServiceDefinition {
-  return {
-    id: "tokenizer-proxy",
-    infra: [],
-    serviceReferences: ["control-plane-api"],
-    supportedModes: ["docker"],
-    healthCheck: async (service) => checkHttpServiceHealth(service, "tokenizer-proxy"),
-    start: async (startInput) => {
-      assertDockerMode(startInput.mode, "tokenizer-proxy");
-      const preparedRuntime = await readPreparedTestHarnessRuntime(
-        input.context.buildContextHostPath,
-      );
-      const service = await startTokenizerProxy({
-        buildContextHostPath: input.context.buildContextHostPath,
-        configPathInContainer: input.context.configPathInContainer,
-        startupTimeoutMs: input.context.startupTimeoutMs,
-        prebuiltImageName: preparedRuntime.appImages.tokenizerProxy,
-        environment: {
-          MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: readOptionalServiceContainerBaseUrl({
-            services: startInput.services,
-            serviceId: "control-plane-api",
-          }),
-          MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: "http://localhost:5100",
-        },
-        bindMounts: [createConfigBindMount(input.context)],
-      });
-
-      return {
-        id: "tokenizer-proxy",
-        mode: startInput.mode,
-        endpoints: createHttpEndpoints({
-          hostBaseUrl: service.hostBaseUrl,
-          internalBaseUrl: service.containerBaseUrl,
-        }),
-        containerId: service.containerId,
-        stop: service.stop,
-      };
-    },
-  };
-}
-
 function createControlPlaneWorkerService(input: {
   context: MistleRegistryContext;
   postgres: TestInfraRequirement;
@@ -1352,7 +1303,7 @@ function createDataPlaneWorkerService(input: {
   return {
     id: "data-plane-worker",
     infra: [input.postgres],
-    serviceReferences: ["data-plane-gateway", "tokenizer-proxy", "control-plane-api"],
+    serviceReferences: ["data-plane-gateway", "control-plane-api"],
     supportedModes: ["docker"],
     healthCheck: async (service) => checkContainerServiceHealth(service, "data-plane-worker"),
     start: async (startInput) =>

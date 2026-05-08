@@ -61,7 +61,6 @@ export type CreateSystemTestInput = {
   services?: readonly SystemTestServiceSelection[];
   extraInfra?: readonly SystemTestExtraInfraId[];
   sandbox?: SystemTestSandbox;
-  gatewayProxy?: true;
   publicAccess?: SystemTestPublicAccess;
   auth?: {
     google?: "simulated";
@@ -76,7 +75,6 @@ export type RuntimeSystemTestEnvironment = {
   dataPlaneApi: IntegrationTestEnvironment["dataPlaneApi"];
   dataPlaneGateway: IntegrationTestEnvironment["dataPlaneGateway"];
   dataPlaneWorker: IntegrationTestEnvironment["dataPlaneWorker"];
-  tokenizerProxy: IntegrationTestEnvironment["tokenizerProxy"];
 };
 
 type SystemTestFixture = {
@@ -89,7 +87,6 @@ const DefaultSystemServices: readonly SystemTestServiceSelection[] = [
   ServiceIds.DATA_PLANE_API,
   ServiceIds.DATA_PLANE_GATEWAY,
   ServiceIds.DATA_PLANE_WORKER,
-  ServiceIds.TOKENIZER_PROXY,
 ];
 
 const DefaultSystemExtraInfra: readonly SystemTestExtraInfraId[] = ["mailpit", "otlp", "seaweedfs"];
@@ -103,7 +100,6 @@ const DockerSocketPath = "/var/run/docker.sock";
 const PublicAccessHostnameEnvVars = new Map<ServiceId, string>([
   [ServiceIds.CONTROL_PLANE_API, "CONTROL_PLANE_API_TUNNEL_HOSTNAME"],
   [ServiceIds.DATA_PLANE_GATEWAY, "DATA_PLANE_API_TUNNEL_HOSTNAME"],
-  [ServiceIds.TOKENIZER_PROXY, "TOKENIZER_PROXY_TUNNEL_HOSTNAME"],
 ]);
 let systemTestSandboxBaseImageRefPromise: Promise<string> | undefined;
 
@@ -198,7 +194,6 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
       cpuCount?: string;
       memoryMb?: string;
     };
-    gatewayProxy?: true;
     publicServiceBaseUrls?: ReadonlyMap<ServiceId, string>;
   };
 }> {
@@ -210,7 +205,6 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
     return {
       sandbox: {
         provider: "docker",
-        ...(input.gatewayProxy === true ? { gatewayProxy: true } : {}),
       },
     };
   }
@@ -221,7 +215,6 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
       provider: "e2b",
       defaultBaseImageRef: await getSystemTestSandboxBaseImageRef(),
       e2b: readE2BOptions(),
-      ...(input.gatewayProxy === true ? { gatewayProxy: true } : {}),
       publicServiceBaseUrls,
     },
   };
@@ -785,9 +778,6 @@ function createRuntimeSystemEnvironment(
     },
     get dataPlaneWorker() {
       return env.dataPlaneWorker;
-    },
-    get tokenizerProxy() {
-      return env.tokenizerProxy;
     },
   };
 }

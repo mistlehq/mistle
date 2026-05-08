@@ -46,12 +46,6 @@ internal_url = "http://127.0.0.1:5202"
 sandbox_ws_public_url = "wss://replace-with-data-plane-gateway-public-host/tunnel/sandbox"
 sandbox_ws_internal_url = "wss://replace-with-data-plane-gateway-public-host/tunnel/sandbox"
 
-[services.tokenizer_proxy]
-host = "0.0.0.0"
-port = 5205
-public_url = "https://replace-with-tokenizer-proxy-public-host"
-internal_url = "http://127.0.0.1:5205"
-
 [services.control_plane_worker]
 workflow_concurrency = 4
 
@@ -142,11 +136,6 @@ audience = "data-plane-gateway"
 secret = "replace-with-bootstrap-token-secret"
 issuer = "data-plane-worker"
 audience = "data-plane-gateway"
-
-[sandbox.tokens.egress]
-secret = "replace-with-egress-token-secret"
-issuer = "data-plane-worker"
-audience = "tokenizer-proxy"
 
 [sandbox.publish.access_token]
 secret = "replace-with-publish-access-token-secret"

@@ -70,10 +70,6 @@ describe("loadRootConfigFromEnv", () => {
         "wss://gateway.example.com/tunnel/sandbox",
       MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL:
         "ws://data-plane-gateway:8084/tunnel/sandbox",
-      MISTLE_SERVICES_TOKENIZER_PROXY_HOST: "0.0.0.0",
-      MISTLE_SERVICES_TOKENIZER_PROXY_PORT: "8085",
-      MISTLE_SERVICES_TOKENIZER_PROXY_PUBLIC_URL: "https://api.example.com",
-      MISTLE_SERVICES_TOKENIZER_PROXY_INTERNAL_URL: "http://tokenizer-proxy:8085",
       MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY: "4",
       MISTLE_SERVICES_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY: "5",
       MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: "control",
@@ -98,9 +94,6 @@ describe("loadRootConfigFromEnv", () => {
       MISTLE_SANDBOX_TOKENS_CONNECT_SECRET: "connect-secret",
       MISTLE_SANDBOX_TOKENS_CONNECT_ISSUER: "control-plane-api",
       MISTLE_SANDBOX_TOKENS_CONNECT_AUDIENCE: "data-plane-gateway",
-      MISTLE_SANDBOX_TOKENS_EGRESS_SECRET: "egress-secret",
-      MISTLE_SANDBOX_TOKENS_EGRESS_ISSUER: "data-plane-worker",
-      MISTLE_SANDBOX_TOKENS_EGRESS_AUDIENCE: "tokenizer-proxy",
       MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET: "publish-access-secret",
       MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_ISSUER: "control-plane-api",
       MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_AUDIENCE: "data-plane-gateway",
@@ -227,12 +220,6 @@ describe("loadRootConfigFromEnv", () => {
           sandbox_ws_public_url: "wss://gateway.example.com/tunnel/sandbox",
           sandbox_ws_internal_url: "ws://data-plane-gateway:8084/tunnel/sandbox",
         },
-        tokenizer_proxy: {
-          host: "0.0.0.0",
-          port: 8085,
-          public_url: "https://api.example.com",
-          internal_url: "http://tokenizer-proxy:8085",
-        },
         control_plane_worker: {
           workflow_concurrency: 4,
         },
@@ -284,11 +271,6 @@ describe("loadRootConfigFromEnv", () => {
             secret: "connect-secret",
             issuer: "control-plane-api",
             audience: "data-plane-gateway",
-          },
-          egress: {
-            secret: "egress-secret",
-            issuer: "data-plane-worker",
-            audience: "tokenizer-proxy",
           },
         },
         publish: {

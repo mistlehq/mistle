@@ -34,8 +34,6 @@ use tungstenite::{Message, accept};
 static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 static ENV_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 #[cfg(target_os = "linux")]
-const GATEWAY_PROXY_ENABLED_ENV: &str = "GATEWAY_PROXY_ENABLED";
-#[cfg(target_os = "linux")]
 const TEST_PUBLIC_KEY: &str = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE";
 #[cfg(target_os = "linux")]
 const TEST_SIGNATURE: &str =
@@ -53,7 +51,6 @@ fn git_commit_s_succeeds_via_the_real_sandboxd_signer_alias() {
     let global_git_config_path = home_dir.join(".gitconfig");
     let _attachment_root_guard = TestAttachmentRootGuard::set(attachment_root.clone());
     let _env_guard = MultiEnvGuard::set([
-        (GATEWAY_PROXY_ENABLED_ENV, "1".to_string()),
         (
             "HOME",
             home_dir
@@ -159,7 +156,6 @@ fn snapshot_materialization_init_does_not_write_global_git_identity_config() {
     let global_git_config_path = home_dir.join(".gitconfig");
     let _attachment_root_guard = TestAttachmentRootGuard::set(attachment_root);
     let _env_guard = MultiEnvGuard::set([
-        (GATEWAY_PROXY_ENABLED_ENV, "1".to_string()),
         (
             "HOME",
             home_dir

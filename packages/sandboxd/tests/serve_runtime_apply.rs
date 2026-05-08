@@ -10,16 +10,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use sandboxd::control;
 use sandboxd::protocol::startup::{StartupInput, StartupMode};
-use sandboxd::test_support::{TestAttachmentRootGuard, TestEnvVarGuard};
+use sandboxd::test_support::TestAttachmentRootGuard;
 use sandboxd::time::{Duration, Sleeper, ThreadSleeper};
 use tungstenite::{Message, accept};
 
 static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
-const GATEWAY_PROXY_ENABLED_ENV: &str = "GATEWAY_PROXY_ENABLED";
 
 #[test]
 fn daemon_applies_startup_input_after_init_submission() {
-    let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
     let test_dir = create_temp_test_dir("serve_runtime_apply");
     let _attachment_root_guard = TestAttachmentRootGuard::set(test_dir.join("attachments"));
     let control_socket_path = test_dir.join("control.sock");

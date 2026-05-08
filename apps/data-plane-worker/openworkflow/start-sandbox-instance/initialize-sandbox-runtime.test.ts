@@ -72,7 +72,7 @@ function createRuntimePlan(input?: {
 }
 
 describe("createSandboxStartupInput", () => {
-  it("omits transparent proxy configuration unless gateway proxy development mode is enabled", async () => {
+  it("includes transparent proxy configuration when the sandbox provider supports it", async () => {
     const startupInput = await createSandboxStartupInput({
       config: createTestRuntimeConfig(),
       organizationId: "org_123",
@@ -86,13 +86,15 @@ describe("createSandboxStartupInput", () => {
           networkName: "mistle-sandbox-dev",
         },
       }),
-      processEnv: {},
     });
 
-    expect(startupInput.transparentProxy).toBeUndefined();
+    expect(startupInput.transparentProxy?.passthroughBypass).toEqual({
+      kind: "socket_mark",
+      mark: 38_514,
+    });
   });
 
-  it("keeps acting-user context out of sandbox startup input when gateway proxy mode is disabled", async () => {
+  it("keeps acting-user context out of sandbox startup input when no sandbox adapter is available", async () => {
     const startupInput = await createSandboxStartupInput({
       config: createTestRuntimeConfig(),
       organizationId: "org_123",
@@ -125,13 +127,12 @@ describe("createSandboxStartupInput", () => {
         ],
       }),
       actingUserId: "usr_123",
-      processEnv: {},
     });
 
     expect(startupInput.actingUserId).toBeUndefined();
   });
 
-  it("includes acting-user context in gateway proxy startup input when the workflow has one", async () => {
+  it("includes acting-user context in sandbox startup input when the workflow has one", async () => {
     const startupInput = await createSandboxStartupInput({
       config: createTestRuntimeConfig(),
       organizationId: "org_123",
@@ -146,15 +147,12 @@ describe("createSandboxStartupInput", () => {
           networkName: "mistle-sandbox-dev",
         },
       }),
-      processEnv: {
-        GATEWAY_PROXY_ENABLED: "1",
-      },
     });
 
     expect(startupInput.actingUserId).toBe("usr_123");
   });
 
-  it("includes provider and runtime transparent proxy exclusions in gateway proxy development mode", async () => {
+  it("includes provider and runtime transparent proxy exclusions", async () => {
     const startupInput = await createSandboxStartupInput({
       config: createTestRuntimeConfig(),
       organizationId: "org_123",
@@ -168,9 +166,6 @@ describe("createSandboxStartupInput", () => {
           networkName: "mistle-sandbox-dev",
         },
       }),
-      processEnv: {
-        GATEWAY_PROXY_ENABLED: "1",
-      },
     });
 
     expect(startupInput.transparentProxy).toEqual({

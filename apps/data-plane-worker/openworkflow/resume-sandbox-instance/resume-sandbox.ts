@@ -22,7 +22,6 @@ export async function resumeSandbox(
     id: input.providerSandboxId,
     env: createSandboxRuntimeEnv({
       config: ctx.config,
-      processEnv: ctx.processEnv,
       sandboxInstanceId: input.sandboxInstanceId,
     }),
   });

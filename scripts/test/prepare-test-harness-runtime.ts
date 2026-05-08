@@ -72,7 +72,6 @@ function createPreparedRuntime(buildContextHostPath: string): PreparedTestHarnes
         dataPlaneApi: "",
         dataPlaneGateway: "",
         dataPlaneWorker: "",
-        tokenizerProxy: "",
       },
     },
     sandboxBaseImage: {
@@ -98,10 +97,6 @@ function createPreparedRuntime(buildContextHostPath: string): PreparedTestHarnes
       }),
       dataPlaneWorker: createPreparedImageName({
         appName: "dataPlaneWorker",
-        buildContextHostPath,
-      }),
-      tokenizerProxy: createPreparedImageName({
-        appName: "tokenizerProxy",
         buildContextHostPath,
       }),
     },
@@ -363,7 +358,6 @@ async function createPreparedRuntimeFingerprint(): Promise<PreparedTestHarnessRu
       dataPlaneApi: hashString(["data-plane-api-test-runtime\n", dockerContextFingerprint]),
       dataPlaneGateway: hashString(["data-plane-gateway-test-runtime\n", dockerContextFingerprint]),
       dataPlaneWorker: hashString(["data-plane-worker-test-runtime\n", dockerContextFingerprint]),
-      tokenizerProxy: hashString(["tokenizer-proxy-test-runtime\n", dockerContextFingerprint]),
     },
   };
 }
@@ -382,8 +376,7 @@ function preparedRuntimeFingerprintsEqual(
       right.appImageFingerprints.controlPlaneWorker &&
     left.appImageFingerprints.dataPlaneApi === right.appImageFingerprints.dataPlaneApi &&
     left.appImageFingerprints.dataPlaneGateway === right.appImageFingerprints.dataPlaneGateway &&
-    left.appImageFingerprints.dataPlaneWorker === right.appImageFingerprints.dataPlaneWorker &&
-    left.appImageFingerprints.tokenizerProxy === right.appImageFingerprints.tokenizerProxy
+    left.appImageFingerprints.dataPlaneWorker === right.appImageFingerprints.dataPlaneWorker
   );
 }
 
@@ -399,8 +392,7 @@ function preparedRuntimeReferencesEqual(
     left.appImages.controlPlaneWorker === right.appImages.controlPlaneWorker &&
     left.appImages.dataPlaneApi === right.appImages.dataPlaneApi &&
     left.appImages.dataPlaneGateway === right.appImages.dataPlaneGateway &&
-    left.appImages.dataPlaneWorker === right.appImages.dataPlaneWorker &&
-    left.appImages.tokenizerProxy === right.appImages.tokenizerProxy
+    left.appImages.dataPlaneWorker === right.appImages.dataPlaneWorker
   );
 }
 
@@ -454,8 +446,7 @@ function allPreparedRuntimeImagesExist(runtime: PreparedTestHarnessRuntime): boo
     dockerImageExists(runtime.appImages.controlPlaneWorker) &&
     dockerImageExists(runtime.appImages.dataPlaneApi) &&
     dockerImageExists(runtime.appImages.dataPlaneGateway) &&
-    dockerImageExists(runtime.appImages.dataPlaneWorker) &&
-    dockerImageExists(runtime.appImages.tokenizerProxy)
+    dockerImageExists(runtime.appImages.dataPlaneWorker)
   );
 }
 

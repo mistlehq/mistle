@@ -50,7 +50,6 @@ describe("prepared runtime manifest", () => {
             dataPlaneApi: "data-plane-api-image",
             dataPlaneGateway: "data-plane-gateway-image",
             dataPlaneWorker: "data-plane-worker-image",
-            tokenizerProxy: "tokenizer-proxy-image",
           },
         },
         sandboxBaseImage: {
@@ -63,7 +62,6 @@ describe("prepared runtime manifest", () => {
           dataPlaneApi: "mistle-test-data-plane-api",
           dataPlaneGateway: "mistle-test-data-plane-gateway",
           dataPlaneWorker: "mistle-test-data-plane-worker",
-          tokenizerProxy: "mistle-test-tokenizer-proxy",
         },
       },
     });
@@ -82,7 +80,6 @@ describe("prepared runtime manifest", () => {
           dataPlaneApi: "data-plane-api-image",
           dataPlaneGateway: "data-plane-gateway-image",
           dataPlaneWorker: "data-plane-worker-image",
-          tokenizerProxy: "tokenizer-proxy-image",
         },
       },
       sandboxBaseImage: {
@@ -95,7 +92,6 @@ describe("prepared runtime manifest", () => {
         dataPlaneApi: "mistle-test-data-plane-api",
         dataPlaneGateway: "mistle-test-data-plane-gateway",
         dataPlaneWorker: "mistle-test-data-plane-worker",
-        tokenizerProxy: "mistle-test-tokenizer-proxy",
       },
     });
   });

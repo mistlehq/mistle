@@ -64,7 +64,6 @@ export async function resumeSandboxRuntime(
     payload: encodeSandboxStartupInput(startupInput),
     env: createSandboxRuntimeEnv({
       config: ctx.config,
-      processEnv: ctx.processEnv,
       sandboxInstanceId: input.sandboxInstanceId,
     }),
   });

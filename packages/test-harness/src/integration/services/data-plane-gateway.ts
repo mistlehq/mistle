@@ -199,11 +199,6 @@ function config(input: {
         tokenIssuer: "integration-new-data-plane-worker",
         tokenAudience: "integration-new-data-plane-gateway",
       },
-      egress: {
-        tokenSecret: "integration-new-egress-token-secret",
-        tokenIssuer: "integration-new-data-plane-worker",
-        tokenAudience: "integration-new-tokenizer-proxy",
-      },
       publish: {
         baseDomain: "mistle.localhost",
         access: {

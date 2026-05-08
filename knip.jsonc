@@ -46,7 +46,6 @@
         "@mistle/data-plane-api",
         "@mistle/data-plane-gateway",
         "@mistle/data-plane-worker",
-        "@mistle/tokenizer-proxy",
       ],
     },
     "packages/data-plane-internal-client": {
@@ -68,7 +67,6 @@
         "@mistle/control-plane-api",
         "@mistle/data-plane-api",
         "@mistle/data-plane-gateway",
-        "@mistle/tokenizer-proxy",
       ],
     },
     "tests": {

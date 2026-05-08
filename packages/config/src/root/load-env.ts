@@ -348,23 +348,6 @@ const RootEnvDescriptors = [
     path: ["services", "data_plane_gateway", "sandbox_ws_internal_url"],
   },
   {
-    envVar: "MISTLE_SERVICES_TOKENIZER_PROXY_HOST",
-    path: ["services", "tokenizer_proxy", "host"],
-  },
-  {
-    envVar: "MISTLE_SERVICES_TOKENIZER_PROXY_PORT",
-    path: ["services", "tokenizer_proxy", "port"],
-    parse: parseNumberEnv,
-  },
-  {
-    envVar: "MISTLE_SERVICES_TOKENIZER_PROXY_PUBLIC_URL",
-    path: ["services", "tokenizer_proxy", "public_url"],
-  },
-  {
-    envVar: "MISTLE_SERVICES_TOKENIZER_PROXY_INTERNAL_URL",
-    path: ["services", "tokenizer_proxy", "internal_url"],
-  },
-  {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY",
     path: ["services", "control_plane_worker", "workflow_concurrency"],
     parse: parseNumberEnv,
@@ -463,18 +446,6 @@ const RootEnvDescriptors = [
   {
     envVar: "MISTLE_SANDBOX_TOKENS_CONNECT_AUDIENCE",
     path: ["sandbox", "tokens", "connect", "audience"],
-  },
-  {
-    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_SECRET",
-    path: ["sandbox", "tokens", "egress", "secret"],
-  },
-  {
-    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_ISSUER",
-    path: ["sandbox", "tokens", "egress", "issuer"],
-  },
-  {
-    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_AUDIENCE",
-    path: ["sandbox", "tokens", "egress", "audience"],
   },
   {
     envVar: "MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET",

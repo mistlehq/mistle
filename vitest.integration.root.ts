@@ -13,7 +13,6 @@ import dashboardConfig from "./apps/dashboard/vitest.integration.config.ts";
 import dataPlaneApiConfig from "./apps/data-plane-api/vitest.integration.config.ts";
 import dataPlaneGatewayConfig from "./apps/data-plane-gateway/vitest.integration.config.ts";
 import dataPlaneWorkerConfig from "./apps/data-plane-worker/vitest.integration.config.ts";
-import tokenizerProxyConfig from "./apps/tokenizer-proxy/vitest.integration.config.ts";
 
 const TimingSetupFilePath = fileURLToPath(
   new URL("./packages/test-harness/src/integration/vitest-timing-setup.ts", import.meta.url),
@@ -68,11 +67,6 @@ export default defineConfig({
         name: "@mistle/data-plane-worker",
         root: "./apps/data-plane-worker",
         config: dataPlaneWorkerConfig,
-      }),
-      createNamedProject({
-        name: "@mistle/tokenizer-proxy",
-        root: "./apps/tokenizer-proxy",
-        config: tokenizerProxyConfig,
       }),
     ],
   },

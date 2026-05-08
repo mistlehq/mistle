@@ -22,8 +22,6 @@ import {
 import { createSigningGrant } from "./signing-grant.js";
 import { createSandboxRuntimeEnv } from "./start-sandbox.js";
 
-const GatewayProxyEnabledEnv = "GATEWAY_PROXY_ENABLED";
-
 export async function createSandboxStartupInput(input: {
   config: DataPlaneWorkerRuntimeConfig;
   organizationId: string;
@@ -101,12 +99,10 @@ export async function createSandboxStartupInput(input: {
       ? undefined
       : createTransparentProxyStartupConfiguration({
           config: input.config,
-          processEnv: input.processEnv ?? process.env,
           sandboxAdapter: input.sandboxAdapter,
           tunnelGatewayWsUrl,
         });
-  const gatewayProxyStartupActingUserId =
-    transparentProxy === undefined ? undefined : input.actingUserId;
+  const startupActingUserId = transparentProxy === undefined ? undefined : input.actingUserId;
 
   return {
     startupMode: input.startupMode,
@@ -115,9 +111,7 @@ export async function createSandboxStartupInput(input: {
     tunnelExchangeToken,
     tunnelGatewayWsUrl,
     runtimePlan: input.runtimePlan,
-    ...(gatewayProxyStartupActingUserId === undefined
-      ? {}
-      : { actingUserId: gatewayProxyStartupActingUserId }),
+    ...(startupActingUserId === undefined ? {} : { actingUserId: startupActingUserId }),
     ...(gitIdentity === undefined ? {} : { gitIdentity }),
     ...(transparentProxy === undefined ? {} : { transparentProxy }),
   };
@@ -159,7 +153,6 @@ export async function initializeSandboxRuntime(
     payload: encodeSandboxStartupInput(startupInput),
     env: createSandboxRuntimeEnv({
       config: ctx.config,
-      processEnv: ctx.processEnv,
       sandboxInstanceId: input.sandboxInstanceId,
     }),
   });
@@ -167,14 +160,9 @@ export async function initializeSandboxRuntime(
 
 function createTransparentProxyStartupConfiguration(input: {
   config: DataPlaneWorkerRuntimeConfig;
-  processEnv: Readonly<Record<string, string | undefined>>;
   sandboxAdapter: SandboxAdapter;
   tunnelGatewayWsUrl: string;
 }): SandboxdTransparentProxyConfiguration | undefined {
-  if (!readGatewayProxyEnabled(input.processEnv)) {
-    return undefined;
-  }
-
   const providerConfiguration = input.sandboxAdapter.getTransparentProxyConfiguration();
   if (!providerConfiguration.supported) {
     throw new Error(
@@ -195,15 +183,4 @@ function createTransparentProxyStartupConfiguration(input: {
       }),
     ],
   };
-}
-
-function readGatewayProxyEnabled(env: Readonly<Record<string, string | undefined>>): boolean {
-  const value = env[GatewayProxyEnabledEnv];
-  if (value === undefined || value === "") {
-    return false;
-  }
-  if (value === "1") {
-    return true;
-  }
-  throw new Error(`${GatewayProxyEnabledEnv} must be '1' when set.`);
 }

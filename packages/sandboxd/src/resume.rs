@@ -134,15 +134,12 @@ mod tests {
     use crate::control;
     use crate::protocol::startup::{StartupInitResponse, StartupInput, StartupMode};
     use crate::resume::run_resume;
-    use crate::test_support::TestEnvVarGuard;
     use crate::time::{Sleeper, ThreadSleeper};
 
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
-    const GATEWAY_PROXY_ENABLED_ENV: &str = "GATEWAY_PROXY_ENABLED";
 
     #[test]
     fn submits_resume_request_and_writes_ok_response() {
-        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("resume_ok");
         let control_socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
@@ -203,7 +200,6 @@ mod tests {
 
     #[test]
     fn writes_error_response_when_resume_is_submitted_before_init() {
-        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("resume_before_init");
         let control_socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();

@@ -41,10 +41,7 @@ export function service(
   return {
     id: ServiceIds.DATA_PLANE_API,
     infra,
-    serviceReferences:
-      options.sandbox === undefined
-        ? [ServiceIds.CONTROL_PLANE_API]
-        : [ServiceIds.CONTROL_PLANE_API, ServiceIds.TOKENIZER_PROXY],
+    serviceReferences: [ServiceIds.CONTROL_PLANE_API],
     endpoints: {
       http: {
         host: Host,
@@ -75,8 +72,6 @@ function start(input: {
         port: endpoint.port,
         postgres,
         gatewayBaseUrl: peer.url(ServiceIds.DATA_PLANE_GATEWAY),
-        tokenizerProxyBaseUrl:
-          input.sandbox === undefined ? undefined : peer.url(ServiceIds.TOKENIZER_PROXY),
         environmentId: startInput.environmentId,
         controlPlaneBaseUrl: peer.url(ServiceIds.CONTROL_PLANE_API),
         sandbox: input.sandbox,
@@ -108,7 +103,6 @@ function config(input: {
   port: number;
   postgres: ResolvedTestInfra;
   gatewayBaseUrl: string;
-  tokenizerProxyBaseUrl: string | undefined;
   environmentId: string;
   controlPlaneBaseUrl: string;
   sandbox: IntegrationSandboxOptions | undefined;

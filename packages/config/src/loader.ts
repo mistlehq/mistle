@@ -14,7 +14,6 @@ import {
   getDataPlaneWorkerPersistentSandboxValidationIssue,
   getDataPlaneWorkerSandboxProviderValidationIssue,
 } from "./apps/data-plane-worker/schema.js";
-import { tokenizerProxyConfigModule } from "./apps/tokenizer-proxy/index.js";
 import { mergeConfigRoots } from "./core/merge.js";
 import { asObjectRecord, setValueAtPath } from "./core/record.js";
 import { GlobalConfigSchema, GlobalSandboxConfigSchema } from "./global/schema.js";
@@ -30,7 +29,6 @@ import {
   selectDataPlaneGatewayConfig,
   selectDataPlaneWorkerConfig,
   selectGlobalConfig,
-  selectTokenizerProxyConfig,
 } from "./root/selectors.js";
 import { type AppConfig } from "./schema.js";
 
@@ -324,18 +322,6 @@ const SandboxEnvDescriptors = [
   {
     envVar: "MISTLE_SANDBOX_TOKENS_BOOTSTRAP_AUDIENCE",
     path: ["bootstrap", "tokenAudience"],
-  },
-  {
-    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_SECRET",
-    path: ["egress", "tokenSecret"],
-  },
-  {
-    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_ISSUER",
-    path: ["egress", "tokenIssuer"],
-  },
-  {
-    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_AUDIENCE",
-    path: ["egress", "tokenAudience"],
   },
   {
     envVar: "MISTLE_SANDBOX_PUBLISH_BASE_DOMAIN",
@@ -672,27 +658,6 @@ const DataPlaneWorkerEnvDescriptors = [
   },
 ] satisfies readonly EnvDescriptor[];
 
-const TokenizerProxyEnvDescriptors = [
-  { envVar: "MISTLE_SERVICES_TOKENIZER_PROXY_HOST", path: ["server", "host"] },
-  {
-    envVar: "MISTLE_SERVICES_TOKENIZER_PROXY_PORT",
-    path: ["server", "port"],
-    parse: parseNumberEnv,
-  },
-  {
-    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL",
-    path: ["controlPlaneApi", "baseUrl"],
-  },
-  {
-    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL",
-    path: ["controlPlaneApi", "publicBaseUrl"],
-  },
-  { envVar: "MISTLE_INTERNAL_AUTH_SHARED_TOKEN", path: ["internalAuth", "serviceToken"] },
-  { envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_SECRET", path: ["egressGrant", "tokenSecret"] },
-  { envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_ISSUER", path: ["egressGrant", "tokenIssuer"] },
-  { envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_AUDIENCE", path: ["egressGrant", "tokenAudience"] },
-] satisfies readonly EnvDescriptor[];
-
 function applyWorkflowRunMigrationsFalse(config: Record<string, unknown>): Record<string, unknown> {
   return setValueAtPath(config, ["workflow", "runMigrations"], false);
 }
@@ -762,10 +727,6 @@ function selectAppConfig(
   appId: typeof AppIds.DATA_PLANE_WORKER,
   rootConfig: RootConfig,
 ): AppConfigModuleValue<typeof AppIds.DATA_PLANE_WORKER>;
-function selectAppConfig(
-  appId: typeof AppIds.TOKENIZER_PROXY,
-  rootConfig: RootConfig,
-): AppConfigModuleValue<typeof AppIds.TOKENIZER_PROXY>;
 function selectAppConfig<TApp extends AppConfigModuleKey>(
   appId: TApp,
   rootConfig: RootConfig,
@@ -792,10 +753,6 @@ function selectAppConfig(
 
   if (appId === AppIds.DATA_PLANE_WORKER) {
     return dataPlaneWorkerConfigModule.schema.parse(selectDataPlaneWorkerConfig(rootConfig));
-  }
-
-  if (appId === AppIds.TOKENIZER_PROXY) {
-    return tokenizerProxyConfigModule.schema.parse(selectTokenizerProxyConfig(rootConfig));
   }
 
   throw new Error("Unsupported app id.");
@@ -831,10 +788,6 @@ function loadDataPlaneWorkerConfigFromEnv(env: NodeJS.ProcessEnv) {
   config = setValueAtPath(config, ["telemetry"], loadTelemetryConfigFromEnv(env));
 
   return dataPlaneWorkerConfigModule.schema.parse(config);
-}
-
-function loadTokenizerProxyConfigFromEnv(env: NodeJS.ProcessEnv) {
-  return tokenizerProxyConfigModule.schema.parse(loadEnvObject(TokenizerProxyEnvDescriptors, env));
 }
 
 function validateSelectedAppConfig(appId: AppConfigModuleKey, rootConfig: RootConfig): void {
@@ -906,11 +859,6 @@ function loadEnvConfig(
   env: NodeJS.ProcessEnv,
   includeGlobal: boolean,
 ): LoadConfigResult<typeof AppIds.DATA_PLANE_WORKER>;
-function loadEnvConfig(
-  appId: typeof AppIds.TOKENIZER_PROXY,
-  env: NodeJS.ProcessEnv,
-  includeGlobal: boolean,
-): LoadConfigResult<typeof AppIds.TOKENIZER_PROXY>;
 function loadEnvConfig<TApp extends AppConfigModuleKey>(
   appId: TApp,
   env: NodeJS.ProcessEnv,
@@ -963,15 +911,6 @@ function loadEnvConfig(
   if (appId === AppIds.DATA_PLANE_WORKER) {
     const appConfig = loadDataPlaneWorkerConfigFromEnv(env);
     validateDataPlaneWorkerConfig(appConfig);
-
-    return {
-      ...(globalConfig === undefined ? {} : { global: globalConfig }),
-      app: appConfig,
-    };
-  }
-
-  if (appId === AppIds.TOKENIZER_PROXY) {
-    const appConfig = loadTokenizerProxyConfigFromEnv(env);
 
     return {
       ...(globalConfig === undefined ? {} : { global: globalConfig }),

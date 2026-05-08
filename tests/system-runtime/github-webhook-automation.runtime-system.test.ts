@@ -30,7 +30,7 @@ const e2bIt = createSystemTest({
   },
   publicAccess: {
     provider: "cloudflare",
-    services: ["control-plane-api", "data-plane-gateway", "tokenizer-proxy"],
+    services: ["control-plane-api", "data-plane-gateway"],
   },
 });
 

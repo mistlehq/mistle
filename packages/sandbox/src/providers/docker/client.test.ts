@@ -16,10 +16,10 @@ describe("createDockerSandboxHostConfig", () => {
     });
   });
 
-  it("adds NET_ADMIN without privileged mode when gateway proxy mode needs redirect rules", () => {
-    expect(createDockerSandboxHostConfig({ netAdmin: true })).toMatchObject({
+  it("adds NET_ADMIN without privileged mode for sandbox transparent egress rules", () => {
+    expect(createDockerSandboxHostConfig({})).toMatchObject({
       CapAdd: ["NET_ADMIN"],
     });
-    expect(createDockerSandboxHostConfig({ netAdmin: true }).Privileged).toBeUndefined();
+    expect(createDockerSandboxHostConfig({}).Privileged).toBeUndefined();
   });
 });

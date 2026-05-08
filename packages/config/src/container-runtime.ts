@@ -20,7 +20,6 @@ const GeneratedSecretEnvVars = [
   "MISTLE_INTERNAL_AUTH_SHARED_TOKEN",
   "MISTLE_SANDBOX_TOKENS_CONNECT_SECRET",
   "MISTLE_SANDBOX_TOKENS_BOOTSTRAP_SECRET",
-  "MISTLE_SANDBOX_TOKENS_EGRESS_SECRET",
   "MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET",
   "MISTLE_SANDBOX_PUBLISH_SESSION_COOKIE_SIGNING_SECRET",
 ];
@@ -29,7 +28,6 @@ const CommonRequiredEnvVars = [
   "MISTLE_SERVICES_DASHBOARD_PUBLIC_URL",
   "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL",
   "MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL",
-  "MISTLE_SERVICES_TOKENIZER_PROXY_PUBLIC_URL",
   "MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL",
   "MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL",
   "MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL",
@@ -107,7 +105,6 @@ function buildGeneratedSecretsEnv(): Record<string, string> {
     MISTLE_INTERNAL_AUTH_SHARED_TOKEN: createSecret(),
     MISTLE_SANDBOX_TOKENS_CONNECT_SECRET: createSecret(),
     MISTLE_SANDBOX_TOKENS_BOOTSTRAP_SECRET: createSecret(),
-    MISTLE_SANDBOX_TOKENS_EGRESS_SECRET: createSecret(),
     MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET: createSecret(),
     MISTLE_SANDBOX_PUBLISH_SESSION_COOKIE_SIGNING_SECRET: createSecret(),
   };
@@ -220,12 +217,6 @@ function buildCommonBaseConfig(env: NodeJS.ProcessEnv): ConfigRecord {
           "MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL",
         ),
       },
-      tokenizer_proxy: {
-        host: "0.0.0.0",
-        port: 5205,
-        public_url: readRequiredEnv(env, "MISTLE_SERVICES_TOKENIZER_PROXY_PUBLIC_URL"),
-        internal_url: "http://127.0.0.1:5205",
-      },
       control_plane_worker: {
         workflow_concurrency: 4,
       },
@@ -273,10 +264,6 @@ function buildCommonBaseConfig(env: NodeJS.ProcessEnv): ConfigRecord {
         bootstrap: {
           issuer: "data-plane-worker",
           audience: "data-plane-gateway",
-        },
-        egress: {
-          issuer: "data-plane-worker",
-          audience: "tokenizer-proxy",
         },
       },
       publish: {
@@ -383,9 +370,6 @@ function buildGeneratedSecretsConfig(env: Record<string, string>): ConfigRecord 
         },
         bootstrap: {
           secret: readGeneratedEnv("MISTLE_SANDBOX_TOKENS_BOOTSTRAP_SECRET"),
-        },
-        egress: {
-          secret: readGeneratedEnv("MISTLE_SANDBOX_TOKENS_EGRESS_SECRET"),
         },
       },
       publish: {

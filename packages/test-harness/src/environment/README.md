@@ -152,9 +152,8 @@ Common `env` properties include:
 
 - `env.id`: the logical test environment id.
 - `env.auth`: helpers for creating authenticated control-plane sessions.
-- `env.controlPlaneApi`, `env.dataPlaneApi`, `env.dataPlaneGateway`,
-  `env.tokenizerProxy`: service handles with `hostBaseUrl` and reusable HTTP
-  clients.
+- `env.controlPlaneApi`, `env.dataPlaneApi`, `env.dataPlaneGateway`: service
+  handles with `hostBaseUrl` and reusable HTTP clients.
 - `env.controlPlaneDb`, `env.dataPlaneDb`: harness-managed Drizzle database
   handles.
 - `env.controlPlaneTables`, `env.dataPlaneTables`: schema-bound Drizzle tables
@@ -267,9 +266,9 @@ emulate Mistle services. If a test needs a Mistle service, select that service
 through `createIntegrationTest(...)`.
 
 Ad hoc local servers are acceptable when the behavior under test is explicitly
-about calling an external or non-Mistle upstream. For example, tokenizer-proxy
-egress tests may use `startHttpEcho()` because the upstream is the outside
-provider being called by Mistle.
+about calling an external or non-Mistle upstream. For example, gateway egress
+tests may use `startHttpEcho()` because the upstream is the outside provider
+being called by Mistle.
 
 Provider-auth behavior should use harness-owned provider switches instead of
 app-local Better Auth setup. For Google id-token sign-in and linking coverage,

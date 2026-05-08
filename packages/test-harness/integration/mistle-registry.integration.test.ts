@@ -4,40 +4,13 @@ import { createTestRegistry, startTestEnvironment } from "../src/index.js";
 
 const DockerSampleConfigPathInContainer = "/app/config/config.docker.sample.toml";
 const startedEnvironments: Awaited<ReturnType<typeof startTestEnvironment>>[] = [];
-const HttpServiceIds = [
-  "control-plane-api",
-  "data-plane-api",
-  "data-plane-gateway",
-  "tokenizer-proxy",
-] as const;
+const HttpServiceIds = ["control-plane-api", "data-plane-api", "data-plane-gateway"] as const;
 
 describe("Mistle test registry", () => {
   afterEach(async () => {
     const environments = startedEnvironments.splice(0, startedEnvironments.length);
     await Promise.all(environments.map(async (environment) => environment.stop()));
   });
-
-  it("starts tokenizer-proxy with a selected control-plane reference", async () => {
-    const registry = createTestRegistry({
-      configPathInContainer: DockerSampleConfigPathInContainer,
-    });
-    const environment = await startTestEnvironment({
-      registry,
-      services: [
-        { service: "control-plane-api", mode: "docker" },
-        { service: "tokenizer-proxy", mode: "docker" },
-      ],
-    });
-    startedEnvironments.push(environment);
-
-    const tokenizerProxy = environment.services.get("tokenizer-proxy");
-    if (tokenizerProxy.http === undefined) {
-      throw new Error("Expected tokenizer-proxy to expose an HTTP client.");
-    }
-
-    const response = await tokenizerProxy.http.fetch("/__healthz");
-    expect(response.status).toBe(200);
-  }, 180_000);
 
   it("starts data-plane-api without starting control-plane-api", async () => {
     const registry = createTestRegistry({
@@ -77,7 +50,6 @@ describe("Mistle test registry", () => {
         { service: "control-plane-api", mode: "docker" },
         { service: "data-plane-api", mode: "docker" },
         { service: "data-plane-gateway", mode: "docker" },
-        { service: "tokenizer-proxy", mode: "docker" },
         { service: "control-plane-worker", mode: "docker" },
         { service: "data-plane-worker", mode: "docker" },
       ],

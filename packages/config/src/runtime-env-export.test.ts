@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { loadConfig, type LoadConfigResult } from "./loader.js";
+import { loadConfig } from "./loader.js";
 import { AppIds } from "./modules.js";
 import { exportServiceConfigToEnv, type RuntimeEnvExportEntry } from "./runtime-env-export.js";
 
@@ -189,60 +189,5 @@ describe("exportServiceConfigToEnv", () => {
       name: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_SECRET_ACCESS_KEY",
       value: "replace-with-sandbox-storage-secret-key",
     });
-  });
-
-  it("exports tokenizer proxy config to resource env entries", () => {
-    const loadedConfig = loadConfig({
-      app: AppIds.TOKENIZER_PROXY,
-      configPath: ConfigSamplePath,
-    });
-
-    const entries = exportServiceConfigToEnv({
-      app: AppIds.TOKENIZER_PROXY,
-      config: loadedConfig,
-    });
-
-    expectEntry(entries, {
-      name: "MISTLE_SERVICES_TOKENIZER_PROXY_PORT",
-      value: 8085,
-    });
-    expectEntry(entries, {
-      name: "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL",
-      value: "https://api.mistle.example",
-    });
-    expectEntry(entries, {
-      name: "MISTLE_SANDBOX_TOKENS_EGRESS_SECRET",
-      value: "replace-with-egress-token-secret",
-    });
-  });
-
-  it("requires global config to project runtime env entries", () => {
-    const loadedConfig = {
-      app: {
-        server: {
-          host: "0.0.0.0",
-          port: 8085,
-        },
-        controlPlaneApi: {
-          baseUrl: "http://control-plane-api:8080",
-          publicBaseUrl: "https://api.mistle.example",
-        },
-        internalAuth: {
-          serviceToken: "secret://MISTLE_INTERNAL_AUTH_SHARED_TOKEN",
-        },
-        egressGrant: {
-          tokenSecret: "secret://MISTLE_SANDBOX_EGRESS_TOKEN_SECRET",
-          tokenIssuer: "data-plane-worker",
-          tokenAudience: "tokenizer-proxy",
-        },
-      },
-    } satisfies LoadConfigResult<typeof AppIds.TOKENIZER_PROXY>;
-
-    expect(() =>
-      exportServiceConfigToEnv({
-        app: AppIds.TOKENIZER_PROXY,
-        config: loadedConfig,
-      }),
-    ).toThrow("Runtime env export requires loadConfig output that includes global config.");
   });
 });

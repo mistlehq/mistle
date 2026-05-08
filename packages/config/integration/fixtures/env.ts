@@ -16,9 +16,6 @@ const baseIntegrationEnv: NodeJS.ProcessEnv = {
   MISTLE_SANDBOX_TOKENS_BOOTSTRAP_SECRET: "fixture-bootstrap-token-secret",
   MISTLE_SANDBOX_TOKENS_BOOTSTRAP_ISSUER: "data-plane-worker",
   MISTLE_SANDBOX_TOKENS_BOOTSTRAP_AUDIENCE: "data-plane-gateway",
-  MISTLE_SANDBOX_TOKENS_EGRESS_SECRET: "fixture-egress-token-secret",
-  MISTLE_SANDBOX_TOKENS_EGRESS_ISSUER: "data-plane-worker",
-  MISTLE_SANDBOX_TOKENS_EGRESS_AUDIENCE: "tokenizer-proxy",
   MISTLE_SANDBOX_PUBLISH_BASE_DOMAIN: "mistle.example.test",
   MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET: "fixture-publish-token-secret",
   MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_ISSUER: "control-plane-api",
@@ -84,8 +81,6 @@ const baseIntegrationEnv: NodeJS.ProcessEnv = {
   MISTLE_OBJECT_STORE_SANDBOX_STORAGE_FORCE_PATH_STYLE: "true",
   MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ACCESS_KEY_ID: "fixture-access-key-id",
   MISTLE_OBJECT_STORE_SANDBOX_STORAGE_SECRET_ACCESS_KEY: "fixture-secret-access-key",
-  MISTLE_SERVICES_TOKENIZER_PROXY_HOST: "127.0.0.1",
-  MISTLE_SERVICES_TOKENIZER_PROXY_PORT: "5005",
 };
 
 export function createIntegrationEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {

@@ -9,7 +9,6 @@
     "@mistle/control-plane-worker": "workspace:*",
     "@mistle/data-plane-api": "workspace:*",
     "@mistle/data-plane-gateway": "workspace:*",
-    "@mistle/data-plane-worker": "workspace:*",
-    "@mistle/tokenizer-proxy": "workspace:*"
+    "@mistle/data-plane-worker": "workspace:*"
   }
 }

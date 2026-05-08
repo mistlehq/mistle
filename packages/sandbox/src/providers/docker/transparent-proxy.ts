@@ -19,7 +19,7 @@ export function createDockerTransparentProxyConfiguration(): SandboxTransparentP
     provider: SandboxProvider.DOCKER,
     exclusions: DockerTransparentProxyExclusions,
     smokeRequirements: [
-      "container must run with NET_ADMIN only when GATEWAY_PROXY_ENABLED=1",
+      "container must run with NET_ADMIN for transparent egress packet rules",
       "nftables must be available in the sandbox runtime",
       "socket-mark bypass rule must be installed before redirect rules",
     ],

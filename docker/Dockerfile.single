@@ -19,7 +19,6 @@ RUN pnpm --filter @mistle/control-plane-api... build && \
   pnpm --filter @mistle/data-plane-api... build && \
   pnpm --filter @mistle/data-plane-worker... build && \
   pnpm --filter @mistle/data-plane-gateway... build && \
-  pnpm --filter @mistle/tokenizer-proxy... build && \
   MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN=same-origin pnpm --filter @mistle/dashboard... build
 
 FROM build AS runtime-workspace
@@ -83,7 +82,6 @@ COPY docker/single/nginx.conf /etc/nginx/http.d/default.conf
 COPY docker/apps/data-plane-api/entrypoint.sh /usr/local/bin/mistle-data-plane-api-entrypoint
 COPY docker/apps/data-plane-gateway/entrypoint.sh /usr/local/bin/mistle-data-plane-gateway-entrypoint
 COPY docker/apps/data-plane-worker/entrypoint.sh /usr/local/bin/mistle-data-plane-worker-entrypoint
-COPY docker/apps/tokenizer-proxy/entrypoint.sh /usr/local/bin/mistle-tokenizer-proxy-entrypoint
 COPY docker/single/bin/mistle-config /usr/local/bin/mistle-config
 COPY docker/single/cont-init.d/10-validate-runtime-artifacts /etc/cont-init.d/10-validate-runtime-artifacts
 COPY docker/single/cont-init.d/15-generate-runtime-config /etc/cont-init.d/15-generate-runtime-config
@@ -100,7 +98,6 @@ RUN chmod +x \
   /usr/local/bin/mistle-data-plane-api-entrypoint \
   /usr/local/bin/mistle-data-plane-gateway-entrypoint \
   /usr/local/bin/mistle-data-plane-worker-entrypoint \
-  /usr/local/bin/mistle-tokenizer-proxy-entrypoint \
   /etc/cont-init.d/10-validate-runtime-artifacts \
   /etc/cont-init.d/15-generate-runtime-config \
   /etc/cont-init.d/20-run-migrations \
@@ -110,10 +107,9 @@ RUN chmod +x \
   /etc/services.d/dashboard/run \
   /etc/services.d/data-plane-api/run \
   /etc/services.d/data-plane-gateway/run \
-  /etc/services.d/data-plane-worker/run \
-  /etc/services.d/tokenizer-proxy/run
+  /etc/services.d/data-plane-worker/run
 
-EXPOSE 3000 5100 5202 5205
+EXPOSE 3000 5100 5202
 
 FROM base AS remote-sandbox
 

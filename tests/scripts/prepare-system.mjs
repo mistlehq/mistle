@@ -27,8 +27,6 @@ run(
     "@mistle/data-plane-worker...",
     "--filter",
     "@mistle/data-plane-gateway...",
-    "--filter",
-    "@mistle/tokenizer-proxy...",
     "build",
   ],
   env,

@@ -55,7 +55,6 @@ describe("createSandboxRuntimeEnv", () => {
   it("includes the sandboxd test faults env when the worker config enables it", () => {
     const runtimeEnv = createSandboxRuntimeEnv({
       config: createTestRuntimeConfig({ sandboxdTestFaultsEnabled: true }),
-      processEnv: {},
       sandboxInstanceId: "sbi_123",
     });
 
@@ -68,35 +67,11 @@ describe("createSandboxRuntimeEnv", () => {
   it("omits the sandboxd test faults env when the worker config leaves it disabled", () => {
     const runtimeEnv = createSandboxRuntimeEnv({
       config: createTestRuntimeConfig({}),
-      processEnv: {},
       sandboxInstanceId: "sbi_123",
     });
 
     expect(runtimeEnv).toEqual({
       SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID: "sbi_123",
     });
-  });
-
-  it("propagates the gateway proxy env when the worker process enables local gateway proxying", () => {
-    const runtimeEnv = createSandboxRuntimeEnv({
-      config: createTestRuntimeConfig({}),
-      processEnv: { GATEWAY_PROXY_ENABLED: "1" },
-      sandboxInstanceId: "sbi_123",
-    });
-
-    expect(runtimeEnv).toEqual({
-      SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID: "sbi_123",
-      GATEWAY_PROXY_ENABLED: "1",
-    });
-  });
-
-  it("rejects invalid gateway proxy env values instead of silently changing sandbox networking", () => {
-    expect(() =>
-      createSandboxRuntimeEnv({
-        config: createTestRuntimeConfig({}),
-        processEnv: { GATEWAY_PROXY_ENABLED: "true" },
-        sandboxInstanceId: "sbi_123",
-      }),
-    ).toThrow("GATEWAY_PROXY_ENABLED must be '1' when set.");
   });
 });

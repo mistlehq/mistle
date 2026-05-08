@@ -51,7 +51,7 @@ Practical consequence: provider targets are the capability boundary. Users canno
 - Persists targets, connections, credentials, OAuth sessions, webhook events.
 - Uses the registry to validate and execute integration behavior.
 
-- `apps/data-plane-worker`, `packages/sandboxd`, `apps/tokenizer-proxy`
+- `apps/data-plane-worker`, `apps/data-plane-gateway`, `packages/sandboxd`
 - Execute compiled runtime plans.
 - Enforce egress route policy and inject credentials via internal resolver calls.
 
@@ -331,4 +331,4 @@ Useful entrypoints when reading the code:
 - `apps/control-plane-api/src/internal-integration-credentials/*`
 - `apps/control-plane-api/src/sandbox-profiles/services/compile-profile-version-runtime-plan.ts`
 - `packages/sandboxd/src/proxy/*`
-- `apps/tokenizer-proxy/src/egress/*`
+- `apps/data-plane-gateway/src/egress/*`

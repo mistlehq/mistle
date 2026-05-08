@@ -76,18 +76,6 @@ const GlobalResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
     path: ["sandbox", "connect", "tokenAudience"],
     envVar: "MISTLE_SANDBOX_TOKENS_CONNECT_AUDIENCE",
   },
-  {
-    path: ["sandbox", "egress", "tokenSecret"],
-    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_SECRET",
-  },
-  {
-    path: ["sandbox", "egress", "tokenIssuer"],
-    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_ISSUER",
-  },
-  {
-    path: ["sandbox", "egress", "tokenAudience"],
-    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_AUDIENCE",
-  },
   { path: ["sandbox", "publish", "baseDomain"], envVar: "MISTLE_SANDBOX_PUBLISH_BASE_DOMAIN" },
   {
     path: ["sandbox", "publish", "access", "tokenSecret"],
@@ -325,22 +313,6 @@ const DataPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
   },
 ];
 
-const TokenizerProxyResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
-  { path: ["server", "host"], envVar: "MISTLE_SERVICES_TOKENIZER_PROXY_HOST" },
-  { path: ["server", "port"], envVar: "MISTLE_SERVICES_TOKENIZER_PROXY_PORT" },
-  {
-    path: ["controlPlaneApi", "baseUrl"],
-    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL",
-  },
-  {
-    path: ["controlPlaneApi", "publicBaseUrl"],
-    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL",
-  },
-  { path: ["egressGrant", "tokenSecret"], envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_SECRET" },
-  { path: ["egressGrant", "tokenIssuer"], envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_ISSUER" },
-  { path: ["egressGrant", "tokenAudience"], envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_AUDIENCE" },
-];
-
 function getAppRuntimeEnvExports(app: AppConfigModuleKey): readonly RuntimeEnvExportDescriptor[] {
   if (app === AppIds.CONTROL_PLANE_API) {
     return ControlPlaneApiResourceRuntimeEnvExports;
@@ -360,10 +332,6 @@ function getAppRuntimeEnvExports(app: AppConfigModuleKey): readonly RuntimeEnvEx
 
   if (app === AppIds.DATA_PLANE_WORKER) {
     return DataPlaneWorkerResourceRuntimeEnvExports;
-  }
-
-  if (app === AppIds.TOKENIZER_PROXY) {
-    return TokenizerProxyResourceRuntimeEnvExports;
   }
 
   throw new Error("Unsupported app id.");

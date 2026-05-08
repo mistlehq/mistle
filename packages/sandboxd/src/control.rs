@@ -1315,12 +1315,10 @@ mod tests {
     use crate::time::{Sleeper, ThreadSleeper};
 
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
-    const GATEWAY_PROXY_ENABLED_ENV: &str = "GATEWAY_PROXY_ENABLED";
     const TEST_PUBLIC_KEY: &str = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE";
 
     #[test]
     fn accepts_one_init_request_from_the_control_socket() {
-        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("control_init");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
@@ -1342,7 +1340,6 @@ mod tests {
 
     #[test]
     fn rejects_second_init_requests_after_initialization_begins() {
-        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("control_second_init");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
@@ -1371,7 +1368,6 @@ mod tests {
 
     #[test]
     fn resumes_after_initialization_completes() {
-        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("control_resume");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
@@ -1400,7 +1396,6 @@ mod tests {
 
     #[test]
     fn rejects_resume_before_initialization_completes() {
-        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("control_resume_before_init");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
@@ -1429,7 +1424,6 @@ mod tests {
 
     #[test]
     fn accepts_signing_requests_after_initialization() {
-        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("control_sign_ok");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_signing_gateway();
@@ -1463,7 +1457,6 @@ mod tests {
 
     #[test]
     fn rejects_signing_requests_for_a_different_key_ref() {
-        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("control_sign_wrong_key");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_signing_gateway();
@@ -1496,7 +1489,6 @@ mod tests {
 
     #[test]
     fn returns_init_failure_to_the_control_socket_client() {
-        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("control_init_failure");
         let socket_path = test_dir.join("control.sock");
         let startup_input = valid_startup_input(
@@ -1570,7 +1562,6 @@ mod tests {
 
     #[test]
     fn serves_initialized_health_snapshot_over_loopback_http() {
-        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("control_health_initialized");
         let socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
@@ -1606,7 +1597,6 @@ mod tests {
 
     #[test]
     fn snapshot_materialization_init_applies_runtime_plan_and_exits_after_init() {
-        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("control_snapshot_materialization");
         let socket_path = test_dir.join("control.sock");
         let startup_output_path = test_dir.join("snapshot-artifact-output.txt");

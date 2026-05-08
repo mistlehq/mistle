@@ -28,7 +28,6 @@ const SANDBOX_BASE_IMAGE_REGISTRY_TAG = getLocalDevDockerRegistrySandboxBaseImag
 const SANDBOX_BASE_DOCKERFILE_PATH = "packages/sandboxd/Dockerfile";
 const SANDBOX_BASE_CACHE_DIR = resolve(REPO_ROOT, ".local", "sandbox-base");
 const SANDBOX_BASE_CACHE_KEY_PATH = resolve(SANDBOX_BASE_CACHE_DIR, ".cache-key");
-const GATEWAY_PROXY_FLAG = "--gateway-proxy";
 
 const SANDBOX_BASE_BUILD_INPUT_PATHS: readonly string[] = [
   "packages/sandboxd",
@@ -47,8 +46,6 @@ type CloudflaredConfigInput = {
   controlPlaneApiLocalPort: number;
   dataPlaneGatewayLocalPort: number;
   dataPlaneGatewayTunnelHostname: string;
-  tokenizerProxyLocalPort: number;
-  tokenizerProxyTunnelHostname: string;
 };
 
 type RunInput = {
@@ -60,15 +57,11 @@ type RunInput = {
 
 type SandboxProvider = "docker" | "e2b";
 
-function readDevStartOptions(): { gatewayProxyEnabled: boolean } {
+function readDevStartOptions(): void {
   const args = process.argv.slice(2);
-  const unknownArgs = args.filter((arg) => arg !== GATEWAY_PROXY_FLAG);
-  if (unknownArgs.length > 0) {
-    throw new Error(`Unsupported dev start option(s): ${unknownArgs.join(", ")}`);
+  if (args.length > 0) {
+    throw new Error(`Unsupported dev start option(s): ${args.join(", ")}`);
   }
-  return {
-    gatewayProxyEnabled: args.includes(GATEWAY_PROXY_FLAG),
-  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -130,14 +123,6 @@ function readDataPlaneGatewayLocalPort(configPath: string): number {
   );
 }
 
-function readTokenizerProxyLocalPort(configPath: string): number {
-  return readRequiredIntegerTomlValue(
-    configPath,
-    ["services", "tokenizer_proxy", "port"],
-    "services.tokenizer_proxy.port",
-  );
-}
-
 function readSandboxProvider(configPath: string): SandboxProvider {
   const configuredProvider = process.env.MISTLE_SANDBOX_PROVIDER?.trim();
 
@@ -178,8 +163,6 @@ function writeCloudflaredConfig(input: CloudflaredConfigInput): void {
     `    service: http://host.docker.internal:${input.controlPlaneApiLocalPort}`,
     `  - hostname: ${input.dataPlaneGatewayTunnelHostname}`,
     `    service: http://host.docker.internal:${input.dataPlaneGatewayLocalPort}`,
-    `  - hostname: ${input.tokenizerProxyTunnelHostname}`,
-    `    service: http://host.docker.internal:${input.tokenizerProxyLocalPort}`,
     "  - service: http_status:404",
     "",
   ].join("\n");
@@ -401,31 +384,26 @@ function dockerImageExists(imageTag: string): boolean {
 }
 
 async function start(): Promise<void> {
-  const options = readDevStartOptions();
+  readDevStartOptions();
   const sandboxProvider = readSandboxProvider(DEV_CONFIG_PATH);
   const infraSummary =
     sandboxProvider === "docker"
-      ? "SeaweedFS, Postgres 18, PgBouncer, Mailpit, Registry, OTel LGTM, tokenizer relay, gateway relay"
+      ? "SeaweedFS, Postgres 18, PgBouncer, Mailpit, Registry, OTel LGTM, gateway relay"
       : "SeaweedFS, Postgres 18, PgBouncer, Mailpit, OTel LGTM";
   console.log(`Starting local infra dependencies (${infraSummary})...`);
   const controlPlaneApiLocalPort = readControlPlaneApiLocalPort(DEV_CONFIG_PATH);
   const dataPlaneGatewayLocalPort = readDataPlaneGatewayLocalPort(DEV_CONFIG_PATH);
-  const tokenizerProxyLocalPort = readTokenizerProxyLocalPort(DEV_CONFIG_PATH);
   const cloudflareTunnelToken = readRequiredEnv("CLOUDFLARE_TUNNEL_TOKEN");
   const controlPlaneApiTunnelHostname = readRequiredEnv("CONTROL_PLANE_API_TUNNEL_HOSTNAME");
   const dataPlaneGatewayTunnelHostname = readRequiredEnv("DATA_PLANE_API_TUNNEL_HOSTNAME");
-  const tokenizerProxyTunnelHostname = readRequiredEnv("TOKENIZER_PROXY_TUNNEL_HOSTNAME");
   const controlPlaneApiPublicUrl = `https://${controlPlaneApiTunnelHostname}`;
   const dataPlaneGatewayPublicUrl = `https://${dataPlaneGatewayTunnelHostname}`;
-  const tokenizerProxyPublicUrl = `https://${tokenizerProxyTunnelHostname}`;
 
   writeCloudflaredConfig({
     controlPlaneApiTunnelHostname,
     controlPlaneApiLocalPort,
     dataPlaneGatewayLocalPort,
     dataPlaneGatewayTunnelHostname,
-    tokenizerProxyLocalPort,
-    tokenizerProxyTunnelHostname,
   });
 
   const sharedDevEnv: NodeJS.ProcessEnv = {
@@ -434,10 +412,8 @@ async function start(): Promise<void> {
     CLOUDFLARE_TUNNEL_TOKEN: cloudflareTunnelToken,
     CONTROL_PLANE_API_TUNNEL_HOSTNAME: controlPlaneApiTunnelHostname,
     DATA_PLANE_API_TUNNEL_HOSTNAME: dataPlaneGatewayTunnelHostname,
-    TOKENIZER_PROXY_TUNNEL_HOSTNAME: tokenizerProxyTunnelHostname,
     CLOUDFLARED_CONFIG_PATH: DEV_CLOUDFLARED_CONFIG_PATH,
     MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: controlPlaneApiPublicUrl,
-    ...(options.gatewayProxyEnabled ? { GATEWAY_PROXY_ENABLED: "1" } : {}),
   };
   localInfraEnv = sharedDevEnv;
   localInfraStartAttempted = true;
@@ -453,7 +429,7 @@ async function start(): Promise<void> {
 
   if (sandboxProvider === "docker") {
     infraServiceNames.splice(4, 0, "registry");
-    infraServiceNames.push("tokenizer-proxy-relay", "data-plane-gateway-relay");
+    infraServiceNames.push("data-plane-gateway-relay");
   }
 
   runOrThrow({
@@ -570,10 +546,6 @@ async function start(): Promise<void> {
   console.log(`- control-plane-api: ${controlPlaneApiPublicUrl}`);
   console.log(`- data-plane-gateway: ${dataPlaneGatewayPublicUrl}`);
   console.log(`- data-plane tunnel route: ${dataPlaneGatewayPublicUrl}/tunnel`);
-  console.log(`- tokenizer-proxy: ${tokenizerProxyPublicUrl}`);
-  if (options.gatewayProxyEnabled) {
-    console.log("- gateway proxy mode: enabled");
-  }
   console.log("- mailpit ui: http://127.0.0.1:8025");
   console.log("- grafana (otel-lgtm): http://127.0.0.1:3000");
   if (sandboxProvider === "docker") {

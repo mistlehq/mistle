@@ -29,8 +29,7 @@ export type PreparedTestHarnessDockerAppName =
   | "controlPlaneWorker"
   | "dataPlaneApi"
   | "dataPlaneGateway"
-  | "dataPlaneWorker"
-  | "tokenizerProxy";
+  | "dataPlaneWorker";
 
 export type PreparedTestHarnessDockerAppBuild = {
   appName: PreparedTestHarnessDockerAppName;
@@ -63,11 +62,6 @@ export const PreparedTestHarnessDockerAppBuilds: readonly PreparedTestHarnessDoc
     appName: "dataPlaneWorker",
     dockerfileRelativePath: "docker/Dockerfile.test",
     dockerTarget: "data-plane-worker-test-runtime",
-  },
-  {
-    appName: "tokenizerProxy",
-    dockerfileRelativePath: "docker/Dockerfile.test",
-    dockerTarget: "tokenizer-proxy-test-runtime",
   },
 ] as const;
 
@@ -152,15 +146,13 @@ function parsePreparedDockerAppStringRecord(input: {
   const dataPlaneApi = parsedValues.dataPlaneApi;
   const dataPlaneGateway = parsedValues.dataPlaneGateway;
   const dataPlaneWorker = parsedValues.dataPlaneWorker;
-  const tokenizerProxy = parsedValues.tokenizerProxy;
 
   if (
     controlPlaneApi === undefined ||
     controlPlaneWorker === undefined ||
     dataPlaneApi === undefined ||
     dataPlaneGateway === undefined ||
-    dataPlaneWorker === undefined ||
-    tokenizerProxy === undefined
+    dataPlaneWorker === undefined
   ) {
     throw new Error(
       "Prepared test-harness runtime manifest is missing required docker app entries.",
@@ -173,7 +165,6 @@ function parsePreparedDockerAppStringRecord(input: {
     dataPlaneApi,
     dataPlaneGateway,
     dataPlaneWorker,
-    tokenizerProxy,
   };
 }
 

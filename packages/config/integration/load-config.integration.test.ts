@@ -18,9 +18,6 @@ const sandboxConnectTokenAudience = "data-plane-gateway";
 const sandboxBootstrapTokenSecret = "fixture-bootstrap-token-secret";
 const sandboxBootstrapTokenIssuer = "data-plane-worker";
 const sandboxBootstrapTokenAudience = "data-plane-gateway";
-const sandboxEgressTokenSecret = "fixture-egress-token-secret";
-const sandboxEgressTokenIssuer = "data-plane-worker";
-const sandboxEgressTokenAudience = "tokenizer-proxy";
 const sandboxPublishBaseDomain = "mistle.example.test";
 const sandboxPublishAccessTokenSecret = "fixture-publish-token-secret";
 const sandboxPublishAccessTokenIssuer = "control-plane-api";
@@ -76,11 +73,6 @@ const globalDevelopmentConfig = {
       tokenIssuer: sandboxBootstrapTokenIssuer,
       tokenAudience: sandboxBootstrapTokenAudience,
     },
-    egress: {
-      tokenSecret: sandboxEgressTokenSecret,
-      tokenIssuer: sandboxEgressTokenIssuer,
-      tokenAudience: sandboxEgressTokenAudience,
-    },
   },
 } as const;
 
@@ -131,11 +123,6 @@ const globalProductionConfig = {
       tokenSecret: sandboxBootstrapTokenSecret,
       tokenIssuer: sandboxBootstrapTokenIssuer,
       tokenAudience: sandboxBootstrapTokenAudience,
-    },
-    egress: {
-      tokenSecret: sandboxEgressTokenSecret,
-      tokenIssuer: sandboxEgressTokenIssuer,
-      tokenAudience: sandboxEgressTokenAudience,
     },
   },
 } as const;
@@ -356,6 +343,7 @@ const dataPlaneGatewayEnvConfig = {
   },
   controlPlaneApi: {
     baseUrl: "http://127.0.0.1:5000",
+    publicBaseUrl: "http://127.0.0.1:5000",
   },
   internalAuth: {
     serviceToken,
@@ -382,6 +370,7 @@ const dataPlaneGatewayBaseFixtureConfig = {
   },
   controlPlaneApi: {
     baseUrl: "http://127.0.0.1:5100",
+    publicBaseUrl: "https://mistle.example.test",
   },
 } as const;
 
@@ -501,37 +490,6 @@ const dataPlaneWorkerDockerFixtureConfig = {
   },
 } as const;
 
-const tokenizerProxyEnvConfig = {
-  server: {
-    host: "127.0.0.1",
-    port: 5005,
-  },
-  controlPlaneApi: {
-    baseUrl: "http://127.0.0.1:5000",
-    publicBaseUrl: "http://127.0.0.1:5000",
-  },
-  internalAuth: {
-    serviceToken,
-  },
-  egressGrant: {
-    tokenSecret: sandboxEgressTokenSecret,
-    tokenIssuer: sandboxEgressTokenIssuer,
-    tokenAudience: sandboxEgressTokenAudience,
-  },
-} as const;
-
-const tokenizerProxyBaseFixtureConfig = {
-  ...tokenizerProxyEnvConfig,
-  server: {
-    host: "0.0.0.0",
-    port: 5305,
-  },
-  controlPlaneApi: {
-    baseUrl: "http://127.0.0.1:5100",
-    publicBaseUrl: "https://mistle.example.test",
-  },
-} as const;
-
 const pooledPostgresUrl = "postgresql://mistle:mistle@127.0.0.1:6432/mistle";
 const directPostgresUrl = "postgresql://mistle:mistle@127.0.0.1:5432/mistle";
 
@@ -595,14 +553,6 @@ const dataPlaneWorkerFixtureConfig = {
   },
 };
 
-const tokenizerProxyFixtureConfig = {
-  ...tokenizerProxyBaseFixtureConfig,
-  controlPlaneApi: {
-    baseUrl: tokenizerProxyBaseFixtureConfig.controlPlaneApi.baseUrl,
-    publicBaseUrl: "https://mistle.example.test",
-  },
-};
-
 describe("loadConfig integrations", () => {
   it("loads every app from config.sample.toml", () => {
     expect(() => {
@@ -611,7 +561,6 @@ describe("loadConfig integrations", () => {
       loadConfig({ app: AppIds.DATA_PLANE_API, configPath: configSamplePath });
       loadConfig({ app: AppIds.DATA_PLANE_GATEWAY, configPath: configSamplePath });
       loadConfig({ app: AppIds.DATA_PLANE_WORKER, configPath: configSamplePath });
-      loadConfig({ app: AppIds.TOKENIZER_PROXY, configPath: configSamplePath });
     }).not.toThrow();
   });
 
@@ -660,15 +609,6 @@ describe("loadConfig integrations", () => {
     ).toEqual({
       global: globalDevelopmentConfig,
       app: dataPlaneWorkerFixtureConfig,
-    });
-    expect(
-      loadConfig({
-        app: AppIds.TOKENIZER_PROXY,
-        configPath: tomlConfigFixturePath,
-      }),
-    ).toEqual({
-      global: globalDevelopmentConfig,
-      app: tokenizerProxyFixtureConfig,
     });
   });
 
@@ -1250,75 +1190,6 @@ describe("loadConfig integrations", () => {
 
     expect(config).toEqual({
       app: dataPlaneWorkerFixtureConfig,
-    });
-  });
-
-  it("loads tokenizer-proxy purely from a config file fixture", () => {
-    const config = loadConfig({
-      app: AppIds.TOKENIZER_PROXY,
-      configPath: tomlConfigFixturePath,
-    });
-
-    expect(config).toEqual({
-      global: globalDevelopmentConfig,
-      app: tokenizerProxyFixtureConfig,
-    });
-  });
-
-  it("loads tokenizer-proxy purely from env", () => {
-    const config = loadConfig({
-      app: AppIds.TOKENIZER_PROXY,
-      env: createIntegrationEnv({
-        MISTLE_ENV: "production",
-        NODE_ENV: "production",
-        MISTLE_SERVICES_TOKENIZER_PROXY_HOST: "localhost",
-        MISTLE_SERVICES_TOKENIZER_PROXY_PORT: "5306",
-      }),
-    });
-
-    expect(config).toEqual({
-      global: globalProductionConfig,
-      app: {
-        ...tokenizerProxyEnvConfig,
-        server: {
-          host: "localhost",
-          port: 5306,
-        },
-      },
-    });
-  });
-
-  it("loads tokenizer-proxy from both config file and env, with env precedence", () => {
-    const config = loadConfig({
-      app: AppIds.TOKENIZER_PROXY,
-      configPath: tomlConfigFixturePath,
-      env: {
-        MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: "https://control-plane.local",
-        MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: "https://public-control-plane.local",
-      },
-    });
-
-    expect(config).toEqual({
-      global: globalDevelopmentConfig,
-      app: {
-        ...tokenizerProxyFixtureConfig,
-        controlPlaneApi: {
-          baseUrl: "https://control-plane.local",
-          publicBaseUrl: "https://public-control-plane.local",
-        },
-      },
-    });
-  });
-
-  it("returns only tokenizer-proxy app config when includeGlobal is false", () => {
-    const config = loadConfig({
-      app: AppIds.TOKENIZER_PROXY,
-      includeGlobal: false,
-      configPath: tomlConfigFixturePath,
-    });
-
-    expect(config).toEqual({
-      app: tokenizerProxyFixtureConfig,
     });
   });
 });

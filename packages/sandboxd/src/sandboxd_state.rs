@@ -101,7 +101,6 @@ impl fmt::Display for SandboxdStateError {
 
 impl std::error::Error for SandboxdStateError {}
 
-const GATEWAY_PROXY_ENABLED_ENV: &str = "GATEWAY_PROXY_ENABLED";
 pub(crate) const GLOBAL_GIT_CONFIG_ENV_NAME: &str = "GIT_CONFIG_GLOBAL";
 pub(crate) const DEFAULT_GLOBAL_GIT_CONFIG_PATH: &str = "/root/.gitconfig";
 const SETUP_SCRIPT_WORKING_DIRECTORY: &str = "/root";
@@ -162,11 +161,7 @@ impl SandboxdState {
             clock.clone(),
             collect_tracked_components(&runtime_plan),
         );
-        let gateway_egress_forwarder = if gateway_proxy_enabled()? {
-            Some(GatewayEgressForwarder::new())
-        } else {
-            None
-        };
+        let gateway_egress_forwarder = Some(GatewayEgressForwarder::new());
         let execution_mode = startup_input.execution_mode;
         record_operation_phase_started(&diagnostics_logger, "apply_git_identity");
         if !startup_input.is_snapshot() {
@@ -1220,20 +1215,6 @@ fn collect_tracked_components(
     tracked_components
 }
 
-fn gateway_proxy_enabled() -> Result<bool, SandboxdStateError> {
-    match std::env::var(GATEWAY_PROXY_ENABLED_ENV) {
-        Ok(value) if value == "1" => Ok(true),
-        Ok(value) if value.is_empty() => Ok(false),
-        Ok(value) => Err(SandboxdStateError::StartEgressProxy(format!(
-            "{GATEWAY_PROXY_ENABLED_ENV} must be '1' when set, got '{value}'"
-        ))),
-        Err(std::env::VarError::NotPresent) => Ok(false),
-        Err(error) => Err(SandboxdStateError::StartEgressProxy(format!(
-            "failed to read {GATEWAY_PROXY_ENABLED_ENV}: {error}"
-        ))),
-    }
-}
-
 fn close_snapshot_tunnel_session(
     tunnel_session: TunnelSession,
     diagnostics_logger: &Option<StartupDiagnosticsLogger>,
@@ -1496,11 +1477,11 @@ mod tests {
         RuntimeClientProcessStopSignal, RuntimeExecCommand,
     };
     use crate::sandboxd_state::{
-        DEFAULT_GLOBAL_GIT_CONFIG_PATH, GATEWAY_PROXY_ENABLED_ENV, GLOBAL_GIT_CONFIG_ENV_NAME,
-        SETUP_SCRIPT_WORKING_DIRECTORY, SandboxdState, build_setup_script_environment,
-        collect_runtime_environment, merge_managed_runtime_environment, run_setup_script,
-        run_setup_script_in_directory, scrub_snapshot_runtime_artifacts_at_paths,
-        spawn_codex_coordination_thread, spawn_runtime_readiness_projection_thread,
+        DEFAULT_GLOBAL_GIT_CONFIG_PATH, GLOBAL_GIT_CONFIG_ENV_NAME, SETUP_SCRIPT_WORKING_DIRECTORY,
+        SandboxdState, build_setup_script_environment, collect_runtime_environment,
+        merge_managed_runtime_environment, run_setup_script, run_setup_script_in_directory,
+        scrub_snapshot_runtime_artifacts_at_paths, spawn_codex_coordination_thread,
+        spawn_runtime_readiness_projection_thread,
     };
     use crate::startup_diagnostics::{StartupDiagnosticsLogger, StartupOperation};
     use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
@@ -1914,6 +1895,7 @@ mod tests {
     #[test]
     fn snapshot_materialization_initialization_applies_runtime_plan_and_skips_session_runtime_resources()
      {
+        let (bootstrap_url, gateway_thread) = start_snapshot_bootstrap_gateway();
         let output_path = std::env::temp_dir().join(format!(
             "mistle-snapshot-materialization-artifact-output-{}",
             SystemTime::now()
@@ -1925,7 +1907,7 @@ mod tests {
             &build_startup_input(
                 StartupMode::New,
                 StartupExecutionMode::Snapshot,
-                "ws://127.0.0.1:9/bootstrap",
+                &bootstrap_url,
                 serde_json::json!({
                     "image": {
                         "source": "base",
@@ -2008,6 +1990,9 @@ mod tests {
             None,
         )
         .expect("snapshot materialization init should succeed after static runtime-plan setup");
+        gateway_thread
+            .join()
+            .expect("snapshot gateway thread should exit after tunnel shutdown");
 
         assert_eq!(state.execution_mode, StartupExecutionMode::Snapshot);
         assert!(state.process_manager.is_none());
@@ -2022,7 +2007,7 @@ mod tests {
     }
 
     #[test]
-    fn snapshot_materialization_gateway_proxy_uses_temporary_bootstrap_tunnel_for_setup() {
+    fn snapshot_materialization_gateway_egress_uses_temporary_bootstrap_tunnel_for_setup() {
         let log_dir = std::env::temp_dir().join(format!(
             "mistle-snapshot-materialization-gateway-log-{}",
             SystemTime::now()
@@ -2032,13 +2017,10 @@ mod tests {
         ));
         let _ = fs::remove_dir_all(&log_dir);
         fs::create_dir_all(&log_dir).expect("startup diagnostics log dir should be creatable");
-        let _env_guard = TestEnvVarsGuard::set([
-            (GATEWAY_PROXY_ENABLED_ENV, "1".to_string()),
-            (
-                "MISTLE_SANDBOXD_OPERATION_LOG_DIR",
-                log_dir.to_string_lossy().to_string(),
-            ),
-        ]);
+        let _env_guard = TestEnvVarsGuard::set([(
+            "MISTLE_SANDBOXD_OPERATION_LOG_DIR",
+            log_dir.to_string_lossy().to_string(),
+        )]);
         let output_path = std::env::temp_dir().join(format!(
             "mistle-snapshot-materialization-gateway-output-{}",
             SystemTime::now()
@@ -2046,32 +2028,7 @@ mod tests {
                 .expect("system time should be after unix epoch")
                 .as_nanos()
         ));
-        let bootstrap_listener =
-            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
-        let bootstrap_url = format!(
-            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_snapshot_tunnel",
-            bootstrap_listener
-                .local_addr()
-                .expect("bootstrap listener should expose an address")
-                .port()
-        );
-        let gateway_thread = thread::spawn(move || {
-            let (stream, _) = bootstrap_listener
-                .accept()
-                .expect("snapshot gateway should accept the bootstrap tunnel");
-            let mut websocket = accept(stream).expect("snapshot gateway handshake should succeed");
-
-            let telemetry_open = read_websocket_json_text_message(&mut websocket);
-            assert_eq!(telemetry_open["type"], "telemetry.open");
-
-            loop {
-                match websocket.read() {
-                    Ok(Message::Close(_)) => break,
-                    Ok(_) => {}
-                    Err(_) => break,
-                }
-            }
-        });
+        let (bootstrap_url, gateway_thread) = start_snapshot_bootstrap_gateway();
 
         let state = SandboxdState::initialize(
             &build_startup_input(
@@ -2166,11 +2123,12 @@ mod tests {
 
     #[test]
     fn snapshot_materialization_state_rejects_resume() {
+        let (bootstrap_url, gateway_thread) = start_snapshot_bootstrap_gateway();
         let mut state = SandboxdState::initialize(
             &build_startup_input(
                 StartupMode::New,
                 StartupExecutionMode::Snapshot,
-                "ws://127.0.0.1:9/bootstrap",
+                &bootstrap_url,
                 minimal_runtime_plan_json(),
                 None,
             ),
@@ -2180,6 +2138,9 @@ mod tests {
             None,
         )
         .expect("snapshot materialization init should succeed");
+        gateway_thread
+            .join()
+            .expect("snapshot gateway thread should exit after tunnel shutdown");
 
         let error = state
             .resume(
@@ -2199,6 +2160,37 @@ mod tests {
             error.to_string(),
             "failed to start bootstrap tunnel session: snapshot materialization sandboxes do not support resume"
         );
+    }
+
+    fn start_snapshot_bootstrap_gateway() -> (String, thread::JoinHandle<()>) {
+        let bootstrap_listener =
+            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+        let bootstrap_url = format!(
+            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_snapshot_tunnel",
+            bootstrap_listener
+                .local_addr()
+                .expect("bootstrap listener should expose an address")
+                .port()
+        );
+        let gateway_thread = thread::spawn(move || {
+            let (stream, _) = bootstrap_listener
+                .accept()
+                .expect("snapshot gateway should accept the bootstrap tunnel");
+            let mut websocket = accept(stream).expect("snapshot gateway handshake should succeed");
+
+            let telemetry_open = read_websocket_json_text_message(&mut websocket);
+            assert_eq!(telemetry_open["type"], "telemetry.open");
+
+            loop {
+                match websocket.read() {
+                    Ok(Message::Close(_)) => break,
+                    Ok(_) => {}
+                    Err(_) => break,
+                }
+            }
+        });
+
+        (bootstrap_url, gateway_thread)
     }
 
     fn read_websocket_json_text_message<S>(socket: &mut WebSocket<S>) -> serde_json::Value

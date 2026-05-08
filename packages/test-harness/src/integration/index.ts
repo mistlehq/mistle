@@ -253,7 +253,6 @@ function supportedExtraInfraIdsForService(
     case ServiceIds.DATA_PLANE_WORKER:
       return ["sandbox-base-image", "sandbox-docker-network"];
     case ServiceIds.DATA_PLANE_API:
-    case ServiceIds.TOKENIZER_PROXY:
       return [];
   }
 }
@@ -325,13 +324,6 @@ async function loadService(serviceId: ServiceId): Promise<IntegrationServiceEntr
     }
     case ServiceIds.DATA_PLANE_WORKER: {
       const module = await loadServiceModule("./services/data-plane-worker.ts");
-      return {
-        serviceId,
-        service: module.service,
-      };
-    }
-    case ServiceIds.TOKENIZER_PROXY: {
-      const module = await loadServiceModule("./services/tokenizer-proxy.ts");
       return {
         serviceId,
         service: module.service,

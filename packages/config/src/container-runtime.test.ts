@@ -21,7 +21,6 @@ function buildCommonEnv(): NodeJS.ProcessEnv {
     MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: "https://api.example.test",
     MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL:
       "wss://gateway.example.test/tunnel/sandbox",
-    MISTLE_SERVICES_TOKENIZER_PROXY_PUBLIC_URL: "https://tokenizer.example.test",
     MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: "postgresql://user:pass@postgres:5432/control",
     MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL: "postgresql://user:pass@pgbouncer:6432/control",
     MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL: "postgresql://user:pass@postgres:5432/data",

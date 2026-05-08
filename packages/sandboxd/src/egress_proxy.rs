@@ -593,7 +593,7 @@ impl EgressProxy {
         };
         let Some(forwarder) = gateway_egress_forwarder else {
             return Err(EgressProxyError::new(
-                "gateway proxying must be enabled before starting sandbox egress proxy",
+                "gateway egress forwarder is required before starting sandbox egress proxy",
             ));
         };
         let forwarding_mode = EgressProxyForwardingMode::Gateway { forwarder };
@@ -635,7 +635,7 @@ impl EgressProxy {
         let routes = runtime_plan
             .egress_routes
             .iter()
-            .map(build_gateway_proxy_route)
+            .map(build_gateway_egress_route)
             .collect::<Result<Vec<_>, _>>()?;
 
         let generated_proxy_ca = generate_proxy_ca(clock.as_ref())
@@ -1614,7 +1614,7 @@ fn socket_addr_from_sockaddr_storage(
     }
 }
 
-fn build_gateway_proxy_route(
+fn build_gateway_egress_route(
     route: &CompiledEgressRoute,
 ) -> Result<EgressProxyRoute, EgressProxyError> {
     let upstream_url = url::Url::parse(&route.upstream.base_url).map_err(|error| {
@@ -3097,7 +3097,7 @@ mod tests {
     use crate::egress_proxy::{
         EgressProxy, EgressProxyForwardingMode, EgressProxyRoute, ProxyCaConfig,
         RequestTargetOverride, TransparentProxyProtocol, build_direct_forward_uri,
-        build_gateway_proxy_route, build_managed_proxy_env, classify_transparent_proxy_first_byte,
+        build_gateway_egress_route, build_managed_proxy_env, classify_transparent_proxy_first_byte,
         match_route, resolve_request_target, serialize_egress_proxy_log_line,
     };
     #[cfg(target_os = "linux")]
@@ -3476,7 +3476,7 @@ mod tests {
     }
 
     #[test]
-    fn gateway_proxy_env_does_not_bypass_tokenizer_proxy_host() {
+    fn managed_proxy_env_does_not_bypass_gateway_egress_host() {
         let env = build_managed_proxy_env(
             "127.0.0.1:4819"
                 .parse()
@@ -3492,10 +3492,10 @@ mod tests {
     }
 
     #[test]
-    fn gateway_proxy_routes_do_not_require_local_egress_grants() {
+    fn gateway_egress_routes_do_not_require_local_egress_grants() {
         let runtime_plan = sample_runtime_plan();
-        let route = build_gateway_proxy_route(&runtime_plan.egress_routes[0])
-            .expect("gateway proxy route should build");
+        let route = build_gateway_egress_route(&runtime_plan.egress_routes[0])
+            .expect("gateway egress route should build");
 
         assert_eq!(route.egress_rule_id, "egress-rule-1");
         assert_eq!(route.host, "api.openai.com");

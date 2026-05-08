@@ -83,7 +83,6 @@ const RuntimeStaticTableRestrictedPathPrefixes = [
   "apps/data-plane-api/src/",
   "apps/data-plane-worker/openworkflow/",
   "apps/data-plane-gateway/src/",
-  "apps/tokenizer-proxy/src/",
 ];
 const TestLikePathPattern =
   /(?:^|\/)(?:integration|integration-new|e2e|tests?)\/|\.(?:test|integration|component|property|stress)\.tsx?$/u;

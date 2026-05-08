@@ -57,15 +57,13 @@ Example naming:
 - `<tunnel-name>`: `mistle-<your-suffix>`
 - `<control-plane-api-hostname>`: `control-plane-api-<your-suffix>.<your-zone>`
 - `<data-plane-gateway-hostname>`: `data-plane-gateway-<your-suffix>.<your-zone>`
-- `<tokenizer-proxy-hostname>`: `tokenizer-proxy-<your-suffix>.<your-zone>`
 
-Choose hostnames for the control-plane API, data-plane gateway, and tokenizer proxy, then create the tunnel and DNS routes:
+Choose hostnames for the control-plane API and data-plane gateway, then create the tunnel and DNS routes:
 
 ```bash
 cloudflared tunnel create <tunnel-name>
 cloudflared tunnel route dns <tunnel-name> <control-plane-api-hostname>
 cloudflared tunnel route dns <tunnel-name> <data-plane-gateway-hostname>
-cloudflared tunnel route dns <tunnel-name> <tokenizer-proxy-hostname>
 ```
 
 Fetch the tunnel token and place the required values in `.env.dev`:
@@ -78,7 +76,6 @@ cloudflared tunnel token <tunnel-name>
 CLOUDFLARE_TUNNEL_TOKEN=<token-from-command-above>
 CONTROL_PLANE_API_TUNNEL_HOSTNAME=<control-plane-api-hostname>
 DATA_PLANE_API_TUNNEL_HOSTNAME=<data-plane-gateway-hostname>
-TOKENIZER_PROXY_TUNNEL_HOSTNAME=<tokenizer-proxy-hostname>
 ```
 
 6. Start the stack:

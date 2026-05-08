@@ -41,14 +41,12 @@ describe("full system environment integration", () => {
         await expectHealthz(environment.controlPlaneApi.hostBaseUrl);
         await expectHealthz(environment.dataPlaneApi.hostBaseUrl);
         await expectHealthz(environment.dataPlaneGateway.hostBaseUrl);
-        await expectHealthz(environment.tokenizerProxy.hostBaseUrl);
 
         await systemSleeper.sleep(10_000);
 
         await expectHealthz(environment.controlPlaneApi.hostBaseUrl);
         await expectHealthz(environment.dataPlaneApi.hostBaseUrl);
         await expectHealthz(environment.dataPlaneGateway.hostBaseUrl);
-        await expectHealthz(environment.tokenizerProxy.hostBaseUrl);
       } finally {
         await environment.stop();
       }

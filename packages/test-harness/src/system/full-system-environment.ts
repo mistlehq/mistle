@@ -17,7 +17,6 @@ import {
 import { startDataPlaneApi, type DataPlaneApiService } from "../apps/data-plane-api.js";
 import { startDataPlaneGateway, type DataPlaneGatewayService } from "../apps/data-plane-gateway.js";
 import { startDataPlaneWorker, type DataPlaneWorkerService } from "../apps/data-plane-worker.js";
-import { startTokenizerProxy, type TokenizerProxyService } from "../apps/tokenizer-proxy.js";
 import { runCleanupTasks } from "../cleanup/index.js";
 import { stopContainerIgnoringMissing } from "../docker/cleanup.js";
 import { startDockerNetwork } from "../network/start-docker-network.js";
@@ -49,7 +48,6 @@ const OMITTED_POSTGRES_OPTIONS = [
 const CONTROL_PLANE_API_CONTAINER_BASE_URL = "http://control-plane-api:5100";
 const DATA_PLANE_API_CONTAINER_BASE_URL = "http://data-plane-api:5200";
 const DATA_PLANE_GATEWAY_CONTAINER_BASE_URL = "http://data-plane-gateway:5202";
-const TOKENIZER_PROXY_CONTAINER_BASE_URL = "http://tokenizer-proxy:5205";
 const DATA_PLANE_GATEWAY_TUNNEL_WS_URL = "ws://data-plane-gateway:5202/tunnel/sandbox";
 const DataPlaneGatewayIdleTimeoutMs = 300_000;
 const DataPlaneGatewayBootstrapDisconnectGraceMs = 60_000;
@@ -107,10 +105,8 @@ export type StartFullSystemEnvironmentInput = {
   dataPlaneApiEnvironment?: Record<string, string>;
   dataPlaneWorkerEnvironment?: Record<string, string>;
   dataPlaneGatewayEnvironment?: Record<string, string>;
-  tokenizerProxyEnvironment?: Record<string, string>;
   sharedControlPlaneTunnel?: CloudflaredPublicTunnel | undefined;
   sandboxPublicGatewayTunnel?: CloudflaredPublicTunnel | undefined;
-  sandboxPublicTokenizerProxyTunnel?: CloudflaredPublicTunnel | undefined;
 };
 
 export type StartedFullSystemEnvironment = {
@@ -119,7 +115,6 @@ export type StartedFullSystemEnvironment = {
   dataPlaneApi: DataPlaneApiService;
   dataPlaneWorker: DataPlaneWorkerService;
   dataPlaneGateway: DataPlaneGatewayService;
-  tokenizerProxy: TokenizerProxyService;
   database: {
     hostDatabaseUrl: string;
     containerDatabaseUrl: string;
@@ -704,27 +699,6 @@ export async function startFullSystemEnvironment(
       await controlPlaneWorker.stop();
     });
 
-    const tokenizerProxy = await withStepTiming("start tokenizer-proxy", async () => {
-      return startTokenizerProxy({
-        buildContextHostPath: input.buildContextHostPath,
-        configPathInContainer: input.configPathInContainer,
-        startupTimeoutMs: input.startupTimeoutMs,
-        ...(input.cacheBustKey === undefined
-          ? {}
-          : {
-              cacheBustKey: input.cacheBustKey,
-            }),
-        prebuiltImageName: preparedRuntime.appImages.tokenizerProxy,
-        network: activeNetwork,
-        environment: {
-          ...input.tokenizerProxyEnvironment,
-          MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: CONTROL_PLANE_API_CONTAINER_BASE_URL,
-        },
-      });
-    });
-    cleanupTasks.unshift(async () => {
-      await withStepTiming("stop tokenizer-proxy", async () => tokenizerProxy.stop());
-    });
     const dataPlaneWorker = await withStepTiming("start data-plane-worker", async () => {
       return startDataPlaneWorker({
         buildContextHostPath: input.buildContextHostPath,
@@ -779,7 +753,6 @@ export async function startFullSystemEnvironment(
 
     addPublicTunnelRoute(input.sharedControlPlaneTunnel, "control-plane-api", 5100);
     addPublicTunnelRoute(input.sandboxPublicGatewayTunnel, "data-plane-gateway", 5202);
-    addPublicTunnelRoute(input.sandboxPublicTokenizerProxyTunnel, "tokenizer-proxy", 5205);
 
     const publicTunnelGroups = new Map<
       string,
@@ -827,7 +800,6 @@ export async function startFullSystemEnvironment(
       dataPlaneApi,
       dataPlaneWorker,
       dataPlaneGateway,
-      tokenizerProxy,
       database: {
         hostDatabaseUrl,
         containerDatabaseUrl,
@@ -884,5 +856,4 @@ export const FullSystemContainerBaseUrls = {
   CONTROL_PLANE_API: CONTROL_PLANE_API_CONTAINER_BASE_URL,
   DATA_PLANE_API: DATA_PLANE_API_CONTAINER_BASE_URL,
   DATA_PLANE_GATEWAY: DATA_PLANE_GATEWAY_CONTAINER_BASE_URL,
-  TOKENIZER_PROXY: TOKENIZER_PROXY_CONTAINER_BASE_URL,
 } as const;

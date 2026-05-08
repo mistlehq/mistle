@@ -24,15 +24,13 @@ Mistle is split into control-plane and data-plane services.
 |                  Sandbox (Docker / remote)                   |
 |               agent runtime | filesystem | tools             |
 +--------------------------------------------------------------+
-                |                                |
-                | runtime connectivity           | outbound requests
-                v                                v
-        data-plane-gateway                tokenizer-proxy
-                                                 |
-                                                 | egress grants +
-                                                 | route policy +
-                                                 | credential injection
-                                                 v
+                |
+                | runtime connectivity + outbound request mediation
+                v
+        data-plane-gateway
+                |
+                | route policy + credential injection
+                v
                               GitHub / Slack / Jira / SigNoz / OpenAI
 ```
 
@@ -40,11 +38,11 @@ Mistle is split into control-plane and data-plane services.
 
 Mistle is built around isolated agent execution and explicit configuration. Sandboxes are credentialless by default. This means that any supported integration that is configured with credentials will not have these credentials set inside the sandboxes directly (no setting environment variables, dotenv files etc.).
 
-Instead, HTTP requests are routed through the Tokenizer Proxy that lives outside the sandbox. The Tokenizer Proxy resolves the right credentials and injects them at request-time. This ensures that agents never see sensitive credentials accidentally (or intentionally).
+Instead, managed HTTP requests are mediated through the data-plane gateway over the sandbox tunnel. The gateway resolves the right credentials and injects them at request-time. This ensures that agents never see sensitive credentials accidentally (or intentionally).
 
 ```text
 +----------------------+     credentialless HTTP request     +----------------------+     authorized upstream request    +----------------------+
-|       Sandbox        | ----------------------------------> |   Tokenizer Proxy    | ---------------------------------> |   Upstream System    |
+|       Sandbox        | ----------------------------------> | Data-Plane Gateway   | ---------------------------------> |   Upstream System    |
 |    agent runtime     |                                     |   egress policy +    |                                    | GitHub, Slack, Jira, |
 +----------------------+                                     | credential injection |                                    | SigNoz, OpenAI, ...  |
                                                              +----------------------+                                    +----------------------+

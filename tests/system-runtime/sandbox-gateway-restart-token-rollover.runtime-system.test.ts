@@ -18,7 +18,7 @@ const it = createSandboxSystemTest({
   sandboxProviders: ["e2b"],
   publicAccess: {
     provider: "cloudflare",
-    services: ["data-plane-gateway", "tokenizer-proxy"],
+    services: ["data-plane-gateway"],
   },
 });
 

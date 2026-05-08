@@ -130,14 +130,6 @@ export const WorkspaceAliases = [
     ),
   },
   {
-    find: /^@mistle\/tokenizer-proxy\/runtime$/,
-    replacement: fileURLToPath(new URL("../tokenizer-proxy/src/runtime/index.ts", import.meta.url)),
-  },
-  {
-    find: /^@mistle\/tokenizer-proxy\/types$/,
-    replacement: fileURLToPath(new URL("../tokenizer-proxy/src/types.ts", import.meta.url)),
-  },
-  {
     find: /^@mistle\/time$/,
     replacement: fileURLToPath(new URL("../../packages/time/src/index.ts", import.meta.url)),
   },

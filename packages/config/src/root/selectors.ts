@@ -9,7 +9,6 @@ import type {
   DataPlaneWorkerConfig,
   DataPlaneWorkerSandboxStorageConfig,
 } from "../apps/data-plane-worker/schema.js";
-import type { TokenizerProxyConfig } from "../apps/tokenizer-proxy/schema.js";
 import type { GlobalConfig, GlobalTelemetryConfig } from "../global/schema.js";
 import { type Config } from "./schema.js";
 
@@ -142,11 +141,6 @@ export function selectGlobalConfig(config: Config): GlobalConfig {
         tokenSecret: config.sandbox.tokens.bootstrap.secret,
         tokenIssuer: config.sandbox.tokens.bootstrap.issuer,
         tokenAudience: config.sandbox.tokens.bootstrap.audience,
-      },
-      egress: {
-        tokenSecret: config.sandbox.tokens.egress.secret,
-        tokenIssuer: config.sandbox.tokens.egress.issuer,
-        tokenAudience: config.sandbox.tokens.egress.audience,
       },
     },
   };
@@ -423,26 +417,5 @@ export function selectDataPlaneWorkerConfig(config: Config): DataPlaneWorkerConf
       serviceToken: config.internal_auth.shared_token.token,
     },
     telemetry: projectTelemetry(config),
-  };
-}
-
-export function selectTokenizerProxyConfig(config: Config): TokenizerProxyConfig {
-  return {
-    server: {
-      host: config.services.tokenizer_proxy.host,
-      port: config.services.tokenizer_proxy.port,
-    },
-    controlPlaneApi: {
-      baseUrl: config.services.control_plane_api.internal_url,
-      publicBaseUrl: config.services.control_plane_api.public_url,
-    },
-    internalAuth: {
-      serviceToken: config.internal_auth.shared_token.token,
-    },
-    egressGrant: {
-      tokenSecret: config.sandbox.tokens.egress.secret,
-      tokenIssuer: config.sandbox.tokens.egress.issuer,
-      tokenAudience: config.sandbox.tokens.egress.audience,
-    },
   };
 }

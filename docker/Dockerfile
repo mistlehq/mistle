@@ -33,9 +33,6 @@ RUN pnpm --filter @mistle/data-plane-worker... build
 FROM workspace-deps AS data-plane-gateway-build
 RUN pnpm --filter @mistle/data-plane-gateway... build
 
-FROM workspace-deps AS tokenizer-proxy-build
-RUN pnpm --filter @mistle/tokenizer-proxy... build
-
 FROM alpine:3.22 AS commit-sign-build
 
 WORKDIR /build/packages/commit-sign
@@ -110,19 +107,6 @@ RUN mkdir -p /app/node_modules/@mistle && \
 EXPOSE 5202
 
 ENTRYPOINT ["/usr/local/bin/mistle-data-plane-gateway-entrypoint"]
-
-FROM base AS tokenizer-proxy-runtime
-
-COPY --from=tokenizer-proxy-build /app /app
-COPY docker/apps/tokenizer-proxy/entrypoint.sh /usr/local/bin/mistle-tokenizer-proxy-entrypoint
-
-RUN mkdir -p /app/node_modules/@mistle && \
-  ln -s ../../apps/tokenizer-proxy /app/node_modules/@mistle/tokenizer-proxy && \
-  chmod +x /usr/local/bin/mistle-tokenizer-proxy-entrypoint
-
-EXPOSE 5205
-
-ENTRYPOINT ["/usr/local/bin/mistle-tokenizer-proxy-entrypoint"]
 
 FROM base AS control-plane-api-runtime
 

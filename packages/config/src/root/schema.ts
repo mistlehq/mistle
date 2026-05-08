@@ -155,14 +155,6 @@ export const ConfigSchema = z
           sandbox_ws_public_url: UrlSchema,
           sandbox_ws_internal_url: UrlSchema,
         }).strict(),
-        tokenizer_proxy: z
-          .object({
-            host: z.string().trim().min(1),
-            port: z.number().int().min(1).max(65535),
-            internal_url: UrlSchema.optional(),
-            public_url: UrlSchema.optional(),
-          })
-          .strict(),
         control_plane_worker: z
           .object({
             workflow_concurrency: z.number().int().min(1),
@@ -278,7 +270,6 @@ export const ConfigSchema = z
           .object({
             connect: TokenConfigSchema,
             bootstrap: TokenConfigSchema,
-            egress: TokenConfigSchema,
           })
           .strict(),
         publish: z

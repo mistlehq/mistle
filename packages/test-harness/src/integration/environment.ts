@@ -114,7 +114,6 @@ export type IntegrationTestEnvironment = {
   mailpit: MailpitInbox;
   objectStore: IntegrationObjectStore;
   otlpCollector: OtlpTestCollector;
-  tokenizerProxy: IntegrationHttpService;
 };
 
 export type ManagedIntegrationTestEnvironment = IntegrationTestEnvironment & {
@@ -259,9 +258,6 @@ export function createIntegrationEnvironment(input: {
       }
 
       return readOtlpTestCollector(collectorId);
-    },
-    get tokenizerProxy() {
-      return httpService(input.environment.services.get(ServiceIds.TOKENIZER_PROXY));
     },
     stop: async () => {
       if (stopped) {

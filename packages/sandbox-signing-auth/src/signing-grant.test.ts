@@ -81,7 +81,7 @@ describe("signing grants", () => {
       verifySigningGrant({
         config: {
           ...TestConfig,
-          tokenAudience: "integration-tokenizer-proxy",
+          tokenAudience: "integration-control-plane-api",
         },
         token,
       }),

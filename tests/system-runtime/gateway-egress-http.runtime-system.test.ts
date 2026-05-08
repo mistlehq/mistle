@@ -28,7 +28,6 @@ const it = createSystemTest({
   sandbox: {
     provider: "docker",
   },
-  gatewayProxy: true,
 });
 
 const SYSTEM_TEST_TIMEOUT_MS = 5 * 60_000;

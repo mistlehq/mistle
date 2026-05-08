@@ -106,7 +106,6 @@ function validate(args: readonly string[], env: NodeJS.ProcessEnv): void {
   loadConfig({ app: AppIds.DATA_PLANE_API, ...loadOptions });
   loadConfig({ app: AppIds.DATA_PLANE_GATEWAY, ...loadOptions });
   loadConfig({ app: AppIds.DATA_PLANE_WORKER, ...loadOptions });
-  loadConfig({ app: AppIds.TOKENIZER_PROXY, ...loadOptions });
 
   console.log(`Validated Mistle config: ${options.configPath}`);
 }

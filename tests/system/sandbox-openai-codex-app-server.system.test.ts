@@ -979,7 +979,6 @@ async function collectAppContainerDiagnostics(input: {
     | "dataPlaneApiContainerId"
     | "dataPlaneWorkerContainerId"
     | "dataPlaneGatewayContainerId"
-    | "tokenizerProxyContainerId"
   >;
 }): Promise<string> {
   const sections = await Promise.all([
@@ -1003,10 +1002,6 @@ async function collectAppContainerDiagnostics(input: {
       containerId: input.fixture.dataPlaneGatewayContainerId,
       label: "data-plane-gateway",
     }),
-    collectDockerContainerLogsDiagnostics({
-      containerId: input.fixture.tokenizerProxyContainerId,
-      label: "tokenizer-proxy",
-    }),
   ]);
 
   return sections.join("\n\n");
@@ -1021,7 +1016,6 @@ async function buildFailureDiagnostics(input: {
     | "dataPlaneApiContainerId"
     | "dataPlaneWorkerContainerId"
     | "dataPlaneGatewayContainerId"
-    | "tokenizerProxyContainerId"
   >;
 }): Promise<string> {
   let diagnostics = `Websocket trace (tail):\n${formatWebSocketTrace(input.websocketTraceEntries)}`;

@@ -51,28 +51,12 @@ describe("createRuntimeSystemServiceOptions", () => {
         },
         publicAccess: {
           provider: "cloudflare",
-          services: [ServiceIds.DATA_PLANE_GATEWAY, ServiceIds.TOKENIZER_PROXY],
+          services: [ServiceIds.DATA_PLANE_GATEWAY],
         },
       }),
     ).resolves.toEqual({
       sandbox: {
         provider: "docker",
-      },
-    });
-  });
-
-  it("marks Docker sandbox system tests for gateway proxy mode when requested", async () => {
-    await expect(
-      createRuntimeSystemServiceOptions({
-        sandbox: {
-          provider: "docker",
-        },
-        gatewayProxy: true,
-      }),
-    ).resolves.toEqual({
-      sandbox: {
-        provider: "docker",
-        gatewayProxy: true,
       },
     });
   });

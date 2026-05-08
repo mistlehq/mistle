@@ -59,9 +59,6 @@ function buildDataPlaneApiServiceEnv(): NodeJS.ProcessEnv {
     MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: "http://control-plane-api:8080",
     MISTLE_INTERNAL_AUTH_SHARED_TOKEN: "internal-service-token",
     MISTLE_SANDBOX_PROVIDER: "docker",
-    MISTLE_SANDBOX_TOKENS_EGRESS_SECRET: "egress-token-secret",
-    MISTLE_SANDBOX_TOKENS_EGRESS_ISSUER: "mistle",
-    MISTLE_SANDBOX_TOKENS_EGRESS_AUDIENCE: "tokenizer-proxy",
     MISTLE_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
     MISTLE_SANDBOX_E2B_API_KEY: "shared-e2b-secret",
   };
@@ -267,7 +264,6 @@ describe("loadConfig", () => {
     AppIds.DATA_PLANE_API,
     AppIds.DATA_PLANE_GATEWAY,
     AppIds.DATA_PLANE_WORKER,
-    AppIds.TOKENIZER_PROXY,
   ])("loads %s from its exported service env", (app) => {
     const configFromToml = loadConfig({
       app,

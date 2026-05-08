@@ -53,12 +53,6 @@ internal_url = "http://127.0.0.1:5302"
 sandbox_ws_public_url = "ws://127.0.0.1:5003/tunnel/sandbox"
 sandbox_ws_internal_url = "ws://127.0.0.1:5003/tunnel/sandbox"
 
-[services.tokenizer_proxy]
-host = "0.0.0.0"
-port = 5305
-public_url = "https://tokenizer-proxy.example.test"
-internal_url = "http://127.0.0.1:5305"
-
 [services.control_plane_worker]
 workflow_concurrency = 2
 
@@ -137,11 +131,6 @@ audience = "data-plane-gateway"
 secret = "fixture-bootstrap-token-secret"
 issuer = "data-plane-worker"
 audience = "data-plane-gateway"
-
-[sandbox.tokens.egress]
-secret = "fixture-egress-token-secret"
-issuer = "data-plane-worker"
-audience = "tokenizer-proxy"
 
 [sandbox.publish.access_token]
 secret = "fixture-publish-token-secret"

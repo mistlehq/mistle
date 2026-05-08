@@ -4,7 +4,6 @@
   "type": "module",
   "scripts": {
     "dev": "tsx ./scripts/dev/start.ts",
-    "dev:gateway-proxy": "tsx ./scripts/dev/start.ts --gateway-proxy",
     "dev:nix": "nix develop --command pnpm dev",
     "dev:workspace": "turbo watch dev dev:schedules --ui=tui --filter=!@mistle/docs --env-mode=loose",
     "docs:dev": "nix develop .#docs -c pnpm --filter @mistle/docs dev",

@@ -17,7 +17,6 @@ describe("createTestRegistry", () => {
       "data-plane-api",
       "data-plane-gateway",
       "data-plane-worker",
-      "tokenizer-proxy",
     ]);
   });
 
@@ -40,7 +39,6 @@ describe("createTestRegistry", () => {
     expect(registry["data-plane-worker"].infra.map((infra) => infra.id)).toEqual([
       "postgres.data-plane",
     ]);
-    expect(registry["tokenizer-proxy"].infra.map((infra) => infra.id)).toEqual([]);
   });
 
   it("resolves explicitly requested extra infra independently from service declarations", () => {
@@ -73,7 +71,6 @@ describe("createTestRegistry", () => {
     expect(registry["data-plane-api"].supportedModes).toEqual(["docker"]);
     expect(registry["data-plane-gateway"].supportedModes).toEqual(["docker"]);
     expect(registry["data-plane-worker"].supportedModes).toEqual(["docker"]);
-    expect(registry["tokenizer-proxy"].supportedModes).toEqual(["docker"]);
   });
 
   it("declares service startup references for workers and gateway", () => {
@@ -91,10 +88,8 @@ describe("createTestRegistry", () => {
     ]);
     expect(registry["data-plane-worker"].serviceReferences).toEqual([
       "data-plane-gateway",
-      "tokenizer-proxy",
       "control-plane-api",
     ]);
-    expect(registry["tokenizer-proxy"].serviceReferences).toEqual(["control-plane-api"]);
   });
 
   it("keeps generated data-plane schema names below the Postgres identifier limit", () => {

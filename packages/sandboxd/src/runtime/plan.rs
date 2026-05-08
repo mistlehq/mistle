@@ -36,7 +36,7 @@ pub enum CompiledRuntimePlanImageSource {
     Snapshot,
 }
 
-/// One outbound route that the sandbox runtime may mediate through tokenizer-proxy.
+/// One outbound route that the sandbox runtime may mediate through gateway egress.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CompiledEgressRoute {
@@ -69,7 +69,7 @@ pub struct CompiledEgressRouteUpstream {
     pub base_url: String,
 }
 
-/// The auth-injection policy that tokenizer-proxy applies for one egress route.
+/// The auth-injection policy that gateway egress applies for one egress route.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CompiledEgressRouteAuthInjection {

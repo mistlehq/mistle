@@ -41,7 +41,6 @@ type DockerHostConfig = Docker.HostConfig & {
 
 const DockerVolumeInitImageRef = "alpine:3.20";
 const DockerHostGatewayExtraHost = "host.docker.internal:host-gateway";
-const GatewayProxyEnabledEnv = "GATEWAY_PROXY_ENABLED";
 
 export type DockerStartSandboxResponse = {
   runtimeId: string;
@@ -295,7 +294,6 @@ export class DockerApiClient implements DockerClient {
 
     const hostConfig = createDockerSandboxHostConfig({
       ...(this.#config.networkName === undefined ? {} : { networkName: this.#config.networkName }),
-      netAdmin: parsedRequest.env?.[GatewayProxyEnabledEnv] === "1",
       ...(parsedRequest.storagePreparation === undefined
         ? {}
         : { storagePreparation: parsedRequest.storagePreparation }),
@@ -497,7 +495,6 @@ export class DockerApiClient implements DockerClient {
 
 export function createDockerSandboxHostConfig(input: {
   networkName?: string;
-  netAdmin?: boolean;
   storagePreparation?: DockerStartSandboxRequest["storagePreparation"];
 }): DockerHostConfig {
   const hostConfig: DockerHostConfig = {
@@ -512,9 +509,7 @@ export function createDockerSandboxHostConfig(input: {
   // sandbox-owned scopes.
   hostConfig.Binds = ["/sys/fs/cgroup:/sys/fs/cgroup:rw"];
   hostConfig.CgroupnsMode = "host";
-  if (input.netAdmin === true) {
-    hostConfig.CapAdd = ["NET_ADMIN"];
-  }
+  hostConfig.CapAdd = ["NET_ADMIN"];
   if (input.storagePreparation !== undefined) {
     hostConfig.Mounts = createDockerVolumeSubpathMounts({
       storage: input.storagePreparation,

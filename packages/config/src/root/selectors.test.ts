@@ -58,12 +58,6 @@ function createRootConfig(input: {
         sandbox_ws_public_url: "wss://gateway.example.com/tunnel/sandbox",
         sandbox_ws_internal_url: "ws://data-plane-gateway:8084/tunnel/sandbox",
       },
-      tokenizer_proxy: {
-        host: "0.0.0.0",
-        port: 8085,
-        internal_url: "http://tokenizer-proxy:8085",
-        public_url: "https://api.example.com",
-      },
       control_plane_worker: {
         workflow_concurrency: 4,
       },
@@ -134,11 +128,6 @@ function createRootConfig(input: {
           secret: "bootstrap-secret",
           issuer: "data-plane-worker",
           audience: "data-plane-gateway",
-        },
-        egress: {
-          secret: "egress-secret",
-          issuer: "data-plane-worker",
-          audience: "tokenizer-proxy",
         },
       },
       publish: {

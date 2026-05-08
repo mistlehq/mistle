@@ -78,14 +78,3 @@ RUN chmod +x /usr/local/bin/mistle-data-plane-gateway-entrypoint
 ENV MISTLE_CONFIG_PATH=/app/config/config.integration.docker.toml
 EXPOSE 5202
 ENTRYPOINT ["/usr/local/bin/mistle-data-plane-gateway-entrypoint"]
-
-FROM source AS tokenizer-proxy-test-deps
-RUN pnpm install --frozen-lockfile --prod --filter @mistle/tokenizer-proxy...
-
-FROM base AS tokenizer-proxy-test-runtime
-COPY --from=tokenizer-proxy-test-deps /app /app
-COPY docker/apps/tokenizer-proxy/entrypoint.sh /usr/local/bin/mistle-tokenizer-proxy-entrypoint
-RUN chmod +x /usr/local/bin/mistle-tokenizer-proxy-entrypoint
-ENV MISTLE_CONFIG_PATH=/app/config/config.integration.docker.toml
-EXPOSE 5205
-ENTRYPOINT ["/usr/local/bin/mistle-tokenizer-proxy-entrypoint"]

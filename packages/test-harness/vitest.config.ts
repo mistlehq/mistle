@@ -41,18 +41,6 @@ export default defineConfig({
           new URL("../../apps/data-plane-gateway/src/types.ts", import.meta.url),
         ),
       },
-      {
-        find: /^@mistle\/tokenizer-proxy\/runtime$/,
-        replacement: fileURLToPath(
-          new URL("../../apps/tokenizer-proxy/src/runtime/index.ts", import.meta.url),
-        ),
-      },
-      {
-        find: /^@mistle\/tokenizer-proxy\/types$/,
-        replacement: fileURLToPath(
-          new URL("../../apps/tokenizer-proxy/src/types.ts", import.meta.url),
-        ),
-      },
     ],
   },
   test: {

@@ -66,11 +66,7 @@ export function service(
   return {
     id: ServiceIds.DATA_PLANE_WORKER,
     infra,
-    serviceReferences: [
-      ServiceIds.DATA_PLANE_GATEWAY,
-      ServiceIds.TOKENIZER_PROXY,
-      ServiceIds.CONTROL_PLANE_API,
-    ],
+    serviceReferences: [ServiceIds.DATA_PLANE_GATEWAY, ServiceIds.CONTROL_PLANE_API],
     poolScope: "environment",
     supportedModes: ["runtime", "process"],
     healthCheck: async (runtime) => processHealth(runtime, ServiceIds.DATA_PLANE_WORKER),
@@ -269,10 +265,6 @@ function createDataPlaneWorkerEnv(input: {
     MISTLE_SANDBOX_TOKENS_BOOTSTRAP_SECRET: "integration-new-bootstrap-token-secret",
     MISTLE_SANDBOX_TOKENS_BOOTSTRAP_ISSUER: "integration-new-data-plane-worker",
     MISTLE_SANDBOX_TOKENS_BOOTSTRAP_AUDIENCE: "integration-new-data-plane-gateway",
-    MISTLE_SANDBOX_TOKENS_EGRESS_SECRET: "integration-new-egress-token-secret",
-    MISTLE_SANDBOX_TOKENS_EGRESS_ISSUER: "integration-new-data-plane-worker",
-    MISTLE_SANDBOX_TOKENS_EGRESS_AUDIENCE: "integration-new-tokenizer-proxy",
-    ...(input.sandbox?.gatewayProxy === true ? { GATEWAY_PROXY_ENABLED: "1" } : {}),
     MISTLE_SANDBOX_PUBLISH_BASE_DOMAIN: "mistle.example.test",
     MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET: "integration-new-port-access-secret",
     MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_ISSUER: "integration-new-control-plane-api",

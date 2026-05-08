@@ -18,7 +18,6 @@ const dockerIt = createSystemTest({
   sandbox: {
     provider: "docker",
   },
-  gatewayProxy: true,
 });
 
 const e2bIt = createSystemTest({
@@ -26,10 +25,9 @@ const e2bIt = createSystemTest({
   sandbox: {
     provider: "e2b",
   },
-  gatewayProxy: true,
   publicAccess: {
     provider: "cloudflare",
-    services: ["data-plane-gateway", "tokenizer-proxy"],
+    services: ["data-plane-gateway"],
   },
 });
 

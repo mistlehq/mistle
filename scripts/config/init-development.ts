@@ -22,7 +22,6 @@ function validateWrittenDevelopmentConfig(configPath: string): void {
   loadConfig({ app: AppIds.DATA_PLANE_API, configPath });
   loadConfig({ app: AppIds.DATA_PLANE_GATEWAY, configPath });
   loadConfig({ app: AppIds.DATA_PLANE_WORKER, configPath });
-  loadConfig({ app: AppIds.TOKENIZER_PROXY, configPath });
 }
 
 function main(): void {

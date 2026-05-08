@@ -127,17 +127,13 @@ mod tests {
 
     use crate::control;
     use crate::protocol::startup::{StartupInitResponse, StartupInput, StartupMode};
-    use crate::test_support::TestEnvVarGuard;
     use crate::time::{Sleeper, ThreadSleeper};
 
     use crate::init::run_init;
 
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
-    const GATEWAY_PROXY_ENABLED_ENV: &str = "GATEWAY_PROXY_ENABLED";
-
     #[test]
     fn submits_startup_input_and_writes_ok_response() {
-        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("init_ok");
         let control_socket_path = test_dir.join("control.sock");
         let gateway = start_bootstrap_gateway();
@@ -193,47 +189,6 @@ mod tests {
         assert!(matches!(error, crate::init::InitError::InvalidRequest(_)));
         assert!(matches!(response, StartupInitResponse::Error(_)));
 
-        fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
-    }
-
-    #[test]
-    fn writes_error_response_when_daemon_initialization_fails() {
-        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "invalid");
-        let test_dir = create_temp_test_dir("init_runtime_failure");
-        let control_socket_path = test_dir.join("control.sock");
-        let gateway = start_bootstrap_gateway();
-        let request = serde_json::to_string(&valid_startup_input(&gateway.ws_url))
-            .expect("startup input should serialize");
-        let mut stdout = Vec::new();
-        let server = start_test_control_server(
-            &control_socket_path,
-            ThreadSleeper,
-            control::DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
-        );
-
-        let error = run_init(&mut request.as_bytes(), &mut stdout, &control_socket_path)
-            .expect_err("init should fail when daemon initialization fails");
-
-        let response: StartupInitResponse =
-            serde_json::from_slice(&stdout).expect("init should write an error response");
-        assert!(matches!(error, crate::init::InitError::SubmitInit(_)));
-        match response {
-            StartupInitResponse::Error(error_response) => {
-                assert!(
-                    error_response.error.contains(
-                        "failed to initialize sandboxd state: failed to start local egress proxy: GATEWAY_PROXY_ENABLED must be '1' when set, got 'invalid'"
-                    )
-                );
-            }
-            StartupInitResponse::Ok(_) => {
-                panic!("expected init error response when daemon initialization fails");
-            }
-        }
-
-        server.close().expect("control server should stop cleanly");
-        gateway
-            .close()
-            .expect("bootstrap gateway should stop cleanly");
         fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
 

@@ -254,7 +254,6 @@ mod tests {
     use super::{Base64, SignError, parse_sign_invocation, run_sign};
 
     static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
-    const GATEWAY_PROXY_ENABLED_ENV: &str = "GATEWAY_PROXY_ENABLED";
     const TEST_PUBLIC_KEY: &str = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLE";
     const TEST_SIGNATURE: &str =
         "-----BEGIN SSH SIGNATURE-----\nexample-signature\n-----END SSH SIGNATURE-----\n";
@@ -288,7 +287,6 @@ mod tests {
 
     #[test]
     fn writes_signature_file_for_valid_signing_request() {
-        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("sign_ok");
         let control_socket_path = test_dir.join("control.sock");
         let gateway = start_signing_gateway();
@@ -388,7 +386,6 @@ mod tests {
 
     #[test]
     fn fails_when_startup_signing_config_is_missing() {
-        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
         let test_dir = create_temp_test_dir("sign_missing_config");
         let control_socket_path = test_dir.join("control.sock");
         let gateway = start_signing_gateway();

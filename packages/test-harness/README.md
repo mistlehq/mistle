@@ -80,7 +80,6 @@ use them as the normal public API for app integration tests.
 - `src/apps/data-plane-api.ts`
 - `src/apps/data-plane-worker.ts`
 - `src/apps/data-plane-gateway.ts`
-- `src/apps/tokenizer-proxy.ts`
 
 Dockerfile-based app launchers expect prebuilt `dist` artifacts in the build
 context. For example, run
