@@ -74,8 +74,6 @@ jobs:
             target: data-plane-worker-runtime
           - component: data-plane-gateway
             target: data-plane-gateway-runtime
-          - component: tokenizer-proxy
-            target: tokenizer-proxy-runtime
     env:
       IMAGE_REPOSITORY: ghcr.io/mistlehq/${{ matrix.component }}
       IMAGE_SHA_TAG: ${{ github.sha }}
@@ -284,7 +282,6 @@ jobs:
               "data-plane-api",
               "data-plane-worker",
               "data-plane-gateway",
-              "tokenizer-proxy",
           }
           version = os.environ["RELEASE_VERSION"]
           stable_release = os.environ["STABLE_RELEASE"] == "true"

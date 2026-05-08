@@ -15,7 +15,6 @@ on:
       - "apps/data-plane-api/**"
       - "apps/data-plane-worker/**"
       - "apps/data-plane-gateway/**"
-      - "apps/tokenizer-proxy/**"
       - "packages/**"
       - "scripts/**"
       - "package.json"

@@ -13,7 +13,6 @@ on:
       - "apps/data-plane-api/**"
       - "apps/data-plane-worker/**"
       - "apps/data-plane-gateway/**"
-      - "apps/tokenizer-proxy/**"
       - "packages/**"
       - "scripts/**"
       - "package.json"
@@ -34,7 +33,6 @@ on:
           - data-plane-api
           - data-plane-worker
           - data-plane-gateway
-          - tokenizer-proxy
       publish_latest:
         description: Also publish the latest tag
         required: true
@@ -85,7 +83,6 @@ jobs:
               {"component": "data-plane-api", "target": "data-plane-api-runtime"},
               {"component": "data-plane-worker", "target": "data-plane-worker-runtime"},
               {"component": "data-plane-gateway", "target": "data-plane-gateway-runtime"},
-              {"component": "tokenizer-proxy", "target": "tokenizer-proxy-runtime"},
           ]
           selected_component = os.environ["SELECTED_COMPONENT"]
 
