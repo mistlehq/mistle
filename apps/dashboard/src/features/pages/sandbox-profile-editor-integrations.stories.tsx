@@ -100,7 +100,7 @@ export const StaleGitProviderBinding: Story = {
   },
 };
 
-export const GitProviderDraftWithOnlyNoneOption: Story = {
+export const DraftWithNoGitProvidersSetup: Story = {
   args: {
     availableConnections: StoryConnectionsWithoutGitProviders,
     availableTargets: StoryTargetsWithoutGitProviders,
