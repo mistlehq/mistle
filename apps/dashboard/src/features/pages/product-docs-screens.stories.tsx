@@ -60,7 +60,7 @@ import {
   type PendingSessionDiffComment,
 } from "./session-diff-comment.js";
 import { SessionDiffPanel } from "./session-diff-panel.js";
-import { SessionPortAccessPopover } from "./session-port-access-popover.js";
+import { SessionPortAccessPopover, SessionPortAccessSheet } from "./session-port-access-popover.js";
 import {
   createStorySessionMainContent,
   renderSessionWorkbenchStory,
@@ -414,6 +414,21 @@ function DocsSessionHeaderActions(input: {
           state={input.portAccessState ?? DocsSessionPortAccessClosedState}
         />
       }
+      mobilePortAccessControl={{
+        disabled:
+          (input.portAccessState ?? DocsSessionPortAccessClosedState).buttonDisabledReason !== null,
+        onOpen: () => {
+          (input.portAccessState ?? DocsSessionPortAccessClosedState).setPanelOpen(true);
+        },
+        surface: (
+          <SessionPortAccessSheet
+            state={input.portAccessState ?? DocsSessionPortAccessClosedState}
+          />
+        ),
+        title:
+          (input.portAccessState ?? DocsSessionPortAccessClosedState).buttonDisabledReason ??
+          "Show running processes",
+      }}
       repositoryControl={{
         ariaLabel: "Primary repository",
         onValueChange: () => {

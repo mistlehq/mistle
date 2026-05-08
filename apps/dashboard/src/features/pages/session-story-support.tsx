@@ -19,7 +19,7 @@ import {
   SessionConversationBottomPanel,
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
-import { SessionPortAccessPopover } from "./session-port-access-popover.js";
+import { SessionPortAccessPopover, SessionPortAccessSheet } from "./session-port-access-popover.js";
 import { SessionTerminalSurface } from "./session-terminal-surface.js";
 import {
   SessionWorkbenchHeaderActions,
@@ -250,6 +250,14 @@ export function SessionWorkbenchStoryHeaderActions(
         onClick: handleDiffToggle,
         pressed: isDiffVisible,
         title: isDiffVisible ? "Changes" : "Open changes",
+      }}
+      mobilePortAccessControl={{
+        disabled: portAccessState.buttonDisabledReason !== null,
+        onOpen: () => {
+          portAccessState.setPanelOpen(true);
+        },
+        surface: <SessionPortAccessSheet state={portAccessState} />,
+        title: portAccessState.buttonDisabledReason ?? "Show running processes",
       }}
       portAccessControl={<SessionPortAccessPopover state={portAccessState} />}
       repositoryControl={{

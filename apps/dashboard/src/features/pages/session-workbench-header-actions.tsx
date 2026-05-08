@@ -1,6 +1,11 @@
 import {
   Badge,
   Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   Notice,
   Select,
   SelectContent,
@@ -10,9 +15,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@mistle/ui";
-import { GitDiffIcon, TerminalIcon } from "@phosphor-icons/react";
+import {
+  CpuIcon,
+  DotsThreeIcon,
+  GitBranchIcon,
+  GitDiffIcon,
+  TerminalIcon,
+} from "@phosphor-icons/react";
+import { useEffect, useState } from "react";
 
+import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { resolveSelectableValue } from "../shared/select-value.js";
+
+const MobileHeaderBreakpointPx = 768;
 
 export type SessionWorkbenchHeaderRepositoryOption = {
   value: string;
@@ -40,9 +55,17 @@ type SessionWorkbenchHeaderButtonControl = {
   title: string;
 };
 
+type SessionWorkbenchHeaderMobilePortAccessControl = {
+  disabled: boolean;
+  onOpen: () => void;
+  surface: React.ReactNode;
+  title: string;
+};
+
 export function SessionWorkbenchHeaderActions(input: {
   cliControl: SessionWorkbenchHeaderButtonControl;
   diffControl: SessionWorkbenchHeaderButtonControl;
+  mobilePortAccessControl?: SessionWorkbenchHeaderMobilePortAccessControl;
   portAccessControl?: React.ReactNode;
   repositoryControl?: SessionWorkbenchHeaderRepositoryControl;
   status: {
@@ -51,6 +74,13 @@ export function SessionWorkbenchHeaderActions(input: {
   };
   terminalControl: SessionWorkbenchHeaderButtonControl;
 }): React.JSX.Element {
+  const isMobileHeaderLayout = useIsMobileHeaderLayout();
+  const desktopPortAccessControl = isMobileHeaderLayout ? null : input.portAccessControl;
+  const mobilePortAccessControl =
+    isMobileHeaderLayout && input.mobilePortAccessControl !== undefined
+      ? input.mobilePortAccessControl
+      : null;
+  const [isMoreActionsOpen, setMoreActionsOpen] = useState(false);
   const repositoryControl = input.repositoryControl;
   const selectedRepositoryLabel =
     repositoryControl === undefined
@@ -62,9 +92,11 @@ export function SessionWorkbenchHeaderActions(input: {
     repositoryControl === undefined ? null : repositoryControl.isRefreshing === true ? (
       <Spinner aria-label="Refreshing repositories" className="size-3.5 text-muted-foreground" />
     ) : undefined;
+  const compactRepositoryLabel =
+    selectedRepositoryLabel === null ? null : toCompactRepositoryLabel(selectedRepositoryLabel);
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5 sm:gap-2">
       {input.status.kind === "error" ? (
         <Badge aria-label={input.status.label} title={input.status.label} variant="destructive">
           {input.status.label}
@@ -84,7 +116,7 @@ export function SessionWorkbenchHeaderActions(input: {
       )}
       {repositoryControl === undefined ? null : (
         <>
-          <span aria-hidden className="h-5 w-px bg-stone-200" />
+          <span aria-hidden className="hidden h-5 w-px bg-stone-200 sm:block" />
           <Select
             disabled={repositoryControl.disabled}
             onOpenChange={repositoryControl.onOpenChange}
@@ -102,12 +134,19 @@ export function SessionWorkbenchHeaderActions(input: {
           >
             <SelectTrigger
               aria-label={repositoryControl.ariaLabel}
-              className="h-8 w-48 min-w-0 border-stone-200 bg-transparent text-sm shadow-none hover:bg-stone-100"
+              className="h-9 w-24 min-w-0 border-stone-200 bg-transparent px-2 text-sm shadow-none hover:bg-stone-100 sm:h-8 sm:w-48 sm:px-2.5"
               indicator={repositoryIndicator}
               title={repositoryControl.title ?? repositoryControl.ariaLabel}
             >
+              <GitBranchIcon
+                aria-hidden
+                className="size-4 shrink-0 text-muted-foreground sm:hidden"
+              />
               <SelectValue className="min-w-0 truncate" placeholder="Primary repository">
-                {selectedRepositoryLabel ?? "Primary repository"}
+                <span className="sm:hidden">{compactRepositoryLabel ?? "Repo"}</span>
+                <span className="hidden sm:inline">
+                  {selectedRepositoryLabel ?? "Primary repository"}
+                </span>
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -133,47 +172,146 @@ export function SessionWorkbenchHeaderActions(input: {
           </Select>
         </>
       )}
-      <span aria-hidden className="h-5 w-px bg-stone-200" />
-      <Button
-        aria-label={input.cliControl.ariaLabel}
-        aria-pressed={input.cliControl.pressed}
-        className={input.cliControl.className}
-        disabled={input.cliControl.disabled}
-        onClick={input.cliControl.onClick}
-        size="sm"
-        title={input.cliControl.title}
-        type="button"
-        variant="ghost"
-      >
-        TUI
-      </Button>
-      <Button
-        aria-label={input.diffControl.ariaLabel}
-        aria-pressed={input.diffControl.pressed}
-        className={input.diffControl.className}
-        disabled={input.diffControl.disabled}
-        onClick={input.diffControl.onClick}
-        size="icon-sm"
-        title={input.diffControl.title}
-        type="button"
-        variant="ghost"
-      >
-        <GitDiffIcon className="size-4" />
-      </Button>
-      {input.portAccessControl}
-      <Button
-        aria-label={input.terminalControl.ariaLabel}
-        aria-pressed={input.terminalControl.pressed}
-        className={input.terminalControl.className}
-        disabled={input.terminalControl.disabled}
-        onClick={input.terminalControl.onClick}
-        size="icon-sm"
-        title={input.terminalControl.title}
-        type="button"
-        variant="ghost"
-      >
-        <TerminalIcon className="size-4" />
-      </Button>
+      <span aria-hidden className="hidden h-5 w-px bg-stone-200 sm:block" />
+      <div className="hidden items-center gap-2 sm:flex">
+        <Button
+          aria-label={input.cliControl.ariaLabel}
+          aria-pressed={input.cliControl.pressed}
+          className={input.cliControl.className}
+          disabled={input.cliControl.disabled}
+          onClick={input.cliControl.onClick}
+          size="sm"
+          title={input.cliControl.title}
+          type="button"
+          variant="ghost"
+        >
+          <span className="text-sm font-medium">TUI</span>
+        </Button>
+        <HeaderIconButton control={input.diffControl}>
+          <GitDiffIcon className="size-4" />
+        </HeaderIconButton>
+        {desktopPortAccessControl}
+        <HeaderIconButton control={input.terminalControl}>
+          <TerminalIcon className="size-4" />
+        </HeaderIconButton>
+      </div>
+      <DropdownMenu onOpenChange={setMoreActionsOpen} open={isMoreActionsOpen}>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              aria-label="Open session tools"
+              className="sm:hidden"
+              size="icon-sm"
+              title="Session tools"
+              type="button"
+              variant="ghost"
+            />
+          }
+        >
+          <DotsThreeIcon aria-hidden className="size-5" weight="bold" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48 sm:hidden" sideOffset={8}>
+          <DropdownMenuGroup>
+            <HeaderMenuItem control={input.cliControl} label="TUI">
+              <img
+                alt=""
+                className="size-4"
+                src={resolveIntegrationLogoPath({ logoKey: "openai" })}
+              />
+            </HeaderMenuItem>
+            <HeaderMenuItem control={input.diffControl} label="Changes">
+              <GitDiffIcon className="size-4" />
+            </HeaderMenuItem>
+            <HeaderMenuItem control={input.terminalControl} label="Terminal">
+              <TerminalIcon className="size-4" />
+            </HeaderMenuItem>
+          </DropdownMenuGroup>
+          {mobilePortAccessControl === null ? null : (
+            <DropdownMenuItem
+              aria-label="Processes"
+              disabled={mobilePortAccessControl.disabled}
+              onClick={() => {
+                setMoreActionsOpen(false);
+                mobilePortAccessControl.onOpen();
+              }}
+              title={mobilePortAccessControl.title}
+            >
+              <CpuIcon className="size-4" />
+              <span className="truncate">Processes</span>
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {mobilePortAccessControl?.surface}
     </div>
   );
+}
+
+function useIsMobileHeaderLayout(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia(`(max-width: ${String(MobileHeaderBreakpointPx - 1)}px)`);
+
+    const updateIsMobile = (): void => {
+      setIsMobile(mediaQuery.matches);
+    };
+
+    updateIsMobile();
+    mediaQuery.addEventListener("change", updateIsMobile);
+
+    return () => {
+      mediaQuery.removeEventListener("change", updateIsMobile);
+    };
+  }, []);
+
+  return isMobile;
+}
+
+function HeaderIconButton(input: {
+  children: React.ReactNode;
+  control: SessionWorkbenchHeaderButtonControl;
+}): React.JSX.Element {
+  return (
+    <Button
+      aria-label={input.control.ariaLabel}
+      aria-pressed={input.control.pressed}
+      className={input.control.className}
+      disabled={input.control.disabled}
+      onClick={input.control.onClick}
+      size="icon-sm"
+      title={input.control.title}
+      type="button"
+      variant="ghost"
+    >
+      {input.children}
+    </Button>
+  );
+}
+
+function HeaderMenuItem(input: {
+  children?: React.ReactNode;
+  control: SessionWorkbenchHeaderButtonControl;
+  label: string;
+}): React.JSX.Element {
+  return (
+    <DropdownMenuItem
+      aria-label={input.label}
+      disabled={input.control.disabled}
+      onClick={input.control.onClick}
+      title={input.control.title}
+    >
+      {input.children}
+      <span className="truncate">{input.label}</span>
+    </DropdownMenuItem>
+  );
+}
+
+function toCompactRepositoryLabel(label: string): string {
+  const pathParts = label.split("/").filter((part) => part.length > 0);
+  return pathParts.at(-1) ?? label;
 }

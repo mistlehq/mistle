@@ -64,6 +64,24 @@ describe("SessionWorkbenchHeaderActions", () => {
     expect(screen.getByRole("combobox", { name: "Primary repository" })).toBeDefined();
   });
 
+  it("renders a compact repository label for the mobile header", () => {
+    renderHeaderActions({
+      repositoryControl: {
+        ariaLabel: "Primary repository",
+        onValueChange: () => {
+          return;
+        },
+        options: [
+          { value: "__none__", label: "None" },
+          { value: "/root/pantheon", label: "staffany-eng/pantheon" },
+        ],
+        selectedValue: "/root/pantheon",
+      },
+    });
+
+    expect(screen.getByText("pantheon")).toBeDefined();
+  });
+
   it("does not render the repository selector when no repository control is provided", () => {
     renderHeaderActions({
       status: {
@@ -81,6 +99,17 @@ describe("SessionWorkbenchHeaderActions", () => {
     });
 
     expect(screen.getByRole("button", { name: "Open processes" })).toBeDefined();
+  });
+
+  it("exposes secondary workbench tools from the mobile tools menu", () => {
+    renderHeaderActions();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open session tools" }));
+
+    expect(screen.queryByText("Tools")).toBeNull();
+    expect(screen.getByRole("menuitem", { name: "TUI" })).toBeDefined();
+    expect(screen.getByRole("menuitem", { name: "Changes" })).toBeDefined();
+    expect(screen.getByRole("menuitem", { name: "Terminal" })).toBeDefined();
   });
 
   it("renders the repository refresh indicator inside the selector trigger", () => {

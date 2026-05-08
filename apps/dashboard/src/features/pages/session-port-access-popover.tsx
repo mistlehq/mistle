@@ -7,7 +7,14 @@ import {
   PopoverHeader,
   PopoverTitle,
   PopoverTrigger,
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
   Spinner,
+  cn,
 } from "@mistle/ui";
 import { CpuIcon } from "@phosphor-icons/react";
 
@@ -94,10 +101,51 @@ function createOpenLabel(process: ProcessEntry): string {
 }
 
 export function SessionPortAccessPopover(input: {
+  appearance?: "icon" | "menu";
   state: SessionPortAccessState;
 }): React.JSX.Element {
+  const appearance = input.appearance ?? "icon";
   const isButtonDisabled = input.state.buttonDisabledReason !== null;
   const listenerEntries = createProcessListenerEntries(input.state.processes);
+  const buttonClassName = input.state.isPanelOpen
+    ? "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300"
+    : "bg-transparent text-foreground shadow-none hover:bg-stone-100";
+
+  if (appearance === "menu") {
+    return (
+      <Sheet onOpenChange={input.state.setPanelOpen} open={input.state.isPanelOpen}>
+        <SheetTrigger
+          render={
+            <Button
+              aria-label="Open processes"
+              aria-pressed={input.state.isPanelOpen}
+              className={cn(
+                buttonClassName,
+                "h-auto w-full justify-start gap-2 px-2 py-1.5 text-left",
+              )}
+              disabled={isButtonDisabled}
+              size="sm"
+              title={input.state.buttonDisabledReason ?? "Show running processes"}
+              type="button"
+              variant="ghost"
+            />
+          }
+        >
+          <CpuIcon className="size-4" />
+          <span className="truncate">Processes</span>
+        </SheetTrigger>
+        <SheetContent className="max-h-[85dvh] gap-0 p-0" side="bottom">
+          <SheetHeader className="shrink-0 border-b border-stone-200 px-4 py-3 pr-12 text-left">
+            <SheetTitle>Processes</SheetTitle>
+            <SheetDescription>
+              Select a process to open its HTTP port in a new tab.
+            </SheetDescription>
+          </SheetHeader>
+          <ProcessAccessList listenerEntries={listenerEntries} state={input.state} />
+        </SheetContent>
+      </Sheet>
+    );
+  }
 
   return (
     <Popover onOpenChange={input.state.setPanelOpen} open={input.state.isPanelOpen}>
@@ -106,11 +154,7 @@ export function SessionPortAccessPopover(input: {
           <Button
             aria-label="Open processes"
             aria-pressed={input.state.isPanelOpen}
-            className={
-              input.state.isPanelOpen
-                ? "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300"
-                : "bg-transparent text-foreground shadow-none hover:bg-stone-100"
-            }
+            className={buttonClassName}
             disabled={isButtonDisabled}
             size="icon-sm"
             title={input.state.buttonDisabledReason ?? "Show running processes"}
@@ -121,62 +165,88 @@ export function SessionPortAccessPopover(input: {
       >
         <CpuIcon className="size-4" />
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-96 gap-0 p-0">
+      <PopoverContent
+        align="end"
+        className="max-h-[calc(100dvh-5rem)] w-96 gap-0 overflow-hidden p-0"
+      >
         <PopoverHeader className="border-b border-stone-200 px-4 py-3">
           <PopoverTitle>Processes</PopoverTitle>
           <PopoverDescription>
             Select a process to open its HTTP port in a new tab.
           </PopoverDescription>
         </PopoverHeader>
-        <div className="flex max-h-96 flex-col gap-1 overflow-y-auto p-2">
-          {input.state.errorMessage !== null ? (
-            <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-              {input.state.errorMessage}
-            </p>
-          ) : null}
-          {input.state.isLoadingProcesses ? (
-            <div className="flex items-center gap-2 px-3 py-3 text-sm text-stone-600">
-              <Spinner className="size-4" />
-              Loading running processes…
-            </div>
-          ) : null}
-          {!input.state.isLoadingProcesses && listenerEntries.length === 0 ? (
-            <p className="px-3 py-3 text-sm text-stone-600">
-              No loopback-listening processes found.
-            </p>
-          ) : null}
-          {listenerEntries.map((entry) => {
-            const primaryListener = resolvePrimaryProcessListener(entry.listenerProcess);
-            const isOpening =
-              input.state.isOpeningProcessKey === createProcessKey(entry.listenerProcess);
-
-            if (primaryListener === null) {
-              return null;
-            }
-
-            return (
-              <OpenTargetRow
-                key={createProcessKey(entry.listenerProcess)}
-                disabled={input.state.isOpeningProcessKey !== null}
-                isLoading={isOpening}
-                onClick={() => {
-                  void input.state.openProcess(entry.listenerProcess);
-                }}
-                primary={
-                  <p className="truncate">
-                    {entry.bindAddresses.join(", ")}:
-                    <span className="font-semibold text-stone-950">
-                      {String(primaryListener.port)}
-                    </span>
-                  </p>
-                }
-                secondary={<p className="truncate text-xs text-stone-600">{entry.processLabel}</p>}
-                title={createOpenLabel(entry.listenerProcess)}
-              />
-            );
-          })}
-        </div>
+        <ProcessAccessList listenerEntries={listenerEntries} state={input.state} />
       </PopoverContent>
     </Popover>
+  );
+}
+
+export function SessionPortAccessSheet(input: {
+  state: SessionPortAccessState;
+}): React.JSX.Element {
+  const listenerEntries = createProcessListenerEntries(input.state.processes);
+
+  return (
+    <Sheet onOpenChange={input.state.setPanelOpen} open={input.state.isPanelOpen}>
+      <SheetContent className="max-h-[85dvh] gap-0 p-0" side="bottom">
+        <SheetHeader className="shrink-0 border-b border-stone-200 px-4 py-3 pr-12 text-left">
+          <SheetTitle>Processes</SheetTitle>
+          <SheetDescription>Select a process to open its HTTP port in a new tab.</SheetDescription>
+        </SheetHeader>
+        <ProcessAccessList listenerEntries={listenerEntries} state={input.state} />
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function ProcessAccessList(input: {
+  listenerEntries: ProcessListenerEntry[];
+  state: SessionPortAccessState;
+}): React.JSX.Element {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2">
+      {input.state.errorMessage !== null ? (
+        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          {input.state.errorMessage}
+        </p>
+      ) : null}
+      {input.state.isLoadingProcesses ? (
+        <div className="flex items-center gap-2 px-3 py-3 text-sm text-stone-600">
+          <Spinner className="size-4" />
+          Loading running processes…
+        </div>
+      ) : null}
+      {!input.state.isLoadingProcesses && input.listenerEntries.length === 0 ? (
+        <p className="px-3 py-3 text-sm text-stone-600">No loopback-listening processes found.</p>
+      ) : null}
+      {input.listenerEntries.map((entry) => {
+        const primaryListener = resolvePrimaryProcessListener(entry.listenerProcess);
+        const isOpening =
+          input.state.isOpeningProcessKey === createProcessKey(entry.listenerProcess);
+
+        if (primaryListener === null) {
+          return null;
+        }
+
+        return (
+          <OpenTargetRow
+            key={createProcessKey(entry.listenerProcess)}
+            disabled={input.state.isOpeningProcessKey !== null}
+            isLoading={isOpening}
+            onClick={() => {
+              void input.state.openProcess(entry.listenerProcess);
+            }}
+            primary={
+              <p className="truncate">
+                {entry.bindAddresses.join(", ")}:
+                <span className="font-semibold text-stone-950">{String(primaryListener.port)}</span>
+              </p>
+            }
+            secondary={<p className="truncate text-xs text-stone-600">{entry.processLabel}</p>}
+            title={createOpenLabel(entry.listenerProcess)}
+          />
+        );
+      })}
+    </div>
   );
 }

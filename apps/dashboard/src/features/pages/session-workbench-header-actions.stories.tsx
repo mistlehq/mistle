@@ -76,6 +76,14 @@ export const Default = createStory({
   status: "connected",
 });
 
+export const MobileMoreActionsOpen = createStory({
+  moreActionsStartsOpen: true,
+  portAccessProcessScenario: "many",
+  repositoryOptions: StoryRepositoryOptions,
+  repositorySelectedValue: "/root/mistle",
+  status: "connected",
+});
+
 export const WithRepositorySelectorRefreshingOpen = createStory({
   repositoryIsRefreshing: true,
   repositoryStartsOpen: true,

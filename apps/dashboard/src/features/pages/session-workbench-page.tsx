@@ -20,7 +20,7 @@ import type {
 import { reconcilePendingSessionDiffComments } from "./session-diff-comment.js";
 import { parseSessionDiffPatch } from "./session-diff-panel-model.js";
 import { SessionDiffPanel } from "./session-diff-panel.js";
-import { SessionPortAccessPopover } from "./session-port-access-popover.js";
+import { SessionPortAccessPopover, SessionPortAccessSheet } from "./session-port-access-popover.js";
 import { SessionStartupStatus } from "./session-startup-status.js";
 import {
   SessionTerminalWorkspace,
@@ -144,6 +144,14 @@ function SessionWorkbenchPageContent(input: {
           },
           pressed: workbench.diffPanelState.isVisible,
           title: diffButtonTitle,
+        }}
+        mobilePortAccessControl={{
+          disabled: workbench.portAccessState.buttonDisabledReason !== null,
+          onOpen: () => {
+            workbench.portAccessState.setPanelOpen(true);
+          },
+          surface: <SessionPortAccessSheet state={workbench.portAccessState} />,
+          title: workbench.portAccessState.buttonDisabledReason ?? "Show running processes",
         }}
         portAccessControl={<SessionPortAccessPopover state={workbench.portAccessState} />}
         repositoryControl={{
