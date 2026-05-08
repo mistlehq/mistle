@@ -94,7 +94,11 @@ export function updateConnectedCodexSessionActiveThread(input: {
   return {
     ...input.currentSession,
     activeThreadId: input.threadId,
-    activeThreadCwd: input.cwd ?? input.currentSession.activeThreadCwd,
+    activeThreadCwd:
+      input.cwd ??
+      (input.currentSession.activeThreadId === input.threadId
+        ? input.currentSession.activeThreadCwd
+        : null),
   };
 }
 

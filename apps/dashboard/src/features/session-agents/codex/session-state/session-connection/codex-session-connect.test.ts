@@ -212,6 +212,27 @@ describe("codex session connect", () => {
     ).toEqual(currentSession);
   });
 
+  it("clears the active thread cwd when a different thread update does not return cwd", () => {
+    const currentSession = createConnectedCodexSession({
+      sandboxInstanceId: "sandbox_123",
+      connectedAtIso: "2026-03-20T00:00:00.000Z",
+      providerThreadId: null,
+      activeThreadId: "thread_123",
+      activeThreadCwd: "/root/acme/repo-2",
+    });
+
+    expect(
+      updateConnectedCodexSessionActiveThread({
+        currentSession,
+        threadId: "thread_456",
+      }),
+    ).toEqual({
+      ...currentSession,
+      activeThreadId: "thread_456",
+      activeThreadCwd: null,
+    });
+  });
+
   it("clears the active thread cwd when the active thread is cleared", () => {
     const currentSession = createConnectedCodexSession({
       sandboxInstanceId: "sandbox_123",

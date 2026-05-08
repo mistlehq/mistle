@@ -207,6 +207,9 @@ export function useCodexSessionState(input: {
   } = useCodexChatController({
     rpcClientRef: input.rpcClientRef,
     threadIdRef,
+    onTurnCwdCommitted: (turnCwd) => {
+      updateActiveThread(turnCwd);
+    },
     setSessionErrorMessage,
   });
 
@@ -517,14 +520,19 @@ export function useCodexSessionState(input: {
         throw new Error("Connect to a sandbox session before unarchiving a thread.");
       }
 
-      return unarchiveCodexThread({
+      const unarchivedThread = await unarchiveCodexThread({
         rpcClient,
         threadId,
+      });
+      return await resumeCodexThread({
+        rpcClient,
+        threadId: unarchivedThread.threadId,
       });
     },
     onSuccess: (result) => {
       updateActiveThread({
         threadId: result.threadId,
+        cwd: result.cwd,
       });
       resetChat();
       void hydrateChatFromThread();

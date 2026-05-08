@@ -31,6 +31,20 @@ type QueuedSteerRequest = {
   status: "queued" | "sending";
 };
 
+export function resolveTurnCwdCommit(input: {
+  threadId: string;
+  cwd?: string;
+}): { threadId: string; cwd: string } | null {
+  if (input.cwd === undefined) {
+    return null;
+  }
+
+  return {
+    threadId: input.threadId,
+    cwd: input.cwd,
+  };
+}
+
 function buildTurnRequest(input: {
   submittedPrompt: string;
   submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
@@ -73,6 +87,7 @@ function buildTurnRequest(input: {
 export function useCodexChatController(input: {
   rpcClientRef: RefObject<CodexJsonRpcClient | null>;
   threadIdRef: RefObject<string | null>;
+  onTurnCwdCommitted: (input: { threadId: string; cwd: string }) => void;
   setSessionErrorMessage: (message: string | null) => void;
 }) {
   const [chatState, dispatchChatAction] = useReducer(
@@ -199,6 +214,13 @@ export function useCodexChatController(input: {
         prompt: turnRequest.transcriptPrompt,
         attachments: turnRequest.displayAttachments,
       });
+      const turnCwdCommit = resolveTurnCwdCommit({
+        threadId,
+        ...(turnRequest.cwd === undefined ? {} : { cwd: turnRequest.cwd }),
+      });
+      if (turnCwdCommit !== null) {
+        input.onTurnCwdCommitted(turnCwdCommit);
+      }
     },
   });
 
