@@ -69,6 +69,17 @@ function toUnavailableSelectedOption(input: {
   };
 }
 
+function findContainingRepositoryOption(input: {
+  repositoryOptions: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
+  selectedRepositoryPath: string;
+}): SessionWorkbenchHeaderRepositoryOption | undefined {
+  return input.repositoryOptions.find(
+    (option) =>
+      input.selectedRepositoryPath.startsWith(`${option.value}/`) &&
+      input.selectedRepositoryPath.length > option.value.length + 1,
+  );
+}
+
 export function resolvePrimaryRepositorySelection(input: {
   repositoryOptions: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
   selectedRepositoryPath: string | null;
@@ -96,6 +107,21 @@ export function resolvePrimaryRepositorySelection(input: {
       workspaceRoot: input.workspaceRoot ?? DefaultSandboxWorkspaceDir,
     }),
   };
+}
+
+function resolveUnavailableRepositoryErrorMessage(input: {
+  repositoryOptions: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
+  selectedRepositoryPath: string;
+}): string {
+  const containingRepositoryOption = findContainingRepositoryOption({
+    repositoryOptions: input.repositoryOptions,
+    selectedRepositoryPath: input.selectedRepositoryPath,
+  });
+  if (containingRepositoryOption !== undefined) {
+    return `Codex is running in ${input.selectedRepositoryPath}, which is not a selectable repository root.`;
+  }
+
+  return "The selected repository is no longer available in this sandbox.";
 }
 
 export function resolvePrimaryRepositoryTurnStartCwd(input: {
@@ -152,7 +178,10 @@ export function resolvePrimaryRepositoryPresentation(input: {
     errorMessage:
       input.queryErrorMessage ??
       (selection.kind === "unavailable"
-        ? "The selected repository is no longer available in this sandbox."
+        ? resolveUnavailableRepositoryErrorMessage({
+            repositoryOptions: input.repositoryOptions,
+            selectedRepositoryPath: selection.path,
+          })
         : null),
     options: [
       ...(selection.kind === "unavailable" ? [selection.option] : []),

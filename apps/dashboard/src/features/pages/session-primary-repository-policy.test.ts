@@ -82,6 +82,39 @@ describe("session primary repository policy", () => {
     });
   });
 
+  it("surfaces a specific error when the restored Codex cwd is inside a selectable repository", () => {
+    expect(
+      resolvePrimaryRepositoryPresentation({
+        repositoryOptions: [
+          { value: "/root/acme/repo-1", label: "acme/repo-1" },
+          { value: "/root/acme/repo-2", label: "acme/repo-2" },
+        ],
+        selectedRepositoryPath: "/root/acme/repo-1/packages/app",
+        queryErrorMessage: null,
+        queryState: "loaded",
+      }),
+    ).toEqual({
+      errorMessage:
+        "Codex is running in /root/acme/repo-1/packages/app, which is not a selectable repository root.",
+      options: [
+        {
+          value: "/root/acme/repo-1/packages/app",
+          label: "acme/repo-1/packages/app (unavailable)",
+        },
+        { value: "/root/acme/repo-1", label: "acme/repo-1" },
+        { value: "/root/acme/repo-2", label: "acme/repo-2" },
+      ],
+      selection: {
+        kind: "unavailable",
+        path: "/root/acme/repo-1/packages/app",
+        option: {
+          value: "/root/acme/repo-1/packages/app",
+          label: "acme/repo-1/packages/app (unavailable)",
+        },
+      },
+    });
+  });
+
   it("uses the selected repository as the Codex turn cwd", () => {
     expect(
       resolvePrimaryRepositoryTurnStartCwd({

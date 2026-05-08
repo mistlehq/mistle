@@ -108,3 +108,20 @@ export const WithRepositorySelectorError = createStory({
   repositorySelectedValue: "/root/platform",
   status: "connected",
 });
+
+export const WithNestedCodexCwdUnavailable = createStory({
+  repositoryErrorMessage:
+    "Codex is running in /root/acme/repo-1/packages/app, which is not a selectable repository root.",
+  repositoryOptions: [
+    { value: "__none__", label: "None" },
+    {
+      value: "/root/acme/repo-1/packages/app",
+      label: "acme/repo-1/packages/app (unavailable)",
+    },
+    { value: "/root/acme/repo-1", label: "acme/repo-1" },
+    { value: "/root/acme/repo-2", label: "acme/repo-2" },
+  ],
+  repositorySelectedValue: "/root/acme/repo-1/packages/app",
+  repositoryStartsOpen: true,
+  status: "connected",
+});

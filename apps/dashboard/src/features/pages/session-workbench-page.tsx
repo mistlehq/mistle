@@ -111,6 +111,9 @@ function SessionWorkbenchPageContent(input: {
     headerStatusKind === "error"
       ? "Error"
       : resolveSandboxStatusBadgeUi(workbench.sandboxLifecycleStatus).label;
+  const primaryRepositoryErrorMessage =
+    workbench.primaryRepositoryState.errorMessage ??
+    workbench.primaryRepositoryControlState.disabledReason;
   const headerActions = useMemo(
     () => (
       <SessionWorkbenchHeaderActions
@@ -162,6 +165,9 @@ function SessionWorkbenchPageContent(input: {
               workbench.primaryRepositoryState.options.length === 1) ||
             workbench.primaryRepositoryControlState.isSwitching ||
             workbench.primaryRepositoryControlState.disabledReason !== null,
+          ...(primaryRepositoryErrorMessage === null
+            ? {}
+            : { errorMessage: primaryRepositoryErrorMessage }),
           isRefreshing: workbench.primaryRepositoryState.isRefreshing,
           onOpenChange: (open) => {
             if (!open) {
@@ -179,8 +185,7 @@ function SessionWorkbenchPageContent(input: {
           selectedValue:
             workbench.primaryRepositoryState.selectedRepositoryPath ?? SessionRepositoryNoneValue,
           title:
-            workbench.primaryRepositoryState.errorMessage ??
-            workbench.primaryRepositoryControlState.disabledReason ??
+            primaryRepositoryErrorMessage ??
             (!workbench.connectionReadiness.canConnect
               ? (workbench.stoppedSessionMessage ??
                 "Primary repository is available only when the sandbox is running.")
@@ -236,7 +241,7 @@ function SessionWorkbenchPageContent(input: {
       workbench.primaryRepositoryState.options,
       workbench.primaryRepositoryState.refreshRepositories,
       workbench.primaryRepositoryState.selectedRepositoryPath,
-      workbench.primaryRepositoryControlState.disabledReason,
+      primaryRepositoryErrorMessage,
       workbench.primaryRepositoryControlState.isSwitching,
       workbench.primaryRepositoryControlState.switchPrimaryRepository,
       workbench.sandboxLifecycleStatus,
