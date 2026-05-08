@@ -271,13 +271,13 @@ export function useSessionWorkbenchController(input: {
         return;
       }
 
-      await sessionState.threads.switchPrimaryRepository(nextSelectedRepositoryPath);
+      await sessionState.threads.ensureCanSwitchPrimaryRepository();
       primaryRepositoryState.setSelectedRepositoryPath(nextSelectedRepositoryPath);
     },
     [
       primaryRepositoryState.selectedRepositoryPath,
       primaryRepositoryState.setSelectedRepositoryPath,
-      sessionState.threads.switchPrimaryRepository,
+      sessionState.threads.ensureCanSwitchPrimaryRepository,
     ],
   );
   const startTurn = useCallback(

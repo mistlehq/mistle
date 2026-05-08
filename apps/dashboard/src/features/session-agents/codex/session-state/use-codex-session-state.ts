@@ -81,7 +81,7 @@ type CodexSessionThreadState = {
   unsubscribeThread: (threadId: string) => void;
   compactThread: (threadId: string) => void;
   rollbackThread: (threadId: string, numTurns: number) => void;
-  switchPrimaryRepository: (selectedRepositoryPath: string | null) => Promise<void>;
+  ensureCanSwitchPrimaryRepository: () => Promise<void>;
 };
 
 type CodexSessionChatState = {
@@ -634,23 +634,20 @@ export function useCodexSessionState(input: {
     [resumeThreadMutateAsync],
   );
 
-  const switchPrimaryRepository = useCallback(
-    async (_selectedRepositoryPath: string | null): Promise<void> => {
-      try {
-        if (rpcClientRef.current === null) {
-          throw new Error("Connect to a sandbox session before switching the primary repository.");
-        }
-
-        if (threadIdRef.current === null) {
-          throw new Error("Choose a thread before switching the primary repository.");
-        }
-      } catch (error) {
-        handleThreadMutationFailure("Could not switch the primary repository.", error);
-        throw error;
+  const ensureCanSwitchPrimaryRepository = useCallback(async (): Promise<void> => {
+    try {
+      if (rpcClientRef.current === null) {
+        throw new Error("Connect to a sandbox session before switching the primary repository.");
       }
-    },
-    [handleThreadMutationFailure, rpcClientRef, threadIdRef],
-  );
+
+      if (threadIdRef.current === null) {
+        throw new Error("Choose a thread before switching the primary repository.");
+      }
+    } catch (error) {
+      handleThreadMutationFailure("Could not switch the primary repository.", error);
+      throw error;
+    }
+  }, [handleThreadMutationFailure, rpcClientRef, threadIdRef]);
 
   const forkThread = useCallback(
     (threadId: string) => {
@@ -794,7 +791,7 @@ export function useCodexSessionState(input: {
       unsubscribeThread,
       compactThread,
       rollbackThread,
-      switchPrimaryRepository,
+      ensureCanSwitchPrimaryRepository,
     };
   }, [
     archiveThread,
@@ -820,7 +817,7 @@ export function useCodexSessionState(input: {
     resumeThread,
     rollbackThread,
     startNewThread,
-    switchPrimaryRepository,
+    ensureCanSwitchPrimaryRepository,
     unarchiveThread,
     unsubscribeThread,
   ]);
