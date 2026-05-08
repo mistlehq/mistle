@@ -106,6 +106,7 @@ export type SandboxProfileEditorPageStoryArgs = {
     kind: "error";
   };
   integrationSaveErrorMessage?: string;
+  versionActionErrorMessage?: string;
   initialBindings?: readonly {
     id: string;
     connectionId: string;
@@ -113,6 +114,8 @@ export type SandboxProfileEditorPageStoryArgs = {
     config: Record<string, unknown>;
   }[];
   setupScript: string | null;
+  setupScriptDraft?: string;
+  setupScriptSaveErrorMessage?: string;
   setupAssistantPanelState?: "closed" | "starting" | "ready" | "proposed-script";
   setupAssistantErrorMessage?: string;
   setupAssistantState?: "available" | "starting" | "disabled";
@@ -551,7 +554,9 @@ function SandboxProfileEditorPageStoryView(
   const [integrationSaveErrorMessage, setIntegrationSaveErrorMessage] = useState(
     input.integrationSaveErrorMessage ?? null,
   );
-  const [setupScriptDraft, setSetupScriptDraft] = useState(input.setupScript ?? "");
+  const [setupScriptDraft, setSetupScriptDraft] = useState(
+    input.setupScriptDraft ?? input.setupScript ?? "",
+  );
   const [persistedSetupScript, setPersistedSetupScript] = useState(input.setupScript ?? "");
   const [activeSectionId, setActiveSectionId] = useState<StorySectionId>(
     input.initialSectionId ?? "sandbox-profile",
@@ -640,7 +645,7 @@ function SandboxProfileEditorPageStoryView(
       onViewDraft={() => {}}
       profileName={profileName}
       profileNameFallback={profileName}
-      versionActionError={null}
+      versionActionError={input.versionActionErrorMessage ?? null}
       versionActionIsPending={false}
       renderSectionPanel={(sectionId) => {
         if (sectionId === "sandbox-profile") {
@@ -704,6 +709,7 @@ function SandboxProfileEditorPageStoryView(
                     <Notice variant="alert">{input.setupAssistantErrorMessage}</Notice>
                   )}
                   <SandboxProfileSetupScriptPanel
+                    errorMessage={input.setupScriptSaveErrorMessage ?? null}
                     onChange={setSetupScriptDraft}
                     disabled={!isEditable}
                     repositoryHandles={resolveSandboxBaseRepositoryHandles(integrationRows)}

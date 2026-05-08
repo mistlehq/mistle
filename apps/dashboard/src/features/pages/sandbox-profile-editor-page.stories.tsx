@@ -27,3 +27,15 @@ export const Published: Story = {
     lifecycleState: "published",
   },
 };
+
+export const DraftSaveFailure: Story = {
+  args: {
+    setupScriptDraft: `#!/usr/bin/env bash
+set -euo pipefail
+
+pnpm install
+pnpm dev:bootstrap
+pnpm lint`,
+    versionActionErrorMessage: "Could not save draft changes. Check your changes and try again.",
+  },
+};

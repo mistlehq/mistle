@@ -29,6 +29,20 @@ export const EmptySetupScript: Story = {
   },
 };
 
+export const DraftSaveFailure: Story = {
+  args: {
+    initialBindings: [StoryBindings[0], StoryBindings[1]],
+    setupScriptDraft: `#!/usr/bin/env bash
+set -euo pipefail
+
+pnpm install
+pnpm dev:bootstrap
+pnpm lint`,
+    setupScriptSaveErrorMessage: "Could not save sandbox profile setup script.",
+    versionActionErrorMessage: "Could not save draft changes. Check your changes and try again.",
+  },
+};
+
 export const SetupAssistantEntry: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],
