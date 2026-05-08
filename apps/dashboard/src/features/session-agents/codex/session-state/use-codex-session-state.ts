@@ -416,23 +416,6 @@ export function useCodexSessionState(input: {
     },
   });
 
-  const switchPrimaryRepositoryMutation = useMutation({
-    mutationFn: async (selectedRepositoryPath: string | null): Promise<void> => {
-      void selectedRepositoryPath;
-
-      if (rpcClientRef.current === null) {
-        throw new Error("Connect to a sandbox session before switching the primary repository.");
-      }
-
-      if (threadIdRef.current === null) {
-        throw new Error("Choose a thread before switching the primary repository.");
-      }
-    },
-    onError: (error) => {
-      handleThreadMutationFailure("Could not switch the primary repository.", error);
-    },
-  });
-
   const respondToServerRequestMutation = useMutation({
     mutationFn: async (input: { requestId: string | number; result: unknown }) => {
       const rpcClient = rpcClientRef.current;
@@ -617,10 +600,6 @@ export function useCodexSessionState(input: {
     startNewThreadMutation;
   const { mutateAsync: resumeThreadMutateAsync, isPending: isResumingThread } =
     resumeThreadMutation;
-  const {
-    mutateAsync: switchPrimaryRepositoryMutateAsync,
-    isPending: isSwitchingPrimaryRepository,
-  } = switchPrimaryRepositoryMutation;
   const { mutate: forkThreadMutate, isPending: isForkingThread } = forkThreadMutation;
   const { mutate: archiveThreadMutate, isPending: isArchivingThread } = archiveThreadMutation;
   const { mutate: unarchiveThreadMutate, isPending: isUnarchivingThread } = unarchiveThreadMutation;
@@ -657,10 +636,21 @@ export function useCodexSessionState(input: {
   );
 
   const switchPrimaryRepository = useCallback(
-    async (selectedRepositoryPath: string | null): Promise<void> => {
-      await switchPrimaryRepositoryMutateAsync(selectedRepositoryPath);
+    async (_selectedRepositoryPath: string | null): Promise<void> => {
+      try {
+        if (rpcClientRef.current === null) {
+          throw new Error("Connect to a sandbox session before switching the primary repository.");
+        }
+
+        if (threadIdRef.current === null) {
+          throw new Error("Choose a thread before switching the primary repository.");
+        }
+      } catch (error) {
+        handleThreadMutationFailure("Could not switch the primary repository.", error);
+        throw error;
+      }
     },
-    [switchPrimaryRepositoryMutateAsync],
+    [handleThreadMutationFailure, rpcClientRef, threadIdRef],
   );
 
   const forkThread = useCallback(
@@ -788,7 +778,7 @@ export function useCodexSessionState(input: {
       isRefreshingArchivedThreads,
       isStartingNewThread,
       isResumingThread,
-      isSwitchingPrimaryRepository,
+      isSwitchingPrimaryRepository: false,
       isForkingThread,
       isArchivingThread,
       isUnarchivingThread,
@@ -821,7 +811,6 @@ export function useCodexSessionState(input: {
     isRefreshingLoadedThreads,
     isRefreshingThreads,
     isResumingThread,
-    isSwitchingPrimaryRepository,
     isRollingBackThread,
     isStartingNewThread,
     isUnarchivingThread,
