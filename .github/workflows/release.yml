@@ -121,7 +121,7 @@ jobs:
           EOF
 
       - name: Upload release manifest fragment
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-image-${{ matrix.component }}
           path: dist/release-manifest/${{ matrix.component }}.json
@@ -178,7 +178,7 @@ jobs:
           EOF
 
       - name: Upload release manifest fragment
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-image-sandbox-base
           path: dist/release-manifest/sandbox-base.json
@@ -244,7 +244,7 @@ jobs:
           EOF
 
       - name: Upload release manifest fragment
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-image-mistle-${{ matrix.profile }}
           path: dist/release-manifest/mistle-${{ matrix.profile }}.json
