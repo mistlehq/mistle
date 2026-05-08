@@ -12,6 +12,7 @@ import {
 import { acquireAutomationConnection } from "./acquire-automation-connection.js";
 import { claimOrResumeAutomationConversationDeliveryTask } from "./claim-or-resume-automation-conversation-delivery-task.js";
 import { deliverConversationAutomationPayload } from "./deliver-conversation-automation-payload.js";
+import { shouldRethrowDurableStepErrorForRetry } from "./durable-step-retry.js";
 import { ensureConversationDeliverySandbox } from "./ensure-conversation-delivery-sandbox.js";
 import { finalizeAutomationConversationDeliveryTask } from "./finalize-automation-conversation-delivery-task.js";
 import { idleAutomationConversationDeliveryProcessorIfEmpty } from "./idle-automation-conversation-delivery-processor-if-empty.js";
@@ -274,6 +275,9 @@ export const HandleAutomationConversationDeliveryWorkflow = defineTracedControlP
               prefix: "deliver-automation-payload",
               taskId: activeTask.taskId,
             }),
+            retryPolicy: {
+              maximumAttempts: 1,
+            },
           },
           async () =>
             deliverConversationAutomationPayload(
@@ -347,6 +351,10 @@ export const HandleAutomationConversationDeliveryWorkflow = defineTracedControlP
           },
         });
       } catch (error) {
+        if (shouldRethrowDurableStepErrorForRetry(error)) {
+          throw error;
+        }
+
         const failure = resolveAutomationRunFailure(error);
 
         await step.run(

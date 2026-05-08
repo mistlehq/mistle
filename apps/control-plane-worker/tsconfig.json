@@ -12,6 +12,7 @@
     "src/**/*.tsx",
     "integration/**/*.ts",
     "integration/**/*.tsx",
+    "test-support/**/*.ts",
     "vitest.config.ts",
     "vitest.integration.config.ts"
   ]
