@@ -47,5 +47,5 @@ tokio-tungstenite = { version = "0.28.0", features = ["rustls-tls-native-roots"]
 tracing = "0.1.44"
 tracing-opentelemetry = "0.32.1"
 tracing-subscriber = { version = "0.3.20", features = ["fmt", "std"] }
-tungstenite = "0.28.0"
+tungstenite = "0.29.0"
 url = "2.5.7"
