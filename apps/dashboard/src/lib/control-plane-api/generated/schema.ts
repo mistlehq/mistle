@@ -8601,6 +8601,132 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/sandbox/profiles/{profileId}/versions/{version}/draft-automation-impact": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          profileId: string;
+          version: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Evaluate whether the specified sandbox profile draft version would break automations that currently use the profile. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              affectedAutomations: {
+                enabled: boolean;
+                id: string;
+                issues: {
+                  bindingId?: string;
+                  /** @enum {string} */
+                  code:
+                    | "AGENT_BINDING_REQUIRED"
+                    | "AGENT_BINDING_AMBIGUOUS"
+                    | "AGENT_BINDING_RUNTIME_INVALID"
+                    | "INVALID_BINDING_CONNECTION_REFERENCE"
+                    | "CONNECTION_NOT_ACTIVE"
+                    | "TARGET_DISABLED"
+                    | "TARGET_MISSING"
+                    | "WEBHOOK_SOURCE_CONNECTION_NOT_BOUND"
+                    | "PRIMARY_REPOSITORY_UNAVAILABLE";
+                  connectionId?: string;
+                  message: string;
+                  primaryRepositoryId?: string;
+                  targetKey?: string;
+                }[];
+                /** @enum {string} */
+                kind: "webhook" | "schedule";
+                name: string;
+              }[];
+              hasBreakingChanges: boolean;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile or version was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_NOT_FOUND" | "PROFILE_VERSION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/sandbox/profiles/{profileId}/versions/{version}/instances": {
     parameters: {
       query?: never;

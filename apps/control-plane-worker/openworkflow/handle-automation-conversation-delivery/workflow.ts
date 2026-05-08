@@ -1,4 +1,5 @@
 import { HandleAutomationConversationDeliveryWorkflowSpec } from "@mistle/workflow-registry/control-plane";
+import { shouldRethrowDurableStepErrorForRetry } from "@mistle/workflow-registry/durable-step-retry.js";
 
 import { getWorkflowContext } from "../core/context.js";
 import { defineTracedControlPlaneWorkflow } from "../core/tracing.js";
@@ -12,7 +13,6 @@ import {
 import { acquireAutomationConnection } from "./acquire-automation-connection.js";
 import { claimOrResumeAutomationConversationDeliveryTask } from "./claim-or-resume-automation-conversation-delivery-task.js";
 import { deliverConversationAutomationPayload } from "./deliver-conversation-automation-payload.js";
-import { shouldRethrowDurableStepErrorForRetry } from "./durable-step-retry.js";
 import { ensureConversationDeliverySandbox } from "./ensure-conversation-delivery-sandbox.js";
 import { finalizeAutomationConversationDeliveryTask } from "./finalize-automation-conversation-delivery-task.js";
 import { idleAutomationConversationDeliveryProcessorIfEmpty } from "./idle-automation-conversation-delivery-processor-if-empty.js";

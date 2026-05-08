@@ -141,3 +141,18 @@ export const SandboxProfilePublishabilityIssueCodes = {
 
 export type SandboxProfilePublishabilityIssueCode =
   (typeof SandboxProfilePublishabilityIssueCodes)[keyof typeof SandboxProfilePublishabilityIssueCodes];
+
+export const SandboxProfileAutomationImpactIssueCodes = {
+  AGENT_BINDING_REQUIRED: "AGENT_BINDING_REQUIRED",
+  AGENT_BINDING_AMBIGUOUS: "AGENT_BINDING_AMBIGUOUS",
+  AGENT_BINDING_RUNTIME_INVALID: "AGENT_BINDING_RUNTIME_INVALID",
+  INVALID_BINDING_CONNECTION_REFERENCE: "INVALID_BINDING_CONNECTION_REFERENCE",
+  CONNECTION_NOT_ACTIVE: "CONNECTION_NOT_ACTIVE",
+  TARGET_DISABLED: "TARGET_DISABLED",
+  TARGET_MISSING: "TARGET_MISSING",
+  WEBHOOK_SOURCE_CONNECTION_NOT_BOUND: "WEBHOOK_SOURCE_CONNECTION_NOT_BOUND",
+  PRIMARY_REPOSITORY_UNAVAILABLE: "PRIMARY_REPOSITORY_UNAVAILABLE",
+} as const;
+
+export type SandboxProfileAutomationImpactIssueCode =
+  (typeof SandboxProfileAutomationImpactIssueCodes)[keyof typeof SandboxProfileAutomationImpactIssueCodes];

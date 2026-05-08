@@ -69,6 +69,13 @@ export type PutSandboxProfileVersionDraftResult = PutSandboxProfileVersionDraftR
 export type SandboxProfileVersionPublishability =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/publishability"]["get"]["responses"][200]["content"]["application/json"];
 
+export type SandboxProfileVersionDraftAutomationImpact =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/draft-automation-impact"]["get"]["responses"][200]["content"]["application/json"];
+export type SandboxProfileVersionDraftAutomationImpactAutomation =
+  SandboxProfileVersionDraftAutomationImpact["affectedAutomations"][number];
+export type SandboxProfileVersionDraftAutomationImpactIssue =
+  SandboxProfileVersionDraftAutomationImpactAutomation["issues"][number];
+
 export type PublishSandboxProfileVersionResult = {
   activeVersion: number | null;
   snapshotJob: {

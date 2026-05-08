@@ -111,6 +111,9 @@ function SessionWorkbenchPageContent(input: {
     headerStatusKind === "error"
       ? "Error"
       : resolveSandboxStatusBadgeUi(workbench.sandboxLifecycleStatus).label;
+  const primaryRepositoryErrorMessage =
+    workbench.primaryRepositoryState.errorMessage ??
+    workbench.primaryRepositoryControlState.disabledReason;
   const headerActions = useMemo(
     () => (
       <SessionWorkbenchHeaderActions
@@ -160,8 +163,10 @@ function SessionWorkbenchPageContent(input: {
             !workbench.connectionReadiness.canConnect ||
             (workbench.primaryRepositoryState.isInitialLoading &&
               workbench.primaryRepositoryState.options.length === 1) ||
-            workbench.primaryRepositoryControlState.isSwitching ||
             workbench.primaryRepositoryControlState.disabledReason !== null,
+          ...(primaryRepositoryErrorMessage === null
+            ? {}
+            : { errorMessage: primaryRepositoryErrorMessage }),
           isRefreshing: workbench.primaryRepositoryState.isRefreshing,
           onOpenChange: (open) => {
             if (!open) {
@@ -179,18 +184,15 @@ function SessionWorkbenchPageContent(input: {
           selectedValue:
             workbench.primaryRepositoryState.selectedRepositoryPath ?? SessionRepositoryNoneValue,
           title:
-            workbench.primaryRepositoryState.errorMessage ??
-            workbench.primaryRepositoryControlState.disabledReason ??
+            primaryRepositoryErrorMessage ??
             (!workbench.connectionReadiness.canConnect
               ? (workbench.stoppedSessionMessage ??
                 "Primary repository is available only when the sandbox is running.")
-              : workbench.primaryRepositoryControlState.isSwitching
-                ? "Switching the active chat thread for the selected repository."
-                : workbench.primaryRepositoryState.isInitialLoading
-                  ? "Loading repositories from the active sandbox."
-                  : workbench.primaryRepositoryState.isRefreshing
-                    ? "Refreshing repositories from the active sandbox."
-                    : "Primary repository"),
+              : workbench.primaryRepositoryState.isInitialLoading
+                ? "Loading repositories from the active sandbox."
+                : workbench.primaryRepositoryState.isRefreshing
+                  ? "Refreshing repositories from the active sandbox."
+                  : "Primary repository"),
         }}
         status={{
           kind: headerStatusKind,
@@ -236,8 +238,7 @@ function SessionWorkbenchPageContent(input: {
       workbench.primaryRepositoryState.options,
       workbench.primaryRepositoryState.refreshRepositories,
       workbench.primaryRepositoryState.selectedRepositoryPath,
-      workbench.primaryRepositoryControlState.disabledReason,
-      workbench.primaryRepositoryControlState.isSwitching,
+      primaryRepositoryErrorMessage,
       workbench.primaryRepositoryControlState.switchPrimaryRepository,
       workbench.sandboxLifecycleStatus,
       workbench.primaryPanelState.canEnterCli,
@@ -395,7 +396,7 @@ function SessionWorkbenchPageContent(input: {
         bottomPanel={
           <SessionTerminalWorkspace
             key={terminalPanelKey}
-            cwd={workbench.primaryRepositoryState.selectedRepositoryPath}
+            cwd={workbench.activeCwd}
             ensureTransportConnected={workbench.ensureTransportConnected}
             isConnectionReady={workbench.connectionReadiness.canConnect}
             isVisible={workbench.terminalPanelState.isVisible}

@@ -15,10 +15,14 @@ const AllCodexThreadSourceKinds = [
   "unknown",
 ] as const;
 
-const ThreadStartResponseSchema = z.looseObject({
+const ThreadResponseSchema = z.looseObject({
   thread: z.looseObject({
     id: z.string().min(1),
   }),
+});
+
+const ThreadSessionResponseSchema = ThreadResponseSchema.extend({
+  cwd: z.string().min(1),
 });
 
 const TurnStartResponseSchema = z.looseObject({
@@ -182,9 +186,33 @@ export type CodexTurnCollaborationModeSettings = {
   developerInstructions: string | null;
 };
 
+export type CodexThreadSessionResult = {
+  threadId: string;
+  cwd: string;
+  response: unknown;
+};
+
+export function parseCodexThreadSessionResponse(input: {
+  method: "thread/start" | "thread/resume" | "thread/fork";
+  response: unknown;
+}): { threadId: string; cwd: string } {
+  const parsedResponse = ThreadSessionResponseSchema.safeParse(input.response);
+  if (!parsedResponse.success) {
+    throw new Error(
+      `${input.method} response payload is invalid. Payload: ${JSON.stringify(input.response)}`,
+    );
+  }
+
+  return {
+    threadId: parsedResponse.data.thread.id,
+    cwd: parsedResponse.data.cwd,
+  };
+}
+
 type CodexTurnStartRequest = {
   threadId: string;
   input: readonly CodexTurnInputItem[];
+  cwd?: string;
   collaborationMode?: {
     mode: "default";
     settings: {
@@ -222,11 +250,13 @@ export function buildCodexTurnInputItems(input: {
 export function buildCodexTurnStartRequest(input: {
   threadId: string;
   input: readonly CodexTurnInputItem[];
+  cwd?: string;
   collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
 }): CodexTurnStartRequest {
   return {
     threadId: input.threadId,
     input: input.input,
+    ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
     ...(input.collaborationModeSettings === undefined
       ? {}
       : {
@@ -246,22 +276,21 @@ export async function startCodexThread(input: {
   rpcClient: CodexJsonRpcClient;
   cwd?: string;
   model?: string;
-}): Promise<{ threadId: string; response: unknown }> {
+}): Promise<CodexThreadSessionResult> {
   const requestParameters = {
     ...(input.model === undefined ? {} : { model: input.model }),
     ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
   };
   const response = await input.rpcClient.call("thread/start", requestParameters);
 
-  const parsedResponse = ThreadStartResponseSchema.safeParse(response);
-  if (!parsedResponse.success) {
-    throw new Error(
-      `thread/start response payload is invalid. Payload: ${JSON.stringify(response)}`,
-    );
-  }
+  const parsedResponse = parseCodexThreadSessionResponse({
+    method: "thread/start",
+    response,
+  });
 
   return {
-    threadId: parsedResponse.data.thread.id,
+    threadId: parsedResponse.threadId,
+    cwd: parsedResponse.cwd,
     response,
   };
 }
@@ -270,6 +299,7 @@ export async function startCodexTurn(input: {
   rpcClient: CodexJsonRpcClient;
   threadId: string;
   input: readonly CodexTurnInputItem[];
+  cwd?: string;
   collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
 }): Promise<{ turnId: string; status: string; response: unknown }> {
   const response = await input.rpcClient.call("turn/start", buildCodexTurnStartRequest(input));
@@ -404,20 +434,19 @@ export async function listCodexThreads(input: {
 export async function resumeCodexThread(input: {
   rpcClient: CodexJsonRpcClient;
   threadId: string;
-}): Promise<{ threadId: string; response: unknown }> {
+}): Promise<CodexThreadSessionResult> {
   const response = await input.rpcClient.call("thread/resume", {
     threadId: input.threadId,
   });
 
-  const parsedResponse = ThreadStartResponseSchema.safeParse(response);
-  if (!parsedResponse.success) {
-    throw new Error(
-      `thread/resume response payload is invalid. Payload: ${JSON.stringify(response)}`,
-    );
-  }
+  const parsedResponse = parseCodexThreadSessionResponse({
+    method: "thread/resume",
+    response,
+  });
 
   return {
-    threadId: parsedResponse.data.thread.id,
+    threadId: parsedResponse.threadId,
+    cwd: parsedResponse.cwd,
     response,
   };
 }
@@ -425,20 +454,19 @@ export async function resumeCodexThread(input: {
 export async function forkCodexThread(input: {
   rpcClient: CodexJsonRpcClient;
   threadId: string;
-}): Promise<{ threadId: string; response: unknown }> {
+}): Promise<CodexThreadSessionResult> {
   const response = await input.rpcClient.call("thread/fork", {
     threadId: input.threadId,
   });
 
-  const parsedResponse = ThreadStartResponseSchema.safeParse(response);
-  if (!parsedResponse.success) {
-    throw new Error(
-      `thread/fork response payload is invalid. Payload: ${JSON.stringify(response)}`,
-    );
-  }
+  const parsedResponse = parseCodexThreadSessionResponse({
+    method: "thread/fork",
+    response,
+  });
 
   return {
-    threadId: parsedResponse.data.thread.id,
+    threadId: parsedResponse.threadId,
+    cwd: parsedResponse.cwd,
     response,
   };
 }
@@ -510,7 +538,7 @@ export async function unarchiveCodexThread(input: {
     threadId: input.threadId,
   });
 
-  const parsedResponse = ThreadStartResponseSchema.safeParse(response);
+  const parsedResponse = ThreadResponseSchema.safeParse(response);
   if (!parsedResponse.success) {
     throw new Error(
       `thread/unarchive response payload is invalid. Payload: ${JSON.stringify(response)}`,
@@ -553,7 +581,7 @@ export async function rollbackCodexThread(input: {
     numTurns: input.numTurns,
   });
 
-  const parsedResponse = ThreadStartResponseSchema.safeParse(response);
+  const parsedResponse = ThreadResponseSchema.safeParse(response);
   if (!parsedResponse.success) {
     throw new Error(
       `thread/rollback response payload is invalid. Payload: ${JSON.stringify(response)}`,

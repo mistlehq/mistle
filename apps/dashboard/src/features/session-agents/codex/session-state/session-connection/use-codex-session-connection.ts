@@ -73,10 +73,39 @@ export type CodexSessionConnectionLifecycleState = {
   reportLifecycleErrorMessage: (message: string) => void;
 };
 
+export type ActiveCodexThreadUpdate = {
+  threadId: string | null;
+  cwd?: string;
+};
+
 export type CodexSessionConnectionStateResult = {
   lifecycle: CodexSessionConnectionLifecycleState;
-  updateActiveThread: (threadId: string | null) => void;
+  updateActiveThread: (input: ActiveCodexThreadUpdate) => void;
 };
+
+export function updateConnectedCodexSessionActiveThread(
+  input: {
+    currentSession: ConnectedCodexSession;
+  } & ActiveCodexThreadUpdate,
+): ConnectedCodexSession {
+  if (input.threadId === null) {
+    return {
+      ...input.currentSession,
+      activeThreadId: null,
+      activeThreadCwd: null,
+    };
+  }
+
+  return {
+    ...input.currentSession,
+    activeThreadId: input.threadId,
+    activeThreadCwd:
+      input.cwd ??
+      (input.currentSession.activeThreadId === input.threadId
+        ? input.currentSession.activeThreadCwd
+        : null),
+  };
+}
 
 export function useCodexSessionConnection(input: {
   connectionGenerationRef: RefObject<number>;
@@ -119,18 +148,18 @@ export function useCodexSessionConnection(input: {
   const reconnectTargetThreadIdRef = useRef<string | null>(null);
 
   const updateActiveThread = useCallback(
-    (threadId: string | null): void => {
-      input.threadIdRef.current = threadId;
-      reconnectTargetThreadIdRef.current = threadId;
+    (activeThreadInput: ActiveCodexThreadUpdate): void => {
+      input.threadIdRef.current = activeThreadInput.threadId;
+      reconnectTargetThreadIdRef.current = activeThreadInput.threadId;
       setSessionSnapshot((currentSession) => {
         if (currentSession === null) {
           return currentSession;
         }
 
-        return {
-          ...currentSession,
-          activeThreadId: threadId,
-        };
+        return updateConnectedCodexSessionActiveThread({
+          currentSession,
+          ...activeThreadInput,
+        });
       });
     },
     [input.threadIdRef],
@@ -386,12 +415,16 @@ export function useCodexSessionConnection(input: {
         return;
       }
 
-      updateActiveThread(result.threadId);
+      updateActiveThread({
+        threadId: result.threadId,
+        cwd: result.cwd,
+      });
       const nextConnectedSession = createConnectedCodexSession({
         sandboxInstanceId: result.sandboxInstanceId,
         connectedAtIso: new Date().toISOString(),
         providerThreadId: result.providerThreadId,
         activeThreadId: result.threadId,
+        activeThreadCwd: result.cwd,
       });
       lastConnectedSessionRef.current = nextConnectedSession;
       setSessionSnapshot(nextConnectedSession);
@@ -476,11 +509,15 @@ export function useCodexSessionConnection(input: {
         return;
       }
 
-      updateActiveThread(result.recoveredThread.threadId);
+      updateActiveThread({
+        threadId: result.recoveredThread.threadId,
+        cwd: result.recoveredThread.cwd,
+      });
       const nextConnectedSession = {
         ...result.previousConnectedSession,
         connectedAtIso: new Date().toISOString(),
         activeThreadId: result.recoveredThread.threadId,
+        activeThreadCwd: result.recoveredThread.cwd,
       };
       lastConnectedSessionRef.current = nextConnectedSession;
       setSessionSnapshot(nextConnectedSession);

@@ -2,12 +2,12 @@ import { DefaultSandboxWorkspaceDir } from "@mistle/integrations-core";
 
 import type { SessionWorkbenchHeaderRepositoryOption } from "./session-workbench-header-actions.js";
 
-export type SessionPrimaryRepositorySelection =
+type SessionPrimaryRepositorySelection =
   | { kind: "none" }
   | { kind: "available"; path: string }
   | { kind: "unavailable"; path: string; option: SessionWorkbenchHeaderRepositoryOption };
 
-export function normalizeRepositoryPath(path: string): string {
+function normalizeRepositoryPath(path: string): string {
   return path.replace(/\/+$/, "");
 }
 
@@ -69,7 +69,18 @@ function toUnavailableSelectedOption(input: {
   };
 }
 
-export function resolvePrimaryRepositorySelection(input: {
+function hasContainingRepositoryOption(input: {
+  repositoryOptions: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
+  selectedRepositoryPath: string;
+}): boolean {
+  return input.repositoryOptions.some(
+    (option) =>
+      input.selectedRepositoryPath.startsWith(`${option.value}/`) &&
+      input.selectedRepositoryPath.length > option.value.length + 1,
+  );
+}
+
+function resolvePrimaryRepositorySelection(input: {
   repositoryOptions: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
   selectedRepositoryPath: string | null;
   workspaceRoot?: string;
@@ -98,6 +109,56 @@ export function resolvePrimaryRepositorySelection(input: {
   };
 }
 
+function resolveUnavailableRepositoryErrorMessage(input: {
+  repositoryOptions: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
+  selectedRepositoryPath: string;
+}): string {
+  const hasContainingRepository = hasContainingRepositoryOption({
+    repositoryOptions: input.repositoryOptions,
+    selectedRepositoryPath: input.selectedRepositoryPath,
+  });
+  if (hasContainingRepository) {
+    return `Codex is running in ${input.selectedRepositoryPath}, which is not a selectable repository root.`;
+  }
+
+  return "The selected repository is no longer available in this sandbox.";
+}
+
+export function resolvePrimaryRepositoryTurnStartCwd(
+  selectedRepositoryPath: string | null,
+): string {
+  return selectedRepositoryPath ?? DefaultSandboxWorkspaceDir;
+}
+
+export function resolveSessionWorkbenchCwd(input: {
+  activeThreadCwd: string | null | undefined;
+  selectedRepositoryPath: string | null;
+}): string {
+  return input.selectedRepositoryPath ?? input.activeThreadCwd ?? DefaultSandboxWorkspaceDir;
+}
+
+function resolveSelectedRepositoryPathFromCwd(input: {
+  cwd: string;
+  workspaceRoot?: string;
+}): string | null {
+  return input.cwd === (input.workspaceRoot ?? DefaultSandboxWorkspaceDir) ? null : input.cwd;
+}
+
+export function resolveInitialSelectedRepositoryPath(input: {
+  activeThreadCwd: string | undefined;
+  runtimePrimaryRepositoryRoot: string | null | undefined;
+  workspaceRoot?: string;
+}): string | null {
+  if (input.activeThreadCwd !== undefined) {
+    return resolveSelectedRepositoryPathFromCwd({
+      cwd: input.activeThreadCwd,
+      ...(input.workspaceRoot === undefined ? {} : { workspaceRoot: input.workspaceRoot }),
+    });
+  }
+
+  return input.runtimePrimaryRepositoryRoot ?? null;
+}
+
 export function resolvePrimaryRepositoryPresentation(input: {
   repositoryOptions: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
   selectedRepositoryPath: string | null;
@@ -107,7 +168,6 @@ export function resolvePrimaryRepositoryPresentation(input: {
 }): {
   errorMessage: string | null;
   options: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
-  selection: SessionPrimaryRepositorySelection;
 } {
   const selection =
     input.queryState === "loaded" || input.queryState === "error"
@@ -124,14 +184,14 @@ export function resolvePrimaryRepositoryPresentation(input: {
     errorMessage:
       input.queryErrorMessage ??
       (selection.kind === "unavailable"
-        ? "The selected repository is no longer available in this sandbox."
+        ? resolveUnavailableRepositoryErrorMessage({
+            repositoryOptions: input.repositoryOptions,
+            selectedRepositoryPath: selection.path,
+          })
         : null),
     options: [
       ...(selection.kind === "unavailable" ? [selection.option] : []),
       ...input.repositoryOptions,
     ],
-    selection,
   };
 }
-
-export { DefaultSandboxWorkspaceDir };

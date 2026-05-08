@@ -23,7 +23,7 @@
     "dev": "tsx scripts/run-dev.ts",
     "dev:schedules": "tsx scripts/run-schedule-dispatcher-dev.ts",
     "db:migrate": "tsx scripts/run-control-plane-migrations.ts",
-    "workflow:migrate": "tsx scripts/run-control-plane-workflow-migrations.ts",
+    "workflow:migrate": "tsx --tsconfig tsconfig.scripts.json scripts/run-control-plane-workflow-migrations.ts",
     "integration-targets:sync": "tsx --tsconfig tsconfig.scripts.json scripts/run-integration-targets-sync.ts",
     "maintenance:prune-expired-auth-state": "node dist/maintenance/cli.js prune-expired-auth-state",
     "maintenance:prune-expired-integration-auth-state": "node dist/maintenance/cli.js prune-expired-integration-auth-state",

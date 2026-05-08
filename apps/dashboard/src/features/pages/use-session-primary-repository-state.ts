@@ -209,5 +209,5 @@ export function useSessionPrimaryRepositoryState(input: {
   };
 }
 
-export { DefaultSandboxWorkspaceDir, SessionRepositoryNoneValue };
+export { SessionRepositoryNoneValue };
 export type { SessionPrimaryRepositoryState, SessionRepositoryDiscoveryResult };

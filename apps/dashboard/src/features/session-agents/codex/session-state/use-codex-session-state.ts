@@ -1,9 +1,7 @@
-import { DefaultSandboxWorkspaceDir } from "@mistle/integrations-core";
 import {
   archiveCodexThread,
   compactCodexThread,
   forkCodexThread,
-  listCodexThreads,
   rollbackCodexThread,
   resumeCodexThread,
   startCodexThread,
@@ -34,7 +32,6 @@ import {
   type StartSessionStep,
 } from "./codex-session-types.js";
 import { readCodexThreadState } from "./codex-thread-read-state.js";
-import { resolvePrimaryRepositoryThreadSwitchAction } from "./primary-repository-thread-switch.js";
 import {
   useCodexSessionBootstrapData,
   useSessionBootstrap,
@@ -67,7 +64,6 @@ type CodexSessionThreadState = {
   isRefreshingArchivedThreads: boolean;
   isStartingNewThread: boolean;
   isResumingThread: boolean;
-  isSwitchingPrimaryRepository: boolean;
   isForkingThread: boolean;
   isArchivingThread: boolean;
   isUnarchivingThread: boolean;
@@ -85,7 +81,7 @@ type CodexSessionThreadState = {
   unsubscribeThread: (threadId: string) => void;
   compactThread: (threadId: string) => void;
   rollbackThread: (threadId: string, numTurns: number) => void;
-  switchPrimaryRepository: (selectedRepositoryPath: string | null) => Promise<string>;
+  ensureCanSwitchPrimaryRepository: () => Promise<void>;
 };
 
 type CodexSessionChatState = {
@@ -102,6 +98,7 @@ type CodexSessionChatState = {
     submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
     transcriptPrompt?: string;
     displayAttachments?: readonly ChatAttachment[];
+    cwd?: string;
     collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
   }) => Promise<void>;
   interruptTurn: () => void;
@@ -209,6 +206,9 @@ export function useCodexSessionState(input: {
   } = useCodexChatController({
     rpcClientRef: input.rpcClientRef,
     threadIdRef,
+    onTurnCwdCommitted: (turnCwd) => {
+      updateActiveThread(turnCwd);
+    },
     setSessionErrorMessage,
   });
 
@@ -375,7 +375,10 @@ export function useCodexSessionState(input: {
       return threadStart;
     },
     onSuccess: (threadStart) => {
-      updateActiveThread(threadStart.threadId);
+      updateActiveThread({
+        threadId: threadStart.threadId,
+        cwd: threadStart.cwd,
+      });
       resetChat();
       setLifecycleErrorMessage(null);
       refreshThreadCollectionsWithErrorHandling();
@@ -398,7 +401,10 @@ export function useCodexSessionState(input: {
       });
     },
     onSuccess: (result) => {
-      updateActiveThread(result.threadId);
+      updateActiveThread({
+        threadId: result.threadId,
+        cwd: result.cwd,
+      });
       resetChat();
       setLifecycleErrorMessage(null);
       void hydrateChatFromThread();
@@ -406,39 +412,6 @@ export function useCodexSessionState(input: {
     },
     onError: (error) => {
       handleThreadMutationFailure("Could not resume thread.", error);
-    },
-  });
-
-  const switchPrimaryRepositoryMutation = useMutation({
-    mutationFn: async (selectedRepositoryPath: string | null) => {
-      const rpcClient = rpcClientRef.current;
-      if (rpcClient === null) {
-        throw new Error("Connect to a sandbox session before switching the primary repository.");
-      }
-
-      const matchingThreads = await listCodexThreads({
-        cwd: selectedRepositoryPath ?? DefaultSandboxWorkspaceDir,
-        limit: 20,
-        rpcClient,
-        sortKey: "updated_at",
-      });
-      const switchAction = resolvePrimaryRepositoryThreadSwitchAction({
-        matchingThreads: matchingThreads.threads,
-        selectedRepositoryPath,
-      });
-
-      if (switchAction.type === "resume_existing_thread") {
-        const result = await resumeThreadMutateAsync(switchAction.threadId);
-        return result.threadId;
-      }
-
-      const result = await startNewThreadMutateAsync({
-        cwd: switchAction.cwd,
-      });
-      return result.threadId;
-    },
-    onError: (error) => {
-      handleThreadMutationFailure("Could not switch the primary repository.", error);
     },
   });
 
@@ -486,7 +459,10 @@ export function useCodexSessionState(input: {
       });
     },
     onSuccess: (result) => {
-      updateActiveThread(result.threadId);
+      updateActiveThread({
+        threadId: result.threadId,
+        cwd: result.cwd,
+      });
       resetChat();
       void hydrateChatFromThread();
       refreshThreadCollectionsWithErrorHandling();
@@ -526,13 +502,20 @@ export function useCodexSessionState(input: {
         throw new Error("Connect to a sandbox session before unarchiving a thread.");
       }
 
-      return unarchiveCodexThread({
+      const unarchivedThread = await unarchiveCodexThread({
         rpcClient,
         threadId,
       });
+      return await resumeCodexThread({
+        rpcClient,
+        threadId: unarchivedThread.threadId,
+      });
     },
     onSuccess: (result) => {
-      updateActiveThread(result.threadId);
+      updateActiveThread({
+        threadId: result.threadId,
+        cwd: result.cwd,
+      });
       resetChat();
       void hydrateChatFromThread();
       refreshThreadCollectionsWithErrorHandling();
@@ -594,7 +577,9 @@ export function useCodexSessionState(input: {
       });
     },
     onSuccess: (result) => {
-      updateActiveThread(result.threadId);
+      updateActiveThread({
+        threadId: result.threadId,
+      });
       resetChat();
       void hydrateChatFromThread();
       refreshThreadCollectionsWithErrorHandling();
@@ -614,10 +599,6 @@ export function useCodexSessionState(input: {
     startNewThreadMutation;
   const { mutateAsync: resumeThreadMutateAsync, isPending: isResumingThread } =
     resumeThreadMutation;
-  const {
-    mutateAsync: switchPrimaryRepositoryMutateAsync,
-    isPending: isSwitchingPrimaryRepository,
-  } = switchPrimaryRepositoryMutation;
   const { mutate: forkThreadMutate, isPending: isForkingThread } = forkThreadMutation;
   const { mutate: archiveThreadMutate, isPending: isArchivingThread } = archiveThreadMutation;
   const { mutate: unarchiveThreadMutate, isPending: isUnarchivingThread } = unarchiveThreadMutation;
@@ -653,12 +634,20 @@ export function useCodexSessionState(input: {
     [resumeThreadMutateAsync],
   );
 
-  const switchPrimaryRepository = useCallback(
-    async (selectedRepositoryPath: string | null): Promise<string> => {
-      return await switchPrimaryRepositoryMutateAsync(selectedRepositoryPath);
-    },
-    [switchPrimaryRepositoryMutateAsync],
-  );
+  const ensureCanSwitchPrimaryRepository = useCallback(async (): Promise<void> => {
+    try {
+      if (rpcClientRef.current === null) {
+        throw new Error("Connect to a sandbox session before switching the primary repository.");
+      }
+
+      if (threadIdRef.current === null) {
+        throw new Error("Choose a thread before switching the primary repository.");
+      }
+    } catch (error) {
+      handleThreadMutationFailure("Could not switch the primary repository.", error);
+      throw error;
+    }
+  }, [handleThreadMutationFailure, rpcClientRef, threadIdRef]);
 
   const forkThread = useCallback(
     (threadId: string) => {
@@ -768,7 +757,9 @@ export function useCodexSessionState(input: {
       // Returning from CLI reconnects local sessions using the
       // "most_recently_updated" thread policy instead of trying to preserve the
       // pre-CLI active thread id.
-      updateActiveThread(null);
+      updateActiveThread({
+        threadId: null,
+      });
     },
     [lifecycle.sessionSnapshot?.providerThreadId, updateActiveThread],
   );
@@ -783,7 +774,6 @@ export function useCodexSessionState(input: {
       isRefreshingArchivedThreads,
       isStartingNewThread,
       isResumingThread,
-      isSwitchingPrimaryRepository,
       isForkingThread,
       isArchivingThread,
       isUnarchivingThread,
@@ -801,7 +791,7 @@ export function useCodexSessionState(input: {
       unsubscribeThread,
       compactThread,
       rollbackThread,
-      switchPrimaryRepository,
+      ensureCanSwitchPrimaryRepository,
     };
   }, [
     archiveThread,
@@ -816,7 +806,6 @@ export function useCodexSessionState(input: {
     isRefreshingLoadedThreads,
     isRefreshingThreads,
     isResumingThread,
-    isSwitchingPrimaryRepository,
     isRollingBackThread,
     isStartingNewThread,
     isUnarchivingThread,
@@ -828,7 +817,7 @@ export function useCodexSessionState(input: {
     resumeThread,
     rollbackThread,
     startNewThread,
-    switchPrimaryRepository,
+    ensureCanSwitchPrimaryRepository,
     unarchiveThread,
     unsubscribeThread,
   ]);

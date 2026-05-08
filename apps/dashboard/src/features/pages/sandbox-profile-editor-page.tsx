@@ -24,9 +24,11 @@ import {
   Label,
   MoreActionsMenu,
   Notice,
+  NoticeAutoHideDurationsMs,
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
+  TextLink,
 } from "@mistle/ui";
 import { SidebarSimpleIcon, SpinnerGapIcon, TerminalIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -68,6 +70,7 @@ import {
   deleteSandboxProfile,
   discardSandboxProfileVersionDraft,
   getSandboxProfile,
+  getSandboxProfileVersionDraftAutomationImpact,
   getSandboxProfileVersionPublishability,
   listSandboxProfileVersions,
   publishSandboxProfileVersion,
@@ -79,6 +82,9 @@ import {
 import type {
   SandboxIntegrationBindingKind,
   SandboxProfile,
+  SandboxProfileVersionDraftAutomationImpactAutomation,
+  SandboxProfileVersionDraftAutomationImpactIssue,
+  SandboxProfileVersionDraftAutomationImpact,
   SandboxProfileVersion,
   SandboxProfileVersionIntegrationBinding,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
@@ -1154,6 +1160,9 @@ function ReadySandboxProfileEditorPage(input: {
   const [publishRequestIsPending, setPublishRequestIsPending] = useState(false);
   const [saveDraftRequestIsPending, setSaveDraftRequestIsPending] = useState(false);
   const [publishFlushError, setPublishFlushError] = useState<string | null>(null);
+  const [draftAutomationImpactAffectedAutomations, setDraftAutomationImpactAffectedAutomations] =
+    useState<readonly SandboxProfileVersionDraftAutomationImpactAutomation[] | null>(null);
+  const [draftAutomationImpactError, setDraftAutomationImpactError] = useState<string | null>(null);
   const [setupAssistantError, setSetupAssistantError] = useState<string | null>(null);
   const [publishSuccessNoticeKey, setPublishSuccessNoticeKey] = useState(0);
   const [showPublishSuccessMessage, setShowPublishSuccessMessage] = useState(
@@ -1367,8 +1376,25 @@ function ReadySandboxProfileEditorPage(input: {
 
   async function handleSaveDraft(): Promise<void> {
     setSaveDraftRequestIsPending(true);
+    setDraftAutomationImpactAffectedAutomations(null);
+    setDraftAutomationImpactError(null);
     try {
-      await saveDraftChanges();
+      const draftSaved = await saveDraftChanges();
+      if (!draftSaved) {
+        return;
+      }
+
+      try {
+        const impact = await getSandboxProfileVersionDraftAutomationImpact({
+          profileId: input.profileId,
+          version: input.mode.version,
+        });
+        setDraftAutomationImpactAffectedAutomations(
+          getDraftAutomationImpactAffectedAutomations(impact),
+        );
+      } catch {
+        setDraftAutomationImpactError(DraftAutomationImpactCheckFailedMessage);
+      }
     } finally {
       setSaveDraftRequestIsPending(false);
     }
@@ -1450,6 +1476,11 @@ function ReadySandboxProfileEditorPage(input: {
       publishRequestIsPending={publishRequestIsPending}
       saveDraftRequestIsPending={saveDraftRequestIsPending}
       draftSaveError={publishFlushError}
+      draftAutomationImpactError={draftAutomationImpactError}
+      draftAutomationImpactAffectedAutomations={draftAutomationImpactAffectedAutomations}
+      onDraftAutomationImpactErrorDismiss={() => {
+        setDraftAutomationImpactError(null);
+      }}
       versionActionError={input.versionActionError}
       versionActionIsPending={input.versionActionIsPending}
       isDeleteProfileDialogOpen={input.isDeleteProfileDialogOpen}
@@ -1735,7 +1766,7 @@ function SetupScriptAssistantPanel(input: {
             <ResizablePanel id="setup-assistant-terminal-panel" minSize="180px">
               <SessionTerminalWorkspace
                 key={terminalPanelKey}
-                cwd={workbench.primaryRepositoryState.selectedRepositoryPath}
+                cwd={workbench.activeCwd}
                 ensureTransportConnected={workbench.ensureTransportConnected}
                 isConnectionReady={workbench.connectionReadiness.canConnect}
                 isVisible={workbench.terminalPanelState.isVisible}
@@ -2001,6 +2032,76 @@ const SandboxProfileEditorTabs = [
 ] as const satisfies readonly SandboxProfileEditorSection<SandboxProfileEditorSectionId>[];
 
 const DraftSaveErrorMessage = "Saving draft failed. Please try again later.";
+const DraftAutomationImpactCheckFailedMessage =
+  "Couldn't check whether this draft affects related automations.";
+
+function getDraftAutomationImpactAffectedAutomations(
+  impact: SandboxProfileVersionDraftAutomationImpact,
+): readonly SandboxProfileVersionDraftAutomationImpactAutomation[] | null {
+  if (!impact.hasBreakingChanges || impact.affectedAutomations.length === 0) {
+    return null;
+  }
+
+  return impact.affectedAutomations;
+}
+
+function getAutomationDetailPath(
+  automation: SandboxProfileVersionDraftAutomationImpactAutomation,
+): string {
+  if (automation.kind === "schedule") {
+    return `/automations/schedules/${automation.id}`;
+  }
+
+  return `/automations/${automation.id}`;
+}
+
+function DraftAutomationImpactAutomationList(input: {
+  automations: readonly SandboxProfileVersionDraftAutomationImpactAutomation[];
+}): ReactNode {
+  return (
+    <ul className="list-disc space-y-1 pl-5">
+      {input.automations.map((automation) => (
+        <li key={automation.id}>
+          <TextLink href={getAutomationDetailPath(automation)} opensInNewWindow>
+            {automation.name}
+          </TextLink>
+          <div className="mt-0.5 space-y-0.5">
+            {automation.issues.map((issue) => (
+              <div key={`${automation.id}:${issue.code}`}>
+                {formatDraftAutomationImpactIssueMessage(issue)}
+              </div>
+            ))}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function formatDraftAutomationImpactIssueMessage(
+  issue: SandboxProfileVersionDraftAutomationImpactIssue,
+): string {
+  switch (issue.code) {
+    case "AGENT_BINDING_REQUIRED":
+      return "This draft does not have an agent binding.";
+    case "AGENT_BINDING_AMBIGUOUS":
+      return "This draft has multiple agent bindings, but automations require exactly one.";
+    case "AGENT_BINDING_RUNTIME_INVALID":
+      return "The draft agent binding does not define a runtime.";
+    case "INVALID_BINDING_CONNECTION_REFERENCE":
+      return "The draft agent binding references a missing or inaccessible connection.";
+    case "CONNECTION_NOT_ACTIVE":
+      return "The draft agent connection is not active.";
+    case "TARGET_DISABLED":
+      return "The draft agent connection uses a disabled integration target.";
+    case "TARGET_MISSING":
+      return "The draft agent connection references an unavailable integration target.";
+    case "WEBHOOK_SOURCE_CONNECTION_NOT_BOUND":
+      return "This automation's webhook source connection is not bound in the draft.";
+    case "PRIMARY_REPOSITORY_UNAVAILABLE":
+      return "This automation's primary repository is not available in the draft.";
+  }
+}
 
 function DeleteSandboxProfileDialog(input: {
   automationUsages: readonly WebhookAutomationSandboxProfileUsage[];
@@ -2094,6 +2195,11 @@ export function SandboxProfileEditorView(input: {
   draftSaveError?: string | null;
   versionActionError: string | null;
   versionActionIsPending: boolean;
+  draftAutomationImpactAffectedAutomations:
+    | readonly SandboxProfileVersionDraftAutomationImpactAutomation[]
+    | null;
+  draftAutomationImpactError: string | null;
+  onDraftAutomationImpactErrorDismiss: () => void;
   publishRequestIsPending?: boolean;
   saveDraftRequestIsPending?: boolean;
   isDeleteProfileDialogOpen: boolean;
@@ -2209,6 +2315,27 @@ export function SandboxProfileEditorView(input: {
                 {input.draftSaveError === undefined || input.draftSaveError === null ? null : (
                   <Notice variant="alert">{input.draftSaveError}</Notice>
                 )}
+                {input.draftAutomationImpactAffectedAutomations === null ? null : (
+                  <Notice
+                    title="Publishing this draft will break the following automations"
+                    variant="warning"
+                  >
+                    <DraftAutomationImpactAutomationList
+                      automations={input.draftAutomationImpactAffectedAutomations}
+                    />
+                  </Notice>
+                )}
+                {input.draftAutomationImpactError === null ? null : (
+                  <Notice
+                    autoHideAfterMs={NoticeAutoHideDurationsMs.LONG}
+                    dismissible
+                    onDismiss={input.onDraftAutomationImpactErrorDismiss}
+                    title="Automation checks failed"
+                    variant="alert"
+                  >
+                    {input.draftAutomationImpactError}
+                  </Notice>
+                )}
                 {input.renderSectionPanel(sectionId)}
               </SandboxProfileEditorHorizontalTabContent>
             ) : (
@@ -2233,7 +2360,9 @@ function SandboxProfileVersionStatusBadge(input: {
           : "inline-flex h-6 items-center rounded-sm border border-blue-200 bg-blue-50 px-2 text-xs font-medium text-blue-700"
       }
     >
-      {input.mode.kind === "draft" ? "Viewing: Draft" : "Viewing: Published"}
+      {input.mode.kind === "draft"
+        ? "Viewing: Draft"
+        : `Viewing: Published (v${String(input.mode.version)})`}
     </span>
   );
 }
