@@ -15,7 +15,7 @@
     "@mistle/ui": "workspace:*"
   },
   "devDependencies": {
-    "@storybook/addon-a11y": "^10.3.5",
+    "@storybook/addon-a11y": "^10.3.6",
     "@storybook/addon-docs": "^10.3.5",
     "@storybook/addon-links": "^10.3.5",
     "@storybook/addon-vitest": "^10.3.6",
