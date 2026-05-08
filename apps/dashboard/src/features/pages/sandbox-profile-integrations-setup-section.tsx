@@ -389,6 +389,14 @@ function UnresolvedNoneCell(): React.JSX.Element {
   );
 }
 
+function NoGitProvidersCell(): React.JSX.Element {
+  return (
+    <div className={SandboxProfileIntegrationCellContentClassName}>
+      <p className="text-muted-foreground text-sm">No git providers setup</p>
+    </div>
+  );
+}
+
 function resolveConnectorRowIssue(input: {
   row: SandboxProfileBindingEditorRow;
   availableConnections: readonly IntegrationConnectionSummary[];
@@ -507,6 +515,7 @@ export function SandboxProfileIntegrationsSetupSection(input: {
     availableConnections: input.availableConnections,
     availableTargets: input.availableTargets,
   });
+  const hasNoGitProviderOptions = gitIssue === null && gitChoices.length === 0;
   const hasUnresolvedConnectorRows = connectorRows.some(
     (row) =>
       resolveConnectorRowIssue({
@@ -745,7 +754,9 @@ export function SandboxProfileIntegrationsSetupSection(input: {
             gridClassName="md:items-start"
           >
             <ResponsiveFieldListCell columnKey="integration">
-              {gitIssue === null ? (
+              {hasNoGitProviderOptions ? (
+                <NoGitProvidersCell />
+              ) : gitIssue === null ? (
                 <IntegrationSelectionCell
                   allowNone={true}
                   ariaLabel="git provider integration"
@@ -774,7 +785,7 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                 <UnresolvedNoneCell />
               )}
             </ResponsiveFieldListCell>
-            <ResponsiveFieldListCell columnKey="connection">
+            <ResponsiveFieldListCell columnKey="connection" hideOnMobile={hasNoGitProviderOptions}>
               {gitIssue === "missing-connection" ? (
                 <UnresolvedConnectionCell message="Connection cannot be found" />
               ) : gitIssue === "missing-target" ? (

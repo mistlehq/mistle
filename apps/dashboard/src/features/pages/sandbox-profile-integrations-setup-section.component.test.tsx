@@ -126,6 +126,29 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     expect(screen.getByRole("button", { name: "Remove git provider" })).toBeDefined();
   });
 
+  it("shows a static empty state when no git provider integrations are available", () => {
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [StoryOpenAiConnection, StoryJiraConnection],
+          availableTargets: [StoryOpenAiTarget, StoryJiraTarget],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("No git providers setup")).toBeDefined();
+    expect(screen.queryByRole("combobox", { name: "git provider integration" })).toBeNull();
+
+    const gitProviderRow = screen
+      .getByText("No git providers setup")
+      .closest('[data-slot="responsive-field-list-row"]');
+    expect(gitProviderRow).not.toBeNull();
+    const gitProviderConnectionCell = gitProviderRow?.querySelector(
+      '[data-column-key="connection"]',
+    );
+    expect(gitProviderConnectionCell?.classList.contains("hidden")).toBe(true);
+  });
+
   it("shows stale git provider rows when the target is missing", () => {
     render(
       <TestSandboxProfileIntegrationsSetupSection

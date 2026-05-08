@@ -25,6 +25,18 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+const StoryTargetsWithoutGitProviders = StoryIntegrationTargets.filter(
+  (target) => target.familyId !== "github",
+);
+const StoryGitProviderTargetKeys = new Set(
+  StoryIntegrationTargets.filter((target) => target.familyId === "github").map(
+    (target) => target.targetKey,
+  ),
+);
+const StoryConnectionsWithoutGitProviders = StoryIntegrationConnections.filter(
+  (connection) => !StoryGitProviderTargetKeys.has(connection.targetKey),
+);
+
 export const AutosaveFailure: Story = {
   args: {
     integrationSaveErrorMessage:
@@ -85,6 +97,14 @@ export const StaleGitProviderBinding: Story = {
         config: {},
       },
     ],
+  },
+};
+
+export const GitProviderDraftWithOnlyNoneOption: Story = {
+  args: {
+    availableConnections: StoryConnectionsWithoutGitProviders,
+    availableTargets: StoryTargetsWithoutGitProviders,
+    initialBindings: StoryBindings.filter((binding) => binding.kind !== "git"),
   },
 };
 
