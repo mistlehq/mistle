@@ -20,7 +20,7 @@ use rcgen::{
 use crate::time::{Clock, add_millis, subtract_millis};
 
 const PROXY_CA_COMMON_NAME: &str = "Mistle Sandbox Proxy CA";
-const PROXY_CA_VALIDITY_MS: u64 = 24 * 60 * 60 * 1000;
+const PROXY_CA_VALIDITY_MS: u64 = 30 * 24 * 60 * 60 * 1000;
 const PROXY_LEAF_VALIDITY_MS: u64 = 12 * 60 * 60 * 1000;
 const CERTIFICATE_CLOCK_SKEW_MS: u64 = 60 * 1000;
 
