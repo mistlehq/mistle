@@ -11,6 +11,25 @@ updates:
           - "version-update:semver-major"
     commit-message:
       prefix: chore(deps)
+  - package-ecosystem: npm
+    directory: "/tests/system/fixtures/vite-dev-server"
+    schedule:
+      interval: daily
+    versioning-strategy: increase
+    commit-message:
+      prefix: chore(deps)
+  - package-ecosystem: cargo
+    directory: "/packages/sandboxd"
+    schedule:
+      interval: daily
+    commit-message:
+      prefix: chore(deps)
+  - package-ecosystem: cargo
+    directory: "/packages/commit-sign"
+    schedule:
+      interval: daily
+    commit-message:
+      prefix: chore(deps)
   - package-ecosystem: github-actions
     directory: "/"
     schedule:

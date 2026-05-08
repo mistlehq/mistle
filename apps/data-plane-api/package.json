@@ -50,7 +50,7 @@
     "@mistle/time": "workspace:*",
     "@mistle/workflow-registry": "workspace:*",
     "drizzle-orm": "^0.45.2",
-    "hono": "^4.12.14",
+    "hono": "^4.12.16",
     "openworkflow": "^0.9.0",
     "pg": "^8.20.0",
     "typeid-js": "^1.2.0",
