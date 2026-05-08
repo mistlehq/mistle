@@ -237,7 +237,7 @@ async function queueProfileVersionSnapshot(
 
       if (snapshotJob === undefined) {
         throw new Error(
-          `Failed to create refresh snapshot job for sandbox profile '${input.profileId}' version '${String(input.profileVersion)}'.`,
+          `Failed to create snapshot job for sandbox profile '${input.profileId}' version '${String(input.profileVersion)}'.`,
         );
       }
 
