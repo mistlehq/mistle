@@ -19,6 +19,7 @@ import {
 } from "./integration-connection-setup-manifest-draft.js";
 
 function createSlackConnection(input?: {
+  appId?: string;
   configuredSecretNames?: readonly string[];
   clientId?: string;
 }): IntegrationConnection {
@@ -31,6 +32,7 @@ function createSlackConnection(input?: {
     connectionMethodLabel: "Slack app",
     config: {
       connection_method: "slack-bot-token",
+      ...(input?.appId === undefined ? {} : { app_id: input.appId }),
       ...(input?.clientId === undefined ? {} : { client_id: input.clientId }),
     },
     ...(input?.configuredSecretNames === undefined
@@ -171,10 +173,13 @@ describe("ProviderAppSetupPane", () => {
     expect(screen.getByText("App configuration token")).toBeTruthy();
     expect(
       screen.getByText(
-        "Generate a Slack app configuration token, then paste it here. Slack configuration tokens expire after 12 hours.",
+        (_content, element) =>
+          element?.tagName === "P" &&
+          element?.textContent ===
+            "Generate a temporary token from https://api.slack.com/apps and paste it below",
       ),
     ).toBeTruthy();
-    const generateTokenLink = screen.getByRole("link", { name: "Generate token in Slack" });
+    const generateTokenLink = screen.getByRole("link", { name: "https://api.slack.com/apps" });
     expect(generateTokenLink.getAttribute("href")).toBe("https://api.slack.com/apps");
     expect(screen.getByPlaceholderText("xoxe.xoxp-...")).toBeTruthy();
     expect(screen.getByRole("heading", { level: 3, name: "Slack app manifest" })).toBeTruthy();
@@ -226,6 +231,7 @@ describe("ProviderAppSetupPane", () => {
   it("defaults a configured Slack connection to the existing app setup", () => {
     renderProviderAppSetupPane({
       connection: createSlackConnection({
+        appId: "A0123456789",
         clientId: "123.456",
         configuredSecretNames: ["botToken", "signingSecret", "clientSecret"],
       }),
@@ -234,6 +240,7 @@ describe("ProviderAppSetupPane", () => {
     expect(screen.getByRole("tab", { name: "Use existing app", selected: true })).toBeTruthy();
     expect(screen.getByText("Existing Slack App")).toBeTruthy();
     expect(screen.getByText("Secrets")).toBeTruthy();
+    expect(screen.getByDisplayValue("A0123456789")).toBeTruthy();
     expect(screen.getByDisplayValue("123.456")).toBeTruthy();
     expect(screen.getAllByPlaceholderText("••••••")).toHaveLength(3);
     expect(screen.queryByText("Bot token is already configured.")).toBeNull();
@@ -339,6 +346,7 @@ describe("ProviderAppSetupPane", () => {
   it("keeps the existing Slack app completion action disabled until required local setup is ready", () => {
     renderProviderAppSetupPane({
       connection: createSlackConnection({
+        appId: "A0123456789",
         clientId: "123.456",
         configuredSecretNames: ["botToken"],
       }),
@@ -355,6 +363,7 @@ describe("ProviderAppSetupPane", () => {
   it("keeps the existing Slack app completion action disabled when the Events API URL is unavailable", () => {
     renderProviderAppSetupPane({
       connection: createSlackConnection({
+        appId: "A0123456789",
         clientId: "123.456",
         configuredSecretNames: ["botToken", "signingSecret"],
       }),

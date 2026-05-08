@@ -14,7 +14,7 @@ import {
   type AnyIntegrationDefinition,
   type IntegrationRegistry,
 } from "@mistle/integrations-core";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import {
   InternalIntegrationCredentialsError,
@@ -806,6 +806,147 @@ export async function createIntegrationWebhookSource(
     }),
     webhookSecret,
   };
+}
+
+export async function refreshIntegrationWebhookSourceTriggerCapabilities(
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+    integrationsConfig: AppContext["var"]["config"]["integrations"];
+    controlPlaneBaseUrl: string;
+  },
+  input: {
+    organizationId: string;
+    connectionId: string;
+    body: unknown;
+  },
+): Promise<WebhookSourceListItem> {
+  const connection = await resolveConnectionWithTargetOrThrow({
+    db: ctx.db,
+    organizationId: input.organizationId,
+    connectionId: input.connectionId,
+  });
+  const { webhookSourceCapability, parsedTargetConfig, parsedTargetSecrets } =
+    resolveWebhookSourceCapabilityOrThrow({
+      integrationRegistry: ctx.integrationRegistry,
+      integrationsConfig: ctx.integrationsConfig,
+      target: connection.target,
+    });
+
+  if (
+    !(await supportsWebhookSourceForConnection({
+      webhookSourceCapability,
+      connection,
+    }))
+  ) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.WEBHOOK_SOURCE_NOT_SUPPORTED,
+      `Integration connection '${connection.id}' does not support webhook sources.`,
+    );
+  }
+
+  const refreshTriggerCapabilities =
+    webhookSourceCapability.refreshTriggerCapabilities?.bind(webhookSourceCapability);
+  if (refreshTriggerCapabilities === undefined) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.WEBHOOK_TRIGGER_CAPABILITIES_REFRESH_NOT_SUPPORTED,
+      `Integration target '${connection.targetKey}' does not support verified webhook trigger capability refresh.`,
+    );
+  }
+
+  if (webhookSourceCapability.lifecycle !== IntegrationWebhookSourceLifecycles.IMPLICIT) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.WEBHOOK_SOURCE_NOT_SUPPORTED,
+      `Integration target '${connection.targetKey}' does not support connection-level webhook trigger capability refresh.`,
+    );
+  }
+
+  const source = await ensureImplicitConnectionWebhookSource({
+    db: ctx.db,
+    organizationId: input.organizationId,
+    connectionId: connection.id,
+    targetKey: connection.targetKey,
+  });
+
+  let refreshResult;
+  try {
+    refreshResult = await refreshTriggerCapabilities({
+      organizationId: input.organizationId,
+      targetKey: connection.targetKey,
+      controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
+      target: {
+        familyId: connection.target.familyId,
+        variantId: connection.target.variantId,
+        enabled: connection.target.enabled,
+        config: parsedTargetConfig,
+        secrets: parsedTargetSecrets,
+      },
+      connection: {
+        id: connection.id,
+        status: "active",
+        config: resolveConnectionConfigOrThrow({
+          connectionId: connection.id,
+          config: connection.config,
+        }),
+      },
+      source: {
+        id: source.id,
+        targetKey: source.targetKey,
+        organizationId: input.organizationId,
+        integrationConnectionId: connection.id,
+        ...(source.displayName === null ? {} : { displayName: source.displayName }),
+        endpointKey: source.endpointKey,
+        ...(source.remoteRegistrationId === null
+          ? {}
+          : { remoteRegistrationId: source.remoteRegistrationId }),
+        providerMetadata: source.providerMetadata,
+      },
+      body: input.body,
+    });
+  } catch (error) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_WEBHOOK_SOURCE_INPUT,
+      error instanceof Error
+        ? error.message
+        : `Webhook trigger capability refresh failed for '${connection.targetKey}'.`,
+    );
+  }
+
+  if (refreshResult.providerMetadata === undefined) {
+    throw new Error(
+      `Webhook trigger capability refresh for '${connection.targetKey}' returned no provider metadata.`,
+    );
+  }
+
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+  const [updatedSource] = await ctx.db
+    .update(tables.integrationWebhookSources)
+    .set({
+      providerMetadata: {
+        ...source.providerMetadata,
+        ...refreshResult.providerMetadata,
+      },
+      updatedAt: sql`now()`,
+    })
+    .where(eq(tables.integrationWebhookSources.id, source.id))
+    .returning();
+
+  if (updatedSource === undefined) {
+    throw new Error(
+      `Failed to update webhook trigger capability metadata for source '${source.id}'.`,
+    );
+  }
+
+  const descriptor = await resolveWebhookSourceDescriptor({
+    controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
+    webhookSourceCapability,
+    parsedTargetConfig,
+    parsedTargetSecrets,
+    connection,
+    source: updatedSource,
+  });
+
+  return toWebhookSourceListItem({ source: updatedSource, descriptor });
 }
 
 export async function deleteIntegrationWebhookSource(

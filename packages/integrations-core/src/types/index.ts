@@ -2115,6 +2115,22 @@ export type IntegrationWebhookSourceRegistrationInput<
   webhookSecret?: string | undefined;
 };
 
+export type IntegrationWebhookSourceTriggerCapabilitiesRefreshInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  organizationId: string;
+  targetKey: string;
+  controlPlaneBaseUrl: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  connection: IntegrationConnection & {
+    config: TConnectionConfig;
+  };
+  source: IntegrationWebhookSource;
+  body: unknown;
+};
+
 /**
  * Provider-side reconciliation data returned from create/update registration
  * hooks. Local persistence is handled by control-plane after the hook returns.
@@ -2163,6 +2179,19 @@ export type IntegrationWebhookSourceCapability<
   /** Reconciles provider-side registration state for an existing source. */
   updateRegistration?(
     input: IntegrationWebhookSourceRegistrationInput<
+      TTargetConfig,
+      TTargetSecrets,
+      TConnectionConfig
+    >,
+  ): MaybePromise<IntegrationWebhookSourceRegistrationResult>;
+  /**
+   * Refreshes trigger capability metadata from a provider-owned source of truth.
+   *
+   * Implementations must only return capabilities that were verified directly
+   * from the provider. This hook must not infer or guess enabled provider events.
+   */
+  refreshTriggerCapabilities?(
+    input: IntegrationWebhookSourceTriggerCapabilitiesRefreshInput<
       TTargetConfig,
       TTargetSecrets,
       TConnectionConfig

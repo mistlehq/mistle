@@ -2,14 +2,18 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildSlackAppManifestCreateUrl,
+  buildSlackAppManifestExportUrl,
   buildSlackAppManifest,
   buildSlackAppManifestDraft,
+  buildSlackManifestWebhookTriggerCapabilitiesProviderMetadata,
   buildSlackOAuthAccessConnectionSecrets,
   buildSlackOAuthAccessUrl,
   buildSlackManifestConnectionConfig,
   buildSlackManifestConnectionSecrets,
   parseSlackManifestCreateErrorResponse,
   parseSlackManifestCreateSuccessResponse,
+  parseSlackManifestExportErrorResponse,
+  parseSlackManifestExportSuccessResponse,
   parseSlackOAuthAccessErrorResponse,
   parseSlackOAuthAccessSuccessResponse,
 } from "./app-manifest.js";
@@ -189,6 +193,16 @@ describe("buildSlackAppManifestCreateUrl", () => {
   });
 });
 
+describe("buildSlackAppManifestExportUrl", () => {
+  it("builds the Slack manifest export endpoint URL", () => {
+    expect(
+      buildSlackAppManifestExportUrl({
+        apiBaseUrl: "https://slack.example.com/api/",
+      }),
+    ).toBe("https://slack.example.com/api/apps.manifest.export");
+  });
+});
+
 describe("buildSlackOAuthAccessUrl", () => {
   it("builds the Slack OAuth access endpoint URL", () => {
     expect(
@@ -196,6 +210,110 @@ describe("buildSlackOAuthAccessUrl", () => {
         apiBaseUrl: "https://slack.example.com/api/",
       }),
     ).toBe("https://slack.example.com/api/oauth.v2.access");
+  });
+});
+
+describe("parseSlackManifestExportSuccessResponse", () => {
+  it("accepts Slack manifest export success responses", () => {
+    expect(
+      parseSlackManifestExportSuccessResponse({
+        ok: true,
+        manifest: {
+          settings: {
+            event_subscriptions: {
+              bot_events: ["app_mention"],
+            },
+          },
+        },
+        ignored_extra_field: true,
+      }),
+    ).toEqual({
+      ok: true,
+      manifest: {
+        settings: {
+          event_subscriptions: {
+            bot_events: ["app_mention"],
+          },
+        },
+      },
+      ignored_extra_field: true,
+    });
+  });
+});
+
+describe("parseSlackManifestExportErrorResponse", () => {
+  it("returns Slack manifest export error responses", () => {
+    expect(
+      parseSlackManifestExportErrorResponse({
+        ok: false,
+        error: "invalid_app_id",
+      }),
+    ).toEqual({
+      ok: false,
+      error: "invalid_app_id",
+    });
+  });
+});
+
+describe("buildSlackManifestWebhookTriggerCapabilitiesProviderMetadata", () => {
+  it("maps exported Slack manifest bot events and bot scopes into trigger capabilities", () => {
+    expect(
+      buildSlackManifestWebhookTriggerCapabilitiesProviderMetadata({
+        expectedRequestUrl:
+          "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_123",
+        manifest: {
+          oauth_config: {
+            scopes: {
+              bot: ["app_mentions:read", "channels:history"],
+            },
+          },
+          settings: {
+            event_subscriptions: {
+              request_url:
+                "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_123",
+              bot_events: ["app_mention", "message.channels"],
+            },
+          },
+        },
+      }),
+    ).toEqual({
+      webhookTriggerCapabilities: {
+        events: ["app_mention", "message.channels"],
+        permissions: [
+          {
+            permission: "app_mentions:read",
+          },
+          {
+            permission: "channels:history",
+          },
+        ],
+      },
+    });
+  });
+
+  it("rejects exported Slack manifests that point at a different Events API Request URL", () => {
+    expect(() =>
+      buildSlackManifestWebhookTriggerCapabilitiesProviderMetadata({
+        expectedRequestUrl:
+          "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_expected",
+        manifest: {
+          oauth_config: {
+            scopes: {
+              bot: ["app_mentions:read"],
+            },
+          },
+          settings: {
+            event_subscriptions: {
+              request_url:
+                "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_other",
+              bot_events: ["app_mention"],
+            },
+          },
+        },
+      }),
+    ).toThrow(
+      "Slack Events API Request URL must be 'https://control-plane.example.com/p/integration/webhooks/slack-default/eps_expected' before webhook events can be synced. Current Slack Request URL is 'https://control-plane.example.com/p/integration/webhooks/slack-default/eps_other'.",
+    );
   });
 });
 
@@ -355,10 +473,12 @@ describe("buildSlackManifestConnectionConfig", () => {
   it("maps Slack manifest credentials into connection config", () => {
     expect(
       buildSlackManifestConnectionConfig({
+        appId: "A123",
         clientId: "123.456",
       }),
     ).toEqual({
       connection_method: "slack-bot-token",
+      app_id: "A123",
       client_id: "123.456",
     });
   });

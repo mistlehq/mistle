@@ -6,6 +6,7 @@ import {
   createIntegrationWebhookSource,
   deleteIntegrationWebhookSource,
   listIntegrationWebhookSources,
+  refreshIntegrationWebhookTriggerCapabilities,
   type IntegrationConnection,
   type IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
@@ -90,6 +91,19 @@ export function useIntegrationWebhookSourceState(input: {
     },
   });
 
+  const refreshTriggerCapabilitiesMutation = useMutation({
+    mutationFn: async (payload: { appConfigToken: string; connectionId: string }) =>
+      refreshIntegrationWebhookTriggerCapabilities(payload),
+    onSuccess: async (_source, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: [
+          ...SETTINGS_INTEGRATION_WEBHOOK_SOURCES_QUERY_KEY_PREFIX,
+          variables.connectionId,
+        ],
+      });
+    },
+  });
+
   const webhookSourceStateByConnectionId = new Map<string, IntegrationWebhookSourceSectionState>(
     supportedConnections.map((connection, index) => {
       const query = webhookSourceQueries[index];
@@ -141,6 +155,23 @@ export function useIntegrationWebhookSourceState(input: {
   return {
     createWebhookSource: createWebhookSourceMutation.mutate,
     deleteWebhookSource: deleteWebhookSourceMutation.mutate,
+    refreshTriggerCapabilities: refreshTriggerCapabilitiesMutation.mutate,
+    refreshTriggerCapabilitiesError:
+      refreshTriggerCapabilitiesMutation.isError &&
+      refreshTriggerCapabilitiesMutation.variables !== undefined
+        ? {
+            connectionId: refreshTriggerCapabilitiesMutation.variables.connectionId,
+            message: resolveApiErrorMessage({
+              error: refreshTriggerCapabilitiesMutation.error,
+              fallbackMessage: "Could not sync webhook events.",
+            }),
+          }
+        : null,
+    refreshingTriggerCapabilitiesConnectionId:
+      refreshTriggerCapabilitiesMutation.isPending &&
+      refreshTriggerCapabilitiesMutation.variables !== undefined
+        ? refreshTriggerCapabilitiesMutation.variables.connectionId
+        : null,
     webhookSourceStateByConnectionId,
   };
 }

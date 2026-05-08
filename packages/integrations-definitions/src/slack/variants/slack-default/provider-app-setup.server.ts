@@ -154,6 +154,7 @@ export const SlackProviderAppSetupCapability: IntegrationProviderAppSetupCapabil
         return {
           connection: {
             config: buildSlackManifestConnectionConfig({
+              appId: createdManifest.app_id,
               clientId: createdManifest.credentials.client_id,
             }),
           },

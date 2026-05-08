@@ -3051,6 +3051,125 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/integration/connections/:connectionId/webhook-sources/trigger-capabilities/refresh": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          connectionId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      responses: {
+        /** @description Refresh verified webhook trigger capabilities for an integration connection. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              callbackUrl?: string;
+              createdAt: string;
+              displayName: string;
+              endpointKey: string;
+              id: string;
+              integrationConnectionId: string;
+              providerMetadata: {
+                [key: string]: unknown;
+              };
+              remoteRegistrationId?: string;
+              /** @enum {string} */
+              status: "active" | "error" | "disabled";
+              targetKey: string;
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_WEBHOOK_SOURCE_INPUT"
+                    | "WEBHOOK_SOURCE_NOT_SUPPORTED"
+                    | "WEBHOOK_TRIGGER_CAPABILITIES_REFRESH_NOT_SUPPORTED";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration connection was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "CONNECTION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/integration/connections/:targetKey/:methodId/draft": {
     parameters: {
       query?: never;

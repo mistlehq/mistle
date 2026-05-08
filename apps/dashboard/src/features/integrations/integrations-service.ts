@@ -7,6 +7,7 @@ export {
   createIntegrationWebhookSource,
   deleteIntegrationWebhookSource,
   listIntegrationWebhookSources,
+  refreshIntegrationWebhookTriggerCapabilities,
 } from "./integration-webhook-sources-service.js";
 export {
   cancelDeviceAuthorizationAttempt,

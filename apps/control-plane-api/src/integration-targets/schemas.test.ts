@@ -91,10 +91,10 @@ describe("IntegrationTargetSchema", () => {
                   required: true,
                   placeholder: "xoxe.xoxp-...",
                   description:
-                    "Generate a Slack app configuration token, then paste it here. Slack configuration tokens expire after 12 hours.",
+                    "Generate a temporary token from https://api.slack.com/apps and paste it below",
                   actions: [
                     {
-                      label: "Generate token in Slack",
+                      label: "https://api.slack.com/apps",
                       href: "https://api.slack.com/apps",
                       opensInNewWindow: true,
                     },
@@ -157,10 +157,10 @@ describe("IntegrationTargetSchema", () => {
               required: true,
               placeholder: "xoxe.xoxp-...",
               description:
-                "Generate a Slack app configuration token, then paste it here. Slack configuration tokens expire after 12 hours.",
+                "Generate a temporary token from https://api.slack.com/apps and paste it below",
               actions: [
                 {
-                  label: "Generate token in Slack",
+                  label: "https://api.slack.com/apps",
                   href: "https://api.slack.com/apps",
                   opensInNewWindow: true,
                 },

@@ -8,6 +8,10 @@ export const SlackConnectionConfigForm: ResolvedIntegrationForm = {
       connection_method: {
         default: SlackConnectionMethodId,
       },
+      app_id: {
+        title: "App ID",
+        description: "Slack app ID used to refresh webhook event capabilities from Slack.",
+      },
       client_id: {
         title: "Client ID (Linked User Auth)",
         description:

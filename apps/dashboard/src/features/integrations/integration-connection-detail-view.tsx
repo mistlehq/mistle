@@ -120,6 +120,7 @@ export type IntegrationConnectionDetailViewProps = {
         showWebhookSources: boolean;
       }
     | undefined;
+  webhookEventsSyncAction?: (input: { connectionId: string }) => ReactNode;
   webhookSourceStateByConnectionId?: ReadonlyMap<string, IntegrationWebhookSourceSectionState>;
 };
 
@@ -331,6 +332,9 @@ export function IntegrationConnectionDetailView(
               ? {}
               : { resourceItemsByKey: props.resourceItemsByKey })}
             {...(props.webhookPolicy === undefined ? {} : { webhookPolicy: props.webhookPolicy })}
+            {...(props.webhookEventsSyncAction === undefined
+              ? {}
+              : { webhookEventsSyncAction: props.webhookEventsSyncAction })}
             {...(props.titleEditor === undefined ? {} : { titleEditor: props.titleEditor })}
             {...(props.selectedConnectionBody === undefined
               ? {}
@@ -364,6 +368,7 @@ function ConnectionDetailPane(input: {
   selectedConnectionNotice?: ReactNode;
   supportedWebhookEvents?: readonly IntegrationWebhookEventDefinition[];
   titleEditor?: IntegrationConnectionDetailViewProps["titleEditor"];
+  webhookEventsSyncAction?: IntegrationConnectionDetailViewProps["webhookEventsSyncAction"];
   webhookPolicy?: IntegrationConnectionDetailViewProps["webhookPolicy"];
   webhookSourceState?: IntegrationWebhookSourceSectionState;
 }): React.JSX.Element {
@@ -374,6 +379,17 @@ function ConnectionDetailPane(input: {
     webhookPolicy: input.webhookPolicy,
     webhookSourceState,
   });
+  const webhookSectionAction =
+    viewState.webhookSectionUiState === null || webhookSourceState === undefined
+      ? null
+      : resolveWebhookSectionAction({
+          connectionId: input.connection.id,
+          onCreateWebhookSource: input.onCreateWebhookSource,
+          onDeleteWebhookSource: input.onDeleteWebhookSource,
+          syncAction: input.webhookEventsSyncAction,
+          uiState: viewState.webhookSectionUiState,
+          webhookSourceState,
+        });
 
   return (
     <section className="flex flex-col gap-8">
@@ -551,53 +567,7 @@ function ConnectionDetailPane(input: {
           )}
 
           {viewState.webhookSectionUiState !== null && webhookSourceState !== undefined ? (
-            <SectionBlock
-              action={
-                viewState.webhookSectionUiState.showCreateAction === true &&
-                input.onCreateWebhookSource !== undefined ? (
-                  <Button
-                    disabled={webhookSourceState.isCreating}
-                    onClick={() => {
-                      input.onCreateWebhookSource?.({ connectionId: input.connection.id });
-                    }}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    {webhookSourceState.isCreating ? "Creating..." : "Create webhook"}
-                  </Button>
-                ) : viewState.webhookSectionUiState.showStandaloneDeleteAction === true &&
-                  viewState.webhookSectionUiState.standaloneSource !== undefined &&
-                  input.onDeleteWebhookSource !== undefined ? (
-                  (() => {
-                    const standaloneSource = viewState.webhookSectionUiState.standaloneSource;
-
-                    return (
-                      <Button
-                        aria-label={`Delete webhook source ${standaloneSource.displayName}`}
-                        disabled={
-                          webhookSourceState.deletingWebhookSourceId === standaloneSource.id
-                        }
-                        onClick={() => {
-                          input.onDeleteWebhookSource?.({
-                            connectionId: input.connection.id,
-                            webhookSourceId: standaloneSource.id,
-                          });
-                        }}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        {webhookSourceState.deletingWebhookSourceId === standaloneSource.id
-                          ? "Deleting..."
-                          : "Delete webhook"}
-                      </Button>
-                    );
-                  })()
-                ) : null
-              }
-              title="Webhook"
-            >
+            <SectionBlock action={webhookSectionAction} title="Webhook">
               <WebhookSourcesSection
                 connectionId={input.connection.id}
                 hideDeleteAction={viewState.webhookSectionUiState.hideInlineDeleteAction}
@@ -723,6 +693,96 @@ function ConnectionAuthSection(input: {
         ]}
       />
     </div>
+  );
+}
+
+function resolveWebhookSectionAction(input: {
+  connectionId: string;
+  onCreateWebhookSource: ((input: { connectionId: string }) => void) | undefined;
+  onDeleteWebhookSource:
+    | ((input: { connectionId: string; webhookSourceId: string }) => void)
+    | undefined;
+  syncAction: IntegrationConnectionDetailViewProps["webhookEventsSyncAction"];
+  uiState: WebhookSectionUiState;
+  webhookSourceState: IntegrationWebhookSourceSectionState;
+}): ReactNode {
+  const syncAction = input.syncAction?.({ connectionId: input.connectionId }) ?? null;
+  const webhookManagementAction = resolveWebhookManagementAction({
+    connectionId: input.connectionId,
+    onCreateWebhookSource: input.onCreateWebhookSource,
+    onDeleteWebhookSource: input.onDeleteWebhookSource,
+    uiState: input.uiState,
+    webhookSourceState: input.webhookSourceState,
+  });
+
+  if (syncAction === null) {
+    return webhookManagementAction;
+  }
+
+  if (webhookManagementAction === null) {
+    return syncAction;
+  }
+
+  return (
+    <div className="flex flex-wrap justify-end gap-2">
+      {syncAction}
+      {webhookManagementAction}
+    </div>
+  );
+}
+
+function resolveWebhookManagementAction(input: {
+  connectionId: string;
+  onCreateWebhookSource: ((input: { connectionId: string }) => void) | undefined;
+  onDeleteWebhookSource:
+    | ((input: { connectionId: string; webhookSourceId: string }) => void)
+    | undefined;
+  uiState: WebhookSectionUiState;
+  webhookSourceState: IntegrationWebhookSourceSectionState;
+}): ReactNode {
+  if (input.uiState.showCreateAction === true && input.onCreateWebhookSource !== undefined) {
+    return (
+      <Button
+        disabled={input.webhookSourceState.isCreating}
+        onClick={() => {
+          input.onCreateWebhookSource?.({ connectionId: input.connectionId });
+        }}
+        size="sm"
+        type="button"
+        variant="outline"
+      >
+        {input.webhookSourceState.isCreating ? "Creating..." : "Create webhook"}
+      </Button>
+    );
+  }
+
+  const standaloneSource = input.uiState.standaloneSource;
+  if (
+    input.uiState.showStandaloneDeleteAction !== true ||
+    standaloneSource === undefined ||
+    input.onDeleteWebhookSource === undefined
+  ) {
+    return null;
+  }
+
+  return (
+    <Button
+      aria-label={`Delete webhook source ${standaloneSource.displayName}`}
+      disabled={input.webhookSourceState.deletingWebhookSourceId === standaloneSource.id}
+      onClick={() => {
+        input.onDeleteWebhookSource?.({
+          connectionId: input.connectionId,
+          webhookSourceId: standaloneSource.id,
+        });
+      }}
+      size="sm"
+      type="button"
+      variant="outline"
+    >
+      {input.webhookSourceState.deletingWebhookSourceId === standaloneSource.id
+        ? "Deleting..."
+        : "Delete webhook"}
+    </Button>
   );
 }
 

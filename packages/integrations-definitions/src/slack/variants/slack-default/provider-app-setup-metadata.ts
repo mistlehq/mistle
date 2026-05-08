@@ -26,11 +26,17 @@ export const SlackProviderAppSetup = {
     description: "Paste values from a Slack app you already created or configured in Slack.",
     connectLabel: "Connect Slack to Mistle",
     installedDetection: {
-      configFields: ["clientId"],
+      configFields: ["appId"],
       secretFields: ["botToken", "signingSecret"],
     },
     saveErrorMessage: "Could not save Slack app setup.",
     configFields: [
+      {
+        configKey: "app_id",
+        name: "appId",
+        label: "App ID",
+        required: true,
+      },
       {
         configKey: "client_id",
         name: "clientId",
@@ -86,11 +92,10 @@ export const SlackProviderAppSetupStartForm = {
       inputType: "password",
       required: true,
       placeholder: "xoxe.xoxp-...",
-      description:
-        "Generate a Slack app configuration token, then paste it here. Slack configuration tokens expire after 12 hours.",
+      description: "Generate a temporary token from https://api.slack.com/apps and paste it below",
       actions: [
         {
-          label: "Generate token in Slack",
+          label: "https://api.slack.com/apps",
           href: "https://api.slack.com/apps",
           opensInNewWindow: true,
         },

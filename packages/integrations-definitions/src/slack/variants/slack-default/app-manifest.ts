@@ -1,4 +1,5 @@
 import { buildUrlWithPath } from "@mistle/http";
+import { IntegrationWebhookTriggerCapabilitiesProviderMetadataKey } from "@mistle/integrations-core";
 import { z } from "zod";
 
 import { SlackConnectionMethodId } from "./auth.js";
@@ -65,6 +66,20 @@ const SlackManifestCreateErrorResponseSchema = z
   })
   .loose();
 
+const SlackManifestExportSuccessResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    manifest: z.record(z.string(), z.unknown()),
+  })
+  .loose();
+
+const SlackManifestExportErrorResponseSchema = z
+  .object({
+    ok: z.literal(false),
+    error: z.string().min(1),
+  })
+  .loose();
+
 export type SlackOAuthAccessSuccessResponse = z.output<
   typeof SlackOAuthAccessSuccessResponseSchema
 >;
@@ -77,6 +92,14 @@ export type SlackManifestCreateSuccessResponse = z.output<
 
 export type SlackManifestCreateErrorResponse = z.output<
   typeof SlackManifestCreateErrorResponseSchema
+>;
+
+export type SlackManifestExportSuccessResponse = z.output<
+  typeof SlackManifestExportSuccessResponseSchema
+>;
+
+export type SlackManifestExportErrorResponse = z.output<
+  typeof SlackManifestExportErrorResponseSchema
 >;
 
 const SlackAppManifestTemplateRedirectUrls = new Set(
@@ -128,6 +151,10 @@ export function buildSlackAppManifestCreateUrl(input: { apiBaseUrl: string }): s
   return buildUrlWithPath(input.apiBaseUrl, "apps.manifest.create");
 }
 
+export function buildSlackAppManifestExportUrl(input: { apiBaseUrl: string }): string {
+  return buildUrlWithPath(input.apiBaseUrl, "apps.manifest.export");
+}
+
 export function buildSlackOAuthAccessUrl(input: { apiBaseUrl: string }): string {
   return buildUrlWithPath(input.apiBaseUrl, "oauth.v2.access");
 }
@@ -158,6 +185,19 @@ export function parseSlackManifestCreateErrorResponse(
   return parsed.success ? parsed.data : null;
 }
 
+export function parseSlackManifestExportSuccessResponse(
+  value: unknown,
+): SlackManifestExportSuccessResponse {
+  return SlackManifestExportSuccessResponseSchema.parse(value);
+}
+
+export function parseSlackManifestExportErrorResponse(
+  value: unknown,
+): SlackManifestExportErrorResponse | null {
+  const parsed = SlackManifestExportErrorResponseSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
 export function buildSlackOAuthAccessConnectionSecrets(input: {
   accessToken: string;
 }): Record<string, string> {
@@ -167,10 +207,12 @@ export function buildSlackOAuthAccessConnectionSecrets(input: {
 }
 
 export function buildSlackManifestConnectionConfig(input: {
+  appId: string;
   clientId: string;
 }): Record<string, string> {
   return {
     connection_method: SlackConnectionMethodId,
+    app_id: input.appId,
     client_id: input.clientId,
   };
 }
@@ -182,6 +224,103 @@ export function buildSlackManifestConnectionSecrets(input: {
   return {
     clientSecret: input.clientSecret,
     signingSecret: input.signingSecret,
+  };
+}
+
+function resolveManifestObjectField(input: {
+  fieldName: string;
+  parent: Record<string, unknown>;
+}): Record<string, unknown> {
+  const value = input.parent[input.fieldName];
+  if (value === undefined) {
+    return {};
+  }
+
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`Slack manifest field '${input.fieldName}' must be an object.`);
+  }
+
+  return Object.fromEntries(Object.entries(value));
+}
+
+function resolveOptionalManifestStringArray(input: {
+  fieldName: string;
+  parent: Record<string, unknown>;
+}): string[] {
+  const value = input.parent[input.fieldName];
+  if (value === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    throw new Error(`Slack manifest field '${input.fieldName}' must be an array.`);
+  }
+
+  return value.map((entry) => {
+    if (typeof entry !== "string" || entry.trim().length === 0) {
+      throw new Error(`Slack manifest field '${input.fieldName}' must contain strings.`);
+    }
+
+    return entry;
+  });
+}
+
+function resolveManifestStringField(input: {
+  fieldName: string;
+  parent: Record<string, unknown>;
+}): string {
+  const value = input.parent[input.fieldName];
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`Slack manifest field '${input.fieldName}' must be a string.`);
+  }
+
+  return value;
+}
+
+export function buildSlackManifestWebhookTriggerCapabilitiesProviderMetadata(input: {
+  expectedRequestUrl: string;
+  manifest: Record<string, unknown>;
+}): Record<string, unknown> {
+  const settings = resolveManifestObjectField({
+    parent: input.manifest,
+    fieldName: "settings",
+  });
+  const eventSubscriptions = resolveManifestObjectField({
+    parent: settings,
+    fieldName: "event_subscriptions",
+  });
+  const oauthConfig = resolveManifestObjectField({
+    parent: input.manifest,
+    fieldName: "oauth_config",
+  });
+  const scopes = resolveManifestObjectField({
+    parent: oauthConfig,
+    fieldName: "scopes",
+  });
+  const events = resolveOptionalManifestStringArray({
+    parent: eventSubscriptions,
+    fieldName: "bot_events",
+  });
+  const requestUrl = resolveManifestStringField({
+    parent: eventSubscriptions,
+    fieldName: "request_url",
+  });
+  if (requestUrl !== input.expectedRequestUrl) {
+    throw new Error(
+      `Slack Events API Request URL must be '${input.expectedRequestUrl}' before webhook events can be synced. Current Slack Request URL is '${requestUrl}'.`,
+    );
+  }
+
+  const botScopes = resolveOptionalManifestStringArray({
+    parent: scopes,
+    fieldName: "bot",
+  });
+
+  return {
+    [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+      events,
+      permissions: botScopes.map((permission) => ({ permission })),
+    },
   };
 }
 

@@ -37,6 +37,13 @@ type IntegrationConnectionSetupStartFormState = {
   values: Record<string, string>;
 };
 
+type IntegrationConnectionSetupStartFormFieldMetadata =
+  IntegrationFormConnectionMethodSetupStartForm["fields"][number];
+
+type IntegrationConnectionSetupStartFormFieldAction = NonNullable<
+  IntegrationConnectionSetupStartFormFieldMetadata["actions"]
+>[number];
+
 export function useIntegrationConnectionSetupStartForm(
   form: IntegrationFormConnectionMethodSetupStartForm,
 ): IntegrationConnectionSetupStartFormState {
@@ -316,7 +323,7 @@ function IntegrationConnectionSetupStartForm(input: {
 }
 
 function IntegrationConnectionSetupStartFormField(input: {
-  field: IntegrationFormConnectionMethodSetupStartForm["fields"][number];
+  field: IntegrationConnectionSetupStartFormFieldMetadata;
   value: string;
   onValueChange: (fieldName: string, value: string) => void;
 }): React.JSX.Element {
@@ -332,21 +339,7 @@ function IntegrationConnectionSetupStartFormField(input: {
         </FieldLabel>
         {hasDescription ? (
           <FieldDescription id={fieldDescriptionId}>
-            {input.field.description === undefined ? null : <span>{input.field.description}</span>}
-            {input.field.actions === undefined
-              ? null
-              : input.field.actions.map((action) => (
-                  <span className="block" key={action.href}>
-                    <TextLink
-                      href={action.href}
-                      {...(action.opensInNewWindow === undefined
-                        ? {}
-                        : { opensInNewWindow: action.opensInNewWindow })}
-                    >
-                      {action.label}
-                    </TextLink>
-                  </span>
-                ))}
+            {renderIntegrationConnectionSetupStartFormFieldDescription(input.field)}
           </FieldDescription>
         ) : null}
       </FieldHeader>
@@ -391,6 +384,78 @@ function IntegrationConnectionSetupStartFormField(input: {
         )}
       </FieldContent>
     </Field>
+  );
+}
+
+function renderIntegrationConnectionSetupStartFormFieldDescription(
+  field: IntegrationConnectionSetupStartFormFieldMetadata,
+): React.ReactNode {
+  const actions = field.actions ?? [];
+  if (field.description === undefined) {
+    return actions.map((action) => renderSetupStartFormFieldAction(action, "block"));
+  }
+
+  const descriptionNodes = renderDescriptionWithInlineActions(field.description, actions);
+  const inlineActionLabels = new Set(
+    actions
+      .filter((action) => field.description?.includes(action.label) === true)
+      .map((action) => action.label),
+  );
+  const remainingActionNodes = actions
+    .filter((action) => !inlineActionLabels.has(action.label))
+    .map((action) => renderSetupStartFormFieldAction(action, "block"));
+
+  return (
+    <>
+      <span>{descriptionNodes}</span>
+      {remainingActionNodes}
+    </>
+  );
+}
+
+function renderDescriptionWithInlineActions(
+  description: string,
+  actions: readonly IntegrationConnectionSetupStartFormFieldAction[],
+): React.ReactNode {
+  const nodes: React.ReactNode[] = [];
+  let remainingDescription = description;
+
+  for (const action of actions) {
+    const actionIndex = remainingDescription.indexOf(action.label);
+    if (actionIndex === -1) {
+      continue;
+    }
+
+    const prefix = remainingDescription.slice(0, actionIndex);
+    if (prefix.length > 0) {
+      nodes.push(prefix);
+    }
+    nodes.push(renderSetupStartFormFieldAction(action));
+    remainingDescription = remainingDescription.slice(actionIndex + action.label.length);
+  }
+
+  if (remainingDescription.length > 0) {
+    nodes.push(remainingDescription);
+  }
+
+  return nodes;
+}
+
+function renderSetupStartFormFieldAction(
+  action: IntegrationConnectionSetupStartFormFieldAction,
+  className?: string,
+): React.JSX.Element {
+  return (
+    <TextLink
+      className={className}
+      href={action.href}
+      key={action.href}
+      {...(action.opensInNewWindow === undefined
+        ? {}
+        : { opensInNewWindow: action.opensInNewWindow })}
+    >
+      {action.label}
+    </TextLink>
   );
 }
 
