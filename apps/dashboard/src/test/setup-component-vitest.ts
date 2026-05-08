@@ -67,15 +67,17 @@ Object.assign(import.meta.env, {
   VITE_CONTROL_PLANE_API_ORIGIN: "http://localhost:3000",
 });
 
-document.documentElement.style.setProperty("--breakpoint-sm", "40rem");
-document.documentElement.style.setProperty("--breakpoint-md", "48rem");
-document.documentElement.style.fontSize = "16px";
+if (typeof document !== "undefined" && typeof window !== "undefined") {
+  document.documentElement.style.setProperty("--breakpoint-sm", "40rem");
+  document.documentElement.style.setProperty("--breakpoint-md", "48rem");
+  document.documentElement.style.fontSize = "16px";
 
-Object.defineProperty(window, "matchMedia", {
-  configurable: true,
-  value: createMatchMedia,
-  writable: true,
-});
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: createMatchMedia,
+    writable: true,
+  });
+}
 
 if (typeof HTMLCanvasElement !== "undefined") {
   Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
