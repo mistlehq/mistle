@@ -14,6 +14,7 @@ import type {
   PutSandboxProfileVersionRefreshScheduleInput,
   SandboxProfile,
   SandboxProfileVersion,
+  SandboxProfileVersionDraftAutomationImpact,
   SandboxProfileVersionPublishability,
   SandboxProfileVersionIntegrationBinding,
   SandboxProfileVersionAutomationConfig,
@@ -53,6 +54,47 @@ const LaunchableSandboxProfilesResultSchema = z
     ),
   })
   .strict();
+
+const SandboxProfileVersionDraftAutomationImpactSchema = z
+  .object({
+    hasBreakingChanges: z.boolean(),
+    affectedAutomations: z.array(
+      z
+        .object({
+          id: z.string().min(1),
+          name: z.string().min(1),
+          kind: z.enum(["webhook", "schedule"]),
+          enabled: z.boolean(),
+          issues: z.array(
+            z
+              .object({
+                code: z.enum([
+                  "AGENT_BINDING_REQUIRED",
+                  "AGENT_BINDING_AMBIGUOUS",
+                  "AGENT_BINDING_RUNTIME_INVALID",
+                  "INVALID_BINDING_CONNECTION_REFERENCE",
+                  "CONNECTION_NOT_ACTIVE",
+                  "TARGET_DISABLED",
+                  "TARGET_MISSING",
+                  "WEBHOOK_SOURCE_CONNECTION_NOT_BOUND",
+                  "PRIMARY_REPOSITORY_UNAVAILABLE",
+                ]),
+                message: z.string().min(1),
+                bindingId: z.string().min(1).optional(),
+                connectionId: z.string().min(1).optional(),
+                targetKey: z.string().min(1).optional(),
+                primaryRepositoryId: z.string().min(1).optional(),
+              })
+              .strict(),
+          ),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+type ParsedSandboxProfileVersionDraftAutomationImpact = z.infer<
+  typeof SandboxProfileVersionDraftAutomationImpactSchema
+>;
 
 export async function listSandboxProfiles(input: {
   limit: number;
@@ -569,6 +611,69 @@ export async function getSandboxProfileVersionPublishability(input: {
       }),
     );
   }
+}
+
+export async function getSandboxProfileVersionDraftAutomationImpact(input: {
+  profileId: string;
+  version: number;
+  signal?: AbortSignal;
+}): Promise<SandboxProfileVersionDraftAutomationImpact> {
+  try {
+    const response = await requestControlPlane({
+      operation: "getSandboxProfileVersionDraftAutomationImpact",
+      method: "GET",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/draft-automation-impact`,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not check draft automation impact.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = SandboxProfileVersionDraftAutomationImpactSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "getSandboxProfileVersionDraftAutomationImpact",
+        status: 500,
+        body: responseBody,
+        message: "Sandbox profile draft automation impact response payload is invalid.",
+      });
+    }
+
+    return normalizeSandboxProfileVersionDraftAutomationImpact(parsedResponse.data);
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "getSandboxProfileVersionDraftAutomationImpact",
+        error,
+        fallbackMessage: "Could not check draft automation impact.",
+      }),
+    );
+  }
+}
+
+function normalizeSandboxProfileVersionDraftAutomationImpact(
+  input: ParsedSandboxProfileVersionDraftAutomationImpact,
+): SandboxProfileVersionDraftAutomationImpact {
+  return {
+    hasBreakingChanges: input.hasBreakingChanges,
+    affectedAutomations: input.affectedAutomations.map((automation) => ({
+      enabled: automation.enabled,
+      id: automation.id,
+      issues: automation.issues.map((issue) => ({
+        code: issue.code,
+        message: issue.message,
+        ...(issue.bindingId === undefined ? {} : { bindingId: issue.bindingId }),
+        ...(issue.connectionId === undefined ? {} : { connectionId: issue.connectionId }),
+        ...(issue.targetKey === undefined ? {} : { targetKey: issue.targetKey }),
+        ...(issue.primaryRepositoryId === undefined
+          ? {}
+          : { primaryRepositoryId: issue.primaryRepositoryId }),
+      })),
+      kind: automation.kind,
+      name: automation.name,
+    })),
+  };
 }
 
 export async function publishSandboxProfileVersion(input: {

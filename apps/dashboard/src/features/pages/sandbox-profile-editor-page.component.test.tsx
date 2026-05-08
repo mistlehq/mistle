@@ -22,7 +22,10 @@ import {
   sandboxProfileVersionSetupScriptQueryKey,
   sandboxProfileVersionsQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
-import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type {
+  SandboxProfileVersion,
+  SandboxProfileVersionDraftAutomationImpactAutomation,
+} from "../sandbox-profiles/sandbox-profiles-types.js";
 import { organizationSandboxStorageSettingsQueryKey } from "../settings/organization/sandbox-storage-service.js";
 import type { SandboxProfileBindingEditorRow } from "./sandbox-profile-binding-config-editor.js";
 import {
@@ -530,6 +533,9 @@ function DeleteProfileDialogHarness(input: {
       deleteProfileAutomationUsagesIsPending={input.automationUsagesIsPending ?? false}
       deleteProfileError={null}
       deleteProfileIsPending={false}
+      draftAutomationImpactAffectedAutomations={null}
+      draftAutomationImpactError={null}
+      onDraftAutomationImpactErrorDismiss={() => {}}
       hasUnpersistedIntegrationChanges={false}
       isDeleteProfileDialogOpen={isOpen}
       mode={{
@@ -565,10 +571,17 @@ function DeleteProfileDialogHarness(input: {
 }
 
 function DraftActionsHarness(input: {
+  draftAutomationImpactAffectedAutomations?:
+    | readonly SandboxProfileVersionDraftAutomationImpactAutomation[]
+    | null;
+  draftAutomationImpactError?: string | null;
   hasUnpersistedIntegrationChanges?: boolean;
   draftSaveError?: string | null;
 }): JSX.Element {
   const [discarded, setDiscarded] = useState(false);
+  const [draftAutomationImpactError, setDraftAutomationImpactError] = useState(
+    input.draftAutomationImpactError ?? null,
+  );
 
   return (
     <SandboxProfileEditorView
@@ -579,6 +592,13 @@ function DraftActionsHarness(input: {
       deleteProfileError={null}
       deleteProfileIsPending={false}
       draftSaveError={input.draftSaveError ?? null}
+      draftAutomationImpactAffectedAutomations={
+        input.draftAutomationImpactAffectedAutomations ?? null
+      }
+      draftAutomationImpactError={draftAutomationImpactError}
+      onDraftAutomationImpactErrorDismiss={() => {
+        setDraftAutomationImpactError(null);
+      }}
       hasUnpersistedIntegrationChanges={input.hasUnpersistedIntegrationChanges ?? false}
       isDeleteProfileDialogOpen={false}
       mode={{
@@ -632,6 +652,10 @@ function renderDeleteProfileDialogHarness(input: {
 }
 
 function renderDraftActionsHarness(input?: {
+  draftAutomationImpactAffectedAutomations?:
+    | readonly SandboxProfileVersionDraftAutomationImpactAutomation[]
+    | null;
+  draftAutomationImpactError?: string | null;
   hasUnpersistedIntegrationChanges?: boolean;
   draftSaveError?: string | null;
 }): void {
@@ -2079,6 +2103,77 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(screen.queryByText("Profile version action failed")).toBeNull();
     expect(screen.getByText("Saving draft failed. Please try again later.")).toBeDefined();
+  });
+
+  it("surfaces saved draft automation impact warnings", () => {
+    renderDraftActionsHarness({
+      draftAutomationImpactAffectedAutomations: [
+        {
+          enabled: true,
+          id: "webhook_repository_triage",
+          issues: [
+            {
+              code: "WEBHOOK_SOURCE_CONNECTION_NOT_BOUND",
+              message: "Webhook source connection is not bound.",
+            },
+          ],
+          kind: "webhook",
+          name: "Repository triage",
+        },
+        {
+          enabled: true,
+          id: "sch_release_notes",
+          issues: [
+            {
+              code: "PRIMARY_REPOSITORY_UNAVAILABLE",
+              message: "Primary repository is unavailable.",
+            },
+          ],
+          kind: "schedule",
+          name: "Release notes",
+        },
+      ],
+    });
+
+    const noticeTitle = screen.getByText(
+      "Publishing this draft will break the following automations",
+    );
+    expect(noticeTitle).toBeDefined();
+    expect(noticeTitle.closest('[role="tabpanel"]')).not.toBeNull();
+    const webhookAutomationLink = screen.getByRole("link", { name: "Repository triage" });
+    expect(webhookAutomationLink.getAttribute("href")).toBe(
+      "/automations/webhook_repository_triage",
+    );
+    expect(webhookAutomationLink.getAttribute("target")).toBe("_blank");
+    expect(webhookAutomationLink.getAttribute("rel")).toBe("noreferrer");
+
+    const scheduledAutomationLink = screen.getByRole("link", { name: "Release notes" });
+    expect(scheduledAutomationLink.getAttribute("href")).toBe(
+      "/automations/schedules/sch_release_notes",
+    );
+    expect(scheduledAutomationLink.getAttribute("target")).toBe("_blank");
+    expect(scheduledAutomationLink.getAttribute("rel")).toBe("noreferrer");
+    expect(
+      screen.getByText("This automation's webhook source connection is not bound in the draft."),
+    ).toBeDefined();
+    expect(
+      screen.getByText("This automation's primary repository is not available in the draft."),
+    ).toBeDefined();
+  });
+
+  it("shows failed draft automation checks as a dismissible notice", () => {
+    renderDraftActionsHarness({
+      draftAutomationImpactError: "Couldn't check whether this draft affects related automations.",
+    });
+
+    expect(screen.getByText("Automation checks failed")).toBeDefined();
+    expect(
+      screen.getByText("Couldn't check whether this draft affects related automations."),
+    ).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+
+    expect(screen.queryByText("Automation checks failed")).toBeNull();
   });
 
   it("shows draft actions for draft profiles with a published version", () => {
