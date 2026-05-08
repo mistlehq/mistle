@@ -75,8 +75,28 @@ export type CodexSessionConnectionLifecycleState = {
 
 export type CodexSessionConnectionStateResult = {
   lifecycle: CodexSessionConnectionLifecycleState;
-  updateActiveThread: (input: { threadId: string | null; cwd?: string | null }) => void;
+  updateActiveThread: (input: { threadId: string | null; cwd?: string }) => void;
 };
+
+export function updateConnectedCodexSessionActiveThread(input: {
+  currentSession: ConnectedCodexSession;
+  threadId: string | null;
+  cwd?: string;
+}): ConnectedCodexSession {
+  if (input.threadId === null) {
+    return {
+      ...input.currentSession,
+      activeThreadId: null,
+      activeThreadCwd: null,
+    };
+  }
+
+  return {
+    ...input.currentSession,
+    activeThreadId: input.threadId,
+    activeThreadCwd: input.cwd ?? input.currentSession.activeThreadCwd,
+  };
+}
 
 export function useCodexSessionConnection(input: {
   connectionGenerationRef: RefObject<number>;
@@ -119,7 +139,7 @@ export function useCodexSessionConnection(input: {
   const reconnectTargetThreadIdRef = useRef<string | null>(null);
 
   const updateActiveThread = useCallback(
-    (activeThreadInput: { threadId: string | null; cwd?: string | null }): void => {
+    (activeThreadInput: { threadId: string | null; cwd?: string }): void => {
       const threadId = activeThreadInput.threadId;
       input.threadIdRef.current = threadId;
       reconnectTargetThreadIdRef.current = threadId;
@@ -128,11 +148,11 @@ export function useCodexSessionConnection(input: {
           return currentSession;
         }
 
-        return {
-          ...currentSession,
-          activeThreadId: threadId,
-          activeThreadCwd: threadId === null ? null : (activeThreadInput.cwd ?? null),
-        };
+        return updateConnectedCodexSessionActiveThread({
+          currentSession,
+          threadId,
+          ...(activeThreadInput.cwd === undefined ? {} : { cwd: activeThreadInput.cwd }),
+        });
       });
     },
     [input.threadIdRef],

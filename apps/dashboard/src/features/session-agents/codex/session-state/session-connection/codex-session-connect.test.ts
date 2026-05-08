@@ -6,6 +6,7 @@ import {
   resolveInitialCodexThreadAction,
   resolveReconnectResumeFailureAction,
 } from "./codex-session-connect.js";
+import { updateConnectedCodexSessionActiveThread } from "./use-codex-session-connection.js";
 
 describe("codex session connect", () => {
   it("resumes the oldest created existing thread on reconnect", () => {
@@ -191,6 +192,44 @@ describe("codex session connect", () => {
       providerThreadId: null,
       activeThreadId: "thread_123",
       activeThreadCwd: "/root/acme/repo-2",
+    });
+  });
+
+  it("preserves the active thread cwd when a thread update does not return cwd", () => {
+    const currentSession = createConnectedCodexSession({
+      sandboxInstanceId: "sandbox_123",
+      connectedAtIso: "2026-03-20T00:00:00.000Z",
+      providerThreadId: null,
+      activeThreadId: "thread_123",
+      activeThreadCwd: "/root/acme/repo-2",
+    });
+
+    expect(
+      updateConnectedCodexSessionActiveThread({
+        currentSession,
+        threadId: "thread_123",
+      }),
+    ).toEqual(currentSession);
+  });
+
+  it("clears the active thread cwd when the active thread is cleared", () => {
+    const currentSession = createConnectedCodexSession({
+      sandboxInstanceId: "sandbox_123",
+      connectedAtIso: "2026-03-20T00:00:00.000Z",
+      providerThreadId: null,
+      activeThreadId: "thread_123",
+      activeThreadCwd: "/root/acme/repo-2",
+    });
+
+    expect(
+      updateConnectedCodexSessionActiveThread({
+        currentSession,
+        threadId: null,
+      }),
+    ).toEqual({
+      ...currentSession,
+      activeThreadId: null,
+      activeThreadCwd: null,
     });
   });
 });
