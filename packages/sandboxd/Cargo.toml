@@ -22,7 +22,7 @@ nix = { version = "0.31.2", features = ["fs", "process", "signal", "socket", "us
 opentelemetry = { version = "0.31", features = ["trace"] }
 opentelemetry_sdk = { version = "0.31", features = ["trace"] }
 portable-pty = "0.9.0"
-rcgen = "0.13.2"
+rcgen = "0.14.7"
 reqwest = { version = "0.13.2", default-features = false, features = [
   "blocking",
   "json",

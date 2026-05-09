@@ -1120,11 +1120,12 @@ mod tests {
     }
 
     fn build_test_tls_acceptor() -> TlsAcceptor {
-        let rcgen::CertifiedKey { cert, key_pair } =
+        let rcgen::CertifiedKey { cert, signing_key } =
             rcgen::generate_simple_self_signed(vec!["localhost".to_string()])
                 .expect("self-signed tls certificate should generate");
         let cert_chain = vec![CertificateDer::from(cert.der().to_vec())];
-        let private_key = PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(key_pair.serialize_der()));
+        let private_key =
+            PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(signing_key.serialize_der()));
         let server_config = ServerConfig::builder()
             .with_no_client_auth()
             .with_single_cert(cert_chain, private_key)

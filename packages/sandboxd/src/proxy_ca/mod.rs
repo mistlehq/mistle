@@ -13,8 +13,8 @@ use std::str::FromStr;
 use nix::fcntl::{FcntlArg, FdFlag, fcntl};
 use nix::unistd::{pipe, write};
 use rcgen::{
-    BasicConstraints, CertificateParams, DistinguishedName, DnType, IsCa, KeyPair, KeyUsagePurpose,
-    SanType,
+    BasicConstraints, CertificateParams, DistinguishedName, DnType, IsCa, Issuer, KeyPair,
+    KeyUsagePurpose, SanType,
 };
 
 use crate::time::{Clock, add_millis, subtract_millis};
@@ -189,13 +189,8 @@ pub fn issue_proxy_leaf_certificate(
         return Err(ProxyCaError::new("proxy ca certificate pem is invalid"));
     }
 
-    let issuer_certificate = base_proxy_ca_params(clock)
-        .self_signed(&ca_key_pair)
-        .map_err(|error| {
-            ProxyCaError::new(format!(
-                "failed to reconstruct proxy ca certificate: {error}"
-            ))
-        })?;
+    let ca_params = base_proxy_ca_params(clock);
+    let issuer = Issuer::from_params(&ca_params, &ca_key_pair);
 
     let leaf_key_pair = KeyPair::generate().map_err(|error| {
         ProxyCaError::new(format!(
@@ -233,13 +228,11 @@ pub fn issue_proxy_leaf_certificate(
         ));
     }
 
-    let leaf_certificate = params
-        .signed_by(&leaf_key_pair, &issuer_certificate, &ca_key_pair)
-        .map_err(|error| {
-            ProxyCaError::new(format!(
-                "failed to issue leaf certificate for \"{normalized_server_name}\": {error}"
-            ))
-        })?;
+    let leaf_certificate = params.signed_by(&leaf_key_pair, &issuer).map_err(|error| {
+        ProxyCaError::new(format!(
+            "failed to issue leaf certificate for \"{normalized_server_name}\": {error}"
+        ))
+    })?;
 
     Ok(IssuedProxyLeafCertificate {
         certificate_chain_pem: format!("{}{}", leaf_certificate.pem(), ca_certificate_pem),
