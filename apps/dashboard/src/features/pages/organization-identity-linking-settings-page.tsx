@@ -328,8 +328,7 @@ export function buildProviderRow(input: {
     connectionPending: input.configuringProviderFamily === input.provider.providerFamily,
     enablePending: input.statusUpdatingProviderFamily === input.provider.providerFamily,
     enabled: input.provider.configurationStatus === "active",
-    linkedUsersCount: input.providerLinksQuery?.data?.length ?? 0,
-    memberLinksLoading: input.providerLinksQuery?.isPending ?? false,
+    linkedUsersCount: input.providerLinksQuery?.data?.length ?? null,
     memberLinksErrorMessage:
       input.providerLinksQuery !== null && input.providerLinksQuery.isError
         ? resolveApiErrorMessage({

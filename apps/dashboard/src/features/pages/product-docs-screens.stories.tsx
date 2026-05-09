@@ -90,7 +90,6 @@ const IdentityLinkingProviders: OrganizationIdentityLinkingProviderRow[] = [
     enablePending: false,
     enabled: true,
     linkedUsersCount: 12,
-    memberLinksLoading: false,
     memberLinksErrorMessage: null,
     memberLinks: [
       {
@@ -126,7 +125,6 @@ const IdentityLinkingProviders: OrganizationIdentityLinkingProviderRow[] = [
     enablePending: false,
     enabled: true,
     linkedUsersCount: 3,
-    memberLinksLoading: false,
     memberLinksErrorMessage: null,
     memberLinks: [
       {

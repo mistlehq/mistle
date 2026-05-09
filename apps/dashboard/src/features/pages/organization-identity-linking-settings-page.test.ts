@@ -146,6 +146,7 @@ describe("buildProviderRow", () => {
     });
 
     expect(providerRow.selectedConnectionId).toBe("icn_slack_first");
+    expect(providerRow.linkedUsersCount).toBeNull();
     expect(providerRow.connectionOptions).toEqual([
       {
         id: "icn_slack_first",

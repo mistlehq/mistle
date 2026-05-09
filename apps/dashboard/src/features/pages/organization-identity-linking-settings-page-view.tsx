@@ -12,7 +12,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Spinner,
   Switch,
 } from "@mistle/ui";
 import { EyeIcon } from "@phosphor-icons/react";
@@ -39,8 +38,7 @@ export type OrganizationIdentityLinkingProviderRow = {
   connectionPending: boolean;
   enablePending: boolean;
   enabled: boolean;
-  linkedUsersCount: number;
-  memberLinksLoading: boolean;
+  linkedUsersCount: number | null;
   memberLinksErrorMessage: string | null;
   memberLinks: readonly {
     userId: string;
@@ -213,9 +211,9 @@ function IdentityLinkingProviderRowView(input: {
 
       <ResponsiveFieldListCell columnKey="linkedUsers">
         <div className="inline-flex items-center gap-2.5 md:justify-center">
-          <span className="text-sm">
-            {provider.memberLinksLoading ? "Loading..." : String(provider.linkedUsersCount)}
-          </span>
+          {provider.linkedUsersCount === null ? null : (
+            <span className="text-sm">{String(provider.linkedUsersCount)}</span>
+          )}
           <Button
             aria-label={`View ${provider.displayName} linked users`}
             className="h-auto w-auto p-0 hover:bg-transparent"
@@ -229,26 +227,21 @@ function IdentityLinkingProviderRowView(input: {
       </ResponsiveFieldListCell>
 
       <ResponsiveFieldListCell columnKey="enable">
-        <div className="inline-flex items-center justify-center gap-2">
-          <Switch
-            aria-label={`Enable ${provider.displayName} identity linking`}
-            checked={provider.enabled}
-            disabled={
-              provider.enablePending ||
-              provider.connectionPending ||
-              provider.selectedConnectionId === null
-            }
-            onCheckedChange={(enabled) => {
-              void input.onEnabledChange({
-                providerFamily: provider.providerFamily,
-                enabled,
-              });
-            }}
-          />
-          {provider.connectionPending || provider.enablePending ? (
-            <Spinner aria-hidden className="size-4 text-muted-foreground" />
-          ) : null}
-        </div>
+        <Switch
+          aria-label={`Enable ${provider.displayName} identity linking`}
+          checked={provider.enabled}
+          disabled={
+            provider.enablePending ||
+            provider.connectionPending ||
+            provider.selectedConnectionId === null
+          }
+          onCheckedChange={(enabled) => {
+            void input.onEnabledChange({
+              providerFamily: provider.providerFamily,
+              enabled,
+            });
+          }}
+        />
       </ResponsiveFieldListCell>
     </ResponsiveFieldListRow>
   );
@@ -269,14 +262,9 @@ function LinkedUsersDialog(input: {
           </DialogTitle>
         </DialogHeader>
 
-        {provider === null ? null : provider.memberLinksLoading ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Spinner aria-hidden className="size-4" />
-            <span>Loading linked users...</span>
-          </div>
-        ) : provider.memberLinksErrorMessage !== null ? (
+        {provider === null ? null : provider.memberLinksErrorMessage !== null ? (
           <Notice variant="alert">{provider.memberLinksErrorMessage}</Notice>
-        ) : provider.memberLinks.length === 0 ? (
+        ) : provider.linkedUsersCount === null ? null : provider.memberLinks.length === 0 ? (
           <Notice>No organization members are linked for this integration yet.</Notice>
         ) : (
           <ScrollArea className="max-h-96 rounded-md border">

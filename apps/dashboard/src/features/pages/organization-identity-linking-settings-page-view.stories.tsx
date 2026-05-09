@@ -31,7 +31,6 @@ const BaseProviders = [
     enablePending: false,
     enabled: true,
     linkedUsersCount: 12,
-    memberLinksLoading: false,
     memberLinksErrorMessage: null,
     memberLinks: [
       {
@@ -67,7 +66,6 @@ const BaseProviders = [
     enablePending: false,
     enabled: false,
     linkedUsersCount: 3,
-    memberLinksLoading: false,
     memberLinksErrorMessage: null,
     memberLinks: [
       {
@@ -90,7 +88,6 @@ const BaseProviders = [
     enablePending: false,
     enabled: false,
     linkedUsersCount: 0,
-    memberLinksLoading: false,
     memberLinksErrorMessage: null,
     memberLinks: [],
   },
@@ -225,7 +222,6 @@ export const UnconfiguredProviderWithDisplayedConnection: Story = {
         enablePending: false,
         enabled: false,
         linkedUsersCount: 0,
-        memberLinksLoading: false,
         memberLinksErrorMessage: null,
         memberLinks: [],
       },
@@ -248,6 +244,18 @@ export const LinkedUsersDialogError: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.click(canvas.getByRole("button", { name: "View GitHub linked users" }));
+  },
+};
+
+export const LinkedUsersUnknown: Story = {
+  args: {
+    providers: [
+      {
+        ...BaseProviders[0],
+        linkedUsersCount: null,
+        memberLinks: [],
+      },
+    ],
   },
 };
 
