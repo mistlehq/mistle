@@ -31,6 +31,12 @@ const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api"],
 });
 
+const EmptySandboxRuntimeConfig = {
+  sandboxConnectionId: null,
+  sandboxProvider: null,
+  sandboxResources: null,
+};
+
 describe.concurrent("sandbox profile versions publish integration", () => {
   it("publishes a draft version and queues initial snapshot materialization", async ({ env }) => {
     const session = await env.auth.createSession({
@@ -122,6 +128,7 @@ describe.concurrent("sandbox profile versions publish integration", () => {
         version: 2,
         state: SandboxProfileVersionStates.PUBLISHED,
         defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
+        ...EmptySandboxRuntimeConfig,
         isActive: false,
         usable: false,
         refreshSchedule: {

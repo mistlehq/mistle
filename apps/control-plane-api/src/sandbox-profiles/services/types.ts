@@ -8,15 +8,23 @@ import type {
 } from "@mistle/db/control-plane";
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
-import type { CompiledRuntimePlan, ResolvedSandboxImage } from "@mistle/integrations-core";
+import type {
+  CompiledRuntimePlan,
+  IntegrationRegistry,
+  ResolvedSandboxImage,
+} from "@mistle/integrations-core";
 
 import type { createControlPlaneOpenWorkflow } from "../../openworkflow.js";
+import type { ControlPlaneApiSandboxRuntimeConfig } from "../../types.js";
 import type { ListProfilesInput } from "./list-profiles.js";
+import type { SandboxProfileVersionResources } from "./profile-version-runtime-config.js";
 
 export type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenWorkflow>;
 
 export type CreateSandboxProfilesServiceInput = {
   db: ControlPlaneDatabase;
+  integrationRegistry: IntegrationRegistry;
+  sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
   openWorkflow: ControlPlaneOpenWorkflow;
   integrationsConfig: {
     activeMasterEncryptionKeyVersion: number;
@@ -39,6 +47,9 @@ export type SandboxProfilesService = {
     version: number;
     state: SandboxProfileVersionState;
     defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
+    sandboxProvider: string | null;
+    sandboxConnectionId: string | null;
+    sandboxResources: SandboxProfileVersionResources | null;
     isActive: boolean;
   }>;
   getProfile: (input: { organizationId: string; profileId: string }) => Promise<SandboxProfile>;
@@ -56,6 +67,9 @@ export type SandboxProfilesService = {
       version: number;
       state: SandboxProfileVersionState;
       defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
+      sandboxProvider: string | null;
+      sandboxConnectionId: string | null;
+      sandboxResources: SandboxProfileVersionResources | null;
       isActive: boolean;
     }>;
   }>;
@@ -111,6 +125,9 @@ export type SandboxProfilesService = {
       version: number;
       state: SandboxProfileVersionState;
       defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
+      sandboxProvider: string | null;
+      sandboxConnectionId: string | null;
+      sandboxResources: SandboxProfileVersionResources | null;
       isActive: boolean;
     };
     activeVersion: number | null;

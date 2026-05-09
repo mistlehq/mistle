@@ -10,11 +10,15 @@ const routeHandler = async (
   { session }: AppSession,
 ) => {
   const db = ctx.get("db");
+  const integrationRegistry = ctx.get("integrationRegistry");
+  const sandboxConfig = ctx.get("sandboxConfig");
   const { displayName } = ctx.req.valid("json");
 
   const profile = await createProfile(
     {
       db,
+      integrationRegistry,
+      sandboxConfig,
     },
     {
       displayName,

@@ -8110,7 +8110,14 @@ export interface paths {
                   scheduleId: string;
                   timezone: string;
                 } | null;
+                sandboxConnectionId: string | null;
                 sandboxProfileId: string;
+                sandboxProvider: string | null;
+                sandboxResources: {
+                  memoryMb: number;
+                  storageMb?: number;
+                  vcpuCount: number;
+                } | null;
                 /** @enum {string} */
                 state: "draft" | "published";
                 usable: boolean;
@@ -8224,7 +8231,14 @@ export interface paths {
                 scheduleId: string;
                 timezone: string;
               } | null;
+              sandboxConnectionId: string | null;
               sandboxProfileId: string;
+              sandboxProvider: string | null;
+              sandboxResources: {
+                memoryMb: number;
+                storageMb?: number;
+                vcpuCount: number;
+              } | null;
               /** @enum {string} */
               state: "draft" | "published";
               usable: boolean;
@@ -8585,6 +8599,13 @@ export interface paths {
                 kind: "agent" | "git" | "connector" | "sandbox";
               }[];
             };
+            sandboxConnectionId?: string | null;
+            sandboxProvider?: string;
+            sandboxResources?: {
+              memoryMb: number;
+              storageMb?: number;
+              vcpuCount: number;
+            };
             setupScript?: string | null;
           };
         };
@@ -8614,7 +8635,14 @@ export interface paths {
                   updatedAt: string;
                 }[];
               };
+              sandboxConnectionId: string | null;
               sandboxProfileId: string;
+              sandboxProvider: string | null;
+              sandboxResources: {
+                memoryMb: number;
+                storageMb?: number;
+                vcpuCount: number;
+              } | null;
               setupScript: string | null;
               version: number;
             };
@@ -9174,7 +9202,14 @@ export interface paths {
                   scheduleId: string;
                   timezone: string;
                 } | null;
+                sandboxConnectionId: string | null;
                 sandboxProfileId: string;
+                sandboxProvider: string | null;
+                sandboxResources: {
+                  memoryMb: number;
+                  storageMb?: number;
+                  vcpuCount: number;
+                } | null;
                 /** @enum {string} */
                 state: "draft" | "published";
                 usable: boolean;
@@ -9444,7 +9479,14 @@ export interface paths {
                   scheduleId: string;
                   timezone: string;
                 } | null;
+                sandboxConnectionId: string | null;
                 sandboxProfileId: string;
+                sandboxProvider: string | null;
+                sandboxResources: {
+                  memoryMb: number;
+                  storageMb?: number;
+                  vcpuCount: number;
+                } | null;
                 /** @enum {string} */
                 state: "draft" | "published";
                 usable: boolean;
@@ -9809,7 +9851,14 @@ export interface paths {
                   scheduleId: string;
                   timezone: string;
                 } | null;
+                sandboxConnectionId: string | null;
                 sandboxProfileId: string;
+                sandboxProvider: string | null;
+                sandboxResources: {
+                  memoryMb: number;
+                  storageMb?: number;
+                  vcpuCount: number;
+                } | null;
                 /** @enum {string} */
                 state: "draft" | "published";
                 usable: boolean;

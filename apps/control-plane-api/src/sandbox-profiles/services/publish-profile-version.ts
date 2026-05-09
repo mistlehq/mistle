@@ -20,6 +20,10 @@ import {
   loadActiveRefreshSchedulesByVersion,
   type ProfileVersionRefreshScheduleSummary,
 } from "./profile-version-refresh-schedule-summary.js";
+import {
+  mapProfileVersionRuntimeConfig,
+  type SandboxProfileVersionResources,
+} from "./profile-version-runtime-config.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type PublishProfileVersionInput = {
@@ -34,6 +38,9 @@ type PublishProfileVersionOutput = {
     version: number;
     state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
     defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
+    sandboxProvider: string | null;
+    sandboxConnectionId: string | null;
+    sandboxResources: SandboxProfileVersionResources | null;
     isActive: boolean;
     usable: boolean;
     refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
@@ -148,6 +155,11 @@ export async function publishProfileVersion(
         version: tables.sandboxProfileVersions.version,
         state: tables.sandboxProfileVersions.state,
         defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
+        sandboxProvider: tables.sandboxProfileVersions.sandboxProvider,
+        sandboxConnectionId: tables.sandboxProfileVersions.sandboxConnectionId,
+        sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
+        sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
+        sandboxStorageMb: tables.sandboxProfileVersions.sandboxStorageMb,
       });
 
     if (publishedVersion === undefined) {
@@ -189,7 +201,11 @@ export async function publishProfileVersion(
 
     return {
       version: {
-        ...publishedVersion,
+        sandboxProfileId: publishedVersion.sandboxProfileId,
+        version: publishedVersion.version,
+        state: publishedVersion.state,
+        defaultPersistenceMode: publishedVersion.defaultPersistenceMode,
+        ...mapProfileVersionRuntimeConfig(publishedVersion),
         isActive: false,
         usable: false,
         refreshSchedule: refreshSchedulesByVersion.get(input.profileVersion) ?? null,

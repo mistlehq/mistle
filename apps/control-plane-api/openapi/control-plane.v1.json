@@ -15334,6 +15334,33 @@
                       "type": "string",
                       "enum": ["ephemeral", "persistent"]
                     },
+                    "sandboxProvider": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "sandboxConnectionId": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "sandboxResources": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "vcpuCount": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "memoryMb": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "storageMb": {
+                          "type": "integer",
+                          "minimum": 1
+                        }
+                      },
+                      "required": ["vcpuCount", "memoryMb"],
+                      "additionalProperties": false
+                    },
                     "isActive": {
                       "type": "boolean"
                     },
@@ -15431,6 +15458,9 @@
                     "version",
                     "state",
                     "defaultPersistenceMode",
+                    "sandboxProvider",
+                    "sandboxConnectionId",
+                    "sandboxResources",
                     "isActive",
                     "usable",
                     "refreshSchedule",
@@ -15606,6 +15636,33 @@
                             "type": "string",
                             "enum": ["ephemeral", "persistent"]
                           },
+                          "sandboxProvider": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          },
+                          "sandboxConnectionId": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          },
+                          "sandboxResources": {
+                            "type": ["object", "null"],
+                            "properties": {
+                              "vcpuCount": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "memoryMb": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "storageMb": {
+                                "type": "integer",
+                                "minimum": 1
+                              }
+                            },
+                            "required": ["vcpuCount", "memoryMb"],
+                            "additionalProperties": false
+                          },
                           "isActive": {
                             "type": "boolean"
                           },
@@ -15703,6 +15760,9 @@
                           "version",
                           "state",
                           "defaultPersistenceMode",
+                          "sandboxProvider",
+                          "sandboxConnectionId",
+                          "sandboxResources",
                           "isActive",
                           "usable",
                           "refreshSchedule",
@@ -17290,6 +17350,33 @@
                     "type": "string",
                     "enum": ["ephemeral", "persistent"]
                   },
+                  "sandboxProvider": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sandboxConnectionId": {
+                    "type": ["string", "null"],
+                    "minLength": 1
+                  },
+                  "sandboxResources": {
+                    "type": "object",
+                    "properties": {
+                      "vcpuCount": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "memoryMb": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "storageMb": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
+                    },
+                    "required": ["vcpuCount", "memoryMb"],
+                    "additionalProperties": false
+                  },
                   "integrationBindings": {
                     "type": "object",
                     "properties": {
@@ -17356,6 +17443,33 @@
                       "type": "string",
                       "enum": ["ephemeral", "persistent"]
                     },
+                    "sandboxProvider": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "sandboxConnectionId": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "sandboxResources": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "vcpuCount": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "memoryMb": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "storageMb": {
+                          "type": "integer",
+                          "minimum": 1
+                        }
+                      },
+                      "required": ["vcpuCount", "memoryMb"],
+                      "additionalProperties": false
+                    },
                     "integrationBindings": {
                       "type": "object",
                       "properties": {
@@ -17418,6 +17532,9 @@
                     "version",
                     "setupScript",
                     "defaultPersistenceMode",
+                    "sandboxProvider",
+                    "sandboxConnectionId",
+                    "sandboxResources",
                     "integrationBindings"
                   ],
                   "additionalProperties": false
@@ -18214,6 +18331,33 @@
                           "type": "string",
                           "enum": ["ephemeral", "persistent"]
                         },
+                        "sandboxProvider": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "sandboxConnectionId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "sandboxResources": {
+                          "type": ["object", "null"],
+                          "properties": {
+                            "vcpuCount": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "memoryMb": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "storageMb": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "required": ["vcpuCount", "memoryMb"],
+                          "additionalProperties": false
+                        },
                         "isActive": {
                           "type": "boolean"
                         },
@@ -18311,6 +18455,9 @@
                         "version",
                         "state",
                         "defaultPersistenceMode",
+                        "sandboxProvider",
+                        "sandboxConnectionId",
+                        "sandboxResources",
                         "isActive",
                         "usable",
                         "refreshSchedule",
@@ -18551,6 +18698,33 @@
                           "type": "string",
                           "enum": ["ephemeral", "persistent"]
                         },
+                        "sandboxProvider": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "sandboxConnectionId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "sandboxResources": {
+                          "type": ["object", "null"],
+                          "properties": {
+                            "vcpuCount": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "memoryMb": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "storageMb": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "required": ["vcpuCount", "memoryMb"],
+                          "additionalProperties": false
+                        },
                         "isActive": {
                           "type": "boolean"
                         },
@@ -18648,6 +18822,9 @@
                         "version",
                         "state",
                         "defaultPersistenceMode",
+                        "sandboxProvider",
+                        "sandboxConnectionId",
+                        "sandboxResources",
                         "isActive",
                         "usable",
                         "refreshSchedule",
@@ -18888,6 +19065,33 @@
                           "type": "string",
                           "enum": ["ephemeral", "persistent"]
                         },
+                        "sandboxProvider": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "sandboxConnectionId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "sandboxResources": {
+                          "type": ["object", "null"],
+                          "properties": {
+                            "vcpuCount": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "memoryMb": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "storageMb": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "required": ["vcpuCount", "memoryMb"],
+                          "additionalProperties": false
+                        },
                         "isActive": {
                           "type": "boolean"
                         },
@@ -18985,6 +19189,9 @@
                         "version",
                         "state",
                         "defaultPersistenceMode",
+                        "sandboxProvider",
+                        "sandboxConnectionId",
+                        "sandboxResources",
                         "isActive",
                         "usable",
                         "refreshSchedule",

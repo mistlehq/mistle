@@ -31,6 +31,11 @@ const routeHandler = async (
         ...(body.defaultPersistenceMode === undefined
           ? {}
           : { defaultPersistenceMode: body.defaultPersistenceMode }),
+        ...(body.sandboxProvider === undefined ? {} : { sandboxProvider: body.sandboxProvider }),
+        ...(body.sandboxConnectionId === undefined
+          ? {}
+          : { sandboxConnectionId: body.sandboxConnectionId }),
+        ...(body.sandboxResources === undefined ? {} : { sandboxResources: body.sandboxResources }),
         ...(body.integrationBindings === undefined
           ? {}
           : {

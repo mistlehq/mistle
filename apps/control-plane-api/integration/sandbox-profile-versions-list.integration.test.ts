@@ -21,6 +21,12 @@ const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
 
+const EmptySandboxRuntimeConfig = {
+  sandboxConnectionId: null,
+  sandboxProvider: null,
+  sandboxResources: null,
+};
+
 describe.concurrent("sandbox profile versions list integration", () => {
   it("returns profile versions ordered by version descending", async ({ env }) => {
     const session = await env.auth.createSession({
@@ -101,6 +107,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
         version: 3,
         state: SandboxProfileVersionStates.DRAFT,
         defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
+        ...EmptySandboxRuntimeConfig,
         isActive: false,
         usable: false,
         refreshSchedule: null,
@@ -111,6 +118,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
         version: 2,
         state: SandboxProfileVersionStates.PUBLISHED,
         defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
+        ...EmptySandboxRuntimeConfig,
         isActive: true,
         usable: true,
         refreshSchedule: null,
@@ -130,6 +138,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
         defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
+        ...EmptySandboxRuntimeConfig,
         isActive: false,
         usable: false,
         refreshSchedule: null,
@@ -186,6 +195,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
         defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
+        ...EmptySandboxRuntimeConfig,
         isActive: false,
         usable: false,
         refreshSchedule: null,
@@ -249,6 +259,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
         defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
+        ...EmptySandboxRuntimeConfig,
         isActive: false,
         usable: false,
         refreshSchedule: null,

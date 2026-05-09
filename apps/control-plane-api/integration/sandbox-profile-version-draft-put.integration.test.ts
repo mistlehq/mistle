@@ -28,6 +28,12 @@ const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
 
+const EmptySandboxRuntimeConfig = {
+  sandboxConnectionId: null,
+  sandboxProvider: null,
+  sandboxResources: null,
+};
+
 describe.concurrent("sandbox profile version draft put integration", () => {
   it("updates setup script, persistence mode, and integration bindings atomically", async ({
     env,
@@ -137,6 +143,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
       version: 1,
       setupScript: "pnpm install\npnpm dev:bootstrap",
       defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
+      ...EmptySandboxRuntimeConfig,
       integrationBindings: {
         bindings: [
           {

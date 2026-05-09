@@ -51,6 +51,13 @@ const sandboxProfileVersionSnapshotJobStateSchema = z.enum([
   SandboxProfileVersionSnapshotJobStates.SUCCEEDED,
   SandboxProfileVersionSnapshotJobStates.FAILED,
 ]);
+const sandboxProfileVersionResourcesSchema = z
+  .object({
+    vcpuCount: z.number().int().min(1),
+    memoryMb: z.number().int().min(1),
+    storageMb: z.number().int().min(1).optional(),
+  })
+  .strict();
 const sandboxProfileVersionSnapshotJobSummarySchema = z
   .object({
     id: z.string().min(1),
@@ -120,14 +127,19 @@ export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVers
   defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema,
   publishedAt: z.string().min(1).nullable(),
   version: z.number().int().min(1),
+  sandboxProvider: z.string().min(1).nullable(),
+  sandboxConnectionId: z.string().min(1).nullable(),
 })
   .pick({
     sandboxProfileId: true,
     version: true,
     state: true,
     defaultPersistenceMode: true,
+    sandboxProvider: true,
+    sandboxConnectionId: true,
   })
   .extend({
+    sandboxResources: sandboxProfileVersionResourcesSchema.nullable(),
     isActive: z.boolean(),
     usable: z.boolean(),
     refreshSchedule: sandboxProfileVersionRefreshScheduleSummarySchema.nullable(),
@@ -285,6 +297,9 @@ export const putSandboxProfileVersionDraftBodySchema = z
   .object({
     setupScript: z.string().min(1).nullable().optional(),
     defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema.optional(),
+    sandboxProvider: z.string().min(1).optional(),
+    sandboxConnectionId: z.string().min(1).nullable().optional(),
+    sandboxResources: sandboxProfileVersionResourcesSchema.optional(),
     integrationBindings: sandboxProfileVersionIntegrationBindingsWriteBodySchema.optional(),
   })
   .strict()
@@ -292,6 +307,9 @@ export const putSandboxProfileVersionDraftBodySchema = z
     (value) =>
       value.setupScript !== undefined ||
       value.defaultPersistenceMode !== undefined ||
+      value.sandboxProvider !== undefined ||
+      value.sandboxConnectionId !== undefined ||
+      value.sandboxResources !== undefined ||
       value.integrationBindings !== undefined,
     {
       message: "At least one draft field must be provided.",
@@ -304,6 +322,9 @@ export const putSandboxProfileVersionDraftResponseSchema = z
     version: z.number().int().min(1),
     setupScript: z.string().nullable(),
     defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema,
+    sandboxProvider: z.string().min(1).nullable(),
+    sandboxConnectionId: z.string().min(1).nullable(),
+    sandboxResources: sandboxProfileVersionResourcesSchema.nullable(),
     integrationBindings: sandboxProfileVersionIntegrationBindingsResponseSchema,
   })
   .strict();

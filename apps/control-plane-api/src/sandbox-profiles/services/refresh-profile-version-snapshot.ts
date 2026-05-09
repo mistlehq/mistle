@@ -21,6 +21,10 @@ import {
   loadActiveRefreshSchedulesByVersion,
   type ProfileVersionRefreshScheduleSummary,
 } from "./profile-version-refresh-schedule-summary.js";
+import {
+  mapProfileVersionRuntimeConfig,
+  type SandboxProfileVersionResources,
+} from "./profile-version-runtime-config.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type RefreshProfileVersionSnapshotInput = {
@@ -45,6 +49,9 @@ type RefreshProfileVersionSnapshotOutput = {
     version: number;
     state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
     defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
+    sandboxProvider: string | null;
+    sandboxConnectionId: string | null;
+    sandboxResources: SandboxProfileVersionResources | null;
     isActive: boolean;
     usable: boolean;
     refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
@@ -147,6 +154,11 @@ async function queueProfileVersionSnapshot(
           defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
           snapshotImageProvider: tables.sandboxProfileVersions.snapshotImageProvider,
           snapshotImageId: tables.sandboxProfileVersions.snapshotImageId,
+          sandboxProvider: tables.sandboxProfileVersions.sandboxProvider,
+          sandboxConnectionId: tables.sandboxProfileVersions.sandboxConnectionId,
+          sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
+          sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
+          sandboxStorageMb: tables.sandboxProfileVersions.sandboxStorageMb,
         })
         .from(tables.sandboxProfiles)
         .leftJoin(
@@ -180,6 +192,11 @@ async function queueProfileVersionSnapshot(
       const resolvedSandboxProfileId = sandboxProfileVersion.sandboxProfileId;
       const resolvedSandboxProfileVersion = sandboxProfileVersion.version;
       const resolvedDefaultPersistenceMode = sandboxProfileVersion.defaultPersistenceMode;
+      const resolvedSandboxProvider = sandboxProfileVersion.sandboxProvider;
+      const resolvedSandboxConnectionId = sandboxProfileVersion.sandboxConnectionId;
+      const resolvedSandboxVcpuCount = sandboxProfileVersion.sandboxVcpuCount;
+      const resolvedSandboxMemoryMb = sandboxProfileVersion.sandboxMemoryMb;
+      const resolvedSandboxStorageMb = sandboxProfileVersion.sandboxStorageMb;
       if (resolvedSandboxProfileId === null || resolvedSandboxProfileVersion === null) {
         throw new Error("Expected joined sandbox profile version metadata to be present.");
       }
@@ -247,6 +264,13 @@ async function queueProfileVersionSnapshot(
           version: resolvedSandboxProfileVersion,
           state: sandboxProfileVersion.state,
           defaultPersistenceMode: resolvedDefaultPersistenceMode,
+          ...mapProfileVersionRuntimeConfig({
+            sandboxProvider: resolvedSandboxProvider,
+            sandboxConnectionId: resolvedSandboxConnectionId,
+            sandboxVcpuCount: resolvedSandboxVcpuCount,
+            sandboxMemoryMb: resolvedSandboxMemoryMb,
+            sandboxStorageMb: resolvedSandboxStorageMb,
+          }),
           isActive: sandboxProfileVersion.activeVersion === input.profileVersion,
           usable: versionHasUsableSnapshot,
           refreshSchedule: refreshSchedulesByVersion.get(resolvedSandboxProfileVersion) ?? null,

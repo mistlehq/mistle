@@ -17,6 +17,10 @@ import {
   replaceProfileVersionIntegrationBindings,
   validateProfileVersionIntegrationBindings,
 } from "./profile-version-integration-bindings-write.js";
+import {
+  mapProfileVersionRuntimeConfig,
+  type SandboxProfileVersionResources,
+} from "./profile-version-runtime-config.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type PutProfileVersionDraftInput = {
@@ -25,6 +29,9 @@ type PutProfileVersionDraftInput = {
   profileVersion: number;
   setupScript?: string | null;
   defaultPersistenceMode?: SandboxProfileVersionDefaultPersistenceMode;
+  sandboxProvider?: string;
+  sandboxConnectionId?: string | null;
+  sandboxResources?: SandboxProfileVersionResources;
   integrationBindings?: {
     bindings: Array<{
       id?: string;
@@ -41,6 +48,9 @@ type PutProfileVersionDraftOutput = {
   version: number;
   setupScript: string | null;
   defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
+  sandboxProvider: string | null;
+  sandboxConnectionId: string | null;
+  sandboxResources: SandboxProfileVersionResources | null;
   integrationBindings: Awaited<ReturnType<typeof replaceProfileVersionIntegrationBindings>>;
 };
 
@@ -95,7 +105,14 @@ export async function putProfileVersionDraft(
       );
     }
 
-    if (input.setupScript !== undefined || input.defaultPersistenceMode !== undefined) {
+    const hasVersionFieldUpdate =
+      input.setupScript !== undefined ||
+      input.defaultPersistenceMode !== undefined ||
+      input.sandboxProvider !== undefined ||
+      input.sandboxConnectionId !== undefined ||
+      input.sandboxResources !== undefined;
+
+    if (hasVersionFieldUpdate) {
       const [updatedVersion] = await tx
         .update(tables.sandboxProfileVersions)
         .set({
@@ -103,6 +120,19 @@ export async function putProfileVersionDraft(
           ...(input.defaultPersistenceMode === undefined
             ? {}
             : { defaultPersistenceMode: input.defaultPersistenceMode }),
+          ...(input.sandboxProvider === undefined
+            ? {}
+            : { sandboxProvider: input.sandboxProvider }),
+          ...(input.sandboxConnectionId === undefined
+            ? {}
+            : { sandboxConnectionId: input.sandboxConnectionId }),
+          ...(input.sandboxResources === undefined
+            ? {}
+            : {
+                sandboxVcpuCount: input.sandboxResources.vcpuCount,
+                sandboxMemoryMb: input.sandboxResources.memoryMb,
+                sandboxStorageMb: input.sandboxResources.storageMb ?? null,
+              }),
         })
         .where(
           and(
@@ -150,6 +180,11 @@ export async function putProfileVersionDraft(
         version: true,
         setupScript: true,
         defaultPersistenceMode: true,
+        sandboxProvider: true,
+        sandboxConnectionId: true,
+        sandboxVcpuCount: true,
+        sandboxMemoryMb: true,
+        sandboxStorageMb: true,
       },
       where: (table, { and: whereAnd, eq: whereEq }) =>
         whereAnd(
@@ -170,6 +205,7 @@ export async function putProfileVersionDraft(
       version: persistedVersion.version,
       setupScript: persistedVersion.setupScript,
       defaultPersistenceMode: persistedVersion.defaultPersistenceMode,
+      ...mapProfileVersionRuntimeConfig(persistedVersion),
       integrationBindings,
     };
   });

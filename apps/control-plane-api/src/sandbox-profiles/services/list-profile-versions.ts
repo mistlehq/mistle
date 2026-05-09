@@ -11,6 +11,10 @@ import {
   loadActiveRefreshSchedulesByVersion,
   type ProfileVersionRefreshScheduleSummary,
 } from "./profile-version-refresh-schedule-summary.js";
+import {
+  mapProfileVersionRuntimeConfig,
+  type SandboxProfileVersionResources,
+} from "./profile-version-runtime-config.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type ListProfileVersionsInput = {
@@ -24,6 +28,9 @@ type ListProfileVersionsOutput = {
     version: number;
     state: SandboxProfileVersionState;
     defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
+    sandboxProvider: string | null;
+    sandboxConnectionId: string | null;
+    sandboxResources: SandboxProfileVersionResources | null;
     isActive: boolean;
     usable: boolean;
     refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
@@ -68,6 +75,11 @@ export async function listProfileVersions(
       defaultPersistenceMode: true,
       snapshotImageProvider: true,
       snapshotImageId: true,
+      sandboxProvider: true,
+      sandboxConnectionId: true,
+      sandboxVcpuCount: true,
+      sandboxMemoryMb: true,
+      sandboxStorageMb: true,
     },
     where: (table, { eq }) => eq(table.sandboxProfileId, input.profileId),
     orderBy: (table, { desc }) => [desc(table.version)],
@@ -112,6 +124,7 @@ export async function listProfileVersions(
         version: version.version,
         state: version.state,
         defaultPersistenceMode: version.defaultPersistenceMode,
+        ...mapProfileVersionRuntimeConfig(version),
         isActive: version.version === sandboxProfile.activeVersion,
         usable:
           version.state === SandboxProfileVersionStates.PUBLISHED &&

@@ -13,6 +13,10 @@ import {
   SandboxProfilesNotFoundError,
 } from "../errors.js";
 import type { ProfileVersionRefreshScheduleSummary } from "./profile-version-refresh-schedule-summary.js";
+import {
+  mapProfileVersionRuntimeConfig,
+  type SandboxProfileVersionResources,
+} from "./profile-version-runtime-config.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type CreateProfileVersionDraftInput = {
@@ -25,6 +29,9 @@ type CreateProfileVersionDraftOutput = {
   version: number;
   state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
   defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
+  sandboxProvider: string | null;
+  sandboxConnectionId: string | null;
+  sandboxResources: SandboxProfileVersionResources | null;
   isActive: boolean;
   usable: boolean;
   refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
@@ -77,6 +84,11 @@ export async function createProfileVersionDraft(
           version: true,
           setupScript: true,
           defaultPersistenceMode: true,
+          sandboxProvider: true,
+          sandboxConnectionId: true,
+          sandboxVcpuCount: true,
+          sandboxMemoryMb: true,
+          sandboxStorageMb: true,
         },
         where: (table, { eq }) => eq(table.sandboxProfileId, input.profileId),
         orderBy: (table, { desc }) => [desc(table.version)],
@@ -112,12 +124,22 @@ export async function createProfileVersionDraft(
           state: SandboxProfileVersionStates.DRAFT,
           setupScript: latestVersion.setupScript,
           defaultPersistenceMode: latestVersion.defaultPersistenceMode,
+          sandboxProvider: latestVersion.sandboxProvider,
+          sandboxConnectionId: latestVersion.sandboxConnectionId,
+          sandboxVcpuCount: latestVersion.sandboxVcpuCount,
+          sandboxMemoryMb: latestVersion.sandboxMemoryMb,
+          sandboxStorageMb: latestVersion.sandboxStorageMb,
         })
         .returning({
           sandboxProfileId: tables.sandboxProfileVersions.sandboxProfileId,
           version: tables.sandboxProfileVersions.version,
           state: tables.sandboxProfileVersions.state,
           defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
+          sandboxProvider: tables.sandboxProfileVersions.sandboxProvider,
+          sandboxConnectionId: tables.sandboxProfileVersions.sandboxConnectionId,
+          sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
+          sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
+          sandboxStorageMb: tables.sandboxProfileVersions.sandboxStorageMb,
         });
 
       if (createdDraftVersion === undefined) {
@@ -139,7 +161,11 @@ export async function createProfileVersionDraft(
       }
 
       return {
-        ...createdDraftVersion,
+        sandboxProfileId: createdDraftVersion.sandboxProfileId,
+        version: createdDraftVersion.version,
+        state: createdDraftVersion.state,
+        defaultPersistenceMode: createdDraftVersion.defaultPersistenceMode,
+        ...mapProfileVersionRuntimeConfig(createdDraftVersion),
         isActive: false,
         usable: false,
         refreshSchedule: null,

@@ -328,6 +328,19 @@ const SandboxProfileVersionRefreshScheduleSummarySchema = z
   })
   .strict();
 
+const SandboxProfileVersionResourcesSchema = z
+  .object({
+    vcpuCount: z.number().int().min(1),
+    memoryMb: z.number().int().min(1),
+    storageMb: z.number().int().min(1).optional(),
+  })
+  .strict()
+  .transform((value) => ({
+    vcpuCount: value.vcpuCount,
+    memoryMb: value.memoryMb,
+    ...(value.storageMb === undefined ? {} : { storageMb: value.storageMb }),
+  }));
+
 const SandboxProfileVersionSchema = z
   .object({
     defaultPersistenceMode: z.enum(["ephemeral", "persistent"]),
@@ -346,7 +359,10 @@ const SandboxProfileVersionSchema = z
       .strict()
       .nullable(),
     refreshSchedule: SandboxProfileVersionRefreshScheduleSummarySchema.nullable(),
+    sandboxConnectionId: z.string().min(1).nullable(),
     sandboxProfileId: z.string().min(1),
+    sandboxProvider: z.string().min(1).nullable(),
+    sandboxResources: SandboxProfileVersionResourcesSchema.nullable(),
     state: z.enum(["draft", "published"]),
     usable: z.boolean(),
     version: z.number().int().min(1),
@@ -466,6 +482,9 @@ const PutSandboxProfileVersionDraftResultSchema = z
     version: z.number().int().min(1),
     setupScript: z.string().nullable(),
     defaultPersistenceMode: z.enum(["ephemeral", "persistent"]),
+    sandboxConnectionId: z.string().min(1).nullable(),
+    sandboxProvider: z.string().min(1).nullable(),
+    sandboxResources: SandboxProfileVersionResourcesSchema.nullable(),
     integrationBindings: SandboxProfileVersionIntegrationBindingsResponseSchema,
   })
   .strict();
@@ -1038,6 +1057,13 @@ export async function putSandboxProfileVersionDraft(
         ...(input.defaultPersistenceMode === undefined
           ? {}
           : { defaultPersistenceMode: input.defaultPersistenceMode }),
+        ...(input.sandboxProvider === undefined ? {} : { sandboxProvider: input.sandboxProvider }),
+        ...(input.sandboxConnectionId === undefined
+          ? {}
+          : { sandboxConnectionId: input.sandboxConnectionId }),
+        ...(input.sandboxResources === undefined
+          ? {}
+          : { sandboxResources: input.sandboxResources }),
         ...(input.integrationBindings === undefined
           ? {}
           : { integrationBindings: input.integrationBindings }),

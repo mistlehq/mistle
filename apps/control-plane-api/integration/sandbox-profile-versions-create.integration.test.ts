@@ -28,6 +28,12 @@ const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
 
+const EmptySandboxRuntimeConfig = {
+  sandboxConnectionId: null,
+  sandboxProvider: null,
+  sandboxResources: null,
+};
+
 describe.concurrent("sandbox profile versions create integration", () => {
   it("creates the next draft version by cloning the latest version content", async ({ env }) => {
     const session = await env.auth.createSession({
@@ -147,6 +153,7 @@ describe.concurrent("sandbox profile versions create integration", () => {
       version: 3,
       state: SandboxProfileVersionStates.DRAFT,
       defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
+      ...EmptySandboxRuntimeConfig,
       isActive: false,
       usable: false,
       refreshSchedule: null,
