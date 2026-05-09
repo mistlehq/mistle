@@ -6,7 +6,10 @@ import { once } from "node:events";
 import { createServer } from "node:http";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
 
-import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import {
+  IntegrationConnectionMethodIds,
+  IntegrationWebhookTriggerCapabilitiesProviderMetadataKey,
+} from "@mistle/integrations-core";
 import { reserveAvailablePort } from "@mistle/test-harness";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
@@ -156,6 +159,110 @@ describe.concurrent("GitHub App setup completion integration connections", () =>
           where: (table, { eq }) => eq(table.state, state),
         });
       expect(redirectSession?.usedAt).not.toBeNull();
+    } finally {
+      await githubApi.stop();
+    }
+  });
+
+  it("refreshes GitHub webhook trigger capabilities from the verified installation", async ({
+    env,
+  }) => {
+    const targetKey = "github-cloud-installation-trigger-capabilities-refresh";
+    const githubApi = await startGitHubApiServer({
+      // GitHub's installation response includes `events` and `permissions`;
+      // those are the provider source of truth for webhook trigger capability refresh.
+      // https://docs.github.com/en/rest/apps/apps#get-an-installation-for-the-authenticated-app
+      responseBody: {
+        id: 12345,
+        app_id: 123,
+        app_slug: "mistle-github-app",
+        events: ["issues", "pull_request"],
+        permissions: {
+          issues: "read",
+          metadata: "read",
+          pull_requests: "write",
+        },
+      },
+    });
+
+    try {
+      await seedGitHubCloudTarget(env, {
+        targetKey,
+        apiBaseUrl: githubApi.baseUrl,
+      });
+      const session = await env.auth.createSession({
+        email: "integration-github-app-trigger-capabilities-refresh@example.com",
+      });
+      const connectionId = await createGitHubAppConnection(env, {
+        targetKey,
+        cookie: session.cookie,
+        displayName: "GitHub Prod",
+      });
+      const state = await startGitHubAppInstallation(env, {
+        cookie: session.cookie,
+        connectionId,
+      });
+
+      const completeResponse = await env.controlPlaneApi.http.fetch(
+        createGitHubAppInstallationCompletePath({
+          state,
+          installationId: "12345",
+        }),
+        {
+          method: "GET",
+          redirect: "manual",
+        },
+      );
+      expect(completeResponse.status).toBe(302);
+
+      const refreshResponse = await env.controlPlaneApi.http.fetch(
+        `/v1/integration/connections/${encodeURIComponent(
+          connectionId,
+        )}/webhook-sources/trigger-capabilities/refresh`,
+        {
+          method: "POST",
+          headers: {
+            cookie: session.cookie,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({}),
+        },
+      );
+
+      expect(refreshResponse.status).toBe(200);
+      const webhookSource = await env.controlPlaneDb.query.integrationWebhookSources.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.organizationId, session.organizationId),
+            eq(table.integrationConnectionId, connectionId),
+          ),
+      });
+      if (webhookSource === undefined) {
+        throw new Error("Expected GitHub App webhook source.");
+      }
+      expect(webhookSource.providerMetadata).toEqual({
+        [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+          events: ["issues", "pull_request"],
+          permissions: [
+            { permission: "issues", access: "read" },
+            { permission: "metadata", access: "read" },
+            { permission: "pull_requests", access: "write" },
+            { permission: "pull_requests", access: "read" },
+          ],
+        },
+      });
+      expect(githubApi.requests).toEqual([
+        {
+          authorization: expect.stringMatching(/^Bearer [^.]+\.[^.]+\.[^.]+$/u),
+          method: "GET",
+          pathname: "/app/installations/12345",
+        },
+        {
+          authorization: expect.stringMatching(/^Bearer [^.]+\.[^.]+\.[^.]+$/u),
+          method: "GET",
+          pathname: "/app/installations/12345",
+        },
+      ]);
     } finally {
       await githubApi.stop();
     }

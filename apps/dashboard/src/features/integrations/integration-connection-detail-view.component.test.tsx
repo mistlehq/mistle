@@ -1477,7 +1477,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(createdConnectionId).toBe("icn_jira_empty");
   });
 
-  it("hides the standalone webhook section for GitHub App connections", () => {
+  it("renders the standalone webhook section for GitHub App connections", () => {
     let startedGitHubAppInstallationConnectionId: string | null = null;
 
     render(
@@ -1496,7 +1496,6 @@ describe("IntegrationConnectionDetailView", () => {
               actionLabel: "Install GitHub App",
               description: "Set the URLs below in your Github App settings, then install the app",
               fields: [{ label: "Installation", value: "Pending" }],
-              hideWebhookSourceSection: true,
               includeWebhookCallbackUrl: true,
               postInstallationSetupUrl:
                 "http://localhost:5100/p/integration/callbacks/setup/github-app-installation",
@@ -1568,12 +1567,12 @@ describe("IntegrationConnectionDetailView", () => {
       screen.getAllByText(
         "https://control-plane.example.com/p/integration/webhooks/github-cloud/ep_github_123",
       ),
-    ).toHaveLength(1);
-    expect(screen.queryByText("Webhook")).toBeNull();
+    ).toHaveLength(2);
+    expect(screen.getByText("Webhook")).toBeTruthy();
     expect(screen.queryByText("GitHub App webhook")).toBeNull();
-    expect(screen.queryByText("Status")).toBeNull();
-    expect(screen.queryByText("Active")).toBeNull();
-    expect(screen.queryByText("Webhook URL")).toBeNull();
+    expect(screen.getByText("Status")).toBeTruthy();
+    expect(screen.getByText("Active")).toBeTruthy();
+    expect(screen.getByText("Webhook URL")).toBeTruthy();
     expect(
       screen.queryByRole("button", { name: "Delete webhook source GitHub App webhook" }),
     ).toBeNull();
@@ -1643,7 +1642,6 @@ describe("IntegrationConnectionDetailView", () => {
               actionLabel: "Install GitHub App",
               description: "Set the URLs below in your Github App settings, then install the app",
               fields: [{ label: "Installation", value: "Pending" }],
-              hideWebhookSourceSection: true,
               includeWebhookCallbackUrl: true,
               postInstallationSetupUrl:
                 "http://localhost:5100/p/integration/callbacks/setup/github-app-installation",
@@ -1675,10 +1673,11 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.getByRole("status", { name: "Loading Webhook callback URL" })).toBeTruthy();
     expect(screen.getByText("Loading…")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Copy Webhook callback URL" })).toBeNull();
-    expect(screen.queryByText("Webhook")).toBeNull();
+    expect(screen.getByText("Webhook")).toBeTruthy();
+    expect(screen.getByText("Loading webhook sources...")).toBeTruthy();
   });
 
-  it("hides the standalone webhook section for installed GitHub App connections", () => {
+  it("renders the standalone webhook section for installed GitHub App connections", () => {
     render(
       <IntegrationConnectionDetailView
         connections={[
@@ -1694,7 +1693,6 @@ describe("IntegrationConnectionDetailView", () => {
             installation: {
               actionLabel: "Manage installation",
               fields: [{ label: "Installation", value: "116007157" }],
-              hideWebhookSourceSection: true,
               includeWebhookCallbackUrl: true,
             },
           },
@@ -1738,8 +1736,8 @@ describe("IntegrationConnectionDetailView", () => {
     );
 
     expect(screen.queryByRole("button", { name: "Create webhook" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Copy Webhook URL" })).toBeNull();
-    expect(screen.queryByText("Webhook")).toBeNull();
+    expect(screen.getByRole("button", { name: "Copy Webhook URL" })).toBeTruthy();
+    expect(screen.getByText("Webhook")).toBeTruthy();
     expect(screen.getByText("Webhook callback URL")).toBeTruthy();
   });
 });

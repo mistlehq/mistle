@@ -108,7 +108,6 @@ export const GitHubCloudBaseDefinition: GitHubCloudBaseIntegrationDefinition = {
               },
             },
           ],
-          hideWebhookSourceSection: true,
           includeWebhookCallbackUrl: true,
           postInstallationSetupPath: GitHubAppInstallationSetupPath,
         },

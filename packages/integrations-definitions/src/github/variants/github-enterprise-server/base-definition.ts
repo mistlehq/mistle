@@ -106,7 +106,6 @@ export const GitHubEnterpriseServerBaseDefinition: GitHubEnterpriseServerBaseInt
                 },
               },
             ],
-            hideWebhookSourceSection: true,
             includeWebhookCallbackUrl: true,
             postInstallationSetupPath: GitHubAppInstallationSetupPath,
           },

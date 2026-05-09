@@ -867,6 +867,12 @@ export async function refreshIntegrationWebhookSourceTriggerCapabilities(
     connectionId: connection.id,
     targetKey: connection.targetKey,
   });
+  const connectionSecrets = await resolveConnectionSecretsOrThrow({
+    db: ctx.db,
+    integrationRegistry: ctx.integrationRegistry,
+    connection,
+    integrationsConfig: ctx.integrationsConfig,
+  });
 
   let refreshResult;
   try {
@@ -889,6 +895,7 @@ export async function refreshIntegrationWebhookSourceTriggerCapabilities(
           config: connection.config,
         }),
       },
+      connectionSecrets,
       source: {
         id: source.id,
         targetKey: source.targetKey,

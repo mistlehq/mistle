@@ -60,7 +60,6 @@ const GitHubAppInstallationMethod = {
           },
         },
       ],
-      hideWebhookSourceSection: true,
       includeWebhookCallbackUrl: true,
       postInstallationSetupPath: "/p/integration/callbacks/setup/github-app-installation",
     },
@@ -378,7 +377,6 @@ describe("integrations page view model", () => {
           value: "mistle-labs",
         },
       ],
-      hideWebhookSourceSection: true,
       includeWebhookCallbackUrl: true,
       postInstallationSetupUrl:
         "https://control-plane.example.com/p/integration/callbacks/setup/github-app-installation",

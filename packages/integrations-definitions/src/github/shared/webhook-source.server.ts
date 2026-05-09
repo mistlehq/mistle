@@ -1,16 +1,124 @@
 import {
   IntegrationConnectionMethodIds,
+  IntegrationWebhookTriggerCapabilitiesProviderMetadataKey,
   IntegrationWebhookSourceLifecycles,
   type IntegrationWebhookSourceCapability,
+  type IntegrationWebhookTriggerProviderPermissionRequirement,
 } from "@mistle/integrations-core";
+import { createAppAuth } from "@octokit/auth-app";
+import { request } from "@octokit/request";
+import { z } from "zod";
 
 import { buildIntegrationWebhookCallbackUrl } from "../../shared/webhook-callback-url.server.js";
 import type { GitHubConnectionConfig } from "./auth.js";
+import { parseGitHubAppInstallationConnectionConfig } from "./auth.js";
 import type { GitHubTargetConfig } from "./target-config-schema.js";
 import type { GitHubTargetSecrets } from "./target-secret-schema.js";
 
+const GitHubWebhookTriggerCapabilitiesRefreshBodySchema = z.object({}).strict();
+
+const GitHubAppInstallationTriggerCapabilitiesResponseSchema = z
+  .object({
+    app_id: z.union([z.string().min(1), z.number().int().nonnegative()]),
+    app_slug: z.string().min(1),
+    events: z.array(z.string().min(1)),
+    id: z.union([z.string().min(1), z.number().int().nonnegative()]),
+    permissions: z.record(z.string().min(1), z.string().min(1)),
+  })
+  .loose();
+
 function isGitHubAppInstallationConnection(connection: GitHubConnectionConfig): boolean {
   return connection.connection_method === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION;
+}
+
+function expandGitHubPermissionCapability(input: {
+  access: string;
+  permission: string;
+}): readonly IntegrationWebhookTriggerProviderPermissionRequirement[] {
+  if (input.access === "admin") {
+    return [
+      { permission: input.permission, access: "admin" },
+      { permission: input.permission, access: "write" },
+      { permission: input.permission, access: "read" },
+    ];
+  }
+
+  if (input.access === "write") {
+    return [
+      { permission: input.permission, access: "write" },
+      { permission: input.permission, access: "read" },
+    ];
+  }
+
+  return [{ permission: input.permission, access: input.access }];
+}
+
+async function loadGitHubAppInstallationTriggerCapabilities(input: {
+  apiBaseUrl: string;
+  appId: string;
+  appPrivateKeyPem: string;
+  appSlug: string;
+  installationId: string;
+}): Promise<Record<string, unknown>> {
+  const numericInstallationId = Number(input.installationId);
+  if (!Number.isInteger(numericInstallationId) || numericInstallationId <= 0) {
+    throw new Error("GitHub App connection is missing a numeric installation_id.");
+  }
+
+  const appAuth = createAppAuth({
+    appId: input.appId,
+    privateKey: input.appPrivateKeyPem,
+    request: request.defaults({
+      baseUrl: input.apiBaseUrl,
+    }),
+  });
+  const authentication = await appAuth({ type: "app" });
+
+  let responseJson: unknown;
+  try {
+    const response = await request("GET /app/installations/{installation_id}", {
+      baseUrl: input.apiBaseUrl,
+      installation_id: numericInstallationId,
+      headers: {
+        accept: "application/vnd.github+json",
+        authorization: `Bearer ${authentication.token}`,
+        "x-github-api-version": "2022-11-28",
+      },
+    });
+    responseJson = response.data;
+  } catch (error) {
+    throw new Error(
+      `GitHub App installation '${input.installationId}' trigger capabilities could not be refreshed: ${
+        error instanceof Error ? error.message : "GitHub API request failed."
+      }`,
+    );
+  }
+
+  const installation = GitHubAppInstallationTriggerCapabilitiesResponseSchema.parse(responseJson);
+  if (installation.id.toString() !== input.installationId) {
+    throw new Error(
+      `GitHub App installation refresh returned installation '${installation.id.toString()}', expected '${input.installationId}'.`,
+    );
+  }
+  if (installation.app_id.toString() !== input.appId) {
+    throw new Error(
+      `GitHub App installation '${input.installationId}' belongs to app '${installation.app_id.toString()}', expected '${input.appId}'.`,
+    );
+  }
+  if (installation.app_slug !== input.appSlug) {
+    throw new Error(
+      `GitHub App installation '${input.installationId}' belongs to app slug '${installation.app_slug}', expected '${input.appSlug}'.`,
+    );
+  }
+
+  return {
+    [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+      events: installation.events,
+      permissions: Object.entries(installation.permissions).flatMap(([permission, access]) =>
+        expandGitHubPermissionCapability({ permission, access }),
+      ),
+    },
+  };
 }
 
 export const GitHubWebhookSourceCapability: IntegrationWebhookSourceCapability<
@@ -36,6 +144,34 @@ export const GitHubWebhookSourceCapability: IntegrationWebhookSourceCapability<
         endpointKey,
       }),
       providerMetadata: input.source.providerMetadata,
+    };
+  },
+  async refreshTriggerCapabilities(input) {
+    GitHubWebhookTriggerCapabilitiesRefreshBodySchema.parse(input.body);
+
+    const connectionConfig = parseGitHubAppInstallationConnectionConfig(input.connection.config);
+    const installationId = connectionConfig.installation_id;
+    if (installationId === undefined || installationId.trim().length === 0) {
+      throw new Error(
+        `Integration connection '${input.connection.id}' is missing installation_id.`,
+      );
+    }
+
+    const appPrivateKeyPem = input.connectionSecrets?.["appPrivateKeyPem"];
+    if (appPrivateKeyPem === undefined || appPrivateKeyPem.trim().length === 0) {
+      throw new Error(
+        `Integration connection '${input.connection.id}' is missing GitHub App private key.`,
+      );
+    }
+
+    return {
+      providerMetadata: await loadGitHubAppInstallationTriggerCapabilities({
+        apiBaseUrl: input.target.config.apiBaseUrl,
+        appId: connectionConfig.app_id,
+        appPrivateKeyPem,
+        appSlug: connectionConfig.app_slug,
+        installationId: installationId.trim(),
+      }),
     };
   },
 };

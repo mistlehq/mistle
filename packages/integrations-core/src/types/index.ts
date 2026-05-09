@@ -2149,6 +2149,7 @@ export type IntegrationWebhookSourceTriggerCapabilitiesRefreshInput<
   connection: IntegrationConnection & {
     config: TConnectionConfig;
   };
+  connectionSecrets?: Record<string, string> | undefined;
   source: IntegrationWebhookSource;
   body: unknown;
 };
