@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
 import { JiraConnectionMethodIds } from "@mistle/integrations-definitions/jira";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
@@ -263,13 +264,13 @@ describe("IntegrationConnectionEditorPage", () => {
     renderEditorPage({
       editor: createUpdateFormEditor({
         connectionConfig: {
-          connection_method: "slack-bot-token",
+          connection_method: SlackConnectionMethodId,
         },
         currentConnectionConfig: {
-          connection_method: "slack-bot-token",
+          connection_method: SlackConnectionMethodId,
         },
         currentMethod: {
-          id: "slack-bot-token",
+          id: SlackConnectionMethodId,
           label: "Slack app",
           kind: "form",
           secretFields: [
@@ -292,7 +293,7 @@ describe("IntegrationConnectionEditorPage", () => {
         targetVariantId: "slack-default",
       }),
       connectionDisplayNameValue: "Existing Slack connection",
-      methodId: "slack-bot-token",
+      methodId: SlackConnectionMethodId,
     });
 
     expect(screen.getByLabelText("Client secret (Linked User Auth)")).toBeTruthy();
@@ -779,10 +780,10 @@ describe("IntegrationConnectionEditorPage", () => {
       mode: "update",
       connectionId: "icn_slack",
       currentConnectionConfig: {
-        connection_method: "slack-bot-token",
+        connection_method: SlackConnectionMethodId,
       },
       currentMethod: {
-        id: "slack-bot-token",
+        id: SlackConnectionMethodId,
         label: "Slack app",
         kind: "form",
         secretFields: [],
@@ -798,9 +799,9 @@ describe("IntegrationConnectionEditorPage", () => {
 
     const configForm = resolveConnectionMethodFormUiModel({
       editor,
-      methodId: "slack-bot-token",
+      methodId: SlackConnectionMethodId,
       currentValue: {
-        connection_method: "slack-bot-token",
+        connection_method: SlackConnectionMethodId,
       },
     });
 
