@@ -13,6 +13,7 @@ import { LinearDefinition } from "./linear/variants/linear-default/definition.js
 import { OpenAiApiKeyDefinition } from "./openai/variants/openai-default/definition.js";
 import { PlanetScaleMcpBaseDefinition } from "./planetscale/variants/planetscale-mcp/base-definition.js";
 import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
+import { E2BSandboxRuntimeDefinition } from "./sandbox-runtimes/index.js";
 import { SignozMcpBaseDefinition } from "./signoz/variants/signoz-mcp/base-definition.js";
 import { SlackBaseDefinition } from "./slack/variants/slack-default/base-definition.js";
 export const AwsBrowserDefinition = AwsBaseDefinition;
@@ -22,6 +23,7 @@ export const GitHubEnterpriseServerBrowserDefinition = GitHubEnterpriseServerBas
 export const JiraBrowserDefinition = JiraBaseDefinition;
 export const LinearBrowserDefinition = LinearDefinition;
 export const PlanetScaleBrowserDefinition = PlanetScaleMcpBaseDefinition;
+export const E2BSandboxRuntimeBrowserDefinition = E2BSandboxRuntimeDefinition;
 export const SignozBrowserDefinition = SignozMcpBaseDefinition;
 export const SlackBrowserDefinition = SlackBaseDefinition;
 
@@ -34,6 +36,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   LinearBrowserDefinition,
   OpenAiApiKeyDefinition,
   PlanetScaleBrowserDefinition,
+  E2BSandboxRuntimeBrowserDefinition,
   SignozBrowserDefinition,
   SlackBrowserDefinition,
 ];
@@ -58,4 +61,5 @@ export function createBrowserDefinitionsBundle(): IntegrationDefinitionsBundle {
 export * from "./datadog/index.js";
 export * from "./github/browser.js";
 export * from "./jira/browser.js";
+export * from "./sandbox-runtimes/index.js";
 export * from "./slack/browser.js";

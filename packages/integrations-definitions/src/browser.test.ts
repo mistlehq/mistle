@@ -4,6 +4,7 @@ import {
   AwsBrowserDefinition,
   createBrowserDefinitionsBundle,
   DatadogBrowserDefinition,
+  E2BSandboxRuntimeBrowserDefinition,
   GitHubCloudBrowserDefinition,
   JiraBrowserDefinition,
   SignozBrowserDefinition,
@@ -68,5 +69,21 @@ describe("browser definitions", () => {
 
   it("keeps signoz browser definitions free of server-only OAuth handlers", () => {
     expect(SignozBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+  });
+
+  it("registers E2B sandbox runtime in the browser-safe definitions bundle", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: E2BSandboxRuntimeBrowserDefinition.familyId,
+      variantId: E2BSandboxRuntimeBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "e2b",
+      variantId: "e2b-default",
+      kind: "sandbox",
+      sandboxRuntime: {
+        providerId: "e2b",
+      },
+    });
   });
 });

@@ -67,6 +67,12 @@
       "import": "./src/forms/index.ts",
       "default": "./src/forms/index.ts"
     },
+    "./sandbox-runtimes": {
+      "types": "./src/sandbox-runtimes/index.ts",
+      "node": "./dist/sandbox-runtimes/index.js",
+      "import": "./src/sandbox-runtimes/index.ts",
+      "default": "./src/sandbox-runtimes/index.ts"
+    },
     "./browser": {
       "types": "./src/browser.ts",
       "node": "./dist/browser.js",

@@ -19,6 +19,25 @@ export const IntegrationKinds: {
   SANDBOX: "sandbox",
 };
 
+export type SandboxRuntimeResourceField = {
+  min: number;
+  max: number;
+  step: number;
+  default: number;
+};
+
+export type SandboxRuntimeResourceCapabilities = {
+  vcpuCount: SandboxRuntimeResourceField;
+  memoryMb: SandboxRuntimeResourceField;
+  storageMb?: SandboxRuntimeResourceField;
+};
+
+export type IntegrationSandboxRuntimeDefinition = {
+  providerId: string;
+  displayName: string;
+  resourceCapabilities: SandboxRuntimeResourceCapabilities;
+};
+
 export type IntegrationConnectionMethodId = string;
 
 export const IntegrationConnectionMethodIds: {
@@ -2227,6 +2246,7 @@ export type IntegrationDefinition<
   displayName: string;
   description?: string;
   logoKey: string;
+  sandboxRuntime?: IntegrationSandboxRuntimeDefinition;
   targetConfigSchema: TTargetConfigSchema;
   targetConfigForm?: IntegrationFormDefinition<
     ParsedSchemaOutput<TTargetConfigSchema>,

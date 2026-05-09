@@ -25,6 +25,10 @@ describe("integrations-definitions server", () => {
       familyId: "github",
       variantId: "github-cloud",
     });
+    const e2bSandboxRuntimeDefinition = registry.getDefinition({
+      familyId: "e2b",
+      variantId: "e2b-default",
+    });
     const githubEnterpriseServerDefinition = registry.getDefinition({
       familyId: "github",
       variantId: "github-enterprise-server",
@@ -72,6 +76,14 @@ describe("integrations-definitions server", () => {
       githubEnterpriseServerDefinition?.credentialResolvers?.custom?.github_app_installation_token,
     ).toBeDefined();
     expect(awsDefinition?.credentialResolvers?.custom?.["assume-role-session"]).toBeDefined();
+    expect(e2bSandboxRuntimeDefinition).toMatchObject({
+      familyId: "e2b",
+      variantId: "e2b-default",
+      kind: "sandbox",
+      sandboxRuntime: {
+        providerId: "e2b",
+      },
+    });
     expect(awsDefinition?.webhookHandler).toBeUndefined();
     expect(awsDefinition?.webhookSource).toBeUndefined();
     expect(githubEnterpriseServerDefinition?.resourceDefinitions).toEqual(
@@ -137,7 +149,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(10);
+    expect(definitions).toHaveLength(11);
   });
 
   it("builds the server definitions bundle with an agent runtime registry", () => {

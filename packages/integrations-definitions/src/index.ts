@@ -12,6 +12,7 @@ import { LinearDefinition } from "./linear/index.js";
 import { OpenAiApiKeyDefinition } from "./openai/index.js";
 import { PlanetScaleDefinition } from "./planetscale/browser.js";
 import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
+import { E2BSandboxRuntimeDefinition } from "./sandbox-runtimes/index.js";
 import { SignozDefinition } from "./signoz/browser.js";
 import { SlackDefinition } from "./slack/browser.js";
 
@@ -23,6 +24,7 @@ export * from "./github/browser.js";
 export * from "./linear/index.js";
 export * from "./openai/index.js";
 export * from "./planetscale/browser.js";
+export * from "./sandbox-runtimes/index.js";
 export * from "./signoz/browser.js";
 export * from "./slack/browser.js";
 export * from "./forms/index.js";
@@ -37,6 +39,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   LinearDefinition,
   OpenAiApiKeyDefinition,
   PlanetScaleDefinition,
+  E2BSandboxRuntimeDefinition,
   SignozDefinition,
   SlackDefinition,
 ];

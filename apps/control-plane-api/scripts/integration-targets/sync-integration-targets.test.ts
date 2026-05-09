@@ -24,6 +24,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "e2b-default",
+        familyId: "e2b",
+        variantId: "e2b-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "github-cloud",
         familyId: "github",
         variantId: "github-cloud",

@@ -29,6 +29,10 @@ describe("integrations-definitions index", () => {
       familyId: "github",
       variantId: "github-cloud",
     });
+    const e2bSandboxRuntimeDefinition = registry.getDefinition({
+      familyId: "e2b",
+      variantId: "e2b-default",
+    });
     const githubEnterpriseServerDefinition = registry.getDefinition({
       familyId: "github",
       variantId: "github-enterprise-server",
@@ -168,6 +172,45 @@ describe("integrations-definitions index", () => {
     );
     expect(openAiDefinition?.displayName).toBe("OpenAI");
     expect(openAiDefinition?.kind).toBe("agent");
+    expect(e2bSandboxRuntimeDefinition).toMatchObject({
+      familyId: "e2b",
+      variantId: "e2b-default",
+      kind: "sandbox",
+      displayName: "E2B",
+      sandboxRuntime: {
+        providerId: "e2b",
+        displayName: "E2B",
+        resourceCapabilities: {
+          vcpuCount: {
+            min: 1,
+            max: 8,
+            step: 1,
+            default: 2,
+          },
+          memoryMb: {
+            min: 1024,
+            max: 8192,
+            step: 1024,
+            default: 4096,
+          },
+        },
+      },
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "API key",
+          kind: "form",
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "API key",
+              inputType: "password",
+              slotKey: "e2b.e2b-default.api-key.api-key",
+            },
+          ],
+        },
+      ],
+    });
     expect(planetscaleDefinition).toMatchObject({
       familyId: "planetscale",
       variantId: "planetscale-mcp",
@@ -434,7 +477,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(10);
+    expect(definitions).toHaveLength(11);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -446,6 +489,7 @@ describe("integrations-definitions index", () => {
       "linear::linear-default",
       "openai::openai-default",
       "planetscale::planetscale-mcp",
+      "e2b::e2b-default",
       "signoz::signoz-mcp",
       "slack::slack-default",
     ]);

@@ -19,6 +19,11 @@
       "config": {}
     },
     {
+      "targetKey": "e2b-default",
+      "enabled": false,
+      "config": {}
+    },
+    {
       "targetKey": "jira-default",
       "enabled": true,
       "config": {}
