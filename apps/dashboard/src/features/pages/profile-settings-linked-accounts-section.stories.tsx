@@ -14,7 +14,7 @@ import {
 } from "./profile-settings-page-view.story-fixtures.js";
 
 const meta = {
-  title: "Dashboard/Settings/Profile/Linked Accounts",
+  title: "Dashboard/Settings/My Profile/Linked Accounts",
   component: ProfileSettingsLinkedAccountsSection,
   decorators: [withDashboardPageStory],
   render: (args) => <ProfileSettingsLinkedAccountsSection {...args} />,

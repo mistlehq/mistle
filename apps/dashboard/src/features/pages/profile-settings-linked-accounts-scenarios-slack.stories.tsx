@@ -14,7 +14,7 @@ import {
 } from "./profile-settings-page-view.story-fixtures.js";
 
 const meta = {
-  title: "Dashboard/Settings/Profile/Linked Accounts/Scenarios/Slack",
+  title: "Dashboard/Settings/My Profile/Linked Accounts/Scenarios/Slack",
   component: ProfileSettingsLinkedAccountsSection,
   decorators: [withDashboardPageStory],
   render: (args) => <ProfileSettingsLinkedAccountsSection {...args} />,

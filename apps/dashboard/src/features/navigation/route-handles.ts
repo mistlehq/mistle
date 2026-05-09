@@ -297,8 +297,8 @@ export const ROUTE_HANDLES = {
   },
   settingsProfile: {
     sidebarTriggerOwner: "page-frame",
-    breadcrumb: "Profile",
-    title: "Profile",
+    breadcrumb: "My Profile",
+    title: "My Profile",
     description: "",
   },
   settingsOrganization: {

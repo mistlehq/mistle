@@ -8,7 +8,7 @@ import {
 import { DefaultProfileSettingsUserSectionProps } from "./profile-settings-page-view.story-fixtures.js";
 
 const meta = {
-  title: "Dashboard/Settings/Profile/User",
+  title: "Dashboard/Settings/My Profile/User",
   component: ProfileSettingsUserSection,
   decorators: [withDashboardPageStory],
   render: (args) => <ProfileSettingsUserSection {...args} />,

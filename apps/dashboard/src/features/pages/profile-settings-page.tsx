@@ -60,7 +60,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
   const [pendingLinkedAccountProviderFamilyCounts, setPendingLinkedAccountProviderFamilyCounts] =
     useState<Record<string, number>>({});
   const [callbackNotice, setCallbackNotice] = useState<LinkedAccountCallbackNotice | null>(null);
-  const { title, description } = resolvePageFrameText(pageMeta, "Profile");
+  const { title, description } = resolvePageFrameText(pageMeta, "My Profile");
   const profileImageQuery = useQuery({
     queryKey: PROFILE_IMAGE_QUERY_KEY,
     queryFn: getProfileImage,

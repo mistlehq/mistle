@@ -55,7 +55,7 @@ describe("app-breadcrumbs", () => {
             >
               <Route
                 element={<BreadcrumbHarness />}
-                handle={{ breadcrumb: "Profile" }}
+                handle={{ breadcrumb: "My Profile" }}
                 path="profile"
               />
             </Route>
@@ -73,7 +73,7 @@ describe("app-breadcrumbs", () => {
     expect(markup).not.toContain('href="/settings/account"');
     expectMarkupToContainAriaLabel(markup, "Settings (not navigable)");
     expectMarkupToContainAriaLabel(markup, "Account (not navigable)");
-    expectMarkupToContainCurrentPageLabel(markup, "Profile");
+    expectMarkupToContainCurrentPageLabel(markup, "My Profile");
     expect((markup.match(/aria-current="page"/g) ?? []).length).toBe(1);
   });
 

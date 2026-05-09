@@ -191,7 +191,7 @@ describe("app routing breadcrumb integration", () => {
     let markup = renderRoutingMarkup(router);
 
     expectMarkupNotToContainBreadcrumbs(markup);
-    expectMarkupToContainMetaTitle(markup, "Profile");
+    expectMarkupToContainMetaTitle(markup, "My Profile");
     expectMarkupToContainEmptyMetaDescription(markup);
 
     await router.navigate("/settings/organization/members");

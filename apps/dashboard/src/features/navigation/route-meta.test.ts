@@ -27,7 +27,7 @@ describe("route breadcrumb metadata", () => {
       },
       {
         handle: {
-          breadcrumb: "Profile",
+          breadcrumb: "My Profile",
         },
         params: {},
         pathname: "/settings/account/profile",
@@ -47,7 +47,7 @@ describe("route breadcrumb metadata", () => {
       },
       {
         isCurrent: true,
-        label: "Profile",
+        label: "My Profile",
         to: null,
       },
     ]);
