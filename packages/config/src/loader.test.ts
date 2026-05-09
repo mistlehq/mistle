@@ -38,6 +38,7 @@ function buildControlPlaneApiServiceEnv(): NodeJS.ProcessEnv {
     MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET: "publish-access-secret",
     MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_ISSUER: "mistle",
     MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_AUDIENCE: "sandbox-publish",
+    MISTLE_SANDBOX_PROVIDER: "docker",
     MISTLE_SANDBOX_DEFAULT_BASE_IMAGE: "ghcr.io/mistlehq/sandbox-base:test",
     MISTLE_SANDBOX_TOKENS_BOOTSTRAP_SECRET: "bootstrap-secret",
     MISTLE_SANDBOX_TOKENS_BOOTSTRAP_ISSUER: "mistle",

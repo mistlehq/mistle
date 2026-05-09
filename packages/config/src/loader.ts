@@ -470,6 +470,7 @@ const ControlPlaneApiEnvDescriptors = [
     path: ["portAccess", "access", "tokenAudience"],
   },
   { envVar: "MISTLE_SANDBOX_DEFAULT_BASE_IMAGE", path: ["sandbox", "defaultBaseImage"] },
+  { envVar: "MISTLE_SANDBOX_PROVIDER", path: ["sandbox", "provider"] },
   {
     envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL",
     path: ["sandbox", "gatewayWsUrl"],

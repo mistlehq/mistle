@@ -32,6 +32,7 @@ import { createOrganizationRoutes } from "./organizations/index.js";
 import { createPublicSessionLinksRoutes } from "./public-session-links/index.js";
 import { createSandboxInstancesRoutes } from "./sandbox-instances/index.js";
 import { createSandboxProfilesRoutes } from "./sandbox-profiles/index.js";
+import { createSandboxProvidersRoutes } from "./sandbox-providers/index.js";
 import type {
   AppContextBindings,
   AppContextVariables,
@@ -151,6 +152,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const organizationRoutes = withActiveOrganizationAccess(createOrganizationRoutes());
   const publicSessionLinksRoutes = createPublicSessionLinksRoutes();
   const sandboxInstancesRoutes = withActiveOrganizationAccess(createSandboxInstancesRoutes());
+  const sandboxProvidersRoutes = withActiveOrganizationAccess(createSandboxProvidersRoutes());
   const sandboxProfilesRoutes = withActiveOrganizationAccess(createSandboxProfilesRoutes());
 
   app.route(authRoutes.basePath, authRoutes.routes);
@@ -167,6 +169,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   app.route(organizationRoutes.basePath, organizationRoutes.routes);
   app.route(publicSessionLinksRoutes.basePath, publicSessionLinksRoutes.routes);
   app.route(sandboxInstancesRoutes.basePath, sandboxInstancesRoutes.routes);
+  app.route(sandboxProvidersRoutes.basePath, sandboxProvidersRoutes.routes);
   app.route(sandboxProfilesRoutes.basePath, sandboxProfilesRoutes.routes);
 }
 

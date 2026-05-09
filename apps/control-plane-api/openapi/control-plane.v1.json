@@ -14593,6 +14593,188 @@
         }
       }
     },
+    "/v1/sandbox/providers": {
+      "get": {
+        "tags": ["Sandbox Providers"],
+        "responses": {
+          "200": {
+            "description": "List supported sandbox providers and resource capabilities.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "displayName": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "managed": {
+                            "type": "boolean"
+                          },
+                          "supportsOrganizationConnection": {
+                            "type": "boolean"
+                          },
+                          "resourceCapabilities": {
+                            "type": ["object", "null"],
+                            "properties": {
+                              "vcpuCount": {
+                                "type": "object",
+                                "properties": {
+                                  "min": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  "max": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  "step": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  },
+                                  "default": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  }
+                                },
+                                "required": ["min", "max", "step", "default"],
+                                "additionalProperties": false
+                              },
+                              "memoryMb": {
+                                "type": "object",
+                                "properties": {
+                                  "min": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  "max": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  "step": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  },
+                                  "default": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  }
+                                },
+                                "required": ["min", "max", "step", "default"],
+                                "additionalProperties": false
+                              },
+                              "storageMb": {
+                                "type": "object",
+                                "properties": {
+                                  "min": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  "max": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  "step": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                  },
+                                  "default": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  }
+                                },
+                                "required": ["min", "max", "step", "default"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": ["vcpuCount", "memoryMb"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "displayName",
+                          "managed",
+                          "supportsOrganizationConnection",
+                          "resourceCapabilities"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/sandbox/profiles": {
       "get": {
         "tags": ["Sandbox Profiles"],

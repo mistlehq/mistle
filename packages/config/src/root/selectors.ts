@@ -213,6 +213,7 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
       },
     },
     sandbox: {
+      provider: config.sandbox.provider,
       defaultBaseImage: config.sandbox.default_base_image,
       gatewayWsUrl: config.services.data_plane_gateway.sandbox_ws_public_url,
       bootstrap: {

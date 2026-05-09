@@ -102,6 +102,7 @@ export const ControlPlaneApiPortAccessConfigSchema = z
 
 export const ControlPlaneApiSandboxRuntimeConfigSchema = z
   .object({
+    provider: z.enum(["docker", "e2b"]),
     defaultBaseImage: z.string().trim().min(1),
     gatewayWsUrl: z.string().trim().min(1),
     bootstrap: GlobalSandboxTokenConfigSchema.optional(),

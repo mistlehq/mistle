@@ -125,6 +125,7 @@ function start(input: {
                 sandbox: input.sandbox,
                 sandboxBaseImage: resolvedSandboxBaseImage,
               }),
+              sandbox: input.sandbox,
               seaweedfs: resolvedSeaweedfs,
             }
           : {
@@ -140,6 +141,7 @@ function start(input: {
                 sandbox: input.sandbox,
                 sandboxBaseImage: resolvedSandboxBaseImage,
               }),
+              sandbox: input.sandbox,
               seaweedfs: resolvedSeaweedfs,
               googleAuth: input.googleAuth,
             },
@@ -180,6 +182,7 @@ function config(input: {
   gatewayWsUrl: string;
   postgres: ResolvedTestInfra;
   sandboxBaseImageRef: string | undefined;
+  sandbox: IntegrationSandboxOptions | undefined;
   seaweedfs: ResolvedTestInfra | undefined;
   googleAuth?: "simulated";
 }): ControlPlaneApiConfig {
@@ -244,6 +247,7 @@ function config(input: {
       },
     },
     sandbox: {
+      provider: input.sandbox?.provider ?? "docker",
       defaultBaseImage: input.sandboxBaseImageRef ?? getLocalDevDockerRegistrySandboxBaseImageRef(),
       gatewayWsUrl: input.gatewayWsUrl,
       bootstrap: {
