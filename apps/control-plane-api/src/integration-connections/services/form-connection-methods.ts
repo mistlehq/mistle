@@ -36,7 +36,7 @@ export type ParsedFormSecret = {
   persistedSecretRef: PersistedSecretRef;
 };
 
-export function createFormConnectionMethodContextOrThrow(input: {
+export function buildFormConnectionMethodContextOrThrow(input: {
   targetKey: string;
   target: {
     familyId: string;

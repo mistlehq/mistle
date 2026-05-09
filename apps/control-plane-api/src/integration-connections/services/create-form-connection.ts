@@ -24,7 +24,7 @@ import {
 import type { CreatedFormIntegrationConnection, ManagedWebhookSetupResult } from "../schemas.js";
 import { buildIntegrationConnectionResponse } from "./build-integration-connection-response.js";
 import {
-  createFormConnectionMethodContextOrThrow,
+  buildFormConnectionMethodContextOrThrow,
   parseFormConnectionConfigOrThrow,
   parseCreateFormSecretsOrThrow,
   resolveFormConnectionMethodOrThrow,
@@ -137,7 +137,7 @@ export async function createFormConnection(
     targetKey: input.targetKey,
     method: formMethod,
     config: input.config,
-    formContext: createFormConnectionMethodContextOrThrow({
+    formContext: buildFormConnectionMethodContextOrThrow({
       targetKey: input.targetKey,
       target: {
         familyId: target.familyId,

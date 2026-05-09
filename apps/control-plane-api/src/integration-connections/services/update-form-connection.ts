@@ -14,7 +14,7 @@ import {
 } from "../constants.js";
 import { assertIdentityLinkingAuthEditableOrThrow } from "./assert-identity-linking-auth-editable.js";
 import {
-  createFormConnectionMethodContextOrThrow,
+  buildFormConnectionMethodContextOrThrow,
   parseFormConnectionConfigOrThrow,
   parseUpdateFormSecretsOrThrow,
   resolveFormConnectionMethodOrThrow,
@@ -115,7 +115,7 @@ export async function updateFormConnection(
     targetKey: existingConnection.targetKey,
     method: formMethod,
     config: input.config,
-    formContext: createFormConnectionMethodContextOrThrow({
+    formContext: buildFormConnectionMethodContextOrThrow({
       targetKey: existingConnection.targetKey,
       target: {
         familyId: target.familyId,

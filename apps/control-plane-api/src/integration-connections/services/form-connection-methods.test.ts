@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
-  createFormConnectionMethodContextOrThrow,
+  buildFormConnectionMethodContextOrThrow,
   parseFormConnectionConfigOrThrow,
   parseCreateFormSecretsOrThrow,
   parseUpdateFormSecretsOrThrow,
@@ -31,9 +31,24 @@ const SlackDefinition: Pick<AnyIntegrationDefinition, "kind" | "targetConfigSche
   }),
 };
 
-describe("createFormConnectionMethodContextOrThrow", () => {
+function expectBadRequestError(
+  error: unknown,
+  expected: {
+    code: string;
+    message: string;
+  },
+): void {
+  expect(error).toBeInstanceOf(BadRequestError);
+  if (!(error instanceof BadRequestError)) {
+    throw new Error("Expected a bad request error.");
+  }
+  expect(error.code).toBe(expected.code);
+  expect(error.message).toBe(expected.message);
+}
+
+describe("buildFormConnectionMethodContextOrThrow", () => {
   it("returns parsed target and connection config for update form context", () => {
-    const context = createFormConnectionMethodContextOrThrow({
+    const context = buildFormConnectionMethodContextOrThrow({
       targetKey: "slack-default",
       target: SlackTarget,
       definition: SlackDefinition,
@@ -85,7 +100,7 @@ describe("createFormConnectionMethodContextOrThrow", () => {
     let thrownError: unknown = null;
 
     try {
-      createFormConnectionMethodContextOrThrow({
+      buildFormConnectionMethodContextOrThrow({
         targetKey: "slack-default",
         target: {
           ...SlackTarget,
@@ -103,19 +118,17 @@ describe("createFormConnectionMethodContextOrThrow", () => {
       thrownError = error;
     }
 
-    expect(thrownError).toBeInstanceOf(BadRequestError);
-    if (!(thrownError instanceof BadRequestError)) {
-      throw new Error("Expected invalid target config to throw.");
-    }
-    expect(thrownError.code).toBe("INVALID_CREATE_CONNECTION_INPUT");
-    expect(thrownError.message).toBe("Integration target 'slack-default' has invalid config.");
+    expectBadRequestError(thrownError, {
+      code: "INVALID_CREATE_CONNECTION_INPUT",
+      message: "Integration target 'slack-default' has invalid config.",
+    });
   });
 
   it("throws a bad request error when stored connection config is not an object", () => {
     let thrownError: unknown = null;
 
     try {
-      createFormConnectionMethodContextOrThrow({
+      buildFormConnectionMethodContextOrThrow({
         targetKey: "slack-default",
         target: SlackTarget,
         definition: SlackDefinition,
@@ -132,12 +145,10 @@ describe("createFormConnectionMethodContextOrThrow", () => {
       thrownError = error;
     }
 
-    expect(thrownError).toBeInstanceOf(BadRequestError);
-    if (!(thrownError instanceof BadRequestError)) {
-      throw new Error("Expected invalid connection config to throw.");
-    }
-    expect(thrownError.code).toBe("INVALID_UPDATE_CONNECTION_INPUT");
-    expect(thrownError.message).toBe("Integration connection 'icn_slack' has invalid config.");
+    expectBadRequestError(thrownError, {
+      code: "INVALID_UPDATE_CONNECTION_INPUT",
+      message: "Integration connection 'icn_slack' has invalid config.",
+    });
   });
 });
 
@@ -200,14 +211,11 @@ describe("resolveFormConnectionMethodOrThrow", () => {
       thrownError = error;
     }
 
-    expect(thrownError).toBeInstanceOf(BadRequestError);
-    if (!(thrownError instanceof BadRequestError)) {
-      throw new Error("Expected unsupported form method to throw.");
-    }
-    expect(thrownError.code).toBe("FORM_CONNECTION_METHOD_NOT_SUPPORTED");
-    expect(thrownError.message).toBe(
-      "Integration target 'oauth2-only-target' does not support form connection method 'oauth2-authorization-code'.",
-    );
+    expectBadRequestError(thrownError, {
+      code: "FORM_CONNECTION_METHOD_NOT_SUPPORTED",
+      message:
+        "Integration target 'oauth2-only-target' does not support form connection method 'oauth2-authorization-code'.",
+    });
   });
 
   it("throws when the selected method is a device-authorization method", () => {
@@ -239,14 +247,11 @@ describe("resolveFormConnectionMethodOrThrow", () => {
       thrownError = error;
     }
 
-    expect(thrownError).toBeInstanceOf(BadRequestError);
-    if (!(thrownError instanceof BadRequestError)) {
-      throw new Error("Expected device-authorization method to throw.");
-    }
-    expect(thrownError.code).toBe("FORM_CONNECTION_METHOD_NOT_SUPPORTED");
-    expect(thrownError.message).toBe(
-      "Integration target 'openai-device-auth-only-target' does not support form connection method 'chatgpt-device-code'.",
-    );
+    expectBadRequestError(thrownError, {
+      code: "FORM_CONNECTION_METHOD_NOT_SUPPORTED",
+      message:
+        "Integration target 'openai-device-auth-only-target' does not support form connection method 'chatgpt-device-code'.",
+    });
   });
 });
 
@@ -316,12 +321,10 @@ describe("parseFormConnectionConfigOrThrow", () => {
       thrownError = error;
     }
 
-    expect(thrownError).toBeInstanceOf(BadRequestError);
-    if (!(thrownError instanceof BadRequestError)) {
-      throw new Error("Expected invalid config to throw.");
-    }
-    expect(thrownError.code).toBe("INVALID_CREATE_CONNECTION_INPUT");
-    expect(thrownError.message).toBe("Connection config for method 'api-key' is invalid.");
+    expectBadRequestError(thrownError, {
+      code: "INVALID_CREATE_CONNECTION_INPUT",
+      message: "Connection config for method 'api-key' is invalid.",
+    });
   });
 
   it("throws a bad request error when a required visible config field is missing", () => {
@@ -377,14 +380,10 @@ describe("parseFormConnectionConfigOrThrow", () => {
       thrownError = error;
     }
 
-    expect(thrownError).toBeInstanceOf(BadRequestError);
-    if (!(thrownError instanceof BadRequestError)) {
-      throw new Error("Expected missing required config field to throw.");
-    }
-    expect(thrownError.code).toBe("INVALID_UPDATE_CONNECTION_INPUT");
-    expect(thrownError.message).toBe(
-      "Connection config field 'App ID' is required for method 'slack-bot-token'.",
-    );
+    expectBadRequestError(thrownError, {
+      code: "INVALID_UPDATE_CONNECTION_INPUT",
+      message: "Connection config field 'App ID' is required for method 'slack-bot-token'.",
+    });
   });
 
   it("throws a bad request error when resolved required config fields are malformed", () => {
@@ -423,12 +422,10 @@ describe("parseFormConnectionConfigOrThrow", () => {
       thrownError = error;
     }
 
-    expect(thrownError).toBeInstanceOf(BadRequestError);
-    if (!(thrownError instanceof BadRequestError)) {
-      throw new Error("Expected malformed required config fields to throw.");
-    }
-    expect(thrownError.code).toBe("INVALID_UPDATE_CONNECTION_INPUT");
-    expect(thrownError.message).toBe("Connection config for method 'slack-bot-token' is invalid.");
+    expectBadRequestError(thrownError, {
+      code: "INVALID_UPDATE_CONNECTION_INPUT",
+      message: "Connection config for method 'slack-bot-token' is invalid.",
+    });
   });
 });
 
@@ -485,14 +482,10 @@ describe("resolvePersistedSecretRefOrThrow", () => {
       thrownError = error;
     }
 
-    expect(thrownError).toBeInstanceOf(BadRequestError);
-    if (!(thrownError instanceof BadRequestError)) {
-      throw new Error("Expected unsupported secret type to throw.");
-    }
-    expect(thrownError.code).toBe("INVALID_UPDATE_CONNECTION_INPUT");
-    expect(thrownError.message).toBe(
-      "Unsupported persisted secret type 'github_app_installation_token'.",
-    );
+    expectBadRequestError(thrownError, {
+      code: "INVALID_UPDATE_CONNECTION_INPUT",
+      message: "Unsupported persisted secret type 'github_app_installation_token'.",
+    });
   });
 });
 
