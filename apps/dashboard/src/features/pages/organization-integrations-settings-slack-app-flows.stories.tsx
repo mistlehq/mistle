@@ -500,9 +500,11 @@ export function SlackAppSetupPageStory(input: {
   );
 }
 
-function SlackConnectedWebhookVerifiedRefreshStory(input?: {
+function SlackConnectedWebhookVerifiedRefreshStory({
+  includeAppId = true,
+}: {
   includeAppId?: boolean;
-}): React.JSX.Element {
+} = {}): React.JSX.Element {
   configureDashboardRuntimeForStory();
   const storyProps = createSlackDetailViewStoryProps();
   const selectedConnection = storyProps.connections[0];
@@ -536,7 +538,7 @@ function SlackConnectedWebhookVerifiedRefreshStory(input?: {
     config: {
       connection_method: "slack-bot-token",
       client_id: "3555487893074.10993991013813",
-      ...(input?.includeAppId === false ? {} : { app_id: "A0123456789" }),
+      ...(includeAppId ? { app_id: "A0123456789" } : {}),
     },
     configuredSecretNames: ["botToken", "clientSecret", "signingSecret"],
     supportsWebhookSources: true,
