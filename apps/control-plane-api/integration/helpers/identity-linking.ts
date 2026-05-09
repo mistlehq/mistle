@@ -22,6 +22,8 @@ import {
   unwrapOrganizationCredentialKey,
 } from "../../src/lib/crypto.js";
 
+const SlackAppId = "A0123456789";
+
 export async function upsertGitHubIdentityTarget(
   env: IntegrationTestEnvironment,
   input: {
@@ -161,6 +163,7 @@ export async function createSlackIdentityConnection(
         methodId: SlackConnectionMethodIds.SLACK_APP,
         config: {
           connection_method: SlackConnectionMethodIds.SLACK_APP,
+          app_id: SlackAppId,
           client_id: "123.456",
         },
         secrets: {

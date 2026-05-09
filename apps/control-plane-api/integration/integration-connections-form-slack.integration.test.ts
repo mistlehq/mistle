@@ -37,6 +37,7 @@ const it = createIntegrationTest({
 
 const SimulatedSlackHost = "0.0.0.0";
 const SimulatedSlackRequestHost = "127.0.0.1";
+const SlackAppId = "A0123456789";
 
 describe.concurrent("Slack form integration connections", () => {
   it("creates a Slack app connection and implicit webhook source", async ({ env }) => {
@@ -54,6 +55,7 @@ describe.concurrent("Slack form integration connections", () => {
         methodId: SlackConnectionMethodIds.SLACK_APP,
         config: {
           connection_method: SlackConnectionMethodIds.SLACK_APP,
+          app_id: SlackAppId,
         },
         secrets: {
           botToken: "xoxb-test-bot-token",
@@ -66,6 +68,7 @@ describe.concurrent("Slack form integration connections", () => {
     const connection = CreatedFormIntegrationConnectionSchema.parse(await response.json());
     expect(connection.config).toEqual({
       connection_method: SlackConnectionMethodIds.SLACK_APP,
+      app_id: SlackAppId,
     });
     expect(connection.targetSnapshotConfig).toEqual({
       api_base_url: "https://slack.com/api",
@@ -117,7 +120,7 @@ describe.concurrent("Slack form integration connections", () => {
           methodId: SlackConnectionMethodIds.SLACK_APP,
           config: {
             connection_method: SlackConnectionMethodIds.SLACK_APP,
-            app_id: "A0123456789",
+            app_id: SlackAppId,
           },
           secrets: {
             botToken: "xoxb-test-bot-token",
@@ -172,7 +175,7 @@ describe.concurrent("Slack form integration connections", () => {
         {
           authorization: "Bearer xoxe.xoxp-test-config-token",
           body: {
-            app_id: "A0123456789",
+            app_id: SlackAppId,
           },
           method: "POST",
           pathname: "/apps.manifest.export",
@@ -208,7 +211,7 @@ describe.concurrent("Slack form integration connections", () => {
           methodId: SlackConnectionMethodIds.SLACK_APP,
           config: {
             connection_method: SlackConnectionMethodIds.SLACK_APP,
-            app_id: "A0123456789",
+            app_id: SlackAppId,
           },
           secrets: {
             botToken: "xoxb-test-bot-token",
@@ -269,6 +272,7 @@ describe.concurrent("Slack form integration connections", () => {
         methodId: SlackConnectionMethodIds.SLACK_APP,
         config: {
           connection_method: SlackConnectionMethodIds.SLACK_APP,
+          app_id: SlackAppId,
         },
         secrets: {
           botToken: "xoxb-original-bot-token",
@@ -293,6 +297,7 @@ describe.concurrent("Slack form integration connections", () => {
         displayName: "Slack bot token rotated",
         config: {
           connection_method: SlackConnectionMethodIds.SLACK_APP,
+          app_id: SlackAppId,
         },
         secrets: {
           botToken: "xoxb-rotated-bot-token",
@@ -306,6 +311,7 @@ describe.concurrent("Slack form integration connections", () => {
     expect(updatedConnection.displayName).toBe("Slack bot token rotated");
     expect(updatedConnection.config).toEqual({
       connection_method: SlackConnectionMethodIds.SLACK_APP,
+      app_id: SlackAppId,
     });
 
     await expectCredentialSlots({

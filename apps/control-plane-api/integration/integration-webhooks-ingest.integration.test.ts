@@ -23,6 +23,7 @@ import { createFormConnection, seedIntegrationTarget } from "./helpers/integrati
 
 const GitHubEventTypeHeader = "issue_comment";
 const InstallationId = "123456";
+const SlackAppId = "A0123456789";
 
 const it = createIntegrationTest({
   services: ["control-plane-api"],
@@ -430,6 +431,7 @@ async function createSlackWebhookConnection(input: {
       methodId: SlackConnectionMethodIds.SLACK_APP,
       config: {
         connection_method: SlackConnectionMethodIds.SLACK_APP,
+        app_id: SlackAppId,
       },
       secrets: {
         botToken: "xoxb-test-bot-token",

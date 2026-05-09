@@ -24,6 +24,7 @@ import { markResourceSyncing } from "../openworkflow/sync-integration-connection
 import { syncIntegrationConnectionResources } from "../openworkflow/sync-integration-connection-resources/sync-integration-connection-resources.js";
 
 const InternalServiceToken = "integration-new-internal-service-token";
+const SlackAppId = "A0123456789";
 
 const it = createIntegrationTest({
   services: ["control-plane-api", "control-plane-worker"],
@@ -416,6 +417,7 @@ async function createSlackConnection(input: {
         methodId: SlackConnectionMethodIds.SLACK_APP,
         config: {
           connection_method: SlackConnectionMethodIds.SLACK_APP,
+          app_id: SlackAppId,
         },
         secrets: {
           botToken: "xoxb-test-token",
