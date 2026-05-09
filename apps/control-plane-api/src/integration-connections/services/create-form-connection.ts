@@ -139,11 +139,7 @@ export async function createFormConnection(
     config: input.config,
     formContext: buildFormConnectionMethodContextOrThrow({
       targetKey: input.targetKey,
-      target: {
-        familyId: target.familyId,
-        variantId: target.variantId,
-        config: target.config,
-      },
+      target,
       currentValue: input.config,
       definition,
       invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,

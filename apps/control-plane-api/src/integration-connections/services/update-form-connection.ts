@@ -117,11 +117,7 @@ export async function updateFormConnection(
     config: input.config,
     formContext: buildFormConnectionMethodContextOrThrow({
       targetKey: existingConnection.targetKey,
-      target: {
-        familyId: target.familyId,
-        variantId: target.variantId,
-        config: target.config,
-      },
+      target,
       currentValue: input.config,
       connection: {
         id: existingConnection.id,
