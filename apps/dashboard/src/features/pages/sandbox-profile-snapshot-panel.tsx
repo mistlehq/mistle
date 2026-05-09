@@ -29,6 +29,7 @@ import {
   putSandboxProfileVersionRefreshSchedule,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { ActionTile } from "../shared/action-tile.js";
 import { ActivityStatus } from "../shared/activity-status.js";
 import { FormPageSection } from "../shared/form-page.js";
 import {
@@ -63,6 +64,11 @@ export type SnapshotPanelState =
       latestSnapshotCreatedAt: string | null;
       message: string;
     };
+
+type SnapshotStatusState = Extract<
+  SnapshotPanelState,
+  { kind: "creating" | "publish-snapshot-error" | "ready" | "refresh-error" }
+>;
 
 export type SnapshotRefreshSchedule = SandboxProfileVersion["refreshSchedule"];
 export type SnapshotRefreshScheduleInput = {
@@ -182,9 +188,6 @@ export function SandboxProfileSnapshotPanelView(input: {
     );
   }
 
-  const actionLabel = resolveSnapshotActionLabel(input.state);
-  const activityLabel = resolveSnapshotActivityLabel(input.state);
-
   return (
     <SandboxProfileEditorHorizontalTabContent>
       <SnapshotPanelDescription />
@@ -210,40 +213,64 @@ export function SandboxProfileSnapshotPanelView(input: {
         </Notice>
       ) : null}
 
-      <FormPageSection>
-        <div className="flex flex-col gap-4 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <SnapshotVersionStatusSummary state={input.state} version={input.version} />
-
-            {activityLabel === null ? null : (
-              <ActivityStatus
-                className="shrink-0 justify-start text-muted-foreground sm:min-w-48 sm:justify-end"
-                label={activityLabel}
-                labelClassName="min-w-0 text-right"
-                labelKey={input.state.kind}
-              />
-            )}
-
-            {activityLabel !== null || actionLabel === null ? null : (
-              <Button
-                className="w-fit shrink-0"
-                disabled={input.isActionPending}
-                onClick={
-                  input.state.kind === "publish-snapshot-error"
-                    ? input.onRetryPublishSnapshot
-                    : input.onRefreshSnapshot
-                }
-                type="button"
-              >
-                {actionLabel}
-              </Button>
-            )}
-          </div>
-        </div>
-      </FormPageSection>
+      <ActionTile
+        action={
+          <SnapshotStatusAction
+            isActionPending={input.isActionPending}
+            onRefreshSnapshot={input.onRefreshSnapshot}
+            onRetryPublishSnapshot={input.onRetryPublishSnapshot}
+            state={input.state}
+          />
+        }
+        actionContainerClassName="justify-start sm:min-w-48 sm:justify-end"
+        className="rounded bg-white py-4"
+        contentClassName="flex-1"
+        description={resolveSnapshotStatusSummaryDescription(input.state)}
+        padding="comfortable"
+        title={resolveSnapshotStatusTitle({
+          state: input.state,
+          version: input.version,
+        })}
+      />
 
       {input.refreshScheduleSection}
     </SandboxProfileEditorHorizontalTabContent>
+  );
+}
+
+function SnapshotStatusAction(input: {
+  isActionPending: boolean;
+  onRefreshSnapshot: () => void;
+  onRetryPublishSnapshot: () => void;
+  state: SnapshotStatusState;
+}): React.JSX.Element {
+  if (input.state.kind === "creating") {
+    return (
+      <ActivityStatus
+        className="shrink-0 justify-start text-muted-foreground sm:justify-end"
+        label="Creating snapshot"
+        labelClassName="min-w-0 text-right"
+        labelKey={input.state.kind}
+      />
+    );
+  }
+
+  const actionLabel =
+    input.state.kind === "publish-snapshot-error" ? "Retry snapshot creation" : "Refresh snapshot";
+
+  return (
+    <Button
+      className="w-fit shrink-0"
+      disabled={input.isActionPending}
+      onClick={
+        input.state.kind === "publish-snapshot-error"
+          ? input.onRetryPublishSnapshot
+          : input.onRefreshSnapshot
+      }
+      type="button"
+    >
+      {actionLabel}
+    </Button>
   );
 }
 
@@ -268,50 +295,22 @@ function formatPublishSnapshotFailureMessage(input: {
   return `Version ${publishedVersion} was published, but its snapshot could not be created. New sessions and automations will continue using v${String(input.runnableVersion)} until the snapshot is retried successfully.`;
 }
 
-function SnapshotVersionStatusSummary(input: {
-  state: Extract<
-    SnapshotPanelState,
-    { kind: "creating" | "publish-snapshot-error" | "ready" | "refresh-error" }
-  >;
-  version: number;
-}): React.JSX.Element {
-  const fallbackVersion =
-    "runnableVersion" in input.state && input.state.runnableVersion !== null
-      ? `v${String(input.state.runnableVersion)}`
-      : null;
-  const description =
-    input.state.kind === "ready" || input.state.kind === "refresh-error"
-      ? null
-      : resolveSnapshotStatusDescription({
-          fallbackVersion,
-          state: input.state,
-        });
+function resolveSnapshotStatusSummaryDescription(state: SnapshotStatusState): string {
+  if (state.kind === "ready" || state.kind === "refresh-error") {
+    return `Latest snapshot: ${state.latestSnapshotCreatedAt ?? "N/A"}`;
+  }
 
-  return (
-    <div className="min-w-0 flex-1">
-      <p className="text-sm font-medium text-foreground">
-        {resolveSnapshotStatusTitle({
-          state: input.state,
-          version: input.version,
-        })}
-      </p>
-      {description === null ? null : (
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      )}
-      {input.state.kind === "ready" || input.state.kind === "refresh-error" ? (
-        <p className="mt-1 text-sm text-muted-foreground">
-          Latest snapshot: {input.state.latestSnapshotCreatedAt ?? "N/A"}
-        </p>
-      ) : null}
-    </div>
-  );
+  const fallbackVersion =
+    state.runnableVersion !== null ? `v${String(state.runnableVersion)}` : null;
+
+  return resolveSnapshotStatusDescription({
+    fallbackVersion,
+    state,
+  });
 }
 
 function resolveSnapshotStatusTitle(input: {
-  state: Extract<
-    SnapshotPanelState,
-    { kind: "creating" | "publish-snapshot-error" | "ready" | "refresh-error" }
-  >;
+  state: SnapshotStatusState;
   version: number;
 }): string {
   if (input.state.kind === "ready" || input.state.kind === "refresh-error") {
@@ -326,10 +325,7 @@ function resolveSnapshotStatusTitle(input: {
 
 function resolveSnapshotStatusDescription(input: {
   fallbackVersion: string | null;
-  state: Extract<
-    SnapshotPanelState,
-    { kind: "creating" | "publish-snapshot-error" | "ready" | "refresh-error" }
-  >;
+  state: SnapshotStatusState;
 }): string {
   if (input.fallbackVersion === null) {
     return input.state.kind === "creating"
@@ -658,24 +654,4 @@ function PublishSuccessSnapshotNotice(input: {
       variant="success"
     />
   );
-}
-
-function resolveSnapshotActionLabel(state: SnapshotPanelState): string | null {
-  if (state.kind === "publish-snapshot-error") {
-    return "Retry snapshot creation";
-  }
-
-  if (state.kind === "ready" || state.kind === "refresh-error") {
-    return "Refresh snapshot";
-  }
-
-  return null;
-}
-
-function resolveSnapshotActivityLabel(state: SnapshotPanelState): string | null {
-  if (state.kind === "creating") {
-    return "Creating snapshot";
-  }
-
-  return null;
 }
