@@ -92,7 +92,7 @@ export function buildFormConnectionMethodContextOrThrow(input: {
     return formContext;
   }
 
-  const connectionConfig = readFormConnectionContextConnectionConfigOrThrow({
+  const connectionConfig = readExistingFormConnectionConfigOrThrow({
     connectionId: input.connection.id,
     config: input.connection.config,
     invalidInputCode: input.invalidInputCode,
@@ -112,7 +112,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function readFormConnectionContextConnectionConfigOrThrow(input: {
+function readExistingFormConnectionConfigOrThrow(input: {
   connectionId: string;
   config: unknown;
   invalidInputCode: FormConnectionInvalidInputCode;

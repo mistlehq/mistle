@@ -63,7 +63,7 @@ function withoutStoryHandlers(
   return rest;
 }
 
-function createIdentityLinkedSlackDetailViewStoryProps(): React.ComponentProps<
+function buildIdentityLinkedSlackDetailViewStoryProps(): React.ComponentProps<
   typeof IntegrationConnectionDetailView
 > {
   const props = createSlackDetailViewStoryProps();
@@ -142,7 +142,7 @@ export const Slack: Story = {
 export const SlackIdentityLinked: Story = {
   name: "Slack identity linked",
   args: {
-    ...withoutStoryHandlers(createIdentityLinkedSlackDetailViewStoryProps()),
+    ...withoutStoryHandlers(buildIdentityLinkedSlackDetailViewStoryProps()),
   },
 };
 
