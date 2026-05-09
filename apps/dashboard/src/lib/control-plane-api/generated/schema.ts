@@ -8347,7 +8347,7 @@ export interface paths {
                 createdAt: string;
                 id: string;
                 /** @enum {string} */
-                kind: "agent" | "git" | "connector";
+                kind: "agent" | "git" | "connector" | "sandbox";
                 sandboxProfileId: string;
                 sandboxProfileVersion: number;
                 updatedAt: string;
@@ -8581,7 +8581,7 @@ export interface paths {
                 connectionId: string;
                 id?: string;
                 /** @enum {string} */
-                kind: "agent" | "git" | "connector";
+                kind: "agent" | "git" | "connector" | "sandbox";
               }[];
             };
             setupScript?: string | null;
@@ -8607,7 +8607,7 @@ export interface paths {
                   createdAt: string;
                   id: string;
                   /** @enum {string} */
-                  kind: "agent" | "git" | "connector";
+                  kind: "agent" | "git" | "connector" | "sandbox";
                   sandboxProfileId: string;
                   sandboxProfileVersion: number;
                   updatedAt: string;
@@ -9029,7 +9029,7 @@ export interface paths {
                 createdAt: string;
                 id: string;
                 /** @enum {string} */
-                kind: "agent" | "git" | "connector";
+                kind: "agent" | "git" | "connector" | "sandbox";
                 sandboxProfileId: string;
                 sandboxProfileVersion: number;
                 updatedAt: string;

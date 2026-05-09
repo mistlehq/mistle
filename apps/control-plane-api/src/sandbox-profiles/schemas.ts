@@ -30,6 +30,7 @@ const integrationBindingKindSchema = z.enum([
   IntegrationBindingKinds.AGENT,
   IntegrationBindingKinds.GIT,
   IntegrationBindingKinds.CONNECTOR,
+  IntegrationBindingKinds.SANDBOX,
 ]);
 const sandboxProfileVersionStateSchema = z.enum([
   SandboxProfileVersionStates.DRAFT,

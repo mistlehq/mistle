@@ -16350,7 +16350,7 @@
                           },
                           "kind": {
                             "type": "string",
-                            "enum": ["agent", "git", "connector"]
+                            "enum": ["agent", "git", "connector", "sandbox"]
                           },
                           "config": {
                             "type": "object",
@@ -16928,7 +16928,7 @@
                           },
                           "kind": {
                             "type": "string",
-                            "enum": ["agent", "git", "connector"]
+                            "enum": ["agent", "git", "connector", "sandbox"]
                           },
                           "config": {
                             "type": "object",
@@ -17126,7 +17126,7 @@
                             },
                             "kind": {
                               "type": "string",
-                              "enum": ["agent", "git", "connector"]
+                              "enum": ["agent", "git", "connector", "sandbox"]
                             },
                             "config": {
                               "type": "object",
@@ -17194,7 +17194,7 @@
                               },
                               "kind": {
                                 "type": "string",
-                                "enum": ["agent", "git", "connector"]
+                                "enum": ["agent", "git", "connector", "sandbox"]
                               },
                               "config": {
                                 "type": "object",

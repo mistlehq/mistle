@@ -46,6 +46,7 @@ export const SandboxIntegrationBindingKinds = {
   AGENT: "agent",
   GIT: "git",
   CONNECTOR: "connector",
+  SANDBOX: "sandbox",
 } as const;
 
 export type SandboxIntegrationBindingKind =

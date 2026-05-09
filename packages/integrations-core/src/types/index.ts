@@ -5,16 +5,18 @@ import type { AgentPtyLaunchSpec } from "../agent-runtimes/types.js";
 import type { ConnectionCapabilitySet } from "../capabilities/index.js";
 import type { IntegrationRegistry } from "../registry/index.js";
 
-export type IntegrationKind = "agent" | "git" | "connector";
+export type IntegrationKind = "agent" | "git" | "connector" | "sandbox";
 
 export const IntegrationKinds: {
   AGENT: IntegrationKind;
   GIT: IntegrationKind;
   CONNECTOR: IntegrationKind;
+  SANDBOX: IntegrationKind;
 } = {
   AGENT: "agent",
   GIT: "git",
   CONNECTOR: "connector",
+  SANDBOX: "sandbox",
 };
 
 export type IntegrationConnectionMethodId = string;

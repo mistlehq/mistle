@@ -624,7 +624,7 @@ export function createDefaultBindingConfig(input: {
     row: {
       clientId: "default-binding-config",
       connectionId: input.connection.id,
-      kind: contextResult.value.definition.kind,
+      kind: resolvedKind,
       config: {},
     },
     context: contextResult.value,

@@ -439,7 +439,7 @@ function normalizeSandboxProfileVersionPublishability(
   };
 }
 
-const IntegrationBindingKindSchema = z.enum(["agent", "git", "connector"]);
+const IntegrationBindingKindSchema = z.enum(["agent", "git", "connector", "sandbox"]);
 
 const SandboxProfileVersionIntegrationBindingSchema = z
   .object({
