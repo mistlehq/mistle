@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import type { IntegrationConnection } from "./integrations-service.js";
 import { useSlackWebhookSourceActions } from "./slack-webhook-source-actions.js";
 
-function SlackWebhookEventsSyncFlowHarness(input: { connection: IntegrationConnection }) {
+function SlackWebhookSourceActionsHarness(input: { connection: IntegrationConnection }) {
   const [syncedValue, setSyncedValue] = useState<string | null>(null);
   const flow = useSlackWebhookSourceActions({
     connections: [input.connection],
@@ -55,7 +55,7 @@ function createConnection(input: {
 
 describe("useSlackWebhookSourceActions", () => {
   it("syncs Slack webhook events through the provider-specific dialog", () => {
-    render(<SlackWebhookEventsSyncFlowHarness connection={createConnection({ appId: "A123" })} />);
+    render(<SlackWebhookSourceActionsHarness connection={createConnection({ appId: "A123" })} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Sync webhook events" }));
     fireEvent.change(screen.getByPlaceholderText("xoxe.xoxp-..."), {
@@ -68,7 +68,7 @@ describe("useSlackWebhookSourceActions", () => {
   });
 
   it("does not offer sync for Slack connections without a saved app id", () => {
-    render(<SlackWebhookEventsSyncFlowHarness connection={createConnection({})} />);
+    render(<SlackWebhookSourceActionsHarness connection={createConnection({})} />);
 
     expect(screen.queryByRole("button", { name: "Sync webhook events" })).toBeNull();
   });
