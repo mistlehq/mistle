@@ -5,6 +5,7 @@ import {
 import { BadRequestError } from "@mistle/http/errors.js";
 import {
   resolveIntegrationForm,
+  type AnyIntegrationDefinition,
   type IntegrationConnectionMethodDefinition,
   type IntegrationConnectionMethodId,
   type IntegrationFormContext,
@@ -35,8 +36,96 @@ export type ParsedFormSecret = {
   persistedSecretRef: PersistedSecretRef;
 };
 
+export function createFormConnectionFormContextOrThrow(input: {
+  targetKey: string;
+  target: {
+    familyId: string;
+    variantId: string;
+    config: unknown;
+  };
+  definition: Pick<AnyIntegrationDefinition, "kind" | "targetConfigSchema">;
+  currentValue: Record<string, unknown>;
+  connection?:
+    | {
+        id: string;
+        config: unknown;
+      }
+    | undefined;
+  invalidInputCode: FormConnectionInvalidInputCode;
+}): IntegrationFormContext {
+  const targetConfig = input.definition.targetConfigSchema.safeParse(input.target.config);
+  if (!targetConfig.success) {
+    throw new BadRequestError(
+      input.invalidInputCode,
+      `Integration target '${input.targetKey}' has invalid config.`,
+    );
+  }
+
+  const targetRawConfig = UnknownRecordSchema.safeParse(input.target.config);
+  if (!targetRawConfig.success) {
+    throw new BadRequestError(
+      input.invalidInputCode,
+      `Integration target '${input.targetKey}' has invalid raw config.`,
+    );
+  }
+
+  const targetConfigRecord = UnknownRecordSchema.safeParse(targetConfig.data);
+  if (!targetConfigRecord.success) {
+    throw new BadRequestError(
+      input.invalidInputCode,
+      `Integration target '${input.targetKey}' resolved to non-object config.`,
+    );
+  }
+
+  const formContext: IntegrationFormContext = {
+    familyId: input.target.familyId,
+    variantId: input.target.variantId,
+    kind: input.definition.kind,
+    target: {
+      rawConfig: targetRawConfig.data,
+      config: targetConfigRecord.data,
+    },
+    currentValue: input.currentValue,
+  };
+
+  if (input.connection === undefined) {
+    return formContext;
+  }
+
+  const connectionConfig = readFormConnectionContextConnectionConfigOrThrow({
+    connectionId: input.connection.id,
+    config: input.connection.config,
+    invalidInputCode: input.invalidInputCode,
+  });
+
+  return {
+    ...formContext,
+    connection: {
+      id: input.connection.id,
+      rawConfig: connectionConfig,
+      config: connectionConfig,
+    },
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readFormConnectionContextConnectionConfigOrThrow(input: {
+  connectionId: string;
+  config: unknown;
+  invalidInputCode: FormConnectionInvalidInputCode;
+}): Record<string, unknown> {
+  const connectionConfig = UnknownRecordSchema.safeParse(input.config);
+  if (!connectionConfig.success) {
+    throw new BadRequestError(
+      input.invalidInputCode,
+      `Integration connection '${input.connectionId}' has invalid config.`,
+    );
+  }
+
+  return connectionConfig.data;
 }
 
 function readStringArray(value: unknown): readonly string[] {

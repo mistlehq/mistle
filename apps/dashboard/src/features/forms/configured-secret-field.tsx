@@ -18,7 +18,7 @@ import {
   cn,
 } from "@mistle/ui";
 import { CheckCircleIcon } from "@phosphor-icons/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 export type SavingFieldStatus = "idle" | "saving" | "saved" | "saved-fading";
 
@@ -33,7 +33,7 @@ const PasswordConfiguredSecretPlaceholder = "••••••";
 type SavingTextFieldProps = {
   id: string;
   label: string;
-  labelAccessory?: React.ReactNode;
+  labelAccessory?: ReactNode;
   value: string;
   fieldState: SavingFieldState;
   required?: boolean;
@@ -53,6 +53,21 @@ type SavingTextFieldProps = {
 export function SavingTextField(input: SavingTextFieldProps): React.JSX.Element {
   const saveState = input.fieldState.errorMessage === null ? input.fieldState.status : "error";
   const showIndicator = saveState !== "idle" && saveState !== "error";
+  const label =
+    input.description === undefined ? (
+      <FieldLabel htmlFor={input.id} {...(input.required === true ? { required: true } : {})}>
+        {input.label}
+      </FieldLabel>
+    ) : (
+      <FieldLabelWithTooltip
+        htmlFor={input.id}
+        {...(input.required === true ? { required: true } : {})}
+        tooltip={input.description}
+        tooltipLabel="Field description"
+      >
+        {input.label}
+      </FieldLabelWithTooltip>
+    );
   const liveMessage =
     input.fieldState.errorMessage !== null
       ? ""
@@ -66,39 +81,10 @@ export function SavingTextField(input: SavingTextFieldProps): React.JSX.Element 
     <Field contentWidth="fill" orientation="vertical">
       <FieldHeader>
         {input.labelAccessory === undefined ? (
-          input.description === undefined ? (
-            <FieldLabel htmlFor={input.id} {...(input.required === true ? { required: true } : {})}>
-              {input.label}
-            </FieldLabel>
-          ) : (
-            <FieldLabelWithTooltip
-              htmlFor={input.id}
-              {...(input.required === true ? { required: true } : {})}
-              tooltip={input.description}
-              tooltipLabel="Field description"
-            >
-              {input.label}
-            </FieldLabelWithTooltip>
-          )
+          label
         ) : (
           <div className="flex items-center justify-between gap-3">
-            {input.description === undefined ? (
-              <FieldLabel
-                htmlFor={input.id}
-                {...(input.required === true ? { required: true } : {})}
-              >
-                {input.label}
-              </FieldLabel>
-            ) : (
-              <FieldLabelWithTooltip
-                htmlFor={input.id}
-                {...(input.required === true ? { required: true } : {})}
-                tooltip={input.description}
-                tooltipLabel="Field description"
-              >
-                {input.label}
-              </FieldLabelWithTooltip>
-            )}
+            {label}
             {input.labelAccessory}
           </div>
         )}

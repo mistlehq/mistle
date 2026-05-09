@@ -525,7 +525,6 @@ function ConnectionDetailPane(input: {
           <SectionBlock
             action={resolveEditAuthenticationAction({
               connection: input.connection,
-              connectionId: input.connection.id,
               onEditAuthentication: input.onEditAuthentication,
             })}
             title="Authentication"
@@ -613,14 +612,14 @@ function resolveDeleteConnectionMessage(
 }
 
 function resolveEditAuthenticationAction(input: {
-  connection: Pick<IntegrationConnectionDetailItem, "authMethodId" | "isIdentityLinked">;
+  connection: Pick<IntegrationConnectionDetailItem, "authMethodId" | "id" | "isIdentityLinked">;
   onEditAuthentication: ((connectionId: string) => void) | undefined;
-  connectionId: string;
 }): ReactNode {
+  const onEditAuthentication = input.onEditAuthentication;
   if (
     input.connection.authMethodId === undefined ||
     input.connection.authMethodId === null ||
-    input.onEditAuthentication === undefined
+    onEditAuthentication === undefined
   ) {
     return null;
   }
@@ -652,7 +651,7 @@ function resolveEditAuthenticationAction(input: {
     <Button
       aria-label="Edit"
       onClick={() => {
-        input.onEditAuthentication?.(input.connectionId);
+        onEditAuthentication(input.connection.id);
       }}
       size="sm"
       type="button"
