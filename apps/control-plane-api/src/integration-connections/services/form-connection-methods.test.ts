@@ -16,9 +16,12 @@ import {
   resolvePersistedSecretRefOrThrow,
 } from "./form-connection-methods.js";
 
+const SlackTargetKey = "slack-default";
+const SlackConnectionMethodId = "slack-bot-token";
+
 const SlackTarget = {
   familyId: "slack",
-  variantId: "slack-default",
+  variantId: SlackTargetKey,
   config: {
     api_base_url: "https://slack.com/api",
   },
@@ -49,17 +52,17 @@ function expectBadRequestError(
 describe("buildFormConnectionMethodContextOrThrow", () => {
   it("returns parsed target and connection config for update form context", () => {
     const context = buildFormConnectionMethodContextOrThrow({
-      targetKey: "slack-default",
+      targetKey: SlackTargetKey,
       target: SlackTarget,
       definition: SlackDefinition,
       currentValue: {
-        connection_method: "slack-bot-token",
+        connection_method: SlackConnectionMethodId,
         app_id: "A123",
       },
       connection: {
         id: "icn_slack",
         config: {
-          connection_method: "slack-bot-token",
+          connection_method: SlackConnectionMethodId,
           app_id: "A000",
         },
       },
@@ -68,7 +71,7 @@ describe("buildFormConnectionMethodContextOrThrow", () => {
 
     expect(context).toEqual({
       familyId: "slack",
-      variantId: "slack-default",
+      variantId: SlackTargetKey,
       kind: "connector",
       target: {
         rawConfig: {
@@ -79,17 +82,17 @@ describe("buildFormConnectionMethodContextOrThrow", () => {
         },
       },
       currentValue: {
-        connection_method: "slack-bot-token",
+        connection_method: SlackConnectionMethodId,
         app_id: "A123",
       },
       connection: {
         id: "icn_slack",
         rawConfig: {
-          connection_method: "slack-bot-token",
+          connection_method: SlackConnectionMethodId,
           app_id: "A000",
         },
         config: {
-          connection_method: "slack-bot-token",
+          connection_method: SlackConnectionMethodId,
           app_id: "A000",
         },
       },
@@ -101,7 +104,7 @@ describe("buildFormConnectionMethodContextOrThrow", () => {
 
     try {
       buildFormConnectionMethodContextOrThrow({
-        targetKey: "slack-default",
+        targetKey: SlackTargetKey,
         target: {
           ...SlackTarget,
           config: {
@@ -110,7 +113,7 @@ describe("buildFormConnectionMethodContextOrThrow", () => {
         },
         definition: SlackDefinition,
         currentValue: {
-          connection_method: "slack-bot-token",
+          connection_method: SlackConnectionMethodId,
         },
         invalidInputCode: "INVALID_CREATE_CONNECTION_INPUT",
       });
@@ -129,11 +132,11 @@ describe("buildFormConnectionMethodContextOrThrow", () => {
 
     try {
       buildFormConnectionMethodContextOrThrow({
-        targetKey: "slack-default",
+        targetKey: SlackTargetKey,
         target: SlackTarget,
         definition: SlackDefinition,
         currentValue: {
-          connection_method: "slack-bot-token",
+          connection_method: SlackConnectionMethodId,
         },
         connection: {
           id: "icn_slack",
@@ -332,15 +335,15 @@ describe("parseFormConnectionConfigOrThrow", () => {
 
     try {
       parseFormConnectionConfigOrThrow({
-        targetKey: "slack-default",
+        targetKey: SlackTargetKey,
         method: {
-          id: "slack-bot-token",
+          id: SlackConnectionMethodId,
           label: "Slack app",
           kind: "form",
           secretFields: [],
           configSchema: z
             .object({
-              connection_method: z.literal("slack-bot-token"),
+              connection_method: z.literal(SlackConnectionMethodId),
               app_id: z.string().min(1).optional(),
             })
             .strict(),
@@ -348,7 +351,7 @@ describe("parseFormConnectionConfigOrThrow", () => {
             schema: {
               properties: {
                 connection_method: {
-                  default: "slack-bot-token",
+                  default: SlackConnectionMethodId,
                 },
                 app_id: {
                   title: "App ID",
@@ -364,14 +367,14 @@ describe("parseFormConnectionConfigOrThrow", () => {
           },
         },
         config: {
-          connection_method: "slack-bot-token",
+          connection_method: SlackConnectionMethodId,
         },
         formContext: {
           familyId: "slack",
-          variantId: "slack-default",
+          variantId: SlackTargetKey,
           kind: "connector",
           currentValue: {
-            connection_method: "slack-bot-token",
+            connection_method: SlackConnectionMethodId,
           },
         },
         invalidInputCode: "INVALID_UPDATE_CONNECTION_INPUT",
@@ -391,15 +394,15 @@ describe("parseFormConnectionConfigOrThrow", () => {
 
     try {
       parseFormConnectionConfigOrThrow({
-        targetKey: "slack-default",
+        targetKey: SlackTargetKey,
         method: {
-          id: "slack-bot-token",
+          id: SlackConnectionMethodId,
           label: "Slack app",
           kind: "form",
           secretFields: [],
           configSchema: z
             .object({
-              connection_method: z.literal("slack-bot-token"),
+              connection_method: z.literal(SlackConnectionMethodId),
             })
             .strict(),
           configForm: {
@@ -409,11 +412,11 @@ describe("parseFormConnectionConfigOrThrow", () => {
           },
         },
         config: {
-          connection_method: "slack-bot-token",
+          connection_method: SlackConnectionMethodId,
         },
         formContext: {
           familyId: "slack",
-          variantId: "slack-default",
+          variantId: SlackTargetKey,
           kind: "connector",
         },
         invalidInputCode: "INVALID_UPDATE_CONNECTION_INPUT",
