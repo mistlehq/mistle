@@ -36,7 +36,7 @@ export type ParsedFormSecret = {
   persistedSecretRef: PersistedSecretRef;
 };
 
-export function createFormConnectionFormContextOrThrow(input: {
+export function createFormConnectionMethodContextOrThrow(input: {
   targetKey: string;
   target: {
     familyId: string;
@@ -128,12 +128,24 @@ function readFormConnectionContextConnectionConfigOrThrow(input: {
   return connectionConfig.data;
 }
 
-function readStringArray(value: unknown): readonly string[] {
-  if (!Array.isArray(value)) {
+function readRequiredPropertyKeys(input: {
+  methodId: string;
+  targetKey: string;
+  schema: Record<string, unknown>;
+}): readonly string[] {
+  const required = input.schema.required;
+  if (required === undefined) {
     return [];
   }
 
-  return value.filter((entry) => typeof entry === "string");
+  const parsedRequired = z.array(z.string()).safeParse(required);
+  if (!parsedRequired.success) {
+    throw new Error(
+      `Resolved config form for method '${input.methodId}' on integration target '${input.targetKey}' has invalid required fields.`,
+    );
+  }
+
+  return parsedRequired.data;
 }
 
 function readUiWidget(input: {
@@ -202,7 +214,11 @@ function assertRequiredVisibleFormConfigFields(input: {
   const schema = UnknownRecordSchema.parse(resolvedForm.schema ?? {});
   const uiSchema = UnknownRecordSchema.parse(resolvedForm.uiSchema ?? {});
 
-  for (const propertyKey of readStringArray(schema.required)) {
+  for (const propertyKey of readRequiredPropertyKeys({
+    methodId: input.method.id,
+    targetKey: input.targetKey,
+    schema,
+  })) {
     if (
       readUiWidget({
         propertyKey,

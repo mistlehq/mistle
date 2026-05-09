@@ -1,16 +1,145 @@
 import { IntegrationCredentialSecretKinds } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
-import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import {
+  IntegrationConnectionMethodIds,
+  type AnyIntegrationDefinition,
+} from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
+  createFormConnectionMethodContextOrThrow,
   parseFormConnectionConfigOrThrow,
   parseCreateFormSecretsOrThrow,
   parseUpdateFormSecretsOrThrow,
   resolveFormConnectionMethodOrThrow,
   resolvePersistedSecretRefOrThrow,
 } from "./form-connection-methods.js";
+
+const SlackTarget = {
+  familyId: "slack",
+  variantId: "slack-default",
+  config: {
+    api_base_url: "https://slack.com/api",
+  },
+};
+
+const SlackDefinition: Pick<AnyIntegrationDefinition, "kind" | "targetConfigSchema"> = {
+  kind: "connector",
+  targetConfigSchema: z.object({
+    api_base_url: z.url(),
+  }),
+};
+
+describe("createFormConnectionMethodContextOrThrow", () => {
+  it("returns parsed target and connection config for update form context", () => {
+    const context = createFormConnectionMethodContextOrThrow({
+      targetKey: "slack-default",
+      target: SlackTarget,
+      definition: SlackDefinition,
+      currentValue: {
+        connection_method: "slack-bot-token",
+        app_id: "A123",
+      },
+      connection: {
+        id: "icn_slack",
+        config: {
+          connection_method: "slack-bot-token",
+          app_id: "A000",
+        },
+      },
+      invalidInputCode: "INVALID_UPDATE_CONNECTION_INPUT",
+    });
+
+    expect(context).toEqual({
+      familyId: "slack",
+      variantId: "slack-default",
+      kind: "connector",
+      target: {
+        rawConfig: {
+          api_base_url: "https://slack.com/api",
+        },
+        config: {
+          api_base_url: "https://slack.com/api",
+        },
+      },
+      currentValue: {
+        connection_method: "slack-bot-token",
+        app_id: "A123",
+      },
+      connection: {
+        id: "icn_slack",
+        rawConfig: {
+          connection_method: "slack-bot-token",
+          app_id: "A000",
+        },
+        config: {
+          connection_method: "slack-bot-token",
+          app_id: "A000",
+        },
+      },
+    });
+  });
+
+  it("throws a bad request error when stored target config is invalid", () => {
+    let thrownError: unknown = null;
+
+    try {
+      createFormConnectionMethodContextOrThrow({
+        targetKey: "slack-default",
+        target: {
+          ...SlackTarget,
+          config: {
+            api_base_url: "",
+          },
+        },
+        definition: SlackDefinition,
+        currentValue: {
+          connection_method: "slack-bot-token",
+        },
+        invalidInputCode: "INVALID_CREATE_CONNECTION_INPUT",
+      });
+    } catch (error) {
+      thrownError = error;
+    }
+
+    expect(thrownError).toBeInstanceOf(BadRequestError);
+    if (!(thrownError instanceof BadRequestError)) {
+      throw new Error("Expected invalid target config to throw.");
+    }
+    expect(thrownError.code).toBe("INVALID_CREATE_CONNECTION_INPUT");
+    expect(thrownError.message).toBe("Integration target 'slack-default' has invalid config.");
+  });
+
+  it("throws a bad request error when stored connection config is not an object", () => {
+    let thrownError: unknown = null;
+
+    try {
+      createFormConnectionMethodContextOrThrow({
+        targetKey: "slack-default",
+        target: SlackTarget,
+        definition: SlackDefinition,
+        currentValue: {
+          connection_method: "slack-bot-token",
+        },
+        connection: {
+          id: "icn_slack",
+          config: null,
+        },
+        invalidInputCode: "INVALID_UPDATE_CONNECTION_INPUT",
+      });
+    } catch (error) {
+      thrownError = error;
+    }
+
+    expect(thrownError).toBeInstanceOf(BadRequestError);
+    if (!(thrownError instanceof BadRequestError)) {
+      throw new Error("Expected invalid connection config to throw.");
+    }
+    expect(thrownError.code).toBe("INVALID_UPDATE_CONNECTION_INPUT");
+    expect(thrownError.message).toBe("Integration connection 'icn_slack' has invalid config.");
+  });
+});
 
 describe("resolveFormConnectionMethodOrThrow", () => {
   it("returns the selected form method", () => {
@@ -256,6 +385,50 @@ describe("parseFormConnectionConfigOrThrow", () => {
     expect(thrownError.message).toBe(
       "Connection config field 'App ID' is required for method 'slack-bot-token'.",
     );
+  });
+
+  it("throws a bad request error when resolved required config fields are malformed", () => {
+    let thrownError: unknown = null;
+
+    try {
+      parseFormConnectionConfigOrThrow({
+        targetKey: "slack-default",
+        method: {
+          id: "slack-bot-token",
+          label: "Slack app",
+          kind: "form",
+          secretFields: [],
+          configSchema: z
+            .object({
+              connection_method: z.literal("slack-bot-token"),
+            })
+            .strict(),
+          configForm: {
+            schema: {
+              required: ["connection_method", 123],
+            },
+          },
+        },
+        config: {
+          connection_method: "slack-bot-token",
+        },
+        formContext: {
+          familyId: "slack",
+          variantId: "slack-default",
+          kind: "connector",
+        },
+        invalidInputCode: "INVALID_UPDATE_CONNECTION_INPUT",
+      });
+    } catch (error) {
+      thrownError = error;
+    }
+
+    expect(thrownError).toBeInstanceOf(BadRequestError);
+    if (!(thrownError instanceof BadRequestError)) {
+      throw new Error("Expected malformed required config fields to throw.");
+    }
+    expect(thrownError.code).toBe("INVALID_UPDATE_CONNECTION_INPUT");
+    expect(thrownError.message).toBe("Connection config for method 'slack-bot-token' is invalid.");
   });
 });
 
