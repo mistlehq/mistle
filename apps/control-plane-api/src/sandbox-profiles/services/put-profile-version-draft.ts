@@ -7,6 +7,8 @@ import {
 import { and, eq } from "drizzle-orm";
 
 import {
+  SandboxProfilesBadRequestCodes,
+  SandboxProfilesBadRequestError,
   SandboxProfilesConflictCodes,
   SandboxProfilesConflictError,
   SandboxProfilesNotFoundCodes,
@@ -20,6 +22,7 @@ import {
 import {
   mapProfileVersionRuntimeConfig,
   type SandboxProfileVersionResources,
+  validateSandboxProfileVersionRuntimeConfig,
 } from "./profile-version-runtime-config.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
@@ -55,7 +58,11 @@ type PutProfileVersionDraftOutput = {
 };
 
 export async function putProfileVersionDraft(
-  { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
+  {
+    db,
+    integrationRegistry,
+    sandboxConfig,
+  }: Pick<CreateSandboxProfilesServiceInput, "db" | "integrationRegistry" | "sandboxConfig">,
   input: PutProfileVersionDraftInput,
 ): Promise<PutProfileVersionDraftOutput> {
   const sandboxProfile = await db.query.sandboxProfiles.findFirst({
@@ -102,6 +109,46 @@ export async function putProfileVersionDraft(
       throw new SandboxProfilesConflictError(
         SandboxProfilesConflictCodes.PROFILE_VERSION_NOT_DRAFT,
         `Sandbox profile version '${String(input.profileVersion)}' is not a draft.`,
+      );
+    }
+
+    const nextRuntimeConfig = mapProfileVersionRuntimeConfig({
+      sandboxProvider: input.sandboxProvider ?? lockedVersion.sandboxProvider,
+      sandboxConnectionId:
+        input.sandboxConnectionId === undefined
+          ? lockedVersion.sandboxConnectionId
+          : input.sandboxConnectionId,
+      sandboxVcpuCount:
+        input.sandboxResources === undefined
+          ? lockedVersion.sandboxVcpuCount
+          : input.sandboxResources.vcpuCount,
+      sandboxMemoryMb:
+        input.sandboxResources === undefined
+          ? lockedVersion.sandboxMemoryMb
+          : input.sandboxResources.memoryMb,
+      sandboxStorageMb:
+        input.sandboxResources === undefined
+          ? lockedVersion.sandboxStorageMb
+          : (input.sandboxResources.storageMb ?? null),
+    });
+
+    const runtimeConfigIssues = await validateSandboxProfileVersionRuntimeConfig(
+      { db: tx, integrationRegistry, sandboxConfig },
+      {
+        organizationId: input.organizationId,
+        runtimeConfig: nextRuntimeConfig,
+      },
+    );
+
+    if (runtimeConfigIssues.length > 0) {
+      const firstIssue = runtimeConfigIssues[0];
+      if (firstIssue === undefined) {
+        throw new Error("Expected sandbox runtime validation issue.");
+      }
+
+      throw new SandboxProfilesBadRequestError(
+        SandboxProfilesBadRequestCodes.INVALID_SANDBOX_RUNTIME_CONFIG,
+        firstIssue.message,
       );
     }
 

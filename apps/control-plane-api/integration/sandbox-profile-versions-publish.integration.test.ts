@@ -10,6 +10,7 @@ import {
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
+import { SandboxProvider } from "@mistle/sandbox";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
@@ -33,7 +34,7 @@ const it = createIntegrationTest({
 
 const EmptySandboxRuntimeConfig = {
   sandboxConnectionId: null,
-  sandboxProvider: null,
+  sandboxProvider: SandboxProvider.DOCKER,
   sandboxResources: null,
 };
 
@@ -79,6 +80,7 @@ describe.concurrent("sandbox profile versions publish integration", () => {
         sandboxProfileId: "sbp_version_publish_001",
         version: 2,
         state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
       }),
     ]);
     await env.controlPlaneDb
@@ -267,6 +269,7 @@ describe.concurrent("sandbox profile versions publish integration", () => {
         sandboxProfileId: "sbp_version_publish_not_publishable_001",
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
       }),
     );
 

@@ -11,6 +11,11 @@ import {
   SandboxProfilesNotFoundError,
   type SandboxProfilePublishabilityIssueCode,
 } from "../errors.js";
+import {
+  mapProfileVersionRuntimeConfig,
+  validateSandboxProfileVersionRuntimeConfig,
+} from "./profile-version-runtime-config.js";
+import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 export type SandboxProfilePublishabilityIssue = {
   code: SandboxProfilePublishabilityIssueCode;
@@ -19,6 +24,10 @@ export type SandboxProfilePublishabilityIssue = {
   connectionId?: string;
   targetKey?: string;
 };
+
+type GetProfileVersionPublishabilityContext = {
+  db: ControlPlaneDatabase | ControlPlaneTransaction;
+} & Pick<CreateSandboxProfilesServiceInput, "integrationRegistry" | "sandboxConfig">;
 
 type GetProfileVersionPublishabilityInput = {
   organizationId: string;
@@ -32,7 +41,7 @@ type GetProfileVersionPublishabilityOutput = {
 };
 
 export async function getProfileVersionPublishability(
-  { db }: { db: ControlPlaneDatabase | ControlPlaneTransaction },
+  { db, integrationRegistry, sandboxConfig }: GetProfileVersionPublishabilityContext,
   input: GetProfileVersionPublishabilityInput,
 ): Promise<GetProfileVersionPublishabilityOutput> {
   const sandboxProfile = await db.query.sandboxProfiles.findFirst({
@@ -53,6 +62,11 @@ export async function getProfileVersionPublishability(
   const sandboxProfileVersion = await db.query.sandboxProfileVersions.findFirst({
     columns: {
       state: true,
+      sandboxProvider: true,
+      sandboxConnectionId: true,
+      sandboxVcpuCount: true,
+      sandboxMemoryMb: true,
+      sandboxStorageMb: true,
     },
     where: (table, { and, eq }) =>
       and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),
@@ -77,6 +91,16 @@ export async function getProfileVersionPublishability(
     };
   }
 
+  const issues: SandboxProfilePublishabilityIssue[] = [
+    ...(await validateSandboxProfileVersionRuntimeConfig(
+      { db, integrationRegistry, sandboxConfig },
+      {
+        organizationId: input.organizationId,
+        runtimeConfig: mapProfileVersionRuntimeConfig(sandboxProfileVersion),
+      },
+    )),
+  ];
+
   const agentBindings = await db.query.sandboxProfileVersionIntegrationBindings.findMany({
     columns: {
       id: true,
@@ -95,6 +119,7 @@ export async function getProfileVersionPublishability(
     return {
       publishable: false,
       issues: [
+        ...issues,
         {
           code: SandboxProfilePublishabilityIssueCodes.AGENT_BINDING_REQUIRED,
           message:
@@ -135,8 +160,6 @@ export async function getProfileVersionPublishability(
       ),
   });
   const targetsByKey = new Map(targets.map((target) => [target.targetKey, target]));
-
-  const issues: SandboxProfilePublishabilityIssue[] = [];
 
   for (const binding of agentBindings) {
     const connection = accessibleConnectionsById.get(binding.connectionId);

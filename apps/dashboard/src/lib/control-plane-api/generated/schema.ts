@@ -8665,7 +8665,8 @@ export interface paths {
                   code:
                     | "INVALID_BINDING_REFERENCE"
                     | "INVALID_BINDING_CONNECTION_REFERENCE"
-                    | "INVALID_BINDING_CONFIG_REFERENCE";
+                    | "INVALID_BINDING_CONFIG_REFERENCE"
+                    | "INVALID_SANDBOX_RUNTIME_CONFIG";
                   details?: {
                     issues: {
                       bindingIdOrDraftIndex: string;
@@ -9334,7 +9335,15 @@ export interface paths {
                   | "AGENT_BINDING_REQUIRED"
                   | "INVALID_BINDING_CONNECTION_REFERENCE"
                   | "CONNECTION_NOT_ACTIVE"
-                  | "TARGET_DISABLED";
+                  | "TARGET_DISABLED"
+                  | "SANDBOX_PROVIDER_REQUIRED"
+                  | "INVALID_SANDBOX_PROVIDER"
+                  | "SANDBOX_MANAGED_PROVIDER_UNAVAILABLE"
+                  | "INVALID_SANDBOX_CONNECTION_REFERENCE"
+                  | "SANDBOX_CONNECTION_NOT_ACTIVE"
+                  | "SANDBOX_CONNECTION_KIND_MISMATCH"
+                  | "SANDBOX_CONNECTION_PROVIDER_MISMATCH"
+                  | "INVALID_SANDBOX_RESOURCES";
                 connectionId?: string;
                 message: string;
                 targetKey?: string;

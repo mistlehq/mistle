@@ -73,7 +73,12 @@ export async function publishProfileVersion(
     db,
     dataPlaneClient,
     defaultBaseImage,
-  }: Pick<CreateSandboxProfilesServiceInput, "db" | "dataPlaneClient"> & {
+    integrationRegistry,
+    sandboxConfig,
+  }: Pick<
+    CreateSandboxProfilesServiceInput,
+    "db" | "dataPlaneClient" | "integrationRegistry" | "sandboxConfig"
+  > & {
     defaultBaseImage: string;
   },
   input: PublishProfileVersionInput,
@@ -126,6 +131,8 @@ export async function publishProfileVersion(
     const publishability = await getProfileVersionPublishability(
       {
         db: tx,
+        integrationRegistry,
+        sandboxConfig,
       },
       input,
     );

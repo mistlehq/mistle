@@ -1,6 +1,7 @@
 import { z } from "@hono/zod-openapi";
 
 import {
+  SandboxProfilesBadRequestCodes,
   SandboxProfilesConflictCodes,
   SandboxProfilesIntegrationBindingsBadRequestCodes,
   SandboxProfilesNotFoundCodes,
@@ -12,6 +13,7 @@ export const badRequestResponseSchema = z
       SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_REFERENCE,
       SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONNECTION_REFERENCE,
       SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONFIG_REFERENCE,
+      SandboxProfilesBadRequestCodes.INVALID_SANDBOX_RUNTIME_CONFIG,
     ]),
     message: z.string().min(1),
     details: z

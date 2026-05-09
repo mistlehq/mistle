@@ -7,6 +7,7 @@ import {
   IntegrationConnectionStatuses,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
+import { SandboxProvider } from "@mistle/sandbox";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
@@ -46,6 +47,7 @@ describe.concurrent("sandbox profile version publishability get integration", ()
         sandboxProfileId: "sbp_publishability_001",
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
       }),
     );
 
@@ -69,6 +71,81 @@ describe.concurrent("sandbox profile version publishability get integration", ()
           code: "AGENT_BINDING_REQUIRED",
           message:
             "Sandbox profile version must declare at least one agent binding before it can be published.",
+        },
+      ],
+    });
+  });
+
+  it("returns structured issues for invalid sandbox runtime configuration", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publishability-runtime@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "openai-publishability-runtime",
+        variantId: "openai-default",
+        enabled: true,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_publishability_runtime",
+        organizationId: session.organizationId,
+        targetKey: "openai-publishability-runtime",
+        displayName: "Runtime Issue Agent Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      }),
+    );
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_publishability_runtime_001",
+        organizationId: session.organizationId,
+        displayName: "Publishability Runtime Profile",
+        activeVersion: null,
+        createdAt: "2026-03-13T00:30:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_publishability_runtime_001",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: "unknown-provider",
+      }),
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_publishability_runtime",
+          sandboxProfileId: "sbp_publishability_runtime_001",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_publishability_runtime",
+          kind: IntegrationBindingKinds.AGENT,
+        }),
+      );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_publishability_runtime_001/versions/1/publishability",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = GetSandboxProfileVersionPublishabilityResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody).toEqual({
+      publishable: false,
+      issues: [
+        {
+          code: "INVALID_SANDBOX_PROVIDER",
+          message: "Sandbox provider 'unknown-provider' is not supported.",
         },
       ],
     });
@@ -134,6 +211,7 @@ describe.concurrent("sandbox profile version publishability get integration", ()
         sandboxProfileId: "sbp_publishability_issues_001",
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
       }),
     );
     await env.controlPlaneDb
@@ -287,6 +365,7 @@ describe.concurrent("sandbox profile version publishability get integration", ()
         sandboxProfileId: "sbp_publishability_valid_001",
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
       }),
     );
     await env.controlPlaneDb
@@ -344,6 +423,7 @@ describe.concurrent("sandbox profile version publishability get integration", ()
         sandboxProfileId: "sbp_publishability_org_b_001",
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
       }),
     );
 

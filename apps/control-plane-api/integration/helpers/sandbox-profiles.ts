@@ -33,6 +33,11 @@ export function sandboxProfileVersionRow(input: {
   publishedAt?: string | null;
   setupScript?: string | null;
   defaultPersistenceMode?: SandboxProfileVersionDefaultPersistenceMode;
+  sandboxProvider?: string | null;
+  sandboxConnectionId?: string | null;
+  sandboxVcpuCount?: number | null;
+  sandboxMemoryMb?: number | null;
+  sandboxStorageMb?: number | null;
 }) {
   return {
     sandboxProfileId: input.sandboxProfileId,
@@ -47,6 +52,13 @@ export function sandboxProfileVersionRow(input: {
     ...(input.setupScript === undefined ? {} : { setupScript: input.setupScript }),
     defaultPersistenceMode:
       input.defaultPersistenceMode ?? SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
+    ...(input.sandboxProvider === undefined ? {} : { sandboxProvider: input.sandboxProvider }),
+    ...(input.sandboxConnectionId === undefined
+      ? {}
+      : { sandboxConnectionId: input.sandboxConnectionId }),
+    ...(input.sandboxVcpuCount === undefined ? {} : { sandboxVcpuCount: input.sandboxVcpuCount }),
+    ...(input.sandboxMemoryMb === undefined ? {} : { sandboxMemoryMb: input.sandboxMemoryMb }),
+    ...(input.sandboxStorageMb === undefined ? {} : { sandboxStorageMb: input.sandboxStorageMb }),
   };
 }
 
@@ -54,13 +66,15 @@ export function integrationTargetRow(input: {
   targetKey: string;
   variantId: string;
   enabled: boolean;
+  familyId?: string;
+  config?: Record<string, unknown>;
 }) {
   return {
     targetKey: input.targetKey,
-    familyId: "openai",
+    familyId: input.familyId ?? "openai",
     variantId: input.variantId,
     enabled: input.enabled,
-    config: {
+    config: input.config ?? {
       api_base_url: "https://api.openai.com/v1",
     },
   };

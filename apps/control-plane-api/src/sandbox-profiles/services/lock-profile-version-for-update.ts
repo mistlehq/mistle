@@ -15,6 +15,11 @@ export async function lockProfileVersionForUpdateOrThrow(input: {
       sandboxProfileId: sandboxProfileVersions.sandboxProfileId,
       version: sandboxProfileVersions.version,
       state: sandboxProfileVersions.state,
+      sandboxProvider: sandboxProfileVersions.sandboxProvider,
+      sandboxConnectionId: sandboxProfileVersions.sandboxConnectionId,
+      sandboxVcpuCount: sandboxProfileVersions.sandboxVcpuCount,
+      sandboxMemoryMb: sandboxProfileVersions.sandboxMemoryMb,
+      sandboxStorageMb: sandboxProfileVersions.sandboxStorageMb,
     })
     .from(sandboxProfileVersions)
     .where(

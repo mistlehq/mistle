@@ -4,6 +4,8 @@ import { withHttpErrorHandler } from "@mistle/http/errors.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
 import {
+  SandboxProfilesBadRequestCodes,
+  SandboxProfilesBadRequestError,
   SandboxProfilesIntegrationBindingsBadRequestCodes,
   SandboxProfilesIntegrationBindingsBadRequestError,
   SandboxProfilesNotFoundError,
@@ -17,12 +19,14 @@ const routeHandler = async (
   { session }: AppSession,
 ) => {
   const db = ctx.get("db");
+  const integrationRegistry = ctx.get("integrationRegistry");
+  const sandboxConfig = ctx.get("sandboxConfig");
   const { profileId, version } = ctx.req.valid("param");
   const body = ctx.req.valid("json");
 
   try {
     const updatedDraft = await putProfileVersionDraft(
-      { db },
+      { db, integrationRegistry, sandboxConfig },
       {
         organizationId: session.activeOrganizationId,
         profileId,
@@ -83,6 +87,15 @@ const routeHandler = async (
     if (error instanceof SandboxProfilesIntegrationBindingsBadRequestError) {
       const responseBody: z.infer<typeof badRequestResponseSchema> = {
         code: error.code,
+        message: error.message,
+      };
+
+      return ctx.json(responseBody, 400);
+    }
+
+    if (error instanceof SandboxProfilesBadRequestError) {
+      const responseBody: z.infer<typeof badRequestResponseSchema> = {
+        code: SandboxProfilesBadRequestCodes.INVALID_SANDBOX_RUNTIME_CONFIG,
         message: error.message,
       };
 

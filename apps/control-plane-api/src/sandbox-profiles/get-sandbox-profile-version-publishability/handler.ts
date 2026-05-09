@@ -11,11 +11,15 @@ const routeHandler = async (
   { session }: AppSession,
 ) => {
   const db = ctx.get("db");
+  const integrationRegistry = ctx.get("integrationRegistry");
+  const sandboxConfig = ctx.get("sandboxConfig");
   const { profileId, version } = ctx.req.valid("param");
 
   const publishability = await getProfileVersionPublishability(
     {
       db,
+      integrationRegistry,
+      sandboxConfig,
     },
     {
       organizationId: session.activeOrganizationId,

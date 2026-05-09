@@ -8,6 +8,11 @@ import {
   SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
+import {
+  E2BSandboxRuntimeFamilyId,
+  E2BSandboxRuntimeVariantId,
+} from "@mistle/integrations-definitions";
+import { SandboxProvider } from "@mistle/sandbox";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
@@ -30,7 +35,7 @@ const it = createIntegrationTest({
 
 const EmptySandboxRuntimeConfig = {
   sandboxConnectionId: null,
-  sandboxProvider: null,
+  sandboxProvider: SandboxProvider.DOCKER,
   sandboxResources: null,
 };
 
@@ -86,6 +91,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
         state: SandboxProfileVersionStates.DRAFT,
         setupScript: "pnpm install",
         defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
+        sandboxProvider: SandboxProvider.DOCKER,
       }),
     );
     await env.controlPlaneDb
@@ -176,6 +182,193 @@ describe.concurrent("sandbox profile version draft put integration", () => {
     expect(persistedVersion).toEqual({
       setupScript: "pnpm install\npnpm dev:bootstrap",
       defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
+    });
+  });
+
+  it("rejects unsupported sandbox runtime provider updates", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-draft-put-invalid-provider@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_draft_put_invalid_provider_001",
+        organizationId: session.organizationId,
+        displayName: "Draft Put Invalid Provider Profile",
+        createdAt: "2026-05-08T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_draft_put_invalid_provider_001",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_draft_put_invalid_provider_001/versions/1/draft",
+      {
+        method: "PUT",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sandboxProvider: "unknown-provider",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const responseBody = PutSandboxProfileVersionDraftBadRequestResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody.code).toBe("INVALID_SANDBOX_RUNTIME_CONFIG");
+    expect(responseBody.message).toBe("Sandbox provider 'unknown-provider' is not supported.");
+  });
+
+  it("accepts an organization-owned E2B sandbox runtime connection with valid resources", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-draft-put-e2b@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "e2b-default-draft-put",
+        familyId: E2BSandboxRuntimeFamilyId,
+        variantId: E2BSandboxRuntimeVariantId,
+        enabled: true,
+        config: {},
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_draft_put_e2b_001",
+        organizationId: session.organizationId,
+        targetKey: "e2b-default-draft-put",
+        displayName: "Draft Put E2B Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {},
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_draft_put_e2b_001",
+        organizationId: session.organizationId,
+        displayName: "Draft Put E2B Profile",
+        createdAt: "2026-05-08T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_draft_put_e2b_001",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_draft_put_e2b_001/versions/1/draft",
+      {
+        method: "PUT",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sandboxProvider: SandboxProvider.E2B,
+          sandboxConnectionId: "icn_draft_put_e2b_001",
+          sandboxResources: {
+            vcpuCount: 2,
+            memoryMb: 4096,
+          },
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = PutSandboxProfileVersionDraftResponseSchema.parse(await response.json());
+    expect(responseBody.sandboxProvider).toBe(SandboxProvider.E2B);
+    expect(responseBody.sandboxConnectionId).toBe("icn_draft_put_e2b_001");
+    expect(responseBody.sandboxResources).toEqual({
+      vcpuCount: 2,
+      memoryMb: 4096,
+    });
+  });
+
+  it("rejects unsupported E2B storage resource updates", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-draft-put-e2b-storage@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "e2b-default-draft-put-storage",
+        familyId: E2BSandboxRuntimeFamilyId,
+        variantId: E2BSandboxRuntimeVariantId,
+        enabled: true,
+        config: {},
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_draft_put_e2b_storage_001",
+        organizationId: session.organizationId,
+        targetKey: "e2b-default-draft-put-storage",
+        displayName: "Draft Put E2B Storage Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {},
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_draft_put_e2b_storage_001",
+        organizationId: session.organizationId,
+        displayName: "Draft Put E2B Storage Profile",
+        createdAt: "2026-05-08T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_draft_put_e2b_storage_001",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_draft_put_e2b_storage_001/versions/1/draft",
+      {
+        method: "PUT",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sandboxProvider: SandboxProvider.E2B,
+          sandboxConnectionId: "icn_draft_put_e2b_storage_001",
+          sandboxResources: {
+            vcpuCount: 2,
+            memoryMb: 4096,
+            storageMb: 1024,
+          },
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const responseBody = PutSandboxProfileVersionDraftBadRequestResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody).toEqual({
+      code: "INVALID_SANDBOX_RUNTIME_CONFIG",
+      message: "Sandbox provider 'e2b' does not support configurable storage.",
     });
   });
 

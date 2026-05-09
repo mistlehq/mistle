@@ -12,6 +12,7 @@ const routeHandler = async (
 ) => {
   const db = ctx.get("db");
   const dataPlaneClient = ctx.get("dataPlaneClient");
+  const integrationRegistry = ctx.get("integrationRegistry");
   const sandboxConfig = ctx.get("sandboxConfig");
   const { profileId, version } = ctx.req.valid("param");
 
@@ -19,6 +20,8 @@ const routeHandler = async (
     {
       db,
       dataPlaneClient,
+      integrationRegistry,
+      sandboxConfig,
       defaultBaseImage: sandboxConfig.defaultBaseImage,
     },
     {
