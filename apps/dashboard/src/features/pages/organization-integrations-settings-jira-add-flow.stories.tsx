@@ -132,12 +132,6 @@ function createJiraWebhookSource(input?: { connectionId?: string }): Integration
     remoteRegistrationId: "10001",
     status: "active",
     providerMetadata: {
-      registeredEvents: [
-        "jira:issue_created",
-        "jira:issue_updated",
-        "comment_created",
-        "comment_updated",
-      ],
       ...createStoryWebhookTriggerCapabilitiesProviderMetadata({
         definition: JiraDefinition,
         events: ["jira:issue_created", "jira:issue_updated", "comment_created"],

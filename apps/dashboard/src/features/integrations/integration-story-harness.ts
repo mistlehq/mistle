@@ -997,12 +997,6 @@ export function createJiraDetailViewStoryProps(): IntegrationConnectionDetailVie
         id: "iws_jira_dense",
         integrationConnectionId: "icn_jira_dense",
         providerMetadata: {
-          registeredEvents: [
-            "jira:issue_created",
-            "jira:issue_updated",
-            "comment_created",
-            "comment_updated",
-          ],
           ...createStoryWebhookTriggerCapabilitiesProviderMetadata({
             definition: getDefinitionOrThrow({
               familyId: "jira",

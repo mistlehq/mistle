@@ -9,11 +9,9 @@ import {
   type IntegrationWebhookTriggerProviderPermissionRequirement,
   type IntegrationWebhookTriggerRequirementSet,
 } from "@mistle/integrations-core";
-import { JiraWebhookEventDisplayNameByType } from "@mistle/integrations-definitions";
 import {
   Badge,
   Button,
-  BadgeListField,
   CopyableValue,
   DefinitionList,
   DetailLabel,
@@ -995,7 +993,6 @@ function WebhookSourceCard(input: {
     !input.hideDeleteAction &&
     input.onDeleteWebhookSource !== undefined &&
     input.source.remoteRegistrationId !== undefined;
-  const registeredEventLabels = resolveWebhookRegisteredEventLabels(input.source.providerMetadata);
   const webhookTriggerCapabilities = parseWebhookTriggerCapabilitiesProviderMetadata(
     input.source.providerMetadata,
   );
@@ -1053,13 +1050,6 @@ function WebhookSourceCard(input: {
                 ]),
           ]}
         />
-        <BadgeListField
-          items={registeredEventLabels.map((label) => ({
-            id: label,
-            label,
-          }))}
-          label="Registered events"
-        />
         {input.source.callbackUrl === undefined ? null : (
           <CopyableValue label="Webhook URL" value={input.source.callbackUrl} />
         )}
@@ -1080,7 +1070,7 @@ function WebhookTriggerCapabilityEventList(input: {
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-2">
-      <DetailLabel as="p">Webhook events</DetailLabel>
+      <DetailLabel as="p">Available automation triggers</DetailLabel>
       <div className="divide-border overflow-hidden rounded-md border">
         {input.events.map((event) => (
           <WebhookTriggerCapabilityEventRow
@@ -1291,22 +1281,4 @@ function formatRequirementSetKey(
     .join("|");
 
   return `${requirementSet.event ?? ""}:${permissionKey}:${index}`;
-}
-
-function isStringArray(input: unknown): input is string[] {
-  return Array.isArray(input) && input.every((item) => typeof item === "string");
-}
-
-function resolveWebhookRegisteredEventLabels(
-  providerMetadata: IntegrationWebhookSource["providerMetadata"],
-): readonly string[] {
-  const registeredEvents = providerMetadata["registeredEvents"];
-
-  if (!isStringArray(registeredEvents)) {
-    return [];
-  }
-
-  return registeredEvents.map((eventType): string => {
-    return JiraWebhookEventDisplayNameByType.get(eventType) ?? eventType;
-  });
 }

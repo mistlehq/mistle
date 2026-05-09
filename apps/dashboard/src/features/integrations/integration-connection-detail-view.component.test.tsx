@@ -1140,11 +1140,11 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.getByText("Active")).toBeTruthy();
     expect(screen.getByText("Provider registration")).toBeTruthy();
     expect(screen.getByText("10001")).toBeTruthy();
-    expect(screen.getByText("Registered events")).toBeTruthy();
-    expect(screen.getByText("Issue created")).toBeTruthy();
-    expect(screen.getByText("Issue updated")).toBeTruthy();
-    expect(screen.getByText("Comment created")).toBeTruthy();
-    expect(screen.getByText("Comment updated")).toBeTruthy();
+    expect(screen.queryByText("Registered events")).toBeNull();
+    expect(screen.queryByText("Issue created")).toBeNull();
+    expect(screen.queryByText("Issue updated")).toBeNull();
+    expect(screen.queryByText("Comment created")).toBeNull();
+    expect(screen.queryByText("Comment updated")).toBeNull();
     expect(screen.getByText("Webhook URL")).toBeTruthy();
     expect(screen.getByText("whsec_jira_123")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Create webhook" })).toBeNull();
@@ -1277,7 +1277,7 @@ describe("IntegrationConnectionDetailView", () => {
       throw new Error("Expected webhook section to render.");
     }
 
-    expect(within(webhookSection).getByText("Webhook events")).toBeTruthy();
+    expect(within(webhookSection).getByText("Available automation triggers")).toBeTruthy();
     expect(within(webhookSection).getByText("Pull request opened")).toBeTruthy();
     expect(within(webhookSection).queryByText("Pull request")).toBeNull();
     expect(within(webhookSection).queryByText("github.pull_request.opened")).toBeNull();
