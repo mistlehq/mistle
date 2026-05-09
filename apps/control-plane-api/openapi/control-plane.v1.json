@@ -17367,7 +17367,7 @@
                     "minLength": 1
                   },
                   "sandboxResources": {
-                    "type": "object",
+                    "type": ["object", "null"],
                     "properties": {
                       "vcpuCount": {
                         "type": "integer",

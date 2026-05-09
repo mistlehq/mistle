@@ -20,6 +20,7 @@ import type {
   SandboxProfileVersionAutomationConfig,
   SandboxProfileVersionRefreshSchedule,
   SandboxProfileVersionSetupScript,
+  SandboxProvidersResult,
   SandboxProfileSetupAssistant,
   SandboxProfileSetupScriptTestRun,
   SandboxProfilesListResult,
@@ -165,6 +166,41 @@ export async function listLaunchableSandboxProfiles(input: {
         operation: "listLaunchableSandboxProfiles",
         error,
         fallbackMessage: "Could not load launchable sandbox profiles.",
+      }),
+    );
+  }
+}
+
+export async function listSandboxProviders(input?: {
+  signal?: AbortSignal;
+}): Promise<SandboxProvidersResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "listSandboxProviders",
+      method: "GET",
+      pathname: "/v1/sandbox/providers",
+      fallbackMessage: "Could not load sandbox providers.",
+      ...(input?.signal === undefined ? {} : { signal: input.signal }),
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = SandboxProvidersResultSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "listSandboxProviders",
+        status: 500,
+        body: responseBody,
+        message: "Sandbox providers response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "listSandboxProviders",
+        error,
+        fallbackMessage: "Could not load sandbox providers.",
       }),
     );
   }
@@ -341,6 +377,44 @@ const SandboxProfileVersionResourcesSchema = z
     ...(value.storageMb === undefined ? {} : { storageMb: value.storageMb }),
   }));
 
+const SandboxRuntimeResourceCapabilitySchema = z
+  .object({
+    default: z.number().int().min(0),
+    max: z.number().int().min(0),
+    min: z.number().int().min(0),
+    step: z.number().int().min(1),
+  })
+  .strict();
+
+const SandboxRuntimeResourceCapabilitiesSchema = z
+  .object({
+    memoryMb: SandboxRuntimeResourceCapabilitySchema,
+    storageMb: SandboxRuntimeResourceCapabilitySchema.optional(),
+    vcpuCount: SandboxRuntimeResourceCapabilitySchema,
+  })
+  .strict()
+  .transform((capabilities) => ({
+    memoryMb: capabilities.memoryMb,
+    ...(capabilities.storageMb === undefined ? {} : { storageMb: capabilities.storageMb }),
+    vcpuCount: capabilities.vcpuCount,
+  }));
+
+const SandboxProvidersResultSchema = z
+  .object({
+    items: z.array(
+      z
+        .object({
+          displayName: z.string().min(1),
+          id: z.string().min(1),
+          managed: z.boolean(),
+          resourceCapabilities: SandboxRuntimeResourceCapabilitiesSchema.nullable(),
+          supportsOrganizationConnection: z.boolean(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
 const SandboxProfileVersionSchema = z
   .object({
     defaultPersistenceMode: z.enum(["ephemeral", "persistent"]),
@@ -387,6 +461,14 @@ const SandboxProfileVersionPublishabilitySchema = z
             "INVALID_BINDING_CONNECTION_REFERENCE",
             "CONNECTION_NOT_ACTIVE",
             "TARGET_DISABLED",
+            "SANDBOX_PROVIDER_REQUIRED",
+            "INVALID_SANDBOX_PROVIDER",
+            "SANDBOX_MANAGED_PROVIDER_UNAVAILABLE",
+            "INVALID_SANDBOX_CONNECTION_REFERENCE",
+            "SANDBOX_CONNECTION_NOT_ACTIVE",
+            "SANDBOX_CONNECTION_KIND_MISMATCH",
+            "SANDBOX_CONNECTION_PROVIDER_MISMATCH",
+            "INVALID_SANDBOX_RESOURCES",
           ]),
           message: z.string().min(1),
           bindingId: z.string().min(1).optional(),

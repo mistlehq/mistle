@@ -301,6 +301,92 @@ describe.concurrent("sandbox profile version draft put integration", () => {
     });
   });
 
+  it("clears sandbox runtime resources when switching to Docker", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-draft-put-docker-resource-clear@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "e2b-default-draft-put-resource-clear",
+        familyId: E2BSandboxRuntimeFamilyId,
+        variantId: E2BSandboxRuntimeVariantId,
+        enabled: true,
+        config: {},
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_draft_put_resource_clear_001",
+        organizationId: session.organizationId,
+        targetKey: "e2b-default-draft-put-resource-clear",
+        displayName: "Draft Put Resource Clear E2B Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {},
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_draft_put_resource_clear_001",
+        organizationId: session.organizationId,
+        displayName: "Draft Put Resource Clear Profile",
+        createdAt: "2026-05-08T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_draft_put_resource_clear_001",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.E2B,
+        sandboxConnectionId: "icn_draft_put_resource_clear_001",
+        sandboxVcpuCount: 2,
+        sandboxMemoryMb: 4096,
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_draft_put_resource_clear_001/versions/1/draft",
+      {
+        method: "PUT",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sandboxProvider: SandboxProvider.DOCKER,
+          sandboxConnectionId: null,
+          sandboxResources: null,
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = PutSandboxProfileVersionDraftResponseSchema.parse(await response.json());
+    expect(responseBody.sandboxProvider).toBe(SandboxProvider.DOCKER);
+    expect(responseBody.sandboxConnectionId).toBeNull();
+    expect(responseBody.sandboxResources).toBeNull();
+
+    const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        sandboxConnectionId: true,
+        sandboxProvider: true,
+        sandboxVcpuCount: true,
+        sandboxMemoryMb: true,
+        sandboxStorageMb: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, "sbp_draft_put_resource_clear_001"), eq(table.version, 1)),
+    });
+    expect(persistedVersion).toEqual({
+      sandboxProvider: SandboxProvider.DOCKER,
+      sandboxConnectionId: null,
+      sandboxVcpuCount: null,
+      sandboxMemoryMb: null,
+      sandboxStorageMb: null,
+    });
+  });
+
   it("rejects unsupported E2B storage resource updates", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-sandbox-profile-draft-put-e2b-storage@example.com",

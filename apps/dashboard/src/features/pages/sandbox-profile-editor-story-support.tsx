@@ -20,6 +20,10 @@ import type { ChatEntry } from "../chat/chat-types.js";
 import { ChatComposer } from "../chat/components/chat-composer.js";
 import { noopRespondToServerRequest } from "../chat/components/chat-story-support.js";
 import type { SandboxProfileVersionDraftAutomationImpactAutomation } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type {
+  SandboxProviderSummary,
+  SandboxProfileVersion,
+} from "../sandbox-profiles/sandbox-profiles-types.js";
 import { SessionComposerFixtureProps } from "../session-agents/codex/fixtures/session-fixtures.js";
 import {
   createIntegrationsEditorSectionStoryQueryClient,
@@ -50,6 +54,7 @@ import {
 import type { SandboxProfileEditorSection } from "./sandbox-profile-editor-sections.js";
 import { SandboxProfileIntegrationsSetupSection } from "./sandbox-profile-integrations-setup-section.js";
 import { mapBindingsToEditorRows } from "./sandbox-profile-integrations-state.js";
+import { SandboxProfileRuntimeSection } from "./sandbox-profile-runtime-section.js";
 import {
   SandboxProfileSetupScriptTestPanel,
   type SetupScriptTestStatus,
@@ -115,6 +120,7 @@ export type SandboxProfileEditorPageStoryArgs = {
   setupAssistantErrorMessage?: string;
   setupAssistantState?: "available" | "starting" | "disabled";
   setupScriptTestStatus?: SetupScriptTestStatus;
+  runtimeState?: "docker" | "e2b-managed" | "e2b-connection";
 };
 
 type IntegrationsSectionState = NonNullable<
@@ -187,6 +193,55 @@ export const StoryBindings = [
     },
   },
 ] as const;
+
+const StoryE2BSandboxConnection = {
+  id: "connection-e2b-sandbox-runtime",
+  displayName: "E2B Production",
+  targetKey: "e2b-default",
+  status: "active",
+  config: {},
+} satisfies IntegrationConnectionSummary;
+
+const StoryE2BSandboxTarget = {
+  targetKey: "e2b-default",
+  displayName: "E2B",
+  familyId: "e2b",
+  variantId: "e2b-default",
+  config: {},
+  targetHealth: {
+    configStatus: "valid",
+  },
+} satisfies IntegrationTargetSummary;
+
+const StorySandboxProviders = [
+  {
+    id: "docker",
+    displayName: "Docker",
+    managed: true,
+    supportsOrganizationConnection: false,
+    resourceCapabilities: null,
+  },
+  {
+    id: "e2b",
+    displayName: "E2B",
+    managed: true,
+    supportsOrganizationConnection: true,
+    resourceCapabilities: {
+      vcpuCount: {
+        min: 1,
+        max: 8,
+        step: 1,
+        default: 2,
+      },
+      memoryMb: {
+        min: 1024,
+        max: 8192,
+        step: 1024,
+        default: 4096,
+      },
+    },
+  },
+] satisfies readonly SandboxProviderSummary[];
 
 type SnapshotStoryStatus = NonNullable<SandboxProfileEditorPageStoryArgs["snapshotState"]>;
 type SnapshotRefreshScheduleStoryState = NonNullable<
@@ -316,6 +371,32 @@ function createSnapshotRefreshScheduleInitialDraft(
   }
 
   return null;
+}
+
+function createRuntimeStoryVersion(input: {
+  runtimeState: SandboxProfileEditorPageStoryArgs["runtimeState"];
+  version: number;
+}): SandboxProfileVersion {
+  const runtimeState = input.runtimeState ?? "docker";
+  return {
+    sandboxProfileId: "sandbox-profile-story",
+    version: input.version,
+    state: "draft",
+    defaultPersistenceMode: "ephemeral",
+    sandboxProvider: runtimeState === "docker" ? "docker" : "e2b",
+    sandboxConnectionId: runtimeState === "e2b-connection" ? StoryE2BSandboxConnection.id : null,
+    sandboxResources:
+      runtimeState === "docker"
+        ? null
+        : {
+            vcpuCount: 2,
+            memoryMb: 4096,
+          },
+    isActive: false,
+    usable: false,
+    refreshSchedule: null,
+    latestSnapshotJob: null,
+  };
 }
 
 function SetupScriptStoryControls(input: {
@@ -585,6 +666,14 @@ function SandboxProfileEditorPageStoryView(
   );
   const setupScriptTestStatus =
     input.setupScriptTestStatus ?? (setupScriptDraft.trim().length === 0 ? "blank" : "idle");
+  const storyConnections = [
+    ...(input.availableConnections ?? StoryIntegrationConnections),
+    StoryE2BSandboxConnection,
+  ];
+  const storyTargets = [
+    ...(input.availableTargets ?? StoryIntegrationTargets),
+    StoryE2BSandboxTarget,
+  ];
   function handleToggleSetupAssistant(): void {
     if (setupAssistantPanelOpen) {
       setSetupAssistantPanelOpen(false);
@@ -639,9 +728,22 @@ function SandboxProfileEditorPageStoryView(
           return (
             <div className="flex w-full flex-col gap-8">
               <SandboxProfilePanelSection>
+                <SandboxProfileRuntimeSection
+                  availableConnections={storyConnections}
+                  availableTargets={storyTargets}
+                  disabled={!isEditable}
+                  isDraft={mode.kind === "draft"}
+                  providers={StorySandboxProviders}
+                  version={createRuntimeStoryVersion({
+                    runtimeState: input.runtimeState,
+                    version: mode.version,
+                  })}
+                />
+              </SandboxProfilePanelSection>
+              <SandboxProfilePanelSection>
                 <SandboxProfileIntegrationsSetupSection
-                  availableConnections={input.availableConnections ?? StoryIntegrationConnections}
-                  availableTargets={input.availableTargets ?? StoryIntegrationTargets}
+                  availableConnections={storyConnections}
+                  availableTargets={storyTargets}
                   integrationBindingsQuery={{
                     isError: false,
                     error: null,

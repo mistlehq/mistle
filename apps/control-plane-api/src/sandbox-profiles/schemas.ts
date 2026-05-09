@@ -307,7 +307,7 @@ export const putSandboxProfileVersionDraftBodySchema = z
     defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema.optional(),
     sandboxProvider: z.string().min(1).optional(),
     sandboxConnectionId: z.string().min(1).nullable().optional(),
-    sandboxResources: sandboxProfileVersionResourcesSchema.optional(),
+    sandboxResources: sandboxProfileVersionResourcesSchema.nullable().optional(),
     integrationBindings: sandboxProfileVersionIntegrationBindingsWriteBodySchema.optional(),
   })
   .strict()

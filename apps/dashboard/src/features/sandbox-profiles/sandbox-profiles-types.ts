@@ -26,6 +26,8 @@ type PutSandboxProfileVersionDraftRequest =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/draft"]["put"]["requestBody"]["content"]["application/json"];
 type PutSandboxProfileVersionDraftResponse =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/draft"]["put"]["responses"][200]["content"]["application/json"];
+type ListSandboxProvidersResponse =
+  paths["/v1/sandbox/providers"]["get"]["responses"][200]["content"]["application/json"];
 
 export type SandboxProfile = GetSandboxProfileResponse;
 export type SandboxProfileStatus = SandboxProfile["status"];
@@ -66,6 +68,8 @@ export type PutSandboxProfileVersionDraftInput = PutSandboxProfileVersionDraftRe
   version: number;
 };
 export type PutSandboxProfileVersionDraftResult = PutSandboxProfileVersionDraftResponse;
+export type SandboxProvidersResult = ListSandboxProvidersResponse;
+export type SandboxProviderSummary = SandboxProvidersResult["items"][number];
 
 export type SandboxProfileVersionPublishability =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/publishability"]["get"]["responses"][200]["content"]["application/json"];

@@ -64,6 +64,7 @@ import {
   sandboxProfileVersionIntegrationBindingsQueryKey,
   sandboxProfileVersionSetupScriptQueryKey,
   sandboxProfileVersionsQueryKey,
+  sandboxProvidersQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import {
   createSandboxProfileVersionDraft,
@@ -72,6 +73,7 @@ import {
   getSandboxProfile,
   getSandboxProfileVersionDraftAutomationImpact,
   getSandboxProfileVersionPublishability,
+  listSandboxProviders,
   listSandboxProfileVersions,
   publishSandboxProfileVersion,
   putSandboxProfileVersionDraft,
@@ -131,6 +133,11 @@ import {
   useCreateSandboxProfileMetaState,
   useEditSandboxProfileMetaState,
 } from "./sandbox-profile-meta-state.js";
+import {
+  SandboxProfileRuntimeSection,
+  type SandboxProfileRuntimeDraftChanges,
+  type SandboxProfileRuntimeDraftState,
+} from "./sandbox-profile-runtime-section.js";
 import {
   useLoadedSandboxProfileSetupScriptState,
   useSandboxProfileSetupScriptLoader,
@@ -198,6 +205,7 @@ type SandboxProfilePersistenceDraftState = {
   ) => void;
   buildDraftChanges?: () => SandboxProfileVersion["defaultPersistenceMode"];
 };
+type SandboxProfileRuntimeSettingsDraftState = SandboxProfileRuntimeDraftState;
 type SetupScriptAssistantControl = {
   disabled: boolean;
   errorMessage: string | null;
@@ -218,6 +226,12 @@ function createIdleSandboxProfileDraftSectionState(): SandboxProfileDraftSection
 }
 
 function createIdleSandboxProfilePersistenceDraftState(): SandboxProfilePersistenceDraftState {
+  return {
+    hasUnpersistedChanges: false,
+  };
+}
+
+function createIdleSandboxProfileRuntimeDraftState(): SandboxProfileRuntimeSettingsDraftState {
   return {
     hasUnpersistedChanges: false,
   };
@@ -1157,6 +1171,9 @@ function ReadySandboxProfileEditorPage(input: {
   const [persistenceDraftState, setPersistenceDraftState] = useState(
     createIdleSandboxProfilePersistenceDraftState,
   );
+  const [runtimeDraftState, setRuntimeDraftState] = useState(
+    createIdleSandboxProfileRuntimeDraftState,
+  );
   const [publishRequestIsPending, setPublishRequestIsPending] = useState(false);
   const [saveDraftRequestIsPending, setSaveDraftRequestIsPending] = useState(false);
   const [publishFlushError, setPublishFlushError] = useState<string | null>(null);
@@ -1313,33 +1330,49 @@ function ReadySandboxProfileEditorPage(input: {
   async function saveDraftChanges(): Promise<boolean> {
     setPublishFlushError(null);
     const shouldSavePersistence = persistenceDraftState.hasUnpersistedChanges;
+    const shouldSaveRuntime = runtimeDraftState.hasUnpersistedChanges;
     const shouldSaveIntegrations = integrationDraftState.hasUnpersistedChanges;
     const shouldSaveSetupScript = setupScriptDraftState.hasUnpersistedChanges;
 
-    if (!shouldSavePersistence && !shouldSaveIntegrations && !shouldSaveSetupScript) {
+    if (
+      !shouldSavePersistence &&
+      !shouldSaveRuntime &&
+      !shouldSaveIntegrations &&
+      !shouldSaveSetupScript
+    ) {
       return true;
     }
 
-    const integrationBindings = shouldSaveIntegrations
-      ? integrationDraftState.buildIntegrationBindingChanges?.()
-      : undefined;
-    if (integrationBindings === null) {
-      setPublishFlushError(DraftSaveErrorMessage);
-      return false;
-    }
-    const setupScript = shouldSaveSetupScript
-      ? (setupScriptDraftState.buildDraftChanges?.() ?? null)
-      : undefined;
-    const defaultPersistenceMode = shouldSavePersistence
-      ? persistenceDraftState.buildDraftChanges?.()
-      : undefined;
-
     try {
+      const integrationBindings = shouldSaveIntegrations
+        ? integrationDraftState.buildIntegrationBindingChanges?.()
+        : undefined;
+      if (integrationBindings === null) {
+        setPublishFlushError(DraftSaveErrorMessage);
+        return false;
+      }
+      const setupScript = shouldSaveSetupScript
+        ? (setupScriptDraftState.buildDraftChanges?.() ?? null)
+        : undefined;
+      const defaultPersistenceMode = shouldSavePersistence
+        ? persistenceDraftState.buildDraftChanges?.()
+        : undefined;
+      const runtimeChanges: SandboxProfileRuntimeDraftChanges | undefined = shouldSaveRuntime
+        ? runtimeDraftState.buildDraftChanges?.()
+        : undefined;
+
       const savedDraft = await putSandboxProfileVersionDraft({
         profileId: input.profileId,
         version: input.mode.version,
         ...(setupScript === undefined ? {} : { setupScript }),
         ...(defaultPersistenceMode === undefined ? {} : { defaultPersistenceMode }),
+        ...(runtimeChanges === undefined
+          ? {}
+          : {
+              sandboxProvider: runtimeChanges.sandboxProvider,
+              sandboxConnectionId: runtimeChanges.sandboxConnectionId,
+              sandboxResources: runtimeChanges.sandboxResources,
+            }),
         ...(shouldSaveIntegrations && integrationBindings !== undefined
           ? { integrationBindings: { bindings: integrationBindings } }
           : {}),
@@ -1363,12 +1396,25 @@ function ReadySandboxProfileEditorPage(input: {
         persistenceDraftState.applySavedPersistenceMode?.(savedDraft.defaultPersistenceMode);
         await input.invalidateProfileVersions(input.profileId);
       }
+      if (shouldSaveRuntime) {
+        if (savedDraft.sandboxProvider === null) {
+          throw new Error("Saved sandbox runtime provider is missing.");
+        }
+
+        runtimeDraftState.applySavedRuntimeConfig?.({
+          sandboxProvider: savedDraft.sandboxProvider,
+          sandboxConnectionId: savedDraft.sandboxConnectionId,
+          sandboxResources: savedDraft.sandboxResources,
+        });
+        await input.invalidateProfileVersions(input.profileId);
+      }
 
       return true;
     } catch (error: unknown) {
       integrationDraftState.applyDraftSaveError?.(error);
       setupScriptDraftState.applyDraftSaveError?.(error);
       persistenceDraftState.applyDraftSaveError?.(error);
+      runtimeDraftState.applyDraftSaveError?.(error);
       setPublishFlushError(DraftSaveErrorMessage);
       return false;
     }
@@ -1422,6 +1468,7 @@ function ReadySandboxProfileEditorPage(input: {
     <SandboxProfileEditorView
       activeSectionId={activeSectionId}
       hasUnpersistedPersistenceChanges={persistenceDraftState.hasUnpersistedChanges}
+      hasUnpersistedRuntimeChanges={runtimeDraftState.hasUnpersistedChanges}
       hasUnpersistedIntegrationChanges={integrationDraftState.hasUnpersistedChanges}
       hasUnpersistedSetupScriptChanges={setupScriptDraftState.hasUnpersistedChanges}
       isSavingProfileName={metaState.isUpdating}
@@ -1494,6 +1541,7 @@ function ReadySandboxProfileEditorPage(input: {
           invalidateProfileVersions={input.invalidateProfileVersions}
           mode={input.mode}
           onPersistenceDraftStateChange={setPersistenceDraftState}
+          onRuntimeDraftStateChange={setRuntimeDraftState}
           onIntegrationDraftStateChange={setIntegrationDraftState}
           onPublishSuccessMessageDismiss={() => {
             setShowPublishSuccessMessage(false);
@@ -1828,6 +1876,7 @@ function SandboxProfileEditorSectionPanels(input: {
   invalidateProfileVersions: (profileId: string) => Promise<void>;
   mode: SandboxProfileEditorVersionMode;
   onPersistenceDraftStateChange: (state: SandboxProfilePersistenceDraftState) => void;
+  onRuntimeDraftStateChange: (state: SandboxProfileRuntimeSettingsDraftState) => void;
   onIntegrationDraftStateChange: (state: SandboxProfileDraftSectionState) => void;
   onPublishSuccessMessageDismiss: () => void;
   onRefreshSnapshot: (version: number) => void;
@@ -1870,6 +1919,18 @@ function SandboxProfileEditorSectionPanels(input: {
 
   return (
     <div className="flex w-full flex-col gap-8">
+      {input.currentVersion === null ? null : (
+        <SandboxProfilePanelSection>
+          <LoadedSandboxProfileRuntimeSection
+            availableConnections={input.integrationsLoader.availableConnections}
+            availableTargets={input.integrationsLoader.availableTargets}
+            disabled={input.draftFieldsAreReadOnly}
+            isDraft={input.mode.kind === "draft"}
+            onDraftStateChange={input.onRuntimeDraftStateChange}
+            version={input.currentVersion}
+          />
+        </SandboxProfilePanelSection>
+      )}
       <LoadedSandboxProfileIntegrationSetupSection
         key={`${input.profileId}:integration-setup`}
         loader={input.integrationsLoader}
@@ -1913,6 +1974,57 @@ function SandboxProfileEditorSectionPanels(input: {
 
 export function SandboxProfilePanelSection(input: { children: ReactNode }): React.JSX.Element {
   return <section className="flex flex-col gap-4">{input.children}</section>;
+}
+
+function LoadedSandboxProfileRuntimeSection(input: {
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+  disabled: boolean;
+  isDraft: boolean;
+  onDraftStateChange: (state: SandboxProfileRuntimeSettingsDraftState) => void;
+  version: SandboxProfileVersion;
+}): React.JSX.Element {
+  const sandboxProvidersQuery = useQuery({
+    queryKey: sandboxProvidersQueryKey(),
+    queryFn: async ({ signal }) => listSandboxProviders({ signal }),
+    retry: false,
+  });
+
+  if (sandboxProvidersQuery.isPending) {
+    return (
+      <div
+        aria-live="polite"
+        className="text-muted-foreground flex items-center gap-2 text-sm"
+        role="status"
+      >
+        <SpinnerGapIcon aria-hidden className="size-4 animate-spin" />
+        <span>Loading sandbox providers...</span>
+      </div>
+    );
+  }
+
+  if (sandboxProvidersQuery.isError) {
+    return (
+      <Notice title="Could not load sandbox providers" variant="alert">
+        {resolveApiErrorMessage({
+          error: sandboxProvidersQuery.error,
+          fallbackMessage: "Could not load sandbox providers.",
+        })}
+      </Notice>
+    );
+  }
+
+  return (
+    <SandboxProfileRuntimeSection
+      availableConnections={input.availableConnections}
+      availableTargets={input.availableTargets}
+      disabled={input.disabled}
+      isDraft={input.isDraft}
+      onDraftStateChange={input.onDraftStateChange}
+      providers={sandboxProvidersQuery.data.items}
+      version={input.version}
+    />
+  );
 }
 
 function SandboxProfilePersistenceModeSection(input: {
@@ -2218,6 +2330,7 @@ export function SandboxProfileEditorView(input: {
   renderSectionPanel: (sectionId: SandboxProfileEditorSectionId) => React.JSX.Element;
   versionActions?: React.JSX.Element;
   hasUnpersistedPersistenceChanges?: boolean;
+  hasUnpersistedRuntimeChanges?: boolean;
   hasUnpersistedIntegrationChanges?: boolean;
   hasUnpersistedSetupScriptChanges?: boolean;
   isSavingProfileName?: boolean;
@@ -2225,6 +2338,7 @@ export function SandboxProfileEditorView(input: {
   const hasUnpersistedDraftChanges =
     input.mode.kind === "draft" &&
     ((input.hasUnpersistedPersistenceChanges ?? false) ||
+      (input.hasUnpersistedRuntimeChanges ?? false) ||
       (input.hasUnpersistedIntegrationChanges ?? false) ||
       (input.hasUnpersistedSetupScriptChanges ?? false));
   const deleteProfileMenuItem = (

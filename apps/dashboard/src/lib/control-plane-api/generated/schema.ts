@@ -8605,7 +8605,7 @@ export interface paths {
               memoryMb: number;
               storageMb?: number;
               vcpuCount: number;
-            };
+            } | null;
             setupScript?: string | null;
           };
         };

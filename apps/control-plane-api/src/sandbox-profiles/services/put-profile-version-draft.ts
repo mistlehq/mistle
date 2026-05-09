@@ -34,7 +34,7 @@ type PutProfileVersionDraftInput = {
   defaultPersistenceMode?: SandboxProfileVersionDefaultPersistenceMode;
   sandboxProvider?: string;
   sandboxConnectionId?: string | null;
-  sandboxResources?: SandboxProfileVersionResources;
+  sandboxResources?: SandboxProfileVersionResources | null;
   integrationBindings?: {
     bindings: Array<{
       id?: string;
@@ -121,15 +121,15 @@ export async function putProfileVersionDraft(
       sandboxVcpuCount:
         input.sandboxResources === undefined
           ? lockedVersion.sandboxVcpuCount
-          : input.sandboxResources.vcpuCount,
+          : (input.sandboxResources?.vcpuCount ?? null),
       sandboxMemoryMb:
         input.sandboxResources === undefined
           ? lockedVersion.sandboxMemoryMb
-          : input.sandboxResources.memoryMb,
+          : (input.sandboxResources?.memoryMb ?? null),
       sandboxStorageMb:
         input.sandboxResources === undefined
           ? lockedVersion.sandboxStorageMb
-          : (input.sandboxResources.storageMb ?? null),
+          : (input.sandboxResources?.storageMb ?? null),
     });
 
     const runtimeConfigIssues = await validateSandboxProfileVersionRuntimeConfig(
@@ -175,11 +175,17 @@ export async function putProfileVersionDraft(
             : { sandboxConnectionId: input.sandboxConnectionId }),
           ...(input.sandboxResources === undefined
             ? {}
-            : {
-                sandboxVcpuCount: input.sandboxResources.vcpuCount,
-                sandboxMemoryMb: input.sandboxResources.memoryMb,
-                sandboxStorageMb: input.sandboxResources.storageMb ?? null,
-              }),
+            : input.sandboxResources === null
+              ? {
+                  sandboxVcpuCount: null,
+                  sandboxMemoryMb: null,
+                  sandboxStorageMb: null,
+                }
+              : {
+                  sandboxVcpuCount: input.sandboxResources.vcpuCount,
+                  sandboxMemoryMb: input.sandboxResources.memoryMb,
+                  sandboxStorageMb: input.sandboxResources.storageMb ?? null,
+                }),
         })
         .where(
           and(

@@ -28,6 +28,18 @@ export const Published: Story = {
   },
 };
 
+export const ManagedE2BRuntime: Story = {
+  args: {
+    runtimeState: "e2b-managed",
+  },
+};
+
+export const OrganizationE2BRuntime: Story = {
+  args: {
+    runtimeState: "e2b-connection",
+  },
+};
+
 export const DraftSaveFailure: Story = {
   args: {
     setupScriptDraft: `#!/usr/bin/env bash

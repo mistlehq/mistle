@@ -21,6 +21,7 @@ import {
   sandboxProfileVersionIntegrationBindingsQueryKey,
   sandboxProfileVersionSetupScriptQueryKey,
   sandboxProfileVersionsQueryKey,
+  sandboxProvidersQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type {
   SandboxProfileVersion,
@@ -397,6 +398,37 @@ function renderSandboxProfileEditor(input?: {
     storageConfigSource: "managed",
     storageConfigVersion: null,
     organizationStorageConfigSummary: null,
+  });
+  queryClient.setQueryData(sandboxProvidersQueryKey(), {
+    items: [
+      {
+        id: "docker",
+        displayName: "Docker",
+        managed: true,
+        supportsOrganizationConnection: false,
+        resourceCapabilities: null,
+      },
+      {
+        id: "e2b",
+        displayName: "E2B",
+        managed: true,
+        supportsOrganizationConnection: true,
+        resourceCapabilities: {
+          vcpuCount: {
+            min: 1,
+            max: 8,
+            step: 1,
+            default: 2,
+          },
+          memoryMb: {
+            min: 1024,
+            max: 8192,
+            step: 1024,
+            default: 4096,
+          },
+        },
+      },
+    ],
   });
   queryClient.setQueryData(sandboxProfileDetailQueryKey(profileId), {
     id: profileId,
