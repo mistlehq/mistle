@@ -23,7 +23,7 @@ export function resolveSettingsNavGroups(input: {
   return [
     {
       label: "Account",
-      items: [{ to: "/settings/account/profile", label: "Profile", icon: ProfileNavIcon }],
+      items: [{ to: "/settings/account/profile", label: "My Profile", icon: ProfileNavIcon }],
     },
     {
       label: "Organization",

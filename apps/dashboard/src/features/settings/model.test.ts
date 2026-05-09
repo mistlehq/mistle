@@ -42,6 +42,7 @@ describe("settings model", () => {
     const accountGroup = SETTINGS_NAV_GROUPS.find((group) => group.label === "Account");
     expect(accountGroup).toBeDefined();
     expect(accountGroup?.items.map((item) => item.to)).toEqual(["/settings/account/profile"]);
+    expect(accountGroup?.items.map((item) => item.label)).toEqual(["My Profile"]);
     for (const item of accountGroup?.items ?? []) {
       expect(typeof item.icon).toBe("function");
     }
