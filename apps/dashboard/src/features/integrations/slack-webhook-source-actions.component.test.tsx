@@ -67,8 +67,25 @@ describe("useSlackWebhookSourceActions", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("does not offer sync for Slack connections without a saved app id", () => {
+  it("explains disabled sync for Slack connections without a saved app id", () => {
     render(<SlackWebhookSourceActionsHarness connection={createConnection({})} />);
+
+    const syncButton = screen.getByRole("button", { name: "Sync webhook events" });
+
+    expect(syncButton.getAttribute("disabled")).toBe("");
+    fireEvent.mouseEnter(syncButton.parentElement ?? syncButton);
+    expect(screen.getByText("Add the Slack App ID before syncing webhook events.")).toBeTruthy();
+  });
+
+  it("does not offer sync for non-Slack app connections", () => {
+    render(
+      <SlackWebhookSourceActionsHarness
+        connection={createConnection({
+          appId: "A123",
+          connectionMethodId: "api-key",
+        })}
+      />,
+    );
 
     expect(screen.queryByRole("button", { name: "Sync webhook events" })).toBeNull();
   });

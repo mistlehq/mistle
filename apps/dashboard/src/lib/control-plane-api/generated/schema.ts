@@ -4333,6 +4333,7 @@ export interface paths {
                   requirements?: {
                     anyOf: {
                       event?: string;
+                      label?: string;
                       permissions?: {
                         access?: string;
                         permission: string;

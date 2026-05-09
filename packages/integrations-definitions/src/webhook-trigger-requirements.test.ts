@@ -64,8 +64,16 @@ describe("webhook trigger requirements", () => {
 
     expect(requireEvent(slackDefinition, "slack:message").requirements).toEqual({
       anyOf: [
-        { event: "message.channels", permissions: [{ permission: "channels:history" }] },
-        { event: "message.groups", permissions: [{ permission: "groups:history" }] },
+        {
+          label: "Public channels",
+          event: "message.channels",
+          permissions: [{ permission: "channels:history" }],
+        },
+        {
+          label: "Private channels",
+          event: "message.groups",
+          permissions: [{ permission: "groups:history" }],
+        },
       ],
     });
 

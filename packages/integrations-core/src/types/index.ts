@@ -1987,6 +1987,7 @@ export type IntegrationWebhookTriggerProviderPermissionRequirement = {
 };
 
 export type IntegrationWebhookTriggerRequirementSet = {
+  label?: string | undefined;
   event?: string | undefined;
   permissions?: ReadonlyArray<IntegrationWebhookTriggerProviderPermissionRequirement> | undefined;
 };

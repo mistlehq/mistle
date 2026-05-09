@@ -72,6 +72,7 @@ type ResolvedWebhookEvent = {
   category?: string;
   requirements?: {
     anyOf: {
+      label?: string;
       event?: string;
       permissions?: {
         permission: string;
@@ -577,6 +578,7 @@ function cloneWebhookEvents(
       : {
           requirements: {
             anyOf: eventDefinition.requirements.anyOf.map((requirementSet) => ({
+              ...(requirementSet.label === undefined ? {} : { label: requirementSet.label }),
               ...(requirementSet.event === undefined ? {} : { event: requirementSet.event }),
               ...(requirementSet.permissions === undefined
                 ? {}

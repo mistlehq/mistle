@@ -179,7 +179,7 @@ describe("IntegrationConnectionDetailView", () => {
     ).toBeTruthy();
   });
 
-  it("hides authentication editing when a connection is configured for identity linking", () => {
+  it("explains disabled authentication editing when a connection is configured for identity linking", () => {
     render(
       <IntegrationConnectionDetailView
         connections={[
@@ -199,7 +199,15 @@ describe("IntegrationConnectionDetailView", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+    const editButton = screen.getByRole("button", { name: "Edit" });
+
+    expect(editButton.getAttribute("disabled")).toBe("");
+    fireEvent.mouseEnter(editButton.parentElement ?? editButton);
+    expect(
+      screen.getByText(
+        "This connection can't be edited while it is configured for Identity Linking.",
+      ),
+    ).toBeTruthy();
   });
 
   it("renders connection navigation and exposes detail actions for the selected connection", () => {
@@ -1199,6 +1207,26 @@ describe("IntegrationConnectionDetailView", () => {
               ],
             },
           },
+          {
+            eventType: "slack:message",
+            providerEventType: "message",
+            displayName: "Message",
+            category: "Messages",
+            requirements: {
+              anyOf: [
+                {
+                  label: "Public channels",
+                  event: "message.channels",
+                  permissions: [{ permission: "channels:history" }],
+                },
+                {
+                  label: "Private channels",
+                  event: "message.groups",
+                  permissions: [{ permission: "groups:history" }],
+                },
+              ],
+            },
+          },
         ]}
         webhookPolicy={ImplicitWebhookPolicy}
         webhookSourceStateByConnectionId={
@@ -1223,10 +1251,11 @@ describe("IntegrationConnectionDetailView", () => {
                     status: "active",
                     providerMetadata: {
                       [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
-                        events: ["pull_request", "push"],
+                        events: ["pull_request", "push", "message.channels"],
                         permissions: [
                           { permission: "pull_requests", access: "read" },
                           { permission: "metadata", access: "read" },
+                          { permission: "channels:history" },
                         ],
                       },
                     },
@@ -1252,9 +1281,9 @@ describe("IntegrationConnectionDetailView", () => {
     expect(within(webhookSection).getByText("Pull request opened")).toBeTruthy();
     expect(within(webhookSection).queryByText("Pull request")).toBeNull();
     expect(within(webhookSection).queryByText("github.pull_request.opened")).toBeNull();
-    expect(within(webhookSection).getAllByText("Events")).toHaveLength(2);
+    expect(within(webhookSection).getAllByText("Events")).toHaveLength(3);
     expect(within(webhookSection).getByText("pull_request")).toBeTruthy();
-    expect(within(webhookSection).getAllByText("Permissions")).toHaveLength(2);
+    expect(within(webhookSection).getAllByText("Permissions")).toHaveLength(3);
     expect(within(webhookSection).getByText("pull_requests:read")).toBeTruthy();
     expect(within(webhookSection).getByText("Push")).toBeTruthy();
     expect(within(webhookSection).queryByText("Branch")).toBeNull();
@@ -1263,11 +1292,20 @@ describe("IntegrationConnectionDetailView", () => {
     expect(within(webhookSection).getByText("push")).toBeTruthy();
     expect(within(webhookSection).getByText("contents:read")).toBeTruthy();
     expect(within(webhookSection).getByText("metadata:read")).toBeTruthy();
-    expect(within(webhookSection).getAllByLabelText("Present")).toHaveLength(4);
+    expect(within(webhookSection).getByText("Message")).toBeTruthy();
+    expect(within(webhookSection).getByText("Public channels")).toBeTruthy();
+    expect(within(webhookSection).getByText("message.channels")).toBeTruthy();
+    expect(within(webhookSection).getByText("channels:history")).toBeTruthy();
+    expect(within(webhookSection).queryByText("Private channels")).toBeNull();
+    expect(within(webhookSection).queryByText("message.groups")).toBeNull();
+    expect(within(webhookSection).queryByText("groups:history")).toBeNull();
+    expect(within(webhookSection).queryByText("Option 1")).toBeNull();
+    expect(within(webhookSection).queryByText("Option 2")).toBeNull();
+    expect(within(webhookSection).getAllByLabelText("Present")).toHaveLength(6);
     expect(within(webhookSection).getAllByLabelText("Missing")).toHaveLength(1);
     expect(within(webhookSection).queryByText("Enabled")).toBeNull();
     expect(within(webhookSection).queryByText("Not enabled")).toBeNull();
-    expect(within(webhookSection).getByLabelText("Not enabled")).toBeTruthy();
+    expect(within(webhookSection).getAllByLabelText("Not enabled")).toHaveLength(1);
   });
 
   it.each([

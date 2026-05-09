@@ -127,10 +127,12 @@ function createSlackWebhookRequirements(
 const SlackMessageRequirements: IntegrationWebhookTriggerRequirements = {
   anyOf: [
     {
+      label: "Public channels",
       event: "message.channels",
       permissions: [SlackWebhookPermissionRequirements.CHANNELS_HISTORY],
     },
     {
+      label: "Private channels",
       event: "message.groups",
       permissions: [SlackWebhookPermissionRequirements.GROUPS_HISTORY],
     },

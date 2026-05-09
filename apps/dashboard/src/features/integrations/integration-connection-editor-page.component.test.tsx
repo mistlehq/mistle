@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { JiraConnectionMethodIds } from "@mistle/integrations-definitions/jira";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { describe, expect, it } from "vitest";
 
@@ -257,6 +257,61 @@ describe("IntegrationConnectionEditorPage", () => {
     });
 
     expect(screen.getAllByText("Replace on save")).toHaveLength(1);
+  });
+
+  it("renders optional secret descriptions as tooltip affordances without optional label suffixes", () => {
+    renderEditorPage({
+      editor: createUpdateFormEditor({
+        connectionConfig: {
+          connection_method: "slack-bot-token",
+        },
+        currentConnectionConfig: {
+          connection_method: "slack-bot-token",
+        },
+        currentMethod: {
+          id: "slack-bot-token",
+          label: "Slack app",
+          kind: "form",
+          secretFields: [
+            {
+              name: "clientSecret",
+              label: "Client secret (Linked User Auth)",
+              description:
+                "Required only for Identity Linking / linked user authorization. Not required for standard Slack app bot-token usage.",
+              inputType: "password",
+              optional: true,
+            },
+          ],
+        },
+        targetConfig: {
+          api_base_url: "https://slack.com/api",
+        },
+        targetDisplayName: "Slack",
+        targetFamilyId: "slack",
+        targetKey: "slack-default",
+        targetVariantId: "slack-default",
+      }),
+      connectionDisplayNameValue: "Existing Slack connection",
+      methodId: "slack-bot-token",
+    });
+
+    expect(screen.getByLabelText("Client secret (Linked User Auth)")).toBeTruthy();
+    expect(screen.queryByText("Client secret (Linked User Auth) (Optional)")).toBeNull();
+
+    const labelContainer = screen.getByText("Client secret (Linked User Auth)").closest("div");
+    if (labelContainer === null) {
+      throw new Error("Expected Client secret label container.");
+    }
+
+    const descriptionButton = within(labelContainer).getByRole("button", {
+      name: "Field description",
+    });
+    fireEvent.mouseEnter(descriptionButton);
+    expect(
+      screen.getByText(
+        "Required only for Identity Linking / linked user authorization. Not required for standard Slack app bot-token usage.",
+      ),
+    ).toBeTruthy();
   });
 
   it("renders definition-driven config fields for form methods", () => {
@@ -716,6 +771,45 @@ describe("IntegrationConnectionEditorPage", () => {
     });
     expect(configForm.uiSchema.setup_action).toMatchObject({
       "ui:widget": "hidden",
+    });
+  });
+
+  it("requires the Slack app id in the connection configuration form", () => {
+    const editor: IntegrationConnectionEditorState = {
+      mode: "update",
+      connectionId: "icn_slack",
+      currentConnectionConfig: {
+        connection_method: "slack-bot-token",
+      },
+      currentMethod: {
+        id: "slack-bot-token",
+        label: "Slack app",
+        kind: "form",
+        secretFields: [],
+      },
+      targetConfig: {
+        api_base_url: "https://slack.com/api",
+      },
+      targetDisplayName: "Slack",
+      targetFamilyId: "slack",
+      targetKey: "slack-default",
+      targetVariantId: "slack-default",
+    };
+
+    const configForm = resolveConnectionMethodFormUiModel({
+      editor,
+      methodId: "slack-bot-token",
+      currentValue: {
+        connection_method: "slack-bot-token",
+      },
+    });
+
+    expect(configForm).toMatchObject({
+      mode: "form",
+      schema: {
+        required: ["connection_method", "app_id"],
+      },
+      visiblePropertyKeys: ["app_id", "client_id"],
     });
   });
 });

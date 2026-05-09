@@ -18,6 +18,7 @@ export const SlackConnectionConfigForm: ResolvedIntegrationForm = {
           "Required only for Identity Linking / linked user authorization. Not required for standard Slack app bot-token usage.",
       },
     },
+    required: ["connection_method", "app_id"],
   },
   uiSchema: {
     connection_method: {

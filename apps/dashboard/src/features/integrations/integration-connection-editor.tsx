@@ -302,7 +302,7 @@ function renderConnectionEditorFields(props: IntegrationConnectionEditorProps) {
                 fieldState={IdleSecretFieldState}
                 id={fieldId}
                 key={secretField.name}
-                label={`${secretField.label}${secretField.optional ? " (Optional)" : ""}`}
+                label={secretField.label}
                 onePasswordIgnore
                 onCancelReplace={ignoreSecretCommit}
                 onChange={(nextValue) => {

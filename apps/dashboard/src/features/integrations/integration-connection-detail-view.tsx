@@ -523,24 +523,11 @@ function ConnectionDetailPane(input: {
           ) : null}
 
           <SectionBlock
-            action={
-              input.connection.authMethodId !== undefined &&
-              input.connection.authMethodId !== null &&
-              input.connection.isIdentityLinked !== true &&
-              input.onEditAuthentication !== undefined ? (
-                <Button
-                  aria-label="Edit"
-                  onClick={() => {
-                    input.onEditAuthentication?.(input.connection.id);
-                  }}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  Edit
-                </Button>
-              ) : null
-            }
+            action={resolveEditAuthenticationAction({
+              connection: input.connection,
+              connectionId: input.connection.id,
+              onEditAuthentication: input.onEditAuthentication,
+            })}
             title="Authentication"
           >
             <ConnectionAuthSection
@@ -623,6 +610,57 @@ function resolveDeleteConnectionMessage(
   }
 
   return "This connection can't be deleted while it is still in use.";
+}
+
+function resolveEditAuthenticationAction(input: {
+  connection: Pick<IntegrationConnectionDetailItem, "authMethodId" | "isIdentityLinked">;
+  onEditAuthentication: ((connectionId: string) => void) | undefined;
+  connectionId: string;
+}): ReactNode {
+  if (
+    input.connection.authMethodId === undefined ||
+    input.connection.authMethodId === null ||
+    input.onEditAuthentication === undefined
+  ) {
+    return null;
+  }
+
+  if (input.connection.isIdentityLinked === true) {
+    const disabledMessage =
+      "This connection can't be edited while it is configured for Identity Linking.";
+
+    return (
+      <Tooltip delay={0}>
+        <TooltipTrigger render={<span className="inline-flex" />}>
+          <Button
+            aria-label="Edit"
+            disabled={true}
+            size="sm"
+            title={disabledMessage}
+            type="button"
+            variant="outline"
+          >
+            Edit
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top">{disabledMessage}</TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <Button
+      aria-label="Edit"
+      onClick={() => {
+        input.onEditAuthentication?.(input.connectionId);
+      }}
+      size="sm"
+      type="button"
+      variant="outline"
+    >
+      Edit
+    </Button>
+  );
 }
 
 function EditableConnectionTitle(input: {
@@ -1086,7 +1124,11 @@ function WebhookTriggerCapabilityEventRow(input: {
         </div>
       </div>
       {providerRequirementSets.length === 0 ? null : (
-        <div className="mt-2 flex flex-col gap-1.5">
+        <div
+          className={`mt-2 flex flex-col ${
+            providerRequirementSets.length > 1 ? "gap-3" : "gap-1.5"
+          }`}
+        >
           {providerRequirementSets.map((requirementSet, index) => (
             <WebhookTriggerProviderRequirementSet
               capabilities={input.capabilities}
@@ -1108,21 +1150,32 @@ function WebhookTriggerProviderRequirementSet(input: {
   requirementSet: IntegrationWebhookTriggerRequirementSet;
   showAlternativeLabel: boolean;
 }): React.JSX.Element {
+  const requirementLabel =
+    input.requirementSet.label ?? (input.showAlternativeLabel ? `Option ${input.index + 1}` : null);
+
   return (
-    <div className="flex flex-col gap-1">
-      {input.showAlternativeLabel ? (
-        <p className="text-muted-foreground text-xs">Option {input.index + 1}</p>
-      ) : null}
-      <WebhookTriggerProviderEventsRequirement
-        capabilities={input.capabilities}
-        event={input.requirementSet.event}
-      />
-      {(input.requirementSet.permissions ?? []).length === 0 ? null : (
-        <WebhookTriggerProviderPermissionsRequirement
-          capabilities={input.capabilities}
-          permissions={input.requirementSet.permissions ?? []}
-        />
+    <div className={requirementLabel === null ? "flex flex-col gap-1" : "flex flex-col gap-1.5"}>
+      {requirementLabel === null ? null : (
+        <p className="text-foreground text-xs font-medium">{requirementLabel}</p>
       )}
+      <div
+        className={
+          requirementLabel === null
+            ? "flex flex-col gap-1"
+            : "border-border flex flex-col gap-1 border-l pl-3"
+        }
+      >
+        <WebhookTriggerProviderEventsRequirement
+          capabilities={input.capabilities}
+          event={input.requirementSet.event}
+        />
+        {(input.requirementSet.permissions ?? []).length === 0 ? null : (
+          <WebhookTriggerProviderPermissionsRequirement
+            capabilities={input.capabilities}
+            permissions={input.requirementSet.permissions ?? []}
+          />
+        )}
+      </div>
     </div>
   );
 }

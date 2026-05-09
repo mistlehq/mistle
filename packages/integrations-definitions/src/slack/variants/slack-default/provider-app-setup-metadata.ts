@@ -63,7 +63,7 @@ export const SlackProviderAppSetup = {
       {
         inputType: "password",
         name: "clientSecret",
-        label: "Client secret",
+        label: "Client secret (Linked User Auth)",
         required: false,
         secretLabel: "client secret",
       },

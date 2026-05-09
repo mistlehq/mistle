@@ -1,5 +1,5 @@
 import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
-import { Button } from "@mistle/ui";
+import { Button, Tooltip, TooltipContent, TooltipTrigger } from "@mistle/ui";
 import { useCallback, useState, type ReactNode } from "react";
 
 import type { IntegrationWebhookSourceActionsRefreshTriggerCapabilities } from "./integration-webhook-source-actions-types.js";
@@ -21,21 +21,35 @@ export function useSlackWebhookSourceActions(input: {
     (actionInput: { connectionId: string }): ReactNode => {
       const connection =
         input.connections.find((candidate) => candidate.id === actionInput.connectionId) ?? null;
-      if (!supportsSlackWebhookEventsSync(connection)) {
+      if (!isSlackAppConnection(connection)) {
         return null;
       }
 
-      return (
+      const disabledMessage = resolveSlackWebhookEventsSyncDisabledMessage(connection);
+      const button = (
         <Button
+          disabled={disabledMessage !== null}
           onClick={() => {
             setSyncConnectionId(actionInput.connectionId);
           }}
           size="sm"
+          {...(disabledMessage === null ? {} : { title: disabledMessage })}
           type="button"
           variant="outline"
         >
           Sync webhook events
         </Button>
+      );
+
+      if (disabledMessage === null) {
+        return button;
+      }
+
+      return (
+        <Tooltip delay={0}>
+          <TooltipTrigger render={<span className="inline-flex" />}>{button}</TooltipTrigger>
+          <TooltipContent side="top">{disabledMessage}</TooltipContent>
+        </Tooltip>
       );
     },
     [input.connections],
@@ -79,10 +93,17 @@ export function useSlackWebhookSourceActions(input: {
   };
 }
 
-function supportsSlackWebhookEventsSync(connection: IntegrationConnection | null): boolean {
-  return (
-    connection?.connectionMethodId === SlackConnectionMethodId &&
-    typeof connection.config?.["app_id"] === "string" &&
+function isSlackAppConnection(
+  connection: IntegrationConnection | null,
+): connection is IntegrationConnection {
+  return connection?.connectionMethodId === SlackConnectionMethodId;
+}
+
+function resolveSlackWebhookEventsSyncDisabledMessage(
+  connection: IntegrationConnection,
+): string | null {
+  return typeof connection.config?.["app_id"] === "string" &&
     connection.config["app_id"].trim().length > 0
-  );
+    ? null
+    : "Add the Slack App ID before syncing webhook events.";
 }

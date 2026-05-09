@@ -9,9 +9,9 @@ import {
   AlertDialogTitle,
   Field,
   FieldContent,
-  FieldDescription,
   FieldHeader,
   FieldLabel,
+  FieldLabelWithTooltip,
   Input,
   Spinner,
   Textarea,
@@ -66,19 +66,41 @@ export function SavingTextField(input: SavingTextFieldProps): React.JSX.Element 
     <Field contentWidth="fill" orientation="vertical">
       <FieldHeader>
         {input.labelAccessory === undefined ? (
-          <FieldLabel htmlFor={input.id} {...(input.required === true ? { required: true } : {})}>
-            {input.label}
-          </FieldLabel>
-        ) : (
-          <div className="flex items-center justify-between gap-3">
+          input.description === undefined ? (
             <FieldLabel htmlFor={input.id} {...(input.required === true ? { required: true } : {})}>
               {input.label}
             </FieldLabel>
+          ) : (
+            <FieldLabelWithTooltip
+              htmlFor={input.id}
+              {...(input.required === true ? { required: true } : {})}
+              tooltip={input.description}
+              tooltipLabel="Field description"
+            >
+              {input.label}
+            </FieldLabelWithTooltip>
+          )
+        ) : (
+          <div className="flex items-center justify-between gap-3">
+            {input.description === undefined ? (
+              <FieldLabel
+                htmlFor={input.id}
+                {...(input.required === true ? { required: true } : {})}
+              >
+                {input.label}
+              </FieldLabel>
+            ) : (
+              <FieldLabelWithTooltip
+                htmlFor={input.id}
+                {...(input.required === true ? { required: true } : {})}
+                tooltip={input.description}
+                tooltipLabel="Field description"
+              >
+                {input.label}
+              </FieldLabelWithTooltip>
+            )}
             {input.labelAccessory}
           </div>
-        )}
-        {input.description === undefined ? null : (
-          <FieldDescription>{input.description}</FieldDescription>
         )}
       </FieldHeader>
       <FieldContent>

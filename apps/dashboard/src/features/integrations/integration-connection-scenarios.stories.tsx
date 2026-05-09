@@ -63,6 +63,28 @@ function withoutStoryHandlers(
   return rest;
 }
 
+function createIdentityLinkedSlackDetailViewStoryProps(): React.ComponentProps<
+  typeof IntegrationConnectionDetailView
+> {
+  const props = createSlackDetailViewStoryProps();
+  const connection = props.connections[0];
+  if (connection === undefined) {
+    throw new Error("Slack identity-linked story requires a connection.");
+  }
+
+  return {
+    ...props,
+    connections: [
+      {
+        ...connection,
+        bindingCount: 0,
+        canDelete: false,
+        isIdentityLinked: true,
+      },
+    ],
+  };
+}
+
 const meta = {
   title: "Dashboard/Integrations/Connection Detail",
   component: IntegrationConnectionDetailView,
@@ -114,6 +136,13 @@ export const Linear: Story = {
 export const Slack: Story = {
   args: {
     ...withoutStoryHandlers(createSlackDetailViewStoryProps()),
+  },
+};
+
+export const SlackIdentityLinked: Story = {
+  name: "Slack identity linked",
+  args: {
+    ...withoutStoryHandlers(createIdentityLinkedSlackDetailViewStoryProps()),
   },
 };
 

@@ -60,7 +60,7 @@ const ProviderAppSetup = {
       {
         inputType: "password",
         name: "clientSecret",
-        label: "Client secret",
+        label: "Client secret (Linked User Auth)",
         required: false,
         secretLabel: "client secret",
       },
@@ -318,7 +318,7 @@ describe("provider app setup model", () => {
         configured: false,
         fieldKey: "clientSecret",
         id: "provider-app-clientSecret",
-        label: "Client secret",
+        label: "Client secret (Linked User Auth)",
         required: false,
         secretLabel: "client secret",
         type: "password",

@@ -4,6 +4,27 @@ import { SlackThreadRootTimestampField } from "./normalized-event-fields.js";
 import { SlackSupportedWebhookEvents } from "./supported-webhook-events.js";
 
 describe("SlackSupportedWebhookEvents", () => {
+  it("labels message event alternatives by Slack channel type", () => {
+    const messageEvent = SlackSupportedWebhookEvents.find(
+      (eventDefinition) => eventDefinition.eventType === "slack:message",
+    );
+
+    expect(messageEvent?.requirements).toEqual({
+      anyOf: [
+        {
+          label: "Public channels",
+          event: "message.channels",
+          permissions: [{ permission: "channels:history" }],
+        },
+        {
+          label: "Private channels",
+          event: "message.groups",
+          permissions: [{ permission: "groups:history" }],
+        },
+      ],
+    });
+  });
+
   it("exposes a resource-backed channel parameter for app mention events", () => {
     const appMentionEvent = SlackSupportedWebhookEvents.find(
       (eventDefinition) => eventDefinition.eventType === "slack:app_mention",

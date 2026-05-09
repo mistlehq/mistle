@@ -173,6 +173,36 @@ function DescriptionOnlyObjectHarness(): React.JSX.Element {
   );
 }
 
+const RequiredSchema: RJSFSchema = {
+  type: "object",
+  required: ["appId"],
+  properties: {
+    appId: {
+      title: "App ID",
+      description: "Slack app ID used to refresh webhook event capabilities from Slack.",
+      type: "string",
+    },
+    clientId: {
+      title: "Client ID",
+      type: "string",
+    },
+  },
+};
+
+function RequiredFieldHarness(): React.JSX.Element {
+  return (
+    <SchemaFormWithoutSubmit
+      formContext={{}}
+      formData={{}}
+      noHtml5Validate
+      onChange={() => {}}
+      schema={RequiredSchema}
+      showErrorList={false}
+      validator={validator}
+    />
+  );
+}
+
 describe("SchemaFormWithoutSubmit", () => {
   it("wires the single-select combobox widget through the form theme", async () => {
     render(
@@ -226,5 +256,14 @@ describe("SchemaFormWithoutSubmit", () => {
     expect(screen.getByText("Description")).toBeDefined();
     expect(screen.getByRole("button", { name: "Field description" })).toBeDefined();
     expect(screen.getByLabelText("API token")).toBeDefined();
+  });
+
+  it("marks required schema fields in the label", () => {
+    render(<RequiredFieldHarness />);
+
+    const appIdLabel = screen.getByText("App ID").closest("div");
+    expect(appIdLabel).not.toBeNull();
+    expect(within(appIdLabel ?? document.body).getByText("required")).toBeDefined();
+    expect(screen.queryByText("Client ID required")).toBeNull();
   });
 });

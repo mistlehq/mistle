@@ -194,6 +194,69 @@ describe("parseFormConnectionConfigOrThrow", () => {
     expect(thrownError.code).toBe("INVALID_CREATE_CONNECTION_INPUT");
     expect(thrownError.message).toBe("Connection config for method 'api-key' is invalid.");
   });
+
+  it("throws a bad request error when a required visible config field is missing", () => {
+    let thrownError: unknown = null;
+
+    try {
+      parseFormConnectionConfigOrThrow({
+        targetKey: "slack-default",
+        method: {
+          id: "slack-bot-token",
+          label: "Slack app",
+          kind: "form",
+          secretFields: [],
+          configSchema: z
+            .object({
+              connection_method: z.literal("slack-bot-token"),
+              app_id: z.string().min(1).optional(),
+            })
+            .strict(),
+          configForm: {
+            schema: {
+              properties: {
+                connection_method: {
+                  default: "slack-bot-token",
+                },
+                app_id: {
+                  title: "App ID",
+                },
+              },
+              required: ["connection_method", "app_id"],
+            },
+            uiSchema: {
+              connection_method: {
+                "ui:widget": "hidden",
+              },
+            },
+          },
+        },
+        config: {
+          connection_method: "slack-bot-token",
+        },
+        formContext: {
+          familyId: "slack",
+          variantId: "slack-default",
+          kind: "connector",
+          currentValue: {
+            connection_method: "slack-bot-token",
+          },
+        },
+        invalidInputCode: "INVALID_UPDATE_CONNECTION_INPUT",
+      });
+    } catch (error) {
+      thrownError = error;
+    }
+
+    expect(thrownError).toBeInstanceOf(BadRequestError);
+    if (!(thrownError instanceof BadRequestError)) {
+      throw new Error("Expected missing required config field to throw.");
+    }
+    expect(thrownError.code).toBe("INVALID_UPDATE_CONNECTION_INPUT");
+    expect(thrownError.message).toBe(
+      "Connection config field 'App ID' is required for method 'slack-bot-token'.",
+    );
+  });
 });
 
 describe("resolvePersistedSecretRefOrThrow", () => {

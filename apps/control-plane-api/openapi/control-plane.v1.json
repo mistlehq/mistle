@@ -8581,6 +8581,10 @@
                                       "items": {
                                         "type": "object",
                                         "properties": {
+                                          "label": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
                                           "event": {
                                             "type": "string",
                                             "minLength": 1

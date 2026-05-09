@@ -10,6 +10,7 @@ import type {
   IntegrationRegistry,
 } from "@mistle/integrations-core";
 import { IntegrationWebhookSourceLifecycles } from "@mistle/integrations-core";
+import { z } from "zod";
 
 import {
   encryptCredentialUtf8,
@@ -41,6 +42,8 @@ export type CreateFormConnectionInput = {
   config: Record<string, unknown>;
   secrets: Record<string, string>;
 };
+
+const UnknownRecordSchema = z.record(z.string(), z.unknown());
 
 export function shouldAutoCreateManagedWebhookSource(
   postCreate: IntegrationFormConnectionMethodPostCreateMetadata | undefined,
@@ -132,10 +135,44 @@ export async function createFormConnection(
     connectionMethods: definition.connectionMethods,
     invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
   });
+  const targetConfig = definition.targetConfigSchema.safeParse(target.config ?? {});
+  if (!targetConfig.success) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
+      `Integration target '${input.targetKey}' has invalid config.`,
+    );
+  }
+
+  const targetRawConfig = UnknownRecordSchema.safeParse(target.config ?? {});
+  if (!targetRawConfig.success) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
+      `Integration target '${input.targetKey}' has invalid raw config.`,
+    );
+  }
+
+  const targetConfigRecord = UnknownRecordSchema.safeParse(targetConfig.data);
+  if (!targetConfigRecord.success) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
+      `Integration target '${input.targetKey}' resolved to non-object config.`,
+    );
+  }
+
   const parsedConfig = parseFormConnectionConfigOrThrow({
     targetKey: input.targetKey,
     method: formMethod,
     config: input.config,
+    formContext: {
+      familyId: target.familyId,
+      variantId: target.variantId,
+      kind: definition.kind,
+      target: {
+        rawConfig: targetRawConfig.data,
+        config: targetConfigRecord.data,
+      },
+      currentValue: input.config,
+    },
     invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
   });
   const parsedSecrets = parseCreateFormSecretsOrThrow({

@@ -3,9 +3,11 @@ import {
   type IntegrationCredentialSecretKind,
 } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
-import type {
-  IntegrationConnectionMethodDefinition,
-  IntegrationConnectionMethodId,
+import {
+  resolveIntegrationForm,
+  type IntegrationConnectionMethodDefinition,
+  type IntegrationConnectionMethodId,
+  type IntegrationFormContext,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
@@ -32,6 +34,109 @@ export type ParsedFormSecret = {
   normalizedValue: string;
   persistedSecretRef: PersistedSecretRef;
 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readStringArray(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((entry) => typeof entry === "string");
+}
+
+function readUiWidget(input: {
+  propertyKey: string;
+  uiSchema: Record<string, unknown>;
+}): string | undefined {
+  const propertyUiSchema = input.uiSchema[input.propertyKey];
+  if (!isRecord(propertyUiSchema)) {
+    return undefined;
+  }
+
+  const widget = propertyUiSchema["ui:widget"];
+  return typeof widget === "string" ? widget : undefined;
+}
+
+function readSchemaPropertyLabel(input: {
+  propertyKey: string;
+  schema: Record<string, unknown>;
+}): string {
+  const properties = input.schema.properties;
+  if (!isRecord(properties)) {
+    return input.propertyKey;
+  }
+
+  const propertySchema = properties[input.propertyKey];
+  if (!isRecord(propertySchema)) {
+    return input.propertyKey;
+  }
+
+  const title = propertySchema.title;
+  return typeof title === "string" && title.trim().length > 0 ? title : input.propertyKey;
+}
+
+function isMissingRequiredConfigValue(value: unknown): boolean {
+  if (value === undefined || value === null) {
+    return true;
+  }
+
+  return typeof value === "string" && value.trim().length === 0;
+}
+
+function assertRequiredVisibleFormConfigFields(input: {
+  targetKey: string;
+  method: FormConnectionMethod;
+  config: Record<string, unknown>;
+  formContext: IntegrationFormContext | undefined;
+  invalidInputCode: FormConnectionInvalidInputCode;
+}): void {
+  if (input.method.configForm === undefined || input.formContext === undefined) {
+    return;
+  }
+
+  const configSchema = input.method.configSchema;
+  if (configSchema === undefined) {
+    throw new BadRequestError(
+      input.invalidInputCode,
+      `Form connection method '${input.method.id}' for integration target '${input.targetKey}' is missing a config schema.`,
+    );
+  }
+
+  const resolvedForm = resolveIntegrationForm({
+    schema: configSchema,
+    form: input.method.configForm,
+    context: input.formContext,
+  });
+  const schema = UnknownRecordSchema.parse(resolvedForm.schema ?? {});
+  const uiSchema = UnknownRecordSchema.parse(resolvedForm.uiSchema ?? {});
+
+  for (const propertyKey of readStringArray(schema.required)) {
+    if (
+      readUiWidget({
+        propertyKey,
+        uiSchema,
+      }) === "hidden"
+    ) {
+      continue;
+    }
+
+    if (!isMissingRequiredConfigValue(input.config[propertyKey])) {
+      continue;
+    }
+
+    const label = readSchemaPropertyLabel({
+      propertyKey,
+      schema,
+    });
+    throw new BadRequestError(
+      input.invalidInputCode,
+      `Connection config field '${label}' is required for method '${input.method.id}'.`,
+    );
+  }
+}
 
 export function resolveFormConnectionMethodOrThrow(input: {
   targetKey: string;
@@ -62,6 +167,7 @@ export function parseFormConnectionConfigOrThrow(input: {
   targetKey: string;
   method: FormConnectionMethod;
   config: Record<string, unknown>;
+  formContext?: IntegrationFormContext | undefined;
   invalidInputCode: FormConnectionInvalidInputCode;
 }): Record<string, unknown> {
   try {
@@ -81,6 +187,14 @@ export function parseFormConnectionConfigOrThrow(input: {
         `Form connection method '${input.method.id}' for integration target '${input.targetKey}' resolved to a non-object config.`,
       );
     }
+
+    assertRequiredVisibleFormConfigFields({
+      targetKey: input.targetKey,
+      method: input.method,
+      config: parsedRecord.data,
+      formContext: input.formContext,
+      invalidInputCode: input.invalidInputCode,
+    });
 
     return parsedRecord.data;
   } catch (error) {

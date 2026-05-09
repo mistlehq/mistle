@@ -2,6 +2,7 @@ import { type ControlPlaneDatabase, getControlPlaneDatabaseSchema } from "@mistl
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { eq, sql } from "drizzle-orm";
+import { z } from "zod";
 
 import {
   encryptCredentialUtf8,
@@ -18,6 +19,8 @@ import {
   parseUpdateFormSecretsOrThrow,
   resolveFormConnectionMethodOrThrow,
 } from "./form-connection-methods.js";
+
+const UnknownRecordSchema = z.record(z.string(), z.unknown());
 
 type UpdatedConnection = {
   id: string;
@@ -110,10 +113,57 @@ export async function updateFormConnection(
     connectionMethods: definition.connectionMethods,
     invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
   });
+  const targetConfig = definition.targetConfigSchema.safeParse(target.config ?? {});
+  if (!targetConfig.success) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+      `Integration target '${existingConnection.targetKey}' has invalid config.`,
+    );
+  }
+
+  const targetRawConfig = UnknownRecordSchema.safeParse(target.config ?? {});
+  if (!targetRawConfig.success) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+      `Integration target '${existingConnection.targetKey}' has invalid raw config.`,
+    );
+  }
+
+  const existingConnectionConfig = UnknownRecordSchema.safeParse(existingConnection.config ?? {});
+  if (!existingConnectionConfig.success) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+      `Integration connection '${input.connectionId}' has invalid config.`,
+    );
+  }
+
+  const targetConfigRecord = UnknownRecordSchema.safeParse(targetConfig.data);
+  if (!targetConfigRecord.success) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+      `Integration target '${existingConnection.targetKey}' resolved to non-object config.`,
+    );
+  }
+
   const parsedConfig = parseFormConnectionConfigOrThrow({
     targetKey: existingConnection.targetKey,
     method: formMethod,
     config: input.config,
+    formContext: {
+      familyId: target.familyId,
+      variantId: target.variantId,
+      kind: definition.kind,
+      target: {
+        rawConfig: targetRawConfig.data,
+        config: targetConfigRecord.data,
+      },
+      currentValue: input.config,
+      connection: {
+        id: existingConnection.id,
+        rawConfig: existingConnectionConfig.data,
+        config: existingConnectionConfig.data,
+      },
+    },
     invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
   });
   const parsedSecrets = input.secrets

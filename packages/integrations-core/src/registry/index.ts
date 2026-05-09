@@ -257,6 +257,13 @@ function validateWebhookTriggerRequirements(
       );
     }
 
+    if (requirementSet.label !== undefined && requirementSet.label.trim().length === 0) {
+      throw new IntegrationDefinitionRegistryError(
+        DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+        "Integration definition supportedWebhookEvents[*].requirements.anyOf[*].label must be non-empty.",
+      );
+    }
+
     if (requirementSet.event !== undefined && requirementSet.event.trim().length === 0) {
       throw new IntegrationDefinitionRegistryError(
         DefinitionRegistryErrorCodes.INVALID_DEFINITION,

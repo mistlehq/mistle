@@ -41,6 +41,7 @@ const IntegrationWebhookTriggerRequirementsSchema = z
       .array(
         z
           .object({
+            label: z.string().min(1).optional(),
             event: z.string().min(1).optional(),
             permissions: z
               .array(

@@ -923,7 +923,12 @@ function SchemaFormFieldTemplate(
             useDetailLabel ? (
               <DetailLabel as="p">{props.label}</DetailLabel>
             ) : (
-              <FieldLabel htmlFor={props.id}>{props.label}</FieldLabel>
+              <FieldLabel
+                htmlFor={props.id}
+                {...(props.required === true ? { required: true } : {})}
+              >
+                {props.label}
+              </FieldLabel>
             )
           ) : useDetailLabel ? (
             <DetailLabelWithTooltip
@@ -936,6 +941,7 @@ function SchemaFormFieldTemplate(
           ) : (
             <FieldLabelWithTooltip
               htmlFor={props.id}
+              {...(props.required === true ? { required: true } : {})}
               tooltip={rawDescription}
               tooltipLabel="Field description"
             >
