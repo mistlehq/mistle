@@ -26,6 +26,14 @@ import {
 const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
+const itManagedE2BDeployment = createIntegrationTest({
+  services: ["control-plane-api"],
+  __serviceOptions: {
+    sandbox: {
+      provider: "e2b",
+    },
+  },
+});
 
 describe.concurrent("sandbox profile version publishability get integration", () => {
   it("returns agent binding required when the draft has no agent bindings", async ({ env }) => {
@@ -150,6 +158,167 @@ describe.concurrent("sandbox profile version publishability get integration", ()
       ],
     });
   });
+
+  itManagedE2BDeployment(
+    "returns a managed provider issue when Docker is selected on an E2B deployment",
+    async ({ env }) => {
+      const session = await env.auth.createSession({
+        email:
+          "integration-new-sandbox-profile-version-publishability-docker-unmanaged@example.com",
+      });
+
+      await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+        integrationTargetRow({
+          targetKey: "openai-publishability-docker-unmanaged",
+          variantId: "openai-default",
+          enabled: true,
+        }),
+      );
+      await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+        integrationConnectionRow({
+          id: "icn_publishability_docker_unmanaged",
+          organizationId: session.organizationId,
+          targetKey: "openai-publishability-docker-unmanaged",
+          displayName: "Docker Unmanaged Agent Connection",
+          status: IntegrationConnectionStatuses.ACTIVE,
+        }),
+      );
+
+      await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+        sandboxProfileRow({
+          id: "sbp_publishability_docker_unmanaged",
+          organizationId: session.organizationId,
+          displayName: "Publishability Docker Unmanaged Profile",
+          activeVersion: null,
+          createdAt: "2026-05-10T00:00:00.000Z",
+        }),
+      );
+      await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+        sandboxProfileVersionRow({
+          sandboxProfileId: "sbp_publishability_docker_unmanaged",
+          version: 1,
+          state: SandboxProfileVersionStates.DRAFT,
+          sandboxProvider: SandboxProvider.DOCKER,
+        }),
+      );
+      await env.controlPlaneDb
+        .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+        .values(
+          sandboxProfileVersionIntegrationBindingRow({
+            id: "ibd_publishability_docker_unmanaged",
+            sandboxProfileId: "sbp_publishability_docker_unmanaged",
+            sandboxProfileVersion: 1,
+            connectionId: "icn_publishability_docker_unmanaged",
+            kind: IntegrationBindingKinds.AGENT,
+          }),
+        );
+
+      const response = await env.controlPlaneApi.http.fetch(
+        "/v1/sandbox/profiles/sbp_publishability_docker_unmanaged/versions/1/publishability",
+        {
+          headers: {
+            cookie: session.cookie,
+          },
+        },
+      );
+
+      expect(response.status).toBe(200);
+      const responseBody = GetSandboxProfileVersionPublishabilityResponseSchema.parse(
+        await response.json(),
+      );
+      expect(responseBody).toEqual({
+        publishable: false,
+        issues: [
+          {
+            code: "SANDBOX_MANAGED_PROVIDER_UNAVAILABLE",
+            message: "Managed sandbox provider 'docker' is not configured for this deployment.",
+          },
+        ],
+      });
+    },
+  );
+
+  itManagedE2BDeployment(
+    "returns a managed provider issue when E2B credentials are not configured",
+    async ({ env }) => {
+      const session = await env.auth.createSession({
+        email:
+          "integration-new-sandbox-profile-version-publishability-e2b-managed-missing@example.com",
+      });
+
+      await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+        integrationTargetRow({
+          targetKey: "openai-publishability-e2b-managed-missing",
+          variantId: "openai-default",
+          enabled: true,
+        }),
+      );
+      await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+        integrationConnectionRow({
+          id: "icn_publishability_e2b_managed_missing",
+          organizationId: session.organizationId,
+          targetKey: "openai-publishability-e2b-managed-missing",
+          displayName: "E2B Managed Missing Agent Connection",
+          status: IntegrationConnectionStatuses.ACTIVE,
+        }),
+      );
+
+      await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+        sandboxProfileRow({
+          id: "sbp_publishability_e2b_managed_missing",
+          organizationId: session.organizationId,
+          displayName: "Publishability E2B Managed Missing Profile",
+          activeVersion: null,
+          createdAt: "2026-05-10T00:05:00.000Z",
+        }),
+      );
+      await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+        sandboxProfileVersionRow({
+          sandboxProfileId: "sbp_publishability_e2b_managed_missing",
+          version: 1,
+          state: SandboxProfileVersionStates.DRAFT,
+          sandboxProvider: SandboxProvider.E2B,
+          sandboxVcpuCount: 2,
+          sandboxMemoryMb: 4096,
+        }),
+      );
+      await env.controlPlaneDb
+        .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+        .values(
+          sandboxProfileVersionIntegrationBindingRow({
+            id: "ibd_publishability_e2b_managed_missing",
+            sandboxProfileId: "sbp_publishability_e2b_managed_missing",
+            sandboxProfileVersion: 1,
+            connectionId: "icn_publishability_e2b_managed_missing",
+            kind: IntegrationBindingKinds.AGENT,
+          }),
+        );
+
+      const response = await env.controlPlaneApi.http.fetch(
+        "/v1/sandbox/profiles/sbp_publishability_e2b_managed_missing/versions/1/publishability",
+        {
+          headers: {
+            cookie: session.cookie,
+          },
+        },
+      );
+
+      expect(response.status).toBe(200);
+      const responseBody = GetSandboxProfileVersionPublishabilityResponseSchema.parse(
+        await response.json(),
+      );
+      expect(responseBody).toEqual({
+        publishable: false,
+        issues: [
+          {
+            code: "SANDBOX_MANAGED_PROVIDER_UNAVAILABLE",
+            message:
+              "Managed E2B sandbox provider credentials are not configured for this deployment.",
+          },
+        ],
+      });
+    },
+  );
 
   it("returns structured issues for inaccessible, inactive, and disabled agent references", async ({
     env,

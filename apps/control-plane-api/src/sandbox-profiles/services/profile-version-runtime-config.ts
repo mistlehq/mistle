@@ -163,7 +163,13 @@ export async function validateSandboxProfileVersionRuntimeConfig(
   }
 
   if (providerId === SandboxProvider.DOCKER) {
-    return validateDockerRuntimeConfig(input.runtimeConfig);
+    return [
+      ...validateManagedSandboxProviderAvailability({
+        providerId,
+        sandboxConfig,
+      }),
+      ...validateDockerRuntimeConfig(input.runtimeConfig),
+    ];
   }
 
   const sandboxRuntimeDefinition = findSandboxRuntimeDefinition({
@@ -187,12 +193,12 @@ export async function validateSandboxProfileVersionRuntimeConfig(
   });
 
   if (input.runtimeConfig.sandboxConnectionId === null) {
-    if (sandboxConfig.provider !== providerId) {
-      issues.push({
-        code: SandboxProfilePublishabilityIssueCodes.SANDBOX_MANAGED_PROVIDER_UNAVAILABLE,
-        message: `Managed sandbox provider '${providerId}' is not configured for this deployment.`,
-      });
-    }
+    issues.push(
+      ...validateManagedSandboxProviderAvailability({
+        providerId,
+        sandboxConfig,
+      }),
+    );
 
     return issues;
   }
@@ -271,6 +277,31 @@ function validateDockerRuntimeConfig(
   }
 
   return issues;
+}
+
+function validateManagedSandboxProviderAvailability(input: {
+  providerId: string;
+  sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
+}): SandboxRuntimeConfigValidationIssue[] {
+  if (input.sandboxConfig.provider !== input.providerId) {
+    return [
+      {
+        code: SandboxProfilePublishabilityIssueCodes.SANDBOX_MANAGED_PROVIDER_UNAVAILABLE,
+        message: `Managed sandbox provider '${input.providerId}' is not configured for this deployment.`,
+      },
+    ];
+  }
+
+  if (input.providerId === SandboxProvider.E2B && input.sandboxConfig.e2b === undefined) {
+    return [
+      {
+        code: SandboxProfilePublishabilityIssueCodes.SANDBOX_MANAGED_PROVIDER_UNAVAILABLE,
+        message: "Managed E2B sandbox provider credentials are not configured for this deployment.",
+      },
+    ];
+  }
+
+  return [];
 }
 
 function validateSandboxResources(input: {
