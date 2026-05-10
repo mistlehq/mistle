@@ -8,11 +8,7 @@ import {
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
-import {
-  createSandboxAdapter,
-  createSandboxRuntimeControl,
-  SandboxProvider,
-} from "@mistle/sandbox";
+import { SandboxProvider } from "@mistle/sandbox";
 import {
   createIntegrationTest,
   TestEnvironmentIdHeader,
@@ -25,6 +21,7 @@ import {
   createDataPlaneWorkerRuntimeConfig,
   type DataPlaneWorkerConfig,
 } from "../openworkflow/core/config.js";
+import { createSandboxRuntimeProviderResolver } from "../openworkflow/core/sandbox-runtime-resolver.js";
 import {
   executeMaterializeSandboxProfileVersionSnapshot,
   type SnapshotWorkflowStepRunner,
@@ -80,74 +77,63 @@ describe.concurrent("data-plane worker snapshot materialization", () => {
     const runtimeConfig = createDataPlaneWorkerRuntimeConfig({
       app: createWorkerConfig(env),
     });
-    const sandboxRuntimeControl = createSandboxRuntimeControl({
-      provider: SandboxProvider.DOCKER,
-      docker: {
-        socketPath: DockerSocketPath,
-      },
-    });
+    const controlPlaneInternalClient = createControlPlaneInternalClient(env);
 
-    try {
-      const output = await executeMaterializeSandboxProfileVersionSnapshot({
-        ctx: {
+    const output = await executeMaterializeSandboxProfileVersionSnapshot({
+      ctx: {
+        config: runtimeConfig,
+        controlPlaneInternalClient,
+        db: env.dataPlaneDb,
+        tables: env.dataPlaneTables,
+        logger: dataPlaneWorkerLogger,
+        processEnv: {},
+        sandboxRuntimeProviderResolver: createSandboxRuntimeProviderResolver({
           config: runtimeConfig,
-          controlPlaneInternalClient: createControlPlaneInternalClient(env),
-          db: env.dataPlaneDb,
-          tables: env.dataPlaneTables,
-          logger: dataPlaneWorkerLogger,
-          processEnv: {},
-          sandboxAdapter: createSandboxAdapter({
-            provider: SandboxProvider.DOCKER,
-            docker: {
-              socketPath: DockerSocketPath,
-            },
-          }),
-          sandboxRuntimeControl,
-        },
-        workflowInput: {
-          snapshotJobId,
-          sandboxInstanceId,
-          organizationId,
-          sandboxProfileId,
-          sandboxProfileVersion: 1,
-          image: {
-            imageId: "integration-new-snapshot-claim-loss-image",
-            createdAt: new Date().toISOString(),
-            kind: "base",
-            provider: SandboxProvider.DOCKER,
-          },
-          sandboxRuntime: {
-            provider: SandboxProvider.DOCKER,
-          },
-        },
-        workflowRunId,
-        step: createInlineStepApi(),
-      });
-
-      expect(output).toEqual({
+          controlPlaneInternalClient,
+        }),
+      },
+      workflowInput: {
         snapshotJobId,
         sandboxInstanceId,
-        claimed: false,
-      });
+        organizationId,
+        sandboxProfileId,
+        sandboxProfileVersion: 1,
+        image: {
+          imageId: "integration-new-snapshot-claim-loss-image",
+          createdAt: new Date().toISOString(),
+          kind: "base",
+          provider: SandboxProvider.DOCKER,
+        },
+        sandboxRuntime: {
+          provider: SandboxProvider.DOCKER,
+        },
+      },
+      workflowRunId,
+      step: createInlineStepApi(),
+    });
 
-      const persistedJob =
-        await env.controlPlaneDb.query.sandboxProfileVersionSnapshotJobs.findFirst({
-          where: (table, { eq }) => eq(table.id, snapshotJobId),
-        });
-      expect(persistedJob).toMatchObject({
-        id: snapshotJobId,
-        state: SandboxProfileVersionSnapshotJobStates.RUNNING,
-        workflowRunId: existingWorkflowRunId,
-      });
+    expect(output).toEqual({
+      snapshotJobId,
+      sandboxInstanceId,
+      claimed: false,
+    });
 
-      await expect(
-        env.dataPlaneDb.query.sandboxInstances.findFirst({
-          where: (table, { eq }) => eq(table.id, sandboxInstanceId),
-        }),
-      ).resolves.toBeUndefined();
-    } finally {
-      await sandboxRuntimeControl.close();
-    }
+    const persistedJob = await env.controlPlaneDb.query.sandboxProfileVersionSnapshotJobs.findFirst(
+      {
+        where: (table, { eq }) => eq(table.id, snapshotJobId),
+      },
+    );
+    expect(persistedJob).toMatchObject({
+      id: snapshotJobId,
+      state: SandboxProfileVersionSnapshotJobStates.RUNNING,
+      workflowRunId: existingWorkflowRunId,
+    });
+
+    await expect(
+      env.dataPlaneDb.query.sandboxInstances.findFirst({
+        where: (table, { eq }) => eq(table.id, sandboxInstanceId),
+      }),
+    ).resolves.toBeUndefined();
   });
 });
 

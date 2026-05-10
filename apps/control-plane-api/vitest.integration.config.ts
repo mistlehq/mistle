@@ -74,6 +74,15 @@ export const WorkspaceAliases = [
     ),
   },
   {
+    find: /^@mistle\/integrations-definitions\/sandbox-runtimes$/,
+    replacement: fileURLToPath(
+      new URL(
+        "../../packages/integrations-definitions/src/sandbox-runtimes/index.ts",
+        import.meta.url,
+      ),
+    ),
+  },
+  {
     find: /^@mistle\/logging$/,
     replacement: fileURLToPath(new URL("../../packages/logging/src/index.ts", import.meta.url)),
   },

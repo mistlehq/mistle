@@ -222,6 +222,14 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
         tokenAudience: config.sandbox.tokens.bootstrap.audience,
       },
       storageBackend: config.sandbox.storage?.backend,
+      ...(config.sandbox.e2b === undefined
+        ? {}
+        : {
+            e2b: {
+              apiKey: config.sandbox.e2b.api_key,
+              domain: config.sandbox.e2b.domain,
+            },
+          }),
     },
     integrations: {
       activeMasterEncryptionKeyVersion:

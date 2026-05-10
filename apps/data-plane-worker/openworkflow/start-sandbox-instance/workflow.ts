@@ -49,6 +49,13 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       runtimeProvider: workflowInput.sandboxRuntime.provider,
     });
     const runtimeProvider = workflowInput.sandboxRuntime.provider;
+    const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve({
+      organizationId: workflowInput.organizationId,
+      provider: runtimeProvider,
+      ...(workflowInput.sandboxRuntime.connectionId === undefined
+        ? {}
+        : { connectionId: workflowInput.sandboxRuntime.connectionId }),
+    });
 
     async function markSandboxInstanceFailedStep(input: {
       sandboxInstanceId: string;
@@ -104,7 +111,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 tables: ctx.tables,
                 controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                 config: ctx.config,
-                sandboxAdapter: ctx.sandboxAdapter,
+                sandboxAdapter: resolvedRuntime.sandboxAdapter,
               },
               {
                 sandboxInstanceId: input.sandboxInstanceId,
@@ -340,7 +347,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               controlPlaneInternalClient: ctx.controlPlaneInternalClient,
               workerConfig: ctx.config.app,
               configuredSandboxProvider: ctx.config.sandbox.provider,
-              sandboxAdapter: ctx.sandboxAdapter,
+              sandboxAdapter: resolvedRuntime.sandboxAdapter,
               storageBackend: ctx.config.sandbox.storage?.backend,
             },
             {
@@ -382,7 +389,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           {
             config: ctx.config,
             processEnv: ctx.processEnv,
-            sandboxAdapter: ctx.sandboxAdapter,
+            sandboxAdapter: resolvedRuntime.sandboxAdapter,
           },
           {
             sandboxInstanceId: workflowInput.sandboxInstanceId,
@@ -428,7 +435,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             controlPlaneInternalClient: ctx.controlPlaneInternalClient,
             workerConfig: ctx.config.app,
             configuredSandboxProvider: ctx.config.sandbox.provider,
-            sandboxAdapter: ctx.sandboxAdapter,
+            sandboxAdapter: resolvedRuntime.sandboxAdapter,
             storageBackend: ctx.config.sandbox.storage?.backend,
           },
           {
@@ -541,8 +548,8 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           {
             config: ctx.config,
             processEnv: ctx.processEnv,
-            sandboxAdapter: ctx.sandboxAdapter,
-            sandboxRuntimeControl: ctx.sandboxRuntimeControl,
+            sandboxAdapter: resolvedRuntime.sandboxAdapter,
+            sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
           },
           {
             organizationId: workflowInput.organizationId,
@@ -577,7 +584,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       );
       await emitSandboxStartupDiagnostics({
         logger,
-        sandboxRuntimeControl: ctx.sandboxRuntimeControl,
+        sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
         providerSandboxId: startedSandbox.providerSandboxId,
         sandboxInstanceId: startedSandbox.sandboxInstanceId,
         runtimeProvider: startedSandbox.runtimeProvider,
@@ -660,7 +667,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       );
       await emitSandboxStartupDiagnostics({
         logger,
-        sandboxRuntimeControl: ctx.sandboxRuntimeControl,
+        sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
         providerSandboxId: startedSandbox.providerSandboxId,
         sandboxInstanceId: startedSandbox.sandboxInstanceId,
         runtimeProvider: startedSandbox.runtimeProvider,
@@ -709,7 +716,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       );
       await emitSandboxStartupDiagnostics({
         logger,
-        sandboxRuntimeControl: ctx.sandboxRuntimeControl,
+        sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
         providerSandboxId: startedSandbox.providerSandboxId,
         sandboxInstanceId: startedSandbox.sandboxInstanceId,
         runtimeProvider: startedSandbox.runtimeProvider,

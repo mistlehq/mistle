@@ -6,6 +6,8 @@ import {
   SandboxStorageBackend,
 } from "../../global/schema.js";
 
+const DefaultE2BCloudDomain = "e2b.app";
+
 const ControlPlaneApiAuthGoogleConfigSchema = z
   .object({
     clientId: z.string().min(1),
@@ -108,6 +110,13 @@ export const ControlPlaneApiSandboxRuntimeConfigSchema = z
     bootstrap: GlobalSandboxTokenConfigSchema.optional(),
     storageBackend: z
       .enum([SandboxStorageBackend.ARCHIL, SandboxStorageBackend.DOCKER_VOLUME])
+      .optional(),
+    e2b: z
+      .object({
+        apiKey: z.string().min(1),
+        domain: z.string().min(1).default(DefaultE2BCloudDomain),
+      })
+      .strict()
       .optional(),
   })
   .strict();

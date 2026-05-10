@@ -5,11 +5,17 @@
 import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
+  IntegrationCredentialSecretKinds,
   UserExternalPrincipalCredentialSecretKinds,
   UserExternalPrincipalCredentialStatuses,
   UserExternalPrincipalStatuses,
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import {
+  E2BSandboxRuntimeCredentialSlotKeys,
+  E2BSandboxRuntimeFamilyId,
+  E2BSandboxRuntimeVariantId,
+} from "@mistle/integrations-definitions/sandbox-runtimes";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
@@ -17,6 +23,7 @@ import {
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
+import { CreatedFormIntegrationConnectionSchema } from "../src/integration-connections/schemas.js";
 import { CONTROL_PLANE_INTERNAL_AUTH_HEADER } from "../src/internal/index.js";
 import { INTERNAL_SANDBOX_RUNTIME_ROUTE_BASE_PATH } from "../src/internal/sandbox-runtime/index.js";
 import {
@@ -28,6 +35,11 @@ import {
   waitForQueuedResumeWorkflowInput,
   waitForQueuedStartWorkflowInput,
 } from "./helpers/data-plane-workflows.js";
+import {
+  createFormConnection,
+  expectCredentialSlots,
+  seedIntegrationTarget,
+} from "./helpers/integration-connections.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api"],
@@ -165,6 +177,67 @@ describe.concurrent("internal sandbox runtime integration", () => {
     await expect(response.json()).resolves.toEqual({
       code: "VALIDATION_ERROR",
       message: "Invalid request.",
+    });
+  });
+
+  it("resolves E2B sandbox runtime credentials from a sandbox connection", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-internal-sandbox-runtime-e2b-credentials@example.com",
+    });
+    await seedIntegrationTarget(env, {
+      targetKey: "e2b-internal-runtime-credentials",
+      familyId: E2BSandboxRuntimeFamilyId,
+      variantId: E2BSandboxRuntimeVariantId,
+      config: {
+        domain: "e2b.internal.example.com",
+      },
+    });
+
+    const createResponse = await createFormConnection({
+      env,
+      targetKey: "e2b-internal-runtime-credentials",
+      cookie: session.cookie,
+      body: {
+        displayName: "E2B runtime credentials",
+        methodId: IntegrationConnectionMethodIds.API_KEY,
+        config: {},
+        secrets: {
+          apiKey: "e2b-connection-api-key",
+        },
+      },
+    });
+
+    expect(createResponse.status).toBe(201);
+    const connection = CreatedFormIntegrationConnectionSchema.parse(await createResponse.json());
+    await expectCredentialSlots({
+      env,
+      connectionId: connection.id,
+      organizationId: session.organizationId,
+      expected: [
+        {
+          slotKey: E2BSandboxRuntimeCredentialSlotKeys.API_KEY,
+          secretKind: IntegrationCredentialSecretKinds.API_KEY,
+          intendedFamilyId: E2BSandboxRuntimeFamilyId,
+          plaintext: "e2b-connection-api-key",
+        },
+      ],
+    });
+
+    const response = await internalSandboxRuntimeRequest(env, {
+      path: "/resolve-credentials",
+      body: {
+        organizationId: session.organizationId,
+        provider: "e2b",
+        connectionId: connection.id,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      provider: "e2b",
+      source: "connection",
+      apiKey: "e2b-connection-api-key",
+      domain: "e2b.internal.example.com",
     });
   });
 

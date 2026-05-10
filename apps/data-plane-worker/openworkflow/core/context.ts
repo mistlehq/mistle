@@ -22,6 +22,10 @@ import {
   createSandboxRuntimeAdapter,
   createSandboxRuntimeControl,
 } from "./sandbox-runtime-adapter.js";
+import {
+  createSandboxRuntimeProviderResolver,
+  type SandboxRuntimeProviderResolver,
+} from "./sandbox-runtime-resolver.js";
 import { DataPlaneWorkerTunnelTokenDurations } from "./tunnel-token-durations.js";
 
 const DefaultTestEnvironmentIdHeader = "x-mistle-test-environment-id";
@@ -35,6 +39,7 @@ export type WorkflowContext = {
   dbPool: Pool;
   sandboxAdapter: SandboxAdapter;
   sandboxRuntimeControl: SandboxRuntimeControl;
+  sandboxRuntimeProviderResolver: SandboxRuntimeProviderResolver;
   runtimeStateReader: SandboxRuntimeStateReader;
   controlPlaneInternalClient: ControlPlaneInternalClient;
   tunnelReadinessPolicy: {
@@ -138,6 +143,10 @@ async function createWorkflowContext(input?: {
         dbPool,
         sandboxAdapter: createSandboxRuntimeAdapter(config),
         sandboxRuntimeControl,
+        sandboxRuntimeProviderResolver: createSandboxRuntimeProviderResolver({
+          config,
+          controlPlaneInternalClient,
+        }),
         runtimeStateReader,
         controlPlaneInternalClient,
         tunnelReadinessPolicy: createDefaultTunnelReadinessPolicy(),

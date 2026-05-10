@@ -1164,6 +1164,116 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/internal/sandbox-runtime/resolve-credentials": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            connectionId?: string;
+            organizationId: string;
+            /** @enum {string} */
+            provider: "docker" | "e2b";
+          };
+        };
+      };
+      responses: {
+        /** @description Resolve sandbox provider credentials for internal data-plane callers. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  provider: "docker";
+                  /** @enum {string} */
+                  source: "managed";
+                }
+              | {
+                  apiKey: string;
+                  domain?: string;
+                  /** @enum {string} */
+                  provider: "e2b";
+                  /** @enum {string} */
+                  source: "managed" | "connection";
+                };
+          };
+        };
+        /** @description Invalid sandbox credential resolution request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  code: string;
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Internal service authentication failed. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox credential resolution dependency was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              code: string;
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/internal/sandbox-runtime/resume-sandbox-instance": {
     parameters: {
       query?: never;

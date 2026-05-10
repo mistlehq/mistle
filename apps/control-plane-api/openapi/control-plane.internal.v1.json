@@ -4078,6 +4078,184 @@
           }
         }
       }
+    },
+    "/internal/sandbox-runtime/resolve-credentials": {
+      "post": {
+        "tags": ["Internal"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "organizationId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "provider": {
+                    "type": "string",
+                    "enum": ["docker", "e2b"]
+                  },
+                  "connectionId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": ["organizationId", "provider"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resolve sandbox provider credentials for internal data-plane callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "enum": ["docker"]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": ["managed"]
+                        }
+                      },
+                      "required": ["provider", "source"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "enum": ["e2b"]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": ["managed", "connection"]
+                        },
+                        "apiKey": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "domain": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["provider", "source", "apiKey"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid sandbox credential resolution request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sandbox credential resolution dependency was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "webhooks": {}

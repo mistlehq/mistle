@@ -10,6 +10,9 @@
       "@mistle/integrations-definitions/server": [
         "../../packages/integrations-definitions/src/server.ts"
       ],
+      "@mistle/integrations-definitions/sandbox-runtimes": [
+        "../../packages/integrations-definitions/src/sandbox-runtimes/index.ts"
+      ],
       "@mistle/http/pagination": ["../../packages/http/src/pagination/index.ts"],
       "@mistle/logging": ["../../packages/logging/src/index.ts"],
       "@mistle/time": ["../../packages/time/src/index.ts"],

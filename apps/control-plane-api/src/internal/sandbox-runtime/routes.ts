@@ -8,6 +8,7 @@ import * as compileProfileVersionRuntimePlan from "./compile-profile-version-run
 import { INTERNAL_SANDBOX_RUNTIME_ROUTE_BASE_PATH } from "./constants.js";
 import * as getSandboxInstance from "./get-sandbox-instance/index.js";
 import * as mintConnectionToken from "./mint-connection-token/index.js";
+import * as resolveSandboxCredentials from "./resolve-sandbox-credentials/index.js";
 import * as resumeSandboxInstance from "./resume-sandbox-instance/index.js";
 import * as startProfileInstance from "./start-profile-instance/index.js";
 
@@ -35,6 +36,7 @@ export function createInternalSandboxRuntimeRoutes(): AppRoutes<
   routes.openapi(getSandboxInstance.route, getSandboxInstance.handler);
   routes.openapi(resumeSandboxInstance.route, resumeSandboxInstance.handler);
   routes.openapi(mintConnectionToken.route, mintConnectionToken.handler);
+  routes.openapi(resolveSandboxCredentials.route, resolveSandboxCredentials.handler);
 
   return {
     basePath: INTERNAL_SANDBOX_RUNTIME_ROUTE_BASE_PATH,

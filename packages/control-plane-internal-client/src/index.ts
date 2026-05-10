@@ -65,6 +65,10 @@ export type ResumeSandboxInstanceForConnectionInput =
   paths["/internal/sandbox-runtime/resume-sandbox-instance"]["post"]["requestBody"]["content"]["application/json"];
 export type ResumeSandboxInstanceForConnectionOutput =
   paths["/internal/sandbox-runtime/resume-sandbox-instance"]["post"]["responses"]["200"]["content"]["application/json"];
+export type ResolveSandboxRuntimeCredentialsInput =
+  paths["/internal/sandbox-runtime/resolve-credentials"]["post"]["requestBody"]["content"]["application/json"];
+export type ResolveSandboxRuntimeCredentialsOutput =
+  paths["/internal/sandbox-runtime/resolve-credentials"]["post"]["responses"]["200"]["content"]["application/json"];
 export type ResolveStoragePersistenceModeInput =
   paths["/internal/sandbox-storage/resolve-persistence-mode"]["post"]["requestBody"]["content"]["application/json"];
 export type ResolveStoragePersistenceModeOutput =
@@ -518,6 +522,27 @@ export class ControlPlaneInternalClient {
       status: result.response.status,
       code: extractErrorCode(result.error),
       message: `Control-plane internal snapshot job claim failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+    });
+  }
+
+  async resolveSandboxRuntimeCredentials(
+    input: ResolveSandboxRuntimeCredentialsInput,
+    options: ControlPlaneInternalClientRequestOptions = {},
+  ): Promise<ResolveSandboxRuntimeCredentialsOutput> {
+    const result = await this.#client.POST("/internal/sandbox-runtime/resolve-credentials", {
+      body: input,
+      headers: this.#headers(options),
+      signal: AbortSignal.timeout(this.#requestTimeoutMs),
+    });
+
+    if (result.response.status === 200 && result.data !== undefined) {
+      return result.data;
+    }
+
+    throw new ControlPlaneInternalClientRequestError({
+      status: result.response.status,
+      code: extractErrorCode(result.error),
+      message: `Control-plane internal sandbox runtime credential resolution failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
     });
   }
 

@@ -47,8 +47,7 @@ type MaterializeSnapshotWorkflowExecutionContext = Pick<
   | "tables"
   | "logger"
   | "processEnv"
-  | "sandboxAdapter"
-  | "sandboxRuntimeControl"
+  | "sandboxRuntimeProviderResolver"
 >;
 
 export type SnapshotWorkflowStepRunner = {
@@ -95,6 +94,13 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     runtimeProvider: workflowInput.sandboxRuntime.provider,
   });
   const requestedRuntimeProvider = workflowInput.sandboxRuntime.provider;
+  const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve({
+    organizationId: workflowInput.organizationId,
+    provider: requestedRuntimeProvider,
+    ...(workflowInput.sandboxRuntime.connectionId === undefined
+      ? {}
+      : { connectionId: workflowInput.sandboxRuntime.connectionId }),
+  });
 
   let providerSandboxId: string | undefined;
   let runtimeProvider: SandboxProvider | undefined;
@@ -139,7 +145,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
               tables: ctx.tables,
               controlPlaneInternalClient: ctx.controlPlaneInternalClient,
               config: ctx.config,
-              sandboxAdapter: ctx.sandboxAdapter,
+              sandboxAdapter: resolvedRuntime.sandboxAdapter,
             },
             {
               sandboxInstanceId: workflowInput.sandboxInstanceId,
@@ -319,7 +325,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
         {
           config: ctx.config,
           processEnv: ctx.processEnv,
-          sandboxAdapter: ctx.sandboxAdapter,
+          sandboxAdapter: resolvedRuntime.sandboxAdapter,
         },
         {
           sandboxInstanceId: workflowInput.sandboxInstanceId,
@@ -354,8 +360,8 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
         {
           config: ctx.config,
           processEnv: ctx.processEnv,
-          sandboxAdapter: ctx.sandboxAdapter,
-          sandboxRuntimeControl: ctx.sandboxRuntimeControl,
+          sandboxAdapter: resolvedRuntime.sandboxAdapter,
+          sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
         },
         {
           organizationId: workflowInput.organizationId,
@@ -383,7 +389,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
 
     currentPhase = "capture";
     const capturedSnapshot = await step.run({ name: "capture-snapshot-image" }, async () =>
-      ctx.sandboxAdapter.captureSnapshot({
+      resolvedRuntime.sandboxAdapter.captureSnapshot({
         id: startedSandbox.providerSandboxId,
       }),
     );
@@ -396,7 +402,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
           tables: ctx.tables,
           controlPlaneInternalClient: ctx.controlPlaneInternalClient,
           config: ctx.config,
-          sandboxAdapter: ctx.sandboxAdapter,
+          sandboxAdapter: resolvedRuntime.sandboxAdapter,
         },
         {
           sandboxInstanceId: workflowInput.sandboxInstanceId,
