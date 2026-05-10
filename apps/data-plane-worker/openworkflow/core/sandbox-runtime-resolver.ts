@@ -5,6 +5,7 @@ import type {
 import {
   createSandboxAdapter,
   createSandboxRuntimeControl,
+  type CreateSandboxAdapterInput,
   SandboxProvider,
   type SandboxAdapter,
   type SandboxRuntimeControl,
@@ -17,6 +18,11 @@ export type ResolveSandboxRuntimeInput = {
   organizationId: string;
   provider: SandboxProviderValue;
   connectionId?: string;
+  resources?: {
+    vcpuCount: number;
+    memoryMb: number;
+    storageMb?: number;
+  };
 };
 
 export type ResolvedSandboxRuntime = {
@@ -75,7 +81,10 @@ export function createSandboxRuntimeProviderResolver(input: {
           throw new Error("Control-plane returned non-E2B credentials for E2B runtime.");
         }
 
-        return createE2BSandboxRuntime({ credentials });
+        return createE2BSandboxRuntime({
+          credentials,
+          resources: runtimeInput.resources,
+        });
       }
 
       return assertUnreachableSandboxProvider(runtimeInput.provider);
@@ -89,18 +98,36 @@ function assertUnreachableSandboxProvider(_provider: never): never {
 
 function createE2BSandboxRuntime(input: {
   credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "e2b" }>;
+  resources?: ResolveSandboxRuntimeInput["resources"];
 }): ResolvedSandboxRuntime {
-  const providerConfig = {
-    provider: SandboxProvider.E2B,
-    e2b: {
-      apiKey: input.credentials.apiKey,
-      ...(input.credentials.domain === undefined ? {} : { domain: input.credentials.domain }),
-    },
-  };
+  const providerConfig = createE2BSandboxProviderConfig(input);
 
   return {
     provider: SandboxProvider.E2B,
     sandboxAdapter: createSandboxAdapter(providerConfig),
     sandboxRuntimeControl: createSandboxRuntimeControl(providerConfig),
+  };
+}
+
+export function createE2BSandboxProviderConfig(input: {
+  credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "e2b" }>;
+  resources?: ResolveSandboxRuntimeInput["resources"];
+}): CreateSandboxAdapterInput {
+  if (input.resources?.storageMb !== undefined) {
+    throw new Error("E2B sandbox runtime does not support configurable storage.");
+  }
+
+  return {
+    provider: SandboxProvider.E2B,
+    e2b: {
+      apiKey: input.credentials.apiKey,
+      ...(input.credentials.domain === undefined ? {} : { domain: input.credentials.domain }),
+      ...(input.resources === undefined
+        ? {}
+        : {
+            cpuCount: input.resources.vcpuCount,
+            memoryMb: input.resources.memoryMb,
+          }),
+    },
   };
 }

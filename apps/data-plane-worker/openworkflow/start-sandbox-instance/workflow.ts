@@ -55,6 +55,9 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       ...(workflowInput.sandboxRuntime.connectionId === undefined
         ? {}
         : { connectionId: workflowInput.sandboxRuntime.connectionId }),
+      ...(workflowInput.sandboxRuntime.resources === undefined
+        ? {}
+        : { resources: workflowInput.sandboxRuntime.resources }),
     });
 
     async function markSandboxInstanceFailedStep(input: {

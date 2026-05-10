@@ -100,6 +100,9 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     ...(workflowInput.sandboxRuntime.connectionId === undefined
       ? {}
       : { connectionId: workflowInput.sandboxRuntime.connectionId }),
+    ...(workflowInput.sandboxRuntime.resources === undefined
+      ? {}
+      : { resources: workflowInput.sandboxRuntime.resources }),
   });
 
   let providerSandboxId: string | undefined;
