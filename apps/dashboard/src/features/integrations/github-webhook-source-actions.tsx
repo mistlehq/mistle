@@ -41,7 +41,11 @@ export function useGitHubWebhookSourceActions(input: {
         </Button>
       );
     },
-    [input],
+    [
+      input.connections,
+      input.refreshTriggerCapabilities,
+      input.refreshingTriggerCapabilitiesConnectionId,
+    ],
   );
 
   return {
