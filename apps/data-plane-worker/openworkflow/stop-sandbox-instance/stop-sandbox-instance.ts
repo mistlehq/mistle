@@ -8,7 +8,6 @@ import {
   type SandboxInstancePurpose,
   type SandboxInstanceProvider,
 } from "@mistle/db/data-plane";
-import type { SandboxAdapter } from "@mistle/sandbox";
 import { isSandboxResourceNotFoundError } from "@mistle/sandbox";
 import type { Clock } from "@mistle/time";
 import type { SandboxStopReason } from "@mistle/workflow-registry/data-plane";
@@ -18,13 +17,22 @@ import type {
   SandboxRuntimeStateSnapshot,
 } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
+import {
+  createResolveSandboxRuntimeInput,
+  type SandboxRuntimeProviderResolver,
+} from "../core/sandbox-runtime-resolver.js";
 import { stopSandbox } from "../shared/stop-sandbox.js";
 import { markSandboxInstanceStopped } from "./mark-sandbox-instance-stopped.js";
 
 type RunningSandboxInstanceStopState = {
+  organizationId: string;
   persistenceMode: SandboxInstancePersistenceMode;
   purpose: SandboxInstancePurpose;
   runtimeProvider: SandboxInstanceProvider;
+  sandboxConnectionId: string | null;
+  sandboxVcpuCount: number | null;
+  sandboxMemoryMb: number | null;
+  sandboxStorageMb: number | null;
   providerSandboxId: string;
 };
 
@@ -79,9 +87,14 @@ async function resolveRunningSandboxInstanceStopState(input: {
 }): Promise<RunningSandboxInstanceStopState | null> {
   const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
     columns: {
+      organizationId: true,
       persistenceMode: true,
       purpose: true,
       runtimeProvider: true,
+      sandboxConnectionId: true,
+      sandboxVcpuCount: true,
+      sandboxMemoryMb: true,
+      sandboxStorageMb: true,
       providerSandboxId: true,
       status: true,
     },
@@ -109,9 +122,14 @@ async function resolveRunningSandboxInstanceStopState(input: {
   }
 
   return {
+    organizationId: sandboxInstance.organizationId,
     persistenceMode: sandboxInstance.persistenceMode,
     purpose: sandboxInstance.purpose,
     runtimeProvider: sandboxInstance.runtimeProvider,
+    sandboxConnectionId: sandboxInstance.sandboxConnectionId,
+    sandboxVcpuCount: sandboxInstance.sandboxVcpuCount,
+    sandboxMemoryMb: sandboxInstance.sandboxMemoryMb,
+    sandboxStorageMb: sandboxInstance.sandboxStorageMb,
     providerSandboxId: sandboxInstance.providerSandboxId,
   };
 }
@@ -157,7 +175,7 @@ export async function stopSandboxInstance(
     db: DataPlaneDatabase;
     tables: DataPlaneTables;
     controlPlaneInternalClient: ControlPlaneInternalClient;
-    sandboxAdapter: SandboxAdapter;
+    sandboxRuntimeProviderResolver: SandboxRuntimeProviderResolver;
     runtimeStateReader: SandboxRuntimeStateReader;
     clock: Clock;
   },
@@ -215,6 +233,10 @@ export async function stopSandboxInstance(
     };
   }
 
+  const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve(
+    createResolveSandboxRuntimeInput(sandboxInstanceState),
+  );
+
   try {
     await stopSandbox(
       {
@@ -222,7 +244,7 @@ export async function stopSandboxInstance(
         tables: ctx.tables,
         controlPlaneInternalClient: ctx.controlPlaneInternalClient,
         config: ctx.config,
-        sandboxAdapter: ctx.sandboxAdapter,
+        sandboxAdapter: resolvedRuntime.sandboxAdapter,
       },
       {
         sandboxInstanceId: input.sandboxInstanceId,

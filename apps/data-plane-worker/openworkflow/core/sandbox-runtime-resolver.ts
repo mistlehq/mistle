@@ -35,6 +35,28 @@ export type SandboxRuntimeProviderResolver = {
   resolve(input: ResolveSandboxRuntimeInput): Promise<ResolvedSandboxRuntime>;
 };
 
+export type PersistedSandboxSelection = {
+  organizationId: string;
+  runtimeProvider: SandboxProviderValue;
+  sandboxConnectionId: string | null;
+  sandboxVcpuCount: number | null;
+  sandboxMemoryMb: number | null;
+  sandboxStorageMb: number | null;
+};
+
+export function createResolveSandboxRuntimeInput(
+  input: PersistedSandboxSelection,
+): ResolveSandboxRuntimeInput {
+  const resources = createPersistedSandboxResources(input);
+
+  return {
+    organizationId: input.organizationId,
+    provider: input.runtimeProvider,
+    ...(input.sandboxConnectionId === null ? {} : { connectionId: input.sandboxConnectionId }),
+    ...(resources === undefined ? {} : { resources }),
+  };
+}
+
 export function createSandboxRuntimeProviderResolver(input: {
   config: DataPlaneWorkerRuntimeConfig;
   controlPlaneInternalClient: ControlPlaneInternalClient;
@@ -89,6 +111,30 @@ export function createSandboxRuntimeProviderResolver(input: {
 
       return assertUnreachableSandboxProvider(runtimeInput.provider);
     },
+  };
+}
+
+function createPersistedSandboxResources(input: {
+  sandboxVcpuCount: number | null;
+  sandboxMemoryMb: number | null;
+  sandboxStorageMb: number | null;
+}): ResolveSandboxRuntimeInput["resources"] | undefined {
+  if (
+    input.sandboxVcpuCount === null &&
+    input.sandboxMemoryMb === null &&
+    input.sandboxStorageMb === null
+  ) {
+    return undefined;
+  }
+
+  if (input.sandboxVcpuCount === null || input.sandboxMemoryMb === null) {
+    throw new Error("Persisted sandbox resources are incomplete.");
+  }
+
+  return {
+    vcpuCount: input.sandboxVcpuCount,
+    memoryMb: input.sandboxMemoryMb,
+    ...(input.sandboxStorageMb === null ? {} : { storageMb: input.sandboxStorageMb }),
   };
 }
 

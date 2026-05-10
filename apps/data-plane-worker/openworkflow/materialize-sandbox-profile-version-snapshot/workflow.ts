@@ -303,7 +303,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
         {
           db: ctx.db,
           tables: ctx.tables,
-          runtimeProvider: requestedRuntimeProvider,
+          sandboxRuntime: workflowInput.sandboxRuntime,
         },
         {
           sandboxInstanceId: workflowInput.sandboxInstanceId,

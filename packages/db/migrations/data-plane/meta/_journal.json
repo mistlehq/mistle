@@ -57,6 +57,13 @@
       "when": 1777141452774,
       "tag": "0007_add-sandbox-instance-purpose",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1778410744389,
+      "tag": "0008_add-sandbox-instance-runtime-config",
+      "breakpoints": true
     }
   ]
 }

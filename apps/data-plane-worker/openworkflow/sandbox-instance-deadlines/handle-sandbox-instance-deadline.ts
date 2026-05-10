@@ -4,12 +4,12 @@ import type {
   DataPlaneTables,
   SandboxInstanceDeadlineKind,
 } from "@mistle/db/data-plane";
-import type { SandboxAdapter } from "@mistle/sandbox";
 import type { Clock } from "@mistle/time";
 import type { HandleSandboxInstanceDeadlineWorkflowOutput } from "@mistle/workflow-registry/data-plane";
 
 import type { SandboxRuntimeStateReader } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
+import type { SandboxRuntimeProviderResolver } from "../core/sandbox-runtime-resolver.js";
 import {
   reconcileSandboxInstance,
   type ReconcileSandboxInstanceResult,
@@ -40,7 +40,7 @@ export async function handleSandboxInstanceDeadline(
     db: DataPlaneDatabase;
     tables: DataPlaneTables;
     controlPlaneInternalClient: ControlPlaneInternalClient;
-    sandboxAdapter: SandboxAdapter;
+    sandboxRuntimeProviderResolver: SandboxRuntimeProviderResolver;
     runtimeStateReader: SandboxRuntimeStateReader;
     clock: Clock;
   },
@@ -123,7 +123,7 @@ async function executeDeadlineAction(
     db: DataPlaneDatabase;
     tables: DataPlaneTables;
     controlPlaneInternalClient: ControlPlaneInternalClient;
-    sandboxAdapter: SandboxAdapter;
+    sandboxRuntimeProviderResolver: SandboxRuntimeProviderResolver;
     runtimeStateReader: SandboxRuntimeStateReader;
     clock: Clock;
   },
@@ -141,7 +141,7 @@ async function executeDeadlineAction(
           db: ctx.db,
           tables: ctx.tables,
           controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-          sandboxAdapter: ctx.sandboxAdapter,
+          sandboxRuntimeProviderResolver: ctx.sandboxRuntimeProviderResolver,
           runtimeStateReader: ctx.runtimeStateReader,
           clock: ctx.clock,
         },
@@ -158,7 +158,7 @@ async function executeDeadlineAction(
           db: ctx.db,
           tables: ctx.tables,
           controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-          sandboxAdapter: ctx.sandboxAdapter,
+          sandboxRuntimeProviderResolver: ctx.sandboxRuntimeProviderResolver,
           runtimeStateReader: ctx.runtimeStateReader,
           clock: ctx.clock,
         },

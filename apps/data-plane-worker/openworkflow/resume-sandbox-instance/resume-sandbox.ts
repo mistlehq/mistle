@@ -11,6 +11,7 @@ export async function resumeSandbox(
   },
   input: {
     sandboxInstanceId: string;
+    runtimeProvider: SandboxProvider;
     providerSandboxId: string;
   },
 ): Promise<{
@@ -26,7 +27,7 @@ export async function resumeSandbox(
     }),
   });
 
-  if (resumedSandbox.provider !== ctx.config.sandbox.provider) {
+  if (resumedSandbox.provider !== input.runtimeProvider) {
     throw new Error("Sandbox adapter returned sandbox handle with unexpected provider.");
   }
   if (resumedSandbox.id !== input.providerSandboxId) {

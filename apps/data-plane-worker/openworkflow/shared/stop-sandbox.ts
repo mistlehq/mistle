@@ -28,12 +28,6 @@ export async function stopSandbox(
     providerSandboxId: string;
   },
 ): Promise<void> {
-  if (input.runtimeProvider !== ctx.config.sandbox.provider) {
-    throw new Error(
-      "Attempted to stop sandbox using provider different from configured runtime sandbox provider.",
-    );
-  }
-
   let beforeComputeStorageCleanupError: unknown;
   try {
     await cleanupSandboxStorage(
@@ -42,7 +36,7 @@ export async function stopSandbox(
         tables: ctx.tables,
         controlPlaneInternalClient: ctx.controlPlaneInternalClient,
         workerConfig: ctx.config.app,
-        configuredSandboxProvider: ctx.config.sandbox.provider,
+        configuredSandboxProvider: input.runtimeProvider,
         sandboxAdapter: ctx.sandboxAdapter,
         storageBackend: ctx.config.sandbox.storage?.backend,
       },
@@ -76,7 +70,7 @@ export async function stopSandbox(
         tables: ctx.tables,
         controlPlaneInternalClient: ctx.controlPlaneInternalClient,
         workerConfig: ctx.config.app,
-        configuredSandboxProvider: ctx.config.sandbox.provider,
+        configuredSandboxProvider: input.runtimeProvider,
         sandboxAdapter: ctx.sandboxAdapter,
         storageBackend: ctx.config.sandbox.storage?.backend,
       },

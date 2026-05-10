@@ -78,6 +78,10 @@ export function defineSandboxInstances(schema: PgSchema) {
       sandboxProfileId: text("sandbox_profile_id").notNull(),
       sandboxProfileVersion: bigint("sandbox_profile_version", { mode: "number" }).notNull(),
       runtimeProvider: text("runtime_provider").notNull().$type<SandboxInstanceProvider>(),
+      sandboxConnectionId: text("sandbox_connection_id"),
+      sandboxVcpuCount: bigint("sandbox_vcpu_count", { mode: "number" }),
+      sandboxMemoryMb: bigint("sandbox_memory_mb", { mode: "number" }),
+      sandboxStorageMb: bigint("sandbox_storage_mb", { mode: "number" }),
       providerSandboxId: text("provider_sandbox_id"),
       computeGeneration: bigint("compute_generation", { mode: "number" }).notNull().default(1),
       status: text("status")

@@ -19,6 +19,10 @@ import type {
   SandboxRuntimeStateSnapshot,
 } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
+import {
+  createResolveSandboxRuntimeInput,
+  type SandboxRuntimeProviderResolver,
+} from "../core/sandbox-runtime-resolver.js";
 import { stopSandbox } from "../shared/stop-sandbox.js";
 import { determineDisconnectReconciliationAction } from "./disconnect-reconciliation-policy.js";
 import { markSandboxInstanceFailed } from "./mark-sandbox-instance-failed.js";
@@ -26,8 +30,13 @@ import { markSandboxInstanceStopped } from "./mark-sandbox-instance-stopped.js";
 
 type ActiveSandboxInstance = {
   id: string;
+  organizationId: string;
   persistenceMode: SandboxInstancePersistenceMode;
   runtimeProvider: SandboxInstanceProvider;
+  sandboxConnectionId: string | null;
+  sandboxVcpuCount: number | null;
+  sandboxMemoryMb: number | null;
+  sandboxStorageMb: number | null;
   providerSandboxId: string;
   status: "starting" | "running";
 };
@@ -93,8 +102,13 @@ async function resolveActiveSandboxInstance(input: {
   const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
     columns: {
       id: true,
+      organizationId: true,
       persistenceMode: true,
       runtimeProvider: true,
+      sandboxConnectionId: true,
+      sandboxVcpuCount: true,
+      sandboxMemoryMb: true,
+      sandboxStorageMb: true,
       providerSandboxId: true,
       status: true,
     },
@@ -123,8 +137,13 @@ async function resolveActiveSandboxInstance(input: {
 
       return {
         id: sandboxInstance.id,
+        organizationId: sandboxInstance.organizationId,
         persistenceMode: sandboxInstance.persistenceMode,
         runtimeProvider: sandboxInstance.runtimeProvider,
+        sandboxConnectionId: sandboxInstance.sandboxConnectionId,
+        sandboxVcpuCount: sandboxInstance.sandboxVcpuCount,
+        sandboxMemoryMb: sandboxInstance.sandboxMemoryMb,
+        sandboxStorageMb: sandboxInstance.sandboxStorageMb,
         providerSandboxId: sandboxInstance.providerSandboxId,
         status: sandboxInstance.status,
       };
@@ -329,7 +348,7 @@ export async function reconcileSandboxInstance(
     db: DataPlaneDatabase;
     tables: DataPlaneTables;
     controlPlaneInternalClient: ControlPlaneInternalClient;
-    sandboxAdapter: SandboxAdapter;
+    sandboxRuntimeProviderResolver: SandboxRuntimeProviderResolver;
     runtimeStateReader: SandboxRuntimeStateReader;
     clock: Clock;
   },
@@ -379,8 +398,12 @@ export async function reconcileSandboxInstance(
     };
   }
 
+  const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve(
+    createResolveSandboxRuntimeInput(sandboxInstance),
+  );
+
   const providerState = await inspectProviderStateOrMissing({
-    sandboxAdapter: ctx.sandboxAdapter,
+    sandboxAdapter: resolvedRuntime.sandboxAdapter,
     providerSandboxId: sandboxInstance.providerSandboxId,
   });
   const action = determineDisconnectReconciliationAction({
@@ -477,7 +500,7 @@ export async function reconcileSandboxInstance(
       return stopProviderSandboxOrMarkMissing({
         config: ctx.config,
         controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-        sandboxAdapter: ctx.sandboxAdapter,
+        sandboxAdapter: resolvedRuntime.sandboxAdapter,
         db: ctx.db,
         tables: ctx.tables,
         runtimeStateReader: ctx.runtimeStateReader,

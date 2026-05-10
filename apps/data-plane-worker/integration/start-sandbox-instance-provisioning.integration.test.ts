@@ -231,7 +231,9 @@ async function ensureEphemeralSandboxInstance(
     {
       db: env.dataPlaneDb,
       tables: env.dataPlaneTables,
-      runtimeProvider: "docker",
+      sandboxRuntime: {
+        provider: "docker",
+      },
     },
     {
       ...input,
@@ -259,7 +261,9 @@ async function ensurePersistentSandboxInstance(
     {
       db: env.dataPlaneDb,
       tables: env.dataPlaneTables,
-      runtimeProvider: "docker",
+      sandboxRuntime: {
+        provider: "docker",
+      },
     },
     {
       ...input,

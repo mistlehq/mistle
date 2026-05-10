@@ -72,6 +72,10 @@ describe.concurrent("data-plane worker resume sandbox instance state", () => {
       organizationId: "org_resume_state_runtime_plan_new",
       persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
       runtimeProvider: "docker",
+      sandboxConnectionId: null,
+      sandboxVcpuCount: null,
+      sandboxMemoryMb: null,
+      sandboxStorageMb: null,
       providerSandboxId: "provider-runtime-plan-new",
       computeGeneration: 1,
       runtimePlan: createRuntimePlan({
@@ -116,6 +120,10 @@ describe.concurrent("data-plane worker resume sandbox instance state", () => {
       organizationId: "org_resume_state_missing_provider_persistent_new",
       persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
       runtimeProvider: "docker",
+      sandboxConnectionId: null,
+      sandboxVcpuCount: null,
+      sandboxMemoryMb: null,
+      sandboxStorageMb: null,
       providerSandboxId: null,
       computeGeneration: 1,
       runtimePlan: createRuntimePlan({

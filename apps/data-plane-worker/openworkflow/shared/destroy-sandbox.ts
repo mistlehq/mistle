@@ -31,12 +31,6 @@ export async function destroySandbox(
     skipPersistentStorageDeprovision?: boolean;
   },
 ): Promise<void> {
-  if (input.runtimeProvider !== ctx.config.sandbox.provider) {
-    throw new Error(
-      "Attempted to destroy sandbox using provider different from configured runtime sandbox provider.",
-    );
-  }
-
   let beforeComputeStorageCleanupError: unknown;
   try {
     await cleanupSandboxStorage(
@@ -45,7 +39,7 @@ export async function destroySandbox(
         tables: ctx.tables,
         controlPlaneInternalClient: ctx.controlPlaneInternalClient,
         workerConfig: ctx.config.app,
-        configuredSandboxProvider: ctx.config.sandbox.provider,
+        configuredSandboxProvider: input.runtimeProvider,
         sandboxAdapter: ctx.sandboxAdapter,
         storageBackend: ctx.config.sandbox.storage?.backend,
       },
@@ -79,7 +73,7 @@ export async function destroySandbox(
         tables: ctx.tables,
         controlPlaneInternalClient: ctx.controlPlaneInternalClient,
         workerConfig: ctx.config.app,
-        configuredSandboxProvider: ctx.config.sandbox.provider,
+        configuredSandboxProvider: input.runtimeProvider,
         sandboxAdapter: ctx.sandboxAdapter,
         storageBackend: ctx.config.sandbox.storage?.backend,
       },

@@ -122,6 +122,10 @@ describe.concurrent("internal sandbox instance start and resume integration", ()
       sandboxProfileId: workflowInput.sandboxProfileId,
       sandboxProfileVersion: workflowInput.sandboxProfileVersion,
       providerSandboxId: null,
+      sandboxConnectionId: null,
+      sandboxVcpuCount: null,
+      sandboxMemoryMb: null,
+      sandboxStorageMb: null,
       persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
       purpose: SandboxInstancePurposes.SESSION,
       status: SandboxInstanceStatuses.PENDING,
@@ -129,6 +133,36 @@ describe.concurrent("internal sandbox instance start and resume integration", ()
 
     await expect(countPersistedRuntimePlans(env, startedSandbox.sandboxInstanceId)).resolves.toBe(
       0,
+    );
+  });
+
+  it("persists the selected sandbox runtime config with the pending sandbox instance", async ({
+    env,
+  }) => {
+    const workflowInput = startInput({
+      organizationId: "org_dp_api_start_runtime_config",
+      sandboxProfileId: "sbp_dp_api_start_runtime_config",
+      sandboxProfileVersion: 8,
+      purpose: SandboxInstancePurposes.SESSION,
+      imageId: "im_dp_api_start_runtime_config",
+      imageProvider: "e2b",
+      sandboxConnectionId: "icn_dp_api_start_runtime_config",
+      runtimeResources: {
+        vcpuCount: 4,
+        memoryMb: 8192,
+      },
+    });
+
+    const startedSandbox = await clientFor(env).startSandboxInstance(workflowInput);
+
+    await expect(readSandboxInstance(env, startedSandbox.sandboxInstanceId)).resolves.toMatchObject(
+      {
+        id: startedSandbox.sandboxInstanceId,
+        sandboxConnectionId: "icn_dp_api_start_runtime_config",
+        sandboxVcpuCount: 4,
+        sandboxMemoryMb: 8192,
+        sandboxStorageMb: null,
+      },
     );
   });
 
@@ -323,6 +357,12 @@ function startInput(input: {
   imageKind?: "base" | "snapshot";
   imageProvider?: "docker" | "e2b";
   idempotencyKey?: string;
+  sandboxConnectionId?: string;
+  runtimeResources?: {
+    vcpuCount: number;
+    memoryMb: number;
+    storageMb?: number;
+  };
 }): StartSandboxInstanceInput {
   const imageKind = input.imageKind ?? "base";
   const imageProvider = input.imageProvider ?? "docker";
@@ -352,6 +392,10 @@ function startInput(input: {
     },
     sandboxRuntime: {
       provider: imageProvider,
+      ...(input.sandboxConnectionId === undefined
+        ? {}
+        : { connectionId: input.sandboxConnectionId }),
+      ...(input.runtimeResources === undefined ? {} : { resources: input.runtimeResources }),
     },
     ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
   };
@@ -426,6 +470,10 @@ async function readSandboxInstance(env: IntegrationTestEnvironment, sandboxInsta
       sandboxProfileId: true,
       sandboxProfileVersion: true,
       providerSandboxId: true,
+      sandboxConnectionId: true,
+      sandboxVcpuCount: true,
+      sandboxMemoryMb: true,
+      sandboxStorageMb: true,
       persistenceMode: true,
       purpose: true,
       status: true,

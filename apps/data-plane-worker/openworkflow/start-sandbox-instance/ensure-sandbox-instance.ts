@@ -5,13 +5,13 @@ import {
   type SandboxInstancePurpose,
   type SandboxInstanceSource,
 } from "@mistle/db/data-plane";
-import type { SandboxProvider } from "@mistle/sandbox";
+import type { SandboxRuntimeProviderInput } from "@mistle/workflow-registry/data-plane";
 
 export async function ensureSandboxInstance(
   ctx: {
     db: DataPlaneDatabase;
     tables: Pick<DataPlaneTables, "sandboxInstances">;
-    runtimeProvider: SandboxProvider;
+    sandboxRuntime: SandboxRuntimeProviderInput;
   },
   input: {
     sandboxInstanceId: string;
@@ -37,7 +37,11 @@ export async function ensureSandboxInstance(
       organizationId: input.organizationId,
       sandboxProfileId: input.sandboxProfileId,
       sandboxProfileVersion: input.sandboxProfileVersion,
-      runtimeProvider: ctx.runtimeProvider,
+      runtimeProvider: ctx.sandboxRuntime.provider,
+      sandboxConnectionId: ctx.sandboxRuntime.connectionId ?? null,
+      sandboxVcpuCount: ctx.sandboxRuntime.resources?.vcpuCount ?? null,
+      sandboxMemoryMb: ctx.sandboxRuntime.resources?.memoryMb ?? null,
+      sandboxStorageMb: ctx.sandboxRuntime.resources?.storageMb ?? null,
       providerSandboxId: null,
       computeGeneration: 1,
       status: SandboxInstanceStatuses.PENDING,
@@ -47,8 +51,15 @@ export async function ensureSandboxInstance(
       purpose: input.purpose,
       persistenceMode: input.persistenceMode,
     })
-    .onConflictDoNothing({
+    .onConflictDoUpdate({
       target: [sandboxInstances.id],
+      set: {
+        runtimeProvider: ctx.sandboxRuntime.provider,
+        sandboxConnectionId: ctx.sandboxRuntime.connectionId ?? null,
+        sandboxVcpuCount: ctx.sandboxRuntime.resources?.vcpuCount ?? null,
+        sandboxMemoryMb: ctx.sandboxRuntime.resources?.memoryMb ?? null,
+        sandboxStorageMb: ctx.sandboxRuntime.resources?.storageMb ?? null,
+      },
     })
     .returning({
       id: sandboxInstances.id,

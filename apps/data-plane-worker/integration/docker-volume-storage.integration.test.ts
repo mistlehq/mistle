@@ -158,7 +158,9 @@ async function ensurePersistentSandboxInstance(input: {
     {
       db: input.env.dataPlaneDb,
       tables: input.env.dataPlaneTables,
-      runtimeProvider: SandboxProvider.DOCKER,
+      sandboxRuntime: {
+        provider: SandboxProvider.DOCKER,
+      },
     },
     {
       sandboxInstanceId: input.sandboxInstanceId,

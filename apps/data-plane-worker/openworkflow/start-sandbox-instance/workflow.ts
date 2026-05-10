@@ -277,7 +277,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         {
           db: ctx.db,
           tables: ctx.tables,
-          runtimeProvider,
+          sandboxRuntime: workflowInput.sandboxRuntime,
         },
         {
           sandboxInstanceId: workflowInput.sandboxInstanceId,
@@ -349,7 +349,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               tables: ctx.tables,
               controlPlaneInternalClient: ctx.controlPlaneInternalClient,
               workerConfig: ctx.config.app,
-              configuredSandboxProvider: ctx.config.sandbox.provider,
+              configuredSandboxProvider: runtimeProvider,
               sandboxAdapter: resolvedRuntime.sandboxAdapter,
               storageBackend: ctx.config.sandbox.storage?.backend,
             },
@@ -437,7 +437,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             tables: ctx.tables,
             controlPlaneInternalClient: ctx.controlPlaneInternalClient,
             workerConfig: ctx.config.app,
-            configuredSandboxProvider: ctx.config.sandbox.provider,
+            configuredSandboxProvider: runtimeProvider,
             sandboxAdapter: resolvedRuntime.sandboxAdapter,
             storageBackend: ctx.config.sandbox.storage?.backend,
           },

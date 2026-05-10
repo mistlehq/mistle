@@ -13,6 +13,10 @@ export type ResumableSandboxInstanceState = {
   organizationId: string;
   persistenceMode: SandboxInstancePersistenceMode;
   runtimeProvider: SandboxProvider;
+  sandboxConnectionId: string | null;
+  sandboxVcpuCount: number | null;
+  sandboxMemoryMb: number | null;
+  sandboxStorageMb: number | null;
   providerSandboxId: string | null;
   computeGeneration: number;
   runtimePlan: CompiledRuntimePlan;
@@ -31,6 +35,10 @@ export async function resolveResumableSandboxInstanceState(input: {
       organizationId: sandboxInstances.organizationId,
       persistenceMode: sandboxInstances.persistenceMode,
       runtimeProvider: sandboxInstances.runtimeProvider,
+      sandboxConnectionId: sandboxInstances.sandboxConnectionId,
+      sandboxVcpuCount: sandboxInstances.sandboxVcpuCount,
+      sandboxMemoryMb: sandboxInstances.sandboxMemoryMb,
+      sandboxStorageMb: sandboxInstances.sandboxStorageMb,
       providerSandboxId: sandboxInstances.providerSandboxId,
       computeGeneration: sandboxInstances.computeGeneration,
       status: sandboxInstances.status,
@@ -87,6 +95,10 @@ export async function resolveResumableSandboxInstanceState(input: {
     organizationId: sandboxInstance.organizationId,
     persistenceMode: sandboxInstance.persistenceMode,
     runtimeProvider: sandboxInstance.runtimeProvider,
+    sandboxConnectionId: sandboxInstance.sandboxConnectionId,
+    sandboxVcpuCount: sandboxInstance.sandboxVcpuCount,
+    sandboxMemoryMb: sandboxInstance.sandboxMemoryMb,
+    sandboxStorageMb: sandboxInstance.sandboxStorageMb,
     providerSandboxId: sandboxInstance.providerSandboxId,
     computeGeneration: sandboxInstance.computeGeneration,
     runtimePlan: CompiledRuntimePlanSchema.parse(sandboxInstance.compiledRuntimePlan),
