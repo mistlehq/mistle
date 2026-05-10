@@ -13,6 +13,7 @@ import {
 import { shouldRethrowDurableStepErrorForRetry } from "@mistle/workflow-registry/durable-step-retry.js";
 
 import { getWorkflowContext, type WorkflowContext } from "../core/context.js";
+import type { ResolvedSandboxRuntime } from "../core/sandbox-runtime-resolver.js";
 import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
 import { destroySandbox } from "../shared/destroy-sandbox.js";
 import { formatPersistedFailureMessage } from "../shared/format-persisted-failure-message.js";
@@ -30,6 +31,7 @@ import { markSandboxInstanceStopped } from "../stop-sandbox-instance/mark-sandbo
 
 const SnapshotMaterializationFailureCodes = {
   RUNTIME_PLAN_COMPILE_FAILED: "snapshot_runtime_plan_compile_failed",
+  SANDBOX_RUNTIME_RESOLVE_FAILED: "snapshot_sandbox_runtime_resolve_failed",
   SANDBOX_START_FAILED: "snapshot_sandbox_start_failed",
   PERSIST_PROVISIONING_METADATA_FAILED: "snapshot_persist_provisioning_metadata_failed",
   SANDBOX_INIT_FAILED: "snapshot_sandbox_init_failed",
@@ -94,23 +96,19 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     runtimeProvider: workflowInput.sandboxRuntime.provider,
   });
   const requestedRuntimeProvider = workflowInput.sandboxRuntime.provider;
-  const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve({
-    organizationId: workflowInput.organizationId,
-    provider: requestedRuntimeProvider,
-    ...(workflowInput.sandboxRuntime.connectionId === undefined
-      ? {}
-      : { connectionId: workflowInput.sandboxRuntime.connectionId }),
-    ...(workflowInput.sandboxRuntime.resources === undefined
-      ? {}
-      : { resources: workflowInput.sandboxRuntime.resources }),
-  });
 
-  let providerSandboxId: string | undefined;
-  let runtimeProvider: SandboxProvider | undefined;
+  let startedSandboxCleanupState:
+    | {
+        providerSandboxId: string;
+        runtime: ResolvedSandboxRuntime;
+        runtimeProvider: SandboxProvider;
+      }
+    | undefined;
   let ensuredSandboxInstance = false;
   let sandboxDestroyed = false;
   let currentPhase:
     | "claim"
+    | "resolve"
     | "compile"
     | "ensure"
     | "start"
@@ -133,13 +131,8 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     });
 
     let destroySandboxError: unknown;
-    if (
-      runtimeProvider !== undefined &&
-      providerSandboxId !== undefined &&
-      sandboxDestroyed !== true
-    ) {
-      const runtimeProviderForCleanup = runtimeProvider;
-      const providerSandboxIdForCleanup = providerSandboxId;
+    if (startedSandboxCleanupState && !sandboxDestroyed) {
+      const { providerSandboxId, runtime, runtimeProvider } = startedSandboxCleanupState;
       try {
         await step.run({ name: "destroy-snapshot-sandbox-after-failure" }, async () => {
           await destroySandbox(
@@ -148,14 +141,14 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
               tables: ctx.tables,
               controlPlaneInternalClient: ctx.controlPlaneInternalClient,
               config: ctx.config,
-              sandboxAdapter: resolvedRuntime.sandboxAdapter,
+              sandboxAdapter: runtime.sandboxAdapter,
             },
             {
               sandboxInstanceId: workflowInput.sandboxInstanceId,
               organizationId: workflowInput.organizationId,
               persistenceMode: "ephemeral",
-              runtimeProvider: runtimeProviderForCleanup,
-              providerSandboxId: providerSandboxIdForCleanup,
+              runtimeProvider,
+              providerSandboxId,
             },
           );
         });
@@ -165,7 +158,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
           {
             err: error,
             snapshotJobId: workflowInput.snapshotJobId,
-            providerSandboxId: providerSandboxIdForCleanup,
+            providerSandboxId,
           },
           "Failed to destroy snapshot sandbox after workflow failure.",
         );
@@ -278,6 +271,20 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
   }
 
   try {
+    currentPhase = "resolve";
+    const resolvedRuntime = await step.run({ name: "resolve-snapshot-sandbox-runtime" }, async () =>
+      ctx.sandboxRuntimeProviderResolver.resolve({
+        organizationId: workflowInput.organizationId,
+        provider: requestedRuntimeProvider,
+        ...(workflowInput.sandboxRuntime.connectionId === undefined
+          ? {}
+          : { connectionId: workflowInput.sandboxRuntime.connectionId }),
+        ...(workflowInput.sandboxRuntime.resources === undefined
+          ? {}
+          : { resources: workflowInput.sandboxRuntime.resources }),
+      }),
+    );
+
     currentPhase = "compile";
     const compiledRuntimePlan = await step.run(
       { name: "compile-snapshot-runtime-plan" },
@@ -337,8 +344,11 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
         },
       ),
     );
-    providerSandboxId = startedSandbox.providerSandboxId;
-    runtimeProvider = startedSandbox.runtimeProvider;
+    startedSandboxCleanupState = {
+      providerSandboxId: startedSandbox.providerSandboxId,
+      runtime: resolvedRuntime,
+      runtimeProvider: startedSandbox.runtimeProvider,
+    };
 
     currentPhase = "persist";
     await step.run({ name: "persist-snapshot-sandbox-provisioning" }, async () => {
@@ -470,6 +480,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
 function mapSnapshotFailure(input: {
   phase:
     | "claim"
+    | "resolve"
     | "compile"
     | "ensure"
     | "start"
@@ -484,6 +495,13 @@ function mapSnapshotFailure(input: {
   failureCode: string;
   summary: string;
 } {
+  if (input.phase === "resolve") {
+    return {
+      failureCode: SnapshotMaterializationFailureCodes.SANDBOX_RUNTIME_RESOLVE_FAILED,
+      summary: "Failed to resolve snapshot sandbox runtime credentials.",
+    };
+  }
+
   if (input.phase === "compile") {
     return {
       failureCode: SnapshotMaterializationFailureCodes.RUNTIME_PLAN_COMPILE_FAILED,

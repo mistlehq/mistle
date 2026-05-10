@@ -135,6 +135,112 @@ describe.concurrent("data-plane worker snapshot materialization", () => {
       }),
     ).resolves.toBeUndefined();
   });
+
+  it("marks a claimed snapshot job failed when sandbox credential resolution fails", async ({
+    env,
+  }) => {
+    const organizationId = "org_snapshot_resolve_failure_integration";
+    const sandboxProfileId = "sbp_snapshot_resolve_failure_integration";
+    const snapshotJobId = "ssj_snapshot_resolve_failure_integration";
+    const sandboxInstanceId = "sbi_snapshot_resolve_failure_integration";
+    const workflowRunId = "wr_snapshot_resolve_failure_integration";
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.organizations).values({
+      id: organizationId,
+      name: "Snapshot Resolve Failure Org",
+      slug: "snapshot-resolve-failure-integration",
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values({
+      id: sandboxProfileId,
+      organizationId,
+      displayName: "Snapshot Resolve Failure Profile",
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values({
+      sandboxProfileId,
+      version: 1,
+      state: SandboxProfileVersionStates.PUBLISHED,
+      setupScript: "printf 'resolve-failure' > /tmp/mistle-snapshot-marker.txt",
+      sandboxProvider: SandboxProvider.E2B,
+      sandboxConnectionId: null,
+      sandboxVcpuCount: 2,
+      sandboxMemoryMb: 4096,
+      sandboxStorageMb: null,
+    });
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionSnapshotJobs)
+      .values({
+        id: snapshotJobId,
+        sandboxProfileId,
+        sandboxProfileVersion: 1,
+        trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+        state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+      });
+
+    const runtimeConfig = createDataPlaneWorkerRuntimeConfig({
+      app: createWorkerConfig(env),
+    });
+    const controlPlaneInternalClient = createControlPlaneInternalClient(env);
+
+    await expect(
+      executeMaterializeSandboxProfileVersionSnapshot({
+        ctx: {
+          config: runtimeConfig,
+          controlPlaneInternalClient,
+          db: env.dataPlaneDb,
+          tables: env.dataPlaneTables,
+          logger: dataPlaneWorkerLogger,
+          processEnv: {},
+          sandboxRuntimeProviderResolver: createSandboxRuntimeProviderResolver({
+            config: runtimeConfig,
+            controlPlaneInternalClient,
+          }),
+        },
+        workflowInput: {
+          snapshotJobId,
+          sandboxInstanceId,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 1,
+          image: {
+            imageId: "integration-snapshot-resolve-failure-image",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            kind: "base",
+            provider: SandboxProvider.E2B,
+          },
+          sandboxRuntime: {
+            provider: SandboxProvider.E2B,
+            resources: {
+              vcpuCount: 2,
+              memoryMb: 4096,
+            },
+          },
+        },
+        workflowRunId,
+        step: createInlineStepApi(),
+      }),
+    ).rejects.toThrow("Failed to resolve snapshot sandbox runtime credentials.");
+
+    const persistedJob = await env.controlPlaneDb.query.sandboxProfileVersionSnapshotJobs.findFirst(
+      {
+        where: (table, { eq }) => eq(table.id, snapshotJobId),
+      },
+    );
+    expect(persistedJob).toMatchObject({
+      id: snapshotJobId,
+      state: SandboxProfileVersionSnapshotJobStates.FAILED,
+      workflowRunId,
+      errorCode: "snapshot_sandbox_runtime_resolve_failed",
+    });
+    expect(persistedJob?.errorMessage).toContain(
+      "Failed to resolve snapshot sandbox runtime credentials.",
+    );
+
+    await expect(
+      env.dataPlaneDb.query.sandboxInstances.findFirst({
+        where: (table, { eq }) => eq(table.id, sandboxInstanceId),
+      }),
+    ).resolves.toBeUndefined();
+  });
 });
 
 function createControlPlaneInternalClient(

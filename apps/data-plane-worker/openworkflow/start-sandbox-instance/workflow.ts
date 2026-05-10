@@ -7,6 +7,7 @@ import {
 import { shouldRethrowDurableStepErrorForRetry } from "@mistle/workflow-registry/durable-step-retry.js";
 
 import { getWorkflowContext } from "../core/context.js";
+import type { ResolvedSandboxRuntime } from "../core/sandbox-runtime-resolver.js";
 import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
 import { attachSandboxStorage } from "../shared/attach-sandbox-storage.js";
 import { destroySandbox } from "../shared/destroy-sandbox.js";
@@ -26,6 +27,7 @@ import { waitForSandboxRuntimeReadiness } from "./wait-for-sandbox-runtime-readi
 const StartSandboxFailureCodes = {
   SANDBOX_STORAGE_PROVISION_FAILED: "sandbox_storage_provision_failed",
   SANDBOX_STORAGE_PREPARE_FAILED: "sandbox_storage_prepare_failed",
+  SANDBOX_RUNTIME_RESOLVE_FAILED: "sandbox_runtime_resolve_failed",
   SANDBOX_START_FAILED: "sandbox_start_failed",
   PERSIST_PROVISIONING_METADATA_FAILED: "persist_provisioning_metadata_failed",
   SANDBOX_INIT_FAILED: "sandbox_init_failed",
@@ -49,16 +51,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       runtimeProvider: workflowInput.sandboxRuntime.provider,
     });
     const runtimeProvider = workflowInput.sandboxRuntime.provider;
-    const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve({
-      organizationId: workflowInput.organizationId,
-      provider: runtimeProvider,
-      ...(workflowInput.sandboxRuntime.connectionId === undefined
-        ? {}
-        : { connectionId: workflowInput.sandboxRuntime.connectionId }),
-      ...(workflowInput.sandboxRuntime.resources === undefined
-        ? {}
-        : { resources: workflowInput.sandboxRuntime.resources }),
-    });
+    let resolvedRuntime: ResolvedSandboxRuntime;
 
     async function markSandboxInstanceFailedStep(input: {
       sandboxInstanceId: string;
@@ -298,6 +291,33 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       logger.info("Ensured sandbox instance exists.");
       return persisted;
     });
+
+    try {
+      resolvedRuntime = await step.run({ name: "resolve-sandbox-runtime" }, async () =>
+        ctx.sandboxRuntimeProviderResolver.resolve({
+          organizationId: workflowInput.organizationId,
+          provider: runtimeProvider,
+          ...(workflowInput.sandboxRuntime.connectionId === undefined
+            ? {}
+            : { connectionId: workflowInput.sandboxRuntime.connectionId }),
+          ...(workflowInput.sandboxRuntime.resources === undefined
+            ? {}
+            : { resources: workflowInput.sandboxRuntime.resources }),
+        }),
+      );
+    } catch (error) {
+      rethrowDurableStepErrorForRetry(error);
+      logger.error({ err: error }, "Sandbox runtime credential resolution failed.");
+      await markSandboxInstanceFailedStep({
+        sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
+        failureCode: StartSandboxFailureCodes.SANDBOX_RUNTIME_RESOLVE_FAILED,
+        failureMessage: formatPersistedFailureMessage({
+          summary: "Sandbox runtime credential resolution failed before sandbox startup.",
+          error,
+        }),
+      });
+      throw error;
+    }
 
     if (workflowInput.persistenceMode === "persistent") {
       try {
