@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type {
@@ -40,6 +41,11 @@ const E2BProvider = {
       default: 4096,
     },
   },
+} satisfies SandboxProviderSummary;
+
+const OrganizationE2BProvider = {
+  ...E2BProvider,
+  managed: false,
 } satisfies SandboxProviderSummary;
 
 const StorageProvider = {
@@ -167,6 +173,47 @@ describe("SandboxProfileRuntimeSection", () => {
     );
     expect(screen.getByText("E2B Production")).toBeTruthy();
     expect(screen.queryByText("E2B (Managed)")).toBeNull();
+  });
+
+  it("requires BYOK credentials for a non-managed provider without a saved connection", () => {
+    render(
+      <MemoryRouter>
+        <SandboxProfileRuntimeSection
+          availableConnections={[]}
+          availableTargets={[
+            {
+              targetKey: "e2b-default",
+              displayName: "E2B",
+              familyId: "e2b",
+              variantId: "e2b-default",
+              config: {},
+              targetHealth: {
+                configStatus: "valid",
+              },
+            },
+          ]}
+          disabled={false}
+          isDraft={true}
+          providers={[DockerProvider, OrganizationE2BProvider]}
+          version={createVersion({
+            sandboxProvider: "e2b",
+            sandboxConnectionId: null,
+            sandboxResources: {
+              vcpuCount: 2,
+              memoryMb: 4096,
+            },
+          })}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole("combobox", { name: "API key" })).toBeNull();
+    expect(screen.getByRole("combobox", { name: "Connection" }).hasAttribute("disabled")).toBe(
+      false,
+    );
+    expect(screen.getByText("Select connection")).toBeTruthy();
+    expect(screen.getByText("Add an API key in integrations")).toBeTruthy();
+    expect(screen.queryByText("Using Mistle's key")).toBeNull();
   });
 
   it("renders provider resource controls only for supported resource fields", () => {

@@ -68,7 +68,10 @@ export function SandboxProfileRuntimeSection(input: {
   providers: readonly SandboxProviderSummary[];
   version: SandboxProfileVersion;
 }): React.JSX.Element {
-  const persistedRuntime = createRuntimeConfigState(input.version);
+  const persistedRuntime = createRuntimeConfigState({
+    providers: input.providers,
+    version: input.version,
+  });
   const [draftRuntime, setDraftRuntime] = useState<RuntimeConfigState>(persistedRuntime);
   const [persistedRuntimeState, setPersistedRuntimeState] =
     useState<RuntimeConfigState>(persistedRuntime);
@@ -112,8 +115,15 @@ export function SandboxProfileRuntimeSection(input: {
 
   const applySavedRuntimeConfig = useCallback(
     (runtimeConfig: SandboxProfileRuntimeDraftChanges): void => {
+      const provider = findProvider({
+        providerId: runtimeConfig.sandboxProvider,
+        providers: input.providers,
+      });
       const nextRuntime = {
-        credentialSource: resolveCredentialSource(runtimeConfig.sandboxConnectionId),
+        credentialSource: resolveCredentialSource({
+          connectionId: runtimeConfig.sandboxConnectionId,
+          provider,
+        }),
         sandboxProvider: runtimeConfig.sandboxProvider,
         sandboxConnectionId: runtimeConfig.sandboxConnectionId,
         sandboxResources: runtimeConfig.sandboxResources,
@@ -122,7 +132,7 @@ export function SandboxProfileRuntimeSection(input: {
       setPersistedRuntimeState(nextRuntime);
       setSaveErrorMessage(null);
     },
-    [],
+    [input.providers],
   );
 
   const applyDraftSaveError = useCallback((error: unknown): void => {
@@ -135,11 +145,15 @@ export function SandboxProfileRuntimeSection(input: {
   }, []);
 
   useEffect(() => {
-    const nextRuntime = createRuntimeConfigState(input.version);
+    const nextRuntime = createRuntimeConfigState({
+      providers: input.providers,
+      version: input.version,
+    });
     setDraftRuntime(nextRuntime);
     setPersistedRuntimeState(nextRuntime);
     setSaveErrorMessage(null);
   }, [
+    input.providers,
     input.version.sandboxConnectionId,
     input.version.sandboxProvider,
     input.version.sandboxResources,
@@ -658,17 +672,43 @@ function findSandboxProviderTarget(input: {
   );
 }
 
-function createRuntimeConfigState(version: SandboxProfileVersion): RuntimeConfigState {
+function createRuntimeConfigState(input: {
+  providers: readonly SandboxProviderSummary[];
+  version: SandboxProfileVersion;
+}): RuntimeConfigState {
+  const provider = findProvider({
+    providerId: input.version.sandboxProvider,
+    providers: input.providers,
+  });
+
   return {
-    credentialSource: resolveCredentialSource(version.sandboxConnectionId),
-    sandboxProvider: version.sandboxProvider,
-    sandboxConnectionId: version.sandboxConnectionId,
-    sandboxResources: version.sandboxResources,
+    credentialSource: resolveCredentialSource({
+      connectionId: input.version.sandboxConnectionId,
+      provider,
+    }),
+    sandboxProvider: input.version.sandboxProvider,
+    sandboxConnectionId: input.version.sandboxConnectionId,
+    sandboxResources: input.version.sandboxResources,
   };
 }
 
-function resolveCredentialSource(connectionId: string | null): SandboxCredentialSource {
-  return connectionId === null ? "managed" : "organization";
+function resolveCredentialSource(input: {
+  connectionId: string | null;
+  provider: SandboxProviderSummary | null;
+}): SandboxCredentialSource {
+  if (input.connectionId !== null) {
+    return "organization";
+  }
+
+  if (
+    input.provider !== null &&
+    !input.provider.managed &&
+    input.provider.supportsOrganizationConnection
+  ) {
+    return "organization";
+  }
+
+  return "managed";
 }
 
 function formatCredentialSource(source: SandboxCredentialSource): string {

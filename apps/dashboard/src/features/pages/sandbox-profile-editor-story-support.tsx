@@ -120,7 +120,7 @@ export type SandboxProfileEditorPageStoryArgs = {
   setupAssistantErrorMessage?: string;
   setupAssistantState?: "available" | "starting" | "disabled";
   setupScriptTestStatus?: SetupScriptTestStatus;
-  runtimeState?: "docker" | "e2b-managed" | "e2b-connection";
+  runtimeState?: "docker" | "e2b-managed" | "e2b-connection" | "e2b-missing-connection";
 };
 
 type IntegrationsSectionState = NonNullable<
@@ -242,6 +242,18 @@ const StorySandboxProviders = [
     },
   },
 ] satisfies readonly SandboxProviderSummary[];
+
+function createStorySandboxProviders(input: {
+  runtimeState: SandboxProfileEditorPageStoryArgs["runtimeState"];
+}): readonly SandboxProviderSummary[] {
+  if (input.runtimeState === "e2b-missing-connection") {
+    return StorySandboxProviders.map((provider) =>
+      provider.id === "e2b" ? { ...provider, managed: false } : provider,
+    );
+  }
+
+  return StorySandboxProviders;
+}
 
 type SnapshotStoryStatus = NonNullable<SandboxProfileEditorPageStoryArgs["snapshotState"]>;
 type SnapshotRefreshScheduleStoryState = NonNullable<
@@ -732,7 +744,9 @@ function SandboxProfileEditorPageStoryView(
                   availableTargets={storyTargets}
                   disabled={!isEditable}
                   isDraft={mode.kind === "draft"}
-                  providers={StorySandboxProviders}
+                  providers={createStorySandboxProviders({
+                    runtimeState: input.runtimeState,
+                  })}
                   version={createRuntimeStoryVersion({
                     runtimeState: input.runtimeState,
                     version: mode.version,

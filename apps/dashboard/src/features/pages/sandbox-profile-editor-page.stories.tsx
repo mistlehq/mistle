@@ -40,6 +40,12 @@ export const OrganizationE2BRuntime: Story = {
   },
 };
 
+export const OrganizationE2BMissingConnection: Story = {
+  args: {
+    runtimeState: "e2b-missing-connection",
+  },
+};
+
 export const DraftSaveFailure: Story = {
   args: {
     setupScriptDraft: `#!/usr/bin/env bash
