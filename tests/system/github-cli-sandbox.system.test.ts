@@ -923,11 +923,13 @@ describeIf("system github cli sandbox", () => {
       });
       await requestJsonOrThrow({
         request: fixture.request,
-        path: `/v1/sandbox/profiles/${encodeURIComponent(sandboxProfile.id)}/versions/1/integration-bindings`,
+        path: `/v1/sandbox/profiles/${encodeURIComponent(sandboxProfile.id)}/versions/1/draft`,
         expectedStatus: 200,
         description: "sandbox profile integration binding update",
         schema: z.object({
-          bindings: z.array(z.unknown()),
+          integrationBindings: z.object({
+            bindings: z.array(z.unknown()),
+          }),
         }),
         init: {
           method: "PUT",
@@ -936,26 +938,28 @@ describeIf("system github cli sandbox", () => {
             cookie: session.cookie,
           },
           body: JSON.stringify({
-            bindings: [
-              {
-                connectionId: openAiConnectionId,
-                kind: "agent",
-                config: {
-                  runtime: {
-                    runtimeId: "codex",
-                    config: {},
+            integrationBindings: {
+              bindings: [
+                {
+                  connectionId: openAiConnectionId,
+                  kind: "agent",
+                  config: {
+                    runtime: {
+                      runtimeId: "codex",
+                      config: {},
+                    },
                   },
                 },
-              },
-              {
-                connectionId: githubConnection.id,
-                kind: "git",
-                config: {
-                  repositories: [`${repository.owner}/${repository.repo}`],
-                  tools: ["github-cli"],
+                {
+                  connectionId: githubConnection.id,
+                  kind: "git",
+                  config: {
+                    repositories: [`${repository.owner}/${repository.repo}`],
+                    tools: ["github-cli"],
+                  },
                 },
-              },
-            ],
+              ],
+            },
           }),
         },
       });

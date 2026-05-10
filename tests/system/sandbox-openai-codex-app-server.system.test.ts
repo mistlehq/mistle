@@ -1705,7 +1705,7 @@ async function updateSandboxBindings(input: {
     action: async () => {
       return await requestWithTimeout({
         request: input.fixture.request,
-        path: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/1/integration-bindings`,
+        path: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/1/draft`,
         timeoutMs: PUT_BINDINGS_TIMEOUT_MS,
         description: "sandbox profile integration binding update",
         init: {
@@ -1715,7 +1715,9 @@ async function updateSandboxBindings(input: {
             cookie: input.authenticatedSession.cookie,
           },
           body: JSON.stringify({
-            bindings: input.bindings,
+            integrationBindings: {
+              bindings: input.bindings,
+            },
           }),
         },
       });

@@ -35,6 +35,10 @@ const SandboxBindingsResponseSchema = z.object({
   bindings: z.array(z.unknown()),
 });
 
+const SandboxProfileVersionDraftBindingsResponseSchema = z.object({
+  integrationBindings: SandboxBindingsResponseSchema,
+});
+
 const StartSandboxInstanceResponseSchema = z.looseObject({
   status: z.literal("accepted"),
   workflowRunId: z.string().min(1),
@@ -643,10 +647,10 @@ async function updateSandboxBindings(input: {
 }): Promise<void> {
   await requestJsonOrThrow({
     request: input.fixture.request,
-    path: `/v1/sandbox/profiles/${encodeURIComponent(input.sandboxProfileId)}/versions/1/integration-bindings`,
+    path: `/v1/sandbox/profiles/${encodeURIComponent(input.sandboxProfileId)}/versions/1/draft`,
     expectedStatus: 200,
     description: "sandbox profile integration binding update",
-    schema: SandboxBindingsResponseSchema,
+    schema: SandboxProfileVersionDraftBindingsResponseSchema,
     init: {
       method: "PUT",
       headers: {
@@ -654,18 +658,20 @@ async function updateSandboxBindings(input: {
         cookie: input.authenticatedSession.cookie,
       },
       body: JSON.stringify({
-        bindings: [
-          {
-            connectionId: input.openAiConnectionId,
-            kind: "agent",
-            config: {
-              runtime: {
-                runtimeId: "codex",
-                config: {},
+        integrationBindings: {
+          bindings: [
+            {
+              connectionId: input.openAiConnectionId,
+              kind: "agent",
+              config: {
+                runtime: {
+                  runtimeId: "codex",
+                  config: {},
+                },
               },
             },
-          },
-        ],
+          ],
+        },
       }),
     },
   });

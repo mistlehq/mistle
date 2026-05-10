@@ -74,6 +74,14 @@ const SandboxProfileResponseSchema = z.looseObject({
   id: z.string().min(1),
 });
 
+const SandboxBindingsResponseSchema = z.object({
+  bindings: z.array(z.unknown()),
+});
+
+const SandboxProfileVersionDraftBindingsResponseSchema = z.object({
+  integrationBindings: SandboxBindingsResponseSchema,
+});
+
 const WebhookAutomationResponseSchema = z.looseObject({
   id: z.string().min(1),
 });
@@ -1284,12 +1292,10 @@ async function putSandboxBindings(input: {
 }): Promise<void> {
   await requestJsonOrThrow({
     request: input.fixture.request,
-    path: `/v1/sandbox/profiles/${encodeURIComponent(input.sandboxProfileId)}/versions/1/integration-bindings`,
+    path: `/v1/sandbox/profiles/${encodeURIComponent(input.sandboxProfileId)}/versions/1/draft`,
     expectedStatus: 200,
     description: input.description,
-    schema: z.object({
-      bindings: z.array(z.unknown()),
-    }),
+    schema: SandboxProfileVersionDraftBindingsResponseSchema,
     init: {
       method: "PUT",
       headers: {
@@ -1297,7 +1303,9 @@ async function putSandboxBindings(input: {
         cookie: input.session.cookie,
       },
       body: JSON.stringify({
-        bindings: input.bindings,
+        integrationBindings: {
+          bindings: input.bindings,
+        },
       }),
     },
   });

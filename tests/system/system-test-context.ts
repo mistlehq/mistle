@@ -140,6 +140,10 @@ const SandboxBindingsResponseSchema = z.object({
   bindings: z.array(z.unknown()),
 });
 
+const SandboxProfileVersionDraftBindingsResponseSchema = z.object({
+  integrationBindings: SandboxBindingsResponseSchema,
+});
+
 const StartSandboxInstanceResponseSchema = z.object({
   status: z.literal("accepted"),
   workflowRunId: z.string().min(1),
@@ -1221,10 +1225,10 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
         });
         await requestJsonOrThrow({
           request,
-          path: `/v1/sandbox/profiles/${encodeURIComponent(sandboxProfile.id)}/versions/1/integration-bindings`,
+          path: `/v1/sandbox/profiles/${encodeURIComponent(sandboxProfile.id)}/versions/1/draft`,
           expectedStatus: 200,
           description: "sandbox profile integration binding update",
-          schema: SandboxBindingsResponseSchema,
+          schema: SandboxProfileVersionDraftBindingsResponseSchema,
           init: {
             method: "PUT",
             headers: {
@@ -1232,18 +1236,20 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
               cookie: session.cookie,
             },
             body: JSON.stringify({
-              bindings: [
-                {
-                  connectionId: openAiConnection.id,
-                  kind: "agent",
-                  config: {
-                    runtime: {
-                      runtimeId: "codex",
-                      config: {},
+              integrationBindings: {
+                bindings: [
+                  {
+                    connectionId: openAiConnection.id,
+                    kind: "agent",
+                    config: {
+                      runtime: {
+                        runtimeId: "codex",
+                        config: {},
+                      },
                     },
                   },
-                },
-              ],
+                ],
+              },
             }),
           },
         });
