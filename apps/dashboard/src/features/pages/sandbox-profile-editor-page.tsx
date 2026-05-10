@@ -2497,7 +2497,7 @@ function SandboxProfileLifecycleActions(input: {
   const discardChangesMenuItem =
     discardChangesInput === null ? null : (
       <DropdownMenuItem
-        disabled={input.hasUnpersistedDraftChanges || versionActionIsDisabled}
+        disabled={versionActionIsDisabled}
         onClick={() => {
           input.onDiscardChangesAndLeaveDraft(discardChangesInput);
         }}

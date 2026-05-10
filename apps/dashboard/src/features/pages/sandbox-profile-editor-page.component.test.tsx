@@ -2246,6 +2246,17 @@ describe("SandboxProfileEditorPage", () => {
     ]);
   });
 
+  it("discards a draft with unsaved local changes", () => {
+    renderDraftActionsHarness({
+      hasUnpersistedIntegrationChanges: true,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Sandbox profile actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Discard draft" }));
+
+    expect(screen.getByText("Discarded")).toBeDefined();
+  });
+
   it("opens the sandbox profile tab from the profile default route when a published version exists", async () => {
     const { profileId, router } = renderSandboxProfileEditor({
       view: "default",
