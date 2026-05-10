@@ -677,6 +677,11 @@ async function seedSnapshotRefreshScheduledAction(input: {
     .values({
       sandboxProfileId: input.profileId,
       version: input.profileVersion,
+      sandboxProvider: "docker",
+      sandboxConnectionId: null,
+      sandboxVcpuCount: null,
+      sandboxMemoryMb: null,
+      sandboxStorageMb: null,
     });
   await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.schedules).values({
     id: input.scheduleId,

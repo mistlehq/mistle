@@ -98,6 +98,11 @@ describe.concurrent("sandbox profile Setup Assistant integration", () => {
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
         setupScript: "pnpm install",
+        sandboxProvider: "docker",
+        sandboxConnectionId: null,
+        sandboxVcpuCount: null,
+        sandboxMemoryMb: null,
+        sandboxStorageMb: null,
       }),
     );
 
@@ -144,6 +149,11 @@ async function createAssistantProfile(input: {
       version: 1,
       state: SandboxProfileVersionStates.DRAFT,
       setupScript: "pnpm install\npnpm dev:bootstrap",
+      sandboxProvider: "docker",
+      sandboxConnectionId: null,
+      sandboxVcpuCount: null,
+      sandboxMemoryMb: null,
+      sandboxStorageMb: null,
     }),
   );
   await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.integrationTargets).values(

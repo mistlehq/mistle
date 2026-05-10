@@ -7,6 +7,7 @@ import {
   SandboxProfileVersionSnapshotJobTriggers,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
+import type { SandboxRuntimeProviderInput } from "@mistle/workflow-registry/data-plane";
 import { and, eq, sql } from "drizzle-orm";
 import { typeid } from "typeid-js";
 import { z } from "zod";
@@ -65,6 +66,12 @@ export async function dispatchSnapshotRefreshScheduledAction(
   }
 
   try {
+    const sandboxRuntime = await loadSnapshotRefreshSandboxRuntime(ctx, {
+      organizationId: input.organizationId,
+      sandboxProfileId: snapshotJob.sandboxProfileId,
+      sandboxProfileVersion: snapshotJob.sandboxProfileVersion,
+    });
+
     const materialization = await ctx.dataPlaneClient.materializeSandboxProfileVersionSnapshotJob({
       snapshotJobId: snapshotJob.id,
       sandboxInstanceId: typeid("sbi").toString(),
@@ -75,7 +82,9 @@ export async function dispatchSnapshotRefreshScheduledAction(
         imageId: ctx.defaultBaseImage,
         createdAt: new Date().toISOString(),
         kind: "base",
+        provider: sandboxRuntime.provider,
       },
+      sandboxRuntime,
     });
 
     return {
@@ -88,6 +97,83 @@ export async function dispatchSnapshotRefreshScheduledAction(
     });
     throw error;
   }
+}
+
+async function loadSnapshotRefreshSandboxRuntime(
+  ctx: {
+    db: ControlPlaneDatabase;
+  },
+  input: {
+    organizationId: string;
+    sandboxProfileId: string;
+    sandboxProfileVersion: number;
+  },
+): Promise<SandboxRuntimeProviderInput> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+  const [sandboxProfileVersion] = await ctx.db
+    .select({
+      sandboxProvider: tables.sandboxProfileVersions.sandboxProvider,
+      sandboxConnectionId: tables.sandboxProfileVersions.sandboxConnectionId,
+      sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
+      sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
+      sandboxStorageMb: tables.sandboxProfileVersions.sandboxStorageMb,
+    })
+    .from(tables.sandboxProfiles)
+    .innerJoin(
+      tables.sandboxProfileVersions,
+      and(
+        eq(tables.sandboxProfileVersions.sandboxProfileId, tables.sandboxProfiles.id),
+        eq(tables.sandboxProfileVersions.version, input.sandboxProfileVersion),
+      ),
+    )
+    .where(
+      and(
+        eq(tables.sandboxProfiles.id, input.sandboxProfileId),
+        eq(tables.sandboxProfiles.organizationId, input.organizationId),
+      ),
+    );
+
+  if (sandboxProfileVersion === undefined) {
+    throw new Error(
+      `Sandbox profile '${input.sandboxProfileId}' version '${String(input.sandboxProfileVersion)}' was not found for scheduled snapshot refresh.`,
+    );
+  }
+
+  const provider = sandboxProfileVersion.sandboxProvider;
+  if (provider !== "docker" && provider !== "e2b") {
+    throw new Error(
+      `Unsupported sandbox provider '${String(provider)}' for scheduled snapshot refresh.`,
+    );
+  }
+
+  if (
+    provider !== "docker" &&
+    (sandboxProfileVersion.sandboxVcpuCount === null ||
+      sandboxProfileVersion.sandboxMemoryMb === null)
+  ) {
+    throw new Error(
+      `Sandbox profile '${input.sandboxProfileId}' version '${String(input.sandboxProfileVersion)}' is missing remote sandbox resources for scheduled snapshot refresh.`,
+    );
+  }
+
+  return {
+    provider,
+    ...(sandboxProfileVersion.sandboxConnectionId === null
+      ? {}
+      : { connectionId: sandboxProfileVersion.sandboxConnectionId }),
+    ...(sandboxProfileVersion.sandboxVcpuCount === null ||
+    sandboxProfileVersion.sandboxMemoryMb === null
+      ? {}
+      : {
+          resources: {
+            vcpuCount: sandboxProfileVersion.sandboxVcpuCount,
+            memoryMb: sandboxProfileVersion.sandboxMemoryMb,
+            ...(sandboxProfileVersion.sandboxStorageMb === null
+              ? {}
+              : { storageMb: sandboxProfileVersion.sandboxStorageMb }),
+          },
+        }),
+  };
 }
 
 async function createOrResolveSnapshotRefreshJob(

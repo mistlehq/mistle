@@ -12,11 +12,11 @@ import {
   SandboxInspectDispositions,
   SandboxInspectStates,
   type SandboxAdapter,
-  type SandboxProvider,
 } from "@mistle/sandbox";
 import { and, eq, or, sql } from "drizzle-orm";
 
 import type { AppRuntimeResources } from "../../../resources.js";
+import { assertRuntimeSandboxProvider } from "../../../sandbox/adapter.js";
 import type {
   GetSandboxInstanceInput,
   GetSandboxInstanceResponse,
@@ -32,7 +32,6 @@ type GetSandboxInstanceContext = {
   tables: Pick<DataPlaneTables, "sandboxInstances">;
   sandboxAdapter: SandboxAdapter;
   runtimeStateReader: AppRuntimeResources["runtimeStateReader"];
-  sandboxProvider: SandboxProvider;
 };
 
 async function readPersistedRuntimePlan(input: {
@@ -676,11 +675,7 @@ export async function getSandboxInstance(
     sandboxInstanceId: sandboxInstance.id,
   });
 
-  if (sandboxInstance.runtimeProvider !== ctx.sandboxProvider) {
-    throw new Error(
-      `Sandbox instance '${sandboxInstance.id}' runtime provider '${sandboxInstance.runtimeProvider}' does not match configured provider '${ctx.sandboxProvider}'.`,
-    );
-  }
+  assertRuntimeSandboxProvider(sandboxInstance.runtimeProvider);
 
   switch (sandboxInstance.status) {
     case SandboxInstanceStatuses.FAILED:

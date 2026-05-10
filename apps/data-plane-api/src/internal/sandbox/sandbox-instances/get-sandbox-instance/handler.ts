@@ -9,7 +9,6 @@ export const handler: RouteHandler<typeof route, AppContextBindings> = async (ct
   const tables = ctx.get("resources").tables;
   const sandboxAdapter = ctx.get("resources").sandboxAdapter;
   const runtimeStateReader = ctx.get("resources").runtimeStateReader;
-  const sandboxProvider = ctx.get("sandboxProvider");
   const params = ctx.req.valid("param");
   const query = ctx.req.valid("query");
 
@@ -19,7 +18,6 @@ export const handler: RouteHandler<typeof route, AppContextBindings> = async (ct
       tables,
       sandboxAdapter,
       runtimeStateReader,
-      sandboxProvider,
     },
     {
       organizationId: query.organizationId,

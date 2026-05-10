@@ -33,6 +33,7 @@ export async function startSandbox(
   input: {
     sandboxInstanceId: string;
     image: StartSandboxInstanceWorkflowImageInput;
+    runtimeProvider: SandboxProvider;
     storagePreparation?: SandboxStartStoragePreparation;
   },
 ): Promise<{
@@ -40,18 +41,13 @@ export async function startSandbox(
   runtimeProvider: SandboxProvider;
   providerSandboxId: string;
 }> {
-  const imageProvider =
-    input.image.kind === "snapshot"
-      ? (input.image.provider ??
-        (() => {
-          throw new Error("Snapshot launch image is missing its provider.");
-        })())
-      : ctx.config.sandbox.provider;
+  if (input.image.provider !== input.runtimeProvider) {
+    throw new Error("Sandbox launch image provider does not match runtime provider.");
+  }
 
   const startedSandbox = await ctx.sandboxAdapter.start({
     image: {
       ...input.image,
-      provider: imageProvider,
       createdAt: input.image.createdAt ?? new Date().toISOString(),
     },
     env: createSandboxRuntimeEnv({
@@ -63,7 +59,7 @@ export async function startSandbox(
       : { storagePreparation: input.storagePreparation }),
   });
 
-  if (startedSandbox.provider !== imageProvider) {
+  if (startedSandbox.provider !== input.runtimeProvider) {
     throw new Error("Sandbox adapter returned sandbox handle with unexpected provider.");
   }
 

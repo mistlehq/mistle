@@ -2,6 +2,7 @@ import {
   getControlPlaneDatabaseSchema,
   SandboxProfileVersionSnapshotJobStates,
 } from "@mistle/db/control-plane";
+import type { SandboxRuntimeProviderInput } from "@mistle/workflow-registry/data-plane";
 import { and, eq, sql } from "drizzle-orm";
 
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
@@ -49,6 +50,7 @@ export async function enqueueSnapshotMaterializationJob(
     organizationId: string;
     profileId: string;
     profileVersion: number;
+    sandboxRuntime: SandboxRuntimeProviderInput;
   },
 ): Promise<void> {
   try {
@@ -62,7 +64,9 @@ export async function enqueueSnapshotMaterializationJob(
         imageId: defaultBaseImage,
         createdAt: new Date().toISOString(),
         kind: "base",
+        provider: input.sandboxRuntime.provider,
       },
+      sandboxRuntime: input.sandboxRuntime,
     });
   } catch (error) {
     await markQueuedSnapshotJobFailedToEnqueue(

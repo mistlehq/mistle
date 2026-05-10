@@ -11,7 +11,10 @@ import {
 } from "@mistle/db/data-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import { SandboxProvider } from "@mistle/sandbox";
-import { StartSandboxInstanceWorkflowSpec } from "@mistle/workflow-registry/data-plane";
+import {
+  type SandboxRuntimeProviderInput,
+  StartSandboxInstanceWorkflowSpec,
+} from "@mistle/workflow-registry/data-plane";
 import { typeid } from "typeid-js";
 import { z } from "zod";
 
@@ -35,7 +38,6 @@ type StartSandboxInstanceContext = {
   openWorkflow: AppRuntimeResources["openWorkflow"];
   workflowDbPool: AppRuntimeResources["workflowDbPool"];
   workflowNamespaceId: DataPlaneApiConfig["workflow"]["namespaceId"];
-  sandboxProvider: DataPlaneApiConfig["sandbox"]["provider"];
   sandboxStorageBackend: DataPlaneApiSandboxStorageBackend;
 };
 
@@ -57,11 +59,32 @@ function createSandboxInstanceId(): string {
   return typeid("sbi").toString();
 }
 
+function createWorkflowSandboxRuntime(
+  input: StartSandboxInstanceInput["sandboxRuntime"],
+): SandboxRuntimeProviderInput {
+  const resources =
+    input.resources === undefined
+      ? undefined
+      : {
+          vcpuCount: input.resources.vcpuCount,
+          memoryMb: input.resources.memoryMb,
+          ...(input.resources.storageMb === undefined
+            ? {}
+            : { storageMb: input.resources.storageMb }),
+        };
+
+  return {
+    provider: input.provider,
+    ...(input.connectionId === undefined ? {} : { connectionId: input.connectionId }),
+    ...(resources === undefined ? {} : { resources }),
+  };
+}
+
 export function resolveSandboxInstancePersistenceMode(input: {
   organizationId: string;
   purpose: SandboxInstancePurpose;
   effectivePersistenceMode: SandboxInstancePersistenceMode;
-  sandboxProvider: DataPlaneApiConfig["sandbox"]["provider"];
+  sandboxProvider: SandboxProvider;
   configuredStorageBackend: DataPlaneApiSandboxStorageBackend;
 }): SandboxInstancePersistenceMode {
   if (input.purpose === SandboxInstancePurposes.SETUP_CHECK) {
@@ -127,11 +150,19 @@ export async function startSandboxInstance(
   input: StartSandboxInstanceInput,
 ): Promise<StartSandboxInstanceAcceptedResponse> {
   const { sandboxInstances } = ctx.tables;
+  const sandboxRuntime = createWorkflowSandboxRuntime(input.sandboxRuntime);
+  if (input.image.provider !== input.sandboxRuntime.provider) {
+    throw new BadRequestError(
+      "INVALID_SANDBOX_RUNTIME_PROVIDER",
+      `Sandbox launch image provider '${input.image.provider}' does not match sandbox runtime provider '${input.sandboxRuntime.provider}'.`,
+    );
+  }
+
   const persistenceMode = resolveSandboxInstancePersistenceMode({
     organizationId: input.organizationId,
     purpose: input.purpose,
     effectivePersistenceMode: input.persistenceMode,
-    sandboxProvider: ctx.sandboxProvider,
+    sandboxProvider: sandboxRuntime.provider,
     configuredStorageBackend: ctx.sandboxStorageBackend,
   });
 
@@ -147,6 +178,7 @@ export async function startSandboxInstance(
     ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
     source: input.source,
     image: input.image,
+    sandboxRuntime,
     ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
   };
 
@@ -171,7 +203,7 @@ export async function startSandboxInstance(
       organizationId: input.organizationId,
       sandboxProfileId: input.sandboxProfileId,
       sandboxProfileVersion: input.sandboxProfileVersion,
-      runtimeProvider: ctx.sandboxProvider,
+      runtimeProvider: sandboxRuntime.provider,
       providerSandboxId: null,
       computeGeneration: 1,
       status: SandboxInstanceStatuses.PENDING,

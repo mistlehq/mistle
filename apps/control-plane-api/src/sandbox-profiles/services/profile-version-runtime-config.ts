@@ -6,6 +6,7 @@ import {
   type SandboxRuntimeResourceCapabilities,
 } from "@mistle/integrations-core";
 import { SandboxProvider } from "@mistle/sandbox";
+import type { SandboxRuntimeProviderInput } from "@mistle/workflow-registry/data-plane";
 
 import type { ControlPlaneApiSandboxRuntimeConfig } from "../../types.js";
 import {
@@ -39,6 +40,42 @@ export type SandboxRuntimeConfigValidationIssue = {
   connectionId?: string;
   targetKey?: string;
 };
+
+export function createWorkflowSandboxRuntime(
+  runtimeConfig: SandboxProfileVersionRuntimeConfig,
+): SandboxRuntimeProviderInput {
+  const provider = assertSandboxRuntimeProvider(runtimeConfig.sandboxProvider);
+  const resources =
+    runtimeConfig.sandboxResources === null
+      ? undefined
+      : {
+          vcpuCount: runtimeConfig.sandboxResources.vcpuCount,
+          memoryMb: runtimeConfig.sandboxResources.memoryMb,
+          ...(runtimeConfig.sandboxResources.storageMb === undefined
+            ? {}
+            : { storageMb: runtimeConfig.sandboxResources.storageMb }),
+        };
+
+  return {
+    provider,
+    ...(runtimeConfig.sandboxConnectionId === null
+      ? {}
+      : { connectionId: runtimeConfig.sandboxConnectionId }),
+    ...(resources === undefined ? {} : { resources }),
+  };
+}
+
+function assertSandboxRuntimeProvider(provider: string | null): SandboxProvider {
+  if (provider === null) {
+    throw new Error("Sandbox profile version runtime provider is missing.");
+  }
+
+  if (provider === SandboxProvider.DOCKER || provider === SandboxProvider.E2B) {
+    return provider;
+  }
+
+  throw new Error(`Unsupported sandbox profile version runtime provider '${provider}'.`);
+}
 
 export function createDefaultProfileVersionRuntimeConfig(input: {
   integrationRegistry: IntegrationRegistry;

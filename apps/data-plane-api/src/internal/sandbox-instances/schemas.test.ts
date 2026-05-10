@@ -129,6 +129,10 @@ describe("StartSandboxInstanceInputSchema", () => {
         imageId: "img_123",
         createdAt: "2026-03-10T00:00:00.000Z",
         kind: "base",
+        provider: "docker",
+      },
+      sandboxRuntime: {
+        provider: "docker",
       },
     };
 
@@ -152,6 +156,10 @@ describe("StartSandboxInstanceInputSchema", () => {
         imageId: "img_123",
         createdAt: "2026-03-10T00:00:00.000Z",
         kind: "base",
+        provider: "docker",
+      },
+      sandboxRuntime: {
+        provider: "docker",
       },
     };
 
@@ -175,6 +183,10 @@ describe("StartSandboxInstanceInputSchema", () => {
         imageId: "img_123",
         createdAt: "2026-03-10T00:00:00.000Z",
         kind: "base",
+        provider: "docker",
+      },
+      sandboxRuntime: {
+        provider: "docker",
       },
     };
 

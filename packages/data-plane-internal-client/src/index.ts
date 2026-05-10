@@ -59,7 +59,16 @@ export type StartSandboxInstanceInput = {
   image: Pick<SandboxImageHandle, "imageId"> & {
     createdAt?: SandboxImageHandle["createdAt"];
     kind: "base" | "snapshot";
-    provider?: SandboxProvider;
+    provider: SandboxProvider;
+  };
+  sandboxRuntime: {
+    provider: SandboxProvider;
+    connectionId?: string;
+    resources?: {
+      vcpuCount: number;
+      memoryMb: number;
+      storageMb?: number;
+    };
   };
   idempotencyKey?: string;
 };

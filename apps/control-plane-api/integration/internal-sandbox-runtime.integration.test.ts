@@ -368,6 +368,11 @@ async function seedProfileWithAgent(
     sandboxProfileId: input.profileId,
     version: 1,
     state: "draft",
+    sandboxProvider: "docker",
+    sandboxConnectionId: null,
+    sandboxVcpuCount: null,
+    sandboxMemoryMb: null,
+    sandboxStorageMb: null,
   });
   await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values({
     targetKey: input.openAiTargetKey,

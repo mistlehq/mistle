@@ -21,6 +21,7 @@ import {
   type ProfileVersionRefreshScheduleSummary,
 } from "./profile-version-refresh-schedule-summary.js";
 import {
+  createWorkflowSandboxRuntime,
   mapProfileVersionRuntimeConfig,
   type SandboxProfileVersionResources,
 } from "./profile-version-runtime-config.js";
@@ -235,6 +236,7 @@ export async function publishProfileVersion(
       organizationId: input.organizationId,
       profileId: input.profileId,
       profileVersion: input.profileVersion,
+      sandboxRuntime: createWorkflowSandboxRuntime(publishedResult.version),
     },
   );
 

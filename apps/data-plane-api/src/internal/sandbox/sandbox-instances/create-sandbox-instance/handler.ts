@@ -11,7 +11,6 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
   const openWorkflow = ctx.get("resources").openWorkflow;
   const workflowDbPool = ctx.get("resources").workflowDbPool;
   const workflowNamespaceId = ctx.get("config").workflow.namespaceId;
-  const sandboxProvider = ctx.get("sandboxProvider");
   const sandboxStorageBackend = ctx.get("sandboxStorageBackend");
   const body = ctx.req.valid("json");
 
@@ -22,7 +21,6 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
       openWorkflow,
       workflowDbPool,
       workflowNamespaceId,
-      sandboxProvider,
       sandboxStorageBackend,
     },
     body,

@@ -114,6 +114,10 @@ describe.concurrent("data-plane worker snapshot materialization", () => {
             imageId: "integration-new-snapshot-claim-loss-image",
             createdAt: new Date().toISOString(),
             kind: "base",
+            provider: SandboxProvider.DOCKER,
+          },
+          sandboxRuntime: {
+            provider: SandboxProvider.DOCKER,
           },
         },
         workflowRunId,

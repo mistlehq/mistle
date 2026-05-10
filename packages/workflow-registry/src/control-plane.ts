@@ -6,7 +6,10 @@ import type {
 import type { CompiledRuntimePlan } from "@mistle/integrations-core";
 import { defineWorkflowSpec } from "openworkflow";
 
-import type { StartSandboxInstanceWorkflowImageInput } from "./data-plane.js";
+import type {
+  SandboxRuntimeProviderInput,
+  StartSandboxInstanceWorkflowImageInput,
+} from "./data-plane.js";
 
 export type OTPVerificationType = "sign-in" | "email-verification" | "forget-password";
 
@@ -93,6 +96,7 @@ export type StartSandboxProfileInstanceWorkflowInput = {
   };
   source: SandboxInstanceSource;
   image: StartSandboxInstanceWorkflowImageInput;
+  sandboxRuntime: SandboxRuntimeProviderInput;
 };
 
 export type StartSandboxProfileInstanceWorkflowOutput = {

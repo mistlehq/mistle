@@ -16,7 +16,10 @@ import {
 } from "@mistle/db/data-plane";
 import { type CompiledRuntimePlan, type ResolvedSandboxImage } from "@mistle/integrations-core";
 import { SandboxProvider } from "@mistle/sandbox";
-import type { StartSandboxInstanceWorkflowImageInput } from "@mistle/workflow-registry/data-plane";
+import type {
+  SandboxRuntimeProviderInput,
+  StartSandboxInstanceWorkflowImageInput,
+} from "@mistle/workflow-registry/data-plane";
 import { and, eq } from "drizzle-orm";
 
 import { resolveSandboxStoragePersistenceMode } from "../../sandbox-storage/services/internal-sandbox-storage.js";
@@ -29,6 +32,10 @@ import {
   SandboxProfilesNotFoundCodes,
   SandboxProfilesNotFoundError,
 } from "../errors.js";
+import {
+  createWorkflowSandboxRuntime,
+  mapProfileVersionRuntimeConfig,
+} from "./profile-version-runtime-config.js";
 import { listProfileVersionRepositoryOptions } from "./repository-options.js";
 import {
   resolveActingUserGitIdentity,
@@ -61,6 +68,7 @@ type ResolvedLaunchImage = {
   defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
   compileImage: ResolvedSandboxImage;
   workflowImage: StartSandboxInstanceWorkflowImageInput;
+  sandboxRuntime: SandboxRuntimeProviderInput;
 };
 
 const LaunchImageKinds = {
@@ -165,6 +173,11 @@ async function resolveLaunchImage(
       defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
       snapshotImageProvider: tables.sandboxProfileVersions.snapshotImageProvider,
       snapshotImageId: tables.sandboxProfileVersions.snapshotImageId,
+      sandboxProvider: tables.sandboxProfileVersions.sandboxProvider,
+      sandboxConnectionId: tables.sandboxProfileVersions.sandboxConnectionId,
+      sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
+      sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
+      sandboxStorageMb: tables.sandboxProfileVersions.sandboxStorageMb,
     })
     .from(tables.sandboxProfiles)
     .leftJoin(
@@ -202,6 +215,16 @@ async function resolveLaunchImage(
     );
   }
 
+  const sandboxRuntime = createWorkflowSandboxRuntime(
+    mapProfileVersionRuntimeConfig({
+      sandboxProvider: sandboxProfileVersion.sandboxProvider,
+      sandboxConnectionId: sandboxProfileVersion.sandboxConnectionId,
+      sandboxVcpuCount: sandboxProfileVersion.sandboxVcpuCount,
+      sandboxMemoryMb: sandboxProfileVersion.sandboxMemoryMb,
+      sandboxStorageMb: sandboxProfileVersion.sandboxStorageMb,
+    }),
+  );
+
   if (sandboxProfileVersion.state === SandboxProfileVersionStates.PUBLISHED) {
     if (
       sandboxProfileVersion.snapshotImageProvider === null ||
@@ -210,6 +233,16 @@ async function resolveLaunchImage(
       throw new SandboxProfilesConflictError(
         SandboxProfilesConflictCodes.PROFILE_VERSION_NOT_USABLE,
         `Sandbox profile version '${String(input.profileVersion)}' is published but not yet usable.`,
+      );
+    }
+
+    const snapshotProvider = assertSnapshotImageProvider(
+      sandboxProfileVersion.snapshotImageProvider,
+    );
+    if (snapshotProvider !== sandboxRuntime.provider) {
+      throw new SandboxProfilesConflictError(
+        SandboxProfilesConflictCodes.PROFILE_VERSION_NOT_USABLE,
+        `Sandbox profile version '${String(input.profileVersion)}' snapshot provider does not match its configured sandbox provider.`,
       );
     }
 
@@ -223,8 +256,9 @@ async function resolveLaunchImage(
       workflowImage: {
         imageId: sandboxProfileVersion.snapshotImageId,
         kind: LaunchImageKinds.SNAPSHOT,
-        provider: assertSnapshotImageProvider(sandboxProfileVersion.snapshotImageProvider),
+        provider: snapshotProvider,
       },
+      sandboxRuntime,
     };
   }
 
@@ -239,7 +273,9 @@ async function resolveLaunchImage(
       imageId: defaultBaseImage,
       createdAt: new Date().toISOString(),
       kind: LaunchImageKinds.BASE,
+      provider: sandboxRuntime.provider,
     },
+    sandboxRuntime,
   };
 }
 
@@ -326,6 +362,7 @@ export async function startProfileInstance(
     ...(gitIdentity === undefined ? {} : { gitIdentity }),
     source: serviceInput.source,
     image: launchImage.workflowImage,
+    sandboxRuntime: launchImage.sandboxRuntime,
   });
 
   return {

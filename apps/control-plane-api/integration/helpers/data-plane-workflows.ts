@@ -22,6 +22,21 @@ const MaterializeWorkflowRunInputSchema = z.looseObject({
       imageId: z.string().min(1),
       createdAt: z.iso.datetime().optional(),
       kind: z.literal("base"),
+      provider: z.enum(["docker", "e2b"]),
+    })
+    .strict(),
+  sandboxRuntime: z
+    .object({
+      provider: z.enum(["docker", "e2b"]),
+      connectionId: z.string().min(1).optional(),
+      resources: z
+        .object({
+          vcpuCount: z.number().int(),
+          memoryMb: z.number().int(),
+          storageMb: z.number().int().optional(),
+        })
+        .strict()
+        .optional(),
     })
     .strict(),
 });

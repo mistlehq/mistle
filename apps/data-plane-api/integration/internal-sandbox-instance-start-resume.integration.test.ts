@@ -325,6 +325,7 @@ function startInput(input: {
   idempotencyKey?: string;
 }): StartSandboxInstanceInput {
   const imageKind = input.imageKind ?? "base";
+  const imageProvider = input.imageProvider ?? "docker";
 
   return {
     organizationId: input.organizationId,
@@ -347,7 +348,10 @@ function startInput(input: {
       imageId: input.imageId,
       createdAt: "2026-02-27T00:00:00.000Z",
       kind: imageKind,
-      ...(input.imageProvider === undefined ? {} : { provider: input.imageProvider }),
+      provider: imageProvider,
+    },
+    sandboxRuntime: {
+      provider: imageProvider,
     },
     ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
   };

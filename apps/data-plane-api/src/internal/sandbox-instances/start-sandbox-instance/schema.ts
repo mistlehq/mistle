@@ -1,6 +1,21 @@
 import { z } from "@hono/zod-openapi";
 import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 
+export const SandboxRuntimeProviderInputSchema = z
+  .object({
+    provider: z.enum(["docker", "e2b"]),
+    connectionId: z.string().min(1).optional(),
+    resources: z
+      .object({
+        vcpuCount: z.number().int().min(1),
+        memoryMb: z.number().int().min(1),
+        storageMb: z.number().int().min(1).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 export const StartSandboxInstanceInputSchema = z
   .object({
     organizationId: z.string().min(1),
@@ -41,9 +56,10 @@ export const StartSandboxInstanceInputSchema = z
         imageId: z.string().min(1),
         createdAt: z.string().min(1).optional(),
         kind: z.enum(["base", "snapshot"]),
-        provider: z.enum(["docker", "e2b"]).optional(),
+        provider: z.enum(["docker", "e2b"]),
       })
       .strict(),
+    sandboxRuntime: SandboxRuntimeProviderInputSchema,
   })
   .strict();
 

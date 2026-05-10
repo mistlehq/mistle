@@ -92,7 +92,9 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     organizationId: workflowInput.organizationId,
     sandboxProfileId: workflowInput.sandboxProfileId,
     sandboxProfileVersion: workflowInput.sandboxProfileVersion,
+    runtimeProvider: workflowInput.sandboxRuntime.provider,
   });
+  const requestedRuntimeProvider = workflowInput.sandboxRuntime.provider;
 
   let providerSandboxId: string | undefined;
   let runtimeProvider: SandboxProvider | undefined;
@@ -292,7 +294,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
         {
           db: ctx.db,
           tables: ctx.tables,
-          runtimeProvider: ctx.config.sandbox.provider,
+          runtimeProvider: requestedRuntimeProvider,
         },
         {
           sandboxInstanceId: workflowInput.sandboxInstanceId,
@@ -322,6 +324,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
         {
           sandboxInstanceId: workflowInput.sandboxInstanceId,
           image: workflowInput.image,
+          runtimeProvider: requestedRuntimeProvider,
         },
       ),
     );

@@ -1,4 +1,7 @@
-import { MaterializeSandboxProfileVersionSnapshotWorkflowSpec } from "@mistle/workflow-registry/data-plane";
+import {
+  type SandboxRuntimeProviderInput,
+  MaterializeSandboxProfileVersionSnapshotWorkflowSpec,
+} from "@mistle/workflow-registry/data-plane";
 import type { OpenWorkflow } from "openworkflow";
 
 import type {
@@ -13,6 +16,27 @@ function createSnapshotMaterializationIdempotencyKey(input: { snapshotJobId: str
   });
 }
 
+function createWorkflowSandboxRuntime(
+  input: MaterializeSandboxProfileVersionSnapshotJobRequest["sandboxRuntime"],
+): SandboxRuntimeProviderInput {
+  const resources =
+    input.resources === undefined
+      ? undefined
+      : {
+          vcpuCount: input.resources.vcpuCount,
+          memoryMb: input.resources.memoryMb,
+          ...(input.resources.storageMb === undefined
+            ? {}
+            : { storageMb: input.resources.storageMb }),
+        };
+
+  return {
+    provider: input.provider,
+    ...(input.connectionId === undefined ? {} : { connectionId: input.connectionId }),
+    ...(resources === undefined ? {} : { resources }),
+  };
+}
+
 export async function requestSandboxProfileVersionSnapshotMaterialization(
   ctx: {
     openWorkflow: OpenWorkflow;
@@ -21,7 +45,10 @@ export async function requestSandboxProfileVersionSnapshotMaterialization(
 ): Promise<MaterializeSandboxProfileVersionSnapshotJobAcceptedResponse> {
   const workflowRunHandle = await ctx.openWorkflow.runWorkflow(
     MaterializeSandboxProfileVersionSnapshotWorkflowSpec,
-    input,
+    {
+      ...input,
+      sandboxRuntime: createWorkflowSandboxRuntime(input.sandboxRuntime),
+    },
     {
       idempotencyKey: createSnapshotMaterializationIdempotencyKey({
         snapshotJobId: input.snapshotJobId,

@@ -34,6 +34,14 @@ const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api"],
 });
 
+const DockerSandboxRuntimeColumns = {
+  sandboxProvider: "docker",
+  sandboxConnectionId: null,
+  sandboxVcpuCount: null,
+  sandboxMemoryMb: null,
+  sandboxStorageMb: null,
+} as const;
+
 describe.concurrent("sandbox profile version start instance integration", () => {
   it("returns 404 when the selected profile version does not exist", async ({ env }) => {
     const session = await env.auth.createSession({
@@ -84,6 +92,7 @@ describe.concurrent("sandbox profile version start instance integration", () => 
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: "2026-04-24T00:00:00.000Z",
+        ...DockerSandboxRuntimeColumns,
       }),
     );
 
@@ -123,6 +132,7 @@ describe.concurrent("sandbox profile version start instance integration", () => 
         sandboxProfileId: "sbp_start_instance_compile_error",
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
+        ...DockerSandboxRuntimeColumns,
       }),
     );
     await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
@@ -195,6 +205,7 @@ describe.concurrent("sandbox profile version start instance integration", () => 
         sandboxProfileId: "sbp_start_instance_missing_agent_binding",
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
+        ...DockerSandboxRuntimeColumns,
       }),
     );
 
@@ -231,6 +242,7 @@ describe.concurrent("sandbox profile version start instance integration", () => 
         sandboxProfileId: "sbp_setup_script_test_blank",
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
+        ...DockerSandboxRuntimeColumns,
       }),
     );
 
@@ -274,6 +286,7 @@ describe.concurrent("sandbox profile version start instance integration", () => 
         sandboxProfileId: "sbp_setup_script_test_other_org",
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
+        ...DockerSandboxRuntimeColumns,
       }),
     );
 
@@ -317,6 +330,7 @@ describe.concurrent("sandbox profile version start instance integration", () => 
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
         setupScript: "echo persisted setup script",
+        ...DockerSandboxRuntimeColumns,
       }),
     );
 
@@ -612,6 +626,7 @@ async function createStartableProfile(input: {
         state: input.versionState,
         defaultPersistenceMode:
           input.defaultPersistenceMode ?? SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
+        ...DockerSandboxRuntimeColumns,
         publishedAt:
           input.versionState === SandboxProfileVersionStates.PUBLISHED
             ? "2026-04-24T00:00:00.000Z"

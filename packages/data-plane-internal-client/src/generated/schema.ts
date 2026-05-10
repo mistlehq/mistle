@@ -139,7 +139,7 @@ export interface paths {
               /** @enum {string} */
               kind: "base" | "snapshot";
               /** @enum {string} */
-              provider?: "docker" | "e2b";
+              provider: "docker" | "e2b";
             };
             organizationId: string;
             /** @enum {string} */
@@ -479,6 +479,16 @@ export interface paths {
             };
             sandboxProfileId: string;
             sandboxProfileVersion: number;
+            sandboxRuntime: {
+              connectionId?: string;
+              /** @enum {string} */
+              provider: "docker" | "e2b";
+              resources?: {
+                memoryMb: number;
+                storageMb?: number;
+                vcpuCount: number;
+              };
+            };
             /** @enum {string} */
             source: "dashboard" | "webhook" | "schedule" | "system";
             startedBy: {
@@ -1590,11 +1600,23 @@ export interface paths {
               imageId: string;
               /** @enum {string} */
               kind: "base";
+              /** @enum {string} */
+              provider: "docker" | "e2b";
             };
             organizationId: string;
             sandboxInstanceId: string;
             sandboxProfileId: string;
             sandboxProfileVersion: number;
+            sandboxRuntime: {
+              connectionId?: string;
+              /** @enum {string} */
+              provider: "docker" | "e2b";
+              resources?: {
+                memoryMb: number;
+                storageMb?: number;
+                vcpuCount: number;
+              };
+            };
             snapshotJobId: string;
           };
         };

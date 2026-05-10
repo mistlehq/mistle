@@ -1,5 +1,7 @@
 import { z } from "@hono/zod-openapi";
 
+import { SandboxRuntimeProviderInputSchema } from "../../../sandbox-instances/start-sandbox-instance/schema.js";
+
 export const MaterializeSandboxProfileVersionSnapshotJobRequestSchema = z
   .object({
     snapshotJobId: z.string().min(1),
@@ -12,8 +14,10 @@ export const MaterializeSandboxProfileVersionSnapshotJobRequestSchema = z
         imageId: z.string().min(1),
         createdAt: z.string().min(1),
         kind: z.literal("base"),
+        provider: z.enum(["docker", "e2b"]),
       })
       .strict(),
+    sandboxRuntime: SandboxRuntimeProviderInputSchema,
   })
   .strict();
 

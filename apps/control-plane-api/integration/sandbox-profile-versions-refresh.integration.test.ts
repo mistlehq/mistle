@@ -23,11 +23,19 @@ const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api"],
 });
 
-const EmptySandboxRuntimeConfig = {
+const DockerSandboxRuntimeColumns = {
+  sandboxProvider: "docker",
   sandboxConnectionId: null,
-  sandboxProvider: null,
+  sandboxVcpuCount: null,
+  sandboxMemoryMb: null,
+  sandboxStorageMb: null,
+} as const;
+
+const DockerSandboxRuntimeConfig = {
+  sandboxConnectionId: null,
+  sandboxProvider: "docker",
   sandboxResources: null,
-};
+} as const;
 
 describe.concurrent("sandbox profile versions refresh integration", () => {
   it("queues manual refresh for a usable published version", async ({ env }) => {
@@ -50,6 +58,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: "2026-04-24T00:01:00.000Z",
+        ...DockerSandboxRuntimeColumns,
       }),
       {
         ...sandboxProfileVersionRow({
@@ -57,6 +66,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
           version: 2,
           state: SandboxProfileVersionStates.PUBLISHED,
           publishedAt: "2026-04-24T00:02:00.000Z",
+          ...DockerSandboxRuntimeColumns,
         }),
         snapshotImageProvider: "docker",
         snapshotImageId: "sha256:refreshable-version-2",
@@ -81,7 +91,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
         version: 2,
         state: SandboxProfileVersionStates.PUBLISHED,
         defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
-        ...EmptySandboxRuntimeConfig,
+        ...DockerSandboxRuntimeConfig,
         isActive: true,
         usable: true,
         refreshSchedule: null,
@@ -165,6 +175,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: "2026-04-25T00:01:00.000Z",
+        ...DockerSandboxRuntimeColumns,
       }),
     );
 
@@ -186,7 +197,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
         defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
-        ...EmptySandboxRuntimeConfig,
+        ...DockerSandboxRuntimeConfig,
         isActive: false,
         usable: false,
         refreshSchedule: null,
@@ -250,6 +261,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: "2026-04-25T00:01:00.000Z",
+        ...DockerSandboxRuntimeColumns,
       }),
     );
 
@@ -293,6 +305,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
           version: 1,
           state: SandboxProfileVersionStates.PUBLISHED,
           publishedAt: "2026-04-26T00:01:00.000Z",
+          ...DockerSandboxRuntimeColumns,
         }),
         snapshotImageProvider: "docker",
         snapshotImageId: "sha256:retry-publish-existing-version-1",
@@ -302,6 +315,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
         version: 2,
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: "2026-04-26T00:02:00.000Z",
+        ...DockerSandboxRuntimeColumns,
       }),
     ]);
     await env.controlPlaneDb
@@ -412,6 +426,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
           version: 1,
           state: SandboxProfileVersionStates.PUBLISHED,
           publishedAt: "2026-04-27T00:01:00.000Z",
+          ...DockerSandboxRuntimeColumns,
         }),
         snapshotImageProvider: "docker",
         snapshotImageId: "sha256:retry-after-manual-existing-version-1",
@@ -421,6 +436,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
         version: 2,
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: "2026-04-27T00:02:00.000Z",
+        ...DockerSandboxRuntimeColumns,
       }),
     ]);
     await env.controlPlaneDb
@@ -506,6 +522,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
           version: 1,
           state: SandboxProfileVersionStates.PUBLISHED,
           publishedAt: "2026-04-28T00:01:00.000Z",
+          ...DockerSandboxRuntimeColumns,
         }),
         snapshotImageProvider: "docker",
         snapshotImageId: "sha256:refresh-failed-publish-existing-version-1",
@@ -515,6 +532,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
         version: 2,
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: "2026-04-28T00:02:00.000Z",
+        ...DockerSandboxRuntimeColumns,
       }),
     ]);
     await env.controlPlaneDb
@@ -578,6 +596,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
         sandboxProfileId: "sbp_version_refresh_not_published_001",
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
+        ...DockerSandboxRuntimeColumns,
       }),
     );
 
@@ -618,6 +637,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: "2026-04-26T00:01:00.000Z",
+        ...DockerSandboxRuntimeColumns,
       }),
       snapshotImageProvider: "docker",
       snapshotImageId: "sha256:refresh-in-progress",

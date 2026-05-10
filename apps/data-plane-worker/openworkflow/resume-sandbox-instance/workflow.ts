@@ -664,6 +664,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
 
     const replacementImage = createReplacementSandboxImage({
       runtimePlan: resumableSandboxState.runtimePlan,
+      runtimeProvider: resumableSandboxState.runtimeProvider,
     });
     let replacementSandbox:
       | {
@@ -716,6 +717,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             {
               sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
               image: replacementImage,
+              runtimeProvider: resumableSandboxState.runtimeProvider,
               storagePreparation,
             },
           );
@@ -1496,11 +1498,13 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
 
 function createReplacementSandboxImage(input: {
   runtimePlan: ResumableSandboxInstanceState["runtimePlan"];
+  runtimeProvider: SandboxProvider;
 }): StartSandboxInstanceWorkflowImageInput {
   return {
     imageId: input.runtimePlan.image.imageRef,
     createdAt: new Date().toISOString(),
     kind: SandboxStartImageKinds.BASE,
+    provider: input.runtimeProvider,
   };
 }
 

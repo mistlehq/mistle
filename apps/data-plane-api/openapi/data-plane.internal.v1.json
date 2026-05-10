@@ -53,9 +53,47 @@
                       "kind": {
                         "type": "string",
                         "enum": ["base"]
+                      },
+                      "provider": {
+                        "type": "string",
+                        "enum": ["docker", "e2b"]
                       }
                     },
-                    "required": ["imageId", "createdAt", "kind"],
+                    "required": ["imageId", "createdAt", "kind", "provider"],
+                    "additionalProperties": false
+                  },
+                  "sandboxRuntime": {
+                    "type": "object",
+                    "properties": {
+                      "provider": {
+                        "type": "string",
+                        "enum": ["docker", "e2b"]
+                      },
+                      "connectionId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "resources": {
+                        "type": "object",
+                        "properties": {
+                          "vcpuCount": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "memoryMb": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "storageMb": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        },
+                        "required": ["vcpuCount", "memoryMb"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": ["provider"],
                     "additionalProperties": false
                   }
                 },
@@ -65,7 +103,8 @@
                   "organizationId",
                   "sandboxProfileId",
                   "sandboxProfileVersion",
-                  "image"
+                  "image",
+                  "sandboxRuntime"
                 ],
                 "additionalProperties": false
               }
@@ -1436,7 +1475,41 @@
                         "enum": ["docker", "e2b"]
                       }
                     },
-                    "required": ["imageId", "kind"],
+                    "required": ["imageId", "kind", "provider"],
+                    "additionalProperties": false
+                  },
+                  "sandboxRuntime": {
+                    "type": "object",
+                    "properties": {
+                      "provider": {
+                        "type": "string",
+                        "enum": ["docker", "e2b"]
+                      },
+                      "connectionId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "resources": {
+                        "type": "object",
+                        "properties": {
+                          "vcpuCount": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "memoryMb": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "storageMb": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        },
+                        "required": ["vcpuCount", "memoryMb"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": ["provider"],
                     "additionalProperties": false
                   }
                 },
@@ -1449,7 +1522,8 @@
                   "runtimePlan",
                   "startedBy",
                   "source",
-                  "image"
+                  "image",
+                  "sandboxRuntime"
                 ],
                 "additionalProperties": false
               }

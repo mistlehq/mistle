@@ -37,7 +37,19 @@ export type SandboxStartImageKind =
 export type StartSandboxInstanceWorkflowImageInput = Pick<SandboxImageHandle, "imageId"> & {
   createdAt?: SandboxImageHandle["createdAt"];
   kind: SandboxStartImageKind;
-  provider?: SandboxProvider;
+  provider: SandboxProvider;
+};
+
+export type SandboxRuntimeResourceInput = {
+  vcpuCount: number;
+  memoryMb: number;
+  storageMb?: number;
+};
+
+export type SandboxRuntimeProviderInput = {
+  provider: SandboxProvider;
+  connectionId?: string;
+  resources?: SandboxRuntimeResourceInput;
 };
 
 export type SandboxWorkflowGitIdentityInput = {
@@ -69,6 +81,7 @@ export type StartSandboxInstanceWorkflowInput = {
   gitIdentity?: SandboxWorkflowGitIdentityInput;
   source: SandboxInstanceSource;
   image: StartSandboxInstanceWorkflowImageInput;
+  sandboxRuntime: SandboxRuntimeProviderInput;
 };
 
 export type StartSandboxInstanceWorkflowOutput = {
@@ -91,6 +104,7 @@ export type MaterializeSandboxProfileVersionSnapshotWorkflowInput = {
   sandboxProfileId: string;
   sandboxProfileVersion: number;
   image: StartSandboxInstanceWorkflowImageInput;
+  sandboxRuntime: SandboxRuntimeProviderInput;
 };
 
 export type MaterializeSandboxProfileVersionSnapshotWorkflowOutput = {
