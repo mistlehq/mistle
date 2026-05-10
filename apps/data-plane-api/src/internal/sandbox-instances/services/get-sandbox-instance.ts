@@ -5,6 +5,7 @@ import {
   SandboxStopReasons,
   type DataPlaneDatabase,
   type DataPlaneTables,
+  type SandboxInstanceProvider,
 } from "@mistle/db/data-plane";
 import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 import {
@@ -17,6 +18,8 @@ import { and, eq, or, sql } from "drizzle-orm";
 
 import type { AppRuntimeResources } from "../../../resources.js";
 import { assertRuntimeSandboxProvider } from "../../../sandbox/adapter.js";
+import { resolveSandboxRuntimeAdapter } from "../../../sandbox/runtime-provider-resolver.js";
+import type { DataPlaneApiRuntimeConfig } from "../../../types.js";
 import type {
   GetSandboxInstanceInput,
   GetSandboxInstanceResponse,
@@ -28,10 +31,30 @@ import {
 } from "./starting-sandbox-inspection-policy.js";
 
 type GetSandboxInstanceContext = {
+  config: DataPlaneApiRuntimeConfig;
+  controlPlaneInternalClient: AppRuntimeResources["controlPlaneInternalClient"];
   db: DataPlaneDatabase;
   tables: Pick<DataPlaneTables, "sandboxInstances">;
-  sandboxAdapter: SandboxAdapter;
   runtimeStateReader: AppRuntimeResources["runtimeStateReader"];
+};
+
+type SandboxInstanceRuntimeSelection = {
+  organizationId: string;
+  runtimeProvider: SandboxInstanceProvider;
+  sandboxConnectionId: string | null;
+  sandboxVcpuCount: number | null;
+  sandboxMemoryMb: number | null;
+  sandboxStorageMb: number | null;
+};
+
+type InspectableSandboxInstance = SandboxInstanceRuntimeSelection & {
+  id: string;
+  title: string | null;
+  persistenceMode: string;
+  providerSandboxId: string | null;
+  failureCode: string | null;
+  failureMessage: string | null;
+  runtimePlan: PersistedRuntimePlan;
 };
 
 async function readPersistedRuntimePlan(input: {
@@ -276,15 +299,7 @@ async function markStoppedSandboxInstanceFailed(
 
 async function inspectStartingSandboxInstance(
   ctx: GetSandboxInstanceContext,
-  sandboxInstance: {
-    id: string;
-    title: string | null;
-    persistenceMode: string;
-    providerSandboxId: string | null;
-    failureCode: string | null;
-    failureMessage: string | null;
-    runtimePlan: PersistedRuntimePlan;
-  },
+  sandboxInstance: InspectableSandboxInstance,
 ): Promise<NonNullable<GetSandboxInstanceResponse>> {
   if (
     sandboxInstance.providerSandboxId === null &&
@@ -311,7 +326,11 @@ async function inspectStartingSandboxInstance(
     );
   }
 
-  const inspection = await inspectSandboxInstanceOrNull(ctx, sandboxInstance.providerSandboxId);
+  const inspection = await inspectSandboxInstanceOrNull(
+    ctx,
+    sandboxInstance,
+    sandboxInstance.providerSandboxId,
+  );
 
   if (inspection === null) {
     if (sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
@@ -425,15 +444,7 @@ function readPendingSandboxInstance(sandboxInstance: {
 
 async function inspectStoppedSandboxInstance(
   ctx: GetSandboxInstanceContext,
-  sandboxInstance: {
-    id: string;
-    title: string | null;
-    persistenceMode: string;
-    providerSandboxId: string | null;
-    failureCode: string | null;
-    failureMessage: string | null;
-    runtimePlan: PersistedRuntimePlan;
-  },
+  sandboxInstance: InspectableSandboxInstance,
 ): Promise<NonNullable<GetSandboxInstanceResponse>> {
   if (
     sandboxInstance.providerSandboxId === null &&
@@ -456,7 +467,11 @@ async function inspectStoppedSandboxInstance(
     );
   }
 
-  const inspection = await inspectSandboxInstanceOrNull(ctx, sandboxInstance.providerSandboxId);
+  const inspection = await inspectSandboxInstanceOrNull(
+    ctx,
+    sandboxInstance,
+    sandboxInstance.providerSandboxId,
+  );
   if (inspection === null) {
     if (sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
       await clearStoppedSandboxInstanceProviderSandboxId(ctx, {
@@ -537,15 +552,7 @@ async function inspectStoppedSandboxInstance(
 
 async function inspectRunningSandboxInstance(
   ctx: GetSandboxInstanceContext,
-  sandboxInstance: {
-    id: string;
-    title: string | null;
-    persistenceMode: string;
-    providerSandboxId: string | null;
-    failureCode: string | null;
-    failureMessage: string | null;
-    runtimePlan: PersistedRuntimePlan;
-  },
+  sandboxInstance: InspectableSandboxInstance,
 ): Promise<NonNullable<GetSandboxInstanceResponse>> {
   if (sandboxInstance.providerSandboxId === null) {
     throw new Error(
@@ -553,7 +560,11 @@ async function inspectRunningSandboxInstance(
     );
   }
 
-  const inspection = await inspectSandboxInstanceOrNull(ctx, sandboxInstance.providerSandboxId);
+  const inspection = await inspectSandboxInstanceOrNull(
+    ctx,
+    sandboxInstance,
+    sandboxInstance.providerSandboxId,
+  );
   if (inspection === null) {
     if (sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
       await markRunningSandboxInstanceStopped(ctx, {
@@ -625,11 +636,14 @@ async function inspectRunningSandboxInstance(
 }
 
 async function inspectSandboxInstanceOrNull(
-  ctx: Pick<GetSandboxInstanceContext, "sandboxAdapter">,
+  ctx: GetSandboxInstanceContext,
+  sandboxInstance: SandboxInstanceRuntimeSelection,
   providerSandboxId: string,
 ) {
+  const sandboxAdapter = await resolvePersistedSandboxInstanceAdapter(ctx, sandboxInstance);
+
   try {
-    return await ctx.sandboxAdapter.inspect({
+    return await sandboxAdapter.inspect({
       id: providerSandboxId,
     });
   } catch (error) {
@@ -641,6 +655,54 @@ async function inspectSandboxInstanceOrNull(
   }
 }
 
+function createPersistedSandboxResources(input: SandboxInstanceRuntimeSelection):
+  | {
+      vcpuCount: number;
+      memoryMb: number;
+      storageMb?: number;
+    }
+  | undefined {
+  if (
+    input.sandboxVcpuCount === null &&
+    input.sandboxMemoryMb === null &&
+    input.sandboxStorageMb === null
+  ) {
+    return undefined;
+  }
+
+  if (input.sandboxVcpuCount === null || input.sandboxMemoryMb === null) {
+    throw new Error("Persisted sandbox resources are incomplete.");
+  }
+
+  return {
+    vcpuCount: input.sandboxVcpuCount,
+    memoryMb: input.sandboxMemoryMb,
+    ...(input.sandboxStorageMb === null ? {} : { storageMb: input.sandboxStorageMb }),
+  };
+}
+
+async function resolvePersistedSandboxInstanceAdapter(
+  ctx: Pick<GetSandboxInstanceContext, "config" | "controlPlaneInternalClient">,
+  sandboxInstance: SandboxInstanceRuntimeSelection,
+): Promise<SandboxAdapter> {
+  const resources = createPersistedSandboxResources(sandboxInstance);
+
+  return resolveSandboxRuntimeAdapter(
+    {
+      config: ctx.config,
+      controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+    },
+    {
+      organizationId: sandboxInstance.organizationId,
+      provider: sandboxInstance.runtimeProvider,
+      ...(sandboxInstance.sandboxConnectionId === null
+        ? {}
+        : { connectionId: sandboxInstance.sandboxConnectionId }),
+      ...(resources === undefined ? {} : { resources }),
+    },
+  );
+}
+
 export async function getSandboxInstance(
   ctx: GetSandboxInstanceContext,
   input: GetSandboxInstanceInput,
@@ -648,9 +710,14 @@ export async function getSandboxInstance(
   const sandboxInstance = await ctx.db.query.sandboxInstances.findFirst({
     columns: {
       id: true,
+      organizationId: true,
       title: true,
       persistenceMode: true,
       runtimeProvider: true,
+      sandboxConnectionId: true,
+      sandboxVcpuCount: true,
+      sandboxMemoryMb: true,
+      sandboxStorageMb: true,
       providerSandboxId: true,
       status: true,
       failureCode: true,

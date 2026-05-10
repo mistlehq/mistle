@@ -5,18 +5,20 @@ import { getSandboxInstance } from "../../../sandbox-instances/services/get-sand
 import { route } from "./route.js";
 
 export const handler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
+  const config = ctx.get("config");
   const db = ctx.get("resources").db;
   const tables = ctx.get("resources").tables;
-  const sandboxAdapter = ctx.get("resources").sandboxAdapter;
+  const controlPlaneInternalClient = ctx.get("resources").controlPlaneInternalClient;
   const runtimeStateReader = ctx.get("resources").runtimeStateReader;
   const params = ctx.req.valid("param");
   const query = ctx.req.valid("query");
 
   const response = await getSandboxInstance(
     {
+      config: { app: config },
+      controlPlaneInternalClient,
       db,
       tables,
-      sandboxAdapter,
       runtimeStateReader,
     },
     {
