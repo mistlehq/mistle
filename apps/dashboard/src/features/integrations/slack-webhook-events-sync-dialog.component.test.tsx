@@ -17,7 +17,6 @@ function SlackWebhookEventsSyncDialogHarness(input: { closeOnSync?: boolean }) {
       </button>
       {syncedToken === null ? null : <p>Synced {syncedToken}</p>}
       <SlackWebhookEventsSyncDialog
-        errorMessage={null}
         isOpen={isOpen}
         isPending={false}
         onOpenChange={setIsOpen}

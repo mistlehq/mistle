@@ -20,6 +20,7 @@ export type IntegrationWebhookSourceSectionState = {
   items: readonly IntegrationWebhookSource[];
   loadErrorMessage: string | null;
   revealedWebhookSecret: string | null;
+  syncErrorMessage?: string | null;
 };
 
 export const SETTINGS_INTEGRATION_WEBHOOK_SOURCES_QUERY_KEY_PREFIX: readonly [
@@ -149,6 +150,14 @@ export function useIntegrationWebhookSourceState(input: {
                 })
               : null,
           revealedWebhookSecret: revealedWebhookSecretByConnectionId.get(connection.id) ?? null,
+          syncErrorMessage:
+            refreshTriggerCapabilitiesMutation.isError &&
+            refreshTriggerCapabilitiesMutation.variables?.connectionId === connection.id
+              ? resolveApiErrorMessage({
+                  error: refreshTriggerCapabilitiesMutation.error,
+                  fallbackMessage: "Could not sync webhook events.",
+                })
+              : null,
         },
       ] as const;
     }),
@@ -158,17 +167,6 @@ export function useIntegrationWebhookSourceState(input: {
     createWebhookSource: createWebhookSourceMutation.mutate,
     deleteWebhookSource: deleteWebhookSourceMutation.mutate,
     refreshTriggerCapabilities: refreshTriggerCapabilitiesMutation.mutate,
-    refreshTriggerCapabilitiesError:
-      refreshTriggerCapabilitiesMutation.isError &&
-      refreshTriggerCapabilitiesMutation.variables !== undefined
-        ? {
-            connectionId: refreshTriggerCapabilitiesMutation.variables.connectionId,
-            message: resolveApiErrorMessage({
-              error: refreshTriggerCapabilitiesMutation.error,
-              fallbackMessage: "Could not sync webhook events.",
-            }),
-          }
-        : null,
     refreshingTriggerCapabilitiesConnectionId:
       refreshTriggerCapabilitiesMutation.isPending &&
       refreshTriggerCapabilitiesMutation.variables !== undefined

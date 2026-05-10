@@ -1265,6 +1265,7 @@ describe("IntegrationConnectionDetailView", () => {
                 ],
                 loadErrorMessage: null,
                 revealedWebhookSecret: null,
+                syncErrorMessage: "GitHub returned 404 for the installation.",
               },
             ],
           ])
@@ -1277,7 +1278,16 @@ describe("IntegrationConnectionDetailView", () => {
       throw new Error("Expected webhook section to render.");
     }
 
+    expect(within(webhookSection).getByText("Could not sync webhook events")).toBeTruthy();
+    expect(
+      within(webhookSection).getByText("GitHub returned 404 for the installation."),
+    ).toBeTruthy();
     expect(within(webhookSection).getByText("Available automation triggers")).toBeTruthy();
+    const syncError = within(webhookSection).getByText("Could not sync webhook events");
+    const triggerHeading = within(webhookSection).getByText("Available automation triggers");
+    expect(
+      syncError.compareDocumentPosition(triggerHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
     expect(within(webhookSection).getByText("Pull request opened")).toBeTruthy();
     expect(within(webhookSection).queryByText("Pull request")).toBeNull();
     expect(within(webhookSection).queryByText("github.pull_request.opened")).toBeNull();

@@ -17,6 +17,7 @@ import { describe, expect } from "vitest";
 import { z } from "zod";
 
 import { CompleteProviderAppSetupCallbackBadRequestResponseSchema } from "../src/integration-callbacks/provider-app-setup/schema.js";
+import { RefreshWebhookTriggerCapabilitiesBadRequestResponseSchema } from "../src/integration-connections/refresh-webhook-trigger-capabilities/schema.js";
 import { CreatedFormIntegrationConnectionSchema } from "../src/integration-connections/schemas.js";
 import { StartedProviderAppSetupResponseSchema } from "../src/integration-connections/start-provider-app-setup/schema.js";
 import { createFormConnection, seedIntegrationTarget } from "./helpers/integration-connections.js";
@@ -73,6 +74,16 @@ type StartedGitHubApiServer = {
   requests: GitHubApiRequest[];
   stop: () => Promise<void>;
 };
+
+type GitHubApiServerResponseInput =
+  | {
+      body: unknown;
+      statusCode?: number;
+    }
+  | (() => {
+      body: unknown;
+      statusCode?: number;
+    });
 
 describe.concurrent("GitHub App setup completion integration connections", () => {
   it("verifies the GitHub installation before marking the connection installed", async ({
@@ -168,6 +179,7 @@ describe.concurrent("GitHub App setup completion integration connections", () =>
     env,
   }) => {
     const targetKey = "github-cloud-installation-trigger-capabilities-refresh";
+    let expectedWebhookUrl = "";
     const githubApi = await startGitHubApiServer({
       // GitHub's installation response includes `events` and `permissions`;
       // those are the provider source of truth for webhook trigger capability refresh.
@@ -183,6 +195,17 @@ describe.concurrent("GitHub App setup completion integration connections", () =>
           pull_requests: "write",
         },
       },
+      // GitHub documents `GET /app/hook/config` as the app-authenticated source
+      // for the configured GitHub App webhook delivery URL and content type.
+      // https://docs.github.com/en/rest/apps/webhooks#get-a-webhook-configuration-for-an-app
+      hookConfigResponse: () => ({
+        body: {
+          content_type: "json",
+          insecure_ssl: "0",
+          secret: "********",
+          url: expectedWebhookUrl,
+        },
+      }),
     });
 
     try {
@@ -192,6 +215,119 @@ describe.concurrent("GitHub App setup completion integration connections", () =>
       });
       const session = await env.auth.createSession({
         email: "integration-github-app-trigger-capabilities-refresh@example.com",
+      });
+      const connectionId = await createGitHubAppConnection(env, {
+        targetKey,
+        cookie: session.cookie,
+        displayName: "GitHub Prod",
+      });
+      const state = await startGitHubAppInstallation(env, {
+        cookie: session.cookie,
+        connectionId,
+      });
+
+      const completeResponse = await env.controlPlaneApi.http.fetch(
+        createGitHubAppInstallationCompletePath({
+          state,
+          installationId: "12345",
+        }),
+        {
+          method: "GET",
+          redirect: "manual",
+        },
+      );
+      expect(completeResponse.status).toBe(302);
+      const sourceBeforeRefresh = await readGitHubWebhookSourceOrThrow(env, {
+        connectionId,
+        organizationId: session.organizationId,
+      });
+      expectedWebhookUrl = `${env.controlPlaneApi.hostBaseUrl}/p/integration/webhooks/${targetKey}/${sourceBeforeRefresh.endpointKey}`;
+
+      const refreshResponse = await env.controlPlaneApi.http.fetch(
+        `/v1/integration/connections/${encodeURIComponent(
+          connectionId,
+        )}/webhook-sources/trigger-capabilities/refresh`,
+        {
+          method: "POST",
+          headers: {
+            cookie: session.cookie,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({}),
+        },
+      );
+
+      expect(refreshResponse.status).toBe(200);
+      const webhookSource = await readGitHubWebhookSourceOrThrow(env, {
+        connectionId,
+        organizationId: session.organizationId,
+      });
+      expect(webhookSource.providerMetadata).toEqual({
+        [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+          events: ["issues", "pull_request"],
+          permissions: [
+            { permission: "issues", access: "read" },
+            { permission: "metadata", access: "read" },
+            { permission: "pull_requests", access: "write" },
+            { permission: "pull_requests", access: "read" },
+          ],
+        },
+      });
+      expect(githubApi.requests).toEqual([
+        {
+          authorization: expect.stringMatching(/^Bearer [^.]+\.[^.]+\.[^.]+$/u),
+          method: "GET",
+          pathname: "/app/installations/12345",
+        },
+        {
+          authorization: expect.stringMatching(/^Bearer [^.]+\.[^.]+\.[^.]+$/u),
+          method: "GET",
+          pathname: "/app/installations/12345",
+        },
+        {
+          authorization: expect.stringMatching(/^Bearer [^.]+\.[^.]+\.[^.]+$/u),
+          method: "GET",
+          pathname: "/app/hook/config",
+        },
+      ]);
+    } finally {
+      await githubApi.stop();
+    }
+  });
+
+  it("does not refresh GitHub webhook trigger capabilities when the app hook URL points elsewhere", async ({
+    env,
+  }) => {
+    const targetKey = "github-cloud-installation-trigger-capabilities-wrong-hook-url";
+    const githubApi = await startGitHubApiServer({
+      responseBody: {
+        id: 12345,
+        app_id: 123,
+        app_slug: "mistle-github-app",
+        events: ["issues", "pull_request"],
+        permissions: {
+          issues: "read",
+          metadata: "read",
+          pull_requests: "write",
+        },
+      },
+      hookConfigResponse: {
+        body: {
+          content_type: "json",
+          insecure_ssl: "0",
+          secret: "********",
+          url: "https://other-control-plane.example.com/p/integration/webhooks/github-cloud/eps_other",
+        },
+      },
+    });
+
+    try {
+      await seedGitHubCloudTarget(env, {
+        targetKey,
+        apiBaseUrl: githubApi.baseUrl,
+      });
+      const session = await env.auth.createSession({
+        email: "integration-github-app-trigger-capabilities-refresh-wrong-url@example.com",
       });
       const connectionId = await createGitHubAppConnection(env, {
         targetKey,
@@ -229,28 +365,21 @@ describe.concurrent("GitHub App setup completion integration connections", () =>
         },
       );
 
-      expect(refreshResponse.status).toBe(200);
-      const webhookSource = await env.controlPlaneDb.query.integrationWebhookSources.findFirst({
-        where: (table, { and, eq }) =>
-          and(
-            eq(table.organizationId, session.organizationId),
-            eq(table.integrationConnectionId, connectionId),
-          ),
+      expect(refreshResponse.status).toBe(400);
+      const responseBody = RefreshWebhookTriggerCapabilitiesBadRequestResponseSchema.parse(
+        await refreshResponse.json(),
+      );
+      expect(responseBody.code).toBe("INVALID_WEBHOOK_SOURCE_INPUT");
+      expect(responseBody.message).toContain("GitHub App webhook URL is");
+      expect(responseBody.message).toContain(
+        "https://other-control-plane.example.com/p/integration/webhooks/github-cloud/eps_other",
+      );
+
+      const webhookSource = await readGitHubWebhookSourceOrThrow(env, {
+        connectionId,
+        organizationId: session.organizationId,
       });
-      if (webhookSource === undefined) {
-        throw new Error("Expected GitHub App webhook source.");
-      }
-      expect(webhookSource.providerMetadata).toEqual({
-        [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
-          events: ["issues", "pull_request"],
-          permissions: [
-            { permission: "issues", access: "read" },
-            { permission: "metadata", access: "read" },
-            { permission: "pull_requests", access: "write" },
-            { permission: "pull_requests", access: "read" },
-          ],
-        },
-      });
+      expect(webhookSource.providerMetadata).toEqual({});
       expect(githubApi.requests).toEqual([
         {
           authorization: expect.stringMatching(/^Bearer [^.]+\.[^.]+\.[^.]+$/u),
@@ -261,6 +390,11 @@ describe.concurrent("GitHub App setup completion integration connections", () =>
           authorization: expect.stringMatching(/^Bearer [^.]+\.[^.]+\.[^.]+$/u),
           method: "GET",
           pathname: "/app/installations/12345",
+        },
+        {
+          authorization: expect.stringMatching(/^Bearer [^.]+\.[^.]+\.[^.]+$/u),
+          method: "GET",
+          pathname: "/app/hook/config",
         },
       ]);
     } finally {
@@ -388,6 +522,27 @@ async function createGitHubAppConnection(
   return createdConnection.id;
 }
 
+async function readGitHubWebhookSourceOrThrow(
+  env: IntegrationTestEnvironment,
+  input: {
+    connectionId: string;
+    organizationId: string;
+  },
+) {
+  const webhookSource = await env.controlPlaneDb.query.integrationWebhookSources.findFirst({
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.organizationId, input.organizationId),
+        eq(table.integrationConnectionId, input.connectionId),
+      ),
+  });
+  if (webhookSource === undefined) {
+    throw new Error("Expected GitHub App webhook source.");
+  }
+
+  return webhookSource;
+}
+
 async function startGitHubAppInstallation(
   env: IntegrationTestEnvironment,
   input: {
@@ -439,6 +594,7 @@ function createGitHubAppInstallationCompletePath(input: {
 }
 
 async function startGitHubApiServer(input: {
+  hookConfigResponse?: GitHubApiServerResponseInput;
   responseBody: unknown;
   statusCode?: number;
 }): Promise<StartedGitHubApiServer> {
@@ -455,9 +611,17 @@ async function startGitHubApiServer(input: {
         : {}),
     });
 
-    response.statusCode = input.statusCode ?? 200;
+    const responseInput =
+      requestUrl.pathname === "/app/hook/config" && input.hookConfigResponse !== undefined
+        ? resolveGitHubApiServerResponse(input.hookConfigResponse)
+        : {
+            body: input.responseBody,
+            ...(input.statusCode === undefined ? {} : { statusCode: input.statusCode }),
+          };
+
+    response.statusCode = responseInput.statusCode ?? 200;
     response.setHeader("content-type", "application/json");
-    response.end(JSON.stringify(input.responseBody));
+    response.end(JSON.stringify(responseInput.body));
   });
 
   await listen(server, { host, port });
@@ -467,6 +631,13 @@ async function startGitHubApiServer(input: {
     requests,
     stop: async () => close(server),
   };
+}
+
+function resolveGitHubApiServerResponse(input: GitHubApiServerResponseInput): {
+  body: unknown;
+  statusCode?: number;
+} {
+  return typeof input === "function" ? input() : input;
 }
 
 async function listen(server: Server, input: { host: string; port: number }): Promise<void> {

@@ -27,6 +27,13 @@ const GitHubAppInstallationTriggerCapabilitiesResponseSchema = z
   })
   .loose();
 
+const GitHubAppWebhookConfigResponseSchema = z
+  .object({
+    content_type: z.string().min(1),
+    url: z.url(),
+  })
+  .loose();
+
 function isGitHubAppInstallationConnection(connection: GitHubConnectionConfig): boolean {
   return connection.connection_method === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION;
 }
@@ -53,11 +60,12 @@ function expandGitHubPermissionCapability(input: {
   return [{ permission: input.permission, access: input.access }];
 }
 
-async function loadGitHubAppInstallationTriggerCapabilities(input: {
+async function loadVerifiedGitHubAppTriggerCapabilities(input: {
   apiBaseUrl: string;
   appId: string;
   appPrivateKeyPem: string;
   appSlug: string;
+  expectedWebhookUrl: string;
   installationId: string;
 }): Promise<Record<string, unknown>> {
   const numericInstallationId = Number(input.installationId);
@@ -73,19 +81,20 @@ async function loadGitHubAppInstallationTriggerCapabilities(input: {
     }),
   });
   const authentication = await appAuth({ type: "app" });
+  const appRequestHeaders = {
+    accept: "application/vnd.github+json",
+    authorization: `Bearer ${authentication.token}`,
+    "x-github-api-version": "2022-11-28",
+  } as const;
 
-  let responseJson: unknown;
+  let installationResponseJson: unknown;
   try {
-    const response = await request("GET /app/installations/{installation_id}", {
+    const installationResponse = await request("GET /app/installations/{installation_id}", {
       baseUrl: input.apiBaseUrl,
       installation_id: numericInstallationId,
-      headers: {
-        accept: "application/vnd.github+json",
-        authorization: `Bearer ${authentication.token}`,
-        "x-github-api-version": "2022-11-28",
-      },
+      headers: appRequestHeaders,
     });
-    responseJson = response.data;
+    installationResponseJson = installationResponse.data;
   } catch (error) {
     throw new Error(
       `GitHub App installation '${input.installationId}' trigger capabilities could not be refreshed: ${
@@ -94,7 +103,23 @@ async function loadGitHubAppInstallationTriggerCapabilities(input: {
     );
   }
 
-  const installation = GitHubAppInstallationTriggerCapabilitiesResponseSchema.parse(responseJson);
+  let hookConfigResponseJson: unknown;
+  try {
+    const hookConfigResponse = await request("GET /app/hook/config", {
+      baseUrl: input.apiBaseUrl,
+      headers: appRequestHeaders,
+    });
+    hookConfigResponseJson = hookConfigResponse.data;
+  } catch (error) {
+    throw new Error(
+      `GitHub App webhook config for installation '${input.installationId}' could not be refreshed: ${
+        error instanceof Error ? error.message : "GitHub API request failed."
+      }`,
+    );
+  }
+
+  const installation =
+    GitHubAppInstallationTriggerCapabilitiesResponseSchema.parse(installationResponseJson);
   if (installation.id.toString() !== input.installationId) {
     throw new Error(
       `GitHub App installation refresh returned installation '${installation.id.toString()}', expected '${input.installationId}'.`,
@@ -108,6 +133,18 @@ async function loadGitHubAppInstallationTriggerCapabilities(input: {
   if (installation.app_slug !== input.appSlug) {
     throw new Error(
       `GitHub App installation '${input.installationId}' belongs to app slug '${installation.app_slug}', expected '${input.appSlug}'.`,
+    );
+  }
+
+  const hookConfig = GitHubAppWebhookConfigResponseSchema.parse(hookConfigResponseJson);
+  if (hookConfig.url !== input.expectedWebhookUrl) {
+    throw new Error(
+      `GitHub App webhook URL is '${hookConfig.url}', expected '${input.expectedWebhookUrl}'. Update the GitHub App webhook URL, then sync again.`,
+    );
+  }
+  if (hookConfig.content_type !== "json") {
+    throw new Error(
+      `GitHub App webhook content type is '${hookConfig.content_type}', expected 'json'. Set the GitHub App webhook content type to JSON, then sync again.`,
     );
   }
 
@@ -164,12 +201,22 @@ export const GitHubWebhookSourceCapability: IntegrationWebhookSourceCapability<
       );
     }
 
+    const endpointKey = input.source.endpointKey;
+    if (endpointKey === undefined) {
+      throw new Error(`GitHub webhook source '${input.source.id}' is missing endpointKey.`);
+    }
+
     return {
-      providerMetadata: await loadGitHubAppInstallationTriggerCapabilities({
+      providerMetadata: await loadVerifiedGitHubAppTriggerCapabilities({
         apiBaseUrl: input.target.config.apiBaseUrl,
         appId: connectionConfig.app_id,
         appPrivateKeyPem,
         appSlug: connectionConfig.app_slug,
+        expectedWebhookUrl: buildIntegrationWebhookCallbackUrl({
+          controlPlaneBaseUrl: input.controlPlaneBaseUrl,
+          targetKey: input.targetKey,
+          endpointKey,
+        }),
         installationId: installationId.trim(),
       }),
     };

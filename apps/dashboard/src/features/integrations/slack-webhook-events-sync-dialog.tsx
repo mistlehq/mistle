@@ -11,13 +11,11 @@ import {
   FieldHeader,
   FieldLabel,
   Input,
-  Notice,
   TextLink,
 } from "@mistle/ui";
 import { useState, type SyntheticEvent } from "react";
 
 export function SlackWebhookEventsSyncDialog(input: {
-  errorMessage: string | null;
   isOpen: boolean;
   isPending: boolean;
   onOpenChange: (open: boolean) => void;
@@ -64,12 +62,6 @@ export function SlackWebhookEventsSyncDialog(input: {
           </DialogHeader>
 
           <div className="flex flex-col gap-4">
-            {input.errorMessage === null ? null : (
-              <Notice title="Could not sync webhook events" variant="alert">
-                {input.errorMessage}
-              </Notice>
-            )}
-
             <Field>
               <FieldHeader>
                 <FieldLabel htmlFor="slack-webhook-events-sync-token" required>

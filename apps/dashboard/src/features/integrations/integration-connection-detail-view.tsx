@@ -934,6 +934,11 @@ function WebhookSourcesSection(input: {
       {input.state.deleteErrorMessage === null ? null : (
         <Notice variant="alert">{input.state.deleteErrorMessage}</Notice>
       )}
+      {input.state.syncErrorMessage == null ? null : (
+        <Notice title="Could not sync webhook events" variant="alert">
+          {input.state.syncErrorMessage}
+        </Notice>
+      )}
       {input.state.revealedWebhookSecret === null ? null : (
         <Notice title="Webhook secret">
           <code className="break-all text-xs">{input.state.revealedWebhookSecret}</code>

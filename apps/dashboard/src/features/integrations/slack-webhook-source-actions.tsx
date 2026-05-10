@@ -9,7 +9,6 @@ import { SlackWebhookEventsSyncDialog } from "./slack-webhook-events-sync-dialog
 export function useSlackWebhookSourceActions(input: {
   connections: readonly IntegrationConnection[];
   refreshTriggerCapabilities: IntegrationWebhookSourceActionsRefreshTriggerCapabilities;
-  refreshTriggerCapabilitiesError: { connectionId: string; message: string } | null;
   refreshingTriggerCapabilitiesConnectionId: string | null;
 }): {
   dialog: ReactNode;
@@ -26,9 +25,11 @@ export function useSlackWebhookSourceActions(input: {
       }
 
       const disabledMessage = resolveSlackWebhookEventsSyncDisabledMessage(connection);
+      const isPending =
+        input.refreshingTriggerCapabilitiesConnectionId === actionInput.connectionId;
       const button = (
         <Button
-          disabled={disabledMessage !== null}
+          disabled={isPending || disabledMessage !== null}
           onClick={() => {
             setSyncConnectionId(actionInput.connectionId);
           }}
@@ -37,7 +38,7 @@ export function useSlackWebhookSourceActions(input: {
           type="button"
           variant="outline"
         >
-          Sync webhook events
+          {isPending ? "Syncing..." : "Sync webhook events"}
         </Button>
       );
 
@@ -52,17 +53,12 @@ export function useSlackWebhookSourceActions(input: {
         </Tooltip>
       );
     },
-    [input.connections],
+    [input.connections, input.refreshingTriggerCapabilitiesConnectionId],
   );
 
   return {
     dialog: (
       <SlackWebhookEventsSyncDialog
-        errorMessage={
-          input.refreshTriggerCapabilitiesError?.connectionId === syncConnectionId
-            ? input.refreshTriggerCapabilitiesError.message
-            : null
-        }
         isOpen={syncConnectionId !== null}
         isPending={input.refreshingTriggerCapabilitiesConnectionId === syncConnectionId}
         onOpenChange={(open) => {
@@ -75,17 +71,11 @@ export function useSlackWebhookSourceActions(input: {
             throw new Error("Slack webhook events sync requires an integration connection.");
           }
 
-          input.refreshTriggerCapabilities(
-            {
-              body: { appConfigToken },
-              connectionId: syncConnectionId,
-            },
-            {
-              onSuccess: () => {
-                setSyncConnectionId(null);
-              },
-            },
-          );
+          input.refreshTriggerCapabilities({
+            body: { appConfigToken },
+            connectionId: syncConnectionId,
+          });
+          setSyncConnectionId(null);
         }}
       />
     ),

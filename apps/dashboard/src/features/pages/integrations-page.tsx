@@ -162,7 +162,6 @@ export function IntegrationsPage() {
   const webhookSourceActions = useIntegrationWebhookSourceActions({
     connections: directoryState.selectedDetailConnections,
     refreshTriggerCapabilities: webhookSourceState.refreshTriggerCapabilities,
-    refreshTriggerCapabilitiesError: webhookSourceState.refreshTriggerCapabilitiesError,
     refreshingTriggerCapabilitiesConnectionId:
       webhookSourceState.refreshingTriggerCapabilitiesConnectionId,
   });

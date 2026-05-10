@@ -10,14 +10,14 @@ import { useSlackWebhookSourceActions } from "./slack-webhook-source-actions.js"
 
 function SlackWebhookSourceActionsHarness(input: { connection: IntegrationConnection }) {
   const [syncedValue, setSyncedValue] = useState<string | null>(null);
+  const [pendingConnectionId, setPendingConnectionId] = useState<string | null>(null);
   const flow = useSlackWebhookSourceActions({
     connections: [input.connection],
-    refreshTriggerCapabilities: (payload, options) => {
+    refreshTriggerCapabilities: (payload) => {
       setSyncedValue(`${payload.connectionId}:${String(payload.body["appConfigToken"])}`);
-      options?.onSuccess?.();
+      setPendingConnectionId(payload.connectionId);
     },
-    refreshTriggerCapabilitiesError: null,
-    refreshingTriggerCapabilitiesConnectionId: null,
+    refreshingTriggerCapabilitiesConnectionId: pendingConnectionId,
   });
 
   return (
@@ -65,6 +65,7 @@ describe("useSlackWebhookSourceActions", () => {
 
     expect(screen.getByText("Synced conn_slack:xoxe.xoxp-temporary-token")).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("button", { name: "Syncing..." }).hasAttribute("disabled")).toBe(true);
   });
 
   it("explains disabled sync for Slack connections without a saved app id", () => {

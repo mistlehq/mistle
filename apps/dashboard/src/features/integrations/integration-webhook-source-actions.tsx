@@ -8,7 +8,6 @@ import { useSlackWebhookSourceActions } from "./slack-webhook-source-actions.js"
 type IntegrationWebhookSourceActionsInput = {
   connections: readonly IntegrationConnection[];
   refreshTriggerCapabilities: IntegrationWebhookSourceActionsRefreshTriggerCapabilities;
-  refreshTriggerCapabilitiesError: { connectionId: string; message: string } | null;
   refreshingTriggerCapabilitiesConnectionId: string | null;
 };
 

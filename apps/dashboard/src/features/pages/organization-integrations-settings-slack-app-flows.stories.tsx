@@ -524,11 +524,6 @@ function SlackConnectedWebhookVerifiedRefreshStory({
   const [webhookSources, setWebhookSources] = useState<readonly IntegrationWebhookSource[]>(
     () => initialWebhookSources,
   );
-  const webhookSourceStateByConnectionId = new Map(storyProps.webhookSourceStateByConnectionId);
-  webhookSourceStateByConnectionId.set(selectedConnection.id, {
-    ...initialWebhookSourceState,
-    items: webhookSources,
-  });
   const storyConnections = storyProps.connections.map((connection) => ({
     id: connection.id,
     targetKey: "slack-default",
@@ -581,6 +576,17 @@ function SlackConnectedWebhookVerifiedRefreshStory({
       });
     },
   });
+  const webhookSourceStateByConnectionId = new Map(storyProps.webhookSourceStateByConnectionId);
+  webhookSourceStateByConnectionId.set(selectedConnection.id, {
+    ...initialWebhookSourceState,
+    items: webhookSources,
+    syncErrorMessage:
+      refreshMutation.isError && refreshMutation.variables?.connectionId === selectedConnection.id
+        ? refreshMutation.error instanceof Error
+          ? refreshMutation.error.message
+          : "Could not sync webhook events."
+        : null,
+  });
   const slackWebhookSourceActions = useSlackWebhookSourceActions({
     connections: storyConnections,
     refreshTriggerCapabilities: (payload, options) => {
@@ -590,16 +596,6 @@ function SlackConnectedWebhookVerifiedRefreshStory({
         },
       });
     },
-    refreshTriggerCapabilitiesError:
-      refreshMutation.isError && refreshMutation.variables !== undefined
-        ? {
-            connectionId: refreshMutation.variables.connectionId,
-            message:
-              refreshMutation.error instanceof Error
-                ? refreshMutation.error.message
-                : "Could not sync webhook events.",
-          }
-        : null,
     refreshingTriggerCapabilitiesConnectionId:
       refreshMutation.isPending && refreshMutation.variables !== undefined
         ? refreshMutation.variables.connectionId
