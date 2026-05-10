@@ -189,6 +189,7 @@ const controlPlaneApiEnvConfig = {
     },
   },
   sandbox: {
+    provider: "docker",
     defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
     gatewayWsUrl: globalDevelopmentConfig.sandbox.gatewayWsUrl,
     bootstrap: globalDevelopmentConfig.sandbox.bootstrap,
@@ -672,7 +673,7 @@ describe("loadConfig integrations", () => {
     ).toBe(dataPlaneWorkflowMigrationUrl);
   });
 
-  it("accepts shared E2B API key env while the selected sandbox provider is docker", () => {
+  it("does not include shared E2B API key env in data-plane API config", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_API,
       configPath: tomlConfigFixturePath,
@@ -683,10 +684,6 @@ describe("loadConfig integrations", () => {
 
     expect(config.app.sandbox).toEqual({
       ...dataPlaneApiFixtureConfig.sandbox,
-      e2b: {
-        apiKey: "fixture-e2b-api-key",
-        domain: "e2b.app",
-      },
     });
   });
 

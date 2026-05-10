@@ -122,26 +122,18 @@ export const PartialDataPlaneApiConfigSchema = z
 
 const DataPlaneApiProviderRequirementMessages = {
   DOCKER: "sandbox.docker is required when sandbox.provider is 'docker'.",
-  E2B: "sandbox.e2b is required when sandbox.provider is 'e2b'.",
 } as const;
 
 export function getDataPlaneApiSandboxProviderValidationIssue(input: {
   appSandbox: Pick<DataPlaneApiConfig["sandbox"], "provider" | "docker" | "e2b">;
 }): {
-  path: readonly ["sandbox", "docker"] | readonly ["sandbox", "e2b"];
+  path: readonly ["sandbox", "docker"];
   message: string;
 } | null {
   if (input.appSandbox.provider === "docker" && input.appSandbox.docker === undefined) {
     return {
       path: ["sandbox", "docker"],
       message: DataPlaneApiProviderRequirementMessages.DOCKER,
-    };
-  }
-
-  if (input.appSandbox.provider === "e2b" && input.appSandbox.e2b === undefined) {
-    return {
-      path: ["sandbox", "e2b"],
-      message: DataPlaneApiProviderRequirementMessages.E2B,
     };
   }
 

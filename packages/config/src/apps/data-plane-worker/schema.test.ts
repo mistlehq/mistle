@@ -212,7 +212,22 @@ describe("DataPlaneWorkerSandboxStorageArchilConfigSchema", () => {
 });
 
 describe("getDataPlaneWorkerSandboxProviderValidationIssue", () => {
-  it("requires E2B settings when the worker provider is e2b", () => {
+  it("requires docker settings when the worker provider is docker", () => {
+    const issue = getDataPlaneWorkerSandboxProviderValidationIssue({
+      appSandbox: {
+        provider: "docker",
+        internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+        bootstrap: SandboxTokenConfig,
+      },
+    });
+
+    expect(issue).toEqual({
+      path: ["sandbox", "docker"],
+      message: "sandbox.docker is required when sandbox.provider is 'docker'.",
+    });
+  });
+
+  it("does not require E2B credentials for the data-plane worker", () => {
     const issue = getDataPlaneWorkerSandboxProviderValidationIssue({
       appSandbox: {
         provider: "e2b",
@@ -221,10 +236,7 @@ describe("getDataPlaneWorkerSandboxProviderValidationIssue", () => {
       },
     });
 
-    expect(issue).toEqual({
-      path: ["sandbox", "e2b"],
-      message: "sandbox.e2b is required when sandbox.provider is 'e2b'.",
-    });
+    expect(issue).toBeNull();
   });
 });
 

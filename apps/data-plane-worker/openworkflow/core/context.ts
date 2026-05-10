@@ -9,7 +9,6 @@ import {
 } from "@mistle/db/data-plane";
 import { createDataPlaneTestSchemaName } from "@mistle/db/test-environment";
 import type { MistleLogger } from "@mistle/logging";
-import type { SandboxAdapter, SandboxRuntimeControl } from "@mistle/sandbox";
 import { systemClock, systemSleeper, type Clock, type Sleeper } from "@mistle/time";
 import { Pool } from "pg";
 
@@ -18,10 +17,6 @@ import { createSandboxRuntimeStateReader } from "../../runtime-state/create-sand
 import type { SandboxRuntimeStateReader } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import { createDataPlaneWorkerRuntimeConfig, type DataPlaneWorkerRuntimeConfig } from "./config.js";
 import { getOpenWorkflowRuntime, type OpenWorkflowRuntime } from "./runtime.js";
-import {
-  createSandboxRuntimeAdapter,
-  createSandboxRuntimeControl,
-} from "./sandbox-runtime-adapter.js";
 import {
   createSandboxRuntimeProviderResolver,
   type SandboxRuntimeProviderResolver,
@@ -37,8 +32,6 @@ export type WorkflowContext = {
   db: DataPlaneDatabase;
   tables: DataPlaneTables;
   dbPool: Pool;
-  sandboxAdapter: SandboxAdapter;
-  sandboxRuntimeControl: SandboxRuntimeControl;
   sandboxRuntimeProviderResolver: SandboxRuntimeProviderResolver;
   runtimeStateReader: SandboxRuntimeStateReader;
   controlPlaneInternalClient: ControlPlaneInternalClient;
@@ -96,11 +89,8 @@ async function createWorkflowContext(input?: {
       connectionString: workerConfig.database.url,
     });
   const ownsDbPool = input?.dbPool === undefined;
-  let sandboxRuntimeControl: SandboxRuntimeControl | undefined;
 
   try {
-    sandboxRuntimeControl = createSandboxRuntimeControl(config);
-    const hostedSandboxRuntimeControl = sandboxRuntimeControl;
     const controlPlaneInternalClient =
       testIsolation === undefined
         ? new ControlPlaneInternalClient({
@@ -141,8 +131,6 @@ async function createWorkflowContext(input?: {
         db,
         tables,
         dbPool,
-        sandboxAdapter: createSandboxRuntimeAdapter(config),
-        sandboxRuntimeControl,
         sandboxRuntimeProviderResolver: createSandboxRuntimeProviderResolver({
           config,
           controlPlaneInternalClient,
@@ -154,14 +142,12 @@ async function createWorkflowContext(input?: {
         sleeper: systemSleeper,
       },
       close: async () => {
-        await hostedSandboxRuntimeControl.close();
         if (ownsDbPool) {
           await dbPool.end();
         }
       },
     };
   } catch (error) {
-    await sandboxRuntimeControl?.close();
     if (ownsDbPool) {
       await dbPool.end();
     }
@@ -215,7 +201,6 @@ export async function closeWorkflowContext(): Promise<void> {
 
   closeWorkflowContextPromise = (async () => {
     const context = await contextPromise;
-    await context.sandboxRuntimeControl.close();
     await context.dbPool.end();
     workflowContextPromise = undefined;
     closeWorkflowContextPromise = undefined;

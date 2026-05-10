@@ -105,4 +105,14 @@ describe("getDataPlaneApiSandboxProviderValidationIssue", () => {
       message: "sandbox.docker is required when sandbox.provider is 'docker'.",
     });
   });
+
+  it("does not require E2B credentials for the data-plane API", () => {
+    const issue = getDataPlaneApiSandboxProviderValidationIssue({
+      appSandbox: {
+        provider: "e2b",
+      },
+    });
+
+    expect(issue).toBeNull();
+  });
 });

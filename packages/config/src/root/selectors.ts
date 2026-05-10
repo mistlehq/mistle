@@ -322,14 +322,6 @@ export function selectDataPlaneApiConfig(config: Config): DataPlaneApiConfig {
             socketPath: config.sandbox.docker.socket_path,
           }
         : undefined,
-      ...(config.sandbox.e2b === undefined
-        ? {}
-        : {
-            e2b: {
-              apiKey: config.sandbox.e2b.api_key,
-              domain: config.sandbox.e2b.domain,
-            },
-          }),
     },
   };
 }
@@ -410,16 +402,6 @@ export function selectDataPlaneWorkerConfig(config: Config): DataPlaneWorkerConf
               socketPath: config.sandbox.docker.socket_path,
               networkName: config.sandbox.docker.network_name,
             },
-      ...(config.sandbox.e2b === undefined
-        ? {}
-        : {
-            e2b: {
-              apiKey: config.sandbox.e2b.api_key,
-              domain: config.sandbox.e2b.domain,
-              cpuCount: config.sandbox.e2b.cpu_count,
-              memoryMb: config.sandbox.e2b.memory_mb,
-            },
-          }),
     },
     sandboxStorage: buildSandboxStorage(config),
     internalAuth: {

@@ -61,6 +61,14 @@ describe("exportServiceConfigToEnv", () => {
       },
       valueFormat: "json",
     });
+    expectEntry(entries, {
+      name: "MISTLE_SANDBOX_E2B_API_KEY",
+      value: "replace-with-e2b-api-key",
+    });
+    expectEntry(entries, {
+      name: "MISTLE_SANDBOX_E2B_DOMAIN",
+      value: "e2b.app",
+    });
   });
 
   it("exports control plane worker config to resource env entries", () => {
@@ -123,7 +131,7 @@ describe("exportServiceConfigToEnv", () => {
       name: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_INTERNAL_URL",
       value: "http://data-plane-gateway:8084",
     });
-    expectEntry(entries, {
+    expect(entries).not.toContainEqual({
       name: "MISTLE_SANDBOX_E2B_API_KEY",
       value: "replace-with-e2b-api-key",
     });
@@ -177,7 +185,7 @@ describe("exportServiceConfigToEnv", () => {
       name: "MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL",
       value: "postgresql://mistle:replace-with-password@db:5432/mistle",
     });
-    expectEntry(entries, {
+    expect(entries).not.toContainEqual({
       name: "MISTLE_SANDBOX_E2B_CPU_COUNT",
       value: 4,
     });
