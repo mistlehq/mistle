@@ -770,6 +770,28 @@ function buildAffectedRustTestCommand(
   return null;
 }
 
+function hasRustPackageChangedFiles(
+  plan: ValidationPlan,
+  workspacePackage: WorkspacePackage,
+): boolean {
+  return plan.changedFiles.some((filePath) =>
+    filePath.startsWith(`${workspacePackage.relativePath}/`),
+  );
+}
+
+function shouldSkipRustPackageTestForPlan(
+  plan: ValidationPlan,
+  workspacePackage: WorkspacePackage,
+): boolean {
+  const reasons = plan.packageReasons.get(workspacePackage.name) ?? [];
+
+  return (
+    AFFECTED_RUST_TEST_PACKAGE_NAMES.has(workspacePackage.name) &&
+    reasons.includes(ALL_PACKAGES_REASON) &&
+    hasRustPackageChangedFiles(plan, workspacePackage) === false
+  );
+}
+
 function buildAffectedTestCommands(
   plan: ValidationPlan,
   workspacePackages: readonly WorkspacePackage[],
@@ -780,6 +802,11 @@ function buildAffectedTestCommands(
   for (const workspacePackage of plan.selectedPackages) {
     if (workspacePackage.policySteps.includes("test") === false) {
       turboPackages.push(workspacePackage);
+      continue;
+    }
+
+    const reasons = plan.packageReasons.get(workspacePackage.name) ?? [];
+    if (shouldSkipRustPackageTestForPlan(plan, workspacePackage)) {
       continue;
     }
 
@@ -794,7 +821,6 @@ function buildAffectedTestCommands(
       continue;
     }
 
-    const reasons = plan.packageReasons.get(workspacePackage.name) ?? [];
     if (reasons.includes(ALL_PACKAGES_REASON)) {
       turboPackages.push(workspacePackage);
       continue;
@@ -940,13 +966,17 @@ function getWorkspacePlanSteps(workspacePackage: WorkspacePackage, steps: readon
 }
 
 function groupWorkspaceChecks(
+  plan: ValidationPlan,
   workspacePackages: readonly WorkspacePackage[],
   steps: readonly Step[],
 ): Map<string, string[]> {
   const groupedPackages = new Map<string, string[]>();
 
   for (const workspacePackage of workspacePackages) {
-    const workspacePlannedSteps = getWorkspacePlanSteps(workspacePackage, steps);
+    const workspacePlannedSteps = getWorkspacePlanSteps(workspacePackage, steps).filter(
+      (step) =>
+        step !== "test" || shouldSkipRustPackageTestForPlan(plan, workspacePackage) === false,
+    );
     if (workspacePlannedSteps.length === 0) {
       continue;
     }
@@ -1016,7 +1046,7 @@ function printPlan(
   }
 
   console.log(`Validation plan (${steps.join(", ")}):`);
-  const groupedPackages = groupWorkspaceChecks(plan.selectedPackages, steps);
+  const groupedPackages = groupWorkspaceChecks(plan, plan.selectedPackages, steps);
   const hasWorkspaceChecks = groupedPackages.size > 0;
   const repoCheckLabels = getAllRepoCheckLabels(plan, steps);
   const hasRepoChecks = repoCheckLabels.length > 0;
