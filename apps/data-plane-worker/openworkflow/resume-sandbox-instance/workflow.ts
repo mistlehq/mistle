@@ -39,6 +39,29 @@ const ResumeSandboxFailureCodes = {
   STATUS_TRANSITION_TO_RUNNING_FAILED: "status_transition_to_running_failed",
 } as const;
 
+function createResumeWorkflowLogFields(input: {
+  sandboxInstanceId: string;
+  organizationId?: string | undefined;
+  runtimeProvider?: SandboxProvider | undefined;
+  providerSandboxId?: string | null | undefined;
+  persistenceMode?: string | undefined;
+  computeGeneration?: number | undefined;
+}) {
+  return {
+    eventName: "sandbox_instance.resume_phase",
+    sandboxInstanceId: input.sandboxInstanceId,
+    ...(input.organizationId === undefined ? {} : { organizationId: input.organizationId }),
+    ...(input.runtimeProvider === undefined ? {} : { runtimeProvider: input.runtimeProvider }),
+    ...(input.providerSandboxId === undefined || input.providerSandboxId === null
+      ? {}
+      : { providerSandboxId: input.providerSandboxId }),
+    ...(input.persistenceMode === undefined ? {} : { persistenceMode: input.persistenceMode }),
+    ...(input.computeGeneration === undefined
+      ? {}
+      : { computeGeneration: input.computeGeneration }),
+  };
+}
+
 export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
   ResumeSandboxInstanceWorkflowSpec,
   async ({ input, step }): Promise<ResumeSandboxInstanceWorkflowOutput> => {
@@ -50,9 +73,24 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
 
     function rethrowDurableStepErrorForRetry(error: unknown): void {
       if (shouldRethrowDurableStepErrorForRetry(error)) {
+        logger.warn(
+          {
+            eventName: "sandbox_instance.resume_step_retry",
+            sandboxInstanceId: input.sandboxInstanceId,
+            err: error,
+          },
+          "Retrying sandbox resume workflow after durable step failure.",
+        );
         throw error;
       }
     }
+
+    logger.info(
+      createResumeWorkflowLogFields({
+        sandboxInstanceId: input.sandboxInstanceId,
+      }),
+      "Starting sandbox instance resume workflow.",
+    );
 
     const resumableSandboxInstance = await step.run(
       { name: "resolve-resumable-sandbox-instance-state" },
@@ -66,16 +104,45 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
     );
 
     if (resumableSandboxInstance === null) {
+      logger.info(
+        createResumeWorkflowLogFields({
+          sandboxInstanceId: input.sandboxInstanceId,
+        }),
+        "Skipping sandbox instance resume workflow because sandbox is already active.",
+      );
       return {
         sandboxInstanceId: input.sandboxInstanceId,
       };
     }
 
     const resumableSandboxState = resumableSandboxInstance;
+    logger.info(
+      createResumeWorkflowLogFields({
+        sandboxInstanceId: input.sandboxInstanceId,
+        organizationId: resumableSandboxState.organizationId,
+        runtimeProvider: resumableSandboxState.runtimeProvider,
+        providerSandboxId: resumableSandboxState.providerSandboxId,
+        persistenceMode: resumableSandboxState.persistenceMode,
+        computeGeneration: resumableSandboxState.computeGeneration,
+      }),
+      "Resolved resumable sandbox instance state.",
+    );
+
     const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve(
       createResolveSandboxRuntimeInput(resumableSandboxState),
     );
 
+    logger.info(
+      createResumeWorkflowLogFields({
+        sandboxInstanceId: input.sandboxInstanceId,
+        organizationId: resumableSandboxState.organizationId,
+        runtimeProvider: resumableSandboxState.runtimeProvider,
+        providerSandboxId: resumableSandboxState.providerSandboxId,
+        persistenceMode: resumableSandboxState.persistenceMode,
+        computeGeneration: resumableSandboxState.computeGeneration,
+      }),
+      "Marking sandbox instance as starting before resume.",
+    );
     await step.run({ name: "mark-sandbox-instance-starting" }, async () => {
       await markSandboxInstanceStarting({
         db: ctx.db,
@@ -88,6 +155,17 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       const existingProviderSandboxId = resumableSandboxState.providerSandboxId;
       let existingResumeFailureHandled = false;
       try {
+        logger.info(
+          createResumeWorkflowLogFields({
+            sandboxInstanceId: input.sandboxInstanceId,
+            organizationId: resumableSandboxState.organizationId,
+            runtimeProvider: resumableSandboxState.runtimeProvider,
+            providerSandboxId: existingProviderSandboxId,
+            persistenceMode: resumableSandboxState.persistenceMode,
+            computeGeneration: resumableSandboxState.computeGeneration,
+          }),
+          "Resuming existing sandbox provider compute.",
+        );
         const resumedRuntime = await step.run(
           { name: "resume-existing-sandbox-compute" },
           async () => {
@@ -117,8 +195,33 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           },
         );
 
+        logger.info(
+          createResumeWorkflowLogFields({
+            sandboxInstanceId: input.sandboxInstanceId,
+            organizationId: resumableSandboxState.organizationId,
+            runtimeProvider: resumableSandboxState.runtimeProvider,
+            providerSandboxId: existingProviderSandboxId,
+            persistenceMode: resumableSandboxState.persistenceMode,
+            computeGeneration: resumableSandboxState.computeGeneration,
+          }),
+          resumedRuntime === null
+            ? "Existing sandbox provider compute was missing; switching to replacement resume."
+            : "Resumed existing sandbox provider compute.",
+        );
+
         if (resumedRuntime !== null) {
           try {
+            logger.info(
+              createResumeWorkflowLogFields({
+                sandboxInstanceId: input.sandboxInstanceId,
+                organizationId: resumableSandboxState.organizationId,
+                runtimeProvider: resumedRuntime.runtimeProvider,
+                providerSandboxId: resumedRuntime.providerSandboxId,
+                persistenceMode: resumableSandboxState.persistenceMode,
+                computeGeneration: resumableSandboxState.computeGeneration,
+              }),
+              "Attaching sandbox storage before resumed runtime initialization.",
+            );
             await step.run({ name: "attach-resumed-sandbox-storage" }, async () => {
               await attachSandboxStorage(
                 {
@@ -140,6 +243,17 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 },
               );
             });
+            logger.info(
+              createResumeWorkflowLogFields({
+                sandboxInstanceId: input.sandboxInstanceId,
+                organizationId: resumableSandboxState.organizationId,
+                runtimeProvider: resumedRuntime.runtimeProvider,
+                providerSandboxId: resumedRuntime.providerSandboxId,
+                persistenceMode: resumableSandboxState.persistenceMode,
+                computeGeneration: resumableSandboxState.computeGeneration,
+              }),
+              "Attached sandbox storage before resumed runtime initialization.",
+            );
           } catch (error) {
             rethrowDurableStepErrorForRetry(error);
             existingResumeFailureHandled = true;
@@ -215,6 +329,17 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           }
 
           try {
+            logger.info(
+              createResumeWorkflowLogFields({
+                sandboxInstanceId: input.sandboxInstanceId,
+                organizationId: resumableSandboxState.organizationId,
+                runtimeProvider: resumedRuntime.runtimeProvider,
+                providerSandboxId: resumedRuntime.providerSandboxId,
+                persistenceMode: resumableSandboxState.persistenceMode,
+                computeGeneration: resumableSandboxState.computeGeneration,
+              }),
+              "Initializing resumed sandbox runtime.",
+            );
             await step.run({ name: "initialize-resumed-sandbox-runtime" }, async () => {
               await resumeSandboxRuntime(
                 {
@@ -234,6 +359,17 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 },
               );
             });
+            logger.info(
+              createResumeWorkflowLogFields({
+                sandboxInstanceId: input.sandboxInstanceId,
+                organizationId: resumableSandboxState.organizationId,
+                runtimeProvider: resumedRuntime.runtimeProvider,
+                providerSandboxId: resumedRuntime.providerSandboxId,
+                persistenceMode: resumableSandboxState.persistenceMode,
+                computeGeneration: resumableSandboxState.computeGeneration,
+              }),
+              "Initialized resumed sandbox runtime.",
+            );
           } catch (error) {
             rethrowDurableStepErrorForRetry(error);
             existingResumeFailureHandled = true;
@@ -319,6 +455,17 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
 
           let resumedSandboxRuntimeReady: boolean;
           try {
+            logger.info(
+              createResumeWorkflowLogFields({
+                sandboxInstanceId: input.sandboxInstanceId,
+                organizationId: resumableSandboxState.organizationId,
+                runtimeProvider: resumedRuntime.runtimeProvider,
+                providerSandboxId: resumedRuntime.providerSandboxId,
+                persistenceMode: resumableSandboxState.persistenceMode,
+                computeGeneration: resumableSandboxState.computeGeneration,
+              }),
+              "Waiting for resumed sandbox runtime readiness.",
+            );
             resumedSandboxRuntimeReady = await step.run(
               { name: "wait-for-resumed-sandbox-runtime-readiness" },
               async () => {
@@ -334,6 +481,20 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                   },
                 );
               },
+            );
+            logger.info(
+              {
+                ...createResumeWorkflowLogFields({
+                  sandboxInstanceId: input.sandboxInstanceId,
+                  organizationId: resumableSandboxState.organizationId,
+                  runtimeProvider: resumedRuntime.runtimeProvider,
+                  providerSandboxId: resumedRuntime.providerSandboxId,
+                  persistenceMode: resumableSandboxState.persistenceMode,
+                  computeGeneration: resumableSandboxState.computeGeneration,
+                }),
+                didSandboxBecomeReady: resumedSandboxRuntimeReady,
+              },
+              "Finished waiting for resumed sandbox runtime readiness.",
             );
           } catch (error) {
             rethrowDurableStepErrorForRetry(error);
@@ -479,6 +640,17 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           }
 
           try {
+            logger.info(
+              createResumeWorkflowLogFields({
+                sandboxInstanceId: input.sandboxInstanceId,
+                organizationId: resumableSandboxState.organizationId,
+                runtimeProvider: resumedRuntime.runtimeProvider,
+                providerSandboxId: resumedRuntime.providerSandboxId,
+                persistenceMode: resumableSandboxState.persistenceMode,
+                computeGeneration: resumableSandboxState.computeGeneration,
+              }),
+              "Marking resumed sandbox instance as running.",
+            );
             await step.run({ name: "mark-resumed-sandbox-instance-running" }, async () => {
               await markSandboxInstanceRunning(
                 {
@@ -490,6 +662,17 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 },
               );
             });
+            logger.info(
+              createResumeWorkflowLogFields({
+                sandboxInstanceId: input.sandboxInstanceId,
+                organizationId: resumableSandboxState.organizationId,
+                runtimeProvider: resumedRuntime.runtimeProvider,
+                providerSandboxId: resumedRuntime.providerSandboxId,
+                persistenceMode: resumableSandboxState.persistenceMode,
+                computeGeneration: resumableSandboxState.computeGeneration,
+              }),
+              "Sandbox resume workflow completed successfully.",
+            );
           } catch (error) {
             rethrowDurableStepErrorForRetry(error);
             existingResumeFailureHandled = true;
