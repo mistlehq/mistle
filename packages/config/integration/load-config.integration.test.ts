@@ -157,6 +157,7 @@ const controlPlaneApiEnvConfig = {
     secret: "test-secret",
     trustedOrigins: ["http://127.0.0.1:3000"],
     allowSignups: true,
+    selfServiceOrganizationCreationEnabled: false,
     otpLength: 6,
     otpExpiresInSeconds: 300,
     otpAllowedAttempts: 3,

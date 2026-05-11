@@ -125,6 +125,10 @@ const ControlPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS",
     valueFormat: "csv",
   },
+  {
+    path: ["auth", "selfServiceOrganizationCreationEnabled"],
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_SELF_SERVICE_ORGANIZATION_CREATION_ENABLED",
+  },
   { path: ["auth", "otpLength"], envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_OTP_LENGTH" },
   {
     path: ["auth", "otpExpiresInSeconds"],

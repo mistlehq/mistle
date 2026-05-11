@@ -10,6 +10,12 @@ import { authMethodsResponseSchema } from "../src/auth/get-auth-methods/index.js
 const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
+const itWithoutSelfServiceOrganizationCreation = createIntegrationTest({
+  services: ["control-plane-api"],
+  auth: {
+    selfServiceOrganizationCreation: "disabled",
+  },
+});
 
 describe.concurrent("auth methods integration", () => {
   it("returns public dashboard auth method availability", async ({ env }) => {
@@ -21,6 +27,27 @@ describe.concurrent("auth methods integration", () => {
         emailOtp: true,
         google: false,
       },
+      organization: {
+        selfServiceCreationEnabled: true,
+      },
     });
   });
+
+  itWithoutSelfServiceOrganizationCreation(
+    "returns public organization creation availability when disabled",
+    async ({ env }) => {
+      const response = await env.controlPlaneApi.http.fetch("/v1/auth/methods");
+
+      expect(response.status).toBe(200);
+      expect(authMethodsResponseSchema.parse(await response.json())).toStrictEqual({
+        methods: {
+          emailOtp: true,
+          google: false,
+        },
+        organization: {
+          selfServiceCreationEnabled: false,
+        },
+      });
+    },
+  );
 });

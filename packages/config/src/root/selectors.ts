@@ -173,6 +173,8 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
       secret: config.services.control_plane_api.auth.secret,
       trustedOrigins: config.services.control_plane_api.auth.trusted_origins,
       allowSignups: config.services.control_plane_api.auth.allow_signups,
+      selfServiceOrganizationCreationEnabled:
+        config.services.control_plane_api.auth.self_service_organization_creation_enabled,
       otpLength: config.services.control_plane_api.auth.otp.length,
       otpExpiresInSeconds: config.services.control_plane_api.auth.otp.expires_in_seconds,
       otpAllowedAttempts: config.services.control_plane_api.auth.otp.allowed_attempts,

@@ -406,6 +406,9 @@ export interface paths {
                 emailOtp: true;
                 google: boolean;
               };
+              organization: {
+                selfServiceCreationEnabled: boolean;
+              };
             };
           };
         };

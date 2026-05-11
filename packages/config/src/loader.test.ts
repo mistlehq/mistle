@@ -238,6 +238,20 @@ describe("loadConfig", () => {
       migrationUrl: "postgresql://direct.example/mistle",
       namespaceId: "staging",
     });
+    expect(loadedConfig.app.auth.selfServiceOrganizationCreationEnabled).toBe(false);
+  });
+
+  it("loads explicit self-service organization creation opt-in from env", () => {
+    const loadedConfig = loadConfig({
+      app: AppIds.CONTROL_PLANE_API,
+      includeGlobal: false,
+      env: {
+        ...buildControlPlaneApiServiceEnv(),
+        MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_SELF_SERVICE_ORGANIZATION_CREATION_ENABLED: "true",
+      },
+    });
+
+    expect(loadedConfig.app.auth.selfServiceOrganizationCreationEnabled).toBe(true);
   });
 
   it("loads env data-plane API Docker config when shared E2B env is also present", () => {

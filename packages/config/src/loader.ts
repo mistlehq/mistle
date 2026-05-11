@@ -408,6 +408,11 @@ const ControlPlaneApiEnvDescriptors = [
     parse: parseStrictBooleanEnv,
   },
   {
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_SELF_SERVICE_ORGANIZATION_CREATION_ENABLED",
+    path: ["auth", "selfServiceOrganizationCreationEnabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_OTP_LENGTH",
     path: ["auth", "otpLength"],
     parse: parseNumberEnv,

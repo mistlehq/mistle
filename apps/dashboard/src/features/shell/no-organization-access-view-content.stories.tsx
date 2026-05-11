@@ -11,6 +11,7 @@ const meta = {
     layout: "fullscreen",
   },
   args: {
+    canCreateOrganization: true,
     createOrganizationError: null,
     isCreatingOrganization: false,
     isSigningOut: false,
@@ -21,7 +22,10 @@ const meta = {
     organizationNameError: null,
   },
   render: (args) => (
-    <AuthPageShell maxWidthClass={AuthPageWidths.SM} title="Create an organization">
+    <AuthPageShell
+      maxWidthClass={AuthPageWidths.SM}
+      title={args.canCreateOrganization ? "Create an organization" : "Organization access"}
+    >
       <NoOrganizationAccessViewContent {...args} />
     </AuthPageShell>
   ),
@@ -67,5 +71,19 @@ export const Creating: Story = {
   args: {
     isCreatingOrganization: true,
     organizationName: "Mistle Labs",
+  },
+};
+
+export const SelfServiceCreationDisabled: Story = {
+  args: {
+    canCreateOrganization: false,
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByText(
+        "Your account is not connected to an organization. Ask your administrator for an invite.",
+      ),
+    ).toBeVisible();
   },
 };

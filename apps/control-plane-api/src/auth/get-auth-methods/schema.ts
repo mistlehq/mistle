@@ -8,6 +8,11 @@ export const authMethodsResponseSchema = z
         google: z.boolean(),
       })
       .strict(),
+    organization: z
+      .object({
+        selfServiceCreationEnabled: z.boolean(),
+      })
+      .strict(),
   })
   .strict();
 

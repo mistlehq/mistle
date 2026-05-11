@@ -49,6 +49,7 @@ type CreateIntegrationTestInput = {
   extraInfra?: readonly MistleTestExtraInfraId[];
   auth?: {
     google?: "simulated";
+    selfServiceOrganizationCreation?: "enabled" | "disabled";
   };
   __dangerouslyIsolatedServices?: DangerouslyIsolatedTestRegistry;
   __internalInfra?: readonly TestInfraRequirement[];
@@ -209,13 +210,16 @@ async function registryFor(input: CreateIntegrationTestInput): Promise<TestServi
         }),
       ],
       {
-        controlPlaneApi:
-          input.auth?.google === undefined
-            ? (inputServiceOptions?.controlPlaneApi ?? {})
+        controlPlaneApi: {
+          ...inputServiceOptions?.controlPlaneApi,
+          ...(input.auth?.google === undefined ? {} : { googleAuth: input.auth.google }),
+          ...(input.auth?.selfServiceOrganizationCreation === undefined
+            ? {}
             : {
-                ...inputServiceOptions?.controlPlaneApi,
-                googleAuth: input.auth.google,
-              },
+                selfServiceOrganizationCreationEnabled:
+                  input.auth.selfServiceOrganizationCreation === "enabled",
+              }),
+        },
         ...(inputServiceOptions?.sandbox === undefined
           ? {}
           : {

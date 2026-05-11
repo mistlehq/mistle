@@ -33,9 +33,19 @@
                       },
                       "required": ["emailOtp", "google"],
                       "additionalProperties": false
+                    },
+                    "organization": {
+                      "type": "object",
+                      "properties": {
+                        "selfServiceCreationEnabled": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": ["selfServiceCreationEnabled"],
+                      "additionalProperties": false
                     }
                   },
-                  "required": ["methods"],
+                  "required": ["methods", "organization"],
                   "additionalProperties": false
                 }
               }

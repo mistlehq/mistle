@@ -21,6 +21,7 @@ export type ControlPlaneAuthConfig = {
   authSecret: string;
   authTrustedOrigins: string[];
   authAllowSignups: boolean;
+  selfServiceOrganizationCreationEnabled: boolean;
   authOTPLength: number;
   authOTPExpiresInSeconds: number;
   authOTPAllowedAttempts: number;
@@ -135,6 +136,7 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
     },
     plugins: [
       organization({
+        allowUserToCreateOrganization: config.selfServiceOrganizationCreationEnabled,
         sendInvitationEmail: async (invitation) => {
           const inviterName = invitation.inviter.user.name;
           const inviterDisplayName =

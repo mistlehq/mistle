@@ -63,10 +63,28 @@ export function service(
   infra: readonly TestInfraRequirement[],
   options: IntegrationServiceOptions,
 ): TestServiceDefinition {
+  const controlPlaneApiOptions = options.controlPlaneApi;
   const requiresEnvironmentScope =
     options.sandbox !== undefined ||
-    options.controlPlaneApi?.googleAuth === "simulated" ||
-    options.controlPlaneApi?.allowSignups === false;
+    controlPlaneApiOptions?.googleAuth === "simulated" ||
+    controlPlaneApiOptions?.allowSignups === false ||
+    controlPlaneApiOptions?.selfServiceOrganizationCreationEnabled !== undefined;
+  const startInput = {
+    postgresInfra: infraRequirement(infra, InfraIds.POSTGRES, ServiceIds.CONTROL_PLANE_API),
+    sandbox: options.sandbox,
+    ...(controlPlaneApiOptions?.googleAuth === undefined
+      ? {}
+      : { googleAuth: controlPlaneApiOptions.googleAuth }),
+    ...(controlPlaneApiOptions?.allowSignups === undefined
+      ? {}
+      : { allowSignups: controlPlaneApiOptions.allowSignups }),
+    ...(controlPlaneApiOptions?.selfServiceOrganizationCreationEnabled === undefined
+      ? {}
+      : {
+          selfServiceOrganizationCreationEnabled:
+            controlPlaneApiOptions.selfServiceOrganizationCreationEnabled,
+        }),
+  };
 
   return {
     id: ServiceIds.CONTROL_PLANE_API,
@@ -80,24 +98,7 @@ export function service(
     ...(requiresEnvironmentScope ? { poolScope: "environment" } : {}),
     supportedModes: ["runtime"],
     healthCheck: async (runtime) => httpHealth(runtime, ServiceIds.CONTROL_PLANE_API),
-    start: start(
-      options?.controlPlaneApi?.googleAuth === undefined
-        ? {
-            postgresInfra: infraRequirement(infra, InfraIds.POSTGRES, ServiceIds.CONTROL_PLANE_API),
-            ...(options.controlPlaneApi?.allowSignups === undefined
-              ? {}
-              : { allowSignups: options.controlPlaneApi.allowSignups }),
-            sandbox: options.sandbox,
-          }
-        : {
-            postgresInfra: infraRequirement(infra, InfraIds.POSTGRES, ServiceIds.CONTROL_PLANE_API),
-            googleAuth: options.controlPlaneApi.googleAuth,
-            ...(options.controlPlaneApi.allowSignups === undefined
-              ? {}
-              : { allowSignups: options.controlPlaneApi.allowSignups }),
-            sandbox: options.sandbox,
-          },
-    ),
+    start: start(startInput),
   };
 }
 
@@ -105,6 +106,7 @@ function start(input: {
   postgresInfra: TestInfraRequirement;
   googleAuth?: "simulated";
   allowSignups?: boolean;
+  selfServiceOrganizationCreationEnabled?: boolean;
   sandbox: IntegrationSandboxOptions | undefined;
 }): (startInput: TestServiceStartInput) => Promise<TestService> {
   return async (startInput) => {
@@ -119,45 +121,31 @@ function start(input: {
     const resolvedSeaweedfs = startInput.infra.get(InfraIds.SEAWEEDFS);
     const endpoint = httpEndpoint(startInput, ServiceIds.CONTROL_PLANE_API);
     const peer = peers(startInput.services, startInput.plannedEndpoints);
+    const configInput = {
+      controlPlaneBaseUrl: endpoint.hostBaseUrl,
+      controlPlanePort: endpoint.port,
+      dataPlaneBaseUrl: peer.url(ServiceIds.DATA_PLANE_API),
+      gatewayWsUrl: withTestEnvironmentIdQueryParam({
+        url: peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
+        environmentId: startInput.environmentId,
+      }),
+      postgres: resolvedPostgres,
+      sandboxBaseImageRef: readSandboxBaseImageRef({
+        sandbox: input.sandbox,
+        sandboxBaseImage: resolvedSandboxBaseImage,
+      }),
+      sandbox: input.sandbox,
+      seaweedfs: resolvedSeaweedfs,
+      ...(input.googleAuth === undefined ? {} : { googleAuth: input.googleAuth }),
+      ...(input.allowSignups === undefined ? {} : { allowSignups: input.allowSignups }),
+      ...(input.selfServiceOrganizationCreationEnabled === undefined
+        ? {}
+        : {
+            selfServiceOrganizationCreationEnabled: input.selfServiceOrganizationCreationEnabled,
+          }),
+    };
     const runtime = await createControlPlaneApiRuntime({
-      app: config(
-        input.googleAuth === undefined
-          ? {
-              controlPlaneBaseUrl: endpoint.hostBaseUrl,
-              controlPlanePort: endpoint.port,
-              dataPlaneBaseUrl: peer.url(ServiceIds.DATA_PLANE_API),
-              gatewayWsUrl: withTestEnvironmentIdQueryParam({
-                url: peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
-                environmentId: startInput.environmentId,
-              }),
-              postgres: resolvedPostgres,
-              sandboxBaseImageRef: readSandboxBaseImageRef({
-                sandbox: input.sandbox,
-                sandboxBaseImage: resolvedSandboxBaseImage,
-              }),
-              sandbox: input.sandbox,
-              seaweedfs: resolvedSeaweedfs,
-              ...(input.allowSignups === undefined ? {} : { allowSignups: input.allowSignups }),
-            }
-          : {
-              controlPlaneBaseUrl: endpoint.hostBaseUrl,
-              controlPlanePort: endpoint.port,
-              dataPlaneBaseUrl: peer.url(ServiceIds.DATA_PLANE_API),
-              gatewayWsUrl: withTestEnvironmentIdQueryParam({
-                url: peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
-                environmentId: startInput.environmentId,
-              }),
-              postgres: resolvedPostgres,
-              sandboxBaseImageRef: readSandboxBaseImageRef({
-                sandbox: input.sandbox,
-                sandboxBaseImage: resolvedSandboxBaseImage,
-              }),
-              sandbox: input.sandbox,
-              seaweedfs: resolvedSeaweedfs,
-              googleAuth: input.googleAuth,
-              ...(input.allowSignups === undefined ? {} : { allowSignups: input.allowSignups }),
-            },
-      ),
+      app: config(configInput),
     });
 
     try {
@@ -198,6 +186,7 @@ function config(input: {
   seaweedfs: ResolvedTestInfra | undefined;
   googleAuth?: "simulated";
   allowSignups?: boolean;
+  selfServiceOrganizationCreationEnabled?: boolean;
 }): ControlPlaneApiConfig {
   const hostPooledUrl = infraValue(input.postgres, PostgresValues.HOST_POOLED_URL);
   const hostDirectUrl = infraValue(input.postgres, PostgresValues.HOST_DIRECT_URL);
@@ -284,6 +273,7 @@ function config(input: {
       secret: "integration-new-auth-secret",
       trustedOrigins: [input.controlPlaneBaseUrl],
       allowSignups: input.allowSignups ?? true,
+      selfServiceOrganizationCreationEnabled: input.selfServiceOrganizationCreationEnabled ?? true,
       otpLength: 6,
       otpExpiresInSeconds: 300,
       otpAllowedAttempts: 3,

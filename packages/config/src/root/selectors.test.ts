@@ -6,6 +6,7 @@ import { selectControlPlaneApiConfig } from "./selectors.js";
 function createRootConfig(input: {
   allowSignups?: boolean;
   enabledMethods?: Array<"otp" | "google">;
+  selfServiceOrganizationCreationEnabled?: boolean;
   google?: {
     client_id: string;
     client_secret: string;
@@ -34,6 +35,8 @@ function createRootConfig(input: {
           trusted_origins: ["https://app.example.com"],
           allow_signups: input.allowSignups ?? true,
           ...(input.enabledMethods === undefined ? {} : { enabled_methods: input.enabledMethods }),
+          self_service_organization_creation_enabled:
+            input.selfServiceOrganizationCreationEnabled ?? false,
           otp: {
             length: 6,
             expires_in_seconds: 300,
@@ -153,6 +156,22 @@ function createRootConfig(input: {
 }
 
 describe("selectControlPlaneApiConfig", () => {
+  it("defaults self-service organization creation to disabled", () => {
+    const config = selectControlPlaneApiConfig(createRootConfig({}));
+
+    expect(config.auth.selfServiceOrganizationCreationEnabled).toBe(false);
+  });
+
+  it("includes explicit self-service organization creation opt-in", () => {
+    const config = selectControlPlaneApiConfig(
+      createRootConfig({
+        selfServiceOrganizationCreationEnabled: true,
+      }),
+    );
+
+    expect(config.auth.selfServiceOrganizationCreationEnabled).toBe(true);
+  });
+
   it("omits Google auth when credentials are configured but google is not enabled", () => {
     const config = selectControlPlaneApiConfig(
       createRootConfig({

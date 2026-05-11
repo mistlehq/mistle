@@ -1,6 +1,7 @@
 import { Field, FieldContent, Input, Notice, ScreenActionButton } from "@mistle/ui";
 
 type NoOrganizationAccessViewContentProps = {
+  canCreateOrganization: boolean;
   organizationName: string;
   organizationNameError: string | null;
   createOrganizationError: string | null;
@@ -16,34 +17,44 @@ export function NoOrganizationAccessViewContent(
 ): React.JSX.Element {
   return (
     <>
-      {props.organizationNameError === null ? null : (
-        <Notice variant="alert">{props.organizationNameError}</Notice>
+      {props.canCreateOrganization ? (
+        <>
+          {props.organizationNameError === null ? null : (
+            <Notice variant="alert">{props.organizationNameError}</Notice>
+          )}
+
+          {props.createOrganizationError === null ? null : (
+            <Notice variant="alert">{props.createOrganizationError}</Notice>
+          )}
+
+          <form className="flex flex-col gap-4" onSubmit={props.onCreateOrganization}>
+            <Field>
+              <FieldContent>
+                <Input
+                  aria-label="Organization name"
+                  aria-invalid={props.organizationNameError === null ? undefined : true}
+                  autoFocus
+                  className="h-12"
+                  id="onboarding-organization-name"
+                  onChange={(event) => props.onOrganizationNameChange(event.currentTarget.value)}
+                  placeholder="Organization name"
+                  value={props.organizationName}
+                />
+              </FieldContent>
+            </Field>
+
+            <ScreenActionButton disabled={props.isCreatingOrganization} type="submit">
+              {props.isCreatingOrganization ? "Creating organization..." : "Create organization"}
+            </ScreenActionButton>
+          </form>
+        </>
+      ) : (
+        <Notice>
+          Your account is not connected to an organization. Ask your administrator for an invite.
+        </Notice>
       )}
 
-      {props.createOrganizationError === null ? null : (
-        <Notice variant="alert">{props.createOrganizationError}</Notice>
-      )}
-
-      <form className="flex flex-col gap-4" onSubmit={props.onCreateOrganization}>
-        <Field>
-          <FieldContent>
-            <Input
-              aria-label="Organization name"
-              aria-invalid={props.organizationNameError === null ? undefined : true}
-              autoFocus
-              className="h-12"
-              id="onboarding-organization-name"
-              onChange={(event) => props.onOrganizationNameChange(event.currentTarget.value)}
-              placeholder="Organization name"
-              value={props.organizationName}
-            />
-          </FieldContent>
-        </Field>
-
-        <ScreenActionButton disabled={props.isCreatingOrganization} type="submit">
-          {props.isCreatingOrganization ? "Creating organization..." : "Create organization"}
-        </ScreenActionButton>
-
+      <div className="mt-4">
         <ScreenActionButton
           disabled={props.isSigningOut || props.isCreatingOrganization}
           onClick={props.onSignOut}
@@ -52,18 +63,20 @@ export function NoOrganizationAccessViewContent(
         >
           {props.isSigningOut ? "Signing out..." : "Sign Out"}
         </ScreenActionButton>
-      </form>
-
-      <div className="mt-6 grid gap-3">
-        <div className="text-muted-foreground flex items-center gap-4">
-          <div className="bg-border h-px flex-1" />
-          <p className="text-xs font-medium tracking-[0.2em] uppercase">Have an existing org?</p>
-          <div className="bg-border h-px flex-1" />
-        </div>
-        <div className="grid gap-2 text-center">
-          <p className="text-muted-foreground text-sm">Ask your administrator for an invite.</p>
-        </div>
       </div>
+
+      {props.canCreateOrganization ? (
+        <div className="mt-6 grid gap-3">
+          <div className="text-muted-foreground flex items-center gap-4">
+            <div className="bg-border h-px flex-1" />
+            <p className="text-xs font-medium tracking-[0.2em] uppercase">Have an existing org?</p>
+            <div className="bg-border h-px flex-1" />
+          </div>
+          <div className="grid gap-2 text-center">
+            <p className="text-muted-foreground text-sm">Ask your administrator for an invite.</p>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

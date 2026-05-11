@@ -12,6 +12,9 @@ const routeHandler = (ctx: Parameters<RouteHandler<typeof route, AppContextBindi
         emailOtp: true,
         google: config.auth.google !== undefined,
       },
+      organization: {
+        selfServiceCreationEnabled: config.auth.selfServiceOrganizationCreationEnabled,
+      },
     },
     200,
   );
