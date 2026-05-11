@@ -6,16 +6,11 @@ import {
   buildProviderAppSetupConfig,
   buildProviderAppSetupConfigFieldInputs,
   buildProviderAppSetupSecretFieldInputs,
-  buildProviderAppSetupSecrets,
+  buildProviderAppSetupSecretUpdates,
   buildProviderAppSetupStartBody,
   createInitialProviderAppSetupDraft,
-  getProviderAppSetupFieldValidationMessage,
   hasProviderAppSetupDraftValues,
-  isProviderAppInstalled,
-  isProviderAppRequiredFieldReady,
-  resolveProviderAppSetupRequiredFieldKeys,
-  resolveProviderAppSetupSavedFieldKeys,
-  shouldPersistProviderAppSetupField,
+  isProviderAppRequiredDraftComplete,
 } from "./integration-connection-provider-app-setup-model.js";
 
 const ProviderAppSetup = {
@@ -94,8 +89,55 @@ const ProviderConnection = {
   updatedAt: "2026-04-26T00:00:00.000Z",
 } satisfies IntegrationConnection;
 
+const RequiredConfigProviderAppSetup = {
+  ...ProviderAppSetup,
+  existingApp: {
+    ...ProviderAppSetup.existingApp,
+    installedDetection: {
+      configFields: ["appId", "appSlug", "clientId"],
+      secretFields: ["appPrivateKeyPem"],
+    },
+    configFields: [
+      {
+        configKey: "app_id",
+        name: "appId",
+        label: "App ID",
+        required: true,
+      },
+      {
+        configKey: "app_slug",
+        name: "appSlug",
+        label: "App slug",
+        required: true,
+      },
+      {
+        configKey: "client_id",
+        name: "clientId",
+        label: "Client ID",
+        required: true,
+      },
+    ],
+    secretFields: [
+      {
+        inputType: "textarea",
+        name: "appPrivateKeyPem",
+        label: "App private key",
+        required: true,
+        secretLabel: "app private key",
+      },
+      {
+        inputType: "password",
+        name: "webhookSecret",
+        label: "Webhook secret",
+        required: false,
+        secretLabel: "webhook secret",
+      },
+    ],
+  },
+} satisfies IntegrationFormConnectionMethodProviderAppSetup;
+
 describe("provider app setup model", () => {
-  it("derives draft values and installed state from provider metadata", () => {
+  it("derives draft values from provider metadata", () => {
     expect(
       createInitialProviderAppSetupDraft({
         connection: ProviderConnection,
@@ -106,15 +148,8 @@ describe("provider app setup model", () => {
       botToken: "",
       clientSecret: "",
     });
-    expect(resolveProviderAppSetupRequiredFieldKeys(ProviderAppSetup)).toEqual(["botToken"]);
     expect(
       hasProviderAppSetupDraftValues({
-        connection: ProviderConnection,
-        providerAppSetup: ProviderAppSetup,
-      }),
-    ).toBe(true);
-    expect(
-      isProviderAppInstalled({
         connection: ProviderConnection,
         providerAppSetup: ProviderAppSetup,
       }),
@@ -139,53 +174,53 @@ describe("provider app setup model", () => {
       client_id: "123.456",
     });
     expect(
-      buildProviderAppSetupSecrets({
+      buildProviderAppSetupSecretUpdates({
         draft,
-        fieldKey: "botToken",
         providerAppSetup: ProviderAppSetup,
       }),
     ).toEqual({
       botToken: "xoxb-token",
     });
-    expect(
-      buildProviderAppSetupSecrets({
-        draft,
-        fieldKey: "clientId",
-        providerAppSetup: ProviderAppSetup,
-      }),
-    ).toBeUndefined();
   });
 
-  it("applies required field readiness and validation from provider metadata", () => {
+  it("requires draft values for required config and unconfigured required secrets before connect", () => {
     expect(
-      getProviderAppSetupFieldValidationMessage({
-        fieldKey: "botToken",
+      isProviderAppRequiredDraftComplete({
+        configuredSecretFieldKeys: new Set(),
         draft: {
-          clientId: "123.456",
-          botToken: "",
-          clientSecret: "",
+          appId: "123",
+          appSlug: "",
+          clientId: "Iv1.client123",
+          appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----",
+          webhookSecret: "",
         },
-        providerAppSetup: ProviderAppSetup,
-      }),
-    ).toBe("Bot token is required.");
-    expect(
-      shouldPersistProviderAppSetupField({
-        fieldKey: "clientSecret",
-        draft: {
-          clientId: "123.456",
-          botToken: "xoxb-token",
-          clientSecret: "",
-        },
-        providerAppSetup: ProviderAppSetup,
+        providerAppSetup: RequiredConfigProviderAppSetup,
       }),
     ).toBe(false);
     expect(
-      isProviderAppRequiredFieldReady({
-        fieldKey: "botToken",
-        draft: { botToken: "" },
-        savedDraft: { botToken: "" },
-        fieldState: { status: "idle", errorMessage: null },
-        isConfiguredOnServer: true,
+      isProviderAppRequiredDraftComplete({
+        configuredSecretFieldKeys: new Set(),
+        draft: {
+          appId: "123",
+          appSlug: "mistle-github-app",
+          clientId: "Iv1.client123",
+          appPrivateKeyPem: "",
+          webhookSecret: "",
+        },
+        providerAppSetup: RequiredConfigProviderAppSetup,
+      }),
+    ).toBe(false);
+    expect(
+      isProviderAppRequiredDraftComplete({
+        configuredSecretFieldKeys: new Set(["appPrivateKeyPem"]),
+        draft: {
+          appId: "123",
+          appSlug: "mistle-github-app",
+          clientId: "Iv1.client123",
+          appPrivateKeyPem: "",
+          webhookSecret: "",
+        },
+        providerAppSetup: RequiredConfigProviderAppSetup,
       }),
     ).toBe(true);
   });
@@ -326,10 +361,14 @@ describe("provider app setup model", () => {
       },
     ]);
     expect(
-      resolveProviderAppSetupSavedFieldKeys({
-        fieldKey: "botToken",
+      buildProviderAppSetupSecretUpdates({
+        draft: {
+          clientId: "123.456",
+          botToken: "",
+          clientSecret: "",
+        },
         providerAppSetup: ProviderAppSetup,
       }),
-    ).toEqual(["clientId", "botToken"]);
+    ).toBeUndefined();
   });
 });

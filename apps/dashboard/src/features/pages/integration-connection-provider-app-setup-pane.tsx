@@ -4,7 +4,7 @@ import type {
 } from "@mistle/integrations-core";
 import { Button, CopyableValue, Notice } from "@mistle/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { getDashboardConfig } from "../../config.js";
@@ -28,29 +28,20 @@ import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/for
 import { SectionHeader } from "../shared/section-header.js";
 import {
   ExistingAppSetupFieldsPanel,
-  getSetupFieldState,
-  useExistingAppSetupAutoSave,
   useSetupManifestDraft,
 } from "./integration-connection-app-setup-shared.js";
 import {
   buildProviderAppSetupConfig,
   buildProviderAppSetupConfigFieldInputs,
   buildProviderAppSetupSecretFieldInputs,
-  buildProviderAppSetupSecrets,
+  buildProviderAppSetupSecretUpdates,
   buildProviderAppSetupStartBody,
   createInitialProviderAppSetupDraft,
-  getProviderAppSetupFieldValidationMessage,
   hasProviderAppSetupDraftValues,
   isProviderAppExistingAppStartActionInstalled,
-  isProviderAppRequiredFieldReady,
-  isProviderAppSetupFieldStable,
-  isProviderAppSetupSecretFieldKey,
+  isProviderAppRequiredDraftComplete,
   normalizeProviderAppSetupValue,
-  resolveProviderAppSetupFieldKeys,
-  resolveProviderAppSetupRequiredFieldKeys,
-  resolveProviderAppSetupSavedFieldKeys,
   resolveProviderAppSetupSecretFieldKeys,
-  shouldPersistProviderAppSetupField,
   type ProviderAppSetupFieldKey,
 } from "./integration-connection-provider-app-setup-model.js";
 import {
@@ -72,6 +63,23 @@ function resolveConfiguredSecretFieldKeys(input: {
     configuredSecretNames: input.connection.configuredSecretNames,
     fieldKeys: resolveProviderAppSetupSecretFieldKeys(input.providerAppSetup),
   });
+}
+
+function normalizeProviderAppSetupDraft(input: {
+  draft: Record<ProviderAppSetupFieldKey, string>;
+  providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
+}): Record<ProviderAppSetupFieldKey, string> {
+  const nextDraft = { ...input.draft };
+
+  for (const field of input.providerAppSetup.existingApp.configFields) {
+    nextDraft[field.name] = normalizeProviderAppSetupValue(input.draft[field.name] ?? "");
+  }
+
+  for (const field of input.providerAppSetup.existingApp.secretFields) {
+    nextDraft[field.name] = "";
+  }
+
+  return nextDraft;
 }
 
 function SetupUrls(input: {
@@ -226,85 +234,12 @@ export function ProviderAppSetupPane(input: {
   const [isRedirectingToExistingAppStartAction, setIsRedirectingToExistingAppStartAction] =
     useState(false);
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
-  const existingAppFieldKeys = useMemo(
-    () => resolveProviderAppSetupFieldKeys(input.providerAppSetup),
-    [input.providerAppSetup],
+  const [existingAppDraft, setExistingAppDraft] = useState(() =>
+    createInitialProviderAppSetupDraft({
+      connection: input.connection,
+      providerAppSetup: input.providerAppSetup,
+    }),
   );
-  const existingAppAutoSave = useExistingAppSetupAutoSave<
-    ProviderAppSetupFieldKey,
-    IntegrationConnection
-  >({
-    clearActionError: () => {
-      setActionErrorMessage(null);
-    },
-    createInitialDraft: () =>
-      createInitialProviderAppSetupDraft({
-        connection: input.connection,
-        providerAppSetup: input.providerAppSetup,
-      }),
-    fieldKeys: existingAppFieldKeys,
-    normalizeValue: normalizeProviderAppSetupValue,
-    onFieldSaved: (updatedConnection, fieldKey) => {
-      if (
-        isProviderAppSetupSecretFieldKey({
-          fieldKey,
-          providerAppSetup: input.providerAppSetup,
-        })
-      ) {
-        setConfiguredSecretFieldKeys(
-          resolveConfiguredSecretFieldKeys({
-            connection: updatedConnection,
-            providerAppSetup: input.providerAppSetup,
-          }),
-        );
-      }
-    },
-    resolveSavedFieldKeys: (fieldKey) =>
-      resolveProviderAppSetupSavedFieldKeys({
-        fieldKey,
-        providerAppSetup: input.providerAppSetup,
-      }),
-    resolveSaveErrorMessage: (error) =>
-      resolveApiErrorMessage({
-        error,
-        fallbackMessage: input.providerAppSetup.existingApp.saveErrorMessage,
-      }),
-    saveField: async ({ draft, fieldKey }) => {
-      const secrets = buildProviderAppSetupSecrets({
-        draft,
-        fieldKey,
-        providerAppSetup: input.providerAppSetup,
-      });
-      const updatedConnection = await updateFormIntegrationConnection({
-        connectionId: input.connection.id,
-        displayName: input.connection.displayName,
-        config: buildProviderAppSetupConfig({
-          methodId: input.methodId,
-          draft,
-          providerAppSetup: input.providerAppSetup,
-        }),
-        ...(secrets === undefined ? {} : { secrets }),
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
-      });
-
-      return updatedConnection;
-    },
-    shouldPersistField: ({ draft, fieldKey }) =>
-      shouldPersistProviderAppSetupField({
-        draft,
-        fieldKey,
-        providerAppSetup: input.providerAppSetup,
-      }),
-    validateField: ({ draft, fieldKey }) =>
-      getProviderAppSetupFieldValidationMessage({
-        draft,
-        fieldKey,
-        providerAppSetup: input.providerAppSetup,
-      }),
-  });
   const webhookCallbackState = useManifestWebhookCallbackState({
     enabled: true,
     connectionId: input.connection.id,
@@ -343,6 +278,30 @@ export function ProviderAppSetupPane(input: {
       });
     },
   });
+  const saveExistingAppSetupMutation = useMutation({
+    mutationFn: async () => {
+      const secrets = buildProviderAppSetupSecretUpdates({
+        draft: existingAppDraft,
+        providerAppSetup: input.providerAppSetup,
+      });
+      const updatedConnection = await updateFormIntegrationConnection({
+        connectionId: input.connection.id,
+        displayName: input.connection.displayName,
+        config: buildProviderAppSetupConfig({
+          methodId: input.methodId,
+          draft: existingAppDraft,
+          providerAppSetup: input.providerAppSetup,
+        }),
+        ...(secrets === undefined ? {} : { secrets }),
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
+      });
+
+      return updatedConnection;
+    },
+  });
 
   async function createProviderApp(): Promise<void> {
     setActionErrorMessage(null);
@@ -366,12 +325,16 @@ export function ProviderAppSetupPane(input: {
 
   async function startExistingAppAction(): Promise<void> {
     const startAction = input.providerAppSetup.existingApp.startAction;
+    const savedConnection = await saveExistingAppSetup();
+    if (savedConnection === null) {
+      return;
+    }
+
     if (startAction === undefined) {
       void navigate(`/integrations/${input.connection.targetKey}`);
       return;
     }
 
-    setActionErrorMessage(null);
     try {
       const started = await startExistingAppActionMutation.mutateAsync();
       setIsRedirectingToExistingAppStartAction(true);
@@ -429,29 +392,44 @@ export function ProviderAppSetupPane(input: {
     }
   }
 
+  async function saveExistingAppSetup(): Promise<IntegrationConnection | null> {
+    setActionErrorMessage(null);
+    try {
+      const updatedConnection = await saveExistingAppSetupMutation.mutateAsync();
+      setConfiguredSecretFieldKeys(
+        resolveConfiguredSecretFieldKeys({
+          connection: updatedConnection,
+          providerAppSetup: input.providerAppSetup,
+        }),
+      );
+      setExistingAppDraft(
+        normalizeProviderAppSetupDraft({
+          draft: existingAppDraft,
+          providerAppSetup: input.providerAppSetup,
+        }),
+      );
+      return updatedConnection;
+    } catch (error) {
+      setActionErrorMessage(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: input.providerAppSetup.existingApp.saveErrorMessage,
+        }),
+      );
+      return null;
+    }
+  }
+
   const manifestValidation = validateManifestJsonObject(manifestDraft.manifestValue);
   const canCreateManifest =
     manifestValidation.status === "valid" &&
     webhookCallbackState.kind === "ready" &&
     setupStartFormState.requiredFieldsComplete;
-  const requiredFieldKeys = resolveProviderAppSetupRequiredFieldKeys(input.providerAppSetup);
-  const requiredFieldsReady = requiredFieldKeys.every((fieldKey) =>
-    isProviderAppRequiredFieldReady({
-      fieldKey,
-      draft: existingAppAutoSave.draft,
-      savedDraft: existingAppAutoSave.savedDraft,
-      fieldState: getSetupFieldState(existingAppAutoSave.fieldStates, fieldKey),
-      isConfiguredOnServer: configuredSecretFieldKeys.has(fieldKey),
-    }),
-  );
-  const allFieldsStable = existingAppFieldKeys.every((fieldKey) =>
-    isProviderAppSetupFieldStable({
-      fieldKey,
-      draft: existingAppAutoSave.draft,
-      savedDraft: existingAppAutoSave.savedDraft,
-      fieldState: getSetupFieldState(existingAppAutoSave.fieldStates, fieldKey),
-    }),
-  );
+  const requiredDraftComplete = isProviderAppRequiredDraftComplete({
+    configuredSecretFieldKeys,
+    draft: existingAppDraft,
+    providerAppSetup: input.providerAppSetup,
+  });
   const isExistingAppStartActionInstalled = isProviderAppExistingAppStartActionInstalled({
     connection: input.connection,
     providerAppSetup: input.providerAppSetup,
@@ -459,8 +437,7 @@ export function ProviderAppSetupPane(input: {
   const showManifestCreatedState = isManifestCreatedReturn && !isExistingAppStartActionInstalled;
   const canConnectExistingApp =
     isExistingAppStartActionInstalled ||
-    (requiredFieldsReady &&
-      allFieldsStable &&
+    (requiredDraftComplete &&
       !isSecretReplacementDialogOpen &&
       webhookCallbackState.kind === "ready");
   const existingAppConnectLabel =
@@ -469,7 +446,12 @@ export function ProviderAppSetupPane(input: {
       ? input.providerAppSetup.existingApp.startAction.installedLabel
       : input.providerAppSetup.existingApp.connectLabel;
   const isExistingAppStartActionPending =
-    startExistingAppActionMutation.isPending || isRedirectingToExistingAppStartAction;
+    saveExistingAppSetupMutation.isPending ||
+    startExistingAppActionMutation.isPending ||
+    isRedirectingToExistingAppStartAction;
+  const pendingExistingAppConnectLabel = saveExistingAppSetupMutation.isPending
+    ? "Saving..."
+    : (input.providerAppSetup.existingApp.startAction?.pendingLabel ?? existingAppConnectLabel);
 
   if (showManifestCreatedState) {
     return (
@@ -480,10 +462,7 @@ export function ProviderAppSetupPane(input: {
         onInstall={() => {
           void startExistingAppAction();
         }}
-        pendingLabel={
-          input.providerAppSetup.existingApp.startAction?.pendingLabel ??
-          input.providerAppSetup.existingApp.connectLabel
-        }
+        pendingLabel={pendingExistingAppConnectLabel}
       />
     );
   }
@@ -496,21 +475,29 @@ export function ProviderAppSetupPane(input: {
         existingAppContent={
           <ExistingAppSetupFieldsPanel
             configFields={buildProviderAppSetupConfigFieldInputs({
-              draft: existingAppAutoSave.draft,
+              draft: existingAppDraft,
               providerAppSetup: input.providerAppSetup,
               routeSegment: input.routeSegment,
             })}
             description={input.providerAppSetup.existingApp.description}
-            fieldStates={existingAppAutoSave.fieldStates}
-            onCommitField={(fieldKey) => {
-              void existingAppAutoSave.persistField(fieldKey);
-            }}
+            isSaving={saveExistingAppSetupMutation.isPending}
             onReplacementDialogOpenChange={setIsSecretReplacementDialogOpen}
-            onRevertSecretReplacement={existingAppAutoSave.revertField}
-            onUpdateFieldDraft={existingAppAutoSave.updateFieldDraft}
+            onRevertSecretReplacement={(fieldKey) => {
+              setExistingAppDraft((currentDraft) => ({
+                ...currentDraft,
+                [fieldKey]: "",
+              }));
+            }}
+            onUpdateFieldDraft={(fieldKey, nextValue) => {
+              setActionErrorMessage(null);
+              setExistingAppDraft((currentDraft) => ({
+                ...currentDraft,
+                [fieldKey]: nextValue,
+              }));
+            }}
             secretFields={buildProviderAppSetupSecretFieldInputs({
               configuredSecretFieldKeys,
-              draft: existingAppAutoSave.draft,
+              draft: existingAppDraft,
               providerAppSetup: input.providerAppSetup,
               routeSegment: input.routeSegment,
             })}
@@ -546,8 +533,7 @@ export function ProviderAppSetupPane(input: {
                   type="button"
                 >
                   {isExistingAppStartActionPending
-                    ? (input.providerAppSetup.existingApp.startAction?.pendingLabel ??
-                      existingAppConnectLabel)
+                    ? pendingExistingAppConnectLabel
                     : existingAppConnectLabel}
                 </Button>
               </FormPageActionBar>

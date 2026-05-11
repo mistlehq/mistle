@@ -75,6 +75,15 @@ function CurrentPath(): React.JSX.Element {
   return <div data-testid="current-path">{location.pathname}</div>;
 }
 
+function getTextControlById(id: string): HTMLInputElement | HTMLTextAreaElement {
+  const element = document.getElementById(id);
+  if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+    return element;
+  }
+
+  throw new Error(`Expected text control '${id}' to be rendered.`);
+}
+
 function renderProviderAppSetupPane(input?: {
   connection?: IntegrationConnection;
   controlPlaneApiOrigin?: string;
@@ -256,8 +265,6 @@ describe("ProviderAppSetupPane", () => {
     expect(screen.queryByRole("button", { name: "Save Slack App" })).toBeNull();
     const connectButton = screen.getByRole("button", { name: "Connect Slack to Mistle" });
     expect(connectButton.hasAttribute("disabled")).toBe(false);
-    fireEvent.click(connectButton);
-    expect(screen.getByTestId("current-path").textContent).toBe("/integrations/slack-default");
   });
 
   it("renders GitHub provider-owned manifest setup fields", async () => {
@@ -310,6 +317,66 @@ describe("ProviderAppSetupPane", () => {
     expect(
       screen.getByRole("button", { name: "Install GitHub App" }).hasAttribute("disabled"),
     ).toBe(false);
+  });
+
+  it("enables GitHub existing app install after the required setup draft is complete", () => {
+    renderProviderAppSetupPane({
+      connection: createGitHubConnection(),
+      methodId: "github-app-installation",
+      routeSegment: "github-app",
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Use existing app" }));
+
+    const installButton = screen.getByRole("button", { name: "Install GitHub App" });
+    expect(installButton.hasAttribute("disabled")).toBe(true);
+
+    fireEvent.change(getTextControlById("github-app-appId"), {
+      target: { value: "12345" },
+    });
+    fireEvent.change(getTextControlById("github-app-appSlug"), {
+      target: { value: "mistle-github-app" },
+    });
+    fireEvent.change(getTextControlById("github-app-clientId"), {
+      target: { value: "Iv1.providerowned" },
+    });
+    fireEvent.change(getTextControlById("github-app-appPrivateKeyPem"), {
+      target: { value: "-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----" },
+    });
+    fireEvent.change(getTextControlById("github-app-clientSecret"), {
+      target: { value: "github-client-secret" },
+    });
+    fireEvent.change(getTextControlById("github-app-webhookSecret"), {
+      target: { value: "github-webhook-secret" },
+    });
+
+    expect(installButton.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("keeps GitHub installed app management available when local setup edits are incomplete", () => {
+    renderProviderAppSetupPane({
+      connection: createGitHubConnection({
+        config: {
+          app_id: "12345",
+          app_slug: "mistle-github-app",
+          client_id: "Iv1.providerowned",
+          installation_id: "98765",
+        },
+        configuredSecretNames: ["appPrivateKeyPem", "clientSecret", "webhookSecret"],
+        externalSubjectId: "github-org",
+      }),
+      methodId: "github-app-installation",
+      routeSegment: "github-app",
+    });
+
+    const manageButton = screen.getByRole("button", { name: "Manage installation" });
+    expect(manageButton.hasAttribute("disabled")).toBe(false);
+
+    fireEvent.change(getTextControlById("github-app-appId"), {
+      target: { value: "" },
+    });
+
+    expect(manageButton.hasAttribute("disabled")).toBe(false);
   });
 
   it("renders a dedicated GitHub App created screen after the manifest callback", () => {
