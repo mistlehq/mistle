@@ -20,7 +20,7 @@
     },
     {
       "targetKey": "e2b-default",
-      "enabled": false,
+      "enabled": true,
       "config": {}
     },
     {

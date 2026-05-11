@@ -13,7 +13,6 @@ import {
 import { shouldRethrowDurableStepErrorForRetry } from "@mistle/workflow-registry/durable-step-retry.js";
 
 import { getWorkflowContext, type WorkflowContext } from "../core/context.js";
-import type { ResolvedSandboxRuntime } from "../core/sandbox-runtime-resolver.js";
 import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
 import { destroySandbox } from "../shared/destroy-sandbox.js";
 import { formatPersistedFailureMessage } from "../shared/format-persisted-failure-message.js";
@@ -96,11 +95,20 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     runtimeProvider: workflowInput.sandboxRuntime.provider,
   });
   const requestedRuntimeProvider = workflowInput.sandboxRuntime.provider;
+  const sandboxRuntimeInput = {
+    organizationId: workflowInput.organizationId,
+    provider: requestedRuntimeProvider,
+    ...(workflowInput.sandboxRuntime.connectionId === undefined
+      ? {}
+      : { connectionId: workflowInput.sandboxRuntime.connectionId }),
+    ...(workflowInput.sandboxRuntime.resources === undefined
+      ? {}
+      : { resources: workflowInput.sandboxRuntime.resources }),
+  };
 
   let startedSandboxCleanupState:
     | {
         providerSandboxId: string;
-        runtime: ResolvedSandboxRuntime;
         runtimeProvider: SandboxProvider;
       }
     | undefined;
@@ -132,16 +140,18 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
 
     let destroySandboxError: unknown;
     if (startedSandboxCleanupState && !sandboxDestroyed) {
-      const { providerSandboxId, runtime, runtimeProvider } = startedSandboxCleanupState;
+      const { providerSandboxId, runtimeProvider } = startedSandboxCleanupState;
       try {
         await step.run({ name: "destroy-snapshot-sandbox-after-failure" }, async () => {
+          const resolvedRuntime =
+            await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
           await destroySandbox(
             {
               db: ctx.db,
               tables: ctx.tables,
               controlPlaneInternalClient: ctx.controlPlaneInternalClient,
               config: ctx.config,
-              sandboxAdapter: runtime.sandboxAdapter,
+              sandboxAdapter: resolvedRuntime.sandboxAdapter,
             },
             {
               sandboxInstanceId: workflowInput.sandboxInstanceId,
@@ -272,18 +282,19 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
 
   try {
     currentPhase = "resolve";
-    const resolvedRuntime = await step.run({ name: "resolve-snapshot-sandbox-runtime" }, async () =>
-      ctx.sandboxRuntimeProviderResolver.resolve({
-        organizationId: workflowInput.organizationId,
-        provider: requestedRuntimeProvider,
-        ...(workflowInput.sandboxRuntime.connectionId === undefined
-          ? {}
-          : { connectionId: workflowInput.sandboxRuntime.connectionId }),
-        ...(workflowInput.sandboxRuntime.resources === undefined
-          ? {}
-          : { resources: workflowInput.sandboxRuntime.resources }),
-      }),
+    const resolvedRuntimeProvider = await step.run(
+      { name: "resolve-snapshot-sandbox-runtime" },
+      async () => {
+        const resolvedRuntime =
+          await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+        return resolvedRuntime.provider;
+      },
     );
+    if (resolvedRuntimeProvider !== requestedRuntimeProvider) {
+      throw new Error(
+        "Resolved snapshot sandbox runtime provider did not match requested provider.",
+      );
+    }
 
     currentPhase = "compile";
     const compiledRuntimePlan = await step.run(
@@ -330,8 +341,10 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     ensuredSandboxInstance = true;
 
     currentPhase = "start";
-    const startedSandbox = await step.run({ name: "start-snapshot-sandbox" }, async () =>
-      startSandbox(
+    const startedSandbox = await step.run({ name: "start-snapshot-sandbox" }, async () => {
+      const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+
+      return startSandbox(
         {
           config: ctx.config,
           processEnv: ctx.processEnv,
@@ -342,11 +355,10 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
           image: workflowInput.image,
           runtimeProvider: requestedRuntimeProvider,
         },
-      ),
-    );
+      );
+    });
     startedSandboxCleanupState = {
       providerSandboxId: startedSandbox.providerSandboxId,
-      runtime: resolvedRuntime,
       runtimeProvider: startedSandbox.runtimeProvider,
     };
 
@@ -369,6 +381,8 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
 
     currentPhase = "init";
     await step.run({ name: "initialize-snapshot-sandbox-runtime" }, async () => {
+      const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+
       await initializeSandboxRuntime(
         {
           config: ctx.config,
@@ -401,14 +415,18 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     });
 
     currentPhase = "capture";
-    const capturedSnapshot = await step.run({ name: "capture-snapshot-image" }, async () =>
-      resolvedRuntime.sandboxAdapter.captureSnapshot({
+    const capturedSnapshot = await step.run({ name: "capture-snapshot-image" }, async () => {
+      const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+
+      return resolvedRuntime.sandboxAdapter.captureSnapshot({
         id: startedSandbox.providerSandboxId,
-      }),
-    );
+      });
+    });
 
     currentPhase = "destroy";
     await step.run({ name: "destroy-snapshot-sandbox-after-capture" }, async () => {
+      const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+
       await destroySandbox(
         {
           db: ctx.db,
