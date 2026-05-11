@@ -118,8 +118,8 @@ const SandboxProfileToolsColumns = [
 ] satisfies readonly ResponsiveFieldListColumn[];
 
 const SandboxProfileProxiedConnectionColumns = [
-  { key: "connection", label: "Connection", desktopWidth: "minmax(10rem,0.8fr)" },
-  { key: "account", label: "Account", desktopWidth: "minmax(14rem,1fr)" },
+  { key: "connection", label: "Service", desktopWidth: "minmax(10rem,0.8fr)" },
+  { key: "account", label: "Credential Connection", desktopWidth: "minmax(14rem,1fr)" },
   {
     key: "actions",
     label: <span className="sr-only">Actions</span>,
