@@ -410,6 +410,52 @@ describe.concurrent("sandbox profile version start instance integration", () => 
     });
   });
 
+  it("queues launches with the profile version agent runtime", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-start-instance-agent-runtime@example.com",
+    });
+
+    await createStartableProfile({
+      env,
+      organizationId: session.organizationId,
+      profileId: "sbp_start_instance_agent_runtime",
+      targetKey: "openai-start-instance-agent-runtime",
+      connectionId: "icn_start_instance_agent_runtime",
+      bindingId: "ibd_start_instance_agent_runtime",
+      versionState: SandboxProfileVersionStates.DRAFT,
+      agentRuntimeId: "opencode",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_start_instance_agent_runtime/versions/1/instances",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(201);
+    const body = StartSandboxProfileInstanceResponseSchema.parse(await response.json());
+    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+      env,
+      sandboxInstanceId: body.sandboxInstanceId,
+    });
+
+    expect(queuedWorkflowInput.runtimePlan.agentRuntimes).toHaveLength(1);
+    expect(queuedWorkflowInput.runtimePlan.agentRuntimes[0]).toMatchObject({
+      runtimeId: "opencode",
+      runtimeKey: "opencode-server",
+      clientId: "opencode-cli",
+      endpointKey: "server",
+    });
+    expect(queuedWorkflowInput.runtimePlan.runtimeClients[0]?.clientId).toBe("opencode-cli");
+    expect(
+      queuedWorkflowInput.runtimePlan.artifacts.map((artifact) => artifact.artifactKey),
+    ).toEqual(["opencode-cli"]);
+  });
+
   it("queues an ephemeral launch when the profile default is persistent but organization persistence is disabled", async ({
     env,
   }) => {
@@ -600,6 +646,7 @@ async function createStartableProfile(input: {
   defaultPersistenceMode?:
     | typeof SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL
     | typeof SandboxProfileVersionDefaultPersistenceModes.PERSISTENT;
+  agentRuntimeId?: "codex" | "opencode";
   snapshotImageId?: string;
   git?: {
     targetKey: string;
@@ -626,6 +673,7 @@ async function createStartableProfile(input: {
         state: input.versionState,
         defaultPersistenceMode:
           input.defaultPersistenceMode ?? SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
+        agentRuntimeId: input.agentRuntimeId ?? "codex",
         ...DockerSandboxRuntimeColumns,
         publishedAt:
           input.versionState === SandboxProfileVersionStates.PUBLISHED

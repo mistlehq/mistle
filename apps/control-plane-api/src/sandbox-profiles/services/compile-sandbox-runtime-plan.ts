@@ -288,6 +288,7 @@ export async function compileSandboxRuntimePlan(
   const sandboxProfileVersion = await input.db.query.sandboxProfileVersions.findFirst({
     columns: {
       sandboxProfileId: true,
+      agentRuntimeId: true,
       setupScript: true,
     },
     where: (table, { and, eq }) =>
@@ -315,6 +316,7 @@ export async function compileSandboxRuntimePlan(
       sandboxProfileId: input.profileId,
       version: input.profileVersion,
       image: input.image,
+      agentRuntimeId: sandboxProfileVersion.agentRuntimeId,
       bindings: compileBindings,
       definitions: input.integrationDefinitions,
     });

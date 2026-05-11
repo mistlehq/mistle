@@ -2581,6 +2581,7 @@ export type CompileRuntimePlanInput = {
   sandboxProfileId: string;
   version: number;
   image: ResolvedSandboxImage;
+  agentRuntimeId: string;
   bindings: ReadonlyArray<CompileRuntimePlanBindingInput>;
   definitions: IntegrationDefinitionsBundle;
 };

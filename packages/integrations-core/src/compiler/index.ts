@@ -591,6 +591,7 @@ type CompileBindingsInput = {
   sandboxProfileId: string;
   version: number;
   definitions: CompileRuntimePlanInput["definitions"];
+  agentRuntimeId: string;
   bindings: ReadonlyArray<CompileRuntimePlanBindingInput>;
   enforceRuntimeEligibility: boolean;
 };
@@ -717,10 +718,12 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
     let compiledBindingResult: CompiledBindingResult;
     let renderRuntimeClients: CompileAgentRuntimeResult["renderRuntimeClients"];
     if (definition.kind === "agent") {
-      const { runtimeId, runtimeConfig } = readAgentRuntimeSelection({
+      const runtimeSelection = readAgentRuntimeSelection({
         bindingId: bindingInput.binding.id,
         bindingConfig: parsedBindingConfig,
       });
+      const runtimeId = input.agentRuntimeId;
+      const runtimeConfig = runtimeSelection.runtimeConfig;
       const runtimeDefinition = input.definitions.agentRuntimeRegistry.getRuntime({
         runtimeId,
       });
@@ -831,6 +834,7 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
     sandboxProfileId: input.sandboxProfileId,
     version: input.version,
     definitions: input.definitions,
+    agentRuntimeId: input.agentRuntimeId,
     bindings: input.bindings,
     enforceRuntimeEligibility: true,
   });

@@ -6,6 +6,7 @@ import { AgentRuntimeRegistry } from "../agent-runtimes/index.js";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import { IntegrationRegistry } from "../registry/index.js";
 import {
+  type CompileRuntimePlanInput,
   type CompileBindingResult,
   IntegrationConnectionMethodIds,
   IntegrationMcpConfigFormats,
@@ -13,6 +14,10 @@ import {
   type RuntimeArtifactInstallStep,
 } from "../types/index.js";
 import { compileRuntimePlan } from "./index.js";
+
+type TestCompileRuntimePlanInput = Omit<CompileRuntimePlanInput, "agentRuntimeId"> & {
+  agentRuntimeId?: string;
+};
 
 const OpenAiTargetConfigSchema = z.object({
   apiBaseUrl: z.url(),
@@ -88,6 +93,13 @@ function expectTypedInstallStep(
   }
 
   return entry;
+}
+
+function compileTestRuntimePlan(input: TestCompileRuntimePlanInput) {
+  return compileRuntimePlan({
+    ...input,
+    agentRuntimeId: input.agentRuntimeId ?? "codex",
+  });
 }
 
 function createDefinitionsBundle(registry: IntegrationRegistry) {
@@ -791,7 +803,7 @@ describe("compileRuntimePlan", () => {
     const registry = new IntegrationRegistry();
     registry.register(createOpenAiDefinition());
 
-    const runtimePlan = compileRuntimePlan({
+    const runtimePlan = compileTestRuntimePlan({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       version: 12,
@@ -941,6 +953,67 @@ describe("compileRuntimePlan", () => {
     ]);
   });
 
+  it("uses the runtime plan agent runtime id instead of the legacy binding runtime id", () => {
+    const registry = new IntegrationRegistry();
+    registry.register(createOpenAiDefinition());
+
+    const runtimePlan = compileTestRuntimePlan({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 12,
+      image: {
+        source: "base",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
+      },
+      agentRuntimeId: "claude-code",
+      definitions: createDefinitionsBundle(registry),
+      bindings: [
+        {
+          targetKey: "openai-default",
+          target: {
+            familyId: "openai",
+            variantId: "openai-default",
+            enabled: true,
+            config: {
+              apiBaseUrl: "https://api.openai.com",
+            },
+            secrets: {},
+          },
+          connection: {
+            id: "conn_openai_org_123",
+            status: "active",
+            config: {},
+          },
+          binding: {
+            id: "bind_openai_agent",
+            kind: "agent",
+            connectionId: "conn_openai_org_123",
+            config: {
+              runtime: {
+                runtimeId: "codex",
+                config: {},
+              },
+              model: {
+                defaultModel: "gpt-5.3-codex",
+                options: {},
+              },
+            },
+          },
+        },
+      ],
+    });
+
+    expect(runtimePlan.runtimeClients[0]?.clientId).toBe("claude-code");
+    expect(runtimePlan.agentRuntimes).toHaveLength(1);
+    expect(runtimePlan.agentRuntimes[0]).toMatchObject({
+      bindingId: "bind_openai_agent",
+      runtimeId: "claude-code",
+      runtimeKey: "claude-code",
+      clientId: "claude-code",
+      endpointKey: "claude-code",
+    });
+  });
+
   it("lets agent runtimes render clients from their compiled egress routes", () => {
     const registry = new IntegrationRegistry();
     registry.register(createOpenAiDefinition());
@@ -1061,7 +1134,7 @@ describe("compileRuntimePlan", () => {
       }),
     });
 
-    const runtimePlan = compileRuntimePlan({
+    const runtimePlan = compileTestRuntimePlan({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       version: 12,
@@ -1069,6 +1142,7 @@ describe("compileRuntimePlan", () => {
         source: "base",
         imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
+      agentRuntimeId: "route-aware",
       definitions: {
         integrationRegistry: registry,
         agentRuntimeRegistry,
@@ -1204,7 +1278,7 @@ describe("compileRuntimePlan", () => {
       }),
     });
 
-    const runtimePlan = compileRuntimePlan({
+    const runtimePlan = compileTestRuntimePlan({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       version: 12,
@@ -1257,7 +1331,7 @@ describe("compileRuntimePlan", () => {
     const registry = new IntegrationRegistry();
     registry.register(createGithubReleaseArtifactDefinition());
 
-    const runtimePlan = compileRuntimePlan({
+    const runtimePlan = compileTestRuntimePlan({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       version: 12,
@@ -1328,7 +1402,7 @@ describe("compileRuntimePlan", () => {
     const registry = new IntegrationRegistry();
     registry.register(createPinnedGithubReleaseArtifactDefinition());
 
-    const runtimePlan = compileRuntimePlan({
+    const runtimePlan = compileTestRuntimePlan({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       version: 12,
@@ -1396,7 +1470,7 @@ describe("compileRuntimePlan", () => {
     const registry = new IntegrationRegistry();
     registry.register(createCanonicalGithubReleaseInstallArtifactDefinition());
 
-    const runtimePlan = compileRuntimePlan({
+    const runtimePlan = compileTestRuntimePlan({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       version: 12,
@@ -1464,7 +1538,7 @@ describe("compileRuntimePlan", () => {
     const registry = new IntegrationRegistry();
     registry.register(createTaggedGithubReleaseArtifactDefinition());
 
-    const runtimePlan = compileRuntimePlan({
+    const runtimePlan = compileTestRuntimePlan({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       version: 12,
@@ -1529,7 +1603,7 @@ describe("compileRuntimePlan", () => {
     const registry = new IntegrationRegistry();
     registry.register(createTypedMiseInstallArtifactDefinition());
 
-    const runtimePlan = compileRuntimePlan({
+    const runtimePlan = compileTestRuntimePlan({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       version: 12,
@@ -1578,7 +1652,7 @@ describe("compileRuntimePlan", () => {
     registry.register(createOpenAiDefinition());
     registry.register(createLinearMcpDefinition());
 
-    const runtimePlan = compileRuntimePlan({
+    const runtimePlan = compileTestRuntimePlan({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       version: 12,
@@ -1661,7 +1735,7 @@ describe("compileRuntimePlan", () => {
     registry.register(createJsonAgentDefinition());
     registry.register(createLinearMcpDefinition());
 
-    const runtimePlan = compileRuntimePlan({
+    const runtimePlan = compileTestRuntimePlan({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       version: 12,
@@ -1669,6 +1743,7 @@ describe("compileRuntimePlan", () => {
         source: "base",
         imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
+      agentRuntimeId: "claude-code",
       definitions: createDefinitionsBundle(registry),
       bindings: [
         {
@@ -1746,7 +1821,7 @@ describe("compileRuntimePlan", () => {
     registry.register(createLinearDuplicateNameMcpDefinition());
 
     expect(() =>
-      compileRuntimePlan({
+      compileTestRuntimePlan({
         organizationId: "org_123",
         sandboxProfileId: "sbp_123",
         version: 12,
@@ -1844,7 +1919,7 @@ describe("compileRuntimePlan", () => {
 
     let caughtError: unknown;
     try {
-      compileRuntimePlan({
+      compileTestRuntimePlan({
         organizationId: "org_123",
         sandboxProfileId: "sbp_123",
         version: 12,
@@ -1951,7 +2026,7 @@ describe("compileRuntimePlan", () => {
     registry.register(createOpenAiDefinition());
 
     expect(() =>
-      compileRuntimePlan({
+      compileTestRuntimePlan({
         organizationId: "org_123",
         sandboxProfileId: "sbp_123",
         version: 1,
@@ -1988,7 +2063,7 @@ describe("compileRuntimePlan", () => {
 
     let caughtError: unknown;
     try {
-      compileRuntimePlan({
+      compileTestRuntimePlan({
         organizationId: "org_123",
         sandboxProfileId: "sbp_123",
         version: 1,
@@ -2034,7 +2109,7 @@ describe("compileRuntimePlan", () => {
     registry.register(createOpenAiDefinition());
 
     expect(() =>
-      compileRuntimePlan({
+      compileTestRuntimePlan({
         organizationId: "org_123",
         sandboxProfileId: "sbp_123",
         version: 1,
@@ -2071,7 +2146,7 @@ describe("compileRuntimePlan", () => {
 
     let caughtError: unknown;
     try {
-      compileRuntimePlan({
+      compileTestRuntimePlan({
         organizationId: "org_123",
         sandboxProfileId: "sbp_123",
         version: 1,
@@ -2117,7 +2192,7 @@ describe("compileRuntimePlan", () => {
     registry.register(createOpenAiDefinition());
 
     expect(() =>
-      compileRuntimePlan({
+      compileTestRuntimePlan({
         organizationId: "org_123",
         sandboxProfileId: "sbp_123",
         version: 1,
@@ -2165,7 +2240,7 @@ describe("compileRuntimePlan", () => {
 
     let caughtError: unknown;
     try {
-      compileRuntimePlan({
+      compileTestRuntimePlan({
         organizationId: "org_123",
         sandboxProfileId: "sbp_123",
         version: 1,
@@ -2247,7 +2322,7 @@ describe("compileRuntimePlan", () => {
     registry.register(definition);
 
     expect(() =>
-      compileRuntimePlan({
+      compileTestRuntimePlan({
         organizationId: "org_123",
         sandboxProfileId: "sbp_123",
         version: 1,
@@ -2295,7 +2370,7 @@ describe("compileRuntimePlan", () => {
 
     let caughtError: unknown;
     try {
-      compileRuntimePlan({
+      compileTestRuntimePlan({
         organizationId: "org_123",
         sandboxProfileId: "sbp_123",
         version: 1,
@@ -2352,7 +2427,7 @@ describe("compileRuntimePlan", () => {
     registry.register(createOpenAiDefinition());
 
     expect(() =>
-      compileRuntimePlan({
+      compileTestRuntimePlan({
         organizationId: "org_123",
         sandboxProfileId: "sbp_123",
         version: 1,
@@ -2400,7 +2475,7 @@ describe("compileRuntimePlan", () => {
 
     let caughtError: unknown;
     try {
-      compileRuntimePlan({
+      compileTestRuntimePlan({
         organizationId: "org_123",
         sandboxProfileId: "sbp_123",
         version: 1,
@@ -2458,7 +2533,7 @@ describe("compileRuntimePlan", () => {
 
     let caughtError: unknown;
     try {
-      compileRuntimePlan({
+      compileTestRuntimePlan({
         organizationId: "org_123",
         sandboxProfileId: "sbp_123",
         version: 1,
@@ -2532,7 +2607,7 @@ describe("compileRuntimePlan", () => {
 
     let caughtError: unknown;
     try {
-      compileRuntimePlan({
+      compileTestRuntimePlan({
         organizationId: "org_123",
         sandboxProfileId: "sbp_123",
         version: 1,
@@ -2608,7 +2683,7 @@ describe("compileRuntimePlan", () => {
 
     let caughtError: unknown;
     try {
-      compileRuntimePlan({
+      compileTestRuntimePlan({
         organizationId: "org_123",
         sandboxProfileId: "sbp_123",
         version: 1,
@@ -2745,7 +2820,7 @@ describe("compileRuntimePlan", () => {
 
     let caughtError: unknown;
     try {
-      compileRuntimePlan({
+      compileTestRuntimePlan({
         organizationId: "org_123",
         sandboxProfileId: "sbp_123",
         version: 1,
@@ -2881,7 +2956,7 @@ describe("compileRuntimePlan", () => {
     const registry = new IntegrationRegistry();
     registry.register(definition);
 
-    const runtimePlan = compileRuntimePlan({
+    const runtimePlan = compileTestRuntimePlan({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       version: 1,

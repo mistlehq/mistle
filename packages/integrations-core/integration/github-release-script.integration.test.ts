@@ -162,6 +162,7 @@ describe("github release helper integration", () => {
         source: "base",
         imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
+      agentRuntimeId: "codex",
       definitions: createDefinitionsBundle(registry),
       bindings: [
         {
@@ -222,6 +223,7 @@ describe("github release helper integration", () => {
         source: "base",
         imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
+      agentRuntimeId: "codex",
       definitions: createDefinitionsBundle(registry),
       bindings: [
         {
