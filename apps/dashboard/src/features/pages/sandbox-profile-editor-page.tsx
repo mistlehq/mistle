@@ -1483,6 +1483,7 @@ function ReadySandboxProfileEditorPage(input: {
         ...(runtimeChanges === undefined
           ? {}
           : {
+              agentRuntimeId: runtimeChanges.agentRuntimeId,
               sandboxProvider: runtimeChanges.sandboxProvider,
               sandboxConnectionId: runtimeChanges.sandboxConnectionId,
               sandboxResources: runtimeChanges.sandboxResources,
@@ -1516,6 +1517,7 @@ function ReadySandboxProfileEditorPage(input: {
         }
 
         runtimeDraftState.applySavedRuntimeConfig?.({
+          agentRuntimeId: savedDraft.agentRuntimeId,
           sandboxProvider: savedDraft.sandboxProvider,
           sandboxConnectionId: savedDraft.sandboxConnectionId,
           sandboxResources: savedDraft.sandboxResources,

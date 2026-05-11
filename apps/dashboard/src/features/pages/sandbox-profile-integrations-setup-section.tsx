@@ -1,5 +1,4 @@
 import {
-  Badge,
   Button,
   Dialog,
   DialogContent,
@@ -553,11 +552,6 @@ function SandboxProfileRuntimeIntegrationRows(
 ): React.JSX.Element {
   const controlsAreDisabled = input.disabled === true;
   const isReadOnly = input.readOnly === true;
-  const agentChoices = resolveKindChoices({
-    kind: "agent",
-    availableConnections: input.availableConnections,
-    availableTargets: input.availableTargets,
-  });
   const gitChoices = resolveKindChoices({
     kind: "git",
     availableConnections: input.availableConnections,
@@ -570,18 +564,6 @@ function SandboxProfileRuntimeIntegrationRows(
     availableTargets: input.availableTargets,
   });
   const hasNoGitProviderOptions = gitIssue === null && gitChoices.length === 0;
-  const agentDisplayChoice =
-    agentChoices[0] === undefined
-      ? undefined
-      : {
-          ...agentChoices[0],
-          title: (
-            <span className="flex items-center gap-2">
-              <span>Codex</span>
-              <Badge variant="outline">Default</Badge>
-            </span>
-          ),
-        };
   const gitTargetKey = findTargetForConnection({
     connectionId: gitRow?.connectionId,
     availableConnections: input.availableConnections,
@@ -621,92 +603,77 @@ function SandboxProfileRuntimeIntegrationRows(
   }
 
   return (
-    <>
-      <SandboxProfileSectionCard>
+    <SandboxProfileSectionCard>
+      <div className="grid gap-4">
         <Field contentWidth="fill" orientation="horizontal">
           <FieldHeader>
-            <FieldLabel>Agent</FieldLabel>
+            <FieldLabel>Git Provider</FieldLabel>
           </FieldHeader>
           <FieldContent>
-            {agentDisplayChoice === undefined ? null : (
-              <IntegrationNameCell item={agentDisplayChoice} />
-            )}
-          </FieldContent>
-        </Field>
-      </SandboxProfileSectionCard>
-
-      <SandboxProfileSectionCard>
-        <div className="grid gap-4">
-          <Field contentWidth="fill" orientation="horizontal">
-            <FieldHeader>
-              <FieldLabel>Git Provider</FieldLabel>
-            </FieldHeader>
-            <FieldContent>
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  {hasNoGitProviderOptions ? (
-                    <NoGitProvidersCell />
-                  ) : gitIssue === null ? (
-                    <IntegrationSelectionCell
-                      allowNone={true}
-                      ariaLabel="git provider integration"
-                      choices={gitChoices}
-                      onIntegrationChange={(nextTargetKey) => {
-                        if (controlsAreDisabled) {
-                          return;
-                        }
-                        if (nextTargetKey === NoIntegrationValue) {
-                          if (gitRow !== null) {
-                            input.onRemoveIntegrationBindingRow(gitRow.clientId);
-                          }
-                          return;
-                        }
-                        void upsertGitBinding(nextTargetKey);
-                      }}
-                      selectedIntegrationId={gitTargetKey ?? NoIntegrationValue}
-                      disabled={controlsAreDisabled}
-                      readOnly={isReadOnly}
-                    />
-                  ) : (
-                    <UnresolvedNoneCell />
-                  )}
-                </div>
-                {gitIssue === null || gitRow === null || isReadOnly ? null : (
-                  <RemoveIntegrationBindingButton
-                    disabled={controlsAreDisabled}
-                    label="Remove git provider"
-                    onRemove={() => {
+            <div className="flex items-start gap-2">
+              <div className="min-w-0 flex-1">
+                {hasNoGitProviderOptions ? (
+                  <NoGitProvidersCell />
+                ) : gitIssue === null ? (
+                  <IntegrationSelectionCell
+                    allowNone={true}
+                    ariaLabel="git provider integration"
+                    choices={gitChoices}
+                    onIntegrationChange={(nextTargetKey) => {
                       if (controlsAreDisabled) {
                         return;
                       }
-
-                      input.onRemoveIntegrationBindingRow(gitRow.clientId);
+                      if (nextTargetKey === NoIntegrationValue) {
+                        if (gitRow !== null) {
+                          input.onRemoveIntegrationBindingRow(gitRow.clientId);
+                        }
+                        return;
+                      }
+                      void upsertGitBinding(nextTargetKey);
                     }}
+                    selectedIntegrationId={gitTargetKey ?? NoIntegrationValue}
+                    disabled={controlsAreDisabled}
+                    readOnly={isReadOnly}
                   />
+                ) : (
+                  <UnresolvedNoneCell />
                 )}
               </div>
-            </FieldContent>
-          </Field>
+              {gitIssue === null || gitRow === null || isReadOnly ? null : (
+                <RemoveIntegrationBindingButton
+                  disabled={controlsAreDisabled}
+                  label="Remove git provider"
+                  onRemove={() => {
+                    if (controlsAreDisabled) {
+                      return;
+                    }
 
-          {gitRow === null ||
-          !hasSandboxProfileBindingResourcesAndToolsCellContent({
-            row: gitRow,
-            availableConnections: input.availableConnections,
-            availableTargets: input.availableTargets,
-          }) ? null : (
-            <SandboxProfileBindingResourcesAndToolsCell
-              availableConnections={input.availableConnections}
-              availableTargets={input.availableTargets}
-              disabled={controlsAreDisabled}
-              showGroupLabels={true}
-              readOnly={isReadOnly}
-              onRowChange={input.onIntegrationBindingRowChange}
-              row={gitRow}
-            />
-          )}
-        </div>
-      </SandboxProfileSectionCard>
-    </>
+                    input.onRemoveIntegrationBindingRow(gitRow.clientId);
+                  }}
+                />
+              )}
+            </div>
+          </FieldContent>
+        </Field>
+
+        {gitRow === null ||
+        !hasSandboxProfileBindingResourcesAndToolsCellContent({
+          row: gitRow,
+          availableConnections: input.availableConnections,
+          availableTargets: input.availableTargets,
+        }) ? null : (
+          <SandboxProfileBindingResourcesAndToolsCell
+            availableConnections={input.availableConnections}
+            availableTargets={input.availableTargets}
+            disabled={controlsAreDisabled}
+            showGroupLabels={true}
+            readOnly={isReadOnly}
+            onRowChange={input.onIntegrationBindingRowChange}
+            row={gitRow}
+          />
+        )}
+      </div>
+    </SandboxProfileSectionCard>
   );
 }
 
@@ -873,6 +840,7 @@ export function SandboxProfileIntegrationsSetupSection(
       {input.runtimeSettings === null ? null : (
         <SectionBlock title="Runtime">
           <div className="grid gap-4">
+            {input.runtimeSettings}
             <SandboxProfileRuntimeIntegrationRows
               availableConnections={input.availableConnections}
               availableTargets={input.availableTargets}
@@ -883,7 +851,6 @@ export function SandboxProfileIntegrationsSetupSection(
               onRemoveIntegrationBindingRow={input.onRemoveIntegrationBindingRow}
               readOnly={input.readOnly}
             />
-            {input.runtimeSettings}
             <SandboxProfileSectionCard>
               <div className="grid gap-3">
                 {connectorRows.length === 0 ? null : (

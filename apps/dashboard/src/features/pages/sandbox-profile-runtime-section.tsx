@@ -37,8 +37,10 @@ const MissingConnectionValue = "__missing_connection__";
 const DockerSandboxProviderId = "docker";
 
 type SandboxCredentialSource = "managed" | "organization";
+type AgentRuntimeId = SandboxProfileVersion["agentRuntimeId"];
 
 export type SandboxProfileRuntimeDraftChanges = {
+  agentRuntimeId: AgentRuntimeId;
   sandboxProvider: string;
   sandboxConnectionId: string | null;
   sandboxResources: SandboxProfileVersion["sandboxResources"];
@@ -52,6 +54,7 @@ export type SandboxProfileRuntimeDraftState = {
 };
 
 type RuntimeConfigState = {
+  agentRuntimeId: AgentRuntimeId;
   credentialSource: SandboxCredentialSource;
   sandboxProvider: string | null;
   sandboxConnectionId: string | null;
@@ -109,6 +112,7 @@ export function SandboxProfileRuntimeSection(input: {
     }
 
     return {
+      agentRuntimeId: runtime.agentRuntimeId,
       sandboxProvider: provider,
       sandboxConnectionId: runtime.sandboxConnectionId,
       sandboxResources: runtime.sandboxResources,
@@ -126,6 +130,7 @@ export function SandboxProfileRuntimeSection(input: {
           connectionId: runtimeConfig.sandboxConnectionId,
           provider,
         }),
+        agentRuntimeId: runtimeConfig.agentRuntimeId,
         sandboxProvider: runtimeConfig.sandboxProvider,
         sandboxConnectionId: runtimeConfig.sandboxConnectionId,
         sandboxResources: runtimeConfig.sandboxResources,
@@ -156,6 +161,7 @@ export function SandboxProfileRuntimeSection(input: {
     setSaveErrorMessage(null);
   }, [
     input.providers,
+    input.version.agentRuntimeId,
     input.version.sandboxConnectionId,
     input.version.sandboxProvider,
     input.version.sandboxResources,
@@ -189,6 +195,7 @@ export function SandboxProfileRuntimeSection(input: {
     }
 
     setDraftRuntime({
+      agentRuntimeId: draftRuntimeRef.current.agentRuntimeId,
       credentialSource: resolveDefaultCredentialSourceForProvider(provider),
       sandboxProvider: provider.id,
       sandboxConnectionId: null,
@@ -242,7 +249,46 @@ export function SandboxProfileRuntimeSection(input: {
     setSaveErrorMessage(null);
   }
 
+  function updateAgentRuntime(value: string | null): void {
+    if (value !== "codex" && value !== "opencode") {
+      return;
+    }
+
+    setDraftRuntime((currentRuntime) => ({
+      ...currentRuntime,
+      agentRuntimeId: value,
+    }));
+    setSaveErrorMessage(null);
+  }
+
   const providerFieldLabel = input.sectionChrome === false ? "Sandbox Runtime" : "Provider";
+  const agentRuntimeField = (
+    <Field
+      contentWidth={input.sectionChrome === false ? "fill" : "fit"}
+      orientation={input.sectionChrome === false ? "horizontal" : "vertical"}
+    >
+      <FieldHeader>
+        <FieldLabel htmlFor="sandbox-profile-agent-runtime">Agent Runtime</FieldLabel>
+      </FieldHeader>
+      <FieldContent>
+        <Select onValueChange={updateAgentRuntime} value={draftRuntime.agentRuntimeId}>
+          <SelectTrigger id="sandbox-profile-agent-runtime">
+            <SelectValue>
+              <AgentRuntimeOptionLabel runtimeId={draftRuntime.agentRuntimeId} />
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="codex">
+              <AgentRuntimeOptionLabel runtimeId="codex" />
+            </SelectItem>
+            <SelectItem value="opencode">
+              <AgentRuntimeOptionLabel runtimeId="opencode" />
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </FieldContent>
+    </Field>
+  );
   const providerField = (
     <Field
       contentWidth={input.sectionChrome === false ? "fill" : "fit"}
@@ -290,6 +336,7 @@ export function SandboxProfileRuntimeSection(input: {
     />
   ) : (
     <div className="grid gap-4">
+      {agentRuntimeField}
       {input.sectionChrome === false ? (
         providerField
       ) : (
@@ -603,7 +650,10 @@ function SandboxProfileRuntimeReadOnlySummary(input: {
 }): React.JSX.Element {
   const shouldShowCredentials = input.runtime.sandboxConnectionId !== null;
   return (
-    <div className="grid gap-4 text-sm md:grid-cols-3">
+    <div className="grid gap-4 text-sm md:grid-cols-4">
+      <ReadOnlyRuntimeItem label="Agent Runtime">
+        <AgentRuntimeOptionLabel runtimeId={input.runtime.agentRuntimeId} />
+      </ReadOnlyRuntimeItem>
       <ReadOnlyRuntimeItem label="Provider">
         {input.provider === null ? (
           input.runtime.sandboxProvider
@@ -620,6 +670,18 @@ function SandboxProfileRuntimeReadOnlySummary(input: {
         {formatResources(input.runtime.sandboxResources)}
       </ReadOnlyRuntimeItem>
     </div>
+  );
+}
+
+function AgentRuntimeOptionLabel(input: { runtimeId: AgentRuntimeId }): React.JSX.Element {
+  const logoKey = input.runtimeId === "opencode" ? "opencode" : "openai";
+  const label = input.runtimeId === "opencode" ? "OpenCode" : "Codex";
+
+  return (
+    <span className="flex items-center gap-2">
+      <img alt="" className="size-4 rounded-sm" src={resolveIntegrationLogoPath({ logoKey })} />
+      {label}
+    </span>
   );
 }
 
@@ -714,6 +776,7 @@ function createRuntimeConfigState(input: {
   });
 
   return {
+    agentRuntimeId: input.version.agentRuntimeId,
     credentialSource: resolveCredentialSource({
       connectionId: input.version.sandboxConnectionId,
       provider,
@@ -813,6 +876,7 @@ function resolveSandboxProviderIdFromTarget(target: IntegrationTargetSummary): s
 
 function runtimeConfigStatesAreEqual(left: RuntimeConfigState, right: RuntimeConfigState): boolean {
   return (
+    left.agentRuntimeId === right.agentRuntimeId &&
     left.sandboxProvider === right.sandboxProvider &&
     left.sandboxConnectionId === right.sandboxConnectionId &&
     resourcesAreEqual(left.sandboxResources, right.sandboxResources)

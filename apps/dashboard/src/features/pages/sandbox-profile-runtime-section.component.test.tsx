@@ -79,13 +79,15 @@ function createVersion(
   input: Pick<
     SandboxProfileVersion,
     "sandboxProvider" | "sandboxConnectionId" | "sandboxResources"
-  >,
+  > & {
+    agentRuntimeId?: SandboxProfileVersion["agentRuntimeId"];
+  },
 ): SandboxProfileVersion {
   return {
     sandboxProfileId: "sbp_runtime_section_test",
     version: 1,
     state: "draft",
-    agentRuntimeId: "codex",
+    agentRuntimeId: input.agentRuntimeId ?? "codex",
     defaultPersistenceMode: "ephemeral",
     sandboxProvider: input.sandboxProvider,
     sandboxConnectionId: input.sandboxConnectionId,
@@ -118,6 +120,8 @@ describe("SandboxProfileRuntimeSection", () => {
     );
 
     expect(screen.getByText("Sandbox Runtime")).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Agent Runtime" })).toBeTruthy();
+    expect(screen.getByText("Codex")).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "Provider" })).toBeTruthy();
     expect(screen.getByText("E2B")).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "Credentials" })).toBeTruthy();
@@ -125,6 +129,27 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(screen.queryByRole("combobox", { name: "Connection" })).toBeNull();
     expect(screen.queryByText("E2B (Managed)")).toBeNull();
     expect(screen.queryByText("Managed")).toBeNull();
+  });
+
+  it("renders OpenCode as the selected profile agent runtime", () => {
+    render(
+      <SandboxProfileRuntimeSection
+        availableConnections={[]}
+        availableTargets={[]}
+        disabled={false}
+        isDraft={true}
+        providers={[DockerProvider]}
+        version={createVersion({
+          agentRuntimeId: "opencode",
+          sandboxProvider: "docker",
+          sandboxConnectionId: null,
+          sandboxResources: null,
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("combobox", { name: "Agent Runtime" })).toBeTruthy();
+    expect(screen.getByText("OpenCode")).toBeTruthy();
   });
 
   it("renders organization-owned E2B as BYOK credentials for the selected provider", () => {
