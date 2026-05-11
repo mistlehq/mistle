@@ -941,6 +941,229 @@ describe("compileRuntimePlan", () => {
     ]);
   });
 
+  it("lets agent runtimes render clients from their compiled egress routes", () => {
+    const registry = new IntegrationRegistry();
+    registry.register(createOpenAiDefinition());
+    registry.register(createLinearMcpDefinition());
+    const agentRuntimeRegistry = new AgentRuntimeRegistry();
+    agentRuntimeRegistry.register({
+      runtimeId: "route-aware",
+      displayName: "Route Aware",
+      configSchema: z.object({}).strict(),
+      compileRuntime: (input) => ({
+        egressRoutes: [
+          {
+            match: {
+              hosts: ["api.openai.com"],
+              methods: ["POST"],
+              pathPrefixes: ["/v1"],
+            },
+            upstream: {
+              baseUrl: input.providerAccess.apiBaseUrl,
+            },
+            authInjection: {
+              type: "bearer",
+              target: "authorization",
+            },
+            credentialResolver: {
+              kind: "integration_connection",
+              connectionId: input.providerAccess.credentialResolver.connectionId,
+              secretType: input.providerAccess.credentialResolver.secretType,
+            },
+          },
+        ],
+        runtimeClients: [
+          {
+            clientId: "route-aware-cli",
+            setup: {
+              env: {
+                ROUTE_ID: "unrendered",
+              },
+              files: [],
+            },
+            processes: [],
+            endpoints: [],
+          },
+        ],
+        renderRuntimeClients: ({ egressRoutes, bindingEgressRoutes }) => {
+          const route = bindingEgressRoutes[0];
+          if (route === undefined) {
+            throw new Error("Expected binding egress route.");
+          }
+          const linearRoute = egressRoutes.find((candidate) => candidate.familyId === "linear");
+          if (linearRoute === undefined) {
+            throw new Error("Expected full compiled egress route set to include Linear.");
+          }
+
+          return [
+            {
+              clientId: "route-aware-cli",
+              setup: {
+                env: {
+                  ROUTE_ID: route.egressRuleId,
+                  BINDING_ID: route.bindingId,
+                  FAMILY_ID: route.familyId,
+                  VARIANT_ID: route.variantId,
+                  UPSTREAM_BASE_URL: route.upstream.baseUrl,
+                  ALL_ROUTE_COUNT: String(egressRoutes.length),
+                  LINEAR_ROUTE_ID: linearRoute.egressRuleId,
+                },
+                files: [],
+              },
+              processes: [],
+              endpoints: [
+                {
+                  endpointKey: "route-aware-endpoint",
+                  transport: {
+                    type: "ws",
+                    url: "ws://127.0.0.1:4747",
+                  },
+                  connectionMode: "dedicated",
+                },
+              ],
+            },
+          ];
+        },
+        agentRuntimes: [
+          {
+            runtimeId: "route-aware",
+            runtimeKey: "route-aware-server",
+            clientId: "route-aware-cli",
+            endpointKey: "route-aware-endpoint",
+            ptyLaunch: {
+              runtimeId: "route-aware",
+              displayName: "Route Aware",
+              newLaunch: {
+                ptySessionId: "cli",
+                cols: 120,
+                rows: 32,
+                command: "route-aware",
+                args: [],
+              },
+              resumeLaunch: {
+                ptySessionId: "cli",
+                cols: 120,
+                rows: 32,
+                command: "route-aware",
+                args: [
+                  {
+                    kind: "literal",
+                    value: "resume",
+                  },
+                  {
+                    kind: "threadId",
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      }),
+    });
+
+    const runtimePlan = compileRuntimePlan({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 12,
+      image: {
+        source: "base",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
+      },
+      definitions: {
+        integrationRegistry: registry,
+        agentRuntimeRegistry,
+      },
+      bindings: [
+        {
+          targetKey: "openai-default",
+          target: {
+            familyId: "openai",
+            variantId: "openai-default",
+            enabled: true,
+            config: {
+              apiBaseUrl: "https://api.openai.com",
+            },
+            secrets: {},
+          },
+          connection: {
+            id: "conn_openai_org_123",
+            status: "active",
+            config: {},
+          },
+          binding: {
+            id: "bind_openai_agent",
+            kind: "agent",
+            connectionId: "conn_openai_org_123",
+            config: {
+              runtime: {
+                runtimeId: "route-aware",
+                config: {},
+              },
+              model: {
+                defaultModel: "gpt-5.3-codex",
+                options: {},
+              },
+            },
+          },
+        },
+        {
+          targetKey: "linear-default",
+          target: {
+            familyId: "linear",
+            variantId: "linear-default",
+            enabled: true,
+            config: {
+              apiBaseUrl: "https://linear.app",
+            },
+            secrets: {},
+          },
+          connection: {
+            id: "conn_linear_org_123",
+            status: "active",
+            config: {},
+          },
+          binding: {
+            id: "bind_linear_connector",
+            kind: "connector",
+            connectionId: "conn_linear_org_123",
+            config: {
+              tools: ["linear-mcp"],
+            },
+          },
+        },
+      ],
+    });
+
+    expect(runtimePlan.runtimeClients).toEqual([
+      {
+        clientId: "route-aware-cli",
+        setup: {
+          env: {
+            ROUTE_ID: "egress_rule_bind_openai_agent",
+            BINDING_ID: "bind_openai_agent",
+            FAMILY_ID: "openai",
+            VARIANT_ID: "openai-default",
+            UPSTREAM_BASE_URL: "https://api.openai.com",
+            ALL_ROUTE_COUNT: "3",
+            LINEAR_ROUTE_ID: "egress_rule_bind_linear_connector",
+          },
+          files: [],
+        },
+        processes: [],
+        endpoints: [
+          {
+            endpointKey: "route-aware-endpoint",
+            transport: {
+              type: "ws",
+              url: "ws://127.0.0.1:4747",
+            },
+            connectionMode: "dedicated",
+          },
+        ],
+      },
+    ]);
+  });
+
   it("preserves request middleware declared by compiled egress routes", () => {
     const registry = new IntegrationRegistry();
     registry.register({

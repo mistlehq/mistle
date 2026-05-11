@@ -6,6 +6,7 @@ import type {
   CompileBindingEgressRoute,
   CompileBindingRefs,
   CompileBindingWorkspaceSource,
+  EgressCredentialRoute,
   IntegrationConfigSchema,
   IntegrationMcpConfig,
   IntegrationFormDefinition,
@@ -52,10 +53,26 @@ export type CompileAgentRuntimeInput<TRuntimeConfig = Record<string, unknown>> =
   refs: CompileBindingRefs;
 };
 
+export type CompileAgentRuntimeRenderRuntimeClientsInput = {
+  /**
+   * All compiled egress routes in the sandbox profile version. Runtime definitions
+   * can derive local compatibility config from this view, but gateway egress
+   * remains the source of truth for proxy policy.
+   */
+  egressRoutes: ReadonlyArray<EgressCredentialRoute>;
+  /**
+   * The subset of egress routes emitted by the binding that owns this runtime.
+   */
+  bindingEgressRoutes: ReadonlyArray<EgressCredentialRoute>;
+};
+
 export type CompileAgentRuntimeResult = {
   egressRoutes?: ReadonlyArray<CompileBindingEgressRoute>;
   artifacts?: ReadonlyArray<RuntimeArtifactSpec>;
   runtimeClients: ReadonlyArray<RuntimeClient>;
+  renderRuntimeClients?: (
+    input: CompileAgentRuntimeRenderRuntimeClientsInput,
+  ) => ReadonlyArray<RuntimeClient>;
   workspaceSources?: ReadonlyArray<CompileBindingWorkspaceSource>;
   agentRuntimes: ReadonlyArray<{
     runtimeId: string;
