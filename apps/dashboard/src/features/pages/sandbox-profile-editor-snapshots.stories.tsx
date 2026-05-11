@@ -10,6 +10,9 @@ const meta = {
   title: "Dashboard/SandboxProfiles/Editor/Snapshots",
   component: SandboxProfileEditorPageStory,
   decorators: [withDashboardPageStory],
+  parameters: {
+    layout: "fullscreen",
+  },
   render: function RenderStory(args): React.JSX.Element {
     return <SandboxProfileEditorPageStory {...args} />;
   },

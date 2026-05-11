@@ -88,13 +88,13 @@ export function PageFrame(input: PageFrameProps): React.JSX.Element {
 
   if (variant === "tabbed") {
     return (
-      <div className="flex min-h-full flex-col">
+      <div className="flex min-h-svh flex-col">
         {renderedHeader === null ? null : (
           <div className="p-4" data-slot="page-frame-above-tabs">
             {renderedHeader}
           </div>
         )}
-        <div className="min-h-0 flex-1" data-slot="page-frame-below-tabs">
+        <div className="flex min-h-0 flex-1 flex-col" data-slot="page-frame-below-tabs">
           {input.children}
         </div>
       </div>

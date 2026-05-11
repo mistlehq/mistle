@@ -10,6 +10,9 @@ const meta = {
   title: "Dashboard/SandboxProfiles/Editor/Overview",
   component: SandboxProfileEditorPageStory,
   decorators: [withDashboardPageStory],
+  parameters: {
+    layout: "fullscreen",
+  },
   render: function RenderStory(args): React.JSX.Element {
     return <SandboxProfileEditorPageStory {...args} />;
   },
@@ -43,6 +46,12 @@ export const OrganizationE2BRuntime: Story = {
 export const OrganizationE2BMissingConnection: Story = {
   args: {
     runtimeState: "e2b-missing-connection",
+  },
+};
+
+export const EmptyAutomationsTab: Story = {
+  args: {
+    initialSectionId: "automations",
   },
 };
 
