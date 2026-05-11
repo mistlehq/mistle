@@ -13,7 +13,7 @@ import { MemoryRouter, NavLink } from "react-router";
 import { ErrorNotice } from "../auth/error-notice.js";
 import { SessionsNavToggleItem } from "../navigation/sessions-nav-toggle-item.js";
 import { AppShellView } from "./app-shell-view.js";
-import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
+import { AppSidebarHeader } from "./app-sidebar-header.js";
 
 type AppShellViewStoryArgs = React.ComponentProps<typeof AppShellView> & {
   locationPathname: string;
@@ -240,7 +240,7 @@ const meta = {
     sidebarContent: null,
     sidebarFooterContent: <ErrorNotice message={null} />,
     sidebarHeaderContent: (
-      <OrganizationMenuTrigger
+      <AppSidebarHeader
         activeOrganizationId="org_mistle"
         isSigningOut={false}
         onSwitchOrganization={function onSwitchOrganization() {}}

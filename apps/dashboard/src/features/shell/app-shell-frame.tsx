@@ -16,7 +16,7 @@ import { SessionsSidebarHeader } from "../navigation/sessions-sidebar-header.js"
 import { SettingsBackButton } from "../settings/settings-back-button.js";
 import { SettingsSectionNav } from "../settings/settings-section-nav.js";
 import { AppShellView } from "./app-shell-view.js";
-import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
+import { AppSidebarHeader } from "./app-sidebar-header.js";
 import type { OrganizationSwitcherOption } from "./organization-switcher.js";
 import { TopLoadingBar } from "./top-loading-bar.js";
 
@@ -118,7 +118,7 @@ export function resolveAppShellFrame(input: {
     ),
     sidebarFooterContent: <ErrorNotice message={input.signOutError} />,
     sidebarHeaderContent: showDedicatedSessionsSidebar ? null : (
-      <OrganizationMenuTrigger
+      <AppSidebarHeader
         activeOrganizationId={input.activeOrganizationId}
         isSigningOut={input.isSigningOut}
         isSwitchingOrganization={input.isSwitchingOrganization}
