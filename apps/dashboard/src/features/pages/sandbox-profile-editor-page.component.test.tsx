@@ -310,6 +310,7 @@ function resolveSandboxProfileEditorTestRouteView(input: {
   switch (input.versionState) {
     case "published":
     case "published-with-draft":
+    case "draft-with-published":
     case "published-pending-with-older-active":
     case "published-failed-with-older-active":
     case "published-manual-refresh-no-snapshot":
@@ -319,7 +320,6 @@ function resolveSandboxProfileEditorTestRouteView(input: {
     case "published-failed":
       return "published";
     case "draft":
-    case "draft-with-published":
       return "draft";
   }
 }
@@ -2124,6 +2124,7 @@ describe("SandboxProfileEditorPage", () => {
 
   it("keeps draft publish action enabled", () => {
     renderSandboxProfileEditor({
+      view: "draft",
       versionState: "draft-with-published",
     });
 
@@ -2216,6 +2217,7 @@ describe("SandboxProfileEditorPage", () => {
 
   it("shows draft actions for draft profiles with a published version", () => {
     renderSandboxProfileEditor({
+      view: "draft",
       versionState: "draft-with-published",
     });
 
