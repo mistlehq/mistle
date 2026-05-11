@@ -11,6 +11,11 @@ import {
   getLocalDevDockerRegistrySandboxBaseImageRef,
   getLocalPreparedRuntimeSandboxBaseImageRef,
 } from "../../packages/config/src/sandbox-base-images.js";
+import {
+  SandboxBaseImagePublishModes,
+  SandboxBaseImageSourceKinds,
+  createDockerBaseImageBuilder,
+} from "../../packages/sandbox/src/index.js";
 import { ensureDevObjectStoreBucketExists } from "./ensure-object-store-bucket.ts";
 import { createControlPlaneStartupCommands } from "./start-commands.ts";
 
@@ -455,19 +460,15 @@ async function start(): Promise<void> {
         );
       }
       console.log("Building sandbox base image...");
-      runOrThrow({
-        command: "docker",
-        args: [
-          "build",
-          "--target",
-          "sandbox-base",
-          "-f",
-          SANDBOX_BASE_DOCKERFILE_PATH,
-          "-t",
-          SANDBOX_BASE_IMAGE_TAG,
-          ".",
-        ],
-        env: sharedDevEnv,
+      await createDockerBaseImageBuilder({ env: sharedDevEnv }).buildBaseImage({
+        source: {
+          kind: SandboxBaseImageSourceKinds.DOCKERFILE,
+          contextPath: REPO_ROOT,
+          dockerfilePath: SANDBOX_BASE_DOCKERFILE_PATH,
+          imageId: SANDBOX_BASE_IMAGE_TAG,
+          publishMode: SandboxBaseImagePublishModes.LOAD,
+          target: "sandbox-base",
+        },
       });
     } else {
       console.log("Sandbox base image is up to date.");

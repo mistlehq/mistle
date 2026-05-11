@@ -16,6 +16,47 @@ export interface SandboxImageHandle {
   readonly createdAt: string;
 }
 
+export const SandboxBaseImageSourceKinds = {
+  DOCKERFILE: "dockerfile",
+  IMAGE: "image",
+} as const;
+export type SandboxBaseImageSourceKind =
+  (typeof SandboxBaseImageSourceKinds)[keyof typeof SandboxBaseImageSourceKinds];
+
+export const SandboxBaseImagePublishModes = {
+  LOAD: "load",
+  PUSH: "push",
+} as const;
+export type SandboxBaseImagePublishMode =
+  (typeof SandboxBaseImagePublishModes)[keyof typeof SandboxBaseImagePublishModes];
+
+export interface SandboxDockerfileBaseImageSource {
+  readonly kind: typeof SandboxBaseImageSourceKinds.DOCKERFILE;
+  readonly additionalImageIds?: readonly string[];
+  readonly contextPath: string;
+  readonly dockerfilePath: string;
+  readonly imageId: string;
+  readonly labels?: Readonly<Record<string, string>>;
+  readonly publishMode: SandboxBaseImagePublishMode;
+  readonly target?: string;
+}
+
+export interface SandboxImageBaseImageSource {
+  readonly kind: typeof SandboxBaseImageSourceKinds.IMAGE;
+  readonly imageId: string;
+}
+
+export type SandboxBaseImageSource = SandboxDockerfileBaseImageSource | SandboxImageBaseImageSource;
+
+export interface SandboxBuildBaseImageRequest {
+  readonly platform?: string;
+  readonly source: SandboxBaseImageSource;
+}
+
+export interface SandboxBaseImageBuilder {
+  buildBaseImage(request: SandboxBuildBaseImageRequest): Promise<SandboxImageHandle>;
+}
+
 export interface SandboxHandle {
   readonly provider: SandboxRuntimeProvider;
   readonly id: string;

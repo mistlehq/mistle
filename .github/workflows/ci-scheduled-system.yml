@@ -102,12 +102,12 @@ jobs:
 
       - name: Build local sandbox base image
         run: >-
-          nix develop --command docker build --platform linux/amd64
-          --pull=false
+          nix develop --command pnpm sandbox-base:build
+          --provider docker
+          --output-image-ref mistle/sandbox-base:dev
+          --publish-mode load
+          --platform linux/amd64
           --target sandbox-base-system-tests
-          -f packages/sandboxd/Dockerfile
-          -t mistle/sandbox-base:dev
-          .
 
       - name: Run runtime system tests
         run: nix develop --command pnpm --filter @mistle/tests test:system:runtime

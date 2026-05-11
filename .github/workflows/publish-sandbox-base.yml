@@ -7,6 +7,10 @@ on:
     paths:
       - ".github/workflows/publish-sandbox-base.yml"
       - ".dockerignore"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/sandbox-base/build-provider-image.ts"
+      - "packages/sandbox/**"
       - "packages/sandboxd/**"
   workflow_dispatch:
     inputs:
@@ -39,6 +43,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 25
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Log in to GitHub Container Registry
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -46,37 +63,29 @@ jobs:
 
       - name: Build sandbox base image
         run: |
-          tags=(--tag "${IMAGE_REPOSITORY}:${IMAGE_TAG}")
+          args=(
+            --output-image-ref "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+            --platform linux/amd64
+            --target sandbox-base
+            --label "org.opencontainers.image.source=${IMAGE_SOURCE}"
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}"
+            --label "org.opencontainers.image.title=Mistle Sandbox Base"
+            --label "org.opencontainers.image.description=Sandbox base image for Mistle coding agent runtimes"
+            --label "org.opencontainers.image.url=${IMAGE_SOURCE}"
+            --label "org.opencontainers.image.vendor=Mistle"
+          )
 
           if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.publish_latest }}" = "true" ]; then
-            tags+=(--tag "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}")
+            args+=(--additional-output-image-ref "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}")
           fi
 
-          docker build \
-            --platform linux/amd64 \
-            --target sandbox-base \
-            --file packages/sandboxd/Dockerfile \
-            --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
-            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
-            --label "org.opencontainers.image.title=Mistle Sandbox Base" \
-            --label "org.opencontainers.image.description=Sandbox base image for Mistle coding agent runtimes" \
-            --label "org.opencontainers.image.url=${IMAGE_SOURCE}" \
-            --label "org.opencontainers.image.vendor=Mistle" \
-            "${tags[@]}" \
-            .
-
-      - name: Push sandbox base image
-        run: |
-          docker push "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
-
-          if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.publish_latest }}" = "true" ]; then
-            docker push "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}"
-          fi
+          pnpm dev:sandbox-base:push:docker "${args[@]}"
 
       - name: Resolve pushed digest
         id: publish
         run: |
-          image_ref="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_REPOSITORY}:${IMAGE_TAG}")"
+          digest="$(docker buildx imagetools inspect "${IMAGE_REPOSITORY}:${IMAGE_TAG}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          image_ref="${IMAGE_REPOSITORY}@${digest}"
           echo "image_ref=${image_ref}" >> "${GITHUB_OUTPUT}"
 
       - name: Summarize published image

@@ -140,6 +140,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 25
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Log in to GitHub Container Registry
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -147,27 +160,23 @@ jobs:
 
       - name: Build sandbox base image
         run: |
-          docker build \
+          pnpm dev:sandbox-base:push:docker \
+            --output-image-ref "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}" \
             --platform linux/amd64 \
             --target sandbox-base \
-            --file packages/sandboxd/Dockerfile \
-            --tag "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}" \
             --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --label "org.opencontainers.image.version=${{ needs.validate.outputs.release_version }}" \
             --label "org.opencontainers.image.title=Mistle Sandbox Base" \
             --label "org.opencontainers.image.description=Sandbox base image for Mistle coding agent runtimes" \
             --label "org.opencontainers.image.url=${IMAGE_SOURCE}" \
-            --label "org.opencontainers.image.vendor=Mistle" \
-            .
-
-      - name: Push sandbox base image
-        run: docker push "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}"
+            --label "org.opencontainers.image.vendor=Mistle"
 
       - name: Resolve pushed digest
         id: publish
         run: |
-          image_ref="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}")"
+          digest="$(docker buildx imagetools inspect "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          image_ref="${IMAGE_REPOSITORY}@${digest}"
           echo "image_ref=${image_ref}" >> "${GITHUB_OUTPUT}"
 
       - name: Write release manifest fragment

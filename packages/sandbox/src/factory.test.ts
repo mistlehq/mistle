@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { SandboxConfigurationError } from "./errors.js";
-import { createSandboxAdapter, createSandboxRuntimeControl } from "./factory.js";
+import {
+  createSandboxAdapter,
+  createSandboxBaseImageBuilder,
+  createSandboxRuntimeControl,
+} from "./factory.js";
 import {
   SandboxPersistentStorageLayout,
   SandboxProvider,
@@ -182,6 +186,35 @@ describe("createSandboxRuntimeControl", () => {
   it("throws when E2B runtime control config is missing", () => {
     expect(() =>
       createSandboxRuntimeControl({
+        provider: SandboxProvider.E2B,
+      }),
+    ).toThrow(SandboxConfigurationError);
+  });
+});
+
+describe("createSandboxBaseImageBuilder", () => {
+  it("creates a docker base image builder without runtime Docker config", () => {
+    const builder = createSandboxBaseImageBuilder({
+      provider: SandboxProvider.DOCKER,
+    });
+
+    expect(typeof builder.buildBaseImage).toBe("function");
+  });
+
+  it("creates an E2B base image builder when E2B config is provided", () => {
+    const builder = createSandboxBaseImageBuilder({
+      provider: SandboxProvider.E2B,
+      e2b: {
+        apiKey: "test-api-key",
+      },
+    });
+
+    expect(typeof builder.buildBaseImage).toBe("function");
+  });
+
+  it("throws when E2B base image builder config is missing", () => {
+    expect(() =>
+      createSandboxBaseImageBuilder({
         provider: SandboxProvider.E2B,
       }),
     ).toThrow(SandboxConfigurationError);

@@ -1,5 +1,6 @@
 import type { SandboxRuntimeControl } from "../../types.js";
 import { DockerSandboxAdapter, createDockerSandboxAdapter } from "./adapter.js";
+import { createDockerBaseImageBuilder } from "./base-image-builder.js";
 import { DockerApiClient, type DockerClient } from "./client.js";
 import { validateDockerSandboxConfig, type DockerSandboxConfig } from "./config.js";
 import { createDockerSandboxRuntimeControl } from "./runtime-control.js";
@@ -8,6 +9,13 @@ export type { DockerSandboxConfig } from "./config.js";
 export type { DockerSandboxInspectResult } from "./types.js";
 export type { DockerClient } from "./client.js";
 export { DockerSandboxAdapter } from "./adapter.js";
+export {
+  DockerBaseImageBuilder,
+  createDockerBaseImageBuilder,
+  createDockerBuildBaseImageCommand,
+  type DockerBaseImageBuilderOptions,
+  type DockerBuildBaseImageCommand,
+} from "./base-image-builder.js";
 
 export function createDockerClient(config: DockerSandboxConfig): DockerClient {
   const validatedConfig = validateDockerSandboxConfig(config);

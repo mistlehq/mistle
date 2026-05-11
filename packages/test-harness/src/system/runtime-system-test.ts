@@ -488,7 +488,7 @@ async function resolveSystemTestSandboxBaseImageRef(): Promise<string> {
       command: "pnpm",
       args: [
         "run",
-        "dev:sandbox-base:push",
+        "dev:sandbox-base:push:docker",
         "--repository",
         SandboxBaseImageRepository,
         "--platform",

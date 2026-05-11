@@ -1,17 +1,20 @@
 import { SandboxConfigurationError } from "./errors.js";
 import {
   createDockerAdapter,
+  createDockerBaseImageBuilder,
   createDockerRuntimeControl,
   type DockerSandboxConfig,
 } from "./providers/docker/index.js";
 import {
   createE2BAdapter,
+  createE2BBaseImageBuilder,
   createE2BRuntimeControl,
   type E2BSandboxConfig,
 } from "./providers/e2b/index.js";
 import {
   SandboxProvider,
   type SandboxAdapter,
+  type SandboxBaseImageBuilder,
   type SandboxRuntimeControl,
   type SandboxProvider as SandboxProviderType,
 } from "./types.js";
@@ -20,6 +23,10 @@ export type CreateSandboxAdapterInput = {
   provider: SandboxProviderType;
   docker?: DockerSandboxConfig;
   e2b?: E2BSandboxConfig;
+};
+
+export type CreateSandboxBaseImageBuilderInput = CreateSandboxAdapterInput & {
+  e2bTemplateLockDirectoryPath?: string;
 };
 
 function assertUnreachable(_value: never): never {
@@ -41,6 +48,29 @@ export function createSandboxAdapter(input: CreateSandboxAdapterInput): SandboxA
     }
 
     return createE2BAdapter(input.e2b);
+  }
+
+  return assertUnreachable(input.provider);
+}
+
+export function createSandboxBaseImageBuilder(
+  input: CreateSandboxBaseImageBuilderInput,
+): SandboxBaseImageBuilder {
+  if (input.provider === SandboxProvider.DOCKER) {
+    return createDockerBaseImageBuilder();
+  }
+
+  if (input.provider === SandboxProvider.E2B) {
+    if (input.e2b === undefined) {
+      throw new SandboxConfigurationError("E2B config is required when provider is e2b.");
+    }
+
+    return createE2BBaseImageBuilder({
+      config: input.e2b,
+      ...(input.e2bTemplateLockDirectoryPath === undefined
+        ? {}
+        : { lockDirectoryPath: input.e2bTemplateLockDirectoryPath }),
+    });
   }
 
   return assertUnreachable(input.provider);
