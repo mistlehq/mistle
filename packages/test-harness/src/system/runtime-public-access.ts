@@ -24,7 +24,13 @@ const RuntimePublicAccessUpgradeProbeTimeoutMs = 5_000;
 
 export type RuntimePublicAccessTunnel = {
   publicBaseUrls: ReadonlyMap<string, string>;
+  checkReady: (input?: RuntimePublicAccessReadinessCheckInput) => Promise<void>;
+  readDiagnostics: () => Promise<unknown>;
   stop: () => Promise<void>;
+};
+
+export type RuntimePublicAccessReadinessCheckInput = {
+  timeoutMs?: number;
 };
 
 export type RuntimePublicAccessIngressRule = {
@@ -70,6 +76,15 @@ export async function startRuntimeCloudflaredTunnel(input: {
 
   return {
     publicBaseUrls,
+    checkReady: async (checkInput = {}) => {
+      await waitForRuntimePublicAccessRoutesReady({
+        proxy,
+        environmentId: input.environmentId,
+        ingressRules: input.ingressRules,
+        timeoutMs: checkInput.timeoutMs ?? RuntimePublicAccessRouteReadyTimeoutMs,
+      });
+    },
+    readDiagnostics: async () => readRuntimePublicAccessProxyDiagnostics(proxy),
     stop: async () => {
       if (registered) {
         await unregisterRuntimePublicAccessRoutes({

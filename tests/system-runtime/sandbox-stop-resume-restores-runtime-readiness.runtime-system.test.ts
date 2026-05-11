@@ -28,11 +28,12 @@ const it = createSandboxSystemTest({
 
 const SYSTEM_TEST_TIMEOUT_MS = 5 * 60_000;
 const STOP_RUNTIME_READY_TIMEOUT_MS = 90_000;
+const RESUME_PUBLIC_ACCESS_READY_TIMEOUT_MS = 30_000;
 
 describe("runtime system sandbox stop resume restores runtime readiness", () => {
   it(
     "waits for runtime-ready recovery across stop and resume",
-    async ({ system }) => {
+    async ({ sandboxProvider, system }) => {
       const fixture = createRuntimeCodexSandboxFixture(system);
       const { authenticatedSession, sandboxInstanceId } = await prepareCodexSandbox({
         fixture,
@@ -67,17 +68,23 @@ describe("runtime system sandbox stop resume restores runtime readiness", () => 
         timeoutMs: STOP_RUNTIME_READY_TIMEOUT_MS,
       });
 
+      const publicAccess = readPublicAccessOrThrow(system);
+      await publicAccess.checkReady({
+        timeoutMs: RESUME_PUBLIC_ACCESS_READY_TIMEOUT_MS,
+      });
+
       await resumeSandboxInstance({
         fixture,
         authenticatedSession,
         sandboxInstanceId,
       });
 
-      await waitForSandboxStatus({
+      await waitForSandboxStatusAfterResume({
         fixture,
         authenticatedSession,
+        publicAccess,
         sandboxInstanceId,
-        expectedStatus: "running",
+        sandboxProvider,
       });
       const runtimeStateWhenRunning = await fixture.readSandboxRuntimeState(sandboxInstanceId);
       expect(runtimeStateWhenRunning.runtime.ready).toBe(true);
@@ -109,3 +116,38 @@ describe("runtime system sandbox stop resume restores runtime readiness", () => 
     SYSTEM_TEST_TIMEOUT_MS,
   );
 });
+
+function readPublicAccessOrThrow(system: Parameters<typeof createRuntimeCodexSandboxFixture>[0]) {
+  const { publicAccess } = system;
+  if (publicAccess === undefined) {
+    throw new Error("Stop/resume runtime system test requires public access diagnostics.");
+  }
+  return publicAccess;
+}
+
+async function waitForSandboxStatusAfterResume(input: {
+  fixture: Parameters<typeof waitForSandboxStatus>[0]["fixture"];
+  authenticatedSession: Parameters<typeof waitForSandboxStatus>[0]["authenticatedSession"];
+  publicAccess: ReturnType<typeof readPublicAccessOrThrow>;
+  sandboxInstanceId: string;
+  sandboxProvider: string;
+}): Promise<void> {
+  try {
+    await waitForSandboxStatus({
+      fixture: input.fixture,
+      authenticatedSession: input.authenticatedSession,
+      sandboxInstanceId: input.sandboxInstanceId,
+      expectedStatus: "running",
+    });
+  } catch (error) {
+    console.info(
+      JSON.stringify({
+        event: "sandbox_stop_resume.public_access_diagnostics_after_resume_wait_failure",
+        sandboxInstanceId: input.sandboxInstanceId,
+        sandboxProvider: input.sandboxProvider,
+        publicAccessDiagnostics: await input.publicAccess.readDiagnostics(),
+      }),
+    );
+    throw error;
+  }
+}

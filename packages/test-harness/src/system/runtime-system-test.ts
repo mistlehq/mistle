@@ -75,7 +75,13 @@ export type RuntimeSystemTestEnvironment = {
   dataPlaneApi: IntegrationTestEnvironment["dataPlaneApi"];
   dataPlaneGateway: IntegrationTestEnvironment["dataPlaneGateway"];
   dataPlaneWorker: IntegrationTestEnvironment["dataPlaneWorker"];
+  publicAccess?: RuntimeSystemPublicAccess;
 };
+
+export type RuntimeSystemPublicAccess = Pick<
+  RuntimePublicAccessTunnel,
+  "checkReady" | "publicBaseUrls" | "readDiagnostics"
+>;
 
 type SystemTestFixture = {
   system: RuntimeSystemTestEnvironment;
@@ -104,6 +110,7 @@ const PublicAccessHostnameEnvVars = new Map<ServiceId, string>([
 let systemTestSandboxBaseImageRefPromise: Promise<string> | undefined;
 
 export function createSystemTest(input: CreateSystemTestInput = {}) {
+  let publicAccessTunnel: RuntimePublicAccessTunnel | undefined;
   const base = createIntegrationTest({
     services: input.services ?? DefaultSystemServices,
     extraInfra: input.extraInfra ?? DefaultSystemExtraInfra,
@@ -139,7 +146,7 @@ export function createSystemTest(input: CreateSystemTestInput = {}) {
       if (e2bProviderSandboxCleanup !== undefined) {
         cleanupTasks.push(e2bProviderSandboxCleanup);
       }
-      const publicAccessTunnel = await startPublicAccess({
+      publicAccessTunnel = await startPublicAccess({
         input,
         environment,
       });
@@ -162,7 +169,7 @@ export function createSystemTest(input: CreateSystemTestInput = {}) {
   return base.extend<SystemTestFixture>({
     system: [
       async ({ env }, use) => {
-        await use(createRuntimeSystemEnvironment(env));
+        await use(createRuntimeSystemEnvironment(env, publicAccessTunnel));
       },
       {
         scope: "file",
@@ -760,10 +767,12 @@ function readErrorOutput(error: unknown, property: "stderr" | "stdout"): string 
 
 function createRuntimeSystemEnvironment(
   env: IntegrationTestEnvironment,
+  publicAccess: RuntimeSystemPublicAccess | undefined,
 ): RuntimeSystemTestEnvironment {
   return {
     id: env.id,
     env,
+    ...(publicAccess === undefined ? {} : { publicAccess }),
     get controlPlaneApi() {
       return env.controlPlaneApi;
     },
