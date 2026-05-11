@@ -35,36 +35,17 @@ export function resolveIncompleteIntegrationConnectionSetupFlow(input: {
     return null;
   }
 
-  if (method.setupFlow.completionRequirements === undefined) {
-    throw new Error(
-      `Draft-then-setup connection method '${method.id}' is missing setup completion metadata.`,
-    );
-  }
+  const completionRequirements = resolveSetupCompletionRequirementsOrThrow(method);
 
   return isSetupCompletionRequirementMet({
     connection: input.connection,
-    requirement: method.setupFlow.completionRequirements,
+    requirement: completionRequirements,
   })
     ? null
     : {
         methodId: method.id,
         routeSegment: method.setupFlow.routeSegment,
       };
-}
-
-export function resolveIntegrationConnectionSetupRouteOrThrow(input: {
-  connection: IntegrationConnection;
-  connectionMethods: readonly IntegrationConnectionMethod[] | undefined;
-  routeSegment: string;
-}): IntegrationConnectionSetupRoute {
-  const setupRouteState = resolveIntegrationConnectionSetupRouteStateOrThrow(input);
-  if (setupRouteState.kind === "complete") {
-    throw new Error(
-      `Integration setup route '${input.routeSegment}' is already complete for connection '${input.connection.id}'.`,
-    );
-  }
-
-  return setupRouteState.setupRoute;
 }
 
 export function resolveIntegrationConnectionSetupRouteStateOrThrow(input: {
@@ -91,16 +72,12 @@ export function resolveIntegrationConnectionSetupRouteStateOrThrow(input: {
     );
   }
 
-  if (method.setupFlow.completionRequirements === undefined) {
-    throw new Error(
-      `Draft-then-setup connection method '${method.id}' is missing setup completion metadata.`,
-    );
-  }
+  const completionRequirements = resolveSetupCompletionRequirementsOrThrow(method);
 
   if (
     isSetupCompletionRequirementMet({
       connection: input.connection,
-      requirement: method.setupFlow.completionRequirements,
+      requirement: completionRequirements,
     })
   ) {
     return {
@@ -152,6 +129,19 @@ function resolveDraftThenSetupConnectionMethod(input: {
       methodId,
     }),
   };
+}
+
+function resolveSetupCompletionRequirementsOrThrow(input: {
+  id: string;
+  setupFlow: ReturnType<typeof resolveDraftThenSetupMethodSetupFlow>;
+}): IntegrationSetupCompletionRequirement {
+  if (input.setupFlow === null || input.setupFlow.completionRequirements === undefined) {
+    throw new Error(
+      `Draft-then-setup connection method '${input.id}' is missing setup completion metadata.`,
+    );
+  }
+
+  return input.setupFlow.completionRequirements;
 }
 
 function isSetupCompletionRequirementMet(input: {

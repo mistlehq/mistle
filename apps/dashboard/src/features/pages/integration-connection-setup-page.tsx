@@ -25,8 +25,6 @@ export function IntegrationConnectionSetupPage(input: {
   const targetKey = params["targetKey"];
   const connectionId = params["connectionId"];
   const setupRouteSegment = params["setupRouteSegment"];
-  const controlPlaneApiOrigin =
-    input.controlPlaneApiOrigin ?? getDashboardConfig().controlPlaneApiOrigin;
 
   if (targetKey === undefined) {
     throw new Error("Integration target key is required.");
@@ -122,6 +120,8 @@ export function IntegrationConnectionSetupPage(input: {
       />
     );
   }
+  const controlPlaneApiOrigin =
+    input.controlPlaneApiOrigin ?? getDashboardConfig().controlPlaneApiOrigin;
 
   return (
     <PageFrame
