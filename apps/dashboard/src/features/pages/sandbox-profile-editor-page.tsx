@@ -406,10 +406,10 @@ function shouldBlockSandboxProfileEditorUnpersistedChangesNavigation(input: {
   return currentSectionId === null || nextSectionId === null;
 }
 
-function resolveDefaultSandboxProfileEditorView(input: {
-  versions: readonly SandboxProfileVersion[];
-}): SandboxProfileRouteView {
-  return input.versions.some((version) => version.state === "published") ? "published" : "draft";
+function resolveDefaultSandboxProfileEditorView(
+  versions: readonly SandboxProfileVersion[],
+): SandboxProfileRouteView {
+  return versions.some((version) => version.state === "published") ? "published" : "draft";
 }
 
 function shouldRedirectPublishedSandboxProfileViewToDraft(input: {
@@ -668,11 +668,7 @@ function EditSandboxProfileEditorPage(): React.JSX.Element {
   });
   const publishSuccessMessage = navigationState.notice === "publish-success";
   const navigate = shellContext.navigate;
-  const routeView =
-    route?.view ??
-    resolveDefaultSandboxProfileEditorView({
-      versions: shellContext.versions,
-    });
+  const routeView = route?.view ?? resolveDefaultSandboxProfileEditorView(shellContext.versions);
   const onPublishSuccessNavigationConsumed = useCallback(() => {
     void navigate(location.pathname + location.search, {
       replace: true,

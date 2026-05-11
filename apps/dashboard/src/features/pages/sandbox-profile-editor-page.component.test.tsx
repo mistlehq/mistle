@@ -2240,10 +2240,10 @@ describe("SandboxProfileEditorPage", () => {
   it("opens the published sandbox profile tab from the profile default route when a draft also exists", async () => {
     const { profileId, router } = renderSandboxProfileEditor({
       view: "default",
-      versionState: "published-with-draft",
+      versionState: "draft-with-published",
     });
 
-    expect(await screen.findByText("Viewing: Published (v3)")).toBeDefined();
+    expect(await screen.findByText("Viewing: Published (v2)")).toBeDefined();
     expect(screen.getByRole("button", { name: "Resume editing" })).toBeDefined();
     expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/sandbox-profile`);
   });
