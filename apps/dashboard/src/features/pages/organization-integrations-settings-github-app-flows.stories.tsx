@@ -12,6 +12,7 @@ import {
 } from "react-router";
 import { z } from "zod";
 
+import { getDashboardStoryControlPlaneApiOrigin } from "../../storybook/dashboard-story-config.js";
 import { withDashboardCenteredStory, withDashboardPageStory } from "../../storybook/decorators.js";
 import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
 import {
@@ -46,7 +47,6 @@ function getGitHubDefinitionOrThrow(): AnyIntegrationDefinition {
 }
 
 const GitHubDefinition = getGitHubDefinitionOrThrow();
-const StoryControlPlaneApiOrigin = "https://control-plane.example.com";
 
 function createStoryQueryClient(input: {
   connections?: readonly IntegrationConnection[];
@@ -139,8 +139,7 @@ function createWebhookSourceFixture(): IntegrationWebhookSource {
     integrationConnectionId: "icn_github_story_draft",
     displayName: "GitHub App webhook",
     endpointKey: "eps_github_story",
-    callbackUrl:
-      "https://control-plane.example.com/p/integration/webhooks/github-cloud/eps_github_story",
+    callbackUrl: `${getDashboardStoryControlPlaneApiOrigin()}/p/integration/webhooks/github-cloud/eps_github_story`,
     status: "active",
     providerMetadata: createStoryWebhookTriggerCapabilitiesProviderMetadata({
       definition: GitHubDefinition,
@@ -205,8 +204,9 @@ function useGitHubStoryControlPlane(input: { queryClient: QueryClient }): void {
     ): Promise<Response> => {
       const request = resource instanceof Request ? resource : new Request(resource, init);
       const url = new URL(request.url);
+      const storyControlPlaneApiOrigin = getDashboardStoryControlPlaneApiOrigin();
 
-      if (url.origin !== StoryControlPlaneApiOrigin) {
+      if (url.origin !== storyControlPlaneApiOrigin) {
         return originalFetch(resource, init);
       }
 
@@ -284,7 +284,7 @@ function useGitHubStoryControlPlane(input: { queryClient: QueryClient }): void {
       if (method === "POST" && startInstallMatch !== null) {
         return createJsonResponse({
           kind: "redirect",
-          authorizationUrl: `${StoryControlPlaneApiOrigin}/storybook/github-app-install`,
+          authorizationUrl: `${storyControlPlaneApiOrigin}/storybook/github-app-install`,
         });
       }
 

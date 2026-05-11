@@ -15,6 +15,7 @@ import {
 } from "react-router";
 import { z } from "zod";
 
+import { getDashboardStoryControlPlaneApiOrigin } from "../../storybook/dashboard-story-config.js";
 import { withDashboardCenteredStory, withDashboardPageStory } from "../../storybook/decorators.js";
 import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
 import {
@@ -37,7 +38,6 @@ import { createStoryConnectionMethods } from "./organization-integrations-settin
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 const IntegrationRegistry = createBrowserIntegrationRegistry();
-const StoryControlPlaneApiOrigin = "https://control-plane.example.com";
 const ActiveConnectionStatus: IntegrationConnection["status"] = "active";
 const SlackStorySyncedBotEvents = [
   "app_mention",
@@ -158,8 +158,7 @@ function createWebhookSourceFixture(): IntegrationWebhookSource {
     integrationConnectionId: "icn_slack_story_draft",
     displayName: "Slack Events API webhook",
     endpointKey: "eps_slack_story",
-    callbackUrl:
-      "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_slack_story",
+    callbackUrl: `${getDashboardStoryControlPlaneApiOrigin()}/p/integration/webhooks/slack-default/eps_slack_story`,
     status: "active",
     providerMetadata: createStoryWebhookTriggerCapabilitiesProviderMetadata({
       definition: SlackDefinition,
@@ -234,8 +233,9 @@ function useSlackStoryControlPlane(input: { queryClient: QueryClient }): void {
     ): Promise<Response> => {
       const request = resource instanceof Request ? resource : new Request(resource, init);
       const url = new URL(request.url);
+      const storyControlPlaneApiOrigin = getDashboardStoryControlPlaneApiOrigin();
 
-      if (url.origin !== StoryControlPlaneApiOrigin) {
+      if (url.origin !== storyControlPlaneApiOrigin) {
         return originalFetch(resource, init);
       }
 
@@ -390,7 +390,7 @@ function useSlackStoryControlPlane(input: { queryClient: QueryClient }): void {
         StorySlackManifestStartRequestBodySchema.parse(requestBody);
         return createJsonResponse({
           kind: "redirect",
-          authorizationUrl: `${StoryControlPlaneApiOrigin}/storybook/slack-app-install`,
+          authorizationUrl: `${storyControlPlaneApiOrigin}/storybook/slack-app-install`,
         });
       }
 
