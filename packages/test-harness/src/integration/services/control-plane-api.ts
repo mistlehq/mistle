@@ -19,6 +19,7 @@ import { ServiceIds } from "./service-ids.js";
 import { httpEndpoint, httpHealth, infraRequirement, infraValue, resolvedInfra } from "./shared.js";
 
 const ControlPlaneHost = "127.0.0.1";
+const DefaultE2BCloudDomain = "e2b.app";
 const CommitSignBinaryPath = fileURLToPath(
   new URL("../../../../commit-sign/target/debug/commit-sign", import.meta.url),
 );
@@ -250,6 +251,7 @@ function config(input: {
       provider: input.sandbox?.provider ?? "docker",
       defaultBaseImage: input.sandboxBaseImageRef ?? getLocalDevDockerRegistrySandboxBaseImageRef(),
       gatewayWsUrl: input.gatewayWsUrl,
+      ...(input.sandbox?.e2b === undefined ? {} : { e2b: mapE2BOptions(input.sandbox.e2b) }),
       bootstrap: {
         tokenSecret: "integration-new-bootstrap-token-secret",
         tokenIssuer: "integration-new-data-plane-worker",
@@ -315,6 +317,16 @@ function config(input: {
           }
         : {}),
     },
+  };
+}
+
+function mapE2BOptions(input: NonNullable<IntegrationSandboxOptions["e2b"]>): {
+  apiKey: string;
+  domain: string;
+} {
+  return {
+    apiKey: input.apiKey,
+    domain: input.domain ?? DefaultE2BCloudDomain,
   };
 }
 

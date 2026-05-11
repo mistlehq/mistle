@@ -33,6 +33,18 @@ const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
 
+const itManagedE2BDeployment = createIntegrationTest({
+  services: ["control-plane-api"],
+  __serviceOptions: {
+    sandbox: {
+      provider: "e2b",
+      e2b: {
+        apiKey: "integration-managed-e2b-api-key",
+      },
+    },
+  },
+});
+
 const EmptySandboxRuntimeConfig = {
   sandboxConnectionId: null,
   sandboxProvider: SandboxProvider.DOCKER,
@@ -300,6 +312,107 @@ describe.concurrent("sandbox profile version draft put integration", () => {
       memoryMb: 4096,
     });
   });
+
+  itManagedE2BDeployment(
+    "updates integration bindings on a managed E2B profile version",
+    async ({ env }) => {
+      const session = await env.auth.createSession({
+        email: "integration-sandbox-profile-draft-put-managed-e2b@example.com",
+      });
+
+      await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+        integrationTargetRow({
+          targetKey: "openai-default-draft-put-managed-e2b",
+          variantId: "openai-default",
+          enabled: true,
+        }),
+      );
+      await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+        integrationConnectionRow({
+          id: "icn_draft_put_managed_e2b_agent_001",
+          organizationId: session.organizationId,
+          targetKey: "openai-default-draft-put-managed-e2b",
+          displayName: "Draft Put Managed E2B Agent Connection",
+          status: IntegrationConnectionStatuses.ACTIVE,
+          config: {
+            connection_method: "api-key",
+          },
+        }),
+      );
+      await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+        sandboxProfileRow({
+          id: "sbp_draft_put_managed_e2b_001",
+          organizationId: session.organizationId,
+          displayName: "Draft Put Managed E2B Profile",
+          createdAt: "2026-05-08T00:00:00.000Z",
+        }),
+      );
+      await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+        sandboxProfileVersionRow({
+          sandboxProfileId: "sbp_draft_put_managed_e2b_001",
+          version: 1,
+          state: SandboxProfileVersionStates.DRAFT,
+          sandboxProvider: SandboxProvider.E2B,
+          sandboxConnectionId: null,
+          sandboxVcpuCount: 2,
+          sandboxMemoryMb: 4096,
+        }),
+      );
+
+      const response = await env.controlPlaneApi.http.fetch(
+        "/v1/sandbox/profiles/sbp_draft_put_managed_e2b_001/versions/1/draft",
+        {
+          method: "PUT",
+          headers: {
+            cookie: session.cookie,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            integrationBindings: {
+              bindings: [
+                {
+                  connectionId: "icn_draft_put_managed_e2b_agent_001",
+                  kind: IntegrationBindingKinds.AGENT,
+                  config: {
+                    runtime: {
+                      runtimeId: "codex",
+                      config: {},
+                    },
+                  },
+                },
+              ],
+            },
+          }),
+        },
+      );
+
+      if (response.status !== 200) {
+        throw new Error(
+          `Expected status 200, got ${String(response.status)}: ${await response.text()}`,
+        );
+      }
+      const responseBody = PutSandboxProfileVersionDraftResponseSchema.parse(await response.json());
+      expect(responseBody.sandboxProvider).toBe(SandboxProvider.E2B);
+      expect(responseBody.sandboxConnectionId).toBeNull();
+      expect(responseBody.sandboxResources).toEqual({
+        vcpuCount: 2,
+        memoryMb: 4096,
+      });
+      expect(responseBody.integrationBindings.bindings).toHaveLength(1);
+      expect(responseBody.integrationBindings.bindings[0]).toMatchObject({
+        sandboxProfileId: "sbp_draft_put_managed_e2b_001",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_draft_put_managed_e2b_agent_001",
+        kind: IntegrationBindingKinds.AGENT,
+        config: {
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+        },
+      });
+    },
+  );
 
   it("clears sandbox runtime resources when switching to Docker", async ({ env }) => {
     const session = await env.auth.createSession({
