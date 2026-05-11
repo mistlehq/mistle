@@ -30,7 +30,7 @@ import {
   ResizablePanelGroup,
   TextLink,
 } from "@mistle/ui";
-import { SidebarSimpleIcon, TerminalIcon } from "@phosphor-icons/react";
+import { SidebarSimpleIcon, SpinnerGapIcon, TerminalIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   useCallback,
