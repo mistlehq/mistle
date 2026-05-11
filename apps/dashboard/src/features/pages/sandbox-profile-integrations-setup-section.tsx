@@ -828,6 +828,7 @@ export function SandboxProfileIntegrationsSetupSection(
     connectionId: gitRow?.connectionId,
     availableConnections: input.availableConnections,
   });
+  const gitServiceChoice = gitChoices.find((choice) => choice.id === gitTargetKey);
   const showGitProxiedConnection =
     !hasNoGitProviderOptions && (gitIssue !== null || gitTargetKey !== null);
 
@@ -998,7 +999,7 @@ export function SandboxProfileIntegrationsSetupSection(
               isLastRow={!showGitProxiedConnection && connectorRows.length === 0}
             >
               <ResponsiveFieldListCell columnKey="connection">
-                <RuntimeSettingLabel>Agent</RuntimeSettingLabel>
+                <RuntimeSettingLabel>OpenAI</RuntimeSettingLabel>
               </ResponsiveFieldListCell>
               <ResponsiveFieldListCell columnKey="account">
                 <ConnectionSelectionCell
@@ -1050,7 +1051,11 @@ export function SandboxProfileIntegrationsSetupSection(
                 isLastRow={connectorRows.length === 0}
               >
                 <ResponsiveFieldListCell columnKey="connection">
-                  <RuntimeSettingLabel>Git provider</RuntimeSettingLabel>
+                  <RuntimeSettingLabel>
+                    {gitIssue === null && gitServiceChoice !== undefined
+                      ? gitServiceChoice.title
+                      : "Git provider"}
+                  </RuntimeSettingLabel>
                 </ResponsiveFieldListCell>
                 <ResponsiveFieldListCell columnKey="account">
                   {gitIssue === "missing-connection" ? (
