@@ -1,7 +1,8 @@
+import { systemScheduler, type TimerHandle } from "@mistle/time";
 import { Button } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 
 import { LoadingIndicators, createLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
@@ -16,8 +17,9 @@ type DeferredQuery = {
  * TopLoadingBar renders the dashboard's route and data-loading progress strip.
  *
  * Use the `Interactive` story to review the visual motion: start a load, watch the bar advance
- * while work remains pending, then finish it to verify the completion fill and fade. Starting a
- * second load immediately after finishing should reset the bar to a visible starting position.
+ * while work remains pending, then finish it to verify the completion fill and fade. Use `Finish
+ * and restart` to verify that a second load during the hide delay keeps the bar near complete
+ * instead of shrinking back to the starting position.
  */
 const meta = {
   title: "Dashboard/Shell/TopLoadingBar",
@@ -56,6 +58,14 @@ function TopLoadingBarHarness(): React.JSX.Element {
   const [loadId, setLoadId] = useState(0);
   const [isActive, setIsActive] = useState(true);
   const [deferredQuery, setDeferredQuery] = useState(() => createDeferredQuery());
+  const restartTimer = useRef<TimerHandle | null>(null);
+
+  useEffect(
+    () => () => {
+      cancelRestartTimer();
+    },
+    [],
+  );
 
   useQuery({
     enabled: isActive,
@@ -64,15 +74,34 @@ function TopLoadingBarHarness(): React.JSX.Element {
     queryKey: ["storybook-top-loading-bar", loadId],
   });
 
-  function handleStartLoad(): void {
-    setDeferredQuery(createDeferredQuery());
-    setLoadId((current) => current + 1);
-    setIsActive(true);
+  function cancelRestartTimer(): void {
+    if (restartTimer.current === null) {
+      return;
+    }
+
+    systemScheduler.cancel(restartTimer.current);
+    restartTimer.current = null;
   }
 
   function handleFinishLoad(): void {
     deferredQuery.resolve("ready");
     setIsActive(false);
+  }
+
+  function startLoad(): void {
+    cancelRestartTimer();
+    setDeferredQuery(createDeferredQuery());
+    setLoadId((current) => current + 1);
+    setIsActive(true);
+  }
+
+  function handleFinishAndRestartLoad(): void {
+    deferredQuery.resolve("ready");
+    setIsActive(false);
+    restartTimer.current = systemScheduler.schedule(() => {
+      restartTimer.current = null;
+      startLoad();
+    }, 100);
   }
 
   return (
@@ -85,11 +114,19 @@ function TopLoadingBarHarness(): React.JSX.Element {
             The active query keeps the bar moving until you finish the load.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
-            <Button disabled={isActive} onClick={handleStartLoad} type="button">
+            <Button disabled={isActive} onClick={startLoad} type="button">
               Start load
             </Button>
             <Button disabled={!isActive} onClick={handleFinishLoad} type="button" variant="outline">
               Finish load
+            </Button>
+            <Button
+              disabled={!isActive}
+              onClick={handleFinishAndRestartLoad}
+              type="button"
+              variant="outline"
+            >
+              Finish and restart
             </Button>
           </div>
         </div>
