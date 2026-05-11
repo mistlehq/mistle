@@ -125,11 +125,9 @@ export function ExistingAppSetupFieldsPanel<FieldKey extends string>(input: {
             key={field.fieldKey}
             label={field.label}
             {...(field.multiline === undefined ? {} : { multiline: field.multiline })}
-            onCancelReplace={noop}
             onChange={(nextValue) => {
               input.onUpdateFieldDraft(field.fieldKey, nextValue);
             }}
-            onCommit={noop}
             {...(field.placeholder === undefined ? {} : { placeholder: field.placeholder })}
             {...(field.replacementStaged === undefined
               ? {}

@@ -59,9 +59,7 @@ function ConfiguredSecretFieldStory(input: {
         }}
         secretLabel={input.secretLabel}
         value={value}
-        {...(input.confirmReplacement === undefined
-          ? {}
-          : { confirmReplacement: input.confirmReplacement })}
+        {...(input.confirmReplacement === false ? { confirmReplacement: false } : {})}
         {...(input.configured === undefined ? {} : { configured: input.configured })}
         {...(input.description === undefined ? {} : { description: input.description })}
         {...(input.multiline === undefined ? {} : { multiline: input.multiline })}

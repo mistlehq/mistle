@@ -36,8 +36,6 @@ const IdleSecretFieldState: SavingFieldState = {
   errorMessage: null,
 };
 
-function ignoreSecretCommit(): void {}
-
 type CreateIntegrationConnectionEditorState = {
   methods: readonly IntegrationConnectionMethod[];
   mode: "create";
@@ -304,11 +302,9 @@ function renderConnectionEditorFields(props: IntegrationConnectionEditorProps) {
                 key={secretField.name}
                 label={secretField.label}
                 onePasswordIgnore
-                onCancelReplace={ignoreSecretCommit}
                 onChange={(nextValue) => {
                   props.onSecretChange(secretField.name, nextValue);
                 }}
-                onCommit={ignoreSecretCommit}
                 placeholder={secretField.placeholder ?? `Enter ${secretField.label.toLowerCase()}`}
                 required={secretField.optional !== true}
                 secretLabel={secretField.label.toLowerCase()}

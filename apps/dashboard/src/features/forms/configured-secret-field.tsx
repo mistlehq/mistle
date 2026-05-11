@@ -159,7 +159,7 @@ export function SavingTextField(input: SavingTextFieldProps): React.JSX.Element 
   );
 }
 
-export function ConfiguredSecretField(input: {
+type ConfiguredSecretFieldBaseProps = {
   id: string;
   label: string;
   secretLabel: string;
@@ -177,10 +177,24 @@ export function ConfiguredSecretField(input: {
   confirmReplacement?: boolean;
   replacementStaged?: boolean;
   onChange: (nextValue: string) => void;
-  onCommit: () => void;
-  onCancelReplace: () => void;
   onReplacementDialogOpenChange?: (open: boolean) => void;
-}): React.JSX.Element {
+};
+
+type ConfiguredSecretFieldProps = ConfiguredSecretFieldBaseProps &
+  (
+    | {
+        confirmReplacement: false;
+        onCommit?: () => void;
+        onCancelReplace?: () => void;
+      }
+    | {
+        confirmReplacement?: true;
+        onCommit: () => void;
+        onCancelReplace: () => void;
+      }
+  );
+
+export function ConfiguredSecretField(input: ConfiguredSecretFieldProps): React.JSX.Element {
   const [isReplaceDialogOpen, setIsReplaceDialogOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const replaceConfirmedRef = useRef(false);
@@ -205,14 +219,14 @@ export function ConfiguredSecretField(input: {
   }, [input.onReplacementDialogOpenChange, isReplaceDialogOpen]);
 
   function handleCancel(): void {
-    input.onCancelReplace();
+    input.onCancelReplace?.();
     setIsReplaceDialogOpen(false);
   }
 
   function handleReplace(): void {
     replaceConfirmedRef.current = true;
     setIsReplaceDialogOpen(false);
-    input.onCommit();
+    input.onCommit?.();
   }
 
   function handleBlur(): void {
@@ -221,7 +235,7 @@ export function ConfiguredSecretField(input: {
     }
 
     if (input.value.trim().length === 0) {
-      input.onCommit();
+      input.onCommit?.();
       return;
     }
 
@@ -230,7 +244,7 @@ export function ConfiguredSecretField(input: {
       return;
     }
 
-    input.onCommit();
+    input.onCommit?.();
   }
 
   return (
