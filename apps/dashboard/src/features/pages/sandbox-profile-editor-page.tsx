@@ -30,7 +30,7 @@ import {
   ResizablePanelGroup,
   TextLink,
 } from "@mistle/ui";
-import { SidebarSimpleIcon, SpinnerGapIcon, TerminalIcon } from "@phosphor-icons/react";
+import { SidebarSimpleIcon, TerminalIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   useCallback,
@@ -2678,14 +2678,19 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
   readOnly: boolean;
   loader: ReturnType<typeof useSandboxProfileIntegrationsLoader>;
   onDraftStateChange?: (state: SandboxProfileDraftSectionState) => void;
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   const showBindingsUnavailableNotice = input.loader.integrationBindingsQuery.isError;
   const showDirectoryUnavailableNotice = input.loader.integrationDirectoryQuery.isError;
 
   if (
     input.loader.integrationBindingsQuery.isPending ||
     input.loader.integrationDirectoryQuery.isPending ||
-    input.loader.initialRows === null ||
+    input.loader.initialRows === null
+  ) {
+    return null;
+  }
+
+  if (
     input.loader.integrationBindingsQuery.isError ||
     input.loader.integrationDirectoryQuery.isError
   ) {
@@ -2697,10 +2702,6 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
           }
           integrationDirectoryError={
             showDirectoryUnavailableNotice ? input.loader.integrationDirectoryQuery.error : null
-          }
-          isPending={
-            input.loader.integrationBindingsQuery.isPending ||
-            input.loader.integrationDirectoryQuery.isPending
           }
         />
       </SandboxProfilePanelSection>
@@ -2728,20 +2729,9 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
 export function SandboxProfileIntegrationsSetupUnavailableState(input: {
   integrationBindingsError: unknown;
   integrationDirectoryError: unknown;
-  isPending: boolean;
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4">
-      {input.isPending ? (
-        <div
-          aria-live="polite"
-          className="text-muted-foreground flex items-center gap-2 text-sm"
-          role="status"
-        >
-          <SpinnerGapIcon aria-hidden className="size-4 animate-spin" />
-          <span>Loading integrations...</span>
-        </div>
-      ) : null}
       {input.integrationBindingsError !== null ? (
         <Notice title="Could not load integration bindings" variant="alert">
           {resolveApiErrorMessage({
@@ -2829,9 +2819,9 @@ function LoadedSandboxProfileSetupScriptSection(input: {
   isDraft: boolean;
   setupAssistantControl: SetupScriptAssistantControl;
   onDraftStateChange?: (state: SandboxProfileDraftSectionState) => void;
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   if (input.loader.setupScriptQuery.isPending) {
-    return <SandboxProfileSetupScriptPanel disabled={true} value="" />;
+    return null;
   }
 
   if (input.loader.setupScriptQuery.isError) {

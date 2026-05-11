@@ -596,7 +596,6 @@ function renderUnavailableIntegrationsSectionPanel(input: {
             ? null
             : new Error(input.state.directoryErrorMessage)
         }
-        isPending={false}
       />
     </SandboxProfilePanelSection>
   );
