@@ -726,34 +726,32 @@ async function clearSandboxProfileVersionDraftQueryState(input: {
   profileId: string;
   version: number;
 }): Promise<void> {
-  const integrationBindingsQueryKey = sandboxProfileVersionIntegrationBindingsQueryKey({
-    profileId: input.profileId,
-    version: input.version,
-  });
-  const setupScriptQueryKey = sandboxProfileVersionSetupScriptQueryKey({
-    profileId: input.profileId,
-    version: input.version,
-  });
-
-  await Promise.all([
-    input.queryClient.cancelQueries({
-      exact: true,
-      queryKey: integrationBindingsQueryKey,
+  const queryKeys = [
+    sandboxProfileVersionIntegrationBindingsQueryKey({
+      profileId: input.profileId,
+      version: input.version,
     }),
-    input.queryClient.cancelQueries({
-      exact: true,
-      queryKey: setupScriptQueryKey,
+    sandboxProfileVersionSetupScriptQueryKey({
+      profileId: input.profileId,
+      version: input.version,
     }),
-  ]);
+  ];
 
-  input.queryClient.removeQueries({
-    exact: true,
-    queryKey: integrationBindingsQueryKey,
-  });
-  input.queryClient.removeQueries({
-    exact: true,
-    queryKey: setupScriptQueryKey,
-  });
+  await Promise.all(
+    queryKeys.map((queryKey) =>
+      input.queryClient.cancelQueries({
+        exact: true,
+        queryKey,
+      }),
+    ),
+  );
+
+  for (const queryKey of queryKeys) {
+    input.queryClient.removeQueries({
+      exact: true,
+      queryKey,
+    });
+  }
 }
 
 function LoadedSandboxProfileEditorPage(
