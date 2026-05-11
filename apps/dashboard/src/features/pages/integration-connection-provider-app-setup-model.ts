@@ -28,12 +28,6 @@ export function createInitialProviderAppSetupDraft(input: {
   return draft;
 }
 
-export function resolveProviderAppSetupSecretFieldKeys(
-  providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup,
-): readonly ProviderAppSetupFieldKey[] {
-  return providerAppSetup.existingApp.secretFields.map((field) => field.name);
-}
-
 export function hasProviderAppSetupDraftValues(input: {
   connection: IntegrationConnection;
   providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;

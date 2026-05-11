@@ -13,8 +13,10 @@ import {
   startProviderAppSetup,
   updateFormIntegrationConnection,
 } from "../integrations/integrations-service.js";
-import type { StartedProviderAppSetup } from "../integrations/integrations-service.js";
-import type { IntegrationConnection } from "../integrations/integrations-service.js";
+import type {
+  IntegrationConnection,
+  StartedProviderAppSetup,
+} from "../integrations/integrations-service.js";
 import {
   parseManifestJsonObject,
   validateManifestJsonObject,
@@ -41,7 +43,6 @@ import {
   isProviderAppExistingAppStartActionInstalled,
   isProviderAppRequiredDraftComplete,
   normalizeProviderAppSetupValue,
-  resolveProviderAppSetupSecretFieldKeys,
   type ProviderAppSetupFieldKey,
 } from "./integration-connection-provider-app-setup-model.js";
 import {
@@ -61,7 +62,7 @@ function resolveConfiguredSecretFieldKeys(input: {
 }): ReadonlySet<ProviderAppSetupFieldKey> {
   return resolveConfiguredSetupSecretFieldKeys({
     configuredSecretNames: input.connection.configuredSecretNames,
-    fieldKeys: resolveProviderAppSetupSecretFieldKeys(input.providerAppSetup),
+    fieldKeys: input.providerAppSetup.existingApp.secretFields.map((field) => field.name),
   });
 }
 
