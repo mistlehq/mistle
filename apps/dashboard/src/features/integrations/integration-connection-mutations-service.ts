@@ -328,7 +328,7 @@ export async function cancelDeviceAuthorizationAttempt(input: {
   }
 }
 
-export async function startProviderAppSetupInstallation(input: {
+export async function startRedirectProviderAppSetup(input: {
   connectionId: string;
   routeSegment: string;
   startErrorMessage: string;

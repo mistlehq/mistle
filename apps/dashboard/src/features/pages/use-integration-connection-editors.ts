@@ -7,7 +7,7 @@ import { resolveFormConnectionMethodProviderAppSetupStartAction } from "../integ
 import type { IntegrationConnectionMethod } from "../integrations/integrations-service-shared.js";
 import {
   deleteIntegrationConnection,
-  startProviderAppSetupInstallation,
+  startRedirectProviderAppSetup,
   updateApiKeyIntegrationConnection,
   updateIntegrationConnection,
 } from "../integrations/integrations-service.js";
@@ -128,7 +128,7 @@ export function useIntegrationConnectionEditors(input: {
       routeSegment: string;
       startErrorMessage: string;
       unexpectedResultMessage: string;
-    }) => startProviderAppSetupInstallation(payload),
+    }) => startRedirectProviderAppSetup(payload),
   });
 
   const editingApiKeyConnection =

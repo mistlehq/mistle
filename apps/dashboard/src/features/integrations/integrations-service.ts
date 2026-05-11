@@ -17,7 +17,7 @@ export {
   deleteIntegrationConnection,
   getDeviceAuthorizationAttempt,
   startProviderAppSetup,
-  startProviderAppSetupInstallation,
+  startRedirectProviderAppSetup,
   startDeviceAuthorizationIntegrationConnection,
   startRedirectIntegrationConnection,
   updateFormIntegrationConnection,
