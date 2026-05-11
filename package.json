@@ -14,7 +14,7 @@
     "dev:down": "tsx ./scripts/dev/down.ts",
     "dev:reset": "tsx ./scripts/dev/down.ts --volumes",
     "dev:reset:hard": "tsx ./scripts/dev/down.ts --volumes --rmi-local",
-    "sandbox-base:build": "tsx ./scripts/sandbox-base/build-provider-image.ts",
+    "sandbox-base:build": "NODE_OPTIONS='--conditions workspace-src' tsx ./scripts/sandbox-base/build-provider-image.ts",
     "dev:sandbox-base:push:docker": "pnpm sandbox-base:build --provider docker --publish-mode push",
     "dev:sandbox-base:push:e2b": "pnpm --filter @mistle/sandbox... build && pnpm sandbox-base:build --provider e2b",
     "build": "turbo run build",
