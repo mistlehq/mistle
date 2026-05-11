@@ -14,6 +14,9 @@ const meta = {
   title: "Dashboard/SandboxProfiles/Editor/Draft Automation Impact",
   component: SandboxProfileEditorPageStory,
   decorators: [withDashboardPageStory],
+  parameters: {
+    layout: "fullscreen",
+  },
   render: function RenderStory(args): React.JSX.Element {
     return <SandboxProfileEditorPageStory {...args} />;
   },

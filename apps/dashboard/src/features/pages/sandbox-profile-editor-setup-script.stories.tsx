@@ -11,6 +11,9 @@ const meta = {
   title: "Dashboard/SandboxProfiles/Editor/Setup Script",
   component: SandboxProfileEditorPageStory,
   decorators: [withDashboardPageStory],
+  parameters: {
+    layout: "fullscreen",
+  },
   render: function RenderStory(args): React.JSX.Element {
     return <SandboxProfileEditorPageStory {...args} />;
   },

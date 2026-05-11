@@ -76,7 +76,7 @@ describe("PageFrame", () => {
     expect(container.querySelector('[data-slot="page-header"]')).toBeDefined();
   });
 
-  it("separates tabbed pages into above-tabs and below-tabs regions", () => {
+  it("lets tabbed pages stretch their below-tabs region under the header", () => {
     const { container } = render(
       <PageFrame
         breadcrumbs={<nav aria-label="Page breadcrumbs">Parent / Child</nav>}
