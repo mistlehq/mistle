@@ -409,7 +409,7 @@ function shouldBlockSandboxProfileEditorUnpersistedChangesNavigation(input: {
 function resolveDefaultSandboxProfileEditorView(input: {
   versions: readonly SandboxProfileVersion[];
 }): SandboxProfileRouteView {
-  return input.versions.some((version) => version.state === "draft") ? "draft" : "published";
+  return input.versions.some((version) => version.state === "published") ? "published" : "draft";
 }
 
 function shouldRedirectPublishedSandboxProfileViewToDraft(input: {

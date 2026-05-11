@@ -1251,7 +1251,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByRole("menuitem", { name: "Discard draft" })).toBeDefined();
   });
 
-  it("returns to the sandbox profile tab when resuming an existing draft from snapshots", () => {
+  it("returns to the published sandbox profile tab when a published profile has an existing draft", () => {
     const { profileId, router } = renderSandboxProfileEditor({
       versionState: "published-with-draft",
     });
@@ -1268,7 +1268,8 @@ describe("SandboxProfileEditorPage", () => {
       "true",
     );
     expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/sandbox-profile`);
-    expect(screen.getByText("Viewing: Draft")).toBeDefined();
+    expect(screen.getByText("Viewing: Published (v3)")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Resume editing" })).toBeDefined();
   });
 
   it("does not show the publish success notice again after it is dismissed and the panel remounts", () => {
@@ -2233,6 +2234,17 @@ describe("SandboxProfileEditorPage", () => {
     });
 
     expect(await screen.findByText("Viewing: Published (v3)")).toBeDefined();
+    expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/sandbox-profile`);
+  });
+
+  it("opens the published sandbox profile tab from the profile default route when a draft also exists", async () => {
+    const { profileId, router } = renderSandboxProfileEditor({
+      view: "default",
+      versionState: "published-with-draft",
+    });
+
+    expect(await screen.findByText("Viewing: Published (v3)")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Resume editing" })).toBeDefined();
     expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/sandbox-profile`);
   });
 
