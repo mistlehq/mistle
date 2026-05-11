@@ -26,6 +26,7 @@ import { listSandboxInstances } from "../sessions/sessions-service.js";
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
 import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
 import { PageFrame } from "../shared/page-frame.js";
+import { parsePaginationCursor } from "../shared/pagination-search-params.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 import { SessionsRoutes } from "../shell/app-shell-sessions-sidebar-mode.js";
@@ -53,19 +54,6 @@ function parseListLimit(rawValue: string | null): number {
   }
 
   return parsed;
-}
-
-function parseCursor(rawValue: string | null): string | null {
-  if (rawValue === null) {
-    return null;
-  }
-
-  const normalized = rawValue.trim();
-  if (normalized.length === 0) {
-    return null;
-  }
-
-  return normalized;
 }
 
 function SessionTitleCell(input: { href?: string; title: string }): React.JSX.Element {
@@ -158,9 +146,9 @@ function resolveUpdatedLabel(input: {
 export function SessionsPage(): React.JSX.Element {
   const [searchParams, setSearchParams] = useSearchParams();
   const sandboxInstanceListLimit = parseListLimit(searchParams.get("limit"));
-  const sandboxInstancesAfter = parseCursor(searchParams.get("after"));
+  const sandboxInstancesAfter = parsePaginationCursor(searchParams.get("after"));
   const sandboxInstancesBefore =
-    sandboxInstancesAfter === null ? parseCursor(searchParams.get("before")) : null;
+    sandboxInstancesAfter === null ? parsePaginationCursor(searchParams.get("before")) : null;
 
   const sandboxInstancesQuery = useQuery({
     queryKey: sandboxInstancesListQueryKey({

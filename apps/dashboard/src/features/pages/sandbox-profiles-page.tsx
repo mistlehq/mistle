@@ -33,6 +33,7 @@ import {
   listSandboxProfiles,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import { PageFrame } from "../shared/page-frame.js";
+import { parsePaginationCursor } from "../shared/pagination-search-params.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 
@@ -60,19 +61,6 @@ function parseListLimit(rawValue: string | null): number {
   return parsed;
 }
 
-function parseCursor(rawValue: string | null): string | null {
-  if (rawValue === null) {
-    return null;
-  }
-
-  const normalized = rawValue.trim();
-  if (normalized.length === 0) {
-    return null;
-  }
-
-  return normalized;
-}
-
 export function SandboxProfilesPage(): React.JSX.Element {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -82,8 +70,8 @@ export function SandboxProfilesPage(): React.JSX.Element {
   const [createProfileError, setCreateProfileError] = useState<string | null>(null);
 
   const limit = parseListLimit(searchParams.get("limit"));
-  const after = parseCursor(searchParams.get("after"));
-  const before = after === null ? parseCursor(searchParams.get("before")) : null;
+  const after = parsePaginationCursor(searchParams.get("after"));
+  const before = after === null ? parsePaginationCursor(searchParams.get("before")) : null;
 
   const listQuery = useQuery({
     queryKey: sandboxProfilesListQueryKey({

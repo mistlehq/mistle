@@ -20,6 +20,7 @@ import { listAutomations } from "../automations/automations-service.js";
 import { getScheduledAutomation } from "../automations/scheduled-automations-service.js";
 import { automationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { getWebhookAutomation } from "../automations/webhook-automations-service.js";
+import { parsePaginationCursor } from "../shared/pagination-search-params.js";
 import { TablePagination } from "../shared/table-pagination.js";
 import { EditScheduledAutomationEditor } from "./scheduled-automation-editor-page.js";
 import { EditWebhookAutomationEditor } from "./webhook-automation-editor-page.js";
@@ -47,15 +48,6 @@ function createAutomationCreatePath(profileId: string): string {
   });
 
   return `/automations/new?${searchParams.toString()}`;
-}
-
-function parseCursor(rawValue: string | null): string | null {
-  if (rawValue === null) {
-    return null;
-  }
-
-  const normalized = rawValue.trim();
-  return normalized.length === 0 ? null : normalized;
 }
 
 function SourceSummary(input: { item: AutomationListItemViewModel }): React.JSX.Element {
@@ -300,8 +292,8 @@ export function SandboxProfileAutomationsSection(input: { profileId: string }): 
   const params = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isMobileAutomationSelectOpen, setIsMobileAutomationSelectOpen] = useState(false);
-  const after = parseCursor(searchParams.get("after"));
-  const before = after === null ? parseCursor(searchParams.get("before")) : null;
+  const after = parsePaginationCursor(searchParams.get("after"));
+  const before = after === null ? parsePaginationCursor(searchParams.get("before")) : null;
   const automationId = params["automationId"];
   const automationsQuery = useQuery({
     queryKey: automationsListQueryKey({
