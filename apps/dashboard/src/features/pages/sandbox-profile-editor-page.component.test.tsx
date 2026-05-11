@@ -1853,7 +1853,7 @@ describe("SandboxProfileEditorPage", () => {
     ]);
   });
 
-  it("keeps integrations and tools inline with runtime selections", () => {
+  it("keeps git resources inline with runtime selections", () => {
     renderSandboxProfileEditor();
 
     fireEvent.click(screen.getByRole("tab", { name: "Sandbox Profile" }));
