@@ -34,13 +34,15 @@ import type {
   SandboxProfileBindingEditorRow,
 } from "./sandbox-profile-binding-config-editor.js";
 import {
-  SandboxProfileIntegrationsSetupUnavailableState,
   SandboxProfileEditorView,
   SandboxProfilePanelSection,
   SandboxProfileSetupScriptPanel,
 } from "./sandbox-profile-editor-page.js";
 import type { SandboxProfileEditorSection } from "./sandbox-profile-editor-sections.js";
-import { SandboxProfileIntegrationsSetupSection } from "./sandbox-profile-integrations-setup-section.js";
+import {
+  SandboxProfileIntegrationsSetupSection,
+  SandboxProfileIntegrationsSetupUnavailableState,
+} from "./sandbox-profile-integrations-setup-section.js";
 import { mapBindingsToEditorRows } from "./sandbox-profile-integrations-state.js";
 import { SandboxProfileRuntimeSection } from "./sandbox-profile-runtime-section.js";
 import { SandboxProfileSectionCard } from "./sandbox-profile-section-card.js";

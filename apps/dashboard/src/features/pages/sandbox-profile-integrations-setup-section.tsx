@@ -1179,3 +1179,29 @@ export function SandboxProfileIntegrationsSetupSection(
     </div>
   );
 }
+
+export function SandboxProfileIntegrationsSetupUnavailableState(input: {
+  integrationBindingsError: unknown;
+  integrationDirectoryError: unknown;
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-4">
+      {input.integrationBindingsError !== null ? (
+        <Notice title="Could not load integration bindings" variant="alert">
+          {resolveApiErrorMessage({
+            error: input.integrationBindingsError,
+            fallbackMessage: "Could not load sandbox profile integration bindings.",
+          })}
+        </Notice>
+      ) : null}
+      {input.integrationDirectoryError !== null ? (
+        <Notice title="Could not load integration connections" variant="alert">
+          {resolveApiErrorMessage({
+            error: input.integrationDirectoryError,
+            fallbackMessage: "Could not load integration connections.",
+          })}
+        </Notice>
+      ) : null}
+    </div>
+  );
+}
