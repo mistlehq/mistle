@@ -3,6 +3,7 @@
 import { systemScheduler } from "@mistle/time";
 import { QueryClientProvider, useMutation, useQuery } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
 
@@ -32,6 +33,16 @@ async function waitForSchedulerDelay(delayMs: number): Promise<void> {
   });
 }
 
+async function findProgressIndicator(): Promise<Element> {
+  const progressBar = await screen.findByRole("progressbar", { name: "Loading" });
+  const progressIndicator = progressBar.firstElementChild;
+  if (progressIndicator === null) {
+    throw new Error("Top loading bar rendered without a progress indicator.");
+  }
+
+  return progressIndicator;
+}
+
 function QueryLoadingHarness(props: {
   initialData?: string;
   indicator?: LoadingIndicator;
@@ -51,6 +62,32 @@ function QueryLoadingHarness(props: {
   return (
     <>
       <span>{query.isFetching ? "fetching query" : "idle query"}</span>
+      <TopLoadingBar />
+    </>
+  );
+}
+
+function SequentialQueryLoadingHarness(props: {
+  firstPromise: Promise<string>;
+  secondPromise: Promise<string>;
+}): React.JSX.Element {
+  const [queryStep, setQueryStep] = useState<"first" | "second">("first");
+  const query = useQuery({
+    queryKey: ["top-loading-bar-sequential-test", queryStep],
+    queryFn: async () => (queryStep === "first" ? props.firstPromise : props.secondPromise),
+  });
+
+  return (
+    <>
+      <span>{query.isFetching ? "fetching query" : "idle query"}</span>
+      <button
+        onClick={() => {
+          setQueryStep("second");
+        }}
+        type="button"
+      >
+        Start next query
+      </button>
       <TopLoadingBar />
     </>
   );
@@ -117,11 +154,7 @@ describe("top-loading-bar", () => {
       </QueryClientProvider>,
     );
 
-    const progressBar = await screen.findByRole("progressbar", { name: "Loading" });
-    const progressIndicator = progressBar.firstElementChild;
-    if (progressIndicator === null) {
-      throw new Error("Top loading bar rendered without a progress indicator.");
-    }
+    const progressIndicator = await findProgressIndicator();
     expect(progressIndicator.getAttribute("style")).toContain("translate3d(-92%,0,0)");
 
     pendingQuery.resolve("ready");
@@ -213,6 +246,52 @@ describe("top-loading-bar", () => {
     expect(screen.queryByRole("progressbar", { name: "Loading" })).toBeNull();
 
     pendingQuery.resolve("ready");
+  });
+
+  it("keeps progress near complete when a new initial query starts during the hide delay", async () => {
+    const queryClient = createTestQueryClient();
+    const firstQuery = createDeferredPromise<string>();
+    const secondQuery = createDeferredPromise<string>();
+    const router = createMemoryRouter(
+      createRoutesFromElements(
+        <Route
+          element={
+            <SequentialQueryLoadingHarness
+              firstPromise={firstQuery.promise}
+              secondPromise={secondQuery.promise}
+            />
+          }
+          path="/"
+        />,
+      ),
+      { initialEntries: ["/"] },
+    );
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+
+    const progressIndicator = await findProgressIndicator();
+
+    firstQuery.resolve("ready");
+
+    await waitFor(() => {
+      expect(progressIndicator.getAttribute("style")).toContain("translate3d(0%,0,0)");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Start next query" }));
+
+    await waitFor(() => {
+      expect(progressIndicator.getAttribute("style")).toContain("translate3d(-8%,0,0)");
+    });
+
+    secondQuery.resolve("ready");
+
+    await waitFor(() => {
+      expect(screen.queryByRole("progressbar", { name: "Loading" })).toBeNull();
+    });
   });
 
   it("renders during mutations and hides after the mutation resolves", async () => {

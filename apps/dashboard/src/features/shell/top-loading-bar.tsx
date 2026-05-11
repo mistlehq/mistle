@@ -158,11 +158,8 @@ export function TopLoadingBar(): React.JSX.Element | null {
 }
 
 function resolveStartedProgress(current: number): number {
-  if (
-    current > TOP_LOADING_BAR_CONFIG.initialProgressPercent &&
-    current < TOP_LOADING_BAR_CONFIG.maxInFlightProgressPercent
-  ) {
-    return current;
+  if (current > TOP_LOADING_BAR_CONFIG.initialProgressPercent) {
+    return Math.min(current, TOP_LOADING_BAR_CONFIG.maxInFlightProgressPercent);
   }
 
   return TOP_LOADING_BAR_CONFIG.initialProgressPercent;
