@@ -12,6 +12,7 @@ pub mod readiness;
 mod runtime_file;
 mod workspace_source;
 
+use std::collections::BTreeMap;
 use std::fmt;
 
 use crate::protocol::startup::StartupInput;
@@ -111,26 +112,27 @@ pub fn apply_runtime_plan(startup_input: &StartupInput) -> Result<(), RuntimePla
     let runtime_plan: CompiledRuntimePlan =
         serde_json::from_value(startup_input.runtime_plan.clone())
             .map_err(RuntimePlanApplyError::InvalidRuntimePlan)?;
-    apply_compiled_runtime_plan(&runtime_plan)
+    apply_compiled_runtime_plan(&runtime_plan, None)
 }
 
 /// Applies the artifact, workspace-source, and setup-file portions of one compiled runtime plan.
 pub fn apply_compiled_runtime_plan(
     runtime_plan: &CompiledRuntimePlan,
+    managed_env: Option<&BTreeMap<String, String>>,
 ) -> Result<(), RuntimePlanApplyError> {
     // Materialize artifacts, workspace sources, and setup files before later PRs add
     // long-lived process supervision on top of this state.
     for (artifact_index, artifact) in runtime_plan.artifacts.iter().enumerate() {
         for (install_index, install_step) in artifact.lifecycle.install.iter().enumerate() {
-            artifact_install::apply_artifact_install_step(install_step).map_err(|error| {
-                RuntimePlanApplyError::ArtifactInstall {
+            artifact_install::apply_artifact_install_step(install_step, managed_env).map_err(
+                |error| RuntimePlanApplyError::ArtifactInstall {
                     artifact_index,
                     install_index,
                     artifact_key: artifact.artifact_key.clone(),
                     op: artifact_install::artifact_install_step_op(install_step),
                     error,
-                }
-            })?;
+                },
+            )?;
         }
     }
 
@@ -148,16 +150,16 @@ pub fn apply_compiled_runtime_plan(
                 clone_url.clone(),
             ),
         };
-        workspace_source::apply_workspace_source(workspace_source).map_err(|error| {
-            RuntimePlanApplyError::WorkspaceSource {
+        workspace_source::apply_workspace_source(workspace_source, managed_env).map_err(
+            |error| RuntimePlanApplyError::WorkspaceSource {
                 source_index,
                 source_kind,
                 path,
                 origin_url,
                 clone_url,
                 error,
-            }
-        })?;
+            },
+        )?;
     }
 
     for (client_index, runtime_client) in runtime_plan.runtime_clients.iter().enumerate() {

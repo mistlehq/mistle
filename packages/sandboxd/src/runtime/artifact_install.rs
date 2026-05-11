@@ -1,12 +1,13 @@
+use std::collections::BTreeMap;
 use std::fs::{self, File};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use flate2::read::GzDecoder;
-use reqwest::blocking::{Client, Response};
+use reqwest::blocking::{Client, ClientBuilder, Response};
 use reqwest::header::ACCEPT;
-use reqwest::{StatusCode, Url};
+use reqwest::{Certificate, Proxy, StatusCode, Url};
 use serde::Deserialize;
 use tar::Archive;
 use tempfile::TempDir;
@@ -36,12 +37,16 @@ pub(crate) fn artifact_install_step_op(step: &RuntimeArtifactInstallStep) -> &'s
     }
 }
 
-pub(crate) fn apply_artifact_install_step(step: &RuntimeArtifactInstallStep) -> Result<(), String> {
-    apply_artifact_install_step_with_dependencies(step, &SystemClock, &ThreadSleeper)
+pub(crate) fn apply_artifact_install_step(
+    step: &RuntimeArtifactInstallStep,
+    managed_env: Option<&BTreeMap<String, String>>,
+) -> Result<(), String> {
+    apply_artifact_install_step_with_dependencies(step, managed_env, &SystemClock, &ThreadSleeper)
 }
 
 fn apply_artifact_install_step_with_dependencies<C, S>(
     step: &RuntimeArtifactInstallStep,
+    managed_env: Option<&BTreeMap<String, String>>,
     clock: &C,
     sleeper: &S,
 ) -> Result<(), String>
@@ -50,14 +55,16 @@ where
     S: Sleeper,
 {
     match step {
-        RuntimeArtifactInstallStep::Exec { command } => apply_exec_command(command, clock, sleeper),
+        RuntimeArtifactInstallStep::Exec { command } => {
+            apply_exec_command(command, managed_env, clock, sleeper)
+        }
         RuntimeArtifactInstallStep::MiseInstall {
             tools,
             force,
             timeout_ms,
         } => {
             let command = build_mise_install_command(tools, *force, *timeout_ms);
-            apply_exec_command(&command, clock, sleeper)
+            apply_exec_command(&command, managed_env, clock, sleeper)
         }
         RuntimeArtifactInstallStep::GitHubReleaseInstall {
             repository,
@@ -66,11 +73,14 @@ where
             install_path,
             timeout_ms,
         } => apply_github_release_install(
-            repository,
-            release,
-            asset,
-            install_path,
-            *timeout_ms,
+            GitHubReleaseInstallRequest {
+                repository,
+                release,
+                asset,
+                install_path,
+                timeout_ms: *timeout_ms,
+                managed_env,
+            },
             clock,
             sleeper,
         ),
@@ -79,6 +89,7 @@ where
 
 fn apply_exec_command<C, S>(
     command: &RuntimeExecCommand,
+    managed_env: Option<&BTreeMap<String, String>>,
     clock: &C,
     sleeper: &S,
 ) -> Result<(), String>
@@ -86,10 +97,11 @@ where
     C: Clock,
     S: Sleeper,
 {
+    let env = merge_exec_environment(command.env.as_ref(), managed_env)?;
     run_command(
         CommandSpec {
             args: &command.args,
-            env: command.env.as_ref(),
+            env: env.as_ref(),
             cwd: command.cwd.as_deref(),
             timeout_ms: command.timeout_ms,
         },
@@ -97,6 +109,30 @@ where
         sleeper,
         DEFAULT_COMMAND_POLL_INTERVAL,
     )
+}
+
+fn merge_exec_environment(
+    command_env: Option<&BTreeMap<String, String>>,
+    managed_env: Option<&BTreeMap<String, String>>,
+) -> Result<Option<BTreeMap<String, String>>, String> {
+    let Some(managed_env) = managed_env else {
+        return Ok(command_env.cloned());
+    };
+    let mut merged = command_env.cloned().unwrap_or_default();
+    for (name, value) in managed_env {
+        match merged.get(name) {
+            Some(existing_value) if existing_value != value => {
+                return Err(format!(
+                    "artifact install command env defines managed env '{name}', which sandboxd reserves"
+                ));
+            }
+            Some(_) => {}
+            None => {
+                merged.insert(name.clone(), value.clone());
+            }
+        }
+    }
+    Ok(Some(merged))
 }
 
 fn build_mise_install_command(
@@ -118,12 +154,17 @@ fn build_mise_install_command(
     }
 }
 
-fn apply_github_release_install<C, S>(
-    repository: &str,
-    release: &RuntimeArtifactGitHubReleaseSelector,
-    asset: &RuntimeArtifactGitHubReleaseInstallAsset,
-    install_path: &str,
+struct GitHubReleaseInstallRequest<'a> {
+    repository: &'a str,
+    release: &'a RuntimeArtifactGitHubReleaseSelector,
+    asset: &'a RuntimeArtifactGitHubReleaseInstallAsset,
+    install_path: &'a str,
     timeout_ms: Option<u64>,
+    managed_env: Option<&'a BTreeMap<String, String>>,
+}
+
+fn apply_github_release_install<C, S>(
+    input: GitHubReleaseInstallRequest<'_>,
     clock: &C,
     sleeper: &S,
 ) -> Result<(), String>
@@ -131,7 +172,15 @@ where
     C: Clock,
     S: Sleeper,
 {
-    let client = build_github_client()?;
+    let GitHubReleaseInstallRequest {
+        repository,
+        release,
+        asset,
+        install_path,
+        timeout_ms,
+        managed_env,
+    } = input;
+    let client = build_github_client(managed_env)?;
     let budget = StepBudget::new(timeout_ms, clock);
     let selector_description = describe_release_selector(release);
     let workspace = InstallWorkspace::new(install_path)?;
@@ -209,12 +258,60 @@ where
     }
 }
 
-fn build_github_client() -> Result<Client, String> {
-    Client::builder()
-        .user_agent(GITHUB_INSTALLER_USER_AGENT)
-        .no_proxy()
+fn build_github_client(managed_env: Option<&BTreeMap<String, String>>) -> Result<Client, String> {
+    let mut builder = Client::builder().user_agent(GITHUB_INSTALLER_USER_AGENT);
+    if let Some(managed_env) = managed_env {
+        builder = apply_managed_github_client_env(builder, managed_env)?;
+    } else {
+        builder = builder.no_proxy();
+    }
+    builder
         .build()
         .map_err(|error| format!("failed to build github release installer client: {error}"))
+}
+
+fn apply_managed_github_client_env(
+    mut builder: ClientBuilder,
+    managed_env: &BTreeMap<String, String>,
+) -> Result<ClientBuilder, String> {
+    if let Some(proxy_url) = managed_env
+        .get("HTTPS_PROXY")
+        .or_else(|| managed_env.get("https_proxy"))
+        .or_else(|| managed_env.get("ALL_PROXY"))
+        .or_else(|| managed_env.get("all_proxy"))
+    {
+        let proxy = Proxy::all(proxy_url).map_err(|error| {
+            format!(
+                "managed HTTPS proxy configuration is invalid for github release install: {error}"
+            )
+        })?;
+        builder = builder.proxy(proxy);
+    } else {
+        builder = builder.no_proxy();
+    }
+
+    if let Some(certificate_path) = managed_env
+        .get("SSL_CERT_FILE")
+        .or_else(|| managed_env.get("CURL_CA_BUNDLE"))
+    {
+        let certificate_pem = fs::read(certificate_path).map_err(|error| {
+            format!(
+                "failed to read managed certificate bundle for github release install '{}': {error}",
+                certificate_path
+            )
+        })?;
+        let certificates = Certificate::from_pem_bundle(&certificate_pem).map_err(|error| {
+            format!(
+                "managed certificate bundle for github release install '{}' is invalid: {error}",
+                certificate_path
+            )
+        })?;
+        for certificate in certificates {
+            builder = builder.add_root_certificate(certificate);
+        }
+    }
+
+    Ok(builder)
 }
 
 fn resolve_github_release<C, S>(
@@ -797,6 +894,7 @@ enum RequestKind {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
     use std::fs;
     use std::io::Write;
     use std::os::unix::fs::PermissionsExt;
@@ -812,10 +910,10 @@ mod tests {
     use super::{
         GitHubReleaseAssetResponse, GitHubReleaseResponse, InstallWorkspace, RetryableFailure,
         RuntimeArtifactGitHubReleaseAssetShape, RuntimeArtifactGitHubReleaseInstallAsset,
-        StepBudget, build_mise_install_command, find_first_matching_published_release,
-        github_release_asset_download_url, is_retryable_http_status,
-        materialize_github_release_asset, run_with_retry, select_release_asset_shape_for_arch,
-        stream_download_to_path_with_retry,
+        StepBudget, apply_managed_github_client_env, build_mise_install_command,
+        find_first_matching_published_release, github_release_asset_download_url,
+        is_retryable_http_status, materialize_github_release_asset, merge_exec_environment,
+        run_with_retry, select_release_asset_shape_for_arch, stream_download_to_path_with_retry,
     };
 
     #[test]
@@ -837,6 +935,68 @@ mod tests {
             ]
         );
         assert_eq!(command.timeout_ms, Some(120_000));
+    }
+
+    #[test]
+    fn merges_managed_env_into_artifact_exec_commands() {
+        let command_env = BTreeMap::from([("TOOL_HOME".to_string(), "/root/.tool".to_string())]);
+        let managed_env = BTreeMap::from([
+            (
+                "HTTPS_PROXY".to_string(),
+                "http://127.0.0.1:4819".to_string(),
+            ),
+            (
+                "SSL_CERT_FILE".to_string(),
+                "/run/mistle/proxy-ca-bundle.crt".to_string(),
+            ),
+        ]);
+
+        let env = merge_exec_environment(Some(&command_env), Some(&managed_env))
+            .expect("artifact exec env should merge managed values")
+            .expect("merged env should exist");
+
+        assert_eq!(env.get("TOOL_HOME"), Some(&"/root/.tool".to_string()));
+        assert_eq!(
+            env.get("HTTPS_PROXY"),
+            Some(&"http://127.0.0.1:4819".to_string())
+        );
+        assert_eq!(
+            env.get("SSL_CERT_FILE"),
+            Some(&"/run/mistle/proxy-ca-bundle.crt".to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_artifact_exec_command_env_that_overrides_managed_values() {
+        let command_env =
+            BTreeMap::from([("HTTPS_PROXY".to_string(), "http://127.0.0.1:1".to_string())]);
+        let managed_env = BTreeMap::from([(
+            "HTTPS_PROXY".to_string(),
+            "http://127.0.0.1:4819".to_string(),
+        )]);
+
+        let error = merge_exec_environment(Some(&command_env), Some(&managed_env))
+            .expect_err("artifact exec env should reject managed env conflicts");
+
+        assert_eq!(
+            error,
+            "artifact install command env defines managed env 'HTTPS_PROXY', which sandboxd reserves"
+        );
+    }
+
+    #[test]
+    fn github_release_client_rejects_invalid_managed_proxy_url() {
+        let managed_env = BTreeMap::from([("HTTPS_PROXY".to_string(), "://bad".to_string())]);
+
+        let error =
+            apply_managed_github_client_env(reqwest::blocking::Client::builder(), &managed_env)
+                .expect_err("invalid managed proxy url should fail fast")
+                .to_string();
+
+        assert!(
+            error.contains("managed HTTPS proxy configuration is invalid"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]

@@ -9,7 +9,10 @@ use crate::time::{SystemClock, ThreadSleeper};
 
 const EGRESS_GRANT_HEADER_NAME: &str = "X-Mistle-Egress-Grant";
 
-pub fn apply_workspace_source(workspace_source: &CompiledWorkspaceSource) -> Result<(), String> {
+pub fn apply_workspace_source(
+    workspace_source: &CompiledWorkspaceSource,
+    managed_env: Option<&BTreeMap<String, String>>,
+) -> Result<(), String> {
     match workspace_source {
         CompiledWorkspaceSource::GitClone {
             resource_kind: WorkspaceSourceResourceKind::Repository,
@@ -22,6 +25,7 @@ pub fn apply_workspace_source(workspace_source: &CompiledWorkspaceSource) -> Res
             origin_url,
             clone_url.as_deref(),
             egress_grant_token.as_deref(),
+            managed_env,
         ),
     }
 }
@@ -31,6 +35,7 @@ fn apply_git_clone_workspace_source(
     origin_url: &str,
     clone_url: Option<&str>,
     egress_grant_token: Option<&str>,
+    managed_env: Option<&BTreeMap<String, String>>,
 ) -> Result<(), String> {
     if Path::new(path).exists() {
         return Ok(());
@@ -50,7 +55,7 @@ fn apply_git_clone_workspace_source(
             )
         })?;
 
-    let env = BTreeMap::from([("GIT_TERMINAL_PROMPT".to_string(), "0".to_string())]);
+    let env = build_git_command_environment(managed_env)?;
     let mut args = vec!["git".to_string()];
     if let Some(egress_grant_token) = egress_grant_token {
         args.push("-c".to_string());
@@ -68,7 +73,7 @@ fn apply_git_clone_workspace_source(
 
     let command = RuntimeExecCommand {
         args,
-        env: Some(env),
+        env: Some(env.clone()),
         cwd: None,
         timeout_ms: None,
     };
@@ -97,10 +102,7 @@ fn apply_git_clone_workspace_source(
                 "origin".to_string(),
                 origin_url.to_string(),
             ],
-            env: Some(BTreeMap::from([(
-                "GIT_TERMINAL_PROMPT".to_string(),
-                "0".to_string(),
-            )])),
+            env: Some(env),
             cwd: None,
             timeout_ms: None,
         };
@@ -120,4 +122,70 @@ fn apply_git_clone_workspace_source(
     }
 
     Ok(())
+}
+
+fn build_git_command_environment(
+    managed_env: Option<&BTreeMap<String, String>>,
+) -> Result<BTreeMap<String, String>, String> {
+    let mut env = managed_env.cloned().unwrap_or_default();
+    match env.get("GIT_TERMINAL_PROMPT") {
+        Some(existing_value) if existing_value != "0" => {
+            return Err(
+                "managed runtime env defines 'GIT_TERMINAL_PROMPT', which workspace clone reserves"
+                    .to_string(),
+            );
+        }
+        Some(_) => {}
+        None => {
+            env.insert("GIT_TERMINAL_PROMPT".to_string(), "0".to_string());
+        }
+    }
+    Ok(env)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::build_git_command_environment;
+
+    #[test]
+    fn git_clone_environment_includes_managed_proxy_settings() {
+        let managed_env = BTreeMap::from([
+            (
+                "HTTPS_PROXY".to_string(),
+                "http://127.0.0.1:4819".to_string(),
+            ),
+            (
+                "GIT_SSL_CAINFO".to_string(),
+                "/run/mistle/proxy-ca-bundle.crt".to_string(),
+            ),
+        ]);
+
+        let env = build_git_command_environment(Some(&managed_env))
+            .expect("workspace clone env should merge managed values");
+
+        assert_eq!(
+            env.get("HTTPS_PROXY"),
+            Some(&"http://127.0.0.1:4819".to_string())
+        );
+        assert_eq!(
+            env.get("GIT_SSL_CAINFO"),
+            Some(&"/run/mistle/proxy-ca-bundle.crt".to_string())
+        );
+        assert_eq!(env.get("GIT_TERMINAL_PROMPT"), Some(&"0".to_string()));
+    }
+
+    #[test]
+    fn git_clone_environment_rejects_terminal_prompt_override() {
+        let managed_env = BTreeMap::from([("GIT_TERMINAL_PROMPT".to_string(), "1".to_string())]);
+
+        let error = build_git_command_environment(Some(&managed_env))
+            .expect_err("workspace clone env should reserve terminal prompt behavior");
+
+        assert_eq!(
+            error,
+            "managed runtime env defines 'GIT_TERMINAL_PROMPT', which workspace clone reserves"
+        );
+    }
 }

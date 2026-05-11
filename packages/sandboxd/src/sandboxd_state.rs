@@ -184,7 +184,7 @@ impl SandboxdState {
             startup_input.is_snapshot() && gateway_egress_forwarder.is_some();
         let mut egress_proxy: Option<EgressProxy>;
         let runtime_env: BTreeMap<String, String>;
-        let mut snapshot_tunnel_session: Option<TunnelSession> = None;
+        let mut materialization_tunnel_session: Option<TunnelSession> = None;
 
         if start_snapshot_gateway_egress_before_runtime_plan {
             record_operation_phase_started(&diagnostics_logger, "start_egress_proxy");
@@ -207,17 +207,35 @@ impl SandboxdState {
                 SandboxdStateError::StartEgressProxy(error.to_string())
             })?;
             record_operation_phase_completed(&diagnostics_logger, "start_egress_proxy");
-            let base_runtime_env = collect_runtime_environment(&runtime_plan)
-                .map_err(SandboxdStateError::StartRuntimeProcesses)?;
+            let base_runtime_env = match collect_runtime_environment(&runtime_plan) {
+                Ok(runtime_env) => runtime_env,
+                Err(error) => {
+                    close_egress_proxy_after_failure(
+                        &mut egress_proxy,
+                        &diagnostics_logger,
+                        "stop_egress_proxy_after_runtime_env_failure",
+                    );
+                    return Err(SandboxdStateError::StartRuntimeProcesses(error));
+                }
+            };
             runtime_env =
-                merge_managed_runtime_environment(base_runtime_env, egress_proxy.as_ref())
-                    .map_err(SandboxdStateError::StartRuntimeProcesses)?;
+                match merge_managed_runtime_environment(base_runtime_env, egress_proxy.as_ref()) {
+                    Ok(runtime_env) => runtime_env,
+                    Err(error) => {
+                        close_egress_proxy_after_failure(
+                            &mut egress_proxy,
+                            &diagnostics_logger,
+                            "stop_egress_proxy_after_runtime_env_failure",
+                        );
+                        return Err(SandboxdStateError::StartRuntimeProcesses(error));
+                    }
+                };
 
             let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
             let runtime_readiness_manager =
                 Arc::new(Mutex::new(RuntimeReadinessManager::default()));
             record_operation_phase_started(&diagnostics_logger, "start_snapshot_tunnel_session");
-            let tunnel_session = TunnelSession::start_with_supervisor(
+            let tunnel_session = match TunnelSession::start_with_supervisor(
                 startup_input,
                 keepalive_manager,
                 runtime_readiness_manager,
@@ -226,34 +244,45 @@ impl SandboxdState {
                 clock.clone(),
                 sleeper.clone(),
                 supervisor_handle.clone(),
-            )
-            .map_err(|error| {
-                record_operation_phase_failure(
-                    &diagnostics_logger,
-                    "start_snapshot_tunnel_session",
-                    BTreeMap::from([(
-                        "error".to_string(),
-                        startup_diagnostics_string(error.to_string()),
-                    )]),
-                );
-                SandboxdStateError::StartTunnelSession(error.to_string())
-            })?;
+            ) {
+                Ok(tunnel_session) => tunnel_session,
+                Err(error) => {
+                    record_operation_phase_failure(
+                        &diagnostics_logger,
+                        "start_snapshot_tunnel_session",
+                        BTreeMap::from([(
+                            "error".to_string(),
+                            startup_diagnostics_string(error.to_string()),
+                        )]),
+                    );
+                    close_egress_proxy_after_failure(
+                        &mut egress_proxy,
+                        &diagnostics_logger,
+                        "stop_egress_proxy_after_snapshot_tunnel_failure",
+                    );
+                    return Err(SandboxdStateError::StartTunnelSession(error.to_string()));
+                }
+            };
             if let Some(forwarder) = &gateway_egress_forwarder {
                 tunnel_session.attach_gateway_egress_forwarder(forwarder);
             }
             record_operation_phase_completed(&diagnostics_logger, "start_snapshot_tunnel_session");
-            snapshot_tunnel_session = Some(tunnel_session);
+            materialization_tunnel_session = Some(tunnel_session);
 
             if !uses_pre_materialized_snapshot {
                 record_operation_phase_started(&diagnostics_logger, "apply_runtime_plan");
-                match runtime::apply_compiled_runtime_plan(&runtime_plan) {
+                match runtime::apply_compiled_runtime_plan(&runtime_plan, Some(&runtime_env)) {
                     Ok(()) => {
                         record_operation_phase_completed(&diagnostics_logger, "apply_runtime_plan");
                     }
                     Err(error) => {
                         record_runtime_plan_apply_failure(&diagnostics_logger, &error);
-                        if let Some(tunnel_session) = snapshot_tunnel_session.take() {
-                            close_snapshot_tunnel_session(tunnel_session, &diagnostics_logger);
+                        if let Some(tunnel_session) = materialization_tunnel_session.take() {
+                            close_startup_tunnel_session(
+                                tunnel_session,
+                                &diagnostics_logger,
+                                "stop_snapshot_tunnel_session",
+                            );
                         }
                         if let Some(egress_proxy) = egress_proxy.take() {
                             record_operation_phase_started(
@@ -280,14 +309,6 @@ impl SandboxdState {
                 }
             }
         } else {
-            if !uses_pre_materialized_snapshot {
-                record_operation_phase_started(&diagnostics_logger, "apply_runtime_plan");
-                runtime::apply_compiled_runtime_plan(&runtime_plan).map_err(|error| {
-                    record_runtime_plan_apply_failure(&diagnostics_logger, &error);
-                    SandboxdStateError::ApplyRuntimePlan(error.to_string())
-                })?;
-                record_operation_phase_completed(&diagnostics_logger, "apply_runtime_plan");
-            }
             record_operation_phase_started(&diagnostics_logger, "start_egress_proxy");
             egress_proxy = EgressProxy::start(
                 &runtime_plan,
@@ -308,11 +329,128 @@ impl SandboxdState {
                 SandboxdStateError::StartEgressProxy(error.to_string())
             })?;
             record_operation_phase_completed(&diagnostics_logger, "start_egress_proxy");
-            let base_runtime_env = collect_runtime_environment(&runtime_plan)
-                .map_err(SandboxdStateError::StartRuntimeProcesses)?;
+            let base_runtime_env = match collect_runtime_environment(&runtime_plan) {
+                Ok(runtime_env) => runtime_env,
+                Err(error) => {
+                    close_egress_proxy_after_failure(
+                        &mut egress_proxy,
+                        &diagnostics_logger,
+                        "stop_egress_proxy_after_runtime_env_failure",
+                    );
+                    return Err(SandboxdStateError::StartRuntimeProcesses(error));
+                }
+            };
             runtime_env =
-                merge_managed_runtime_environment(base_runtime_env, egress_proxy.as_ref())
-                    .map_err(SandboxdStateError::StartRuntimeProcesses)?;
+                match merge_managed_runtime_environment(base_runtime_env, egress_proxy.as_ref()) {
+                    Ok(runtime_env) => runtime_env,
+                    Err(error) => {
+                        close_egress_proxy_after_failure(
+                            &mut egress_proxy,
+                            &diagnostics_logger,
+                            "stop_egress_proxy_after_runtime_env_failure",
+                        );
+                        return Err(SandboxdStateError::StartRuntimeProcesses(error));
+                    }
+                };
+
+            if egress_proxy.is_some() && !uses_pre_materialized_snapshot {
+                let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+                let runtime_readiness_manager =
+                    Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+                record_operation_phase_started(
+                    &diagnostics_logger,
+                    "start_materialization_tunnel_session",
+                );
+                let tunnel_session = match TunnelSession::start_with_supervisor(
+                    startup_input,
+                    keepalive_manager,
+                    runtime_readiness_manager,
+                    None,
+                    runtime_env.clone(),
+                    clock.clone(),
+                    sleeper.clone(),
+                    supervisor_handle.clone(),
+                ) {
+                    Ok(tunnel_session) => tunnel_session,
+                    Err(error) => {
+                        record_operation_phase_failure(
+                            &diagnostics_logger,
+                            "start_materialization_tunnel_session",
+                            BTreeMap::from([(
+                                "error".to_string(),
+                                startup_diagnostics_string(error.to_string()),
+                            )]),
+                        );
+                        if let Some(egress_proxy) = egress_proxy.take() {
+                            record_operation_phase_started(
+                                &diagnostics_logger,
+                                "stop_egress_proxy_after_materialization_tunnel_failure",
+                            );
+                            match egress_proxy.close() {
+                                Ok(()) => record_operation_phase_completed(
+                                    &diagnostics_logger,
+                                    "stop_egress_proxy_after_materialization_tunnel_failure",
+                                ),
+                                Err(close_error) => record_operation_phase_failure(
+                                    &diagnostics_logger,
+                                    "stop_egress_proxy_after_materialization_tunnel_failure",
+                                    BTreeMap::from([(
+                                        "error".to_string(),
+                                        startup_diagnostics_string(close_error.to_string()),
+                                    )]),
+                                ),
+                            }
+                        }
+                        return Err(SandboxdStateError::StartTunnelSession(error.to_string()));
+                    }
+                };
+                if let Some(forwarder) = &gateway_egress_forwarder {
+                    tunnel_session.attach_gateway_egress_forwarder(forwarder);
+                }
+                record_operation_phase_completed(
+                    &diagnostics_logger,
+                    "start_materialization_tunnel_session",
+                );
+                materialization_tunnel_session = Some(tunnel_session);
+            }
+
+            if !uses_pre_materialized_snapshot {
+                record_operation_phase_started(&diagnostics_logger, "apply_runtime_plan");
+                runtime::apply_compiled_runtime_plan(&runtime_plan, Some(&runtime_env)).map_err(
+                    |error| {
+                        record_runtime_plan_apply_failure(&diagnostics_logger, &error);
+                        if let Some(tunnel_session) = materialization_tunnel_session.take() {
+                            close_startup_tunnel_session(
+                                tunnel_session,
+                                &diagnostics_logger,
+                                "stop_materialization_tunnel_session_after_runtime_plan_failure",
+                            );
+                        }
+                        if let Some(egress_proxy) = egress_proxy.take() {
+                            record_operation_phase_started(
+                                &diagnostics_logger,
+                                "stop_egress_proxy_after_runtime_plan_failure",
+                            );
+                            match egress_proxy.close() {
+                                Ok(()) => record_operation_phase_completed(
+                                    &diagnostics_logger,
+                                    "stop_egress_proxy_after_runtime_plan_failure",
+                                ),
+                                Err(close_error) => record_operation_phase_failure(
+                                    &diagnostics_logger,
+                                    "stop_egress_proxy_after_runtime_plan_failure",
+                                    BTreeMap::from([(
+                                        "error".to_string(),
+                                        startup_diagnostics_string(close_error.to_string()),
+                                    )]),
+                                ),
+                            }
+                        }
+                        SandboxdStateError::ApplyRuntimePlan(error.to_string())
+                    },
+                )?;
+                record_operation_phase_completed(&diagnostics_logger, "apply_runtime_plan");
+            }
         }
         if !uses_pre_materialized_snapshot {
             record_operation_phase_started(&diagnostics_logger, "run_setup_script");
@@ -327,30 +465,36 @@ impl SandboxdState {
                 }
                 Err(error) => {
                     record_setup_script_failure(&diagnostics_logger, &error);
-                    if startup_input.is_snapshot() {
-                        if let Some(tunnel_session) = snapshot_tunnel_session.take() {
-                            close_snapshot_tunnel_session(tunnel_session, &diagnostics_logger);
-                        }
-                        if let Some(egress_proxy) = egress_proxy.take() {
-                            record_operation_phase_started(
+                    if let Some(tunnel_session) = materialization_tunnel_session.take() {
+                        close_startup_tunnel_session(
+                            tunnel_session,
+                            &diagnostics_logger,
+                            if startup_input.is_snapshot() {
+                                "stop_snapshot_tunnel_session_after_setup_failure"
+                            } else {
+                                "stop_materialization_tunnel_session_after_setup_failure"
+                            },
+                        );
+                    }
+                    if let Some(egress_proxy) = egress_proxy.take() {
+                        record_operation_phase_started(
+                            &diagnostics_logger,
+                            "stop_egress_proxy_after_setup_failure",
+                        );
+                        match egress_proxy.close() {
+                            Ok(()) => record_operation_phase_completed(
                                 &diagnostics_logger,
                                 "stop_egress_proxy_after_setup_failure",
-                            );
-                            match egress_proxy.close() {
-                                Ok(()) => record_operation_phase_completed(
+                            ),
+                            Err(close_error) => {
+                                record_operation_phase_failure(
                                     &diagnostics_logger,
                                     "stop_egress_proxy_after_setup_failure",
-                                ),
-                                Err(close_error) => {
-                                    record_operation_phase_failure(
-                                        &diagnostics_logger,
-                                        "stop_egress_proxy_after_setup_failure",
-                                        BTreeMap::from([(
-                                            "error".to_string(),
-                                            startup_diagnostics_string(close_error.to_string()),
-                                        )]),
-                                    );
-                                }
+                                    BTreeMap::from([(
+                                        "error".to_string(),
+                                        startup_diagnostics_string(close_error.to_string()),
+                                    )]),
+                                );
                             }
                         }
                     }
@@ -363,8 +507,12 @@ impl SandboxdState {
             // mount persistent storage at paths like /root and /etc/codex, which would shadow any
             // image contents there, so snapshot workflows must stop here and run on ephemeral
             // sandboxes without session runtime resources or persistent mounts.
-            if let Some(tunnel_session) = snapshot_tunnel_session.take() {
-                close_snapshot_tunnel_session(tunnel_session, &diagnostics_logger);
+            if let Some(tunnel_session) = materialization_tunnel_session.take() {
+                close_startup_tunnel_session(
+                    tunnel_session,
+                    &diagnostics_logger,
+                    "stop_snapshot_tunnel_session",
+                );
             }
             record_operation_phase_started(&diagnostics_logger, "stop_egress_proxy");
             if let Some(egress_proxy) = egress_proxy.take() {
@@ -420,6 +568,18 @@ impl SandboxdState {
                 )
                 .map_err(|error| {
                     record_runtime_process_failure(&diagnostics_logger, &error);
+                    if let Some(tunnel_session) = materialization_tunnel_session.take() {
+                        close_startup_tunnel_session(
+                            tunnel_session,
+                            &diagnostics_logger,
+                            "stop_materialization_tunnel_session_after_runtime_process_failure",
+                        );
+                    }
+                    close_egress_proxy_after_failure(
+                        &mut egress_proxy,
+                        &diagnostics_logger,
+                        "stop_egress_proxy_after_runtime_process_failure",
+                    );
                     SandboxdStateError::StartRuntimeProcesses(error.to_string())
                 })?,
             )
@@ -452,6 +612,18 @@ impl SandboxdState {
                         "error".to_string(),
                         startup_diagnostics_string(error.to_string()),
                     )]),
+                );
+                if let Some(tunnel_session) = materialization_tunnel_session.take() {
+                    close_startup_tunnel_session(
+                        tunnel_session,
+                        &diagnostics_logger,
+                        "stop_materialization_tunnel_session_after_runtime_adapter_failure",
+                    );
+                }
+                close_egress_proxy_after_failure(
+                    &mut egress_proxy,
+                    &diagnostics_logger,
+                    "stop_egress_proxy_after_runtime_adapter_failure",
                 );
                 SandboxdStateError::StartRuntimeAdapters(error.to_string())
             })?;
@@ -490,6 +662,13 @@ impl SandboxdState {
             runtime_readiness_shutdown_requested.clone(),
         ));
 
+        if let Some(tunnel_session) = materialization_tunnel_session.take() {
+            close_startup_tunnel_session(
+                tunnel_session,
+                &diagnostics_logger,
+                "stop_materialization_tunnel_session",
+            );
+        }
         record_operation_phase_started(&diagnostics_logger, "start_tunnel_session");
         let tunnel_session = TunnelSession::start_with_supervisor(
             startup_input,
@@ -1214,13 +1393,36 @@ fn collect_tracked_components(
     tracked_components
 }
 
-fn close_snapshot_tunnel_session(
+fn close_startup_tunnel_session(
     tunnel_session: TunnelSession,
     diagnostics_logger: &Option<StartupDiagnosticsLogger>,
+    phase: &str,
 ) {
-    record_operation_phase_started(diagnostics_logger, "stop_snapshot_tunnel_session");
+    record_operation_phase_started(diagnostics_logger, phase);
     tunnel_session.close();
-    record_operation_phase_completed(diagnostics_logger, "stop_snapshot_tunnel_session");
+    record_operation_phase_completed(diagnostics_logger, phase);
+}
+
+fn close_egress_proxy_after_failure(
+    egress_proxy: &mut Option<EgressProxy>,
+    diagnostics_logger: &Option<StartupDiagnosticsLogger>,
+    phase: &str,
+) {
+    let Some(egress_proxy) = egress_proxy.take() else {
+        return;
+    };
+    record_operation_phase_started(diagnostics_logger, phase);
+    match egress_proxy.close() {
+        Ok(()) => record_operation_phase_completed(diagnostics_logger, phase),
+        Err(close_error) => record_operation_phase_failure(
+            diagnostics_logger,
+            phase,
+            BTreeMap::from([(
+                "error".to_string(),
+                startup_diagnostics_string(close_error.to_string()),
+            )]),
+        ),
+    }
 }
 
 fn collect_runtime_environment(
