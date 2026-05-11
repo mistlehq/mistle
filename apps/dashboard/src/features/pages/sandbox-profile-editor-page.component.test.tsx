@@ -369,7 +369,7 @@ function renderSandboxProfileEditor(input?: {
       configStatus: "valid" | "invalid";
     };
   }[];
-  integrationsError?: string;
+  integrationBindingsError?: string;
   integrationsLoading?: boolean;
   defaultPersistenceMode?: SandboxProfileVersion["defaultPersistenceMode"];
   persistentSandboxesEnabled?: boolean;
@@ -459,7 +459,7 @@ function renderSandboxProfileEditor(input?: {
     createdAt: "2026-04-23T00:00:00.000Z",
     updatedAt: "2026-04-23T00:00:00.000Z",
   });
-  if (input?.integrationsError !== undefined) {
+  if (input?.integrationBindingsError !== undefined) {
     queryClient.setQueryData(sandboxProfileVersionsQueryKey(profileId), {
       versions,
     });
@@ -469,7 +469,7 @@ function renderSandboxProfileEditor(input?: {
         version,
       }),
       queryFn: async () => {
-        throw new Error(input.integrationsError);
+        throw new Error(input.integrationBindingsError);
       },
     });
   } else if (input?.integrationsLoading === true) {
@@ -1790,7 +1790,7 @@ describe("SandboxProfileEditorPage", () => {
 
   it("shows integration binding load failures without a loading placeholder", async () => {
     renderSandboxProfileEditor({
-      integrationsError: "Bindings failed to load.",
+      integrationBindingsError: "Bindings failed to load.",
     });
 
     fireEvent.click(screen.getByRole("tab", { name: "Sandbox Profile" }));
