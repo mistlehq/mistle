@@ -2683,14 +2683,6 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
   const showDirectoryUnavailableNotice = input.loader.integrationDirectoryQuery.isError;
 
   if (
-    input.loader.integrationBindingsQuery.isPending ||
-    input.loader.integrationDirectoryQuery.isPending ||
-    input.loader.initialRows === null
-  ) {
-    return null;
-  }
-
-  if (
     input.loader.integrationBindingsQuery.isError ||
     input.loader.integrationDirectoryQuery.isError
   ) {
@@ -2706,6 +2698,14 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
         />
       </SandboxProfilePanelSection>
     );
+  }
+
+  if (
+    input.loader.integrationBindingsQuery.isPending ||
+    input.loader.integrationDirectoryQuery.isPending ||
+    input.loader.initialRows === null
+  ) {
+    return null;
   }
 
   return (

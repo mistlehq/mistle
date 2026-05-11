@@ -369,6 +369,7 @@ function renderSandboxProfileEditor(input?: {
       configStatus: "valid" | "invalid";
     };
   }[];
+  integrationsError?: string;
   integrationsLoading?: boolean;
   defaultPersistenceMode?: SandboxProfileVersion["defaultPersistenceMode"];
   persistentSandboxesEnabled?: boolean;
@@ -458,7 +459,20 @@ function renderSandboxProfileEditor(input?: {
     createdAt: "2026-04-23T00:00:00.000Z",
     updatedAt: "2026-04-23T00:00:00.000Z",
   });
-  if (input?.integrationsLoading === true) {
+  if (input?.integrationsError !== undefined) {
+    queryClient.setQueryData(sandboxProfileVersionsQueryKey(profileId), {
+      versions,
+    });
+    queryClient.getQueryCache().build(queryClient, {
+      queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
+        profileId,
+        version,
+      }),
+      queryFn: async () => {
+        throw new Error(input.integrationsError);
+      },
+    });
+  } else if (input?.integrationsLoading === true) {
     queryClient.setQueryData(sandboxProfileVersionsQueryKey(profileId), {
       versions,
     });
@@ -1772,6 +1786,17 @@ describe("SandboxProfileEditorPage", () => {
         "Choose a Git provider in Integrations before selecting repository resources.",
       ),
     ).toBeNull();
+  });
+
+  it("shows integration binding load failures without a loading placeholder", async () => {
+    renderSandboxProfileEditor({
+      integrationsError: "Bindings failed to load.",
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Sandbox Profile" }));
+
+    expect(await screen.findByText("Could not load integration bindings")).toBeDefined();
+    expect(screen.queryByText("Loading integrations...")).toBeNull();
   });
 
   it("shows the setup script editor in the sandbox profile section", () => {
