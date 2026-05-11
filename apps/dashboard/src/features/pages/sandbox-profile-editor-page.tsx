@@ -2682,10 +2682,7 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
   const showBindingsUnavailableNotice = input.loader.integrationBindingsQuery.isError;
   const showDirectoryUnavailableNotice = input.loader.integrationDirectoryQuery.isError;
 
-  if (
-    input.loader.integrationBindingsQuery.isError ||
-    input.loader.integrationDirectoryQuery.isError
-  ) {
+  if (showBindingsUnavailableNotice || showDirectoryUnavailableNotice) {
     return (
       <SandboxProfilePanelSection>
         <SandboxProfileIntegrationsSetupUnavailableState
@@ -2785,28 +2782,26 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
   }, [onDraftStateChange, integrationsState.hasUnsavedChanges, integrationsState.integrationRows]);
 
   return (
-    <>
-      <SandboxProfilePanelSection>
-        <SandboxProfileIntegrationsSetupSection
-          availableConnections={integrationsState.availableConnections}
-          availableTargets={integrationsState.availableTargets}
-          integrationBindingsQuery={{
-            isError: false,
-            error: null,
-            isPending: false,
-          }}
-          integrationDirectoryQuery={input.integrationDirectoryQuery}
-          integrationRows={integrationsState.integrationRows}
-          integrationSaveError={integrationsState.integrationSaveError}
-          disabled={input.disabled}
-          readOnly={input.readOnly}
-          onAddIntegrationBindingRow={integrationsState.onAddIntegrationBindingRow}
-          onIntegrationBindingRowChange={integrationsState.onIntegrationBindingRowChange}
-          onRemoveIntegrationBindingRow={integrationsState.onRemoveIntegrationBindingRow}
-          onIntegrationSaveErrorDismiss={integrationsState.onIntegrationSaveErrorDismiss}
-        />
-      </SandboxProfilePanelSection>
-    </>
+    <SandboxProfilePanelSection>
+      <SandboxProfileIntegrationsSetupSection
+        availableConnections={integrationsState.availableConnections}
+        availableTargets={integrationsState.availableTargets}
+        integrationBindingsQuery={{
+          isError: false,
+          error: null,
+          isPending: false,
+        }}
+        integrationDirectoryQuery={input.integrationDirectoryQuery}
+        integrationRows={integrationsState.integrationRows}
+        integrationSaveError={integrationsState.integrationSaveError}
+        disabled={input.disabled}
+        readOnly={input.readOnly}
+        onAddIntegrationBindingRow={integrationsState.onAddIntegrationBindingRow}
+        onIntegrationBindingRowChange={integrationsState.onIntegrationBindingRowChange}
+        onRemoveIntegrationBindingRow={integrationsState.onRemoveIntegrationBindingRow}
+        onIntegrationSaveErrorDismiss={integrationsState.onIntegrationSaveErrorDismiss}
+      />
+    </SandboxProfilePanelSection>
   );
 }
 
