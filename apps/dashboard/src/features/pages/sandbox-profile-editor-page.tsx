@@ -413,12 +413,12 @@ function resolveDefaultSandboxProfileEditorView(
 }
 
 function shouldRedirectPublishedSandboxProfileViewToDraft(input: {
-  activeVersion: number | null;
   versions: readonly SandboxProfileVersion[];
 }): boolean {
-  return (
-    input.activeVersion === null && input.versions.some((version) => version.state === "draft")
-  );
+  const hasDraftVersion = input.versions.some((version) => version.state === "draft");
+  const hasPublishedVersion = input.versions.some((version) => version.state === "published");
+
+  return hasDraftVersion && !hasPublishedVersion;
 }
 
 export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): React.JSX.Element {
@@ -972,7 +972,6 @@ function LoadedSandboxProfileEditorPage(
   if (
     input.view === "published" &&
     shouldRedirectPublishedSandboxProfileViewToDraft({
-      activeVersion: input.profile.activeVersion,
       versions: input.versions,
     })
   ) {

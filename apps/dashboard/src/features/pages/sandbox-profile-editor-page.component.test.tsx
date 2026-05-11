@@ -95,6 +95,7 @@ type SandboxProfileEditorTestVersionState =
   | "draft-with-published"
   | "published"
   | "published-with-draft"
+  | "published-pending-with-draft"
   | "published-pending-with-older-active"
   | "published-manual-refresh-no-snapshot"
   | "published-no-snapshot"
@@ -209,6 +210,21 @@ function createSandboxProfileVersionsForTest(input: {
           state: "draft",
         }),
       ];
+    case "published-pending-with-draft":
+      return [
+        createVersion({
+          state: "published",
+          usable: false,
+          latestSnapshotJob: createRunningSnapshotJobFixture({
+            id: "ssj_pending_initial_materialization",
+            trigger: "publish",
+          }),
+        }),
+        createVersion({
+          version: input.version + 1,
+          state: "draft",
+        }),
+      ];
     case "published-pending-with-older-active":
       return [
         createVersion({
@@ -311,6 +327,7 @@ function resolveSandboxProfileEditorTestRouteView(input: {
     case "published":
     case "published-with-draft":
     case "draft-with-published":
+    case "published-pending-with-draft":
     case "published-pending-with-older-active":
     case "published-failed-with-older-active":
     case "published-manual-refresh-no-snapshot":
@@ -2269,6 +2286,19 @@ describe("SandboxProfileEditorPage", () => {
     expect(await screen.findByText("Viewing: Draft")).toBeDefined();
     expect(router.state.location.pathname).toBe(
       `/sandbox-profiles/${profileId}/sandbox-profile/draft`,
+    );
+  });
+
+  it("keeps the published route when a published version is materializing and a draft exists", async () => {
+    const { profileId, router } = renderSandboxProfileEditor({
+      view: "published",
+      versionState: "published-pending-with-draft",
+    });
+
+    expect(await screen.findByText("Viewing: Published (v3)")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Resume editing" })).toBeDefined();
+    expect(router.state.location.pathname).toBe(
+      `/sandbox-profiles/${profileId}/sandbox-profile/published`,
     );
   });
 
