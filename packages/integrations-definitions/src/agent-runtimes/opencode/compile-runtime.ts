@@ -1,7 +1,8 @@
 import type {
-  AgentProviderAccess,
   CompileAgentRuntimeInput,
   CompileAgentRuntimeResult,
+  EgressCredentialRoute,
+  RuntimeClient,
 } from "@mistle/integrations-core";
 
 import { OpenCodePtyLaunchSpec } from "./pty-launch.js";
@@ -34,10 +35,11 @@ const ArtifactCommandTimeoutMs = 120_000;
 const RuntimeClientProcessReadinessTimeoutMs = 60_000;
 const RuntimeClientProcessStopTimeoutMs = 10_000;
 const RuntimeClientProcessStopGracePeriodMs = 2_000;
-
-type OpenCodeProviderMetadata = {
-  responsesApiBaseUrl: string;
-};
+const MistleManagedApiKey = "mistle-managed-credential";
+const MistleManagedChatGptAccess = "mistle-managed-access";
+const MistleManagedChatGptRefresh = "mistle-managed-refresh";
+const MistleManagedChatGptExpires = 4_102_444_800_000;
+const OpenCodeAuthContentEnvKey = "OPENCODE_AUTH_CONTENT";
 
 const OpenCodeGlobalAgentsMd = [
   "Mistle-managed sandbox context:",
@@ -55,36 +57,37 @@ const OpenCodeGlobalAgentsMd = [
   "  - `cmddir search '^(jira|slack)$'`",
 ].join("\n");
 
-type OpenCodeProviderConfig = {
-  options: {
-    apiKey: string;
-    baseURL: string;
-  };
-};
-
 type OpenCodeConfig = {
   server: {
     hostname: string;
     port: number;
     mdns: boolean;
   };
-  provider: Record<string, OpenCodeProviderConfig>;
 };
 
-function renderOpenCodeConfig(input: { providerBaseUrl: string }): string {
+type OpenCodeApiAuth = {
+  type: "api";
+  key: string;
+};
+
+type OpenCodeOauthAuth = {
+  type: "oauth";
+  refresh: string;
+  access: string;
+  expires: number;
+  accountId?: string;
+};
+
+type OpenCodeAuth = OpenCodeApiAuth | OpenCodeOauthAuth;
+
+type OpenCodeAuthContent = Record<string, OpenCodeAuth>;
+
+function renderOpenCodeConfig(): string {
   const config: OpenCodeConfig = {
     server: {
       hostname: OpenCodeServerListenHost,
       port: OpenCodeServerListenPort,
       mdns: false,
-    },
-    provider: {
-      openai: {
-        options: {
-          apiKey: "mistle-managed-credential",
-          baseURL: input.providerBaseUrl,
-        },
-      },
     },
   };
 
@@ -95,22 +98,222 @@ function renderOpenCodeGlobalAgentsMd(): string {
   return `${OpenCodeGlobalAgentsMd}\n`;
 }
 
-function resolveOpenCodeProviderMetadata(
-  providerAccess: AgentProviderAccess,
-): OpenCodeProviderMetadata | null {
-  const providerMetadata = providerAccess.providerMetadata;
-  if (providerMetadata === undefined) {
-    return null;
+function isIntegrationConnectionCredentialRoute(
+  route: EgressCredentialRoute,
+): route is EgressCredentialRoute & {
+  credentialResolver: Extract<
+    EgressCredentialRoute["credentialResolver"],
+    { kind: "integration_connection" }
+  >;
+} {
+  return route.credentialResolver.kind === "integration_connection";
+}
+
+function routeHasHost(input: { route: EgressCredentialRoute; host: string }): boolean {
+  return input.route.match.hosts.some((host) => host.toLowerCase() === input.host);
+}
+
+function routeHasPathPrefix(input: { route: EgressCredentialRoute; pathPrefix: string }): boolean {
+  const baseUrlPathname = new URL(input.route.upstream.baseUrl).pathname;
+  return (
+    baseUrlPathname.startsWith(input.pathPrefix) ||
+    input.route.match.pathPrefixes?.some((pathPrefix) =>
+      pathPrefix.startsWith(input.pathPrefix),
+    ) === true
+  );
+}
+
+function isOpenAiApiRoute(route: EgressCredentialRoute): boolean {
+  return (
+    route.familyId === "openai" &&
+    routeHasHost({ route, host: "api.openai.com" }) &&
+    route.authInjection.type === "bearer" &&
+    isIntegrationConnectionCredentialRoute(route) &&
+    route.credentialResolver.secretType === "api_key"
+  );
+}
+
+function isOpenAiChatGptSubscriptionRoute(route: EgressCredentialRoute): boolean {
+  return (
+    route.familyId === "openai" &&
+    routeHasHost({ route, host: "chatgpt.com" }) &&
+    route.authInjection.type === "bearer" &&
+    isIntegrationConnectionCredentialRoute(route) &&
+    (route.credentialResolver.secretType === "oauth2_access_token" ||
+      route.credentialResolver.secretType === "chatgpt_access_token")
+  );
+}
+
+function isAnthropicApiRoute(route: EgressCredentialRoute): boolean {
+  return (
+    route.familyId === "anthropic" &&
+    routeHasHost({ route, host: "api.anthropic.com" }) &&
+    route.authInjection.type === "bearer"
+  );
+}
+
+function isOpenCodeGoRoute(route: EgressCredentialRoute): boolean {
+  return (
+    route.familyId === "opencode" &&
+    routeHasHost({ route, host: "opencode.ai" }) &&
+    routeHasPathPrefix({ route, pathPrefix: "/zen/go" }) &&
+    route.authInjection.type === "bearer"
+  );
+}
+
+function readChatGptAccountId(route: EgressCredentialRoute): string | undefined {
+  for (const [header, value] of Object.entries(route.additionalHeaders ?? {})) {
+    if (header.toLowerCase() === "chatgpt-account-id" && value.trim().length > 0) {
+      return value;
+    }
   }
 
-  const responsesApiBaseUrl = providerMetadata["responsesApiBaseUrl"];
-  if (typeof responsesApiBaseUrl !== "string" || responsesApiBaseUrl.trim().length === 0) {
-    return null;
+  return undefined;
+}
+
+function insertOpenCodeAuth(input: {
+  auth: OpenCodeAuthContent;
+  providerId: string;
+  value: OpenCodeAuth;
+}): void {
+  const existing = input.auth[input.providerId];
+  if (existing !== undefined && JSON.stringify(existing) !== JSON.stringify(input.value)) {
+    throw new Error(
+      `OpenCode runtime cannot represent multiple auth shapes for provider '${input.providerId}'.`,
+    );
   }
 
-  return {
-    responsesApiBaseUrl,
-  };
+  input.auth[input.providerId] = input.value;
+}
+
+function renderOpenCodeAuthContent(input: {
+  egressRoutes: ReadonlyArray<EgressCredentialRoute>;
+}): string | undefined {
+  const auth: OpenCodeAuthContent = {};
+
+  for (const route of input.egressRoutes) {
+    if (isOpenAiApiRoute(route)) {
+      insertOpenCodeAuth({
+        auth,
+        providerId: "openai",
+        value: {
+          type: "api",
+          key: MistleManagedApiKey,
+        },
+      });
+    }
+
+    if (isOpenAiChatGptSubscriptionRoute(route)) {
+      const accountId = readChatGptAccountId(route);
+      insertOpenCodeAuth({
+        auth,
+        providerId: "openai",
+        value: {
+          type: "oauth",
+          refresh: MistleManagedChatGptRefresh,
+          access: MistleManagedChatGptAccess,
+          expires: MistleManagedChatGptExpires,
+          ...(accountId === undefined ? {} : { accountId }),
+        },
+      });
+    }
+
+    if (isAnthropicApiRoute(route)) {
+      insertOpenCodeAuth({
+        auth,
+        providerId: "anthropic",
+        value: {
+          type: "api",
+          key: MistleManagedApiKey,
+        },
+      });
+    }
+
+    if (isOpenCodeGoRoute(route)) {
+      insertOpenCodeAuth({
+        auth,
+        providerId: "opencode-go",
+        value: {
+          type: "api",
+          key: MistleManagedApiKey,
+        },
+      });
+    }
+  }
+
+  return Object.keys(auth).length === 0 ? undefined : JSON.stringify(auth);
+}
+
+function buildOpenCodeRuntimeClients(input: {
+  openCodeCliInstallPath: string;
+  authContent?: string;
+}): ReadonlyArray<RuntimeClient> {
+  return [
+    {
+      clientId: "opencode-cli",
+      setup: {
+        env:
+          input.authContent === undefined
+            ? {}
+            : {
+                [OpenCodeAuthContentEnvKey]: input.authContent,
+              },
+        files: [
+          {
+            fileId: "opencode_config",
+            path: OpenCodeConfigPath,
+            mode: 384,
+            writeMode: "if-absent",
+            content: renderOpenCodeConfig(),
+          },
+          {
+            fileId: "opencode_global_agents",
+            path: OpenCodeGlobalAgentsPath,
+            mode: 384,
+            writeMode: "if-absent",
+            content: renderOpenCodeGlobalAgentsMd(),
+          },
+        ],
+      },
+      processes: [
+        {
+          processKey: OpenCodeServerProcessKey,
+          command: {
+            args: [
+              input.openCodeCliInstallPath,
+              "serve",
+              "--hostname",
+              OpenCodeServerListenHost,
+              "--port",
+              String(OpenCodeServerListenPort),
+            ],
+          },
+          readiness: {
+            type: "http",
+            url: OpenCodeServerHealthUrl,
+            expectedStatus: 200,
+            timeoutMs: RuntimeClientProcessReadinessTimeoutMs,
+          },
+          stop: {
+            signal: "sigterm",
+            timeoutMs: RuntimeClientProcessStopTimeoutMs,
+            gracePeriodMs: RuntimeClientProcessStopGracePeriodMs,
+          },
+        },
+      ],
+      endpoints: [
+        {
+          endpointKey: OpenCodeServerEndpointKey,
+          processKey: OpenCodeServerProcessKey,
+          transport: {
+            type: "ws",
+            url: OpenCodeProxyListenUrl,
+          },
+          connectionMode: "dedicated",
+        },
+      ],
+    },
+  ];
 }
 
 export function compileOpenCodeRuntime(
@@ -118,11 +321,6 @@ export function compileOpenCodeRuntime(
 ): CompileAgentRuntimeResult {
   const routeHost = new URL(input.providerAccess.apiBaseUrl).host;
   const openCodeCliInstallPath = input.refs.artifactBinPath("opencode");
-  const providerMetadata = resolveOpenCodeProviderMetadata(input.providerAccess);
-
-  if (providerMetadata === null) {
-    throw new Error("OpenCode runtime requires provider URL metadata.");
-  }
 
   return {
     egressRoutes: [
@@ -185,69 +383,19 @@ export function compileOpenCodeRuntime(
         },
       },
     ],
-    runtimeClients: [
-      {
-        clientId: "opencode-cli",
-        setup: {
-          env: {},
-          files: [
-            {
-              fileId: "opencode_config",
-              path: OpenCodeConfigPath,
-              mode: 384,
-              writeMode: "if-absent",
-              content: renderOpenCodeConfig({
-                providerBaseUrl: providerMetadata.responsesApiBaseUrl,
-              }),
-            },
-            {
-              fileId: "opencode_global_agents",
-              path: OpenCodeGlobalAgentsPath,
-              mode: 384,
-              writeMode: "if-absent",
-              content: renderOpenCodeGlobalAgentsMd(),
-            },
-          ],
-        },
-        processes: [
-          {
-            processKey: OpenCodeServerProcessKey,
-            command: {
-              args: [
-                openCodeCliInstallPath,
-                "serve",
-                "--hostname",
-                OpenCodeServerListenHost,
-                "--port",
-                String(OpenCodeServerListenPort),
-              ],
-            },
-            readiness: {
-              type: "http",
-              url: OpenCodeServerHealthUrl,
-              expectedStatus: 200,
-              timeoutMs: RuntimeClientProcessReadinessTimeoutMs,
-            },
-            stop: {
-              signal: "sigterm",
-              timeoutMs: RuntimeClientProcessStopTimeoutMs,
-              gracePeriodMs: RuntimeClientProcessStopGracePeriodMs,
-            },
-          },
-        ],
-        endpoints: [
-          {
-            endpointKey: OpenCodeServerEndpointKey,
-            processKey: OpenCodeServerProcessKey,
-            transport: {
-              type: "ws",
-              url: OpenCodeProxyListenUrl,
-            },
-            connectionMode: "dedicated",
-          },
-        ],
-      },
-    ],
+    runtimeClients: buildOpenCodeRuntimeClients({
+      openCodeCliInstallPath,
+    }),
+    renderRuntimeClients: ({ egressRoutes }) => {
+      const authContent = renderOpenCodeAuthContent({
+        egressRoutes,
+      });
+
+      return buildOpenCodeRuntimeClients({
+        openCodeCliInstallPath,
+        ...(authContent === undefined ? {} : { authContent }),
+      });
+    },
     agentRuntimes: [
       {
         runtimeId: "opencode",

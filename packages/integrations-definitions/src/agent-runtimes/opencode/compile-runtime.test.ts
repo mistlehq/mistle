@@ -1,4 +1,6 @@
 import type {
+  CompileAgentRuntimeResult,
+  EgressCredentialRoute,
   RuntimeArtifactGitHubReleaseInstallHelperInput,
   RuntimeArtifactInstallStep,
   RuntimeArtifactSpec,
@@ -8,6 +10,109 @@ import { describe, expect, it } from "vitest";
 
 import { compileOpenCodeRuntime } from "./compile-runtime.js";
 import { OpenCodeRuntimeDefinition } from "./definition.js";
+
+function createCompiledRoute(input: {
+  egressRuleId: string;
+  bindingId: string;
+  familyId: string;
+  variantId: string;
+  host: string;
+  baseUrl: string;
+  secretType: string;
+  pathPrefixes?: ReadonlyArray<string>;
+  additionalHeaders?: Record<string, string>;
+}): EgressCredentialRoute {
+  return {
+    egressRuleId: input.egressRuleId,
+    bindingId: input.bindingId,
+    familyId: input.familyId,
+    variantId: input.variantId,
+    match: {
+      hosts: [input.host],
+      methods: ["GET", "POST"],
+      pathPrefixes: input.pathPrefixes === undefined ? ["/"] : [...input.pathPrefixes],
+    },
+    upstream: {
+      baseUrl: input.baseUrl,
+    },
+    authInjection: {
+      type: "bearer",
+      target: "authorization",
+    },
+    ...(input.additionalHeaders === undefined
+      ? {}
+      : { additionalHeaders: input.additionalHeaders }),
+    credentialResolver: {
+      kind: "integration_connection",
+      connectionId: `conn_${input.familyId}`,
+      secretType: input.secretType,
+    },
+  };
+}
+
+function renderRuntimeClients(input: {
+  compiled: CompileAgentRuntimeResult;
+  egressRoutes: ReadonlyArray<EgressCredentialRoute>;
+}) {
+  if (input.compiled.renderRuntimeClients === undefined) {
+    throw new Error("Expected OpenCode runtime client renderer.");
+  }
+
+  return input.compiled.renderRuntimeClients({
+    egressRoutes: input.egressRoutes,
+    bindingEgressRoutes: input.egressRoutes.filter(
+      (route) => route.bindingId === "bind_openai_agent",
+    ),
+  });
+}
+
+function readOpenCodeAuthContent(
+  compiled: CompileAgentRuntimeResult,
+  egressRoutes: ReadonlyArray<EgressCredentialRoute>,
+) {
+  const runtimeClients = renderRuntimeClients({
+    compiled,
+    egressRoutes,
+  });
+  const authContent = runtimeClients[0]?.setup.env["OPENCODE_AUTH_CONTENT"];
+  return authContent === undefined ? undefined : JSON.parse(authContent);
+}
+
+function compileDefaultOpenCodeRuntime(): CompileAgentRuntimeResult {
+  return compileOpenCodeRuntime({
+    organizationId: "org_123",
+    sandboxProfileId: "sbp_123",
+    version: 1,
+    bindingId: "bind_openai_agent",
+    connectionId: "conn_openai_org_123",
+    runtimeId: "opencode",
+    runtimeConfig: {},
+    providerAccess: {
+      providerFamilyId: "openai",
+      providerVariantId: "openai-default",
+      apiBaseUrl: "https://api.openai.com/v1",
+      authScheme: "bearer",
+      credentialResolver: {
+        connectionId: "conn_openai_org_123",
+        secretType: "api_key",
+        slotKey: "openai.openai-default.api-key.api-key",
+      },
+      allowedMethods: ["GET", "POST"],
+      allowedPathPrefixes: ["/"],
+    },
+    mcpServers: [],
+    refs: {
+      sandboxPaths: {
+        userHomeDir: "/root",
+        workspaceDir: "/root",
+        runtimeDataDir: "/var/lib/mistle",
+        runtimeArtifactDir: "/var/lib/mistle/artifacts",
+        runtimeArtifactBinDir: "/usr/local/bin",
+      },
+      artifactBinPath: (artifactName) => `/usr/local/bin/${artifactName}`,
+    },
+  });
+}
 
 function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
   install: ReadonlyArray<RuntimeArtifactInstallStep>;
@@ -250,14 +355,6 @@ describe("compileOpenCodeRuntime", () => {
         port: 4511,
         mdns: false,
       },
-      provider: {
-        openai: {
-          options: {
-            apiKey: "mistle-managed-credential",
-            baseURL: "https://api.openai.com/v1",
-          },
-        },
-      },
     });
     expect(agentsFile.content).toContain("Mistle-managed sandbox context:");
     expect(agentsFile.content).toContain(
@@ -403,51 +500,151 @@ describe("compileOpenCodeRuntime", () => {
     if (configContent === undefined) {
       throw new Error("Expected compiled OpenCode config content.");
     }
-    expect(JSON.parse(configContent)).toMatchObject({
-      provider: {
-        openai: {
-          options: {
-            baseURL: "https://chatgpt.com/backend-api/codex",
-          },
-        },
+    expect(JSON.parse(configContent)).toEqual({
+      server: {
+        hostname: "127.0.0.1",
+        port: 4511,
+        mdns: false,
       },
     });
   });
 
-  it("fails fast when provider URL metadata is missing", () => {
+  it("does not render auth content when no supported provider egress route is present", () => {
+    const compiled = compileDefaultOpenCodeRuntime();
+
+    const rendered = renderRuntimeClients({
+      compiled,
+      egressRoutes: [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_github",
+          bindingId: "bind_github",
+          familyId: "github",
+          variantId: "github-cloud",
+          host: "api.github.com",
+          baseUrl: "https://api.github.com",
+          secretType: "api_key",
+        }),
+      ],
+    });
+
+    expect(rendered[0]?.setup.env).toEqual({});
+  });
+
+  it("renders OpenAI API auth content from proxied egress routes", () => {
+    expect(
+      readOpenCodeAuthContent(compileDefaultOpenCodeRuntime(), [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_openai",
+          bindingId: "bind_openai",
+          familyId: "openai",
+          variantId: "openai-default",
+          host: "api.openai.com",
+          baseUrl: "https://api.openai.com",
+          secretType: "api_key",
+        }),
+      ]),
+    ).toEqual({
+      openai: {
+        type: "api",
+        key: "mistle-managed-credential",
+      },
+    });
+  });
+
+  it("renders ChatGPT subscription auth content from proxied egress routes", () => {
+    expect(
+      readOpenCodeAuthContent(compileDefaultOpenCodeRuntime(), [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_chatgpt",
+          bindingId: "bind_chatgpt",
+          familyId: "openai",
+          variantId: "openai-default",
+          host: "chatgpt.com",
+          baseUrl: "https://chatgpt.com",
+          secretType: "oauth2_access_token",
+          additionalHeaders: {
+            "ChatGPT-Account-ID": "acct_123",
+          },
+        }),
+      ]),
+    ).toEqual({
+      openai: {
+        type: "oauth",
+        refresh: "mistle-managed-refresh",
+        access: "mistle-managed-access",
+        expires: 4_102_444_800_000,
+        accountId: "acct_123",
+      },
+    });
+  });
+
+  it("renders Anthropic API auth content from proxied egress routes", () => {
+    expect(
+      readOpenCodeAuthContent(compileDefaultOpenCodeRuntime(), [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_anthropic",
+          bindingId: "bind_anthropic",
+          familyId: "anthropic",
+          variantId: "anthropic-default",
+          host: "api.anthropic.com",
+          baseUrl: "https://api.anthropic.com",
+          secretType: "api_key",
+        }),
+      ]),
+    ).toEqual({
+      anthropic: {
+        type: "api",
+        key: "mistle-managed-credential",
+      },
+    });
+  });
+
+  it("renders OpenCode Go auth content from proxied egress routes", () => {
+    expect(
+      readOpenCodeAuthContent(compileDefaultOpenCodeRuntime(), [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_opencode_go",
+          bindingId: "bind_opencode_go",
+          familyId: "opencode",
+          variantId: "opencode-go",
+          host: "opencode.ai",
+          baseUrl: "https://opencode.ai/zen/go/v1",
+          secretType: "api_key",
+        }),
+      ]),
+    ).toEqual({
+      "opencode-go": {
+        type: "api",
+        key: "mistle-managed-credential",
+      },
+    });
+  });
+
+  it("fails fast when OpenAI API and ChatGPT subscription routes are both proxied", () => {
     expect(() =>
-      compileOpenCodeRuntime({
-        organizationId: "org_123",
-        sandboxProfileId: "sbp_123",
-        version: 1,
-        bindingId: "bind_openai_agent",
-        connectionId: "conn_openai_org_123",
-        runtimeId: "opencode",
-        runtimeConfig: {},
-        providerAccess: {
-          providerFamilyId: "openai",
-          providerVariantId: "openai-default",
-          apiBaseUrl: "https://api.openai.com/v1",
-          authScheme: "bearer",
-          credentialResolver: {
-            connectionId: "conn_openai_org_123",
+      renderRuntimeClients({
+        compiled: compileDefaultOpenCodeRuntime(),
+        egressRoutes: [
+          createCompiledRoute({
+            egressRuleId: "egress_rule_bind_openai",
+            bindingId: "bind_openai",
+            familyId: "openai",
+            variantId: "openai-default",
+            host: "api.openai.com",
+            baseUrl: "https://api.openai.com",
             secretType: "api_key",
-          },
-          allowedMethods: ["GET", "POST"],
-          allowedPathPrefixes: ["/"],
-        },
-        mcpServers: [],
-        refs: {
-          sandboxPaths: {
-            userHomeDir: "/root",
-            workspaceDir: "/root",
-            runtimeDataDir: "/var/lib/mistle",
-            runtimeArtifactDir: "/var/lib/mistle/artifacts",
-            runtimeArtifactBinDir: "/usr/local/bin",
-          },
-          artifactBinPath: (artifactName) => `/usr/local/bin/${artifactName}`,
-        },
+          }),
+          createCompiledRoute({
+            egressRuleId: "egress_rule_bind_chatgpt",
+            bindingId: "bind_chatgpt",
+            familyId: "openai",
+            variantId: "openai-default",
+            host: "chatgpt.com",
+            baseUrl: "https://chatgpt.com",
+            secretType: "oauth2_access_token",
+          }),
+        ],
       }),
-    ).toThrow("OpenCode runtime requires provider URL metadata.");
+    ).toThrow("OpenCode runtime cannot represent multiple auth shapes for provider 'openai'.");
   });
 });
