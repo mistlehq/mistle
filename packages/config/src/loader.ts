@@ -493,6 +493,8 @@ const ControlPlaneApiEnvDescriptors = [
     path: ["sandbox", "bootstrap", "tokenAudience"],
   },
   { envVar: "MISTLE_SANDBOX_STORAGE_BACKEND", path: ["sandbox", "storageBackend"] },
+  { envVar: "MISTLE_SANDBOX_E2B_API_KEY", path: ["sandbox", "e2b", "apiKey"] },
+  { envVar: "MISTLE_SANDBOX_E2B_DOMAIN", path: ["sandbox", "e2b", "domain"] },
   {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION",
     path: ["integrations", "activeMasterEncryptionKeyVersion"],

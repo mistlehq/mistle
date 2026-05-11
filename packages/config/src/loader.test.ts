@@ -40,6 +40,7 @@ function buildControlPlaneApiServiceEnv(): NodeJS.ProcessEnv {
     MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_AUDIENCE: "sandbox-publish",
     MISTLE_SANDBOX_PROVIDER: "docker",
     MISTLE_SANDBOX_DEFAULT_BASE_IMAGE: "ghcr.io/mistlehq/sandbox-base:test",
+    MISTLE_SANDBOX_E2B_API_KEY: "shared-e2b-secret",
     MISTLE_SANDBOX_TOKENS_BOOTSTRAP_SECRET: "bootstrap-secret",
     MISTLE_SANDBOX_TOKENS_BOOTSTRAP_ISSUER: "mistle",
     MISTLE_SANDBOX_TOKENS_BOOTSTRAP_AUDIENCE: "sandbox-bootstrap",
@@ -237,6 +238,10 @@ describe("loadConfig", () => {
       databaseUrl: "postgresql://direct.example/mistle",
       migrationUrl: "postgresql://direct.example/mistle",
       namespaceId: "staging",
+    });
+    expect(loadedConfig.app.sandbox.e2b).toEqual({
+      apiKey: "shared-e2b-secret",
+      domain: "e2b.app",
     });
   });
 
