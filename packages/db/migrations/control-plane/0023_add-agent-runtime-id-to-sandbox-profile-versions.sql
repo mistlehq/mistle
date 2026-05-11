@@ -1,0 +1,1 @@
+ALTER TABLE "control_plane"."sandbox_profile_versions" ADD COLUMN "agent_runtime_id" text DEFAULT 'codex' NOT NULL;

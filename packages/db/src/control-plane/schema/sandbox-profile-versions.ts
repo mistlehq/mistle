@@ -30,6 +30,14 @@ export const SandboxProfileVersionDefaultPersistenceModes = {
 export type SandboxProfileVersionDefaultPersistenceMode =
   (typeof SandboxProfileVersionDefaultPersistenceModes)[keyof typeof SandboxProfileVersionDefaultPersistenceModes];
 
+export const SandboxProfileVersionAgentRuntimeIds = {
+  CODEX: "codex",
+  OPENCODE: "opencode",
+} as const;
+
+export type SandboxProfileVersionAgentRuntimeId =
+  (typeof SandboxProfileVersionAgentRuntimeIds)[keyof typeof SandboxProfileVersionAgentRuntimeIds];
+
 export function defineSandboxProfileVersions(schema: PgSchema) {
   return schema.table(
     "sandbox_profile_versions",
@@ -55,6 +63,10 @@ export function defineSandboxProfileVersions(schema: PgSchema) {
       sandboxVcpuCount: bigint("sandbox_vcpu_count", { mode: "number" }),
       sandboxMemoryMb: bigint("sandbox_memory_mb", { mode: "number" }),
       sandboxStorageMb: bigint("sandbox_storage_mb", { mode: "number" }),
+      agentRuntimeId: text("agent_runtime_id")
+        .notNull()
+        .$type<SandboxProfileVersionAgentRuntimeId>()
+        .default(SandboxProfileVersionAgentRuntimeIds.CODEX),
     },
     (table) => [
       primaryKey({
