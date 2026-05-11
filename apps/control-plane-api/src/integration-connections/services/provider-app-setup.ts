@@ -64,7 +64,6 @@ function resolveSetupFlowOrThrow(input: {
 }
 
 function assertConnectionMethodMatchesSetupFlow(input: {
-  connectionId: string;
   config: Record<string, unknown>;
   methodId: IntegrationConnectionMethodId;
   routeSegment: string;
@@ -243,7 +242,6 @@ export async function startProviderAppSetup(
   });
   const parsedConnectionConfig = UnknownRecordSchema.parse(connectionConfig);
   assertConnectionMethodMatchesSetupFlow({
-    connectionId: connection.id,
     config: parsedConnectionConfig,
     methodId: flow.methodId,
     routeSegment: input.routeSegment,
@@ -445,7 +443,6 @@ export async function completeProviderAppSetup(
   });
   const parsedConnectionConfig = UnknownRecordSchema.parse(connectionConfig);
   assertConnectionMethodMatchesSetupFlow({
-    connectionId: connection.id,
     config: parsedConnectionConfig,
     methodId: flow.methodId,
     routeSegment: stateMetadata.routeSegment,
