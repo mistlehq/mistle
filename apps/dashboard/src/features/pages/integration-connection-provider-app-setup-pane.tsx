@@ -164,8 +164,10 @@ function completeProviderAppSetupStart(input: {
 
 function PostManifestInstallationScreen(input: {
   actionErrorMessage: string | null;
+  installLabel: string;
   isPending: boolean;
   onInstall: () => void;
+  pendingLabel: string;
 }): React.JSX.Element {
   return (
     <FormPageStack>
@@ -184,7 +186,7 @@ function PostManifestInstallationScreen(input: {
               onClick={input.onInstall}
               type="button"
             >
-              {input.isPending ? "Starting install..." : "Install GitHub App"}
+              {input.isPending ? input.pendingLabel : input.installLabel}
             </Button>
           </FormPageActionBar>
         </div>
@@ -398,8 +400,8 @@ export function ProviderAppSetupPane(input: {
 
     setActionErrorMessage(null);
     const setupWindow = openDeferredExternalWindow({
-      loadingMessage: startAction.pendingLabel ?? input.providerAppSetup.existingApp.connectLabel,
-      title: startAction.pendingLabel ?? input.providerAppSetup.existingApp.connectLabel,
+      loadingMessage: startAction.windowTitle,
+      title: startAction.windowTitle,
     });
     if (setupWindow === null) {
       setActionErrorMessage("Browser blocked opening a new window.");
@@ -463,7 +465,7 @@ export function ProviderAppSetupPane(input: {
       webhookCallbackState.kind === "ready");
   const existingAppConnectLabel =
     isExistingAppStartActionInstalled &&
-    input.providerAppSetup.existingApp.startAction?.installedLabel !== undefined
+    input.providerAppSetup.existingApp.startAction !== undefined
       ? input.providerAppSetup.existingApp.startAction.installedLabel
       : input.providerAppSetup.existingApp.connectLabel;
   const isExistingAppStartActionPending =
@@ -473,10 +475,15 @@ export function ProviderAppSetupPane(input: {
     return (
       <PostManifestInstallationScreen
         actionErrorMessage={actionErrorMessage}
+        installLabel={input.providerAppSetup.existingApp.connectLabel}
         isPending={isExistingAppStartActionPending}
         onInstall={() => {
           void startExistingAppAction();
         }}
+        pendingLabel={
+          input.providerAppSetup.existingApp.startAction?.pendingLabel ??
+          input.providerAppSetup.existingApp.connectLabel
+        }
       />
     );
   }

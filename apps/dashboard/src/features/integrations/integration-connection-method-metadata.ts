@@ -1,3 +1,5 @@
+import type { IntegrationFormConnectionMethodProviderAppSetupExistingAppStartAction } from "@mistle/integrations-core";
+
 import type {
   IntegrationConnectionMethod,
   IntegrationManagedWebhookSourcePostCreate,
@@ -11,4 +13,14 @@ export function resolveFormConnectionMethodManagedWebhookSourcePostCreate(
   }
 
   return method.postCreate?.managedWebhookSource ?? null;
+}
+
+export function resolveFormConnectionMethodProviderAppSetupStartAction(
+  method: IntegrationConnectionMethod | null | undefined,
+): IntegrationFormConnectionMethodProviderAppSetupExistingAppStartAction | null {
+  if (method?.kind !== "form") {
+    return null;
+  }
+
+  return method.setupFlow?.providerAppSetup?.existingApp.startAction ?? null;
 }

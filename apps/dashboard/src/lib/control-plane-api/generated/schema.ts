@@ -4210,12 +4210,13 @@ export interface paths {
                                 configFields?: string[];
                                 externalSubject?: boolean;
                               };
-                              installedLabel?: string;
+                              installedLabel: string;
                               installedOpensInNewWindow?: boolean;
                               pendingLabel?: string;
                               routeSegment: string;
                               startErrorMessage: string;
                               unexpectedResultMessage: string;
+                              windowTitle: string;
                             };
                             title: string;
                           };

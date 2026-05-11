@@ -101,8 +101,9 @@ export function createGitHubProviderAppSetupMetadata(
         startErrorMessage: "Could not start GitHub App installation.",
         unexpectedResultMessage: "GitHub App installation setup did not return a redirect URL.",
         pendingLabel: "Starting install...",
-        installedLabel: "Manage Installation",
+        installedLabel: "Manage installation",
         installedOpensInNewWindow: true,
+        windowTitle: "Opening GitHub App installation...",
         installedDetection: {
           configFields: ["installation_id"],
           externalSubject: true,

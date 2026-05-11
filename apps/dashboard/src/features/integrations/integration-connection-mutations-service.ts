@@ -330,15 +330,18 @@ export async function cancelDeviceAuthorizationAttempt(input: {
 
 export async function startProviderAppSetupInstallation(input: {
   connectionId: string;
+  routeSegment: string;
+  startErrorMessage: string;
+  unexpectedResultMessage: string;
 }): Promise<StartedRedirectConnection> {
   const startedSetup = await startProviderAppSetup({
     connectionId: input.connectionId,
-    routeSegment: "github-app-installation",
+    routeSegment: input.routeSegment,
     body: {},
-    fallbackMessage: "Could not start GitHub App installation.",
+    fallbackMessage: input.startErrorMessage,
   });
   if (startedSetup.kind !== "redirect") {
-    throw new Error("GitHub App installation setup did not return a redirect URL.");
+    throw new Error(input.unexpectedResultMessage);
   }
 
   return {

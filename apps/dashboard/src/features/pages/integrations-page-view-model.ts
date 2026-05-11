@@ -4,6 +4,7 @@ import type { IntegrationCardViewModel } from "../integrations/directory-model.j
 import { formatConnectionCount } from "../integrations/format-connection-count.js";
 import type { IntegrationConnectionDetailItem } from "../integrations/integration-connection-detail-view.js";
 import type { IntegrationConnectionMethod } from "../integrations/integration-connection-editor.js";
+import { resolveFormConnectionMethodProviderAppSetupStartAction } from "../integrations/integration-connection-method-metadata.js";
 import type {
   IntegrationConnection,
   IntegrationConnectionResource,
@@ -326,6 +327,9 @@ function resolveConnectionMethodDetailContext(input: {
   if (installationMetadata === undefined) {
     return undefined;
   }
+  const providerAppSetupStartAction = resolveFormConnectionMethodProviderAppSetupStartAction(
+    input.currentMethod,
+  );
 
   const config = resolveTargetConfig(input.connection.config);
   const resolvedFields = (installationMetadata.fields ?? []).flatMap((field) => {
@@ -368,9 +372,11 @@ function resolveConnectionMethodDetailContext(input: {
 
   return {
     installation: {
-      ...(installationMetadata.actionLabel === undefined
-        ? {}
-        : { actionLabel: installationMetadata.actionLabel }),
+      ...(providerAppSetupStartAction === null
+        ? installationMetadata.actionLabel === undefined
+          ? {}
+          : { actionLabel: installationMetadata.actionLabel }
+        : { actionLabel: providerAppSetupStartAction.installedLabel }),
       fields: installationFields,
       ...(installationMetadata.hideWebhookSourceSection === undefined
         ? {}

@@ -240,7 +240,8 @@ describe("resolveIntegrationProviderAppSetupOrThrow", () => {
         connectLabel: "Install GitHub App",
         startAction: {
           routeSegment: "github-app-installation",
-          installedLabel: "Manage Installation",
+          installedLabel: "Manage installation",
+          windowTitle: "Opening GitHub App installation...",
         },
       },
       urls: {

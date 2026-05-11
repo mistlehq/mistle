@@ -240,12 +240,13 @@ const IntegrationFormConnectionMethodProviderAppSetupSchema = z
               })
               .strict()
               .optional(),
-            installedLabel: z.string().min(1).optional(),
+            installedLabel: z.string().min(1),
             installedOpensInNewWindow: z.boolean().optional(),
             pendingLabel: z.string().min(1).optional(),
             routeSegment: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
             startErrorMessage: z.string().min(1),
             unexpectedResultMessage: z.string().min(1),
+            windowTitle: z.string().min(1),
           })
           .strict()
           .optional(),

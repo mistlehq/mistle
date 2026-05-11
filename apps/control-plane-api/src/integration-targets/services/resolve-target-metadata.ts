@@ -301,9 +301,7 @@ function cloneProviderAppSetup(
                           }),
                     },
                   }),
-              ...(setup.existingApp.startAction.installedLabel === undefined
-                ? {}
-                : { installedLabel: setup.existingApp.startAction.installedLabel }),
+              installedLabel: setup.existingApp.startAction.installedLabel,
               ...(setup.existingApp.startAction.installedOpensInNewWindow === undefined
                 ? {}
                 : {
@@ -316,6 +314,7 @@ function cloneProviderAppSetup(
               routeSegment: setup.existingApp.startAction.routeSegment,
               startErrorMessage: setup.existingApp.startAction.startErrorMessage,
               unexpectedResultMessage: setup.existingApp.startAction.unexpectedResultMessage,
+              windowTitle: setup.existingApp.startAction.windowTitle,
             },
           }),
       title: setup.existingApp.title,

@@ -76,7 +76,6 @@ export const GitHubCloudBaseDefinition: GitHubCloudBaseIntegrationDefinition = {
       kind: "form",
       connectionDetail: {
         installation: {
-          actionLabel: "Manage installation",
           fields: [
             {
               label: "App ID",

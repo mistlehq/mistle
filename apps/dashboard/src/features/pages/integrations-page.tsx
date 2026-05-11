@@ -148,6 +148,7 @@ export function IntegrationsPage() {
 
   const connectionEditors = useIntegrationConnectionEditors({
     connections: directoryState.selectedDetailConnections,
+    connectionMethods: directoryState.selectedDetailCard?.target.connectionMethods,
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
   });
   const webhookSourceState = useIntegrationWebhookSourceState({

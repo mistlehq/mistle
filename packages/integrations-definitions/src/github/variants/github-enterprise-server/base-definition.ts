@@ -74,7 +74,6 @@ export const GitHubEnterpriseServerBaseDefinition: GitHubEnterpriseServerBaseInt
         kind: "form",
         connectionDetail: {
           installation: {
-            actionLabel: "Manage installation",
             fields: [
               {
                 label: "App ID",

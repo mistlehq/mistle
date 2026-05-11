@@ -1,7 +1,10 @@
+import type { IntegrationFormConnectionMethodProviderAppSetupExistingAppStartAction } from "@mistle/integrations-core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { resolveFormConnectionMethodProviderAppSetupStartAction } from "../integrations/integration-connection-method-metadata.js";
+import type { IntegrationConnectionMethod } from "../integrations/integrations-service-shared.js";
 import {
   deleteIntegrationConnection,
   startProviderAppSetupInstallation,
@@ -11,8 +14,43 @@ import {
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import { openDeferredExternalWindow } from "../shared/external-window.js";
 
+function resolveProviderAppSetupStartActionOrThrow(input: {
+  connectionId: string;
+  connections: readonly IntegrationConnection[];
+  connectionMethods: readonly IntegrationConnectionMethod[] | undefined;
+}): IntegrationFormConnectionMethodProviderAppSetupExistingAppStartAction {
+  const connection = input.connections.find((candidate) => candidate.id === input.connectionId);
+  if (connection === undefined) {
+    throw new Error(`Integration connection '${input.connectionId}' was not found.`);
+  }
+  if (connection.connectionMethodId === undefined) {
+    throw new Error(
+      `Integration connection '${input.connectionId}' does not declare a connection method.`,
+    );
+  }
+
+  const method = input.connectionMethods?.find(
+    (candidate) => candidate.id === connection.connectionMethodId,
+  );
+  if (method === undefined) {
+    throw new Error(
+      `Integration connection method '${connection.connectionMethodId}' was not found.`,
+    );
+  }
+
+  const startAction = resolveFormConnectionMethodProviderAppSetupStartAction(method);
+  if (startAction === null) {
+    throw new Error(
+      `Integration connection method '${connection.connectionMethodId}' does not define a provider app setup start action.`,
+    );
+  }
+
+  return startAction;
+}
+
 export function useIntegrationConnectionEditors(input: {
   connections: readonly IntegrationConnection[];
+  connectionMethods: readonly IntegrationConnectionMethod[] | undefined;
   queryKey: readonly ["settings", "integrations", "directory"];
 }) {
   const queryClient = useQueryClient();
@@ -85,8 +123,12 @@ export function useIntegrationConnectionEditors(input: {
   });
 
   const startProviderAppSetupMutation = useMutation({
-    mutationFn: async (payload: { connectionId: string }) =>
-      startProviderAppSetupInstallation(payload),
+    mutationFn: async (payload: {
+      connectionId: string;
+      routeSegment: string;
+      startErrorMessage: string;
+      unexpectedResultMessage: string;
+    }) => startProviderAppSetupInstallation(payload),
   });
 
   const editingApiKeyConnection =
@@ -171,14 +213,19 @@ export function useIntegrationConnectionEditors(input: {
         ? (startProviderAppSetupMutation.variables?.connectionId ?? null)
         : null,
       onStartInstallation: async (connectionId: string) => {
+        const startAction = resolveProviderAppSetupStartActionOrThrow({
+          connectionId,
+          connections: input.connections,
+          connectionMethods: input.connectionMethods,
+        });
         setProviderAppSetupErrorByConnectionId((current) => ({
           ...current,
           [connectionId]: undefined,
         }));
 
         const authorizationWindow = openDeferredExternalWindow({
-          loadingMessage: "Opening GitHub App installation...",
-          title: "Opening GitHub App installation...",
+          loadingMessage: startAction.windowTitle,
+          title: startAction.windowTitle,
         });
         if (authorizationWindow === null) {
           setProviderAppSetupErrorByConnectionId((current) => ({
@@ -191,13 +238,16 @@ export function useIntegrationConnectionEditors(input: {
         try {
           const startedInstallation = await startProviderAppSetupMutation.mutateAsync({
             connectionId,
+            routeSegment: startAction.routeSegment,
+            startErrorMessage: startAction.startErrorMessage,
+            unexpectedResultMessage: startAction.unexpectedResultMessage,
           });
           authorizationWindow.navigate(startedInstallation.authorizationUrl);
         } catch (error) {
           authorizationWindow.close();
           const errorMessage = resolveApiErrorMessage({
             error,
-            fallbackMessage: "Could not start GitHub App installation.",
+            fallbackMessage: startAction.startErrorMessage,
           });
 
           setProviderAppSetupErrorByConnectionId((current) => ({

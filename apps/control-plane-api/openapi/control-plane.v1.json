@@ -8324,13 +8324,19 @@
                                                     "unexpectedResultMessage": {
                                                       "type": "string",
                                                       "minLength": 1
+                                                    },
+                                                    "windowTitle": {
+                                                      "type": "string",
+                                                      "minLength": 1
                                                     }
                                                   },
                                                   "required": [
                                                     "expectedResultKind",
+                                                    "installedLabel",
                                                     "routeSegment",
                                                     "startErrorMessage",
-                                                    "unexpectedResultMessage"
+                                                    "unexpectedResultMessage",
+                                                    "windowTitle"
                                                   ],
                                                   "additionalProperties": false
                                                 },

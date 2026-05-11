@@ -584,12 +584,13 @@ export type IntegrationFormConnectionMethodProviderAppSetupExistingAppStartActio
         externalSubject?: boolean | undefined;
       }
     | undefined;
-  installedLabel?: string | undefined;
+  installedLabel: string;
   installedOpensInNewWindow?: boolean | undefined;
   pendingLabel?: string | undefined;
   routeSegment: string;
   startErrorMessage: string;
   unexpectedResultMessage: string;
+  windowTitle: string;
 };
 
 export type IntegrationFormConnectionMethodProviderAppSetup = {
