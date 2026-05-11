@@ -191,7 +191,8 @@ const meta = {
     },
     sidebarHeaderContent: {
       control: false,
-      description: "Sidebar header content, such as the org switcher or settings back button.",
+      description:
+        "Sidebar header content, such as the app sidebar header or settings back button.",
     },
     topLoadingBar: {
       control: false,
