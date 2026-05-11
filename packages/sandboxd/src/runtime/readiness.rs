@@ -16,6 +16,7 @@ pub enum RuntimeReadinessMode {
     NoAgentRuntime,
     CodexProxyOnly,
     Codex,
+    OpenCodeProxyOnly,
 }
 
 /// Derives the publishable runtime readiness bit from the supervision snapshot.
@@ -26,6 +27,9 @@ pub fn derive_runtime_ready(snapshot: &SandboxdHealthSnapshot, mode: RuntimeRead
         RuntimeReadinessMode::Codex => {
             codex_proxy_is_ready(snapshot)
                 && component_is_healthy(snapshot, SupervisedComponent::CodexAppServer)
+        }
+        RuntimeReadinessMode::OpenCodeProxyOnly => {
+            component_is_healthy(snapshot, SupervisedComponent::OpenCodeProxy)
         }
     }
 }

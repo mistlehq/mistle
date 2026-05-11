@@ -24,6 +24,7 @@ pub enum SupervisedComponent {
     EgressProxy,
     CodexProxy,
     CodexAppServer,
+    OpenCodeProxy,
 }
 
 impl SupervisedComponent {
@@ -33,6 +34,7 @@ impl SupervisedComponent {
             Self::EgressProxy => "EgressProxy",
             Self::CodexProxy => "CodexProxy",
             Self::CodexAppServer => "CodexAppServer",
+            Self::OpenCodeProxy => "OpenCodeProxy",
         }
     }
 }
@@ -627,6 +629,15 @@ fn snapshot_detail_field_names_for_event(
         ) => &["listenAddr", "stablePort"],
         (
             SupervisedComponent::CodexProxy,
+            LifecycleEventName::ComponentStarting
+            | LifecycleEventName::ComponentStarted
+            | LifecycleEventName::ComponentHealthcheckFailed
+            | LifecycleEventName::ComponentExited
+            | LifecycleEventName::ComponentRestartScheduled
+            | LifecycleEventName::ComponentRestartSucceeded,
+        ) => &["listenAddr", "rawTarget"],
+        (
+            SupervisedComponent::OpenCodeProxy,
             LifecycleEventName::ComponentStarting
             | LifecycleEventName::ComponentStarted
             | LifecycleEventName::ComponentHealthcheckFailed

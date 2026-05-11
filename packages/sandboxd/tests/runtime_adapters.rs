@@ -1,4 +1,5 @@
-use std::net::TcpListener;
+use std::io::{Read, Write};
+use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
@@ -279,6 +280,168 @@ fn runtime_adapter_registry_starts_codex_proxy_adapter() {
         .expect("raw server thread should exit cleanly");
 }
 
+#[test]
+fn runtime_adapter_registry_starts_opencode_proxy_adapter() {
+    let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
+    let raw_port = raw_listener
+        .local_addr()
+        .expect("raw listener should expose an address")
+        .port();
+    let raw_health_url = format!("http://127.0.0.1:{raw_port}/global/health");
+
+    let (server_complete_sender, server_complete_receiver) = mpsc::channel();
+    let raw_server_thread = thread::spawn(move || {
+        let (mut stream, _) = raw_listener
+            .accept()
+            .expect("raw server should accept the proxied OpenCode request");
+        let request = read_http_request(&mut stream);
+        assert_eq!(request.method, "GET");
+        assert_eq!(request.path, "/event");
+        stream
+            .write_all(
+                b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n\r\nevent: message\ndata: {\"type\":\"server.connected\"}\n\n",
+            )
+            .expect("raw OpenCode response should send");
+        server_complete_sender
+            .send(())
+            .expect("raw server completion should send");
+    });
+
+    let startup_input = StartupInput {
+        startup_mode: StartupMode::New,
+        execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
+        bootstrap_token: "bootstrap-token-value".to_string(),
+        tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+        tunnel_gateway_ws_url: "ws://127.0.0.1:5000/tunnel/sandbox".to_string(),
+        acting_user_id: None,
+        runtime_plan: serde_json::json!({
+            "sandboxProfileId": "sbp_123",
+            "version": 1,
+            "image": {
+                "source": "base",
+                "imageRef": sandboxd::test_support::local_prepared_runtime_sandbox_base_image_ref()
+            },
+            "egressRoutes": [],
+            "artifacts": [],
+            "runtimeClients": [
+                {
+                    "clientId": "opencode-cli",
+                    "setup": {
+                        "env": {},
+                        "files": []
+                    },
+                    "processes": [
+                        {
+                            "processKey": "opencode-server",
+                            "command": {
+                                "args": ["opencode", "serve"]
+                            },
+                            "readiness": {
+                                "type": "http",
+                                "url": raw_health_url,
+                                "expectedStatus": 200,
+                                "timeoutMs": 5000
+                            },
+                            "stop": {
+                                "signal": "sigterm",
+                                "timeoutMs": 10000,
+                                "gracePeriodMs": 2000
+                            }
+                        }
+                    ],
+                    "endpoints": [
+                        {
+                            "endpointKey": "server",
+                            "processKey": "opencode-server",
+                            "transport": {
+                                "type": "ws",
+                                "url": "ws://127.0.0.1:0/opencode"
+                            },
+                            "connectionMode": "dedicated"
+                        }
+                    ]
+                }
+            ],
+            "workspaceSources": [],
+            "agentRuntimes": [
+                {
+                    "bindingId": "arb_123",
+                    "runtimeId": "opencode",
+                    "runtimeKey": "opencode-server",
+                    "clientId": "opencode-cli",
+                    "endpointKey": "server",
+                    "ptyLaunch": {
+                        "runtimeId": "opencode",
+                        "displayName": "OpenCode",
+                        "newLaunch": {
+                            "ptySessionId": "pty_new",
+                            "cols": 80,
+                            "rows": 24,
+                            "command": "opencode",
+                            "args": []
+                        },
+                        "resumeLaunch": {
+                            "ptySessionId": "pty_resume",
+                            "cols": 80,
+                            "rows": 24,
+                            "command": "opencode",
+                            "args": []
+                        }
+                    }
+                }
+            ]
+        }),
+        git_identity: None,
+        transparent_proxy: None,
+    };
+
+    let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+    let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+    let adapters = RuntimeAdapterRegistry
+        .start(
+            &startup_input,
+            keepalive_manager.clone(),
+            runtime_readiness_manager.clone(),
+        )
+        .expect("runtime adapter registry should start the OpenCode adapter");
+
+    assert_eq!(adapters.adapters().len(), 1);
+    assert_eq!(adapters.adapters()[0].runtime_id(), "opencode");
+    wait_for_runtime_readiness(&runtime_readiness_manager, true);
+
+    let (mut proxy_client, _) = connect(adapters.adapters()[0].listen_url())
+        .expect("client should connect through the OpenCode runtime adapter");
+    proxy_client
+        .send(Message::Text(
+            json!({
+                "id": "events",
+                "method": "GET",
+                "path": "/event"
+            })
+            .to_string()
+            .into(),
+        ))
+        .expect("client event request should send through OpenCode proxy");
+
+    let event = read_json_text_message(&mut proxy_client);
+    assert_eq!(event["id"], json!("events"));
+    assert_eq!(event["type"], json!("sse"));
+    assert_eq!(event["data"], json!("{\"type\":\"server.connected\"}"));
+
+    proxy_client
+        .close(None)
+        .expect("proxy client should close cleanly");
+    adapters
+        .close()
+        .expect("runtime adapter registry should close the OpenCode adapter");
+    server_complete_receiver
+        .recv()
+        .expect("raw server should complete OpenCode request");
+    raw_server_thread
+        .join()
+        .expect("raw OpenCode server thread should exit cleanly");
+}
+
 fn wait_for_runtime_readiness(
     runtime_readiness_manager: &Arc<Mutex<RuntimeReadinessManager>>,
     expected_ready: bool,
@@ -331,4 +494,42 @@ where
     };
 
     serde_json::from_str(payload.as_str()).expect("text payload should be valid JSON")
+}
+
+struct HttpRequest {
+    method: String,
+    path: String,
+}
+
+fn read_http_request(stream: &mut TcpStream) -> HttpRequest {
+    let mut buffer = Vec::new();
+    let mut scratch = [0_u8; 1024];
+    loop {
+        let bytes_read = stream
+            .read(&mut scratch)
+            .expect("raw server request should read");
+        if bytes_read == 0 {
+            break;
+        }
+        buffer.extend_from_slice(&scratch[..bytes_read]);
+        if buffer.windows(4).any(|window| window == b"\r\n\r\n") {
+            break;
+        }
+    }
+    let request = String::from_utf8(buffer).expect("raw server request should be utf8");
+    let request_line = request
+        .lines()
+        .next()
+        .expect("raw server request should contain request line");
+    let mut parts = request_line.split_whitespace();
+    let method = parts
+        .next()
+        .expect("raw server request should contain method")
+        .to_string();
+    let path = parts
+        .next()
+        .expect("raw server request should contain path")
+        .to_string();
+
+    HttpRequest { method, path }
 }

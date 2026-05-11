@@ -14,6 +14,10 @@ use crate::codex_proxy::{
     CodexProxy, CodexProxyControlHandle, CodexProxyError, start_codex_proxy_with_supervisor,
 };
 use crate::keepalive::KeepaliveManager;
+use crate::opencode_proxy::{
+    OpenCodeProxy, OpenCodeProxyError, derive_opencode_raw_server_url,
+    start_opencode_proxy_with_supervisor,
+};
 use crate::protocol::startup::StartupInput;
 use crate::runtime::plan::{
     CompiledAgentRuntime, CompiledRuntimePlan, RuntimeClientConnectionMode,
@@ -59,7 +63,12 @@ pub enum RuntimeAdapterRegistryError {
         runtime_id: String,
         process_key: String,
     },
+    RawOpenCodeServerReadinessMustUseHttp {
+        runtime_id: String,
+        process_key: String,
+    },
     StartCodexProxy(CodexProxyError),
+    StartOpenCodeProxy(OpenCodeProxyError),
 }
 
 impl fmt::Display for RuntimeAdapterRegistryError {
@@ -113,8 +122,18 @@ impl fmt::Display for RuntimeAdapterRegistryError {
                 f,
                 "runtime '{runtime_id}' process '{process_key}' must use websocket readiness so sandboxd can attach its proxy adapter"
             ),
+            Self::RawOpenCodeServerReadinessMustUseHttp {
+                runtime_id,
+                process_key,
+            } => write!(
+                f,
+                "runtime '{runtime_id}' process '{process_key}' must use http readiness so sandboxd can attach its OpenCode proxy adapter"
+            ),
             Self::StartCodexProxy(error) => {
                 write!(f, "failed to start Codex runtime adapter: {error}")
+            }
+            Self::StartOpenCodeProxy(error) => {
+                write!(f, "failed to start OpenCode runtime adapter: {error}")
             }
         }
     }
@@ -128,6 +147,10 @@ pub enum RuntimeAdapter {
         runtime_id: String,
         proxy: CodexProxy,
     },
+    OpenCode {
+        runtime_id: String,
+        proxy: OpenCodeProxy,
+    },
 }
 
 impl RuntimeAdapter {
@@ -135,6 +158,7 @@ impl RuntimeAdapter {
     pub fn runtime_id(&self) -> &str {
         match self {
             Self::Codex { runtime_id, .. } => runtime_id,
+            Self::OpenCode { runtime_id, .. } => runtime_id,
         }
     }
 
@@ -142,6 +166,7 @@ impl RuntimeAdapter {
     pub fn listen_url(&self) -> &str {
         match self {
             Self::Codex { proxy, .. } => proxy.listen_url(),
+            Self::OpenCode { proxy, .. } => proxy.listen_url(),
         }
     }
 
@@ -149,11 +174,16 @@ impl RuntimeAdapter {
     pub fn close(self) -> Result<(), RuntimeAdapterRegistryError> {
         match self {
             Self::Codex { proxy, .. } => proxy.close().map_err(Self::map_codex_close_error),
+            Self::OpenCode { proxy, .. } => proxy.close().map_err(Self::map_opencode_close_error),
         }
     }
 
     fn map_codex_close_error(error: CodexProxyError) -> RuntimeAdapterRegistryError {
         RuntimeAdapterRegistryError::StartCodexProxy(error)
+    }
+
+    fn map_opencode_close_error(error: OpenCodeProxyError) -> RuntimeAdapterRegistryError {
+        RuntimeAdapterRegistryError::StartOpenCodeProxy(error)
     }
 }
 
@@ -198,10 +228,13 @@ impl RuntimeAdapterRegistry {
                     error.to_string(),
                 ))
             })?;
+        let runtime_plan: CompiledRuntimePlan =
+            serde_json::from_value(startup_input.runtime_plan.clone())
+                .map_err(RuntimeAdapterRegistryError::InvalidRuntimePlan)?;
         let supervisor_handle = SandboxdSupervisorHandle::new(
             sandbox_instance_id,
             Arc::new(SystemClock),
-            BTreeSet::from([SupervisedComponent::CodexProxy]),
+            collect_runtime_adapter_components(&runtime_plan),
         );
 
         self.start_with_supervisor(
@@ -246,6 +279,15 @@ impl RuntimeAdapterRegistry {
                     started_adapters.push(adapter);
                     codex_proxy_control_handle = Some(control_handle);
                 }
+                "opencode" => {
+                    let adapter = start_opencode_runtime_adapter(
+                        agent_runtime,
+                        &runtime_plan,
+                        runtime_readiness_manager.clone(),
+                        supervisor_handle.clone(),
+                    )?;
+                    started_adapters.push(adapter);
+                }
                 _ => {
                     return Err(RuntimeAdapterRegistryError::UnsupportedRuntimeId {
                         runtime_id: agent_runtime.runtime_id.clone(),
@@ -259,6 +301,94 @@ impl RuntimeAdapterRegistry {
             codex_proxy_control_handle,
         })
     }
+}
+
+fn collect_runtime_adapter_components(
+    runtime_plan: &CompiledRuntimePlan,
+) -> BTreeSet<SupervisedComponent> {
+    let mut components = BTreeSet::new();
+    for agent_runtime in &runtime_plan.agent_runtimes {
+        match agent_runtime.runtime_id.as_str() {
+            "codex" => {
+                components.insert(SupervisedComponent::CodexProxy);
+            }
+            "opencode" => {
+                components.insert(SupervisedComponent::OpenCodeProxy);
+            }
+            _ => {}
+        }
+    }
+    components
+}
+
+fn start_opencode_runtime_adapter(
+    agent_runtime: &CompiledAgentRuntime,
+    runtime_plan: &CompiledRuntimePlan,
+    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
+    supervisor_handle: SandboxdSupervisorHandle,
+) -> Result<RuntimeAdapter, RuntimeAdapterRegistryError> {
+    let runtime_client = runtime_plan
+        .runtime_clients
+        .iter()
+        .find(|runtime_client| runtime_client.client_id == agent_runtime.client_id)
+        .ok_or_else(|| RuntimeAdapterRegistryError::MissingRuntimeClient {
+            runtime_id: agent_runtime.runtime_id.clone(),
+            client_id: agent_runtime.client_id.clone(),
+        })?;
+
+    let endpoint = runtime_client
+        .endpoints
+        .iter()
+        .find(|endpoint| endpoint.endpoint_key == agent_runtime.endpoint_key)
+        .ok_or_else(|| RuntimeAdapterRegistryError::MissingRuntimeEndpoint {
+            runtime_id: agent_runtime.runtime_id.clone(),
+            client_id: agent_runtime.client_id.clone(),
+            endpoint_key: agent_runtime.endpoint_key.clone(),
+        })?;
+    if endpoint.connection_mode != RuntimeClientConnectionMode::Dedicated {
+        return Err(RuntimeAdapterRegistryError::UnsupportedConnectionMode {
+            runtime_id: agent_runtime.runtime_id.clone(),
+            connection_mode: endpoint.connection_mode,
+        });
+    }
+
+    let process = runtime_client
+        .processes
+        .iter()
+        .find(|process| process.process_key == agent_runtime.runtime_key)
+        .ok_or_else(|| RuntimeAdapterRegistryError::MissingRuntimeProcess {
+            runtime_id: agent_runtime.runtime_id.clone(),
+            client_id: agent_runtime.client_id.clone(),
+            process_key: agent_runtime.runtime_key.clone(),
+        })?;
+
+    let RuntimeClientEndpointTransport::Ws { url: listen_url } = &endpoint.transport;
+    let RuntimeClientProcessReadiness::Http {
+        url: readiness_url, ..
+    } = &process.readiness
+    else {
+        return Err(
+            RuntimeAdapterRegistryError::RawOpenCodeServerReadinessMustUseHttp {
+                runtime_id: agent_runtime.runtime_id.clone(),
+                process_key: process.process_key.clone(),
+            },
+        );
+    };
+    let raw_server_url = derive_opencode_raw_server_url(readiness_url)
+        .map_err(RuntimeAdapterRegistryError::StartOpenCodeProxy)?;
+
+    let proxy = start_opencode_proxy_with_supervisor(
+        listen_url,
+        &raw_server_url,
+        runtime_readiness_manager,
+        supervisor_handle,
+    )
+    .map_err(RuntimeAdapterRegistryError::StartOpenCodeProxy)?;
+
+    Ok(RuntimeAdapter::OpenCode {
+        runtime_id: agent_runtime.runtime_id.clone(),
+        proxy,
+    })
 }
 
 fn start_codex_runtime_adapter(

@@ -459,18 +459,7 @@ impl SandboxdState {
         let codex_proxy_control_handle = runtime_adapters.codex_proxy_control_handle().cloned();
         let agent_endpoint_url = match runtime_adapters.adapters() {
             [] => None,
-            [_adapter] => Some(
-                codex_proxy_control_handle
-                    .as_ref()
-                    .ok_or_else(|| {
-                        SandboxdStateError::StartRuntimeAdapters(
-                            "sandboxd is missing the typed Codex proxy control handle for the running runtime adapter"
-                                .to_string(),
-                        )
-                    })?
-                    .listen_url()
-                    .to_string(),
-            ),
+            [adapter] => Some(adapter.listen_url().to_string()),
             _ => {
                 record_operation_phase_failure(
                     &diagnostics_logger,
@@ -1037,6 +1026,8 @@ fn determine_runtime_readiness_mode(
         RuntimeReadinessMode::Codex
     } else if supervisor_handle.tracks_component(SupervisedComponent::CodexProxy) {
         RuntimeReadinessMode::CodexProxyOnly
+    } else if supervisor_handle.tracks_component(SupervisedComponent::OpenCodeProxy) {
+        RuntimeReadinessMode::OpenCodeProxyOnly
     } else {
         RuntimeReadinessMode::NoAgentRuntime
     }
@@ -1210,6 +1201,14 @@ fn collect_tracked_components(
     {
         tracked_components.insert(SupervisedComponent::CodexProxy);
         tracked_components.insert(SupervisedComponent::CodexAppServer);
+    }
+
+    if runtime_plan
+        .agent_runtimes
+        .iter()
+        .any(|agent_runtime| agent_runtime.runtime_id == "opencode")
+    {
+        tracked_components.insert(SupervisedComponent::OpenCodeProxy);
     }
 
     tracked_components

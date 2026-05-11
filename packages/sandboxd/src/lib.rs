@@ -25,6 +25,7 @@ pub mod control;
 pub mod egress_proxy;
 pub mod init;
 pub mod keepalive;
+pub mod opencode_proxy;
 pub mod process;
 pub mod protocol;
 pub mod proxy_ca;
