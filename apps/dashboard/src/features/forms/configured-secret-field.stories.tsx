@@ -14,7 +14,7 @@ function createIdleFieldState(): SavingFieldState {
 }
 
 function ConfiguredSecretFieldStory(input: {
-  confirmReplacement?: boolean;
+  confirmReplacement?: false;
   configured?: boolean;
   description?: string;
   errorMessage?: string;
@@ -41,25 +41,29 @@ function ConfiguredSecretFieldStory(input: {
         fieldState={fieldState}
         id="storybook-configured-secret-field"
         label={input.label}
-        onCancelReplace={() => {
-          setValue("");
-          setFieldState(createIdleFieldState());
-        }}
         onChange={(nextValue) => {
           setValue(nextValue);
           if (fieldState.errorMessage !== null || fieldState.status !== "idle") {
             setFieldState(createIdleFieldState());
           }
         }}
-        onCommit={() => {
-          setFieldState({
-            status: "saved",
-            errorMessage: null,
-          });
-        }}
         secretLabel={input.secretLabel}
         value={value}
         {...(input.confirmReplacement === false ? { confirmReplacement: false } : {})}
+        {...(input.confirmReplacement === false
+          ? {}
+          : {
+              onCancelReplace: () => {
+                setValue("");
+                setFieldState(createIdleFieldState());
+              },
+              onCommit: () => {
+                setFieldState({
+                  status: "saved",
+                  errorMessage: null,
+                });
+              },
+            })}
         {...(input.configured === undefined ? {} : { configured: input.configured })}
         {...(input.description === undefined ? {} : { description: input.description })}
         {...(input.multiline === undefined ? {} : { multiline: input.multiline })}

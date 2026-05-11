@@ -18,7 +18,7 @@ import {
   cn,
 } from "@mistle/ui";
 import { CheckCircleIcon } from "@phosphor-icons/react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 export type SavingFieldStatus = "idle" | "saving" | "saved" | "saved-fading";
 
@@ -174,10 +174,8 @@ type ConfiguredSecretFieldBaseProps = {
   multiline?: boolean;
   autoComplete?: string;
   onePasswordIgnore?: boolean;
-  confirmReplacement?: boolean;
   replacementStaged?: boolean;
   onChange: (nextValue: string) => void;
-  onReplacementDialogOpenChange?: (open: boolean) => void;
 };
 
 type ConfiguredSecretFieldProps = ConfiguredSecretFieldBaseProps &
@@ -213,10 +211,6 @@ export function ConfiguredSecretField(input: ConfiguredSecretFieldProps): React.
     input.replacementStaged === true ? (
       <span className="text-muted-foreground text-xs">Replace on save</span>
     ) : undefined;
-
-  useEffect(() => {
-    input.onReplacementDialogOpenChange?.(isReplaceDialogOpen);
-  }, [input.onReplacementDialogOpenChange, isReplaceDialogOpen]);
 
   function handleCancel(): void {
     input.onCancelReplace?.();
