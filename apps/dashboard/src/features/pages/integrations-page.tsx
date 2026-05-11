@@ -39,8 +39,6 @@ import {
   useIntegrationsDirectoryState,
 } from "./use-integrations-directory-state.js";
 
-type ProviderAppSetupStateEntry = [string, ProviderAppSetupState];
-
 function buildProviderAppSetupStateByConnectionId(input: {
   connections: readonly {
     id: string;
@@ -49,7 +47,7 @@ function buildProviderAppSetupStateByConnectionId(input: {
   pendingConnectionId: string | null | undefined;
 }): ReadonlyMap<string, ProviderAppSetupState> {
   return new Map(
-    input.connections.map((connection): ProviderAppSetupStateEntry => {
+    input.connections.map((connection) => {
       const errorMessage = input.errorMessageByConnectionId[connection.id];
 
       return [
