@@ -2,7 +2,7 @@
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, useLocation } from "react-router";
+import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { resetDashboardConfigForTest } from "../../config.js";
@@ -68,11 +68,6 @@ function createGitHubConnection(input?: {
     createdAt: "2026-04-26T00:00:00.000Z",
     updatedAt: "2026-04-26T00:00:00.000Z",
   };
-}
-
-function CurrentPath(): React.JSX.Element {
-  const location = useLocation();
-  return <div data-testid="current-path">{location.pathname}</div>;
 }
 
 function getTextControlById(id: string): HTMLInputElement | HTMLTextAreaElement {
@@ -161,7 +156,6 @@ function renderProviderAppSetupPane(input?: {
             },
           })}
         />
-        <CurrentPath />
       </QueryClientProvider>
     </MemoryRouter>,
   );
