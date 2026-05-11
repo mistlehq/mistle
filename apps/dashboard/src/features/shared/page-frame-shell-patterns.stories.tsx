@@ -12,7 +12,7 @@ import { MemoryRouter } from "react-router";
 
 import { ErrorNotice } from "../auth/error-notice.js";
 import { AppShellView } from "../shell/app-shell-view.js";
-import { OrganizationMenuTrigger } from "../shell/organization-menu-trigger.js";
+import { AppSidebarHeader } from "../shell/app-sidebar-header.js";
 import { ConversationWorkspaceFrame } from "./conversation-workspace-frame.js";
 import { PageFrame } from "./page-frame.js";
 
@@ -43,7 +43,7 @@ function PageFrameShellPatternsStory(input: PageFrameShellPatternsStoryArgs): Re
         sidebarDefaultOpen={input.sidebarDefaultOpen}
         sidebarFooterContent={<ErrorNotice message={null} />}
         sidebarHeaderContent={
-          <OrganizationMenuTrigger
+          <AppSidebarHeader
             activeOrganizationId="org_mistle"
             isSigningOut={false}
             onSwitchOrganization={function onSwitchOrganization() {}}

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { SessionsShellSidebar } from "../navigation/sessions-shell-sidebar.js";
 import { resolveAppShellFrame } from "./app-shell-frame.js";
 import { resolveAppShellRouteState } from "./app-shell-route-state.js";
+import { AppSidebarHeader } from "./app-sidebar-header.js";
 
 describe("resolveAppShellFrame", () => {
   it("uses the dedicated sessions sidebar only when the toggle is enabled on sessions routes", () => {
@@ -102,7 +103,11 @@ describe("resolveAppShellFrame", () => {
       throw new Error("Expected sidebar content to be a React element.");
     }
     expect(frame.sidebarContent.type).not.toBe(SessionsShellSidebar);
-    expect(frame.sidebarHeaderContent).not.toBeNull();
+    expect(isValidElement(frame.sidebarHeaderContent)).toBe(true);
+    if (!isValidElement(frame.sidebarHeaderContent)) {
+      throw new Error("Expected sidebar header content to be a React element.");
+    }
+    expect(frame.sidebarHeaderContent.type).toBe(AppSidebarHeader);
     expect(frame.renderSidebarTrigger).toBe(false);
   });
 
