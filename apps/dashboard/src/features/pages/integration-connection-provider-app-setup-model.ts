@@ -1,13 +1,13 @@
 import type { IntegrationFormConnectionMethodProviderAppSetup } from "@mistle/integrations-core";
 
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
+import type { IntegrationConnectionSetupStartFormState } from "./integration-connection-setup-flow.js";
 import { hasConfiguredSetupSecretField } from "./integration-connection-setup-secret-fields.js";
 
-type ProviderAppSetupStartFormState = {
-  isFieldVisible: (fieldName: string) => boolean;
-  resolveRequiredValue: (fieldName: string) => string;
-  values: Record<string, string>;
-};
+type ProviderAppSetupStartFormState = Pick<
+  IntegrationConnectionSetupStartFormState,
+  "isFieldVisible" | "resolveRequiredValue" | "values"
+>;
 
 export function createInitialProviderAppSetupDraft(input: {
   connection: IntegrationConnection;

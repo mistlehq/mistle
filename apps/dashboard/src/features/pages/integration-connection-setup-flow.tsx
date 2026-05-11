@@ -29,7 +29,7 @@ import { SectionHeader } from "../shared/section-header.js";
 
 export type IntegrationConnectionSetupMode = "manifest" | "existing-app";
 
-type IntegrationConnectionSetupStartFormState = {
+export type IntegrationConnectionSetupStartFormState = {
   isFieldVisible: (fieldName: string) => boolean;
   requiredFieldsComplete: boolean;
   resolveRequiredValue: (fieldName: string) => string;
