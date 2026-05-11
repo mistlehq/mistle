@@ -763,6 +763,7 @@ function LoadedSandboxProfileEditorPage(
   const [versionActionError, setVersionActionError] = useState<string | null>(null);
   const [isDeleteProfileDialogOpen, setIsDeleteProfileDialogOpen] = useState(false);
   const [deleteProfileError, setDeleteProfileError] = useState<string | null>(null);
+  const [draftEditorResetKey, setDraftEditorResetKey] = useState(0);
   const automationUsagesQuery = useQuery({
     queryKey: sandboxProfileAutomationUsagesQueryKey(input.profileId),
     queryFn: async ({ signal }) =>
@@ -900,6 +901,7 @@ function LoadedSandboxProfileEditorPage(
           version: inputValue.draftVersion,
         });
       }
+      setDraftEditorResetKey((currentKey) => currentKey + 1);
       queryClient.setQueryData<{ versions: readonly SandboxProfileVersion[] } | undefined>(
         sandboxProfileVersionsQueryKey(input.profileId),
         (currentVersions) => {
@@ -1098,6 +1100,7 @@ function LoadedSandboxProfileEditorPage(
       currentVersion={
         input.versions.find((version) => version.version === resolvedMode.mode.version) ?? null
       }
+      draftEditorResetKey={draftEditorResetKey}
       mode={resolvedMode.mode}
       navigate={input.navigate}
       onMakeChanges={() => {
@@ -1193,6 +1196,7 @@ function ReadySandboxProfileEditorPage(input: {
   profile: SandboxProfile;
   mode: SandboxProfileEditorVersionMode;
   currentVersion: SandboxProfileVersion | null;
+  draftEditorResetKey: number;
   versions: readonly SandboxProfileVersion[];
   routeSectionId: SandboxProfileEditorSectionId;
   publishSuccessNavigationKey: string | null;
@@ -1605,6 +1609,7 @@ function ReadySandboxProfileEditorPage(input: {
           activeSectionId={sectionId}
           currentVersion={input.currentVersion}
           draftFieldsAreReadOnly={draftFieldsAreReadOnly}
+          draftEditorResetKey={input.draftEditorResetKey}
           integrationDraftState={integrationDraftState}
           integrationsLoader={integrationsLoader}
           invalidateProfileVersions={input.invalidateProfileVersions}
@@ -1940,6 +1945,7 @@ function SandboxProfileEditorSectionPanels(input: {
   activeSectionId: SandboxProfileEditorSectionId;
   currentVersion: SandboxProfileVersion | null;
   draftFieldsAreReadOnly: boolean;
+  draftEditorResetKey: number;
   integrationDraftState: SandboxProfileDraftSectionState;
   integrationsLoader: ReturnType<typeof useSandboxProfileIntegrationsLoader>;
   invalidateProfileVersions: (profileId: string) => Promise<void>;
@@ -2001,7 +2007,7 @@ function SandboxProfileEditorSectionPanels(input: {
         </SandboxProfilePanelSection>
       )}
       <LoadedSandboxProfileIntegrationSetupSection
-        key={`${input.profileId}:integration-setup`}
+        key={`${input.profileId}:${String(input.mode.version)}:${String(input.draftEditorResetKey)}:integration-setup`}
         loader={input.integrationsLoader}
         onDraftStateChange={input.onIntegrationDraftStateChange}
         profileId={input.profileId}
@@ -2012,7 +2018,7 @@ function SandboxProfileEditorSectionPanels(input: {
       <SandboxProfilePanelSection>
         <LoadedSandboxProfileSetupScriptSection
           disabled={input.draftFieldsAreReadOnly}
-          key={`${input.profileId}:${String(input.mode.version)}:setup-script`}
+          key={`${input.profileId}:${String(input.mode.version)}:${String(input.draftEditorResetKey)}:setup-script`}
           integrationRows={resolveSandboxProfileSetupScriptIntegrationRows(
             input.integrationsLoader.initialRows,
             input.integrationDraftState.integrationRows,
@@ -2031,6 +2037,7 @@ function SandboxProfileEditorSectionPanels(input: {
             disabled={input.draftFieldsAreReadOnly}
             invalidateProfileVersions={input.invalidateProfileVersions}
             isDraft={input.mode.kind === "draft"}
+            key={`${input.profileId}:${String(input.mode.version)}:${String(input.draftEditorResetKey)}:persistence-mode`}
             onDraftStateChange={input.onPersistenceDraftStateChange}
             profileId={input.profileId}
             version={input.currentVersion}
