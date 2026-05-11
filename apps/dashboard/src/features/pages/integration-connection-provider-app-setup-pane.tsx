@@ -230,7 +230,6 @@ export function ProviderAppSetupPane(input: {
       providerAppSetup: input.providerAppSetup,
     }),
   );
-  const [isSecretReplacementDialogOpen, setIsSecretReplacementDialogOpen] = useState(false);
   const [isRedirectingToExistingAppStartAction, setIsRedirectingToExistingAppStartAction] =
     useState(false);
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
@@ -437,9 +436,7 @@ export function ProviderAppSetupPane(input: {
   const showManifestCreatedState = isManifestCreatedReturn && !isExistingAppStartActionInstalled;
   const canConnectExistingApp =
     isExistingAppStartActionInstalled ||
-    (requiredDraftComplete &&
-      !isSecretReplacementDialogOpen &&
-      webhookCallbackState.kind === "ready");
+    (requiredDraftComplete && webhookCallbackState.kind === "ready");
   const existingAppConnectLabel =
     isExistingAppStartActionInstalled &&
     input.providerAppSetup.existingApp.startAction !== undefined
@@ -481,13 +478,6 @@ export function ProviderAppSetupPane(input: {
             })}
             description={input.providerAppSetup.existingApp.description}
             isSaving={saveExistingAppSetupMutation.isPending}
-            onReplacementDialogOpenChange={setIsSecretReplacementDialogOpen}
-            onRevertSecretReplacement={(fieldKey) => {
-              setExistingAppDraft((currentDraft) => ({
-                ...currentDraft,
-                [fieldKey]: "",
-              }));
-            }}
             onUpdateFieldDraft={(fieldKey, nextValue) => {
               setActionErrorMessage(null);
               setExistingAppDraft((currentDraft) => ({

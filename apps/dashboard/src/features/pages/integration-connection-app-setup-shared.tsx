@@ -84,17 +84,12 @@ export function useSetupManifestDraft(input: {
   };
 }
 
-export function ExistingAppSetupFieldsPanel<
-  FieldKey extends string,
-  SecretFieldKey extends FieldKey,
->(input: {
+export function ExistingAppSetupFieldsPanel<FieldKey extends string>(input: {
   configFields: readonly ExistingAppSetupTextField<FieldKey>[];
   description: string;
   isSaving?: boolean;
-  onReplacementDialogOpenChange: (open: boolean) => void;
-  onRevertSecretReplacement: (fieldKey: SecretFieldKey) => void;
   onUpdateFieldDraft: (fieldKey: FieldKey, nextValue: string) => void;
-  secretFields: readonly ExistingAppSetupSecretField<SecretFieldKey>[];
+  secretFields: readonly ExistingAppSetupSecretField<FieldKey>[];
   title: string;
 }): React.JSX.Element {
   const fieldState = input.isSaving === true ? SavingFieldStateValue : IdleFieldState;
@@ -123,20 +118,18 @@ export function ExistingAppSetupFieldsPanel<
         <SectionHeader title="Secrets" />
         {input.secretFields.map((field) => (
           <ConfiguredSecretField
+            confirmReplacement={false}
             configured={field.configured}
             fieldState={fieldState}
             id={field.id}
             key={field.fieldKey}
             label={field.label}
             {...(field.multiline === undefined ? {} : { multiline: field.multiline })}
-            onCancelReplace={() => {
-              input.onRevertSecretReplacement(field.fieldKey);
-            }}
+            onCancelReplace={noop}
             onChange={(nextValue) => {
               input.onUpdateFieldDraft(field.fieldKey, nextValue);
             }}
             onCommit={noop}
-            onReplacementDialogOpenChange={input.onReplacementDialogOpenChange}
             {...(field.placeholder === undefined ? {} : { placeholder: field.placeholder })}
             {...(field.replacementStaged === undefined
               ? {}

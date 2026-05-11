@@ -258,6 +258,28 @@ describe("ProviderAppSetupPane", () => {
     expect(connectButton.hasAttribute("disabled")).toBe(false);
   });
 
+  it("stages configured existing app secret replacements without opening a confirmation dialog", () => {
+    renderProviderAppSetupPane({
+      connection: createSlackConnection({
+        appId: "A0123456789",
+        clientId: "123.456",
+        configuredSecretNames: ["botToken", "signingSecret", "clientSecret"],
+      }),
+    });
+
+    const signingSecretInput = getTextControlById("slack-app-signingSecret");
+    fireEvent.change(signingSecretInput, {
+      target: { value: "replacement-signing-secret" },
+    });
+    fireEvent.blur(signingSecretInput);
+
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.getByText("Replace on save")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Connect Slack to Mistle" }).hasAttribute("disabled"),
+    ).toBe(false);
+  });
+
   it("renders GitHub provider-owned manifest setup fields", async () => {
     renderProviderAppSetupPane({
       connection: createGitHubConnection(),
