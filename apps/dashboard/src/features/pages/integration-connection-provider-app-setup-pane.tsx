@@ -7,7 +7,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
-import { getDashboardConfig } from "../../config.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
   startProviderAppSetup,
@@ -83,6 +82,7 @@ function normalizeProviderAppSetupDraft(input: {
 }
 
 function SetupUrls(input: {
+  controlPlaneApiOrigin: string;
   providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
   webhookCallbackState: ManifestWebhookCallbackState;
 }): React.JSX.Element {
@@ -99,10 +99,7 @@ function SetupUrls(input: {
         {setupCallbackInstructions === undefined ? null : (
           <CopyableValue
             label={setupCallbackInstructions.label}
-            value={new URL(
-              setupCallbackInstructions.path,
-              getDashboardConfig().controlPlaneApiOrigin,
-            ).toString()}
+            value={new URL(setupCallbackInstructions.path, input.controlPlaneApiOrigin).toString()}
           />
         )}
         <IntegrationConnectionSetupWebhookCallbackValue
@@ -205,6 +202,7 @@ function PostManifestInstallationScreen(input: {
 
 export function ProviderAppSetupPane(input: {
   connection: IntegrationConnection;
+  controlPlaneApiOrigin: string;
   manifestDraftBuilder: IntegrationSetupAppManifestDraftBuilder;
   methodId: string;
   routeSegment: string;
@@ -508,6 +506,7 @@ export function ProviderAppSetupPane(input: {
           <>
             {setupMode === "existing-app" ? (
               <SetupUrls
+                controlPlaneApiOrigin={input.controlPlaneApiOrigin}
                 providerAppSetup={input.providerAppSetup}
                 webhookCallbackState={webhookCallbackState}
               />

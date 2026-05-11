@@ -1,7 +1,8 @@
 import { Button, Notice } from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate, useParams } from "react-router";
+import { Navigate, useNavigate, useParams } from "react-router";
 
+import { getDashboardConfig } from "../../config.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
@@ -10,10 +11,12 @@ import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageSection } from "../shared/form-page.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { renderIntegrationConnectionSetupPane } from "./integration-connection-setup-pane-registry.js";
-import { resolveIntegrationConnectionSetupRouteOrThrow } from "./integration-connection-setup-state.js";
+import { resolveIntegrationConnectionSetupRouteStateOrThrow } from "./integration-connection-setup-state.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
-export function IntegrationConnectionSetupPage(): React.JSX.Element {
+export function IntegrationConnectionSetupPage(input: {
+  controlPlaneApiOrigin?: string;
+}): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   const breadcrumbs = useAppPageBreadcrumbs();
   const navigate = useNavigate();
@@ -22,6 +25,8 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
   const targetKey = params["targetKey"];
   const connectionId = params["connectionId"];
   const setupRouteSegment = params["setupRouteSegment"];
+  const controlPlaneApiOrigin =
+    input.controlPlaneApiOrigin ?? getDashboardConfig().controlPlaneApiOrigin;
 
   if (targetKey === undefined) {
     throw new Error("Integration target key is required.");
@@ -102,11 +107,21 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
       `Integration connection '${connectionId}' was not found for target '${targetKey}'.`,
     );
   }
-  const setupRoute = resolveIntegrationConnectionSetupRouteOrThrow({
+  const setupRouteState = resolveIntegrationConnectionSetupRouteStateOrThrow({
     connection,
     connectionMethods: card.target.connectionMethods,
     routeSegment: setupRouteSegment,
   });
+  if (setupRouteState.kind === "complete") {
+    return (
+      <Navigate
+        replace
+        to={`/integrations/${encodeURIComponent(targetKey)}?connectionId=${encodeURIComponent(
+          connectionId,
+        )}`}
+      />
+    );
+  }
 
   return (
     <PageFrame
@@ -118,7 +133,8 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
     >
       {renderIntegrationConnectionSetupPane({
         connection,
-        setupRoute,
+        controlPlaneApiOrigin,
+        setupRoute: setupRouteState.setupRoute,
       })}
     </PageFrame>
   );

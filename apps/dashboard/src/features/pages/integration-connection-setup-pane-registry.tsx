@@ -10,16 +10,19 @@ import type { IntegrationConnectionSetupRoute } from "./integration-connection-s
 
 type IntegrationConnectionSetupPaneComponent = (input: {
   connection: IntegrationConnection;
+  controlPlaneApiOrigin: string;
   setupRoute: IntegrationConnectionSetupRoute;
 }) => React.JSX.Element;
 
 function renderProviderAppSetupPane(input: {
   connection: IntegrationConnection;
+  controlPlaneApiOrigin: string;
   setupRoute: IntegrationConnectionSetupRoute;
 }): React.JSX.Element {
   return (
     <ProviderAppSetupPane
       connection={input.connection}
+      controlPlaneApiOrigin={input.controlPlaneApiOrigin}
       manifestDraftBuilder={resolveIntegrationSetupAppManifestDraftBuilderOrThrow({
         connection: input.connection,
         setupRoute: input.setupRoute,
@@ -56,6 +59,7 @@ function handleUnsupportedIntegrationSetupPaneKind(_kind: never): never {
 
 export function renderIntegrationConnectionSetupPane(input: {
   connection: IntegrationConnection;
+  controlPlaneApiOrigin: string;
   setupRoute: IntegrationConnectionSetupRoute;
 }): React.JSX.Element {
   const SetupPane = resolveSetupPane({
@@ -66,6 +70,7 @@ export function renderIntegrationConnectionSetupPane(input: {
   return (
     <SetupPane
       connection={input.connection}
+      controlPlaneApiOrigin={input.controlPlaneApiOrigin}
       key={input.connection.id}
       setupRoute={input.setupRoute}
     />

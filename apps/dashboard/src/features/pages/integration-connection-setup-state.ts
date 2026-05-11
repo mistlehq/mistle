@@ -17,6 +17,15 @@ export type IntegrationConnectionSetupRoute = {
   routeSegment: string;
 };
 
+export type IntegrationConnectionSetupRouteState =
+  | {
+      kind: "ready";
+      setupRoute: IntegrationConnectionSetupRoute;
+    }
+  | {
+      kind: "complete";
+    };
+
 export function resolveIncompleteIntegrationConnectionSetupFlow(input: {
   connection: IntegrationConnection;
   connectionMethods: readonly IntegrationConnectionMethod[] | undefined;
@@ -48,6 +57,21 @@ export function resolveIntegrationConnectionSetupRouteOrThrow(input: {
   connectionMethods: readonly IntegrationConnectionMethod[] | undefined;
   routeSegment: string;
 }): IntegrationConnectionSetupRoute {
+  const setupRouteState = resolveIntegrationConnectionSetupRouteStateOrThrow(input);
+  if (setupRouteState.kind === "complete") {
+    throw new Error(
+      `Integration setup route '${input.routeSegment}' is already complete for connection '${input.connection.id}'.`,
+    );
+  }
+
+  return setupRouteState.setupRoute;
+}
+
+export function resolveIntegrationConnectionSetupRouteStateOrThrow(input: {
+  connection: IntegrationConnection;
+  connectionMethods: readonly IntegrationConnectionMethod[] | undefined;
+  routeSegment: string;
+}): IntegrationConnectionSetupRouteState {
   if (input.connection.connectionMethodId === undefined) {
     throw new Error(
       `Integration connection '${input.connection.id}' is missing connection method metadata.`,
@@ -67,9 +91,29 @@ export function resolveIntegrationConnectionSetupRouteOrThrow(input: {
     );
   }
 
+  if (method.setupFlow.completionRequirements === undefined) {
+    throw new Error(
+      `Draft-then-setup connection method '${method.id}' is missing setup completion metadata.`,
+    );
+  }
+
+  if (
+    isSetupCompletionRequirementMet({
+      connection: input.connection,
+      requirement: method.setupFlow.completionRequirements,
+    })
+  ) {
+    return {
+      kind: "complete",
+    };
+  }
+
   return {
-    methodId: method.id,
-    routeSegment: method.setupFlow.routeSegment,
+    kind: "ready",
+    setupRoute: {
+      methodId: method.id,
+      routeSegment: method.setupFlow.routeSegment,
+    },
   };
 }
 

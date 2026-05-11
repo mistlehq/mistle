@@ -4,6 +4,7 @@ import type { IntegrationConnectionMethod } from "../integrations/integration-co
 import {
   resolveIncompleteIntegrationConnectionSetupFlow,
   resolveIntegrationConnectionSetupRouteOrThrow,
+  resolveIntegrationConnectionSetupRouteStateOrThrow,
 } from "./integration-connection-setup-state.js";
 
 const CreatedAt = "2026-04-28T00:00:00.000Z";
@@ -235,6 +236,29 @@ describe("resolveIntegrationConnectionSetupRouteOrThrow", () => {
     });
   });
 
+  it("fails fast when the requested setup route is already complete", () => {
+    expect(() =>
+      resolveIntegrationConnectionSetupRouteOrThrow({
+        connectionMethods: [GitHubAppMethod],
+        routeSegment: "github-app",
+        connection: {
+          createdAt: CreatedAt,
+          id: "icn_github",
+          targetKey: "github-cloud",
+          displayName: "GitHub",
+          status: "active",
+          connectionMethodId: "github-app-installation",
+          config: {
+            installation_id: "12345",
+          },
+          updatedAt: UpdatedAt,
+        },
+      }),
+    ).toThrow(
+      "Integration setup route 'github-app' is already complete for connection 'icn_github'.",
+    );
+  });
+
   it("fails fast when the URL setup segment does not match the connection method", () => {
     expect(() =>
       resolveIntegrationConnectionSetupRouteOrThrow({
@@ -253,5 +277,52 @@ describe("resolveIntegrationConnectionSetupRouteOrThrow", () => {
     ).toThrow(
       "Integration setup route segment 'github-app' does not match connection method 'slack-bot-token'.",
     );
+  });
+});
+
+describe("resolveIntegrationConnectionSetupRouteStateOrThrow", () => {
+  it("returns ready setup route metadata while setup requirements are incomplete", () => {
+    expect(
+      resolveIntegrationConnectionSetupRouteStateOrThrow({
+        connectionMethods: [SlackAppMethod],
+        routeSegment: "slack-app",
+        connection: {
+          createdAt: CreatedAt,
+          id: "icn_slack",
+          targetKey: "slack-default",
+          displayName: "Slack",
+          status: "active",
+          connectionMethodId: "slack-bot-token",
+          updatedAt: UpdatedAt,
+        },
+      }),
+    ).toEqual({
+      kind: "ready",
+      setupRoute: {
+        methodId: "slack-bot-token",
+        routeSegment: "slack-app",
+      },
+    });
+  });
+
+  it("returns complete when setup completion requirements are already met", () => {
+    expect(
+      resolveIntegrationConnectionSetupRouteStateOrThrow({
+        connectionMethods: [GitHubAppMethod],
+        routeSegment: "github-app",
+        connection: {
+          createdAt: CreatedAt,
+          id: "icn_github",
+          targetKey: "github-cloud",
+          displayName: "GitHub",
+          status: "active",
+          connectionMethodId: "github-app-installation",
+          externalSubjectId: "github-org",
+          updatedAt: UpdatedAt,
+        },
+      }),
+    ).toEqual({
+      kind: "complete",
+    });
   });
 });
