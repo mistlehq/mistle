@@ -55,6 +55,10 @@ describe("exportServiceConfigToEnv", () => {
       valueFormat: "csv",
     });
     expectEntry(entries, {
+      name: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_ALLOW_SIGNUPS",
+      value: true,
+    });
+    expectEntry(entries, {
       name: "MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON",
       value: {
         "1": "replace-with-master-encryption-key",
