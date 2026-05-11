@@ -2,10 +2,6 @@ import type { Preview } from "@storybook/react-vite";
 
 import "./preview.css";
 
-Object.assign(import.meta.env, {
-  VITE_CONTROL_PLANE_API_ORIGIN: "https://control-plane.example.com",
-});
-
 const preview: Preview = {
   parameters: {
     options: {
