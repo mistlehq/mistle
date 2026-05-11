@@ -1692,6 +1692,29 @@ export interface paths {
                   [key: string]: unknown;
                 };
                 updatedAt: string;
+                webhookTriggerCapabilitiesRefreshAction?: {
+                  actionLabel: string;
+                  bodyForm?: {
+                    fields: {
+                      actions?: {
+                        href: string;
+                        label: string;
+                        opensInNewWindow?: boolean;
+                      }[];
+                      description?: string;
+                      /** @enum {string} */
+                      inputType: "password" | "text" | "textarea";
+                      label: string;
+                      name: string;
+                      placeholder?: string;
+                      required?: boolean;
+                    }[];
+                    submitLabel: string;
+                    title: string;
+                  };
+                  disabledMessage?: string;
+                  pendingLabel: string;
+                };
               }[];
               nextPage: {
                 after: string;
@@ -1825,6 +1848,29 @@ export interface paths {
                 [key: string]: unknown;
               };
               updatedAt: string;
+              webhookTriggerCapabilitiesRefreshAction?: {
+                actionLabel: string;
+                bodyForm?: {
+                  fields: {
+                    actions?: {
+                      href: string;
+                      label: string;
+                      opensInNewWindow?: boolean;
+                    }[];
+                    description?: string;
+                    /** @enum {string} */
+                    inputType: "password" | "text" | "textarea";
+                    label: string;
+                    name: string;
+                    placeholder?: string;
+                    required?: boolean;
+                  }[];
+                  submitLabel: string;
+                  title: string;
+                };
+                disabledMessage?: string;
+                pendingLabel: string;
+              };
             };
           };
         };
@@ -2069,6 +2115,29 @@ export interface paths {
                 [key: string]: unknown;
               };
               updatedAt: string;
+              webhookTriggerCapabilitiesRefreshAction?: {
+                actionLabel: string;
+                bodyForm?: {
+                  fields: {
+                    actions?: {
+                      href: string;
+                      label: string;
+                      opensInNewWindow?: boolean;
+                    }[];
+                    description?: string;
+                    /** @enum {string} */
+                    inputType: "password" | "text" | "textarea";
+                    label: string;
+                    name: string;
+                    placeholder?: string;
+                    required?: boolean;
+                  }[];
+                  submitLabel: string;
+                  title: string;
+                };
+                disabledMessage?: string;
+                pendingLabel: string;
+              };
             };
           };
         };
@@ -3234,6 +3303,29 @@ export interface paths {
                 [key: string]: unknown;
               };
               updatedAt: string;
+              webhookTriggerCapabilitiesRefreshAction?: {
+                actionLabel: string;
+                bodyForm?: {
+                  fields: {
+                    actions?: {
+                      href: string;
+                      label: string;
+                      opensInNewWindow?: boolean;
+                    }[];
+                    description?: string;
+                    /** @enum {string} */
+                    inputType: "password" | "text" | "textarea";
+                    label: string;
+                    name: string;
+                    placeholder?: string;
+                    required?: boolean;
+                  }[];
+                  submitLabel: string;
+                  title: string;
+                };
+                disabledMessage?: string;
+                pendingLabel: string;
+              };
             };
           };
         };
@@ -3734,6 +3826,29 @@ export interface paths {
                 [key: string]: unknown;
               };
               updatedAt: string;
+              webhookTriggerCapabilitiesRefreshAction?: {
+                actionLabel: string;
+                bodyForm?: {
+                  fields: {
+                    actions?: {
+                      href: string;
+                      label: string;
+                      opensInNewWindow?: boolean;
+                    }[];
+                    description?: string;
+                    /** @enum {string} */
+                    inputType: "password" | "text" | "textarea";
+                    label: string;
+                    name: string;
+                    placeholder?: string;
+                    required?: boolean;
+                  }[];
+                  submitLabel: string;
+                  title: string;
+                };
+                disabledMessage?: string;
+                pendingLabel: string;
+              };
             };
           };
         };

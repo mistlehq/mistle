@@ -22,13 +22,13 @@ import {
   createSlackDetailViewStoryProps,
   createStoryWebhookTriggerCapabilitiesProviderMetadata,
 } from "../integrations/integration-story-harness.js";
+import { useIntegrationWebhookSourceActions } from "../integrations/integration-webhook-source-actions.js";
 import type {
   IntegrationConnection,
   IntegrationTarget,
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
 import { refreshIntegrationWebhookTriggerCapabilities } from "../integrations/integrations-service.js";
-import { useSlackWebhookSourceActions } from "../integrations/slack-webhook-source-actions.js";
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query.js";
 import { IntegrationConnectionCreatePage } from "./integration-connection-create-page.js";
@@ -538,6 +538,34 @@ function SlackConnectedWebhookVerifiedRefreshStory({
     },
     configuredSecretNames: ["botToken", "clientSecret", "signingSecret"],
     supportsWebhookSources: true,
+    webhookTriggerCapabilitiesRefreshAction: {
+      actionLabel: "Sync webhook events",
+      pendingLabel: "Syncing...",
+      ...(includeAppId
+        ? {}
+        : { disabledMessage: "Add the Slack App ID before syncing webhook events." }),
+      bodyForm: {
+        title: "Sync webhook events",
+        submitLabel: "Sync",
+        fields: [
+          {
+            name: "appConfigToken",
+            label: "App configuration token",
+            inputType: "password",
+            required: true,
+            placeholder: "xoxe.xoxp-...",
+            description: "Generate a temporary app configuration token and paste it below",
+            actions: [
+              {
+                label: "https://api.slack.com/apps",
+                href: "https://api.slack.com/apps",
+                opensInNewWindow: true,
+              },
+            ],
+          },
+        ],
+      },
+    },
     createdAt: "2026-04-26T00:00:00.000Z",
     updatedAt: "2026-04-26T00:00:00.000Z",
   })) satisfies readonly IntegrationConnection[];
@@ -587,7 +615,7 @@ function SlackConnectedWebhookVerifiedRefreshStory({
           : "Could not sync webhook events."
         : null,
   });
-  const slackWebhookSourceActions = useSlackWebhookSourceActions({
+  const webhookSourceActions = useIntegrationWebhookSourceActions({
     connections: storyConnections,
     refreshTriggerCapabilities: (payload, options) => {
       refreshMutation.mutate(payload, {
@@ -608,10 +636,10 @@ function SlackConnectedWebhookVerifiedRefreshStory({
         <IntegrationConnectionDetailView
           {...storyProps}
           connections={storyDetailConnections}
-          renderWebhookSourceActions={slackWebhookSourceActions.renderWebhookSourceActions}
+          renderWebhookSourceActions={webhookSourceActions.renderWebhookSourceActions}
           webhookSourceStateByConnectionId={webhookSourceStateByConnectionId}
         />
-        {slackWebhookSourceActions.dialog}
+        {webhookSourceActions.dialog}
       </div>
     </StoryQueryClientProvider>
   );

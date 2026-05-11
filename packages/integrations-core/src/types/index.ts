@@ -2069,6 +2069,34 @@ export type IntegrationWebhookSourceDescriptor = {
   providerMetadata: Record<string, unknown>;
 };
 
+export type IntegrationWebhookTriggerCapabilitiesRefreshUiField = {
+  actions?: ReadonlyArray<IntegrationFormConnectionMethodSetupStartFormAction> | undefined;
+  description?: string | undefined;
+  inputType: "password" | "text" | "textarea";
+  label: string;
+  name: string;
+  placeholder?: string | undefined;
+  required?: boolean | undefined;
+};
+
+export type IntegrationWebhookTriggerCapabilitiesRefreshUi = {
+  actionLabel: string;
+  pendingLabel: string;
+  disabledWhen?:
+    | {
+        missingConnectionConfigField: string;
+        message: string;
+      }
+    | undefined;
+  bodyForm?:
+    | {
+        fields: ReadonlyArray<IntegrationWebhookTriggerCapabilitiesRefreshUiField>;
+        submitLabel: string;
+        title: string;
+      }
+    | undefined;
+};
+
 /**
  * Persisted local source-of-truth record for one inbound webhook source.
  *
@@ -2329,6 +2357,7 @@ export type IntegrationDefinition<
     ParsedSchemaOutput<TTargetSecretsSchema>,
     TConnectionConfig
   >;
+  webhookTriggerCapabilitiesRefreshUi?: IntegrationWebhookTriggerCapabilitiesRefreshUi | undefined;
   resourceDefinitions?: ReadonlyArray<IntegrationResourceDefinition>;
   resourceSyncTriggers?: ReadonlyArray<IntegrationResourceSyncTrigger>;
   egressRequestMiddleware?: ReadonlyArray<IntegrationEgressRequestMiddleware>;

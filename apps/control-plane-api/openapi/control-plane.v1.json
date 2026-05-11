@@ -3165,6 +3165,94 @@
                           "supportsWebhookSources": {
                             "type": "boolean"
                           },
+                          "webhookTriggerCapabilitiesRefreshAction": {
+                            "type": "object",
+                            "properties": {
+                              "actionLabel": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "disabledMessage": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "pendingLabel": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "bodyForm": {
+                                "type": "object",
+                                "properties": {
+                                  "fields": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "actions": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "object",
+                                            "properties": {
+                                              "href": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "label": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "opensInNewWindow": {
+                                                "type": "boolean"
+                                              }
+                                            },
+                                            "required": ["href", "label"],
+                                            "additionalProperties": false
+                                          }
+                                        },
+                                        "description": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "inputType": {
+                                          "type": "string",
+                                          "enum": ["password", "text", "textarea"]
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "name": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "placeholder": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "required": {
+                                          "type": "boolean"
+                                        }
+                                      },
+                                      "required": ["inputType", "label", "name"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "submitLabel": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "title": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": ["fields", "submitLabel", "title"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": ["actionLabel", "pendingLabel"],
+                            "additionalProperties": false
+                          },
                           "createdAt": {
                             "type": "string",
                             "minLength": 1
@@ -5088,6 +5176,94 @@
                     "supportsWebhookSources": {
                       "type": "boolean"
                     },
+                    "webhookTriggerCapabilitiesRefreshAction": {
+                      "type": "object",
+                      "properties": {
+                        "actionLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "disabledMessage": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "pendingLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "bodyForm": {
+                          "type": "object",
+                          "properties": {
+                            "fields": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "actions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "href": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "opensInNewWindow": {
+                                          "type": "boolean"
+                                        }
+                                      },
+                                      "required": ["href", "label"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "description": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "inputType": {
+                                    "type": "string",
+                                    "enum": ["password", "text", "textarea"]
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "placeholder": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "required": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": ["inputType", "label", "name"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "submitLabel": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "title": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["fields", "submitLabel", "title"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["actionLabel", "pendingLabel"],
+                      "additionalProperties": false
+                    },
                     "createdAt": {
                       "type": "string",
                       "minLength": 1
@@ -5393,6 +5569,94 @@
                     "supportsWebhookSources": {
                       "type": "boolean"
                     },
+                    "webhookTriggerCapabilitiesRefreshAction": {
+                      "type": "object",
+                      "properties": {
+                        "actionLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "disabledMessage": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "pendingLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "bodyForm": {
+                          "type": "object",
+                          "properties": {
+                            "fields": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "actions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "href": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "opensInNewWindow": {
+                                          "type": "boolean"
+                                        }
+                                      },
+                                      "required": ["href", "label"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "description": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "inputType": {
+                                    "type": "string",
+                                    "enum": ["password", "text", "textarea"]
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "placeholder": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "required": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": ["inputType", "label", "name"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "submitLabel": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "title": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["fields", "submitLabel", "title"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["actionLabel", "pendingLabel"],
+                      "additionalProperties": false
+                    },
                     "createdAt": {
                       "type": "string",
                       "minLength": 1
@@ -5658,6 +5922,94 @@
                     },
                     "supportsWebhookSources": {
                       "type": "boolean"
+                    },
+                    "webhookTriggerCapabilitiesRefreshAction": {
+                      "type": "object",
+                      "properties": {
+                        "actionLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "disabledMessage": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "pendingLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "bodyForm": {
+                          "type": "object",
+                          "properties": {
+                            "fields": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "actions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "href": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "opensInNewWindow": {
+                                          "type": "boolean"
+                                        }
+                                      },
+                                      "required": ["href", "label"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "description": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "inputType": {
+                                    "type": "string",
+                                    "enum": ["password", "text", "textarea"]
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "placeholder": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "required": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": ["inputType", "label", "name"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "submitLabel": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "title": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["fields", "submitLabel", "title"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["actionLabel", "pendingLabel"],
+                      "additionalProperties": false
                     },
                     "createdAt": {
                       "type": "string",
@@ -6109,6 +6461,94 @@
                     },
                     "supportsWebhookSources": {
                       "type": "boolean"
+                    },
+                    "webhookTriggerCapabilitiesRefreshAction": {
+                      "type": "object",
+                      "properties": {
+                        "actionLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "disabledMessage": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "pendingLabel": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "bodyForm": {
+                          "type": "object",
+                          "properties": {
+                            "fields": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "actions": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "href": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "opensInNewWindow": {
+                                          "type": "boolean"
+                                        }
+                                      },
+                                      "required": ["href", "label"],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "description": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "inputType": {
+                                    "type": "string",
+                                    "enum": ["password", "text", "textarea"]
+                                  },
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "placeholder": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "required": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": ["inputType", "label", "name"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "submitLabel": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "title": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["fields", "submitLabel", "title"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["actionLabel", "pendingLabel"],
+                      "additionalProperties": false
                     },
                     "createdAt": {
                       "type": "string",

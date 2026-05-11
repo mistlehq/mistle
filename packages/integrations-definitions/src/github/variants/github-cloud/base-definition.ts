@@ -26,6 +26,7 @@ import { GitHubAppInstallationSetupPath } from "../../shared/provider-app-setup-
 import { GitHubCredentialSlotKeys } from "../../shared/slot-keys.js";
 import { GitHubSupportedWebhookEvents } from "../../shared/supported-webhook-events.js";
 import { GitHubTargetSecretSchema } from "../../shared/target-secret-schema.js";
+import { GitHubWebhookTriggerCapabilitiesRefreshUi } from "../../shared/webhook-trigger-capabilities-refresh-ui.js";
 import { GitHubCloudBindingConfigSchema } from "./binding-config-schema.js";
 import { compileGitHubCloudBinding } from "./compile-binding.js";
 import { GitHubCloudTargetConfigSchema } from "./target-config-schema.js";
@@ -170,5 +171,6 @@ export const GitHubCloudBaseDefinition: GitHubCloudBaseIntegrationDefinition = {
     },
   ],
   supportedWebhookEvents: GitHubSupportedWebhookEvents,
+  webhookTriggerCapabilitiesRefreshUi: GitHubWebhookTriggerCapabilitiesRefreshUi,
   compileBinding: compileGitHubCloudBinding,
 };

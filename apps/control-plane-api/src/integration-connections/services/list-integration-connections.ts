@@ -3,8 +3,6 @@ import {
   type ControlPlaneDatabase,
   type IntegrationConnection,
   type IntegrationConnectionResourceState,
-  type IntegrationConnectionResourceSyncState,
-  type IntegrationConnectionStatus,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
@@ -19,11 +17,15 @@ import {
   paginateKeyset,
   parseKeysetPageSize,
 } from "@mistle/http/pagination";
-import type { IntegrationRegistry } from "@mistle/integrations-core";
+import type {
+  IntegrationRegistry,
+  IntegrationWebhookTriggerCapabilitiesRefreshUi,
+} from "@mistle/integrations-core";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
+import { IntegrationConnectionSchema } from "../schemas.js";
 import { buildIntegrationConnectionResponse } from "./build-integration-connection-response.js";
 import { listActiveSandboxProfileBindingCountsByConnectionId } from "./list-active-sandbox-profile-binding-counts-by-connection-id.js";
 import { listConfiguredSecretNamesByConnectionId } from "./list-configured-secret-names-by-connection-id.js";
@@ -49,31 +51,11 @@ export type ListIntegrationConnectionsInput = {
   before?: string | undefined;
 };
 
-type IntegrationConnectionListItem = {
-  id: string;
-  targetKey: string;
-  displayName: string;
-  status: IntegrationConnectionStatus;
-  bindingCount: number;
-  automationCount: number;
-  isIdentityLinked?: boolean;
-  externalSubjectId?: string;
-  config?: Record<string, unknown>;
-  targetSnapshotConfig?: Record<string, unknown>;
-  connectionMethodId?: string;
-  connectionMethodLabel?: string;
-  configuredSecretNames?: string[];
-  supportsWebhookSources?: boolean;
-  resources?: Array<{
-    kind: string;
-    selectionMode: "single" | "multi";
-    count: number;
-    syncState: IntegrationConnectionResourceSyncState;
-    lastSyncedAt?: string;
-  }>;
-  createdAt: string;
-  updatedAt: string;
-};
+type IntegrationConnectionListItem = z.output<typeof IntegrationConnectionSchema>;
+
+type IntegrationWebhookTriggerCapabilitiesRefreshAction = NonNullable<
+  IntegrationConnectionListItem["webhookTriggerCapabilitiesRefreshAction"]
+>;
 
 type IntegrationConnectionListRow = IntegrationConnection & {
   target: {
@@ -222,6 +204,14 @@ export async function listIntegrationConnections(
                     config: connection.config,
                   },
                 })) ?? true);
+          const webhookTriggerCapabilitiesRefreshAction =
+            supportsWebhookSources === true &&
+            definition?.webhookSource?.refreshTriggerCapabilities !== undefined
+              ? resolveWebhookTriggerCapabilitiesRefreshAction({
+                  config: connection.config,
+                  ui: definition.webhookTriggerCapabilitiesRefreshUi,
+                })
+              : undefined;
 
           return {
             ...buildIntegrationConnectionResponse({
@@ -238,6 +228,9 @@ export async function listIntegrationConnections(
             automationCount: automationCountsByConnectionId.get(connection.id) ?? 0,
             ...(identityLinkedConnectionIds.has(connection.id) ? { isIdentityLinked: true } : {}),
             ...(supportsWebhookSources === undefined ? {} : { supportsWebhookSources }),
+            ...(webhookTriggerCapabilitiesRefreshAction === undefined
+              ? {}
+              : { webhookTriggerCapabilitiesRefreshAction }),
             createdAt: normalizeTimestamp(connection.createdAt),
             updatedAt: normalizeTimestamp(connection.updatedAt),
           };
@@ -328,6 +321,72 @@ async function listAutomationCountsByConnectionId(input: {
 
 function normalizeTimestamp(value: string | Date): string {
   return new Date(value).toISOString();
+}
+
+function resolveWebhookTriggerCapabilitiesRefreshAction(input: {
+  config: Record<string, unknown> | null;
+  ui: IntegrationWebhookTriggerCapabilitiesRefreshUi | undefined;
+}): IntegrationWebhookTriggerCapabilitiesRefreshAction | undefined {
+  const ui = input.ui;
+  if (ui === undefined) {
+    return undefined;
+  }
+
+  const disabledMessage =
+    ui.disabledWhen !== undefined &&
+    !hasPresentConfigValue({
+      config: input.config,
+      field: ui.disabledWhen.missingConnectionConfigField,
+    })
+      ? ui.disabledWhen.message
+      : undefined;
+
+  return {
+    actionLabel: ui.actionLabel,
+    pendingLabel: ui.pendingLabel,
+    ...(disabledMessage === undefined ? {} : { disabledMessage }),
+    ...(ui.bodyForm === undefined ? {} : { bodyForm: projectRefreshActionBodyForm(ui.bodyForm) }),
+  };
+}
+
+function projectRefreshActionBodyForm(
+  bodyForm: NonNullable<IntegrationWebhookTriggerCapabilitiesRefreshUi["bodyForm"]>,
+): NonNullable<IntegrationWebhookTriggerCapabilitiesRefreshAction["bodyForm"]> {
+  return {
+    fields: bodyForm.fields.map((field) => ({
+      ...(field.actions === undefined
+        ? {}
+        : {
+            actions: field.actions.map((action) => ({
+              href: action.href,
+              label: action.label,
+              ...(action.opensInNewWindow === undefined
+                ? {}
+                : { opensInNewWindow: action.opensInNewWindow }),
+            })),
+          }),
+      ...(field.description === undefined ? {} : { description: field.description }),
+      inputType: field.inputType,
+      label: field.label,
+      name: field.name,
+      ...(field.placeholder === undefined ? {} : { placeholder: field.placeholder }),
+      ...(field.required === undefined ? {} : { required: field.required }),
+    })),
+    submitLabel: bodyForm.submitLabel,
+    title: bodyForm.title,
+  };
+}
+
+function hasPresentConfigValue(input: {
+  config: Record<string, unknown> | null;
+  field: string;
+}): boolean {
+  const value = input.config?.[input.field];
+  if (typeof value === "string") {
+    return value.trim().length > 0;
+  }
+
+  return value !== undefined && value !== null;
 }
 
 function buildResourceSummary(

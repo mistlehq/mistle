@@ -26,6 +26,7 @@ import { GitHubAppInstallationSetupPath } from "../../shared/provider-app-setup-
 import { GitHubCredentialSlotKeys } from "../../shared/slot-keys.js";
 import { GitHubSupportedWebhookEvents } from "../../shared/supported-webhook-events.js";
 import { GitHubTargetSecretSchema } from "../../shared/target-secret-schema.js";
+import { GitHubWebhookTriggerCapabilitiesRefreshUi } from "../../shared/webhook-trigger-capabilities-refresh-ui.js";
 import { GitHubEnterpriseServerBindingConfigSchema } from "./binding-config-schema.js";
 import { compileGitHubEnterpriseServerBinding } from "./compile-binding.js";
 import { GitHubEnterpriseServerTargetConfigSchema } from "./target-config-schema.js";
@@ -159,5 +160,6 @@ export const GitHubEnterpriseServerBaseDefinition: GitHubEnterpriseServerBaseInt
       },
     ],
     supportedWebhookEvents: GitHubSupportedWebhookEvents,
+    webhookTriggerCapabilitiesRefreshUi: GitHubWebhookTriggerCapabilitiesRefreshUi,
     compileBinding: compileGitHubEnterpriseServerBinding,
   };

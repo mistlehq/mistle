@@ -32,6 +32,44 @@ export const IntegrationConnectionResourceSummarySchema = z
   })
   .strict();
 
+export const IntegrationWebhookTriggerCapabilitiesRefreshActionFieldSchema = z
+  .object({
+    actions: z
+      .array(
+        z
+          .object({
+            href: z.string().min(1),
+            label: z.string().min(1),
+            opensInNewWindow: z.boolean().optional(),
+          })
+          .strict(),
+      )
+      .optional(),
+    description: z.string().min(1).optional(),
+    inputType: z.enum(["password", "text", "textarea"]),
+    label: z.string().min(1),
+    name: z.string().min(1),
+    placeholder: z.string().min(1).optional(),
+    required: z.boolean().optional(),
+  })
+  .strict();
+
+export const IntegrationWebhookTriggerCapabilitiesRefreshActionSchema = z
+  .object({
+    actionLabel: z.string().min(1),
+    disabledMessage: z.string().min(1).optional(),
+    pendingLabel: z.string().min(1),
+    bodyForm: z
+      .object({
+        fields: z.array(IntegrationWebhookTriggerCapabilitiesRefreshActionFieldSchema),
+        submitLabel: z.string().min(1),
+        title: z.string().min(1),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 export const IntegrationConnectionSchema = z
   .object({
     id: z.string().min(1),
@@ -49,6 +87,8 @@ export const IntegrationConnectionSchema = z
     configuredSecretNames: z.array(z.string().min(1)).optional(),
     resources: z.array(IntegrationConnectionResourceSummarySchema).optional(),
     supportsWebhookSources: z.boolean().optional(),
+    webhookTriggerCapabilitiesRefreshAction:
+      IntegrationWebhookTriggerCapabilitiesRefreshActionSchema.optional(),
     createdAt: z.string().min(1),
     updatedAt: z.string().min(1),
   })

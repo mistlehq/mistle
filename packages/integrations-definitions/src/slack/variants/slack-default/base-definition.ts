@@ -111,5 +111,34 @@ export const SlackBaseDefinition: SlackBaseIntegrationDefinition = {
     },
   ],
   supportedWebhookEvents: SlackSupportedWebhookEvents,
+  webhookTriggerCapabilitiesRefreshUi: {
+    actionLabel: "Sync webhook events",
+    pendingLabel: "Syncing...",
+    disabledWhen: {
+      missingConnectionConfigField: "app_id",
+      message: "Add the Slack App ID before syncing webhook events.",
+    },
+    bodyForm: {
+      title: "Sync webhook events",
+      submitLabel: "Sync",
+      fields: [
+        {
+          name: "appConfigToken",
+          label: "App configuration token",
+          inputType: "password",
+          required: true,
+          placeholder: "xoxe.xoxp-...",
+          description: "Generate a temporary app configuration token and paste it below",
+          actions: [
+            {
+              label: "https://api.slack.com/apps",
+              href: "https://api.slack.com/apps",
+              opensInNewWindow: true,
+            },
+          ],
+        },
+      ],
+    },
+  },
   compileBinding: compileSlackBinding,
 };
