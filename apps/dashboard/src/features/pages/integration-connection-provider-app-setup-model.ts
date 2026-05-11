@@ -4,11 +4,6 @@ import type { IntegrationConnection } from "../integrations/integrations-service
 import type { IntegrationConnectionSetupStartFormState } from "./integration-connection-setup-flow.js";
 import { hasConfiguredSetupSecretField } from "./integration-connection-setup-secret-fields.js";
 
-type ProviderAppSetupStartFormState = Pick<
-  IntegrationConnectionSetupStartFormState,
-  "isFieldVisible" | "resolveRequiredValue" | "values"
->;
-
 export function createInitialProviderAppSetupDraft(input: {
   connection: IntegrationConnection;
   providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
@@ -133,7 +128,10 @@ export function buildProviderAppSetupStartBody(input: {
   manifest: Record<string, unknown>;
   providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
   setupStartFormFields: readonly { name: string; required?: boolean | undefined }[];
-  setupStartFormState: ProviderAppSetupStartFormState;
+  setupStartFormState: Pick<
+    IntegrationConnectionSetupStartFormState,
+    "isFieldVisible" | "resolveRequiredValue" | "values"
+  >;
 }): Record<string, unknown> {
   const body: Record<string, unknown> = {
     [input.providerAppSetup.manifest.startAction.manifestBodyField]: input.manifest,
