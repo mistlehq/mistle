@@ -145,10 +145,12 @@ export function IntegrationsPage() {
     detailConnectionId,
     detailTargetKey,
   });
+  const selectedDetailConnectionMethods =
+    directoryState.selectedDetailCard?.target.connectionMethods;
 
   const connectionEditors = useIntegrationConnectionEditors({
     connections: directoryState.selectedDetailConnections,
-    connectionMethods: directoryState.selectedDetailCard?.target.connectionMethods,
+    connectionMethods: selectedDetailConnectionMethods,
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
   });
   const webhookSourceState = useIntegrationWebhookSourceState({
@@ -187,7 +189,7 @@ export function IntegrationsPage() {
       (connection) => connection.id === directoryState.activeDetailConnectionId,
     ) ?? directoryState.selectedDetailConnections[0];
   const routeStateConnectionNotice = resolveRouteStateConnectionNotice({
-    connectionMethods: directoryState.selectedDetailCard?.target.connectionMethods,
+    connectionMethods: selectedDetailConnectionMethods,
     detailConnectionId,
     locationState: location.state,
     selectedConnection: selectedDetailConnection,
@@ -202,11 +204,12 @@ export function IntegrationsPage() {
       ? null
       : resolveIncompleteIntegrationConnectionSetupFlow({
           connection: selectedDetailConnection,
-          connectionMethods: directoryState.selectedDetailCard?.target.connectionMethods,
+          connectionMethods: selectedDetailConnectionMethods,
         });
 
   useEffect(() => {
     const resolvedUrlNotice = resolveInstalledIntegrationConnectionNotice({
+      connectionMethods: selectedDetailConnectionMethods,
       detailConnectionId,
       searchParams,
       selectedConnection: selectedDetailConnection,
@@ -218,7 +221,13 @@ export function IntegrationsPage() {
 
     setUrlConnectionNotice(resolvedUrlNotice);
     setSearchParams(clearUrlConnectionNoticeParams(searchParams), { replace: true });
-  }, [detailConnectionId, searchParams, selectedDetailConnection, setSearchParams]);
+  }, [
+    detailConnectionId,
+    searchParams,
+    selectedDetailConnection,
+    selectedDetailConnectionMethods,
+    setSearchParams,
+  ]);
 
   if (directoryState.integrationsQuery.isPending) {
     return null;

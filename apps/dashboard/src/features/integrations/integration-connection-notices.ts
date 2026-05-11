@@ -1,6 +1,5 @@
-import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
-
+import { resolveFormConnectionMethodProviderAppSetupInstalledNoticeTitle } from "./integration-connection-method-metadata.js";
+import type { IntegrationConnectionMethod } from "./integrations-service-shared.js";
 import type { IntegrationConnection } from "./integrations-service.js";
 
 export type IntegrationConnectionNotice = {
@@ -12,6 +11,7 @@ export type IntegrationConnectionNotice = {
 };
 
 export function resolveInstalledIntegrationConnectionNotice(input: {
+  connectionMethods: readonly IntegrationConnectionMethod[] | undefined;
   detailConnectionId: string | null;
   searchParams: URLSearchParams;
   selectedConnection: Pick<IntegrationConnection, "connectionMethodId" | "id"> | undefined;
@@ -27,26 +27,23 @@ export function resolveInstalledIntegrationConnectionNotice(input: {
     return null;
   }
 
-  if (input.selectedConnection.connectionMethodId === SlackConnectionMethodId) {
-    return {
-      connectionId: input.detailConnectionId,
-      resetKey: `slack-installed:${input.detailConnectionId}`,
-      title: "The Slack app was created and connected to Mistle successfully",
-      variant: "success",
-    };
+  const connectionMethodId = input.selectedConnection.connectionMethodId;
+  if (connectionMethodId === undefined) {
+    return null;
   }
 
-  if (
-    input.selectedConnection.connectionMethodId ===
-    IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
-  ) {
-    return {
-      connectionId: input.detailConnectionId,
-      resetKey: `github-installed:${input.detailConnectionId}`,
-      title: "GitHub App connected to Mistle successfully",
-      variant: "success",
-    };
+  const connectionMethod =
+    input.connectionMethods?.find((candidate) => candidate.id === connectionMethodId) ?? null;
+  const installedNoticeTitle =
+    resolveFormConnectionMethodProviderAppSetupInstalledNoticeTitle(connectionMethod);
+  if (installedNoticeTitle === null) {
+    return null;
   }
 
-  return null;
+  return {
+    connectionId: input.detailConnectionId,
+    resetKey: `provider-app-installed:${connectionMethodId}:${input.detailConnectionId}`,
+    title: installedNoticeTitle,
+    variant: "success",
+  };
 }

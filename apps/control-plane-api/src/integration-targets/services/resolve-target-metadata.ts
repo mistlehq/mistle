@@ -252,6 +252,9 @@ function cloneProviderAppSetup(
 ): IntegrationFormConnectionMethodProviderAppSetup {
   return {
     description: setup.description,
+    ...(setup.installedNoticeTitle === undefined
+      ? {}
+      : { installedNoticeTitle: setup.installedNoticeTitle }),
     existingApp: {
       configFields: setup.existingApp.configFields.map((field) => ({
         configKey: field.configKey,

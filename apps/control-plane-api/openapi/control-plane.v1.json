@@ -8168,6 +8168,10 @@
                                               "type": "string",
                                               "minLength": 1
                                             },
+                                            "installedNoticeTitle": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
                                             "existingApp": {
                                               "type": "object",
                                               "properties": {

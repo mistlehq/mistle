@@ -595,6 +595,7 @@ export type IntegrationFormConnectionMethodProviderAppSetupExistingAppStartActio
 
 export type IntegrationFormConnectionMethodProviderAppSetup = {
   description: string;
+  installedNoticeTitle?: string | undefined;
   existingApp: {
     configFields: ReadonlyArray<IntegrationFormConnectionMethodProviderAppSetupExistingAppConfigField>;
     connectLabel: string;

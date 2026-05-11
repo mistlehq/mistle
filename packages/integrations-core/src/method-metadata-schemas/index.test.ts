@@ -63,6 +63,7 @@ describe("integration method metadata schemas", () => {
         providerAppSetup: {
           title: "Choose a setup method",
           description: "Create or connect a provider app.",
+          installedNoticeTitle: "Provider app connected successfully",
           manifest: {
             title: "Provider app manifest",
             description: "Create a provider app from a manifest.",
@@ -153,6 +154,7 @@ describe("integration method metadata schemas", () => {
       providerAppSetup: {
         title: "Choose a setup method",
         description: "Create or connect a provider app.",
+        installedNoticeTitle: "Provider app connected successfully",
         manifest: {
           title: "Provider app manifest",
           description: "Create a provider app from a manifest.",

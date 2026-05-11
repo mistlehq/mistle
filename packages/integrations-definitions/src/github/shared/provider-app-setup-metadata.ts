@@ -52,6 +52,7 @@ export function createGitHubProviderAppSetupMetadata(
     title: "Choose a setup method",
     description:
       "Create a new GitHub App with a manifest or connect an app you've already configured in GitHub.",
+    installedNoticeTitle: "GitHub App connected to Mistle successfully",
     manifest: {
       title: "GitHub App Manifest",
       description:

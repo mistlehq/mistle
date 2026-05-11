@@ -200,6 +200,7 @@ describe("resolveIntegrationProviderAppSetupOrThrow", () => {
       title: "Choose a setup method",
       description:
         "Create a new Slack app with a manifest or connect an app you've already configured in Slack.",
+      installedNoticeTitle: "The Slack app was created and connected to Mistle successfully",
       manifest: {
         title: "Slack app manifest",
         description:
@@ -230,6 +231,7 @@ describe("resolveIntegrationProviderAppSetupOrThrow", () => {
       }),
     ).toMatchObject({
       title: "Choose a setup method",
+      installedNoticeTitle: "GitHub App connected to Mistle successfully",
       manifest: {
         startAction: {
           expectedResultKind: "form-post",

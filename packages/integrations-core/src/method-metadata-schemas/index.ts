@@ -192,6 +192,7 @@ const IntegrationFormConnectionMethodSetupPaneMetadataSchema = z
 const IntegrationFormConnectionMethodProviderAppSetupSchema = z
   .object({
     description: z.string().min(1),
+    installedNoticeTitle: z.string().min(1).optional(),
     existingApp: z
       .object({
         configFields: z

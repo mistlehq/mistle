@@ -4220,6 +4220,7 @@ export interface paths {
                             };
                             title: string;
                           };
+                          installedNoticeTitle?: string;
                           manifest: {
                             createErrorMessage: string;
                             description: string;

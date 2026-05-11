@@ -80,6 +80,66 @@ describe("IntegrationTargetSchema", () => {
                 },
               ],
             },
+            providerAppSetup: {
+              title: "Choose a setup method",
+              description: "Create or connect a Slack app.",
+              installedNoticeTitle: "Slack app connected successfully",
+              manifest: {
+                title: "Slack app manifest",
+                description: "Create a Slack app from a manifest.",
+                createErrorMessage: "Could not create Slack app manifest.",
+                startAction: {
+                  expectedResultKind: "redirect",
+                  manifestBodyField: "manifest",
+                  unexpectedResultMessage:
+                    "Slack app manifest setup did not return a redirect URL.",
+                },
+              },
+              existingApp: {
+                title: "Existing Slack App",
+                description: "Paste values from an existing Slack app.",
+                connectLabel: "Connect Slack to Mistle",
+                installedDetection: {
+                  configFields: ["appId"],
+                  secretFields: ["botToken", "signingSecret"],
+                },
+                saveErrorMessage: "Could not save Slack app setup.",
+                configFields: [
+                  {
+                    configKey: "app_id",
+                    name: "appId",
+                    label: "App ID",
+                    required: true,
+                  },
+                ],
+                secretFields: [
+                  {
+                    inputType: "password",
+                    name: "botToken",
+                    label: "Bot token",
+                    required: true,
+                    secretLabel: "bot token",
+                  },
+                  {
+                    inputType: "password",
+                    name: "signingSecret",
+                    label: "Signing secret",
+                    required: true,
+                    secretLabel: "signing secret",
+                  },
+                ],
+              },
+              urls: {
+                title: "Slack app URLs",
+                description: "Copy this URL into Slack Event Subscriptions.",
+                webhookCallback: {
+                  label: "Events API Request URL",
+                  errorTitle: "Could not load Events API Request URL",
+                  missingTitle: "Events API Request URL is not available yet",
+                  missingMessage: "Setup requires an Events API Request URL.",
+                },
+              },
+            },
             routeSegment: "slack-app",
             startForm: {
               submitLabel: "Create and connect Slack app",
@@ -147,6 +207,9 @@ describe("IntegrationTargetSchema", () => {
           ],
         },
         routeSegment: "slack-app",
+        providerAppSetup: {
+          installedNoticeTitle: "Slack app connected successfully",
+        },
         startForm: {
           submitLabel: "Create and connect Slack app",
           fields: [

@@ -24,3 +24,13 @@ export function resolveFormConnectionMethodProviderAppSetupStartAction(
 
   return method.setupFlow?.providerAppSetup?.existingApp.startAction ?? null;
 }
+
+export function resolveFormConnectionMethodProviderAppSetupInstalledNoticeTitle(
+  method: IntegrationConnectionMethod | null | undefined,
+): string | null {
+  if (method?.kind !== "form") {
+    return null;
+  }
+
+  return method.setupFlow?.providerAppSetup?.installedNoticeTitle ?? null;
+}
