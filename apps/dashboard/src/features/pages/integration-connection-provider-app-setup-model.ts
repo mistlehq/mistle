@@ -3,8 +3,6 @@ import type { IntegrationFormConnectionMethodProviderAppSetup } from "@mistle/in
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import { hasConfiguredSetupSecretField } from "./integration-connection-setup-secret-fields.js";
 
-export type ProviderAppSetupFieldKey = string;
-
 type ProviderAppSetupStartFormState = {
   isFieldVisible: (fieldName: string) => boolean;
   resolveRequiredValue: (fieldName: string) => string;
@@ -14,8 +12,8 @@ type ProviderAppSetupStartFormState = {
 export function createInitialProviderAppSetupDraft(input: {
   connection: IntegrationConnection;
   providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
-}): Record<ProviderAppSetupFieldKey, string> {
-  const draft: Record<ProviderAppSetupFieldKey, string> = {};
+}): Record<string, string> {
+  const draft: Record<string, string> = {};
 
   for (const field of input.providerAppSetup.existingApp.configFields) {
     draft[field.name] = normalizeInputValue(input.connection.config?.[field.configKey]);
@@ -70,7 +68,7 @@ export function normalizeProviderAppSetupValue(value: string): string {
 
 export function buildProviderAppSetupConfig(input: {
   methodId: string;
-  draft: Record<ProviderAppSetupFieldKey, string>;
+  draft: Record<string, string>;
   providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
 }): Record<string, string> {
   const config: Record<string, string> = {
@@ -88,7 +86,7 @@ export function buildProviderAppSetupConfig(input: {
 }
 
 export function buildProviderAppSetupSecretUpdates(input: {
-  draft: Record<ProviderAppSetupFieldKey, string>;
+  draft: Record<string, string>;
   providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
 }): Record<string, string> | undefined {
   const secrets: Record<string, string> = {};
@@ -104,8 +102,8 @@ export function buildProviderAppSetupSecretUpdates(input: {
 }
 
 export function isProviderAppRequiredDraftComplete(input: {
-  configuredSecretFieldKeys: ReadonlySet<ProviderAppSetupFieldKey>;
-  draft: Record<ProviderAppSetupFieldKey, string>;
+  configuredSecretFieldKeys: ReadonlySet<string>;
+  draft: Record<string, string>;
   providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
 }): boolean {
   for (const field of input.providerAppSetup.existingApp.configFields) {
@@ -156,11 +154,11 @@ export function buildProviderAppSetupStartBody(input: {
 }
 
 export function buildProviderAppSetupConfigFieldInputs(input: {
-  draft: Record<ProviderAppSetupFieldKey, string>;
+  draft: Record<string, string>;
   providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
   routeSegment: string;
 }): readonly {
-  fieldKey: ProviderAppSetupFieldKey;
+  fieldKey: string;
   id: string;
   label: string;
   required: boolean;
@@ -176,13 +174,13 @@ export function buildProviderAppSetupConfigFieldInputs(input: {
 }
 
 export function buildProviderAppSetupSecretFieldInputs(input: {
-  configuredSecretFieldKeys: ReadonlySet<ProviderAppSetupFieldKey>;
-  draft: Record<ProviderAppSetupFieldKey, string>;
+  configuredSecretFieldKeys: ReadonlySet<string>;
+  draft: Record<string, string>;
   providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
   routeSegment: string;
 }): readonly {
   configured: boolean;
-  fieldKey: ProviderAppSetupFieldKey;
+  fieldKey: string;
   id: string;
   label: string;
   multiline?: boolean;

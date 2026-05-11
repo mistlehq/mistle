@@ -43,7 +43,6 @@ import {
   isProviderAppExistingAppStartActionInstalled,
   isProviderAppRequiredDraftComplete,
   normalizeProviderAppSetupValue,
-  type ProviderAppSetupFieldKey,
 } from "./integration-connection-provider-app-setup-model.js";
 import {
   IntegrationConnectionSetupManifestPanel,
@@ -59,7 +58,7 @@ import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-st
 function resolveConfiguredSecretFieldKeys(input: {
   connection: IntegrationConnection;
   providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
-}): ReadonlySet<ProviderAppSetupFieldKey> {
+}): ReadonlySet<string> {
   return resolveConfiguredSetupSecretFieldKeys({
     configuredSecretNames: input.connection.configuredSecretNames,
     fieldKeys: input.providerAppSetup.existingApp.secretFields.map((field) => field.name),
@@ -67,9 +66,9 @@ function resolveConfiguredSecretFieldKeys(input: {
 }
 
 function normalizeProviderAppSetupDraft(input: {
-  draft: Record<ProviderAppSetupFieldKey, string>;
+  draft: Record<string, string>;
   providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
-}): Record<ProviderAppSetupFieldKey, string> {
+}): Record<string, string> {
   const nextDraft = { ...input.draft };
 
   for (const field of input.providerAppSetup.existingApp.configFields) {
