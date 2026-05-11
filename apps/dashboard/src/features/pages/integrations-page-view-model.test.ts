@@ -604,7 +604,7 @@ describe("integrations page view model", () => {
       ],
       controlPlaneApiOrigin: "https://control-plane.example.com",
       targetConnectionMethods: [GitHubAppInstallationMethod],
-      githubAppInstallationStateByConnectionId: new Map([
+      providerAppSetupStateByConnectionId: new Map([
         [
           "icn_preinstall",
           {

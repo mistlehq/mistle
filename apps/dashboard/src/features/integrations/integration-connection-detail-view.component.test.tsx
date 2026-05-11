@@ -212,7 +212,7 @@ describe("IntegrationConnectionDetailView", () => {
 
   it("renders connection navigation and exposes detail actions for the selected connection", () => {
     let refreshedKind: string | null = null;
-    let startedGitHubAppInstallationConnectionId: string | null = null;
+    let startedProviderAppSetupConnectionId: string | null = null;
     render(
       <IntegrationConnectionDetailView
         connections={[
@@ -260,8 +260,8 @@ describe("IntegrationConnectionDetailView", () => {
         onRefreshResource={({ kind }) => {
           refreshedKind = kind;
         }}
-        onStartGitHubAppInstallation={(connectionId) => {
-          startedGitHubAppInstallationConnectionId = connectionId;
+        onStartProviderAppSetup={(connectionId) => {
+          startedProviderAppSetupConnectionId = connectionId;
         }}
         resourceItemsByKey={
           new Map([
@@ -356,7 +356,7 @@ describe("IntegrationConnectionDetailView", () => {
     const manageInstallationButton = screen.getByRole("button", { name: "Manage installation" });
     expect(manageInstallationButton.querySelector("svg")).toBeTruthy();
     fireEvent.click(manageInstallationButton);
-    expect(startedGitHubAppInstallationConnectionId).toBe("icn_github_primary");
+    expect(startedProviderAppSetupConnectionId).toBe("icn_github_primary");
     fireEvent.click(screen.getByRole("button", { name: "Select connection Archive Mirror" }));
     expect(screen.getByRole("heading", { name: "Archive Mirror" })).toBeTruthy();
     expect(screen.getByText("Repository")).toBeTruthy();
@@ -904,7 +904,7 @@ describe("IntegrationConnectionDetailView", () => {
 
   it("keeps Manage installation visible alongside Edit for installed GitHub App connections", () => {
     let editedConnectionId: string | null = null;
-    let startedGitHubAppInstallationConnectionId: string | null = null;
+    let startedProviderAppSetupConnectionId: string | null = null;
 
     render(
       <IntegrationConnectionDetailView
@@ -931,8 +931,8 @@ describe("IntegrationConnectionDetailView", () => {
         onEditAuthentication={(connectionId) => {
           editedConnectionId = connectionId;
         }}
-        onStartGitHubAppInstallation={(connectionId) => {
-          startedGitHubAppInstallationConnectionId = connectionId;
+        onStartProviderAppSetup={(connectionId) => {
+          startedProviderAppSetupConnectionId = connectionId;
         }}
       />,
     );
@@ -943,7 +943,7 @@ describe("IntegrationConnectionDetailView", () => {
     fireEvent.click(manageInstallationButton);
 
     expect(editedConnectionId).toBe("icn_github_installed");
-    expect(startedGitHubAppInstallationConnectionId).toBe("icn_github_installed");
+    expect(startedProviderAppSetupConnectionId).toBe("icn_github_installed");
   });
 
   it("renders visible non-secret auth fields under authentication", () => {
@@ -1401,7 +1401,7 @@ describe("IntegrationConnectionDetailView", () => {
             },
           },
         ]}
-        onStartGitHubAppInstallation={() => {}}
+        onStartProviderAppSetup={() => {}}
         onCreateWebhookSource={() => {}}
         webhookPolicy={ManagedWebhookPolicy}
         webhookSourceStateByConnectionId={
@@ -1488,7 +1488,7 @@ describe("IntegrationConnectionDetailView", () => {
   });
 
   it("renders the standalone webhook section for GitHub App connections", () => {
-    let startedGitHubAppInstallationConnectionId: string | null = null;
+    let startedProviderAppSetupConnectionId: string | null = null;
 
     render(
       <IntegrationConnectionDetailView
@@ -1512,8 +1512,8 @@ describe("IntegrationConnectionDetailView", () => {
             },
           },
         ]}
-        onStartGitHubAppInstallation={(connectionId) => {
-          startedGitHubAppInstallationConnectionId = connectionId;
+        onStartProviderAppSetup={(connectionId) => {
+          startedProviderAppSetupConnectionId = connectionId;
         }}
         webhookPolicy={ImplicitWebhookPolicy}
         webhookSourceStateByConnectionId={
@@ -1596,7 +1596,7 @@ describe("IntegrationConnectionDetailView", () => {
     ).not.toBe(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Install GitHub App" }));
-    expect(startedGitHubAppInstallationConnectionId).toBe("icn_github_primary");
+    expect(startedProviderAppSetupConnectionId).toBe("icn_github_primary");
   });
 
   it("renders a selected-connection custom body while keeping connection navigation visible", () => {

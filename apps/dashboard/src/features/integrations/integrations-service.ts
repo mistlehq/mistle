@@ -17,7 +17,7 @@ export {
   deleteIntegrationConnection,
   getDeviceAuthorizationAttempt,
   startProviderAppSetup,
-  startGitHubAppInstallation,
+  startProviderAppSetupInstallation,
   startDeviceAuthorizationIntegrationConnection,
   startRedirectIntegrationConnection,
   updateFormIntegrationConnection,

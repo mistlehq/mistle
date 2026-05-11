@@ -508,7 +508,7 @@ function InstalledConnectionScreen(input: {
           onDeleteWebhookSource={() => {}}
           onEditAuthentication={() => {}}
           onRefreshResource={() => {}}
-          onStartGitHubAppInstallation={async () => {}}
+          onStartProviderAppSetup={async () => {}}
           titleEditor={InstalledConnectionTitleEditor}
         />
       </div>

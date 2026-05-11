@@ -4,7 +4,7 @@ import { useState } from "react";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
   deleteIntegrationConnection,
-  startGitHubAppInstallation,
+  startProviderAppSetupInstallation,
   updateApiKeyIntegrationConnection,
   updateIntegrationConnection,
 } from "../integrations/integrations-service.js";
@@ -22,7 +22,7 @@ export function useIntegrationConnectionEditors(input: {
   const [editingApiKeyConnectionId, setEditingApiKeyConnectionId] = useState<string | null>(null);
   const [apiKeyDraft, setApiKeyDraft] = useState("");
   const [apiKeyError, setApiKeyError] = useState<string | undefined>(undefined);
-  const [githubAppInstallErrorByConnectionId, setGitHubAppInstallErrorByConnectionId] = useState<
+  const [providerAppSetupErrorByConnectionId, setProviderAppSetupErrorByConnectionId] = useState<
     Readonly<Record<string, string | undefined>>
   >({});
   const [deletingConnectionId, setDeletingConnectionId] = useState<string | null>(null);
@@ -84,8 +84,9 @@ export function useIntegrationConnectionEditors(input: {
     },
   });
 
-  const startGitHubAppInstallationMutation = useMutation({
-    mutationFn: async (payload: { connectionId: string }) => startGitHubAppInstallation(payload),
+  const startProviderAppSetupMutation = useMutation({
+    mutationFn: async (payload: { connectionId: string }) =>
+      startProviderAppSetupInstallation(payload),
   });
 
   const editingApiKeyConnection =
@@ -164,13 +165,13 @@ export function useIntegrationConnectionEditors(input: {
       setApiKeyDraft("");
       setApiKeyError(undefined);
     },
-    githubAppInstallation: {
-      errorMessageByConnectionId: githubAppInstallErrorByConnectionId,
-      pendingConnectionId: startGitHubAppInstallationMutation.isPending
-        ? (startGitHubAppInstallationMutation.variables?.connectionId ?? null)
+    providerAppSetup: {
+      errorMessageByConnectionId: providerAppSetupErrorByConnectionId,
+      pendingConnectionId: startProviderAppSetupMutation.isPending
+        ? (startProviderAppSetupMutation.variables?.connectionId ?? null)
         : null,
       onStartInstallation: async (connectionId: string) => {
-        setGitHubAppInstallErrorByConnectionId((current) => ({
+        setProviderAppSetupErrorByConnectionId((current) => ({
           ...current,
           [connectionId]: undefined,
         }));
@@ -180,7 +181,7 @@ export function useIntegrationConnectionEditors(input: {
           title: "Opening GitHub App installation...",
         });
         if (authorizationWindow === null) {
-          setGitHubAppInstallErrorByConnectionId((current) => ({
+          setProviderAppSetupErrorByConnectionId((current) => ({
             ...current,
             [connectionId]: "Browser blocked opening a new window.",
           }));
@@ -188,7 +189,7 @@ export function useIntegrationConnectionEditors(input: {
         }
 
         try {
-          const startedInstallation = await startGitHubAppInstallationMutation.mutateAsync({
+          const startedInstallation = await startProviderAppSetupMutation.mutateAsync({
             connectionId,
           });
           authorizationWindow.navigate(startedInstallation.authorizationUrl);
@@ -199,7 +200,7 @@ export function useIntegrationConnectionEditors(input: {
             fallbackMessage: "Could not start GitHub App installation.",
           });
 
-          setGitHubAppInstallErrorByConnectionId((current) => ({
+          setProviderAppSetupErrorByConnectionId((current) => ({
             ...current,
             [connectionId]: errorMessage,
           }));

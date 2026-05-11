@@ -96,7 +96,7 @@ export type IntegrationConnectionDetailViewProps = {
   onDeleteWebhookSource?: (input: { connectionId: string; webhookSourceId: string }) => void;
   onEditAuthentication?: (connectionId: string) => void;
   onSelectedConnectionChange?: (connectionId: string | null) => void;
-  onStartGitHubAppInstallation?: (connectionId: string) => Promise<void> | void;
+  onStartProviderAppSetup?: (connectionId: string) => Promise<void> | void;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
   resourceItemsByKey?: ReadonlyMap<string, IntegrationResourceListItemData>;
   selectedConnectionId?: string | null;
@@ -323,9 +323,9 @@ export function IntegrationConnectionDetailView(
             {...(props.onRefreshResource === undefined
               ? {}
               : { onRefreshResource: props.onRefreshResource })}
-            {...(props.onStartGitHubAppInstallation === undefined
+            {...(props.onStartProviderAppSetup === undefined
               ? {}
-              : { onStartGitHubAppInstallation: props.onStartGitHubAppInstallation })}
+              : { onStartProviderAppSetup: props.onStartProviderAppSetup })}
             {...(props.resourceItemsByKey === undefined
               ? {}
               : { resourceItemsByKey: props.resourceItemsByKey })}
@@ -359,7 +359,7 @@ function ConnectionDetailPane(input: {
   onDeleteConnection?: (connectionId: string) => void;
   onDeleteWebhookSource?: (input: { connectionId: string; webhookSourceId: string }) => void;
   onEditAuthentication?: (connectionId: string) => void;
-  onStartGitHubAppInstallation?: (connectionId: string) => Promise<void> | void;
+  onStartProviderAppSetup?: (connectionId: string) => Promise<void> | void;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
   resourceItemsByKey?: IntegrationConnectionDetailViewProps["resourceItemsByKey"];
   customBody?: ReactNode;
@@ -469,12 +469,12 @@ function ConnectionDetailPane(input: {
           {viewState.hasInstallationSection ? (
             <SectionBlock
               action={
-                input.onStartGitHubAppInstallation !== undefined &&
+                input.onStartProviderAppSetup !== undefined &&
                 viewState.installation?.actionLabel !== undefined ? (
                   <Button
                     disabled={viewState.installation?.isPending ?? false}
                     onClick={() => {
-                      void input.onStartGitHubAppInstallation?.(input.connection.id);
+                      void input.onStartProviderAppSetup?.(input.connection.id);
                     }}
                     size="sm"
                     type="button"

@@ -581,7 +581,7 @@ export const InstalledDetailPreview: PageStory = {
         onDeleteWebhookSource={() => {}}
         onEditAuthentication={() => {}}
         onRefreshResource={() => {}}
-        onStartGitHubAppInstallation={async () => {}}
+        onStartProviderAppSetup={async () => {}}
         titleEditor={{
           disabled: false,
           errorMessageByConnectionId: {},

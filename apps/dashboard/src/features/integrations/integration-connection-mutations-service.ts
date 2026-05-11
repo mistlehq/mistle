@@ -328,7 +328,7 @@ export async function cancelDeviceAuthorizationAttempt(input: {
   }
 }
 
-export async function startGitHubAppInstallation(input: {
+export async function startProviderAppSetupInstallation(input: {
   connectionId: string;
 }): Promise<StartedRedirectConnection> {
   const startedSetup = await startProviderAppSetup({

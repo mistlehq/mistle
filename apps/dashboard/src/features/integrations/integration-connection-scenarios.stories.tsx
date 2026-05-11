@@ -49,14 +49,14 @@ function withoutStoryHandlers(
   | "onDeleteWebhookSource"
   | "onEditAuthentication"
   | "onRefreshResource"
-  | "onStartGitHubAppInstallation"
+  | "onStartProviderAppSetup"
 > {
   const {
     onCreateWebhookSource: _onCreateWebhookSource,
     onDeleteWebhookSource: _onDeleteWebhookSource,
     onEditAuthentication: _onEditAuthentication,
     onRefreshResource: _onRefreshResource,
-    onStartGitHubAppInstallation: _onStartGitHubAppInstallation,
+    onStartProviderAppSetup: _onStartProviderAppSetup,
     ...rest
   } = input;
 
@@ -94,7 +94,7 @@ const meta = {
     onDeleteWebhookSource: (_input: { connectionId: string; webhookSourceId: string }) => {},
     onEditAuthentication: (_connectionId: string) => {},
     onRefreshResource: (_input: { connectionId: string; kind: string }) => {},
-    onStartGitHubAppInstallation: async (_connectionId: string) => {},
+    onStartProviderAppSetup: async (_connectionId: string) => {},
     titleEditor: {
       disabled: false,
       errorMessageByConnectionId: {},
