@@ -304,6 +304,10 @@ function createSandboxProfileAutomationsPath(profileId: string): string {
   return `/sandbox-profiles/${profileId}/automations`;
 }
 
+function pathnameMatchesPathOrChild(input: { basePath: string; pathname: string }): boolean {
+  return input.pathname === input.basePath || input.pathname.startsWith(`${input.basePath}/`);
+}
+
 function createSandboxProfileTabPath(input: {
   profileId: string;
   sectionId: SandboxProfileEditorSectionId;
@@ -356,8 +360,10 @@ function readSandboxProfileEditorSectionPathSegment(input: {
   profileId: string;
 }): SandboxProfileEditorSectionId | null {
   if (
-    input.pathname === createSandboxProfileDefaultPath(input.profileId) ||
-    input.pathname.startsWith(`${createSandboxProfileDefaultPath(input.profileId)}/`)
+    pathnameMatchesPathOrChild({
+      basePath: createSandboxProfileDefaultPath(input.profileId),
+      pathname: input.pathname,
+    })
   ) {
     return SandboxProfileEditorSectionIds.SANDBOX_PROFILE;
   }
@@ -367,8 +373,10 @@ function readSandboxProfileEditorSectionPathSegment(input: {
   }
 
   if (
-    input.pathname === createSandboxProfileAutomationsPath(input.profileId) ||
-    input.pathname.startsWith(`${createSandboxProfileAutomationsPath(input.profileId)}/`)
+    pathnameMatchesPathOrChild({
+      basePath: createSandboxProfileAutomationsPath(input.profileId),
+      pathname: input.pathname,
+    })
   ) {
     return SandboxProfileEditorSectionIds.AUTOMATIONS;
   }
@@ -408,8 +416,10 @@ function readSandboxProfileEditorRoute(input: {
   }
 
   if (
-    input.pathname === createSandboxProfileAutomationsPath(input.profileId) ||
-    input.pathname.startsWith(`${createSandboxProfileAutomationsPath(input.profileId)}/`)
+    pathnameMatchesPathOrChild({
+      basePath: createSandboxProfileAutomationsPath(input.profileId),
+      pathname: input.pathname,
+    })
   ) {
     return {
       sectionId: SandboxProfileEditorSectionIds.AUTOMATIONS,
