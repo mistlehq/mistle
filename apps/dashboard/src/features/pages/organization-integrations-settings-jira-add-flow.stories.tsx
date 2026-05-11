@@ -330,10 +330,7 @@ function JiraAddFlowStory(input: {
         <Route element={<Outlet />}>
           <Route element={<Outlet />} handle={ROUTE_HANDLES.integrations} path="/integrations">
             <Route element={<Outlet />} handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
-              <Route
-                element={<IntegrationsPage controlPlaneApiOrigin={StoryControlPlaneApiOrigin} />}
-                index
-              />
+              <Route element={<IntegrationsPage />} index />
               <Route
                 element={<IntegrationConnectionCreatePage />}
                 handle={ROUTE_HANDLES.integrationCreate}

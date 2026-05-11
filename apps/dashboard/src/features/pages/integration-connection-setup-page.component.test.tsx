@@ -95,9 +95,7 @@ describe("IntegrationConnectionSetupPage", () => {
       [
         {
           path: "/integrations/:targetKey/:connectionId/:setupRouteSegment/setup",
-          element: (
-            <IntegrationConnectionSetupPage controlPlaneApiOrigin="https://control-plane.example.com" />
-          ),
+          element: <IntegrationConnectionSetupPage />,
         },
         {
           path: "/integrations/:targetKey",

@@ -81,7 +81,6 @@ function getTextControlById(id: string): HTMLInputElement | HTMLTextAreaElement 
 
 function renderProviderAppSetupPane(input?: {
   connection?: IntegrationConnection;
-  controlPlaneApiOrigin?: string;
   initialEntry?: string;
   methodId?: string;
   routeSegment?: string;
@@ -89,8 +88,7 @@ function renderProviderAppSetupPane(input?: {
   webhookSource?: IntegrationWebhookSource | null;
 }) {
   Object.assign(import.meta.env, {
-    VITE_CONTROL_PLANE_API_ORIGIN:
-      input?.controlPlaneApiOrigin ?? "https://control-plane.example.com",
+    VITE_CONTROL_PLANE_API_ORIGIN: "https://control-plane.example.com",
   });
   resetDashboardConfigForTest();
 
@@ -132,9 +130,6 @@ function renderProviderAppSetupPane(input?: {
       <QueryClientProvider client={queryClient}>
         <ProviderAppSetupPane
           connection={connection}
-          controlPlaneApiOrigin={
-            input?.controlPlaneApiOrigin ?? "https://control-plane.example.com"
-          }
           manifestDraftBuilder={resolveIntegrationSetupAppManifestDraftBuilderOrThrow({
             connection,
             setupRoute: {
@@ -213,7 +208,6 @@ describe("ProviderAppSetupPane", () => {
 
   it("uses the provider-facing webhook callback base for generated redirect URLs", async () => {
     const rendered = renderProviderAppSetupPane({
-      controlPlaneApiOrigin: "http://localhost:3000",
       webhookCallbackUrl:
         "https://public-control-plane.example.com/base/p/integration/webhooks/slack-default/eps_public",
     });

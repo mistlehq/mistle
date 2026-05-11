@@ -20,7 +20,6 @@ describe("renderIntegrationConnectionSetupPane", () => {
       isValidElement(
         renderIntegrationConnectionSetupPane({
           connection: Connection,
-          controlPlaneApiOrigin: "https://control-plane.example.com",
           setupRoute: {
             methodId: "github-app-installation",
             routeSegment: "github-app",
@@ -34,7 +33,6 @@ describe("renderIntegrationConnectionSetupPane", () => {
     expect(() =>
       renderIntegrationConnectionSetupPane({
         connection: Connection,
-        controlPlaneApiOrigin: "https://control-plane.example.com",
         setupRoute: {
           methodId: "unsupported-method",
           routeSegment: "unsupported",

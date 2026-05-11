@@ -130,7 +130,7 @@ function resolveManagedWebhookSetupState(state: unknown): ManagedWebhookSetupRes
   return parsed.success ? parsed.data : null;
 }
 
-export function IntegrationsPage(input: { controlPlaneApiOrigin?: string }) {
+export function IntegrationsPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const params = useParams();
@@ -140,8 +140,7 @@ export function IntegrationsPage(input: { controlPlaneApiOrigin?: string }) {
   useRequiredOrganizationId();
   const detailTargetKey = params["targetKey"] ?? null;
   const detailConnectionId = searchParams.get("connectionId");
-  const controlPlaneApiOrigin =
-    input.controlPlaneApiOrigin ?? getDashboardConfig().controlPlaneApiOrigin;
+  const dashboardConfig = getDashboardConfig();
   const directoryState = useIntegrationsDirectoryState({
     detailConnectionId,
     detailTargetKey,
@@ -239,7 +238,7 @@ export function IntegrationsPage(input: { controlPlaneApiOrigin?: string }) {
       <IntegrationConnectionDetailView
         connections={buildIntegrationConnectionDetailItems({
           connections: directoryState.selectedDetailConnections,
-          controlPlaneApiOrigin,
+          controlPlaneApiOrigin: dashboardConfig.controlPlaneApiOrigin,
           providerAppSetupStateByConnectionId,
           refreshingConnectionIds: directoryState.refreshingConnectionIds,
           refreshingResourceKeys: directoryState.refreshingResourceKeys,
@@ -288,7 +287,6 @@ export function IntegrationsPage(input: { controlPlaneApiOrigin?: string }) {
         selectedConnectionId={directoryState.activeDetailConnectionId}
         selectedConnectionBody={renderSelectedConnectionSetupBody({
           connection: selectedDetailConnection,
-          controlPlaneApiOrigin,
           setupFlow: selectedDetailConnectionSetupFlow,
         })}
         selectedConnectionNotice={
@@ -352,7 +350,6 @@ export function IntegrationsPage(input: { controlPlaneApiOrigin?: string }) {
 
 function renderSelectedConnectionSetupBody(input: {
   connection: IntegrationConnection | undefined;
-  controlPlaneApiOrigin: string;
   setupFlow: IntegrationConnectionSetupRoute | null;
 }): React.JSX.Element | undefined {
   if (input.connection === undefined || input.setupFlow === null) {
@@ -361,7 +358,6 @@ function renderSelectedConnectionSetupBody(input: {
 
   return renderIntegrationConnectionSetupPane({
     connection: input.connection,
-    controlPlaneApiOrigin: input.controlPlaneApiOrigin,
     setupRoute: input.setupFlow,
   });
 }

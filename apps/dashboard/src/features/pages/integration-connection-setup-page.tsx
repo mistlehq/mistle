@@ -2,7 +2,6 @@ import { Button, Notice } from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Navigate, useNavigate, useParams } from "react-router";
 
-import { getDashboardConfig } from "../../config.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
@@ -14,9 +13,7 @@ import { renderIntegrationConnectionSetupPane } from "./integration-connection-s
 import { resolveIntegrationConnectionSetupRouteStateOrThrow } from "./integration-connection-setup-state.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
-export function IntegrationConnectionSetupPage(input: {
-  controlPlaneApiOrigin?: string;
-}): React.JSX.Element {
+export function IntegrationConnectionSetupPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   const breadcrumbs = useAppPageBreadcrumbs();
   const navigate = useNavigate();
@@ -120,9 +117,6 @@ export function IntegrationConnectionSetupPage(input: {
       />
     );
   }
-  const controlPlaneApiOrigin =
-    input.controlPlaneApiOrigin ?? getDashboardConfig().controlPlaneApiOrigin;
-
   return (
     <PageFrame
       width="form"
@@ -133,7 +127,6 @@ export function IntegrationConnectionSetupPage(input: {
     >
       {renderIntegrationConnectionSetupPane({
         connection,
-        controlPlaneApiOrigin,
         setupRoute: setupRouteState.setupRoute,
       })}
     </PageFrame>
