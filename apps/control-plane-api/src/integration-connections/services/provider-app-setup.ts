@@ -48,12 +48,6 @@ type CompletedProviderAppSetup = {
   routeSegment: string;
 };
 
-type ProviderAppSetupStartInvalidInputCode =
-  typeof IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_START_INPUT;
-
-type ProviderAppSetupCompleteInvalidInputCode =
-  typeof IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT;
-
 function resolveSetupFlowOrThrow(input: {
   routeSegment: string;
   flows: ReadonlyArray<IntegrationProviderAppSetupFlowCapability>;
@@ -93,7 +87,6 @@ function assertConnectionMethodMatchesSetupFlow(input: {
 function assertCallbackRouteKeyMatchesSetupFlow(input: {
   callbackRouteKey: string;
   flow: IntegrationProviderAppSetupFlowCapability;
-  invalidInputCode: ProviderAppSetupCompleteInvalidInputCode;
   routeSegment: string;
 }): void {
   const acceptedCallbackRouteKeys = [
@@ -106,7 +99,7 @@ function assertCallbackRouteKeyMatchesSetupFlow(input: {
   }
 
   throw new BadRequestError(
-    input.invalidInputCode,
+    IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT,
     `Provider app setup callback route key '${input.callbackRouteKey}' does not match setup flow '${input.routeSegment}'.`,
   );
 }
@@ -213,7 +206,6 @@ export async function startProviderAppSetup(
     connectionId: string;
     routeSegment: string;
     body: Record<string, unknown>;
-    invalidInputCode: ProviderAppSetupStartInvalidInputCode;
   },
 ): Promise<IntegrationProviderAppSetupStartResult> {
   const connection = await resolveConnectionWithTargetOrThrow({
@@ -322,13 +314,13 @@ export async function startProviderAppSetup(
       error.code === InternalIntegrationCredentialsErrorCodes.CREDENTIAL_NOT_FOUND
     ) {
       throw new BadRequestError(
-        input.invalidInputCode,
+        IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_START_INPUT,
         `Integration connection '${connection.id}' is missing required setup credentials.`,
       );
     }
 
     throw new BadRequestError(
-      input.invalidInputCode,
+      IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_START_INPUT,
       error instanceof Error ? error.message : "Provider app setup start failed.",
     );
   }
@@ -337,12 +329,12 @@ export async function startProviderAppSetup(
     targetKey: connection.targetKey,
     methodId: flow.methodId,
     connectionMethods: definition.connectionMethods,
-    invalidInputCode: input.invalidInputCode,
+    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_START_INPUT,
   });
   const parsedSecrets = parseUpdateFormSecretsOrThrow({
     method: formMethod,
     secrets: startedSetup.secrets ?? {},
-    invalidInputCode: input.invalidInputCode,
+    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_START_INPUT,
   });
 
   await persistRedirectSessionOrThrow({
@@ -388,14 +380,13 @@ export async function completeProviderAppSetup(
   input: {
     callbackRouteKey: string;
     query: Record<string, string>;
-    invalidInputCode: ProviderAppSetupCompleteInvalidInputCode;
   },
 ): Promise<CompletedProviderAppSetup> {
   const queryParams = createRedirectQueryParams(input.query);
   const state = queryParams.get("state");
   if (state === null || state.length === 0) {
     throw new BadRequestError(
-      input.invalidInputCode,
+      IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT,
       "Provider app setup callback query must include `state`.",
     );
   }
@@ -439,7 +430,6 @@ export async function completeProviderAppSetup(
   assertCallbackRouteKeyMatchesSetupFlow({
     callbackRouteKey: input.callbackRouteKey,
     flow,
-    invalidInputCode: input.invalidInputCode,
     routeSegment: stateMetadata.routeSegment,
   });
   if (flow.complete === undefined) {
@@ -510,13 +500,13 @@ export async function completeProviderAppSetup(
       error.code === InternalIntegrationCredentialsErrorCodes.CREDENTIAL_NOT_FOUND
     ) {
       throw new BadRequestError(
-        input.invalidInputCode,
+        IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT,
         `Integration connection '${connection.id}' is missing required setup credentials.`,
       );
     }
 
     throw new BadRequestError(
-      input.invalidInputCode,
+      IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT,
       error instanceof Error ? error.message : "Provider app setup completion failed.",
     );
   }
@@ -532,12 +522,14 @@ export async function completeProviderAppSetup(
     targetKey: connection.targetKey,
     methodId: flow.methodId,
     connectionMethods: definition.connectionMethods,
-    invalidInputCode: input.invalidInputCode,
+    invalidInputCode:
+      IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT,
   });
   const parsedSecrets = parseUpdateFormSecretsOrThrow({
     method: formMethod,
     secrets: setupResult.secrets ?? {},
-    invalidInputCode: input.invalidInputCode,
+    invalidInputCode:
+      IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT,
   });
   const completedConnection = await persistProviderAppSetupResult({
     db: ctx.db,

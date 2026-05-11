@@ -2,7 +2,6 @@ import type { RouteHandler } from "@hono/zod-openapi";
 import { withHttpErrorHandler } from "@mistle/http/errors.js";
 import type { IntegrationProviderAppSetupCompletionRedirect } from "@mistle/integrations-core";
 
-import { IntegrationConnectionsBadRequestCodes } from "../../integration-connections/constants.js";
 import { completeProviderAppSetup } from "../../integration-connections/services/provider-app-setup.js";
 import { buildDashboardUrl } from "../../lib/dashboard-url.js";
 import type { AppContextBindings } from "../../types.js";
@@ -54,8 +53,6 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
     {
       callbackRouteKey,
       query,
-      invalidInputCode:
-        IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT,
     },
   );
 
