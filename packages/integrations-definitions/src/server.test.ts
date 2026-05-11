@@ -161,6 +161,6 @@ describe("integrations-definitions server", () => {
         variantId: "openai-default",
       }),
     ).toBeDefined();
-    expect(definitions.agentRuntimeRegistry.listRuntimes()).toHaveLength(1);
+    expect(definitions.agentRuntimeRegistry.listRuntimes()).toHaveLength(2);
   });
 });

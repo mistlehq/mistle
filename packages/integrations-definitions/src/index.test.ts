@@ -504,10 +504,15 @@ describe("integrations-definitions index", () => {
         variantId: "openai-default",
       }),
     ).toBeDefined();
-    expect(definitions.agentRuntimeRegistry.listRuntimes()).toHaveLength(1);
-    expect(definitions.agentRuntimeRegistry.listRuntimes()[0]).toMatchObject({
-      runtimeId: "codex",
-      displayName: "Codex",
-    });
+    expect(definitions.agentRuntimeRegistry.listRuntimes()).toMatchObject([
+      {
+        runtimeId: "codex",
+        displayName: "Codex",
+      },
+      {
+        runtimeId: "opencode",
+        displayName: "OpenCode",
+      },
+    ]);
   });
 });

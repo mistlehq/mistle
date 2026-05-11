@@ -21,7 +21,7 @@ export function resolveOpenAiBindingConfigForm(
           },
           properties: {
             runtimeId: {
-              const: OpenAiAllowedRuntimeIds[0],
+              enum: [...OpenAiAllowedRuntimeIds],
               default: OpenAiAllowedRuntimeIds[0],
             },
             config: {

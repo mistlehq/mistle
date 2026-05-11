@@ -95,4 +95,35 @@ describe("validateOpenAiBindingWriteContext", () => {
 
     expect(result.ok).toBe(true);
   });
+
+  it("accepts ChatGPT subscription connections for OpenCode runtime", () => {
+    const result = validateOpenAiBindingWriteContext({
+      targetKey: "openai-default",
+      bindingIdOrDraftIndex: "draft:0",
+      target: {
+        familyId: "openai",
+        variantId: "openai-default",
+        config: createTargetConfig(),
+      },
+      connection: {
+        id: "icn_1",
+        config: {
+          connection_method: "chatgpt-device-code",
+          auth_mode: "chatgpt",
+          chatgpt_account_id: "acct_123",
+        },
+      },
+      binding: {
+        kind: "agent",
+        config: {
+          runtime: {
+            runtimeId: "opencode",
+            config: {},
+          },
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+  });
 });

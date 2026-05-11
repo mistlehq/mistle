@@ -29,7 +29,7 @@ describe("openai binding config forms", () => {
           },
           properties: {
             runtimeId: {
-              const: "codex",
+              enum: ["codex", "opencode"],
               default: "codex",
             },
             config: {

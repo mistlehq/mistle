@@ -6,10 +6,16 @@ import {
 } from "./binding-config-schema.js";
 
 describe("OpenAiApiKeyBindingConfigSchema", () => {
-  it("parses a valid codex binding config", () => {
+  it("parses valid OpenAI agent runtime binding configs", () => {
     const parsed = OpenAiApiKeyBindingConfigSchema.parse({
       runtime: {
         runtimeId: OpenAiAllowedRuntimeIds[0],
+        config: {},
+      },
+    });
+    const openCodeParsed = OpenAiApiKeyBindingConfigSchema.parse({
+      runtime: {
+        runtimeId: "opencode",
         config: {},
       },
     });
@@ -20,9 +26,15 @@ describe("OpenAiApiKeyBindingConfigSchema", () => {
         config: {},
       },
     });
+    expect(openCodeParsed).toEqual({
+      runtime: {
+        runtimeId: "opencode",
+        config: {},
+      },
+    });
   });
 
-  it("fails when runtime is not codex", () => {
+  it("fails when runtime is not supported", () => {
     expect(() =>
       OpenAiApiKeyBindingConfigSchema.parse({
         runtime: {
@@ -30,7 +42,7 @@ describe("OpenAiApiKeyBindingConfigSchema", () => {
           config: {},
         },
       }),
-    ).toThrow(/Invalid input/);
+    ).toThrow(/Invalid option/);
   });
 
   it("fails when model settings are provided", () => {

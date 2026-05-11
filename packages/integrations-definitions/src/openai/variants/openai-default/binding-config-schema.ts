@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const OpenAiAllowedRuntimeIds = ["codex"] as const;
+export const OpenAiAllowedRuntimeIds = ["codex", "opencode"] as const;
 
 export const OpenAiApiKeyBindingConfigSchema = z
   .object({

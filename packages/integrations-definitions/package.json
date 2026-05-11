@@ -56,6 +56,20 @@
       "import": "./src/agent-runtimes/codex/client.ts",
       "default": "./src/agent-runtimes/codex/client.ts"
     },
+    "./agent-runtimes/opencode": {
+      "types": "./src/agent-runtimes/opencode/index.ts",
+      "workspace-src": "./src/agent-runtimes/opencode/index.ts",
+      "node": "./dist/agent-runtimes/opencode/index.js",
+      "import": "./src/agent-runtimes/opencode/index.ts",
+      "default": "./src/agent-runtimes/opencode/index.ts"
+    },
+    "./agent-runtimes/opencode/server": {
+      "types": "./src/agent-runtimes/opencode/server.ts",
+      "workspace-src": "./src/agent-runtimes/opencode/server.ts",
+      "node": "./dist/agent-runtimes/opencode/server.js",
+      "import": "./src/agent-runtimes/opencode/server.ts",
+      "default": "./src/agent-runtimes/opencode/server.ts"
+    },
     "./openai": {
       "types": "./src/openai/index.ts",
       "workspace-src": "./src/openai/index.ts",
