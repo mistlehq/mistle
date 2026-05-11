@@ -36,7 +36,7 @@ export function IntegrationWebhookTriggerCapabilitiesRefreshDialog(input: {
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const action = input.action;
   const form = action?.bodyForm;
-  const pendingLabel = action?.pendingLabel ?? "Syncing...";
+  const content = input.isOpen && action !== null && form !== undefined ? { action, form } : null;
 
   function handleOpenChange(open: boolean): void {
     if (!open) {
@@ -67,7 +67,7 @@ export function IntegrationWebhookTriggerCapabilitiesRefreshDialog(input: {
       onOpenChange={handleOpenChange}
       open={input.isOpen}
     >
-      {input.isOpen && form !== undefined ? (
+      {content === null ? null : (
         <DialogContent
           className="sm:max-w-xl"
           formProps={{
@@ -76,11 +76,11 @@ export function IntegrationWebhookTriggerCapabilitiesRefreshDialog(input: {
           }}
         >
           <DialogHeader>
-            <DialogTitle>{form.title}</DialogTitle>
+            <DialogTitle>{content.form.title}</DialogTitle>
           </DialogHeader>
 
           <div className="flex flex-col gap-4">
-            {form.fields.map((field) => (
+            {content.form.fields.map((field) => (
               <RefreshActionField
                 disabled={input.isPending}
                 field={field}
@@ -108,14 +108,16 @@ export function IntegrationWebhookTriggerCapabilitiesRefreshDialog(input: {
               Cancel
             </Button>
             <Button
-              disabled={input.isPending || !isFormComplete({ fields: form.fields, formValues })}
+              disabled={
+                input.isPending || !isFormComplete({ fields: content.form.fields, formValues })
+              }
               type="submit"
             >
-              {input.isPending ? pendingLabel : form.submitLabel}
+              {input.isPending ? content.action.pendingLabel : content.form.submitLabel}
             </Button>
           </DialogFooter>
         </DialogContent>
-      ) : null}
+      )}
     </Dialog>
   );
 }
