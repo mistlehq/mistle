@@ -2962,6 +2962,7 @@ export function SandboxProfileSetupScriptPanel(input: {
         </FieldHeader>
         <FieldContent>
           <div className="gap-2 flex flex-col">
+            {input.testPanel}
             <SandboxSetupScriptEditor
               ariaLabelledBy="sandbox-setup-script-label"
               disabled={input.disabled === true}
@@ -2971,7 +2972,6 @@ export function SandboxProfileSetupScriptPanel(input: {
               placeholderText={SetupScriptPlaceholder}
               value={input.value}
             />
-            {input.testPanel}
             {input.disabled === true ? null : (
               <div className="flex flex-col pt-1">
                 <Accordion className="border-border/70 w-full border-y" multiple>

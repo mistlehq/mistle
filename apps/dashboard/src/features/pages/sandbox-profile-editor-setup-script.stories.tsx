@@ -14,7 +14,10 @@ const meta = {
   render: function RenderStory(args): React.JSX.Element {
     return <SandboxProfileEditorPageStory {...args} />;
   },
-  args: DefaultSandboxProfileEditorStoryArgs,
+  args: {
+    ...DefaultSandboxProfileEditorStoryArgs,
+    setupAssistantState: "available",
+  },
 } satisfies Meta<typeof SandboxProfileEditorPageStory>;
 
 export default meta;
@@ -25,14 +28,12 @@ export const EmptySetupScript: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],
     setupScript: "",
-    setupAssistantState: "available",
   },
 };
 
 export const SetupAssistantEntry: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],
-    setupAssistantState: "available",
   },
 };
 
@@ -63,7 +64,6 @@ export const SetupAssistantPanelReady: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],
     setupAssistantPanelState: "ready",
-    setupAssistantState: "available",
   },
 };
 
@@ -71,7 +71,6 @@ export const SetupAssistantPanelWithDraft: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],
     setupAssistantPanelState: "proposed-script",
-    setupAssistantState: "available",
   },
 };
 

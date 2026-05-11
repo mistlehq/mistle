@@ -1,17 +1,5 @@
-import {
-  Button,
-  ButtonGroup,
-  Label,
-  Notice,
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-  Switch,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@mistle/ui";
-import { PlayIcon, SidebarSimpleIcon, SpinnerGapIcon, TerminalIcon } from "@phosphor-icons/react";
+import { Button, Notice, ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@mistle/ui";
+import { SidebarSimpleIcon, TerminalIcon } from "@phosphor-icons/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } from "react-router";
@@ -56,6 +44,7 @@ import { SandboxProfileIntegrationsSetupSection } from "./sandbox-profile-integr
 import { mapBindingsToEditorRows } from "./sandbox-profile-integrations-state.js";
 import { SandboxProfileRuntimeSection } from "./sandbox-profile-runtime-section.js";
 import {
+  SandboxProfileSetupScriptTestButton,
   SandboxProfileSetupScriptTestPanel,
   type SetupScriptTestStatus,
 } from "./sandbox-profile-setup-script-test.js";
@@ -411,22 +400,21 @@ function createRuntimeStoryVersion(input: {
   };
 }
 
+function noopStoryAction(): void {}
+
 function SetupScriptStoryControls(input: {
   setupAssistantState: SandboxProfileEditorPageStoryArgs["setupAssistantState"];
   setupAssistantPanelIsOpen: boolean;
   isDraft: boolean;
-  onToggleSetupAssistant?: () => void;
+  onToggleSetupAssistant: () => void;
   testStatus: SetupScriptTestStatus;
 }): React.JSX.Element {
   const showSetupAssistantAction = input.setupAssistantState !== undefined;
   const setupAssistantIsStarting =
     !input.setupAssistantPanelIsOpen && input.setupAssistantState === "starting";
-  const testIsBusy = input.testStatus === "starting" || input.testStatus === "running";
-  const testIsDisabled = !input.isDraft || input.testStatus === "blank" || testIsBusy;
   const setupAssistantIsDisabled =
     !input.setupAssistantPanelIsOpen &&
     (input.setupAssistantState === "disabled" || !input.isDraft || setupAssistantIsStarting);
-  const failOnFirstErrorSwitchId = "story-setup-script-test-fail-on-first-error";
   const setupAssistantTitle = input.setupAssistantPanelIsOpen
     ? "Close the Setup Assistant panel."
     : !input.isDraft
@@ -434,70 +422,24 @@ function SetupScriptStoryControls(input: {
       : input.setupAssistantState === "disabled"
         ? "Add an agent integration before using Setup Assistant."
         : "Open the right panel to write this setup script.";
-  const setupAssistantButton = (
-    <Button
-      disabled={setupAssistantIsDisabled}
-      size="sm"
-      title={setupAssistantTitle}
-      onClick={input.onToggleSetupAssistant}
-      type="button"
-      variant="outline"
-    >
-      {setupAssistantIsStarting ? (
-        "Starting Setup Assistant..."
-      ) : (
-        <>
-          <SidebarSimpleIcon aria-hidden className="size-4 -scale-x-100" />
-          Setup Assistant
-        </>
-      )}
-    </Button>
-  );
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-3">
-      <div className="flex items-center gap-2">
-        <Switch
-          checked={true}
-          disabled={testIsBusy || !input.isDraft}
-          id={failOnFirstErrorSwitchId}
-          size="sm"
-        />
-        <Label className="text-xs normal-case" htmlFor={failOnFirstErrorSwitchId}>
-          Fail on error
-        </Label>
-      </div>
-      <ButtonGroup>
-        <Button
-          disabled={testIsDisabled}
-          size="sm"
-          title="Test setup script"
-          type="button"
-          variant="outline"
-        >
-          {testIsBusy ? (
-            <SpinnerGapIcon aria-hidden className="size-4 animate-spin" />
-          ) : (
-            <PlayIcon aria-hidden className="size-4" />
-          )}
-          {testIsBusy ? "Running..." : "Test"}
-        </Button>
-        {showSetupAssistantAction ? (
-          setupAssistantIsDisabled ? (
-            <Tooltip>
-              <TooltipTrigger render={<span className="inline-flex" />}>
-                {setupAssistantButton}
-              </TooltipTrigger>
-              <TooltipContent className="max-w-64 text-left" side="top">
-                {setupAssistantTitle}
-              </TooltipContent>
-            </Tooltip>
-          ) : (
-            setupAssistantButton
-          )
-        ) : null}
-      </ButtonGroup>
-    </div>
+    <SandboxProfileSetupScriptTestButton
+      failOnFirstError={true}
+      isDraft={input.isDraft}
+      status={input.testStatus}
+      {...(input.testStatus === "running" ? { onStop: noopStoryAction } : {})}
+      {...(showSetupAssistantAction
+        ? {
+            setupAssistant: {
+              disabled: setupAssistantIsDisabled,
+              isStarting: setupAssistantIsStarting,
+              onClick: input.onToggleSetupAssistant,
+              title: setupAssistantTitle,
+            },
+          }
+        : {})}
+    />
   );
 }
 

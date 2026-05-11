@@ -2,7 +2,6 @@ import { SandboxPtyStates, type SandboxPtyState } from "@mistle/sandbox-session-
 import {
   Button,
   ButtonGroup,
-  InlineCode,
   Label,
   Notice,
   Switch,
@@ -15,6 +14,7 @@ import {
   PlayIcon,
   SidebarSimpleIcon,
   SpinnerGapIcon,
+  StopIcon,
   WarningCircleIcon,
   XIcon,
 } from "@phosphor-icons/react";
@@ -43,6 +43,7 @@ type SetupScriptTestViewProps = {
   onFailOnFirstErrorChange?: (checked: boolean) => void;
   onResize?: (dimensions: { cols: number; rows: number }) => Promise<void>;
   onRun?: () => void;
+  onStop?: () => void;
   onWriteInput?: (input: string) => Promise<void>;
   failOnFirstError?: boolean;
   outputChunks?: readonly Uint8Array[];
@@ -141,27 +142,42 @@ export function createSetupScriptTestShellPayload(input: {
   ].join("\n");
 }
 
-function resolveSetupScriptTestButtonLabel(status: SetupScriptTestStatus): string {
-  if (status === "starting") {
+function resolveSetupScriptTestButtonLabel(input: {
+  canStop: boolean;
+  status: SetupScriptTestStatus;
+}): string {
+  if (input.canStop) {
+    return "Stop";
+  }
+
+  if (input.status === "starting") {
     return "Starting...";
   }
 
-  if (status === "running") {
+  if (input.status === "running") {
     return "Running...";
   }
 
   return "Test";
 }
 
-function resolveSetupScriptTestButtonIcon(status: SetupScriptTestStatus): React.JSX.Element {
-  if (status === "starting" || status === "running") {
+function resolveSetupScriptTestButtonIcon(input: {
+  canStop: boolean;
+  status: SetupScriptTestStatus;
+}): React.JSX.Element {
+  if (input.status === "starting" && !input.canStop) {
     return <SpinnerGapIcon aria-hidden className="size-4 animate-spin" />;
+  }
+
+  if (input.canStop) {
+    return <StopIcon aria-hidden className="size-4" weight="fill" />;
   }
 
   return <PlayIcon aria-hidden className="size-4" />;
 }
 
 function resolveSetupScriptTestButtonTitle(input: {
+  canStop: boolean;
   disabled: boolean;
   isDraft: boolean;
   status: SetupScriptTestStatus;
@@ -174,7 +190,15 @@ function resolveSetupScriptTestButtonTitle(input: {
     return "Add a setup script before testing.";
   }
 
-  if (input.status === "starting" || input.status === "running") {
+  if (input.canStop) {
+    return "Stop setup script test.";
+  }
+
+  if (input.status === "starting") {
+    return "Setup script test is starting.";
+  }
+
+  if (input.status === "running") {
     return "Setup script test is running.";
   }
 
@@ -260,8 +284,10 @@ export function SandboxProfileSetupScriptTestButton(
   input: SetupScriptTestViewProps,
 ): React.JSX.Element {
   const isBusy = input.status === "starting" || input.status === "running";
+  const canStop = isBusy && input.onStop !== undefined;
   const isButtonDisabled =
-    input.disabled === true || !input.isDraft || input.status === "blank" || isBusy;
+    input.disabled === true || !input.isDraft || input.status === "blank" || (isBusy && !canStop);
+  const onButtonClick = canStop ? input.onStop : input.onRun;
 
   const failOnFirstErrorSwitchId = "setup-script-test-fail-on-first-error";
   const setupAssistantButton =
@@ -302,9 +328,10 @@ export function SandboxProfileSetupScriptTestButton(
       <ButtonGroup>
         <Button
           disabled={isButtonDisabled}
-          onClick={input.onRun}
+          onClick={onButtonClick}
           size="sm"
           title={resolveSetupScriptTestButtonTitle({
+            canStop,
             disabled: input.disabled === true,
             isDraft: input.isDraft,
             status: input.status,
@@ -312,8 +339,8 @@ export function SandboxProfileSetupScriptTestButton(
           type="button"
           variant="outline"
         >
-          {resolveSetupScriptTestButtonIcon(input.status)}
-          {resolveSetupScriptTestButtonLabel(input.status)}
+          {resolveSetupScriptTestButtonIcon({ canStop, status: input.status })}
+          {resolveSetupScriptTestButtonLabel({ canStop, status: input.status })}
         </Button>
         {input.setupAssistant === undefined ? null : input.setupAssistant.disabled ? (
           <Tooltip>
@@ -372,7 +399,6 @@ export function SandboxProfileSetupScriptTestPanel(
           </span>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <InlineCode variant="muted">Draft test</InlineCode>
           {input.onClose === undefined ? null : (
             <Button
               aria-label="Close setup script test output"
@@ -422,7 +448,7 @@ export function useSandboxProfileSetupScriptTestRun(
   const [isOpenRequested, setIsOpenRequested] = useState(false);
   const [failOnFirstError, setFailOnFirstError] = useState(true);
   const openedPtySessionIdRef = useRef<string | null>(null);
-  const stoppedSandboxInstanceIdsRef = useRef<ReadonlySet<string>>(new Set());
+  const stopRequestedSandboxInstanceIdsRef = useRef<ReadonlySet<string>>(new Set());
   const transportManager = useSessionWorkbenchTransport({
     sandboxInstanceId: startedRun?.sandboxInstanceId ?? null,
   });
@@ -436,6 +462,12 @@ export function useSandboxProfileSetupScriptTestRun(
   const writeInput = ptyState.actions.writeInput;
   const scriptIsBlank = input.setupScript.trim().length === 0;
   const startedRunRef = useRef<StartedSetupScriptTestRun | null>(null);
+  const clearStartedRun = useCallback((): void => {
+    setStartedRun(null);
+    startedRunRef.current = null;
+    openedPtySessionIdRef.current = null;
+    setIsOpenRequested(false);
+  }, []);
   const closeActivePtySession = useCallback((): void => {
     if (startedRunRef.current === null) {
       return;
@@ -445,24 +477,27 @@ export function useSandboxProfileSetupScriptTestRun(
       void disconnectPty();
     });
   }, [closePty, disconnectPty]);
+  const stopTestSandboxBestEffort = useCallback((run: StartedSetupScriptTestRun): void => {
+    if (stopRequestedSandboxInstanceIdsRef.current.has(run.sandboxInstanceId)) {
+      return;
+    }
+
+    stopRequestedSandboxInstanceIdsRef.current = new Set([
+      ...stopRequestedSandboxInstanceIdsRef.current,
+      run.sandboxInstanceId,
+    ]);
+
+    void stopSandboxInstance({
+      instanceId: run.sandboxInstanceId,
+      idempotencyKey: `setup-script-test-stop:${run.ptySessionId}`,
+    }).catch(() => undefined);
+  }, []);
   const stopCompletedTestSandbox = useCallback(
     (run: StartedSetupScriptTestRun): void => {
-      if (stoppedSandboxInstanceIdsRef.current.has(run.sandboxInstanceId)) {
-        return;
-      }
-
-      stoppedSandboxInstanceIdsRef.current = new Set([
-        ...stoppedSandboxInstanceIdsRef.current,
-        run.sandboxInstanceId,
-      ]);
-
       void closePty().catch(() => undefined);
-      void stopSandboxInstance({
-        instanceId: run.sandboxInstanceId,
-        idempotencyKey: `setup-script-test-stop:${run.ptySessionId}`,
-      }).catch(() => undefined);
+      stopTestSandboxBestEffort(run);
     },
-    [closePty],
+    [closePty, stopTestSandboxBestEffort],
   );
   const startMutation = useMutation({
     meta: NoLoadingIndicatorMeta,
@@ -601,15 +636,13 @@ export function useSandboxProfileSetupScriptTestRun(
 
     setRunErrorMessage(null);
     closeActivePtySession();
-    setStartedRun(null);
-    startedRunRef.current = null;
-    openedPtySessionIdRef.current = null;
-    setIsOpenRequested(false);
+    clearStartedRun();
     startMutation.mutate({
       failOnFirstError,
       setupScript: input.setupScript,
     });
   }, [
+    clearStartedRun,
     closeActivePtySession,
     failOnFirstError,
     input.disabled,
@@ -620,14 +653,25 @@ export function useSandboxProfileSetupScriptTestRun(
     status,
   ]);
 
+  const handleStop = useCallback((): void => {
+    const currentRun = startedRunRef.current;
+    if (currentRun === null || (status !== "starting" && status !== "running")) {
+      return;
+    }
+
+    setRunErrorMessage(null);
+    void closePty().catch(() => {
+      void disconnectPty();
+    });
+    clearStartedRun();
+    stopTestSandboxBestEffort(currentRun);
+  }, [clearStartedRun, closePty, disconnectPty, status, stopTestSandboxBestEffort]);
+
   const handleClose = useCallback((): void => {
     setRunErrorMessage(null);
     closeActivePtySession();
-    setStartedRun(null);
-    startedRunRef.current = null;
-    openedPtySessionIdRef.current = null;
-    setIsOpenRequested(false);
-  }, [closeActivePtySession]);
+    clearStartedRun();
+  }, [clearStartedRun, closeActivePtySession]);
 
   useEffect(() => {
     return () => {
@@ -641,6 +685,7 @@ export function useSandboxProfileSetupScriptTestRun(
       isDraft: input.isDraft,
       onFailOnFirstErrorChange: setFailOnFirstError,
       onRun: handleRun,
+      ...(startedRun === null ? {} : { onStop: handleStop }),
       status,
       ...(input.disabled === undefined ? {} : { disabled: input.disabled }),
     },

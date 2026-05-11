@@ -48,6 +48,7 @@ import {
   SandboxProfileEditorPage,
   SandboxProfileEditorShell,
   SandboxProfileEditorView,
+  SandboxProfileSetupScriptPanel,
 } from "./sandbox-profile-editor-page.js";
 
 beforeAll(() => {
@@ -757,6 +758,26 @@ function updateSetupScriptEditor(input: { editor: HTMLElement; value: string }):
 }
 
 describe("SandboxProfileEditorPage", () => {
+  it("shows setup script test output before the setup script input", () => {
+    render(
+      <SandboxProfileSetupScriptPanel
+        testPanel={<section aria-label="Setup script test output">Running setup script</section>}
+        value="pnpm install"
+      />,
+    );
+
+    const testOutput = screen.getByRole("region", {
+      name: "Setup script test output",
+    });
+    const editor = screen.getByRole("textbox", {
+      name: "Setup script",
+    });
+
+    expect(testOutput.compareDocumentPosition(editor) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(
+      0,
+    );
+  });
+
   it("resolves the active version for the published route when draft and published versions both exist", () => {
     const result = resolveSandboxProfileEditorVersionMode({
       activeVersion: 1,
