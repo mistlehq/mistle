@@ -121,16 +121,15 @@ export function buildOpenUpdateIntegrationConnectionInput(input: {
   };
 }
 
+export type ProviderAppSetupState = Required<
+  Pick<NonNullable<IntegrationConnectionDetailItem["installation"]>, "isPending">
+> &
+  Pick<NonNullable<IntegrationConnectionDetailItem["installation"]>, "errorMessage">;
+
 export function buildIntegrationConnectionDetailItems(input: {
   connections: readonly IntegrationConnection[];
   controlPlaneApiOrigin?: string;
-  providerAppSetupStateByConnectionId?: ReadonlyMap<
-    string,
-    {
-      errorMessage?: string;
-      isPending: boolean;
-    }
-  >;
+  providerAppSetupStateByConnectionId?: ReadonlyMap<string, ProviderAppSetupState>;
   refreshingConnectionIds?: ReadonlySet<string>;
   refreshingResourceKeys: ReadonlySet<string>;
   targetConfig?: Record<string, unknown>;

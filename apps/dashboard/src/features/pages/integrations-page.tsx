@@ -28,6 +28,7 @@ import {
 } from "./integration-connection-setup-state.js";
 import {
   buildIntegrationConnectionDetailItems,
+  type ProviderAppSetupState,
   resolveIntegrationConnectionDetailWebhookPolicy,
 } from "./integrations-page-view-model.js";
 import { OrganizationIntegrationsSettingsPageView } from "./organization-integrations-settings-page-view.js";
@@ -37,11 +38,6 @@ import {
   SETTINGS_INTEGRATIONS_QUERY_KEY,
   useIntegrationsDirectoryState,
 } from "./use-integrations-directory-state.js";
-
-type ProviderAppSetupState = {
-  errorMessage?: string;
-  isPending: boolean;
-};
 
 type ProviderAppSetupStateEntry = [string, ProviderAppSetupState];
 
