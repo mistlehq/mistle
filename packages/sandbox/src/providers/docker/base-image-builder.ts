@@ -20,6 +20,20 @@ export type DockerBaseImageBuilderOptions = {
   readonly env?: NodeJS.ProcessEnv;
 };
 
+export function createDockerBaseImageBuilderEnv(input: {
+  readonly baseEnv: NodeJS.ProcessEnv;
+  readonly overrideEnv?: NodeJS.ProcessEnv;
+}): NodeJS.ProcessEnv {
+  if (input.overrideEnv === undefined) {
+    return input.baseEnv;
+  }
+
+  return {
+    ...input.baseEnv,
+    ...input.overrideEnv,
+  };
+}
+
 export class DockerBaseImageBuilder implements SandboxBaseImageBuilder {
   readonly #options: DockerBaseImageBuilderOptions;
 
@@ -31,7 +45,10 @@ export class DockerBaseImageBuilder implements SandboxBaseImageBuilder {
     const command = createDockerBuildBaseImageCommand(request);
     const result = spawnSync(command.command, command.args, {
       cwd: command.cwd,
-      ...(this.#options.env === undefined ? {} : { env: this.#options.env }),
+      env: createDockerBaseImageBuilderEnv({
+        baseEnv: process.env,
+        ...(this.#options.env === undefined ? {} : { overrideEnv: this.#options.env }),
+      }),
       stdio: "inherit",
     });
 

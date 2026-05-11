@@ -2,7 +2,7 @@
   "name": "@mistle/config",
   "private": true,
   "bin": {
-    "mistle-config": "./dist/cli/mistle-config.js"
+    "mistle-config": "./mistle-config.js"
   },
   "files": [
     "dist/**",

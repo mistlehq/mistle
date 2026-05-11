@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx ./scripts/dev/start.ts",
+    "dev": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--conditions=workspace-src\" tsx ./scripts/dev/start.ts",
     "dev:nix": "nix develop --command pnpm dev",
     "dev:workspace": "turbo watch dev dev:schedules --ui=tui --filter=!@mistle/docs --env-mode=loose",
     "docs:dev": "nix develop .#docs -c pnpm --filter @mistle/docs dev",

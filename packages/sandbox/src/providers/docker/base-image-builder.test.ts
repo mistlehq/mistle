@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { SandboxConfigurationError } from "../../errors.js";
 import { SandboxBaseImagePublishModes, SandboxBaseImageSourceKinds } from "../../types.js";
-import { createDockerBuildBaseImageCommand } from "./base-image-builder.js";
+import {
+  createDockerBaseImageBuilderEnv,
+  createDockerBuildBaseImageCommand,
+} from "./base-image-builder.js";
 
 describe("createDockerBuildBaseImageCommand", () => {
   it("creates a Docker buildx push command for a Dockerfile source", () => {
@@ -69,5 +72,36 @@ describe("createDockerBuildBaseImageCommand", () => {
         },
       }),
     ).toThrow(SandboxConfigurationError);
+  });
+});
+
+describe("createDockerBaseImageBuilderEnv", () => {
+  it("preserves process environment entries required to resolve the Docker executable", () => {
+    const baseEnv: NodeJS.ProcessEnv = {
+      PATH: "/usr/local/bin:/usr/bin:/bin",
+      HOME: "/Users/dev",
+    };
+    const overrideEnv: NodeJS.ProcessEnv = {
+      MISTLE_CONFIG_PATH: "/repo/config/config.development.toml",
+    };
+
+    expect(createDockerBaseImageBuilderEnv({ baseEnv, overrideEnv })).toEqual({
+      PATH: "/usr/local/bin:/usr/bin:/bin",
+      HOME: "/Users/dev",
+      MISTLE_CONFIG_PATH: "/repo/config/config.development.toml",
+    });
+  });
+
+  it("lets explicit override values win over the base process environment", () => {
+    const baseEnv: NodeJS.ProcessEnv = {
+      MISTLE_CONFIG_PATH: "/old/config.toml",
+    };
+    const overrideEnv: NodeJS.ProcessEnv = {
+      MISTLE_CONFIG_PATH: "/repo/config/config.development.toml",
+    };
+
+    expect(createDockerBaseImageBuilderEnv({ baseEnv, overrideEnv })).toEqual({
+      MISTLE_CONFIG_PATH: "/repo/config/config.development.toml",
+    });
   });
 });
