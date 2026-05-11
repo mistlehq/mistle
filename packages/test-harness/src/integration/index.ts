@@ -58,9 +58,11 @@ type CreateIntegrationTestInput = {
   }) => Promise<void | (() => Promise<void>)>;
   __serviceOptions?:
     | {
+        controlPlaneApi?: IntegrationServiceOptions["controlPlaneApi"];
         sandbox?: IntegrationServiceOptions["sandbox"];
       }
     | (() => Promise<{
+        controlPlaneApi?: IntegrationServiceOptions["controlPlaneApi"];
         sandbox?: IntegrationServiceOptions["sandbox"];
       }>);
 };
@@ -209,8 +211,9 @@ async function registryFor(input: CreateIntegrationTestInput): Promise<TestServi
       {
         controlPlaneApi:
           input.auth?.google === undefined
-            ? {}
+            ? (inputServiceOptions?.controlPlaneApi ?? {})
             : {
+                ...inputServiceOptions?.controlPlaneApi,
                 googleAuth: input.auth.google,
               },
         ...(inputServiceOptions?.sandbox === undefined

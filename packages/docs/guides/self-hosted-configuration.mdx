@@ -103,7 +103,11 @@ by the current runtime. Add `google` only when Google OAuth is configured:
 ```toml
 [services.control_plane_api.auth]
 enabled_methods = ["otp", "google"]
+allow_signups = true
 ```
+
+Set `allow_signups = false` to let existing users continue signing in while
+blocking first-time OTP and Google users from creating accounts.
 
 Service-to-service auth is configured under `internal_auth`. The `method` field is
 currently optional and kept for future expansion; the runtime uses shared-token
@@ -180,6 +184,7 @@ This table covers the operator-facing TOML keys accepted by `@mistle/config`.
 | `services.control_plane_api.auth.secret`                                       | Yes                                        | Auth signing secret.                                                                                      |
 | `services.control_plane_api.auth.trusted_origins`                              | Yes                                        | Allowed dashboard/browser origins.                                                                        |
 | `services.control_plane_api.auth.enabled_methods`                              | No                                         | Supported values: `otp`, `google`. Google requires credentials. If omitted, only OTP is exposed to users. |
+| `services.control_plane_api.auth.allow_signups`                                | No                                         | Whether first-time OTP and Google sign-ins may create users. Defaults to `true`.                          |
 | `services.control_plane_api.auth.otp.length`                                   | Yes                                        | OTP code length.                                                                                          |
 | `services.control_plane_api.auth.otp.expires_in_seconds`                       | Yes                                        | OTP expiry.                                                                                               |
 | `services.control_plane_api.auth.otp.allowed_attempts`                         | Yes                                        | Maximum OTP attempts.                                                                                     |

@@ -19,6 +19,7 @@ export type IntegrationSandboxOptions = {
 
 export type IntegrationServiceOptions = {
   controlPlaneApi: {
+    allowSignups?: boolean;
     googleAuth?: "simulated";
   };
   sandbox?: IntegrationSandboxOptions;

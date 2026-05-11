@@ -16,6 +16,7 @@ export function createEmailOtpProvider(input: CreateEmailOtpProviderInput) {
     otpLength: input.config.otpLength,
     expiresIn: input.config.otpExpiresInSeconds,
     allowedAttempts: input.config.otpAllowedAttempts,
+    disableSignUp: !input.config.allowSignups,
     sendVerificationOTP: input.sendVerificationOTP,
   });
 }

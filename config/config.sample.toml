@@ -32,6 +32,7 @@ internal_url = "http://control-plane-api:8080"
 secret = "replace-with-strong-auth-secret"
 trusted_origins = ["https://app.mistle.example"]
 enabled_methods = ["otp"]
+allow_signups = true
 
 [services.control_plane_api.auth.otp]
 length = 6

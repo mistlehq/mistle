@@ -131,6 +131,7 @@ function createAuthConfig(config: ControlPlaneApiRuntimeConfig["app"]): ControlP
     dashboardBaseUrl: config.dashboard.baseUrl,
     authSecret: config.auth.secret,
     authTrustedOrigins: config.auth.trustedOrigins,
+    authAllowSignups: config.auth.allowSignups,
     authOTPLength: config.auth.otpLength,
     authOTPExpiresInSeconds: config.auth.otpExpiresInSeconds,
     authOTPAllowedAttempts: config.auth.otpAllowedAttempts,

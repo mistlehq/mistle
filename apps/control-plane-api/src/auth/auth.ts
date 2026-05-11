@@ -2,6 +2,7 @@ import type { ControlPlaneDatabase, ControlPlaneTables } from "@mistle/db/contro
 import { ControlPlaneDbSchema } from "@mistle/db/control-plane";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { APIError } from "better-auth/api";
 import { organization } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
 import type { OpenWorkflow } from "openworkflow";
@@ -19,6 +20,7 @@ export type ControlPlaneAuthConfig = {
   dashboardBaseUrl: string;
   authSecret: string;
   authTrustedOrigins: string[];
+  authAllowSignups: boolean;
   authOTPLength: number;
   authOTPExpiresInSeconds: number;
   authOTPAllowedAttempts: number;
@@ -72,8 +74,10 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
         otpLength: config.authOTPLength,
         otpExpiresInSeconds: config.authOTPExpiresInSeconds,
         otpAllowedAttempts: config.authOTPAllowedAttempts,
+        allowSignups: config.authAllowSignups,
       },
-      google: googleConfig,
+      google:
+        googleConfig === null ? null : { ...googleConfig, allowSignups: config.authAllowSignups },
     },
     sendVerificationOTP,
   });
@@ -104,6 +108,20 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
     },
     socialProviders: providers.options.socialProviders,
     databaseHooks: {
+      user: {
+        create: {
+          async before() {
+            if (config.authAllowSignups) {
+              return;
+            }
+
+            throw new APIError("FORBIDDEN", {
+              code: "SIGNUPS_DISABLED",
+              message: "Signups are disabled.",
+            });
+          },
+        },
+      },
       session: {
         create: {
           async before(session) {

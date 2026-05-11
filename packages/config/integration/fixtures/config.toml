@@ -29,6 +29,7 @@ internal_url = "http://127.0.0.1:5100"
 secret = "test-secret"
 trusted_origins = ["http://127.0.0.1:3000"]
 enabled_methods = ["otp"]
+allow_signups = true
 
 [services.control_plane_api.auth.otp]
 length = 6

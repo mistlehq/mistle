@@ -4,6 +4,7 @@ import type { Config } from "./schema.js";
 import { selectControlPlaneApiConfig } from "./selectors.js";
 
 function createRootConfig(input: {
+  allowSignups?: boolean;
   enabledMethods?: Array<"otp" | "google">;
   google?: {
     client_id: string;
@@ -31,6 +32,7 @@ function createRootConfig(input: {
         auth: {
           secret: "auth-secret",
           trusted_origins: ["https://app.example.com"],
+          allow_signups: input.allowSignups ?? true,
           ...(input.enabledMethods === undefined ? {} : { enabled_methods: input.enabledMethods }),
           otp: {
             length: 6,
@@ -190,5 +192,17 @@ describe("selectControlPlaneApiConfig", () => {
     );
 
     expect(config.auth.google).toBeUndefined();
+  });
+
+  it("selects enabled signup allowance", () => {
+    const config = selectControlPlaneApiConfig(createRootConfig({}));
+
+    expect(config.auth.allowSignups).toBe(true);
+  });
+
+  it("selects disabled signup allowance", () => {
+    const config = selectControlPlaneApiConfig(createRootConfig({ allowSignups: false }));
+
+    expect(config.auth.allowSignups).toBe(false);
   });
 });

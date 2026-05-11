@@ -156,6 +156,7 @@ const controlPlaneApiEnvConfig = {
     baseUrl: "http://127.0.0.1:5000",
     secret: "test-secret",
     trustedOrigins: ["http://127.0.0.1:3000"],
+    allowSignups: true,
     otpLength: 6,
     otpExpiresInSeconds: 300,
     otpAllowedAttempts: 3,

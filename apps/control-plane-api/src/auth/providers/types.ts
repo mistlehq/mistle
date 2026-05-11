@@ -2,6 +2,7 @@ import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import type { OAuth2Tokens } from "better-auth/oauth2";
 
 export type EmailOtpProviderConfig = {
+  allowSignups: boolean;
   otpLength: number;
   otpExpiresInSeconds: number;
   otpAllowedAttempts: number;
@@ -26,7 +27,7 @@ export type GoogleProviderConfig = {
 
 export type AuthProviderConfig = {
   emailOtp: EmailOtpProviderConfig;
-  google: GoogleProviderConfig | null;
+  google: (GoogleProviderConfig & { allowSignups: boolean }) | null;
 };
 
 export type AuthProviderAssembly = {

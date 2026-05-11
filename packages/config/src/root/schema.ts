@@ -66,6 +66,7 @@ const ControlPlaneApiAuthSchema = z
     secret: z.string().trim().min(1),
     trusted_origins: z.array(UrlSchema).min(1),
     enabled_methods: z.array(AuthMethodSchema).min(1).optional(),
+    allow_signups: z.boolean().default(true),
     otp: z
       .object({
         length: z.number().int().min(4).max(12),

@@ -27,6 +27,7 @@ internal_url = "http://127.0.0.1:5100"
 secret = "replace-with-control-plane-auth-secret"
 trusted_origins = ["https://replace-with-dashboard-public-host"]
 enabled_methods = ["otp"]
+allow_signups = true
 
 [services.control_plane_api.auth.otp]
 length = 6

@@ -52,6 +52,7 @@ describe("loadRootConfigFromEnv", () => {
       MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_SECRET: "auth-secret",
       MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: "https://app.example.com",
       MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_ENABLED_METHODS: "otp,google",
+      MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_ALLOW_SIGNUPS: "false",
       MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_OTP_LENGTH: "6",
       MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_OTP_EXPIRES_IN_SECONDS: "300",
       MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_OTP_ALLOWED_ATTEMPTS: "3",
@@ -191,6 +192,7 @@ describe("loadRootConfigFromEnv", () => {
             secret: "auth-secret",
             trusted_origins: ["https://app.example.com"],
             enabled_methods: ["otp", "google"],
+            allow_signups: false,
             otp: {
               length: 6,
               expires_in_seconds: 300,

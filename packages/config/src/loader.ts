@@ -403,6 +403,11 @@ const ControlPlaneApiEnvDescriptors = [
     parse: parseCsvEnv,
   },
   {
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_ALLOW_SIGNUPS",
+    path: ["auth", "allowSignups"],
+    parse: parseStrictBooleanEnv,
+  },
+  {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_OTP_LENGTH",
     path: ["auth", "otpLength"],
     parse: parseNumberEnv,
