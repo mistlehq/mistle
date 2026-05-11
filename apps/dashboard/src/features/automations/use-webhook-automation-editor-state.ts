@@ -17,6 +17,7 @@ import {
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxProfileVersionIntegrationBinding } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type { AutomationCreateSuccessPath } from "./automation-editor-navigation.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import {
   toCreateWebhookAutomationPayload,
@@ -227,6 +228,8 @@ type LoadedWebhookAutomationEditorStateInput = {
   mode: "create" | "edit";
   automationId: string | undefined;
   navigate: NavigateFunction;
+  createSuccessPath?: AutomationCreateSuccessPath;
+  deleteSuccessPath?: string;
   initialValues: WebhookAutomationFormValues;
   initialSandboxProfileVersion?: number;
   connectionOptions: readonly WebhookAutomationOption[];
@@ -506,7 +509,11 @@ export function useLoadedWebhookAutomationEditorState(
       setValidationSummaryError(null);
       setFormError(null);
       await invalidateAutomationsQuery(queryClient);
-      await input.navigate(`/automations/${automation.id}`);
+      await input.navigate(
+        input.createSuccessPath === undefined
+          ? `/automations/${automation.id}`
+          : input.createSuccessPath(automation),
+      );
     },
     onError: (error: unknown) => {
       setFormError(
@@ -564,7 +571,7 @@ export function useLoadedWebhookAutomationEditorState(
     },
     onSuccess: async () => {
       await invalidateAutomationsQuery(queryClient);
-      await input.navigate("/automations");
+      await input.navigate(input.deleteSuccessPath ?? "/automations");
     },
     onError: (error: unknown) => {
       setDeleteError(

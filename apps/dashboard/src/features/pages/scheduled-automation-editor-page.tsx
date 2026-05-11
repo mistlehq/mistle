@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import type { AutomationCreateSuccessPath } from "../automations/automation-editor-navigation.js";
 import { AutomationTypeDisplayField } from "../automations/automation-type-field.js";
 import { DeleteWebhookAutomationDialog } from "../automations/delete-webhook-automation-dialog.js";
 import { toScheduledAutomationFormValues } from "../automations/scheduled-automation-form-helpers.js";
@@ -74,6 +75,8 @@ function renderScheduledAutomationEditorError(input: {
 export function CreateScheduledAutomationEditor(input: {
   navigate: (to: string) => void | Promise<void>;
   automationTypeField?: ReactNode;
+  initialSandboxProfileId?: string | undefined;
+  createSuccessPath?: AutomationCreateSuccessPath;
 }): React.JSX.Element | null {
   const prerequisites = useScheduledAutomationPrerequisites();
 
@@ -98,15 +101,23 @@ export function CreateScheduledAutomationEditor(input: {
       automationId={undefined}
       automationTypeField={input.automationTypeField}
       navigate={input.navigate}
-      initialValues={toScheduledAutomationFormValues(null)}
+      {...(input.createSuccessPath === undefined
+        ? {}
+        : { createSuccessPath: input.createSuccessPath })}
+      initialValues={{
+        ...toScheduledAutomationFormValues(null),
+        sandboxProfileId: input.initialSandboxProfileId ?? "",
+      }}
       sandboxProfileOptions={prerequisites.sandboxProfileOptions}
     />
   );
 }
 
-function EditScheduledAutomationEditor(input: {
+export function EditScheduledAutomationEditor(input: {
   automationId: string;
   navigate: (to: string) => void | Promise<void>;
+  backPath?: string | undefined;
+  deleteSuccessPath?: string | undefined;
 }): React.JSX.Element | null {
   const automationQuery = useQuery({
     queryKey: scheduledAutomationDetailQueryKey(input.automationId),
@@ -127,7 +138,7 @@ function EditScheduledAutomationEditor(input: {
         fallbackMessage: prerequisites.errorMessage ?? "Could not load automation.",
       }),
       onBack: () => {
-        void input.navigate("/automations");
+        void input.navigate(input.backPath ?? "/automations");
       },
     });
   }
@@ -143,6 +154,9 @@ function EditScheduledAutomationEditor(input: {
       automationId={input.automationId}
       automationTypeField={<AutomationTypeDisplayField value="scheduled" />}
       navigate={input.navigate}
+      {...(input.deleteSuccessPath === undefined
+        ? {}
+        : { deleteSuccessPath: input.deleteSuccessPath })}
       initialValues={toScheduledAutomationFormValues(automationQuery.data)}
       sandboxProfileOptions={prerequisites.sandboxProfileOptions}
       initialSandboxProfileVersion={automationQuery.data.target.sandboxProfileVersion}
@@ -155,6 +169,8 @@ function LoadedScheduledAutomationEditor(input: {
   automationId: string | undefined;
   automationTypeField?: ReactNode;
   navigate: (to: string) => void | Promise<void>;
+  createSuccessPath?: AutomationCreateSuccessPath;
+  deleteSuccessPath?: string;
   initialValues: ReturnType<typeof toScheduledAutomationFormValues>;
   sandboxProfileOptions: ReturnType<
     typeof useScheduledAutomationPrerequisites

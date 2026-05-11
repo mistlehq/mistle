@@ -101,6 +101,14 @@ export const APP_ROUTES = createRoutesFromElements(
               </Route>
               <Route
                 element={<RouteOutlet />}
+                handle={ROUTE_HANDLES.sandboxProfileAutomations}
+                path="automations"
+              >
+                <Route element={<RouteOutlet />} index />
+                <Route element={<RouteOutlet />} path=":automationId" />
+              </Route>
+              <Route
+                element={<RouteOutlet />}
                 handle={ROUTE_HANDLES.sandboxProfileSnapshots}
                 path="snapshots"
               />

@@ -115,7 +115,7 @@ export type SandboxProfileEditorPageStoryArgs = {
 type IntegrationsSectionState = NonNullable<
   SandboxProfileEditorPageStoryArgs["integrationsSectionState"]
 >;
-type StorySectionId = "sandbox-profile" | "snapshot";
+type StorySectionId = "sandbox-profile" | "automations" | "snapshot";
 
 const StorySections = [
   {
@@ -125,6 +125,10 @@ const StorySections = [
   {
     id: "snapshot",
     label: "Snapshots",
+  },
+  {
+    id: "automations",
+    label: "Automations",
   },
 ] as const satisfies readonly SandboxProfileEditorSection<StorySectionId>[];
 
@@ -805,6 +809,14 @@ function SandboxProfileEditorPageStoryView(
                 snapshotStatus,
               })}
             />
+          );
+        }
+
+        if (sectionId === "automations") {
+          return (
+            <div className="flex min-h-64 items-center justify-center rounded-md border bg-background p-6 text-center text-sm text-muted-foreground">
+              No automations use this sandbox profile.
+            </div>
           );
         }
 

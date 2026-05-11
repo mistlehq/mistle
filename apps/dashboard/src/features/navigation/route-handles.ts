@@ -246,6 +246,13 @@ export const ROUTE_HANDLES = {
     title: "Edit profile",
     description: "Edit sandbox profile configuration.",
   },
+  sandboxProfileAutomations: {
+    appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
+    breadcrumb: "Automations",
+    title: "Edit profile",
+    description: "Manage sandbox profile automations.",
+  },
   sandboxProfileSnapshots: {
     appShellInsetOwner: "child",
     sidebarTriggerOwner: "page-frame",

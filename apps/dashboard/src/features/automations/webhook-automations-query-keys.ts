@@ -4,8 +4,16 @@ export function automationsListQueryKey(input: {
   limit: number;
   after: string | null;
   before: string | null;
-}): readonly ["automations", "list", number, string | null, string | null] {
-  return [AUTOMATIONS_QUERY_KEY_PREFIX[0], "list", input.limit, input.after, input.before];
+  sandboxProfileId?: string | undefined;
+}): readonly ["automations", "list", number, string | null, string | null, string | undefined] {
+  return [
+    AUTOMATIONS_QUERY_KEY_PREFIX[0],
+    "list",
+    input.limit,
+    input.after,
+    input.before,
+    input.sandboxProfileId,
+  ];
 }
 
 export function webhookAutomationsListQueryKey(input: {

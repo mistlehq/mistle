@@ -104,6 +104,7 @@ import {
   resolveSandboxBaseRepositoryHandles,
   SetupScriptTimingDescription,
 } from "./sandbox-base-inventory-copy.js";
+import { SandboxProfileAutomationsSection } from "./sandbox-profile-automations-section.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -180,7 +181,7 @@ type SandboxProfileEditorPageProps =
       mode: "edit";
     };
 
-type SandboxProfileEditorSectionId = "sandbox-profile" | "snapshot";
+type SandboxProfileEditorSectionId = "sandbox-profile" | "automations" | "snapshot";
 type SandboxProfileEditorNavigationState = {
   notice: "publish-success" | null;
 };
@@ -275,6 +276,7 @@ pnpm dev:bootstrap`;
 
 const SandboxProfileEditorSectionIds = {
   SANDBOX_PROFILE: "sandbox-profile",
+  AUTOMATIONS: "automations",
   SNAPSHOT: "snapshot",
 } satisfies Record<string, SandboxProfileEditorSectionId>;
 const PublishSuccessNavigationState: SandboxProfileEditorNavigationState = {
@@ -298,17 +300,27 @@ function createSandboxProfileSnapshotsPath(profileId: string): string {
   return `/sandbox-profiles/${profileId}/snapshots`;
 }
 
+function createSandboxProfileAutomationsPath(profileId: string): string {
+  return `/sandbox-profiles/${profileId}/automations`;
+}
+
 function createSandboxProfileTabPath(input: {
   profileId: string;
   sectionId: SandboxProfileEditorSectionId;
   view?: SandboxProfileRouteView;
 }): string {
-  return input.sectionId === SandboxProfileEditorSectionIds.SNAPSHOT
-    ? createSandboxProfileSnapshotsPath(input.profileId)
-    : createSandboxProfileEditorPath({
-        profileId: input.profileId,
-        ...(input.view === undefined ? {} : { view: input.view }),
-      });
+  if (input.sectionId === SandboxProfileEditorSectionIds.SNAPSHOT) {
+    return createSandboxProfileSnapshotsPath(input.profileId);
+  }
+
+  if (input.sectionId === SandboxProfileEditorSectionIds.AUTOMATIONS) {
+    return createSandboxProfileAutomationsPath(input.profileId);
+  }
+
+  return createSandboxProfileEditorPath({
+    profileId: input.profileId,
+    ...(input.view === undefined ? {} : { view: input.view }),
+  });
 }
 
 function resolveLatestPublishedSandboxProfileVersion(
@@ -354,6 +366,13 @@ function readSandboxProfileEditorSectionPathSegment(input: {
     return SandboxProfileEditorSectionIds.SNAPSHOT;
   }
 
+  if (
+    input.pathname === createSandboxProfileAutomationsPath(input.profileId) ||
+    input.pathname.startsWith(`${createSandboxProfileAutomationsPath(input.profileId)}/`)
+  ) {
+    return SandboxProfileEditorSectionIds.AUTOMATIONS;
+  }
+
   return null;
 }
 
@@ -385,6 +404,15 @@ function readSandboxProfileEditorRoute(input: {
   if (input.pathname === createSandboxProfileSnapshotsPath(input.profileId)) {
     return {
       sectionId: SandboxProfileEditorSectionIds.SNAPSHOT,
+    };
+  }
+
+  if (
+    input.pathname === createSandboxProfileAutomationsPath(input.profileId) ||
+    input.pathname.startsWith(`${createSandboxProfileAutomationsPath(input.profileId)}/`)
+  ) {
+    return {
+      sectionId: SandboxProfileEditorSectionIds.AUTOMATIONS,
     };
   }
 
@@ -1964,6 +1992,10 @@ function SandboxProfileEditorSectionPanels(input: {
   snapshotVersion: SandboxProfileVersion | null;
   versionActionIsPending: boolean;
 }): React.JSX.Element {
+  if (input.activeSectionId === SandboxProfileEditorSectionIds.AUTOMATIONS) {
+    return <SandboxProfileAutomationsSection profileId={input.profileId} />;
+  }
+
   if (input.activeSectionId === SandboxProfileEditorSectionIds.SNAPSHOT) {
     return (
       <SandboxProfileSnapshotPanel
@@ -2214,6 +2246,10 @@ const SandboxProfileEditorTabs = [
   {
     id: SandboxProfileEditorSectionIds.SNAPSHOT,
     label: "Snapshots",
+  },
+  {
+    id: SandboxProfileEditorSectionIds.AUTOMATIONS,
+    label: "Automations",
   },
 ] as const satisfies readonly SandboxProfileEditorSection<SandboxProfileEditorSectionId>[];
 

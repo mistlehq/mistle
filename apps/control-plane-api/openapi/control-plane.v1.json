@@ -87,6 +87,15 @@
             "required": false,
             "name": "before",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "sandboxProfileId",
+            "in": "query"
           }
         ],
         "responses": {

@@ -142,6 +142,11 @@ describe("app routing breadcrumb integration", () => {
           </Route>
           <Route
             element={<PageHarness />}
+            handle={ROUTE_HANDLES.sandboxProfileAutomations}
+            path="automations"
+          />
+          <Route
+            element={<PageHarness />}
             handle={ROUTE_HANDLES.sandboxProfileSnapshots}
             path="snapshots"
           />

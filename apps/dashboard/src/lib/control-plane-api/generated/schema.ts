@@ -441,6 +441,7 @@ export interface paths {
           after?: string;
           before?: string;
           limit?: number;
+          sandboxProfileId?: string;
         };
         header?: never;
         path?: never;

@@ -19,7 +19,15 @@ describe("webhook automations query keys", () => {
         after: "cursor_after",
         before: null,
       }),
-    ).toEqual(["automations", "list", 25, "cursor_after", null]);
+    ).toEqual(["automations", "list", 25, "cursor_after", null, undefined]);
+    expect(
+      automationsListQueryKey({
+        limit: 25,
+        after: null,
+        before: null,
+        sandboxProfileId: "sbp_123",
+      }),
+    ).toEqual(["automations", "list", 25, null, null, "sbp_123"]);
   });
 
   it("builds the webhook list query key", () => {

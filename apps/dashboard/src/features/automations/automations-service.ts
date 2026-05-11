@@ -33,6 +33,7 @@ export async function listAutomations(input: {
   limit: number;
   after: string | null;
   before: string | null;
+  sandboxProfileId?: string | undefined;
   signal?: AbortSignal;
 }): Promise<AutomationsListResult> {
   try {
@@ -44,6 +45,9 @@ export async function listAutomations(input: {
         limit: input.limit,
         ...(input.after === null ? {} : { after: input.after }),
         ...(input.before === null ? {} : { before: input.before }),
+        ...(input.sandboxProfileId === undefined
+          ? {}
+          : { sandboxProfileId: input.sandboxProfileId }),
       },
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not load automations.",

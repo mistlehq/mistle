@@ -11,6 +11,7 @@ import {
   listSandboxProfileVersions,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type { AutomationCreateSuccessPath } from "./automation-editor-navigation.js";
 import {
   toCreateScheduledAutomationPayload,
   toScheduledAutomationFormValues,
@@ -38,6 +39,8 @@ type LoadedScheduledAutomationEditorStateInput = {
   mode: "create" | "edit";
   automationId: string | undefined;
   navigate: NavigateFunction;
+  createSuccessPath?: AutomationCreateSuccessPath;
+  deleteSuccessPath?: string;
   initialValues: ScheduledAutomationFormValues;
   initialSandboxProfileVersion?: number;
   sandboxProfileOptions: readonly ScheduledAutomationFormOption[];
@@ -267,7 +270,11 @@ export function useLoadedScheduledAutomationEditorState(
         queryClient,
         automationId: automation.id,
       });
-      await input.navigate(`/automations/schedules/${automation.id}`);
+      await input.navigate(
+        input.createSuccessPath === undefined
+          ? `/automations/schedules/${automation.id}`
+          : input.createSuccessPath(automation),
+      );
     },
     onError: (error: unknown) => {
       setFormError(
@@ -335,7 +342,7 @@ export function useLoadedScheduledAutomationEditorState(
         queryClient,
         automationId: input.automationId,
       });
-      await input.navigate("/automations");
+      await input.navigate(input.deleteSuccessPath ?? "/automations");
     },
     onError: (error: unknown) => {
       setDeleteError(

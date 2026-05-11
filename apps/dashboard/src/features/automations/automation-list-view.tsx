@@ -6,16 +6,13 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
   textLinkVariants,
 } from "@mistle/ui";
-import { WarningCircleIcon } from "@phosphor-icons/react";
 
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
+import { AutomationIssueIndicator } from "./automation-list-indicators.js";
 import { AutomationListToolbar } from "./automation-list-toolbar.js";
 import type { AutomationListItemViewModel } from "./automation-list-types.js";
 import { useAutomationListState } from "./use-automation-list-state.js";
@@ -123,43 +120,6 @@ function SourceDetailsCell(input: { item: AutomationListItemViewModel }): React.
   }
 
   return <ScheduleSummaryCell item={input.item.source} />;
-}
-
-function AutomationStatusDot(input: { enabled: boolean }): React.JSX.Element {
-  return (
-    <>
-      <span
-        aria-hidden
-        className={`inline-block size-2 shrink-0 rounded-full ${
-          input.enabled ? "bg-emerald-500" : "bg-muted-foreground/35"
-        }`}
-      />
-      <span className="sr-only">{input.enabled ? "Enabled" : "Disabled"}</span>
-    </>
-  );
-}
-
-function AutomationIssueIndicator(input: {
-  issue: AutomationListItemViewModel["issue"];
-  enabled: boolean;
-}): React.JSX.Element {
-  if (input.issue === undefined) {
-    return <AutomationStatusDot enabled={input.enabled} />;
-  }
-
-  return (
-    <Tooltip delay={0}>
-      <TooltipTrigger
-        aria-label="View automation issue details"
-        className="inline-flex shrink-0 items-center justify-center rounded-full text-destructive outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-      >
-        <WarningCircleIcon aria-hidden className="size-4 fill-current" weight="fill" />
-      </TooltipTrigger>
-      <TooltipContent className="max-w-80 whitespace-pre-wrap text-left" side="top">
-        {input.issue.message}
-      </TooltipContent>
-    </Tooltip>
-  );
 }
 
 function AutomationIdentityCell(input: {

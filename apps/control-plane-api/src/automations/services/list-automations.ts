@@ -43,6 +43,8 @@ const CursorSchema = z
 export const ListAutomationsQuerySchema = createKeysetPaginationQuerySchema({
   defaultLimit: DEFAULT_PAGE_SIZE,
   maxLimit: MAX_PAGE_SIZE,
+}).extend({
+  sandboxProfileId: z.string().min(1).optional(),
 });
 
 export type ListAutomationsInput = {
@@ -50,6 +52,7 @@ export type ListAutomationsInput = {
   limit?: number;
   after?: string | undefined;
   before?: string | undefined;
+  sandboxProfileId?: string | undefined;
 };
 
 type AutomationListIssue = {
@@ -653,6 +656,7 @@ async function loadAutomationListPageItems(input: {
 function buildListableAutomationWhereClause(input: {
   tables: ControlPlaneTables;
   organizationId: string;
+  sandboxProfileId?: string | undefined;
   cursor?: z.infer<typeof CursorSchema> | undefined;
   direction?: (typeof KeysetPaginationDirections)[keyof typeof KeysetPaginationDirections];
 }) {
@@ -670,6 +674,9 @@ function buildListableAutomationWhereClause(input: {
         isNull(tables.schedules.deletedAt),
       ),
     ),
+    input.sandboxProfileId === undefined
+      ? undefined
+      : eq(tables.automationTargets.sandboxProfileId, input.sandboxProfileId),
   );
 
   if (input.cursor === undefined || input.direction === undefined) {
@@ -704,6 +711,7 @@ function buildListableAutomationWhereClause(input: {
 async function listAutomationPageReferences(input: {
   db: ControlPlaneDatabase;
   organizationId: string;
+  sandboxProfileId?: string | undefined;
   limitPlusOne: number;
   cursor?: z.infer<typeof CursorSchema> | undefined;
   direction: (typeof KeysetPaginationDirections)[keyof typeof KeysetPaginationDirections];
@@ -721,10 +729,15 @@ async function listAutomationPageReferences(input: {
       eq(tables.scheduleAutomations.automationId, tables.automations.id),
     )
     .leftJoin(tables.schedules, eq(tables.schedules.id, tables.scheduleAutomations.scheduleId))
+    .innerJoin(
+      tables.automationTargets,
+      eq(tables.automationTargets.automationId, tables.automations.id),
+    )
     .where(
       buildListableAutomationWhereClause({
         tables,
         organizationId: input.organizationId,
+        sandboxProfileId: input.sandboxProfileId,
         cursor: input.cursor,
         direction: input.direction,
       }),
@@ -748,6 +761,7 @@ function descAutomationCreatedAt(tables: ControlPlaneTables) {
 async function countListableAutomations(input: {
   db: ControlPlaneDatabase;
   organizationId: string;
+  sandboxProfileId?: string | undefined;
 }): Promise<number> {
   const tables = getControlPlaneDatabaseSchema(input.db);
   const [result] = await input.db
@@ -760,10 +774,15 @@ async function countListableAutomations(input: {
       eq(tables.scheduleAutomations.automationId, tables.automations.id),
     )
     .leftJoin(tables.schedules, eq(tables.schedules.id, tables.scheduleAutomations.scheduleId))
+    .innerJoin(
+      tables.automationTargets,
+      eq(tables.automationTargets.automationId, tables.automations.id),
+    )
     .where(
       buildListableAutomationWhereClause({
         tables,
         organizationId: input.organizationId,
+        sandboxProfileId: input.sandboxProfileId,
       }),
     );
 
@@ -823,6 +842,7 @@ export async function listAutomations(
         const automationReferences = await listAutomationPageReferences({
           db: ctx.db,
           organizationId: input.organizationId,
+          sandboxProfileId: input.sandboxProfileId,
           limitPlusOne,
           cursor,
           direction,
@@ -838,6 +858,7 @@ export async function listAutomations(
         countListableAutomations({
           db: ctx.db,
           organizationId: input.organizationId,
+          sandboxProfileId: input.sandboxProfileId,
         }),
     });
 

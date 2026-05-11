@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { withDashboardPageStory } from "../../storybook/decorators.js";
+import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import {
   DefaultSandboxProfileEditorStoryArgs,
   SandboxProfileEditorPageStory,
@@ -14,7 +14,7 @@ import {
 const meta = {
   title: "Dashboard/SandboxProfiles/Editor/Integrations",
   component: SandboxProfileEditorPageStory,
-  decorators: [withDashboardPageStory],
+  decorators: [withDashboardCenteredStory],
   render: function RenderStory(args): React.JSX.Element {
     return <SandboxProfileEditorPageStory {...args} />;
   },

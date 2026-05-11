@@ -15,6 +15,8 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { cleanupTestQueryClients, createTestQueryClient } from "../../test-support/query-client.js";
+import type { AutomationsListResult } from "../automations/automations-types.js";
+import { automationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import {
   sandboxProfileDetailQueryKey,
   sandboxProfileIntegrationDirectoryQueryKey,
@@ -108,7 +110,7 @@ type SandboxProfileEditorTestVersionState =
   | "published-failed";
 
 type SandboxProfileEditorTestRouteView = "published" | "draft" | "default";
-type SandboxProfileEditorTestRouteSection = "sandbox-profile" | "snapshot" | null;
+type SandboxProfileEditorTestRouteSection = "sandbox-profile" | "automations" | "snapshot" | null;
 
 function createRunningSnapshotJobFixture(input: {
   id: string;
@@ -374,6 +376,7 @@ function renderSandboxProfileEditor(input?: {
   integrationsLoading?: boolean;
   defaultPersistenceMode?: SandboxProfileVersion["defaultPersistenceMode"];
   persistentSandboxesEnabled?: boolean;
+  profileAutomationsListResult?: AutomationsListResult;
   routeSearch?: string;
   routeState?: unknown;
   routeSection?: SandboxProfileEditorTestRouteSection;
@@ -460,6 +463,24 @@ function renderSandboxProfileEditor(input?: {
     createdAt: "2026-04-23T00:00:00.000Z",
     updatedAt: "2026-04-23T00:00:00.000Z",
   });
+  const automationRouteSearchParams = new URLSearchParams(input?.routeSearch ?? "");
+  const automationAfter = automationRouteSearchParams.get("after");
+  const automationBefore =
+    automationAfter === null ? automationRouteSearchParams.get("before") : null;
+  queryClient.setQueryData(
+    automationsListQueryKey({
+      limit: 25,
+      after: automationAfter,
+      before: automationBefore,
+      sandboxProfileId: profileId,
+    }),
+    input?.profileAutomationsListResult ?? {
+      items: [],
+      nextPage: null,
+      previousPage: null,
+      totalResults: 0,
+    },
+  );
   if (input?.integrationBindingsError !== undefined) {
     queryClient.setQueryData(sandboxProfileVersionsQueryKey(profileId), {
       versions,
@@ -537,9 +558,11 @@ function renderSandboxProfileEditor(input?: {
       ? ""
       : resolvedRouteSection === "snapshot"
         ? "/snapshots"
-        : resolvedRouteView === "default"
-          ? "/sandbox-profile"
-          : `/sandbox-profile/${resolvedRouteView}`;
+        : resolvedRouteSection === "automations"
+          ? "/automations"
+          : resolvedRouteView === "default"
+            ? "/sandbox-profile"
+            : `/sandbox-profile/${resolvedRouteView}`;
   const initialPath =
     resolvedRouteView === "default"
       ? `/sandbox-profiles/${profileId}`
@@ -555,6 +578,10 @@ function renderSandboxProfileEditor(input?: {
               <Route element={<Outlet />} index />
               <Route element={<Outlet />} path="published" />
               <Route element={<Outlet />} path="draft" />
+            </Route>
+            <Route element={<Outlet />} path="automations">
+              <Route element={<Outlet />} index />
+              <Route element={<Outlet />} path=":automationId" />
             </Route>
             <Route element={<Outlet />} path="snapshots" />
           </Route>
@@ -961,10 +988,11 @@ describe("SandboxProfileEditorPage", () => {
     });
   });
 
-  it("renders sandbox profile and snapshots tabs", () => {
+  it("renders sandbox profile, automations, and snapshots tabs", () => {
     renderSandboxProfileEditor();
 
     expect(screen.getByRole("tab", { name: "Sandbox Profile" })).toBeDefined();
+    expect(screen.getByRole("tab", { name: "Automations" })).toBeDefined();
     expect(screen.getByRole("tab", { name: "Snapshots" })).toBeDefined();
     expect(screen.getByLabelText("Profile sections").className).toContain("max-w-5xl");
     expect(screen.getByLabelText("Profile sections").parentElement?.className).toContain("px-4");
@@ -1375,6 +1403,65 @@ describe("SandboxProfileEditorPage", () => {
 
     await router.navigate(-1);
     expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/snapshots`);
+  });
+
+  it("opens the automations tab from the section route segment", () => {
+    const { profileId, router } = renderSandboxProfileEditor({
+      routeSection: "automations",
+      versionState: "published",
+    });
+
+    expect(screen.getByRole("tab", { name: "Automations" }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
+    expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/automations`);
+    expect(screen.getByText("No automations use this sandbox profile.")).toBeDefined();
+  });
+
+  it("preserves the profile automation page cursor when selecting an automation", () => {
+    const { profileId, router } = renderSandboxProfileEditor({
+      routeSection: "automations",
+      routeSearch: "?after=cursor_after",
+      versionState: "published",
+      profileAutomationsListResult: {
+        items: [
+          {
+            id: "atm_profile_page_2",
+            kind: "webhook",
+            name: "Page two webhook",
+            enabled: true,
+            target: {
+              sandboxProfileId: "sbp_test",
+              sandboxProfileName: "Prototype Profile",
+              primaryRepositoryId: null,
+              primaryRepositoryName: null,
+            },
+            source: {
+              kind: "webhook",
+              events: [
+                {
+                  label: "Issue comment created",
+                },
+              ],
+            },
+            updatedAt: "2026-04-23T00:00:00.000Z",
+          },
+        ],
+        nextPage: null,
+        previousPage: {
+          before: "cursor_before",
+          limit: 25,
+        },
+        totalResults: 26,
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Page two webhook/ }));
+
+    expect(router.state.location.pathname).toBe(
+      `/sandbox-profiles/${profileId}/automations/atm_profile_page_2`,
+    );
+    expect(router.state.location.search).toBe("?after=cursor_after");
   });
 
   it("keeps draft setup script edits across section route changes", async () => {

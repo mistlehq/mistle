@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import type { AutomationCreateSuccessPath } from "../automations/automation-editor-navigation.js";
 import { AutomationTypeDisplayField } from "../automations/automation-type-field.js";
 import { DeleteWebhookAutomationDialog } from "../automations/delete-webhook-automation-dialog.js";
 import {
@@ -79,6 +80,8 @@ function renderWebhookAutomationEditorError(input: {
 export function CreateWebhookAutomationEditor(input: {
   navigate: (to: string) => void | Promise<void>;
   automationTypeField?: ReactNode;
+  initialSandboxProfileId?: string | undefined;
+  createSuccessPath?: AutomationCreateSuccessPath;
 }): React.JSX.Element | null {
   const prerequisites = useWebhookAutomationPrerequisites();
 
@@ -103,7 +106,13 @@ export function CreateWebhookAutomationEditor(input: {
       automationId={undefined}
       automationTypeField={input.automationTypeField}
       navigate={input.navigate}
-      initialValues={toWebhookAutomationFormValues(null)}
+      {...(input.createSuccessPath === undefined
+        ? {}
+        : { createSuccessPath: input.createSuccessPath })}
+      initialValues={{
+        ...toWebhookAutomationFormValues(null),
+        sandboxProfileId: input.initialSandboxProfileId ?? "",
+      }}
       connectionOptions={prerequisites.connectionOptions}
       sandboxProfileOptions={prerequisites.sandboxProfileOptions}
       directoryData={prerequisites.directoryData}
@@ -111,9 +120,11 @@ export function CreateWebhookAutomationEditor(input: {
   );
 }
 
-function EditWebhookAutomationEditor(input: {
+export function EditWebhookAutomationEditor(input: {
   automationId: string;
   navigate: (to: string) => void | Promise<void>;
+  backPath?: string | undefined;
+  deleteSuccessPath?: string | undefined;
 }): React.JSX.Element | null {
   const automationQuery = useQuery({
     queryKey: webhookAutomationDetailQueryKey(input.automationId),
@@ -140,7 +151,7 @@ function EditWebhookAutomationEditor(input: {
         fallbackMessage: prerequisites.errorMessage ?? "Could not load automation.",
       }),
       onBack: () => {
-        void input.navigate("/automations");
+        void input.navigate(input.backPath ?? "/automations");
       },
     });
   }
@@ -168,7 +179,7 @@ function EditWebhookAutomationEditor(input: {
         fallbackMessage: "Could not load automation.",
       }),
       onBack: () => {
-        void input.navigate("/automations");
+        void input.navigate(input.backPath ?? "/automations");
       },
     });
   }
@@ -180,6 +191,9 @@ function EditWebhookAutomationEditor(input: {
       automationId={input.automationId}
       automationTypeField={<AutomationTypeDisplayField value="trigger" />}
       navigate={input.navigate}
+      {...(input.deleteSuccessPath === undefined
+        ? {}
+        : { deleteSuccessPath: input.deleteSuccessPath })}
       initialValues={initialValues}
       preservedWebhookSourceId={automationQuery.data.integrationWebhookSourceId}
       connectionOptions={prerequisites.connectionOptions}
@@ -195,6 +209,8 @@ function LoadedWebhookAutomationEditor(input: {
   automationId: string | undefined;
   automationTypeField?: ReactNode;
   navigate: (to: string) => void | Promise<void>;
+  createSuccessPath?: AutomationCreateSuccessPath;
+  deleteSuccessPath?: string;
   initialValues: ReturnType<typeof toWebhookAutomationFormValues>;
   connectionOptions: ReturnType<typeof useWebhookAutomationPrerequisites>["connectionOptions"];
   sandboxProfileOptions: ReturnType<

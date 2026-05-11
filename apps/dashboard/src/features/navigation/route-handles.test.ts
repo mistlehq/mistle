@@ -285,6 +285,11 @@ const DurableAppShellLeafRoutes: DurableAppShellLeafRoute[] = [
     handle: ROUTE_HANDLES.sandboxProfilePublished,
   },
   {
+    path: "/sandbox-profiles/:profileId/automations",
+    handleName: "sandboxProfileAutomations",
+    handle: ROUTE_HANDLES.sandboxProfileAutomations,
+  },
+  {
     path: "/sandbox-profiles/:profileId/snapshots",
     handleName: "sandboxProfileSnapshots",
     handle: ROUTE_HANDLES.sandboxProfileSnapshots,
