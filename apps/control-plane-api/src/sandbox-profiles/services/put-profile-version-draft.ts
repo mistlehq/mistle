@@ -1,6 +1,7 @@
 import {
   getControlPlaneDatabaseSchema,
   type IntegrationBindingKind,
+  type SandboxProfileVersionAgentRuntimeId,
   type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
@@ -32,6 +33,7 @@ type PutProfileVersionDraftInput = {
   profileVersion: number;
   setupScript?: string | null;
   defaultPersistenceMode?: SandboxProfileVersionDefaultPersistenceMode;
+  agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
   sandboxProvider?: string;
   sandboxConnectionId?: string | null;
   sandboxResources?: SandboxProfileVersionResources | null;
@@ -51,6 +53,7 @@ type PutProfileVersionDraftOutput = {
   version: number;
   setupScript: string | null;
   defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
+  agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
   sandboxProvider: string | null;
   sandboxConnectionId: string | null;
   sandboxResources: SandboxProfileVersionResources | null;
@@ -155,6 +158,7 @@ export async function putProfileVersionDraft(
     const hasVersionFieldUpdate =
       input.setupScript !== undefined ||
       input.defaultPersistenceMode !== undefined ||
+      input.agentRuntimeId !== undefined ||
       input.sandboxProvider !== undefined ||
       input.sandboxConnectionId !== undefined ||
       input.sandboxResources !== undefined;
@@ -167,6 +171,7 @@ export async function putProfileVersionDraft(
           ...(input.defaultPersistenceMode === undefined
             ? {}
             : { defaultPersistenceMode: input.defaultPersistenceMode }),
+          ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
           ...(input.sandboxProvider === undefined
             ? {}
             : { sandboxProvider: input.sandboxProvider }),
@@ -198,6 +203,7 @@ export async function putProfileVersionDraft(
           version: tables.sandboxProfileVersions.version,
           setupScript: tables.sandboxProfileVersions.setupScript,
           defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
+          agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
         });
 
       if (updatedVersion === undefined) {
@@ -233,6 +239,7 @@ export async function putProfileVersionDraft(
         version: true,
         setupScript: true,
         defaultPersistenceMode: true,
+        agentRuntimeId: true,
         sandboxProvider: true,
         sandboxConnectionId: true,
         sandboxVcpuCount: true,
@@ -258,6 +265,7 @@ export async function putProfileVersionDraft(
       version: persistedVersion.version,
       setupScript: persistedVersion.setupScript,
       defaultPersistenceMode: persistedVersion.defaultPersistenceMode,
+      agentRuntimeId: persistedVersion.agentRuntimeId,
       ...mapProfileVersionRuntimeConfig(persistedVersion),
       integrationBindings,
     };

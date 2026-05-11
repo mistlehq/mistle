@@ -5,6 +5,7 @@
 import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
+  SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
@@ -92,6 +93,7 @@ describe.concurrent("sandbox profile versions create integration", () => {
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: "2026-03-10T00:02:00.000Z",
         setupScript: "echo latest-version-two",
+        agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
         defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
       }),
     ]);
@@ -153,6 +155,7 @@ describe.concurrent("sandbox profile versions create integration", () => {
       version: 3,
       state: SandboxProfileVersionStates.DRAFT,
       defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
+      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
       ...EmptySandboxRuntimeConfig,
       isActive: false,
       usable: false,
@@ -169,6 +172,9 @@ describe.concurrent("sandbox profile versions create integration", () => {
     expect(persistedDraftVersion?.setupScript).toBe("echo latest-version-two");
     expect(persistedDraftVersion?.defaultPersistenceMode).toBe(
       SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
+    );
+    expect(persistedDraftVersion?.agentRuntimeId).toBe(
+      SandboxProfileVersionAgentRuntimeIds.OPENCODE,
     );
 
     const persistedDraftBindings =

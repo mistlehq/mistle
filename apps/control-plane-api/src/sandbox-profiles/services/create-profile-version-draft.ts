@@ -1,6 +1,7 @@
 import {
   ControlPlaneConstraintIds,
   getControlPlaneDatabaseSchema,
+  type SandboxProfileVersionAgentRuntimeId,
   isControlPlaneUniqueViolation,
   type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionStates,
@@ -29,6 +30,7 @@ type CreateProfileVersionDraftOutput = {
   version: number;
   state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
   defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
+  agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
   sandboxProvider: string | null;
   sandboxConnectionId: string | null;
   sandboxResources: SandboxProfileVersionResources | null;
@@ -84,6 +86,7 @@ export async function createProfileVersionDraft(
           version: true,
           setupScript: true,
           defaultPersistenceMode: true,
+          agentRuntimeId: true,
           sandboxProvider: true,
           sandboxConnectionId: true,
           sandboxVcpuCount: true,
@@ -124,6 +127,7 @@ export async function createProfileVersionDraft(
           state: SandboxProfileVersionStates.DRAFT,
           setupScript: latestVersion.setupScript,
           defaultPersistenceMode: latestVersion.defaultPersistenceMode,
+          agentRuntimeId: latestVersion.agentRuntimeId,
           sandboxProvider: latestVersion.sandboxProvider,
           sandboxConnectionId: latestVersion.sandboxConnectionId,
           sandboxVcpuCount: latestVersion.sandboxVcpuCount,
@@ -135,6 +139,7 @@ export async function createProfileVersionDraft(
           version: tables.sandboxProfileVersions.version,
           state: tables.sandboxProfileVersions.state,
           defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
+          agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
           sandboxProvider: tables.sandboxProfileVersions.sandboxProvider,
           sandboxConnectionId: tables.sandboxProfileVersions.sandboxConnectionId,
           sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
@@ -165,6 +170,7 @@ export async function createProfileVersionDraft(
         version: createdDraftVersion.version,
         state: createdDraftVersion.state,
         defaultPersistenceMode: createdDraftVersion.defaultPersistenceMode,
+        agentRuntimeId: createdDraftVersion.agentRuntimeId,
         ...mapProfileVersionRuntimeConfig(createdDraftVersion),
         isActive: false,
         usable: false,

@@ -1,5 +1,6 @@
 import {
   getControlPlaneDatabaseSchema,
+  type SandboxProfileVersionAgentRuntimeId,
   type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
@@ -39,6 +40,7 @@ type PublishProfileVersionOutput = {
     version: number;
     state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
     defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
+    agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
     sandboxProvider: string | null;
     sandboxConnectionId: string | null;
     sandboxResources: SandboxProfileVersionResources | null;
@@ -163,6 +165,7 @@ export async function publishProfileVersion(
         version: tables.sandboxProfileVersions.version,
         state: tables.sandboxProfileVersions.state,
         defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
+        agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
         sandboxProvider: tables.sandboxProfileVersions.sandboxProvider,
         sandboxConnectionId: tables.sandboxProfileVersions.sandboxConnectionId,
         sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
@@ -213,6 +216,7 @@ export async function publishProfileVersion(
         version: publishedVersion.version,
         state: publishedVersion.state,
         defaultPersistenceMode: publishedVersion.defaultPersistenceMode,
+        agentRuntimeId: publishedVersion.agentRuntimeId,
         ...mapProfileVersionRuntimeConfig(publishedVersion),
         isActive: false,
         usable: false,

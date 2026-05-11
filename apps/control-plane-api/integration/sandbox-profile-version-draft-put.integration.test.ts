@@ -5,6 +5,7 @@
 import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
+  SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
@@ -134,6 +135,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
         },
         body: JSON.stringify({
           setupScript: "pnpm install\npnpm dev:bootstrap",
+          agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
           defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
           integrationBindings: {
             bindings: [
@@ -160,6 +162,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
       sandboxProfileId: "sbp_draft_put_001",
       version: 1,
       setupScript: "pnpm install\npnpm dev:bootstrap",
+      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
       defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
       ...EmptySandboxRuntimeConfig,
       integrationBindings: {
@@ -186,6 +189,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
     const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
       columns: {
         setupScript: true,
+        agentRuntimeId: true,
         defaultPersistenceMode: true,
       },
       where: (table, { and, eq }) =>
@@ -193,6 +197,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
     });
     expect(persistedVersion).toEqual({
       setupScript: "pnpm install\npnpm dev:bootstrap",
+      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
       defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
     });
   });

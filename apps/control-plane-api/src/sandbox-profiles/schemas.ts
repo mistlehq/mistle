@@ -3,6 +3,7 @@ import {
   AutomationKinds,
   IntegrationBindingKinds,
   SandboxProfileStatuses,
+  SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
@@ -39,6 +40,10 @@ const sandboxProfileVersionStateSchema = z.enum([
 const sandboxProfileVersionDefaultPersistenceModeSchema = z.enum([
   SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
   SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
+]);
+const sandboxProfileVersionAgentRuntimeIdSchema = z.enum([
+  SandboxProfileVersionAgentRuntimeIds.CODEX,
+  SandboxProfileVersionAgentRuntimeIds.OPENCODE,
 ]);
 const sandboxProfileVersionSnapshotJobTriggerSchema = z.enum([
   SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
@@ -127,6 +132,7 @@ export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVers
   defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema,
   publishedAt: z.string().min(1).nullable(),
   version: z.number().int().min(1),
+  agentRuntimeId: sandboxProfileVersionAgentRuntimeIdSchema,
   sandboxProvider: z.string().min(1).nullable(),
   sandboxConnectionId: z.string().min(1).nullable(),
 })
@@ -135,6 +141,7 @@ export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVers
     version: true,
     state: true,
     defaultPersistenceMode: true,
+    agentRuntimeId: true,
     sandboxProvider: true,
     sandboxConnectionId: true,
   })
@@ -305,6 +312,7 @@ export const putSandboxProfileVersionDraftBodySchema = z
   .object({
     setupScript: z.string().min(1).nullable().optional(),
     defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema.optional(),
+    agentRuntimeId: sandboxProfileVersionAgentRuntimeIdSchema.optional(),
     sandboxProvider: z.string().min(1).optional(),
     sandboxConnectionId: z.string().min(1).nullable().optional(),
     sandboxResources: sandboxProfileVersionResourcesSchema.nullable().optional(),
@@ -315,6 +323,7 @@ export const putSandboxProfileVersionDraftBodySchema = z
     (value) =>
       value.setupScript !== undefined ||
       value.defaultPersistenceMode !== undefined ||
+      value.agentRuntimeId !== undefined ||
       value.sandboxProvider !== undefined ||
       value.sandboxConnectionId !== undefined ||
       value.sandboxResources !== undefined ||
@@ -330,6 +339,7 @@ export const putSandboxProfileVersionDraftResponseSchema = z
     version: z.number().int().min(1),
     setupScript: z.string().nullable(),
     defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema,
+    agentRuntimeId: sandboxProfileVersionAgentRuntimeIdSchema,
     sandboxProvider: z.string().min(1).nullable(),
     sandboxConnectionId: z.string().min(1).nullable(),
     sandboxResources: sandboxProfileVersionResourcesSchema.nullable(),

@@ -88,6 +88,7 @@ function createSandboxProfileVersionFixture(input: {
     sandboxProfileId: input.sandboxProfileId,
     version: input.version,
     state: input.state,
+    agentRuntimeId: "codex",
     defaultPersistenceMode: input.defaultPersistenceMode ?? "ephemeral",
     sandboxConnectionId: null,
     sandboxProvider: "docker",

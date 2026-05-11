@@ -417,6 +417,7 @@ const SandboxProvidersResultSchema = z
 
 const SandboxProfileVersionSchema = z
   .object({
+    agentRuntimeId: z.enum(["codex", "opencode"]),
     defaultPersistenceMode: z.enum(["ephemeral", "persistent"]),
     isActive: z.boolean(),
     latestSnapshotJob: z
@@ -563,6 +564,7 @@ const PutSandboxProfileVersionDraftResultSchema = z
     sandboxProfileId: z.string().min(1),
     version: z.number().int().min(1),
     setupScript: z.string().nullable(),
+    agentRuntimeId: z.enum(["codex", "opencode"]),
     defaultPersistenceMode: z.enum(["ephemeral", "persistent"]),
     sandboxConnectionId: z.string().min(1).nullable(),
     sandboxProvider: z.string().min(1).nullable(),
@@ -1139,6 +1141,7 @@ export async function putSandboxProfileVersionDraft(
         ...(input.defaultPersistenceMode === undefined
           ? {}
           : { defaultPersistenceMode: input.defaultPersistenceMode }),
+        ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
         ...(input.sandboxProvider === undefined ? {} : { sandboxProvider: input.sandboxProvider }),
         ...(input.sandboxConnectionId === undefined
           ? {}

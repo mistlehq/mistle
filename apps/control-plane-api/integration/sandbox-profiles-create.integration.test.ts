@@ -4,6 +4,7 @@
 
 import {
   SandboxProfileStatuses,
+  SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
@@ -73,6 +74,7 @@ describe.concurrent("sandbox profiles create integration", () => {
     expect(initialVersion.defaultPersistenceMode).toBe(
       SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
     );
+    expect(initialVersion.agentRuntimeId).toBe(SandboxProfileVersionAgentRuntimeIds.CODEX);
     expect(initialVersion.publishedAt).toBeNull();
   });
 

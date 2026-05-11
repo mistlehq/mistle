@@ -8209,6 +8209,8 @@ export interface paths {
             "application/json": {
               versions: {
                 /** @enum {string} */
+                agentRuntimeId: "codex" | "opencode";
+                /** @enum {string} */
                 defaultPersistenceMode: "ephemeral" | "persistent";
                 isActive: boolean;
                 latestSnapshotJob: {
@@ -8329,6 +8331,8 @@ export interface paths {
           };
           content: {
             "application/json": {
+              /** @enum {string} */
+              agentRuntimeId: "codex" | "opencode";
               /** @enum {string} */
               defaultPersistenceMode: "ephemeral" | "persistent";
               isActive: boolean;
@@ -8707,6 +8711,8 @@ export interface paths {
         content: {
           "application/json": {
             /** @enum {string} */
+            agentRuntimeId?: "codex" | "opencode";
+            /** @enum {string} */
             defaultPersistenceMode?: "ephemeral" | "persistent";
             integrationBindings?: {
               bindings: {
@@ -8739,6 +8745,8 @@ export interface paths {
           };
           content: {
             "application/json": {
+              /** @enum {string} */
+              agentRuntimeId: "codex" | "opencode";
               /** @enum {string} */
               defaultPersistenceMode: "ephemeral" | "persistent";
               integrationBindings: {
@@ -9302,6 +9310,8 @@ export interface paths {
               };
               version: {
                 /** @enum {string} */
+                agentRuntimeId: "codex" | "opencode";
+                /** @enum {string} */
                 defaultPersistenceMode: "ephemeral" | "persistent";
                 isActive: boolean;
                 latestSnapshotJob: {
@@ -9586,6 +9596,8 @@ export interface paths {
                 trigger: "publish" | "manual_refresh" | "scheduled_refresh";
               };
               version: {
+                /** @enum {string} */
+                agentRuntimeId: "codex" | "opencode";
                 /** @enum {string} */
                 defaultPersistenceMode: "ephemeral" | "persistent";
                 isActive: boolean;
@@ -9958,6 +9970,8 @@ export interface paths {
                 trigger: "publish" | "manual_refresh" | "scheduled_refresh";
               };
               version: {
+                /** @enum {string} */
+                agentRuntimeId: "codex" | "opencode";
                 /** @enum {string} */
                 defaultPersistenceMode: "ephemeral" | "persistent";
                 isActive: boolean;

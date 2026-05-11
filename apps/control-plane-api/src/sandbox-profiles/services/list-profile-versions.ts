@@ -1,4 +1,5 @@
 import type {
+  SandboxProfileVersionAgentRuntimeId,
   SandboxProfileVersionSnapshotJobState,
   SandboxProfileVersionSnapshotJobTrigger,
   SandboxProfileVersionState,
@@ -28,6 +29,7 @@ type ListProfileVersionsOutput = {
     version: number;
     state: SandboxProfileVersionState;
     defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
+    agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
     sandboxProvider: string | null;
     sandboxConnectionId: string | null;
     sandboxResources: SandboxProfileVersionResources | null;
@@ -73,6 +75,7 @@ export async function listProfileVersions(
       version: true,
       state: true,
       defaultPersistenceMode: true,
+      agentRuntimeId: true,
       snapshotImageProvider: true,
       snapshotImageId: true,
       sandboxProvider: true,
@@ -124,6 +127,7 @@ export async function listProfileVersions(
         version: version.version,
         state: version.state,
         defaultPersistenceMode: version.defaultPersistenceMode,
+        agentRuntimeId: version.agentRuntimeId,
         ...mapProfileVersionRuntimeConfig(version),
         isActive: version.version === sandboxProfile.activeVersion,
         usable:

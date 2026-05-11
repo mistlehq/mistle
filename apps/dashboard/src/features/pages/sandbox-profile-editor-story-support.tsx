@@ -390,6 +390,7 @@ function createRuntimeStoryVersion(input: {
     sandboxProfileId: "sandbox-profile-story",
     version: input.version,
     state: "draft",
+    agentRuntimeId: "codex",
     defaultPersistenceMode: "ephemeral",
     sandboxProvider: runtimeState === "docker" ? "docker" : "e2b",
     sandboxConnectionId: runtimeState === "e2b-connection" ? StoryE2BSandboxConnection.id : null,

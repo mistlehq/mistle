@@ -5,6 +5,7 @@
 import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
+  SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
@@ -33,6 +34,7 @@ const it = createIntegrationTest({
 });
 
 const EmptySandboxRuntimeConfig = {
+  agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CODEX,
   sandboxConnectionId: null,
   sandboxProvider: SandboxProvider.DOCKER,
   sandboxResources: null,

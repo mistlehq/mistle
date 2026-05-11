@@ -35,6 +35,7 @@ const routeHandler = async (
         ...(body.defaultPersistenceMode === undefined
           ? {}
           : { defaultPersistenceMode: body.defaultPersistenceMode }),
+        ...(body.agentRuntimeId === undefined ? {} : { agentRuntimeId: body.agentRuntimeId }),
         ...(body.sandboxProvider === undefined ? {} : { sandboxProvider: body.sandboxProvider }),
         ...(body.sandboxConnectionId === undefined
           ? {}

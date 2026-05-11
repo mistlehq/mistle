@@ -1,6 +1,7 @@
 import {
   type IntegrationBindingKind,
   type IntegrationConnectionStatus,
+  type SandboxProfileVersionAgentRuntimeId,
   type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileStatuses,
@@ -32,6 +33,7 @@ export function sandboxProfileVersionRow(input: {
   state?: "draft" | "published";
   publishedAt?: string | null;
   setupScript?: string | null;
+  agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
   defaultPersistenceMode?: SandboxProfileVersionDefaultPersistenceMode;
   sandboxProvider?: string | null;
   sandboxConnectionId?: string | null;
@@ -50,6 +52,7 @@ export function sandboxProfileVersionRow(input: {
           : "2026-01-01T00:00:00.000Z"
         : input.publishedAt,
     ...(input.setupScript === undefined ? {} : { setupScript: input.setupScript }),
+    ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
     defaultPersistenceMode:
       input.defaultPersistenceMode ?? SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
     ...(input.sandboxProvider === undefined ? {} : { sandboxProvider: input.sandboxProvider }),

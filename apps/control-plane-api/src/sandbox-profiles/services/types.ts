@@ -2,6 +2,7 @@ import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-interna
 import type {
   ControlPlaneDatabase,
   SandboxProfile,
+  SandboxProfileVersionAgentRuntimeId,
   SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionState,
   SandboxProfileVersionIntegrationBinding,
@@ -47,6 +48,7 @@ export type SandboxProfilesService = {
     version: number;
     state: SandboxProfileVersionState;
     defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
+    agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
     sandboxProvider: string | null;
     sandboxConnectionId: string | null;
     sandboxResources: SandboxProfileVersionResources | null;
@@ -67,6 +69,7 @@ export type SandboxProfilesService = {
       version: number;
       state: SandboxProfileVersionState;
       defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
+      agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
       sandboxProvider: string | null;
       sandboxConnectionId: string | null;
       sandboxResources: SandboxProfileVersionResources | null;
@@ -125,6 +128,7 @@ export type SandboxProfilesService = {
       version: number;
       state: SandboxProfileVersionState;
       defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
+      agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
       sandboxProvider: string | null;
       sandboxConnectionId: string | null;
       sandboxResources: SandboxProfileVersionResources | null;

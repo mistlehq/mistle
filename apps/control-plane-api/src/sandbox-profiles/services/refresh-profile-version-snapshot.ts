@@ -2,6 +2,7 @@ import {
   ControlPlaneConstraintIds,
   getControlPlaneDatabaseSchema,
   isControlPlaneUniqueViolation,
+  type SandboxProfileVersionAgentRuntimeId,
   type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
@@ -50,6 +51,7 @@ type RefreshProfileVersionSnapshotOutput = {
     version: number;
     state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
     defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
+    agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
     sandboxProvider: string | null;
     sandboxConnectionId: string | null;
     sandboxResources: SandboxProfileVersionResources | null;
@@ -153,6 +155,7 @@ async function queueProfileVersionSnapshot(
           version: tables.sandboxProfileVersions.version,
           state: tables.sandboxProfileVersions.state,
           defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
+          agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
           snapshotImageProvider: tables.sandboxProfileVersions.snapshotImageProvider,
           snapshotImageId: tables.sandboxProfileVersions.snapshotImageId,
           sandboxProvider: tables.sandboxProfileVersions.sandboxProvider,
@@ -193,6 +196,7 @@ async function queueProfileVersionSnapshot(
       const resolvedSandboxProfileId = sandboxProfileVersion.sandboxProfileId;
       const resolvedSandboxProfileVersion = sandboxProfileVersion.version;
       const resolvedDefaultPersistenceMode = sandboxProfileVersion.defaultPersistenceMode;
+      const resolvedAgentRuntimeId = sandboxProfileVersion.agentRuntimeId;
       const resolvedSandboxProvider = sandboxProfileVersion.sandboxProvider;
       const resolvedSandboxConnectionId = sandboxProfileVersion.sandboxConnectionId;
       const resolvedSandboxVcpuCount = sandboxProfileVersion.sandboxVcpuCount;
@@ -203,6 +207,9 @@ async function queueProfileVersionSnapshot(
       }
       if (resolvedDefaultPersistenceMode === null) {
         throw new Error("Expected joined sandbox profile persistence mode to be present.");
+      }
+      if (resolvedAgentRuntimeId === null) {
+        throw new Error("Expected joined sandbox profile agent runtime id to be present.");
       }
 
       if (sandboxProfileVersion.state !== SandboxProfileVersionStates.PUBLISHED) {
@@ -265,6 +272,7 @@ async function queueProfileVersionSnapshot(
           version: resolvedSandboxProfileVersion,
           state: sandboxProfileVersion.state,
           defaultPersistenceMode: resolvedDefaultPersistenceMode,
+          agentRuntimeId: resolvedAgentRuntimeId,
           ...mapProfileVersionRuntimeConfig({
             sandboxProvider: resolvedSandboxProvider,
             sandboxConnectionId: resolvedSandboxConnectionId,

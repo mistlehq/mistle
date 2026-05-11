@@ -188,12 +188,14 @@ export type {
 } from "./sandbox-profiles.js";
 export {
   sandboxProfileVersions,
+  SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionStates,
 } from "./sandbox-profile-versions.js";
 export type {
   InsertSandboxProfileVersion,
   SandboxProfileVersion,
+  SandboxProfileVersionAgentRuntimeId,
   SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionState,
 } from "./sandbox-profile-versions.js";

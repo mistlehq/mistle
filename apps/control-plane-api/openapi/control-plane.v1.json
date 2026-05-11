@@ -15796,6 +15796,10 @@
                       "type": "string",
                       "enum": ["ephemeral", "persistent"]
                     },
+                    "agentRuntimeId": {
+                      "type": "string",
+                      "enum": ["codex", "opencode"]
+                    },
                     "sandboxProvider": {
                       "type": ["string", "null"],
                       "minLength": 1
@@ -15920,6 +15924,7 @@
                     "version",
                     "state",
                     "defaultPersistenceMode",
+                    "agentRuntimeId",
                     "sandboxProvider",
                     "sandboxConnectionId",
                     "sandboxResources",
@@ -16098,6 +16103,10 @@
                             "type": "string",
                             "enum": ["ephemeral", "persistent"]
                           },
+                          "agentRuntimeId": {
+                            "type": "string",
+                            "enum": ["codex", "opencode"]
+                          },
                           "sandboxProvider": {
                             "type": ["string", "null"],
                             "minLength": 1
@@ -16222,6 +16231,7 @@
                           "version",
                           "state",
                           "defaultPersistenceMode",
+                          "agentRuntimeId",
                           "sandboxProvider",
                           "sandboxConnectionId",
                           "sandboxResources",
@@ -17820,6 +17830,10 @@
                     "type": "string",
                     "enum": ["ephemeral", "persistent"]
                   },
+                  "agentRuntimeId": {
+                    "type": "string",
+                    "enum": ["codex", "opencode"]
+                  },
                   "sandboxProvider": {
                     "type": "string",
                     "minLength": 1
@@ -17913,6 +17927,10 @@
                       "type": "string",
                       "enum": ["ephemeral", "persistent"]
                     },
+                    "agentRuntimeId": {
+                      "type": "string",
+                      "enum": ["codex", "opencode"]
+                    },
                     "sandboxProvider": {
                       "type": ["string", "null"],
                       "minLength": 1
@@ -18002,6 +18020,7 @@
                     "version",
                     "setupScript",
                     "defaultPersistenceMode",
+                    "agentRuntimeId",
                     "sandboxProvider",
                     "sandboxConnectionId",
                     "sandboxResources",
@@ -18802,6 +18821,10 @@
                           "type": "string",
                           "enum": ["ephemeral", "persistent"]
                         },
+                        "agentRuntimeId": {
+                          "type": "string",
+                          "enum": ["codex", "opencode"]
+                        },
                         "sandboxProvider": {
                           "type": ["string", "null"],
                           "minLength": 1
@@ -18926,6 +18949,7 @@
                         "version",
                         "state",
                         "defaultPersistenceMode",
+                        "agentRuntimeId",
                         "sandboxProvider",
                         "sandboxConnectionId",
                         "sandboxResources",
@@ -19169,6 +19193,10 @@
                           "type": "string",
                           "enum": ["ephemeral", "persistent"]
                         },
+                        "agentRuntimeId": {
+                          "type": "string",
+                          "enum": ["codex", "opencode"]
+                        },
                         "sandboxProvider": {
                           "type": ["string", "null"],
                           "minLength": 1
@@ -19293,6 +19321,7 @@
                         "version",
                         "state",
                         "defaultPersistenceMode",
+                        "agentRuntimeId",
                         "sandboxProvider",
                         "sandboxConnectionId",
                         "sandboxResources",
@@ -19536,6 +19565,10 @@
                           "type": "string",
                           "enum": ["ephemeral", "persistent"]
                         },
+                        "agentRuntimeId": {
+                          "type": "string",
+                          "enum": ["codex", "opencode"]
+                        },
                         "sandboxProvider": {
                           "type": ["string", "null"],
                           "minLength": 1
@@ -19660,6 +19693,7 @@
                         "version",
                         "state",
                         "defaultPersistenceMode",
+                        "agentRuntimeId",
                         "sandboxProvider",
                         "sandboxConnectionId",
                         "sandboxResources",

@@ -85,6 +85,7 @@ function createVersion(
     sandboxProfileId: "sbp_runtime_section_test",
     version: 1,
     state: "draft",
+    agentRuntimeId: "codex",
     defaultPersistenceMode: "ephemeral",
     sandboxProvider: input.sandboxProvider,
     sandboxConnectionId: input.sandboxConnectionId,

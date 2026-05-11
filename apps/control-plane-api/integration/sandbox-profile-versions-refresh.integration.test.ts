@@ -4,6 +4,7 @@
 
 import {
   AutomationKinds,
+  SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
@@ -32,6 +33,7 @@ const DockerSandboxRuntimeColumns = {
 } as const;
 
 const DockerSandboxRuntimeConfig = {
+  agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CODEX,
   sandboxConnectionId: null,
   sandboxProvider: "docker",
   sandboxResources: null,
