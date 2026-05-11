@@ -1,11 +1,4 @@
-import {
-  Button,
-  Notice,
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-  SectionBlock,
-} from "@mistle/ui";
+import { Button, Notice, ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@mistle/ui";
 import { SidebarSimpleIcon, TerminalIcon } from "@phosphor-icons/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -686,28 +679,6 @@ function SandboxProfileEditorPageStoryView(
         if (sectionId === "sandbox-profile") {
           return (
             <div className="flex w-full flex-col gap-8">
-              <SandboxProfilePanelSection>
-                <SectionBlock title="Runtime">
-                  <div className="grid gap-4">
-                    <SandboxProfileSectionCard>
-                      <SandboxProfileRuntimeSection
-                        availableConnections={storyConnections}
-                        availableTargets={storyTargets}
-                        disabled={!isEditable}
-                        isDraft={mode.kind === "draft"}
-                        providers={createStorySandboxProviders({
-                          runtimeState: input.runtimeState,
-                        })}
-                        sectionChrome={false}
-                        version={createRuntimeStoryVersion({
-                          runtimeState: input.runtimeState,
-                          version: mode.version,
-                        })}
-                      />
-                    </SandboxProfileSectionCard>
-                  </div>
-                </SectionBlock>
-              </SandboxProfilePanelSection>
               {input.integrationsSectionState === undefined ? (
                 <SandboxProfilePanelSection>
                   <SandboxProfileIntegrationsSetupSection
@@ -725,6 +696,24 @@ function SandboxProfileEditorPageStoryView(
                     }}
                     integrationRows={integrationRows}
                     integrationSaveError={null}
+                    runtimeSettings={
+                      <SandboxProfileSectionCard>
+                        <SandboxProfileRuntimeSection
+                          availableConnections={storyConnections}
+                          availableTargets={storyTargets}
+                          disabled={!isEditable}
+                          isDraft={mode.kind === "draft"}
+                          providers={createStorySandboxProviders({
+                            runtimeState: input.runtimeState,
+                          })}
+                          sectionChrome={false}
+                          version={createRuntimeStoryVersion({
+                            runtimeState: input.runtimeState,
+                            version: mode.version,
+                          })}
+                        />
+                      </SandboxProfileSectionCard>
+                    }
                     disabled={!isEditable}
                     onAddIntegrationBindingRow={async (nextBinding) => {
                       setIntegrationRows((currentRows) => [

@@ -35,6 +35,7 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
       />,
     );
 
+    expect(screen.queryByText("Integrations & Tools")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Add integration or tool" }));
 
     const dialog = screen.getByRole("dialog", { name: "Add connectors" });
@@ -211,6 +212,7 @@ function TestSandboxProfileIntegrationsSetupSection(input: {
     },
     integrationRows: [],
     integrationSaveError: null,
+    runtimeSettings: <div>Sandbox Runtime</div>,
     onAddIntegrationBindingRow: async () => true,
     onIntegrationBindingRowChange: () => {},
     onRemoveIntegrationBindingRow: () => {},

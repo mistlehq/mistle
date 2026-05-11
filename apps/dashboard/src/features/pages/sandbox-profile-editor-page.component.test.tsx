@@ -65,6 +65,10 @@ beforeAll(() => {
   });
 });
 
+function expectElementToFollow(previous: Element, next: Element): void {
+  expect(previous.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+}
+
 afterEach(() => {
   cleanup();
   void cleanupTestQueryClients();
@@ -1859,6 +1863,27 @@ describe("SandboxProfileEditorPage", () => {
         "Choose a Git provider in Integrations before selecting repository resources.",
       ),
     ).toBeNull();
+  });
+
+  it("groups runtime rows without an integrations and tools label", () => {
+    renderSandboxProfileEditor();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Sandbox Profile" }));
+
+    const runtimeHeading = screen.getByRole("heading", { name: "Runtime" });
+    const [agentLabel] = screen.getAllByText("Agent");
+    if (agentLabel === undefined) {
+      throw new Error("Expected the runtime section to render an Agent row.");
+    }
+    const gitProviderLabel = screen.getByText("Git Provider");
+    const sandboxRuntimeLabel = screen.getByText("Sandbox Runtime");
+    const proxiedConnectionsHeading = screen.getByRole("heading", { name: "Proxied Connections" });
+
+    expectElementToFollow(runtimeHeading, agentLabel);
+    expectElementToFollow(agentLabel, gitProviderLabel);
+    expectElementToFollow(gitProviderLabel, sandboxRuntimeLabel);
+    expectElementToFollow(sandboxRuntimeLabel, proxiedConnectionsHeading);
+    expect(screen.queryByText("Integrations & Tools")).toBeNull();
   });
 
   it("shows stale git guidance when a persisted git binding cannot be resolved", () => {

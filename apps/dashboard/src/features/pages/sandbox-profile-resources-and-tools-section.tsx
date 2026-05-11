@@ -377,8 +377,10 @@ export function SandboxProfileBindingResourcesAndToolsCell(input: {
     );
   }
 
+  const groupGapClassName = input.showGroupLabels === true ? "gap-4" : "gap-3";
+
   return (
-    <div className="flex min-w-0 flex-col gap-3">
+    <div className={`flex min-w-0 flex-col ${groupGapClassName}`}>
       {input.row.kind === "git" && connection !== undefined ? (
         input.showGroupLabels === true ? (
           <Field contentWidth="fill" orientation="horizontal">

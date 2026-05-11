@@ -289,7 +289,7 @@ export function SandboxProfileRuntimeSection(input: {
       runtime={draftRuntime}
     />
   ) : (
-    <div className="grid gap-5">
+    <div className="grid gap-4">
       {input.sectionChrome === false ? (
         providerField
       ) : (
@@ -478,7 +478,7 @@ function SandboxProviderResourceFields(input: {
 
   const capabilities = input.provider.resourceCapabilities;
   return (
-    <div className="grid gap-4">
+    <>
       <ResourceSliderField
         capability={capabilities.vcpuCount}
         disabled={input.disabled}
@@ -513,7 +513,7 @@ function SandboxProviderResourceFields(input: {
           value={input.resources.storageMb ?? capabilities.storageMb.default}
         />
       )}
-    </div>
+    </>
   );
 }
 
