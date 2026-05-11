@@ -700,15 +700,44 @@ async function readRuntimePublicAccessProxyDiagnostics(
       };
     }
     return {
+      proxyPid: proxy.pid,
+      proxyProcessAlive: proxy.pid === undefined ? undefined : isProcessAlive(proxy.pid),
       status: response.status,
       statusText: response.statusText,
       body: parsed,
     };
   } catch (error) {
     return {
+      proxyPid: proxy.pid,
+      proxyProcessAlive: proxy.pid === undefined ? undefined : isProcessAlive(proxy.pid),
+      errorName: error instanceof Error ? error.name : "Error",
       error: error instanceof Error ? error.message : String(error),
+      cause: readUnknownErrorCause(error),
     };
   }
+}
+
+function isProcessAlive(processId: number): boolean {
+  try {
+    process.kill(processId, 0);
+    return true;
+  } catch (error) {
+    return typeof error === "object" && error !== null && Reflect.get(error, "code") === "EPERM";
+  }
+}
+
+function readUnknownErrorCause(error: unknown): unknown {
+  if (!(error instanceof Error) || error.cause === undefined) {
+    return undefined;
+  }
+  const { cause } = error;
+  if (cause instanceof Error) {
+    return {
+      name: cause.name,
+      message: cause.message,
+    };
+  }
+  return cause;
 }
 
 export function createRuntimePublicAccessRouteHealthUrl(input: {
@@ -753,12 +782,14 @@ import { spawn, spawnSync } from "node:child_process";
 import { createWriteStream } from "node:fs";
 import http from "node:http";
 import net from "node:net";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 
 const DockerHostGatewayName = "host.docker.internal";
+const DiagnosticsLogTailBytes = 64 * 1024;
+const DiagnosticsLocalOriginProbeTimeoutMs = 2_000;
 const UpgradeTargetConnectRetryIntervalMs = 100;
 const UpgradeTargetConnectTimeoutMs = 10_000;
 const tunnelId = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_TUNNEL_ID");
@@ -830,24 +861,9 @@ async function handleRequest(request, response) {
   }
 
   if (request.url === "/__mistle/diagnostics" && request.method === "GET") {
+    const diagnostics = await buildDiagnostics();
     response.writeHead(200, { "content-type": "application/json" });
-    response.end(JSON.stringify({
-      ok: true,
-      publicHostnames,
-      cloudflaredContainerName,
-      cloudflaredPid: cloudflared?.pid,
-      routeCount: routes.size,
-      recentUpgradeFailures,
-      routes: Array.from(routes.entries()).map(([key, localBaseUrl]) => {
-        const separatorIndex = key.lastIndexOf(":");
-        return {
-          key,
-          publicHostname: separatorIndex > 0 ? key.slice(0, separatorIndex) : key,
-          environmentId: separatorIndex > 0 ? key.slice(separatorIndex + 1) : "",
-          localBaseUrl,
-        };
-      }),
-    }));
+    response.end(JSON.stringify(diagnostics));
     return;
   }
 
@@ -985,6 +1001,122 @@ function recordUpgradeFailure(event) {
     recentUpgradeFailures.shift();
   }
   logStream.write(JSON.stringify(failure) + "\n");
+}
+
+async function buildDiagnostics() {
+  const routeDiagnostics = await Promise.all(
+    Array.from(routes.entries()).map(async ([key, localBaseUrl]) => {
+      const separatorIndex = key.lastIndexOf(":");
+      const publicHostname = separatorIndex > 0 ? key.slice(0, separatorIndex) : key;
+      const environmentId = separatorIndex > 0 ? key.slice(separatorIndex + 1) : "";
+      return {
+        key,
+        publicHostname,
+        environmentId,
+        localBaseUrl,
+        localOriginHealth: await probeLocalOriginHealth({ localBaseUrl, environmentId }),
+      };
+    }),
+  );
+  return {
+    ok: true,
+    publicHostnames,
+    proxyPid: process.pid,
+    ownerPid,
+    ownerProcessAlive: isProcessAlive(ownerPid),
+    cloudflaredContainerName,
+    cloudflaredPid: cloudflared?.pid,
+    cloudflaredProcessExitCode: cloudflared?.exitCode,
+    cloudflaredProcessSignalCode: cloudflared?.signalCode,
+    cloudflaredContainer: readCloudflaredContainerDiagnostics(),
+    proxyLogTail: await readFileTail(logPath, DiagnosticsLogTailBytes),
+    cloudflaredDockerLogTail: readCloudflaredDockerLogTail(),
+    routeCount: routes.size,
+    recentUpgradeFailures,
+    routes: routeDiagnostics,
+  };
+}
+
+async function probeLocalOriginHealth(input) {
+  try {
+    const healthUrl = new URL("/__healthz", input.localBaseUrl);
+    const response = await fetch(healthUrl, {
+      headers: {
+        "x-mistle-test-environment-id": input.environmentId,
+      },
+      signal: AbortSignal.timeout(DiagnosticsLocalOriginProbeTimeoutMs),
+    });
+    return {
+      kind: "http",
+      url: healthUrl.toString(),
+      status: response.status,
+      statusText: response.statusText,
+      bodyPreview: (await response.text()).slice(0, 1000),
+    };
+  } catch (error) {
+    return {
+      kind: "fetch_error",
+      errorName: error instanceof Error ? error.name : "Error",
+      errorMessage: error instanceof Error ? error.message : String(error),
+      cause: readErrorCause(error),
+    };
+  }
+}
+
+function readCloudflaredContainerDiagnostics() {
+  if (cloudflaredContainerName === undefined) {
+    return null;
+  }
+  const inspect = spawnSync("docker", [
+    "inspect",
+    "--format",
+    "{{json .State}}",
+    cloudflaredContainerName,
+  ], {
+    encoding: "utf8",
+  });
+  return {
+    exitCode: inspect.status,
+    stdout: inspect.stdout.slice(0, 4000),
+    stderr: inspect.stderr.slice(0, 4000),
+  };
+}
+
+function readCloudflaredDockerLogTail() {
+  if (cloudflaredContainerName === undefined) {
+    return null;
+  }
+  const logs = spawnSync("docker", ["logs", "--tail", "200", cloudflaredContainerName], {
+    encoding: "utf8",
+  });
+  return {
+    exitCode: logs.status,
+    stdout: logs.stdout.slice(-DiagnosticsLogTailBytes),
+    stderr: logs.stderr.slice(-DiagnosticsLogTailBytes),
+  };
+}
+
+async function readFileTail(path, maxBytes) {
+  try {
+    const content = await readFile(path, "utf8");
+    return content.slice(-maxBytes);
+  } catch (error) {
+    return "<failed to read log file: " + (error instanceof Error ? error.message : String(error)) + ">";
+  }
+}
+
+function readErrorCause(error) {
+  if (!(error instanceof Error) || error.cause === undefined) {
+    return undefined;
+  }
+  const cause = error.cause;
+  if (cause instanceof Error) {
+    return {
+      name: cause.name,
+      message: cause.message,
+    };
+  }
+  return String(cause);
 }
 
 function connectUpgradeTarget(input) {

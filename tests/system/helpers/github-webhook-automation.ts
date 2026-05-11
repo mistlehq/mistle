@@ -182,6 +182,7 @@ export type GitHubWebhookAutomationFixture = {
   testContextId?: string;
   testEnvironmentId?: string;
   createSessionRuntime?: () => SandboxSessionRuntime;
+  readPublicAccessDiagnostics?: () => Promise<unknown>;
 };
 
 export type GitHubRepository = {
@@ -396,6 +397,7 @@ async function buildWebhookDeliveryDiagnostics(input: {
   const currentWebhookConfig = await readGitHubAppWebhookConfig().catch((error: unknown) => ({
     url: `<read failed: ${formatDiagnosticError(error)}>`,
   }));
+  const publicAccessDiagnostics = await readPublicAccessDiagnostics(input.fixture);
   const recentEvents = await input.fixture.db.query.integrationWebhookEvents.findMany({
     where: (table, { and, eq }) =>
       and(
@@ -413,6 +415,7 @@ async function buildWebhookDeliveryDiagnostics(input: {
     issueCommentId: input.issueCommentId,
     payloadMarker: input.payloadMarker,
     currentGitHubAppWebhookUrl: currentWebhookConfig.url,
+    publicAccessDiagnostics,
     recentEvents: recentEvents.map((event) => {
       const comment = isRecord(event.payload.comment) ? event.payload.comment : null;
       const body = comment === null ? null : comment.body;
@@ -463,6 +466,7 @@ async function buildAutomationRunFailureDiagnostics(input: {
             }),
     })),
   );
+  const publicAccessDiagnostics = await readPublicAccessDiagnostics(input.fixture);
 
   return JSON.stringify({
     automationRunId: input.automationRunId,
@@ -501,7 +505,24 @@ async function buildAutomationRunFailureDiagnostics(input: {
       updatedAt: route.updatedAt,
     })),
     routeSandboxStatuses,
+    publicAccessDiagnostics,
   });
+}
+
+async function readPublicAccessDiagnostics(
+  fixture: GitHubWebhookAutomationFixture,
+): Promise<unknown> {
+  if (fixture.readPublicAccessDiagnostics === undefined) {
+    return null;
+  }
+
+  try {
+    return await fixture.readPublicAccessDiagnostics();
+  } catch (error) {
+    return {
+      error: formatDiagnosticError(error),
+    };
+  }
 }
 
 async function readSandboxInstanceStatusDiagnostics(input: {

@@ -10,6 +10,7 @@ import type {
 export function createRuntimeGitHubWebhookAutomationFixture(
   system: RuntimeSystemTestEnvironment,
 ): GitHubWebhookAutomationFixture {
+  const { publicAccess } = system;
   return {
     authSession: async (input): Promise<AuthenticatedSession> => {
       const session = await system.env.auth.createSession({
@@ -30,6 +31,11 @@ export function createRuntimeGitHubWebhookAutomationFixture(
     }),
     testContextId: system.id,
     testEnvironmentId: system.id,
+    ...(publicAccess === undefined
+      ? {}
+      : {
+          readPublicAccessDiagnostics: async () => await publicAccess.readDiagnostics(),
+        }),
     createSessionRuntime: () =>
       createNodeSandboxSessionRuntime({
         headers: {
