@@ -35,7 +35,7 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Add more connectors" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add integration or tool" }));
 
     const dialog = screen.getByRole("dialog", { name: "Add connectors" });
     expect(within(dialog).getByText("Datadog")).toBeDefined();
@@ -66,7 +66,7 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     expect(
       screen.getByText("Remove or replace integrations where the connection cannot be found."),
     ).toBeDefined();
-    expect(screen.getByText("Unknown integration")).toBeDefined();
+    expect(screen.getAllByText("Unknown integration").length).toBeGreaterThan(0);
     expect(screen.getByText("Connection cannot be found")).toBeDefined();
     expect(screen.getByRole("button", { name: "Remove connector" })).toBeDefined();
   });
@@ -140,15 +140,7 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
 
       expect(screen.getByText("No git providers setup")).toBeDefined();
       expect(screen.queryByRole("combobox", { name: "git provider integration" })).toBeNull();
-
-      const gitProviderRow = screen
-        .getByText("No git providers setup")
-        .closest('[data-slot="responsive-field-list-row"]');
-      expect(gitProviderRow).not.toBeNull();
-      const gitProviderConnectionCell = gitProviderRow?.querySelector(
-        '[data-column-key="connection"]',
-      );
-      expect(gitProviderConnectionCell?.classList.contains("hidden")).toBe(true);
+      expect(screen.queryByRole("combobox", { name: "git provider connection" })).toBeNull();
 
       unmount();
     }

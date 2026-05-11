@@ -6,6 +6,7 @@ import {
   FieldLabel,
   Input,
   Notice,
+  SectionBlock,
   Select,
   SelectContent,
   SelectItem,
@@ -66,6 +67,7 @@ export function SandboxProfileRuntimeSection(input: {
   isDraft: boolean;
   onDraftStateChange?: (state: SandboxProfileRuntimeDraftState) => void;
   providers: readonly SandboxProviderSummary[];
+  sectionChrome?: boolean;
   version: SandboxProfileVersion;
 }): React.JSX.Element {
   const persistedRuntime = createRuntimeConfigState({
@@ -102,7 +104,7 @@ export function SandboxProfileRuntimeSection(input: {
     }
 
     if (runtime.credentialSource === "organization" && runtime.sandboxConnectionId === null) {
-      setSaveErrorMessage("Select an API key connection before saving sandbox settings.");
+      setSaveErrorMessage("Select a workspace API key connection before saving sandbox runtime.");
       throw new Error("Sandbox runtime credentials are missing.");
     }
 
@@ -240,88 +242,110 @@ export function SandboxProfileRuntimeSection(input: {
     setSaveErrorMessage(null);
   }
 
+  const providerFieldLabel = input.sectionChrome === false ? "Sandbox Runtime" : "Provider";
+  const providerField = (
+    <Field
+      contentWidth={input.sectionChrome === false ? "fill" : "fit"}
+      orientation={input.sectionChrome === false ? "horizontal" : "vertical"}
+    >
+      <FieldHeader>
+        <FieldLabel htmlFor="sandbox-profile-runtime-provider">{providerFieldLabel}</FieldLabel>
+      </FieldHeader>
+      <FieldContent>
+        <Select onValueChange={updateProvider} value={selectedProvider?.id ?? MissingProviderValue}>
+          <SelectTrigger id="sandbox-profile-runtime-provider">
+            <SelectValue placeholder="Select provider">
+              {selectedProvider === null ? (
+                <span className="text-muted-foreground">Unknown provider</span>
+              ) : (
+                <ProviderOptionLabel provider={selectedProvider} />
+              )}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {selectedProvider === null ? (
+              <SelectItem disabled value={MissingProviderValue}>
+                Unknown provider
+              </SelectItem>
+            ) : null}
+            {providerOptions.map((provider) => (
+              <SelectItem key={provider.id} value={provider.id}>
+                <ProviderOptionLabel provider={provider} />
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </FieldContent>
+    </Field>
+  );
+
+  const runtimeFields = fieldIsReadOnly ? (
+    <SandboxProfileRuntimeReadOnlySummary
+      connection={resolveConnection({
+        connectionId: draftRuntime.sandboxConnectionId,
+        connections: input.availableConnections,
+      })}
+      provider={selectedProvider}
+      runtime={draftRuntime}
+    />
+  ) : (
+    <div className="grid gap-5">
+      {input.sectionChrome === false ? (
+        providerField
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          {providerField}
+
+          <SandboxProviderCredentialSourceField
+            credentialSource={draftRuntime.credentialSource}
+            onCredentialSourceChange={updateCredentialSource}
+            provider={selectedProvider}
+          />
+        </div>
+      )}
+      {input.sectionChrome === false ? (
+        <SandboxProviderCredentialSourceField
+          credentialSource={draftRuntime.credentialSource}
+          horizontal={true}
+          onCredentialSourceChange={updateCredentialSource}
+          provider={selectedProvider}
+        />
+      ) : null}
+      <SandboxProviderConnectionField
+        connectionId={draftRuntime.sandboxConnectionId}
+        connections={matchingConnections}
+        credentialSource={draftRuntime.credentialSource}
+        onConnectionChange={updateConnection}
+        providerTarget={findSandboxProviderTarget({
+          availableTargets: input.availableTargets,
+          providerId: selectedProvider?.id ?? null,
+        })}
+        horizontal={input.sectionChrome === false}
+        provider={selectedProvider}
+      />
+
+      <SandboxProviderResourceFields
+        disabled={fieldIsReadOnly}
+        onResourceFieldChange={updateResourceField}
+        provider={selectedProvider}
+        resources={draftRuntime.sandboxResources}
+      />
+    </div>
+  );
+
+  if (input.sectionChrome === false) {
+    return (
+      <div className="grid gap-3">
+        {saveErrorMessage === null ? null : <Notice variant="alert">{saveErrorMessage}</Notice>}
+        {runtimeFields}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2">
       {saveErrorMessage === null ? null : <Notice variant="alert">{saveErrorMessage}</Notice>}
-      <div className="flex max-w-5xl flex-col gap-2">
-        <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-          Sandbox settings
-        </h2>
-        <div className="rounded-md border bg-background p-4">
-          {fieldIsReadOnly ? (
-            <SandboxProfileRuntimeReadOnlySummary
-              connection={resolveConnection({
-                connectionId: draftRuntime.sandboxConnectionId,
-                connections: input.availableConnections,
-              })}
-              provider={selectedProvider}
-              runtime={draftRuntime}
-            />
-          ) : (
-            <div className="grid gap-5">
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                <Field>
-                  <FieldHeader>
-                    <FieldLabel htmlFor="sandbox-profile-runtime-provider">Provider</FieldLabel>
-                  </FieldHeader>
-                  <FieldContent>
-                    <Select
-                      onValueChange={updateProvider}
-                      value={selectedProvider?.id ?? MissingProviderValue}
-                    >
-                      <SelectTrigger id="sandbox-profile-runtime-provider">
-                        <SelectValue placeholder="Select provider">
-                          {selectedProvider === null ? (
-                            <span className="text-muted-foreground">Unknown provider</span>
-                          ) : (
-                            <ProviderOptionLabel provider={selectedProvider} />
-                          )}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {selectedProvider === null ? (
-                          <SelectItem disabled value={MissingProviderValue}>
-                            Unknown provider
-                          </SelectItem>
-                        ) : null}
-                        {providerOptions.map((provider) => (
-                          <SelectItem key={provider.id} value={provider.id}>
-                            <ProviderOptionLabel provider={provider} />
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FieldContent>
-                </Field>
-
-                <SandboxProviderCredentialSourceField
-                  credentialSource={draftRuntime.credentialSource}
-                  onCredentialSourceChange={updateCredentialSource}
-                  provider={selectedProvider}
-                />
-              </div>
-              <SandboxProviderConnectionField
-                connectionId={draftRuntime.sandboxConnectionId}
-                connections={matchingConnections}
-                credentialSource={draftRuntime.credentialSource}
-                onConnectionChange={updateConnection}
-                providerTarget={findSandboxProviderTarget({
-                  availableTargets: input.availableTargets,
-                  providerId: selectedProvider?.id ?? null,
-                })}
-                provider={selectedProvider}
-              />
-
-              <SandboxProviderResourceFields
-                disabled={fieldIsReadOnly}
-                onResourceFieldChange={updateResourceField}
-                provider={selectedProvider}
-                resources={draftRuntime.sandboxResources}
-              />
-            </div>
-          )}
-        </div>
-      </div>
+      <SectionBlock title="Sandbox Runtime">{runtimeFields}</SectionBlock>
     </div>
   );
 }
@@ -330,11 +354,16 @@ function SandboxProviderConnectionField(input: {
   connectionId: string | null;
   connections: readonly IntegrationConnectionSummary[];
   credentialSource: SandboxCredentialSource;
+  horizontal?: boolean | undefined;
   onConnectionChange: (value: string | null) => void;
   provider: SandboxProviderSummary | null;
   providerTarget: IntegrationTargetSummary | null;
 }): React.JSX.Element | null {
-  if (input.provider === null || !input.provider.supportsOrganizationConnection) {
+  if (
+    input.provider === null ||
+    !input.provider.supportsOrganizationConnection ||
+    input.credentialSource === "managed"
+  ) {
     return null;
   }
 
@@ -343,24 +372,19 @@ function SandboxProviderConnectionField(input: {
     connections: input.connections,
   });
   const connectionValue = input.connectionId ?? MissingConnectionValue;
-  const isManaged = input.credentialSource === "managed";
-
   return (
-    <Field>
+    <Field
+      contentWidth={input.horizontal === true ? "fill" : "fit"}
+      orientation={input.horizontal === true ? "horizontal" : "vertical"}
+    >
       <FieldHeader>
         <FieldLabel htmlFor="sandbox-profile-runtime-connection">Connection</FieldLabel>
       </FieldHeader>
       <FieldContent>
-        <Select
-          disabled={isManaged}
-          onValueChange={input.onConnectionChange}
-          value={connectionValue}
-        >
+        <Select onValueChange={input.onConnectionChange} value={connectionValue}>
           <SelectTrigger id="sandbox-profile-runtime-connection">
             <SelectValue placeholder="Select credentials">
-              {isManaged ? (
-                <span className="text-muted-foreground">Using Mistle&apos;s key</span>
-              ) : selectedConnection === null ? (
+              {selectedConnection === null ? (
                 <span className="text-muted-foreground">Select connection</span>
               ) : (
                 selectedConnection.displayName
@@ -385,7 +409,7 @@ function SandboxProviderConnectionField(input: {
             ))}
           </SelectContent>
         </Select>
-        {isManaged || input.connections.length > 0 || input.providerTarget === null ? null : (
+        {input.connections.length > 0 || input.providerTarget === null ? null : (
           <TextLink
             className="mt-2 inline-flex text-sm font-medium"
             render={<RouterLink to={`/integrations/${input.providerTarget.targetKey}/add`} />}
@@ -400,6 +424,7 @@ function SandboxProviderConnectionField(input: {
 
 function SandboxProviderCredentialSourceField(input: {
   credentialSource: SandboxCredentialSource;
+  horizontal?: boolean | undefined;
   onCredentialSourceChange: (value: string | null) => void;
   provider: SandboxProviderSummary | null;
 }): React.JSX.Element | null {
@@ -412,9 +437,12 @@ function SandboxProviderCredentialSourceField(input: {
   }
 
   return (
-    <Field>
+    <Field
+      contentWidth={input.horizontal === true ? "fill" : "fit"}
+      orientation={input.horizontal === true ? "horizontal" : "vertical"}
+    >
       <FieldHeader>
-        <FieldLabel htmlFor="sandbox-profile-runtime-credential-source">API key</FieldLabel>
+        <FieldLabel htmlFor="sandbox-profile-runtime-credential-source">Credentials</FieldLabel>
       </FieldHeader>
       <FieldContent>
         <Select onValueChange={input.onCredentialSourceChange} value={input.credentialSource}>
@@ -422,8 +450,8 @@ function SandboxProviderCredentialSourceField(input: {
             <SelectValue>{formatCredentialSource(input.credentialSource)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="managed">Use Mistle&apos;s key</SelectItem>
-            <SelectItem value="organization">Use my API key</SelectItem>
+            <SelectItem value="managed">Managed by Mistle</SelectItem>
+            <SelectItem value="organization">Use workspace API key</SelectItem>
           </SelectContent>
         </Select>
       </FieldContent>
@@ -450,7 +478,7 @@ function SandboxProviderResourceFields(input: {
 
   const capabilities = input.provider.resourceCapabilities;
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+    <div className="grid gap-4">
       <ResourceSliderField
         capability={capabilities.vcpuCount}
         disabled={input.disabled}
@@ -498,7 +526,7 @@ function ResourceNumberField(input: {
   value: number;
 }): React.JSX.Element {
   return (
-    <Field>
+    <Field contentWidth="fill" orientation="horizontal">
       <FieldHeader>
         <FieldLabel htmlFor={input.id}>{input.label}</FieldLabel>
       </FieldHeader>
@@ -535,30 +563,34 @@ function ResourceSliderField(input: {
   value: number;
 }): React.JSX.Element {
   return (
-    <Field>
-      <FieldHeader className="flex-row items-center justify-between gap-3">
+    <Field contentWidth="fill" orientation="horizontal">
+      <FieldHeader>
         <FieldLabel>{input.label}</FieldLabel>
-        <span className="text-sm font-medium">{input.formatValue(input.value)}</span>
       </FieldHeader>
       <FieldContent>
-        <Slider
-          aria-label={input.label}
-          className="[&_[data-slot=slider-range]]:bg-primary/80 [&_[data-slot=slider-thumb]]:size-5 [&_[data-slot=slider-track]]:h-2 [&_[data-slot=slider-track]]:bg-border"
-          disabled={input.disabled}
-          id={input.id}
-          max={input.capability.max}
-          min={input.capability.min}
-          onValueChange={(values) => {
-            const nextValue = Array.isArray(values) ? values[0] : values;
-            if (nextValue === undefined) {
-              return;
-            }
+        <div className="flex items-center gap-4">
+          <Slider
+            aria-label={input.label}
+            className="[&_[data-slot=slider-range]]:bg-primary/80 [&_[data-slot=slider-thumb]]:size-5 [&_[data-slot=slider-track]]:h-2 [&_[data-slot=slider-track]]:bg-border min-w-0 flex-1"
+            disabled={input.disabled}
+            id={input.id}
+            max={input.capability.max}
+            min={input.capability.min}
+            onValueChange={(values) => {
+              const nextValue = Array.isArray(values) ? values[0] : values;
+              if (nextValue === undefined) {
+                return;
+              }
 
-            input.onChange(nextValue);
-          }}
-          step={input.capability.step}
-          value={[input.value]}
-        />
+              input.onChange(nextValue);
+            }}
+            step={input.capability.step}
+            value={[input.value]}
+          />
+          <span className="min-w-20 shrink-0 text-right text-sm font-medium">
+            {input.formatValue(input.value)}
+          </span>
+        </div>
       </FieldContent>
     </Field>
   );
@@ -712,7 +744,7 @@ function resolveCredentialSource(input: {
 }
 
 function formatCredentialSource(source: SandboxCredentialSource): string {
-  return source === "managed" ? "Use Mistle's key" : "Use my API key";
+  return source === "managed" ? "Managed by Mistle" : "Use workspace API key";
 }
 
 function createDefaultResources(

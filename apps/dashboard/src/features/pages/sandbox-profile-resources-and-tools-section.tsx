@@ -1,4 +1,4 @@
-import { Checkbox, DetailLabel } from "@mistle/ui";
+import { Checkbox, DetailLabel, Field, FieldContent, FieldHeader, FieldLabel } from "@mistle/ui";
 import { useDebouncedValue } from "@tanstack/react-pacer";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
@@ -229,6 +229,7 @@ function BindingToolsControl(input: {
   ) => void;
   disabled?: boolean | undefined;
   readOnly?: boolean | undefined;
+  showLabel?: boolean | undefined;
 }): ReactNode {
   const toolToggleModel = resolveBindingToolToggleModel({
     row: input.row,
@@ -240,10 +241,10 @@ function BindingToolsControl(input: {
     return null;
   }
 
-  return (
-    <div className="flex flex-col gap-2">
+  const toolsControl = (
+    <div className="flex flex-col gap-1">
       {toolToggleModel.options.map((option) => (
-        <label className="flex items-center gap-2 text-sm md:min-h-9" key={option.value}>
+        <label className="flex min-h-7 items-center gap-2 text-sm" key={option.value}>
           <Checkbox
             aria-label={option.label}
             checked={option.checked}
@@ -276,6 +277,17 @@ function BindingToolsControl(input: {
         </label>
       ))}
     </div>
+  );
+
+  return input.showLabel === true ? (
+    <Field contentWidth="fill" orientation="horizontal">
+      <FieldHeader>
+        <FieldLabel>Tools</FieldLabel>
+      </FieldHeader>
+      <FieldContent>{toolsControl}</FieldContent>
+    </Field>
+  ) : (
+    toolsControl
   );
 }
 
@@ -326,6 +338,7 @@ export function SandboxProfileBindingResourcesAndToolsCell(input: {
   ) => void;
   disabled?: boolean | undefined;
   readOnly?: boolean | undefined;
+  showGroupLabels?: boolean | undefined;
 }): React.JSX.Element {
   const connection = input.availableConnections.find(
     (candidate) => candidate.id === input.row.connectionId,
@@ -367,13 +380,30 @@ export function SandboxProfileBindingResourcesAndToolsCell(input: {
   return (
     <div className="flex min-w-0 flex-col gap-3">
       {input.row.kind === "git" && connection !== undefined ? (
-        <RepositoryResourcesPicker
-          connection={connection}
-          disabled={input.disabled}
-          readOnly={input.readOnly}
-          onRowChange={input.onRowChange}
-          row={input.row}
-        />
+        input.showGroupLabels === true ? (
+          <Field contentWidth="fill" orientation="horizontal">
+            <FieldHeader>
+              <FieldLabel>Repositories</FieldLabel>
+            </FieldHeader>
+            <FieldContent>
+              <RepositoryResourcesPicker
+                connection={connection}
+                disabled={input.disabled}
+                readOnly={input.readOnly}
+                onRowChange={input.onRowChange}
+                row={input.row}
+              />
+            </FieldContent>
+          </Field>
+        ) : (
+          <RepositoryResourcesPicker
+            connection={connection}
+            disabled={input.disabled}
+            readOnly={input.readOnly}
+            onRowChange={input.onRowChange}
+            row={input.row}
+          />
+        )
       ) : null}
 
       {summaryItems.length === 0 ? null : (
@@ -391,6 +421,7 @@ export function SandboxProfileBindingResourcesAndToolsCell(input: {
         availableConnections={input.availableConnections}
         availableTargets={input.availableTargets}
         disabled={input.disabled}
+        showLabel={input.showGroupLabels}
         readOnly={input.readOnly}
         onRowChange={input.onRowChange}
         row={input.row}

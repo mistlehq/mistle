@@ -1011,7 +1011,6 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.queryByRole("heading", { name: "Integrations" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Resources & Tools" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Configurations" })).toBeNull();
-    expect(screen.getAllByText("Resources & Tools").length).toBeGreaterThan(0);
     expect(screen.getByRole("textbox", { name: "Setup script" })).toBeDefined();
   });
 
@@ -1850,12 +1849,11 @@ describe("SandboxProfileEditorPage", () => {
     ]);
   });
 
-  it("keeps resources and tools inline with the integration rows", () => {
+  it("keeps integrations and tools inline with runtime selections", () => {
     renderSandboxProfileEditor();
 
     fireEvent.click(screen.getByRole("tab", { name: "Sandbox Profile" }));
 
-    expect(screen.getAllByText("Resources & Tools").length).toBeGreaterThan(0);
     expect(
       screen.queryByText(
         "Choose a Git provider in Integrations before selecting repository resources.",
@@ -1887,6 +1885,8 @@ describe("SandboxProfileEditorPage", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Sandbox Profile" }));
 
+    expect(screen.getByRole("heading", { name: "Runtime" })).toBeDefined();
+    expect(screen.getByRole("combobox", { name: "Sandbox Runtime" })).toBeDefined();
     expect(screen.queryByText("Loading integrations and resources...")).toBeNull();
     expect(screen.queryByText("Loading integrations...")).toBeNull();
     expect(
@@ -1904,6 +1904,8 @@ describe("SandboxProfileEditorPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Sandbox Profile" }));
 
     expect(await screen.findByText("Could not load integration bindings")).toBeDefined();
+    expect(screen.getByRole("heading", { name: "Runtime" })).toBeDefined();
+    expect(screen.getByRole("combobox", { name: "Sandbox Runtime" })).toBeDefined();
     expect(screen.queryByText("Loading integrations...")).toBeNull();
   });
 

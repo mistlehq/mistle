@@ -1,4 +1,11 @@
-import { Button, Notice, ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@mistle/ui";
+import {
+  Button,
+  Notice,
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+  SectionBlock,
+} from "@mistle/ui";
 import { SidebarSimpleIcon, TerminalIcon } from "@phosphor-icons/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -43,6 +50,7 @@ import type { SandboxProfileEditorSection } from "./sandbox-profile-editor-secti
 import { SandboxProfileIntegrationsSetupSection } from "./sandbox-profile-integrations-setup-section.js";
 import { mapBindingsToEditorRows } from "./sandbox-profile-integrations-state.js";
 import { SandboxProfileRuntimeSection } from "./sandbox-profile-runtime-section.js";
+import { SandboxProfileSectionCard } from "./sandbox-profile-section-card.js";
 import {
   SandboxProfileSetupScriptTestButton,
   SandboxProfileSetupScriptTestPanel,
@@ -676,73 +684,80 @@ function SandboxProfileEditorPageStoryView(
       versionActionIsPending={false}
       renderSectionPanel={(sectionId) => {
         if (sectionId === "sandbox-profile") {
-          if (input.integrationsSectionState !== undefined) {
-            return renderUnavailableIntegrationsSectionPanel({
-              state: input.integrationsSectionState,
-            });
-          }
-
           return (
             <div className="flex w-full flex-col gap-8">
               <SandboxProfilePanelSection>
-                <SandboxProfileRuntimeSection
-                  availableConnections={storyConnections}
-                  availableTargets={storyTargets}
-                  disabled={!isEditable}
-                  isDraft={mode.kind === "draft"}
-                  providers={createStorySandboxProviders({
-                    runtimeState: input.runtimeState,
-                  })}
-                  version={createRuntimeStoryVersion({
-                    runtimeState: input.runtimeState,
-                    version: mode.version,
-                  })}
-                />
+                <SectionBlock title="Runtime">
+                  <div className="grid gap-4">
+                    <SandboxProfileSectionCard>
+                      <SandboxProfileRuntimeSection
+                        availableConnections={storyConnections}
+                        availableTargets={storyTargets}
+                        disabled={!isEditable}
+                        isDraft={mode.kind === "draft"}
+                        providers={createStorySandboxProviders({
+                          runtimeState: input.runtimeState,
+                        })}
+                        sectionChrome={false}
+                        version={createRuntimeStoryVersion({
+                          runtimeState: input.runtimeState,
+                          version: mode.version,
+                        })}
+                      />
+                    </SandboxProfileSectionCard>
+                  </div>
+                </SectionBlock>
               </SandboxProfilePanelSection>
-              <SandboxProfilePanelSection>
-                <SandboxProfileIntegrationsSetupSection
-                  availableConnections={storyConnections}
-                  availableTargets={storyTargets}
-                  integrationBindingsQuery={{
-                    isError: false,
-                    error: null,
-                    isPending: false,
-                  }}
-                  integrationDirectoryQuery={{
-                    isError: false,
-                    error: null,
-                    isPending: false,
-                  }}
-                  integrationRows={integrationRows}
-                  integrationSaveError={null}
-                  disabled={!isEditable}
-                  onAddIntegrationBindingRow={async (nextBinding) => {
-                    setIntegrationRows((currentRows) => [
-                      ...currentRows,
-                      {
-                        clientId: `row-${String(currentRows.length + 1)}`,
-                        connectionId: nextBinding.connectionId,
-                        kind: nextBinding.kind,
-                        config: nextBinding.config,
-                      },
-                    ]);
-                    return true;
-                  }}
-                  onIntegrationBindingRowChange={(clientId, changes) => {
-                    setIntegrationRows((currentRows) =>
-                      currentRows.map((row) =>
-                        row.clientId === clientId ? { ...row, ...changes } : row,
-                      ),
-                    );
-                  }}
-                  onRemoveIntegrationBindingRow={(clientId) => {
-                    setIntegrationRows((currentRows) =>
-                      currentRows.filter((row) => row.clientId !== clientId),
-                    );
-                  }}
-                  onIntegrationSaveErrorDismiss={() => {}}
-                />
-              </SandboxProfilePanelSection>
+              {input.integrationsSectionState === undefined ? (
+                <SandboxProfilePanelSection>
+                  <SandboxProfileIntegrationsSetupSection
+                    availableConnections={storyConnections}
+                    availableTargets={storyTargets}
+                    integrationBindingsQuery={{
+                      isError: false,
+                      error: null,
+                      isPending: false,
+                    }}
+                    integrationDirectoryQuery={{
+                      isError: false,
+                      error: null,
+                      isPending: false,
+                    }}
+                    integrationRows={integrationRows}
+                    integrationSaveError={null}
+                    disabled={!isEditable}
+                    onAddIntegrationBindingRow={async (nextBinding) => {
+                      setIntegrationRows((currentRows) => [
+                        ...currentRows,
+                        {
+                          clientId: `row-${String(currentRows.length + 1)}`,
+                          connectionId: nextBinding.connectionId,
+                          kind: nextBinding.kind,
+                          config: nextBinding.config,
+                        },
+                      ]);
+                      return true;
+                    }}
+                    onIntegrationBindingRowChange={(clientId, changes) => {
+                      setIntegrationRows((currentRows) =>
+                        currentRows.map((row) =>
+                          row.clientId === clientId ? { ...row, ...changes } : row,
+                        ),
+                      );
+                    }}
+                    onRemoveIntegrationBindingRow={(clientId) => {
+                      setIntegrationRows((currentRows) =>
+                        currentRows.filter((row) => row.clientId !== clientId),
+                      );
+                    }}
+                    onIntegrationSaveErrorDismiss={() => {}}
+                  />
+                </SandboxProfilePanelSection>
+              ) : (
+                renderUnavailableIntegrationsSectionPanel({
+                  state: input.integrationsSectionState,
+                })
+              )}
               <SandboxProfilePanelSection>
                 <div className="flex flex-col gap-4">
                   {input.setupAssistantErrorMessage === undefined ? null : (

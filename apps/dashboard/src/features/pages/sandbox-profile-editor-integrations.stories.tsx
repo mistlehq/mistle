@@ -12,7 +12,7 @@ import {
 } from "./sandbox-profile-editor-story-support.js";
 
 const meta = {
-  title: "Dashboard/SandboxProfiles/Editor/Integrations",
+  title: "Dashboard/SandboxProfiles/Editor/Runtime And Connections",
   component: SandboxProfileEditorPageStory,
   decorators: [withDashboardCenteredStory],
   render: function RenderStory(args): React.JSX.Element {
@@ -24,6 +24,8 @@ const meta = {
 export default meta;
 
 type Story = StoryObj<typeof meta>;
+
+export const Default: Story = {};
 
 const StoryTargetsWithoutGitProviders = StoryIntegrationTargets.filter(
   (target) => target.familyId !== "github",
@@ -37,7 +39,7 @@ const StoryConnectionsWithoutGitProviders = StoryIntegrationConnections.filter(
   (connection) => !StoryGitProviderTargetKeys.has(connection.targetKey),
 );
 
-export const ResourcesAndToolsLoadError: Story = {
+export const RuntimeAndConnectionsLoadError: Story = {
   args: {
     integrationsSectionState: {
       kind: "error",

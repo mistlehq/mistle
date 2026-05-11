@@ -116,15 +116,12 @@ describe("SandboxProfileRuntimeSection", () => {
       />,
     );
 
-    expect(screen.getByText("Sandbox settings")).toBeTruthy();
+    expect(screen.getByText("Sandbox Runtime")).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "Provider" })).toBeTruthy();
     expect(screen.getByText("E2B")).toBeTruthy();
-    expect(screen.getByRole("combobox", { name: "API key" })).toBeTruthy();
-    expect(screen.getByText("Use Mistle's key")).toBeTruthy();
-    expect(screen.getByRole("combobox", { name: "Connection" }).hasAttribute("disabled")).toBe(
-      true,
-    );
-    expect(screen.getByText("Using Mistle's key")).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Credentials" })).toBeTruthy();
+    expect(screen.getByText("Managed by Mistle")).toBeTruthy();
+    expect(screen.queryByRole("combobox", { name: "Connection" })).toBeNull();
     expect(screen.queryByText("E2B (Managed)")).toBeNull();
     expect(screen.queryByText("Managed")).toBeNull();
   });
@@ -167,7 +164,7 @@ describe("SandboxProfileRuntimeSection", () => {
       />,
     );
 
-    expect(screen.getByText("Use my API key")).toBeTruthy();
+    expect(screen.getByText("Use workspace API key")).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "Connection" }).hasAttribute("disabled")).toBe(
       false,
     );
