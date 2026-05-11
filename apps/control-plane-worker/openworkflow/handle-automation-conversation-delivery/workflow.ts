@@ -80,6 +80,8 @@ export const HandleAutomationConversationDeliveryWorkflow = defineTracedControlP
           automationRunId: activeTask.automationRunId,
           conversationId: input.conversationId,
           deliveryTaskId: activeTask.taskId,
+          attemptCount: activeTask.attemptCount,
+          processorGeneration: activeTask.processorGeneration,
           workflowRunId,
         },
         attributes: taskLifecycleEvent.attributes,
@@ -186,6 +188,8 @@ export const HandleAutomationConversationDeliveryWorkflow = defineTracedControlP
                   automationRunId: activeTask.automationRunId,
                   conversationId: preparedAutomationRun.conversationId,
                   deliveryTaskId: activeTask.taskId,
+                  attemptCount: activeTask.attemptCount,
+                  processorGeneration: activeTask.processorGeneration,
                   webhookEventId: preparedAutomationRun.webhookEventId,
                   workflowRunId,
                 },
@@ -345,12 +349,30 @@ export const HandleAutomationConversationDeliveryWorkflow = defineTracedControlP
             conversationId:
               preparedAutomationRunForTelemetry?.conversationId ?? input.conversationId,
             deliveryTaskId: activeTask.taskId,
+            attemptCount: activeTask.attemptCount,
+            processorGeneration: activeTask.processorGeneration,
             webhookEventId: preparedAutomationRunForTelemetry?.webhookEventId,
             workflowRunId,
           },
         });
       } catch (error) {
         if (shouldRethrowDurableStepErrorForRetry(error)) {
+          logAutomationConversationDeliveryEvent({
+            eventName: "delivery_task.step_retry",
+            message: "Retrying automation conversation delivery after durable step failure",
+            telemetryContext: {
+              automationRunId: activeTask.automationRunId,
+              conversationId:
+                preparedAutomationRunForTelemetry?.conversationId ?? input.conversationId,
+              deliveryTaskId: activeTask.taskId,
+              attemptCount: activeTask.attemptCount,
+              processorGeneration: activeTask.processorGeneration,
+              webhookEventId: preparedAutomationRunForTelemetry?.webhookEventId,
+              workflowRunId,
+            },
+            err: error,
+            level: "warn",
+          });
           throw error;
         }
 
@@ -406,6 +428,8 @@ export const HandleAutomationConversationDeliveryWorkflow = defineTracedControlP
             conversationId:
               preparedAutomationRunForTelemetry?.conversationId ?? input.conversationId,
             deliveryTaskId: activeTask.taskId,
+            attemptCount: activeTask.attemptCount,
+            processorGeneration: activeTask.processorGeneration,
             webhookEventId: preparedAutomationRunForTelemetry?.webhookEventId,
             workflowRunId,
           },

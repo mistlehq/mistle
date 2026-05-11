@@ -430,9 +430,13 @@ async function buildWebhookDeliveryDiagnostics(input: {
 
 async function buildAutomationRunFailureDiagnostics(input: {
   fixture: GitHubWebhookAutomationFixture;
+  sessionCookie: string;
   automationRunId: string;
   conversationId: string | null;
 }): Promise<string> {
+  const automationRun = await input.fixture.db.query.automationRuns.findFirst({
+    where: (table, { eq }) => eq(table.id, input.automationRunId),
+  });
   const deliveryTasks = await input.fixture.db.query.automationConversationDeliveryTasks.findMany({
     where: (table, { eq }) => eq(table.automationRunId, input.automationRunId),
     orderBy: (table, { desc }) => [desc(table.createdAt), desc(table.id)],
@@ -445,10 +449,37 @@ async function buildAutomationRunFailureDiagnostics(input: {
           fixture: input.fixture,
           conversationId: input.conversationId,
         });
+  const routeSandboxStatuses = await Promise.all(
+    routes.map(async (route) => ({
+      routeId: route.id,
+      sandboxInstanceId: route.sandboxInstanceId,
+      statusLookup:
+        route.sandboxInstanceId === null
+          ? null
+          : await readSandboxInstanceStatusDiagnostics({
+              fixture: input.fixture,
+              sessionCookie: input.sessionCookie,
+              sandboxInstanceId: route.sandboxInstanceId,
+            }),
+    })),
+  );
 
   return JSON.stringify({
     automationRunId: input.automationRunId,
     conversationId: input.conversationId,
+    automationRun:
+      automationRun === undefined
+        ? null
+        : {
+            id: automationRun.id,
+            status: automationRun.status,
+            failureCode: automationRun.failureCode,
+            failureMessage: automationRun.failureMessage,
+            sourceWebhookEventId: automationRun.sourceWebhookEventId,
+            conversationId: automationRun.conversationId,
+            createdAt: automationRun.createdAt,
+            updatedAt: automationRun.updatedAt,
+          },
     deliveryTasks: deliveryTasks.map((task) => ({
       id: task.id,
       status: task.status,
@@ -469,7 +500,34 @@ async function buildAutomationRunFailureDiagnostics(input: {
       createdAt: route.createdAt,
       updatedAt: route.updatedAt,
     })),
+    routeSandboxStatuses,
   });
+}
+
+async function readSandboxInstanceStatusDiagnostics(input: {
+  fixture: GitHubWebhookAutomationFixture;
+  sessionCookie: string;
+  sandboxInstanceId: string;
+}) {
+  try {
+    const response = await input.fixture.request(
+      `/v1/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}`,
+      {
+        headers: {
+          cookie: input.sessionCookie,
+        },
+      },
+    );
+    const bodyText = await response.text().catch(() => "");
+    return {
+      httpStatus: response.status,
+      bodyText,
+    };
+  } catch (error) {
+    return {
+      error: formatDiagnosticError(error),
+    };
+  }
 }
 
 async function readAutomationConversationRouteDiagnostics(input: {
@@ -2033,6 +2091,7 @@ export async function startGitHubWebhookAutomationConversation(input: {
                 });
           const diagnostics = await buildAutomationRunFailureDiagnostics({
             fixture: input.fixture,
+            sessionCookie: session.cookie,
             automationRunId: run.id,
             conversationId: run.conversationId,
           });
@@ -2043,6 +2102,31 @@ export async function startGitHubWebhookAutomationConversation(input: {
 
         return run.status === AutomationRunStatuses.COMPLETED ? run : null;
       },
+    }).catch(async (error: unknown) => {
+      const run = await input.fixture.db.query.automationRuns.findFirst({
+        where: (table, { eq }) => eq(table.sourceWebhookEventId, webhookEvent.id),
+      });
+      const diagnostics =
+        run === undefined
+          ? await buildWebhookDeliveryDiagnostics({
+              fixture: input.fixture,
+              githubWebhookSource,
+              payloadMarker,
+              issueNumber: issue.number,
+              issueCommentId: issueComment.id,
+            })
+          : await buildAutomationRunFailureDiagnostics({
+              fixture: input.fixture,
+              sessionCookie: session.cookie,
+              automationRunId: run.id,
+              conversationId: run.conversationId,
+            });
+      throw new Error(
+        `${formatDiagnosticError(error)} Automation run completion diagnostics: ${diagnostics}`,
+        {
+          cause: error,
+        },
+      );
     });
     if (automationRun.conversationId === null) {
       throw new Error("Expected completed automation run to persist conversationId.");
@@ -2085,7 +2169,7 @@ export async function startGitHubWebhookAutomationConversation(input: {
         const bodyText = await response.text().catch(() => "");
         if (response.status !== 200) {
           throw new Error(
-            `sandbox instance status lookup failed with status ${String(response.status)}. Response body: ${bodyText}`,
+            `sandbox instance status lookup failed with status ${String(response.status)} for conversation '${conversationId}' sandbox '${route.sandboxInstanceId}'. Response body: ${bodyText}`,
           );
         }
 

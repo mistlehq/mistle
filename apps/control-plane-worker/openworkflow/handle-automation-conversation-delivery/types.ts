@@ -6,6 +6,8 @@ export type ActiveAutomationConversationDeliveryTask = {
   taskId: string;
   automationRunId: string;
   status: ActiveAutomationConversationDeliveryTaskStatus;
+  attemptCount: number | null;
+  processorGeneration: number | null;
 };
 
 export type ResolvedAutomationConversationDeliveryRoute = {

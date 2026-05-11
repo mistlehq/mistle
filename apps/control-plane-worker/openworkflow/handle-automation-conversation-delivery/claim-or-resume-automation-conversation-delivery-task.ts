@@ -33,6 +33,8 @@ export async function claimOrResumeAutomationConversationDeliveryTask(
         taskId: activeTask.id,
         automationRunId: activeTask.automationRunId,
         status: "claimed",
+        attemptCount: activeTask.attemptCount,
+        processorGeneration: activeTask.processorGeneration,
       };
     }
 
@@ -41,6 +43,8 @@ export async function claimOrResumeAutomationConversationDeliveryTask(
         taskId: activeTask.id,
         automationRunId: activeTask.automationRunId,
         status: "delivering",
+        attemptCount: activeTask.attemptCount,
+        processorGeneration: activeTask.processorGeneration,
       };
     }
 
@@ -67,5 +71,7 @@ export async function claimOrResumeAutomationConversationDeliveryTask(
     taskId: claimedTask.id,
     automationRunId: claimedTask.automationRunId,
     status: "claimed",
+    attemptCount: claimedTask.attemptCount,
+    processorGeneration: claimedTask.processorGeneration,
   };
 }

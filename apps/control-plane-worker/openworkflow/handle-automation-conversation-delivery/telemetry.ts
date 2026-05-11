@@ -12,6 +12,8 @@ export type AutomationConversationDeliveryTelemetryContext = {
   workflowRunId?: string | undefined;
   sandboxInstanceId?: string | undefined;
   routeId?: string | undefined;
+  attemptCount?: number | null | undefined;
+  processorGeneration?: number | null | undefined;
 };
 
 type DeliveryTelemetryAttributeValue = string | number | boolean;
@@ -66,6 +68,12 @@ export function createAutomationConversationDeliveryTelemetryAttributes(
       ? {}
       : { "mistle.sandbox.instance_id": input.sandboxInstanceId }),
     ...(input.routeId === undefined ? {} : { "mistle.route.id": input.routeId }),
+    ...(input.attemptCount === undefined || input.attemptCount === null
+      ? {}
+      : { "mistle.delivery.attempt_count": input.attemptCount }),
+    ...(input.processorGeneration === undefined || input.processorGeneration === null
+      ? {}
+      : { "mistle.delivery.processor_generation": input.processorGeneration }),
   };
 }
 

@@ -375,7 +375,7 @@ export async function waitForSandboxInstanceRunning(input: {
 
       if (response.status !== 200) {
         throw new Error(
-          `sandbox status lookup failed with status ${String(response.status)}. Response body: ${bodyText}`,
+          `sandbox status lookup failed with status ${String(response.status)} for sandbox '${input.sandboxInstanceId}'. Response body: ${bodyText}`,
         );
       }
 
