@@ -9,78 +9,91 @@
   "exports": {
     ".": {
       "types": "./src/index.ts",
+      "workspace-src": "./src/index.ts",
       "node": "./dist/index.js",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
     "./server": {
       "types": "./src/server.ts",
+      "workspace-src": "./src/server.ts",
       "node": "./dist/server.js",
       "import": "./src/server.ts",
       "default": "./src/server.ts"
     },
     "./agent-runtimes/server": {
       "types": "./src/agent-runtimes/server.ts",
+      "workspace-src": "./src/agent-runtimes/server.ts",
       "node": "./dist/agent-runtimes/server.js",
       "import": "./src/agent-runtimes/server.ts",
       "default": "./src/agent-runtimes/server.ts"
     },
     "./agent-runtimes/codex": {
       "types": "./src/agent-runtimes/codex/index.ts",
+      "workspace-src": "./src/agent-runtimes/codex/index.ts",
       "node": "./dist/agent-runtimes/codex/index.js",
       "import": "./src/agent-runtimes/codex/index.ts",
       "default": "./src/agent-runtimes/codex/index.ts"
     },
     "./agent-runtimes/codex/server": {
       "types": "./src/agent-runtimes/codex/server.ts",
+      "workspace-src": "./src/agent-runtimes/codex/server.ts",
       "node": "./dist/agent-runtimes/codex/server.js",
       "import": "./src/agent-runtimes/codex/server.ts",
       "default": "./src/agent-runtimes/codex/server.ts"
     },
     "./agent-runtimes/codex/app-server": {
       "types": "./src/agent-runtimes/codex/app-server.ts",
+      "workspace-src": "./src/agent-runtimes/codex/app-server.ts",
       "node": "./dist/agent-runtimes/codex/app-server.js",
       "import": "./src/agent-runtimes/codex/app-server.ts",
       "default": "./src/agent-runtimes/codex/app-server.ts"
     },
     "./agent-runtimes/codex/client": {
       "types": "./src/agent-runtimes/codex/client.ts",
+      "workspace-src": "./src/agent-runtimes/codex/client.ts",
       "node": "./dist/agent-runtimes/codex/client.js",
       "import": "./src/agent-runtimes/codex/client.ts",
       "default": "./src/agent-runtimes/codex/client.ts"
     },
     "./openai": {
       "types": "./src/openai/index.ts",
+      "workspace-src": "./src/openai/index.ts",
       "node": "./dist/openai/index.js",
       "import": "./src/openai/index.ts",
       "default": "./src/openai/index.ts"
     },
     "./jira": {
       "types": "./src/jira.ts",
+      "workspace-src": "./src/jira.ts",
       "node": "./dist/jira.js",
       "import": "./src/jira.ts",
       "default": "./src/jira.ts"
     },
     "./forms": {
       "types": "./src/forms/index.ts",
+      "workspace-src": "./src/forms/index.ts",
       "node": "./dist/forms/index.js",
       "import": "./src/forms/index.ts",
       "default": "./src/forms/index.ts"
     },
     "./sandbox-runtimes": {
       "types": "./src/sandbox-runtimes/index.ts",
+      "workspace-src": "./src/sandbox-runtimes/index.ts",
       "node": "./dist/sandbox-runtimes/index.js",
       "import": "./src/sandbox-runtimes/index.ts",
       "default": "./src/sandbox-runtimes/index.ts"
     },
     "./browser": {
       "types": "./src/browser.ts",
+      "workspace-src": "./src/browser.ts",
       "node": "./dist/browser.js",
       "import": "./src/browser.ts",
       "default": "./src/browser.ts"
     },
     "./*.js": {
       "types": "./src/*.ts",
+      "workspace-src": "./src/*.ts",
       "node": "./dist/*.js",
       "import": "./src/*.ts",
       "default": "./src/*.ts"

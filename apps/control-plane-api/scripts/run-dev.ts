@@ -25,6 +25,7 @@ function runDevServer(): void {
     stdio: "inherit",
     env: {
       ...process.env,
+      NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --conditions=workspace-src`.trim(),
       PATH: `${commitSignBinaryDir}${delimiter}${process.env.PATH ?? ""}`,
     },
   });

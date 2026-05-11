@@ -12,18 +12,21 @@
   "exports": {
     ".": {
       "types": "./src/index.ts",
+      "workspace-src": "./src/index.ts",
       "node": "./index.js",
       "import": "./index.js",
       "default": "./index.js"
     },
     "./browser": {
       "types": "./src/browser.ts",
+      "workspace-src": "./src/browser.ts",
       "node": "./browser.js",
       "import": "./browser.js",
       "default": "./browser.js"
     },
     "./node": {
       "types": "./src/node.ts",
+      "workspace-src": "./src/node.ts",
       "node": "./node.js",
       "import": "./node.js",
       "default": "./node.js"

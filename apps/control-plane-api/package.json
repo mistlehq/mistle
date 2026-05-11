@@ -8,23 +8,25 @@
   "exports": {
     "./runtime": {
       "types": "./src/main.ts",
+      "workspace-src": "./src/main.ts",
       "node": "./dist/main.js",
       "import": "./src/main.ts",
       "default": "./src/main.ts"
     },
     "./types": {
       "types": "./src/types.ts",
+      "workspace-src": "./src/types.ts",
       "node": "./dist/types.js",
       "import": "./src/types.ts",
       "default": "./src/types.ts"
     }
   },
   "scripts": {
-    "dev": "tsx scripts/run-dev.ts",
-    "dev:schedules": "tsx scripts/run-schedule-dispatcher-dev.ts",
-    "db:migrate": "tsx scripts/run-control-plane-migrations.ts",
-    "workflow:migrate": "tsx --tsconfig tsconfig.scripts.json scripts/run-control-plane-workflow-migrations.ts",
-    "integration-targets:sync": "tsx --tsconfig tsconfig.scripts.json scripts/run-integration-targets-sync.ts",
+    "dev": "node --conditions=workspace-src --import tsx scripts/run-dev.ts",
+    "dev:schedules": "node --conditions=workspace-src --import tsx scripts/run-schedule-dispatcher-dev.ts",
+    "db:migrate": "node --conditions=workspace-src --import tsx scripts/run-control-plane-migrations.ts",
+    "workflow:migrate": "node --conditions=workspace-src --import tsx scripts/run-control-plane-workflow-migrations.ts",
+    "integration-targets:sync": "node --conditions=workspace-src --import tsx scripts/run-integration-targets-sync.ts",
     "maintenance:prune-expired-auth-state": "node dist/maintenance/cli.js prune-expired-auth-state",
     "maintenance:prune-expired-integration-auth-state": "node dist/maintenance/cli.js prune-expired-integration-auth-state",
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && tsc -p tsconfig.build.scripts.json && tsc-alias -p tsconfig.build.scripts.json",
@@ -34,8 +36,8 @@
     "test": "vitest run -c vitest.config.ts",
     "test:integration": "vitest run -c vitest.integration.config.ts",
     "test:property": "vitest run -c vitest.property.config.ts --passWithNoTests",
-    "openapi:generate": "tsx --tsconfig tsconfig.scripts.json scripts/openapi/generate-spec.ts",
-    "openapi:check": "tsx --tsconfig tsconfig.scripts.json scripts/openapi/check-spec-drift.ts",
+    "openapi:generate": "node --conditions=workspace-src --import tsx scripts/openapi/generate-spec.ts",
+    "openapi:check": "node --conditions=workspace-src --import tsx scripts/openapi/check-spec-drift.ts",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
   },

@@ -12,6 +12,7 @@
   "exports": {
     ".": {
       "types": "./src/index.ts",
+      "workspace-src": "./src/index.ts",
       "node": "./dist/index.js",
       "import": "./src/index.ts",
       "default": "./src/index.ts"

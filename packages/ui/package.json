@@ -16,6 +16,7 @@
     },
     "./*.js": {
       "types": "./src/*",
+      "workspace-src": "./src/*",
       "node": "./dist/*.js",
       "import": "./src/*",
       "default": "./src/*"

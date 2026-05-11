@@ -6,7 +6,7 @@
   ],
   "type": "module",
   "scripts": {
-    "dev": "tsx watch --import ./instrument.ts ./node_modules/@openworkflow/cli/dist/cli.js worker start --config ./openworkflow.config.ts",
+    "dev": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--conditions=workspace-src\" tsx watch --import ./instrument.ts ./node_modules/@openworkflow/cli/dist/cli.js worker start --config ./openworkflow.config.ts",
     "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && tsc -p tsconfig.build.openworkflow.json && tsc-alias -p tsconfig.build.openworkflow.json",
     "start": "node --import ./dist/instrument.js ./node_modules/@openworkflow/cli/dist/cli.js worker start --config ./dist/openworkflow.config.js",
     "lint": "oxlint --type-aware --deny-warnings .",

@@ -9,18 +9,21 @@
   "exports": {
     ".": {
       "types": "./src/index.ts",
+      "workspace-src": "./src/index.ts",
       "node": "./dist/index.js",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
     "./pagination": {
       "types": "./src/pagination/index.ts",
+      "workspace-src": "./src/pagination/index.ts",
       "node": "./dist/pagination/index.js",
       "import": "./src/pagination/index.ts",
       "default": "./src/pagination/index.ts"
     },
     "./*.js": {
       "types": "./src/*.ts",
+      "workspace-src": "./src/*.ts",
       "node": "./dist/*.js",
       "import": "./src/*.ts",
       "default": "./src/*.ts"

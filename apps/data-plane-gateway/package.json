@@ -8,19 +8,21 @@
   "exports": {
     "./runtime": {
       "types": "./src/runtime/index.ts",
+      "workspace-src": "./src/runtime/index.ts",
       "node": "./dist/runtime/index.js",
       "import": "./src/runtime/index.ts",
       "default": "./src/runtime/index.ts"
     },
     "./types": {
       "types": "./src/types.ts",
+      "workspace-src": "./src/types.ts",
       "node": "./dist/types.js",
       "import": "./src/types.ts",
       "default": "./src/types.ts"
     }
   },
   "scripts": {
-    "dev": "tsx watch --import ./src/instrument.ts src/index.ts",
+    "dev": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--conditions=workspace-src\" tsx watch --import ./src/instrument.ts src/index.ts",
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "start": "node --import ./dist/instrument.js dist/index.js",
     "lint": "oxlint --type-aware --deny-warnings .",

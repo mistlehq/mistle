@@ -8,21 +8,23 @@
   "exports": {
     "./runtime": {
       "types": "./src/main.ts",
+      "workspace-src": "./src/main.ts",
       "node": "./dist/main.js",
       "import": "./src/main.ts",
       "default": "./src/main.ts"
     },
     "./types": {
       "types": "./src/types.ts",
+      "workspace-src": "./src/types.ts",
       "node": "./dist/types.js",
       "import": "./src/types.ts",
       "default": "./src/types.ts"
     }
   },
   "scripts": {
-    "dev": "tsx watch --import ./src/instrument.ts src/index.ts",
-    "db:migrate": "tsx src/scripts/run-data-plane-migrations.ts",
-    "workflow:migrate": "tsx --tsconfig tsconfig.scripts.json src/scripts/run-data-plane-workflow-migrations.ts",
+    "dev": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--conditions=workspace-src\" tsx watch --import ./src/instrument.ts src/index.ts",
+    "db:migrate": "node --conditions=workspace-src --import tsx src/scripts/run-data-plane-migrations.ts",
+    "workflow:migrate": "node --conditions=workspace-src --import tsx src/scripts/run-data-plane-workflow-migrations.ts",
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "start": "node --import ./dist/instrument.js dist/index.js",
     "lint": "oxlint --type-aware --deny-warnings .",
@@ -30,8 +32,8 @@
     "test": "vitest run -c vitest.config.ts --passWithNoTests",
     "test:integration": "vitest run -c vitest.integration.config.ts",
     "test:property": "vitest run --passWithNoTests",
-    "openapi:generate": "tsx --tsconfig tsconfig.scripts.json scripts/openapi/generate-spec.ts",
-    "openapi:check": "tsx --tsconfig tsconfig.scripts.json scripts/openapi/check-spec-drift.ts",
+    "openapi:generate": "node --conditions=workspace-src --import tsx scripts/openapi/generate-spec.ts",
+    "openapi:check": "node --conditions=workspace-src --import tsx scripts/openapi/check-spec-drift.ts",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
   },
