@@ -210,6 +210,29 @@ export function applyPublishedSandboxProfileVersionToVersions(input: {
   );
 }
 
+export function applyCreatedSandboxProfileVersionDraftToVersions(input: {
+  versions: readonly SandboxProfileVersion[] | undefined;
+  draftVersion: SandboxProfileVersion;
+}): readonly SandboxProfileVersion[] {
+  const remainingVersions = (input.versions ?? []).filter(
+    (version) => version.version !== input.draftVersion.version && version.state !== "draft",
+  );
+  return [...remainingVersions, input.draftVersion].sort(
+    (left, right) => left.version - right.version,
+  );
+}
+
+export function applyDiscardedSandboxProfileVersionDraftToVersions(input: {
+  versions: readonly SandboxProfileVersion[] | undefined;
+  discardedVersion: number;
+}): readonly SandboxProfileVersion[] | undefined {
+  if (input.versions === undefined) {
+    return undefined;
+  }
+
+  return input.versions.filter((version) => version.version !== input.discardedVersion);
+}
+
 export function resolveSandboxProfileSetupScriptIntegrationRows(
   initialRows: readonly SandboxProfileBindingEditorRow[] | null,
   draftRows: readonly SandboxProfileBindingEditorRow[] | null | undefined,

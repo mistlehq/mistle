@@ -31,7 +31,7 @@ import {
   TextLink,
 } from "@mistle/ui";
 import { SidebarSimpleIcon, SpinnerGapIcon, TerminalIcon } from "@phosphor-icons/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   useCallback,
   useEffect,
@@ -110,6 +110,8 @@ import type {
   SandboxProfileBindingEditorRow,
 } from "./sandbox-profile-binding-config-editor.js";
 import {
+  applyCreatedSandboxProfileVersionDraftToVersions,
+  applyDiscardedSandboxProfileVersionDraftToVersions,
   applyPublishedSandboxProfileVersionToProfile,
   applyPublishedSandboxProfileVersionToVersions,
   resolveSandboxProfileEditorVersionMode,
@@ -719,6 +721,41 @@ type LoadedSandboxProfileEditorPageInput = {
   invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
 };
 
+async function clearSandboxProfileVersionDraftQueryState(input: {
+  queryClient: QueryClient;
+  profileId: string;
+  version: number;
+}): Promise<void> {
+  const integrationBindingsQueryKey = sandboxProfileVersionIntegrationBindingsQueryKey({
+    profileId: input.profileId,
+    version: input.version,
+  });
+  const setupScriptQueryKey = sandboxProfileVersionSetupScriptQueryKey({
+    profileId: input.profileId,
+    version: input.version,
+  });
+
+  await Promise.all([
+    input.queryClient.cancelQueries({
+      exact: true,
+      queryKey: integrationBindingsQueryKey,
+    }),
+    input.queryClient.cancelQueries({
+      exact: true,
+      queryKey: setupScriptQueryKey,
+    }),
+  ]);
+
+  input.queryClient.removeQueries({
+    exact: true,
+    queryKey: integrationBindingsQueryKey,
+  });
+  input.queryClient.removeQueries({
+    exact: true,
+    queryKey: setupScriptQueryKey,
+  });
+}
+
 function LoadedSandboxProfileEditorPage(
   input: LoadedSandboxProfileEditorPageInput,
 ): React.JSX.Element {
@@ -741,19 +778,33 @@ function LoadedSandboxProfileEditorPage(
       createSandboxProfileVersionDraft({
         profileId: input.profileId,
       }),
-    onSuccess: async () => {
+    onSuccess: async (draftVersion) => {
       setVersionActionError(null);
-      await Promise.all([
-        input.invalidateProfileVersions(input.profileId),
-        input.invalidateSandboxProfiles(),
-        input.invalidateProfileDetail(input.profileId),
-      ]);
+      await clearSandboxProfileVersionDraftQueryState({
+        queryClient,
+        profileId: input.profileId,
+        version: draftVersion.version,
+      });
+      queryClient.setQueryData<{ versions: readonly SandboxProfileVersion[] } | undefined>(
+        sandboxProfileVersionsQueryKey(input.profileId),
+        (currentVersions) => ({
+          versions: applyCreatedSandboxProfileVersionDraftToVersions({
+            versions: currentVersions?.versions,
+            draftVersion,
+          }),
+        }),
+      );
       void input.navigate(
         createSandboxProfileEditorPath({
           profileId: input.profileId,
           view: "draft",
         }),
       );
+      void Promise.all([
+        input.invalidateProfileVersions(input.profileId),
+        input.invalidateSandboxProfiles(),
+        input.invalidateProfileDetail(input.profileId),
+      ]);
     },
     onError: (error: unknown) => {
       setVersionActionError(
@@ -835,19 +886,42 @@ function LoadedSandboxProfileEditorPage(
         profileId: input.profileId,
         version: inputValue.draftVersion,
       }),
-    onSuccess: async () => {
+    onSuccess: async (result, inputValue) => {
       setVersionActionError(null);
-      await Promise.all([
-        input.invalidateProfileVersions(input.profileId),
-        input.invalidateSandboxProfiles(),
-        input.invalidateProfileDetail(input.profileId),
-      ]);
+      await clearSandboxProfileVersionDraftQueryState({
+        queryClient,
+        profileId: input.profileId,
+        version: result.discardedVersion,
+      });
+      if (inputValue.draftVersion !== result.discardedVersion) {
+        await clearSandboxProfileVersionDraftQueryState({
+          queryClient,
+          profileId: input.profileId,
+          version: inputValue.draftVersion,
+        });
+      }
+      queryClient.setQueryData<{ versions: readonly SandboxProfileVersion[] } | undefined>(
+        sandboxProfileVersionsQueryKey(input.profileId),
+        (currentVersions) => {
+          const nextVersions = applyDiscardedSandboxProfileVersionDraftToVersions({
+            versions: currentVersions?.versions,
+            discardedVersion: result.discardedVersion,
+          });
+
+          return nextVersions === undefined ? currentVersions : { versions: nextVersions };
+        },
+      );
       void input.navigate(
         createSandboxProfileEditorPath({
           profileId: input.profileId,
           view: "published",
         }),
       );
+      void Promise.all([
+        input.invalidateProfileVersions(input.profileId),
+        input.invalidateSandboxProfiles(),
+        input.invalidateProfileDetail(input.profileId),
+      ]);
     },
     onError: (error: unknown) => {
       setVersionActionError(
