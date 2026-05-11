@@ -12,7 +12,6 @@ import {
 } from "react-router";
 import { z } from "zod";
 
-import { resetDashboardConfigForTest } from "../../config.js";
 import { withDashboardCenteredStory, withDashboardPageStory } from "../../storybook/decorators.js";
 import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
 import {
@@ -48,13 +47,6 @@ function getGitHubDefinitionOrThrow(): AnyIntegrationDefinition {
 
 const GitHubDefinition = getGitHubDefinitionOrThrow();
 const StoryControlPlaneApiOrigin = "https://control-plane.example.com";
-
-function configureDashboardRuntimeForStory(): void {
-  Object.assign(import.meta.env, {
-    VITE_CONTROL_PLANE_API_ORIGIN: StoryControlPlaneApiOrigin,
-  });
-  resetDashboardConfigForTest();
-}
 
 function createStoryQueryClient(input: {
   connections?: readonly IntegrationConnection[];
@@ -373,7 +365,6 @@ function StoryQueryClientProvider(input: {
 }
 
 function GitHubCreatePageStory(): React.JSX.Element {
-  configureDashboardRuntimeForStory();
   const [queryClient] = useState(() => createStoryQueryClient({}));
   const [router] = useState(() =>
     createMemoryRouter(
@@ -407,7 +398,6 @@ export function GitHubAppSetupPageStory(input: {
   connection: IntegrationConnection;
   initialEntry?: string;
 }): React.JSX.Element {
-  configureDashboardRuntimeForStory();
   const [queryClient] = useState(() =>
     createStoryQueryClient({
       connections: [input.connection],
@@ -446,7 +436,6 @@ export function GitHubAppSetupPageStory(input: {
 }
 
 function GitHubInstalledDetailPageStory(): React.JSX.Element {
-  configureDashboardRuntimeForStory();
   const [queryClient] = useState(() =>
     createStoryQueryClient({
       connections: [

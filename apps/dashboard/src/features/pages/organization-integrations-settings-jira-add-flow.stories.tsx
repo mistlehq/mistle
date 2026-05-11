@@ -12,7 +12,6 @@ import {
 } from "react-router";
 import { z } from "zod";
 
-import { resetDashboardConfigForTest } from "../../config.js";
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import { createStoryWebhookTriggerCapabilitiesProviderMetadata } from "../integrations/integration-story-harness.js";
 import type { ManagedWebhookSetupResult } from "../integrations/integrations-service-shared.js";
@@ -49,13 +48,6 @@ type JiraAddFlowInitialEntry =
         managedWebhookSetup: ManagedWebhookSetupResult;
       };
     };
-
-function configureDashboardRuntimeForStory(): void {
-  Object.assign(import.meta.env, {
-    VITE_CONTROL_PLANE_API_ORIGIN: StoryControlPlaneApiOrigin,
-  });
-  resetDashboardConfigForTest();
-}
 
 function getJiraDefinitionOrThrow(): AnyIntegrationDefinition {
   const definition = IntegrationRegistry.getDefinition({
@@ -317,7 +309,6 @@ function JiraAddFlowStory(input: {
   webhookSources?: readonly IntegrationWebhookSource[];
   managedWebhookSetup: ManagedWebhookSetupResult;
 }): React.JSX.Element {
-  configureDashboardRuntimeForStory();
   const [queryClient] = useState(() =>
     createStoryQueryClient({
       ...(input.connections === undefined ? {} : { connections: input.connections }),

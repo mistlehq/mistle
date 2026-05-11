@@ -15,7 +15,6 @@ import {
 } from "react-router";
 import { z } from "zod";
 
-import { resetDashboardConfigForTest } from "../../config.js";
 import { withDashboardCenteredStory, withDashboardPageStory } from "../../storybook/decorators.js";
 import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
 import {
@@ -68,13 +67,6 @@ function getSlackDefinitionOrThrow(): AnyIntegrationDefinition {
 }
 
 const SlackDefinition = getSlackDefinitionOrThrow();
-
-function configureDashboardRuntimeForStory(): void {
-  Object.assign(import.meta.env, {
-    VITE_CONTROL_PLANE_API_ORIGIN: StoryControlPlaneApiOrigin,
-  });
-  resetDashboardConfigForTest();
-}
 
 function createStoryQueryClient(input: {
   connections?: readonly IntegrationConnection[];
@@ -424,7 +416,6 @@ function StoryQueryClientProvider(input: {
 }
 
 function SlackCreatePageStory(): React.JSX.Element {
-  configureDashboardRuntimeForStory();
   const [queryClient] = useState(() => createStoryQueryClient({}));
   const [router] = useState(() =>
     createMemoryRouter(
@@ -464,7 +455,6 @@ export function SlackAppSetupPageStory(input: {
   initialEntry?: string;
   webhookSource?: IntegrationWebhookSource;
 }): React.JSX.Element {
-  configureDashboardRuntimeForStory();
   const [queryClient] = useState(() =>
     createStoryQueryClient({
       connections: [input.connection],
@@ -506,7 +496,6 @@ function SlackConnectedWebhookVerifiedRefreshStory({
 }: {
   includeAppId?: boolean;
 } = {}): React.JSX.Element {
-  configureDashboardRuntimeForStory();
   const storyProps = createSlackDetailViewStoryProps();
   const selectedConnection = storyProps.connections[0];
   if (selectedConnection === undefined) {
@@ -646,7 +635,6 @@ function SlackConnectedWebhookVerifiedRefreshStory({
 }
 
 function SlackInstalledDetailPageStory(): React.JSX.Element {
-  configureDashboardRuntimeForStory();
   const [queryClient] = useState(() =>
     createStoryQueryClient({
       connections: [

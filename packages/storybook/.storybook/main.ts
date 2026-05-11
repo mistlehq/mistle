@@ -11,6 +11,7 @@ const SandboxSessionClientIndexPath = fileURLToPath(
 const SandboxSessionClientBrowserPath = fileURLToPath(
   new URL("../../sandbox-session-client/src/browser.ts", import.meta.url),
 );
+const StorybookControlPlaneApiOrigin = "https://control-plane.example.com";
 
 const config: StorybookConfig = {
   framework: {
@@ -30,6 +31,11 @@ const config: StorybookConfig = {
   ],
   async viteFinal(config) {
     return mergeConfig(config, {
+      define: {
+        "import.meta.env.VITE_CONTROL_PLANE_API_ORIGIN": JSON.stringify(
+          StorybookControlPlaneApiOrigin,
+        ),
+      },
       plugins: [react(), tailwindcss()],
       resolve: {
         alias: [
