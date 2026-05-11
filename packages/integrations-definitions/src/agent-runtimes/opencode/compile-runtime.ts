@@ -3,6 +3,7 @@ import type {
   CompileAgentRuntimeResult,
   EgressCredentialRoute,
   RuntimeClient,
+  RuntimeClientSetupFile,
 } from "@mistle/integrations-core";
 
 import { OpenCodePtyLaunchSpec } from "./pty-launch.js";
@@ -21,6 +22,7 @@ const OpenCodeCliReleaseTag = `v${OpenCodeCliVersion}`;
 const OpenCodeGitHubRepository = "anomalyco/opencode";
 const OpenCodeConfigPath = "/root/.config/opencode/opencode.json";
 const OpenCodeGlobalAgentsPath = "/root/.config/opencode/AGENTS.md";
+const OpenCodeAuthPath = "/root/.local/share/opencode/auth.json";
 const OpenCodeGitHubAssets = {
   x86_64: {
     fileName: "opencode-linux-x64-baseline.tar.gz",
@@ -39,7 +41,6 @@ const MistleManagedApiKey = "mistle-managed-credential";
 const MistleManagedChatGptAccess = "mistle-managed-access";
 const MistleManagedChatGptRefresh = "mistle-managed-refresh";
 const MistleManagedChatGptExpires = 4_102_444_800_000;
-const OpenCodeAuthContentEnvKey = "OPENCODE_AUTH_CONTENT";
 
 const OpenCodeGlobalAgentsMd = [
   "Mistle-managed sandbox context:",
@@ -241,7 +242,40 @@ function renderOpenCodeAuthContent(input: {
     }
   }
 
-  return Object.keys(auth).length === 0 ? undefined : JSON.stringify(auth);
+  return Object.keys(auth).length === 0 ? undefined : `${JSON.stringify(auth, null, 2)}\n`;
+}
+
+function buildOpenCodeSetupFiles(input: {
+  authContent: string | undefined;
+}): ReadonlyArray<RuntimeClientSetupFile> {
+  const files: RuntimeClientSetupFile[] = [
+    {
+      fileId: "opencode_config",
+      path: OpenCodeConfigPath,
+      mode: 384,
+      writeMode: "if-absent",
+      content: renderOpenCodeConfig(),
+    },
+    {
+      fileId: "opencode_global_agents",
+      path: OpenCodeGlobalAgentsPath,
+      mode: 384,
+      writeMode: "if-absent",
+      content: renderOpenCodeGlobalAgentsMd(),
+    },
+  ];
+
+  if (input.authContent !== undefined) {
+    files.push({
+      fileId: "opencode_auth",
+      path: OpenCodeAuthPath,
+      mode: 384,
+      writeMode: "overwrite",
+      content: input.authContent,
+    });
+  }
+
+  return files;
 }
 
 function buildOpenCodeRuntimeClients(input: {
@@ -252,28 +286,10 @@ function buildOpenCodeRuntimeClients(input: {
     {
       clientId: "opencode-cli",
       setup: {
-        env:
-          input.authContent === undefined
-            ? {}
-            : {
-                [OpenCodeAuthContentEnvKey]: input.authContent,
-              },
-        files: [
-          {
-            fileId: "opencode_config",
-            path: OpenCodeConfigPath,
-            mode: 384,
-            writeMode: "if-absent",
-            content: renderOpenCodeConfig(),
-          },
-          {
-            fileId: "opencode_global_agents",
-            path: OpenCodeGlobalAgentsPath,
-            mode: 384,
-            writeMode: "if-absent",
-            content: renderOpenCodeGlobalAgentsMd(),
-          },
-        ],
+        env: {},
+        files: buildOpenCodeSetupFiles({
+          authContent: input.authContent,
+        }),
       },
       processes: [
         {

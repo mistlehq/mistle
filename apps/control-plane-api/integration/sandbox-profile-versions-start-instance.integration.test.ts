@@ -451,6 +451,22 @@ describe.concurrent("sandbox profile version start instance integration", () => 
       endpointKey: "server",
     });
     expect(queuedWorkflowInput.runtimePlan.runtimeClients[0]?.clientId).toBe("opencode-cli");
+    const opencodeAuthFile = queuedWorkflowInput.runtimePlan.runtimeClients[0]?.setup.files.find(
+      (file) => file.fileId === "opencode_auth",
+    );
+    expect(opencodeAuthFile).toMatchObject({
+      path: "/root/.local/share/opencode/auth.json",
+      mode: 384,
+      writeMode: "overwrite",
+    });
+    expect(
+      opencodeAuthFile === undefined ? undefined : JSON.parse(opencodeAuthFile.content),
+    ).toEqual({
+      openai: {
+        type: "api",
+        key: "mistle-managed-credential",
+      },
+    });
     expect(
       queuedWorkflowInput.runtimePlan.artifacts.map((artifact) => artifact.artifactKey),
     ).toEqual(["opencode-cli"]);

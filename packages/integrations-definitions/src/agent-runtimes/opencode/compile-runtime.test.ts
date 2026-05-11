@@ -74,8 +74,8 @@ function readOpenCodeAuthContent(
     compiled,
     egressRoutes,
   });
-  const authContent = runtimeClients[0]?.setup.env["OPENCODE_AUTH_CONTENT"];
-  return authContent === undefined ? undefined : JSON.parse(authContent);
+  const authFile = runtimeClients[0]?.setup.files.find((file) => file.fileId === "opencode_auth");
+  return authFile === undefined ? undefined : JSON.parse(authFile.content);
 }
 
 function compileDefaultOpenCodeRuntime(): CompileAgentRuntimeResult {
@@ -528,11 +528,13 @@ describe("compileOpenCodeRuntime", () => {
     });
 
     expect(rendered[0]?.setup.env).toEqual({});
+    expect(rendered[0]?.setup.files.some((file) => file.fileId === "opencode_auth")).toBe(false);
   });
 
-  it("renders OpenAI API auth content from proxied egress routes", () => {
-    expect(
-      readOpenCodeAuthContent(compileDefaultOpenCodeRuntime(), [
+  it("renders OpenAI API auth file from proxied egress routes", () => {
+    const runtimeClients = renderRuntimeClients({
+      compiled: compileDefaultOpenCodeRuntime(),
+      egressRoutes: [
         createCompiledRoute({
           egressRuleId: "egress_rule_bind_openai",
           bindingId: "bind_openai",
@@ -542,8 +544,17 @@ describe("compileOpenCodeRuntime", () => {
           baseUrl: "https://api.openai.com",
           secretType: "api_key",
         }),
-      ]),
-    ).toEqual({
+      ],
+    });
+    const authFile = runtimeClients[0]?.setup.files.find((file) => file.fileId === "opencode_auth");
+
+    expect(authFile).toMatchObject({
+      fileId: "opencode_auth",
+      path: "/root/.local/share/opencode/auth.json",
+      mode: 384,
+      writeMode: "overwrite",
+    });
+    expect(authFile === undefined ? undefined : JSON.parse(authFile.content)).toEqual({
       openai: {
         type: "api",
         key: "mistle-managed-credential",
@@ -551,7 +562,7 @@ describe("compileOpenCodeRuntime", () => {
     });
   });
 
-  it("renders ChatGPT subscription auth content from proxied egress routes", () => {
+  it("renders ChatGPT subscription auth file from proxied egress routes", () => {
     expect(
       readOpenCodeAuthContent(compileDefaultOpenCodeRuntime(), [
         createCompiledRoute({
@@ -578,7 +589,7 @@ describe("compileOpenCodeRuntime", () => {
     });
   });
 
-  it("renders Anthropic API auth content from proxied egress routes", () => {
+  it("renders Anthropic API auth file from proxied egress routes", () => {
     expect(
       readOpenCodeAuthContent(compileDefaultOpenCodeRuntime(), [
         createCompiledRoute({
@@ -599,7 +610,7 @@ describe("compileOpenCodeRuntime", () => {
     });
   });
 
-  it("renders OpenCode Go auth content from proxied egress routes", () => {
+  it("renders OpenCode Go auth file from proxied egress routes", () => {
     expect(
       readOpenCodeAuthContent(compileDefaultOpenCodeRuntime(), [
         createCompiledRoute({
