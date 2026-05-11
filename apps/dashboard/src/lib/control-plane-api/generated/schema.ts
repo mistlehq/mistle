@@ -181,6 +181,7 @@ export interface paths {
                   code:
                     | "INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT"
                     | "FORM_CONNECTION_METHOD_NOT_SUPPORTED"
+                    | "PROVIDER_APP_SETUP_CONNECTION_METHOD_NOT_SUPPORTED"
                     | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
                     | "REDIRECT_STATE_INVALID"
                     | "REDIRECT_STATE_EXPIRED"
@@ -2637,6 +2638,8 @@ export interface paths {
                   /** @enum {string} */
                   code:
                     | "FORM_CONNECTION_METHOD_NOT_SUPPORTED"
+                    | "PROVIDER_APP_SETUP_CONNECTION_METHOD_NOT_SUPPORTED"
+                    | "INVALID_PROVIDER_APP_SETUP_START_INPUT"
                     | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
                     | "INVALID_GITHUB_APP_INSTALLATION_START_INPUT"
                     | "INVALID_GITHUB_APP_MANIFEST_START_INPUT"

@@ -117,7 +117,7 @@ describe.concurrent("GitHub App setup start integration connections", () => {
 
     expect(response.status).toBe(400);
     const responseBody = StartProviderAppSetupBadRequestResponseSchema.parse(await response.json());
-    expect(responseBody.code).toBe("GITHUB_APP_INSTALLATION_NOT_SUPPORTED");
+    expect(responseBody.code).toBe("PROVIDER_APP_SETUP_CONNECTION_METHOD_NOT_SUPPORTED");
   });
 
   it("returns 404 when the GitHub App installation start connection does not exist", async ({

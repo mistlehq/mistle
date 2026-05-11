@@ -1,6 +1,5 @@
 import { type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
-import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import type {
   IntegrationConnectionMethodId,
   IntegrationProviderAppSetupCompletionRedirect,
@@ -50,6 +49,7 @@ type CompletedProviderAppSetup = {
 };
 
 type ProviderAppSetupStartInvalidInputCode =
+  | typeof IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_START_INPUT
   | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_START_INPUT
   | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_START_INPUT
   | typeof IntegrationConnectionsBadRequestCodes.INVALID_SLACK_APP_MANIFEST_START_INPUT
@@ -58,6 +58,11 @@ type ProviderAppSetupStartInvalidInputCode =
 type ProviderAppSetupCompleteInvalidInputCode =
   | typeof IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT
   | typeof IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT;
+
+type ProviderAppSetupConnectionMethodNotSupportedCode =
+  | typeof IntegrationConnectionsBadRequestCodes.PROVIDER_APP_SETUP_CONNECTION_METHOD_NOT_SUPPORTED
+  | typeof IntegrationConnectionsBadRequestCodes.FORM_CONNECTION_METHOD_NOT_SUPPORTED
+  | typeof IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_NOT_SUPPORTED;
 
 function resolveSetupFlowOrThrow(input: {
   routeSegment: string;
@@ -78,6 +83,7 @@ function assertConnectionMethodMatchesSetupFlow(input: {
   connectionId: string;
   config: Record<string, unknown>;
   methodId: IntegrationConnectionMethodId;
+  notSupportedCode: ProviderAppSetupConnectionMethodNotSupportedCode;
   routeSegment: string;
 }): void {
   const connectionMethod = input.config["connection_method"];
@@ -85,19 +91,12 @@ function assertConnectionMethodMatchesSetupFlow(input: {
     return;
   }
 
-  if (input.methodId === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION) {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_NOT_SUPPORTED,
-      `Integration connection '${input.connectionId}' does not use GitHub App installation auth.`,
-    );
-  }
-
   const receivedMethod =
     typeof connectionMethod === "string" && connectionMethod.length > 0
       ? connectionMethod
       : "missing";
   throw new BadRequestError(
-    IntegrationConnectionsBadRequestCodes.FORM_CONNECTION_METHOD_NOT_SUPPORTED,
+    input.notSupportedCode,
     `Integration setup flow '${input.routeSegment}' requires connection method '${input.methodId}', received '${receivedMethod}'.`,
   );
 }
@@ -266,6 +265,8 @@ export async function startProviderAppSetup(
     connectionId: connection.id,
     config: parsedConnectionConfig,
     methodId: flow.methodId,
+    notSupportedCode:
+      IntegrationConnectionsBadRequestCodes.PROVIDER_APP_SETUP_CONNECTION_METHOD_NOT_SUPPORTED,
     routeSegment: input.routeSegment,
   });
   const parsedTargetConfig = UnknownRecordSchema.parse(
@@ -470,6 +471,8 @@ export async function completeProviderAppSetup(
     connectionId: connection.id,
     config: parsedConnectionConfig,
     methodId: flow.methodId,
+    notSupportedCode:
+      IntegrationConnectionsBadRequestCodes.PROVIDER_APP_SETUP_CONNECTION_METHOD_NOT_SUPPORTED,
     routeSegment: stateMetadata.routeSegment,
   });
   const parsedTargetConfig = UnknownRecordSchema.parse(

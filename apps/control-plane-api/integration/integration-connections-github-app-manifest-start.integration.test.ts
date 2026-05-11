@@ -147,7 +147,7 @@ describe.concurrent("GitHub App manifest setup start integration connections", (
 
     expect(response.status).toBe(400);
     const responseBody = StartProviderAppSetupBadRequestResponseSchema.parse(await response.json());
-    expect(responseBody.code).toBe("INVALID_GITHUB_APP_MANIFEST_START_INPUT");
+    expect(responseBody.code).toBe("INVALID_PROVIDER_APP_SETUP_START_INPUT");
 
     const redirectSessions =
       await env.controlPlaneDb.query.integrationConnectionRedirectSessions.findMany({
@@ -181,7 +181,7 @@ describe.concurrent("GitHub App manifest setup start integration connections", (
 
     expect(response.status).toBe(400);
     const responseBody = StartProviderAppSetupBadRequestResponseSchema.parse(await response.json());
-    expect(responseBody.code).toBe("GITHUB_APP_INSTALLATION_NOT_SUPPORTED");
+    expect(responseBody.code).toBe("PROVIDER_APP_SETUP_CONNECTION_METHOD_NOT_SUPPORTED");
   });
 });
 

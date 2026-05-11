@@ -32,6 +32,7 @@ export const CompleteProviderAppSetupCallbackBadRequestResponseSchema = z.union(
     z.enum([
       IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT,
       IntegrationConnectionsBadRequestCodes.FORM_CONNECTION_METHOD_NOT_SUPPORTED,
+      IntegrationConnectionsBadRequestCodes.PROVIDER_APP_SETUP_CONNECTION_METHOD_NOT_SUPPORTED,
       IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_NOT_SUPPORTED,
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_EXPIRED,
