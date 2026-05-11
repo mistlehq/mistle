@@ -109,6 +109,11 @@ allow_signups = true
 Set `allow_signups = false` to let existing users continue signing in while
 blocking first-time OTP and Google users from creating accounts.
 
+`self_service_organization_creation_enabled` controls whether signed-in users
+without an organization can create one from the dashboard. It defaults to
+`false`. The matching environment override is
+`MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_SELF_SERVICE_ORGANIZATION_CREATION_ENABLED`.
+
 Service-to-service auth is configured under `internal_auth`. The `method` field is
 currently optional and kept for future expansion; the runtime uses shared-token
 auth while using `internal_auth.shared_token.token`.
@@ -185,6 +190,7 @@ This table covers the operator-facing TOML keys accepted by `@mistle/config`.
 | `services.control_plane_api.auth.trusted_origins`                              | Yes                                        | Allowed dashboard/browser origins.                                                                        |
 | `services.control_plane_api.auth.enabled_methods`                              | No                                         | Supported values: `otp`, `google`. Google requires credentials. If omitted, only OTP is exposed to users. |
 | `services.control_plane_api.auth.allow_signups`                                | No                                         | Whether first-time OTP and Google sign-ins may create users. Defaults to `true`.                          |
+| `services.control_plane_api.auth.self_service_organization_creation_enabled`   | No                                         | Defaults to `false`. Enable only when users should be able to create organizations from the dashboard.    |
 | `services.control_plane_api.auth.otp.length`                                   | Yes                                        | OTP code length.                                                                                          |
 | `services.control_plane_api.auth.otp.expires_in_seconds`                       | Yes                                        | OTP expiry.                                                                                               |
 | `services.control_plane_api.auth.otp.allowed_attempts`                         | Yes                                        | Maximum OTP attempts.                                                                                     |
