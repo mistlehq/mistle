@@ -8,15 +8,14 @@ import { AutomationListView } from "../automations/automation-list-view.js";
 import { listAutomations } from "../automations/automations-service.js";
 import { automationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { PageFrame } from "../shared/page-frame.js";
-import { parsePaginationCursor } from "../shared/pagination-search-params.js";
+import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
 
 const AUTOMATIONS_LIST_LIMIT = 25;
 
 export function AutomationsPage(): React.JSX.Element {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const after = parsePaginationCursor(searchParams.get("after"));
-  const before = after === null ? parsePaginationCursor(searchParams.get("before")) : null;
+  const { after, before } = readKeysetPaginationCursors(searchParams);
 
   const automationsQuery = useQuery({
     queryKey: automationsListQueryKey({

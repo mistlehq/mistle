@@ -1,6 +1,9 @@
 import { useNavigate, useSearchParams } from "react-router";
 
-import type { CreatedAutomationNavigationTarget } from "../automations/automation-editor-navigation.js";
+import {
+  createProfileAutomationDetailPath,
+  type CreatedAutomationNavigationTarget,
+} from "../automations/automation-editor-navigation.js";
 import {
   AutomationTypeSelectField,
   type AutomationTypeValue,
@@ -21,13 +24,6 @@ function parseSandboxProfileId(value: string | null): string | undefined {
 
   const normalized = value.trim();
   return normalized.length === 0 ? undefined : normalized;
-}
-
-function createProfileAutomationDetailPath(input: {
-  profileId: string;
-  automationId: string;
-}): string {
-  return `/sandbox-profiles/${input.profileId}/automations/${input.automationId}`;
 }
 
 export function AutomationCreatePage(): React.JSX.Element {

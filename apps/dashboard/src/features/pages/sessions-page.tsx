@@ -26,7 +26,7 @@ import { listSandboxInstances } from "../sessions/sessions-service.js";
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
 import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
 import { PageFrame } from "../shared/page-frame.js";
-import { parsePaginationCursor } from "../shared/pagination-search-params.js";
+import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 import { SessionsRoutes } from "../shell/app-shell-sessions-sidebar-mode.js";
@@ -146,9 +146,8 @@ function resolveUpdatedLabel(input: {
 export function SessionsPage(): React.JSX.Element {
   const [searchParams, setSearchParams] = useSearchParams();
   const sandboxInstanceListLimit = parseListLimit(searchParams.get("limit"));
-  const sandboxInstancesAfter = parsePaginationCursor(searchParams.get("after"));
-  const sandboxInstancesBefore =
-    sandboxInstancesAfter === null ? parsePaginationCursor(searchParams.get("before")) : null;
+  const { after: sandboxInstancesAfter, before: sandboxInstancesBefore } =
+    readKeysetPaginationCursors(searchParams);
 
   const sandboxInstancesQuery = useQuery({
     queryKey: sandboxInstancesListQueryKey({

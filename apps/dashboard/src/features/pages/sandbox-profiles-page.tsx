@@ -33,7 +33,7 @@ import {
   listSandboxProfiles,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import { PageFrame } from "../shared/page-frame.js";
-import { parsePaginationCursor } from "../shared/pagination-search-params.js";
+import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 
@@ -70,8 +70,7 @@ export function SandboxProfilesPage(): React.JSX.Element {
   const [createProfileError, setCreateProfileError] = useState<string | null>(null);
 
   const limit = parseListLimit(searchParams.get("limit"));
-  const after = parsePaginationCursor(searchParams.get("after"));
-  const before = after === null ? parsePaginationCursor(searchParams.get("before")) : null;
+  const { after, before } = readKeysetPaginationCursors(searchParams);
 
   const listQuery = useQuery({
     queryKey: sandboxProfilesListQueryKey({

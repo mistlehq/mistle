@@ -13,6 +13,10 @@ import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import {
+  createProfileAutomationDetailPath,
+  createProfileAutomationsPath,
+} from "../automations/automation-editor-navigation.js";
 import { AutomationIssueIndicator } from "../automations/automation-list-indicators.js";
 import type { AutomationListItemViewModel } from "../automations/automation-list-types.js";
 import { toAutomationListItemViewModel } from "../automations/automation-list-view-model.js";
@@ -20,27 +24,12 @@ import { listAutomations } from "../automations/automations-service.js";
 import { getScheduledAutomation } from "../automations/scheduled-automations-service.js";
 import { automationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { getWebhookAutomation } from "../automations/webhook-automations-service.js";
-import { parsePaginationCursor } from "../shared/pagination-search-params.js";
+import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
 import { TablePagination } from "../shared/table-pagination.js";
 import { EditScheduledAutomationEditor } from "./scheduled-automation-editor-page.js";
 import { EditWebhookAutomationEditor } from "./webhook-automation-editor-page.js";
 
 const ProfileAutomationsListLimit = 25;
-
-function createProfileAutomationsPath(profileId: string): string {
-  return `/sandbox-profiles/${profileId}/automations`;
-}
-
-function createProfileAutomationDetailPath(input: {
-  profileId: string;
-  automationId: string;
-  searchParams?: URLSearchParams;
-}): string {
-  const search = input.searchParams?.toString();
-  const suffix = search === undefined || search.length === 0 ? "" : `?${search}`;
-
-  return `${createProfileAutomationsPath(input.profileId)}/${input.automationId}${suffix}`;
-}
 
 function createAutomationCreatePath(profileId: string): string {
   const searchParams = new URLSearchParams({
@@ -292,8 +281,7 @@ export function SandboxProfileAutomationsSection(input: { profileId: string }): 
   const params = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isMobileAutomationSelectOpen, setIsMobileAutomationSelectOpen] = useState(false);
-  const after = parsePaginationCursor(searchParams.get("after"));
-  const before = after === null ? parsePaginationCursor(searchParams.get("before")) : null;
+  const { after, before } = readKeysetPaginationCursors(searchParams);
   const automationId = params["automationId"];
   const automationsQuery = useQuery({
     queryKey: automationsListQueryKey({
