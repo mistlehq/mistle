@@ -29,6 +29,16 @@ describe("createRuntimePublicAccessProxyScript", () => {
     expect(script).toContain('server.once("error", (error) => {');
     expect(script).toContain("runtime public access proxy startup failed:");
   });
+
+  it("logs proxy shutdown and fatal error reasons for system-run diagnostics", () => {
+    const script = createRuntimePublicAccessProxyScript();
+
+    expect(script).toContain('process.on("uncaughtException", (error) => {');
+    expect(script).toContain('process.on("unhandledRejection", (reason) => {');
+    expect(script).toContain("runtime public access proxy shutdown reason=");
+    expect(script).toContain("cloudflared container process exited code=");
+    expect(script).toContain("shuttingDown=");
+  });
 });
 
 describe("normalizeRuntimePublicAccessHostnames", () => {

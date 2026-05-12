@@ -882,20 +882,45 @@ server.listen(proxyPort, "0.0.0.0", async () => {
 
 let cloudflared;
 let cloudflaredContainerName;
+let shuttingDown = false;
 const ownerWatchdog = setInterval(() => {
   if (!isProcessAlive(ownerPid)) {
-    logStream.write("owner process " + String(ownerPid) + " is no longer alive; shutting down\n");
-    shutdown();
+    shutdown("owner process " + String(ownerPid) + " is no longer alive");
   }
 }, 1000);
-process.on("SIGTERM", shutdown);
-process.on("SIGINT", shutdown);
+process.on("SIGTERM", () => {
+  shutdown("SIGTERM");
+});
+process.on("SIGINT", () => {
+  shutdown("SIGINT");
+});
+process.on("uncaughtException", (error) => {
+  fatalProcessError("uncaughtException", error);
+});
+process.on("unhandledRejection", (reason) => {
+  fatalProcessError("unhandledRejection", reason);
+});
 
 function startupFailed(error) {
-  const message = error instanceof Error ? error.stack ?? error.message : String(error);
+  const message = formatUnknownError(error);
   logStream.write("runtime public access proxy startup failed: " + message + "\n", () => {
     process.exit(1);
   });
+}
+
+function fatalProcessError(kind, error) {
+  if (shuttingDown) {
+    return;
+  }
+
+  const message = formatUnknownError(error);
+  logStream.write("runtime public access proxy " + kind + ": " + message + "\n", () => {
+    process.exit(1);
+  });
+}
+
+function formatUnknownError(error) {
+  return error instanceof Error ? error.stack ?? error.message : String(error);
 }
 
 async function handleRequest(request, response) {
@@ -929,7 +954,7 @@ async function handleRequest(request, response) {
       }
       routes.set(createRouteKey(route.publicHostname, parsed.environmentId), route.localBaseUrl);
     }
-    logStream.write("registered runtime public access routes environmentId=" + parsed.environmentId + " routeCount=" + String(parsed.routes.length) + "\n");
+    logStream.write("registered runtime public access routes environmentId=" + parsed.environmentId + " routeCount=" + String(parsed.routes.length) + " totalRouteCount=" + String(routes.size) + "\n");
     response.writeHead(204);
     response.end();
     return;
@@ -944,7 +969,7 @@ async function handleRequest(request, response) {
           routes.delete(key);
         }
       }
-      logStream.write("unregistered runtime public access routes environmentId=" + parsed.environmentId + "\n");
+      logStream.write("unregistered runtime public access routes environmentId=" + parsed.environmentId + " totalRouteCount=" + String(routes.size) + "\n");
     }
     response.writeHead(204);
     response.end();
@@ -1283,12 +1308,18 @@ async function startCloudflared(proxyBaseUrl) {
   cloudflared.stdout.pipe(logStream, { end: false });
   cloudflared.stderr.pipe(logStream, { end: false });
   cloudflared.on("exit", (code, signal) => {
-    logStream.write("cloudflared container process exited code=" + String(code) + " signal=" + String(signal) + "\n");
+    logStream.write("cloudflared container process exited code=" + String(code) + " signal=" + String(signal) + " shuttingDown=" + String(shuttingDown) + "\n");
   });
 }
 
-function shutdown() {
+function shutdown(reason) {
+  if (shuttingDown) {
+    return;
+  }
+
+  shuttingDown = true;
   clearInterval(ownerWatchdog);
+  logStream.write("runtime public access proxy shutdown reason=" + String(reason) + "\n");
   server.close();
   if (cloudflared !== undefined) {
     cloudflared.kill("SIGTERM");
@@ -1296,8 +1327,9 @@ function shutdown() {
   if (cloudflaredContainerName !== undefined) {
     spawnSync("docker", ["rm", "--force", cloudflaredContainerName], { stdio: "ignore" });
   }
-  logStream.end();
-  process.exit(0);
+  logStream.end(() => {
+    process.exit(0);
+  });
 }
 
 function isProcessAlive(processId) {

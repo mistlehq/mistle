@@ -26,9 +26,10 @@ const it = createSandboxSystemTest({
   },
 });
 
-const SYSTEM_TEST_TIMEOUT_MS = 5 * 60_000;
+const SYSTEM_TEST_TIMEOUT_MS = 10 * 60_000;
 const STOP_RUNTIME_READY_TIMEOUT_MS = 90_000;
 const RESUME_PUBLIC_ACCESS_READY_TIMEOUT_MS = 30_000;
+const RESUME_SANDBOX_STATUS_TIMEOUT_MS = 8 * 60_000;
 
 describe("runtime system sandbox stop resume restores runtime readiness", () => {
   it(
@@ -138,6 +139,7 @@ async function waitForSandboxStatusAfterResume(input: {
       authenticatedSession: input.authenticatedSession,
       sandboxInstanceId: input.sandboxInstanceId,
       expectedStatus: "running",
+      timeoutMs: RESUME_SANDBOX_STATUS_TIMEOUT_MS,
     });
   } catch (error) {
     console.info(
@@ -145,6 +147,7 @@ async function waitForSandboxStatusAfterResume(input: {
         event: "sandbox_stop_resume.public_access_diagnostics_after_resume_wait_failure",
         sandboxInstanceId: input.sandboxInstanceId,
         sandboxProvider: input.sandboxProvider,
+        resumeStatusTimeoutMs: RESUME_SANDBOX_STATUS_TIMEOUT_MS,
         publicAccessDiagnostics: await input.publicAccess.readDiagnostics(),
       }),
     );

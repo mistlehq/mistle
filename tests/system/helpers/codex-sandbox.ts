@@ -411,10 +411,11 @@ export async function waitForSandboxStatus(input: {
   authenticatedSession: CodexSandboxAuthenticatedSession;
   sandboxInstanceId: string;
   expectedStatus: z.infer<typeof SandboxInstanceStatusResponseSchema>["status"];
+  timeoutMs?: number;
 }): Promise<z.infer<typeof SandboxInstanceStatusResponseSchema>> {
   return waitForCondition({
     description: `sandbox '${input.sandboxInstanceId}' status=${input.expectedStatus}`,
-    timeoutMs: SANDBOX_READY_TIMEOUT_MS,
+    timeoutMs: input.timeoutMs ?? SANDBOX_READY_TIMEOUT_MS,
     evaluate: async () => {
       const response = await input.fixture.request(
         `/v1/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}`,
