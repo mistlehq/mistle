@@ -51,6 +51,7 @@ type OpenCodeProxyTransportServer = {
   close: () => Promise<void>;
   nextRequest: () => Promise<ObservedOpenCodeProxyRequest>;
   receivedControlMessages: readonly StreamControlMessage[];
+  resetStream: (input: { code: string; message: string; streamId: number }) => void;
   sendFrame: (input: { frame: OpenCodeProxyFrame; streamId: number }) => void;
   url: string;
 };
@@ -270,6 +271,19 @@ async function startOpenCodeProxyTransportServer(): Promise<OpenCodeProxyTranspo
       return await deferred.promise;
     },
     receivedControlMessages,
+    resetStream: (input) => {
+      if (socket === null) {
+        throw new Error("OpenCode proxy transport server has no connected socket.");
+      }
+      socket.send(
+        JSON.stringify({
+          type: "stream.reset",
+          streamId: input.streamId,
+          code: input.code,
+          message: input.message,
+        }),
+      );
+    },
     sendFrame: (input) => {
       if (socket === null) {
         throw new Error("OpenCode proxy transport server has no connected socket.");
@@ -311,7 +325,9 @@ describe("createOpenCodeProxyFetch", () => {
       fetch: createOpenCodeProxyFetch({ transport }),
     });
 
-    const healthResultPromise = client.global.health();
+    const healthResultPromise = client.global.health({
+      throwOnError: true,
+    });
     const observedRequest = await server.nextRequest();
     server.sendFrame({
       streamId: observedRequest.streamId,
@@ -532,5 +548,28 @@ describe("createOpenCodeProxyFetch", () => {
         }),
       timeoutMs: 1_000,
     });
+  });
+
+  it("rejects an SDK request when the sandbox stream resets before the OpenCode response", async () => {
+    const server = await startOpenCodeProxyTransportServer();
+    const transport = await createConnectedTransport(server);
+    const client = createOpencodeClient({
+      baseUrl: "http://opencode.internal",
+      fetch: createOpenCodeProxyFetch({ transport }),
+    });
+
+    const healthResultPromise = client.global.health({
+      throwOnError: true,
+    });
+    const observedRequest = await server.nextRequest();
+    server.resetStream({
+      streamId: observedRequest.streamId,
+      code: "opencode_upstream_reset",
+      message: "OpenCode upstream closed before responding.",
+    });
+
+    await expect(healthResultPromise).rejects.toThrow(
+      "OpenCode proxy stream entered state 'reset': Sandbox session stream reset (opencode_upstream_reset): OpenCode upstream closed before responding.",
+    );
   });
 });

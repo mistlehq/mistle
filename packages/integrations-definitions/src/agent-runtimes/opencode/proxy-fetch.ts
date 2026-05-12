@@ -437,6 +437,7 @@ async function waitForInitialResponse(input: {
       ) {
         settle(() => {
           cleanup();
+          void closeStream(input.stream);
           reject(createStateError(event));
         });
       }
