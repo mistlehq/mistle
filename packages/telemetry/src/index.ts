@@ -32,7 +32,13 @@ const OTLP_METRICS_ENDPOINT_ENV = "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT";
 const OTEL_NODE_ENABLED_INSTRUMENTATIONS_ENV = "OTEL_NODE_ENABLED_INSTRUMENTATIONS";
 const DISABLED_VALUES = new Set(["0", "false"]);
 const ENABLED_VALUES = new Set(["1", "true"]);
-const DEFAULT_NODE_INSTRUMENTATIONS: readonly string[] = ["http", "undici", "pg", "pino"];
+const DEFAULT_NODE_INSTRUMENTATIONS: readonly string[] = [
+  "http",
+  "undici",
+  "pg",
+  "pino",
+  "runtime-node",
+];
 const SQL_STATEMENT_LOG_MAX_LENGTH = 1024;
 const OTelLog = logs.getLogger("@mistle/telemetry");
 
