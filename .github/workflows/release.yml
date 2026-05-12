@@ -258,6 +258,83 @@ jobs:
           name: release-image-mistle-${{ matrix.profile }}
           path: dist/release-manifest/mistle-${{ matrix.profile }}.json
 
+  publish-sandboxd-artifact:
+    name: Publish sandboxd artifact
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SANDBOXD_TARGET: x86_64-unknown-linux-gnu
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build sandboxd release binary
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --target sandboxd-build \
+            --file packages/sandboxd/Dockerfile \
+            --tag mistle/sandboxd-artifact-build:${GITHUB_SHA} \
+            .
+
+          container_id="$(docker create mistle/sandboxd-artifact-build:${GITHUB_SHA})"
+          trap 'docker rm -f "${container_id}" >/dev/null 2>&1 || true' EXIT
+
+          mkdir -p dist/sandboxd-artifact-root/bin
+          docker cp "${container_id}:/app/packages/sandboxd/target/release/sandboxd" \
+            dist/sandboxd-artifact-root/bin/sandboxd
+          chmod 0755 dist/sandboxd-artifact-root/bin/sandboxd
+          ln -s sandboxd dist/sandboxd-artifact-root/bin/mistle-ssh-sign
+
+      - name: Package sandboxd release artifact
+        run: |
+          version="${{ needs.validate.outputs.release_version }}"
+          binary_version="$(dist/sandboxd-artifact-root/bin/sandboxd version)"
+          if [ "${binary_version}" != "${version}" ]; then
+            echo "sandboxd binary version ${binary_version} did not match release version ${version}" >&2
+            exit 1
+          fi
+
+          python3 <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          manifest = {
+              "component": "sandboxd",
+              "version": os.environ["RELEASE_VERSION"],
+              "git_sha": os.environ["GITHUB_SHA"],
+              "target": os.environ["SANDBOXD_TARGET"],
+              "binary_path": "bin/sandboxd",
+              "signer_alias_path": "bin/mistle-ssh-sign",
+          }
+          Path("dist/sandboxd-artifact-root/sandboxd-manifest.json").write_text(
+              json.dumps(manifest, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          mkdir -p dist/release-assets
+          asset_name="sandboxd-${SANDBOXD_TARGET}.tar.gz"
+          tar -C dist/sandboxd-artifact-root -czf "dist/release-assets/${asset_name}" .
+          (cd dist/release-assets && sha256sum "${asset_name}" > "${asset_name}.sha256")
+
+          mkdir -p dist/sandboxd-artifact-check
+          tar -xzf "dist/release-assets/${asset_name}" -C dist/sandboxd-artifact-check
+          test "$(dist/sandboxd-artifact-check/bin/sandboxd version)" = "${version}"
+          test -L dist/sandboxd-artifact-check/bin/mistle-ssh-sign
+        env:
+          RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
+          SANDBOXD_TARGET: x86_64-unknown-linux-gnu
+
+      - name: Upload sandboxd release assets
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-sandboxd-assets
+          path: dist/release-assets/*
+
   promote-release-images:
     name: Promote release image tags
     needs:
@@ -342,6 +419,7 @@ jobs:
     needs:
       - validate
       - promote-release-images
+      - publish-sandboxd-artifact
     runs-on: ubuntu-latest
 
     steps:
@@ -366,7 +444,14 @@ jobs:
       - name: Download release manifest fragments
         uses: actions/download-artifact@v8
         with:
+          pattern: release-image-*
           path: dist/release-artifacts
+
+      - name: Download sandboxd release assets
+        uses: actions/download-artifact@v8
+        with:
+          name: release-sandboxd-assets
+          path: dist/release-assets
 
       - name: Generate stable release notes
         if: needs.validate.outputs.stable_release == 'true'
@@ -394,10 +479,28 @@ jobs:
               payload = json.loads(manifest_path.read_text(encoding="utf-8"))
               images[payload["component"]] = payload["image_ref"]
 
+          sandboxd_target = os.environ["SANDBOXD_TARGET"]
+          sandboxd_asset = f"sandboxd-{sandboxd_target}.tar.gz"
+          sandboxd_checksum_path = Path("dist/release-assets") / f"{sandboxd_asset}.sha256"
+          sandboxd_checksum = sandboxd_checksum_path.read_text(encoding="utf-8").split()[0]
+          release_tag = f"v{os.environ['RELEASE_VERSION']}"
+
           output = {
-              "version": f"v{os.environ['RELEASE_VERSION']}",
+              "version": release_tag,
               "commit": os.environ["GITHUB_SHA"],
               "images": images,
+              "artifacts": {
+                  "sandboxd": {
+                      "version": os.environ["RELEASE_VERSION"],
+                      "target": sandboxd_target,
+                      "asset": sandboxd_asset,
+                      "sha256": sandboxd_checksum,
+                      "url": (
+                          f"https://github.com/{os.environ['GITHUB_REPOSITORY']}"
+                          f"/releases/download/{release_tag}/{sandboxd_asset}"
+                      ),
+                  }
+              },
           }
 
           Path("dist").mkdir(exist_ok=True)
@@ -408,6 +511,7 @@ jobs:
           PY
         env:
           RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
+          SANDBOXD_TARGET: x86_64-unknown-linux-gnu
 
       - name: Publish GitHub release
         env:
@@ -422,8 +526,10 @@ jobs:
             notes_args+=(--notes-file dist/release-notes.md)
           fi
 
+          release_assets=(dist/release-manifest.json dist/release-assets/*)
+
           gh release create "${GITHUB_REF_NAME}" \
             --title "${GITHUB_REF_NAME}" \
             "${notes_args[@]}" \
             "${prerelease_args[@]}" \
-            dist/release-manifest.json
+            "${release_assets[@]}"
