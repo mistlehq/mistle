@@ -538,7 +538,7 @@ export const Saving: Story = {
   },
 };
 
-export const NoEventsAvailable: Story = {
+export const NoEventCapableIntegrations: Story = {
   args: {
     mode: "create",
     triggerPickerDisabledState: {
