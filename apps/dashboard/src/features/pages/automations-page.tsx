@@ -5,8 +5,8 @@ import { useNavigate, useSearchParams } from "react-router";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { toAutomationListItemViewModel } from "../automations/automation-list-view-model.js";
 import { AutomationListView } from "../automations/automation-list-view.js";
+import { automationsListQueryKey } from "../automations/automations-query-keys.js";
 import { listAutomations } from "../automations/automations-service.js";
-import { automationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { PageFrame } from "../shared/page-frame.js";
 import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
 

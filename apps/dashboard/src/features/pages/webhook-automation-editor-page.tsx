@@ -6,6 +6,7 @@ import { useNavigate, useParams } from "react-router";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import type { AutomationCreateSuccessPath } from "../automations/automation-editor-navigation.js";
 import { AutomationTypeDisplayField } from "../automations/automation-type-field.js";
+import { webhookAutomationDetailQueryKey } from "../automations/automations-query-keys.js";
 import { DeleteWebhookAutomationDialog } from "../automations/delete-webhook-automation-dialog.js";
 import {
   resolveWebhookAutomationEditInitialValues,
@@ -14,7 +15,6 @@ import {
 import { useWebhookAutomationPrerequisites } from "../automations/use-webhook-automation-prerequisites.js";
 import { toWebhookAutomationFormValues } from "../automations/webhook-automation-form-helpers.js";
 import { WebhookAutomationForm } from "../automations/webhook-automation-form.js";
-import { webhookAutomationDetailQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { getWebhookAutomation } from "../automations/webhook-automations-service.js";
 import { useAppPageBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";

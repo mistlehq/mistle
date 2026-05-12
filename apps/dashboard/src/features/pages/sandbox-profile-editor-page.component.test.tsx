@@ -15,8 +15,8 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { cleanupTestQueryClients, createTestQueryClient } from "../../test-support/query-client.js";
+import { automationsListQueryKey } from "../automations/automations-query-keys.js";
 import type { AutomationsListResult } from "../automations/automations-types.js";
-import { automationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import {
   sandboxProfileDetailQueryKey,
   sandboxProfileIntegrationDirectoryQueryKey,

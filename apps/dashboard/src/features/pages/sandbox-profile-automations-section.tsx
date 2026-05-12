@@ -20,9 +20,9 @@ import {
 import { AutomationIssueIndicator } from "../automations/automation-list-indicators.js";
 import type { AutomationListItemViewModel } from "../automations/automation-list-types.js";
 import { toAutomationListItemViewModel } from "../automations/automation-list-view-model.js";
+import { automationsListQueryKey } from "../automations/automations-query-keys.js";
 import { listAutomations } from "../automations/automations-service.js";
 import { getScheduledAutomation } from "../automations/scheduled-automations-service.js";
-import { automationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { getWebhookAutomation } from "../automations/webhook-automations-service.js";
 import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
 import { TablePagination } from "../shared/table-pagination.js";

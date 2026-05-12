@@ -8,11 +8,11 @@ import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { createAutomationListEvent } from "../automations/automation-list-test-fixtures.js";
+import { automationsListQueryKey } from "../automations/automations-query-keys.js";
 import type {
   AutomationListItem,
   AutomationsListResult,
 } from "../automations/automations-types.js";
-import { automationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { AutomationsPage } from "./automations-page.js";
 
 function createListResult(

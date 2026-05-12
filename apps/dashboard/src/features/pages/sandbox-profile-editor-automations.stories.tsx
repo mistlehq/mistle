@@ -4,11 +4,11 @@ import { useState } from "react";
 import { createMemoryRouter, Route, RouterProvider, createRoutesFromElements } from "react-router";
 
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
+import { scheduledAutomationDetailQueryKey } from "../automations/automations-query-keys.js";
+import { automationsListQueryKey } from "../automations/automations-query-keys.js";
 import type { AutomationsListResult } from "../automations/automations-types.js";
-import { scheduledAutomationDetailQueryKey } from "../automations/scheduled-automations-query-keys.js";
 import type { ScheduledAutomation } from "../automations/scheduled-automations-types.js";
 import { AUTOMATION_SANDBOX_PROFILES_QUERY_KEY } from "../automations/use-automation-sandbox-profile-options.js";
-import { automationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import {
   sandboxProfileVersionAutomationConfigQueryKey,
   sandboxProfileVersionsQueryKey,

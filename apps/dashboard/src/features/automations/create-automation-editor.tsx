@@ -15,6 +15,7 @@ import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles
 import type { AutomationCreateSuccessPath } from "./automation-editor-navigation.js";
 import { AutomationFormShell } from "./automation-form-shell.js";
 import { AutomationTypeSelectField, type AutomationTypeValue } from "./automation-type-field.js";
+import { AUTOMATIONS_QUERY_KEY_PREFIX } from "./automations-query-keys.js";
 import {
   toCreateScheduledAutomationPayload,
   toScheduledAutomationFormValues,
@@ -52,7 +53,6 @@ import {
   WebhookAutomationWorkspaceRootRepositoryOptionValue,
 } from "./webhook-automation-option-builders.js";
 import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
-import { AUTOMATIONS_QUERY_KEY_PREFIX } from "./webhook-automations-query-keys.js";
 import { createWebhookAutomation } from "./webhook-automations-service.js";
 
 type NavigateFunction = (to: string) => void | Promise<void>;

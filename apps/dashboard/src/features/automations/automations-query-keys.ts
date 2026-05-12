@@ -21,3 +21,9 @@ export function webhookAutomationDetailQueryKey(
 ): readonly ["automations", "webhooks", "detail", string] {
   return [AUTOMATIONS_QUERY_KEY_PREFIX[0], "webhooks", "detail", automationId];
 }
+
+export function scheduledAutomationDetailQueryKey(
+  automationId: string,
+): readonly ["automations", "schedules", "detail", string] {
+  return [AUTOMATIONS_QUERY_KEY_PREFIX[0], "schedules", "detail", automationId];
+}
