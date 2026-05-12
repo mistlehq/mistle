@@ -158,7 +158,7 @@ describe("compileCodexRuntime", () => {
           release: {
             kind: "tag",
             match: "exact",
-            tag: "rust-v0.129.0",
+            tag: "rust-v0.130.0",
           },
           asset: {
             kind: "by_arch",
