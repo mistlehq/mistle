@@ -56,6 +56,7 @@ type AutomationFormShellProps = {
   automationTypeField?: ReactNode;
   typeSpecificSection: ReactNode;
   extraSectionsBeforeMessage?: ReactNode;
+  shouldShowMessageSection?: boolean;
   inputTemplateLabelId: string;
   inputTemplateDescription: ReactNode;
   inputTemplatePlaceholderText?: string;
@@ -353,44 +354,46 @@ export function AutomationFormShell(input: AutomationFormShellProps): React.JSX.
       {input.typeSpecificSection}
       {input.extraSectionsBeforeMessage}
 
-      <FormPageSection>
-        <div className="p-4">
-          <Field>
-            <FieldHeader>
-              <div className="space-y-1">
-                <FieldLabel id={input.inputTemplateLabelId}>User message</FieldLabel>
-                <FieldDescription>{input.inputTemplateDescription}</FieldDescription>
-              </div>
-            </FieldHeader>
-            <FieldContent>
-              <AgentInstructionsEditor
-                ariaLabelledBy={input.inputTemplateLabelId}
-                disabled={disabled}
-                invalid={input.fieldErrors.inputTemplate !== undefined}
-                onChange={(nextValue) => {
-                  input.onValueChange("inputTemplate", nextValue);
-                }}
-                {...(input.inputTemplatePlaceholderText === undefined
-                  ? {}
-                  : { placeholderText: input.inputTemplatePlaceholderText })}
-                tokens={input.inputTemplateTokens}
-                value={input.inputTemplate}
-              />
-              <AutomationFormFieldError
-                message={
-                  shouldRenderCommonAutomationInlineFieldError({
-                    key: "inputTemplate",
-                    message: input.fieldErrors.inputTemplate,
-                  })
-                    ? input.fieldErrors.inputTemplate
-                    : undefined
-                }
-                className="text-right text-xs"
-              />
-            </FieldContent>
-          </Field>
-        </div>
-      </FormPageSection>
+      {input.shouldShowMessageSection === false ? null : (
+        <FormPageSection>
+          <div className="p-4">
+            <Field>
+              <FieldHeader>
+                <div className="space-y-1">
+                  <FieldLabel id={input.inputTemplateLabelId}>User message</FieldLabel>
+                  <FieldDescription>{input.inputTemplateDescription}</FieldDescription>
+                </div>
+              </FieldHeader>
+              <FieldContent>
+                <AgentInstructionsEditor
+                  ariaLabelledBy={input.inputTemplateLabelId}
+                  disabled={disabled}
+                  invalid={input.fieldErrors.inputTemplate !== undefined}
+                  onChange={(nextValue) => {
+                    input.onValueChange("inputTemplate", nextValue);
+                  }}
+                  {...(input.inputTemplatePlaceholderText === undefined
+                    ? {}
+                    : { placeholderText: input.inputTemplatePlaceholderText })}
+                  tokens={input.inputTemplateTokens}
+                  value={input.inputTemplate}
+                />
+                <AutomationFormFieldError
+                  message={
+                    shouldRenderCommonAutomationInlineFieldError({
+                      key: "inputTemplate",
+                      message: input.fieldErrors.inputTemplate,
+                    })
+                      ? input.fieldErrors.inputTemplate
+                      : undefined
+                  }
+                  className="text-right text-xs"
+                />
+              </FieldContent>
+            </Field>
+          </div>
+        </FormPageSection>
+      )}
 
       <FormPageFooter>
         {input.validationSummaryError === null ? null : (

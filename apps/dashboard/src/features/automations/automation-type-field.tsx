@@ -8,6 +8,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  cn,
 } from "@mistle/ui";
 
 export type AutomationTypeValue = "trigger" | "scheduled";
@@ -17,9 +18,12 @@ export function formatAutomationTypeValue(value: AutomationTypeValue): string {
 }
 
 export function AutomationTypeSelectField(input: {
-  value: AutomationTypeValue;
+  value: AutomationTypeValue | null;
+  error?: string | undefined;
   onValueChange?: (value: AutomationTypeValue) => void;
 }): React.JSX.Element {
+  const isInvalid = input.error !== undefined;
+
   return (
     <Field orientation="horizontal">
       <FieldHeader>
@@ -32,16 +36,21 @@ export function AutomationTypeSelectField(input: {
               input.onValueChange?.(value);
             }
           }}
-          value={input.value}
+          value={input.value ?? ""}
         >
-          <SelectTrigger>
-            <SelectValue>{formatAutomationTypeValue(input.value)}</SelectValue>
+          <SelectTrigger aria-invalid={isInvalid ? true : undefined}>
+            <SelectValue placeholder="Select type">
+              {input.value === null ? undefined : formatAutomationTypeValue(input.value)}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="trigger">Event</SelectItem>
             <SelectItem value="scheduled">Schedule</SelectItem>
           </SelectContent>
         </Select>
+        {input.error === undefined ? null : (
+          <p className={cn("text-destructive text-sm")}>{input.error}</p>
+        )}
       </FieldContent>
     </Field>
   );

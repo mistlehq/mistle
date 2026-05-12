@@ -77,6 +77,7 @@ type CreateAutomationFormValues = CommonCreateAutomationFormValues &
 
 type CreateAutomationFormValueKey =
   | keyof CommonCreateAutomationFormValues
+  | "automationType"
   | Exclude<WebhookAutomationFormValueKey, keyof CommonCreateAutomationFormValues>
   | Exclude<ScheduledAutomationFormValueKey, keyof CommonCreateAutomationFormValues>;
 
@@ -86,6 +87,7 @@ type SelectedSandboxProfileVersion = {
 };
 
 const RequiredFieldSummaryMessage = "Please address the fields highlighted in red.";
+const RequiredAutomationTypeSelectionMessage = "Select an automation type.";
 const RequiredTriggerSelectionMessage = "Please add an event";
 const MissingProfileVersionQueryId = 0;
 
@@ -144,15 +146,20 @@ function toScheduledValues(values: CreateAutomationFormValues): ScheduledAutomat
 }
 
 function hasRequiredFieldErrors(
-  kind: AutomationTypeValue,
+  kind: AutomationTypeValue | null,
   fieldErrors: Partial<Record<CreateAutomationFormValueKey, string>>,
 ): boolean {
   if (
+    fieldErrors.automationType !== undefined ||
     fieldErrors.name !== undefined ||
     fieldErrors.sandboxProfileId !== undefined ||
     fieldErrors.inputTemplate !== undefined
   ) {
     return true;
+  }
+
+  if (kind === null) {
+    return false;
   }
 
   if (kind === "scheduled") {
@@ -269,7 +276,7 @@ async function invalidateAutomationsQuery(queryClient: QueryClient) {
 
 function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
   const queryClient = useQueryClient();
-  const [kind, setKind] = useState<AutomationTypeValue>("trigger");
+  const [kind, setKind] = useState<AutomationTypeValue | null>(null);
   const [formValues, setFormValues] = useState<CreateAutomationFormValues>(() =>
     createInitialCreateAutomationFormValues({
       initialSandboxProfileId: input.initialSandboxProfileId,
@@ -501,7 +508,8 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
 
   function onKindChange(nextKind: AutomationTypeValue): void {
     setFormValues((currentValues) => {
-      const currentDefaultInputTemplate = resolveDefaultInputTemplate(kind);
+      const currentDefaultInputTemplate =
+        kind === null ? resolveDefaultInputTemplate("trigger") : resolveDefaultInputTemplate(kind);
       if (currentValues.inputTemplate !== currentDefaultInputTemplate) {
         return currentValues;
       }
@@ -512,7 +520,13 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
       };
     });
     setKind(nextKind);
-    setFieldErrors({});
+    setFieldErrors((currentErrors) => {
+      const { automationType: _automationType, ...remainingErrors } = currentErrors;
+
+      void _automationType;
+
+      return remainingErrors;
+    });
     setValidationSummaryError(null);
     setFormError(null);
   }
@@ -680,9 +694,11 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
 
   function onSubmit() {
     const nextFieldErrors: Partial<Record<CreateAutomationFormValueKey, string>> =
-      kind === "scheduled"
-        ? validateScheduledAutomationFormValues(toScheduledValues(formValues))
-        : validateWebhookAutomationFormValues(toWebhookValues(formValues), webhookEventOptions);
+      kind === null
+        ? { automationType: RequiredAutomationTypeSelectionMessage }
+        : kind === "scheduled"
+          ? validateScheduledAutomationFormValues(toScheduledValues(formValues))
+          : validateWebhookAutomationFormValues(toWebhookValues(formValues), webhookEventOptions);
     if (hasActiveProfileVersion === false) {
       nextFieldErrors.sandboxProfileId = resolveNoActiveProfileVersionMessage({
         selectedProfileId,
@@ -718,7 +734,7 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
       (kind === "trigger" ? eventPrerequisites.errorMessage : null),
     isPending:
       sandboxProfilePrerequisites.errorMessage === null &&
-      (kind === "scheduled"
+      (kind === null || kind === "scheduled"
         ? sandboxProfilePrerequisites.isPending
         : eventPrerequisites.errorMessage === null &&
           (eventPrerequisites.isPending || eventPrerequisites.directoryData === undefined)),
@@ -787,17 +803,25 @@ export function CreateAutomationEditor(
   return (
     <AutomationFormShell
       automationTypeField={
-        <AutomationTypeSelectField onValueChange={state.onKindChange} value={state.kind} />
+        <AutomationTypeSelectField
+          error={state.fieldErrors.automationType}
+          onValueChange={state.onKindChange}
+          value={state.kind}
+        />
       }
       enabled={state.formValues.enabled}
       fieldErrors={state.fieldErrors}
       formError={state.formError}
       inputIdPrefix="automation"
       inputTemplate={state.formValues.inputTemplate}
-      inputTemplateDescription={renderInputTemplateDescription({
-        kind: state.kind,
-        formState,
-      })}
+      inputTemplateDescription={
+        state.kind === null
+          ? ""
+          : renderInputTemplateDescription({
+              kind: state.kind,
+              formState,
+            })
+      }
       inputTemplateLabelId="automation-input-template-label"
       {...(state.kind === "scheduled"
         ? {}
@@ -821,11 +845,12 @@ export function CreateAutomationEditor(
       selectedWorkspaceRoot={presentation.selectedWorkspaceRoot}
       shouldShowAutomationEnabledField={presentation.shouldShowAutomationEnabledField}
       shouldShowCreateNameField={presentation.shouldShowCreateNameField}
+      shouldShowMessageSection={state.kind !== null}
       shouldShowPrimaryRepositoryField={presentation.shouldShowPrimaryRepositoryField}
       submitLabel={presentation.submitLabel}
       validationSummaryError={state.validationSummaryError}
       typeSpecificSection={
-        state.kind === "scheduled" ? (
+        state.kind === null ? null : state.kind === "scheduled" ? (
           <ScheduledAutomationTypeSpecificSection
             fieldErrors={state.fieldErrors}
             isDeleting={false}

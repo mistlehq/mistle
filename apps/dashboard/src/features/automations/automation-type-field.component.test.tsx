@@ -13,6 +13,15 @@ describe("AutomationTypeField", () => {
     expect(screen.getByRole("combobox").textContent).toContain("Schedule");
   });
 
+  it("renders a placeholder and error before an automation type is selected", () => {
+    render(<AutomationTypeSelectField error="Select an automation type." value={null} />);
+
+    expect(screen.getByText("Automation type")).toBeDefined();
+    expect(screen.getByText("Select type")).toBeDefined();
+    expect(screen.getByText("Select an automation type.")).toBeDefined();
+    expect(screen.getByRole("combobox").getAttribute("aria-invalid")).toBe("true");
+  });
+
   it("renders the edit field as read-only text", () => {
     render(<AutomationTypeDisplayField value="trigger" />);
 

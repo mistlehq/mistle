@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
 
@@ -56,7 +56,7 @@ function renderCreatePage(input: {
 }
 
 describe("AutomationCreatePage", () => {
-  it("shows the trigger automation fields by default", () => {
+  it("starts without a selected automation type", () => {
     renderCreatePage({ initialEntry: "/automations/new" });
 
     expect(
@@ -64,8 +64,10 @@ describe("AutomationCreatePage", () => {
     ).toBe("scrollbar-gutter: stable;");
     expect(screen.getByRole("heading", { name: "Create automation" })).toBeDefined();
     expect(screen.getByText("Automation type")).toBeDefined();
-    expect(screen.getByRole("heading", { name: "Events" })).toBeDefined();
-    expect(screen.getByRole("textbox", { name: "User message" })).toBeDefined();
+    expect(screen.getByText("Select type")).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "Events" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Schedule" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "User message" })).toBeNull();
   });
 
   it("orders the create form fields by profile, type, and name", () => {
@@ -88,8 +90,20 @@ describe("AutomationCreatePage", () => {
 
     expect(screen.getByRole("heading", { name: "Create automation" })).toBeDefined();
     expect(screen.getByText("Automation type")).toBeDefined();
-    expect(screen.getByRole("heading", { name: "Events" })).toBeDefined();
+    expect(screen.getByText("Select type")).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "Events" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Schedule" })).toBeNull();
-    expect(screen.getByRole("textbox", { name: "User message" })).toBeDefined();
+    expect(screen.queryByRole("textbox", { name: "User message" })).toBeNull();
+  });
+
+  it("requires the user to select an automation type before creating", () => {
+    renderCreatePage({ initialEntry: "/automations/new" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    expect(screen.getByText("Select an automation type.")).toBeDefined();
+    expect(screen.getByText("Please address the fields highlighted in red.")).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "Events" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "User message" })).toBeNull();
   });
 });
