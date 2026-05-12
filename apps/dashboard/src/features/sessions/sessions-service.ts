@@ -24,6 +24,7 @@ const SandboxInstanceStatusResponseSchema = z
     failureMessage: z.string().min(1).nullable(),
     runtimeContext: z
       .object({
+        agentRuntimeId: z.enum(["codex", "opencode"]).nullable(),
         launchCwd: z.string().min(1).nullable(),
         primaryRepositoryRoot: z.string().min(1).nullable(),
       })

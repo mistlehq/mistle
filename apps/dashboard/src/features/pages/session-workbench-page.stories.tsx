@@ -36,6 +36,7 @@ const meta = {
           connectable: args.connectable,
           runtimeContext: args.connectable
             ? {
+                agentRuntimeId: "codex",
                 launchCwd: null,
                 primaryRepositoryRoot: null,
               }

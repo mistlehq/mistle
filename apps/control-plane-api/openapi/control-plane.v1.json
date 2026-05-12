@@ -13590,6 +13590,10 @@
                     "runtimeContext": {
                       "type": ["object", "null"],
                       "properties": {
+                        "agentRuntimeId": {
+                          "type": ["string", "null"],
+                          "enum": ["codex", "opencode", null]
+                        },
                         "launchCwd": {
                           "type": ["string", "null"],
                           "minLength": 1
@@ -13599,7 +13603,7 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["launchCwd", "primaryRepositoryRoot"],
+                      "required": ["agentRuntimeId", "launchCwd", "primaryRepositoryRoot"],
                       "additionalProperties": false
                     },
                     "automationConversation": {
@@ -14100,6 +14104,10 @@
                     "runtimeContext": {
                       "type": ["object", "null"],
                       "properties": {
+                        "agentRuntimeId": {
+                          "type": ["string", "null"],
+                          "enum": ["codex", "opencode", null]
+                        },
                         "launchCwd": {
                           "type": ["string", "null"],
                           "minLength": 1
@@ -14109,7 +14117,7 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["launchCwd", "primaryRepositoryRoot"],
+                      "required": ["agentRuntimeId", "launchCwd", "primaryRepositoryRoot"],
                       "additionalProperties": false
                     },
                     "automationConversation": {

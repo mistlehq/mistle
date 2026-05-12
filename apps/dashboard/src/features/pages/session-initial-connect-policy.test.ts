@@ -24,6 +24,7 @@ describe("session initial connect policy", () => {
         providerThreadId: "thread_123",
         sandboxInstanceId: "sbi_123",
         runtimeContext: {
+          agentRuntimeId: "codex",
           launchCwd: "/root/acme/repo-1/packages/app",
           primaryRepositoryRoot: "/root/acme/repo-1",
         },
@@ -42,6 +43,7 @@ describe("session initial connect policy", () => {
         providerThreadId: null,
         sandboxInstanceId: "sbi_123",
         runtimeContext: {
+          agentRuntimeId: "codex",
           launchCwd: "/root/acme/repo-1/packages/app",
           primaryRepositoryRoot: "/root/acme/repo-1",
         },
@@ -60,6 +62,7 @@ describe("session initial connect policy", () => {
         providerThreadId: null,
         sandboxInstanceId: "sbi_123",
         runtimeContext: {
+          agentRuntimeId: "codex",
           launchCwd: null,
           primaryRepositoryRoot: null,
         },

@@ -74,6 +74,7 @@ describe("runtime context", () => {
         }),
       }),
     ).toEqual({
+      agentRuntimeId: "codex",
       launchCwd: "/root/acme/repo-1/packages/app",
       primaryRepositoryRoot: "/root/acme/repo-1",
     });
@@ -95,6 +96,7 @@ describe("runtime context", () => {
         }),
       }),
     ).toEqual({
+      agentRuntimeId: "codex",
       launchCwd: "/root/workspace/tmp",
       primaryRepositoryRoot: null,
     });
@@ -106,6 +108,7 @@ describe("runtime context", () => {
         runtimePlan: createRuntimePlan({}),
       }),
     ).toEqual({
+      agentRuntimeId: "codex",
       launchCwd: null,
       primaryRepositoryRoot: null,
     });

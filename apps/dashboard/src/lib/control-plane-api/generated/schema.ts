@@ -6828,6 +6828,8 @@ export interface paths {
               failureMessage: string | null;
               id: string;
               runtimeContext: {
+                /** @enum {string|null} */
+                agentRuntimeId: "codex" | "opencode" | null;
                 launchCwd: string | null;
                 primaryRepositoryRoot: string | null;
               } | null;
@@ -7179,6 +7181,8 @@ export interface paths {
               failureMessage: string | null;
               id: string;
               runtimeContext: {
+                /** @enum {string|null} */
+                agentRuntimeId: "codex" | "opencode" | null;
                 launchCwd: string | null;
                 primaryRepositoryRoot: string | null;
               } | null;
