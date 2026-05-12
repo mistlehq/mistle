@@ -25,7 +25,7 @@ const it = createIntegrationTest({
 });
 
 describe.concurrent("sandbox profiles launchable integration", () => {
-  it("returns active published profiles with usable agent bindings ordered by recency", async ({
+  it("returns active published profiles with agent runtimes ordered by recency", async ({
     env,
   }) => {
     const session = await env.auth.createSession({
@@ -247,8 +247,12 @@ describe.concurrent("sandbox profiles launchable integration", () => {
           id: "ibd_launchable_git_only_v1",
           sandboxProfileId: "sbp_launchable_git_only",
           sandboxProfileVersion: 1,
-          connectionId: "icn_sandbox_profiles_launchable",
+          connectionId: "icn_sandbox_profiles_launchable_github",
           kind: IntegrationBindingKinds.GIT,
+          config: {
+            repositories: ["mistlehq/git-only"],
+            tools: [],
+          },
         }),
         sandboxProfileVersionIntegrationBindingRow({
           id: "ibd_launchable_old_agent_v1",
@@ -326,7 +330,10 @@ describe.concurrent("sandbox profiles launchable integration", () => {
     expect(body.items.map((profile) => profile.id)).toEqual([
       "sbp_launchable_agent_with_repos",
       "sbp_launchable_agent",
+      "sbp_launchable_git_only",
       "sbp_launchable_old_agent_only",
+      "sbp_launchable_inactive_connection",
+      "sbp_launchable_disabled_target",
       "sbp_launchable_mixed_bindings",
     ]);
     expect(body.items[0]).toMatchObject({

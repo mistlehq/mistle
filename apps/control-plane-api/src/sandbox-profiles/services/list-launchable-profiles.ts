@@ -43,43 +43,12 @@ export async function listLaunchableProfiles(
       sql`${eq(tables.sandboxProfiles.organizationId, input.organizationId)}
         and ${tables.sandboxProfiles.activeVersion} is not null
         and exists (
-        select 1
-        from ${tables.sandboxProfileVersions}
-        where ${tables.sandboxProfileVersions.sandboxProfileId} = ${tables.sandboxProfiles.id}
-          and ${tables.sandboxProfileVersions.version} = ${tables.sandboxProfiles.activeVersion}
-          and ${tables.sandboxProfileVersions.state} = ${SandboxProfileVersionStates.PUBLISHED}
-      )
-      and exists (
-        select 1
-        from ${tables.sandboxProfileVersionIntegrationBindings}
-        inner join ${tables.integrationConnections} as icn
-          on icn."id" = ${tables.sandboxProfileVersionIntegrationBindings.connectionId}
-        inner join ${tables.integrationTargets} as itg
-          on itg."target_key" = icn."target_key"
-        where ${tables.sandboxProfileVersionIntegrationBindings.sandboxProfileId} = ${tables.sandboxProfiles.id}
-          and ${tables.sandboxProfileVersionIntegrationBindings.sandboxProfileVersion} = ${launchableVersionSql}
-          and ${tables.sandboxProfileVersionIntegrationBindings.kind} = ${IntegrationBindingKinds.AGENT}
-          and icn."organization_id" = ${input.organizationId}
-          and icn."status" = ${IntegrationConnectionStatuses.ACTIVE}
-          and itg."enabled" = true
-      ) and not exists (
-        select 1
-        from ${tables.sandboxProfileVersionIntegrationBindings}
-        left join ${tables.integrationConnections} as icn
-          on icn."id" = ${tables.sandboxProfileVersionIntegrationBindings.connectionId}
-         and icn."organization_id" = ${input.organizationId}
-        left join ${tables.integrationTargets} as itg
-          on itg."target_key" = icn."target_key"
-        where ${tables.sandboxProfileVersionIntegrationBindings.sandboxProfileId} = ${tables.sandboxProfiles.id}
-          and ${tables.sandboxProfileVersionIntegrationBindings.sandboxProfileVersion} = ${launchableVersionSql}
-          and ${tables.sandboxProfileVersionIntegrationBindings.kind} = ${IntegrationBindingKinds.AGENT}
-          and (
-            icn."id" is null
-            or icn."status" <> ${IntegrationConnectionStatuses.ACTIVE}
-            or itg."target_key" is null
-            or itg."enabled" = false
-          )
-      )`,
+          select 1
+          from ${tables.sandboxProfileVersions}
+          where ${tables.sandboxProfileVersions.sandboxProfileId} = ${tables.sandboxProfiles.id}
+            and ${tables.sandboxProfileVersions.version} = ${tables.sandboxProfiles.activeVersion}
+            and ${tables.sandboxProfileVersions.state} = ${SandboxProfileVersionStates.PUBLISHED}
+        )`,
     )
     .orderBy(desc(tables.sandboxProfiles.createdAt), desc(tables.sandboxProfiles.id));
 

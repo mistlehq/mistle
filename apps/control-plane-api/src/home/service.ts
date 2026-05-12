@@ -1,9 +1,9 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import {
   AutomationKinds,
-  IntegrationBindingKinds,
   IntegrationConnectionStatuses,
   type ControlPlaneDatabase,
+  SandboxProfileVersionStates,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { IntegrationKinds, type IntegrationRegistry } from "@mistle/integrations-core";
@@ -79,35 +79,10 @@ export async function getHomeSummary(
             and sp."active_version" is not null
             and exists (
               select 1
-              from ${tables.sandboxProfileVersionIntegrationBindings} as spvib
-              inner join ${tables.integrationConnections} as icn
-                on icn."id" = spvib."connection_id"
-              inner join ${tables.integrationTargets} as itg
-                on itg."target_key" = icn."target_key"
-              where spvib."sandbox_profile_id" = sp."id"
-                and spvib."sandbox_profile_version" = sp."active_version"
-                and spvib."kind" = ${IntegrationBindingKinds.AGENT}
-                and icn."organization_id" = ${params.organizationId}
-                and icn."status" = ${IntegrationConnectionStatuses.ACTIVE}
-                and itg."enabled" = true
-            )
-            and not exists (
-              select 1
-              from ${tables.sandboxProfileVersionIntegrationBindings} as spvib
-              left join ${tables.integrationConnections} as icn
-                on icn."id" = spvib."connection_id"
-               and icn."organization_id" = ${params.organizationId}
-              left join ${tables.integrationTargets} as itg
-                on itg."target_key" = icn."target_key"
-              where spvib."sandbox_profile_id" = sp."id"
-                and spvib."sandbox_profile_version" = sp."active_version"
-                and spvib."kind" = ${IntegrationBindingKinds.AGENT}
-                and (
-                  icn."id" is null
-                  or icn."status" <> ${IntegrationConnectionStatuses.ACTIVE}
-                  or itg."target_key" is null
-                  or itg."enabled" = false
-                )
+              from ${tables.sandboxProfileVersions} as spv
+              where spv."sandbox_profile_id" = sp."id"
+                and spv."version" = sp."active_version"
+                and spv."state" = ${SandboxProfileVersionStates.PUBLISHED}
             )
         ) as "hasUsableProfiles",
         exists(

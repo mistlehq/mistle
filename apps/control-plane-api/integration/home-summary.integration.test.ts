@@ -94,32 +94,6 @@ describe.concurrent("home summary integration", () => {
       email: "integration-new-home-summary-active-version@example.com",
     });
 
-    await seedIntegrationTarget({
-      env,
-      targetKey: "openai-home-summary-active-version",
-      familyId: "openai",
-      variantId: "openai-default",
-    });
-    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values([
-      {
-        id: "icn_home_summary_active_version",
-        organizationId: session.organizationId,
-        targetKey: "openai-home-summary-active-version",
-        displayName: "OpenAI",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        createdAt: "2026-03-01T00:00:00.000Z",
-        updatedAt: "2026-03-01T00:00:00.000Z",
-      },
-      {
-        id: "icn_home_summary_active_version_inactive",
-        organizationId: session.organizationId,
-        targetKey: "openai-home-summary-active-version",
-        displayName: "OpenAI inactive",
-        status: IntegrationConnectionStatuses.ERROR,
-        createdAt: "2026-03-02T00:00:00.000Z",
-        updatedAt: "2026-03-02T00:00:00.000Z",
-      },
-    ]);
     await seedSandboxProfile({
       env,
       profileId: "sbp_home_summary_active_version",
@@ -140,30 +114,6 @@ describe.concurrent("home summary integration", () => {
         publishedAt: null,
       },
     ]);
-    await env.controlPlaneDb
-      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
-      .values([
-        {
-          id: "ibd_home_summary_active_version_v1",
-          sandboxProfileId: "sbp_home_summary_active_version",
-          sandboxProfileVersion: 1,
-          connectionId: "icn_home_summary_active_version",
-          kind: IntegrationBindingKinds.AGENT,
-          config: {},
-          createdAt: "2026-03-01T00:00:00.000Z",
-          updatedAt: "2026-03-01T00:00:00.000Z",
-        },
-        {
-          id: "ibd_home_summary_active_version_v2",
-          sandboxProfileId: "sbp_home_summary_active_version",
-          sandboxProfileVersion: 2,
-          connectionId: "icn_home_summary_active_version_inactive",
-          kind: IntegrationBindingKinds.AGENT,
-          config: {},
-          createdAt: "2026-03-02T00:00:00.000Z",
-          updatedAt: "2026-03-02T00:00:00.000Z",
-        },
-      ]);
 
     const body = await readHomeSummary(env, session.cookie);
     expect(body.onboarding).toMatchObject({
@@ -249,43 +199,11 @@ describe.concurrent("home summary integration", () => {
     expect(body.onboarding.hasWebhookCapableIntegration).toBe(true);
   });
 
-  it("ignores non-agent bindings when checking whether a profile is usable", async ({ env }) => {
+  it("counts active published profiles as usable without agent bindings", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-home-summary-non-agent-binding@example.com",
     });
 
-    await seedIntegrationTarget({
-      env,
-      targetKey: "openai-home-summary-agent",
-      familyId: "openai",
-      variantId: "openai-default",
-    });
-    await seedIntegrationTarget({
-      env,
-      targetKey: "github-home-summary-git",
-      familyId: "github",
-      variantId: "github-default",
-    });
-    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values([
-      {
-        id: "icn_home_summary_agent",
-        organizationId: session.organizationId,
-        targetKey: "openai-home-summary-agent",
-        displayName: "OpenAI",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        createdAt: "2026-03-01T00:00:00.000Z",
-        updatedAt: "2026-03-01T00:00:00.000Z",
-      },
-      {
-        id: "icn_home_summary_git",
-        organizationId: session.organizationId,
-        targetKey: "github-home-summary-git",
-        displayName: "GitHub",
-        status: IntegrationConnectionStatuses.ERROR,
-        createdAt: "2026-03-01T00:00:00.000Z",
-        updatedAt: "2026-03-01T00:00:00.000Z",
-      },
-    ]);
     await seedSandboxProfile({
       env,
       profileId: "sbp_home_summary_non_agent",
@@ -296,30 +214,6 @@ describe.concurrent("home summary integration", () => {
       sandboxProfileId: "sbp_home_summary_non_agent",
       version: 1,
     });
-    await env.controlPlaneDb
-      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
-      .values([
-        {
-          id: "ibd_home_summary_agent",
-          sandboxProfileId: "sbp_home_summary_non_agent",
-          sandboxProfileVersion: 1,
-          connectionId: "icn_home_summary_agent",
-          kind: IntegrationBindingKinds.AGENT,
-          config: {},
-          createdAt: "2026-03-01T00:00:00.000Z",
-          updatedAt: "2026-03-01T00:00:00.000Z",
-        },
-        {
-          id: "ibd_home_summary_git",
-          sandboxProfileId: "sbp_home_summary_non_agent",
-          sandboxProfileVersion: 1,
-          connectionId: "icn_home_summary_git",
-          kind: IntegrationBindingKinds.GIT,
-          config: {},
-          createdAt: "2026-03-01T00:00:00.000Z",
-          updatedAt: "2026-03-01T00:00:00.000Z",
-        },
-      ]);
 
     const body = await readHomeSummary(env, session.cookie);
     expect(body.onboarding.hasUsableProfiles).toBe(true);
