@@ -62,29 +62,35 @@ type CodexProviderMetadata = {
   chatgptBaseUrl?: string;
 };
 
-function renderCodexConfig(input: {
-  responsesApiBaseUrl: string;
-  chatgptBaseUrl?: string;
-}): string {
+function renderCodexConfig(input: { providerMetadata?: CodexProviderMetadata }): string {
+  const providerConfig =
+    input.providerMetadata === undefined
+      ? {}
+      : {
+          model_provider: ProxyModelProviderKey,
+          model_providers: {
+            [ProxyModelProviderKey]: {
+              name: ProxyModelProviderName,
+              base_url: input.providerMetadata.responsesApiBaseUrl,
+              wire_api: "responses",
+              requires_openai_auth: false,
+              supports_websockets: true,
+            },
+          },
+          ...(input.providerMetadata.chatgptBaseUrl === undefined
+            ? {}
+            : { chatgpt_base_url: input.providerMetadata.chatgptBaseUrl }),
+        };
+
   return stringifyToml({
-    model_provider: ProxyModelProviderKey,
+    ...providerConfig,
     approval_policy: "never",
     sandbox_mode: "danger-full-access",
-    model_providers: {
-      [ProxyModelProviderKey]: {
-        name: ProxyModelProviderName,
-        base_url: input.responsesApiBaseUrl,
-        wire_api: "responses",
-        requires_openai_auth: false,
-        supports_websockets: true,
-      },
-    },
     features: {
       apps: false,
       plugins: false,
       tool_search: true,
     },
-    ...(input.chatgptBaseUrl === undefined ? {} : { chatgpt_base_url: input.chatgptBaseUrl }),
     projects: {
       "/": {
         trust_level: "trusted",
@@ -135,23 +141,19 @@ function isOpenAiChatGptSubscriptionRoute(route: EgressCredentialRoute): boolean
 
 function resolveCodexProviderMetadataFromEgressRoutes(input: {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
-}): CodexProviderMetadata {
+}): CodexProviderMetadata | undefined {
   const matchingRoutes = input.egressRoutes.filter(
     (route) => isOpenAiApiRoute(route) || isOpenAiChatGptSubscriptionRoute(route),
   );
   const route = matchingRoutes[0];
 
-  if (route === undefined) {
-    throw new Error("Codex runtime requires exactly one proxied OpenAI provider route.");
-  }
-
-  if (matchingRoutes[1] !== undefined) {
-    throw new Error("Codex runtime cannot represent multiple proxied OpenAI provider routes.");
+  if (route === undefined || matchingRoutes[1] !== undefined) {
+    return undefined;
   }
 
   if (isOpenAiChatGptSubscriptionRoute(route)) {
     if (route.upstream.baseUrl !== OpenAiChatGptOriginBaseUrl) {
-      throw new Error("Codex runtime ChatGPT route must use the ChatGPT origin base URL.");
+      return undefined;
     }
 
     return {
@@ -165,21 +167,19 @@ function resolveCodexProviderMetadataFromEgressRoutes(input: {
   };
 }
 
-function buildCodexSetupFiles(input: CodexProviderMetadata): ReadonlyArray<RuntimeClientSetupFile> {
+function buildCodexSetupFiles(input: {
+  providerMetadata?: CodexProviderMetadata;
+}): ReadonlyArray<RuntimeClientSetupFile> {
   return [
     {
       fileId: "codex_config",
       path: CodexConfigPath,
       mode: 384,
       writeMode: "if-absent",
-      content: renderCodexConfig({
-        responsesApiBaseUrl: input.responsesApiBaseUrl,
-        ...(input.chatgptBaseUrl === undefined
-          ? {}
-          : {
-              chatgptBaseUrl: input.chatgptBaseUrl,
-            }),
-      }),
+      content:
+        input.providerMetadata === undefined
+          ? renderCodexConfig({})
+          : renderCodexConfig({ providerMetadata: input.providerMetadata }),
     },
     {
       fileId: "codex_global_agents",
@@ -189,6 +189,16 @@ function buildCodexSetupFiles(input: CodexProviderMetadata): ReadonlyArray<Runti
       content: renderCodexGlobalAgentsMd(),
     },
   ];
+}
+
+function buildCodexSetupFilesFromEgressRoutes(input: {
+  egressRoutes: ReadonlyArray<EgressCredentialRoute>;
+}): ReadonlyArray<RuntimeClientSetupFile> {
+  const providerMetadata = resolveCodexProviderMetadataFromEgressRoutes({
+    egressRoutes: input.egressRoutes,
+  });
+
+  return buildCodexSetupFiles(providerMetadata === undefined ? {} : { providerMetadata });
 }
 
 function buildCodexRuntimeClients(input: {
@@ -277,11 +287,7 @@ export function compileCodexRuntime(
     renderRuntimeClients: ({ egressRoutes }) =>
       buildCodexRuntimeClients({
         codexCliInstallPath,
-        setupFiles: buildCodexSetupFiles(
-          resolveCodexProviderMetadataFromEgressRoutes({
-            egressRoutes,
-          }),
-        ),
+        setupFiles: buildCodexSetupFilesFromEgressRoutes({ egressRoutes }),
       }),
     agentRuntimes: [
       {

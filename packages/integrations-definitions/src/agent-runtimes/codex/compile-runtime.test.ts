@@ -376,4 +376,89 @@ describe("compileCodexRuntime", () => {
     expect(configContent).toContain("plugins = false");
     expect(configContent).toContain("tool_search = true");
   });
+
+  it("omits Codex provider config when no proxied OpenAI route is present", () => {
+    const runtimeClients = renderRuntimeClients({
+      compiled: compileCodexRuntime({
+        organizationId: "org_123",
+        sandboxProfileId: "sbp_123",
+        version: 1,
+        runtimeId: "codex",
+        runtimeConfig: {},
+        mcpServers: [],
+        refs: {
+          sandboxPaths: {
+            userHomeDir: "/root",
+            workspaceDir: "/root",
+            runtimeDataDir: "/var/lib/mistle",
+            runtimeArtifactDir: "/var/lib/mistle/artifacts",
+            runtimeArtifactBinDir: "/usr/local/bin",
+          },
+          artifactBinPath: (artifactName) => `/usr/local/bin/${artifactName}`,
+        },
+      }),
+      egressRoutes: [],
+    });
+    const configContent = runtimeClients[0]?.setup.files.find(
+      (file) => file.fileId === "codex_config",
+    )?.content;
+
+    expect(configContent).not.toContain("model_provider");
+    expect(configContent).not.toContain("model_providers");
+    expect(configContent).not.toContain("base_url");
+    expect(configContent).not.toContain("chatgpt_base_url");
+    expect(configContent).toContain('approval_policy = "never"');
+    expect(configContent).toContain('sandbox_mode = "danger-full-access"');
+    expect(configContent).toContain("[features]");
+    expect(configContent).toContain("apps = false");
+    expect(configContent).toContain("plugins = false");
+    expect(configContent).toContain("tool_search = true");
+  });
+
+  it("omits Codex provider config when proxied OpenAI routes are ambiguous", () => {
+    const runtimeClients = renderRuntimeClients({
+      compiled: compileCodexRuntime({
+        organizationId: "org_123",
+        sandboxProfileId: "sbp_123",
+        version: 1,
+        runtimeId: "codex",
+        runtimeConfig: {},
+        mcpServers: [],
+        refs: {
+          sandboxPaths: {
+            userHomeDir: "/root",
+            workspaceDir: "/root",
+            runtimeDataDir: "/var/lib/mistle",
+            runtimeArtifactDir: "/var/lib/mistle/artifacts",
+            runtimeArtifactBinDir: "/usr/local/bin",
+          },
+          artifactBinPath: (artifactName) => `/usr/local/bin/${artifactName}`,
+        },
+      }),
+      egressRoutes: [
+        createCompiledOpenAiRoute({
+          egressRuleId: "egress_rule_bind_openai_agent",
+          host: "api.openai.com",
+          baseUrl: "https://api.openai.com",
+          secretType: "api_key",
+        }),
+        createCompiledOpenAiRoute({
+          egressRuleId: "egress_rule_bind_chatgpt",
+          host: "chatgpt.com",
+          baseUrl: "https://chatgpt.com",
+          secretType: "oauth2_access_token",
+        }),
+      ],
+    });
+    const configContent = runtimeClients[0]?.setup.files.find(
+      (file) => file.fileId === "codex_config",
+    )?.content;
+
+    expect(configContent).not.toContain("model_provider");
+    expect(configContent).not.toContain("model_providers");
+    expect(configContent).not.toContain("base_url");
+    expect(configContent).not.toContain("chatgpt_base_url");
+    expect(configContent).toContain('approval_policy = "never"');
+    expect(configContent).toContain('sandbox_mode = "danger-full-access"');
+  });
 });
