@@ -1847,7 +1847,7 @@ export type CompileBindingEgressRoute = Omit<
   "egressRuleId" | "bindingId" | "familyId" | "variantId"
 >;
 
-export type CompileBindingAgentRuntime = {
+export type CompiledAgentRuntime = {
   runtimeId: string;
   runtimeKey: string;
   clientId: string;
@@ -1876,7 +1876,7 @@ export type CompileBindingResult = {
    * any route references into concrete compiled route IDs.
    */
   workspaceSources?: ReadonlyArray<CompileBindingWorkspaceSource>;
-  agentRuntimes?: ReadonlyArray<CompileBindingAgentRuntime>;
+  agentRuntimes?: ReadonlyArray<CompiledAgentRuntime>;
 };
 
 export type CompiledBindingResult = {
@@ -1884,7 +1884,7 @@ export type CompiledBindingResult = {
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
   workspaceSources: ReadonlyArray<CompiledWorkspaceSource>;
-  agentRuntimes: ReadonlyArray<CompileBindingAgentRuntime>;
+  agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
 };
 
 export type IntegrationMcpDefinitionValue =
@@ -2544,7 +2544,7 @@ export type CompiledRuntimePlan = {
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   workspaceSources: ReadonlyArray<CompiledWorkspaceSource>;
   runtimeClients: ReadonlyArray<RuntimeClient>;
-  agentRuntimes: ReadonlyArray<CompileBindingAgentRuntime>;
+  agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
 };
 
 export type IntegrationDefinitionLocator = {

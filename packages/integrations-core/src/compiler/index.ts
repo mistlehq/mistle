@@ -569,7 +569,6 @@ function compileProfileAgentRuntimeResult(input: {
     renderedRuntimeClients =
       compileAgentRuntimeResult.renderRuntimeClients?.({
         egressRoutes: input.egressRoutes,
-        bindingEgressRoutes: [],
       }) ??
       compileAgentRuntimeResult.runtimeClients ??
       [];

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import type {
-  CompileBindingAgentRuntime,
+  CompiledAgentRuntime,
   CompiledBindingResult,
   CompiledWorkspaceSource,
   EgressCredentialRoute,
@@ -131,7 +131,7 @@ function createCompiledBindingResult(input: {
   runtimeClientProcesses?: ReadonlyArray<RuntimeClientProcessSpec>;
   runtimeClientEndpoints?: ReadonlyArray<RuntimeClientEndpointSpec>;
   workspaceSources?: ReadonlyArray<CompiledWorkspaceSource>;
-  agentRuntimes?: ReadonlyArray<CompileBindingAgentRuntime>;
+  agentRuntimes?: ReadonlyArray<CompiledAgentRuntime>;
 }): CompiledBindingResult {
   const hasRuntimeClient =
     input.runtimeClientSetup !== undefined ||

@@ -61,9 +61,6 @@ function renderRuntimeClients(input: {
 
   return input.compiled.renderRuntimeClients({
     egressRoutes: input.egressRoutes,
-    bindingEgressRoutes: input.egressRoutes.filter(
-      (route) => route.bindingId === "bind_openai_agent",
-    ),
   });
 }
 

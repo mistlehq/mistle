@@ -55,11 +55,6 @@ export type CompileAgentRuntimeRenderRuntimeClientsInput = {
    * remains the source of truth for proxy policy.
    */
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
-  /**
-   * @deprecated Agent runtimes are profile-scoped. This is retained during the
-   * provider/runtime decoupling migration and is empty for profile-scoped runtimes.
-   */
-  bindingEgressRoutes: ReadonlyArray<EgressCredentialRoute>;
 };
 
 type CompileAgentRuntimeResultBase = {
