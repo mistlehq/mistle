@@ -66,14 +66,17 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
       />,
     );
 
-    expect(screen.getAllByText("Service").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Credential Connection").length).toBeGreaterThan(0);
-    expect(screen.getByText("OpenAI")).toBeDefined();
-    expect(screen.getAllByText("GitHub").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Jira").length).toBeGreaterThan(0);
-    expect(screen.getByText("Primary OpenAI Workspace")).toBeDefined();
-    expect(screen.getByText("GitHub Production")).toBeDefined();
-    expect(screen.getByText("Jira Production")).toBeDefined();
+    const proxiedConnectionsSection = getSectionByHeading("Proxied Connections");
+    const proxiedConnections = within(proxiedConnectionsSection);
+
+    expect(proxiedConnections.getAllByText("Service").length).toBeGreaterThan(0);
+    expect(proxiedConnections.getAllByText("Credential Connection").length).toBeGreaterThan(0);
+    expect(proxiedConnections.getByText("OpenAI")).toBeDefined();
+    expect(proxiedConnections.getByText("GitHub")).toBeDefined();
+    expect(proxiedConnections.getByText("Jira")).toBeDefined();
+    expect(proxiedConnections.getByText("Primary OpenAI Workspace")).toBeDefined();
+    expect(proxiedConnections.getByText("GitHub Production")).toBeDefined();
+    expect(proxiedConnections.getByText("Jira Production")).toBeDefined();
   });
 
   it("links disconnected connector setup to the integration add flow", () => {
@@ -287,4 +290,13 @@ function TestSandboxProfileIntegrationsSetupSection(input: {
       </MemoryRouter>
     </QueryClientProvider>
   );
+}
+
+function getSectionByHeading(name: string): HTMLElement {
+  const section = screen.getByRole("heading", { name }).closest("section");
+  if (section === null) {
+    throw new Error(`Expected ${name} heading to be inside a section.`);
+  }
+
+  return section;
 }
