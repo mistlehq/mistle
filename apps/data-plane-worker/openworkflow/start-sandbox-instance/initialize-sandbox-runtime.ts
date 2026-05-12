@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { mintBootstrapToken, mintTunnelExchangeToken } from "@mistle/gateway-tunnel-auth";
+import type { MistleLogger } from "@mistle/logging";
 import {
   createRuntimeDestinationTransparentProxyExclusions,
   type SandboxAdapter,
@@ -120,6 +121,7 @@ export async function createSandboxStartupInput(input: {
 export async function initializeSandboxRuntime(
   ctx: {
     config: DataPlaneWorkerRuntimeConfig;
+    logger: MistleLogger;
     processEnv: Readonly<Record<string, string | undefined>>;
     sandboxAdapter: SandboxAdapter;
     sandboxRuntimeControl: SandboxRuntimeControl;
@@ -135,6 +137,23 @@ export async function initializeSandboxRuntime(
     gitIdentity?: StartSandboxInstanceWorkflowInput["gitIdentity"];
   },
 ): Promise<void> {
+  const runtimeEnv = createSandboxRuntimeEnv({
+    config: ctx.config,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
+  const sandboxdVersion = await ctx.sandboxRuntimeControl.readSandboxdVersion({
+    id: input.providerSandboxId,
+    env: runtimeEnv,
+  });
+  ctx.logger.info(
+    {
+      providerSandboxId: input.providerSandboxId,
+      sandboxInstanceId: input.sandboxInstanceId,
+      sandboxdVersion,
+    },
+    "Read sandboxd version before runtime initialization.",
+  );
+
   const startupInput = await createSandboxStartupInput({
     config: ctx.config,
     organizationId: input.organizationId,
@@ -151,10 +170,7 @@ export async function initializeSandboxRuntime(
   await ctx.sandboxRuntimeControl.init({
     id: input.providerSandboxId,
     payload: encodeSandboxStartupInput(startupInput),
-    env: createSandboxRuntimeEnv({
-      config: ctx.config,
-      sandboxInstanceId: input.sandboxInstanceId,
-    }),
+    env: runtimeEnv,
   });
 }
 

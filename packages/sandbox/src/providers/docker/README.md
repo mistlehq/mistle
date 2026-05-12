@@ -49,6 +49,7 @@ const runtimeControl = createSandboxRuntimeControl({
 
 ## Runtime Control
 
+- `readSandboxdVersion({ id })` runs `/opt/mistle/bin/sandboxd version` as `root` in the container and returns trimmed stdout.
 - `init({ id, payload })` runs `/opt/mistle/bin/sandboxd init` as `root` in the container, writes `payload` to stdin, waits for process exit, and includes stdout/stderr in failures.
 - `resume({ id, payload })` currently delegates to `init(...)`; the worker passes Docker resume startup mode as a new runtime startup.
 - `readOperationLog({ id, operation })` reads `/run/mistle/init.log` or `/run/mistle/resume.log` from the container and returns `null` when the log is absent or empty.

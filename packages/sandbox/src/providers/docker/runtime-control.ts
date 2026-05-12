@@ -18,6 +18,7 @@ import {
 import type { DockerSandboxConfig } from "./config.js";
 
 const InitCommand = ["/opt/mistle/bin/sandboxd", "init"];
+const VersionCommand = ["/opt/mistle/bin/sandboxd", "version"];
 const DockerExecExitPollIntervalMs = 50;
 const DockerInitExecExitTimeoutMs = 120_000;
 const DockerExecExitPollAttempts = DockerInitExecExitTimeoutMs / DockerExecExitPollIntervalMs;
@@ -134,6 +135,37 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
     });
   }
 
+  async readSandboxdVersion(input: { id: string }): Promise<string> {
+    if (input.id.trim().length === 0) {
+      throw new SandboxConfigurationError("Sandbox id is required.");
+    }
+
+    try {
+      const output = await this.#runExecCommand({
+        id: input.id,
+        operation: DockerClientOperationIds.READ_SANDBOXD_VERSION,
+        command: VersionCommand,
+        failureDescription: "Docker sandboxd version command",
+      });
+      const version = output.stdout.trim();
+      if (version.length === 0) {
+        throw new Error("Docker sandboxd version command returned empty stdout.");
+      }
+
+      return version;
+    } catch (error) {
+      if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
+        throw new SandboxResourceNotFoundError({
+          resourceType: "sandbox",
+          resourceId: input.id,
+          cause: error,
+        });
+      }
+
+      throw error;
+    }
+  }
+
   async init(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void> {
     if (input.id.trim().length === 0) {
       throw new SandboxConfigurationError("Sandbox id is required.");
@@ -212,54 +244,13 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
     const path = input.operation === "init" ? "/run/mistle/init.log" : "/run/mistle/resume.log";
 
     try {
-      const container = this.#docker.getContainer(input.id);
-      const exec = await this.#runDockerOperation(DockerClientOperationIds.READ_OPERATION_LOG, () =>
-        container.exec({
-          AttachStdin: false,
-          AttachStdout: true,
-          AttachStderr: true,
-          Cmd: ["sh", "-euc", `if test -f '${path}'; then cat -- '${path}'; fi`],
-          Tty: false,
-          User: "root",
-        }),
-      );
-      const execStream = await this.#runDockerOperation(
-        DockerClientOperationIds.READ_OPERATION_LOG,
-        () =>
-          exec.start({
-            hijack: true,
-            stdin: false,
-            Detach: false,
-            Tty: false,
-          }),
-      );
-      const stdout = new PassThrough();
-      const stderr = new PassThrough();
-      container.modem.demuxStream(execStream, stdout, stderr);
-      const capturedStdout = captureUtf8Stream(stdout);
-      const capturedStderr = captureUtf8Stream(stderr);
-
-      const exitCode = await this.#runDockerOperation(
-        DockerClientOperationIds.READ_OPERATION_LOG,
-        () => waitForDockerExecExitCode(exec),
-      );
-      const stdoutText = capturedStdout.read();
-      const stderrText = capturedStderr.read();
-      capturedStdout.stop();
-      capturedStderr.stop();
-
-      if (exitCode !== 0) {
-        throw new Error(
-          `Docker sandbox operation log read exited with code ${String(exitCode)}.${formatCommandOutput(
-            {
-              stdout: stdoutText,
-              stderr: stderrText,
-            },
-          )}`,
-        );
-      }
-
-      const logText = stdoutText.trim();
+      const output = await this.#runExecCommand({
+        id: input.id,
+        operation: DockerClientOperationIds.READ_OPERATION_LOG,
+        command: ["sh", "-euc", `if test -f '${path}'; then cat -- '${path}'; fi`],
+        failureDescription: "Docker sandbox operation log read",
+      });
+      const logText = output.stdout.trim();
       return logText.length === 0 ? null : logText;
     } catch (error) {
       if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
@@ -275,6 +266,60 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
   }
 
   async close(): Promise<void> {}
+
+  async #runExecCommand(input: {
+    id: string;
+    operation: (typeof DockerClientOperationIds)[keyof typeof DockerClientOperationIds];
+    command: readonly string[];
+    failureDescription: string;
+  }): Promise<{ stdout: string; stderr: string }> {
+    const container = this.#docker.getContainer(input.id);
+    const exec = await this.#runDockerOperation(input.operation, () =>
+      container.exec({
+        AttachStdin: false,
+        AttachStdout: true,
+        AttachStderr: true,
+        Cmd: [...input.command],
+        Tty: false,
+        User: "root",
+      }),
+    );
+    const execStream = await this.#runDockerOperation(input.operation, () =>
+      exec.start({
+        hijack: true,
+        stdin: false,
+        Detach: false,
+        Tty: false,
+      }),
+    );
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    container.modem.demuxStream(execStream, stdout, stderr);
+    const capturedStdout = captureUtf8Stream(stdout);
+    const capturedStderr = captureUtf8Stream(stderr);
+
+    const exitCode = await this.#runDockerOperation(input.operation, () =>
+      waitForDockerExecExitCode(exec),
+    );
+    const stdoutText = capturedStdout.read();
+    const stderrText = capturedStderr.read();
+    capturedStdout.stop();
+    capturedStderr.stop();
+
+    if (exitCode !== 0) {
+      throw new Error(
+        `${input.failureDescription} exited with code ${String(exitCode)}.${formatCommandOutput({
+          stdout: stdoutText,
+          stderr: stderrText,
+        })}`,
+      );
+    }
+
+    return {
+      stdout: stdoutText,
+      stderr: stderrText,
+    };
+  }
 
   async #runDockerOperation<TResult>(
     operation: (typeof DockerClientOperationIds)[keyof typeof DockerClientOperationIds],

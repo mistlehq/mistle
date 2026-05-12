@@ -1,9 +1,9 @@
 //! `sandboxd` is the long-lived sandbox supervisor daemon.
 //!
 //! The default entrypoint runs the daemon behind the local Unix control socket.
-//! The supported subcommands, `init` and `resume`, are thin local clients that
-//! read one startup payload from stdin, submit it to the running daemon, print
-//! the daemon response, and exit.
+//! The supported lifecycle subcommands, `init` and `resume`, are thin local
+//! clients that read one startup payload from stdin, submit it to the running
+//! daemon, print the daemon response, and exit.
 
 use std::fmt;
 use std::io;
@@ -72,6 +72,7 @@ pub enum SandboxdCommand {
     Init,
     Resume,
     Sign,
+    Version,
 }
 
 /// Describes why CLI argument parsing failed before any command-specific work ran.
@@ -89,7 +90,7 @@ impl fmt::Display for ParseSandboxdCommandError {
             }
             Self::UnknownCommand(command) => write!(
                 f,
-                "unknown sandboxd subcommand '{command}' (expected 'init' or 'resume')"
+                "unknown sandboxd subcommand '{command}' (expected 'init', 'resume', or 'version')"
             ),
         }
     }
@@ -111,6 +112,7 @@ where
     let command = match command.as_str() {
         "init" => SandboxdCommand::Init,
         "resume" => SandboxdCommand::Resume,
+        "version" => SandboxdCommand::Version,
         _ => {
             return Err(ParseSandboxdCommandError::UnknownCommand(command));
         }
@@ -198,6 +200,13 @@ where
             Ok(()) => 0,
             Err(_) => 1,
         },
+        SandboxdCommand::Version => match writeln!(stdout, "{}", env!("CARGO_PKG_VERSION")) {
+            Ok(()) => 0,
+            Err(error) => {
+                let _ = writeln!(stderr, "failed to write sandboxd version: {error}");
+                1
+            }
+        },
         SandboxdCommand::Sign => match sign::run_sign(parsed_args, &sign_control_socket_path()) {
             Ok(()) => 0,
             Err(error) => {
@@ -246,6 +255,35 @@ mod tests {
         let command = parse_sandboxd_command(["resume"]);
 
         assert_eq!(command, Ok(SandboxdCommand::Resume));
+    }
+
+    #[test]
+    fn parses_version() {
+        let command = parse_sandboxd_command(["version"]);
+
+        assert_eq!(command, Ok(SandboxdCommand::Version));
+    }
+
+    #[test]
+    fn writes_plaintext_version() {
+        let mut stdin = std::io::empty();
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+
+        let exit_code = crate::run(
+            "sandboxd",
+            ["version"],
+            &mut stdin,
+            &mut stdout,
+            &mut stderr,
+        );
+
+        assert_eq!(exit_code, 0);
+        assert_eq!(
+            String::from_utf8(stdout).expect("version output should be utf8"),
+            format!("{}\n", env!("CARGO_PKG_VERSION"))
+        );
+        assert!(stderr.is_empty());
     }
 
     #[test]

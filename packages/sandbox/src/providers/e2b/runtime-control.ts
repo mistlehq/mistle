@@ -28,6 +28,36 @@ export class E2BSandboxRuntimeControl implements SandboxRuntimeControl {
     this.#client = client;
   }
 
+  async readSandboxdVersion(input: {
+    id: string;
+    env?: Readonly<Record<string, string>>;
+  }): Promise<string> {
+    requireSandboxId(input.id);
+
+    try {
+      const result = await this.#client.runCommand({
+        sandboxId: input.id,
+        operation: E2BClientOperationIds.READ_SANDBOXD_VERSION,
+        commandDescription: "Read sandboxd version",
+        command: "/opt/mistle/bin/sandboxd version",
+        ...(input.env === undefined ? {} : { env: { ...input.env } }),
+        user: "root",
+      });
+      const version = result.stdout.trim();
+      if (version.length === 0) {
+        throw new Error("E2B sandboxd version command returned empty stdout.");
+      }
+
+      return version;
+    } catch (error) {
+      if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
+        throw toSandboxNotFoundError(input.id, error);
+      }
+
+      throw error;
+    }
+  }
+
   async init(input: SandboxRuntimeControlRequest): Promise<void> {
     requireSandboxId(input.id);
 

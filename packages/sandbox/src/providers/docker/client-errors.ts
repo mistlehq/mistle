@@ -47,6 +47,7 @@ export const DockerClientOperationIds = {
    */
   STOP_CONTAINER: "stop_container",
   INIT: "init",
+  READ_SANDBOXD_VERSION: "read_sandboxd_version",
   /**
    * `container.inspect(...)`.
    * Source:

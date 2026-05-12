@@ -386,6 +386,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
       await initializeSandboxRuntime(
         {
           config: ctx.config,
+          logger,
           processEnv: ctx.processEnv,
           sandboxAdapter: resolvedRuntime.sandboxAdapter,
           sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,

@@ -85,6 +85,7 @@ export const E2BClientOperationIds = {
    * `sandbox.commands.run(...)` for in-guest bind-mount and Archil unmount cleanup.
    */
   CLEANUP_STORAGE: "cleanup_storage",
+  READ_SANDBOXD_VERSION: "read_sandboxd_version",
   READ_OPERATION_LOG: "read_operation_log",
 } as const;
 export type E2BClientOperation = (typeof E2BClientOperationIds)[keyof typeof E2BClientOperationIds];

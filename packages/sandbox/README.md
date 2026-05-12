@@ -25,6 +25,7 @@ Persistent sandbox behavior across data-plane workflows is documented in [`docs/
 - capture a new provider image or snapshot handle from a running sandbox
 - attach and clean up provider-mounted persistent storage
 - initialize or resume the in-sandbox `sandboxd` runtime
+- read `sandboxd` version for runtime visibility
 - read `sandboxd` init/resume operation logs for startup diagnostics
 
 It does not decide whether a sandbox instance is ephemeral or persistent, provision durable storage records, choose organization storage settings, compile runtime plans, mint tunnel tokens, or manage provider platform infrastructure such as autoscaling, cluster/node lifecycle, scheduling policy, and capacity management. Those decisions live in the data-plane/control-plane application layers. This package receives already-resolved provider config, image handles, runtime payloads, and storage attachment handles.
@@ -50,6 +51,7 @@ The main entrypoints are:
 
 `SandboxRuntimeControl` exposes runtime-daemon operations:
 
+- `readSandboxdVersion(request)`
 - `init(request)`
 - `resume(request)`
 - `readOperationLog(request)`
@@ -210,7 +212,7 @@ Use the current Docker and E2B providers as reference implementations; neither p
 4. Implement `src/providers/<provider>/client.ts` for raw SDK/API calls.
 5. Add provider error mapping in `src/providers/<provider>/client-errors.ts`.
 6. Implement `src/providers/<provider>/adapter.ts` for the complete `SandboxAdapter` surface: storage preparation, start, inspect, resume, snapshot capture, storage attach, storage cleanup, stop, and destroy.
-7. Implement `src/providers/<provider>/runtime-control.ts` for the complete `SandboxRuntimeControl` surface: init, resume, egress refresh, operation-log reads, and close.
+7. Implement `src/providers/<provider>/runtime-control.ts` for the complete `SandboxRuntimeControl` surface: sandboxd version reads, init, resume, operation-log reads, and close.
 8. Create `src/providers/<provider>/index.ts` with both `create<Provider>Adapter(...)` and `create<Provider>RuntimeControl(...)` constructors.
 9. Wire the provider into both `createSandboxAdapter` and `createSandboxRuntimeControl` in `src/factory.ts`.
 10. Decide which persistent storage backend combinations the provider supports and fail fast for unsupported storage payloads.

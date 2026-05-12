@@ -1,3 +1,4 @@
+import type { MistleLogger } from "@mistle/logging";
 import { SandboxProvider, type SandboxAdapter, type SandboxRuntimeControl } from "@mistle/sandbox";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 
@@ -31,6 +32,7 @@ export function resolveResumeStartupMode(input: {
 export async function resumeSandboxRuntime(
   ctx: {
     config: DataPlaneWorkerRuntimeConfig;
+    logger: MistleLogger;
     processEnv: Readonly<Record<string, string | undefined>>;
     sandboxAdapter: SandboxAdapter;
     sandboxRuntimeControl: SandboxRuntimeControl;
@@ -45,6 +47,24 @@ export async function resumeSandboxRuntime(
     gitIdentity?: StartSandboxInstanceWorkflowInput["gitIdentity"];
   },
 ): Promise<void> {
+  const runtimeEnv = createSandboxRuntimeEnv({
+    config: ctx.config,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
+  const sandboxdVersion = await ctx.sandboxRuntimeControl.readSandboxdVersion({
+    id: input.providerSandboxId,
+    env: runtimeEnv,
+  });
+  ctx.logger.info(
+    {
+      providerSandboxId: input.providerSandboxId,
+      runtimeProvider: input.runtimeProvider,
+      sandboxInstanceId: input.sandboxInstanceId,
+      sandboxdVersion,
+    },
+    "Read sandboxd version before runtime resume.",
+  );
+
   const startupInput = await createSandboxStartupInput({
     config: ctx.config,
     organizationId: input.organizationId,
@@ -62,9 +82,6 @@ export async function resumeSandboxRuntime(
   await ctx.sandboxRuntimeControl.resume({
     id: input.providerSandboxId,
     payload: encodeSandboxStartupInput(startupInput),
-    env: createSandboxRuntimeEnv({
-      config: ctx.config,
-      sandboxInstanceId: input.sandboxInstanceId,
-    }),
+    env: runtimeEnv,
   });
 }

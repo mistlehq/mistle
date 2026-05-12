@@ -223,6 +223,10 @@ export interface SandboxRuntimeControlRequest {
 }
 
 export interface SandboxRuntimeControl {
+  readSandboxdVersion(input: {
+    id: string;
+    env?: Readonly<Record<string, string>>;
+  }): Promise<string>;
   init(input: SandboxRuntimeControlRequest): Promise<void>;
   resume(input: SandboxRuntimeControlRequest): Promise<void>;
   readOperationLog(input: { id: string; operation: "init" | "resume" }): Promise<string | null>;
