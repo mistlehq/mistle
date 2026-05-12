@@ -93,7 +93,7 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.conversationPane.serverRequestsState.pendingServerRequests).toEqual([]);
   });
 
-  it("uses the OpenCode chat composer boundary for OpenCode runtime sessions", () => {
+  it("keeps the OpenCode composer unavailable until the OpenCode session connects", () => {
     const queryClient = createControllerQueryClient();
     const sandboxStatus: SandboxInstanceStatusResult = {
       id: "sbi_opencode",
@@ -118,7 +118,7 @@ describe("useSessionWorkbenchController", () => {
 
     expect(result.current.conversationPane.composerStateInput.requiresModelSelection).toBe(false);
     expect(result.current.conversationPane.composerStateInput.bootstrap.phase).toEqual({
-      status: "ready",
+      status: "unavailable",
     });
     expect(result.current.conversationPane.composerStateInput.contextUsage).toBeNull();
     expect(result.current.conversationPane.serverRequestsState.pendingServerRequests).toEqual([]);
