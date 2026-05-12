@@ -22,7 +22,7 @@ use hyper_util::client::legacy::Client;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::TokioExecutor;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::Builder;
 use tokio::sync::mpsc;
@@ -556,28 +556,10 @@ async fn handle_opencode_proxy_request(
         .body(Full::new(Bytes::from(body)))
         .map_err(|error| OpenCodeProxyError::ConfigureRuntime(error.to_string()))?;
 
-    let response = match client.request(upstream_request).await {
-        Ok(response) => response,
-        Err(error) => {
-            send_json_message(
-                &sender,
-                &OpenCodeProxyResponse {
-                    id: request.id,
-                    message_type: OpenCodeProxyResponseType::Response,
-                    status: 502,
-                    headers: BTreeMap::from([(
-                        CONTENT_TYPE.to_string(),
-                        "application/json".to_string(),
-                    )]),
-                    body: json!({
-                        "error": format!("OpenCode upstream request failed: {error}")
-                    })
-                    .to_string(),
-                },
-            )?;
-            return Ok(());
-        }
-    };
+    let response = client
+        .request(upstream_request)
+        .await
+        .map_err(|error| OpenCodeProxyError::HttpRequest(error.to_string()))?;
     let status = response.status().as_u16();
     let headers = response
         .headers()
