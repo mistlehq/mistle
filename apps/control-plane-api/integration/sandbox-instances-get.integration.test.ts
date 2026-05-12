@@ -217,6 +217,7 @@ describe.concurrent("sandbox instances get integration", () => {
     expect(response.status).toBe(200);
     const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
     expect(body.runtimeContext).toEqual({
+      agentRuntimeId: "codex",
       launchCwd: "/root/acme/repo-1/packages/app",
       primaryRepositoryRoot: "/root/acme/repo-1",
     });
