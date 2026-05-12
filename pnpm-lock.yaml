@@ -393,8 +393,8 @@ importers:
         specifier: 1.5.6
         version: 1.5.6(@opentelemetry/api@1.9.1)(@prisma/client@7.4.2(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@5.9.3))(typescript@5.9.3))(drizzle-kit@0.31.10)(drizzle-orm@0.45.2(@electric-sql/pglite@0.3.15)(@opentelemetry/api@1.9.1)(@prisma/client@7.4.2(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.20.0)(kysely@0.28.17)(mysql2@3.15.3)(pg@8.20.0)(postgres@3.4.9)(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@5.9.3)))(mongodb@7.1.0(socks@2.8.7))(mysql2@3.15.3)(pg@8.20.0)(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(typescript@5.9.3))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vitest@4.1.5(@opentelemetry/api@1.9.1)(@types/node@25.6.2)(jsdom@29.1.1(@noble/hashes@2.0.1))(vite@8.0.10(@types/node@25.6.2)(esbuild@0.25.0)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)))
       dockview:
-        specifier: ^5.2.0
-        version: 5.2.0(react@19.2.5)
+        specifier: ^6.0.1
+        version: 6.0.1(react@19.2.5)
       openapi-fetch:
         specifier: ^0.17.0
         version: 0.17.0
@@ -7492,11 +7492,11 @@ packages:
     resolution: {integrity: sha512-C52mvJ+7lcyhWNfrzVfFsbTrBfy/ezE9FGEYLpu17FUeBcCkxERk9nN7uDl/478ynDiQ4U+5DbQC2vENHkVEtQ==}
     engines: {node: '>= 14.17'}
 
-  dockview-core@5.2.0:
-    resolution: {integrity: sha512-Gib8yhK2Ng7w47ASvbUZ7GdhBYbeXEflbIDxf/vobdQBMrN/QXmPaouSsSSkEx5YH0N8ap8GYljfvqjug7h5Fg==}
+  dockview-core@6.0.6:
+    resolution: {integrity: sha512-d7MA42recquehve/52nC3yIbnFBHicRNbkHYX7bFepw3TlQF0XRHEOBnyYIT9OlVLkVRkv7aEOy5yIzZw5wyyA==}
 
-  dockview@5.2.0:
-    resolution: {integrity: sha512-Eh+SWt+AydcyeVmYkwP+Yxax0XpYSQfXsc4Rad9k+6QEddkSCn4hcjsdxp9lLsw/CaMy39jHawbDVxPMC4kvTg==}
+  dockview@6.0.1:
+    resolution: {integrity: sha512-4PMPq4W+E05VV8I+857m94H1P3I343GeowQIaC8Zk2NhFAEIx5Jxsb0se0ylRd5kASjJf3BcmAqdcF6xlXR0RQ==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
@@ -19213,11 +19213,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  dockview-core@5.2.0: {}
+  dockview-core@6.0.6: {}
 
-  dockview@5.2.0(react@19.2.5):
+  dockview@6.0.1(react@19.2.5):
     dependencies:
-      dockview-core: 5.2.0
+      dockview-core: 6.0.6
       react: 19.2.5
 
   doctrine@3.0.0:
