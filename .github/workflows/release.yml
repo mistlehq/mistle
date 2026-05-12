@@ -6,8 +6,7 @@ on:
       - "v*"
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref_name }}
@@ -17,25 +16,29 @@ jobs:
   validate:
     name: Validate release tag
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       release_version: ${{ steps.release.outputs.version }}
       stable_release: ${{ steps.release.outputs.stable_release }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@739bfe42ca9233c5e6aca07c1a25a9d34aca49b0 # v6
         with:
           run_install: false
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 25
+          package-manager-cache: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -60,6 +63,9 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -81,12 +87,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Log in to GitHub Container Registry
         env:
+          GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
 
       - name: Build service image
         run: |
@@ -121,7 +130,7 @@ jobs:
           EOF
 
       - name: Upload release manifest fragment
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: release-image-${{ matrix.component }}
           path: dist/release-manifest/${{ matrix.component }}.json
@@ -131,6 +140,9 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
     env:
       IMAGE_REPOSITORY: ghcr.io/mistlehq/sandbox-base
       IMAGE_SHA_TAG: ${{ github.sha }}
@@ -138,25 +150,29 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@739bfe42ca9233c5e6aca07c1a25a9d34aca49b0 # v6
         with:
           run_install: false
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 25
+          package-manager-cache: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Log in to GitHub Container Registry
         env:
+          GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
 
       - name: Build sandbox base image
         run: |
@@ -187,7 +203,7 @@ jobs:
           EOF
 
       - name: Upload release manifest fragment
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: release-image-sandbox-base
           path: dist/release-manifest/sandbox-base.json
@@ -197,6 +213,9 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -213,12 +232,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Log in to GitHub Container Registry
         env:
+          GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
 
       - name: Build single-container image
         run: |
@@ -253,7 +275,7 @@ jobs:
           EOF
 
       - name: Upload release manifest fragment
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: release-image-mistle-${{ matrix.profile }}
           path: dist/release-manifest/mistle-${{ matrix.profile }}.json
@@ -268,7 +290,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Build sandboxd release binary
         run: |
@@ -276,10 +300,10 @@ jobs:
             --platform linux/amd64 \
             --target sandboxd-build \
             --file packages/sandboxd/Dockerfile \
-            --tag mistle/sandboxd-artifact-build:${GITHUB_SHA} \
+            --tag "mistle/sandboxd-artifact-build:${GITHUB_SHA}" \
             .
 
-          container_id="$(docker create mistle/sandboxd-artifact-build:${GITHUB_SHA})"
+          container_id="$(docker create "mistle/sandboxd-artifact-build:${GITHUB_SHA}")"
           trap 'docker rm -f "${container_id}" >/dev/null 2>&1 || true' EXIT
 
           mkdir -p dist/sandboxd-artifact-root/bin
@@ -330,7 +354,7 @@ jobs:
           SANDBOXD_TARGET: x86_64-unknown-linux-gnu
 
       - name: Upload sandboxd release assets
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: release-sandboxd-assets
           path: dist/release-assets/*
@@ -343,17 +367,21 @@ jobs:
       - publish-sandbox-base
       - publish-single-container
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Download release manifest fragments
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: dist/release-artifacts
 
       - name: Log in to GitHub Container Registry
         env:
+          GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
 
       - name: Promote release tags
         run: |
@@ -421,34 +449,38 @@ jobs:
       - promote-release-images
       - publish-sandboxd-artifact
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@739bfe42ca9233c5e6aca07c1a25a9d34aca49b0 # v6
         with:
           run_install: false
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 25
+          package-manager-cache: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Download release manifest fragments
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: release-image-*
           path: dist/release-artifacts
 
       - name: Download sandboxd release assets
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: release-sandboxd-assets
           path: dist/release-assets
@@ -456,7 +488,7 @@ jobs:
       - name: Generate stable release notes
         if: needs.validate.outputs.stable_release == 'true'
         id: git-cliff
-        uses: orhun/git-cliff-action@v4
+        uses: orhun/git-cliff-action@f50e11560dce63f7c33227798f90b924471a88b5 # v4
         with:
           version: v2.10.1
           config: cliff.toml

@@ -22,7 +22,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: publish-sandbox-base-${{ github.ref }}
@@ -33,6 +32,9 @@ jobs:
     name: Publish Sandbox Base Image
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
     env:
       IMAGE_REPOSITORY: ghcr.io/mistlehq/sandbox-base
       IMAGE_TAG: ${{ github.sha }}
@@ -41,25 +43,29 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@739bfe42ca9233c5e6aca07c1a25a9d34aca49b0 # v6
         with:
           run_install: false
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 25
+          package-manager-cache: false
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Log in to GitHub Container Registry
         env:
+          GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
 
       - name: Build sandbox base image
         run: |
@@ -116,7 +122,7 @@ jobs:
 
     steps:
       - name: Fetch Infisical secrets
-        uses: Infisical/secrets-action@v1.0.16
+        uses: Infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995 # v1.0.16
         with:
           method: oidc
           identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}

@@ -29,12 +29,14 @@ jobs:
     steps:
       - name: Checkout
         if: github.event_name == 'pull_request'
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Detect PR file changes
         if: github.event_name == 'pull_request'
         id: filter
-        uses: dorny/paths-filter@v4
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4
         with:
           filters: |
             actions:
@@ -62,15 +64,19 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "actions=${{ steps.filter.outputs.actions }}" >> "$GITHUB_OUTPUT"
-            echo "javascript_typescript=${{ steps.filter.outputs.javascript_typescript }}" >> "$GITHUB_OUTPUT"
-            echo "rust=${{ steps.filter.outputs.rust }}" >> "$GITHUB_OUTPUT"
+            {
+              echo "actions=${{ steps.filter.outputs.actions }}"
+              echo "javascript_typescript=${{ steps.filter.outputs.javascript_typescript }}"
+              echo "rust=${{ steps.filter.outputs.rust }}"
+            } >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          echo "actions=true" >> "$GITHUB_OUTPUT"
-          echo "javascript_typescript=true" >> "$GITHUB_OUTPUT"
-          echo "rust=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "actions=true"
+            echo "javascript_typescript=true"
+            echo "rust=true"
+          } >> "$GITHUB_OUTPUT"
 
   analyze-actions:
     name: Analyze (actions)
@@ -85,15 +91,17 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4
         with:
           languages: actions
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4
         with:
           category: "/language:actions"
 
@@ -110,16 +118,18 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4
         with:
           languages: javascript-typescript
           build-mode: none
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4
         with:
           category: "/language:javascript-typescript"
 
@@ -136,15 +146,17 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4
         with:
           languages: rust
           build-mode: none
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@68bde559dea0fdcac2102bfdf6230c5f70eb485e # v4
         with:
           category: "/language:rust"

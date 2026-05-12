@@ -27,6 +27,7 @@ jobs:
       ts_test: ${{ steps.filter.outputs.ts_test }}
       ts_integration: ${{ steps.filter.outputs.ts_integration }}
       ts_component: ${{ steps.filter.outputs.ts_component }}
+      github_actions_security: ${{ steps.filter.outputs.github_actions_security }}
       knip: ${{ steps.filter.outputs.knip }}
       rust_static: ${{ steps.filter.outputs.rust_static }}
       commit_sign: ${{ steps.filter.outputs.commit_sign }}
@@ -37,11 +38,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Detect changed files
         id: filter
-        uses: dorny/paths-filter@v4
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4
         with:
           filters: |
             ts_static:
@@ -113,6 +116,8 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'turbo.json'
               - 'tsconfig.base.json'
+            github_actions_security:
+              - '.github/workflows/**'
             knip:
               - '.envrc'
               - 'apps/**'
@@ -154,6 +159,31 @@ jobs:
             data_plane_migrations:
               - 'packages/db/migrations/data-plane/**'
 
+  github-actions-security:
+    name: GitHub Actions Security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - changes
+    if: needs.changes.outputs.github_actions_security == 'true'
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Run zizmor
+        run: >-
+          docker run --rm
+          --volume "$PWD:/repo"
+          --workdir /repo
+          ghcr.io/zizmorcore/zizmor@sha256:128ebbe369a95f9d4427737e794537256095b55f779a247aebc960dc4ea1f7b3
+          --min-severity medium
+          .
+
   static-ts:
     name: TS Static
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -169,7 +199,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Create Nix directories
         run: |
@@ -177,7 +209,7 @@ jobs:
           sudo chmod -R 777 /nix
 
       - name: Mount Nix sticky disk
-        uses: useblacksmith/stickydisk@v1
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
         with:
           key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
@@ -188,13 +220,13 @@ jobs:
           sudo chown "$USER:$USER" /nix /nix/store
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v31
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
         with:
           install_options: --no-daemon
 
       - name: Restore pnpm store cache
         id: static-ts-pnpm-store-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -203,7 +235,7 @@ jobs:
 
       - name: Restore Turbo local cache
         id: static-ts-turbo-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-static-ts-${{ github.sha }}
@@ -219,7 +251,7 @@ jobs:
 
       - name: Save pnpm store cache
         if: steps.static-ts-pnpm-store-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -239,7 +271,7 @@ jobs:
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.static-ts-turbo-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-static-ts-${{ github.sha }}
@@ -259,7 +291,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Create Nix directories
         run: |
@@ -267,7 +301,7 @@ jobs:
           sudo chmod -R 777 /nix
 
       - name: Mount Nix sticky disk
-        uses: useblacksmith/stickydisk@v1
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
         with:
           key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
@@ -278,13 +312,13 @@ jobs:
           sudo chown "$USER:$USER" /nix /nix/store
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v31
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
         with:
           install_options: --no-daemon
 
       - name: Restore pnpm store cache
         id: build-ts-pnpm-store-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -293,7 +327,7 @@ jobs:
 
       - name: Restore Turbo local cache
         id: build-ts-turbo-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-build-ts-${{ github.sha }}
@@ -309,7 +343,7 @@ jobs:
 
       - name: Save pnpm store cache
         if: steps.build-ts-pnpm-store-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -322,7 +356,7 @@ jobs:
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.build-ts-turbo-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-build-ts-${{ github.sha }}
@@ -342,7 +376,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Create Nix directories
         run: |
@@ -350,7 +386,7 @@ jobs:
           sudo chmod -R 777 /nix
 
       - name: Mount Nix sticky disk
-        uses: useblacksmith/stickydisk@v1
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
         with:
           key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
@@ -361,12 +397,12 @@ jobs:
           sudo chown "$USER:$USER" /nix /nix/store
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v31
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
         with:
           install_options: --no-daemon
 
       - name: Restore Rust cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           shared-key: sandbox-rust
           workspaces: |
@@ -377,7 +413,7 @@ jobs:
 
       - name: Restore pnpm store cache
         id: static-rust-pnpm-store-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -386,7 +422,7 @@ jobs:
 
       - name: Restore Turbo local cache
         id: static-rust-turbo-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-static-rust-${{ github.sha }}
@@ -402,7 +438,7 @@ jobs:
 
       - name: Save pnpm store cache
         if: steps.static-rust-pnpm-store-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -423,7 +459,7 @@ jobs:
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.static-rust-turbo-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-static-rust-${{ github.sha }}
@@ -444,15 +480,17 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v31
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
         with:
           install_options: --no-daemon
 
       - name: Set up Magic Nix Cache
-        uses: DeterminateSystems/magic-nix-cache-action@v13
+        uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
         with:
           use-gha-cache: enabled
           use-flakehub: disabled
@@ -461,7 +499,7 @@ jobs:
 
       - name: Restore pnpm store cache
         id: knip-pnpm-store-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -495,7 +533,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Create Nix directories
         run: |
@@ -503,7 +543,7 @@ jobs:
           sudo chmod -R 777 /nix
 
       - name: Mount Nix sticky disk
-        uses: useblacksmith/stickydisk@v1
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
         with:
           key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
@@ -514,13 +554,13 @@ jobs:
           sudo chown "$USER:$USER" /nix /nix/store
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v31
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
         with:
           install_options: --no-daemon
 
       - name: Restore pnpm store cache
         id: test-ts-pnpm-store-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -529,7 +569,7 @@ jobs:
 
       - name: Restore Turbo local cache
         id: test-ts-turbo-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-${{ github.sha }}
@@ -545,7 +585,7 @@ jobs:
 
       - name: Save pnpm store cache
         if: steps.test-ts-pnpm-store-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -560,7 +600,7 @@ jobs:
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.test-ts-turbo-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-${{ github.sha }}
@@ -580,7 +620,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Create Nix directories
         run: |
@@ -588,7 +630,7 @@ jobs:
           sudo chmod -R 777 /nix
 
       - name: Mount Nix sticky disk
-        uses: useblacksmith/stickydisk@v1
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
         with:
           key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
@@ -599,13 +641,13 @@ jobs:
           sudo chown "$USER:$USER" /nix /nix/store
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v31
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
         with:
           install_options: --no-daemon
 
       - name: Restore pnpm store cache
         id: test-ts-component-pnpm-store-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -614,7 +656,7 @@ jobs:
 
       - name: Restore Turbo local cache
         id: test-ts-component-turbo-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-component-${{ github.sha }}
@@ -630,7 +672,7 @@ jobs:
 
       - name: Save pnpm store cache
         if: steps.test-ts-component-pnpm-store-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -643,7 +685,7 @@ jobs:
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.test-ts-component-turbo-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-component-${{ github.sha }}
@@ -663,7 +705,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Create Nix directories
         run: |
@@ -671,7 +715,7 @@ jobs:
           sudo chmod -R 777 /nix
 
       - name: Mount Nix sticky disk
-        uses: useblacksmith/stickydisk@v1
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
         with:
           key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
@@ -682,13 +726,13 @@ jobs:
           sudo chown "$USER:$USER" /nix /nix/store
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v31
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
         with:
           install_options: --no-daemon
 
       - name: Restore pnpm store cache
         id: test-ts-integration-pnpm-store-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -697,7 +741,7 @@ jobs:
 
       - name: Restore Turbo local cache
         id: test-ts-integration-turbo-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-integration-${{ github.sha }}
@@ -713,7 +757,7 @@ jobs:
 
       - name: Save pnpm store cache
         if: steps.test-ts-integration-pnpm-store-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -726,7 +770,7 @@ jobs:
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.test-ts-integration-turbo-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-integration-${{ github.sha }}
@@ -758,16 +802,18 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v31
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
         with:
           install_options: --no-daemon
 
       - name: Restore pnpm store cache
         id: control-plane-migration-smoke-pnpm-store-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -782,7 +828,7 @@ jobs:
 
       - name: Save pnpm store cache
         if: steps.control-plane-migration-smoke-pnpm-store-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -829,16 +875,18 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v31
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
         with:
           install_options: --no-daemon
 
       - name: Restore pnpm store cache
         id: data-plane-migration-smoke-pnpm-store-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -853,7 +901,7 @@ jobs:
 
       - name: Save pnpm store cache
         if: steps.data-plane-migration-smoke-pnpm-store-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -885,7 +933,9 @@ jobs:
       CI: true
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Create Nix directories
         run: |
@@ -893,7 +943,7 @@ jobs:
           sudo chmod -R 777 /nix
 
       - name: Mount Nix sticky disk
-        uses: useblacksmith/stickydisk@v1
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
         with:
           key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
@@ -904,13 +954,13 @@ jobs:
           sudo chown "$USER:$USER" /nix /nix/store
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v31
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
         with:
           install_options: --no-daemon
 
       - name: Restore commit-sign container cargo cache
         id: test-commit-sign-container-cargo-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .local/commit-sign-test/cargo-home
           key: ${{ runner.os }}-commit-sign-test-cargo-home-${{ hashFiles('packages/commit-sign/Cargo.lock') }}
@@ -919,7 +969,7 @@ jobs:
 
       - name: Restore commit-sign container target cache
         id: test-commit-sign-container-target-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .local/commit-sign-test/target-alpine-container
           key: ${{ runner.os }}-commit-sign-test-target-alpine-${{ hashFiles('packages/commit-sign/Cargo.lock') }}-${{ github.sha }}
@@ -929,7 +979,7 @@ jobs:
 
       - name: Restore pnpm store cache
         id: test-commit-sign-pnpm-store-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -944,13 +994,13 @@ jobs:
 
       - name: Save pnpm store cache
         if: steps.test-commit-sign-pnpm-store-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Setup Blacksmith Docker builder
-        uses: useblacksmith/setup-docker-builder@v1
+        uses: useblacksmith/setup-docker-builder@722e97d12b1d06a961800dd6c05d79d951ad3c80 # v1
         with:
           max-cache-size-mb: "10240"
 
@@ -971,14 +1021,14 @@ jobs:
 
       - name: Save commit-sign container cargo cache
         if: steps.test-commit-sign-container-cargo-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .local/commit-sign-test/cargo-home
           key: ${{ runner.os }}-commit-sign-test-cargo-home-${{ hashFiles('packages/commit-sign/Cargo.lock') }}
 
       - name: Save commit-sign container target cache
         if: ${{ always() && !cancelled() && steps.test-commit-sign-container-target-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .local/commit-sign-test/target-alpine-container
           key: ${{ runner.os }}-commit-sign-test-target-alpine-${{ hashFiles('packages/commit-sign/Cargo.lock') }}-${{ github.sha }}
@@ -996,7 +1046,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Create Nix directories
         run: |
@@ -1004,7 +1056,7 @@ jobs:
           sudo chmod -R 777 /nix
 
       - name: Mount Nix sticky disk
-        uses: useblacksmith/stickydisk@v1
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
         with:
           key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
@@ -1015,13 +1067,13 @@ jobs:
           sudo chown "$USER:$USER" /nix /nix/store
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v31
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
         with:
           install_options: --no-daemon
 
       - name: Restore sandboxd container cargo cache
         id: test-sandboxd-container-cargo-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .local/sandboxd-test/cargo-home
           key: ${{ runner.os }}-sandboxd-test-cargo-home-${{ hashFiles('packages/sandboxd/Cargo.lock') }}
@@ -1030,7 +1082,7 @@ jobs:
 
       - name: Restore sandboxd container target cache
         id: test-sandboxd-container-target-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .local/sandboxd-test/target-debian-container
           key: ${{ runner.os }}-sandboxd-test-target-debian-${{ hashFiles('packages/sandboxd/Cargo.lock') }}-${{ github.sha }}
@@ -1040,7 +1092,7 @@ jobs:
 
       - name: Restore pnpm store cache
         id: test-sandboxd-pnpm-store-cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -1055,7 +1107,7 @@ jobs:
 
       - name: Save pnpm store cache
         if: steps.test-sandboxd-pnpm-store-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
@@ -1064,7 +1116,7 @@ jobs:
         run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
 
       - name: Setup Blacksmith Docker builder
-        uses: useblacksmith/setup-docker-builder@v1
+        uses: useblacksmith/setup-docker-builder@722e97d12b1d06a961800dd6c05d79d951ad3c80 # v1
         with:
           max-cache-size-mb: "20480"
 
@@ -1091,14 +1143,14 @@ jobs:
 
       - name: Save sandboxd container cargo cache
         if: steps.test-sandboxd-container-cargo-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .local/sandboxd-test/cargo-home
           key: ${{ runner.os }}-sandboxd-test-cargo-home-${{ hashFiles('packages/sandboxd/Cargo.lock') }}
 
       - name: Save sandboxd container target cache
         if: ${{ always() && !cancelled() && steps.test-sandboxd-container-target-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: .local/sandboxd-test/target-debian-container
           key: ${{ runner.os }}-sandboxd-test-target-debian-${{ hashFiles('packages/sandboxd/Cargo.lock') }}-${{ github.sha }}
@@ -1113,10 +1165,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
 
       - name: Setup Blacksmith Docker builder
-        uses: useblacksmith/setup-docker-builder@v1
+        uses: useblacksmith/setup-docker-builder@722e97d12b1d06a961800dd6c05d79d951ad3c80 # v1
         with:
           max-cache-size-mb: "20480"
 
@@ -1144,6 +1198,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - changes
+      - github-actions-security
       - static-ts
       - static-rust
       - test-ts
@@ -1162,6 +1217,7 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ github.token }}
       CHANGES_RESULT: ${{ needs.changes.result }}
+      GITHUB_ACTIONS_SECURITY_RESULT: ${{ needs.github-actions-security.result }}
       TS_STATIC_RESULT: ${{ needs.static-ts.result }}
       RUST_STATIC_RESULT: ${{ needs.static-rust.result }}
       TS_TEST_RESULT: ${{ needs.test-ts.result }}
@@ -1177,7 +1233,7 @@ jobs:
 
     steps:
       - name: Fetch Infisical secrets
-        uses: Infisical/secrets-action@v1.0.16
+        uses: Infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995 # v1.0.16
         with:
           method: oidc
           identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
@@ -1195,6 +1251,7 @@ jobs:
 
           changes_result = os.environ["CHANGES_RESULT"]
           lane_results = [
+              os.environ["GITHUB_ACTIONS_SECURITY_RESULT"],
               os.environ["TS_STATIC_RESULT"],
               os.environ["RUST_STATIC_RESULT"],
               os.environ["TS_TEST_RESULT"],
