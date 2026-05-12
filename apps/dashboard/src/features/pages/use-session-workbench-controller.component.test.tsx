@@ -716,6 +716,7 @@ describe("useSessionWorkbenchController", () => {
         providerThreadId: "thread_123",
         sandboxInstanceId: "sbi_123",
         runtimeContext: {
+          agentRuntimeId: "codex",
           launchCwd: null,
           primaryRepositoryRoot: null,
         },

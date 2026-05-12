@@ -1,5 +1,7 @@
 import type { CompiledRuntimePlan } from "@mistle/integrations-core";
 
+export type SandboxInstanceAgentRuntimeId = "codex" | "opencode";
+
 function normalizePath(path: string): string {
   return path.replace(/\/+$/, "");
 }
@@ -44,7 +46,21 @@ function resolveRepositoryRoot(input: {
   return null;
 }
 
+function resolveAgentRuntimeId(
+  runtimePlan: CompiledRuntimePlan,
+): SandboxInstanceAgentRuntimeId | null {
+  const agentRuntime = runtimePlan.agentRuntimes[0];
+  if (agentRuntime === undefined) {
+    return null;
+  }
+  if (agentRuntime.runtimeId !== "codex" && agentRuntime.runtimeId !== "opencode") {
+    throw new Error(`Unsupported sandbox instance agent runtime '${agentRuntime.runtimeId}'.`);
+  }
+  return agentRuntime.runtimeId;
+}
+
 export type SandboxInstanceRuntimeContext = {
+  agentRuntimeId: SandboxInstanceAgentRuntimeId | null;
   launchCwd: string | null;
   primaryRepositoryRoot: string | null;
 };
@@ -59,12 +75,14 @@ export function resolveSandboxInstanceRuntimeContext(input: {
   const launchCwd = resolveLaunchCwd(input.runtimePlan);
   if (launchCwd === null) {
     return {
+      agentRuntimeId: resolveAgentRuntimeId(input.runtimePlan),
       launchCwd: null,
       primaryRepositoryRoot: null,
     };
   }
 
   return {
+    agentRuntimeId: resolveAgentRuntimeId(input.runtimePlan),
     launchCwd,
     primaryRepositoryRoot: resolveRepositoryRoot({
       launchCwd,

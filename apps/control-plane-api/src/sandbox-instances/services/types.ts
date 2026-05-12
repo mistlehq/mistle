@@ -5,6 +5,8 @@ import type {
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { PortAccessBootstrapTokenConfig } from "@mistle/port-access-auth";
 
+import type { SandboxInstanceAgentRuntimeId } from "./runtime-context.js";
+
 export type MintSandboxInstanceConnectionTokenInput = {
   organizationId: string;
   instanceId: string;
@@ -46,6 +48,7 @@ export type SandboxInstanceAutomationConversation = {
 };
 
 export type SandboxInstanceRuntimeContext = {
+  agentRuntimeId: SandboxInstanceAgentRuntimeId | null;
   launchCwd: string | null;
   primaryRepositoryRoot: string | null;
 };
