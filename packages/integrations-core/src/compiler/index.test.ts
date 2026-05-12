@@ -355,22 +355,6 @@ function createOpenAiDefinition(): IntegrationDefinition<
     bindingConfigSchema: AgentBindingConfigSchema,
     allowedRuntimeIds: ["codex"],
     connectionMethods: ApiKeyConnectionMethods,
-    capabilities: {
-      resolveCapabilities: (input) => ({
-        agentProviderAccess: {
-          providerFamilyId: input.target.familyId,
-          providerVariantId: input.target.variantId,
-          apiBaseUrl: input.target.config.apiBaseUrl,
-          authScheme: "bearer",
-          credentialResolver: {
-            connectionId: input.connection.id,
-            secretType: "api_key",
-          },
-          allowedMethods: ["POST"],
-          allowedPathPrefixes: ["/v1"],
-        },
-      }),
-    },
     compileBinding: (input) => ({
       egressRoutes: [
         {
@@ -415,22 +399,6 @@ function createJsonAgentDefinition(): IntegrationDefinition<
     bindingConfigSchema: AgentBindingConfigSchema,
     allowedRuntimeIds: ["claude-code"],
     connectionMethods: ApiKeyConnectionMethods,
-    capabilities: {
-      resolveCapabilities: (input) => ({
-        agentProviderAccess: {
-          providerFamilyId: input.target.familyId,
-          providerVariantId: input.target.variantId,
-          apiBaseUrl: input.target.config.apiBaseUrl,
-          authScheme: "bearer",
-          credentialResolver: {
-            connectionId: input.connection.id,
-            secretType: "api_key",
-          },
-          allowedMethods: ["POST"],
-          allowedPathPrefixes: ["/v1/messages"],
-        },
-      }),
-    },
     compileBinding: () => ({
       egressRoutes: [],
       artifacts: [],

@@ -1,7 +1,6 @@
 import {
   IntegrationConnectionMethodIds,
   IntegrationKinds,
-  type AgentProviderAccess,
   type CompileBindingInput,
   type CompileBindingResult,
   type IntegrationDefinition,
@@ -32,8 +31,6 @@ import {
 import { OpenAiConnectionMethodIds } from "./model-capabilities.js";
 import {
   OpenAiApiKeyTargetConfigSchema,
-  resolveOpenAiChatGptBaseUrlForConnectionMethod,
-  resolveOpenAiResponsesApiBaseUrlForConnectionMethod,
   resolveOpenAiRouteBaseUrlForConnectionMethod,
   type OpenAiApiKeyTargetConfig,
 } from "./target-config-schema.js";
@@ -48,18 +45,29 @@ type OpenAiApiKeyIntegrationDefinition = IntegrationDefinition<
 
 const OpenAiApiKeyTargetSecretSchema = z.object({}).strict();
 
-function resolveOpenAiAgentProviderAccess(
+type OpenAiProviderRouteConfig = {
+  apiBaseUrl: string;
+  authScheme: "bearer";
+  credentialResolver: {
+    connectionId: string;
+    secretType: "api_key" | "oauth2_access_token";
+    slotKey?: string;
+  };
+  additionalHeaders?: Record<string, string>;
+  allowedMethods: ReadonlyArray<"GET" | "POST">;
+  allowedPathPrefixes: ReadonlyArray<string>;
+};
+
+function resolveOpenAiProviderRouteConfig(
   input: CompileBindingInput<
     OpenAiApiKeyTargetConfig,
     OpenAiApiKeyBindingConfig,
     z.output<typeof OpenAiApiKeyTargetSecretSchema>
   >,
-): AgentProviderAccess {
+): OpenAiProviderRouteConfig {
   const connectionConfig = OpenAiConnectionConfigSchema.parse(input.connection.config);
 
   return {
-    providerFamilyId: input.target.familyId,
-    providerVariantId: input.target.variantId,
     apiBaseUrl: resolveOpenAiRouteBaseUrlForConnectionMethod({
       targetConfig: input.target.config,
       connectionMethod: connectionConfig.connection_method,
@@ -87,21 +95,6 @@ function resolveOpenAiAgentProviderAccess(
       connectionConfig.connection_method === OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE
         ? ["/"]
         : ["/"],
-    providerMetadata: {
-      responsesApiBaseUrl: resolveOpenAiResponsesApiBaseUrlForConnectionMethod({
-        targetConfig: input.target.config,
-        connectionMethod: connectionConfig.connection_method,
-      }),
-      ...(resolveOpenAiChatGptBaseUrlForConnectionMethod({
-        connectionMethod: connectionConfig.connection_method,
-      }) === undefined
-        ? {}
-        : {
-            chatgptBaseUrl: resolveOpenAiChatGptBaseUrlForConnectionMethod({
-              connectionMethod: connectionConfig.connection_method,
-            }),
-          }),
-    },
   };
 }
 
@@ -112,34 +105,34 @@ function compileOpenAiBinding(
     z.output<typeof OpenAiApiKeyTargetSecretSchema>
   >,
 ): CompileBindingResult {
-  const providerAccess = resolveOpenAiAgentProviderAccess(input);
-  const routeHost = new URL(providerAccess.apiBaseUrl).host;
+  const routeConfig = resolveOpenAiProviderRouteConfig(input);
+  const routeHost = new URL(routeConfig.apiBaseUrl).host;
 
   return {
     egressRoutes: [
       {
         match: {
           hosts: [routeHost],
-          pathPrefixes: [...providerAccess.allowedPathPrefixes],
-          methods: [...providerAccess.allowedMethods],
+          pathPrefixes: [...routeConfig.allowedPathPrefixes],
+          methods: [...routeConfig.allowedMethods],
         },
         upstream: {
-          baseUrl: providerAccess.apiBaseUrl,
+          baseUrl: routeConfig.apiBaseUrl,
         },
         authInjection: {
-          type: providerAccess.authScheme,
+          type: routeConfig.authScheme,
           target: "authorization",
         },
-        ...(providerAccess.additionalHeaders === undefined
+        ...(routeConfig.additionalHeaders === undefined
           ? {}
-          : { additionalHeaders: providerAccess.additionalHeaders }),
+          : { additionalHeaders: routeConfig.additionalHeaders }),
         credentialResolver: {
           kind: "integration_connection",
-          connectionId: providerAccess.credentialResolver.connectionId,
-          secretType: providerAccess.credentialResolver.secretType,
-          ...(providerAccess.credentialResolver.slotKey === undefined
+          connectionId: routeConfig.credentialResolver.connectionId,
+          secretType: routeConfig.credentialResolver.secretType,
+          ...(routeConfig.credentialResolver.slotKey === undefined
             ? {}
-            : { slotKey: providerAccess.credentialResolver.slotKey }),
+            : { slotKey: routeConfig.credentialResolver.slotKey }),
         },
       },
     ],
@@ -196,12 +189,5 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
   validateBindingWriteContext: validateOpenAiBindingWriteContext,
   deviceAuthorization: OpenAiDeviceAuthorizationCapability,
   oauth2AuthorizationCode: OpenAiDeviceAuthorizationOAuth2Capability,
-  capabilities: {
-    resolveCapabilities: (input) => {
-      return {
-        agentProviderAccess: resolveOpenAiAgentProviderAccess(input),
-      };
-    },
-  },
   compileBinding: compileOpenAiBinding,
 };
