@@ -104,6 +104,14 @@ describe("ChatComposer", () => {
     );
   });
 
+  it("hides model and reasoning controls when the composer does not own runtime config", () => {
+    render(<ChatComposer {...createBaseComposerProps()} showConfigControls={false} />);
+
+    expect(screen.queryByRole("combobox", { name: "Model switcher" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Reasoning switcher" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
+  });
+
   it("renders the file attachment button with icon-only visible copy", () => {
     const { container } = render(<ChatComposer {...createBaseComposerProps()} />);
 

@@ -17,8 +17,13 @@ export type ComposerStatusMessage = {
 export function resolveComposerBootstrapMessage(input: {
   activeComposerModel: CodexModelSummary | null;
   bootstrapState: SessionBootstrapPhase;
+  requiresModelSelection?: boolean | undefined;
   selectedModel: string | null;
 }): string | null {
+  if (input.requiresModelSelection === false) {
+    return null;
+  }
+
   if (input.bootstrapState.status === "failed") {
     return input.bootstrapState.message;
   }
@@ -43,6 +48,7 @@ export function resolveComposerStatusMessage(input: {
   completedTurnErrorMessage: string | null;
   hasPendingImageAttachments: boolean;
   isUploadingAttachments: boolean;
+  requiresModelSelection?: boolean | undefined;
   sessionErrorMessage: string | null;
   selectedModel: string | null;
 }): ComposerStatusMessage | null {
@@ -78,6 +84,7 @@ export function resolveComposerStatusMessage(input: {
   const bootstrapMessage = resolveComposerBootstrapMessage({
     activeComposerModel: input.activeComposerModel,
     bootstrapState: input.bootstrapState,
+    requiresModelSelection: input.requiresModelSelection,
     selectedModel: input.selectedModel,
   });
   if (bootstrapMessage !== null) {

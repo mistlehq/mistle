@@ -86,6 +86,7 @@ export type SessionComposerStateInput = {
   };
   contextUsage: CodexContextUsageViewModel | null;
   collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
+  requiresModelSelection?: boolean;
   sessionErrorMessage: string | null;
   turnControl: SessionTurnControl;
 };
@@ -110,6 +111,7 @@ export function useSessionComposerState(input: {
 }): SessionComposerUiState {
   const { composerStateInput, draftState } = input;
   const { clearSessionErrorMessage, sessionErrorMessage } = composerStateInput;
+  const requiresModelSelection = composerStateInput.requiresModelSelection !== false;
   const composerText = draftState.composerText;
   const [composerErrorMessage, setComposerErrorMessage] = useState<string | null>(null);
   const [pendingComposerAttachments, setPendingComposerAttachments] = useState<
@@ -161,6 +163,7 @@ export function useSessionComposerState(input: {
       attachment.file.type.startsWith("image/"),
     ),
     isUploadingAttachments: composerStateInput.attachmentControl.isUploadingAttachments,
+    requiresModelSelection,
     sessionErrorMessage,
     selectedModel: composerStateInput.configControl.selectedModel,
   });
@@ -312,7 +315,7 @@ export function useSessionComposerState(input: {
         return;
       }
 
-      if (activeComposerModel === null) {
+      if (requiresModelSelection && activeComposerModel === null) {
         const missingModelMessage =
           composerStateInput.configControl.selectedModel === null
             ? buildModelSelectionRequiredMessage()
@@ -336,7 +339,8 @@ export function useSessionComposerState(input: {
         preparedAttachments = await composerStateInput.attachmentControl.prepareAttachments({
           files: queuedPrompt.attachments.map((attachment) => attachment.file),
           prompt: submittedPrompt,
-          supportsImageInspection: supportsImageInspection(activeComposerModel),
+          supportsImageInspection:
+            activeComposerModel !== null && supportsImageInspection(activeComposerModel),
         });
       } catch (error) {
         setComposerErrorMessage(
@@ -396,6 +400,7 @@ export function useSessionComposerState(input: {
       composerStateInput.bootstrap.phase,
       composerStateInput.configControl.selectedModel,
       composerStateInput.turnControl,
+      requiresModelSelection,
       turnCollaborationModeSettings,
     ],
   );
@@ -417,7 +422,7 @@ export function useSessionComposerState(input: {
         return;
       }
 
-      if (activeComposerModel === null) {
+      if (requiresModelSelection && activeComposerModel === null) {
         const missingModelMessage =
           composerStateInput.configControl.selectedModel === null
             ? buildModelSelectionRequiredMessage()
@@ -436,7 +441,8 @@ export function useSessionComposerState(input: {
         preparedAttachments = await composerStateInput.attachmentControl.prepareAttachments({
           files: pendingComposerAttachments.map((attachment) => attachment.file),
           prompt: submittedPrompt,
-          supportsImageInspection: supportsImageInspection(activeComposerModel),
+          supportsImageInspection:
+            activeComposerModel !== null && supportsImageInspection(activeComposerModel),
         });
       } catch (error) {
         setComposerErrorMessage(
@@ -485,6 +491,7 @@ export function useSessionComposerState(input: {
     composerStateInput.turnControl,
     draftState,
     pendingComposerAttachments,
+    requiresModelSelection,
     submitAction,
     turnCollaborationModeSettings,
   ]);
@@ -524,7 +531,7 @@ export function useSessionComposerState(input: {
       return (
         !composerStateInput.turnControl.canSteer ||
         composerStateInput.bootstrap.phase.status !== "ready" ||
-        activeComposerModel === null
+        (requiresModelSelection && activeComposerModel === null)
       );
     }
 
@@ -534,7 +541,7 @@ export function useSessionComposerState(input: {
       (composerText.trim().length === 0 &&
         pendingComposerAttachments.length === 0 &&
         draftState.pendingDiffComments.length === 0) ||
-      activeComposerModel === null
+      (requiresModelSelection && activeComposerModel === null)
     );
   }, [
     activeComposerModel,
@@ -546,6 +553,7 @@ export function useSessionComposerState(input: {
     composerStateInput.turnControl.isStarting,
     draftState.pendingDiffComments.length,
     pendingComposerAttachments.length,
+    requiresModelSelection,
     submitAction.submitMode,
   ]);
 
@@ -554,7 +562,7 @@ export function useSessionComposerState(input: {
       composerStateInput.turnControl.activeTurnState !== "running" ||
       composerStateInput.attachmentControl.isUploadingAttachments ||
       composerStateInput.bootstrap.phase.status !== "ready" ||
-      activeComposerModel === null ||
+      (requiresModelSelection && activeComposerModel === null) ||
       (composerText.trim().length === 0 &&
         pendingComposerAttachments.length === 0 &&
         draftState.pendingDiffComments.length === 0),
@@ -566,6 +574,7 @@ export function useSessionComposerState(input: {
       composerStateInput.turnControl.activeTurnState,
       draftState.pendingDiffComments.length,
       pendingComposerAttachments.length,
+      requiresModelSelection,
     ],
   );
 
@@ -662,6 +671,7 @@ export function useSessionComposerState(input: {
         composerStateInput.bootstrap.phase.status !== "ready" ||
         composerStateInput.configControl.isUpdating ||
         composerStateInput.attachmentControl.isUploadingAttachments,
+      showConfigControls: requiresModelSelection,
       onComposerTextChange: handleComposerTextChange,
       onSubmit: submitComposer,
       onSecondarySubmit: queuePrompt,

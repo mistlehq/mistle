@@ -59,6 +59,22 @@ describe("session-composer-status", () => {
     ).toBeNull();
   });
 
+  it("does not require a Codex model when the active runtime owns model selection elsewhere", () => {
+    expect(
+      resolveComposerStatusMessage({
+        activeComposerModel: null,
+        bootstrapState: { status: "ready" },
+        composerErrorMessage: null,
+        completedTurnErrorMessage: null,
+        hasPendingImageAttachments: false,
+        isUploadingAttachments: false,
+        requiresModelSelection: false,
+        sessionErrorMessage: null,
+        selectedModel: null,
+      }),
+    ).toBeNull();
+  });
+
   it("shows a completed turn error as an alert notice", () => {
     expect(
       resolveComposerStatusMessage({
