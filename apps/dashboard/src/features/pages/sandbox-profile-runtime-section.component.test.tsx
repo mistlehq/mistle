@@ -120,7 +120,7 @@ describe("SandboxProfileRuntimeSection", () => {
     );
 
     expect(screen.getByText("Sandbox Runtime")).toBeTruthy();
-    expect(screen.getByRole("combobox", { name: "Agent Runtime" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Agent" })).toBeTruthy();
     expect(screen.getByText("Codex")).toBeTruthy();
     expect(screen.getByRole("combobox", { name: "Provider" })).toBeTruthy();
     expect(screen.getByText("E2B")).toBeTruthy();
@@ -148,7 +148,7 @@ describe("SandboxProfileRuntimeSection", () => {
       />,
     );
 
-    expect(screen.getByRole("combobox", { name: "Agent Runtime" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Agent" })).toBeTruthy();
     expect(screen.getByText("OpenCode")).toBeTruthy();
   });
 

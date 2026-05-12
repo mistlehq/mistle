@@ -1774,15 +1774,10 @@ fn validate_repeated_header_values(
     headers: &RepeatedHeaderValues,
     field_name: &str,
 ) -> Result<(), TunnelProtocolError> {
-    for (header_name, values) in headers {
+    for header_name in headers.keys() {
         if header_name.trim().is_empty() {
             return Err(TunnelProtocolError::new(format!(
                 "{field_name} header names must be non-empty",
-            )));
-        }
-        if values.iter().any(|value| value.trim().is_empty()) {
-            return Err(TunnelProtocolError::new(format!(
-                "{field_name} header values must be non-empty",
             )));
         }
     }
@@ -2700,6 +2695,15 @@ mod tests {
         .expect("egress.http.response.start should parse");
         assert!(matches!(
             response_start,
+            Some(crate::tunnel::protocol::EgressTransportMessage::HttpResponseStart(_))
+        ));
+
+        let response_start_with_empty_header = parse_egress_transport_message(
+            r#"{"type":"egress.http.response.start","streamId":71,"status":200,"headers":{"content-type":["application/json"],"x-empty":[""]}}"#,
+        )
+        .expect("egress.http.response.start with empty header value should parse");
+        assert!(matches!(
+            response_start_with_empty_header,
             Some(crate::tunnel::protocol::EgressTransportMessage::HttpResponseStart(_))
         ));
 

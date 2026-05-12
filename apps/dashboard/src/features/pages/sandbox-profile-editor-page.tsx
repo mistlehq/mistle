@@ -2048,17 +2048,15 @@ function SandboxProfileEditorSectionPanels(input: {
         profileId={input.profileId}
         runtimeSettings={
           input.currentVersion === null ? null : (
-            <SandboxProfileSectionCard>
-              <LoadedSandboxProfileRuntimeSection
-                availableConnections={input.integrationsLoader.availableConnections}
-                availableTargets={input.integrationsLoader.availableTargets}
-                disabled={input.draftFieldsAreReadOnly}
-                isDraft={input.mode.kind === "draft"}
-                onDraftStateChange={input.onRuntimeDraftStateChange}
-                sectionChrome={false}
-                version={input.currentVersion}
-              />
-            </SandboxProfileSectionCard>
+            <LoadedSandboxProfileRuntimeSection
+              availableConnections={input.integrationsLoader.availableConnections}
+              availableTargets={input.integrationsLoader.availableTargets}
+              disabled={input.draftFieldsAreReadOnly}
+              isDraft={input.mode.kind === "draft"}
+              onDraftStateChange={input.onRuntimeDraftStateChange}
+              sectionChrome={false}
+              version={input.currentVersion}
+            />
           )
         }
         disabled={input.draftFieldsAreReadOnly}

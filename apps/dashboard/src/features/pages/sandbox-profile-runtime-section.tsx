@@ -28,6 +28,7 @@ import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
 } from "./sandbox-profile-binding-config-editor.js";
+import { SandboxProfileSectionCard } from "./sandbox-profile-section-card.js";
 
 const Definitions = createBrowserDefinitionsBundle();
 const IntegrationRegistry = Definitions.integrationRegistry;
@@ -268,7 +269,7 @@ export function SandboxProfileRuntimeSection(input: {
       orientation={input.sectionChrome === false ? "horizontal" : "vertical"}
     >
       <FieldHeader>
-        <FieldLabel htmlFor="sandbox-profile-agent-runtime">Agent Runtime</FieldLabel>
+        <FieldLabel htmlFor="sandbox-profile-agent-runtime">Agent</FieldLabel>
       </FieldHeader>
       <FieldContent>
         <Select onValueChange={updateAgentRuntime} value={draftRuntime.agentRuntimeId}>
@@ -288,6 +289,11 @@ export function SandboxProfileRuntimeSection(input: {
         </Select>
       </FieldContent>
     </Field>
+  );
+  const agentRuntimeContent = fieldIsReadOnly ? (
+    <SandboxProfileAgentRuntimeReadOnlySummary runtimeId={draftRuntime.agentRuntimeId} />
+  ) : (
+    agentRuntimeField
   );
   const providerField = (
     <Field
@@ -336,7 +342,6 @@ export function SandboxProfileRuntimeSection(input: {
     />
   ) : (
     <div className="grid gap-4">
-      {agentRuntimeField}
       {input.sectionChrome === false ? (
         providerField
       ) : (
@@ -384,7 +389,8 @@ export function SandboxProfileRuntimeSection(input: {
     return (
       <div className="grid gap-3">
         {saveErrorMessage === null ? null : <Notice variant="alert">{saveErrorMessage}</Notice>}
-        {runtimeFields}
+        <SandboxProfileSectionCard>{agentRuntimeContent}</SandboxProfileSectionCard>
+        <SandboxProfileSectionCard>{runtimeFields}</SandboxProfileSectionCard>
       </div>
     );
   }
@@ -392,6 +398,7 @@ export function SandboxProfileRuntimeSection(input: {
   return (
     <div className="space-y-2">
       {saveErrorMessage === null ? null : <Notice variant="alert">{saveErrorMessage}</Notice>}
+      <SectionBlock title="Agent">{agentRuntimeContent}</SectionBlock>
       <SectionBlock title="Sandbox Runtime">{runtimeFields}</SectionBlock>
     </div>
   );
@@ -651,9 +658,6 @@ function SandboxProfileRuntimeReadOnlySummary(input: {
   const shouldShowCredentials = input.runtime.sandboxConnectionId !== null;
   return (
     <div className="grid gap-4 text-sm md:grid-cols-4">
-      <ReadOnlyRuntimeItem label="Agent Runtime">
-        <AgentRuntimeOptionLabel runtimeId={input.runtime.agentRuntimeId} />
-      </ReadOnlyRuntimeItem>
       <ReadOnlyRuntimeItem label="Provider">
         {input.provider === null ? (
           input.runtime.sandboxProvider
@@ -668,6 +672,18 @@ function SandboxProfileRuntimeReadOnlySummary(input: {
       ) : null}
       <ReadOnlyRuntimeItem label="Resources">
         {formatResources(input.runtime.sandboxResources)}
+      </ReadOnlyRuntimeItem>
+    </div>
+  );
+}
+
+function SandboxProfileAgentRuntimeReadOnlySummary(input: {
+  runtimeId: AgentRuntimeId;
+}): React.JSX.Element {
+  return (
+    <div className="text-sm">
+      <ReadOnlyRuntimeItem label="Agent">
+        <AgentRuntimeOptionLabel runtimeId={input.runtimeId} />
       </ReadOnlyRuntimeItem>
     </div>
   );
