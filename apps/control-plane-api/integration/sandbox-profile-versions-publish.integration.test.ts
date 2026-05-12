@@ -252,7 +252,7 @@ describe.concurrent("sandbox profile versions publish integration", () => {
     expect(responseBody.code).toBe("PROFILE_VERSION_NOT_DRAFT");
   });
 
-  it("returns 409 when the draft is not publishable", async ({ env }) => {
+  it("returns 409 when the draft has invalid runtime configuration", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-version-publish-not-publishable@example.com",
     });
@@ -271,7 +271,7 @@ describe.concurrent("sandbox profile versions publish integration", () => {
         sandboxProfileId: "sbp_version_publish_not_publishable_001",
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
-        sandboxProvider: SandboxProvider.DOCKER,
+        sandboxProvider: "unknown-provider",
       }),
     );
 

@@ -3,8 +3,7 @@
  */
 
 import {
-  IntegrationBindingKinds,
-  IntegrationConnectionStatuses,
+  SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import { SandboxProvider } from "@mistle/sandbox";
@@ -15,13 +14,7 @@ import {
   GetSandboxProfileVersionPublishabilityNotFoundResponseSchema,
   GetSandboxProfileVersionPublishabilityResponseSchema,
 } from "../src/sandbox-profiles/index.js";
-import {
-  integrationConnectionRow,
-  integrationTargetRow,
-  sandboxProfileRow,
-  sandboxProfileVersionIntegrationBindingRow,
-  sandboxProfileVersionRow,
-} from "./helpers/sandbox-profiles.js";
+import { sandboxProfileRow, sandboxProfileVersionRow } from "./helpers/sandbox-profiles.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api"],
@@ -36,7 +29,9 @@ const itManagedE2BDeployment = createIntegrationTest({
 });
 
 describe.concurrent("sandbox profile version publishability get integration", () => {
-  it("returns agent binding required when the draft has no agent bindings", async ({ env }) => {
+  it("returns publishable true when the draft has an agent runtime and no agent bindings", async ({
+    env,
+  }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-version-publishability-no-agent@example.com",
     });
@@ -55,6 +50,7 @@ describe.concurrent("sandbox profile version publishability get integration", ()
         sandboxProfileId: "sbp_publishability_001",
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
+        agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.CODEX,
         sandboxProvider: SandboxProvider.DOCKER,
       }),
     );
@@ -73,14 +69,8 @@ describe.concurrent("sandbox profile version publishability get integration", ()
       await response.json(),
     );
     expect(responseBody).toEqual({
-      publishable: false,
-      issues: [
-        {
-          code: "AGENT_BINDING_REQUIRED",
-          message:
-            "Sandbox profile version must declare at least one agent binding before it can be published.",
-        },
-      ],
+      publishable: true,
+      issues: [],
     });
   });
 
@@ -88,23 +78,6 @@ describe.concurrent("sandbox profile version publishability get integration", ()
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-version-publishability-runtime@example.com",
     });
-
-    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
-      integrationTargetRow({
-        targetKey: "openai-publishability-runtime",
-        variantId: "openai-default",
-        enabled: true,
-      }),
-    );
-    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
-      integrationConnectionRow({
-        id: "icn_publishability_runtime",
-        organizationId: session.organizationId,
-        targetKey: "openai-publishability-runtime",
-        displayName: "Runtime Issue Agent Connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-      }),
-    );
 
     await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
       sandboxProfileRow({
@@ -123,18 +96,6 @@ describe.concurrent("sandbox profile version publishability get integration", ()
         sandboxProvider: "unknown-provider",
       }),
     );
-    await env.controlPlaneDb
-      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
-      .values(
-        sandboxProfileVersionIntegrationBindingRow({
-          id: "ibd_publishability_runtime",
-          sandboxProfileId: "sbp_publishability_runtime_001",
-          sandboxProfileVersion: 1,
-          connectionId: "icn_publishability_runtime",
-          kind: IntegrationBindingKinds.AGENT,
-        }),
-      );
-
     const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_publishability_runtime_001/versions/1/publishability",
       {
@@ -167,23 +128,6 @@ describe.concurrent("sandbox profile version publishability get integration", ()
           "integration-new-sandbox-profile-version-publishability-docker-unmanaged@example.com",
       });
 
-      await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
-        integrationTargetRow({
-          targetKey: "openai-publishability-docker-unmanaged",
-          variantId: "openai-default",
-          enabled: true,
-        }),
-      );
-      await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
-        integrationConnectionRow({
-          id: "icn_publishability_docker_unmanaged",
-          organizationId: session.organizationId,
-          targetKey: "openai-publishability-docker-unmanaged",
-          displayName: "Docker Unmanaged Agent Connection",
-          status: IntegrationConnectionStatuses.ACTIVE,
-        }),
-      );
-
       await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
         sandboxProfileRow({
           id: "sbp_publishability_docker_unmanaged",
@@ -201,18 +145,6 @@ describe.concurrent("sandbox profile version publishability get integration", ()
           sandboxProvider: SandboxProvider.DOCKER,
         }),
       );
-      await env.controlPlaneDb
-        .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
-        .values(
-          sandboxProfileVersionIntegrationBindingRow({
-            id: "ibd_publishability_docker_unmanaged",
-            sandboxProfileId: "sbp_publishability_docker_unmanaged",
-            sandboxProfileVersion: 1,
-            connectionId: "icn_publishability_docker_unmanaged",
-            kind: IntegrationBindingKinds.AGENT,
-          }),
-        );
-
       const response = await env.controlPlaneApi.http.fetch(
         "/v1/sandbox/profiles/sbp_publishability_docker_unmanaged/versions/1/publishability",
         {
@@ -246,23 +178,6 @@ describe.concurrent("sandbox profile version publishability get integration", ()
           "integration-new-sandbox-profile-version-publishability-e2b-managed-missing@example.com",
       });
 
-      await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
-        integrationTargetRow({
-          targetKey: "openai-publishability-e2b-managed-missing",
-          variantId: "openai-default",
-          enabled: true,
-        }),
-      );
-      await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
-        integrationConnectionRow({
-          id: "icn_publishability_e2b_managed_missing",
-          organizationId: session.organizationId,
-          targetKey: "openai-publishability-e2b-managed-missing",
-          displayName: "E2B Managed Missing Agent Connection",
-          status: IntegrationConnectionStatuses.ACTIVE,
-        }),
-      );
-
       await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
         sandboxProfileRow({
           id: "sbp_publishability_e2b_managed_missing",
@@ -282,18 +197,6 @@ describe.concurrent("sandbox profile version publishability get integration", ()
           sandboxMemoryMb: 4096,
         }),
       );
-      await env.controlPlaneDb
-        .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
-        .values(
-          sandboxProfileVersionIntegrationBindingRow({
-            id: "ibd_publishability_e2b_managed_missing",
-            sandboxProfileId: "sbp_publishability_e2b_managed_missing",
-            sandboxProfileVersion: 1,
-            connectionId: "icn_publishability_e2b_managed_missing",
-            kind: IntegrationBindingKinds.AGENT,
-          }),
-        );
-
       const response = await env.controlPlaneApi.http.fetch(
         "/v1/sandbox/profiles/sbp_publishability_e2b_managed_missing/versions/1/publishability",
         {
@@ -319,137 +222,6 @@ describe.concurrent("sandbox profile version publishability get integration", ()
       });
     },
   );
-
-  it("returns structured issues for inaccessible, inactive, and disabled agent references", async ({
-    env,
-  }) => {
-    const session = await env.auth.createSession({
-      email: "integration-new-sandbox-profile-version-publishability-issues@example.com",
-    });
-    const otherOrganizationSession = await env.auth.createSession({
-      email: "integration-new-sandbox-profile-version-publishability-issues-other-org@example.com",
-    });
-
-    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values([
-      integrationTargetRow({
-        targetKey: "openai-publishability-active",
-        variantId: "openai-default",
-        enabled: true,
-      }),
-      integrationTargetRow({
-        targetKey: "openai-publishability-disabled",
-        variantId: "openai-default",
-        enabled: false,
-      }),
-    ]);
-    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values([
-      integrationConnectionRow({
-        id: "icn_publishability_other_org",
-        organizationId: otherOrganizationSession.organizationId,
-        targetKey: "openai-publishability-active",
-        displayName: "Other Organization Connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-      }),
-      integrationConnectionRow({
-        id: "icn_publishability_inactive",
-        organizationId: session.organizationId,
-        targetKey: "openai-publishability-active",
-        displayName: "Inactive Connection",
-        status: IntegrationConnectionStatuses.ERROR,
-      }),
-      integrationConnectionRow({
-        id: "icn_publishability_disabled_target",
-        organizationId: session.organizationId,
-        targetKey: "openai-publishability-disabled",
-        displayName: "Disabled Target Connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-      }),
-    ]);
-
-    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
-      sandboxProfileRow({
-        id: "sbp_publishability_issues_001",
-        organizationId: session.organizationId,
-        displayName: "Publishability Issues Profile",
-        activeVersion: null,
-        createdAt: "2026-03-14T00:00:00.000Z",
-      }),
-    );
-    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
-      sandboxProfileVersionRow({
-        sandboxProfileId: "sbp_publishability_issues_001",
-        version: 1,
-        state: SandboxProfileVersionStates.DRAFT,
-        sandboxProvider: SandboxProvider.DOCKER,
-      }),
-    );
-    await env.controlPlaneDb
-      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
-      .values([
-        sandboxProfileVersionIntegrationBindingRow({
-          id: "ibd_publishability_missing_connection",
-          sandboxProfileId: "sbp_publishability_issues_001",
-          sandboxProfileVersion: 1,
-          connectionId: "icn_publishability_other_org",
-          kind: IntegrationBindingKinds.AGENT,
-        }),
-        sandboxProfileVersionIntegrationBindingRow({
-          id: "ibd_publishability_inactive_connection",
-          sandboxProfileId: "sbp_publishability_issues_001",
-          sandboxProfileVersion: 1,
-          connectionId: "icn_publishability_inactive",
-          kind: IntegrationBindingKinds.AGENT,
-        }),
-        sandboxProfileVersionIntegrationBindingRow({
-          id: "ibd_publishability_disabled_target",
-          sandboxProfileId: "sbp_publishability_issues_001",
-          sandboxProfileVersion: 1,
-          connectionId: "icn_publishability_disabled_target",
-          kind: IntegrationBindingKinds.AGENT,
-        }),
-      ]);
-
-    const response = await env.controlPlaneApi.http.fetch(
-      "/v1/sandbox/profiles/sbp_publishability_issues_001/versions/1/publishability",
-      {
-        headers: {
-          cookie: session.cookie,
-        },
-      },
-    );
-
-    expect(response.status).toBe(200);
-    const responseBody = GetSandboxProfileVersionPublishabilityResponseSchema.parse(
-      await response.json(),
-    );
-    expect(responseBody).toEqual({
-      publishable: false,
-      issues: [
-        {
-          code: "TARGET_DISABLED",
-          message:
-            "Agent binding 'ibd_publishability_disabled_target' references disabled target 'openai-publishability-disabled'.",
-          bindingId: "ibd_publishability_disabled_target",
-          connectionId: "icn_publishability_disabled_target",
-          targetKey: "openai-publishability-disabled",
-        },
-        {
-          code: "CONNECTION_NOT_ACTIVE",
-          message:
-            "Agent binding 'ibd_publishability_inactive_connection' references connection 'icn_publishability_inactive' that is not active.",
-          bindingId: "ibd_publishability_inactive_connection",
-          connectionId: "icn_publishability_inactive",
-        },
-        {
-          code: "INVALID_BINDING_CONNECTION_REFERENCE",
-          message:
-            "Agent binding 'ibd_publishability_missing_connection' references connection 'icn_publishability_other_org' that is missing or inaccessible.",
-          bindingId: "ibd_publishability_missing_connection",
-          connectionId: "icn_publishability_other_org",
-        },
-      ],
-    });
-  });
 
   it("returns profile version not draft for published versions", async ({ env }) => {
     const session = await env.auth.createSession({
@@ -503,23 +275,6 @@ describe.concurrent("sandbox profile version publishability get integration", ()
       email: "integration-new-sandbox-profile-version-publishability-valid@example.com",
     });
 
-    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
-      integrationTargetRow({
-        targetKey: "openai-publishability-valid",
-        variantId: "openai-default",
-        enabled: true,
-      }),
-    );
-    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
-      integrationConnectionRow({
-        id: "icn_publishability_valid",
-        organizationId: session.organizationId,
-        targetKey: "openai-publishability-valid",
-        displayName: "Valid Connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-      }),
-    );
-
     await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
       sandboxProfileRow({
         id: "sbp_publishability_valid_001",
@@ -537,18 +292,6 @@ describe.concurrent("sandbox profile version publishability get integration", ()
         sandboxProvider: SandboxProvider.DOCKER,
       }),
     );
-    await env.controlPlaneDb
-      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
-      .values(
-        sandboxProfileVersionIntegrationBindingRow({
-          id: "ibd_publishability_valid",
-          sandboxProfileId: "sbp_publishability_valid_001",
-          sandboxProfileVersion: 1,
-          connectionId: "icn_publishability_valid",
-          kind: IntegrationBindingKinds.AGENT,
-        }),
-      );
-
     const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_publishability_valid_001/versions/1/publishability",
       {
