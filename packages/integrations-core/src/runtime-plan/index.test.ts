@@ -53,7 +53,7 @@ describe("assembleCompiledRuntimePlan", () => {
         source: "base",
         imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
-      compiledBindingResults: [
+      compiledRuntimePlanFragments: [
         {
           egressRoutes: [
             {
@@ -100,7 +100,7 @@ describe("assembleCompiledRuntimePlan", () => {
         source: "base",
         imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
-      compiledBindingResults: [
+      compiledRuntimePlanFragments: [
         {
           egressRoutes: [],
           artifacts: [],
@@ -169,7 +169,7 @@ describe("assembleCompiledRuntimePlan", () => {
           source: "base",
           imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
-        compiledBindingResults: [
+        compiledRuntimePlanFragments: [
           {
             egressRoutes: [],
             artifacts: [],
@@ -193,7 +193,7 @@ describe("assembleCompiledRuntimePlan", () => {
         source: "base",
         imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
-      compiledBindingResults: [
+      compiledRuntimePlanFragments: [
         {
           egressRoutes: [
             {
@@ -457,7 +457,7 @@ describe("assembleCompiledRuntimePlan", () => {
         source: "base",
         imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
-      compiledBindingResults: [
+      compiledRuntimePlanFragments: [
         {
           egressRoutes: [],
           artifacts: [
@@ -541,7 +541,7 @@ describe("assembleCompiledRuntimePlan", () => {
           source: "base",
           imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
-        compiledBindingResults: [
+        compiledRuntimePlanFragments: [
           {
             egressRoutes: [],
             artifacts: [],
@@ -593,7 +593,7 @@ describe("assembleCompiledRuntimePlan", () => {
           source: "base",
           imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
-        compiledBindingResults: [
+        compiledRuntimePlanFragments: [
           {
             egressRoutes: [],
             artifacts: [],
@@ -653,7 +653,7 @@ describe("assembleCompiledRuntimePlan", () => {
           source: "base",
           imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
-        compiledBindingResults: [
+        compiledRuntimePlanFragments: [
           {
             egressRoutes: [],
             artifacts: [],
@@ -715,7 +715,7 @@ describe("assembleCompiledRuntimePlan", () => {
           source: "base",
           imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
-        compiledBindingResults: [
+        compiledRuntimePlanFragments: [
           {
             egressRoutes: [],
             artifacts: [],

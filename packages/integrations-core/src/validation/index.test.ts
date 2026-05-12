@@ -3,14 +3,14 @@ import { describe, expect, it } from "vitest";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import type {
   CompiledAgentRuntime,
-  CompiledBindingResult,
+  CompiledRuntimePlanFragment,
   CompiledWorkspaceSource,
   EgressCredentialRoute,
   RuntimeArtifactInstallStep,
   RuntimeClientEndpointSpec,
   RuntimeClientProcessSpec,
 } from "../types/index.js";
-import { validateCompiledBindingResults } from "./index.js";
+import { validateCompiledRuntimePlanFragments } from "./index.js";
 
 function createPtyLaunch(input: { runtimeId: string; displayName?: string; command?: string }) {
   return {
@@ -117,7 +117,7 @@ function createAwsRoute(input: {
   };
 }
 
-function createCompiledBindingResult(input: {
+function createCompiledRuntimePlanFragment(input: {
   route: EgressCredentialRoute;
   artifactKey: string;
   artifactName?: string;
@@ -132,7 +132,7 @@ function createCompiledBindingResult(input: {
   runtimeClientEndpoints?: ReadonlyArray<RuntimeClientEndpointSpec>;
   workspaceSources?: ReadonlyArray<CompiledWorkspaceSource>;
   agentRuntimes?: ReadonlyArray<CompiledAgentRuntime>;
-}): CompiledBindingResult {
+}): CompiledRuntimePlanFragment {
   const hasRuntimeClient =
     input.runtimeClientSetup !== undefined ||
     (input.runtimeClientProcesses !== undefined && input.runtimeClientProcesses.length > 0) ||
@@ -179,9 +179,9 @@ function createCompiledBindingResult(input: {
   };
 }
 
-describe("validateCompiledBindingResults", () => {
+describe("validateCompiledRuntimePlanFragments", () => {
   it("accepts non-conflicting compiled binding outputs", () => {
-    const resultA = createCompiledBindingResult({
+    const resultA = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_openai",
         bindingId: "bind_openai",
@@ -205,7 +205,7 @@ describe("validateCompiledBindingResults", () => {
       },
     });
 
-    const resultB = createCompiledBindingResult({
+    const resultB = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_github",
         bindingId: "bind_github",
@@ -216,17 +216,17 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [resultA, resultB],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [resultA, resultB],
       }),
     ).not.toThrow();
   });
 
   it("accepts aws sigv4 routes in compiled binding outputs", () => {
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [
-          createCompiledBindingResult({
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [
+          createCompiledRuntimePlanFragment({
             route: createAwsRoute({
               egressRuleId: "egress_rule_aws",
               bindingId: "binding_aws",
@@ -241,7 +241,7 @@ describe("validateCompiledBindingResults", () => {
   });
 
   it("fails on overlapping routes", () => {
-    const resultA = createCompiledBindingResult({
+    const resultA = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -250,7 +250,7 @@ describe("validateCompiledBindingResults", () => {
       }),
       artifactKey: "artifact-a",
     });
-    const resultB = createCompiledBindingResult({
+    const resultB = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_b",
         bindingId: "bind_b",
@@ -261,15 +261,15 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [resultA, resultB],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [resultA, resultB],
       }),
     ).toThrow(IntegrationCompilerError);
 
     let caughtError: unknown;
     try {
-      validateCompiledBindingResults({
-        compiledBindingResults: [resultA, resultB],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [resultA, resultB],
       });
     } catch (error) {
       caughtError = error;
@@ -280,7 +280,7 @@ describe("validateCompiledBindingResults", () => {
   });
 
   it("fails on duplicate workspace source paths", () => {
-    const resultA = createCompiledBindingResult({
+    const resultA = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -296,7 +296,7 @@ describe("validateCompiledBindingResults", () => {
         },
       ],
     });
-    const resultB = createCompiledBindingResult({
+    const resultB = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_b",
         bindingId: "bind_b",
@@ -314,15 +314,15 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [resultA, resultB],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [resultA, resultB],
       }),
     ).toThrow(IntegrationCompilerError);
 
     let caughtError: unknown;
     try {
-      validateCompiledBindingResults({
-        compiledBindingResults: [resultA, resultB],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [resultA, resultB],
       });
     } catch (error) {
       caughtError = error;
@@ -335,7 +335,7 @@ describe("validateCompiledBindingResults", () => {
   });
 
   it("fails when a route contains an empty path prefix", () => {
-    const result = createCompiledBindingResult({
+    const result = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -346,15 +346,15 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [result],
       }),
     ).toThrow(IntegrationCompilerError);
 
     let caughtError: unknown;
     try {
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [result],
       });
     } catch (error) {
       caughtError = error;
@@ -365,7 +365,7 @@ describe("validateCompiledBindingResults", () => {
   });
 
   it("fails on runtime client env conflicts", () => {
-    const resultA = createCompiledBindingResult({
+    const resultA = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -380,7 +380,7 @@ describe("validateCompiledBindingResults", () => {
         files: [],
       },
     });
-    const resultB = createCompiledBindingResult({
+    const resultB = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_b",
         bindingId: "bind_b",
@@ -397,15 +397,15 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [resultA, resultB],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [resultA, resultB],
       }),
     ).toThrow(IntegrationCompilerError);
 
     let caughtError: unknown;
     try {
-      validateCompiledBindingResults({
-        compiledBindingResults: [resultA, resultB],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [resultA, resultB],
       });
     } catch (error) {
       caughtError = error;
@@ -418,7 +418,7 @@ describe("validateCompiledBindingResults", () => {
   });
 
   it("fails on runtime client fileId conflicts", () => {
-    const resultA = createCompiledBindingResult({
+    const resultA = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -438,7 +438,7 @@ describe("validateCompiledBindingResults", () => {
         ],
       },
     });
-    const resultB = createCompiledBindingResult({
+    const resultB = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_b",
         bindingId: "bind_b",
@@ -460,15 +460,15 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [resultA, resultB],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [resultA, resultB],
       }),
     ).toThrow(IntegrationCompilerError);
 
     let caughtError: unknown;
     try {
-      validateCompiledBindingResults({
-        compiledBindingResults: [resultA, resultB],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [resultA, resultB],
       });
     } catch (error) {
       caughtError = error;
@@ -481,7 +481,7 @@ describe("validateCompiledBindingResults", () => {
   });
 
   it("accepts runtime client env values that are structurally equivalent", () => {
-    const resultA = createCompiledBindingResult({
+    const resultA = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -497,7 +497,7 @@ describe("validateCompiledBindingResults", () => {
       },
     });
 
-    const resultB = createCompiledBindingResult({
+    const resultB = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_b",
         bindingId: "bind_b",
@@ -514,14 +514,14 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [resultA, resultB],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [resultA, resultB],
       }),
     ).not.toThrow();
   });
 
   it("accepts duplicate artifacts when only artifact env differs", () => {
-    const resultA = createCompiledBindingResult({
+    const resultA = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -542,7 +542,7 @@ describe("validateCompiledBindingResults", () => {
         },
       ],
     });
-    const resultB = createCompiledBindingResult({
+    const resultB = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_b",
         bindingId: "bind_b",
@@ -565,8 +565,8 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [resultA, resultB],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [resultA, resultB],
       }),
     ).not.toThrow();
   });
@@ -602,7 +602,7 @@ describe("validateCompiledBindingResults", () => {
       },
     };
 
-    const resultA = createCompiledBindingResult({
+    const resultA = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -611,7 +611,7 @@ describe("validateCompiledBindingResults", () => {
       artifactKey: "artifact-a",
       runtimeClientProcesses: [processA],
     });
-    const resultB = createCompiledBindingResult({
+    const resultB = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_b",
         bindingId: "bind_b",
@@ -622,14 +622,14 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [resultA, resultB],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [resultA, resultB],
       }),
     ).toThrow(IntegrationCompilerError);
   });
 
   it("fails when runtime client process readiness is invalid", () => {
-    const result = createCompiledBindingResult({
+    const result = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -657,14 +657,14 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [result],
       }),
     ).toThrow(IntegrationCompilerError);
   });
 
   it("accepts runtime client process ws readiness", () => {
-    const result = createCompiledBindingResult({
+    const result = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -691,14 +691,14 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [result],
       }),
     ).not.toThrow();
   });
 
   it("fails when runtime client process ws readiness uses unsupported url scheme", () => {
-    const result = createCompiledBindingResult({
+    const result = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -725,14 +725,14 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [result],
       }),
     ).toThrow(IntegrationCompilerError);
   });
 
   it("fails when runtime client endpoint references missing process", () => {
-    const result = createCompiledBindingResult({
+    const result = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -753,14 +753,14 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [result],
       }),
     ).toThrow(IntegrationCompilerError);
   });
 
   it("fails when runtime client endpoint ws url uses unsupported url scheme", () => {
-    const result = createCompiledBindingResult({
+    const result = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -780,14 +780,14 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [result],
       }),
     ).toThrow(IntegrationCompilerError);
   });
 
   it("fails on artifact key conflicts with different lifecycle specs", () => {
-    const resultA = createCompiledBindingResult({
+    const resultA = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -805,7 +805,7 @@ describe("validateCompiledBindingResults", () => {
       ],
     });
 
-    const resultB = createCompiledBindingResult({
+    const resultB = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_b",
         bindingId: "bind_b",
@@ -824,14 +824,14 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [resultA, resultB],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [resultA, resultB],
       }),
     ).toThrow(IntegrationCompilerError);
   });
 
   it("fails on artifact key conflicts with different env specs", () => {
-    const resultA = createCompiledBindingResult({
+    const resultA = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -844,7 +844,7 @@ describe("validateCompiledBindingResults", () => {
       },
     });
 
-    const resultB = createCompiledBindingResult({
+    const resultB = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_b",
         bindingId: "bind_b",
@@ -858,14 +858,14 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [resultA, resultB],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [resultA, resultB],
       }),
     ).toThrow(IntegrationCompilerError);
   });
 
   it("fails when an artifact has no install commands", () => {
-    const result = createCompiledBindingResult({
+    const result = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -876,14 +876,14 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [result],
       }),
     ).toThrow(IntegrationCompilerError);
   });
 
   it("fails when an artifact exec install step has empty args", () => {
-    const result = createCompiledBindingResult({
+    const result = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -901,14 +901,14 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [result],
       }),
     ).toThrow(IntegrationCompilerError);
   });
 
   it("fails when an artifact defines a reserved proxy env key", () => {
-    const result = createCompiledBindingResult({
+    const result = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -921,14 +921,14 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [result],
       }),
     ).toThrow(IntegrationCompilerError);
   });
 
   it("fails when an artifact defines a reserved proxy ca env key", () => {
-    const result = createCompiledBindingResult({
+    const result = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -941,14 +941,14 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [result],
       }),
     ).toThrow(IntegrationCompilerError);
   });
 
   it("accepts agent runtimes that reference an existing client endpoint", () => {
-    const result = createCompiledBindingResult({
+    const result = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -986,14 +986,14 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [result],
       }),
     ).not.toThrow();
   });
 
   it("fails when an agent runtime references a missing client", () => {
-    const result = createCompiledBindingResult({
+    const result = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -1016,15 +1016,15 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [result],
       }),
     ).toThrow(IntegrationCompilerError);
 
     let caughtError: unknown;
     try {
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [result],
       });
     } catch (error) {
       caughtError = error;
@@ -1035,7 +1035,7 @@ describe("validateCompiledBindingResults", () => {
   });
 
   it("fails when an agent runtime references a missing endpoint", () => {
-    const result = createCompiledBindingResult({
+    const result = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -1073,15 +1073,15 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [result],
       }),
     ).toThrow(IntegrationCompilerError);
 
     let caughtError: unknown;
     try {
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [result],
       });
     } catch (error) {
       caughtError = error;
@@ -1109,7 +1109,7 @@ describe("validateCompiledBindingResults", () => {
       },
     };
 
-    const result = createCompiledBindingResult({
+    const result = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -1143,8 +1143,8 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [result],
       }),
     ).toThrow("must not define threadId placeholders in ptyLaunch.newLaunch");
   });
@@ -1163,7 +1163,7 @@ describe("validateCompiledBindingResults", () => {
       },
     };
 
-    const result = createCompiledBindingResult({
+    const result = createCompiledRuntimePlanFragment({
       route: createRoute({
         egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
@@ -1197,8 +1197,8 @@ describe("validateCompiledBindingResults", () => {
     });
 
     expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [result],
       }),
     ).toThrow("must define at least one threadId placeholder in ptyLaunch.resumeLaunch");
   });

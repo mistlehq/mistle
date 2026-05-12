@@ -13,7 +13,7 @@ function createRuntimePlan() {
       source: "base",
       imageRef: "img_base_123",
     },
-    compiledBindingResults: [
+    compiledRuntimePlanFragments: [
       {
         egressRoutes: [],
         artifacts: [],

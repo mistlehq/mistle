@@ -10,7 +10,7 @@ import {
   type CompileRuntimePlanBindingInput,
   type CompileBindingResult,
   type CompileRuntimePlanInput,
-  type CompiledBindingResult,
+  type CompiledRuntimePlanFragment,
   type CompiledRuntimeArtifactSpec,
   type IntegrationBindingMcpServer,
   type IntegrationMcpDefinitionValue,
@@ -27,7 +27,7 @@ import {
   type RuntimeClient,
   type SandboxPathRefs,
 } from "../types/index.js";
-import { validateCompiledBindingResults } from "../validation/index.js";
+import { validateCompiledRuntimePlanFragments } from "../validation/index.js";
 
 export const DefaultSandboxWorkspaceDir = "/root";
 
@@ -297,7 +297,7 @@ function validateMcpServerShape(input: { server: IntegrationBindingMcpServer }):
 type PreparedBindingContext = {
   definition: AnyIntegrationDefinition;
   compileBindingInput: CompileBindingInput<unknown, unknown, unknown>;
-  compiledBindingResult: CompiledBindingResult;
+  compiledRuntimePlanFragment: CompiledRuntimePlanFragment;
 };
 
 function collectResolvedMcpServers(input: {
@@ -417,7 +417,7 @@ function applyMcpMappings(input: {
   definitions: CompileBindingsInput["definitions"];
   preparedBindings: ReadonlyArray<PreparedBindingContext>;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
-}): ReadonlyArray<CompiledBindingResult> {
+}): ReadonlyArray<CompiledRuntimePlanFragment> {
   return input.preparedBindings.map((preparedBinding) => {
     const providerOwnedMcpConfig =
       preparedBinding.definition.kind === "agent"
@@ -425,13 +425,13 @@ function applyMcpMappings(input: {
         : preparedBinding.definition.mcpConfig;
 
     if (providerOwnedMcpConfig === undefined) {
-      return preparedBinding.compiledBindingResult;
+      return preparedBinding.compiledRuntimePlanFragment;
     }
 
     return {
-      ...preparedBinding.compiledBindingResult,
+      ...preparedBinding.compiledRuntimePlanFragment,
       runtimeClients: applyMcpConfigToRuntimeClients({
-        runtimeClients: preparedBinding.compiledBindingResult.runtimeClients,
+        runtimeClients: preparedBinding.compiledRuntimePlanFragment.runtimeClients,
         mcpConfig: providerOwnedMcpConfig,
         mcpServers: input.mcpServers,
       }),
@@ -439,7 +439,7 @@ function applyMcpMappings(input: {
   });
 }
 
-function compileBindingResultToCompiledBindingResult(input: {
+function compileBindingResultToCompiledRuntimePlanFragment(input: {
   organizationId: string;
   sandboxProfileId: string;
   version: number;
@@ -448,7 +448,7 @@ function compileBindingResultToCompiledBindingResult(input: {
   familyId: string;
   variantId: string;
   compileBindingResult: CompileBindingResult;
-}): CompiledBindingResult {
+}): CompiledRuntimePlanFragment {
   return {
     egressRoutes: input.compileBindingResult.egressRoutes.map((route, routeIndex) => ({
       ...route,
@@ -484,7 +484,7 @@ type CompileBindingsInput = {
 };
 
 type CompileBindingsResult = {
-  compiledBindingResults: ReadonlyArray<CompiledBindingResult>;
+  compiledRuntimePlanFragments: ReadonlyArray<CompiledRuntimePlanFragment>;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
 };
 
@@ -520,15 +520,15 @@ function applyAgentRuntimeMcpMappings(input: {
   return runtimeClients;
 }
 
-function compileProfileAgentRuntimeResult(input: {
+function compileProfileAgentRuntimeFragment(input: {
   organizationId: string;
   sandboxProfileId: string;
   version: number;
   definitions: CompileRuntimePlanInput["definitions"];
   agentRuntimeId: string;
-  egressRoutes: ReadonlyArray<CompiledBindingResult["egressRoutes"][number]>;
+  egressRoutes: ReadonlyArray<CompiledRuntimePlanFragment["egressRoutes"][number]>;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
-}): CompiledBindingResult {
+}): CompiledRuntimePlanFragment {
   const runtimeDefinition = input.definitions.agentRuntimeRegistry.getRuntime({
     runtimeId: input.agentRuntimeId,
   });
@@ -722,7 +722,7 @@ function compileBindings(input: CompileBindingsInput): CompileBindingsResult {
     };
 
     const compileBindingResult = definition.compileBinding(compileBindingInput);
-    const compiledBindingResult = compileBindingResultToCompiledBindingResult({
+    const compiledRuntimePlanFragment = compileBindingResultToCompiledRuntimePlanFragment({
       organizationId: input.organizationId,
       sandboxProfileId: input.sandboxProfileId,
       version: input.version,
@@ -736,7 +736,7 @@ function compileBindings(input: CompileBindingsInput): CompileBindingsResult {
     preparedBindings.push({
       definition,
       compileBindingInput,
-      compiledBindingResult,
+      compiledRuntimePlanFragment,
     });
   }
 
@@ -745,7 +745,7 @@ function compileBindings(input: CompileBindingsInput): CompileBindingsResult {
   });
 
   return {
-    compiledBindingResults: applyMcpMappings({
+    compiledRuntimePlanFragments: applyMcpMappings({
       definitions: input.definitions,
       preparedBindings,
       mcpServers: resolvedMcpServers,
@@ -763,29 +763,29 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
     bindings: input.bindings,
     enforceRuntimeEligibility: true,
   });
-  const compiledBindingResults = [
-    ...compiledBindings.compiledBindingResults,
-    compileProfileAgentRuntimeResult({
+  const compiledRuntimePlanFragments = [
+    ...compiledBindings.compiledRuntimePlanFragments,
+    compileProfileAgentRuntimeFragment({
       organizationId: input.organizationId,
       sandboxProfileId: input.sandboxProfileId,
       version: input.version,
       definitions: input.definitions,
       agentRuntimeId: input.agentRuntimeId,
-      egressRoutes: compiledBindings.compiledBindingResults.flatMap(
-        (compiledBindingResult) => compiledBindingResult.egressRoutes,
+      egressRoutes: compiledBindings.compiledRuntimePlanFragments.flatMap(
+        (compiledRuntimePlanFragment) => compiledRuntimePlanFragment.egressRoutes,
       ),
       mcpServers: compiledBindings.mcpServers,
     }),
   ];
 
-  validateCompiledBindingResults({
-    compiledBindingResults,
+  validateCompiledRuntimePlanFragments({
+    compiledRuntimePlanFragments,
   });
 
   return assembleCompiledRuntimePlan({
     sandboxProfileId: input.sandboxProfileId,
     version: input.version,
     image: input.image,
-    compiledBindingResults,
+    compiledRuntimePlanFragments,
   });
 }

@@ -2,7 +2,7 @@ import { orderRoutesForMatching } from "../egress/index.js";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import type {
   CompiledAgentRuntime,
-  CompiledBindingResult,
+  CompiledRuntimePlanFragment,
   CompiledRuntimeArtifactSpec,
   CompiledRuntimeClient,
   CompiledRuntimePlan,
@@ -20,52 +20,52 @@ type AssembleCompiledRuntimePlanInput = {
   sandboxProfileId: string;
   version: number;
   image: CompiledRuntimePlan["image"];
-  compiledBindingResults: ReadonlyArray<CompiledBindingResult>;
+  compiledRuntimePlanFragments: ReadonlyArray<CompiledRuntimePlanFragment>;
 };
 
 function flattenArtifacts(
-  input: ReadonlyArray<CompiledBindingResult>,
+  input: ReadonlyArray<CompiledRuntimePlanFragment>,
 ): ReadonlyArray<CompiledRuntimeArtifactSpec> {
   const artifacts: CompiledRuntimeArtifactSpec[] = [];
 
-  for (const compiledBindingResult of input) {
-    artifacts.push(...compiledBindingResult.artifacts);
+  for (const compiledRuntimePlanFragment of input) {
+    artifacts.push(...compiledRuntimePlanFragment.artifacts);
   }
 
   return artifacts;
 }
 
 function flattenRuntimeClients(
-  input: ReadonlyArray<CompiledBindingResult>,
+  input: ReadonlyArray<CompiledRuntimePlanFragment>,
 ): ReadonlyArray<CompiledRuntimeClient> {
   const runtimeClients: CompiledRuntimeClient[] = [];
 
-  for (const compiledBindingResult of input) {
-    runtimeClients.push(...compiledBindingResult.runtimeClients);
+  for (const compiledRuntimePlanFragment of input) {
+    runtimeClients.push(...compiledRuntimePlanFragment.runtimeClients);
   }
 
   return runtimeClients;
 }
 
 function flattenAgentRuntimes(
-  input: ReadonlyArray<CompiledBindingResult>,
+  input: ReadonlyArray<CompiledRuntimePlanFragment>,
 ): ReadonlyArray<CompiledAgentRuntime> {
   const agentRuntimes: CompiledAgentRuntime[] = [];
 
-  for (const compiledBindingResult of input) {
-    agentRuntimes.push(...compiledBindingResult.agentRuntimes);
+  for (const compiledRuntimePlanFragment of input) {
+    agentRuntimes.push(...compiledRuntimePlanFragment.agentRuntimes);
   }
 
   return agentRuntimes;
 }
 
 function flattenWorkspaceSources(
-  input: ReadonlyArray<CompiledBindingResult>,
+  input: ReadonlyArray<CompiledRuntimePlanFragment>,
 ): ReadonlyArray<CompiledWorkspaceSource> {
   const workspaceSources: CompiledWorkspaceSource[] = [];
 
-  for (const compiledBindingResult of input) {
-    workspaceSources.push(...compiledBindingResult.workspaceSources);
+  for (const compiledRuntimePlanFragment of input) {
+    workspaceSources.push(...compiledRuntimePlanFragment.workspaceSources);
   }
 
   return workspaceSources;
@@ -429,23 +429,25 @@ export function assembleCompiledRuntimePlan(
   input: AssembleCompiledRuntimePlanInput,
 ): CompiledRuntimePlan {
   const routes = orderRoutesForMatching(
-    input.compiledBindingResults.flatMap(
-      (compiledBindingResult) => compiledBindingResult.egressRoutes,
+    input.compiledRuntimePlanFragments.flatMap(
+      (compiledRuntimePlanFragment) => compiledRuntimePlanFragment.egressRoutes,
     ),
   );
-  const artifacts = sortArtifacts(dedupeArtifacts(flattenArtifacts(input.compiledBindingResults)));
+  const artifacts = sortArtifacts(
+    dedupeArtifacts(flattenArtifacts(input.compiledRuntimePlanFragments)),
+  );
   const runtimeClients = mergeRuntimeClients(
     resolveRuntimeClients({
-      runtimeClients: flattenRuntimeClients(input.compiledBindingResults),
+      runtimeClients: flattenRuntimeClients(input.compiledRuntimePlanFragments),
     }),
   );
-  const agentRuntimes = [...flattenAgentRuntimes(input.compiledBindingResults)].sort(
+  const agentRuntimes = [...flattenAgentRuntimes(input.compiledRuntimePlanFragments)].sort(
     (left, right) =>
       left.runtimeKey.localeCompare(right.runtimeKey) ||
       left.clientId.localeCompare(right.clientId) ||
       left.endpointKey.localeCompare(right.endpointKey),
   );
-  const workspaceSources = [...flattenWorkspaceSources(input.compiledBindingResults)].sort(
+  const workspaceSources = [...flattenWorkspaceSources(input.compiledRuntimePlanFragments)].sort(
     (left, right) =>
       left.path.localeCompare(right.path) || left.originUrl.localeCompare(right.originUrl),
   );

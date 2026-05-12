@@ -3,7 +3,7 @@ import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js
 import type {
   CompiledRuntimeArtifactSpec,
   CompiledAgentRuntime,
-  CompiledBindingResult,
+  CompiledRuntimePlanFragment,
   CompiledRuntimeClient,
   CompiledWorkspaceSource,
   EgressCredentialRoute,
@@ -33,7 +33,7 @@ const ReservedArtifactEnvKeys = new Set([
   "GIT_SSL_CAPATH",
 ]);
 
-function flattenCompiledBindingResults(input: ReadonlyArray<CompiledBindingResult>): {
+function flattenCompiledRuntimePlanFragments(input: ReadonlyArray<CompiledRuntimePlanFragment>): {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
@@ -46,12 +46,12 @@ function flattenCompiledBindingResults(input: ReadonlyArray<CompiledBindingResul
   const workspaceSources: CompiledWorkspaceSource[] = [];
   const agentRuntimes: CompiledAgentRuntime[] = [];
 
-  for (const compiledBindingResult of input) {
-    egressRoutes.push(...compiledBindingResult.egressRoutes);
-    artifacts.push(...compiledBindingResult.artifacts);
-    runtimeClients.push(...compiledBindingResult.runtimeClients);
-    workspaceSources.push(...compiledBindingResult.workspaceSources);
-    agentRuntimes.push(...compiledBindingResult.agentRuntimes);
+  for (const compiledRuntimePlanFragment of input) {
+    egressRoutes.push(...compiledRuntimePlanFragment.egressRoutes);
+    artifacts.push(...compiledRuntimePlanFragment.artifacts);
+    runtimeClients.push(...compiledRuntimePlanFragment.runtimeClients);
+    workspaceSources.push(...compiledRuntimePlanFragment.workspaceSources);
+    agentRuntimes.push(...compiledRuntimePlanFragment.agentRuntimes);
   }
 
   return {
@@ -402,7 +402,7 @@ function stringRecordEquals(
 }
 
 function validateAgentPtyLaunch(input: {
-  bindingId: string;
+  sourceKey: string;
   runtimeKey: string;
   runtimeId: string;
   ptyLaunch: {
@@ -464,13 +464,13 @@ function validateAgentPtyLaunch(input: {
     if (templateInput.template.ptySessionId.trim().length === 0) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
-        `Agent runtime '${input.runtimeKey}' for binding '${input.bindingId}' must define a non-empty ptyLaunch.${templateInput.templateName}.ptySessionId.`,
+        `Agent runtime '${input.runtimeKey}' for source '${input.sourceKey}' must define a non-empty ptyLaunch.${templateInput.templateName}.ptySessionId.`,
       );
     }
     if (templateInput.template.cols <= 0 || templateInput.template.rows <= 0) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
-        `Agent runtime '${input.runtimeKey}' for binding '${input.bindingId}' must define positive ptyLaunch.${templateInput.templateName} dimensions.`,
+        `Agent runtime '${input.runtimeKey}' for source '${input.sourceKey}' must define positive ptyLaunch.${templateInput.templateName} dimensions.`,
       );
     }
     if (
@@ -479,13 +479,13 @@ function validateAgentPtyLaunch(input: {
     ) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
-        `Agent runtime '${input.runtimeKey}' for binding '${input.bindingId}' must not define an empty ptyLaunch.${templateInput.templateName}.cwd.`,
+        `Agent runtime '${input.runtimeKey}' for source '${input.sourceKey}' must not define an empty ptyLaunch.${templateInput.templateName}.cwd.`,
       );
     }
     if (templateInput.template.command.trim().length === 0) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
-        `Agent runtime '${input.runtimeKey}' for binding '${input.bindingId}' must define a non-empty ptyLaunch.${templateInput.templateName}.command.`,
+        `Agent runtime '${input.runtimeKey}' for source '${input.sourceKey}' must define a non-empty ptyLaunch.${templateInput.templateName}.command.`,
       );
     }
 
@@ -494,7 +494,7 @@ function validateAgentPtyLaunch(input: {
       if (argument.kind === "literal" && argument.value.trim().length === 0) {
         throw new IntegrationCompilerError(
           CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
-          `Agent runtime '${input.runtimeKey}' for binding '${input.bindingId}' contains an empty literal ptyLaunch.${templateInput.templateName} arg at index ${index}.`,
+          `Agent runtime '${input.runtimeKey}' for source '${input.sourceKey}' contains an empty literal ptyLaunch.${templateInput.templateName} arg at index ${index}.`,
         );
       }
 
@@ -506,14 +506,14 @@ function validateAgentPtyLaunch(input: {
     if (templateInput.templateName === "newLaunch" && threadIdArgumentCount !== 0) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
-        `Agent runtime '${input.runtimeKey}' for binding '${input.bindingId}' must not define threadId placeholders in ptyLaunch.newLaunch.`,
+        `Agent runtime '${input.runtimeKey}' for source '${input.sourceKey}' must not define threadId placeholders in ptyLaunch.newLaunch.`,
       );
     }
 
     if (templateInput.templateName === "resumeLaunch" && threadIdArgumentCount === 0) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
-        `Agent runtime '${input.runtimeKey}' for binding '${input.bindingId}' must define at least one threadId placeholder in ptyLaunch.resumeLaunch.`,
+        `Agent runtime '${input.runtimeKey}' for source '${input.sourceKey}' must define at least one threadId placeholder in ptyLaunch.resumeLaunch.`,
       );
     }
   }
@@ -521,13 +521,13 @@ function validateAgentPtyLaunch(input: {
   if (input.ptyLaunch.runtimeId !== input.runtimeId) {
     throw new IntegrationCompilerError(
       CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
-      `Agent runtime '${input.runtimeKey}' for binding '${input.bindingId}' must declare a ptyLaunch.runtimeId matching '${input.runtimeId}'.`,
+      `Agent runtime '${input.runtimeKey}' for source '${input.sourceKey}' must declare a ptyLaunch.runtimeId matching '${input.runtimeId}'.`,
     );
   }
   if (input.ptyLaunch.displayName.trim().length === 0) {
     throw new IntegrationCompilerError(
       CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
-      `Agent runtime '${input.runtimeKey}' for binding '${input.bindingId}' must define a non-empty ptyLaunch.displayName.`,
+      `Agent runtime '${input.runtimeKey}' for source '${input.sourceKey}' must define a non-empty ptyLaunch.displayName.`,
     );
   }
 
@@ -1161,7 +1161,7 @@ function validateAgentRuntimes(input: {
     }
 
     validateAgentPtyLaunch({
-      bindingId: agentRuntime.runtimeKey,
+      sourceKey: agentRuntime.runtimeKey,
       runtimeKey: agentRuntime.runtimeKey,
       runtimeId: agentRuntime.runtimeId,
       ptyLaunch: agentRuntime.ptyLaunch,
@@ -1169,10 +1169,10 @@ function validateAgentRuntimes(input: {
   }
 }
 
-export function validateCompiledBindingResults(input: {
-  compiledBindingResults: ReadonlyArray<CompiledBindingResult>;
+export function validateCompiledRuntimePlanFragments(input: {
+  compiledRuntimePlanFragments: ReadonlyArray<CompiledRuntimePlanFragment>;
 }): void {
-  const flattenedResults = flattenCompiledBindingResults(input.compiledBindingResults);
+  const flattenedResults = flattenCompiledRuntimePlanFragments(input.compiledRuntimePlanFragments);
 
   validateRoutes(flattenedResults.egressRoutes);
   validateArtifacts(flattenedResults.artifacts);

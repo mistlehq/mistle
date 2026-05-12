@@ -1879,7 +1879,7 @@ export type CompileBindingResult = {
   agentRuntimes?: ReadonlyArray<CompiledAgentRuntime>;
 };
 
-export type CompiledBindingResult = {
+export type CompiledRuntimePlanFragment = {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
