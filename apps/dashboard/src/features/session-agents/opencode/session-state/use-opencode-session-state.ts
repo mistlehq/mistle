@@ -1,5 +1,6 @@
 import {
   createOpenCodeSessionClient,
+  type OpenCodeEvent,
   type OpenCodeEventSubscription,
   type OpenCodePermissionResponseInput,
   type OpenCodeSessionClient,
@@ -257,10 +258,16 @@ export function useOpenCodeSessionState(input: {
             return;
           }
           eventSubscriptionRef.current = eventSubscription;
+          const bufferedEvents: OpenCodeEvent[] = [];
+          let hydrationHasCompleted = false;
           void (async (): Promise<void> => {
             for await (const event of eventSubscription) {
               if (generationRef.current !== generation) {
                 return;
+              }
+              if (!hydrationHasCompleted) {
+                bufferedEvents.push(event);
+                continue;
               }
               dispatchChatAction({
                 type: "event_received",
@@ -278,7 +285,9 @@ export function useOpenCodeSessionState(input: {
             type: "hydrate_messages",
             sessionId: session.id,
             messages,
+            bufferedEvents,
           });
+          hydrationHasCompleted = true;
           setStep("connected");
           setSessionConnectionState("connected");
         } catch (error) {

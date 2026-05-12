@@ -31,6 +31,7 @@ export type OpenCodeChatState = {
 
 export type OpenCodeChatAction =
   | {
+      bufferedEvents?: readonly OpenCodeEvent[];
       messages: readonly OpenCodeMessageWithParts[];
       sessionId: string;
       type: "hydrate_messages";
@@ -404,10 +405,11 @@ function reduceOpenCodePayload(
     });
   }
   if (payload.type === "session.status") {
+    const status = payload.properties.status.type;
     return rebuildState({
       ...state,
       sessionId: payload.properties.sessionID,
-      status: payload.properties.status.type === "busy" ? "busy" : "idle",
+      status: status === "busy" || status === "retry" ? "busy" : "idle",
     });
   }
   if (payload.type === "session.idle") {
@@ -460,12 +462,16 @@ export function reduceOpenCodeChatState(
     const messagesById = Object.fromEntries(
       action.messages.map((message) => [message.info.id, createMessageState(message)]),
     );
-    return rebuildState({
+    const hydrated = rebuildState({
       ...createInitialOpenCodeChatState(),
       messageOrder: action.messages.map((message) => message.info.id),
       messagesById,
       sessionId: action.sessionId,
     });
+    return (action.bufferedEvents ?? []).reduce(
+      (currentState, event) => reduceOpenCodePayload(currentState, event.payload),
+      hydrated,
+    );
   }
 
   return reduceOpenCodePayload(state, action.event.payload);

@@ -277,6 +277,27 @@ describe("reduceOpenCodeChatState", () => {
     expect(idle.status).toBe("idle");
   });
 
+  it("keeps retrying sessions in progress", () => {
+    const retrying = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "event_received",
+      event: createEvent({
+        id: "evt_retry",
+        type: "session.status",
+        properties: {
+          sessionID: "ses_test",
+          status: {
+            type: "retry",
+            attempt: 1,
+            message: "retrying provider request",
+            next: 123,
+          },
+        },
+      }),
+    });
+
+    expect(retrying.status).toBe("busy");
+  });
+
   it("surfaces permission requests and removes them when replied", () => {
     const asked = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
       type: "event_received",
@@ -376,6 +397,69 @@ describe("reduceOpenCodeChatState", () => {
         id: "permission:perm_stale",
       }),
     );
+  });
+
+  it("applies buffered events after hydrating message snapshots", () => {
+    const hydrated = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "hydrate_messages",
+      sessionId: "ses_test",
+      messages: [
+        createAssistantMessage({
+          id: "msg_assistant",
+          parentId: "msg_user",
+          parts: [
+            {
+              id: "part_text",
+              messageID: "msg_assistant",
+              sessionID: "ses_test",
+              text: "Hel",
+              time: {
+                start: 1,
+              },
+              type: "text",
+            },
+          ],
+        }),
+      ],
+      bufferedEvents: [
+        createEvent({
+          id: "evt_delta",
+          type: "message.part.delta",
+          properties: {
+            sessionID: "ses_test",
+            messageID: "msg_assistant",
+            partID: "part_text",
+            field: "text",
+            delta: "lo",
+          },
+        }),
+        createEvent({
+          id: "evt_permission",
+          type: "permission.asked",
+          properties: {
+            id: "perm_buffered",
+            sessionID: "ses_test",
+            permission: "bash",
+            patterns: ["pnpm test"],
+            metadata: {},
+            always: [],
+          },
+        }),
+      ],
+    });
+
+    expect(hydrated.entries).toContainEqual(
+      expect.objectContaining({
+        id: "part_text",
+        kind: "assistant-message",
+        text: "Hello",
+      }),
+    );
+    expect(hydrated.pendingPermissions).toEqual([
+      expect.objectContaining({
+        id: "perm_buffered",
+      }),
+    ]);
   });
 
   it("throws explicit errors for unsupported critical deltas", () => {
