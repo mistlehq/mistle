@@ -9,6 +9,10 @@ import {
 describe("integrations-definitions server", () => {
   it("registers built-in server integration definitions in a registry", () => {
     const registry = createIntegrationRegistry();
+    const anthropicDefinition = registry.getDefinition({
+      familyId: "anthropic",
+      variantId: "anthropic-default",
+    });
     const awsDefinition = registry.getDefinition({
       familyId: "aws",
       variantId: "aws-cli-default",
@@ -32,6 +36,10 @@ describe("integrations-definitions server", () => {
     const githubEnterpriseServerDefinition = registry.getDefinition({
       familyId: "github",
       variantId: "github-enterprise-server",
+    });
+    const openCodeGoDefinition = registry.getDefinition({
+      familyId: "opencode",
+      variantId: "opencode-go",
     });
     const planetscaleDefinition = registry.getDefinition({
       familyId: "planetscale",
@@ -72,6 +80,8 @@ describe("integrations-definitions server", () => {
     expect(githubEnterpriseServerDefinition?.webhookSource).toMatchObject({
       lifecycle: "implicit",
     });
+    expect(anthropicDefinition?.kind).toBe("agent");
+    expect(openCodeGoDefinition?.kind).toBe("agent");
     expect(
       githubEnterpriseServerDefinition?.credentialResolvers?.custom?.github_app_installation_token,
     ).toBeDefined();
@@ -149,7 +159,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(11);
+    expect(definitions).toHaveLength(13);
   });
 
   it("builds the server definitions bundle with an agent runtime registry", () => {

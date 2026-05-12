@@ -10,6 +10,13 @@ describe("sync-integration-targets", () => {
 
     expect(targets).toEqual([
       {
+        targetKey: "anthropic-default",
+        familyId: "anthropic",
+        variantId: "anthropic-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "aws-cli-default",
         familyId: "aws",
         variantId: "aws-cli-default",
@@ -62,6 +69,13 @@ describe("sync-integration-targets", () => {
         targetKey: "openai-default",
         familyId: "openai",
         variantId: "openai-default",
+        enabled: false,
+        config: {},
+      },
+      {
+        targetKey: "opencode-go",
+        familyId: "opencode",
+        variantId: "opencode-go",
         enabled: false,
         config: {},
       },

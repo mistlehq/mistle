@@ -9,6 +9,11 @@
       }
     },
     {
+      "targetKey": "anthropic-default",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "aws-cli-default",
       "enabled": true,
       "config": {}
@@ -30,6 +35,11 @@
     },
     {
       "targetKey": "linear-default",
+      "enabled": true,
+      "config": {}
+    },
+    {
+      "targetKey": "opencode-go",
       "enabled": true,
       "config": {}
     },

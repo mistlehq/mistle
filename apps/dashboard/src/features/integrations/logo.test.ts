@@ -11,6 +11,9 @@ describe("resolveIntegrationLogoPath", () => {
     expect(resolveIntegrationLogoPath({ logoKey: "linear" })).toBe("/integration-logos/linear.svg");
     expect(resolveIntegrationLogoPath({ logoKey: "slack" })).toBe("/integration-logos/slack.svg");
     expect(resolveIntegrationLogoPath({ logoKey: "aws" })).toBe("/integration-logos/aws.svg");
+    expect(resolveIntegrationLogoPath({ logoKey: "anthropic" })).toBe(
+      "/integration-logos/anthropic.svg",
+    );
     expect(resolveIntegrationLogoPath({ logoKey: "datadog" })).toBe(
       "/integration-logos/datadog.svg",
     );

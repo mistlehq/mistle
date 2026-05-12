@@ -9,6 +9,10 @@ import {
 describe("integrations-definitions index", () => {
   it("registers built-in browser-safe integration definitions in a registry", () => {
     const registry = createIntegrationRegistry();
+    const anthropicDefinition = registry.getDefinition({
+      familyId: "anthropic",
+      variantId: "anthropic-default",
+    });
     const awsDefinition = registry.getDefinition({
       familyId: "aws",
       variantId: "aws-cli-default",
@@ -24,6 +28,10 @@ describe("integrations-definitions index", () => {
     const openAiDefinition = registry.getDefinition({
       familyId: "openai",
       variantId: "openai-default",
+    });
+    const openCodeGoDefinition = registry.getDefinition({
+      familyId: "opencode",
+      variantId: "opencode-go",
     });
     const githubCloudDefinition = registry.getDefinition({
       familyId: "github",
@@ -170,8 +178,22 @@ describe("integrations-definitions index", () => {
         }),
       ]),
     );
+    expect(anthropicDefinition).toMatchObject({
+      familyId: "anthropic",
+      variantId: "anthropic-default",
+      kind: "agent",
+      displayName: "Anthropic",
+      allowedRuntimeIds: ["opencode"],
+    });
     expect(openAiDefinition?.displayName).toBe("OpenAI");
     expect(openAiDefinition?.kind).toBe("agent");
+    expect(openCodeGoDefinition).toMatchObject({
+      familyId: "opencode",
+      variantId: "opencode-go",
+      kind: "agent",
+      displayName: "OpenCode Go",
+      allowedRuntimeIds: ["opencode"],
+    });
     expect(e2bSandboxRuntimeDefinition).toMatchObject({
       familyId: "e2b",
       variantId: "e2b-default",
@@ -477,10 +499,11 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(11);
+    expect(definitions).toHaveLength(13);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
+      "anthropic::anthropic-default",
       "aws::aws-cli-default",
       "datadog::datadog-default",
       "jira::jira-default",
@@ -488,6 +511,7 @@ describe("integrations-definitions index", () => {
       "github::github-enterprise-server",
       "linear::linear-default",
       "openai::openai-default",
+      "opencode::opencode-go",
       "planetscale::planetscale-mcp",
       "e2b::e2b-default",
       "signoz::signoz-mcp",

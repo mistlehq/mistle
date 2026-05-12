@@ -4,18 +4,21 @@ import {
   type IntegrationDefinitionsBundle,
 } from "@mistle/integrations-core";
 
+import { AnthropicDefinition } from "./anthropic/index.js";
 import { AwsDefinition } from "./aws/browser.js";
 import { DatadogDefinition } from "./datadog/index.js";
 import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./github/browser.js";
 import { JiraDefinition } from "./jira/browser.js";
 import { LinearDefinition } from "./linear/index.js";
 import { OpenAiApiKeyDefinition } from "./openai/index.js";
+import { OpenCodeGoDefinition } from "./opencode/index.js";
 import { PlanetScaleDefinition } from "./planetscale/browser.js";
 import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
 import { E2BSandboxRuntimeDefinition } from "./sandbox-runtimes/index.js";
 import { SignozDefinition } from "./signoz/browser.js";
 import { SlackDefinition } from "./slack/browser.js";
 
+export * from "./anthropic/index.js";
 export * from "./aws/browser.js";
 export * from "./datadog/index.js";
 export * from "./jira/browser.js";
@@ -23,6 +26,7 @@ export * from "./jira-shared.js";
 export * from "./github/browser.js";
 export * from "./linear/index.js";
 export * from "./openai/index.js";
+export * from "./opencode/index.js";
 export * from "./planetscale/browser.js";
 export * from "./sandbox-runtimes/index.js";
 export * from "./signoz/browser.js";
@@ -31,6 +35,7 @@ export * from "./forms/index.js";
 export * from "./registry/agent-runtimes.js";
 
 const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
+  AnthropicDefinition,
   AwsDefinition,
   DatadogDefinition,
   JiraDefinition,
@@ -38,6 +43,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   GitHubEnterpriseServerDefinition,
   LinearDefinition,
   OpenAiApiKeyDefinition,
+  OpenCodeGoDefinition,
   PlanetScaleDefinition,
   E2BSandboxRuntimeDefinition,
   SignozDefinition,

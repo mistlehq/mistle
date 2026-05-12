@@ -21,6 +21,7 @@ function createCompiledRoute(input: {
   baseUrl: string;
   secretType: string;
   pathPrefixes?: ReadonlyArray<string>;
+  authInjection?: EgressCredentialRoute["authInjection"];
   additionalHeaders?: Record<string, string>;
 }): EgressCredentialRoute {
   return {
@@ -36,7 +37,7 @@ function createCompiledRoute(input: {
     upstream: {
       baseUrl: input.baseUrl,
     },
-    authInjection: {
+    authInjection: input.authInjection ?? {
       type: "bearer",
       target: "authorization",
     },
@@ -507,6 +508,10 @@ describe("compileOpenCodeRuntime", () => {
           host: "api.anthropic.com",
           baseUrl: "https://api.anthropic.com",
           secretType: "api_key",
+          authInjection: {
+            type: "header",
+            target: "x-api-key",
+          },
         }),
       ]),
     ).toEqual({

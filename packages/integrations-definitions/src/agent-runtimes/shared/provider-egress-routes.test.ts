@@ -17,6 +17,7 @@ function createRoute(input: {
   baseUrl?: string;
   pathPrefixes?: ReadonlyArray<string>;
   authInjectionType?: "bearer" | "basic" | "header" | "query";
+  authInjectionTarget?: string;
   credentialResolver?: EgressCredentialRoute["credentialResolver"];
 }): EgressCredentialRoute {
   return {
@@ -33,7 +34,7 @@ function createRoute(input: {
     },
     authInjection: {
       type: input.authInjectionType ?? "bearer",
-      target: "authorization",
+      target: input.authInjectionTarget ?? "authorization",
     },
     credentialResolver: input.credentialResolver ?? {
       kind: "integration_connection",
@@ -152,6 +153,8 @@ describe("provider egress route helpers", () => {
         createRoute({
           familyId: "anthropic",
           host: "api.anthropic.com",
+          authInjectionType: "header",
+          authInjectionTarget: "x-api-key",
         }),
       ),
     ).toBe(true);
@@ -165,5 +168,16 @@ describe("provider egress route helpers", () => {
         }),
       ),
     ).toBe(true);
+  });
+
+  it("rejects Anthropic API routes with incompatible auth injection", () => {
+    expect(
+      isAnthropicApiRoute(
+        createRoute({
+          familyId: "anthropic",
+          host: "api.anthropic.com",
+        }),
+      ),
+    ).toBe(false);
   });
 });

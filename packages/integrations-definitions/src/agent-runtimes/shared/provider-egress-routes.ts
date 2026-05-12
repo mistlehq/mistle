@@ -55,7 +55,10 @@ export function isAnthropicApiRoute(route: EgressCredentialRoute): boolean {
   return (
     route.familyId === "anthropic" &&
     routeHasHost({ route, host: "api.anthropic.com" }) &&
-    route.authInjection.type === "bearer"
+    route.authInjection.type === "header" &&
+    route.authInjection.target.toLowerCase() === "x-api-key" &&
+    isIntegrationConnectionCredentialRoute(route) &&
+    route.credentialResolver.secretType === "api_key"
   );
 }
 
@@ -64,6 +67,8 @@ export function isOpenCodeGoRoute(route: EgressCredentialRoute): boolean {
     route.familyId === "opencode" &&
     routeHasHost({ route, host: "opencode.ai" }) &&
     routeHasPathPrefix({ route, pathPrefix: "/zen/go" }) &&
-    route.authInjection.type === "bearer"
+    route.authInjection.type === "bearer" &&
+    isIntegrationConnectionCredentialRoute(route) &&
+    route.credentialResolver.secretType === "api_key"
   );
 }
