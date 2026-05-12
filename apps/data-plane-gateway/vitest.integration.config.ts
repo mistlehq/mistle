@@ -4,6 +4,10 @@ import { defineConfig } from "vitest/config";
 
 export const WorkspaceAliases = [
   {
+    find: /^@mistle\/cache$/,
+    replacement: fileURLToPath(new URL("../../packages/cache/src/index.ts", import.meta.url)),
+  },
+  {
     find: /^@mistle\/test-harness\/integration$/,
     replacement: fileURLToPath(
       new URL("../../packages/test-harness/src/integration/index.ts", import.meta.url),
@@ -70,6 +74,12 @@ export const WorkspaceAliases = [
     replacement: fileURLToPath(new URL("../../packages/db/src/migrator/index.ts", import.meta.url)),
   },
   {
+    find: /^@mistle\/db\/test-environment$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/db/src/test-environment.ts", import.meta.url),
+    ),
+  },
+  {
     find: /^@mistle\/gateway-connection-auth$/,
     replacement: fileURLToPath(
       new URL("../../packages/gateway-connection-auth/src/index.ts", import.meta.url),
@@ -88,8 +98,49 @@ export const WorkspaceAliases = [
     ),
   },
   {
+    find: /^@mistle\/integrations-definitions$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/integrations-definitions/src/index.ts", import.meta.url),
+    ),
+  },
+  {
+    find: /^@mistle\/integrations-definitions\/server$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/integrations-definitions/src/server.ts", import.meta.url),
+    ),
+  },
+  {
+    find: /^@mistle\/integrations-definitions\/sandbox-runtimes$/,
+    replacement: fileURLToPath(
+      new URL(
+        "../../packages/integrations-definitions/src/sandbox-runtimes/index.ts",
+        import.meta.url,
+      ),
+    ),
+  },
+  {
+    find: /^@mistle\/http$/,
+    replacement: fileURLToPath(new URL("../../packages/http/src/index.ts", import.meta.url)),
+  },
+  {
+    find: /^@mistle\/http\/pagination$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/http/src/pagination/index.ts", import.meta.url),
+    ),
+  },
+  {
+    find: /^@mistle\/http\/(.+)\.js$/,
+    replacement: fileURLToPath(new URL("../../packages/http/src/$1.ts", import.meta.url)),
+  },
+  {
     find: /^@mistle\/logging$/,
     replacement: fileURLToPath(new URL("../../packages/logging/src/index.ts", import.meta.url)),
+  },
+  {
+    find: /^@mistle\/object-store$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/object-store/src/index.ts", import.meta.url),
+    ),
   },
   {
     find: /^@mistle\/port-access-auth$/,
@@ -137,6 +188,22 @@ export const WorkspaceAliases = [
     find: /^@mistle\/time\/testing$/,
     replacement: fileURLToPath(
       new URL("../../packages/time/src/testing/index.ts", import.meta.url),
+    ),
+  },
+  {
+    find: /^@mistle\/webhooks$/,
+    replacement: fileURLToPath(new URL("../../packages/webhooks/src/index.ts", import.meta.url)),
+  },
+  {
+    find: /^@mistle\/workflow-registry\/data-plane$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/workflow-registry/src/data-plane.ts", import.meta.url),
+    ),
+  },
+  {
+    find: /^@mistle\/workflow-registry\/control-plane$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/workflow-registry/src/control-plane.ts", import.meta.url),
     ),
   },
 ];

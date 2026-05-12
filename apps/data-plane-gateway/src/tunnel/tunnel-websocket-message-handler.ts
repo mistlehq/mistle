@@ -1,5 +1,8 @@
+import { setTimeout as sleep } from "node:timers/promises";
+
 import type { DataPlaneDatabase, DataPlaneTables } from "@mistle/db/data-plane";
 import type { WSContext, WSMessageReceive } from "hono/ws";
+import type { WebSocket } from "ws";
 
 import type { GatewayEgressTransportService } from "../egress/egress-transport-service.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
@@ -62,7 +65,7 @@ export function toTunnelForwardPayload(data: WSMessageReceive): string | ArrayBu
 export async function handleTunnelWebSocketMessage(input: {
   bootstrapOwnerLeaseId?: string;
   clientSessionId: string;
-  currentSocket: Pick<WSContext, "send">;
+  currentSocket: Pick<WSContext<WebSocket>, "raw" | "send">;
   db: DataPlaneDatabase;
   gatewayEgressTransportService: GatewayEgressTransportService;
   handleSigningDelivery?: ((delivery: SigningDelivery) => Promise<void>) | undefined;
@@ -142,8 +145,8 @@ export async function handleTunnelWebSocketMessage(input: {
       db: input.db,
       message: translation.delivery.message,
       sandboxInstanceId: input.sandboxInstanceId,
-      sendBootstrapMessage: (message) => {
-        input.currentSocket.send(JSON.stringify(message));
+      sendBootstrapMessage: (payload) => {
+        return sendWebSocketPayload({ payload, socket: input.currentSocket });
       },
       sourceBootstrapSessionId: input.clientSessionId,
       tables: input.tables,
@@ -155,8 +158,8 @@ export async function handleTunnelWebSocketMessage(input: {
     input.gatewayEgressTransportService.rejectMalformedBootstrapMessage({
       message: translation.delivery.message,
       sandboxInstanceId: input.sandboxInstanceId,
-      sendBootstrapMessage: (message) => {
-        input.currentSocket.send(JSON.stringify(message));
+      sendBootstrapMessage: (payload) => {
+        return sendWebSocketPayload({ payload, socket: input.currentSocket });
       },
       sourceBootstrapSessionId: input.clientSessionId,
       streamId: translation.delivery.streamId,
@@ -191,4 +194,50 @@ export async function handleTunnelWebSocketMessage(input: {
         translation.notifyBootstrapPeerOfReleasedStream.targetBootstrapSessionId,
     });
   }
+}
+
+function sendWebSocketPayload(input: {
+  payload: ArrayBuffer | object | string;
+  socket: Pick<WSContext<WebSocket>, "raw" | "send">;
+}): {
+  bufferedBytes: number;
+  waitForBufferedBytesBelow: (bytes: number) => Promise<void>;
+  writeFinished: Promise<void>;
+} {
+  const payload =
+    input.payload instanceof ArrayBuffer || typeof input.payload === "string"
+      ? input.payload
+      : JSON.stringify(input.payload);
+
+  if (input.socket.raw === undefined) {
+    input.socket.send(payload);
+    return {
+      bufferedBytes: 0,
+      waitForBufferedBytesBelow: async () => {
+        await Promise.resolve();
+      },
+      writeFinished: Promise.resolve(),
+    };
+  }
+
+  const rawSocket = input.socket.raw;
+  const writeFinished = new Promise<void>((resolve, reject) => {
+    rawSocket.send(payload, { compress: false }, (error) => {
+      if (error === undefined || error === null) {
+        resolve();
+        return;
+      }
+
+      reject(error);
+    });
+  });
+  return {
+    bufferedBytes: rawSocket.bufferedAmount,
+    waitForBufferedBytesBelow: async (bytes) => {
+      while (rawSocket.readyState === rawSocket.OPEN && rawSocket.bufferedAmount > bytes) {
+        await sleep(5);
+      }
+    },
+    writeFinished,
+  };
 }

@@ -11,6 +11,7 @@ import type { ControlPlaneInternalClient } from "@mistle/control-plane-internal-
 import type { DataPlaneDatabase, DataPlaneTables } from "@mistle/db/data-plane";
 import type { CompiledRuntimePlan } from "@mistle/sandbox-runtime-contract";
 import {
+  PayloadKindRawBytes,
   type EgressHttpOpen,
   type EgressStreamError,
   type EgressStreamCancel,
@@ -18,8 +19,8 @@ import {
   type EgressTcpData,
   type EgressTransportMessage,
   type EgressHttpResponseStart,
-  type EgressHttpResponseBodyChunk,
   type EgressHttpResponseBodyEnd,
+  encodeDataFrame,
 } from "@mistle/sandbox-session-protocol";
 import { metrics, trace, SpanStatusCode, type Attributes, type Span } from "@opentelemetry/api";
 
@@ -66,6 +67,48 @@ const EgressStreamDurationMs = EgressMeter.createHistogram(
     unit: "ms",
   },
 );
+const BootstrapWebSocketBufferedBytes = EgressMeter.createHistogram(
+  "mistle.gateway.egress.bootstrap_ws.buffered_bytes",
+  {
+    description:
+      "Bootstrap websocket buffered bytes observed after gateway egress websocket writes.",
+    unit: "By",
+  },
+);
+const BootstrapWebSocketBackpressurePauses = EgressMeter.createCounter(
+  "mistle.gateway.egress.bootstrap_ws.backpressure_pauses",
+  {
+    description:
+      "Gateway egress upstream response pauses caused by bootstrap websocket backpressure.",
+  },
+);
+const BootstrapWebSocketBackpressureDurationMs = EgressMeter.createHistogram(
+  "mistle.gateway.egress.bootstrap_ws.backpressure_duration",
+  {
+    description:
+      "Duration that gateway egress upstream responses remain paused waiting for bootstrap websocket buffer drain.",
+    unit: "ms",
+  },
+);
+const BootstrapWebSocketSendFailures = EgressMeter.createCounter(
+  "mistle.gateway.egress.bootstrap_ws.send_failures",
+  {
+    description: "Gateway egress bootstrap websocket send failures.",
+  },
+);
+const BootstrapWebSocketHighWatermarkBytes = readPositiveIntegerEnv(
+  "MISTLE_GATEWAY_EGRESS_BOOTSTRAP_WS_HIGH_WATERMARK_BYTES",
+  8 * 1024 * 1024,
+);
+const BootstrapWebSocketLowWatermarkBytes = readPositiveIntegerEnv(
+  "MISTLE_GATEWAY_EGRESS_BOOTSTRAP_WS_LOW_WATERMARK_BYTES",
+  2 * 1024 * 1024,
+);
+if (BootstrapWebSocketLowWatermarkBytes >= BootstrapWebSocketHighWatermarkBytes) {
+  throw new Error(
+    "MISTLE_GATEWAY_EGRESS_BOOTSTRAP_WS_LOW_WATERMARK_BYTES must be lower than MISTLE_GATEWAY_EGRESS_BOOTSTRAP_WS_HIGH_WATERMARK_BYTES.",
+  );
+}
 
 type RepeatedHeaderValues = Record<string, string[]>;
 type EgressStreamOutcome =
@@ -85,7 +128,14 @@ type EgressStreamOutcome =
   | "malformed_frame"
   | "forbidden_tunnel_state";
 
-type SendBootstrapMessage = (message: EgressTransportMessage) => void;
+type SendBootstrapPayloadResult = {
+  bufferedBytes: number;
+  waitForBufferedBytesBelow: (bytes: number) => Promise<void>;
+  writeFinished: Promise<void>;
+};
+type SendBootstrapPayload = (
+  payload: ArrayBuffer | EgressTransportMessage,
+) => SendBootstrapPayloadResult;
 
 type GatewayEgressStreamIdentity = {
   sandboxInstanceId: string;
@@ -107,7 +157,7 @@ type ActiveGatewayEgressStream = {
   responseStatusCode?: number;
   organizationId: string;
   sandboxInstanceId: string;
-  sendBootstrapMessage: SendBootstrapMessage;
+  sendBootstrapMessage: SendBootstrapPayload;
   sourceBootstrapSessionId: string;
   socket?: Socket;
   span: Span;
@@ -213,6 +263,29 @@ function decodeValidatedBase64(payload: string): Buffer | undefined {
   return Buffer.from(payload, "base64");
 }
 
+function readPositiveIntegerEnv(name: string, defaultValue: number): number {
+  const value = process.env[name];
+  if (value === undefined) {
+    return defaultValue;
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive integer when provided.`);
+  }
+  return parsed;
+}
+
+function encodeRawBytesDataFrame(input: { bytes: Buffer; streamId: number }): ArrayBuffer {
+  const encoded = encodeDataFrame({
+    streamId: input.streamId,
+    payloadKind: PayloadKindRawBytes,
+    payload: input.bytes,
+  });
+  const payload = new ArrayBuffer(encoded.byteLength);
+  new Uint8Array(payload).set(encoded);
+  return payload;
+}
+
 function buildStreamAttributes(input: {
   classification: GatewayEgressRouteClassification;
   open: EgressHttpOpen;
@@ -277,6 +350,41 @@ function recordStreamEvent(input: {
   }
 }
 
+function buildBootstrapWebSocketAttributes(stream: ActiveGatewayEgressStream): Attributes {
+  return {
+    ...stream.attributes,
+    "mistle.gateway.egress.bootstrap_ws.high_watermark_bytes": BootstrapWebSocketHighWatermarkBytes,
+    "mistle.gateway.egress.bootstrap_ws.low_watermark_bytes": BootstrapWebSocketLowWatermarkBytes,
+  };
+}
+
+function recordBootstrapWebSocketBufferedBytes(input: {
+  bufferedBytes: number;
+  stream: ActiveGatewayEgressStream;
+}): void {
+  BootstrapWebSocketBufferedBytes.record(
+    input.bufferedBytes,
+    buildBootstrapWebSocketAttributes(input.stream),
+  );
+}
+
+function recordBootstrapWebSocketSendFailure(input: {
+  error: unknown;
+  stream?: ActiveGatewayEgressStream;
+}): void {
+  const attributes: Attributes =
+    input.stream === undefined
+      ? {}
+      : {
+          ...buildBootstrapWebSocketAttributes(input.stream),
+          "mistle.gateway.egress.error_message":
+            input.error instanceof Error ? input.error.message : String(input.error),
+          "mistle.gateway.egress.error_name":
+            input.error instanceof Error ? input.error.name : "Error",
+        };
+  BootstrapWebSocketSendFailures.add(1, attributes);
+}
+
 function finishStream(input: {
   clockNowMs: number;
   error?: Error;
@@ -336,7 +444,7 @@ export class GatewayEgressTransportService {
     db: DataPlaneDatabase;
     message: EgressTransportMessage;
     sandboxInstanceId: string;
-    sendBootstrapMessage: SendBootstrapMessage;
+    sendBootstrapMessage: SendBootstrapPayload;
     sourceBootstrapSessionId: string;
     tables: DataPlaneTables;
     testEnvironmentId?: string;
@@ -405,7 +513,7 @@ export class GatewayEgressTransportService {
   public rejectMalformedBootstrapMessage(input: {
     message: string;
     sandboxInstanceId: string;
-    sendBootstrapMessage: SendBootstrapMessage;
+    sendBootstrapMessage: SendBootstrapPayload;
     sourceBootstrapSessionId: string;
     streamId: number;
   }): void {
@@ -441,7 +549,7 @@ export class GatewayEgressTransportService {
     db: DataPlaneDatabase;
     message: EgressHttpOpen;
     sandboxInstanceId: string;
-    sendBootstrapMessage: SendBootstrapMessage;
+    sendBootstrapMessage: SendBootstrapPayload;
     sourceBootstrapSessionId: string;
     tables: DataPlaneTables;
     testEnvironmentId?: string;
@@ -648,7 +756,7 @@ export class GatewayEgressTransportService {
     key: string;
     message: EgressHttpOpen;
     sandboxInstanceId: string;
-    sendBootstrapMessage: SendBootstrapMessage;
+    sendBootstrapMessage: SendBootstrapPayload;
     sourceBootstrapSessionId: string;
     testEnvironmentId?: string;
     url: URL;
@@ -713,7 +821,7 @@ export class GatewayEgressTransportService {
     db: DataPlaneDatabase;
     message: EgressHttpOpen;
     sandboxInstanceId: string;
-    sendBootstrapMessage: SendBootstrapMessage;
+    sendBootstrapMessage: SendBootstrapPayload;
     sourceBootstrapSessionId: string;
     tables: DataPlaneTables;
     testEnvironmentId?: string;
@@ -748,18 +856,23 @@ export class GatewayEgressTransportService {
     sandboxInstanceId: string;
     stream: ActiveGatewayEgressStream;
   }): void {
+    input.response.pause();
     input.stream.responseStarted = true;
     input.stream.responseStatusCode = input.response.statusCode ?? 502;
     this.setManagedResponseTelemetry({
       headers: input.response.headers,
       stream: input.stream,
     });
-    input.stream.sendBootstrapMessage({
-      type: "egress.http.response.start",
-      streamId: input.stream.streamId,
-      status: input.response.statusCode ?? 502,
-      headers: toRepeatedHeaderValues(input.response.headers),
-    } satisfies EgressHttpResponseStart);
+    this.sendUpstreamResponsePayload({
+      payload: {
+        type: "egress.http.response.start",
+        streamId: input.stream.streamId,
+        status: input.response.statusCode ?? 502,
+        headers: toRepeatedHeaderValues(input.response.headers),
+      } satisfies EgressHttpResponseStart,
+      response: input.response,
+      stream: input.stream,
+    });
     input.stream.span.addEvent("gateway.egress.http.response_start", {
       "http.response.status_code": input.response.statusCode ?? 502,
     });
@@ -781,12 +894,14 @@ export class GatewayEgressTransportService {
         ...input.stream.attributes,
         "mistle.gateway.egress.byte_direction": "response",
       });
-      input.stream.sendBootstrapMessage({
-        type: "egress.http.response.body.chunk",
-        streamId: input.stream.streamId,
-        bytes: chunk.toString("base64"),
-        encoding: "base64",
-      } satisfies EgressHttpResponseBodyChunk);
+      this.sendUpstreamResponsePayload({
+        payload: encodeRawBytesDataFrame({
+          bytes: chunk,
+          streamId: input.stream.streamId,
+        }),
+        response: input.response,
+        stream: input.stream,
+      });
     });
     input.response.on("end", () => {
       if (input.stream.finished) {
@@ -800,10 +915,13 @@ export class GatewayEgressTransportService {
           streamId: input.stream.streamId,
         }),
       );
-      input.stream.sendBootstrapMessage({
-        type: "egress.http.response.body.end",
-        streamId: input.stream.streamId,
-      } satisfies EgressHttpResponseBodyEnd);
+      this.sendBootstrapPayloadWithoutBackpressure({
+        payload: {
+          type: "egress.http.response.body.end",
+          streamId: input.stream.streamId,
+        } satisfies EgressHttpResponseBodyEnd,
+        stream: input.stream,
+      });
       this.finishActiveStream({
         clockNowMs: Date.now(),
         outcome: "completed",
@@ -824,6 +942,107 @@ export class GatewayEgressTransportService {
     });
   }
 
+  private sendUpstreamResponsePayload(input: {
+    payload: ArrayBuffer | EgressTransportMessage;
+    response: IncomingMessage;
+    stream: ActiveGatewayEgressStream;
+  }): void {
+    const delivery = input.stream.sendBootstrapMessage(input.payload);
+    recordBootstrapWebSocketBufferedBytes({
+      bufferedBytes: delivery.bufferedBytes,
+      stream: input.stream,
+    });
+    delivery.writeFinished.catch((error: unknown) => {
+      if (input.stream.finished) {
+        return;
+      }
+
+      recordBootstrapWebSocketSendFailure({
+        error,
+        stream: input.stream,
+      });
+      this.failActiveStream({
+        error: error instanceof Error ? error : new Error(String(error)),
+        failureCode: "upstream_io_error",
+        outcome: "upstream_io_error",
+        stream: input.stream,
+      });
+    });
+
+    if (delivery.bufferedBytes < BootstrapWebSocketHighWatermarkBytes) {
+      if (!input.stream.finished) {
+        input.response.resume();
+      }
+      return;
+    }
+
+    input.response.pause();
+    const pauseStartedAtMs = Date.now();
+    BootstrapWebSocketBackpressurePauses.add(1, {
+      ...buildBootstrapWebSocketAttributes(input.stream),
+      "mistle.gateway.egress.bootstrap_ws.buffered_bytes": delivery.bufferedBytes,
+    });
+    delivery
+      .waitForBufferedBytesBelow(BootstrapWebSocketLowWatermarkBytes)
+      .then(() => {
+        BootstrapWebSocketBackpressureDurationMs.record(Date.now() - pauseStartedAtMs, {
+          ...buildBootstrapWebSocketAttributes(input.stream),
+          "mistle.gateway.egress.bootstrap_ws.drain_result": "resumed",
+        });
+        if (!input.stream.finished) {
+          input.response.resume();
+        }
+      })
+      .catch((error: unknown) => {
+        if (input.stream.finished) {
+          return;
+        }
+
+        BootstrapWebSocketBackpressureDurationMs.record(Date.now() - pauseStartedAtMs, {
+          ...buildBootstrapWebSocketAttributes(input.stream),
+          "mistle.gateway.egress.bootstrap_ws.drain_result": "failed",
+        });
+        recordBootstrapWebSocketSendFailure({
+          error,
+          stream: input.stream,
+        });
+        this.failActiveStream({
+          error: error instanceof Error ? error : new Error(String(error)),
+          failureCode: "upstream_io_error",
+          outcome: "upstream_io_error",
+          stream: input.stream,
+        });
+      });
+  }
+
+  private sendBootstrapPayloadWithoutBackpressure(input: {
+    payload: ArrayBuffer | EgressTransportMessage;
+    sendBootstrapMessage?: SendBootstrapPayload;
+    stream?: ActiveGatewayEgressStream;
+  }): void {
+    const sendBootstrapMessage = input.stream?.sendBootstrapMessage ?? input.sendBootstrapMessage;
+    if (sendBootstrapMessage === undefined) {
+      throw new Error("Bootstrap message sender is required.");
+    }
+
+    sendBootstrapMessage(input.payload).writeFinished.catch((error: unknown) => {
+      recordBootstrapWebSocketSendFailure({
+        error,
+        ...(input.stream === undefined ? {} : { stream: input.stream }),
+      });
+      logger.debug(
+        {
+          error,
+          event: "gateway_egress_bootstrap_send_failed",
+          sandboxInstanceId: input.stream?.sandboxInstanceId,
+          sourceBootstrapSessionId: input.stream?.sourceBootstrapSessionId,
+          streamId: input.stream?.streamId,
+        },
+        "Failed to send gateway egress websocket message to bootstrap tunnel.",
+      );
+    });
+  }
+
   private handleUpstreamUpgrade(input: {
     head: Buffer;
     response: IncomingMessage;
@@ -839,12 +1058,15 @@ export class GatewayEgressTransportService {
       headers: input.response.headers,
       stream: input.stream,
     });
-    input.stream.sendBootstrapMessage({
-      type: "egress.http.response.start",
-      streamId: input.stream.streamId,
-      status: input.response.statusCode ?? 101,
-      headers: toRepeatedHeaderValues(input.response.headers),
-    } satisfies EgressHttpResponseStart);
+    this.sendBootstrapPayloadWithoutBackpressure({
+      payload: {
+        type: "egress.http.response.start",
+        streamId: input.stream.streamId,
+        status: input.response.statusCode ?? 101,
+        headers: toRepeatedHeaderValues(input.response.headers),
+      } satisfies EgressHttpResponseStart,
+      stream: input.stream,
+    });
     recordStreamEvent({
       attributes: {
         ...input.stream.attributes,
@@ -877,11 +1099,14 @@ export class GatewayEgressTransportService {
         return;
       }
 
-      input.stream.sendBootstrapMessage({
-        type: "egress.tcp.close",
-        streamId: input.stream.streamId,
-        direction: "response",
-      } satisfies EgressTcpClose);
+      this.sendBootstrapPayloadWithoutBackpressure({
+        payload: {
+          type: "egress.tcp.close",
+          streamId: input.stream.streamId,
+          direction: "response",
+        } satisfies EgressTcpClose,
+        stream: input.stream,
+      });
     });
     input.socket.on("close", () => {
       if (input.stream.finished) {
@@ -935,7 +1160,7 @@ export class GatewayEgressTransportService {
   private async writeRequestBodyChunk(input: {
     message: Extract<EgressTransportMessage, { type: "egress.http.request.body.chunk" }>;
     sandboxInstanceId: string;
-    sendBootstrapMessage: SendBootstrapMessage;
+    sendBootstrapMessage: SendBootstrapPayload;
     sourceBootstrapSessionId: string;
   }): Promise<boolean> {
     const streamIdentity = {
@@ -1093,7 +1318,7 @@ export class GatewayEgressTransportService {
 
   private async endRequestBody(
     input: GatewayEgressStreamIdentity & {
-      sendBootstrapMessage: SendBootstrapMessage;
+      sendBootstrapMessage: SendBootstrapPayload;
     },
   ): Promise<boolean> {
     await this.waitForOpeningStream(input);
@@ -1138,7 +1363,7 @@ export class GatewayEgressTransportService {
   private async writeUpgradedBytes(input: {
     message: EgressTcpData;
     sandboxInstanceId: string;
-    sendBootstrapMessage: SendBootstrapMessage;
+    sendBootstrapMessage: SendBootstrapPayload;
     sourceBootstrapSessionId: string;
   }): Promise<boolean> {
     const streamIdentity = {
@@ -1193,7 +1418,7 @@ export class GatewayEgressTransportService {
   private async closeUpgradedDirection(input: {
     message: EgressTcpClose;
     sandboxInstanceId: string;
-    sendBootstrapMessage: SendBootstrapMessage;
+    sendBootstrapMessage: SendBootstrapPayload;
     sourceBootstrapSessionId: string;
   }): Promise<boolean> {
     const streamIdentity = {
@@ -1260,13 +1485,16 @@ export class GatewayEgressTransportService {
       ...input.stream.attributes,
       "mistle.gateway.egress.byte_direction": input.direction,
     });
-    input.stream.sendBootstrapMessage({
-      type: "egress.tcp.data",
-      streamId: input.stream.streamId,
-      direction: input.direction,
-      bytes: input.bytes.toString("base64"),
-      encoding: "base64",
-    } satisfies EgressTcpData);
+    this.sendBootstrapPayloadWithoutBackpressure({
+      payload: {
+        type: "egress.tcp.data",
+        streamId: input.stream.streamId,
+        direction: input.direction,
+        bytes: input.bytes.toString("base64"),
+        encoding: "base64",
+      } satisfies EgressTcpData,
+      stream: input.stream,
+    });
   }
 
   private getActiveStream(
@@ -1296,7 +1524,7 @@ export class GatewayEgressTransportService {
       }
     >;
     sandboxInstanceId: string;
-    sendBootstrapMessage: SendBootstrapMessage;
+    sendBootstrapMessage: SendBootstrapPayload;
     sourceBootstrapSessionId: string;
   }): void {
     const errorMessage = `Bootstrap tunnel cannot send gateway-owned egress message '${input.message.type}'.`;
@@ -1328,7 +1556,7 @@ export class GatewayEgressTransportService {
   private rejectForbiddenStreamState(input: {
     message: string;
     sandboxInstanceId: string;
-    sendBootstrapMessage: SendBootstrapMessage;
+    sendBootstrapMessage: SendBootstrapPayload;
     sourceBootstrapSessionId: string;
     streamId: number;
   }): void {
@@ -1394,7 +1622,7 @@ export class GatewayEgressTransportService {
     eventAttributes?: Record<string, string | number | boolean | null | undefined>;
     message: string;
     sandboxInstanceId: string;
-    sendBootstrapMessage: SendBootstrapMessage;
+    sendBootstrapMessage: SendBootstrapPayload;
     sourceBootstrapSessionId: string;
     streamId: number;
   }): void {
@@ -1409,12 +1637,15 @@ export class GatewayEgressTransportService {
       },
       input.message,
     );
-    input.sendBootstrapMessage({
-      type: "egress.stream.error",
-      streamId: input.streamId,
-      code: input.code,
-      message: input.message,
-    } satisfies EgressStreamError);
+    this.sendBootstrapPayloadWithoutBackpressure({
+      payload: {
+        type: "egress.stream.error",
+        streamId: input.streamId,
+        code: input.code,
+        message: input.message,
+      } satisfies EgressStreamError,
+      sendBootstrapMessage: input.sendBootstrapMessage,
+    });
   }
 
   private cancelActiveStream(input: {
@@ -1476,7 +1707,7 @@ export class GatewayEgressTransportService {
   private rejectMissingActiveRuntimePlanState(input: {
     message: EgressHttpOpen;
     sandboxInstanceId: string;
-    sendBootstrapMessage: SendBootstrapMessage;
+    sendBootstrapMessage: SendBootstrapPayload;
     sourceBootstrapSessionId: string;
     url: URL;
   }): void {
@@ -1503,7 +1734,7 @@ export class GatewayEgressTransportService {
     error: InvalidActiveSandboxRuntimePlanError;
     message: EgressHttpOpen;
     sandboxInstanceId: string;
-    sendBootstrapMessage: SendBootstrapMessage;
+    sendBootstrapMessage: SendBootstrapPayload;
     sourceBootstrapSessionId: string;
     url: URL;
   }): void {
@@ -1533,7 +1764,7 @@ export class GatewayEgressTransportService {
     message: EgressHttpOpen;
     runtimePlanRevision: number;
     sandboxInstanceId: string;
-    sendBootstrapMessage: SendBootstrapMessage;
+    sendBootstrapMessage: SendBootstrapPayload;
     sourceBootstrapSessionId: string;
     url: URL;
   }): void {
@@ -1565,7 +1796,7 @@ export class GatewayEgressTransportService {
     message: EgressHttpOpen;
     runtimePlanRevision: number;
     sandboxInstanceId: string;
-    sendBootstrapMessage: SendBootstrapMessage;
+    sendBootstrapMessage: SendBootstrapPayload;
     sourceBootstrapSessionId: string;
     url: URL;
   }): void {

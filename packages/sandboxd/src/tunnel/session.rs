@@ -5197,6 +5197,13 @@ fn handle_tunnel_binary_frame(
     session_state: &mut TunnelSessionMutableState,
     clock: &dyn Clock,
 ) -> Result<(), TunnelSessionError> {
+    if session_state
+        .pending_egress_http_requests
+        .contains_key(&frame.stream_id)
+    {
+        return handle_egress_binary_frame(frame, session_state);
+    }
+
     if let Some(agent_stream) = session_state.agent_streams.get_mut(&frame.stream_id) {
         let payload_bytes = frame.payload.len();
         match frame.payload_kind {
@@ -5436,6 +5443,43 @@ fn handle_tunnel_binary_frame(
             ),
         ),
     )?;
+    Ok(())
+}
+
+fn handle_egress_binary_frame(
+    frame: crate::tunnel::protocol::StreamDataFrame,
+    session_state: &mut TunnelSessionMutableState,
+) -> Result<(), TunnelSessionError> {
+    if frame.payload_kind != PAYLOAD_KIND_RAW_BYTES {
+        return Err(TunnelSessionError::Egress(format!(
+            "egress binary data frame streamId {} used unsupported payload kind {}",
+            frame.stream_id, frame.payload_kind
+        )));
+    }
+
+    let Some(pending_request) = session_state
+        .pending_egress_http_requests
+        .get_mut(&frame.stream_id)
+    else {
+        return Err(TunnelSessionError::Egress(format!(
+            "egress binary data frame streamId {} is not bound to a pending egress http request",
+            frame.stream_id
+        )));
+    };
+    if pending_request.response.is_none() {
+        return Err(TunnelSessionError::Egress(format!(
+            "egress binary data frame streamId {} arrived before response start",
+            frame.stream_id
+        )));
+    }
+    let Some(body_sender) = &pending_request.body_sender else {
+        return Err(TunnelSessionError::Egress(format!(
+            "egress binary data frame streamId {} arrived before response stream was attached",
+            frame.stream_id
+        )));
+    };
+
+    let _ = body_sender.send(Ok(Bytes::from(frame.payload)));
     Ok(())
 }
 
@@ -5927,9 +5971,10 @@ mod tests {
         TunnelSessionLoopContext, TunnelSessionMutableState, TunnelSessionRequest,
         TunnelSessionRuntime, TunnelWriterMessage, connect_bootstrap_websocket,
         handle_egress_transport_message, handle_ports_transport_message,
-        handle_tunnel_control_message, handle_tunnel_session_event, handle_tunnel_session_request,
-        prioritize_ipv4_socket_addresses, publish_pty_input_latency_warning,
-        publish_pty_session_summary, resolve_bootstrap_tunnel_url, resolve_tunnel_exchange_url,
+        handle_tunnel_binary_frame, handle_tunnel_control_message, handle_tunnel_session_event,
+        handle_tunnel_session_request, prioritize_ipv4_socket_addresses,
+        publish_pty_input_latency_warning, publish_pty_session_summary,
+        resolve_bootstrap_tunnel_url, resolve_tunnel_exchange_url,
         run_connected_tunnel_session_catching_panics, startup_transparent_passthrough_socket_mark,
         sync_pty_scope_keepalive,
     };
@@ -5950,6 +5995,7 @@ mod tests {
     use base64::Engine;
     use bytes::Bytes;
     use serde_json::{Value, json};
+    use tokio::sync::mpsc::unbounded_channel;
     use tungstenite::{
         Error as WebSocketError, Message, WebSocket, accept, accept_hdr,
         handshake::server::{Request, Response},
@@ -6336,6 +6382,73 @@ mod tests {
         )
         .expect("response body end should complete pending egress request");
         assert!(session_state.pending_egress_http_requests.is_empty());
+    }
+
+    #[tokio::test]
+    async fn streams_pending_gateway_egress_http_response_bytes_from_binary_frames() {
+        let (tunnel_writer_sender, mut tunnel_writer_receiver) = unbounded_channel();
+        let (response_sender, response_receiver) = mpsc::channel();
+        let mut session_state = TunnelSessionMutableState {
+            agent_endpoint_url: None,
+            telemetry_relay: TelemetryRelay::default(),
+            pending_signing_requests: BTreeMap::new(),
+            pending_egress_http_requests: BTreeMap::from([(
+                95,
+                PendingEgressHttpRequest {
+                    response_sender: Some(response_sender),
+                    response: None,
+                    body_sender: None,
+                },
+            )]),
+            pending_agent_opens: BTreeMap::new(),
+            pending_exec_opens: BTreeMap::new(),
+            agent_streams: BTreeMap::new(),
+            port_access_http_streams: BTreeMap::new(),
+            port_access_tcp_streams: BTreeMap::new(),
+            processes_stream_send_windows: BTreeMap::new(),
+            last_processes_snapshot_at_ms: None,
+            pty_sessions: BTreeMap::new(),
+            file_uploads: BTreeMap::new(),
+        };
+
+        handle_egress_transport_message(
+            EgressTransportMessage::HttpResponseStart(EgressHttpResponseStart {
+                message_type: "egress.http.response.start".to_string(),
+                stream_id: 95,
+                status: 200,
+                headers: BTreeMap::new(),
+            }),
+            &mut session_state,
+        )
+        .expect("response start should attach to pending egress request");
+        let mut response = response_receiver
+            .recv_timeout(Duration::from_secs(1))
+            .expect("egress response should be delivered")
+            .expect("egress response should succeed");
+
+        handle_tunnel_binary_frame(
+            &tunnel_writer_sender,
+            StreamDataFrame {
+                stream_id: 95,
+                payload_kind: PAYLOAD_KIND_RAW_BYTES,
+                payload: b"binary-pong".to_vec(),
+            },
+            &mut session_state,
+            &SystemClock,
+        )
+        .expect("binary response body frame should stream to the response body");
+
+        assert!(
+            tunnel_writer_receiver.try_recv().is_err(),
+            "accepted egress body frames should not emit tunnel control messages"
+        );
+        let streamed_chunk = response
+            .body
+            .recv()
+            .await
+            .expect("egress response body chunk should be delivered")
+            .expect("egress response body chunk should succeed");
+        assert_eq!(streamed_chunk, Bytes::from_static(b"binary-pong"));
     }
 
     #[tokio::test]

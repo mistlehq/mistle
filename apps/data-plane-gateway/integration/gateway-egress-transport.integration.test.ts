@@ -21,6 +21,8 @@ import {
 } from "@mistle/integrations-definitions";
 import type { CompiledRuntimePlan } from "@mistle/sandbox-runtime-contract";
 import {
+  PayloadKindRawBytes,
+  decodeDataFrame,
   parseEgressTransportMessage,
   type EgressTransportMessage,
 } from "@mistle/sandbox-session-protocol";
@@ -2244,11 +2246,9 @@ function createWebSocketMessageQueue(socket: WebSocket): WebSocketMessageQueue {
   const waitingResolvers: Array<(message: EgressTransportMessage) => void> = [];
 
   const onMessage = (data: RawData, isBinary: boolean): void => {
-    if (isBinary) {
-      throw new Error("Expected text websocket payload.");
-    }
-
-    const message = parseTransportMessage(toBuffer(data).toString("utf8"));
+    const message = isBinary
+      ? parseBinaryEgressBodyFrame(toBuffer(data))
+      : parseTransportMessage(toBuffer(data).toString("utf8"));
     const waitingResolver = waitingResolvers.shift();
     if (waitingResolver !== undefined) {
       waitingResolver(message);
@@ -2274,6 +2274,22 @@ function createWebSocketMessageQueue(socket: WebSocket): WebSocketMessageQueue {
         waitingResolvers.push(resolve);
       });
     },
+  };
+}
+
+function parseBinaryEgressBodyFrame(data: Buffer): EgressTransportMessage {
+  const frame = decodeDataFrame(data);
+  if (frame.payloadKind !== PayloadKindRawBytes) {
+    throw new Error(
+      `Expected binary egress body frame to use raw-bytes payload kind, received ${String(frame.payloadKind)}.`,
+    );
+  }
+
+  return {
+    type: "egress.http.response.body.chunk",
+    streamId: frame.streamId,
+    bytes: Buffer.from(frame.payload).toString("base64"),
+    encoding: "base64",
   };
 }
 
