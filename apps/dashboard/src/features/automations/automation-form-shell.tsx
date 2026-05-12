@@ -78,7 +78,7 @@ export type AutomationFormShellStatusMessage = {
   variant: "alert" | "default";
 };
 
-export function shouldRenderCommonAutomationInlineFieldError(input: {
+function shouldRenderCommonAutomationInlineFieldError(input: {
   key: CommonAutomationFormValueKey;
   message: string | undefined;
 }): boolean {

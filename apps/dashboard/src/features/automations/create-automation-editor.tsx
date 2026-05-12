@@ -96,15 +96,15 @@ function resolveActiveVersion(versions: readonly SandboxProfileVersion[]): numbe
   return activeVersion?.version ?? null;
 }
 
-function createInitialCreateAutomationFormValues(input: {
-  initialSandboxProfileId: string | undefined;
-}): CreateAutomationFormValues {
+function createInitialCreateAutomationFormValues(
+  initialSandboxProfileId: string | undefined,
+): CreateAutomationFormValues {
   const webhookValues = toWebhookAutomationFormValues(null);
   const scheduledValues = toScheduledAutomationFormValues(null);
 
   return {
     name: "",
-    sandboxProfileId: input.initialSandboxProfileId ?? "",
+    sandboxProfileId: initialSandboxProfileId ?? "",
     primaryRepositoryId: "",
     enabled: true,
     inputTemplate: webhookValues.inputTemplate,
@@ -278,9 +278,7 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
   const queryClient = useQueryClient();
   const [kind, setKind] = useState<AutomationTypeValue | null>(null);
   const [formValues, setFormValues] = useState<CreateAutomationFormValues>(() =>
-    createInitialCreateAutomationFormValues({
-      initialSandboxProfileId: input.initialSandboxProfileId,
-    }),
+    createInitialCreateAutomationFormValues(input.initialSandboxProfileId),
   );
   const [selectedSandboxProfileVersion, setSelectedSandboxProfileVersion] =
     useState<SelectedSandboxProfileVersion | null>(null);
