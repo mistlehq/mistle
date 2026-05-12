@@ -75,6 +75,7 @@ export type TestServiceRuntime = {
   endpoints: TestServiceEndpoints;
   pid?: number;
   containerId?: string;
+  metadata?: Readonly<Record<string, string>>;
 };
 
 /**

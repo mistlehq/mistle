@@ -48,6 +48,7 @@ type PersistedRunnerService = {
   endpoints: TestServiceEndpoints;
   pid: number | undefined;
   containerId: string | undefined;
+  metadata: Readonly<Record<string, string>> | undefined;
   ownerPid: number;
   startedAt: number;
 };
@@ -82,6 +83,7 @@ export async function acquireRunnerServicePoolLease(
           ...(existingService.containerId === undefined
             ? {}
             : { containerId: existingService.containerId }),
+          ...(existingService.metadata === undefined ? {} : { metadata: existingService.metadata }),
           release,
         };
       }
@@ -97,6 +99,7 @@ export async function acquireRunnerServicePoolLease(
         endpoints: startedService.endpoints,
         pid: startedService.pid,
         containerId: startedService.containerId,
+        metadata: startedService.metadata,
         ownerPid: process.pid,
         startedAt: systemClock.nowMs(),
       };
@@ -115,6 +118,7 @@ export async function acquireRunnerServicePoolLease(
         ...(startedService.containerId === undefined
           ? {}
           : { containerId: startedService.containerId }),
+        ...(startedService.metadata === undefined ? {} : { metadata: startedService.metadata }),
         release,
       };
     },
@@ -264,6 +268,7 @@ function createRuntimeFromPersisted(service: PersistedRunnerService): TestServic
     endpoints: service.endpoints,
     ...(service.pid === undefined ? {} : { pid: service.pid }),
     ...(service.containerId === undefined ? {} : { containerId: service.containerId }),
+    ...(service.metadata === undefined ? {} : { metadata: service.metadata }),
   };
 }
 
@@ -392,6 +397,11 @@ async function readPersistedService(
     containerIdValue === undefined
       ? undefined
       : readString(parsed, "containerId", "runner service pool state containerId");
+  const metadataValue = parsed["metadata"];
+  const metadata =
+    metadataValue === undefined
+      ? undefined
+      : readStringRecord(metadataValue, "runner service pool state metadata");
 
   return {
     version,
@@ -399,9 +409,25 @@ async function readPersistedService(
     endpoints,
     pid,
     containerId,
+    metadata,
     ownerPid,
     startedAt,
   };
+}
+
+function readStringRecord(value: unknown, label: string): Readonly<Record<string, string>> {
+  if (!isRecord(value)) {
+    throw new Error(`${label} must be an object.`);
+  }
+
+  const record: Record<string, string> = {};
+  for (const [key, entryValue] of Object.entries(value)) {
+    if (typeof entryValue !== "string") {
+      throw new Error(`${label}.${key} must be a string.`);
+    }
+    record[key] = entryValue;
+  }
+  return record;
 }
 
 function readEndpoints(record: Record<string, unknown>, label: string): TestServiceEndpoints {

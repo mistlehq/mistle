@@ -56,6 +56,8 @@ describe("runner service pool", () => {
     ]);
 
     expect(firstAcquire.hostBaseUrl).toBe(secondAcquire.hostBaseUrl);
+    expect(firstAcquire.metadata).toEqual({ diagnosticsPath: "pooled-server.log" });
+    expect(secondAcquire.metadata).toEqual({ diagnosticsPath: "pooled-server.log" });
 
     const lifecycle = await readFile(lifecycleFilePath, "utf8");
     expect(lifecycle.trim().split("\n")).toEqual(["started"]);
@@ -233,6 +235,9 @@ const lease = await acquireRunnerServicePoolLease({
         },
       },
       pid: startup.pid,
+      metadata: {
+        diagnosticsPath: "pooled-server.log",
+      },
       stop: async () => {
         process.kill(startup.pid, "SIGTERM");
       },
@@ -242,6 +247,7 @@ const lease = await acquireRunnerServicePoolLease({
 
 console.log(JSON.stringify({
   hostBaseUrl: readHttpEndpoint(lease).hostBaseUrl,
+  metadata: lease.metadata,
 }));
 
 await lease.release();
@@ -342,7 +348,7 @@ function runAcquirer(input: {
   lockMarkerFilePath?: string;
   lockTimeoutMs?: number;
   startDelayMs?: number;
-}): Promise<{ hostBaseUrl: string }> {
+}): Promise<{ hostBaseUrl: string; metadata: Readonly<Record<string, string>> | undefined }> {
   return new Promise((resolve, reject) => {
     execFile(
       process.execPath,
@@ -408,7 +414,10 @@ async function waitForProcessExit(processId: number): Promise<void> {
   throw new Error(`Timed out waiting for process ${String(processId)} to exit.`);
 }
 
-function parseAcquirerOutput(stdout: string): { hostBaseUrl: string } {
+function parseAcquirerOutput(stdout: string): {
+  hostBaseUrl: string;
+  metadata: Readonly<Record<string, string>> | undefined;
+} {
   const lines = stdout.trim().split("\n");
   const lastLine = lines.at(-1);
   if (lastLine === undefined) {
@@ -424,10 +433,22 @@ function parseAcquirerOutput(stdout: string): { hostBaseUrl: string } {
   if (typeof hostBaseUrl !== "string") {
     throw new Error("Expected acquirer output to contain hostBaseUrl.");
   }
+  const metadata = Reflect.get(parsed, "metadata");
+  if (metadata !== undefined && !isStringRecord(metadata)) {
+    throw new Error("Expected acquirer output metadata to contain string values.");
+  }
 
   return {
     hostBaseUrl,
+    metadata,
   };
+}
+
+function isStringRecord(value: unknown): value is Readonly<Record<string, string>> {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  return Object.values(value).every((entry) => typeof entry === "string");
 }
 
 async function readServerStartupFile(

@@ -110,6 +110,7 @@ function createPooledServiceDefinition(input: {
             ...(startedService.containerId === undefined
               ? {}
               : { containerId: startedService.containerId }),
+            ...(startedService.metadata === undefined ? {} : { metadata: startedService.metadata }),
             stop: startedService.stop,
           };
         },
@@ -122,6 +123,7 @@ function createPooledServiceDefinition(input: {
         endpoints: lease.endpoints,
         ...(lease.pid === undefined ? {} : { pid: lease.pid }),
         ...(lease.containerId === undefined ? {} : { containerId: lease.containerId }),
+        ...(lease.metadata === undefined ? {} : { metadata: lease.metadata }),
         stop: lease.release,
       };
     },

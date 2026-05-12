@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { connect as connectTls } from "node:tls";
 
@@ -21,6 +21,7 @@ const RuntimePublicAccessProxyReadyTimeoutMs = 30_000;
 const RuntimePublicAccessProxyPoolLockTimeoutMs = 240_000;
 const RuntimePublicAccessRouteReadyTimeoutMs = 30_000;
 const RuntimePublicAccessUpgradeProbeTimeoutMs = 5_000;
+const RuntimePublicAccessProxyDiagnosticsLogTailBytes = 64 * 1024;
 
 export type RuntimePublicAccessTunnel = {
   publicBaseUrls: ReadonlyMap<string, string>;
@@ -174,6 +175,7 @@ async function startRuntimePublicAccessProxy(input: {
     };
   };
   pid: number;
+  metadata: Readonly<Record<string, string>>;
   stop: () => Promise<void>;
 }> {
   const workDirectoryPath = await mkdtemp(
@@ -213,6 +215,13 @@ async function startRuntimePublicAccessProxy(input: {
     });
     throw new Error("Failed to start runtime public access proxy process.");
   }
+  child.once("exit", (code, signal) => {
+    void appendFile(
+      logPath,
+      `runtime public access proxy process exited code=${String(code)} signal=${String(signal)}\n`,
+      "utf8",
+    ).catch(() => undefined);
+  });
 
   try {
     const ready = await waitForRuntimePublicAccessProxyReady({
@@ -234,6 +243,11 @@ async function startRuntimePublicAccessProxy(input: {
         },
       },
       pid: child.pid,
+      metadata: {
+        logPath,
+        proxyPort: String(proxyPort),
+        workDirectoryPath,
+      },
       stop: async () => {
         try {
           child.kill("SIGTERM");
@@ -682,9 +696,11 @@ async function readRuntimePublicAccessProxyDiagnostics(
   proxy: RuntimePublicAccessProxy,
 ): Promise<unknown> {
   const endpoint = proxy.endpoints.http;
+  const processDiagnostics = await readRuntimePublicAccessProxyProcessDiagnostics(proxy);
   if (endpoint === undefined) {
     return {
       error: "runtime public access proxy did not expose an HTTP endpoint",
+      ...processDiagnostics,
     };
   }
 
@@ -700,20 +716,49 @@ async function readRuntimePublicAccessProxyDiagnostics(
       };
     }
     return {
-      proxyPid: proxy.pid,
-      proxyProcessAlive: proxy.pid === undefined ? undefined : isProcessAlive(proxy.pid),
+      ...processDiagnostics,
       status: response.status,
       statusText: response.statusText,
       body: parsed,
     };
   } catch (error) {
     return {
-      proxyPid: proxy.pid,
-      proxyProcessAlive: proxy.pid === undefined ? undefined : isProcessAlive(proxy.pid),
+      ...processDiagnostics,
       errorName: error instanceof Error ? error.name : "Error",
       error: error instanceof Error ? error.message : String(error),
       cause: readUnknownErrorCause(error),
     };
+  }
+}
+
+async function readRuntimePublicAccessProxyProcessDiagnostics(
+  proxy: RuntimePublicAccessProxy,
+): Promise<{
+  proxyPid: number | undefined;
+  proxyProcessAlive: boolean | undefined;
+  proxyMetadata: Readonly<Record<string, string>> | undefined;
+  proxyLogTail: string | undefined;
+}> {
+  return {
+    proxyPid: proxy.pid,
+    proxyProcessAlive: proxy.pid === undefined ? undefined : isProcessAlive(proxy.pid),
+    proxyMetadata: proxy.metadata,
+    proxyLogTail:
+      proxy.metadata?.logPath === undefined
+        ? undefined
+        : await readTextFileTail(
+            proxy.metadata.logPath,
+            RuntimePublicAccessProxyDiagnosticsLogTailBytes,
+          ),
+  };
+}
+
+async function readTextFileTail(filePath: string, maxBytes: number): Promise<string> {
+  try {
+    const content = await readFile(filePath, "utf8");
+    return content.slice(-maxBytes);
+  } catch (error) {
+    return `<failed to read ${filePath}: ${error instanceof Error ? error.message : String(error)}>`;
   }
 }
 
