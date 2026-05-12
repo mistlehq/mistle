@@ -278,6 +278,9 @@ export function useOpenCodeSessionState(input: {
           const messages = await client.listMessages({
             sessionId: session.id,
           });
+          const pendingPermissions = await client.listPermissions({
+            ...(directory === undefined ? {} : { directory }),
+          });
           if (generationRef.current !== generation) {
             return;
           }
@@ -285,6 +288,7 @@ export function useOpenCodeSessionState(input: {
             type: "hydrate_messages",
             sessionId: session.id,
             messages,
+            pendingPermissions,
             bufferedEvents,
           });
           hydrationHasCompleted = true;

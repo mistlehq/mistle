@@ -33,6 +33,7 @@ export type OpenCodeChatAction =
   | {
       bufferedEvents?: readonly OpenCodeEvent[];
       messages: readonly OpenCodeMessageWithParts[];
+      pendingPermissions?: readonly OpenCodePermissionRequest[];
       sessionId: string;
       type: "hydrate_messages";
     }
@@ -361,10 +362,54 @@ function applyPartDelta(input: {
   });
 }
 
+function getOpenCodePayloadSessionId(payload: OpenCodeEvent["payload"]): string | null {
+  if (payload.type === "message.updated") {
+    return payload.properties.sessionID;
+  }
+  if (payload.type === "message.part.updated") {
+    return payload.properties.sessionID;
+  }
+  if (payload.type === "message.part.delta") {
+    return payload.properties.sessionID;
+  }
+  if (payload.type === "session.status") {
+    return payload.properties.sessionID;
+  }
+  if (payload.type === "session.idle") {
+    return payload.properties.sessionID;
+  }
+  if (payload.type === "session.error") {
+    return payload.properties.sessionID ?? null;
+  }
+  if (payload.type === "permission.asked") {
+    return payload.properties.sessionID;
+  }
+  if (payload.type === "permission.replied") {
+    return payload.properties.sessionID;
+  }
+  if (payload.type === "session.diff") {
+    return payload.properties.sessionID;
+  }
+  return null;
+}
+
+function shouldApplyOpenCodePayload(
+  state: OpenCodeChatState,
+  payload: OpenCodeEvent["payload"],
+): boolean {
+  const payloadSessionId = getOpenCodePayloadSessionId(payload);
+  return (
+    state.sessionId === null || payloadSessionId === null || payloadSessionId === state.sessionId
+  );
+}
+
 function reduceOpenCodePayload(
   state: OpenCodeChatState,
   payload: OpenCodeEvent["payload"],
 ): OpenCodeChatState {
+  if (!shouldApplyOpenCodePayload(state, payload)) {
+    return state;
+  }
   if (payload.type === "message.updated") {
     const updated = upsertMessage({
       message: payload.properties.info,
@@ -466,6 +511,9 @@ export function reduceOpenCodeChatState(
       ...createInitialOpenCodeChatState(),
       messageOrder: action.messages.map((message) => message.info.id),
       messagesById,
+      pendingPermissions: (action.pendingPermissions ?? []).filter(
+        (permission) => permission.sessionID === action.sessionId,
+      ),
       sessionId: action.sessionId,
     });
     return (action.bufferedEvents ?? []).reduce(

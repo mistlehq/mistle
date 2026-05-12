@@ -1,6 +1,7 @@
 import type {
   OpenCodeEvent,
   OpenCodeMessageWithParts,
+  OpenCodePermissionRequest,
 } from "@mistle/integrations-definitions/agent-runtimes/opencode/client";
 import { describe, expect, it } from "vitest";
 
@@ -462,6 +463,109 @@ describe("reduceOpenCodeChatState", () => {
     ]);
   });
 
+  it("hydrates permissions that were already pending before event subscription", () => {
+    const hydrated = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "hydrate_messages",
+      sessionId: "ses_test",
+      messages: [],
+      pendingPermissions: [
+        createPermissionRequest({
+          id: "perm_existing",
+          sessionId: "ses_test",
+        }),
+        createPermissionRequest({
+          id: "perm_other_session",
+          sessionId: "ses_other",
+        }),
+      ],
+    });
+
+    expect(hydrated.pendingPermissions).toEqual([
+      expect.objectContaining({
+        id: "perm_existing",
+        sessionID: "ses_test",
+      }),
+    ]);
+    expect(hydrated.entries).toContainEqual(
+      expect.objectContaining({
+        id: "permission:perm_existing",
+        kind: "generic-item",
+        itemType: "opencode-permission",
+      }),
+    );
+  });
+
+  it("ignores live and buffered events for other OpenCode sessions", () => {
+    const hydrated = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "hydrate_messages",
+      sessionId: "ses_test",
+      messages: [
+        createAssistantMessage({
+          id: "msg_assistant",
+          parentId: "msg_user",
+          parts: [
+            {
+              id: "part_text",
+              messageID: "msg_assistant",
+              sessionID: "ses_test",
+              text: "Hel",
+              time: {
+                start: 1,
+              },
+              type: "text",
+            },
+          ],
+        }),
+      ],
+      bufferedEvents: [
+        createEvent({
+          id: "evt_other_status",
+          type: "session.status",
+          properties: {
+            sessionID: "ses_other",
+            status: {
+              type: "busy",
+            },
+          },
+        }),
+        createEvent({
+          id: "evt_other_permission",
+          type: "permission.asked",
+          properties: createPermissionRequest({
+            id: "perm_other",
+            sessionId: "ses_other",
+          }),
+        }),
+      ],
+    });
+
+    const afterOtherSessionDelta = reduceOpenCodeChatState(hydrated, {
+      type: "event_received",
+      event: createEvent({
+        id: "evt_other_delta",
+        type: "message.part.delta",
+        properties: {
+          sessionID: "ses_other",
+          messageID: "msg_assistant",
+          partID: "part_text",
+          field: "text",
+          delta: "lo",
+        },
+      }),
+    });
+
+    expect(afterOtherSessionDelta.sessionId).toBe("ses_test");
+    expect(afterOtherSessionDelta.status).toBeNull();
+    expect(afterOtherSessionDelta.pendingPermissions).toEqual([]);
+    expect(afterOtherSessionDelta.entries).toContainEqual(
+      expect.objectContaining({
+        id: "part_text",
+        kind: "assistant-message",
+        text: "Hel",
+      }),
+    );
+  });
+
   it("throws explicit errors for unsupported critical deltas", () => {
     const state = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
       type: "hydrate_messages",
@@ -509,6 +613,20 @@ function createEvent(payload: OpenCodeEvent["payload"]): OpenCodeEvent {
   return {
     directory: "/workspace",
     payload,
+  };
+}
+
+function createPermissionRequest(input: {
+  id: string;
+  sessionId: string;
+}): OpenCodePermissionRequest {
+  return {
+    id: input.id,
+    sessionID: input.sessionId,
+    permission: "bash",
+    patterns: ["pnpm test"],
+    metadata: {},
+    always: [],
   };
 }
 
