@@ -3,9 +3,21 @@ import {
   SandboxProviderNotImplementedError,
   SandboxResourceNotFoundError,
 } from "../../errors.js";
-import type { SandboxRuntimeControl, SandboxRuntimeControlRequest } from "../../types.js";
+import {
+  SandboxdInstallCommand,
+  SandboxdInstallEnvVars,
+  SandboxdStopDaemonCommand,
+} from "../../sandboxd-install.js";
+import type {
+  SandboxRuntimeControl,
+  SandboxRuntimeControlRequest,
+  SandboxRuntimeEnsureSandboxdRequest,
+} from "../../types.js";
 import { E2BClientError, E2BClientErrorCodes, E2BClientOperationIds } from "./client-errors.js";
 import type { E2BClient } from "./client.js";
+
+const SandboxdEnsureTimeoutMs = 120_000;
+const SandboxdStopDaemonTimeoutMs = 10_000;
 
 function requireSandboxId(id: string): void {
   if (id.trim().length === 0) {
@@ -49,6 +61,40 @@ export class E2BSandboxRuntimeControl implements SandboxRuntimeControl {
       }
 
       return version;
+    } catch (error) {
+      if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
+        throw toSandboxNotFoundError(input.id, error);
+      }
+
+      throw error;
+    }
+  }
+
+  async ensureSandboxd(input: SandboxRuntimeEnsureSandboxdRequest): Promise<void> {
+    requireSandboxId(input.id);
+
+    try {
+      await this.#client.runCommand({
+        sandboxId: input.id,
+        operation: E2BClientOperationIds.STOP_SANDBOXD_DAEMON,
+        commandDescription: "Stop sandboxd daemon",
+        command: SandboxdStopDaemonCommand,
+        user: "root",
+        timeoutMs: SandboxdStopDaemonTimeoutMs,
+      });
+      await this.#client.runCommand({
+        sandboxId: input.id,
+        operation: E2BClientOperationIds.ENSURE_SANDBOXD,
+        commandDescription: "Ensure sandboxd artifact",
+        command: SandboxdInstallCommand,
+        env: {
+          [SandboxdInstallEnvVars.URL]: input.artifact.url,
+          [SandboxdInstallEnvVars.SHA256]: input.artifact.sha256,
+          [SandboxdInstallEnvVars.VERSION]: input.artifact.version,
+        },
+        user: "root",
+        timeoutMs: SandboxdEnsureTimeoutMs,
+      });
     } catch (error) {
       if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
         throw toSandboxNotFoundError(input.id, error);

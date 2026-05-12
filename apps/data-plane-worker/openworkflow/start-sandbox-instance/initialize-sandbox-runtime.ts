@@ -14,6 +14,7 @@ import {
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
+import type { SandboxdArtifactResolver } from "../core/sandboxd-artifact-resolver.js";
 import { DataPlaneWorkerTunnelTokenDurations } from "../core/tunnel-token-durations.js";
 import {
   createSandboxTunnelGatewayWsUrl,
@@ -124,6 +125,7 @@ export async function initializeSandboxRuntime(
     logger: MistleLogger;
     processEnv: Readonly<Record<string, string | undefined>>;
     sandboxAdapter: SandboxAdapter;
+    sandboxdArtifactResolver: SandboxdArtifactResolver | undefined;
     sandboxRuntimeControl: SandboxRuntimeControl;
   },
   input: {
@@ -141,6 +143,23 @@ export async function initializeSandboxRuntime(
     config: ctx.config,
     sandboxInstanceId: input.sandboxInstanceId,
   });
+  const sandboxdArtifact = await ctx.sandboxdArtifactResolver?.resolve();
+  if (sandboxdArtifact !== undefined) {
+    await ctx.sandboxRuntimeControl.ensureSandboxd({
+      id: input.providerSandboxId,
+      artifact: sandboxdArtifact,
+      env: runtimeEnv,
+    });
+    ctx.logger.info(
+      {
+        providerSandboxId: input.providerSandboxId,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sandboxdVersion: sandboxdArtifact.version,
+      },
+      "Ensured sandboxd artifact before runtime initialization.",
+    );
+  }
+
   const sandboxdVersion = await ctx.sandboxRuntimeControl.readSandboxdVersion({
     id: input.providerSandboxId,
     env: runtimeEnv,

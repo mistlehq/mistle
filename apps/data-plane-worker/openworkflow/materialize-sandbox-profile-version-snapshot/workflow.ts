@@ -48,6 +48,7 @@ type MaterializeSnapshotWorkflowExecutionContext = Pick<
   | "tables"
   | "logger"
   | "processEnv"
+  | "sandboxdArtifactResolver"
   | "sandboxRuntimeProviderResolver"
 >;
 
@@ -389,6 +390,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
           logger,
           processEnv: ctx.processEnv,
           sandboxAdapter: resolvedRuntime.sandboxAdapter,
+          sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
           sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
         },
         {

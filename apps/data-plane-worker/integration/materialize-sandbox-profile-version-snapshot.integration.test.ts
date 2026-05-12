@@ -87,6 +87,7 @@ describe.concurrent("data-plane worker snapshot materialization", () => {
         tables: env.dataPlaneTables,
         logger: dataPlaneWorkerLogger,
         processEnv: {},
+        sandboxdArtifactResolver: undefined,
         sandboxRuntimeProviderResolver: createSandboxRuntimeProviderResolver({
           config: runtimeConfig,
           controlPlaneInternalClient,
@@ -190,6 +191,7 @@ describe.concurrent("data-plane worker snapshot materialization", () => {
           tables: env.dataPlaneTables,
           logger: dataPlaneWorkerLogger,
           processEnv: {},
+          sandboxdArtifactResolver: undefined,
           sandboxRuntimeProviderResolver: createSandboxRuntimeProviderResolver({
             config: runtimeConfig,
             controlPlaneInternalClient,

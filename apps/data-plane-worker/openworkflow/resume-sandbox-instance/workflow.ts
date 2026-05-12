@@ -347,6 +347,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                   logger,
                   processEnv: ctx.processEnv,
                   sandboxAdapter: resolvedRuntime.sandboxAdapter,
+                  sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
                   sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
                 },
                 {
@@ -1073,6 +1074,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               logger,
               processEnv: ctx.processEnv,
               sandboxAdapter: resolvedRuntime.sandboxAdapter,
+              sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
               sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
             },
             {

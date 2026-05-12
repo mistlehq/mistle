@@ -3,6 +3,7 @@ import { SandboxProvider, type SandboxAdapter, type SandboxRuntimeControl } from
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
+import type { SandboxdArtifactResolver } from "../core/sandboxd-artifact-resolver.js";
 import { createSandboxStartupInput } from "./initialize-sandbox-runtime.js";
 import {
   SandboxStartupModes,
@@ -35,6 +36,7 @@ export async function resumeSandboxRuntime(
     logger: MistleLogger;
     processEnv: Readonly<Record<string, string | undefined>>;
     sandboxAdapter: SandboxAdapter;
+    sandboxdArtifactResolver: SandboxdArtifactResolver | undefined;
     sandboxRuntimeControl: SandboxRuntimeControl;
   },
   input: {
@@ -51,6 +53,24 @@ export async function resumeSandboxRuntime(
     config: ctx.config,
     sandboxInstanceId: input.sandboxInstanceId,
   });
+  const sandboxdArtifact = await ctx.sandboxdArtifactResolver?.resolve();
+  if (sandboxdArtifact !== undefined) {
+    await ctx.sandboxRuntimeControl.ensureSandboxd({
+      id: input.providerSandboxId,
+      artifact: sandboxdArtifact,
+      env: runtimeEnv,
+    });
+    ctx.logger.info(
+      {
+        providerSandboxId: input.providerSandboxId,
+        runtimeProvider: input.runtimeProvider,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sandboxdVersion: sandboxdArtifact.version,
+      },
+      "Ensured sandboxd artifact before runtime resume.",
+    );
+  }
+
   const sandboxdVersion = await ctx.sandboxRuntimeControl.readSandboxdVersion({
     id: input.providerSandboxId,
     env: runtimeEnv,

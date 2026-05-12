@@ -222,11 +222,24 @@ export interface SandboxRuntimeControlRequest {
   readonly env?: Readonly<Record<string, string>>;
 }
 
+export interface SandboxdArtifact {
+  readonly version: string;
+  readonly url: string;
+  readonly sha256: string;
+}
+
+export interface SandboxRuntimeEnsureSandboxdRequest {
+  readonly id: string;
+  readonly artifact: SandboxdArtifact;
+  readonly env?: Readonly<Record<string, string>>;
+}
+
 export interface SandboxRuntimeControl {
   readSandboxdVersion(input: {
     id: string;
     env?: Readonly<Record<string, string>>;
   }): Promise<string>;
+  ensureSandboxd(input: SandboxRuntimeEnsureSandboxdRequest): Promise<void>;
   init(input: SandboxRuntimeControlRequest): Promise<void>;
   resume(input: SandboxRuntimeControlRequest): Promise<void>;
   readOperationLog(input: { id: string; operation: "init" | "resume" }): Promise<string | null>;

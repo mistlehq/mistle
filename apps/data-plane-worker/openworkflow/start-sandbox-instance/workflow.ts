@@ -625,6 +625,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             logger,
             processEnv: ctx.processEnv,
             sandboxAdapter: resolvedRuntime.sandboxAdapter,
+            sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
             sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
           },
           {

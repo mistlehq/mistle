@@ -46,6 +46,7 @@ export const DockerClientOperationIds = {
    * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L422-L452
    */
   STOP_CONTAINER: "stop_container",
+  ENSURE_SANDBOXD: "ensure_sandboxd",
   INIT: "init",
   READ_SANDBOXD_VERSION: "read_sandboxd_version",
   /**

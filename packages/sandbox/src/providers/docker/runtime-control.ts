@@ -8,7 +8,8 @@ import {
   SandboxProviderNotImplementedError,
   SandboxResourceNotFoundError,
 } from "../../errors.js";
-import type { SandboxRuntimeControl } from "../../types.js";
+import { SandboxdInstallCommand, SandboxdInstallEnvVars } from "../../sandboxd-install.js";
+import type { SandboxRuntimeControl, SandboxRuntimeEnsureSandboxdRequest } from "../../types.js";
 import {
   DockerClientError,
   DockerClientErrorCodes,
@@ -19,9 +20,9 @@ import type { DockerSandboxConfig } from "./config.js";
 
 const InitCommand = ["/opt/mistle/bin/sandboxd", "init"];
 const VersionCommand = ["/opt/mistle/bin/sandboxd", "version"];
+const EnsureSandboxdCommand = ["sh", "-euc", SandboxdInstallCommand];
 const DockerExecExitPollIntervalMs = 50;
-const DockerInitExecExitTimeoutMs = 120_000;
-const DockerExecExitPollAttempts = DockerInitExecExitTimeoutMs / DockerExecExitPollIntervalMs;
+const DockerExecExitTimeoutMs = 120_000;
 
 async function sleep(ms: number): Promise<void> {
   await systemSleeper.sleep(ms);
@@ -66,9 +67,13 @@ function captureUtf8Stream(stream: NodeJS.ReadableStream): {
   };
 }
 
-async function waitForDockerExecExitCode(exec: DockerClient.Exec): Promise<number> {
-  for (let attempt = 0; attempt < DockerExecExitPollAttempts; attempt += 1) {
-    const execInspect = await exec.inspect();
+async function waitForDockerExecExitCode(input: {
+  exec: DockerClient.Exec;
+  failureDescription: string;
+}): Promise<number> {
+  const attempts = DockerExecExitTimeoutMs / DockerExecExitPollIntervalMs;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const execInspect = await input.exec.inspect();
     if (execInspect.ExitCode !== null) {
       return execInspect.ExitCode;
     }
@@ -76,7 +81,7 @@ async function waitForDockerExecExitCode(exec: DockerClient.Exec): Promise<numbe
     await sleep(DockerExecExitPollIntervalMs);
   }
 
-  throw new Error("Timed out waiting for Docker sandbox init exec to report an exit code.");
+  throw new Error(`Timed out waiting for ${input.failureDescription} to report an exit code.`);
 }
 
 async function writePayloadToStream(
@@ -166,6 +171,36 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
     }
   }
 
+  async ensureSandboxd(input: SandboxRuntimeEnsureSandboxdRequest): Promise<void> {
+    if (input.id.trim().length === 0) {
+      throw new SandboxConfigurationError("Sandbox id is required.");
+    }
+
+    try {
+      await this.#runExecCommand({
+        id: input.id,
+        operation: DockerClientOperationIds.ENSURE_SANDBOXD,
+        command: EnsureSandboxdCommand,
+        env: {
+          [SandboxdInstallEnvVars.URL]: input.artifact.url,
+          [SandboxdInstallEnvVars.SHA256]: input.artifact.sha256,
+          [SandboxdInstallEnvVars.VERSION]: input.artifact.version,
+        },
+        failureDescription: "Docker sandboxd ensure command",
+      });
+    } catch (error) {
+      if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
+        throw new SandboxResourceNotFoundError({
+          resourceType: "sandbox",
+          resourceId: input.id,
+          cause: error,
+        });
+      }
+
+      throw error;
+    }
+  }
+
   async init(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void> {
     if (input.id.trim().length === 0) {
       throw new SandboxConfigurationError("Sandbox id is required.");
@@ -201,7 +236,10 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
       await endWritableStream(execStream);
 
       const exitCode = await this.#runDockerOperation(DockerClientOperationIds.INIT, () =>
-        waitForDockerExecExitCode(exec),
+        waitForDockerExecExitCode({
+          exec,
+          failureDescription: "Docker sandbox init exec",
+        }),
       );
       const stdoutText = capturedStdout.read();
       const stderrText = capturedStderr.read();
@@ -271,15 +309,23 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
     id: string;
     operation: (typeof DockerClientOperationIds)[keyof typeof DockerClientOperationIds];
     command: readonly string[];
+    env?: Readonly<Record<string, string>>;
     failureDescription: string;
   }): Promise<{ stdout: string; stderr: string }> {
     const container = this.#docker.getContainer(input.id);
+    const env =
+      input.env === undefined
+        ? undefined
+        : Object.entries(input.env)
+            .sort(([left], [right]) => left.localeCompare(right))
+            .map(([name, value]) => `${name}=${value}`);
     const exec = await this.#runDockerOperation(input.operation, () =>
       container.exec({
         AttachStdin: false,
         AttachStdout: true,
         AttachStderr: true,
         Cmd: [...input.command],
+        ...(env === undefined ? {} : { Env: env }),
         Tty: false,
         User: "root",
       }),
@@ -299,7 +345,10 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
     const capturedStderr = captureUtf8Stream(stderr);
 
     const exitCode = await this.#runDockerOperation(input.operation, () =>
-      waitForDockerExecExitCode(exec),
+      waitForDockerExecExitCode({
+        exec,
+        failureDescription: input.failureDescription,
+      }),
     );
     const stdoutText = capturedStdout.read();
     const stderrText = capturedStderr.read();
