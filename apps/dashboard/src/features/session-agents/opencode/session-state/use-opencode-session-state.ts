@@ -56,6 +56,7 @@ export type UseOpenCodeSessionStateResult = {
     hydrateChatFromSession: () => Promise<void>;
     isHydratingChat: boolean;
     isInterruptingTurn: boolean;
+    isRespondingToPermission: boolean;
     isStartingTurn: boolean;
     respondToPermission: (
       input: Omit<OpenCodePermissionResponseInput, "sessionId">,
@@ -118,6 +119,7 @@ export function useOpenCodeSessionState(input: {
   const [isHydratingChat, setIsHydratingChat] = useState(false);
   const [isStartingTurn, setIsStartingTurn] = useState(false);
   const [isInterruptingTurn, setIsInterruptingTurn] = useState(false);
+  const [isRespondingToPermission, setIsRespondingToPermission] = useState(false);
 
   const clearLifecycleErrorMessage = useCallback((): void => {
     setLifecycleErrorMessage(null);
@@ -351,7 +353,18 @@ export function useOpenCodeSessionState(input: {
       if (client === null) {
         throw new Error("Connect OpenCode before responding to a permission request.");
       }
-      await client.respondToPermission(permissionInput);
+      setIsRespondingToPermission(true);
+      try {
+        await client.respondToPermission(permissionInput);
+        setSessionErrorMessage(null);
+      } catch (error) {
+        setSessionErrorMessage(
+          error instanceof Error ? error.message : "Could not respond to OpenCode permission.",
+        );
+        throw error;
+      } finally {
+        setIsRespondingToPermission(false);
+      }
     },
     [],
   );
@@ -384,6 +397,7 @@ export function useOpenCodeSessionState(input: {
       hydrateChatFromSession,
       isHydratingChat,
       isInterruptingTurn,
+      isRespondingToPermission,
       isStartingTurn,
       respondToPermission,
       sendPrompt,

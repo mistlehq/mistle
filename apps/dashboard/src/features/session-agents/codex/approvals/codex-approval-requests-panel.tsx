@@ -182,6 +182,30 @@ export function CodexApprovalRequestsPanel({
             </div>
           );
         }
+
+        if (entry.kind === "opencode-permission") {
+          return (
+            <div className="space-y-3 rounded-xl border p-4" key={requestKey}>
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-medium text-sm">OpenCode permission</p>
+                <p className="text-muted-foreground text-xs">{entry.method}</p>
+              </div>
+              <p className="text-sm leading-6 whitespace-pre-wrap">
+                {entry.permission}: {entry.patterns.join(", ")}
+              </p>
+              <ApprovalDecisionButtons
+                appearance="panel"
+                availableDecisions={entry.availableDecisions}
+                disabled={isRespondingToServerRequest}
+                onRespondToServerRequest={onRespondToServerRequest}
+                requestId={entry.requestId}
+              />
+              {entry.responseErrorMessage === null ? null : (
+                <p className="text-destructive text-sm">{entry.responseErrorMessage}</p>
+              )}
+            </div>
+          );
+        }
       })}
     </div>
   );

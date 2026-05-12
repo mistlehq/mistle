@@ -323,6 +323,61 @@ describe("reduceOpenCodeChatState", () => {
     );
   });
 
+  it("clears session-scoped state when hydrating another session", () => {
+    const staleBusyPermissionState = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "event_received",
+      event: createEvent({
+        id: "evt_permission",
+        type: "permission.asked",
+        properties: {
+          id: "perm_stale",
+          sessionID: "ses_old",
+          permission: "bash",
+          patterns: ["pnpm test"],
+          metadata: {},
+          always: [],
+        },
+      }),
+    });
+    const staleFailedState = reduceOpenCodeChatState(staleBusyPermissionState, {
+      type: "event_received",
+      event: createEvent({
+        id: "evt_error",
+        type: "session.error",
+        properties: {
+          sessionID: "ses_old",
+          error: {
+            name: "UnknownError",
+            data: {
+              message: "stale error",
+            },
+          },
+        },
+      }),
+    });
+
+    const hydrated = reduceOpenCodeChatState(staleFailedState, {
+      type: "hydrate_messages",
+      sessionId: "ses_new",
+      messages: [
+        createUserMessage({
+          id: "msg_new",
+          text: "New session prompt",
+        }),
+      ],
+    });
+
+    expect(hydrated.sessionId).toBe("ses_new");
+    expect(hydrated.pendingPermissions).toEqual([]);
+    expect(hydrated.completedErrorMessage).toBeNull();
+    expect(hydrated.status).toBeNull();
+    expect(hydrated.entries).not.toContainEqual(
+      expect.objectContaining({
+        id: "permission:perm_stale",
+      }),
+    );
+  });
+
   it("throws explicit errors for unsupported critical deltas", () => {
     const state = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
       type: "hydrate_messages",

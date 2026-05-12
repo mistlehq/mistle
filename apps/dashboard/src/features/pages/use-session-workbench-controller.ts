@@ -2,11 +2,16 @@ import type {
   CodexJsonRpcClient,
   AgentStreamClient,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
+import type {
+  OpenCodePermissionRequest,
+  OpenCodePermissionResponseInput,
+} from "@mistle/integrations-definitions/agent-runtimes/opencode/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef } from "react";
 
 import type { ChatState } from "../chat/chat-state.js";
+import type { OpenCodePermissionApprovalRequestEntry } from "../session-agents/codex/approvals/index.js";
 import { formatCodexContextUsage } from "../session-agents/codex/session-state/codex-context-usage.js";
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import type { SessionBootstrapResult } from "../session-agents/codex/session-state/session-bootstrap/index.js";
@@ -164,12 +169,50 @@ function mapOpenCodeChatStateForConversation(
   };
 }
 
+function normalizeOpenCodePermissionPatterns(
+  permission: OpenCodePermissionRequest,
+): readonly string[] {
+  return permission.patterns.length === 0 ? [permission.permission] : permission.patterns;
+}
+
+function mapOpenCodePermissionsToServerRequests(
+  pendingPermissions: readonly OpenCodePermissionRequest[],
+): readonly OpenCodePermissionApprovalRequestEntry[] {
+  return pendingPermissions.map((permission) => ({
+    requestId: permission.id,
+    method: "opencode/permission/requestApproval",
+    kind: "opencode-permission",
+    sessionId: permission.sessionID,
+    permission: permission.permission,
+    patterns: normalizeOpenCodePermissionPatterns(permission),
+    availableDecisions: ["once", "always", "reject"],
+    status: "pending",
+    responseErrorMessage: null,
+  }));
+}
+
+function resolveOpenCodePermissionResponse(
+  result: unknown,
+): OpenCodePermissionResponseInput["response"] {
+  if (typeof result !== "object" || result === null || !("decision" in result)) {
+    return "reject";
+  }
+
+  const decision = result.decision;
+  if (decision === "always" || decision === "once" || decision === "reject") {
+    return decision;
+  }
+
+  return "reject";
+}
+
 type UseSessionWorkbenchControllerResult = {
   workbench: SessionWorkbenchState;
   conversationPane: SessionConversationPaneState;
 };
 
 export {
+  mapOpenCodePermissionsToServerRequests,
   sandboxInstanceStatusQueryKey,
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
@@ -179,6 +222,7 @@ export {
   resolveAutomationSessionPreparationTimeoutDelayMs,
   resolveCodexRecoveryStateForRender,
   resolveCodexReconnectMessage,
+  resolveOpenCodePermissionResponse,
   resolveStoppedSessionMessageForWorkbenchEntryPhase,
   resolveWorkbenchEntryPhase,
   shouldWaitForAutomationSessionThread,
@@ -441,6 +485,25 @@ export function useSessionWorkbenchController(input: {
   const interruptOpenCodeTurn = useCallback((): void => {
     void openCodeSessionState.chat.abortSession();
   }, [openCodeSessionState.chat]);
+  const respondToOpenCodePermission = useCallback(
+    (requestId: string | number, result: unknown): void => {
+      const response = resolveOpenCodePermissionResponse(result);
+      void openCodeSessionState.chat
+        .respondToPermission({
+          requestId: String(requestId),
+          response,
+        })
+        .catch((error: unknown) => {
+          openCodeSessionState.sessionMessage.reportSessionErrorMessage(
+            error instanceof Error ? error.message : "Could not respond to OpenCode permission.",
+          );
+        });
+    },
+    [openCodeSessionState.chat, openCodeSessionState.sessionMessage],
+  );
+  const openCodePendingServerRequests = mapOpenCodePermissionsToServerRequests(
+    openCodeSessionState.chat.chatState.pendingPermissions,
+  );
 
   return {
     workbench: {
@@ -528,10 +591,14 @@ export function useSessionWorkbenchController(input: {
       },
       serverRequestsState: {
         isRespondingToServerRequest: isOpenCodeRuntime
-          ? false
+          ? openCodeSessionState.chat.isRespondingToPermission
           : serverRequests.isRespondingToServerRequest,
-        pendingServerRequests: isOpenCodeRuntime ? [] : serverRequests.pendingServerRequests,
-        respondToServerRequest: serverRequests.respondToServerRequest,
+        pendingServerRequests: isOpenCodeRuntime
+          ? openCodePendingServerRequests
+          : serverRequests.pendingServerRequests,
+        respondToServerRequest: isOpenCodeRuntime
+          ? respondToOpenCodePermission
+          : serverRequests.respondToServerRequest,
       },
     },
   };

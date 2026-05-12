@@ -461,7 +461,7 @@ export function reduceOpenCodeChatState(
       action.messages.map((message) => [message.info.id, createMessageState(message)]),
     );
     return rebuildState({
-      ...state,
+      ...createInitialOpenCodeChatState(),
       messageOrder: action.messages.map((message) => message.info.id),
       messagesById,
       sessionId: action.sessionId,

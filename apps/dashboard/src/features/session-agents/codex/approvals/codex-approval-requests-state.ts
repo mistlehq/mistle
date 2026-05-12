@@ -134,10 +134,23 @@ export type CodexToolRequestUserInputEntry = {
   responseErrorMessage: string | null;
 };
 
+export type OpenCodePermissionApprovalRequestEntry = {
+  requestId: string;
+  method: "opencode/permission/requestApproval";
+  kind: "opencode-permission";
+  sessionId: string;
+  permission: string;
+  patterns: readonly string[];
+  availableDecisions: readonly string[];
+  status: "pending" | "responding";
+  responseErrorMessage: string | null;
+};
+
 export type CodexApprovalRequestEntry =
   | CodexCommandApprovalRequestEntry
   | CodexFileChangeApprovalRequestEntry
-  | CodexToolRequestUserInputEntry;
+  | CodexToolRequestUserInputEntry
+  | OpenCodePermissionApprovalRequestEntry;
 
 export type CodexApprovalRequestsState = {
   entries: readonly CodexApprovalRequestEntry[];

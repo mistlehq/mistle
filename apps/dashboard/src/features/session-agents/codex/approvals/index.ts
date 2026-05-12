@@ -12,4 +12,5 @@ export {
   type CodexCommandApprovalRequestEntry,
   type CodexFileChangeApprovalRequestEntry,
   type CodexToolRequestUserInputEntry,
+  type OpenCodePermissionApprovalRequestEntry,
 } from "./codex-approval-requests-state.js";
