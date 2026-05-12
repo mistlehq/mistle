@@ -7,11 +7,11 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
+import { createAutomationListEvent } from "../automations/automation-list-test-fixtures.js";
 import type {
   AutomationListItem,
   AutomationsListResult,
 } from "../automations/automations-types.js";
-import { createWebhookAutomationListEvent } from "../automations/webhook-automation-test-fixtures.js";
 import { automationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { AutomationsPage } from "./automations-page.js";
 
@@ -42,7 +42,7 @@ function createAutomationListItem(overrides?: Partial<AutomationListItem>): Auto
     },
     source: {
       kind: "webhook",
-      events: [createWebhookAutomationListEvent()],
+      events: [createAutomationListEvent()],
     },
     updatedAt: "2026-04-30T02:00:00.000Z",
     ...overrides,
@@ -273,7 +273,7 @@ describe("AutomationsPage", () => {
           name: "Backlog sync",
           source: {
             kind: "webhook",
-            events: [createWebhookAutomationListEvent({ label: "Issue comment created" })],
+            events: [createAutomationListEvent({ label: "Issue comment created" })],
           },
         }),
       ]),

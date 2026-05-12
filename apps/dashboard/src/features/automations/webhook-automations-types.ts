@@ -1,56 +1,11 @@
 import { z } from "zod";
 
-const KeysetPageSchema = z
-  .object({
-    after: z.string().min(1),
-    limit: z.number().int().min(1),
-  })
-  .strict();
-
-const PreviousPageSchema = z
-  .object({
-    before: z.string().min(1),
-    limit: z.number().int().min(1),
-  })
-  .strict();
-
 const WebhookAutomationTargetSchema = z
   .object({
     id: z.string().min(1),
     sandboxProfileId: z.string().min(1),
     sandboxProfileVersion: z.number().int().min(1),
     primaryRepositoryId: z.string().min(1).nullable(),
-  })
-  .strict();
-
-export const WebhookAutomationListEventSchema = z
-  .object({
-    label: z.string().min(1),
-    logoKey: z.string().min(1).optional(),
-    unavailable: z.boolean().optional(),
-  })
-  .strict();
-
-export const WebhookAutomationListIssueSchema = z
-  .object({
-    code: z.enum([
-      "MISSING_TARGET_METADATA",
-      "MISSING_INTEGRATION_CONNECTION",
-      "MISSING_SANDBOX_PROFILE",
-    ]),
-    message: z.string().min(1),
-  })
-  .strict();
-
-export const WebhookAutomationListItemSchema = z
-  .object({
-    id: z.string().min(1),
-    name: z.string().min(1),
-    enabled: z.boolean(),
-    targetName: z.string().min(1),
-    issue: WebhookAutomationListIssueSchema.optional(),
-    events: z.array(WebhookAutomationListEventSchema),
-    updatedAt: z.string().min(1),
   })
   .strict();
 
@@ -73,15 +28,6 @@ export const WebhookAutomationSchema = z
   })
   .strict();
 
-export const WebhookAutomationsListResultSchema = z
-  .object({
-    items: z.array(WebhookAutomationListItemSchema),
-    nextPage: KeysetPageSchema.nullable(),
-    previousPage: PreviousPageSchema.nullable(),
-    totalResults: z.number().int().min(0),
-  })
-  .strict();
-
 export const DeleteWebhookAutomationResultSchema = z
   .object({
     automationId: z.string().min(1),
@@ -89,11 +35,6 @@ export const DeleteWebhookAutomationResultSchema = z
   .strict();
 
 export type WebhookAutomation = z.infer<typeof WebhookAutomationSchema>;
-export type WebhookAutomationSandboxProfileUsage = Pick<WebhookAutomation, "id" | "name">;
-export type WebhookAutomationListEvent = z.infer<typeof WebhookAutomationListEventSchema>;
-export type WebhookAutomationListIssue = z.infer<typeof WebhookAutomationListIssueSchema>;
-export type WebhookAutomationListItem = z.infer<typeof WebhookAutomationListItemSchema>;
-export type WebhookAutomationsListResult = z.infer<typeof WebhookAutomationsListResultSchema>;
 export type DeleteWebhookAutomationResult = z.infer<typeof DeleteWebhookAutomationResultSchema>;
 
 export type CreateWebhookAutomationInput = {

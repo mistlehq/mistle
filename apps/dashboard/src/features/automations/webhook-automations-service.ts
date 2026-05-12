@@ -12,10 +12,7 @@ import {
   type DeleteWebhookAutomationResult,
   type UpdateWebhookAutomationInput,
   WebhookAutomationSchema,
-  WebhookAutomationsListResultSchema,
   type WebhookAutomation,
-  type WebhookAutomationSandboxProfileUsage,
-  type WebhookAutomationsListResult,
 } from "./webhook-automations-types.js";
 
 async function readJsonWithSchema<T>(input: {
@@ -37,80 +34,6 @@ async function readJsonWithSchema<T>(input: {
   }
 
   return parsed.data;
-}
-
-export async function listWebhookAutomations(input: {
-  limit: number;
-  after: string | null;
-  before: string | null;
-  signal?: AbortSignal;
-}): Promise<WebhookAutomationsListResult> {
-  try {
-    const response = await requestControlPlane({
-      operation: "listWebhookAutomations",
-      method: "GET",
-      pathname: "/v1/automations/webhooks",
-      query: {
-        limit: input.limit,
-        ...(input.after === null ? {} : { after: input.after }),
-        ...(input.before === null ? {} : { before: input.before }),
-      },
-      ...(input.signal === undefined ? {} : { signal: input.signal }),
-      fallbackMessage: "Could not load webhook automations.",
-      errorFactory: createWebhookAutomationsApiError,
-    });
-
-    return await readJsonWithSchema({
-      response,
-      schema: WebhookAutomationsListResultSchema,
-      operation: "listWebhookAutomations",
-      invalidMessage: "Webhook automations list response payload is invalid.",
-    });
-  } catch (error) {
-    throw toWebhookAutomationsApiError({
-      operation: "listWebhookAutomations",
-      error,
-      fallbackMessage: "Could not load webhook automations.",
-    });
-  }
-}
-
-export async function listWebhookAutomationsForSandboxProfile(input: {
-  sandboxProfileId: string;
-  signal?: AbortSignal;
-}): Promise<WebhookAutomationSandboxProfileUsage[]> {
-  const matchingAutomations: WebhookAutomationSandboxProfileUsage[] = [];
-  let after: string | null = null;
-
-  do {
-    const page = await listWebhookAutomations({
-      limit: 100,
-      after,
-      before: null,
-      ...(input.signal === undefined ? {} : { signal: input.signal }),
-    });
-    const automations = await Promise.all(
-      page.items.map((item) =>
-        getWebhookAutomation({
-          automationId: item.id,
-          ...(input.signal === undefined ? {} : { signal: input.signal }),
-        }),
-      ),
-    );
-
-    for (const automation of automations) {
-      if (automation.target.sandboxProfileId === input.sandboxProfileId) {
-        matchingAutomations.push({
-          id: automation.id,
-          name: automation.name,
-        });
-      }
-    }
-
-    after = page.nextPage?.after ?? null;
-  } while (after !== null);
-
-  return matchingAutomations;
 }
 
 export async function getWebhookAutomation(input: {

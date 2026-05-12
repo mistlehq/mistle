@@ -53,8 +53,10 @@ import {
 } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { listWebhookAutomationsForSandboxProfile } from "../automations/webhook-automations-service.js";
-import type { WebhookAutomationSandboxProfileUsage } from "../automations/webhook-automations-types.js";
+import {
+  listWebhookAutomationsForSandboxProfile,
+  type WebhookAutomationSandboxProfileUsage,
+} from "../automations/automations-service.js";
 import { useAppPageBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { NavigationBlockerDialog } from "../navigation/navigation-blocker-dialog.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";

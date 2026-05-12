@@ -4,7 +4,6 @@ import {
   AUTOMATIONS_QUERY_KEY_PREFIX,
   automationsListQueryKey,
   webhookAutomationDetailQueryKey,
-  webhookAutomationsListQueryKey,
 } from "./webhook-automations-query-keys.js";
 
 describe("webhook automations query keys", () => {
@@ -28,16 +27,6 @@ describe("webhook automations query keys", () => {
         sandboxProfileId: "sbp_123",
       }),
     ).toEqual(["automations", "list", 25, null, null, "sbp_123"]);
-  });
-
-  it("builds the webhook list query key", () => {
-    expect(
-      webhookAutomationsListQueryKey({
-        limit: 25,
-        after: "cursor_after",
-        before: null,
-      }),
-    ).toEqual(["automations", "webhooks", "list", 25, "cursor_after", null]);
   });
 
   it("builds the detail query key", () => {

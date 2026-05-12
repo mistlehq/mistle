@@ -68,3 +68,39 @@ export async function listAutomations(input: {
     });
   }
 }
+
+export type WebhookAutomationSandboxProfileUsage = {
+  id: string;
+  name: string;
+};
+
+export async function listWebhookAutomationsForSandboxProfile(input: {
+  sandboxProfileId: string;
+  signal?: AbortSignal;
+}): Promise<WebhookAutomationSandboxProfileUsage[]> {
+  const matchingAutomations: WebhookAutomationSandboxProfileUsage[] = [];
+  let after: string | null = null;
+
+  do {
+    const page = await listAutomations({
+      limit: 100,
+      after,
+      before: null,
+      sandboxProfileId: input.sandboxProfileId,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+    });
+
+    for (const automation of page.items) {
+      if (automation.kind === "webhook") {
+        matchingAutomations.push({
+          id: automation.id,
+          name: automation.name,
+        });
+      }
+    }
+
+    after = page.nextPage?.after ?? null;
+  } while (after !== null);
+
+  return matchingAutomations;
+}

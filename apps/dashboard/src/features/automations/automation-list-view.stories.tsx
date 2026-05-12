@@ -1,13 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
+import {
+  createAutomationListEvent,
+  createAutomationListIssue,
+} from "./automation-list-test-fixtures.js";
 import type { AutomationListItemViewModel } from "./automation-list-types.js";
 import { AutomationListView } from "./automation-list-view.js";
-import {
-  createRowLevelIssueWebhookAutomationListItemViewModel,
-  createWebhookAutomationListEvent,
-  createWebhookAutomationListIssue,
-} from "./webhook-automation-test-fixtures.js";
 
 const MixedItems: readonly AutomationListItemViewModel[] = [
   {
@@ -24,11 +23,11 @@ const MixedItems: readonly AutomationListItemViewModel[] = [
     source: {
       kind: "webhook",
       events: [
-        createWebhookAutomationListEvent({
+        createAutomationListEvent({
           label: "CI completed",
           logoKey: "github",
         }),
-        createWebhookAutomationListEvent({
+        createAutomationListEvent({
           label: "Pull request opened",
           logoKey: "github",
         }),
@@ -90,7 +89,7 @@ const MixedItems: readonly AutomationListItemViewModel[] = [
     source: {
       kind: "webhook",
       events: [
-        createWebhookAutomationListEvent({
+        createAutomationListEvent({
           label: "github.push.deleted",
           unavailable: true,
         }),
@@ -104,8 +103,10 @@ const ScheduleOnlyItems = MixedItems.filter((item) => item.kind === "schedule");
 const EventOnlyItems = MixedItems.filter((item) => item.kind === "webhook");
 
 const RowLevelIssueItem: AutomationListItemViewModel = {
-  ...createRowLevelIssueWebhookAutomationListItemViewModel(),
+  id: "atm_01jps82rc4z62qy0m7zdb8h5qn",
   kind: "webhook",
+  name: "Retired metadata triage",
+  enabled: true,
   target: {
     sandboxProfileId: "sbp_incident_commander",
     sandboxProfileName: null,
@@ -115,12 +116,14 @@ const RowLevelIssueItem: AutomationListItemViewModel = {
   source: {
     kind: "webhook",
     events: [
-      createWebhookAutomationListEvent({
+      createAutomationListEvent({
         label: "issue_comment.created",
         unavailable: true,
       }),
     ],
   },
+  issue: createAutomationListIssue(),
+  updatedAtLabel: "3 days ago",
 };
 
 const ScheduleWithoutNextRunItem: AutomationListItemViewModel = {
@@ -134,7 +137,7 @@ const ScheduleWithoutNextRunItem: AutomationListItemViewModel = {
     primaryRepositoryId: null,
     primaryRepositoryName: null,
   },
-  issue: createWebhookAutomationListIssue({
+  issue: createAutomationListIssue({
     code: "MISSING_TARGET_METADATA",
     message:
       "This scheduled automation has no next run. Check whether the schedule is valid and enabled.",
