@@ -149,10 +149,14 @@ async function startRuntimeDataPlaneWorker(input: {
     sandboxEndpoints: input.sandboxEndpoints,
     sandbox: input.sandbox,
   });
-  const config = loadConfig({
+  const loadedConfig = loadConfig({
     app: AppIds.DATA_PLANE_WORKER,
     env,
-  }).app;
+  });
+  if (loadedConfig.global === undefined) {
+    throw new Error("Expected global config to be loaded for data-plane worker test runtime.");
+  }
+  const config = loadedConfig.app;
   const appDatabaseUrl = infraValue(input.postgres, PostgresValues.HOST_POOLED_URL);
   const workflowDatabaseUrl = infraValue(input.postgres, PostgresValues.HOST_DIRECT_URL);
   const workflowNamespaceId = createDataPlaneWorkflowNamespaceId(input.startInput.environmentId);
@@ -175,6 +179,7 @@ async function startRuntimeDataPlaneWorker(input: {
   const runtime = {
     backend,
     workerConfig: config,
+    environment: loadedConfig.global.env,
   };
   const hostedContext = await createHostedWorkflowContext({
     runtime,

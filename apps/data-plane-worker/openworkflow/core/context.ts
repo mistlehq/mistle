@@ -16,11 +16,16 @@ import { logger } from "../../logger.js";
 import { createSandboxRuntimeStateReader } from "../../runtime-state/create-sandbox-runtime-state-reader.js";
 import type { SandboxRuntimeStateReader } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import { createDataPlaneWorkerRuntimeConfig, type DataPlaneWorkerRuntimeConfig } from "./config.js";
+import { readServiceReleaseVersion } from "./release-version.js";
 import { getOpenWorkflowRuntime, type OpenWorkflowRuntime } from "./runtime.js";
 import {
   createSandboxRuntimeProviderResolver,
   type SandboxRuntimeProviderResolver,
 } from "./sandbox-runtime-resolver.js";
+import {
+  createSandboxdArtifactResolver,
+  type SandboxdArtifactResolver,
+} from "./sandboxd-artifact-resolver.js";
 import { DataPlaneWorkerTunnelTokenDurations } from "./tunnel-token-durations.js";
 
 const DefaultTestEnvironmentIdHeader = "x-mistle-test-environment-id";
@@ -33,6 +38,7 @@ export type WorkflowContext = {
   tables: DataPlaneTables;
   dbPool: Pool;
   sandboxRuntimeProviderResolver: SandboxRuntimeProviderResolver;
+  sandboxdArtifactResolver: SandboxdArtifactResolver | undefined;
   runtimeStateReader: SandboxRuntimeStateReader;
   controlPlaneInternalClient: ControlPlaneInternalClient;
   tunnelReadinessPolicy: {
@@ -79,7 +85,7 @@ async function createWorkflowContext(input?: {
   dbPool?: Pool;
   processEnv?: Readonly<Record<string, string | undefined>>;
 }): Promise<HostedWorkflowContext> {
-  const { workerConfig } = input?.runtime ?? (await getOpenWorkflowRuntime());
+  const { environment, workerConfig } = input?.runtime ?? (await getOpenWorkflowRuntime());
   const config = createDataPlaneWorkerRuntimeConfig({ app: workerConfig });
   const processEnv = input?.processEnv ?? process.env;
   const testIsolation = input?.testIsolation ?? readTestIsolationEnv();
@@ -135,6 +141,12 @@ async function createWorkflowContext(input?: {
           config,
           controlPlaneInternalClient,
         }),
+        sandboxdArtifactResolver:
+          environment === "production"
+            ? createSandboxdArtifactResolver({
+                releaseVersion: readServiceReleaseVersion(),
+              })
+            : undefined,
         runtimeStateReader,
         controlPlaneInternalClient,
         tunnelReadinessPolicy: createDefaultTunnelReadinessPolicy(),

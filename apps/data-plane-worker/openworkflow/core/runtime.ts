@@ -6,6 +6,7 @@ import { loadDataPlaneWorkerConfig, type DataPlaneWorkerConfig } from "./config.
 export type OpenWorkflowRuntime = {
   backend: Awaited<ReturnType<typeof createDataPlaneBackend>>;
   workerConfig: DataPlaneWorkerConfig;
+  environment: "development" | "production";
 };
 
 let openWorkflowRuntimePromise: Promise<OpenWorkflowRuntime> | undefined;
@@ -25,8 +26,12 @@ export function getOpenWorkflowRuntime(): Promise<OpenWorkflowRuntime> {
   openWorkflowRuntimePromise = Promise.resolve()
     .then(async () => {
       const loadedConfig = loadDataPlaneWorkerConfig(process.env);
+      if (loadedConfig.global === undefined) {
+        throw new Error("Expected global config to be loaded for data-plane worker runtime.");
+      }
 
       return {
+        environment: loadedConfig.global.env,
         workerConfig: loadedConfig.app,
         backend: await createDataPlaneBackend({
           url: loadedConfig.app.workflow.databaseUrl,
