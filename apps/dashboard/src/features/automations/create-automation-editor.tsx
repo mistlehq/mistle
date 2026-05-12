@@ -1,0 +1,791 @@
+import { InlineCode } from "@mistle/ui";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+
+import { resolveApiErrorMessage } from "../api/error-message.js";
+import {
+  sandboxProfileVersionAutomationConfigQueryKey,
+  sandboxProfileVersionsQueryKey,
+} from "../sandbox-profiles/sandbox-profiles-query-keys.js";
+import {
+  getSandboxProfileVersionAutomationConfig,
+  listSandboxProfileVersions,
+} from "../sandbox-profiles/sandbox-profiles-service.js";
+import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type { AutomationCreateSuccessPath } from "./automation-editor-navigation.js";
+import { AutomationFormShell } from "./automation-form-shell.js";
+import { AutomationTypeSelectField, type AutomationTypeValue } from "./automation-type-field.js";
+import {
+  toCreateScheduledAutomationPayload,
+  toScheduledAutomationFormValues,
+  validateScheduledAutomationFormValues,
+} from "./scheduled-automation-form-helpers.js";
+import { resolveScheduledAutomationFormPresentation } from "./scheduled-automation-form-state.js";
+import {
+  type ScheduledAutomationFormValueKey,
+  type ScheduledAutomationFormValues,
+} from "./scheduled-automation-form-types.js";
+import { ScheduledAutomationTypeSpecificSection } from "./scheduled-automation-form.js";
+import { createScheduledAutomation } from "./scheduled-automations-service.js";
+import { resolveSelectedProfileTriggerState } from "./use-webhook-automation-editor-state.js";
+import { useWebhookAutomationPrerequisites } from "./use-webhook-automation-prerequisites.js";
+import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
+import {
+  toCreateWebhookAutomationPayload,
+  toWebhookAutomationFormValues,
+  validateWebhookAutomationFormValues,
+} from "./webhook-automation-form-helpers.js";
+import { resolveWebhookAutomationFormState } from "./webhook-automation-form-state.js";
+import {
+  type WebhookAutomationFormValueKey,
+  type WebhookAutomationFormValues,
+} from "./webhook-automation-form-types.js";
+import { WebhookAutomationTypeSpecificSection } from "./webhook-automation-form.js";
+import { DefaultWebhookAutomationMessageTemplate } from "./webhook-automation-input-template.js";
+import {
+  buildWebhookAutomationEventOptions,
+  buildWebhookAutomationPrimaryRepositoryOptions,
+  WebhookAutomationWorkspaceRootRepositoryOptionValue,
+} from "./webhook-automation-option-builders.js";
+import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
+import { AUTOMATIONS_QUERY_KEY_PREFIX } from "./webhook-automations-query-keys.js";
+import { createWebhookAutomation } from "./webhook-automations-service.js";
+
+type NavigateFunction = (to: string) => void | Promise<void>;
+
+type CreateAutomationEditorProps = {
+  initialKind: AutomationTypeValue;
+  navigate: NavigateFunction;
+  initialSandboxProfileId?: string | undefined;
+  createSuccessPath?: AutomationCreateSuccessPath;
+};
+
+type CommonCreateAutomationFormValues = Pick<
+  WebhookAutomationFormValues,
+  "enabled" | "inputTemplate" | "name" | "primaryRepositoryId" | "sandboxProfileId"
+>;
+
+type CreateAutomationFormValues = CommonCreateAutomationFormValues &
+  Pick<
+    WebhookAutomationFormValues,
+    "conversationKeyTemplate" | "instructions" | "triggerIds" | "triggerParameterValues"
+  > &
+  Pick<ScheduledAutomationFormValues, "conversationMode" | "cronExpression" | "timezone">;
+
+type CreateAutomationFormValueKey =
+  | keyof CommonCreateAutomationFormValues
+  | Exclude<WebhookAutomationFormValueKey, keyof CommonCreateAutomationFormValues>
+  | Exclude<ScheduledAutomationFormValueKey, keyof CommonCreateAutomationFormValues>;
+
+type SelectedSandboxProfileVersion = {
+  profileId: string;
+  version: number;
+};
+
+const RequiredFieldSummaryMessage = "Please address the fields highlighted in red.";
+const RequiredTriggerSelectionMessage = "Please add an event";
+const MissingProfileVersionQueryId = 0;
+
+function resolveActiveVersion(versions: readonly SandboxProfileVersion[]): number | null {
+  const activeVersion = versions.find((version) => version.isActive);
+  return activeVersion?.version ?? null;
+}
+
+function createInitialCreateAutomationFormValues(input: {
+  kind: AutomationTypeValue;
+  initialSandboxProfileId: string | undefined;
+}): CreateAutomationFormValues {
+  const webhookValues = toWebhookAutomationFormValues(null);
+  const scheduledValues = toScheduledAutomationFormValues(null);
+
+  return {
+    name: "",
+    sandboxProfileId: input.initialSandboxProfileId ?? "",
+    primaryRepositoryId: "",
+    enabled: true,
+    inputTemplate:
+      input.kind === "scheduled" ? scheduledValues.inputTemplate : webhookValues.inputTemplate,
+    instructions: webhookValues.instructions,
+    conversationKeyTemplate: webhookValues.conversationKeyTemplate,
+    triggerIds: webhookValues.triggerIds,
+    triggerParameterValues: webhookValues.triggerParameterValues,
+    cronExpression: scheduledValues.cronExpression,
+    timezone: scheduledValues.timezone,
+    conversationMode: scheduledValues.conversationMode,
+  };
+}
+
+function toWebhookValues(values: CreateAutomationFormValues): WebhookAutomationFormValues {
+  return {
+    name: values.name,
+    sandboxProfileId: values.sandboxProfileId,
+    primaryRepositoryId: values.primaryRepositoryId,
+    enabled: values.enabled,
+    inputTemplate: values.inputTemplate,
+    instructions: values.instructions,
+    conversationKeyTemplate: values.conversationKeyTemplate,
+    triggerIds: values.triggerIds,
+    triggerParameterValues: values.triggerParameterValues,
+  };
+}
+
+function toScheduledValues(values: CreateAutomationFormValues): ScheduledAutomationFormValues {
+  return {
+    name: values.name,
+    sandboxProfileId: values.sandboxProfileId,
+    primaryRepositoryId: values.primaryRepositoryId,
+    enabled: values.enabled,
+    cronExpression: values.cronExpression,
+    timezone: values.timezone,
+    conversationMode: values.conversationMode,
+    inputTemplate: values.inputTemplate,
+  };
+}
+
+function hasRequiredFieldErrors(
+  kind: AutomationTypeValue,
+  fieldErrors: Partial<Record<CreateAutomationFormValueKey, string>>,
+): boolean {
+  if (
+    fieldErrors.name !== undefined ||
+    fieldErrors.sandboxProfileId !== undefined ||
+    fieldErrors.inputTemplate !== undefined
+  ) {
+    return true;
+  }
+
+  if (kind === "scheduled") {
+    return fieldErrors.cronExpression !== undefined || fieldErrors.timezone !== undefined;
+  }
+
+  return fieldErrors.triggerIds === RequiredTriggerSelectionMessage;
+}
+
+function resolvePrimaryRepositorySelectionNormalization(input: {
+  currentValues: CreateAutomationFormValues;
+  selectedProfileId: string;
+  hasLoadedAutomationConfig: boolean;
+  primaryRepositoryOptions: readonly { value: string }[];
+}): string | null {
+  if (!input.hasLoadedAutomationConfig) {
+    return null;
+  }
+
+  if (input.currentValues.sandboxProfileId.trim() !== input.selectedProfileId) {
+    return null;
+  }
+
+  if (input.primaryRepositoryOptions.length === 0) {
+    return input.currentValues.primaryRepositoryId.trim().length === 0 ? null : "";
+  }
+
+  return input.primaryRepositoryOptions.some(
+    (option) => option.value === input.currentValues.primaryRepositoryId,
+  )
+    ? null
+    : WebhookAutomationWorkspaceRootRepositoryOptionValue;
+}
+
+function resolveNormalizedConversationKeyTemplate(input: {
+  values: CreateAutomationFormValues;
+  eventOptions: readonly WebhookAutomationEventOption[];
+}): string {
+  const formState = resolveWebhookAutomationFormState({
+    webhookEventOptions: input.eventOptions,
+    selectedTriggerIds: input.values.triggerIds,
+    conversationKeyTemplate: input.values.conversationKeyTemplate,
+    triggerIdsError: undefined,
+  });
+  const conversationKeyFieldOptions = resolveConversationKeyFieldOptions({
+    selectedEventOptions: formState.selectedTriggerOptions,
+    currentTemplate: input.values.conversationKeyTemplate,
+  });
+
+  if (conversationKeyFieldOptions.options.length === 0) {
+    return input.values.conversationKeyTemplate;
+  }
+
+  if (conversationKeyFieldOptions.hasUnsupportedCurrentTemplate) {
+    return "";
+  }
+
+  if (
+    input.values.conversationKeyTemplate.trim().length === 0 ||
+    conversationKeyFieldOptions.selectedTemplate.length === 0
+  ) {
+    return conversationKeyFieldOptions.options[0]?.template ?? "";
+  }
+
+  return input.values.conversationKeyTemplate;
+}
+
+function applyTriggerIdsChange(input: {
+  values: CreateAutomationFormValues;
+  triggerIds: string[];
+  eventOptions: readonly WebhookAutomationEventOption[];
+}): CreateAutomationFormValues {
+  const nextValues: CreateAutomationFormValues = {
+    ...input.values,
+    triggerIds: input.triggerIds,
+    triggerParameterValues: Object.fromEntries(
+      input.triggerIds.map((triggerId) => [
+        triggerId,
+        input.values.triggerParameterValues[triggerId] ?? {},
+      ]),
+    ),
+  };
+
+  return {
+    ...nextValues,
+    conversationKeyTemplate: resolveNormalizedConversationKeyTemplate({
+      values: nextValues,
+      eventOptions: input.eventOptions,
+    }),
+  };
+}
+
+function resolveCreateAutomationMutationErrorMessage(input: {
+  error: unknown;
+  fallbackMessage: string;
+}): string {
+  return resolveApiErrorMessage({
+    error: input.error,
+    fallbackMessage: input.fallbackMessage,
+  });
+}
+
+async function invalidateAutomationsQuery(queryClient: QueryClient) {
+  await queryClient.invalidateQueries({
+    queryKey: AUTOMATIONS_QUERY_KEY_PREFIX,
+  });
+}
+
+function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
+  const queryClient = useQueryClient();
+  const [kind, setKind] = useState<AutomationTypeValue>(input.initialKind);
+  const [formValues, setFormValues] = useState<CreateAutomationFormValues>(() =>
+    createInitialCreateAutomationFormValues({
+      kind: input.initialKind,
+      initialSandboxProfileId: input.initialSandboxProfileId,
+    }),
+  );
+  const [selectedSandboxProfileVersion, setSelectedSandboxProfileVersion] =
+    useState<SelectedSandboxProfileVersion | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<CreateAutomationFormValueKey, string>>
+  >({});
+  const [validationSummaryError, setValidationSummaryError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const prerequisites = useWebhookAutomationPrerequisites();
+  const selectedProfileId = formValues.sandboxProfileId.trim();
+  const isUsingPinnedSelectedProfileVersion =
+    selectedSandboxProfileVersion?.profileId === selectedProfileId;
+  const selectedProfileVersionsQuery = useQuery({
+    queryKey: sandboxProfileVersionsQueryKey(selectedProfileId),
+    queryFn: async ({ signal }) =>
+      listSandboxProfileVersions({
+        profileId: selectedProfileId,
+        signal,
+      }),
+    enabled: selectedProfileId.length > 0 && !isUsingPinnedSelectedProfileVersion,
+    retry: false,
+  });
+  const activeSelectedProfileVersion = useMemo(
+    () => resolveActiveVersion(selectedProfileVersionsQuery.data?.versions ?? []),
+    [selectedProfileVersionsQuery.data],
+  );
+  const effectiveSelectedProfileVersion = isUsingPinnedSelectedProfileVersion
+    ? selectedSandboxProfileVersion.version
+    : activeSelectedProfileVersion;
+  const selectedProfileAutomationConfigQuery = useQuery({
+    queryKey: sandboxProfileVersionAutomationConfigQueryKey({
+      profileId: selectedProfileId,
+      version: effectiveSelectedProfileVersion ?? MissingProfileVersionQueryId,
+    }),
+    queryFn: async ({ signal }) => {
+      if (effectiveSelectedProfileVersion === null) {
+        throw new Error("No sandbox profile version is available for this profile.");
+      }
+
+      return getSandboxProfileVersionAutomationConfig({
+        profileId: selectedProfileId,
+        version: effectiveSelectedProfileVersion,
+        signal,
+      });
+    },
+    enabled: selectedProfileId.length > 0 && effectiveSelectedProfileVersion !== null,
+    retry: false,
+  });
+  const selectedProfileAutomationConfig = selectedProfileAutomationConfigQuery.data;
+  const hasLoadedSelectedProfileAutomationConfig = selectedProfileAutomationConfig !== undefined;
+  const selectedProfileRepositoryOptions = selectedProfileAutomationConfig?.repositoryOptions ?? [];
+  const primaryRepositoryOptions = useMemo(
+    () =>
+      buildWebhookAutomationPrimaryRepositoryOptions({
+        repositoryOptions: selectedProfileRepositoryOptions,
+      }),
+    [selectedProfileRepositoryOptions],
+  );
+  const selectedProfileBindingsError = isUsingPinnedSelectedProfileVersion
+    ? selectedProfileAutomationConfigQuery.error
+    : (selectedProfileVersionsQuery.error ?? selectedProfileAutomationConfigQuery.error);
+  const selectedProfileBindingsErrorMessage =
+    selectedProfileBindingsError === null
+      ? null
+      : resolveApiErrorMessage({
+          error: selectedProfileBindingsError,
+          fallbackMessage: "Could not load profile bindings.",
+        });
+  const selectedProfileTriggerState = useMemo(
+    () =>
+      resolveSelectedProfileTriggerState({
+        selectedProfileId,
+        hasBindingData:
+          effectiveSelectedProfileVersion === null || hasLoadedSelectedProfileAutomationConfig,
+        isBindingDataPending:
+          selectedProfileId.length > 0 &&
+          ((isUsingPinnedSelectedProfileVersion ? false : selectedProfileVersionsQuery.isPending) ||
+            selectedProfileAutomationConfigQuery.isPending),
+        bindingErrorMessage: selectedProfileBindingsErrorMessage,
+        bindings: selectedProfileAutomationConfig?.bindings ?? [],
+        directoryData: prerequisites.directoryData ?? {
+          connections: [],
+          targets: [],
+          webhookSources: [],
+        },
+      }),
+    [
+      effectiveSelectedProfileVersion,
+      hasLoadedSelectedProfileAutomationConfig,
+      isUsingPinnedSelectedProfileVersion,
+      prerequisites.directoryData,
+      selectedProfileAutomationConfig,
+      selectedProfileAutomationConfigQuery.isPending,
+      selectedProfileBindingsErrorMessage,
+      selectedProfileId,
+      selectedProfileVersionsQuery.isPending,
+    ],
+  );
+  const webhookEventOptions = useMemo(
+    () =>
+      prerequisites.directoryData === undefined
+        ? []
+        : buildWebhookAutomationEventOptions({
+            connections: prerequisites.directoryData.connections,
+            targets: prerequisites.directoryData.targets,
+            webhookSources: prerequisites.directoryData.webhookSources,
+            selectableConnectionIds: selectedProfileTriggerState.selectableConnectionIds,
+            selectedTriggerIds: formValues.triggerIds,
+          }),
+    [
+      formValues.triggerIds,
+      prerequisites.directoryData,
+      selectedProfileTriggerState.selectableConnectionIds,
+    ],
+  );
+
+  useEffect(() => {
+    setFormValues((currentValues) => {
+      const normalizedPrimaryRepositoryId = resolvePrimaryRepositorySelectionNormalization({
+        currentValues,
+        selectedProfileId,
+        hasLoadedAutomationConfig: hasLoadedSelectedProfileAutomationConfig,
+        primaryRepositoryOptions,
+      });
+      if (normalizedPrimaryRepositoryId === null) {
+        return currentValues;
+      }
+
+      return {
+        ...currentValues,
+        primaryRepositoryId: normalizedPrimaryRepositoryId,
+      };
+    });
+  }, [
+    primaryRepositoryOptions,
+    hasLoadedSelectedProfileAutomationConfig,
+    selectedProfileAutomationConfig,
+    selectedProfileId,
+  ]);
+
+  const createWebhookMutation = useMutation({
+    mutationFn: async (values: WebhookAutomationFormValues) =>
+      createWebhookAutomation({
+        payload: toCreateWebhookAutomationPayload(values, webhookEventOptions),
+      }),
+    onSuccess: async (automation) => {
+      setSelectedSandboxProfileVersion({
+        profileId: automation.target.sandboxProfileId,
+        version: automation.target.sandboxProfileVersion,
+      });
+      setValidationSummaryError(null);
+      setFormError(null);
+      await invalidateAutomationsQuery(queryClient);
+      await input.navigate(
+        input.createSuccessPath === undefined
+          ? `/automations/${automation.id}`
+          : input.createSuccessPath(automation),
+      );
+    },
+    onError: (error: unknown) => {
+      setFormError(
+        resolveCreateAutomationMutationErrorMessage({
+          error,
+          fallbackMessage: "Could not create automation.",
+        }),
+      );
+    },
+  });
+  const createScheduledMutation = useMutation({
+    mutationFn: async (values: ScheduledAutomationFormValues) =>
+      createScheduledAutomation({
+        payload: toCreateScheduledAutomationPayload(values),
+      }),
+    onSuccess: async (automation) => {
+      setSelectedSandboxProfileVersion({
+        profileId: automation.target.sandboxProfileId,
+        version: automation.target.sandboxProfileVersion,
+      });
+      setValidationSummaryError(null);
+      setFormError(null);
+      await invalidateAutomationsQuery(queryClient);
+      await input.navigate(
+        input.createSuccessPath === undefined
+          ? `/automations/schedules/${automation.id}`
+          : input.createSuccessPath(automation),
+      );
+    },
+    onError: (error: unknown) => {
+      setFormError(
+        resolveCreateAutomationMutationErrorMessage({
+          error,
+          fallbackMessage: "Could not create automation.",
+        }),
+      );
+    },
+  });
+
+  function onKindChange(nextKind: AutomationTypeValue): void {
+    setKind(nextKind);
+    setFieldErrors({});
+    setValidationSummaryError(null);
+    setFormError(null);
+  }
+
+  function onCommonValueChange(
+    key: keyof CommonCreateAutomationFormValues,
+    value: string | boolean,
+  ) {
+    setFormValues((currentValues) => {
+      if (key === "sandboxProfileId") {
+        return {
+          ...currentValues,
+          sandboxProfileId: typeof value === "string" ? value : currentValues.sandboxProfileId,
+          primaryRepositoryId: "",
+        };
+      }
+
+      return {
+        ...currentValues,
+        [key]: value,
+      };
+    });
+
+    if (key === "sandboxProfileId") {
+      setSelectedSandboxProfileVersion(null);
+    }
+
+    setFieldErrors((currentErrors) => {
+      if (key === "sandboxProfileId") {
+        const {
+          sandboxProfileId: _sandboxProfileId,
+          primaryRepositoryId: _primaryRepositoryId,
+          triggerIds: _triggerIds,
+          conversationKeyTemplate: _conversationKeyTemplate,
+          ...remainingErrors
+        } = currentErrors;
+
+        void _sandboxProfileId;
+        void _primaryRepositoryId;
+        void _triggerIds;
+        void _conversationKeyTemplate;
+
+        return remainingErrors;
+      }
+
+      if (key === "enabled") {
+        const { enabled: _enabled, ...remainingErrors } = currentErrors;
+
+        void _enabled;
+
+        return remainingErrors;
+      }
+
+      if (key === "inputTemplate") {
+        const { inputTemplate: _inputTemplate, ...remainingErrors } = currentErrors;
+
+        void _inputTemplate;
+
+        return remainingErrors;
+      }
+
+      if (key === "name") {
+        const { name: _name, ...remainingErrors } = currentErrors;
+
+        void _name;
+
+        return remainingErrors;
+      }
+
+      const { primaryRepositoryId: _primaryRepositoryId, ...remainingErrors } = currentErrors;
+
+      void _primaryRepositoryId;
+
+      return remainingErrors;
+    });
+    setValidationSummaryError(null);
+    setFormError(null);
+  }
+
+  function onWebhookValueChange(
+    key: "conversationKeyTemplate" | "triggerIds" | "triggerParameterValues",
+    value: string | string[] | WebhookAutomationFormValues["triggerParameterValues"],
+  ) {
+    setFormValues((currentValues) => {
+      if (key === "triggerIds") {
+        return applyTriggerIdsChange({
+          values: currentValues,
+          triggerIds: Array.isArray(value) ? value : currentValues.triggerIds,
+          eventOptions: webhookEventOptions,
+        });
+      }
+
+      return {
+        ...currentValues,
+        [key]: value,
+      };
+    });
+    setFieldErrors((currentErrors) => {
+      if (key === "triggerIds") {
+        const {
+          triggerIds: _triggerIds,
+          conversationKeyTemplate: _conversationKeyTemplate,
+          ...remainingErrors
+        } = currentErrors;
+
+        void _triggerIds;
+        void _conversationKeyTemplate;
+
+        return remainingErrors;
+      }
+
+      if (key === "conversationKeyTemplate") {
+        const { conversationKeyTemplate: _conversationKeyTemplate, ...remainingErrors } =
+          currentErrors;
+
+        void _conversationKeyTemplate;
+
+        return remainingErrors;
+      }
+
+      const { triggerParameterValues: _triggerParameterValues, ...remainingErrors } = currentErrors;
+
+      void _triggerParameterValues;
+
+      return remainingErrors;
+    });
+    setValidationSummaryError(null);
+    setFormError(null);
+  }
+
+  function onScheduledValueChange(
+    key: "conversationMode" | "cronExpression" | "timezone",
+    value: string,
+  ) {
+    setFormValues((currentValues) => ({
+      ...currentValues,
+      [key]: value,
+    }));
+    setFieldErrors((currentErrors) => {
+      if (key === "conversationMode") {
+        const { conversationMode: _conversationMode, ...remainingErrors } = currentErrors;
+
+        void _conversationMode;
+
+        return remainingErrors;
+      }
+
+      if (key === "cronExpression") {
+        const { cronExpression: _cronExpression, ...remainingErrors } = currentErrors;
+
+        void _cronExpression;
+
+        return remainingErrors;
+      }
+
+      const { timezone: _timezone, ...remainingErrors } = currentErrors;
+
+      void _timezone;
+
+      return remainingErrors;
+    });
+    setValidationSummaryError(null);
+    setFormError(null);
+  }
+
+  function onSubmit() {
+    const nextFieldErrors =
+      kind === "scheduled"
+        ? validateScheduledAutomationFormValues(toScheduledValues(formValues))
+        : validateWebhookAutomationFormValues(toWebhookValues(formValues), webhookEventOptions);
+    setFieldErrors(nextFieldErrors);
+    setValidationSummaryError(
+      hasRequiredFieldErrors(kind, nextFieldErrors) ? RequiredFieldSummaryMessage : null,
+    );
+    setFormError(null);
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      return;
+    }
+
+    if (kind === "scheduled") {
+      createScheduledMutation.mutate(toScheduledValues(formValues));
+      return;
+    }
+
+    createWebhookMutation.mutate(toWebhookValues(formValues));
+  }
+
+  return {
+    kind,
+    formValues,
+    fieldErrors,
+    validationSummaryError,
+    formError: formError ?? prerequisites.errorMessage,
+    isPending:
+      prerequisites.errorMessage === null &&
+      (prerequisites.isPending || prerequisites.directoryData === undefined),
+    isSaving: createWebhookMutation.isPending || createScheduledMutation.isPending,
+    sandboxProfileOptions: prerequisites.sandboxProfileOptions,
+    primaryRepositoryOptions,
+    connectionOptions: prerequisites.connectionOptions,
+    webhookEventOptions,
+    triggerPickerDisabledState: selectedProfileTriggerState.disabledState,
+    onKindChange,
+    onCommonValueChange,
+    onWebhookValueChange,
+    onScheduledValueChange,
+    onSubmit,
+  };
+}
+
+function renderInputTemplateDescription(input: {
+  kind: AutomationTypeValue;
+  formState: ReturnType<typeof resolveWebhookAutomationFormState>;
+}): ReactNode {
+  if (input.kind === "scheduled") {
+    return "Sent to the agent each time the automation runs.";
+  }
+
+  if (input.formState.hasSelectedTrigger) {
+    return (
+      <>
+        <span className="block">Sent to the agent each time the automation runs.</span>
+        <span className="block">
+          Use <InlineCode variant="muted">{"{{ ... }}"}</InlineCode> to insert event fields.
+        </span>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <span className="block">Sent to the agent each time the automation runs.</span>
+      <span className="block">Select a trigger to insert event fields.</span>
+    </>
+  );
+}
+
+export function CreateAutomationEditor(
+  input: CreateAutomationEditorProps,
+): React.JSX.Element | null {
+  const state = useCreateAutomationEditorState(input);
+  const presentation = resolveScheduledAutomationFormPresentation({
+    mode: "create",
+    values: state.formValues,
+    primaryRepositoryOptions: state.primaryRepositoryOptions,
+  });
+  const formState = resolveWebhookAutomationFormState({
+    webhookEventOptions: state.webhookEventOptions,
+    selectedTriggerIds: state.formValues.triggerIds,
+    conversationKeyTemplate: state.formValues.conversationKeyTemplate,
+    triggerIdsError: state.fieldErrors.triggerIds,
+  });
+
+  if (state.isPending) {
+    return null;
+  }
+
+  return (
+    <AutomationFormShell
+      automationTypeField={
+        <AutomationTypeSelectField onValueChange={state.onKindChange} value={state.kind} />
+      }
+      enabled={state.formValues.enabled}
+      fieldErrors={state.fieldErrors}
+      formError={state.formError}
+      inputIdPrefix="automation"
+      inputTemplate={state.formValues.inputTemplate}
+      inputTemplateDescription={renderInputTemplateDescription({
+        kind: state.kind,
+        formState,
+      })}
+      inputTemplateLabelId="automation-input-template-label"
+      {...(state.kind === "scheduled"
+        ? {}
+        : { inputTemplatePlaceholderText: DefaultWebhookAutomationMessageTemplate })}
+      inputTemplateTokens={state.kind === "scheduled" ? [] : formState.agentInstructionTokens}
+      isDeleting={false}
+      isSaving={state.isSaving}
+      mode="create"
+      name={state.formValues.name}
+      onDelete={null}
+      onSubmit={state.onSubmit}
+      onValueChange={(key, value) => {
+        state.onCommonValueChange(key, value);
+      }}
+      primaryRepositoryId={state.formValues.primaryRepositoryId}
+      primaryRepositoryOptions={state.primaryRepositoryOptions}
+      sandboxProfileId={state.formValues.sandboxProfileId}
+      sandboxProfileOptions={state.sandboxProfileOptions}
+      selectedPrimaryRepositoryPath={presentation.selectedPrimaryRepositoryPath}
+      selectedWorkspaceRoot={presentation.selectedWorkspaceRoot}
+      shouldShowAutomationEnabledField={presentation.shouldShowAutomationEnabledField}
+      shouldShowCreateNameField={presentation.shouldShowCreateNameField}
+      shouldShowPrimaryRepositoryField={presentation.shouldShowPrimaryRepositoryField}
+      submitLabel={presentation.submitLabel}
+      validationSummaryError={state.validationSummaryError}
+      typeSpecificSection={
+        state.kind === "scheduled" ? (
+          <ScheduledAutomationTypeSpecificSection
+            fieldErrors={state.fieldErrors}
+            isDeleting={false}
+            isSaving={state.isSaving}
+            onValueChange={state.onScheduledValueChange}
+            values={state.formValues}
+          />
+        ) : (
+          <WebhookAutomationTypeSpecificSection
+            connectionOptions={state.connectionOptions}
+            fieldErrors={state.fieldErrors}
+            formState={formState}
+            onValueChange={state.onWebhookValueChange}
+            triggerPickerDisabledState={state.triggerPickerDisabledState}
+            values={state.formValues}
+            webhookEventOptions={state.webhookEventOptions}
+          />
+        )
+      }
+    />
+  );
+}

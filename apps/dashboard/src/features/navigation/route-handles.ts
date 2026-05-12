@@ -269,6 +269,7 @@ export const ROUTE_HANDLES = {
   },
   automationsNew: {
     appShellInsetOwner: "child",
+    appShellViewportMode: "workspace",
     sidebarTriggerOwner: "page-frame",
     breadcrumb: "Create",
     pageBreadcrumbVisible: true,

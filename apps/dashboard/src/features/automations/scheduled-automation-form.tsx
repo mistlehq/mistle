@@ -39,6 +39,17 @@ type ScheduledAutomationFormProps = {
   onDelete: (() => void) | null;
 };
 
+type ScheduledAutomationTypeSpecificSectionProps = {
+  values: Pick<ScheduledAutomationFormValues, "conversationMode" | "cronExpression" | "timezone">;
+  fieldErrors: Pick<
+    ScheduledAutomationFormProps["fieldErrors"],
+    "conversationMode" | "cronExpression" | "timezone"
+  >;
+  isSaving: boolean;
+  isDeleting: boolean;
+  onValueChange: (key: "conversationMode" | "cronExpression" | "timezone", value: string) => void;
+};
+
 function shouldRenderInlineFieldError(input: {
   key: ScheduledAutomationFormValueKey;
   message: string | undefined;
@@ -67,8 +78,9 @@ function CronExpressionBreakdownList(input: {
   );
 }
 
-export function ScheduledAutomationForm(input: ScheduledAutomationFormProps): React.JSX.Element {
-  const inputTemplateLabelId = "scheduled-automation-input-template-label";
+export function ScheduledAutomationTypeSpecificSection(
+  input: ScheduledAutomationTypeSpecificSectionProps,
+): React.JSX.Element {
   const previewAfter = useMemo(() => new Date(), []);
   const timezoneOptions = useMemo(
     () => createTimezoneOptions(input.values.timezone),
@@ -80,6 +92,107 @@ export function ScheduledAutomationForm(input: ScheduledAutomationFormProps): Re
     timezone: input.values.timezone,
   });
   const cronExpressionBreakdown = resolveCronExpressionBreakdown(input.values.cronExpression);
+  const disabled = input.isDeleting || input.isSaving;
+
+  return (
+    <FormPageSection
+      header={
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold">Schedule</h2>
+        </div>
+      }
+    >
+      <div className="p-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field>
+            <FieldHeader>
+              <FieldLabel htmlFor="scheduled-automation-cron-expression">
+                Cron expression
+              </FieldLabel>
+            </FieldHeader>
+            <FieldContent>
+              <Input
+                aria-invalid={input.fieldErrors.cronExpression !== undefined ? true : undefined}
+                disabled={disabled}
+                id="scheduled-automation-cron-expression"
+                onChange={(event) => {
+                  input.onValueChange("cronExpression", event.currentTarget.value);
+                }}
+                placeholder="0 9 * * 1"
+                value={input.values.cronExpression}
+              />
+              <AutomationFormFieldError
+                message={
+                  shouldRenderInlineFieldError({
+                    key: "cronExpression",
+                    message: input.fieldErrors.cronExpression,
+                  })
+                    ? input.fieldErrors.cronExpression
+                    : undefined
+                }
+              />
+            </FieldContent>
+          </Field>
+          <Field>
+            <FieldHeader>
+              <FieldLabel htmlFor="scheduled-automation-timezone">Timezone</FieldLabel>
+            </FieldHeader>
+            <FieldContent>
+              <SingleSelectStringComboboxField
+                contentClassName="max-h-80"
+                disabled={disabled}
+                emptyMessage="No matching timezones."
+                inputId="scheduled-automation-timezone"
+                inputLabel="Timezone"
+                invalid={input.fieldErrors.timezone !== undefined}
+                onChange={(value) => {
+                  input.onValueChange("timezone", value ?? "");
+                }}
+                options={timezoneOptions}
+                placeholder="Asia/Singapore"
+                value={input.values.timezone}
+              />
+              <AutomationFormFieldError
+                message={
+                  shouldRenderInlineFieldError({
+                    key: "timezone",
+                    message: input.fieldErrors.timezone,
+                  })
+                    ? input.fieldErrors.timezone
+                    : undefined
+                }
+              />
+            </FieldContent>
+          </Field>
+        </div>
+
+        <div className="mt-4">
+          <CronExpressionBreakdownList
+            breakdown={cronExpressionBreakdown}
+            message={scheduleBehaviorDescription}
+          />
+        </div>
+
+        <div className="mt-4">
+          <AutomationFormSelectField
+            disabled={disabled}
+            error={input.fieldErrors.conversationMode}
+            label="Group runs by"
+            onValueChange={(value) => {
+              input.onValueChange("conversationMode", value);
+            }}
+            options={ScheduledAutomationConversationOptions}
+            placeholder="Select run grouping"
+            value={input.values.conversationMode}
+          />
+        </div>
+      </div>
+    </FormPageSection>
+  );
+}
+
+export function ScheduledAutomationForm(input: ScheduledAutomationFormProps): React.JSX.Element {
+  const inputTemplateLabelId = "scheduled-automation-input-template-label";
   const presentation = resolveScheduledAutomationFormPresentation({
     mode: input.mode,
     values: input.values,
@@ -122,99 +235,15 @@ export function ScheduledAutomationForm(input: ScheduledAutomationFormProps): Re
       submitLabel={presentation.submitLabel}
       validationSummaryError={input.validationSummaryError}
       typeSpecificSection={
-        <FormPageSection
-          header={
-            <div className="space-y-1">
-              <h2 className="text-base font-semibold">Schedule</h2>
-            </div>
-          }
-        >
-          <div className="p-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field>
-                <FieldHeader>
-                  <FieldLabel htmlFor="scheduled-automation-cron-expression">
-                    Cron expression
-                  </FieldLabel>
-                </FieldHeader>
-                <FieldContent>
-                  <Input
-                    aria-invalid={input.fieldErrors.cronExpression !== undefined ? true : undefined}
-                    disabled={input.isDeleting || input.isSaving}
-                    id="scheduled-automation-cron-expression"
-                    onChange={(event) => {
-                      input.onValueChange("cronExpression", event.currentTarget.value);
-                    }}
-                    placeholder="0 9 * * 1"
-                    value={input.values.cronExpression}
-                  />
-                  <AutomationFormFieldError
-                    message={
-                      shouldRenderInlineFieldError({
-                        key: "cronExpression",
-                        message: input.fieldErrors.cronExpression,
-                      })
-                        ? input.fieldErrors.cronExpression
-                        : undefined
-                    }
-                  />
-                </FieldContent>
-              </Field>
-              <Field>
-                <FieldHeader>
-                  <FieldLabel htmlFor="scheduled-automation-timezone">Timezone</FieldLabel>
-                </FieldHeader>
-                <FieldContent>
-                  <SingleSelectStringComboboxField
-                    contentClassName="max-h-80"
-                    disabled={input.isDeleting || input.isSaving}
-                    emptyMessage="No matching timezones."
-                    inputId="scheduled-automation-timezone"
-                    inputLabel="Timezone"
-                    invalid={input.fieldErrors.timezone !== undefined}
-                    onChange={(value) => {
-                      input.onValueChange("timezone", value ?? "");
-                    }}
-                    options={timezoneOptions}
-                    placeholder="Asia/Singapore"
-                    value={input.values.timezone}
-                  />
-                  <AutomationFormFieldError
-                    message={
-                      shouldRenderInlineFieldError({
-                        key: "timezone",
-                        message: input.fieldErrors.timezone,
-                      })
-                        ? input.fieldErrors.timezone
-                        : undefined
-                    }
-                  />
-                </FieldContent>
-              </Field>
-            </div>
-
-            <div className="mt-4">
-              <CronExpressionBreakdownList
-                breakdown={cronExpressionBreakdown}
-                message={scheduleBehaviorDescription}
-              />
-            </div>
-
-            <div className="mt-4">
-              <AutomationFormSelectField
-                disabled={input.isDeleting || input.isSaving}
-                error={input.fieldErrors.conversationMode}
-                label="Group runs by"
-                onValueChange={(value) => {
-                  input.onValueChange("conversationMode", value);
-                }}
-                options={ScheduledAutomationConversationOptions}
-                placeholder="Select run grouping"
-                value={input.values.conversationMode}
-              />
-            </div>
-          </div>
-        </FormPageSection>
+        <ScheduledAutomationTypeSpecificSection
+          fieldErrors={input.fieldErrors}
+          isDeleting={input.isDeleting}
+          isSaving={input.isSaving}
+          onValueChange={(key, value) => {
+            input.onValueChange(key, value);
+          }}
+          values={input.values}
+        />
       }
     />
   );

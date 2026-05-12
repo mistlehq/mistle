@@ -14,7 +14,7 @@ import {
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import { AutomationCreatePage } from "./automation-create-page.js";
 
-function renderCreatePage(input: { initialEntry: string }): void {
+function renderCreatePage(input: { initialEntry: string }): ReturnType<typeof createMemoryRouter> {
   const queryClient = createTestQueryClient({
     refetchOnMount: false,
     staleTime: Number.POSITIVE_INFINITY,
@@ -45,12 +45,17 @@ function renderCreatePage(input: { initialEntry: string }): void {
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
+
+  return router;
 }
 
 describe("AutomationCreatePage", () => {
   it("shows the trigger automation fields by default", () => {
     renderCreatePage({ initialEntry: "/automations/new" });
 
+    expect(
+      screen.getByRole("region", { name: "Create automation page" }).getAttribute("style"),
+    ).toBe("scrollbar-gutter: stable;");
     expect(screen.getByRole("heading", { name: "Create automation" })).toBeDefined();
     expect(screen.getByText("Automation type")).toBeDefined();
     expect(screen.getByRole("heading", { name: "Events" })).toBeDefined();
