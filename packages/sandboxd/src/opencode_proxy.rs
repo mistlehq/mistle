@@ -593,6 +593,16 @@ async fn handle_opencode_proxy_request(
         .get("content-type")
         .is_some_and(|content_type| content_type.starts_with("text/event-stream"));
     if is_sse {
+        send_json_message(
+            &sender,
+            &OpenCodeProxyResponse {
+                id: request.id.clone(),
+                message_type: OpenCodeProxyResponseType::Response,
+                status,
+                headers,
+                body: String::new(),
+            },
+        )?;
         relay_sse_response(request.id, response, sender).await?;
         return Ok(());
     }
