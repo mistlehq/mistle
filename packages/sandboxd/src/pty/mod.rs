@@ -7,6 +7,7 @@
 
 use std::collections::BTreeMap;
 use std::fmt::{self, Display};
+use std::fs;
 use std::io::{ErrorKind, Read, Write};
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -31,6 +32,7 @@ pub const DEFAULT_PTY_TERM: &str = "xterm-256color";
 pub const DEFAULT_PTY_TERMINATE_POLL_INTERVAL: Duration = Duration::from_millis(10);
 /// Maximum time `sandboxd` waits after sending a PTY termination signal.
 pub const DEFAULT_PTY_TERMINATE_TIMEOUT_MS: u64 = 2_000;
+const PTY_CGROUP_MISSING_PROCESS_EXIT_TIMEOUT_MS: u64 = 250;
 
 static PTY_SCOPE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -339,6 +341,19 @@ pub fn start_scoped_pty_session(
     };
 
     if let Err(error) = attach_pid_to_scope(&scope_paths, process_id) {
+        if error.is_missing_process()
+            && wait_for_pty_exit(
+                &session,
+                clock,
+                sleeper,
+                DEFAULT_PTY_TERMINATE_POLL_INTERVAL,
+                PTY_CGROUP_MISSING_PROCESS_EXIT_TIMEOUT_MS,
+            )
+        {
+            let _ = fs::remove_dir(&scope_paths.scope_root);
+            return Ok(session);
+        }
+
         let _ = session.terminate(
             clock,
             sleeper,
@@ -351,6 +366,27 @@ pub fn start_scoped_pty_session(
     session.scope_id = Some(scope_id);
     session.scope_paths = Some(scope_paths);
     Ok(session)
+}
+
+fn wait_for_pty_exit(
+    session: &PtySession,
+    clock: &dyn Clock,
+    sleeper: &dyn Sleeper,
+    poll_interval: Duration,
+    timeout_ms: u64,
+) -> bool {
+    let deadline_ms = clock.now_ms().saturating_add(timeout_ms);
+    loop {
+        if session.exit_code().is_some() {
+            return true;
+        }
+
+        if clock.now_ms() >= deadline_ms {
+            return false;
+        }
+
+        sleeper.sleep(poll_interval);
+    }
 }
 
 fn spawn_pty_output_thread(event_sender: Sender<PtyEvent>, mut reader: Box<dyn Read + Send>) {

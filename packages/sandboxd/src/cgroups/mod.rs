@@ -10,6 +10,8 @@ use std::fmt::{self, Display};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+const LINUX_ESRCH: i32 = 3;
+
 /// Default root for sandboxd-owned cgroup directories.
 pub const DEFAULT_CGROUP_ROOT: &str = "/sys/fs/cgroup/mistle";
 
@@ -95,6 +97,18 @@ impl Display for CgroupError {
 }
 
 impl std::error::Error for CgroupError {}
+
+impl CgroupError {
+    /// Returns true when Linux rejected a `cgroup.procs` write because the pid
+    /// no longer exists. This can happen when a PTY child exits between spawn
+    /// and cgroup attachment.
+    pub fn is_missing_process(&self) -> bool {
+        matches!(
+            self,
+            Self::WriteFile { error, .. } if error.raw_os_error() == Some(LINUX_ESRCH)
+        )
+    }
+}
 
 /// Ensures the per-sandbox cgroup tree exists under `<root>/<sandbox-instance-id>`.
 pub fn ensure_sandbox_cgroup_tree(
@@ -254,6 +268,16 @@ mod tests {
         );
 
         fs::remove_dir_all(temp_root).expect("temp dir should be removable");
+    }
+
+    #[test]
+    fn detects_missing_process_cgroup_write_errors() {
+        let error = CgroupError::WriteFile {
+            path: PathBuf::from("/sys/fs/cgroup/mistle/sbi_123/user/scope_123/cgroup.procs"),
+            error: std::io::Error::from_raw_os_error(3),
+        };
+
+        assert!(error.is_missing_process());
     }
 
     #[test]
