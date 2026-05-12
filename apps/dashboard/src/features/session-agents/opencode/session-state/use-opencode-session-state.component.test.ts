@@ -320,6 +320,65 @@ function closeTransport(transport: SandboxSessionTransport): void {
   transport.disconnect();
 }
 
+async function connectOpenCodeSessionForTest(input: {
+  result: { current: ReturnType<typeof useOpenCodeSessionState> };
+  sandboxInstanceId: string;
+  server: OpenCodeProxyTransportServer;
+  sessionId: string;
+}): Promise<ObservedOpenCodeProxyRequest> {
+  act(() => {
+    input.result.current.lifecycle.connectSession({
+      sandboxInstanceId: input.sandboxInstanceId,
+      targetSessionId: input.sessionId,
+    });
+  });
+
+  const healthRequest = await input.server.nextRequest();
+  expect(healthRequest.request).toMatchObject({
+    method: "GET",
+    path: "/global/health",
+  });
+  input.server.sendJsonResponse({
+    request: healthRequest,
+    body: {
+      healthy: true,
+      version: "1.14.41",
+    },
+  });
+
+  const getSessionRequest = await input.server.nextRequest();
+  expect(getSessionRequest.request).toMatchObject({
+    method: "GET",
+    path: `/session/${input.sessionId}`,
+  });
+  input.server.sendJsonResponse({
+    request: getSessionRequest,
+    body: createSessionResponse(input.sessionId),
+  });
+
+  const eventRequest = await input.server.nextRequest();
+  input.server.sendSseOpenResponse({
+    request: eventRequest,
+  });
+
+  const messagesRequest = await input.server.nextRequest();
+  expect(messagesRequest.request).toMatchObject({
+    method: "GET",
+    path: `/session/${input.sessionId}/message`,
+  });
+  input.server.sendJsonResponse({
+    request: messagesRequest,
+    body: [],
+  });
+
+  const permissionsRequest = await input.server.nextRequest();
+  expect(permissionsRequest.request).toMatchObject({
+    method: "GET",
+    path: "/permission",
+  });
+  return permissionsRequest;
+}
+
 afterEach(async () => {
   for (const transport of openTransports) {
     closeTransport(transport);
@@ -363,55 +422,11 @@ describe("useOpenCodeSessionState", () => {
       }),
     );
 
-    act(() => {
-      result.current.lifecycle.connectSession({
-        sandboxInstanceId: "sbi_123",
-        targetSessionId: "ses_test",
-      });
-    });
-
-    const healthRequest = await server.nextRequest();
-    expect(healthRequest.request).toMatchObject({
-      method: "GET",
-      path: "/global/health",
-    });
-    server.sendJsonResponse({
-      request: healthRequest,
-      body: {
-        healthy: true,
-        version: "1.14.41",
-      },
-    });
-
-    const getSessionRequest = await server.nextRequest();
-    expect(getSessionRequest.request).toMatchObject({
-      method: "GET",
-      path: "/session/ses_test",
-    });
-    server.sendJsonResponse({
-      request: getSessionRequest,
-      body: createSessionResponse("ses_test"),
-    });
-
-    const eventRequest = await server.nextRequest();
-    server.sendSseOpenResponse({
-      request: eventRequest,
-    });
-
-    const messagesRequest = await server.nextRequest();
-    expect(messagesRequest.request).toMatchObject({
-      method: "GET",
-      path: "/session/ses_test/message",
-    });
-    server.sendJsonResponse({
-      request: messagesRequest,
-      body: [],
-    });
-
-    const permissionsRequest = await server.nextRequest();
-    expect(permissionsRequest.request).toMatchObject({
-      method: "GET",
-      path: "/permission",
+    const permissionsRequest = await connectOpenCodeSessionForTest({
+      result,
+      sandboxInstanceId: "sbi_123",
+      server,
+      sessionId: "ses_test",
     });
     server.sendJsonError({
       request: permissionsRequest,
@@ -443,40 +458,12 @@ describe("useOpenCodeSessionState", () => {
       }),
     );
 
-    act(() => {
-      result.current.lifecycle.connectSession({
-        sandboxInstanceId: "sbi_123",
-        targetSessionId: "ses_test",
-      });
+    const permissionsRequest = await connectOpenCodeSessionForTest({
+      result,
+      sandboxInstanceId: "sbi_123",
+      server,
+      sessionId: "ses_test",
     });
-
-    const healthRequest = await server.nextRequest();
-    server.sendJsonResponse({
-      request: healthRequest,
-      body: {
-        healthy: true,
-        version: "1.14.41",
-      },
-    });
-
-    const getSessionRequest = await server.nextRequest();
-    server.sendJsonResponse({
-      request: getSessionRequest,
-      body: createSessionResponse("ses_test"),
-    });
-
-    const eventRequest = await server.nextRequest();
-    server.sendSseOpenResponse({
-      request: eventRequest,
-    });
-
-    const messagesRequest = await server.nextRequest();
-    server.sendJsonResponse({
-      request: messagesRequest,
-      body: [],
-    });
-
-    const permissionsRequest = await server.nextRequest();
     server.sendJsonResponse({
       request: permissionsRequest,
       body: [],

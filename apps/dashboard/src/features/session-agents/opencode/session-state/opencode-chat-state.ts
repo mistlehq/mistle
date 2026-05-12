@@ -96,15 +96,12 @@ function createToolEntry(input: {
   turnId: string;
 }): ChatCommandEntry | ChatGenericItemEntry {
   const state = input.part.state;
-  if (
-    (input.part.tool === "bash" || input.part.tool === "shell") &&
-    "input" in state &&
-    readStringProperty(state.input, "command") !== null
-  ) {
+  const command = "input" in state ? readStringProperty(state.input, "command") : null;
+  if ((input.part.tool === "bash" || input.part.tool === "shell") && command !== null) {
     return {
       id: input.part.id,
       kind: "command-execution",
-      command: readStringProperty(state.input, "command"),
+      command,
       output:
         state.status === "completed" ? state.output : state.status === "error" ? state.error : null,
       cwd: readStringProperty(state.input, "cwd"),
@@ -363,34 +360,21 @@ function applyPartDelta(input: {
 }
 
 function getOpenCodePayloadSessionId(payload: OpenCodeEvent["payload"]): string | null {
-  if (payload.type === "message.updated") {
-    return payload.properties.sessionID;
+  switch (payload.type) {
+    case "message.updated":
+    case "message.part.updated":
+    case "message.part.delta":
+    case "session.status":
+    case "session.idle":
+    case "permission.asked":
+    case "permission.replied":
+    case "session.diff":
+      return payload.properties.sessionID;
+    case "session.error":
+      return payload.properties.sessionID ?? null;
+    default:
+      return null;
   }
-  if (payload.type === "message.part.updated") {
-    return payload.properties.sessionID;
-  }
-  if (payload.type === "message.part.delta") {
-    return payload.properties.sessionID;
-  }
-  if (payload.type === "session.status") {
-    return payload.properties.sessionID;
-  }
-  if (payload.type === "session.idle") {
-    return payload.properties.sessionID;
-  }
-  if (payload.type === "session.error") {
-    return payload.properties.sessionID ?? null;
-  }
-  if (payload.type === "permission.asked") {
-    return payload.properties.sessionID;
-  }
-  if (payload.type === "permission.replied") {
-    return payload.properties.sessionID;
-  }
-  if (payload.type === "session.diff") {
-    return payload.properties.sessionID;
-  }
-  return null;
 }
 
 function shouldApplyOpenCodePayload(
