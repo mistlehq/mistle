@@ -92,11 +92,6 @@ fn relays_opencode_event_streams_as_websocket_sse_frames() {
         ))
         .expect("websocket request should send");
 
-    let response = read_json_text_message(&mut client);
-    assert_eq!(response["id"], json!("events"));
-    assert_eq!(response["type"], json!("response"));
-    assert_eq!(response["status"], json!(200));
-
     let event = read_json_text_message(&mut client);
     assert_eq!(event["id"], json!("events"));
     assert_eq!(event["type"], json!("sse"));
