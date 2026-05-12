@@ -742,9 +742,44 @@ async function runCommand(input: {
   } catch (error) {
     const stderr = readErrorOutput(error, "stderr");
     const stdout = readErrorOutput(error, "stdout");
-    const output = stderr.length > 0 ? stderr : stdout.length > 0 ? stdout : "no command output";
-    throw new Error(`Command failed: ${input.command} ${input.args.join(" ")}. Output: ${output}`);
+    const exitCode = readErrorExitCode(error);
+    const output = formatCommandFailureOutput({ stdout, stderr });
+    throw new Error(
+      `Command failed: ${input.command} ${input.args.join(" ")}.${exitCode} Output:${output}`,
+    );
   }
+}
+
+function formatCommandFailureOutput(input: { stdout: string; stderr: string }): string {
+  const parts: string[] = [];
+
+  if (input.stdout.length > 0) {
+    parts.push(`\nstdout:\n${input.stdout}`);
+  }
+
+  if (input.stderr.length > 0) {
+    parts.push(`\nstderr:\n${input.stderr}`);
+  }
+
+  if (parts.length === 0) {
+    return "\nno command output";
+  }
+
+  return parts.join("");
+}
+
+function readErrorExitCode(error: unknown): string {
+  if (typeof error !== "object" || error === null) {
+    return "";
+  }
+
+  const descriptor = Object.getOwnPropertyDescriptor(error, "code");
+  const code = descriptor?.value;
+  if (typeof code === "number" || typeof code === "string") {
+    return ` Exit code: ${code}.`;
+  }
+
+  return "";
 }
 
 function readErrorOutput(error: unknown, property: "stderr" | "stdout"): string {
