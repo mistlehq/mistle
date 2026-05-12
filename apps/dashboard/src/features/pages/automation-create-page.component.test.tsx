@@ -68,6 +68,21 @@ describe("AutomationCreatePage", () => {
     expect(screen.getByRole("textbox", { name: "User message" })).toBeDefined();
   });
 
+  it("orders the create form fields by profile, type, and name", () => {
+    renderCreatePage({ initialEntry: "/automations/new" });
+
+    const sandboxProfileLabel = screen.getByText("Sandbox profile");
+    const automationTypeLabel = screen.getByText("Automation type");
+    const automationNameLabel = screen.getByText("Automation name");
+
+    expect(sandboxProfileLabel.compareDocumentPosition(automationTypeLabel)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(automationTypeLabel.compareDocumentPosition(automationNameLabel)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
   it("shows the scheduled automation fields from the type query without event prerequisites", () => {
     renderCreatePage({
       initialEntry: "/automations/new?type=scheduled",

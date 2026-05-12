@@ -154,6 +154,57 @@ export function AutomationFormShell(input: AutomationFormShellProps): React.JSX.
   const automationEnabledId = `${input.inputIdPrefix}-enabled`;
   const automationNameId = `${input.inputIdPrefix}-name`;
   const primaryRepositoryInputId = `${input.inputIdPrefix}-primary-repository-combobox`;
+  const automationNameField = input.shouldShowCreateNameField ? (
+    <div className="p-4">
+      <Field orientation="horizontal">
+        <FieldHeader>
+          <FieldLabel htmlFor={automationNameId}>Automation name</FieldLabel>
+        </FieldHeader>
+        <FieldContent>
+          <Input
+            aria-invalid={input.fieldErrors.name !== undefined ? true : undefined}
+            disabled={disabled}
+            id={automationNameId}
+            onChange={(event) => {
+              input.onValueChange("name", event.currentTarget.value);
+            }}
+            value={input.name}
+          />
+          <AutomationFormFieldError
+            message={
+              shouldRenderCommonAutomationInlineFieldError({
+                key: "name",
+                message: input.fieldErrors.name,
+              })
+                ? input.fieldErrors.name
+                : undefined
+            }
+          />
+        </FieldContent>
+      </Field>
+    </div>
+  ) : null;
+  const automationTypeField =
+    input.automationTypeField === undefined ? null : (
+      <div className="p-4">{input.automationTypeField}</div>
+    );
+  const sandboxProfileField = (
+    <div className="p-4">
+      <AutomationFormSelectField
+        disabled={disabled}
+        error={input.fieldErrors.sandboxProfileId}
+        label="Sandbox profile"
+        orientation="horizontal"
+        onValueChange={(value) => {
+          input.onValueChange("sandboxProfileId", value);
+        }}
+        options={input.sandboxProfileOptions}
+        placeholder="Select profile"
+        showInlineError={false}
+        value={input.sandboxProfileId}
+      />
+    </div>
+  );
 
   return (
     <FormPageStack>
@@ -218,56 +269,19 @@ export function AutomationFormShell(input: AutomationFormShellProps): React.JSX.
           </div>
         ) : null}
 
-        {input.shouldShowCreateNameField ? (
-          <div className="p-4">
-            <Field orientation="horizontal">
-              <FieldHeader>
-                <FieldLabel htmlFor={automationNameId}>Automation name</FieldLabel>
-              </FieldHeader>
-              <FieldContent>
-                <Input
-                  aria-invalid={input.fieldErrors.name !== undefined ? true : undefined}
-                  disabled={disabled}
-                  id={automationNameId}
-                  onChange={(event) => {
-                    input.onValueChange("name", event.currentTarget.value);
-                  }}
-                  value={input.name}
-                />
-                <AutomationFormFieldError
-                  message={
-                    shouldRenderCommonAutomationInlineFieldError({
-                      key: "name",
-                      message: input.fieldErrors.name,
-                    })
-                      ? input.fieldErrors.name
-                      : undefined
-                  }
-                />
-              </FieldContent>
-            </Field>
-          </div>
-        ) : null}
-
-        {input.automationTypeField === undefined ? null : (
-          <div className="p-4">{input.automationTypeField}</div>
+        {input.mode === "create" ? (
+          <>
+            {sandboxProfileField}
+            {automationTypeField}
+            {automationNameField}
+          </>
+        ) : (
+          <>
+            {automationNameField}
+            {automationTypeField}
+            {sandboxProfileField}
+          </>
         )}
-
-        <div className="p-4">
-          <AutomationFormSelectField
-            disabled={disabled}
-            error={input.fieldErrors.sandboxProfileId}
-            label="Sandbox profile"
-            orientation="horizontal"
-            onValueChange={(value) => {
-              input.onValueChange("sandboxProfileId", value);
-            }}
-            options={input.sandboxProfileOptions}
-            placeholder="Select profile"
-            showInlineError={false}
-            value={input.sandboxProfileId}
-          />
-        </div>
 
         {input.shouldShowPrimaryRepositoryField ? (
           <div className="border-t p-4">
