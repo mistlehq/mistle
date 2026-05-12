@@ -6,6 +6,12 @@ import type {
   RuntimeClientSetupFile,
 } from "@mistle/integrations-core";
 
+import {
+  isAnthropicApiRoute,
+  isOpenAiApiRoute,
+  isOpenAiChatGptSubscriptionRoute,
+  isOpenCodeGoRoute,
+} from "../shared/provider-egress-routes.js";
 import { OpenCodePtyLaunchSpec } from "./pty-launch.js";
 import {
   OpenCodeProxyListenUrl,
@@ -97,69 +103,6 @@ function renderOpenCodeConfig(): string {
 
 function renderOpenCodeGlobalAgentsMd(): string {
   return `${OpenCodeGlobalAgentsMd}\n`;
-}
-
-function isIntegrationConnectionCredentialRoute(
-  route: EgressCredentialRoute,
-): route is EgressCredentialRoute & {
-  credentialResolver: Extract<
-    EgressCredentialRoute["credentialResolver"],
-    { kind: "integration_connection" }
-  >;
-} {
-  return route.credentialResolver.kind === "integration_connection";
-}
-
-function routeHasHost(input: { route: EgressCredentialRoute; host: string }): boolean {
-  return input.route.match.hosts.some((host) => host.toLowerCase() === input.host);
-}
-
-function routeHasPathPrefix(input: { route: EgressCredentialRoute; pathPrefix: string }): boolean {
-  const baseUrlPathname = new URL(input.route.upstream.baseUrl).pathname;
-  return (
-    baseUrlPathname.startsWith(input.pathPrefix) ||
-    input.route.match.pathPrefixes?.some((pathPrefix) =>
-      pathPrefix.startsWith(input.pathPrefix),
-    ) === true
-  );
-}
-
-function isOpenAiApiRoute(route: EgressCredentialRoute): boolean {
-  return (
-    route.familyId === "openai" &&
-    routeHasHost({ route, host: "api.openai.com" }) &&
-    route.authInjection.type === "bearer" &&
-    isIntegrationConnectionCredentialRoute(route) &&
-    route.credentialResolver.secretType === "api_key"
-  );
-}
-
-function isOpenAiChatGptSubscriptionRoute(route: EgressCredentialRoute): boolean {
-  return (
-    route.familyId === "openai" &&
-    routeHasHost({ route, host: "chatgpt.com" }) &&
-    route.authInjection.type === "bearer" &&
-    isIntegrationConnectionCredentialRoute(route) &&
-    (route.credentialResolver.secretType === "oauth2_access_token" ||
-      route.credentialResolver.secretType === "chatgpt_access_token")
-  );
-}
-
-function isAnthropicApiRoute(route: EgressCredentialRoute): boolean {
-  return (
-    route.familyId === "anthropic" &&
-    routeHasHost({ route, host: "api.anthropic.com" }) &&
-    route.authInjection.type === "bearer"
-  );
-}
-
-function isOpenCodeGoRoute(route: EgressCredentialRoute): boolean {
-  return (
-    route.familyId === "opencode" &&
-    routeHasHost({ route, host: "opencode.ai" }) &&
-    routeHasPathPrefix({ route, pathPrefix: "/zen/go" }) &&
-    route.authInjection.type === "bearer"
-  );
 }
 
 function readChatGptAccountId(route: EgressCredentialRoute): string | undefined {

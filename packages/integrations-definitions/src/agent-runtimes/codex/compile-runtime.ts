@@ -13,6 +13,10 @@ import {
   OpenAiChatGptResponsesApiBaseUrl,
 } from "../../openai/variants/openai-default/target-config-schema.js";
 import {
+  isOpenAiApiRoute,
+  isOpenAiChatGptSubscriptionRoute,
+} from "../shared/provider-egress-routes.js";
+import {
   CodexAppServerEndpointKey,
   CodexAppServerListenUrl,
   CodexAppServerProcessKey,
@@ -101,42 +105,6 @@ function renderCodexConfig(input: { providerMetadata?: CodexProviderMetadata }):
 
 function renderCodexGlobalAgentsMd(): string {
   return `${CodexGlobalAgentsMd}\n`;
-}
-
-function isIntegrationConnectionCredentialRoute(
-  route: EgressCredentialRoute,
-): route is EgressCredentialRoute & {
-  credentialResolver: Extract<
-    EgressCredentialRoute["credentialResolver"],
-    { kind: "integration_connection" }
-  >;
-} {
-  return route.credentialResolver.kind === "integration_connection";
-}
-
-function routeHasHost(input: { route: EgressCredentialRoute; host: string }): boolean {
-  return input.route.match.hosts.some((host) => host.toLowerCase() === input.host);
-}
-
-function isOpenAiApiRoute(route: EgressCredentialRoute): boolean {
-  return (
-    route.familyId === "openai" &&
-    routeHasHost({ route, host: "api.openai.com" }) &&
-    route.authInjection.type === "bearer" &&
-    isIntegrationConnectionCredentialRoute(route) &&
-    route.credentialResolver.secretType === "api_key"
-  );
-}
-
-function isOpenAiChatGptSubscriptionRoute(route: EgressCredentialRoute): boolean {
-  return (
-    route.familyId === "openai" &&
-    routeHasHost({ route, host: "chatgpt.com" }) &&
-    route.authInjection.type === "bearer" &&
-    isIntegrationConnectionCredentialRoute(route) &&
-    (route.credentialResolver.secretType === "oauth2_access_token" ||
-      route.credentialResolver.secretType === "chatgpt_access_token")
-  );
 }
 
 function resolveCodexProviderMetadataFromEgressRoutes(input: {
