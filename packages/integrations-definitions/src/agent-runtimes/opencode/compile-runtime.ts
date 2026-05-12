@@ -335,37 +335,9 @@ function buildOpenCodeRuntimeClients(input: {
 export function compileOpenCodeRuntime(
   input: CompileAgentRuntimeInput<Record<string, never>>,
 ): CompileAgentRuntimeResult {
-  const routeHost = new URL(input.providerAccess.apiBaseUrl).host;
   const openCodeCliInstallPath = input.refs.artifactBinPath("opencode");
 
   return {
-    egressRoutes: [
-      {
-        match: {
-          hosts: [routeHost],
-          pathPrefixes: [...input.providerAccess.allowedPathPrefixes],
-          methods: [...input.providerAccess.allowedMethods],
-        },
-        upstream: {
-          baseUrl: input.providerAccess.apiBaseUrl,
-        },
-        authInjection: {
-          type: input.providerAccess.authScheme,
-          target: "authorization",
-        },
-        ...(input.providerAccess.additionalHeaders === undefined
-          ? {}
-          : { additionalHeaders: input.providerAccess.additionalHeaders }),
-        credentialResolver: {
-          kind: "integration_connection",
-          connectionId: input.providerAccess.credentialResolver.connectionId,
-          secretType: input.providerAccess.credentialResolver.secretType,
-          ...(input.providerAccess.credentialResolver.slotKey === undefined
-            ? {}
-            : { slotKey: input.providerAccess.credentialResolver.slotKey }),
-        },
-      },
-    ],
     artifacts: [
       {
         artifactKey: OpenCodeCliArtifactKey,

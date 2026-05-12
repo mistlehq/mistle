@@ -2,9 +2,17 @@ import {
   type AgentProviderAccess,
   type CompileAgentRuntimeInput,
   type CompileAgentRuntimeResult,
+  type EgressCredentialRoute,
+  type RuntimeClient,
+  type RuntimeClientSetupFile,
 } from "@mistle/integrations-core";
 import { stringify as stringifyToml } from "smol-toml";
 
+import {
+  OpenAiChatGptBaseUrl,
+  OpenAiChatGptOriginBaseUrl,
+  OpenAiChatGptResponsesApiBaseUrl,
+} from "../../openai/variants/openai-default/target-config-schema.js";
 import {
   CodexAppServerEndpointKey,
   CodexAppServerListenUrl,
@@ -115,10 +123,147 @@ function renderCodexGlobalAgentsMd(): string {
   return `${CodexGlobalAgentsMd}\n`;
 }
 
+function isIntegrationConnectionCredentialRoute(
+  route: EgressCredentialRoute,
+): route is EgressCredentialRoute & {
+  credentialResolver: Extract<
+    EgressCredentialRoute["credentialResolver"],
+    { kind: "integration_connection" }
+  >;
+} {
+  return route.credentialResolver.kind === "integration_connection";
+}
+
+function routeHasHost(input: { route: EgressCredentialRoute; host: string }): boolean {
+  return input.route.match.hosts.some((host) => host.toLowerCase() === input.host);
+}
+
+function isOpenAiApiRoute(route: EgressCredentialRoute): boolean {
+  return (
+    route.familyId === "openai" &&
+    routeHasHost({ route, host: "api.openai.com" }) &&
+    route.authInjection.type === "bearer" &&
+    isIntegrationConnectionCredentialRoute(route) &&
+    route.credentialResolver.secretType === "api_key"
+  );
+}
+
+function isOpenAiChatGptSubscriptionRoute(route: EgressCredentialRoute): boolean {
+  return (
+    route.familyId === "openai" &&
+    routeHasHost({ route, host: "chatgpt.com" }) &&
+    route.authInjection.type === "bearer" &&
+    isIntegrationConnectionCredentialRoute(route) &&
+    (route.credentialResolver.secretType === "oauth2_access_token" ||
+      route.credentialResolver.secretType === "chatgpt_access_token")
+  );
+}
+
+function resolveCodexProviderMetadataFromEgressRoutes(input: {
+  egressRoutes: ReadonlyArray<EgressCredentialRoute>;
+}): CodexProviderMetadata {
+  const matchingRoutes = input.egressRoutes.filter(
+    (route) => isOpenAiApiRoute(route) || isOpenAiChatGptSubscriptionRoute(route),
+  );
+  const route = matchingRoutes[0];
+
+  if (route === undefined) {
+    throw new Error("Codex runtime requires exactly one proxied OpenAI provider route.");
+  }
+
+  if (matchingRoutes[1] !== undefined) {
+    throw new Error("Codex runtime cannot represent multiple proxied OpenAI provider routes.");
+  }
+
+  if (isOpenAiChatGptSubscriptionRoute(route)) {
+    if (route.upstream.baseUrl !== OpenAiChatGptOriginBaseUrl) {
+      throw new Error("Codex runtime ChatGPT route must use the ChatGPT origin base URL.");
+    }
+
+    return {
+      responsesApiBaseUrl: OpenAiChatGptResponsesApiBaseUrl,
+      chatgptBaseUrl: OpenAiChatGptBaseUrl,
+    };
+  }
+
+  return {
+    responsesApiBaseUrl: route.upstream.baseUrl,
+  };
+}
+
+function buildCodexSetupFiles(input: CodexProviderMetadata): ReadonlyArray<RuntimeClientSetupFile> {
+  return [
+    {
+      fileId: "codex_config",
+      path: CodexConfigPath,
+      mode: 384,
+      writeMode: "if-absent",
+      content: renderCodexConfig({
+        responsesApiBaseUrl: input.responsesApiBaseUrl,
+        ...(input.chatgptBaseUrl === undefined
+          ? {}
+          : {
+              chatgptBaseUrl: input.chatgptBaseUrl,
+            }),
+      }),
+    },
+    {
+      fileId: "codex_global_agents",
+      path: CodexGlobalAgentsPath,
+      mode: 384,
+      writeMode: "if-absent",
+      content: renderCodexGlobalAgentsMd(),
+    },
+  ];
+}
+
+function buildCodexRuntimeClients(input: {
+  codexCliInstallPath: string;
+  providerMetadata: CodexProviderMetadata;
+}): ReadonlyArray<RuntimeClient> {
+  return [
+    {
+      clientId: "codex-cli",
+      setup: {
+        env: {},
+        files: buildCodexSetupFiles(input.providerMetadata),
+      },
+      processes: [
+        {
+          processKey: CodexAppServerProcessKey,
+          command: {
+            args: [input.codexCliInstallPath, "app-server", "--listen", CodexAppServerListenUrl],
+          },
+          readiness: {
+            type: "ws",
+            url: CodexAppServerListenUrl,
+            timeoutMs: RuntimeClientProcessReadinessTimeoutMs,
+          },
+          stop: {
+            signal: "sigterm",
+            timeoutMs: RuntimeClientProcessStopTimeoutMs,
+            gracePeriodMs: RuntimeClientProcessStopGracePeriodMs,
+          },
+        },
+      ],
+      endpoints: [
+        {
+          endpointKey: CodexAppServerEndpointKey,
+          processKey: CodexAppServerProcessKey,
+          transport: {
+            type: "ws",
+            url: CodexProxyListenUrl,
+          },
+          connectionMode: "dedicated",
+        },
+      ],
+    },
+  ];
+}
+
 export function compileCodexRuntime(
   input: CompileAgentRuntimeInput<Record<string, never>>,
 ): CompileAgentRuntimeResult {
-  const routeHost = new URL(input.providerAccess.apiBaseUrl).host;
   const codexCliInstallPath = input.refs.artifactBinPath("codex");
   const providerMetadata = resolveCodexProviderMetadata(input.providerAccess);
 
@@ -127,33 +272,6 @@ export function compileCodexRuntime(
   }
 
   return {
-    egressRoutes: [
-      {
-        match: {
-          hosts: [routeHost],
-          pathPrefixes: [...input.providerAccess.allowedPathPrefixes],
-          methods: [...input.providerAccess.allowedMethods],
-        },
-        upstream: {
-          baseUrl: input.providerAccess.apiBaseUrl,
-        },
-        authInjection: {
-          type: input.providerAccess.authScheme,
-          target: "authorization",
-        },
-        ...(input.providerAccess.additionalHeaders === undefined
-          ? {}
-          : { additionalHeaders: input.providerAccess.additionalHeaders }),
-        credentialResolver: {
-          kind: "integration_connection",
-          connectionId: input.providerAccess.credentialResolver.connectionId,
-          secretType: input.providerAccess.credentialResolver.secretType,
-          ...(input.providerAccess.credentialResolver.slotKey === undefined
-            ? {}
-            : { slotKey: input.providerAccess.credentialResolver.slotKey }),
-        },
-      },
-    ],
     artifacts: [
       {
         artifactKey: CodexCliArtifactKey,
@@ -187,66 +305,17 @@ export function compileCodexRuntime(
         },
       },
     ],
-    runtimeClients: [
-      {
-        clientId: "codex-cli",
-        setup: {
-          env: {},
-          files: [
-            {
-              fileId: "codex_config",
-              path: CodexConfigPath,
-              mode: 384,
-              writeMode: "if-absent",
-              content: renderCodexConfig({
-                responsesApiBaseUrl: providerMetadata.responsesApiBaseUrl,
-                ...(providerMetadata.chatgptBaseUrl === undefined
-                  ? {}
-                  : {
-                      chatgptBaseUrl: providerMetadata.chatgptBaseUrl,
-                    }),
-              }),
-            },
-            {
-              fileId: "codex_global_agents",
-              path: CodexGlobalAgentsPath,
-              mode: 384,
-              writeMode: "if-absent",
-              content: renderCodexGlobalAgentsMd(),
-            },
-          ],
-        },
-        processes: [
-          {
-            processKey: CodexAppServerProcessKey,
-            command: {
-              args: [codexCliInstallPath, "app-server", "--listen", CodexAppServerListenUrl],
-            },
-            readiness: {
-              type: "ws",
-              url: CodexAppServerListenUrl,
-              timeoutMs: RuntimeClientProcessReadinessTimeoutMs,
-            },
-            stop: {
-              signal: "sigterm",
-              timeoutMs: RuntimeClientProcessStopTimeoutMs,
-              gracePeriodMs: RuntimeClientProcessStopGracePeriodMs,
-            },
-          },
-        ],
-        endpoints: [
-          {
-            endpointKey: CodexAppServerEndpointKey,
-            processKey: CodexAppServerProcessKey,
-            transport: {
-              type: "ws",
-              url: CodexProxyListenUrl,
-            },
-            connectionMode: "dedicated",
-          },
-        ],
-      },
-    ],
+    runtimeClients: buildCodexRuntimeClients({
+      codexCliInstallPath,
+      providerMetadata,
+    }),
+    renderRuntimeClients: ({ egressRoutes }) =>
+      buildCodexRuntimeClients({
+        codexCliInstallPath,
+        providerMetadata: resolveCodexProviderMetadataFromEgressRoutes({
+          egressRoutes,
+        }),
+      }),
     agentRuntimes: [
       {
         runtimeId: "codex",

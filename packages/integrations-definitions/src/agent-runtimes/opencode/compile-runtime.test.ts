@@ -189,7 +189,7 @@ describe("compileOpenCodeRuntime", () => {
     ]);
   });
 
-  it("compiles OpenCode runtime artifacts, server wiring, and proxied provider access", () => {
+  it("compiles OpenCode runtime artifacts and server wiring without owning provider egress", () => {
     const compiled = compileOpenCodeRuntime({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
@@ -227,28 +227,7 @@ describe("compileOpenCodeRuntime", () => {
       },
     });
 
-    expect(compiled.egressRoutes).toEqual([
-      {
-        match: {
-          hosts: ["api.openai.com"],
-          pathPrefixes: ["/"],
-          methods: ["GET", "POST"],
-        },
-        upstream: {
-          baseUrl: "https://api.openai.com/v1",
-        },
-        authInjection: {
-          type: "bearer",
-          target: "authorization",
-        },
-        credentialResolver: {
-          kind: "integration_connection",
-          connectionId: "conn_openai_org_123",
-          secretType: "api_key",
-          slotKey: "openai.openai-default.api-key.api-key",
-        },
-      },
-    ]);
+    expect(compiled.egressRoutes).toBeUndefined();
 
     expect(compiled.artifacts).toHaveLength(1);
     expect(compiled.artifacts?.[0]?.artifactKey).toBe("opencode-cli");
@@ -429,7 +408,7 @@ describe("compileOpenCodeRuntime", () => {
     ]);
   });
 
-  it("preserves additional provider headers in the egress route", () => {
+  it("does not emit provider egress routes when provider access has additional headers", () => {
     const compiled = compileOpenCodeRuntime({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
@@ -469,30 +448,7 @@ describe("compileOpenCodeRuntime", () => {
       },
     });
 
-    expect(compiled.egressRoutes).toEqual([
-      {
-        match: {
-          hosts: ["chatgpt.com"],
-          pathPrefixes: ["/"],
-          methods: ["GET", "POST"],
-        },
-        upstream: {
-          baseUrl: "https://chatgpt.com",
-        },
-        authInjection: {
-          type: "bearer",
-          target: "authorization",
-        },
-        additionalHeaders: {
-          "ChatGPT-Account-ID": "acct_123",
-        },
-        credentialResolver: {
-          kind: "integration_connection",
-          connectionId: "conn_openai_org_123",
-          secretType: "chatgpt_access_token",
-        },
-      },
-    ]);
+    expect(compiled.egressRoutes).toBeUndefined();
 
     const configContent = compiled.runtimeClients[0]?.setup.files.find(
       (file) => file.fileId === "opencode_config",

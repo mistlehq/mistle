@@ -1,4 +1,6 @@
 import type {
+  CompileAgentRuntimeResult,
+  EgressCredentialRoute,
   RuntimeArtifactGitHubReleaseInstallHelperInput,
   RuntimeArtifactInstallStep,
   RuntimeArtifactSpec,
@@ -7,6 +9,57 @@ import type {
 import { describe, expect, it } from "vitest";
 
 import { compileCodexRuntime } from "./compile-runtime.js";
+
+function createCompiledOpenAiRoute(input: {
+  egressRuleId: string;
+  host: string;
+  baseUrl: string;
+  secretType: string;
+  additionalHeaders?: Record<string, string>;
+}): EgressCredentialRoute {
+  return {
+    egressRuleId: input.egressRuleId,
+    bindingId: "bind_openai_agent",
+    familyId: "openai",
+    variantId: "openai-default",
+    match: {
+      hosts: [input.host],
+      methods: ["GET", "POST"],
+      pathPrefixes: ["/"],
+    },
+    upstream: {
+      baseUrl: input.baseUrl,
+    },
+    authInjection: {
+      type: "bearer",
+      target: "authorization",
+    },
+    ...(input.additionalHeaders === undefined
+      ? {}
+      : { additionalHeaders: input.additionalHeaders }),
+    credentialResolver: {
+      kind: "integration_connection",
+      connectionId: "conn_openai_org_123",
+      secretType: input.secretType,
+    },
+  };
+}
+
+function renderRuntimeClients(input: {
+  compiled: CompileAgentRuntimeResult;
+  egressRoutes: ReadonlyArray<EgressCredentialRoute>;
+}) {
+  if (input.compiled.renderRuntimeClients === undefined) {
+    throw new Error("Expected Codex runtime client renderer.");
+  }
+
+  return input.compiled.renderRuntimeClients({
+    egressRoutes: input.egressRoutes,
+    bindingEgressRoutes: input.egressRoutes.filter(
+      (route) => route.bindingId === "bind_openai_agent",
+    ),
+  });
+}
 
 function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
   install: ReadonlyArray<RuntimeArtifactInstallStep>;
@@ -110,30 +163,7 @@ describe("compileCodexRuntime", () => {
       },
     });
 
-    expect(compiled.egressRoutes).toEqual([
-      {
-        match: {
-          hosts: ["api.openai.com"],
-          pathPrefixes: ["/"],
-          methods: ["GET", "POST"],
-        },
-        upstream: {
-          baseUrl: "https://api.openai.com",
-        },
-        authInjection: {
-          type: "bearer",
-          target: "authorization",
-        },
-        additionalHeaders: {
-          "ChatGPT-Account-ID": "acct_123",
-        },
-        credentialResolver: {
-          kind: "integration_connection",
-          connectionId: "conn_openai_org_123",
-          secretType: "api_key",
-        },
-      },
-    ]);
+    expect(compiled.egressRoutes).toBeUndefined();
     expect(compiled.artifacts).toHaveLength(1);
     expect(compiled.artifacts?.[0]?.artifactKey).toBe("codex-cli");
     if (compiled.artifacts?.[0] === undefined) {
@@ -345,32 +375,23 @@ describe("compileCodexRuntime", () => {
       },
     });
 
-    expect(compiled.egressRoutes).toEqual([
-      {
-        match: {
-          hosts: ["chatgpt.com"],
-          pathPrefixes: ["/"],
-          methods: ["GET", "POST"],
-        },
-        upstream: {
-          baseUrl: "https://chatgpt.com",
-        },
-        authInjection: {
-          type: "bearer",
-          target: "authorization",
-        },
-        additionalHeaders: {
-          "ChatGPT-Account-ID": "acct_123",
-        },
-        credentialResolver: {
-          kind: "integration_connection",
-          connectionId: "conn_openai_org_123",
-          secretType: "chatgpt_access_token",
-        },
-      },
-    ]);
+    expect(compiled.egressRoutes).toBeUndefined();
 
-    const configContent = compiled.runtimeClients[0]?.setup.files.find(
+    const runtimeClients = renderRuntimeClients({
+      compiled,
+      egressRoutes: [
+        createCompiledOpenAiRoute({
+          egressRuleId: "egress_rule_bind_openai_agent",
+          host: "chatgpt.com",
+          baseUrl: "https://chatgpt.com",
+          secretType: "oauth2_access_token",
+          additionalHeaders: {
+            "ChatGPT-Account-ID": "acct_123",
+          },
+        }),
+      ],
+    });
+    const configContent = runtimeClients[0]?.setup.files.find(
       (file) => file.fileId === "codex_config",
     )?.content;
     expect(configContent).toContain('model_provider = "proxy"');

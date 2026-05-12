@@ -1,6 +1,8 @@
 import {
   IntegrationConnectionMethodIds,
   IntegrationKinds,
+  type AgentProviderAccess,
+  type CompileBindingInput,
   type CompileBindingResult,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
@@ -20,6 +22,7 @@ import {
 } from "./binding-config-form.js";
 import {
   OpenAiAllowedRuntimeIds,
+  type OpenAiApiKeyBindingConfig,
   OpenAiApiKeyBindingConfigSchema,
 } from "./binding-config-schema.js";
 import {
@@ -32,6 +35,7 @@ import {
   resolveOpenAiChatGptBaseUrlForConnectionMethod,
   resolveOpenAiResponsesApiBaseUrlForConnectionMethod,
   resolveOpenAiRouteBaseUrlForConnectionMethod,
+  type OpenAiApiKeyTargetConfig,
 } from "./target-config-schema.js";
 import { validateOpenAiBindingWriteContext } from "./validate-binding-write-context.js";
 
@@ -44,11 +48,105 @@ type OpenAiApiKeyIntegrationDefinition = IntegrationDefinition<
 
 const OpenAiApiKeyTargetSecretSchema = z.object({}).strict();
 
-const EmptyCompileBindingResult: CompileBindingResult = {
-  egressRoutes: [],
-  artifacts: [],
-  runtimeClients: [],
-};
+function resolveOpenAiAgentProviderAccess(
+  input: CompileBindingInput<
+    OpenAiApiKeyTargetConfig,
+    OpenAiApiKeyBindingConfig,
+    z.output<typeof OpenAiApiKeyTargetSecretSchema>
+  >,
+): AgentProviderAccess {
+  const connectionConfig = OpenAiConnectionConfigSchema.parse(input.connection.config);
+
+  return {
+    providerFamilyId: input.target.familyId,
+    providerVariantId: input.target.variantId,
+    apiBaseUrl: resolveOpenAiRouteBaseUrlForConnectionMethod({
+      targetConfig: input.target.config,
+      connectionMethod: connectionConfig.connection_method,
+    }),
+    authScheme: "bearer",
+    credentialResolver: {
+      connectionId: input.connection.id,
+      secretType: resolveOpenAiCredentialSecretType(input.connection.config),
+      slotKey: resolveOpenAiCredentialSlotKey({
+        familyId: input.target.familyId,
+        variantId: input.target.variantId,
+        connectionConfig: input.connection.config,
+      }),
+    },
+    ...(connectionConfig.connection_method === OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE &&
+    connectionConfig.chatgpt_account_id !== undefined
+      ? {
+          additionalHeaders: {
+            "ChatGPT-Account-ID": connectionConfig.chatgpt_account_id,
+          },
+        }
+      : {}),
+    allowedMethods: ["GET", "POST"],
+    allowedPathPrefixes:
+      connectionConfig.connection_method === OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE
+        ? ["/"]
+        : ["/"],
+    providerMetadata: {
+      responsesApiBaseUrl: resolveOpenAiResponsesApiBaseUrlForConnectionMethod({
+        targetConfig: input.target.config,
+        connectionMethod: connectionConfig.connection_method,
+      }),
+      ...(resolveOpenAiChatGptBaseUrlForConnectionMethod({
+        connectionMethod: connectionConfig.connection_method,
+      }) === undefined
+        ? {}
+        : {
+            chatgptBaseUrl: resolveOpenAiChatGptBaseUrlForConnectionMethod({
+              connectionMethod: connectionConfig.connection_method,
+            }),
+          }),
+    },
+  };
+}
+
+function compileOpenAiBinding(
+  input: CompileBindingInput<
+    OpenAiApiKeyTargetConfig,
+    OpenAiApiKeyBindingConfig,
+    z.output<typeof OpenAiApiKeyTargetSecretSchema>
+  >,
+): CompileBindingResult {
+  const providerAccess = resolveOpenAiAgentProviderAccess(input);
+  const routeHost = new URL(providerAccess.apiBaseUrl).host;
+
+  return {
+    egressRoutes: [
+      {
+        match: {
+          hosts: [routeHost],
+          pathPrefixes: [...providerAccess.allowedPathPrefixes],
+          methods: [...providerAccess.allowedMethods],
+        },
+        upstream: {
+          baseUrl: providerAccess.apiBaseUrl,
+        },
+        authInjection: {
+          type: providerAccess.authScheme,
+          target: "authorization",
+        },
+        ...(providerAccess.additionalHeaders === undefined
+          ? {}
+          : { additionalHeaders: providerAccess.additionalHeaders }),
+        credentialResolver: {
+          kind: "integration_connection",
+          connectionId: providerAccess.credentialResolver.connectionId,
+          secretType: providerAccess.credentialResolver.secretType,
+          ...(providerAccess.credentialResolver.slotKey === undefined
+            ? {}
+            : { slotKey: providerAccess.credentialResolver.slotKey }),
+        },
+      },
+    ],
+    artifacts: [],
+    runtimeClients: [],
+  };
+}
 
 export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
   familyId: "openai",
@@ -100,58 +198,10 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
   oauth2AuthorizationCode: OpenAiDeviceAuthorizationOAuth2Capability,
   capabilities: {
     resolveCapabilities: (input) => {
-      const connectionConfig = OpenAiConnectionConfigSchema.parse(input.connection.config);
       return {
-        agentProviderAccess: {
-          providerFamilyId: input.target.familyId,
-          providerVariantId: input.target.variantId,
-          apiBaseUrl: resolveOpenAiRouteBaseUrlForConnectionMethod({
-            targetConfig: input.target.config,
-            connectionMethod: connectionConfig.connection_method,
-          }),
-          authScheme: "bearer",
-          credentialResolver: {
-            kind: "integration_connection",
-            connectionId: input.connection.id,
-            secretType: resolveOpenAiCredentialSecretType(input.connection.config),
-            slotKey: resolveOpenAiCredentialSlotKey({
-              familyId: input.target.familyId,
-              variantId: input.target.variantId,
-              connectionConfig: input.connection.config,
-            }),
-          },
-          ...(connectionConfig.connection_method ===
-            OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE &&
-          connectionConfig.chatgpt_account_id !== undefined
-            ? {
-                additionalHeaders: {
-                  "ChatGPT-Account-ID": connectionConfig.chatgpt_account_id,
-                },
-              }
-            : {}),
-          allowedMethods: ["GET", "POST"],
-          allowedPathPrefixes:
-            connectionConfig.connection_method === OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE
-              ? ["/"]
-              : ["/"],
-          providerMetadata: {
-            responsesApiBaseUrl: resolveOpenAiResponsesApiBaseUrlForConnectionMethod({
-              targetConfig: input.target.config,
-              connectionMethod: connectionConfig.connection_method,
-            }),
-            ...(resolveOpenAiChatGptBaseUrlForConnectionMethod({
-              connectionMethod: connectionConfig.connection_method,
-            }) === undefined
-              ? {}
-              : {
-                  chatgptBaseUrl: resolveOpenAiChatGptBaseUrlForConnectionMethod({
-                    connectionMethod: connectionConfig.connection_method,
-                  }),
-                }),
-          },
-        },
+        agentProviderAccess: resolveOpenAiAgentProviderAccess(input),
       };
     },
   },
-  compileBinding: () => EmptyCompileBindingResult,
+  compileBinding: compileOpenAiBinding,
 };

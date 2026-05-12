@@ -756,6 +756,7 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
         );
       }
 
+      const providerCompileBindingResult = definition.compileBinding(compileBindingInput);
       const compileAgentRuntimeResult = runtimeDefinition.compileRuntime({
         organizationId: input.organizationId,
         sandboxProfileId: input.sandboxProfileId,
@@ -769,13 +770,26 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
         refs: compileBindingInput.refs,
       });
       const compileBindingResult: CompileBindingResult = {
-        egressRoutes: compileAgentRuntimeResult.egressRoutes ?? [],
-        artifacts: compileAgentRuntimeResult.artifacts ?? [],
-        runtimeClients: compileAgentRuntimeResult.runtimeClients,
-        ...(compileAgentRuntimeResult.workspaceSources === undefined
+        egressRoutes: [
+          ...providerCompileBindingResult.egressRoutes,
+          ...(compileAgentRuntimeResult.egressRoutes ?? []),
+        ],
+        artifacts: [
+          ...providerCompileBindingResult.artifacts,
+          ...(compileAgentRuntimeResult.artifacts ?? []),
+        ],
+        runtimeClients: [
+          ...providerCompileBindingResult.runtimeClients,
+          ...compileAgentRuntimeResult.runtimeClients,
+        ],
+        ...(providerCompileBindingResult.workspaceSources === undefined &&
+        compileAgentRuntimeResult.workspaceSources === undefined
           ? {}
           : {
-              workspaceSources: compileAgentRuntimeResult.workspaceSources,
+              workspaceSources: [
+                ...(providerCompileBindingResult.workspaceSources ?? []),
+                ...(compileAgentRuntimeResult.workspaceSources ?? []),
+              ],
             }),
         agentRuntimes: compileAgentRuntimeResult.agentRuntimes,
       };
@@ -790,7 +804,14 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
         compileBindingResult,
       });
 
-      renderRuntimeClients = compileAgentRuntimeResult.renderRuntimeClients;
+      const runtimeClientRenderer = compileAgentRuntimeResult.renderRuntimeClients;
+      renderRuntimeClients =
+        runtimeClientRenderer === undefined
+          ? undefined
+          : (renderInput) => [
+              ...providerCompileBindingResult.runtimeClients,
+              ...runtimeClientRenderer(renderInput),
+            ];
     } else {
       const compileBindingResult = definition.compileBinding(compileBindingInput);
       compiledBindingResult = compileBindingResultToCompiledBindingResult({
