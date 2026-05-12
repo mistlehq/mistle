@@ -55,7 +55,6 @@ import { createWebhookAutomation } from "./webhook-automations-service.js";
 type NavigateFunction = (to: string) => void | Promise<void>;
 
 type CreateAutomationEditorProps = {
-  initialKind: AutomationTypeValue;
   navigate: NavigateFunction;
   initialSandboxProfileId?: string | undefined;
   createSuccessPath?: AutomationCreateSuccessPath;
@@ -93,7 +92,6 @@ function resolveActiveVersion(versions: readonly SandboxProfileVersion[]): numbe
 }
 
 function createInitialCreateAutomationFormValues(input: {
-  kind: AutomationTypeValue;
   initialSandboxProfileId: string | undefined;
 }): CreateAutomationFormValues {
   const webhookValues = toWebhookAutomationFormValues(null);
@@ -104,8 +102,7 @@ function createInitialCreateAutomationFormValues(input: {
     sandboxProfileId: input.initialSandboxProfileId ?? "",
     primaryRepositoryId: "",
     enabled: true,
-    inputTemplate:
-      input.kind === "scheduled" ? scheduledValues.inputTemplate : webhookValues.inputTemplate,
+    inputTemplate: webhookValues.inputTemplate,
     instructions: webhookValues.instructions,
     conversationKeyTemplate: webhookValues.conversationKeyTemplate,
     triggerIds: webhookValues.triggerIds,
@@ -245,6 +242,12 @@ function applyTriggerIdsChange(input: {
   };
 }
 
+function resolveDefaultInputTemplate(kind: AutomationTypeValue): string {
+  return kind === "scheduled"
+    ? toScheduledAutomationFormValues(null).inputTemplate
+    : toWebhookAutomationFormValues(null).inputTemplate;
+}
+
 function resolveCreateAutomationMutationErrorMessage(input: {
   error: unknown;
   fallbackMessage: string;
@@ -263,10 +266,9 @@ async function invalidateAutomationsQuery(queryClient: QueryClient) {
 
 function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
   const queryClient = useQueryClient();
-  const [kind, setKind] = useState<AutomationTypeValue>(input.initialKind);
+  const [kind, setKind] = useState<AutomationTypeValue>("trigger");
   const [formValues, setFormValues] = useState<CreateAutomationFormValues>(() =>
     createInitialCreateAutomationFormValues({
-      kind: input.initialKind,
       initialSandboxProfileId: input.initialSandboxProfileId,
     }),
   );
@@ -475,6 +477,17 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
   });
 
   function onKindChange(nextKind: AutomationTypeValue): void {
+    setFormValues((currentValues) => {
+      const currentDefaultInputTemplate = resolveDefaultInputTemplate(kind);
+      if (currentValues.inputTemplate !== currentDefaultInputTemplate) {
+        return currentValues;
+      }
+
+      return {
+        ...currentValues,
+        inputTemplate: resolveDefaultInputTemplate(nextKind),
+      };
+    });
     setKind(nextKind);
     setFieldErrors({});
     setValidationSummaryError(null);

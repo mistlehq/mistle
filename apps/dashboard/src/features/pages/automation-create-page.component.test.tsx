@@ -83,18 +83,13 @@ describe("AutomationCreatePage", () => {
     );
   });
 
-  it("shows the scheduled automation fields from the type query without event prerequisites", () => {
-    renderCreatePage({
-      initialEntry: "/automations/new?type=scheduled",
-      shouldSeedIntegrationDirectory: false,
-    });
+  it("ignores type query values when choosing the initial automation type", () => {
+    renderCreatePage({ initialEntry: "/automations/new?type=event" });
 
     expect(screen.getByRole("heading", { name: "Create automation" })).toBeDefined();
     expect(screen.getByText("Automation type")).toBeDefined();
-    expect(screen.getByRole("heading", { name: "Schedule" })).toBeDefined();
-    expect(screen.getByText("Group runs by")).toBeDefined();
-    expect(screen.getAllByText("Schedule").length).toBeGreaterThan(0);
-    expect(screen.getByLabelText("Cron breakdown")).toBeDefined();
+    expect(screen.getByRole("heading", { name: "Events" })).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "Schedule" })).toBeNull();
     expect(screen.getByRole("textbox", { name: "User message" })).toBeDefined();
   });
 });

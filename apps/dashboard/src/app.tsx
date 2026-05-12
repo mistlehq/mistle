@@ -122,10 +122,7 @@ export const APP_ROUTES = createRoutesFromElements(
             handle={ROUTE_HANDLES.automationsNew}
             path="new"
           />
-          <Route
-            element={<Navigate replace to="/automations/new?type=scheduled" />}
-            path="schedules/new"
-          />
+          <Route element={<Navigate replace to="/automations/new" />} path="schedules/new" />
           <Route
             element={<ScheduledAutomationEditorPage mode="edit" />}
             handle={ROUTE_HANDLES.scheduledAutomationsDetail}

@@ -5,7 +5,6 @@ import {
   createProfileAutomationDetailPath,
   type CreatedAutomationNavigationTarget,
 } from "../automations/automation-editor-navigation.js";
-import type { AutomationTypeValue } from "../automations/automation-type-field.js";
 import { CreateAutomationEditor } from "../automations/create-automation-editor.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
@@ -13,10 +12,6 @@ import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 const AutomationCreatePageScrollStyle: CSSProperties = {
   scrollbarGutter: "stable",
 };
-
-function parseAutomationCreateKind(value: string | null): AutomationTypeValue {
-  return value === "scheduled" ? "scheduled" : "trigger";
-}
 
 function parseSandboxProfileId(value: string | null): string | undefined {
   if (value === null) {
@@ -31,7 +26,6 @@ export function AutomationCreatePage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const initialKind = parseAutomationCreateKind(searchParams.get("type"));
   const initialSandboxProfileId = parseSandboxProfileId(searchParams.get("sandboxProfileId"));
   const { title, description } = resolvePageFrameText(pageMeta, "Create automation");
   const createSuccessPath =
@@ -52,7 +46,6 @@ export function AutomationCreatePage(): React.JSX.Element {
     >
       <PageFrame description={description} title={title} width="form">
         <CreateAutomationEditor
-          initialKind={initialKind}
           {...(initialSandboxProfileId === undefined ? {} : { initialSandboxProfileId })}
           {...(createSuccessPath === undefined ? {} : { createSuccessPath })}
           navigate={navigate}
