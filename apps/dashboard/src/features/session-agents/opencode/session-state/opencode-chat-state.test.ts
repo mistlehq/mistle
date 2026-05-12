@@ -1,0 +1,438 @@
+import type {
+  OpenCodeEvent,
+  OpenCodeMessageWithParts,
+} from "@mistle/integrations-definitions/agent-runtimes/opencode/client";
+import { describe, expect, it } from "vitest";
+
+import { createInitialOpenCodeChatState, reduceOpenCodeChatState } from "./opencode-chat-state.js";
+
+describe("reduceOpenCodeChatState", () => {
+  it("hydrates persisted user and assistant messages into chat entries", () => {
+    const state = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "hydrate_messages",
+      sessionId: "ses_test",
+      messages: [
+        createUserMessage({
+          id: "msg_user",
+          text: "Please update the docs",
+        }),
+        createAssistantMessage({
+          id: "msg_assistant",
+          parentId: "msg_user",
+          parts: [
+            {
+              id: "part_reasoning",
+              messageID: "msg_assistant",
+              sessionID: "ses_test",
+              text: "I will inspect the repo.",
+              time: {
+                start: 2,
+                end: 3,
+              },
+              type: "reasoning",
+            },
+            {
+              id: "part_text",
+              messageID: "msg_assistant",
+              sessionID: "ses_test",
+              text: "Updated the docs.",
+              time: {
+                start: 4,
+                end: 5,
+              },
+              type: "text",
+            },
+          ],
+        }),
+      ],
+    });
+
+    expect(state.entries).toMatchObject([
+      {
+        id: "msg_user",
+        kind: "user-message",
+        text: "Please update the docs",
+        turnId: "msg_user",
+      },
+      {
+        id: "part_reasoning",
+        kind: "reasoning",
+        summary: "I will inspect the repo.",
+        turnId: "msg_user",
+      },
+      {
+        id: "part_text",
+        kind: "assistant-message",
+        text: "Updated the docs.",
+        turnId: "msg_user",
+      },
+    ]);
+  });
+
+  it("applies text deltas and part updates by OpenCode ids", () => {
+    const hydrated = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "hydrate_messages",
+      sessionId: "ses_test",
+      messages: [
+        createUserMessage({
+          id: "msg_user",
+          text: "Build it",
+        }),
+        createAssistantMessage({
+          id: "msg_assistant",
+          parentId: "msg_user",
+          parts: [
+            {
+              id: "part_text",
+              messageID: "msg_assistant",
+              sessionID: "ses_test",
+              text: "Hel",
+              time: {
+                start: 1,
+              },
+              type: "text",
+            },
+          ],
+        }),
+      ],
+    });
+
+    const deltaApplied = reduceOpenCodeChatState(hydrated, {
+      type: "event_received",
+      event: createEvent({
+        id: "evt_delta",
+        type: "message.part.delta",
+        properties: {
+          sessionID: "ses_test",
+          messageID: "msg_assistant",
+          partID: "part_text",
+          field: "text",
+          delta: "lo",
+        },
+      }),
+    });
+    expect(deltaApplied.entries).toContainEqual(
+      expect.objectContaining({
+        id: "part_text",
+        kind: "assistant-message",
+        text: "Hello",
+        status: "completed",
+      }),
+    );
+
+    const updated = reduceOpenCodeChatState(deltaApplied, {
+      type: "event_received",
+      event: createEvent({
+        id: "evt_update",
+        type: "message.part.updated",
+        properties: {
+          sessionID: "ses_test",
+          time: 2,
+          part: {
+            id: "part_text",
+            messageID: "msg_assistant",
+            sessionID: "ses_test",
+            text: "Hello world",
+            time: {
+              start: 1,
+              end: 2,
+            },
+            type: "text",
+          },
+        },
+      }),
+    });
+
+    expect(updated.entries).toContainEqual(
+      expect.objectContaining({
+        id: "part_text",
+        kind: "assistant-message",
+        text: "Hello world",
+        status: "completed",
+      }),
+    );
+  });
+
+  it("maps OpenCode shell tools to command entries and failed tools to visible items", () => {
+    const state = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "hydrate_messages",
+      sessionId: "ses_test",
+      messages: [
+        createUserMessage({
+          id: "msg_user",
+          text: "Run tests",
+        }),
+        createAssistantMessage({
+          id: "msg_assistant",
+          parentId: "msg_user",
+          parts: [
+            {
+              callID: "call_bash",
+              id: "part_bash",
+              messageID: "msg_assistant",
+              sessionID: "ses_test",
+              state: {
+                input: {
+                  command: "pnpm test",
+                  cwd: "/workspace",
+                },
+                metadata: {},
+                output: "passed",
+                status: "completed",
+                time: {
+                  start: 1,
+                  end: 2,
+                },
+                title: "Run tests",
+              },
+              tool: "bash",
+              type: "tool",
+            },
+            {
+              callID: "call_custom",
+              id: "part_custom",
+              messageID: "msg_assistant",
+              sessionID: "ses_test",
+              state: {
+                error: "tool failed",
+                input: {},
+                status: "error",
+                time: {
+                  start: 3,
+                  end: 4,
+                },
+              },
+              tool: "custom_tool",
+              type: "tool",
+            },
+          ],
+        }),
+      ],
+    });
+
+    expect(state.entries).toContainEqual(
+      expect.objectContaining({
+        id: "part_bash",
+        kind: "command-execution",
+        command: "pnpm test",
+        output: "passed",
+        status: "completed",
+      }),
+    );
+    expect(state.entries).toContainEqual(
+      expect.objectContaining({
+        id: "part_custom",
+        kind: "generic-item",
+        itemType: "opencode-tool",
+        body: "tool failed",
+      }),
+    );
+  });
+
+  it("surfaces session errors and clears running state on idle", () => {
+    const busy = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "event_received",
+      event: createEvent({
+        id: "evt_busy",
+        type: "session.status",
+        properties: {
+          sessionID: "ses_test",
+          status: {
+            type: "busy",
+          },
+        },
+      }),
+    });
+    expect(busy.status).toBe("busy");
+
+    const failed = reduceOpenCodeChatState(busy, {
+      type: "event_received",
+      event: createEvent({
+        id: "evt_error",
+        type: "session.error",
+        properties: {
+          sessionID: "ses_test",
+          error: {
+            name: "UnknownError",
+            data: {
+              message: "provider failed",
+            },
+          },
+        },
+      }),
+    });
+    expect(failed.status).toBe("failed");
+    expect(failed.completedErrorMessage).toBe("provider failed");
+
+    const idle = reduceOpenCodeChatState(failed, {
+      type: "event_received",
+      event: createEvent({
+        id: "evt_idle",
+        type: "session.idle",
+        properties: {
+          sessionID: "ses_test",
+        },
+      }),
+    });
+    expect(idle.status).toBe("idle");
+  });
+
+  it("surfaces permission requests and removes them when replied", () => {
+    const asked = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "event_received",
+      event: createEvent({
+        id: "evt_permission",
+        type: "permission.asked",
+        properties: {
+          id: "perm_test",
+          sessionID: "ses_test",
+          permission: "bash",
+          patterns: ["pnpm test"],
+          metadata: {},
+          always: [],
+        },
+      }),
+    });
+    expect(asked.pendingPermissions).toHaveLength(1);
+    expect(asked.entries).toContainEqual(
+      expect.objectContaining({
+        id: "permission:perm_test",
+        kind: "generic-item",
+        itemType: "opencode-permission",
+        title: "Permission requested",
+      }),
+    );
+
+    const replied = reduceOpenCodeChatState(asked, {
+      type: "event_received",
+      event: createEvent({
+        id: "evt_permission_replied",
+        type: "permission.replied",
+        properties: {
+          sessionID: "ses_test",
+          requestID: "perm_test",
+          reply: "once",
+        },
+      }),
+    });
+    expect(replied.pendingPermissions).toEqual([]);
+    expect(replied.entries).not.toContainEqual(
+      expect.objectContaining({
+        id: "permission:perm_test",
+      }),
+    );
+  });
+
+  it("throws explicit errors for unsupported critical deltas", () => {
+    const state = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "hydrate_messages",
+      sessionId: "ses_test",
+      messages: [
+        createAssistantMessage({
+          id: "msg_assistant",
+          parentId: "msg_user",
+          parts: [
+            {
+              id: "part_text",
+              messageID: "msg_assistant",
+              sessionID: "ses_test",
+              text: "hello",
+              time: {
+                start: 1,
+              },
+              type: "text",
+            },
+          ],
+        }),
+      ],
+    });
+
+    expect(() =>
+      reduceOpenCodeChatState(state, {
+        type: "event_received",
+        event: createEvent({
+          id: "evt_delta",
+          type: "message.part.delta",
+          properties: {
+            sessionID: "ses_test",
+            messageID: "msg_assistant",
+            partID: "part_text",
+            field: "unsupported",
+            delta: "x",
+          },
+        }),
+      }),
+    ).toThrow("OpenCode part delta field 'unsupported' is not supported.");
+  });
+});
+
+function createEvent(payload: OpenCodeEvent["payload"]): OpenCodeEvent {
+  return {
+    directory: "/workspace",
+    payload,
+  };
+}
+
+function createUserMessage(input: { id: string; text: string }): OpenCodeMessageWithParts {
+  return {
+    info: {
+      agent: "build",
+      id: input.id,
+      model: {
+        modelID: "gpt-5",
+        providerID: "openai",
+      },
+      role: "user",
+      sessionID: "ses_test",
+      time: {
+        created: 1,
+      },
+    },
+    parts: [
+      {
+        id: `${input.id}_part`,
+        messageID: input.id,
+        sessionID: "ses_test",
+        text: input.text,
+        type: "text",
+      },
+    ],
+  };
+}
+
+function createAssistantMessage(input: {
+  id: string;
+  parentId: string;
+  parts: OpenCodeMessageWithParts["parts"];
+}): OpenCodeMessageWithParts {
+  return {
+    info: {
+      agent: "build",
+      cost: 0,
+      id: input.id,
+      mode: "build",
+      modelID: "gpt-5",
+      parentID: input.parentId,
+      path: {
+        cwd: "/workspace",
+        root: "/workspace",
+      },
+      providerID: "openai",
+      role: "assistant",
+      sessionID: "ses_test",
+      time: {
+        created: 2,
+      },
+      tokens: {
+        input: 0,
+        output: 0,
+        reasoning: 0,
+        cache: {
+          read: 0,
+          write: 0,
+        },
+      },
+    },
+    parts: input.parts,
+  };
+}

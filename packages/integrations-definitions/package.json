@@ -63,6 +63,13 @@
       "import": "./src/agent-runtimes/opencode/index.ts",
       "default": "./src/agent-runtimes/opencode/index.ts"
     },
+    "./agent-runtimes/opencode/client": {
+      "types": "./src/agent-runtimes/opencode/client.ts",
+      "workspace-src": "./src/agent-runtimes/opencode/client.ts",
+      "node": "./dist/agent-runtimes/opencode/client.js",
+      "import": "./src/agent-runtimes/opencode/client.ts",
+      "default": "./src/agent-runtimes/opencode/client.ts"
+    },
     "./agent-runtimes/opencode/server": {
       "types": "./src/agent-runtimes/opencode/server.ts",
       "workspace-src": "./src/agent-runtimes/opencode/server.ts",
