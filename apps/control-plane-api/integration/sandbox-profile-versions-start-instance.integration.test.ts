@@ -187,7 +187,7 @@ describe.concurrent("sandbox profile version start instance integration", () => 
     expect(body.code).toBe("INVALID_BINDING_CONNECTION_REFERENCE");
   });
 
-  it("returns 400 when the selected agent runtime has no proxied provider route", async ({
+  it("starts an instance when the selected agent runtime has no proxied provider route", async ({
     env,
   }) => {
     const session = await env.auth.createSession({
@@ -221,9 +221,18 @@ describe.concurrent("sandbox profile version start instance integration", () => 
       },
     );
 
-    expect(response.status).toBe(400);
-    const body = StartSandboxProfileInstanceBadRequestResponseSchema.parse(await response.json());
-    expect(body.code).toBe("INVALID_BINDING_CONFIG");
+    expect(response.status).toBe(201);
+    const body = StartSandboxProfileInstanceResponseSchema.parse(await response.json());
+    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+      env,
+      sandboxInstanceId: body.sandboxInstanceId,
+    });
+    expect(queuedWorkflowInput.runtimePlan.agentRuntimes).toMatchObject([
+      {
+        runtimeId: "codex",
+      },
+    ]);
+    expect(queuedWorkflowInput.runtimePlan.egressRoutes).toEqual([]);
   });
 
   it("returns 400 when the setup script test run body is blank", async ({ env }) => {

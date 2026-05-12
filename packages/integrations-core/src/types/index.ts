@@ -1855,8 +1855,6 @@ export type CompileBindingAgentRuntime = {
   ptyLaunch: AgentPtyLaunchSpec;
 };
 
-export type CompiledAgentRuntime = CompileBindingAgentRuntime;
-
 type GitCloneWorkspaceSourceBase = {
   sourceKind: "git-clone";
   resourceKind: "repository";
@@ -1886,7 +1884,7 @@ export type CompiledBindingResult = {
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
   workspaceSources: ReadonlyArray<CompiledWorkspaceSource>;
-  agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
+  agentRuntimes: ReadonlyArray<CompileBindingAgentRuntime>;
 };
 
 export type IntegrationMcpDefinitionValue =
@@ -2546,7 +2544,7 @@ export type CompiledRuntimePlan = {
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   workspaceSources: ReadonlyArray<CompiledWorkspaceSource>;
   runtimeClients: ReadonlyArray<RuntimeClient>;
-  agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
+  agentRuntimes: ReadonlyArray<CompileBindingAgentRuntime>;
 };
 
 export type IntegrationDefinitionLocator = {

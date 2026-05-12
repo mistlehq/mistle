@@ -1,7 +1,7 @@
 import { orderRoutesForMatching } from "../egress/index.js";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import type {
-  CompiledAgentRuntime,
+  CompileBindingAgentRuntime,
   CompiledBindingResult,
   CompiledRuntimeArtifactSpec,
   CompiledRuntimeClient,
@@ -49,8 +49,8 @@ function flattenRuntimeClients(
 
 function flattenAgentRuntimes(
   input: ReadonlyArray<CompiledBindingResult>,
-): ReadonlyArray<CompiledAgentRuntime> {
-  const agentRuntimes: CompiledAgentRuntime[] = [];
+): ReadonlyArray<CompileBindingAgentRuntime> {
+  const agentRuntimes: CompileBindingAgentRuntime[] = [];
 
   for (const compiledBindingResult of input) {
     agentRuntimes.push(...compiledBindingResult.agentRuntimes);

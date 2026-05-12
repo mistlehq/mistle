@@ -16,7 +16,6 @@ import {
 import { describe, expect } from "vitest";
 
 import { StartSandboxProfileSetupAssistantResponseSchema } from "../src/sandbox-profiles/index.js";
-import { badRequestResponseSchema } from "../src/sandbox-profiles/start-sandbox-profile-instance/schema.js";
 import { waitForQueuedStartWorkflowInput } from "./helpers/data-plane-workflows.js";
 import {
   integrationConnectionRow,
@@ -78,7 +77,7 @@ describe.concurrent("sandbox profile Setup Assistant integration", () => {
     });
   });
 
-  it("returns 400 when the selected agent runtime has no proxied provider route", async ({
+  it("starts setup assistant when the selected agent runtime has no proxied provider route", async ({
     env,
   }) => {
     const session = await env.auth.createSession({
@@ -122,9 +121,18 @@ describe.concurrent("sandbox profile Setup Assistant integration", () => {
       },
     );
 
-    expect(response.status).toBe(400);
-    const body = badRequestResponseSchema.parse(await response.json());
-    expect(body.code).toBe("INVALID_BINDING_CONFIG");
+    expect(response.status).toBe(201);
+    const body = StartSandboxProfileSetupAssistantResponseSchema.parse(await response.json());
+    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+      env,
+      sandboxInstanceId: body.sandboxInstanceId,
+    });
+    expect(queuedWorkflowInput.runtimePlan.agentRuntimes).toMatchObject([
+      {
+        runtimeId: "codex",
+      },
+    ]);
+    expect(queuedWorkflowInput.runtimePlan.egressRoutes).toEqual([]);
   });
 });
 

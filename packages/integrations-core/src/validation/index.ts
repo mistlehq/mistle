@@ -2,7 +2,7 @@ import { routesOverlap } from "../egress/index.js";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import type {
   CompiledRuntimeArtifactSpec,
-  CompiledAgentRuntime,
+  CompileBindingAgentRuntime,
   CompiledBindingResult,
   CompiledRuntimeClient,
   CompiledWorkspaceSource,
@@ -38,13 +38,13 @@ function flattenCompiledBindingResults(input: ReadonlyArray<CompiledBindingResul
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
   workspaceSources: ReadonlyArray<CompiledWorkspaceSource>;
-  agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
+  agentRuntimes: ReadonlyArray<CompileBindingAgentRuntime>;
 } {
   const egressRoutes: EgressCredentialRoute[] = [];
   const artifacts: CompiledRuntimeArtifactSpec[] = [];
   const runtimeClients: CompiledRuntimeClient[] = [];
   const workspaceSources: CompiledWorkspaceSource[] = [];
-  const agentRuntimes: CompiledAgentRuntime[] = [];
+  const agentRuntimes: CompileBindingAgentRuntime[] = [];
 
   for (const compiledBindingResult of input) {
     egressRoutes.push(...compiledBindingResult.egressRoutes);
@@ -1091,7 +1091,7 @@ function validateRuntimeClients(input: ReadonlyArray<CompiledRuntimeClient>): vo
 
 function validateAgentRuntimes(input: {
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
-  agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
+  agentRuntimes: ReadonlyArray<CompileBindingAgentRuntime>;
 }): void {
   const endpointKeysByClientId = new Map<string, Set<string>>();
   const runtimeKeys = new Set<string>();
