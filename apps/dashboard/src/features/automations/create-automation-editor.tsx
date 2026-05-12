@@ -28,7 +28,10 @@ import {
 import { ScheduledAutomationTypeSpecificSection } from "./scheduled-automation-form.js";
 import { createScheduledAutomation } from "./scheduled-automations-service.js";
 import { useAutomationSandboxProfileOptions } from "./use-automation-sandbox-profile-options.js";
-import { resolveSelectedProfileTriggerState } from "./use-webhook-automation-editor-state.js";
+import {
+  resolveNoActiveProfileVersionMessage,
+  resolveSelectedProfileTriggerState,
+} from "./use-webhook-automation-editor-state.js";
 import { useWebhookAutomationEventPrerequisites } from "./use-webhook-automation-prerequisites.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import {
@@ -303,6 +306,14 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
   const effectiveSelectedProfileVersion = isUsingPinnedSelectedProfileVersion
     ? selectedSandboxProfileVersion.version
     : activeSelectedProfileVersion;
+  const hasActiveProfileVersion =
+    selectedProfileId.length === 0
+      ? null
+      : isUsingPinnedSelectedProfileVersion
+        ? true
+        : selectedProfileVersionsQuery.data === undefined
+          ? null
+          : activeSelectedProfileVersion !== null;
   const selectedProfileAutomationConfigQuery = useQuery({
     queryKey: sandboxProfileVersionAutomationConfigQueryKey({
       profileId: selectedProfileId,
@@ -350,12 +361,13 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
       resolveSelectedProfileTriggerState({
         selectedProfileId,
         selectedProfileName,
-        hasBindingData:
-          effectiveSelectedProfileVersion === null || hasLoadedSelectedProfileAutomationConfig,
+        hasActiveProfileVersion,
+        hasBindingData: hasLoadedSelectedProfileAutomationConfig,
         isBindingDataPending:
           selectedProfileId.length > 0 &&
           ((isUsingPinnedSelectedProfileVersion ? false : selectedProfileVersionsQuery.isPending) ||
-            selectedProfileAutomationConfigQuery.isPending),
+            (effectiveSelectedProfileVersion !== null &&
+              selectedProfileAutomationConfigQuery.isPending)),
         bindingErrorMessage: selectedProfileBindingsErrorMessage,
         bindings: selectedProfileAutomationConfig?.bindings ?? [],
         directoryData: eventPrerequisites.directoryData ?? {
@@ -366,6 +378,7 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
       }),
     [
       effectiveSelectedProfileVersion,
+      hasActiveProfileVersion,
       hasLoadedSelectedProfileAutomationConfig,
       isUsingPinnedSelectedProfileVersion,
       eventPrerequisites.directoryData,
@@ -377,6 +390,16 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
       selectedProfileVersionsQuery.isPending,
     ],
   );
+  const sandboxProfileStatusMessage =
+    hasActiveProfileVersion === false
+      ? {
+          message: resolveNoActiveProfileVersionMessage({
+            selectedProfileId,
+            selectedProfileName,
+          }),
+          variant: "alert" as const,
+        }
+      : undefined;
   const webhookEventOptions = useMemo(
     () =>
       eventPrerequisites.directoryData === undefined
@@ -656,10 +679,16 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
   }
 
   function onSubmit() {
-    const nextFieldErrors =
+    const nextFieldErrors: Partial<Record<CreateAutomationFormValueKey, string>> =
       kind === "scheduled"
         ? validateScheduledAutomationFormValues(toScheduledValues(formValues))
         : validateWebhookAutomationFormValues(toWebhookValues(formValues), webhookEventOptions);
+    if (hasActiveProfileVersion === false) {
+      nextFieldErrors.sandboxProfileId = resolveNoActiveProfileVersionMessage({
+        selectedProfileId,
+        selectedProfileName,
+      });
+    }
     setFieldErrors(nextFieldErrors);
     setValidationSummaryError(
       hasRequiredFieldErrors(kind, nextFieldErrors) ? RequiredFieldSummaryMessage : null,
@@ -696,6 +725,7 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
     isSaving: createWebhookMutation.isPending || createScheduledMutation.isPending,
     sandboxProfileOptions: sandboxProfilePrerequisites.sandboxProfileOptions,
     primaryRepositoryOptions,
+    sandboxProfileStatusMessage,
     connectionOptions: eventPrerequisites.connectionOptions,
     webhookEventOptions,
     triggerPickerDisabledState: selectedProfileTriggerState.disabledState,
@@ -786,6 +816,7 @@ export function CreateAutomationEditor(
       primaryRepositoryOptions={state.primaryRepositoryOptions}
       sandboxProfileId={state.formValues.sandboxProfileId}
       sandboxProfileOptions={state.sandboxProfileOptions}
+      sandboxProfileStatusMessage={state.sandboxProfileStatusMessage}
       selectedPrimaryRepositoryPath={presentation.selectedPrimaryRepositoryPath}
       selectedWorkspaceRoot={presentation.selectedWorkspaceRoot}
       shouldShowAutomationEnabledField={presentation.shouldShowAutomationEnabledField}

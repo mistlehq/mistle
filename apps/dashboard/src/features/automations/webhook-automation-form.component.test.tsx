@@ -5,6 +5,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
+import type { AutomationFormShellStatusMessage } from "./automation-form-shell.js";
 import {
   WebhookAutomationForm,
   type WebhookAutomationFormOption,
@@ -123,6 +124,7 @@ describe("WebhookAutomationForm", () => {
     mode?: "create" | "edit";
     values?: WebhookAutomationFormValues;
     triggerPickerDisabledState?: WebhookAutomationTriggerPickerDisabledState | null;
+    sandboxProfileStatusMessage?: AutomationFormShellStatusMessage | undefined;
     webhookEventOptions?: typeof WebhookEventOptions;
     primaryRepositoryOptions?: readonly WebhookAutomationFormOption[];
     onValueChange?: (
@@ -152,6 +154,9 @@ describe("WebhookAutomationForm", () => {
             ? {}
             : { primaryRepositoryOptions: input.primaryRepositoryOptions })}
           sandboxProfileOptions={SandboxProfileOptions}
+          {...(input.sandboxProfileStatusMessage === undefined
+            ? {}
+            : { sandboxProfileStatusMessage: input.sandboxProfileStatusMessage })}
           triggerPickerDisabledState={input.triggerPickerDisabledState ?? null}
           webhookEventOptions={input.webhookEventOptions ?? WebhookEventOptions}
           values={input.values ?? FormValues}
@@ -313,6 +318,41 @@ describe("WebhookAutomationForm", () => {
         "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event automation.",
       ).length,
     ).toBeGreaterThan(0);
+  });
+
+  it("shows sandbox profile status messages above the form fields", () => {
+    renderFormWithOptions({
+      mode: "create",
+      sandboxProfileStatusMessage: {
+        message:
+          "The sandbox profile Repo Maintainer has no active version. Publish the profile before creating automations.",
+        variant: "alert",
+      },
+      triggerPickerDisabledState: {
+        reason: "Select a sandbox profile with an active version to choose events.",
+        variant: "default",
+      },
+      webhookEventOptions: [],
+      values: buildFormValues({
+        triggerIds: [],
+        conversationKeyTemplate: "",
+      }),
+    });
+
+    const profileMessage = screen.getByText(
+      "The sandbox profile Repo Maintainer has no active version. Publish the profile before creating automations.",
+    );
+    const sandboxProfileLabel = screen.getByText("Sandbox profile");
+    const eventsMessage = screen.getByText(
+      "Select a sandbox profile with an active version to choose events.",
+    );
+
+    expect(profileMessage.compareDocumentPosition(sandboxProfileLabel)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(profileMessage.compareDocumentPosition(eventsMessage)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
   });
 
   it("marks invalid controls with aria-invalid when field errors are present", () => {

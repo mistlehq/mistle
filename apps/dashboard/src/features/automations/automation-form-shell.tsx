@@ -46,6 +46,7 @@ type AutomationFormShellProps = {
   primaryRepositoryId: string;
   inputTemplate: string;
   sandboxProfileOptions: readonly AutomationFormShellOption[];
+  sandboxProfileStatusMessage?: AutomationFormShellStatusMessage | undefined;
   primaryRepositoryOptions?: readonly AutomationFormShellOption[];
   fieldErrors: Partial<Record<CommonAutomationFormValueKey, string>>;
   validationSummaryError: string | null;
@@ -69,6 +70,11 @@ type AutomationFormShellProps = {
   onValueChange: (key: CommonAutomationFormValueKey, value: string | boolean) => void;
   onSubmit: () => void;
   onDelete: (() => void) | null;
+};
+
+export type AutomationFormShellStatusMessage = {
+  message: string;
+  variant: "alert" | "default";
 };
 
 export function shouldRenderCommonAutomationInlineFieldError(input: {
@@ -188,11 +194,12 @@ export function AutomationFormShell(input: AutomationFormShellProps): React.JSX.
     input.automationTypeField === undefined ? null : (
       <div className="p-4">{input.automationTypeField}</div>
     );
+  const sandboxProfileFieldError = input.fieldErrors.sandboxProfileId;
   const sandboxProfileField = (
     <div className="p-4">
       <AutomationFormSelectField
         disabled={disabled}
-        error={input.fieldErrors.sandboxProfileId}
+        error={sandboxProfileFieldError}
         label="Sandbox profile"
         orientation="horizontal"
         onValueChange={(value) => {
@@ -246,6 +253,12 @@ export function AutomationFormShell(input: AutomationFormShellProps): React.JSX.
       {input.formError === null ? null : (
         <Notice title="Automation could not be saved" variant="alert">
           {input.formError}
+        </Notice>
+      )}
+
+      {input.sandboxProfileStatusMessage === undefined ? null : (
+        <Notice variant={input.sandboxProfileStatusMessage.variant}>
+          {input.sandboxProfileStatusMessage.message}
         </Notice>
       )}
 

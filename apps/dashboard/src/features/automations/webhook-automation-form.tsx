@@ -15,7 +15,11 @@ import type { ReactNode } from "react";
 
 import { FormPageSection } from "../shared/form-page.js";
 import { AgentInstructionsEditor } from "./agent-instructions-editor.js";
-import { AutomationFormFieldError, AutomationFormShell } from "./automation-form-shell.js";
+import {
+  AutomationFormFieldError,
+  AutomationFormShell,
+  type AutomationFormShellStatusMessage,
+} from "./automation-form-shell.js";
 import {
   resolveWebhookAutomationFormPresentation,
   resolveWebhookAutomationFormState,
@@ -74,6 +78,7 @@ type WebhookAutomationFormProps = {
   values: WebhookAutomationFormValues;
   connectionOptions: readonly WebhookAutomationFormOption[];
   sandboxProfileOptions: readonly WebhookAutomationFormOption[];
+  sandboxProfileStatusMessage?: AutomationFormShellStatusMessage | undefined;
   primaryRepositoryOptions?: readonly WebhookAutomationFormOption[];
   webhookEventOptions: readonly WebhookAutomationEventOption[];
   triggerPickerDisabledState: WebhookAutomationTriggerPickerDisabledState | null;
@@ -282,6 +287,9 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         : { primaryRepositoryOptions: input.primaryRepositoryOptions })}
       sandboxProfileId={input.values.sandboxProfileId}
       sandboxProfileOptions={input.sandboxProfileOptions}
+      {...(input.sandboxProfileStatusMessage === undefined
+        ? {}
+        : { sandboxProfileStatusMessage: input.sandboxProfileStatusMessage })}
       selectedPrimaryRepositoryPath={presentation.selectedPrimaryRepositoryPath}
       selectedWorkspaceRoot={presentation.selectedWorkspaceRoot}
       shouldShowAutomationEnabledField={presentation.shouldShowAutomationEnabledField}

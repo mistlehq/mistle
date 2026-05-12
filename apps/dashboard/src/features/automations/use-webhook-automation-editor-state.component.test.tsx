@@ -199,6 +199,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       resolveSelectedProfileTriggerState({
         selectedProfileId: "sbp_123",
         selectedProfileName: "Repo Maintainer",
+        hasActiveProfileVersion: true,
         hasBindingData: true,
         isBindingDataPending: false,
         bindingErrorMessage: null,
@@ -216,6 +217,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     expect(
       resolveSelectedProfileTriggerState({
         selectedProfileId: "sbp_123",
+        hasActiveProfileVersion: null,
         hasBindingData: false,
         isBindingDataPending: false,
         bindingErrorMessage: "Could not load profile bindings.",
@@ -226,6 +228,93 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       reason: "Could not load profile bindings.",
       variant: "alert",
     });
+  });
+
+  it("marks profiles without an active version as unavailable for automations", () => {
+    expect(
+      resolveSelectedProfileTriggerState({
+        selectedProfileId: "sbp_123",
+        selectedProfileName: "Repo Maintainer",
+        hasActiveProfileVersion: false,
+        hasBindingData: false,
+        isBindingDataPending: false,
+        bindingErrorMessage: null,
+        bindings: [],
+        directoryData: createDirectoryData(),
+      }).disabledState,
+    ).toEqual({
+      reason: "Select a sandbox profile with an active version to choose events.",
+      variant: "default",
+    });
+  });
+
+  it("shows the sandbox profile status message when the selected profile has no active version", () => {
+    const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
+    queryClient.setQueryData(sandboxProfileVersionsQueryKey("sbp_123"), {
+      versions: [
+        createSandboxProfileVersion({
+          sandboxProfileId: "sbp_123",
+          version: 1,
+          isActive: false,
+          state: "draft",
+        }),
+      ],
+    });
+
+    const { result } = renderHook(
+      () =>
+        useLoadedWebhookAutomationEditorState({
+          mode: "create",
+          automationId: undefined,
+          navigate: async () => {},
+          initialValues: {
+            name: "Linear automation",
+            sandboxProfileId: "sbp_123",
+            primaryRepositoryId: "",
+            enabled: true,
+            inputTemplate: "",
+            instructions: "",
+            conversationKeyTemplate: "",
+            triggerIds: [],
+            triggerParameterValues: {},
+          },
+          connectionOptions: [],
+          sandboxProfileOptions: [
+            {
+              value: "sbp_123",
+              label: "Repo Maintainer",
+            },
+          ],
+          directoryData: {
+            connections: [],
+            webhookSources: [],
+            targets: [],
+          },
+        }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    expect(result.current.sandboxProfileStatusMessage).toEqual({
+      message:
+        "The sandbox profile Repo Maintainer has no active version. Publish the profile before creating automations.",
+      variant: "alert",
+    });
+    expect(result.current.triggerPickerDisabledState).toEqual({
+      reason: "Select a sandbox profile with an active version to choose events.",
+      variant: "default",
+    });
+
+    act(() => {
+      result.current.onSubmit();
+    });
+
+    expect(result.current.fieldErrors.sandboxProfileId).toBe(
+      "The sandbox profile Repo Maintainer has no active version. Publish the profile before creating automations.",
+    );
   });
 
   it("preserves selected triggers when the sandbox profile changes", () => {

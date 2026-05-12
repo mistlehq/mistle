@@ -18,6 +18,7 @@ import {
 import type { SandboxProfileVersionIntegrationBinding } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { AutomationCreateSuccessPath } from "./automation-editor-navigation.js";
+import type { AutomationFormShellStatusMessage } from "./automation-form-shell.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import {
   toCreateWebhookAutomationPayload,
@@ -72,6 +73,13 @@ const RequiredFieldSummaryMessage = "Please address the fields highlighted in re
 const RequiredTriggerSelectionMessage = "Please add an event";
 const MissingProfileVersionQueryId = 0;
 
+export function resolveNoActiveProfileVersionMessage(input: {
+  selectedProfileId: string;
+  selectedProfileName?: string | undefined;
+}): string {
+  return `The sandbox profile ${input.selectedProfileName ?? input.selectedProfileId} has no active version. Publish the profile before creating automations.`;
+}
+
 function resolveActiveVersion(versions: readonly SandboxProfileVersion[]): number | null {
   const activeVersion = versions.find((version) => version.isActive);
   return activeVersion?.version ?? null;
@@ -91,6 +99,7 @@ function hasRequiredFieldErrors(
 export function resolveSelectedProfileTriggerState(input: {
   selectedProfileId: string;
   selectedProfileName?: string | undefined;
+  hasActiveProfileVersion: boolean | null;
   hasBindingData: boolean;
   isBindingDataPending: boolean;
   bindingErrorMessage: string | null;
@@ -113,6 +122,16 @@ export function resolveSelectedProfileTriggerState(input: {
       disabledState: {
         reason: input.bindingErrorMessage,
         variant: "alert",
+      },
+    };
+  }
+
+  if (input.hasActiveProfileVersion === false) {
+    return {
+      selectableConnectionIds: [],
+      disabledState: {
+        reason: "Select a sandbox profile with an active version to choose events.",
+        variant: "default",
       },
     };
   }
@@ -330,6 +349,7 @@ export function useLoadedWebhookAutomationEditorState(
   connectionOptions: readonly WebhookAutomationOption[];
   sandboxProfileOptions: readonly WebhookAutomationOption[];
   primaryRepositoryOptions: readonly WebhookAutomationOption[];
+  sandboxProfileStatusMessage?: AutomationFormShellStatusMessage | undefined;
   webhookEventOptions: readonly WebhookAutomationEventOption[];
   triggerPickerDisabledState: WebhookAutomationTriggerPickerDisabledState | null;
   values: WebhookAutomationFormValues;
@@ -388,6 +408,14 @@ export function useLoadedWebhookAutomationEditorState(
   const effectiveSelectedProfileVersion = isUsingPinnedSelectedProfileVersion
     ? selectedSandboxProfileVersion.version
     : activeSelectedProfileVersion;
+  const hasActiveProfileVersion =
+    selectedProfileId.length === 0
+      ? null
+      : isUsingPinnedSelectedProfileVersion
+        ? true
+        : selectedProfileVersionsQuery.data === undefined
+          ? null
+          : activeSelectedProfileVersion !== null;
   const selectedProfileAutomationConfigQuery = useQuery({
     queryKey: sandboxProfileVersionAutomationConfigQueryKey({
       profileId: selectedProfileId,
@@ -421,25 +449,28 @@ export function useLoadedWebhookAutomationEditorState(
       }),
     [selectedProfileRepositoryOptions],
   );
+  const selectedProfileName = input.sandboxProfileOptions.find(
+    (option) => option.value === selectedProfileId,
+  )?.label;
   const selectedProfileTriggerState = useMemo(
     () =>
       resolveSelectedProfileTriggerState({
         selectedProfileId,
-        selectedProfileName: input.sandboxProfileOptions.find(
-          (option) => option.value === selectedProfileId,
-        )?.label,
-        hasBindingData:
-          effectiveSelectedProfileVersion === null || hasLoadedSelectedProfileAutomationConfig,
+        selectedProfileName,
+        hasActiveProfileVersion,
+        hasBindingData: hasLoadedSelectedProfileAutomationConfig,
         isBindingDataPending:
           selectedProfileId.length > 0 &&
           ((isUsingPinnedSelectedProfileVersion ? false : selectedProfileVersionsQuery.isPending) ||
-            selectedProfileAutomationConfigQuery.isPending),
+            (effectiveSelectedProfileVersion !== null &&
+              selectedProfileAutomationConfigQuery.isPending)),
         bindingErrorMessage: selectedProfileBindingsErrorMessage,
         bindings: selectedProfileAutomationConfig?.bindings ?? [],
         directoryData: input.directoryData,
       }),
     [
       effectiveSelectedProfileVersion,
+      hasActiveProfileVersion,
       hasLoadedSelectedProfileAutomationConfig,
       input.directoryData,
       isUsingPinnedSelectedProfileVersion,
@@ -447,9 +478,20 @@ export function useLoadedWebhookAutomationEditorState(
       selectedProfileAutomationConfigQuery.isPending,
       selectedProfileBindingsErrorMessage,
       selectedProfileId,
+      selectedProfileName,
       selectedProfileVersionsQuery.isPending,
     ],
   );
+  const sandboxProfileStatusMessage =
+    hasActiveProfileVersion === false
+      ? {
+          message: resolveNoActiveProfileVersionMessage({
+            selectedProfileId,
+            selectedProfileName,
+          }),
+          variant: "alert" as const,
+        }
+      : undefined;
   const preservedConnectionId =
     input.preservedWebhookSourceId === undefined
       ? undefined
@@ -631,6 +673,12 @@ export function useLoadedWebhookAutomationEditorState(
 
   function onSubmit(): void {
     const nextFieldErrors = validateWebhookAutomationFormValues(formValues, webhookEventOptions);
+    if (hasActiveProfileVersion === false) {
+      nextFieldErrors.sandboxProfileId = resolveNoActiveProfileVersionMessage({
+        selectedProfileId,
+        selectedProfileName,
+      });
+    }
     setFieldErrors(nextFieldErrors);
     setValidationSummaryError(
       hasRequiredFieldErrors(nextFieldErrors) ? RequiredFieldSummaryMessage : null,
@@ -662,6 +710,7 @@ export function useLoadedWebhookAutomationEditorState(
     connectionOptions: input.connectionOptions,
     sandboxProfileOptions: input.sandboxProfileOptions,
     primaryRepositoryOptions,
+    sandboxProfileStatusMessage,
     webhookEventOptions,
     triggerPickerDisabledState: selectedProfileTriggerState.disabledState,
     values: formValues,

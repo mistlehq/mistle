@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
 import { PageFrame } from "../shared/page-frame.js";
+import type { AutomationFormShellStatusMessage } from "./automation-form-shell.js";
 import { AutomationTypeDisplayField, AutomationTypeSelectField } from "./automation-type-field.js";
 import { validateWebhookAutomationFormValues } from "./webhook-automation-form-helpers.js";
 import {
@@ -389,6 +390,7 @@ export function WebhookAutomationFormStoryHarness(input: {
   triggerPickerDisabledState?: WebhookAutomationTriggerPickerDisabledState | null;
   connectionOptions?: readonly WebhookAutomationFormOption[];
   sandboxProfileOptions?: readonly WebhookAutomationFormOption[];
+  sandboxProfileStatusMessage?: AutomationFormShellStatusMessage | undefined;
   primaryRepositoryOptions?: readonly WebhookAutomationFormOption[];
   webhookEventOptions?: readonly WebhookAutomationEventOption[];
   enableSubmitValidation?: boolean;
@@ -455,6 +457,9 @@ export function WebhookAutomationFormStoryHarness(input: {
           {...(input.primaryRepositoryOptions === undefined
             ? {}
             : { primaryRepositoryOptions: input.primaryRepositoryOptions })}
+          {...(input.sandboxProfileStatusMessage === undefined
+            ? {}
+            : { sandboxProfileStatusMessage: input.sandboxProfileStatusMessage })}
           sandboxProfileOptions={input.sandboxProfileOptions ?? SandboxProfileOptions}
           triggerPickerDisabledState={input.triggerPickerDisabledState ?? null}
           webhookEventOptions={input.webhookEventOptions ?? GitHubWebhookEventOptions}
@@ -544,6 +549,26 @@ export const NoEventCapableIntegrations: Story = {
     triggerPickerDisabledState: {
       reason:
         "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event automation.",
+      variant: "default",
+    },
+    values: {
+      ...EmptyCreateValues,
+      sandboxProfileId: "sbp_repo_maintainer",
+    },
+    webhookEventOptions: [],
+  },
+};
+
+export const NoActiveProfileVersion: Story = {
+  args: {
+    mode: "create",
+    sandboxProfileStatusMessage: {
+      message:
+        "The sandbox profile Repo Maintainer has no active version. Publish the profile before creating automations.",
+      variant: "alert",
+    },
+    triggerPickerDisabledState: {
+      reason: "Select a sandbox profile with an active version to choose events.",
       variant: "default",
     },
     values: {

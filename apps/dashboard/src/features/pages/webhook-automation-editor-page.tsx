@@ -238,6 +238,7 @@ function LoadedWebhookAutomationEditor(input: {
         onValueChange={state.onValueChange}
         primaryRepositoryOptions={state.primaryRepositoryOptions}
         sandboxProfileOptions={state.sandboxProfileOptions}
+        sandboxProfileStatusMessage={state.sandboxProfileStatusMessage}
         triggerPickerDisabledState={state.triggerPickerDisabledState}
         webhookEventOptions={state.webhookEventOptions}
         values={state.values}
