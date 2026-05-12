@@ -92,6 +92,11 @@ fn relays_opencode_event_streams_as_websocket_sse_frames() {
         ))
         .expect("websocket request should send");
 
+    let response = read_json_text_message(&mut client);
+    assert_eq!(response["id"], json!("events"));
+    assert_eq!(response["type"], json!("response"));
+    assert_eq!(response["status"], json!(200));
+
     let event = read_json_text_message(&mut client);
     assert_eq!(event["id"], json!("events"));
     assert_eq!(event["type"], json!("sse"));
@@ -105,6 +110,78 @@ fn relays_opencode_event_streams_as_websocket_sse_frames() {
     client.close(None).expect("websocket should close cleanly");
     proxy.close().expect("OpenCode proxy should close cleanly");
     simulated_server.join();
+}
+
+#[test]
+fn returns_bad_gateway_when_raw_opencode_server_is_unavailable_and_keeps_proxy_alive() {
+    let unavailable_listener =
+        TcpListener::bind("127.0.0.1:0").expect("unavailable listener should bind");
+    let unavailable_port = unavailable_listener
+        .local_addr()
+        .expect("unavailable listener should expose address")
+        .port();
+    drop(unavailable_listener);
+
+    let runtime_readiness_manager =
+        std::sync::Arc::new(std::sync::Mutex::new(RuntimeReadinessManager::default()));
+    let proxy = start_opencode_proxy(
+        "ws://127.0.0.1:0/opencode",
+        &format!("http://127.0.0.1:{unavailable_port}"),
+        runtime_readiness_manager,
+    )
+    .expect("OpenCode proxy should start");
+
+    let (mut first_client, _) =
+        connect(proxy.listen_url()).expect("proxy websocket should connect");
+    first_client
+        .send(Message::Text(
+            json!({
+                "id": "first",
+                "method": "GET",
+                "path": "/global/health"
+            })
+            .to_string()
+            .into(),
+        ))
+        .expect("first websocket request should send");
+
+    let first_response = read_json_text_message(&mut first_client);
+    assert_eq!(first_response["id"], json!("first"));
+    assert_eq!(first_response["type"], json!("response"));
+    assert_eq!(first_response["status"], json!(502));
+    assert!(
+        first_response["body"]
+            .as_str()
+            .expect("response body should be a string")
+            .contains("OpenCode upstream request failed")
+    );
+    first_client
+        .close(None)
+        .expect("first websocket should close cleanly");
+
+    let (mut second_client, _) =
+        connect(proxy.listen_url()).expect("proxy should still accept websocket connections");
+    second_client
+        .send(Message::Text(
+            json!({
+                "id": "second",
+                "method": "GET",
+                "path": "/global/health"
+            })
+            .to_string()
+            .into(),
+        ))
+        .expect("second websocket request should send");
+
+    let second_response = read_json_text_message(&mut second_client);
+    assert_eq!(second_response["id"], json!("second"));
+    assert_eq!(second_response["type"], json!("response"));
+    assert_eq!(second_response["status"], json!(502));
+
+    second_client
+        .close(None)
+        .expect("second websocket should close cleanly");
+    proxy.close().expect("OpenCode proxy should close cleanly");
 }
 
 #[test]

@@ -22,7 +22,7 @@ use hyper_util::client::legacy::Client;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::TokioExecutor;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::Builder;
 use tokio::sync::mpsc;
@@ -556,10 +556,28 @@ async fn handle_opencode_proxy_request(
         .body(Full::new(Bytes::from(body)))
         .map_err(|error| OpenCodeProxyError::ConfigureRuntime(error.to_string()))?;
 
-    let response = client
-        .request(upstream_request)
-        .await
-        .map_err(|error| OpenCodeProxyError::HttpRequest(error.to_string()))?;
+    let response = match client.request(upstream_request).await {
+        Ok(response) => response,
+        Err(error) => {
+            send_json_message(
+                &sender,
+                &OpenCodeProxyResponse {
+                    id: request.id,
+                    message_type: OpenCodeProxyResponseType::Response,
+                    status: 502,
+                    headers: BTreeMap::from([(
+                        CONTENT_TYPE.to_string(),
+                        "application/json".to_string(),
+                    )]),
+                    body: json!({
+                        "error": format!("OpenCode upstream request failed: {error}")
+                    })
+                    .to_string(),
+                },
+            )?;
+            return Ok(());
+        }
+    };
     let status = response.status().as_u16();
     let headers = response
         .headers()
@@ -575,6 +593,16 @@ async fn handle_opencode_proxy_request(
         .get("content-type")
         .is_some_and(|content_type| content_type.starts_with("text/event-stream"));
     if is_sse {
+        send_json_message(
+            &sender,
+            &OpenCodeProxyResponse {
+                id: request.id.clone(),
+                message_type: OpenCodeProxyResponseType::Response,
+                status,
+                headers,
+                body: String::new(),
+            },
+        )?;
         relay_sse_response(request.id, response, sender).await?;
         return Ok(());
     }

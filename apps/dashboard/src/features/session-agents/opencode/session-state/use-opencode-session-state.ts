@@ -100,6 +100,7 @@ export function useOpenCodeSessionState(input: {
     transport: SandboxSessionTransport;
   }>;
 }): UseOpenCodeSessionStateResult {
+  const ensureTransportConnected = input.ensureTransportConnected;
   const clientRef = useRef<OpenCodeSessionClient | null>(null);
   const eventSubscriptionRef = useRef<OpenCodeEventSubscription | null>(null);
   const generationRef = useRef(0);
@@ -117,6 +118,18 @@ export function useOpenCodeSessionState(input: {
   const [isHydratingChat, setIsHydratingChat] = useState(false);
   const [isStartingTurn, setIsStartingTurn] = useState(false);
   const [isInterruptingTurn, setIsInterruptingTurn] = useState(false);
+
+  const clearLifecycleErrorMessage = useCallback((): void => {
+    setLifecycleErrorMessage(null);
+  }, []);
+
+  const clearSessionErrorMessage = useCallback((): void => {
+    setSessionErrorMessage(null);
+  }, []);
+
+  const reportSessionErrorMessage = useCallback((message: string): void => {
+    setSessionErrorMessage(message);
+  }, []);
 
   const clearEventSubscription = useCallback((): void => {
     const subscription = eventSubscriptionRef.current;
@@ -186,7 +199,7 @@ export function useOpenCodeSessionState(input: {
 
       void (async (): Promise<void> => {
         try {
-          const transportConnection = await input.ensureTransportConnected({
+          const transportConnection = await ensureTransportConnected({
             sandboxInstanceId: connectInput.sandboxInstanceId,
           });
           if (generationRef.current !== generation) {
@@ -278,7 +291,7 @@ export function useOpenCodeSessionState(input: {
         }
       })();
     },
-    [clearEventSubscription, input],
+    [clearEventSubscription, ensureTransportConnected],
   );
 
   const sendPrompt = useCallback(
@@ -343,17 +356,22 @@ export function useOpenCodeSessionState(input: {
     [],
   );
 
+  const recoverSession = useCallback(
+    (recoverInput: { sandboxInstanceId: string; targetThreadId: string | null }): void => {
+      connectSession(recoverInput);
+    },
+    [connectSession],
+  );
+
   return {
     lifecycle: {
-      clearLifecycleErrorMessage: () => setLifecycleErrorMessage(null),
+      clearLifecycleErrorMessage,
       connectSession,
       detachSessionConnection: disconnectSession,
       disconnectSession,
       isStartingSession: sessionConnectionState === "connecting",
       lifecycleErrorMessage,
-      recoverSession: (recoverInput) => {
-        connectSession(recoverInput);
-      },
+      recoverSession,
       recoverableDisconnect: null,
       sessionConnectionState,
       sessionSnapshot,
@@ -371,8 +389,8 @@ export function useOpenCodeSessionState(input: {
       sendPrompt,
     },
     sessionMessage: {
-      clearSessionErrorMessage: () => setSessionErrorMessage(null),
-      reportSessionErrorMessage: setSessionErrorMessage,
+      clearSessionErrorMessage,
+      reportSessionErrorMessage,
       sessionErrorMessage,
     },
   };
