@@ -823,10 +823,10 @@ export function CreateAutomationEditor(
             })
       }
       inputTemplateLabelId="automation-input-template-label"
-      {...(state.kind === "scheduled"
-        ? {}
-        : { inputTemplatePlaceholderText: DefaultWebhookAutomationMessageTemplate })}
-      inputTemplateTokens={state.kind === "scheduled" ? [] : formState.agentInstructionTokens}
+      {...(state.kind === "trigger"
+        ? { inputTemplatePlaceholderText: DefaultWebhookAutomationMessageTemplate }
+        : {})}
+      inputTemplateTokens={state.kind === "trigger" ? formState.agentInstructionTokens : []}
       isDeleting={false}
       isSaving={state.isSaving}
       mode="create"

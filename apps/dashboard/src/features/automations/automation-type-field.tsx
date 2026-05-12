@@ -8,7 +8,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  cn,
 } from "@mistle/ui";
 
 export type AutomationTypeValue = "trigger" | "scheduled";
@@ -49,7 +48,7 @@ export function AutomationTypeSelectField(input: {
           </SelectContent>
         </Select>
         {input.error === undefined ? null : (
-          <p className={cn("text-destructive text-sm")}>{input.error}</p>
+          <p className="text-destructive text-sm">{input.error}</p>
         )}
       </FieldContent>
     </Field>

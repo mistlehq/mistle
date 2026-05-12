@@ -5,16 +5,8 @@ import {
   listIntegrationDirectory,
   listIntegrationWebhookSources,
 } from "../integrations/integrations-service.js";
-import {
-  AUTOMATION_SANDBOX_PROFILES_QUERY_KEY,
-  useAutomationSandboxProfileOptions,
-} from "./use-automation-sandbox-profile-options.js";
+import { useAutomationSandboxProfileOptions } from "./use-automation-sandbox-profile-options.js";
 import { buildWebhookAutomationConnectionOptions } from "./webhook-automation-option-builders.js";
-
-export const WEBHOOK_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY: readonly [
-  "automations",
-  "sandbox-profiles",
-] = AUTOMATION_SANDBOX_PROFILES_QUERY_KEY;
 
 export const WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY: readonly [
   "automations",

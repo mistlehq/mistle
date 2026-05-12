@@ -6,11 +6,8 @@ import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } f
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
-import { SCHEDULED_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY } from "../automations/use-scheduled-automation-prerequisites.js";
-import {
-  WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY,
-  WEBHOOK_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY,
-} from "../automations/use-webhook-automation-prerequisites.js";
+import { AUTOMATION_SANDBOX_PROFILES_QUERY_KEY } from "../automations/use-automation-sandbox-profile-options.js";
+import { WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY } from "../automations/use-webhook-automation-prerequisites.js";
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import { AutomationCreatePage } from "./automation-create-page.js";
 
@@ -30,8 +27,7 @@ function renderCreatePage(input: {
     });
   }
 
-  queryClient.setQueryData(WEBHOOK_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY, []);
-  queryClient.setQueryData(SCHEDULED_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY, []);
+  queryClient.setQueryData(AUTOMATION_SANDBOX_PROFILES_QUERY_KEY, []);
 
   const router = createMemoryRouter(
     createRoutesFromElements(

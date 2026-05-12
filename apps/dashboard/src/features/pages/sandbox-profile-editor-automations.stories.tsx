@@ -7,7 +7,7 @@ import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import type { AutomationsListResult } from "../automations/automations-types.js";
 import { scheduledAutomationDetailQueryKey } from "../automations/scheduled-automations-query-keys.js";
 import type { ScheduledAutomation } from "../automations/scheduled-automations-types.js";
-import { SCHEDULED_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY } from "../automations/use-scheduled-automation-prerequisites.js";
+import { AUTOMATION_SANDBOX_PROFILES_QUERY_KEY } from "../automations/use-automation-sandbox-profile-options.js";
 import { automationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import {
   sandboxProfileVersionAutomationConfigQueryKey,
@@ -251,7 +251,7 @@ function createStoryQueryClient(input: {
       page.automations,
     );
   }
-  queryClient.setQueryData(SCHEDULED_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY, [Profile]);
+  queryClient.setQueryData(AUTOMATION_SANDBOX_PROFILES_QUERY_KEY, [Profile]);
   queryClient.setQueryData(scheduledAutomationDetailQueryKey(SelectedScheduleAutomationId), {
     ...SelectedScheduleAutomation,
   });

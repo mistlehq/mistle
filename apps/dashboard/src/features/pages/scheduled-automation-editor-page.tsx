@@ -11,8 +11,8 @@ import { toScheduledAutomationFormValues } from "../automations/scheduled-automa
 import { ScheduledAutomationForm } from "../automations/scheduled-automation-form.js";
 import { scheduledAutomationDetailQueryKey } from "../automations/scheduled-automations-query-keys.js";
 import { getScheduledAutomation } from "../automations/scheduled-automations-service.js";
+import { useAutomationSandboxProfileOptions } from "../automations/use-automation-sandbox-profile-options.js";
 import { useLoadedScheduledAutomationEditorState } from "../automations/use-scheduled-automation-editor-state.js";
-import { useScheduledAutomationPrerequisites } from "../automations/use-scheduled-automation-prerequisites.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageSection } from "../shared/form-page.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
@@ -78,7 +78,7 @@ export function CreateScheduledAutomationEditor(input: {
   initialSandboxProfileId?: string | undefined;
   createSuccessPath?: AutomationCreateSuccessPath;
 }): React.JSX.Element | null {
-  const prerequisites = useScheduledAutomationPrerequisites();
+  const prerequisites = useAutomationSandboxProfileOptions();
 
   if (prerequisites.errorMessage !== null) {
     return renderScheduledAutomationEditorError({
@@ -128,7 +128,7 @@ export function EditScheduledAutomationEditor(input: {
       }),
     retry: false,
   });
-  const prerequisites = useScheduledAutomationPrerequisites();
+  const prerequisites = useAutomationSandboxProfileOptions();
 
   if (prerequisites.errorMessage !== null || automationQuery.isError) {
     return renderScheduledAutomationEditorError({
@@ -173,7 +173,7 @@ function LoadedScheduledAutomationEditor(input: {
   deleteSuccessPath?: string;
   initialValues: ReturnType<typeof toScheduledAutomationFormValues>;
   sandboxProfileOptions: ReturnType<
-    typeof useScheduledAutomationPrerequisites
+    typeof useAutomationSandboxProfileOptions
   >["sandboxProfileOptions"];
   initialSandboxProfileVersion?: number;
 }): React.JSX.Element {

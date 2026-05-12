@@ -12,10 +12,8 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
-import {
-  WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY,
-  WEBHOOK_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY,
-} from "../automations/use-webhook-automation-prerequisites.js";
+import { AUTOMATION_SANDBOX_PROFILES_QUERY_KEY } from "../automations/use-automation-sandbox-profile-options.js";
+import { WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY } from "../automations/use-webhook-automation-prerequisites.js";
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import { WebhookAutomationEditorPage } from "./webhook-automation-editor-page.js";
 
@@ -30,7 +28,7 @@ describe("WebhookAutomationEditorPage", () => {
       connections: [],
       targets: [],
     });
-    queryClient.setQueryData(WEBHOOK_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY, []);
+    queryClient.setQueryData(AUTOMATION_SANDBOX_PROFILES_QUERY_KEY, []);
 
     const router = createMemoryRouter(
       createRoutesFromElements(
