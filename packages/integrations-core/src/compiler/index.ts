@@ -746,16 +746,6 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
         );
       }
 
-      const resolvedCapabilities =
-        definition.capabilities?.resolveCapabilities(compileBindingInput);
-      const providerAccess = resolvedCapabilities?.agentProviderAccess;
-      if (providerAccess === undefined) {
-        throw new IntegrationCompilerError(
-          CompilerErrorCodes.MISSING_AGENT_PROVIDER_ACCESS,
-          `Definition '${definition.familyId}::${definition.variantId}' did not resolve agent provider access for binding '${bindingInput.binding.id}'.`,
-        );
-      }
-
       const providerCompileBindingResult = definition.compileBinding(compileBindingInput);
       const compileAgentRuntimeResult = runtimeDefinition.compileRuntime({
         organizationId: input.organizationId,
@@ -765,7 +755,6 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
         connectionId: bindingInput.connection.id,
         runtimeId,
         runtimeConfig: parsedRuntimeConfig,
-        providerAccess,
         mcpServers: [],
         refs: compileBindingInput.refs,
       });
@@ -777,7 +766,7 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
         ],
         runtimeClients: [
           ...providerCompileBindingResult.runtimeClients,
-          ...compileAgentRuntimeResult.runtimeClients,
+          ...(compileAgentRuntimeResult.runtimeClients ?? []),
         ],
         ...(providerCompileBindingResult.workspaceSources === undefined &&
         compileAgentRuntimeResult.workspaceSources === undefined

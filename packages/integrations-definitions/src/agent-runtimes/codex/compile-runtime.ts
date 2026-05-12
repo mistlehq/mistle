@@ -1,5 +1,4 @@
 import {
-  type AgentProviderAccess,
   type CompileAgentRuntimeInput,
   type CompileAgentRuntimeResult,
   type EgressCredentialRoute,
@@ -62,31 +61,6 @@ type CodexProviderMetadata = {
   responsesApiBaseUrl: string;
   chatgptBaseUrl?: string;
 };
-
-function resolveCodexProviderMetadata(
-  providerAccess: AgentProviderAccess,
-): CodexProviderMetadata | null {
-  const providerMetadata = providerAccess.providerMetadata;
-  if (providerMetadata === undefined) {
-    return null;
-  }
-
-  const responsesApiBaseUrl = providerMetadata["responsesApiBaseUrl"];
-  const chatgptBaseUrl = providerMetadata["chatgptBaseUrl"];
-
-  if (typeof responsesApiBaseUrl !== "string" || responsesApiBaseUrl.trim().length === 0) {
-    return null;
-  }
-
-  if (chatgptBaseUrl !== undefined && typeof chatgptBaseUrl !== "string") {
-    return null;
-  }
-
-  return {
-    responsesApiBaseUrl,
-    ...(chatgptBaseUrl === undefined ? {} : { chatgptBaseUrl }),
-  };
-}
 
 function renderCodexConfig(input: {
   responsesApiBaseUrl: string;
@@ -219,14 +193,14 @@ function buildCodexSetupFiles(input: CodexProviderMetadata): ReadonlyArray<Runti
 
 function buildCodexRuntimeClients(input: {
   codexCliInstallPath: string;
-  providerMetadata: CodexProviderMetadata;
+  setupFiles: ReadonlyArray<RuntimeClientSetupFile>;
 }): ReadonlyArray<RuntimeClient> {
   return [
     {
       clientId: "codex-cli",
       setup: {
         env: {},
-        files: buildCodexSetupFiles(input.providerMetadata),
+        files: input.setupFiles,
       },
       processes: [
         {
@@ -265,11 +239,6 @@ export function compileCodexRuntime(
   input: CompileAgentRuntimeInput<Record<string, never>>,
 ): CompileAgentRuntimeResult {
   const codexCliInstallPath = input.refs.artifactBinPath("codex");
-  const providerMetadata = resolveCodexProviderMetadata(input.providerAccess);
-
-  if (providerMetadata === null) {
-    throw new Error("Codex runtime requires provider URL metadata.");
-  }
 
   return {
     artifacts: [
@@ -305,16 +274,14 @@ export function compileCodexRuntime(
         },
       },
     ],
-    runtimeClients: buildCodexRuntimeClients({
-      codexCliInstallPath,
-      providerMetadata,
-    }),
     renderRuntimeClients: ({ egressRoutes }) =>
       buildCodexRuntimeClients({
         codexCliInstallPath,
-        providerMetadata: resolveCodexProviderMetadataFromEgressRoutes({
-          egressRoutes,
-        }),
+        setupFiles: buildCodexSetupFiles(
+          resolveCodexProviderMetadataFromEgressRoutes({
+            egressRoutes,
+          }),
+        ),
       }),
     agentRuntimes: [
       {

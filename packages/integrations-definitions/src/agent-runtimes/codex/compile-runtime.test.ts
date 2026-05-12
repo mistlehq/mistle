@@ -123,7 +123,7 @@ function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
 }
 
 describe("compileCodexRuntime", () => {
-  it("compiles Codex runtime artifacts and app-server wiring from provider access", () => {
+  it("compiles Codex runtime artifacts and renders app-server wiring from provider routes", () => {
     const compiled = compileCodexRuntime({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
@@ -132,24 +132,6 @@ describe("compileCodexRuntime", () => {
       connectionId: "conn_openai_org_123",
       runtimeId: "codex",
       runtimeConfig: {},
-      providerAccess: {
-        providerFamilyId: "openai",
-        providerVariantId: "openai-default",
-        apiBaseUrl: "https://api.openai.com",
-        authScheme: "bearer",
-        credentialResolver: {
-          connectionId: "conn_openai_org_123",
-          secretType: "api_key",
-        },
-        additionalHeaders: {
-          "ChatGPT-Account-ID": "acct_123",
-        },
-        allowedMethods: ["GET", "POST"],
-        allowedPathPrefixes: ["/"],
-        providerMetadata: {
-          responsesApiBaseUrl: "https://api.openai.com",
-        },
-      },
       mcpServers: [],
       refs: {
         sandboxPaths: {
@@ -196,8 +178,20 @@ describe("compileCodexRuntime", () => {
         },
       ],
     });
-    expect(compiled.runtimeClients).toHaveLength(1);
-    expect(compiled.runtimeClients[0]).toMatchObject({
+    const runtimeClients = renderRuntimeClients({
+      compiled,
+      egressRoutes: [
+        createCompiledOpenAiRoute({
+          egressRuleId: "egress_rule_bind_openai_agent",
+          host: "api.openai.com",
+          baseUrl: "https://api.openai.com",
+          secretType: "api_key",
+        }),
+      ],
+    });
+
+    expect(runtimeClients).toHaveLength(1);
+    expect(runtimeClients[0]).toMatchObject({
       clientId: "codex-cli",
       setup: {
         env: {},
@@ -217,7 +211,7 @@ describe("compileCodexRuntime", () => {
         ],
       },
     });
-    expect(compiled.runtimeClients[0]?.processes).toEqual([
+    expect(runtimeClients[0]?.processes).toEqual([
       {
         processKey: "codex-app-server",
         command: {
@@ -235,7 +229,7 @@ describe("compileCodexRuntime", () => {
         },
       },
     ]);
-    expect(compiled.runtimeClients[0]?.endpoints).toEqual([
+    expect(runtimeClients[0]?.endpoints).toEqual([
       {
         endpointKey: "app-server",
         processKey: "codex-app-server",
@@ -246,7 +240,7 @@ describe("compileCodexRuntime", () => {
         connectionMode: "dedicated",
       },
     ]);
-    const setupFiles = compiled.runtimeClients[0]?.setup.files;
+    const setupFiles = runtimeClients[0]?.setup.files;
     if (setupFiles === undefined) {
       throw new Error("Expected compiled Codex runtime setup files.");
     }
@@ -342,25 +336,6 @@ describe("compileCodexRuntime", () => {
       connectionId: "conn_openai_org_123",
       runtimeId: "codex",
       runtimeConfig: {},
-      providerAccess: {
-        providerFamilyId: "openai",
-        providerVariantId: "openai-default",
-        apiBaseUrl: "https://chatgpt.com",
-        authScheme: "bearer",
-        credentialResolver: {
-          connectionId: "conn_openai_org_123",
-          secretType: "chatgpt_access_token",
-        },
-        additionalHeaders: {
-          "ChatGPT-Account-ID": "acct_123",
-        },
-        allowedMethods: ["GET", "POST"],
-        allowedPathPrefixes: ["/"],
-        providerMetadata: {
-          responsesApiBaseUrl: "https://chatgpt.com/backend-api/codex",
-          chatgptBaseUrl: "https://chatgpt.com/backend-api",
-        },
-      },
       mcpServers: [],
       refs: {
         sandboxPaths: {

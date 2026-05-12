@@ -4,6 +4,7 @@ import type {
   RuntimeArtifactGitHubReleaseInstallHelperInput,
   RuntimeArtifactInstallStep,
   RuntimeArtifactSpec,
+  RuntimeClient,
   RuntimeExecCommand,
 } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
@@ -87,19 +88,6 @@ function compileDefaultOpenCodeRuntime(): CompileAgentRuntimeResult {
     connectionId: "conn_openai_org_123",
     runtimeId: "opencode",
     runtimeConfig: {},
-    providerAccess: {
-      providerFamilyId: "openai",
-      providerVariantId: "openai-default",
-      apiBaseUrl: "https://api.openai.com/v1",
-      authScheme: "bearer",
-      credentialResolver: {
-        connectionId: "conn_openai_org_123",
-        secretType: "api_key",
-        slotKey: "openai.openai-default.api-key.api-key",
-      },
-      allowedMethods: ["GET", "POST"],
-      allowedPathPrefixes: ["/"],
-    },
     mcpServers: [],
     refs: {
       sandboxPaths: {
@@ -112,6 +100,14 @@ function compileDefaultOpenCodeRuntime(): CompileAgentRuntimeResult {
       artifactBinPath: (artifactName) => `/usr/local/bin/${artifactName}`,
     },
   });
+}
+
+function readRuntimeClients(compiled: CompileAgentRuntimeResult): ReadonlyArray<RuntimeClient> {
+  if (compiled.runtimeClients === undefined) {
+    throw new Error("Expected static OpenCode runtime clients.");
+  }
+
+  return compiled.runtimeClients;
 }
 
 function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
@@ -198,22 +194,6 @@ describe("compileOpenCodeRuntime", () => {
       connectionId: "conn_openai_org_123",
       runtimeId: "opencode",
       runtimeConfig: {},
-      providerAccess: {
-        providerFamilyId: "openai",
-        providerVariantId: "openai-default",
-        apiBaseUrl: "https://api.openai.com/v1",
-        authScheme: "bearer",
-        credentialResolver: {
-          connectionId: "conn_openai_org_123",
-          secretType: "api_key",
-          slotKey: "openai.openai-default.api-key.api-key",
-        },
-        allowedMethods: ["GET", "POST"],
-        allowedPathPrefixes: ["/"],
-        providerMetadata: {
-          responsesApiBaseUrl: "https://api.openai.com/v1",
-        },
-      },
       mcpServers: [],
       refs: {
         sandboxPaths: {
@@ -261,8 +241,9 @@ describe("compileOpenCodeRuntime", () => {
       ],
     });
 
-    expect(compiled.runtimeClients).toHaveLength(1);
-    expect(compiled.runtimeClients[0]).toMatchObject({
+    const runtimeClients = readRuntimeClients(compiled);
+    expect(runtimeClients).toHaveLength(1);
+    expect(runtimeClients[0]).toMatchObject({
       clientId: "opencode-cli",
       setup: {
         env: {},
@@ -282,7 +263,7 @@ describe("compileOpenCodeRuntime", () => {
         ],
       },
     });
-    expect(compiled.runtimeClients[0]?.processes).toEqual([
+    expect(runtimeClients[0]?.processes).toEqual([
       {
         processKey: "opencode-server",
         command: {
@@ -301,7 +282,7 @@ describe("compileOpenCodeRuntime", () => {
         },
       },
     ]);
-    expect(compiled.runtimeClients[0]?.endpoints).toEqual([
+    expect(runtimeClients[0]?.endpoints).toEqual([
       {
         endpointKey: "server",
         processKey: "opencode-server",
@@ -313,7 +294,7 @@ describe("compileOpenCodeRuntime", () => {
       },
     ]);
 
-    const setupFiles = compiled.runtimeClients[0]?.setup.files;
+    const setupFiles = runtimeClients[0]?.setup.files;
     if (setupFiles === undefined) {
       throw new Error("Expected compiled OpenCode runtime setup files.");
     }
@@ -415,24 +396,6 @@ describe("compileOpenCodeRuntime", () => {
       connectionId: "conn_openai_org_123",
       runtimeId: "opencode",
       runtimeConfig: {},
-      providerAccess: {
-        providerFamilyId: "openai",
-        providerVariantId: "openai-default",
-        apiBaseUrl: "https://chatgpt.com",
-        authScheme: "bearer",
-        credentialResolver: {
-          connectionId: "conn_openai_org_123",
-          secretType: "chatgpt_access_token",
-        },
-        additionalHeaders: {
-          "ChatGPT-Account-ID": "acct_123",
-        },
-        allowedMethods: ["GET", "POST"],
-        allowedPathPrefixes: ["/"],
-        providerMetadata: {
-          responsesApiBaseUrl: "https://chatgpt.com/backend-api/codex",
-        },
-      },
       mcpServers: [],
       refs: {
         sandboxPaths: {
@@ -446,7 +409,8 @@ describe("compileOpenCodeRuntime", () => {
       },
     });
 
-    const configContent = compiled.runtimeClients[0]?.setup.files.find(
+    const runtimeClients = readRuntimeClients(compiled);
+    const configContent = runtimeClients[0]?.setup.files.find(
       (file) => file.fileId === "opencode_config",
     )?.content;
     if (configContent === undefined) {

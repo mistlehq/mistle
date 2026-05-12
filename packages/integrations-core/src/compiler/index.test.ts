@@ -155,60 +155,67 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
           },
         },
       ],
-      runtimeClients: [
-        {
-          clientId: "codex-cli",
-          setup: {
-            env: {
-              OPENAI_BASE_URL: input.providerAccess.apiBaseUrl,
+      renderRuntimeClients: ({ bindingEgressRoutes }) => {
+        const providerRoute = bindingEgressRoutes[0];
+        if (providerRoute === undefined) {
+          throw new Error("Expected provider-owned egress route for Codex test runtime.");
+        }
+
+        return [
+          {
+            clientId: "codex-cli",
+            setup: {
+              env: {
+                OPENAI_BASE_URL: providerRoute.upstream.baseUrl,
+              },
+              files: [
+                {
+                  fileId: "codex_config",
+                  path: "/root/.codex/config.toml",
+                  mode: 384,
+                  content: 'model = "gpt-5.3-codex"',
+                  writeMode: "if-absent",
+                },
+              ],
             },
-            files: [
+            processes: [
               {
-                fileId: "codex_config",
-                path: "/root/.codex/config.toml",
-                mode: 384,
-                content: 'model = "gpt-5.3-codex"',
-                writeMode: "if-absent",
+                processKey: "codex-app-server",
+                command: {
+                  args: [
+                    input.refs.artifactBinPath("codex"),
+                    "app-server",
+                    "--listen",
+                    "ws://127.0.0.1:4747",
+                  ],
+                },
+                readiness: {
+                  type: "tcp",
+                  host: "127.0.0.1",
+                  port: 4747,
+                  timeoutMs: 5_000,
+                },
+                stop: {
+                  signal: "sigterm",
+                  timeoutMs: 10_000,
+                  gracePeriodMs: 2_000,
+                },
+              },
+            ],
+            endpoints: [
+              {
+                endpointKey: "app-server",
+                processKey: "codex-app-server",
+                transport: {
+                  type: "ws",
+                  url: "ws://127.0.0.1:4747",
+                },
+                connectionMode: "dedicated",
               },
             ],
           },
-          processes: [
-            {
-              processKey: "codex-app-server",
-              command: {
-                args: [
-                  input.refs.artifactBinPath("codex"),
-                  "app-server",
-                  "--listen",
-                  "ws://127.0.0.1:4747",
-                ],
-              },
-              readiness: {
-                type: "tcp",
-                host: "127.0.0.1",
-                port: 4747,
-                timeoutMs: 5_000,
-              },
-              stop: {
-                signal: "sigterm",
-                timeoutMs: 10_000,
-                gracePeriodMs: 2_000,
-              },
-            },
-          ],
-          endpoints: [
-            {
-              endpointKey: "app-server",
-              processKey: "codex-app-server",
-              transport: {
-                type: "ws",
-                url: "ws://127.0.0.1:4747",
-              },
-              connectionMode: "dedicated",
-            },
-          ],
-        },
-      ],
+        ];
+      },
       agentRuntimes: [
         {
           runtimeId: "codex",
@@ -373,7 +380,7 @@ function createOpenAiDefinition(): IntegrationDefinition<
             pathPrefixes: ["/v1"],
           },
           upstream: {
-            baseUrl: input.target.config.apiBaseUrl,
+            baseUrl: "https://api.openai.com",
           },
           authInjection: {
             type: "bearer",
@@ -2640,7 +2647,7 @@ describe("compileRuntimePlan", () => {
     expect(caughtError).toMatchObject({ code: CompilerErrorCodes.INVALID_AGENT_RUNTIME_CONFIG });
   });
 
-  it("fails when an agent provider does not resolve provider access", () => {
+  it("compiles agent runtimes without provider access capabilities", () => {
     const registry = new IntegrationRegistry();
     registry.register({
       familyId: "openai",
@@ -2652,65 +2659,80 @@ describe("compileRuntimePlan", () => {
       targetSecretSchema: EmptyTargetSecretsSchema,
       bindingConfigSchema: AgentBindingConfigSchema,
       connectionMethods: ApiKeyConnectionMethods,
-      compileBinding: () => ({
-        egressRoutes: [],
+      compileBinding: (input) => ({
+        egressRoutes: [
+          {
+            match: {
+              hosts: ["api.openai.com"],
+              methods: ["POST"],
+              pathPrefixes: ["/v1"],
+            },
+            upstream: {
+              baseUrl: "https://api.openai.com",
+            },
+            authInjection: {
+              type: "bearer",
+              target: "authorization",
+            },
+            credentialResolver: {
+              kind: "integration_connection",
+              connectionId: input.connection.id,
+              secretType: "api_key",
+            },
+          },
+        ],
         artifacts: [],
         runtimeClients: [],
       }),
     });
 
-    let caughtError: unknown;
-    try {
-      compileTestRuntimePlan({
-        organizationId: "org_123",
-        sandboxProfileId: "sbp_123",
-        version: 1,
-        image: {
-          source: "base",
-          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
-        },
-        definitions: createDefinitionsBundle(registry),
-        bindings: [
-          {
-            targetKey: "openai-default",
-            target: {
-              familyId: "openai",
-              variantId: "openai-default",
-              enabled: true,
-              config: {
-                apiBaseUrl: "https://api.openai.com",
+    const runtimePlan = compileTestRuntimePlan({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      image: {
+        source: "base",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
+      },
+      definitions: createDefinitionsBundle(registry),
+      bindings: [
+        {
+          targetKey: "openai-default",
+          target: {
+            familyId: "openai",
+            variantId: "openai-default",
+            enabled: true,
+            config: {
+              apiBaseUrl: "https://api.openai.com",
+            },
+            secrets: {},
+          },
+          connection: {
+            id: "conn_openai_org_123",
+            status: "active",
+            config: {},
+          },
+          binding: {
+            id: "bind_openai_agent",
+            kind: "agent",
+            connectionId: "conn_openai_org_123",
+            config: {
+              runtime: {
+                runtimeId: "codex",
+                config: {},
               },
-              secrets: {},
-            },
-            connection: {
-              id: "conn_openai_org_123",
-              status: "active",
-              config: {},
-            },
-            binding: {
-              id: "bind_openai_agent",
-              kind: "agent",
-              connectionId: "conn_openai_org_123",
-              config: {
-                runtime: {
-                  runtimeId: "codex",
-                  config: {},
-                },
-                model: {
-                  defaultModel: "gpt-5.3-codex",
-                  options: {},
-                },
+              model: {
+                defaultModel: "gpt-5.3-codex",
+                options: {},
               },
             },
           },
-        ],
-      });
-    } catch (error) {
-      caughtError = error;
-    }
+        },
+      ],
+    });
 
-    expect(caughtError).toBeInstanceOf(IntegrationCompilerError);
-    expect(caughtError).toMatchObject({ code: CompilerErrorCodes.MISSING_AGENT_PROVIDER_ACCESS });
+    expect(runtimePlan.egressRoutes).toHaveLength(1);
+    expect(runtimePlan.runtimeClients[0]?.setup.env.OPENAI_BASE_URL).toBe("https://api.openai.com");
   });
 
   it("fails when runtime-owned MCP materialization targets a missing client file", () => {

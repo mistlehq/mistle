@@ -1,7 +1,6 @@
 import type { z } from "zod";
 
 import type { AgentConversationProvider } from "../agent/conversation-provider.js";
-import type { AgentProviderAccess } from "../capabilities/index.js";
 import type {
   CompileBindingRefs,
   CompileBindingWorkspaceSource,
@@ -47,7 +46,6 @@ export type CompileAgentRuntimeInput<TRuntimeConfig = Record<string, unknown>> =
   connectionId: string;
   runtimeId: string;
   runtimeConfig: TRuntimeConfig;
-  providerAccess: AgentProviderAccess;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
   refs: CompileBindingRefs;
 };
@@ -65,12 +63,8 @@ export type CompileAgentRuntimeRenderRuntimeClientsInput = {
   bindingEgressRoutes: ReadonlyArray<EgressCredentialRoute>;
 };
 
-export type CompileAgentRuntimeResult = {
+type CompileAgentRuntimeResultBase = {
   artifacts?: ReadonlyArray<RuntimeArtifactSpec>;
-  runtimeClients: ReadonlyArray<RuntimeClient>;
-  renderRuntimeClients?: (
-    input: CompileAgentRuntimeRenderRuntimeClientsInput,
-  ) => ReadonlyArray<RuntimeClient>;
   workspaceSources?: ReadonlyArray<CompileBindingWorkspaceSource>;
   agentRuntimes: ReadonlyArray<{
     runtimeId: string;
@@ -80,6 +74,20 @@ export type CompileAgentRuntimeResult = {
     ptyLaunch: AgentPtyLaunchSpec;
   }>;
 };
+
+export type CompileAgentRuntimeResult =
+  | (CompileAgentRuntimeResultBase & {
+      runtimeClients: ReadonlyArray<RuntimeClient>;
+      renderRuntimeClients?: (
+        input: CompileAgentRuntimeRenderRuntimeClientsInput,
+      ) => ReadonlyArray<RuntimeClient>;
+    })
+  | (CompileAgentRuntimeResultBase & {
+      runtimeClients?: undefined;
+      renderRuntimeClients: (
+        input: CompileAgentRuntimeRenderRuntimeClientsInput,
+      ) => ReadonlyArray<RuntimeClient>;
+    });
 
 export type AgentRuntimeDefinition<
   TRuntimeConfigSchema extends IntegrationConfigSchema<unknown> = IntegrationConfigSchema<
