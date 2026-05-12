@@ -12,7 +12,7 @@ import {
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
-import { buildEventSummaryTitle, resolveEventSummary } from "./automation-list-event-summary.js";
+import { resolveEventSummary } from "./automation-list-event-summary.js";
 import { AutomationIssueIndicator } from "./automation-list-indicators.js";
 import { AutomationListToolbar } from "./automation-list-toolbar.js";
 import type { AutomationListItemViewModel } from "./automation-list-types.js";
@@ -71,10 +71,7 @@ function EventSummaryCell(input: {
   }
 
   return (
-    <div
-      className="flex min-w-0 items-center gap-2"
-      title={buildEventSummaryTitle(input.item.events)}
-    >
+    <div className="flex min-w-0 items-center gap-2" title={eventSummary.title}>
       {eventSummary.firstEvent.logoKey === undefined ? null : (
         <img
           alt=""
