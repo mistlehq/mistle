@@ -27,8 +27,9 @@ import {
 } from "./scheduled-automation-form-types.js";
 import { ScheduledAutomationTypeSpecificSection } from "./scheduled-automation-form.js";
 import { createScheduledAutomation } from "./scheduled-automations-service.js";
+import { useAutomationSandboxProfileOptions } from "./use-automation-sandbox-profile-options.js";
 import { resolveSelectedProfileTriggerState } from "./use-webhook-automation-editor-state.js";
-import { useWebhookAutomationPrerequisites } from "./use-webhook-automation-prerequisites.js";
+import { useWebhookAutomationEventPrerequisites } from "./use-webhook-automation-prerequisites.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import {
   toCreateWebhookAutomationPayload,
@@ -276,7 +277,10 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
   >({});
   const [validationSummaryError, setValidationSummaryError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const prerequisites = useWebhookAutomationPrerequisites();
+  const sandboxProfilePrerequisites = useAutomationSandboxProfileOptions();
+  const eventPrerequisites = useWebhookAutomationEventPrerequisites({
+    enabled: kind === "trigger",
+  });
   const selectedProfileId = formValues.sandboxProfileId.trim();
   const isUsingPinnedSelectedProfileVersion =
     selectedSandboxProfileVersion?.profileId === selectedProfileId;
@@ -348,7 +352,7 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
             selectedProfileAutomationConfigQuery.isPending),
         bindingErrorMessage: selectedProfileBindingsErrorMessage,
         bindings: selectedProfileAutomationConfig?.bindings ?? [],
-        directoryData: prerequisites.directoryData ?? {
+        directoryData: eventPrerequisites.directoryData ?? {
           connections: [],
           targets: [],
           webhookSources: [],
@@ -358,7 +362,7 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
       effectiveSelectedProfileVersion,
       hasLoadedSelectedProfileAutomationConfig,
       isUsingPinnedSelectedProfileVersion,
-      prerequisites.directoryData,
+      eventPrerequisites.directoryData,
       selectedProfileAutomationConfig,
       selectedProfileAutomationConfigQuery.isPending,
       selectedProfileBindingsErrorMessage,
@@ -368,18 +372,18 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
   );
   const webhookEventOptions = useMemo(
     () =>
-      prerequisites.directoryData === undefined
+      eventPrerequisites.directoryData === undefined
         ? []
         : buildWebhookAutomationEventOptions({
-            connections: prerequisites.directoryData.connections,
-            targets: prerequisites.directoryData.targets,
-            webhookSources: prerequisites.directoryData.webhookSources,
+            connections: eventPrerequisites.directoryData.connections,
+            targets: eventPrerequisites.directoryData.targets,
+            webhookSources: eventPrerequisites.directoryData.webhookSources,
             selectableConnectionIds: selectedProfileTriggerState.selectableConnectionIds,
             selectedTriggerIds: formValues.triggerIds,
           }),
     [
       formValues.triggerIds,
-      prerequisites.directoryData,
+      eventPrerequisites.directoryData,
       selectedProfileTriggerState.selectableConnectionIds,
     ],
   );
@@ -661,14 +665,20 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
     formValues,
     fieldErrors,
     validationSummaryError,
-    formError: formError ?? prerequisites.errorMessage,
+    formError:
+      formError ??
+      sandboxProfilePrerequisites.errorMessage ??
+      (kind === "trigger" ? eventPrerequisites.errorMessage : null),
     isPending:
-      prerequisites.errorMessage === null &&
-      (prerequisites.isPending || prerequisites.directoryData === undefined),
+      sandboxProfilePrerequisites.errorMessage === null &&
+      (kind === "scheduled"
+        ? sandboxProfilePrerequisites.isPending
+        : eventPrerequisites.errorMessage === null &&
+          (eventPrerequisites.isPending || eventPrerequisites.directoryData === undefined)),
     isSaving: createWebhookMutation.isPending || createScheduledMutation.isPending,
-    sandboxProfileOptions: prerequisites.sandboxProfileOptions,
+    sandboxProfileOptions: sandboxProfilePrerequisites.sandboxProfileOptions,
     primaryRepositoryOptions,
-    connectionOptions: prerequisites.connectionOptions,
+    connectionOptions: eventPrerequisites.connectionOptions,
     webhookEventOptions,
     triggerPickerDisabledState: selectedProfileTriggerState.disabledState,
     onKindChange,

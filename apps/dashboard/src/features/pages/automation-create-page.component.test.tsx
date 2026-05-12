@@ -14,16 +14,22 @@ import {
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import { AutomationCreatePage } from "./automation-create-page.js";
 
-function renderCreatePage(input: { initialEntry: string }): ReturnType<typeof createMemoryRouter> {
+function renderCreatePage(input: {
+  initialEntry: string;
+  shouldSeedIntegrationDirectory?: boolean;
+}): ReturnType<typeof createMemoryRouter> {
   const queryClient = createTestQueryClient({
     refetchOnMount: false,
     staleTime: Number.POSITIVE_INFINITY,
   });
 
-  queryClient.setQueryData(WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY, {
-    connections: [],
-    targets: [],
-  });
+  if (input.shouldSeedIntegrationDirectory ?? true) {
+    queryClient.setQueryData(WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY, {
+      connections: [],
+      targets: [],
+    });
+  }
+
   queryClient.setQueryData(WEBHOOK_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY, []);
   queryClient.setQueryData(SCHEDULED_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY, []);
 
@@ -62,8 +68,11 @@ describe("AutomationCreatePage", () => {
     expect(screen.getByRole("textbox", { name: "User message" })).toBeDefined();
   });
 
-  it("shows the scheduled automation fields from the type query", () => {
-    renderCreatePage({ initialEntry: "/automations/new?type=scheduled" });
+  it("shows the scheduled automation fields from the type query without event prerequisites", () => {
+    renderCreatePage({
+      initialEntry: "/automations/new?type=scheduled",
+      shouldSeedIntegrationDirectory: false,
+    });
 
     expect(screen.getByRole("heading", { name: "Create automation" })).toBeDefined();
     expect(screen.getByText("Automation type")).toBeDefined();

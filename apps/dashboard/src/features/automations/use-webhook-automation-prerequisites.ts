@@ -5,17 +5,16 @@ import {
   listIntegrationDirectory,
   listIntegrationWebhookSources,
 } from "../integrations/integrations-service.js";
-import { listSandboxProfiles } from "../sandbox-profiles/sandbox-profiles-service.js";
-import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
 import {
-  buildWebhookAutomationConnectionOptions,
-  buildWebhookAutomationSandboxProfileOptions,
-} from "./webhook-automation-option-builders.js";
+  AUTOMATION_SANDBOX_PROFILES_QUERY_KEY,
+  useAutomationSandboxProfileOptions,
+} from "./use-automation-sandbox-profile-options.js";
+import { buildWebhookAutomationConnectionOptions } from "./webhook-automation-option-builders.js";
 
 export const WEBHOOK_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY: readonly [
   "automations",
   "sandbox-profiles",
-] = ["automations", "sandbox-profiles"];
+] = AUTOMATION_SANDBOX_PROFILES_QUERY_KEY;
 
 export const WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY: readonly [
   "automations",
@@ -27,40 +26,15 @@ export const WEBHOOK_AUTOMATION_WEBHOOK_SOURCES_QUERY_KEY_PREFIX: readonly [
   "webhook-sources",
 ] = ["automations", "webhook-sources"];
 
-async function listAllSandboxProfiles(input: {
-  signal?: AbortSignal;
-}): Promise<readonly SandboxProfile[]> {
-  const items: SandboxProfile[] = [];
-  let after: string | null = null;
-
-  for (;;) {
-    const result = await listSandboxProfiles({
-      limit: 100,
-      after,
-      before: null,
-      ...(input.signal === undefined ? {} : { signal: input.signal }),
-    });
-
-    items.push(...result.items);
-
-    if (result.nextPage === null) {
-      return items;
-    }
-
-    after = result.nextPage.after;
-  }
-}
-
-export function useWebhookAutomationPrerequisites(input?: { preservedWebhookSourceId?: string }) {
+export function useWebhookAutomationEventPrerequisites(input?: {
+  enabled?: boolean;
+  preservedWebhookSourceId?: string;
+}) {
+  const enabled = input?.enabled ?? true;
   const integrationDirectoryQuery = useQuery({
     queryKey: WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY,
     queryFn: async ({ signal }) => listIntegrationDirectory({ signal }),
-    retry: false,
-  });
-
-  const sandboxProfilesQuery = useQuery({
-    queryKey: WEBHOOK_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY,
-    queryFn: async ({ signal }) => listAllSandboxProfiles({ signal }),
+    enabled,
     retry: false,
   });
 
@@ -80,6 +54,7 @@ export function useWebhookAutomationPrerequisites(input?: { preservedWebhookSour
           connectionId: connection.id,
           signal,
         }),
+      enabled,
       retry: false,
     })),
   });
@@ -101,22 +76,12 @@ export function useWebhookAutomationPrerequisites(input?: { preservedWebhookSour
           ...(preservedConnectionId === undefined ? {} : { preservedConnectionId }),
         });
 
-  const sandboxProfileOptions =
-    sandboxProfilesQuery.data === undefined
-      ? []
-      : buildWebhookAutomationSandboxProfileOptions({
-          sandboxProfiles: sandboxProfilesQuery.data,
-        });
-
   const webhookSourceError = webhookSourceQueries.find((query) => query.isError)?.error;
 
   const errorMessage =
-    integrationDirectoryQuery.isError ||
-    sandboxProfilesQuery.isError ||
-    webhookSourceError !== undefined
+    integrationDirectoryQuery.isError || webhookSourceError !== undefined
       ? resolveApiErrorMessage({
-          error:
-            integrationDirectoryQuery.error ?? sandboxProfilesQuery.error ?? webhookSourceError,
+          error: integrationDirectoryQuery.error ?? webhookSourceError,
           fallbackMessage: "Could not load automation prerequisites.",
         })
       : null;
@@ -131,14 +96,27 @@ export function useWebhookAutomationPrerequisites(input?: { preservedWebhookSour
 
   return {
     connectionOptions,
-    sandboxProfileOptions,
     integrationDirectoryQuery,
-    sandboxProfilesQuery,
     directoryData,
     errorMessage,
     isPending:
-      integrationDirectoryQuery.isPending ||
-      sandboxProfilesQuery.isPending ||
-      webhookSourceQueries.some((query) => query.isPending),
+      enabled &&
+      (integrationDirectoryQuery.isPending ||
+        webhookSourceQueries.some((query) => query.isPending)),
+  };
+}
+
+export function useWebhookAutomationPrerequisites(input?: {
+  enabled?: boolean;
+  preservedWebhookSourceId?: string;
+}) {
+  const sandboxProfiles = useAutomationSandboxProfileOptions();
+  const eventPrerequisites = useWebhookAutomationEventPrerequisites(input);
+
+  return {
+    ...eventPrerequisites,
+    sandboxProfileOptions: sandboxProfiles.sandboxProfileOptions,
+    errorMessage: sandboxProfiles.errorMessage ?? eventPrerequisites.errorMessage,
+    isPending: sandboxProfiles.isPending || eventPrerequisites.isPending,
   };
 }
