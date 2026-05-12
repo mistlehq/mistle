@@ -240,11 +240,6 @@ export function useOpenCodeSessionState(input: {
             client.close();
             return;
           }
-          setSessionSnapshot({
-            activeSessionId: session.id,
-            connectedAtIso: new Date().toISOString(),
-            sandboxInstanceId: connectInput.sandboxInstanceId,
-          });
           const eventSubscription = await client.subscribeEvents({
             onError: (error) => {
               setSessionErrorMessage(
@@ -292,12 +287,21 @@ export function useOpenCodeSessionState(input: {
             bufferedEvents,
           });
           hydrationHasCompleted = true;
+          setSessionSnapshot({
+            activeSessionId: session.id,
+            connectedAtIso: new Date().toISOString(),
+            sandboxInstanceId: connectInput.sandboxInstanceId,
+          });
           setStep("connected");
           setSessionConnectionState("connected");
         } catch (error) {
           if (generationRef.current !== generation) {
             return;
           }
+          clearEventSubscription();
+          clientRef.current?.close();
+          clientRef.current = null;
+          setSessionSnapshot(null);
           setLifecycleErrorMessage(
             error instanceof Error ? error.message : "Could not connect OpenCode session.",
           );
