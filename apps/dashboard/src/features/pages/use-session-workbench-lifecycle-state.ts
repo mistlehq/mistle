@@ -2,7 +2,6 @@ import { systemScheduler } from "@mistle/time";
 import { type QueryClient, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import {
   resolveSessionConnectionReadiness,
   shouldAutoConnectSession,
@@ -39,6 +38,34 @@ type SessionWorkbenchSandboxStatusSnapshot = {
   status: SandboxInstanceStatusResult["status"] | null;
 };
 
+type SessionConnectInputForWorkbench = ReturnType<typeof resolveInitialSessionConnectInput>;
+
+type SessionSnapshotForWorkbench = {
+  activeThreadCwd?: string | null;
+  activeThreadId?: string | null;
+  connectedAtIso: string;
+  providerThreadId?: string | null;
+  sandboxInstanceId?: string;
+};
+
+type SessionLifecycleForWorkbench = {
+  clearLifecycleErrorMessage: () => void;
+  connectSession: (input: SessionConnectInputForWorkbench) => void;
+  detachSessionConnection: () => void;
+  disconnectSession: () => void;
+  isStartingSession: boolean;
+  lifecycleErrorMessage: string | null;
+  recoverSession: (input: { sandboxInstanceId: string; targetThreadId: string | null }) => void;
+  recoverableDisconnect: {
+    id: number;
+    message: string;
+    targetThreadId: string | null;
+    recoveryStrategy: "reconnect_transport" | "reopen_stream";
+  } | null;
+  sessionConnectionState: "connected" | "connecting" | "detached" | "recovering";
+  sessionSnapshot: SessionSnapshotForWorkbench | null;
+};
+
 export function resolveSandboxStatusRefetchInterval(
   input: SessionWorkbenchSandboxStatusSnapshot & {
     isAutoResumingStoppedSandbox: boolean;
@@ -67,19 +94,8 @@ export function resolveSandboxStatusRefetchInterval(
 export function useSessionWorkbenchLifecycleState(input: {
   sandboxInstanceId: string | null;
   mainPanelTransitionState: MainPanelTransitionState;
-  lifecycle: Pick<
-    ReturnType<typeof useCodexSessionState>["lifecycle"],
-    | "clearLifecycleErrorMessage"
-    | "connectSession"
-    | "detachSessionConnection"
-    | "disconnectSession"
-    | "isStartingSession"
-    | "lifecycleErrorMessage"
-    | "recoverSession"
-    | "recoverableDisconnect"
-    | "sessionSnapshot"
-    | "sessionConnectionState"
-  >;
+  lifecycle: SessionLifecycleForWorkbench;
+  opencodeLifecycle?: SessionLifecycleForWorkbench;
   queryClient: QueryClient;
 }) {
   const [hasAttemptedAutoConnect, setHasAttemptedAutoConnect] = useState(false);
@@ -99,17 +115,6 @@ export function useSessionWorkbenchLifecycleState(input: {
     inFlight: false,
   });
 
-  const {
-    clearLifecycleErrorMessage,
-    connectSession,
-    sessionSnapshot,
-    disconnectSession,
-    isStartingSession,
-    lifecycleErrorMessage,
-    recoverSession,
-    recoverableDisconnect,
-    sessionConnectionState,
-  } = input.lifecycle;
   const sandboxStatusQuery = useQuery({
     queryKey:
       input.sandboxInstanceId === null
@@ -139,6 +144,24 @@ export function useSessionWorkbenchLifecycleState(input: {
       });
     },
   });
+  const sandboxStatus = sandboxStatusQuery.data;
+  const activeAgentRuntimeId = sandboxStatus?.runtimeContext?.agentRuntimeId ?? "codex";
+  const activeLifecycle =
+    activeAgentRuntimeId === "opencode" && input.opencodeLifecycle !== undefined
+      ? input.opencodeLifecycle
+      : input.lifecycle;
+
+  const {
+    clearLifecycleErrorMessage,
+    connectSession,
+    sessionSnapshot,
+    disconnectSession,
+    isStartingSession,
+    lifecycleErrorMessage,
+    recoverSession,
+    recoverableDisconnect,
+    sessionConnectionState,
+  } = activeLifecycle;
   const requestRecoveryStatusRefresh = useCallback((): void => {
     const refreshState = recoveryRefreshStateRef.current;
     refreshState.boundaryEpoch += 1;
@@ -208,7 +231,6 @@ export function useSessionWorkbenchLifecycleState(input: {
   });
   const displaySandboxLifecycleStatus =
     resolveSandboxLifecycleStatusForWorkbenchEntryPhase(workbenchEntryPhase);
-  const sandboxStatus = sandboxStatusQuery.data;
   const automationConversation = sandboxStatus?.automationConversation ?? null;
   const providerThreadId = automationConversation?.providerConversationId ?? null;
   const isWaitingForAutomationThread = shouldWaitForAutomationSessionThread({
@@ -469,7 +491,7 @@ export function resolveInitialEntryStartupState(input: {
   mainPanelTransitionState: MainPanelTransitionState;
   rawSandboxStatus: SandboxInstanceStatusResult["status"] | null;
   sandboxStatusReadState: "error" | "loading" | "ready";
-  sessionSnapshot: ReturnType<typeof useCodexSessionState>["lifecycle"]["sessionSnapshot"];
+  sessionSnapshot: SessionSnapshotForWorkbench | null;
 }): SessionStartupState | null {
   if (input.sessionSnapshot !== null && input.mainPanelTransitionState === "stable_chat") {
     return null;

@@ -4,10 +4,16 @@ import type {
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 
+import type { ChatState } from "../chat/chat-state.js";
 import { formatCodexContextUsage } from "../session-agents/codex/session-state/codex-context-usage.js";
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
+import type { SessionBootstrapResult } from "../session-agents/codex/session-state/session-bootstrap/index.js";
+import {
+  useOpenCodeSessionState,
+  type OpenCodeChatState,
+} from "../session-agents/opencode/session-state/index.js";
 import { applyPatchedSessionTitleToCache } from "../sessions/session-header-title-model.js";
 import { generateSessionTitleWithSandboxCodexExec } from "../sessions/session-title-generation.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
@@ -112,10 +118,15 @@ type SessionWorkbenchState = {
   portAccessState: ReturnType<typeof useSessionPortAccess>;
 };
 
+type SessionConversationChatState = Pick<
+  ChatState,
+  "activeTurnId" | "entries" | "pendingTurnId" | "status"
+>;
+
 type SessionConversationPaneState = {
   activeThreadId: string | null;
-  chatState: ReturnType<typeof useCodexSessionState>["chat"]["chatState"];
-  dismissUserMessageAction: ReturnType<
+  chatState: SessionConversationChatState;
+  dismissUserMessageAction?: ReturnType<
     typeof useCodexSessionState
   >["chat"]["dismissUserMessageAction"];
   composerStateInput: SessionComposerStateInput;
@@ -127,6 +138,31 @@ type SessionConversationPaneState = {
     respondToServerRequest: (requestId: string | number, result: unknown) => void;
   };
 };
+
+const OpenCodeComposerBootstrap: SessionBootstrapResult = {
+  phase: { status: "ready" },
+  establishedSnapshot: {
+    availableModels: [],
+    configSnapshot: {
+      model: null,
+      modelReasoningEffort: null,
+    },
+  },
+};
+
+function mapOpenCodeChatStateForConversation(
+  chatState: OpenCodeChatState,
+): SessionConversationChatState {
+  const activeTurnId =
+    chatState.status === "busy" ? (chatState.sessionId ?? "opencode-active-turn") : null;
+
+  return {
+    activeTurnId,
+    entries: chatState.entries,
+    pendingTurnId: null,
+    status: chatState.status === "busy" ? "inProgress" : chatState.status,
+  };
+}
 
 type UseSessionWorkbenchControllerResult = {
   workbench: SessionWorkbenchState;
@@ -170,6 +206,43 @@ export function useSessionWorkbenchController(input: {
     rpcClientRef,
     sessionEventUnsubscribersRef,
   });
+  const lifecycle = sessionState.lifecycle;
+  const openCodeSessionState = useOpenCodeSessionState({
+    ensureTransportConnected: transportManager.ensureTransportConnected,
+  });
+  const openCodeLifecycle = openCodeSessionState.lifecycle;
+  const opencodeLifecycleForWorkbench = useMemo(
+    () => ({
+      clearLifecycleErrorMessage: openCodeLifecycle.clearLifecycleErrorMessage,
+      connectSession: (connectInput: Parameters<typeof lifecycle.connectSession>[0]): void => {
+        const targetThreadId = connectInput.targetThreadId;
+        openCodeLifecycle.connectSession({
+          sandboxInstanceId: connectInput.sandboxInstanceId,
+          ...(targetThreadId === null ? {} : { targetThreadId }),
+        });
+      },
+      detachSessionConnection: openCodeLifecycle.detachSessionConnection,
+      disconnectSession: openCodeLifecycle.disconnectSession,
+      isStartingSession: openCodeLifecycle.isStartingSession,
+      lifecycleErrorMessage: openCodeLifecycle.lifecycleErrorMessage,
+      recoverSession: openCodeLifecycle.recoverSession,
+      recoverableDisconnect: openCodeLifecycle.recoverableDisconnect,
+      sessionConnectionState: openCodeLifecycle.sessionConnectionState,
+      sessionSnapshot: openCodeLifecycle.sessionSnapshot,
+    }),
+    [
+      openCodeLifecycle.clearLifecycleErrorMessage,
+      openCodeLifecycle.connectSession,
+      openCodeLifecycle.detachSessionConnection,
+      openCodeLifecycle.disconnectSession,
+      openCodeLifecycle.isStartingSession,
+      openCodeLifecycle.lifecycleErrorMessage,
+      openCodeLifecycle.recoverSession,
+      openCodeLifecycle.recoverableDisconnect,
+      openCodeLifecycle.sessionConnectionState,
+      openCodeLifecycle.sessionSnapshot,
+    ],
+  );
   const contextUsage =
     sessionState.threadTokenUsageSnapshot?.threadId ===
     sessionState.lifecycle.sessionSnapshot?.activeThreadId
@@ -184,7 +257,6 @@ export function useSessionWorkbenchController(input: {
   const diffPanelState = useSessionDiffWorkbenchState({
     sandboxInstanceId: input.sandboxInstanceId,
   });
-  const lifecycle = sessionState.lifecycle;
   const chat = sessionState.chat;
   const codexConfig = sessionState.codexConfig;
   const serverRequests = sessionState.serverRequests;
@@ -203,10 +275,14 @@ export function useSessionWorkbenchController(input: {
     sandboxInstanceId: input.sandboxInstanceId,
     mainPanelTransitionState: handoff.transitionState,
     lifecycle,
+    opencodeLifecycle: opencodeLifecycleForWorkbench,
     queryClient,
   });
   const sandboxStatus = workbenchLifecycleState.sandboxStatusQuery.data;
-  const activeThreadCwd = sessionState.lifecycle.sessionSnapshot?.activeThreadCwd;
+  const isOpenCodeRuntime = sandboxStatus?.runtimeContext?.agentRuntimeId === "opencode";
+  const activeThreadCwd = isOpenCodeRuntime
+    ? null
+    : sessionState.lifecycle.sessionSnapshot?.activeThreadCwd;
   const initialSelectedRepositoryPath = resolveInitialSelectedRepositoryPath({
     activeThreadCwd: activeThreadCwd ?? undefined,
     runtimePrimaryRepositoryRoot: sandboxStatus?.runtimeContext?.primaryRepositoryRoot,
@@ -250,25 +326,34 @@ export function useSessionWorkbenchController(input: {
     codexConfig,
   });
   const sessionSnapshot = workbenchLifecycleState.sessionSnapshot;
+  const activeSessionThreadId = isOpenCodeRuntime
+    ? null
+    : (sessionSnapshot?.activeThreadId ?? null);
+  const activeConversationThreadId = isOpenCodeRuntime
+    ? (openCodeSessionState.lifecycle.sessionSnapshot?.activeSessionId ?? null)
+    : activeSessionThreadId;
   const enterCliDisabledReason =
     input.sandboxInstanceId === null
       ? "Session id is required."
-      : sessionSnapshot === null
-        ? "TUI is available after the session is connected."
-        : !workbenchLifecycleState.connectionReadiness.canConnect
-          ? (workbenchLifecycleState.stoppedSessionMessage ??
-            "TUI is available only when the sandbox is running.")
-          : handoff.transitionState !== "stable_chat"
-            ? "Finish the current primary-panel transition before opening Codex TUI."
-            : null;
+      : isOpenCodeRuntime
+        ? "OpenCode TUI handoff is not available from chat yet."
+        : sessionSnapshot === null
+          ? "TUI is available after the session is connected."
+          : !workbenchLifecycleState.connectionReadiness.canConnect
+            ? (workbenchLifecycleState.stoppedSessionMessage ??
+              "TUI is available only when the sandbox is running.")
+            : handoff.transitionState !== "stable_chat"
+              ? "Finish the current primary-panel transition before opening Codex TUI."
+              : null;
   const attachmentControl = useSessionComposerAttachmentControl({
     attachmentTarget:
+      !isOpenCodeRuntime &&
       input.sandboxInstanceId !== null &&
       sessionSnapshot !== null &&
-      sessionSnapshot.activeThreadId !== null
+      activeSessionThreadId !== null
         ? {
             sandboxInstanceId: input.sandboxInstanceId,
-            threadId: sessionSnapshot.activeThreadId,
+            threadId: activeSessionThreadId,
           }
         : null,
     ensureTransportConnected: transportManager.ensureTransportConnected,
@@ -279,10 +364,13 @@ export function useSessionWorkbenchController(input: {
         return;
       }
 
-      await sessionState.threads.ensureCanSwitchPrimaryRepository();
+      if (!isOpenCodeRuntime) {
+        await sessionState.threads.ensureCanSwitchPrimaryRepository();
+      }
       primaryRepositoryState.setSelectedRepositoryPath(nextSelectedRepositoryPath);
     },
     [
+      isOpenCodeRuntime,
       primaryRepositoryState.setSelectedRepositoryPath,
       selectedRepositoryPath,
       sessionState.threads.ensureCanSwitchPrimaryRepository,
@@ -290,6 +378,13 @@ export function useSessionWorkbenchController(input: {
   );
   const startTurn = useCallback(
     async (turnInput: Parameters<typeof chat.startTurn>[0]): Promise<void> => {
+      if (isOpenCodeRuntime) {
+        await openCodeSessionState.chat.sendPrompt({
+          submittedPrompt: turnInput.transcriptPrompt ?? turnInput.submittedPrompt,
+        });
+        return;
+      }
+
       const sandboxInstanceId = input.sandboxInstanceId;
       const cachedTitle = sandboxStatus?.title;
       const shouldGenerateSessionTitle =
@@ -324,12 +419,27 @@ export function useSessionWorkbenchController(input: {
     [
       chat,
       input.sandboxInstanceId,
+      isOpenCodeRuntime,
+      openCodeSessionState.chat,
       queryClient,
       sandboxStatus?.title,
       selectedRepositoryPath,
       transportManager.ensureTransportConnected,
     ],
   );
+  const activeConversationChatState = isOpenCodeRuntime
+    ? mapOpenCodeChatStateForConversation(openCodeSessionState.chat.chatState)
+    : chat.chatState;
+  const activeSessionErrorMessage = isOpenCodeRuntime
+    ? openCodeSessionState.sessionMessage.sessionErrorMessage
+    : sessionMessage.sessionErrorMessage;
+  const activeClearSessionErrorMessage = isOpenCodeRuntime
+    ? openCodeSessionState.sessionMessage.clearSessionErrorMessage
+    : sessionMessage.clearSessionErrorMessage;
+  const isOpenCodeTurnRunning = openCodeSessionState.chat.chatState.status === "busy";
+  const interruptOpenCodeTurn = useCallback((): void => {
+    void openCodeSessionState.chat.abortSession();
+  }, [openCodeSessionState.chat]);
 
   return {
     workbench: {
@@ -343,7 +453,7 @@ export function useSessionWorkbenchController(input: {
       sandboxLifecycleStatus: workbenchLifecycleState.sandboxLifecycleStatus,
       initialEntryStartupState: workbenchLifecycleState.initialEntryStartupState,
       sandboxStatusQuery: workbenchLifecycleState.sandboxStatusQuery,
-      lifecycleStep: lifecycle.step,
+      lifecycleStep: isOpenCodeRuntime ? openCodeSessionState.lifecycle.step : lifecycle.step,
       primaryPanelState: {
         transitionState: handoff.transitionState,
         canEnterCli: enterCliDisabledReason === null,
@@ -368,40 +478,58 @@ export function useSessionWorkbenchController(input: {
       primaryRepositoryState,
       portAccessState,
       primaryRepositoryControlState: {
-        disabledReason: isPrimaryRepositorySwitchBlockedByCli
-          ? "Exit Codex TUI before switching the primary repository."
-          : null,
+        disabledReason:
+          !isOpenCodeRuntime && isPrimaryRepositorySwitchBlockedByCli
+            ? "Exit Codex TUI before switching the primary repository."
+            : null,
         switchPrimaryRepository,
       },
     },
     conversationPane: {
-      activeThreadId: sessionSnapshot?.activeThreadId ?? null,
-      chatState: chat.chatState,
-      dismissUserMessageAction: chat.dismissUserMessageAction,
+      activeThreadId: activeConversationThreadId,
+      chatState: activeConversationChatState,
+      ...(isOpenCodeRuntime ? {} : { dismissUserMessageAction: chat.dismissUserMessageAction }),
       composerStateInput: {
-        bootstrap: sessionState.bootstrap,
+        bootstrap: isOpenCodeRuntime ? OpenCodeComposerBootstrap : sessionState.bootstrap,
         configControl,
         attachmentControl,
         turnControl: {
-          activeTurnState: chat.canInterruptTurn || chat.canSteerTurn ? "running" : "idle",
-          canInterrupt: chat.canInterruptTurn,
-          canSteer: chat.canSteerTurn,
-          completedTurnErrorMessage: chat.chatState.completedErrorMessage,
-          interruptTurn: chat.interruptTurn,
-          isInterrupting: chat.isInterruptingTurn,
-          isStarting: chat.isStartingTurn,
-          isSteering: chat.isSteeringTurn,
+          activeTurnState: isOpenCodeRuntime
+            ? isOpenCodeTurnRunning
+              ? "running"
+              : "idle"
+            : chat.canInterruptTurn || chat.canSteerTurn
+              ? "running"
+              : "idle",
+          canInterrupt: isOpenCodeRuntime
+            ? openCodeSessionState.chat.canInterruptTurn
+            : chat.canInterruptTurn,
+          canSteer: isOpenCodeRuntime ? false : chat.canSteerTurn,
+          completedTurnErrorMessage: isOpenCodeRuntime
+            ? openCodeSessionState.chat.chatState.completedErrorMessage
+            : chat.chatState.completedErrorMessage,
+          interruptTurn: isOpenCodeRuntime ? interruptOpenCodeTurn : chat.interruptTurn,
+          isInterrupting: isOpenCodeRuntime
+            ? openCodeSessionState.chat.isInterruptingTurn
+            : chat.isInterruptingTurn,
+          isStarting: isOpenCodeRuntime
+            ? openCodeSessionState.chat.isStartingTurn
+            : chat.isStartingTurn,
+          isSteering: isOpenCodeRuntime ? false : chat.isSteeringTurn,
           startTurn,
           steerTurn: chat.steerTurn,
         },
-        sessionErrorMessage: sessionMessage.sessionErrorMessage,
-        clearSessionErrorMessage: sessionMessage.clearSessionErrorMessage,
+        sessionErrorMessage: activeSessionErrorMessage,
+        clearSessionErrorMessage: activeClearSessionErrorMessage,
         repositoryStatus,
-        contextUsage,
+        contextUsage: isOpenCodeRuntime ? null : contextUsage,
+        requiresModelSelection: !isOpenCodeRuntime,
       },
       serverRequestsState: {
-        isRespondingToServerRequest: serverRequests.isRespondingToServerRequest,
-        pendingServerRequests: serverRequests.pendingServerRequests,
+        isRespondingToServerRequest: isOpenCodeRuntime
+          ? false
+          : serverRequests.isRespondingToServerRequest,
+        pendingServerRequests: isOpenCodeRuntime ? [] : serverRequests.pendingServerRequests,
         respondToServerRequest: serverRequests.respondToServerRequest,
       },
     },

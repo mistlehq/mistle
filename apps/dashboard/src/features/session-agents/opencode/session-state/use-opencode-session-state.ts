@@ -21,10 +21,17 @@ export type ConnectedOpenCodeSession = {
 
 export type OpenCodeSessionLifecycleState = {
   clearLifecycleErrorMessage: () => void;
-  connectSession: (input: { sandboxInstanceId: string; targetSessionId?: string | null }) => void;
+  connectSession: (input: {
+    sandboxInstanceId: string;
+    targetSessionId?: string | null;
+    targetThreadId?: string | null;
+  }) => void;
+  detachSessionConnection: () => void;
   disconnectSession: () => void;
   isStartingSession: boolean;
   lifecycleErrorMessage: string | null;
+  recoverSession: (input: { sandboxInstanceId: string; targetThreadId: string | null }) => void;
+  recoverableDisconnect: null;
   sessionConnectionState: "connected" | "connecting" | "detached";
   sessionSnapshot: ConnectedOpenCodeSession | null;
   step: "connected" | "connecting" | "idle" | "securing";
@@ -127,7 +134,11 @@ export function useOpenCodeSessionState(input: {
   }, [sessionSnapshot?.activeSessionId]);
 
   const connectSession = useCallback(
-    (connectInput: { sandboxInstanceId: string; targetSessionId?: string | null }): void => {
+    (connectInput: {
+      sandboxInstanceId: string;
+      targetSessionId?: string | null;
+      targetThreadId?: string | null;
+    }): void => {
       const generation = generationRef.current + 1;
       generationRef.current = generation;
       clearEventSubscription();
@@ -151,11 +162,13 @@ export function useOpenCodeSessionState(input: {
           });
           clientRef.current = client;
           await client.health();
+          const targetSessionId =
+            connectInput.targetSessionId ?? connectInput.targetThreadId ?? null;
           const session =
-            connectInput.targetSessionId === undefined || connectInput.targetSessionId === null
+            targetSessionId === null
               ? await client.createSession({})
               : await client.getSession({
-                  sessionId: connectInput.targetSessionId,
+                  sessionId: targetSessionId,
                 });
           if (generationRef.current !== generation) {
             client.close();
@@ -284,9 +297,14 @@ export function useOpenCodeSessionState(input: {
     lifecycle: {
       clearLifecycleErrorMessage: () => setLifecycleErrorMessage(null),
       connectSession,
+      detachSessionConnection: disconnectSession,
       disconnectSession,
       isStartingSession: sessionConnectionState === "connecting",
       lifecycleErrorMessage,
+      recoverSession: (recoverInput) => {
+        connectSession(recoverInput);
+      },
+      recoverableDisconnect: null,
       sessionConnectionState,
       sessionSnapshot,
       step,

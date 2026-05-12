@@ -33,7 +33,7 @@ type SessionConversationMainContentProps = {
   initialBottomScrollResetKey?: string | null;
   scrollBehavior?: SessionConversationScrollBehavior;
   chatEntries: readonly ChatEntry[];
-  onUserMessageAction?: (actionId: string) => void;
+  onUserMessageAction?: ((actionId: string) => void) | undefined;
   serverRequestPanelEntries: readonly CodexApprovalRequestEntry[];
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
