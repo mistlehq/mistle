@@ -217,6 +217,7 @@ export function useSessionWorkbenchController(input: {
       connectSession: (connectInput: Parameters<typeof lifecycle.connectSession>[0]): void => {
         const targetThreadId = connectInput.targetThreadId;
         openCodeLifecycle.connectSession({
+          ...(connectInput.initialCwd === undefined ? {} : { initialCwd: connectInput.initialCwd }),
           sandboxInstanceId: connectInput.sandboxInstanceId,
           ...(targetThreadId === null ? {} : { targetThreadId }),
         });

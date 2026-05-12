@@ -376,6 +376,26 @@ describe("createOpenCodeSessionClient", () => {
       path: "/session/ses_test",
     });
 
+    const sessionsPromise = client.listSessions({
+      directory: "/workspace/repo",
+      limit: 1,
+    });
+    const sessionsRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: sessionsRequest,
+      body: [createSessionResponse("ses_recent", "Recent session")],
+    });
+    await expect(sessionsPromise).resolves.toMatchObject([
+      {
+        id: "ses_recent",
+        title: "Recent session",
+      },
+    ]);
+    expect(sessionsRequest.request).toMatchObject({
+      method: "GET",
+      path: "/session?directory=%2Fworkspace%2Frepo&limit=1",
+    });
+
     const messagesPromise = client.listMessages({
       sessionId: "ses_test",
     });

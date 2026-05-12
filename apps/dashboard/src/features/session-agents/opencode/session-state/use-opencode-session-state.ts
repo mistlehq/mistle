@@ -3,6 +3,7 @@ import {
   type OpenCodeEventSubscription,
   type OpenCodePermissionResponseInput,
   type OpenCodeSessionClient,
+  type OpenCodeSessionSummary,
 } from "@mistle/integrations-definitions/agent-runtimes/opencode/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
@@ -19,9 +20,19 @@ export type ConnectedOpenCodeSession = {
   sandboxInstanceId: string;
 };
 
+export type OpenCodeSessionSelection =
+  | {
+      kind: "create";
+    }
+  | {
+      kind: "resume";
+      sessionId: string;
+    };
+
 export type OpenCodeSessionLifecycleState = {
   clearLifecycleErrorMessage: () => void;
   connectSession: (input: {
+    initialCwd?: string | null;
     sandboxInstanceId: string;
     targetSessionId?: string | null;
     targetThreadId?: string | null;
@@ -58,6 +69,30 @@ export type UseOpenCodeSessionStateResult = {
     sessionErrorMessage: string | null;
   };
 };
+
+export function resolveOpenCodeSessionSelection(input: {
+  listedSessions: readonly OpenCodeSessionSummary[];
+  targetSessionId: string | null;
+}): OpenCodeSessionSelection {
+  if (input.targetSessionId !== null) {
+    return {
+      kind: "resume",
+      sessionId: input.targetSessionId,
+    };
+  }
+
+  const [mostRecentSession] = input.listedSessions;
+  if (mostRecentSession === undefined) {
+    return {
+      kind: "create",
+    };
+  }
+
+  return {
+    kind: "resume",
+    sessionId: mostRecentSession.id,
+  };
+}
 
 export function useOpenCodeSessionState(input: {
   ensureTransportConnected: (input: { sandboxInstanceId: string }) => Promise<{
@@ -135,6 +170,7 @@ export function useOpenCodeSessionState(input: {
 
   const connectSession = useCallback(
     (connectInput: {
+      initialCwd?: string | null;
       sandboxInstanceId: string;
       targetSessionId?: string | null;
       targetThreadId?: string | null;
@@ -164,11 +200,25 @@ export function useOpenCodeSessionState(input: {
           await client.health();
           const targetSessionId =
             connectInput.targetSessionId ?? connectInput.targetThreadId ?? null;
+          const directory = connectInput.initialCwd ?? undefined;
+          const sessionSelection = resolveOpenCodeSessionSelection({
+            targetSessionId,
+            listedSessions:
+              targetSessionId === null
+                ? await client.listSessions({
+                    ...(directory === undefined ? {} : { directory }),
+                    limit: 1,
+                  })
+                : [],
+          });
           const session =
-            targetSessionId === null
-              ? await client.createSession({})
+            sessionSelection.kind === "create"
+              ? await client.createSession({
+                  ...(directory === undefined ? {} : { directory }),
+                })
               : await client.getSession({
-                  sessionId: targetSessionId,
+                  ...(directory === undefined ? {} : { directory }),
+                  sessionId: sessionSelection.sessionId,
                 });
           if (generationRef.current !== generation) {
             client.close();
