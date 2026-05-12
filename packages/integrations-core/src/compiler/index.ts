@@ -770,10 +770,7 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
         refs: compileBindingInput.refs,
       });
       const compileBindingResult: CompileBindingResult = {
-        egressRoutes: [
-          ...providerCompileBindingResult.egressRoutes,
-          ...(compileAgentRuntimeResult.egressRoutes ?? []),
-        ],
+        egressRoutes: providerCompileBindingResult.egressRoutes,
         artifacts: [
           ...providerCompileBindingResult.artifacts,
           ...(compileAgentRuntimeResult.artifacts ?? []),

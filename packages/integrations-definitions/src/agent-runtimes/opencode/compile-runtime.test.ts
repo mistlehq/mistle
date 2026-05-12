@@ -227,8 +227,6 @@ describe("compileOpenCodeRuntime", () => {
       },
     });
 
-    expect(compiled.egressRoutes).toBeUndefined();
-
     expect(compiled.artifacts).toHaveLength(1);
     expect(compiled.artifacts?.[0]?.artifactKey).toBe("opencode-cli");
     if (compiled.artifacts?.[0] === undefined) {
@@ -447,8 +445,6 @@ describe("compileOpenCodeRuntime", () => {
         artifactBinPath: (artifactName) => `/usr/local/bin/${artifactName}`,
       },
     });
-
-    expect(compiled.egressRoutes).toBeUndefined();
 
     const configContent = compiled.runtimeClients[0]?.setup.files.find(
       (file) => file.fileId === "opencode_config",

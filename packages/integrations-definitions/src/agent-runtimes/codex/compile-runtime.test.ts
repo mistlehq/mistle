@@ -163,7 +163,6 @@ describe("compileCodexRuntime", () => {
       },
     });
 
-    expect(compiled.egressRoutes).toBeUndefined();
     expect(compiled.artifacts).toHaveLength(1);
     expect(compiled.artifacts?.[0]?.artifactKey).toBe("codex-cli");
     if (compiled.artifacts?.[0] === undefined) {
@@ -374,8 +373,6 @@ describe("compileCodexRuntime", () => {
         artifactBinPath: (artifactName) => `/usr/local/bin/${artifactName}`,
       },
     });
-
-    expect(compiled.egressRoutes).toBeUndefined();
 
     const runtimeClients = renderRuntimeClients({
       compiled,

@@ -118,27 +118,6 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
       },
     ],
     compileRuntime: (input) => ({
-      egressRoutes: [
-        {
-          match: {
-            hosts: ["api.openai.com"],
-            methods: ["POST"],
-            pathPrefixes: ["/v1"],
-          },
-          upstream: {
-            baseUrl: input.providerAccess.apiBaseUrl,
-          },
-          authInjection: {
-            type: "bearer",
-            target: "authorization",
-          },
-          credentialResolver: {
-            kind: "integration_connection",
-            connectionId: input.providerAccess.credentialResolver.connectionId,
-            secretType: input.providerAccess.credentialResolver.secretType,
-          },
-        },
-      ],
       artifacts: [
         {
           artifactKey: "codex-cli",
@@ -385,8 +364,28 @@ function createOpenAiDefinition(): IntegrationDefinition<
         },
       }),
     },
-    compileBinding: () => ({
-      egressRoutes: [],
+    compileBinding: (input) => ({
+      egressRoutes: [
+        {
+          match: {
+            hosts: ["api.openai.com"],
+            methods: ["POST"],
+            pathPrefixes: ["/v1"],
+          },
+          upstream: {
+            baseUrl: input.target.config.apiBaseUrl,
+          },
+          authInjection: {
+            type: "bearer",
+            target: "authorization",
+          },
+          credentialResolver: {
+            kind: "integration_connection",
+            connectionId: input.connection.id,
+            secretType: "api_key",
+          },
+        },
+      ],
       artifacts: [],
       runtimeClients: [],
     }),
@@ -1014,7 +1013,7 @@ describe("compileRuntimePlan", () => {
     });
   });
 
-  it("lets agent runtimes render clients from their compiled egress routes", () => {
+  it("lets agent runtimes render clients from compiled provider egress routes", () => {
     const registry = new IntegrationRegistry();
     registry.register(createOpenAiDefinition());
     registry.register(createLinearMcpDefinition());
@@ -1023,28 +1022,7 @@ describe("compileRuntimePlan", () => {
       runtimeId: "route-aware",
       displayName: "Route Aware",
       configSchema: z.object({}).strict(),
-      compileRuntime: (input) => ({
-        egressRoutes: [
-          {
-            match: {
-              hosts: ["api.openai.com"],
-              methods: ["POST"],
-              pathPrefixes: ["/v1"],
-            },
-            upstream: {
-              baseUrl: input.providerAccess.apiBaseUrl,
-            },
-            authInjection: {
-              type: "bearer",
-              target: "authorization",
-            },
-            credentialResolver: {
-              kind: "integration_connection",
-              connectionId: input.providerAccess.credentialResolver.connectionId,
-              secretType: input.providerAccess.credentialResolver.secretType,
-            },
-          },
-        ],
+      compileRuntime: () => ({
         runtimeClients: [
           {
             clientId: "route-aware-cli",

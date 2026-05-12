@@ -3,7 +3,6 @@ import type { z } from "zod";
 import type { AgentConversationProvider } from "../agent/conversation-provider.js";
 import type { AgentProviderAccess } from "../capabilities/index.js";
 import type {
-  CompileBindingEgressRoute,
   CompileBindingRefs,
   CompileBindingWorkspaceSource,
   EgressCredentialRoute,
@@ -67,7 +66,6 @@ export type CompileAgentRuntimeRenderRuntimeClientsInput = {
 };
 
 export type CompileAgentRuntimeResult = {
-  egressRoutes?: ReadonlyArray<CompileBindingEgressRoute>;
   artifacts?: ReadonlyArray<RuntimeArtifactSpec>;
   runtimeClients: ReadonlyArray<RuntimeClient>;
   renderRuntimeClients?: (
