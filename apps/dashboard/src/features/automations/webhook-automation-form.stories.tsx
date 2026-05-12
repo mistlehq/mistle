@@ -542,7 +542,8 @@ export const NoEventsAvailable: Story = {
   args: {
     mode: "create",
     triggerPickerDisabledState: {
-      reason: "The selected profile has no bindings with automation events.",
+      reason:
+        "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event automation.",
       variant: "default",
     },
     values: {

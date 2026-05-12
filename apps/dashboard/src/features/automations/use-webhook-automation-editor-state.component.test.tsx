@@ -198,6 +198,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     expect(
       resolveSelectedProfileTriggerState({
         selectedProfileId: "sbp_123",
+        selectedProfileName: "Repo Maintainer",
         hasBindingData: true,
         isBindingDataPending: false,
         bindingErrorMessage: null,
@@ -205,7 +206,8 @@ describe("useLoadedWebhookAutomationEditorState", () => {
         directoryData: createDirectoryData(),
       }).disabledState,
     ).toEqual({
-      reason: "The selected profile has no bindings with automation events.",
+      reason:
+        "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event automation.",
       variant: "default",
     });
   });

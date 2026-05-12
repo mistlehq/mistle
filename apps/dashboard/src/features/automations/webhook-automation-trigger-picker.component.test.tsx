@@ -252,7 +252,8 @@ describe("WebhookAutomationTriggerPicker", () => {
       triggerParameterValues: {},
       eventOptions: [],
       disabledState: {
-        reason: "The selected profile has no bindings with automation events.",
+        reason:
+          "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event automation.",
         variant: "default",
       },
     });
@@ -264,10 +265,12 @@ describe("WebhookAutomationTriggerPicker", () => {
 
     expect(input.getAttribute("disabled")).toBe("");
     expect(
-      screen.getAllByText("The selected profile has no bindings with automation events.").length,
+      screen.getAllByText(
+        "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event automation.",
+      ).length,
     ).toBeGreaterThan(0);
     const helperMessage = screen.getByText(
-      "The selected profile has no bindings with automation events.",
+      "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event automation.",
     );
     const helperContainer = helperMessage.closest('[data-slot="notice"]');
     if (helperContainer === null) {

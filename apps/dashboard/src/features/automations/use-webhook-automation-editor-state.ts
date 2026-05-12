@@ -67,7 +67,6 @@ type SelectedProfileTriggerState = {
 };
 
 const NoProfileSelectedMessage = "Select a sandbox profile to choose events.";
-const InvalidProfileBindingMessage = "The selected profile has no bindings with automation events.";
 const LoadProfileBindingsErrorMessage = "Could not load profile bindings.";
 const RequiredFieldSummaryMessage = "Please address the fields highlighted in red.";
 const RequiredTriggerSelectionMessage = "Please add an event";
@@ -91,6 +90,7 @@ function hasRequiredFieldErrors(
 
 export function resolveSelectedProfileTriggerState(input: {
   selectedProfileId: string;
+  selectedProfileName?: string | undefined;
   hasBindingData: boolean;
   isBindingDataPending: boolean;
   bindingErrorMessage: string | null;
@@ -138,7 +138,7 @@ export function resolveSelectedProfileTriggerState(input: {
     disabledState:
       selectableConnectionIds.length === 0
         ? {
-            reason: InvalidProfileBindingMessage,
+            reason: `The sandbox profile ${input.selectedProfileName ?? input.selectedProfileId} has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event automation.`,
             variant: "default",
           }
         : null,
@@ -425,6 +425,9 @@ export function useLoadedWebhookAutomationEditorState(
     () =>
       resolveSelectedProfileTriggerState({
         selectedProfileId,
+        selectedProfileName: input.sandboxProfileOptions.find(
+          (option) => option.value === selectedProfileId,
+        )?.label,
         hasBindingData:
           effectiveSelectedProfileVersion === null || hasLoadedSelectedProfileAutomationConfig,
         isBindingDataPending:

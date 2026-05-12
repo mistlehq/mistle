@@ -340,10 +340,14 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
           error: selectedProfileBindingsError,
           fallbackMessage: "Could not load profile bindings.",
         });
+  const selectedProfileName = sandboxProfilePrerequisites.sandboxProfileOptions.find(
+    (option) => option.value === selectedProfileId,
+  )?.label;
   const selectedProfileTriggerState = useMemo(
     () =>
       resolveSelectedProfileTriggerState({
         selectedProfileId,
+        selectedProfileName,
         hasBindingData:
           effectiveSelectedProfileVersion === null || hasLoadedSelectedProfileAutomationConfig,
         isBindingDataPending:
@@ -367,6 +371,7 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
       selectedProfileAutomationConfigQuery.isPending,
       selectedProfileBindingsErrorMessage,
       selectedProfileId,
+      selectedProfileName,
       selectedProfileVersionsQuery.isPending,
     ],
   );
