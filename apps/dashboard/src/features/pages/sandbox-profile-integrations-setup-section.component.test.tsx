@@ -66,7 +66,12 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
       />,
     );
 
-    const proxiedConnectionsSection = getSectionByHeading("Proxied Connections");
+    const proxiedConnectionsSection = screen
+      .getByRole("heading", { name: "Proxied Connections" })
+      .closest("section");
+    if (proxiedConnectionsSection === null) {
+      throw new Error("Expected Proxied Connections heading to be inside a section.");
+    }
     const proxiedConnections = within(proxiedConnectionsSection);
 
     expect(proxiedConnections.getAllByText("Service").length).toBeGreaterThan(0);
@@ -290,13 +295,4 @@ function TestSandboxProfileIntegrationsSetupSection(input: {
       </MemoryRouter>
     </QueryClientProvider>
   );
-}
-
-function getSectionByHeading(name: string): HTMLElement {
-  const section = screen.getByRole("heading", { name }).closest("section");
-  if (section === null) {
-    throw new Error(`Expected ${name} heading to be inside a section.`);
-  }
-
-  return section;
 }
