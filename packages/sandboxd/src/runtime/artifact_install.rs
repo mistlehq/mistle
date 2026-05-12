@@ -296,14 +296,12 @@ fn apply_managed_github_client_env(
     {
         let certificate_pem = fs::read(certificate_path).map_err(|error| {
             format!(
-                "failed to read managed certificate bundle for github release install '{}': {error}",
-                certificate_path
+                "failed to read managed certificate bundle for github release install '{certificate_path}': {error}"
             )
         })?;
         let certificates = Certificate::from_pem_bundle(&certificate_pem).map_err(|error| {
             format!(
-                "managed certificate bundle for github release install '{}' is invalid: {error}",
-                certificate_path
+                "managed certificate bundle for github release install '{certificate_path}' is invalid: {error}"
             )
         })?;
         for certificate in certificates {
