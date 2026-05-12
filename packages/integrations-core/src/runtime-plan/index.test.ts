@@ -142,7 +142,6 @@ describe("assembleCompiledRuntimePlan", () => {
           workspaceSources: [],
           agentRuntimes: [
             {
-              bindingId: "ibd_123",
               runtimeId: "codex",
               runtimeKey: "codex-app-server",
               clientId: "codex-cli",
@@ -276,7 +275,6 @@ describe("assembleCompiledRuntimePlan", () => {
           workspaceSources: [],
           agentRuntimes: [
             {
-              bindingId: "bind_b",
               runtimeId: "github-agent",
               runtimeKey: "github-app-server",
               clientId: "codex-cli",
@@ -383,7 +381,6 @@ describe("assembleCompiledRuntimePlan", () => {
           workspaceSources: [],
           agentRuntimes: [
             {
-              bindingId: "bind_a",
               runtimeId: "codex",
               runtimeKey: "codex-app-server",
               clientId: "codex-cli",
@@ -428,7 +425,6 @@ describe("assembleCompiledRuntimePlan", () => {
     ]);
     expect(plan.agentRuntimes).toEqual([
       {
-        bindingId: "bind_a",
         runtimeId: "codex",
         runtimeKey: "codex-app-server",
         clientId: "codex-cli",
@@ -440,7 +436,6 @@ describe("assembleCompiledRuntimePlan", () => {
         }),
       },
       {
-        bindingId: "bind_b",
         runtimeId: "github-agent",
         runtimeKey: "github-app-server",
         clientId: "codex-cli",

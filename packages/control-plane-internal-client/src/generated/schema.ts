@@ -552,7 +552,6 @@ export interface paths {
             "application/json": {
               runtimePlan: {
                 agentRuntimes: {
-                  bindingId: string;
                   clientId: string;
                   endpointKey: string;
                   ptyLaunch: {

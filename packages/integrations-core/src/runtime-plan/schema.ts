@@ -367,7 +367,6 @@ const AgentPtyLaunchSpecSchema = z
 
 const CompiledAgentRuntimeSchema = z
   .object({
-    bindingId: z.string().min(1),
     runtimeId: z.string().min(1),
     runtimeKey: z.string().min(1),
     clientId: z.string().min(1),
@@ -815,7 +814,6 @@ function normalizeAgentRuntime(
   agentRuntime: z.output<typeof CompiledAgentRuntimeSchema>,
 ): RuntimePlanAgentRuntime {
   return {
-    bindingId: agentRuntime.bindingId,
     runtimeId: agentRuntime.runtimeId,
     runtimeKey: agentRuntime.runtimeKey,
     clientId: agentRuntime.clientId,

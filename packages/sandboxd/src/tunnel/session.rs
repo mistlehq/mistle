@@ -7845,7 +7845,6 @@ mod tests {
                 ],
                 "agentRuntimes": [
                     {
-                        "bindingId": "arb_123",
                         "runtimeId": "codex",
                         "runtimeKey": "codex-app-server",
                         "clientId": "codex-cli",
@@ -8201,7 +8200,6 @@ mod tests {
                 ],
                 "agentRuntimes": [
                     {
-                        "bindingId": "arb_123",
                         "runtimeId": "codex",
                         "runtimeKey": "codex-app-server",
                         "clientId": "codex-cli",

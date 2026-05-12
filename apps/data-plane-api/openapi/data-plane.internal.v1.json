@@ -1199,10 +1199,6 @@
                         "items": {
                           "type": "object",
                           "properties": {
-                            "bindingId": {
-                              "type": "string",
-                              "minLength": 1
-                            },
                             "runtimeId": {
                               "type": "string",
                               "minLength": 1
@@ -1356,7 +1352,6 @@
                             }
                           },
                           "required": [
-                            "bindingId",
                             "runtimeId",
                             "runtimeKey",
                             "clientId",
@@ -2895,10 +2890,6 @@
                           "items": {
                             "type": "object",
                             "properties": {
-                              "bindingId": {
-                                "type": "string",
-                                "minLength": 1
-                              },
                               "runtimeId": {
                                 "type": "string",
                                 "minLength": 1
@@ -3057,7 +3048,6 @@
                               }
                             },
                             "required": [
-                              "bindingId",
                               "runtimeId",
                               "runtimeKey",
                               "clientId",

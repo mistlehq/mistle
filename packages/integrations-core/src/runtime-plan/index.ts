@@ -441,7 +441,6 @@ export function assembleCompiledRuntimePlan(
   );
   const agentRuntimes = [...flattenAgentRuntimes(input.compiledBindingResults)].sort(
     (left, right) =>
-      left.bindingId.localeCompare(right.bindingId) ||
       left.runtimeKey.localeCompare(right.runtimeKey) ||
       left.clientId.localeCompare(right.clientId) ||
       left.endpointKey.localeCompare(right.endpointKey),

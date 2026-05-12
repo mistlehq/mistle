@@ -78,7 +78,9 @@ describe.concurrent("sandbox profile Setup Assistant integration", () => {
     });
   });
 
-  it("returns 400 when the profile version has no agent binding", async ({ env }) => {
+  it("returns 400 when the selected agent runtime has no proxied provider route", async ({
+    env,
+  }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-setup-assistant-missing-agent@example.com",
     });
@@ -122,7 +124,7 @@ describe.concurrent("sandbox profile Setup Assistant integration", () => {
 
     expect(response.status).toBe(400);
     const body = badRequestResponseSchema.parse(await response.json());
-    expect(body.code).toBe("AGENT_RUNTIME_REQUIRED");
+    expect(body.code).toBe("INVALID_BINDING_CONFIG");
   });
 });
 

@@ -42,8 +42,6 @@ export type CompileAgentRuntimeInput<TRuntimeConfig = Record<string, unknown>> =
   organizationId: string;
   sandboxProfileId: string;
   version: number;
-  bindingId: string;
-  connectionId: string;
   runtimeId: string;
   runtimeConfig: TRuntimeConfig;
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
@@ -58,7 +56,8 @@ export type CompileAgentRuntimeRenderRuntimeClientsInput = {
    */
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   /**
-   * The subset of egress routes emitted by the binding that owns this runtime.
+   * @deprecated Agent runtimes are profile-scoped. This is retained during the
+   * provider/runtime decoupling migration and is empty for profile-scoped runtimes.
    */
   bindingEgressRoutes: ReadonlyArray<EgressCredentialRoute>;
 };

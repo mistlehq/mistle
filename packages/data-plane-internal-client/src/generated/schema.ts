@@ -148,7 +148,6 @@ export interface paths {
             purpose: "session" | "snapshot" | "setup_check";
             runtimePlan: {
               agentRuntimes: {
-                bindingId: string;
                 clientId: string;
                 endpointKey: string;
                 ptyLaunch: {
@@ -590,7 +589,6 @@ export interface paths {
               id: string;
               runtimePlan: {
                 agentRuntimes: {
-                  bindingId: string;
                   clientId: string;
                   endpointKey: string;
                   ptyLaunch: {

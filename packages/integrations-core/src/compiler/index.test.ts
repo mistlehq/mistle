@@ -8,6 +8,7 @@ import { IntegrationRegistry } from "../registry/index.js";
 import {
   type CompileRuntimePlanInput,
   type CompileBindingResult,
+  type CompiledRuntimeArtifactSpec,
   IntegrationConnectionMethodIds,
   IntegrationMcpConfigFormats,
   type IntegrationDefinition,
@@ -95,6 +96,18 @@ function expectTypedInstallStep(
   return entry;
 }
 
+function expectRuntimeArtifact(
+  artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>,
+  artifactKey: string,
+): CompiledRuntimeArtifactSpec {
+  const artifact = artifacts.find((candidate) => candidate.artifactKey === artifactKey);
+  if (artifact === undefined) {
+    throw new Error(`Expected runtime artifact '${artifactKey}'.`);
+  }
+
+  return artifact;
+}
+
 function compileTestRuntimePlan(input: TestCompileRuntimePlanInput) {
   return compileRuntimePlan({
     ...input,
@@ -155,18 +168,15 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
           },
         },
       ],
-      renderRuntimeClients: ({ bindingEgressRoutes }) => {
-        const providerRoute = bindingEgressRoutes[0];
-        if (providerRoute === undefined) {
-          throw new Error("Expected provider-owned egress route for Codex test runtime.");
-        }
+      renderRuntimeClients: ({ egressRoutes }) => {
+        const providerRoute = egressRoutes[0];
 
         return [
           {
             clientId: "codex-cli",
             setup: {
               env: {
-                OPENAI_BASE_URL: providerRoute.upstream.baseUrl,
+                OPENAI_BASE_URL: providerRoute?.upstream.baseUrl ?? "https://runtime.test",
               },
               files: [
                 {
@@ -545,7 +555,7 @@ function createGithubReleaseArtifactDefinition(): IntegrationDefinition<
       egressRoutes: [],
       artifacts: [
         {
-          artifactKey: "codex-cli",
+          artifactKey: "test-codex-cli",
           name: "Codex CLI",
           lifecycle: {
             install: ({ refs }) => [
@@ -598,7 +608,7 @@ function createPinnedGithubReleaseArtifactDefinition(): IntegrationDefinition<
       egressRoutes: [],
       artifacts: [
         {
-          artifactKey: "codex-cli",
+          artifactKey: "test-codex-cli",
           name: "Codex CLI",
           lifecycle: {
             install: ({ refs }) => [
@@ -653,7 +663,7 @@ function createCanonicalGithubReleaseInstallArtifactDefinition(): IntegrationDef
       egressRoutes: [],
       artifacts: [
         {
-          artifactKey: "codex-cli",
+          artifactKey: "test-codex-cli",
           name: "Codex CLI",
           lifecycle: {
             install: ({ refs }) => [
@@ -863,7 +873,7 @@ describe("compileRuntimePlan", () => {
     expect(expectTypedInstallStep(runtimePlan.artifacts[0]?.lifecycle.install[1])).toEqual({
       op: "exec",
       command: {
-        args: ["echo", "binding:bind_openai_agent"],
+        args: ["echo", "binding:agent-runtime-codex"],
       },
     });
     expect(runtimePlan.artifacts[0]?.env).toEqual({
@@ -892,7 +902,6 @@ describe("compileRuntimePlan", () => {
     ]);
     expect(runtimePlan.agentRuntimes).toEqual([
       {
-        bindingId: "bind_openai_agent",
         runtimeId: "codex",
         runtimeKey: "codex-app-server",
         clientId: "codex-cli",
@@ -980,7 +989,6 @@ describe("compileRuntimePlan", () => {
     expect(runtimePlan.runtimeClients[0]?.clientId).toBe("claude-code");
     expect(runtimePlan.agentRuntimes).toHaveLength(1);
     expect(runtimePlan.agentRuntimes[0]).toMatchObject({
-      bindingId: "bind_openai_agent",
       runtimeId: "claude-code",
       runtimeKey: "claude-code",
       clientId: "claude-code",
@@ -1011,10 +1019,10 @@ describe("compileRuntimePlan", () => {
             endpoints: [],
           },
         ],
-        renderRuntimeClients: ({ egressRoutes, bindingEgressRoutes }) => {
-          const route = bindingEgressRoutes[0];
+        renderRuntimeClients: ({ egressRoutes }) => {
+          const route = egressRoutes.find((candidate) => candidate.familyId === "openai");
           if (route === undefined) {
-            throw new Error("Expected binding egress route.");
+            throw new Error("Expected OpenAI egress route.");
           }
           const linearRoute = egressRoutes.find((candidate) => candidate.familyId === "linear");
           if (linearRoute === undefined) {
@@ -1322,11 +1330,9 @@ describe("compileRuntimePlan", () => {
       ],
     });
 
-    expect(runtimePlan.artifacts).toHaveLength(1);
-    expect(runtimePlan.artifacts[0]?.lifecycle.install).toHaveLength(1);
-    const latestBinaryInstallCommand = expectTypedInstallStep(
-      runtimePlan.artifacts[0]?.lifecycle.install[0],
-    );
+    const artifact = expectRuntimeArtifact(runtimePlan.artifacts, "test-codex-cli");
+    expect(artifact.lifecycle.install).toHaveLength(1);
+    const latestBinaryInstallCommand = expectTypedInstallStep(artifact.lifecycle.install[0]);
     expect(latestBinaryInstallCommand).toEqual({
       op: "github_release_install",
       repository: "openai/codex",
@@ -1393,7 +1399,8 @@ describe("compileRuntimePlan", () => {
       ],
     });
 
-    expect(expectTypedInstallStep(runtimePlan.artifacts[0]?.lifecycle.install[0])).toEqual({
+    const artifact = expectRuntimeArtifact(runtimePlan.artifacts, "test-codex-cli");
+    expect(expectTypedInstallStep(artifact.lifecycle.install[0])).toEqual({
       op: "github_release_install",
       repository: "openai/codex",
       release: {
@@ -1461,7 +1468,8 @@ describe("compileRuntimePlan", () => {
       ],
     });
 
-    expect(expectTypedInstallStep(runtimePlan.artifacts[0]?.lifecycle.install[0])).toEqual({
+    const artifact = expectRuntimeArtifact(runtimePlan.artifacts, "test-codex-cli");
+    expect(expectTypedInstallStep(artifact.lifecycle.install[0])).toEqual({
       op: "github_release_install",
       repository: "openai/codex",
       release: {
@@ -1529,11 +1537,9 @@ describe("compileRuntimePlan", () => {
       ],
     });
 
-    expect(runtimePlan.artifacts).toHaveLength(1);
-    expect(runtimePlan.artifacts[0]?.lifecycle.install).toHaveLength(1);
-    const taggedAssetInstallCommand = expectTypedInstallStep(
-      runtimePlan.artifacts[0]?.lifecycle.install[0],
-    );
+    const artifact = expectRuntimeArtifact(runtimePlan.artifacts, "jira-cli");
+    expect(artifact.lifecycle.install).toHaveLength(1);
+    const taggedAssetInstallCommand = expectTypedInstallStep(artifact.lifecycle.install[0]);
     expect(taggedAssetInstallCommand).toEqual({
       op: "github_release_install",
       repository: "mistlehq/tools",
@@ -1594,7 +1600,8 @@ describe("compileRuntimePlan", () => {
       ],
     });
 
-    expect(expectTypedInstallStep(runtimePlan.artifacts[0]?.lifecycle.install[0])).toEqual({
+    const artifact = expectRuntimeArtifact(runtimePlan.artifacts, "typed-mise-cli");
+    expect(expectTypedInstallStep(artifact.lifecycle.install[0])).toEqual({
       op: "mise_install",
       tools: ["node@22.0.0"],
     });
@@ -2962,20 +2969,18 @@ describe("compileRuntimePlan", () => {
       ],
     });
 
-    expect(runtimePlan.runtimeClients).toEqual([
-      {
-        clientId: "typed-config",
-        setup: {
-          env: {
-            API_HOST: "api.openai.com",
-            MODEL: "gpt-5.3-codex",
-            BINDING_ID: "bind_openai_agent",
-          },
-          files: [],
+    expect(runtimePlan.runtimeClients).toContainEqual({
+      clientId: "typed-config",
+      setup: {
+        env: {
+          API_HOST: "api.openai.com",
+          MODEL: "gpt-5.3-codex",
+          BINDING_ID: "bind_openai_agent",
         },
-        processes: [],
-        endpoints: [],
+        files: [],
       },
-    ]);
+      processes: [],
+      endpoints: [],
+    });
   });
 });

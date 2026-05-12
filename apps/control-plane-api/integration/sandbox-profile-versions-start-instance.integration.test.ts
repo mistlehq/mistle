@@ -187,7 +187,9 @@ describe.concurrent("sandbox profile version start instance integration", () => 
     expect(body.code).toBe("INVALID_BINDING_CONNECTION_REFERENCE");
   });
 
-  it("returns 400 when the profile version has no agent binding", async ({ env }) => {
+  it("returns 400 when the selected agent runtime has no proxied provider route", async ({
+    env,
+  }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-start-instance-missing-agent@example.com",
     });
@@ -221,7 +223,7 @@ describe.concurrent("sandbox profile version start instance integration", () => 
 
     expect(response.status).toBe(400);
     const body = StartSandboxProfileInstanceBadRequestResponseSchema.parse(await response.json());
-    expect(body.code).toBe("AGENT_RUNTIME_REQUIRED");
+    expect(body.code).toBe("INVALID_BINDING_CONFIG");
   });
 
   it("returns 400 when the setup script test run body is blank", async ({ env }) => {
@@ -309,7 +311,7 @@ describe.concurrent("sandbox profile version start instance integration", () => 
     expect(body.code).toBe("PROFILE_NOT_FOUND");
   });
 
-  it("queues setup script test runs from the base image without setup script or agent bindings", async ({
+  it("queues setup script test runs from the base image without passing the persisted setup script", async ({
     env,
   }) => {
     const session = await env.auth.createSession({
@@ -333,6 +335,42 @@ describe.concurrent("sandbox profile version start instance integration", () => 
         ...DockerSandboxRuntimeColumns,
       }),
     );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "openai-setup-script-test-launch",
+        variantId: "openai-default",
+        enabled: true,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_setup_script_test_launch_agent",
+        organizationId: session.organizationId,
+        targetKey: "openai-setup-script-test-launch",
+        displayName: "Setup script test agent connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      }),
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_setup_script_test_launch_agent",
+          sandboxProfileId: "sbp_setup_script_test_launch",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_setup_script_test_launch_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {
+            runtime: {
+              runtimeId: "codex",
+              config: {},
+            },
+          },
+        }),
+      );
 
     const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_setup_script_test_launch/versions/1/setup-script/test-runs",
@@ -360,7 +398,7 @@ describe.concurrent("sandbox profile version start instance integration", () => 
     expect(queuedWorkflowInput.persistenceMode).toBe(SandboxInstancePersistenceModes.EPHEMERAL);
     expect(queuedWorkflowInput.image?.kind).toBe("base");
     expect(queuedWorkflowInput.runtimePlan.image.source).toBe("base");
-    expect(queuedWorkflowInput.runtimePlan.agentRuntimes).toHaveLength(0);
+    expect(queuedWorkflowInput.runtimePlan.agentRuntimes).toHaveLength(1);
     expect(queuedWorkflowInput.runtimePlan).not.toHaveProperty("setupScript");
   });
 

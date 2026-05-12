@@ -2198,7 +2198,6 @@ mod tests {
                     ],
                     "agentRuntimes": [
                         {
-                            "bindingId": "arb_123",
                             "runtimeId": "codex",
                             "runtimeKey": "should-not-start",
                             "clientId": "snapshot-client",

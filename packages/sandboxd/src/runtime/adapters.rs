@@ -497,7 +497,6 @@ mod tests {
                 "workspaceSources": [],
                 "agentRuntimes": [
                     {
-                        "bindingId": "arb_123",
                         "runtimeId": "unknown-runtime",
                         "runtimeKey": "runtime-process",
                         "clientId": "runtime-client",

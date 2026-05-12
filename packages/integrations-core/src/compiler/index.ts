@@ -1,4 +1,3 @@
-import type { CompileAgentRuntimeResult } from "../agent-runtimes/index.js";
 import { runDefinitionBindingWriteValidation } from "../binding-validation/index.js";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import { applyMcpConfigToRuntimeClients } from "../mcp-config/index.js";
@@ -25,6 +24,7 @@ import {
   type RuntimeArtifactRefs,
   type RuntimeExecCommand,
   type RuntimeArtifactSpec,
+  type RuntimeClient,
   type SandboxPathRefs,
 } from "../types/index.js";
 import { validateCompiledBindingResults } from "../validation/index.js";
@@ -298,53 +298,7 @@ type PreparedBindingContext = {
   definition: AnyIntegrationDefinition;
   compileBindingInput: CompileBindingInput<unknown, unknown, unknown>;
   compiledBindingResult: CompiledBindingResult;
-  renderRuntimeClients?: CompileAgentRuntimeResult["renderRuntimeClients"];
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function readAgentRuntimeSelection(input: { bindingId: string; bindingConfig: unknown }): {
-  runtimeId: string;
-  runtimeConfig: Record<string, unknown>;
-} {
-  if (!isRecord(input.bindingConfig)) {
-    throw new IntegrationCompilerError(
-      CompilerErrorCodes.INVALID_BINDING_CONFIG,
-      `Binding '${input.bindingId}' is missing agent runtime config.`,
-    );
-  }
-
-  const runtimeValue = input.bindingConfig["runtime"];
-  if (!isRecord(runtimeValue)) {
-    throw new IntegrationCompilerError(
-      CompilerErrorCodes.INVALID_BINDING_CONFIG,
-      `Binding '${input.bindingId}' is missing agent runtime selection.`,
-    );
-  }
-
-  const runtimeId = runtimeValue["runtimeId"];
-  if (typeof runtimeId !== "string" || runtimeId.trim().length === 0) {
-    throw new IntegrationCompilerError(
-      CompilerErrorCodes.INVALID_BINDING_CONFIG,
-      `Binding '${input.bindingId}' is missing agent runtime id.`,
-    );
-  }
-
-  const runtimeConfig = runtimeValue["config"];
-  if (!isRecord(runtimeConfig)) {
-    throw new IntegrationCompilerError(
-      CompilerErrorCodes.INVALID_BINDING_CONFIG,
-      `Binding '${input.bindingId}' is missing agent runtime config object.`,
-    );
-  }
-
-  return {
-    runtimeId,
-    runtimeConfig,
-  };
-}
 
 function collectResolvedMcpServers(input: {
   preparedBindings: ReadonlyArray<PreparedBindingContext>;
@@ -465,84 +419,22 @@ function applyMcpMappings(input: {
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
 }): ReadonlyArray<CompiledBindingResult> {
   return input.preparedBindings.map((preparedBinding) => {
-    const runtimeOwnedMcpConfigs =
-      preparedBinding.definition.kind !== "agent"
-        ? []
-        : preparedBinding.compiledBindingResult.agentRuntimes.flatMap((agentRuntime) => {
-            const runtimeDefinition = input.definitions.agentRuntimeRegistry.getRuntime({
-              runtimeId: agentRuntime.runtimeId,
-            });
-
-            return runtimeDefinition?.materializeMcpConfig?.() ?? [];
-          });
     const providerOwnedMcpConfig =
       preparedBinding.definition.kind === "agent"
         ? undefined
         : preparedBinding.definition.mcpConfig;
 
-    if (providerOwnedMcpConfig === undefined && runtimeOwnedMcpConfigs.length === 0) {
-      return preparedBinding.compiledBindingResult;
-    }
-
-    let runtimeClients = preparedBinding.compiledBindingResult.runtimeClients;
-    for (const mcpConfig of runtimeOwnedMcpConfigs) {
-      const targetClient = runtimeClients.find(
-        (runtimeClient) => runtimeClient.clientId === mcpConfig.clientId,
-      );
-      const targetFile = targetClient?.setup.files.find((file) => file.fileId === mcpConfig.fileId);
-      if (targetClient === undefined || targetFile === undefined) {
-        throw new IntegrationCompilerError(
-          CompilerErrorCodes.AGENT_RUNTIME_MCP_TARGET_CLIENT_MISSING,
-          `Agent runtime MCP config target '${mcpConfig.clientId}::${mcpConfig.fileId}' was not found for binding '${preparedBinding.compileBindingInput.binding.id}'.`,
-        );
-      }
-
-      runtimeClients = applyMcpConfigToRuntimeClients({
-        runtimeClients,
-        mcpConfig,
-        mcpServers: input.mcpServers,
-      });
-    }
-
     if (providerOwnedMcpConfig === undefined) {
-      return {
-        ...preparedBinding.compiledBindingResult,
-        runtimeClients,
-      };
+      return preparedBinding.compiledBindingResult;
     }
 
     return {
       ...preparedBinding.compiledBindingResult,
       runtimeClients: applyMcpConfigToRuntimeClients({
-        runtimeClients,
+        runtimeClients: preparedBinding.compiledBindingResult.runtimeClients,
         mcpConfig: providerOwnedMcpConfig,
         mcpServers: input.mcpServers,
       }),
-    };
-  });
-}
-
-function applyRuntimeClientRenderers(input: {
-  preparedBindings: ReadonlyArray<PreparedBindingContext>;
-}): ReadonlyArray<PreparedBindingContext> {
-  const egressRoutes = input.preparedBindings.flatMap(
-    (preparedBinding) => preparedBinding.compiledBindingResult.egressRoutes,
-  );
-
-  return input.preparedBindings.map((preparedBinding) => {
-    if (preparedBinding.renderRuntimeClients === undefined) {
-      return preparedBinding;
-    }
-
-    return {
-      ...preparedBinding,
-      compiledBindingResult: {
-        ...preparedBinding.compiledBindingResult,
-        runtimeClients: preparedBinding.renderRuntimeClients({
-          egressRoutes,
-          bindingEgressRoutes: preparedBinding.compiledBindingResult.egressRoutes,
-        }),
-      },
     };
   });
 }
@@ -578,11 +470,7 @@ function compileBindingResultToCompiledBindingResult(input: {
     }),
     runtimeClients: input.compileBindingResult.runtimeClients,
     workspaceSources: input.compileBindingResult.workspaceSources ?? [],
-    agentRuntimes:
-      input.compileBindingResult.agentRuntimes?.map((agentRuntime) => ({
-        ...agentRuntime,
-        bindingId: input.bindingId,
-      })) ?? [],
+    agentRuntimes: input.compileBindingResult.agentRuntimes ?? [],
   };
 }
 
@@ -591,12 +479,131 @@ type CompileBindingsInput = {
   sandboxProfileId: string;
   version: number;
   definitions: CompileRuntimePlanInput["definitions"];
-  agentRuntimeId: string;
   bindings: ReadonlyArray<CompileRuntimePlanBindingInput>;
   enforceRuntimeEligibility: boolean;
 };
 
-function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBindingResult> {
+type CompileBindingsResult = {
+  compiledBindingResults: ReadonlyArray<CompiledBindingResult>;
+  mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
+};
+
+function applyAgentRuntimeMcpMappings(input: {
+  runtimeId: string;
+  runtimeClients: ReadonlyArray<RuntimeClient>;
+  runtimeDefinition: NonNullable<
+    ReturnType<CompileRuntimePlanInput["definitions"]["agentRuntimeRegistry"]["getRuntime"]>
+  >;
+  mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
+}): ReadonlyArray<RuntimeClient> {
+  let runtimeClients = input.runtimeClients;
+
+  for (const mcpConfig of input.runtimeDefinition.materializeMcpConfig?.() ?? []) {
+    const targetClient = runtimeClients.find(
+      (runtimeClient) => runtimeClient.clientId === mcpConfig.clientId,
+    );
+    const targetFile = targetClient?.setup.files.find((file) => file.fileId === mcpConfig.fileId);
+    if (targetClient === undefined || targetFile === undefined) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.AGENT_RUNTIME_MCP_TARGET_CLIENT_MISSING,
+        `Agent runtime '${input.runtimeId}' MCP config target '${mcpConfig.clientId}::${mcpConfig.fileId}' was not found.`,
+      );
+    }
+
+    runtimeClients = applyMcpConfigToRuntimeClients({
+      runtimeClients,
+      mcpConfig,
+      mcpServers: input.mcpServers,
+    });
+  }
+
+  return runtimeClients;
+}
+
+function compileProfileAgentRuntimeResult(input: {
+  organizationId: string;
+  sandboxProfileId: string;
+  version: number;
+  definitions: CompileRuntimePlanInput["definitions"];
+  agentRuntimeId: string;
+  egressRoutes: ReadonlyArray<CompiledBindingResult["egressRoutes"][number]>;
+  mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
+}): CompiledBindingResult {
+  const runtimeDefinition = input.definitions.agentRuntimeRegistry.getRuntime({
+    runtimeId: input.agentRuntimeId,
+  });
+
+  if (runtimeDefinition === undefined) {
+    throw new IntegrationCompilerError(
+      CompilerErrorCodes.AGENT_RUNTIME_NOT_FOUND,
+      `Sandbox profile references unknown agent runtime '${input.agentRuntimeId}'.`,
+    );
+  }
+
+  let parsedRuntimeConfig: unknown;
+  try {
+    parsedRuntimeConfig = runtimeDefinition.configSchema.parse({});
+  } catch (error) {
+    throw new IntegrationCompilerError(
+      CompilerErrorCodes.INVALID_AGENT_RUNTIME_CONFIG,
+      `Sandbox profile has invalid config for agent runtime '${input.agentRuntimeId}'.`,
+      { cause: error },
+    );
+  }
+
+  const runtimeRefs = {
+    sandboxPaths: SandboxPaths,
+    artifactBinPath,
+  };
+  const compileAgentRuntimeResult = runtimeDefinition.compileRuntime({
+    organizationId: input.organizationId,
+    sandboxProfileId: input.sandboxProfileId,
+    version: input.version,
+    runtimeId: input.agentRuntimeId,
+    runtimeConfig: parsedRuntimeConfig,
+    mcpServers: input.mcpServers,
+    refs: runtimeRefs,
+  });
+  let renderedRuntimeClients: ReadonlyArray<RuntimeClient>;
+  try {
+    renderedRuntimeClients =
+      compileAgentRuntimeResult.renderRuntimeClients?.({
+        egressRoutes: input.egressRoutes,
+        bindingEgressRoutes: [],
+      }) ??
+      compileAgentRuntimeResult.runtimeClients ??
+      [];
+  } catch (error) {
+    const causeMessage = error instanceof Error ? ` ${error.message}` : "";
+    throw new IntegrationCompilerError(
+      CompilerErrorCodes.INVALID_AGENT_RUNTIME_CONFIG,
+      `Agent runtime '${input.agentRuntimeId}' failed to render runtime clients.${causeMessage}`,
+      { cause: error },
+    );
+  }
+
+  return {
+    egressRoutes: [],
+    artifacts: resolveRuntimeArtifacts({
+      artifacts: compileAgentRuntimeResult.artifacts ?? [],
+      organizationId: input.organizationId,
+      sandboxProfileId: input.sandboxProfileId,
+      version: input.version,
+      targetKey: "agent-runtime",
+      bindingId: `agent-runtime-${input.agentRuntimeId}`,
+    }),
+    runtimeClients: applyAgentRuntimeMcpMappings({
+      runtimeId: input.agentRuntimeId,
+      runtimeClients: renderedRuntimeClients,
+      runtimeDefinition,
+      mcpServers: input.mcpServers,
+    }),
+    workspaceSources: compileAgentRuntimeResult.workspaceSources ?? [],
+    agentRuntimes: compileAgentRuntimeResult.agentRuntimes,
+  };
+}
+
+function compileBindings(input: CompileBindingsInput): CompileBindingsResult {
   const preparedBindings: PreparedBindingContext[] = [];
 
   for (const bindingInput of input.bindings) {
@@ -715,136 +722,62 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
       },
     };
 
-    let compiledBindingResult: CompiledBindingResult;
-    let renderRuntimeClients: CompileAgentRuntimeResult["renderRuntimeClients"];
-    if (definition.kind === "agent") {
-      const runtimeSelection = readAgentRuntimeSelection({
-        bindingId: bindingInput.binding.id,
-        bindingConfig: parsedBindingConfig,
-      });
-      const runtimeId = input.agentRuntimeId;
-      const runtimeConfig = runtimeSelection.runtimeConfig;
-      const runtimeDefinition = input.definitions.agentRuntimeRegistry.getRuntime({
-        runtimeId,
-      });
-
-      if (runtimeDefinition === undefined) {
-        throw new IntegrationCompilerError(
-          CompilerErrorCodes.AGENT_RUNTIME_NOT_FOUND,
-          `Binding '${bindingInput.binding.id}' references unknown agent runtime '${runtimeId}'.`,
-        );
-      }
-
-      let parsedRuntimeConfig: unknown;
-      try {
-        parsedRuntimeConfig = runtimeDefinition.configSchema.parse(runtimeConfig);
-      } catch (error) {
-        throw new IntegrationCompilerError(
-          CompilerErrorCodes.INVALID_AGENT_RUNTIME_CONFIG,
-          `Binding '${bindingInput.binding.id}' has invalid config for agent runtime '${runtimeId}'.`,
-          { cause: error },
-        );
-      }
-
-      const providerCompileBindingResult = definition.compileBinding(compileBindingInput);
-      const compileAgentRuntimeResult = runtimeDefinition.compileRuntime({
-        organizationId: input.organizationId,
-        sandboxProfileId: input.sandboxProfileId,
-        version: input.version,
-        bindingId: bindingInput.binding.id,
-        connectionId: bindingInput.connection.id,
-        runtimeId,
-        runtimeConfig: parsedRuntimeConfig,
-        mcpServers: [],
-        refs: compileBindingInput.refs,
-      });
-      const compileBindingResult: CompileBindingResult = {
-        egressRoutes: providerCompileBindingResult.egressRoutes,
-        artifacts: [
-          ...providerCompileBindingResult.artifacts,
-          ...(compileAgentRuntimeResult.artifacts ?? []),
-        ],
-        runtimeClients: [
-          ...providerCompileBindingResult.runtimeClients,
-          ...(compileAgentRuntimeResult.runtimeClients ?? []),
-        ],
-        ...(providerCompileBindingResult.workspaceSources === undefined &&
-        compileAgentRuntimeResult.workspaceSources === undefined
-          ? {}
-          : {
-              workspaceSources: [
-                ...(providerCompileBindingResult.workspaceSources ?? []),
-                ...(compileAgentRuntimeResult.workspaceSources ?? []),
-              ],
-            }),
-        agentRuntimes: compileAgentRuntimeResult.agentRuntimes,
-      };
-      compiledBindingResult = compileBindingResultToCompiledBindingResult({
-        organizationId: input.organizationId,
-        sandboxProfileId: input.sandboxProfileId,
-        version: input.version,
-        targetKey: bindingInput.targetKey,
-        bindingId: bindingInput.binding.id,
-        familyId: bindingInput.target.familyId,
-        variantId: bindingInput.target.variantId,
-        compileBindingResult,
-      });
-
-      const runtimeClientRenderer = compileAgentRuntimeResult.renderRuntimeClients;
-      renderRuntimeClients =
-        runtimeClientRenderer === undefined
-          ? undefined
-          : (renderInput) => [
-              ...providerCompileBindingResult.runtimeClients,
-              ...runtimeClientRenderer(renderInput),
-            ];
-    } else {
-      const compileBindingResult = definition.compileBinding(compileBindingInput);
-      compiledBindingResult = compileBindingResultToCompiledBindingResult({
-        organizationId: input.organizationId,
-        sandboxProfileId: input.sandboxProfileId,
-        version: input.version,
-        targetKey: bindingInput.targetKey,
-        bindingId: bindingInput.binding.id,
-        familyId: bindingInput.target.familyId,
-        variantId: bindingInput.target.variantId,
-        compileBindingResult,
-      });
-    }
+    const compileBindingResult = definition.compileBinding(compileBindingInput);
+    const compiledBindingResult = compileBindingResultToCompiledBindingResult({
+      organizationId: input.organizationId,
+      sandboxProfileId: input.sandboxProfileId,
+      version: input.version,
+      targetKey: bindingInput.targetKey,
+      bindingId: bindingInput.binding.id,
+      familyId: bindingInput.target.familyId,
+      variantId: bindingInput.target.variantId,
+      compileBindingResult,
+    });
 
     preparedBindings.push({
       definition,
       compileBindingInput,
       compiledBindingResult,
-      ...(renderRuntimeClients === undefined ? {} : { renderRuntimeClients }),
     });
   }
 
-  const runtimeRenderedBindings = applyRuntimeClientRenderers({
+  const resolvedMcpServers = collectResolvedMcpServers({
     preparedBindings,
   });
 
-  const resolvedMcpServers = collectResolvedMcpServers({
-    preparedBindings: runtimeRenderedBindings,
-  });
-
-  return applyMcpMappings({
-    definitions: input.definitions,
-    preparedBindings: runtimeRenderedBindings,
+  return {
+    compiledBindingResults: applyMcpMappings({
+      definitions: input.definitions,
+      preparedBindings,
+      mcpServers: resolvedMcpServers,
+    }),
     mcpServers: resolvedMcpServers,
-  });
+  };
 }
 
 export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRuntimePlan {
-  const compiledBindingResults = compileBindings({
+  const compiledBindings = compileBindings({
     organizationId: input.organizationId,
     sandboxProfileId: input.sandboxProfileId,
     version: input.version,
     definitions: input.definitions,
-    agentRuntimeId: input.agentRuntimeId,
     bindings: input.bindings,
     enforceRuntimeEligibility: true,
   });
+  const compiledBindingResults = [
+    ...compiledBindings.compiledBindingResults,
+    compileProfileAgentRuntimeResult({
+      organizationId: input.organizationId,
+      sandboxProfileId: input.sandboxProfileId,
+      version: input.version,
+      definitions: input.definitions,
+      agentRuntimeId: input.agentRuntimeId,
+      egressRoutes: compiledBindings.compiledBindingResults.flatMap(
+        (compiledBindingResult) => compiledBindingResult.egressRoutes,
+      ),
+      mcpServers: compiledBindings.mcpServers,
+    }),
+  ];
 
   validateCompiledBindingResults({
     compiledBindingResults,

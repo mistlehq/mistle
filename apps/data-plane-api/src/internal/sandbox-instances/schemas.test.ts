@@ -55,7 +55,6 @@ function createRuntimePlan() {
         workspaceSources: [],
         agentRuntimes: [
           {
-            bindingId: "ibd_123",
             runtimeId: "test-agent",
             runtimeKey: "runtime_123",
             clientId: "client_123",

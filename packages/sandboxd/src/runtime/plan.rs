@@ -594,7 +594,6 @@ pub enum RuntimeClientProcessStopSignal {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CompiledAgentRuntime {
-    pub binding_id: String,
     pub runtime_id: String,
     pub runtime_key: String,
     pub client_id: String,

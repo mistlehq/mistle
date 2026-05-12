@@ -168,6 +168,13 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
       profileId: "sbp_compile_blank_setup_script",
       setupScript: "   \n\t  ",
     });
+    await seedOpenAiAgentBinding(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_blank_setup_script",
+      targetKey: "openai-default-compile-blank-setup-script",
+      connectionId: "icn_compile_blank_setup_script_openai",
+      bindingId: "ibd_compile_blank_setup_script_openai",
+    });
 
     const runtimePlan = await compilePlan(env, {
       organizationId: session.organizationId,

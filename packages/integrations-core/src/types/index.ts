@@ -1855,9 +1855,7 @@ export type CompileBindingAgentRuntime = {
   ptyLaunch: AgentPtyLaunchSpec;
 };
 
-export type CompiledAgentRuntime = CompileBindingAgentRuntime & {
-  bindingId: string;
-};
+export type CompiledAgentRuntime = CompileBindingAgentRuntime;
 
 type GitCloneWorkspaceSourceBase = {
   sourceKind: "git-clone";

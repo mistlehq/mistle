@@ -20,7 +20,6 @@ function createRuntimePlan(input: {
     runtimeClients: [],
     agentRuntimes: [
       {
-        bindingId: "ibd_123",
         runtimeId: "codex",
         runtimeKey: "codex",
         clientId: "rtc_123",

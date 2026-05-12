@@ -358,7 +358,6 @@ function createRuntimePlan() {
     ],
     agentRuntimes: [
       {
-        bindingId: "ibd_runtime_context",
         runtimeId: "codex",
         runtimeKey: "codex-app-server",
         clientId: "codex-cli",

@@ -200,7 +200,6 @@ fn runtime_adapter_registry_starts_codex_proxy_adapter() {
             "workspaceSources": [],
             "agentRuntimes": [
                 {
-                    "bindingId": "arb_123",
                     "runtimeId": "codex",
                     "runtimeKey": "codex-app-server",
                     "clientId": "codex-cli",
@@ -365,7 +364,6 @@ fn runtime_adapter_registry_starts_opencode_proxy_adapter() {
             "workspaceSources": [],
             "agentRuntimes": [
                 {
-                    "bindingId": "arb_123",
                     "runtimeId": "opencode",
                     "runtimeKey": "opencode-server",
                     "clientId": "opencode-cli",

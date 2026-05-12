@@ -1017,10 +1017,6 @@
           "items": {
             "type": "object",
             "properties": {
-              "bindingId": {
-                "type": "string",
-                "minLength": 1
-              },
               "runtimeId": {
                 "type": "string",
                 "minLength": 1
@@ -1179,14 +1175,7 @@
                 "additionalProperties": false
               }
             },
-            "required": [
-              "bindingId",
-              "runtimeId",
-              "runtimeKey",
-              "clientId",
-              "endpointKey",
-              "ptyLaunch"
-            ],
+            "required": ["runtimeId", "runtimeKey", "clientId", "endpointKey", "ptyLaunch"],
             "additionalProperties": false
           }
         }
