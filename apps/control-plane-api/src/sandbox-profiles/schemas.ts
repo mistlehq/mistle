@@ -223,7 +223,6 @@ export const getSandboxProfileVersionDraftAutomationImpactResponseSchema = z
                 code: z.enum([
                   SandboxProfileAutomationImpactIssueCodes.AGENT_BINDING_REQUIRED,
                   SandboxProfileAutomationImpactIssueCodes.AGENT_BINDING_AMBIGUOUS,
-                  SandboxProfileAutomationImpactIssueCodes.AGENT_BINDING_RUNTIME_INVALID,
                   SandboxProfileAutomationImpactIssueCodes.INVALID_BINDING_CONNECTION_REFERENCE,
                   SandboxProfileAutomationImpactIssueCodes.CONNECTION_NOT_ACTIVE,
                   SandboxProfileAutomationImpactIssueCodes.TARGET_DISABLED,

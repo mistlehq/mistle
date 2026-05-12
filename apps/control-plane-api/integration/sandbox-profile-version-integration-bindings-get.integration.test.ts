@@ -68,12 +68,7 @@ describe.concurrent("sandbox profile version integration bindings get integratio
           sandboxProfileVersion: 1,
           connectionId: "icn_bindings_get_001",
           kind: IntegrationBindingKinds.AGENT,
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         }),
       );
 
@@ -93,12 +88,7 @@ describe.concurrent("sandbox profile version integration bindings get integratio
     expect(body.bindings).toHaveLength(1);
     expect(body.bindings[0]).toMatchObject({
       id: "ibd_bindings_get_001",
-      config: {
-        runtime: {
-          runtimeId: "codex",
-          config: {},
-        },
-      },
+      config: {},
     });
   });
 

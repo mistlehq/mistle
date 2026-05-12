@@ -163,12 +163,7 @@ describe.concurrent("sandbox profile version start instance integration", () => 
           sandboxProfileVersion: 1,
           connectionId: "icn_missing_connection",
           kind: IntegrationBindingKinds.AGENT,
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         }),
       );
 
@@ -372,12 +367,7 @@ describe.concurrent("sandbox profile version start instance integration", () => 
           sandboxProfileVersion: 1,
           connectionId: "icn_setup_script_test_launch_agent",
           kind: IntegrationBindingKinds.AGENT,
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         }),
       );
 
@@ -809,12 +799,7 @@ async function createStartableProfile(input: {
         sandboxProfileVersion: 1,
         connectionId: input.connectionId,
         kind: IntegrationBindingKinds.AGENT,
-        config: {
-          runtime: {
-            runtimeId: "codex",
-            config: {},
-          },
-        },
+        config: {},
       }),
       ...(input.git === undefined
         ? []

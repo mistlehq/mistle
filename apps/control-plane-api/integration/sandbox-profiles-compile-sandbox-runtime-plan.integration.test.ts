@@ -76,12 +76,7 @@ describe.concurrent("sandbox profile internal runtime plan compiler integration"
           sandboxProfileVersion: 1,
           connectionId: "icn_compile_internal_missing_target_secrets_entry",
           kind: IntegrationBindingKinds.AGENT,
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         }),
       );
 

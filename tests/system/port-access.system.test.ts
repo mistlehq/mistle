@@ -1132,12 +1132,7 @@ describe("system port access", () => {
           {
             connectionId: openAiConnectionId,
             kind: "agent",
-            config: {
-              runtime: {
-                runtimeId: "codex",
-                config: {},
-              },
-            },
+            config: {},
           },
         ],
       });
@@ -1264,12 +1259,7 @@ describe("system port access", () => {
           {
             connectionId: openAiConnectionId,
             kind: "agent",
-            config: {
-              runtime: {
-                runtimeId: "codex",
-                config: {},
-              },
-            },
+            config: {},
           },
         ],
       });

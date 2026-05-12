@@ -116,12 +116,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
           sandboxProfileVersion: 1,
           connectionId: "icn_draft_put_001",
           kind: IntegrationBindingKinds.AGENT,
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         }),
       );
 
@@ -143,12 +138,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
                 id: "ibd_draft_put_existing_001",
                 connectionId: "icn_draft_put_002",
                 kind: IntegrationBindingKinds.AGENT,
-                config: {
-                  runtime: {
-                    runtimeId: "codex",
-                    config: {},
-                  },
-                },
+                config: {},
               },
             ],
           },
@@ -173,12 +163,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
             sandboxProfileVersion: 1,
             connectionId: "icn_draft_put_002",
             kind: IntegrationBindingKinds.AGENT,
-            config: {
-              runtime: {
-                runtimeId: "codex",
-                config: {},
-              },
-            },
+            config: {},
             createdAt: responseBody.integrationBindings.bindings[0]?.createdAt,
             updatedAt: responseBody.integrationBindings.bindings[0]?.updatedAt,
           },
@@ -378,12 +363,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
                 {
                   connectionId: "icn_draft_put_managed_e2b_agent_001",
                   kind: IntegrationBindingKinds.AGENT,
-                  config: {
-                    runtime: {
-                      runtimeId: "codex",
-                      config: {},
-                    },
-                  },
+                  config: {},
                 },
               ],
             },
@@ -409,12 +389,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
         sandboxProfileVersion: 1,
         connectionId: "icn_draft_put_managed_e2b_agent_001",
         kind: IntegrationBindingKinds.AGENT,
-        config: {
-          runtime: {
-            runtimeId: "codex",
-            config: {},
-          },
-        },
+        config: {},
       });
     },
   );
@@ -615,12 +590,7 @@ describe.concurrent("sandbox profile version draft put integration", () => {
               {
                 connectionId: "icn_draft_put_missing",
                 kind: IntegrationBindingKinds.AGENT,
-                config: {
-                  runtime: {
-                    runtimeId: "codex",
-                    config: {},
-                  },
-                },
+                config: {},
               },
             ],
           },

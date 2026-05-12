@@ -2243,12 +2243,7 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
               {
                 connectionId,
                 kind: "agent",
-                config: {
-                  runtime: {
-                    runtimeId: "codex",
-                    config: {},
-                  },
-                },
+                config: {},
               },
             ],
           });
@@ -2357,12 +2352,7 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
               {
                 connectionId,
                 kind: "agent",
-                config: {
-                  runtime: {
-                    runtimeId: "codex",
-                    config: {},
-                  },
-                },
+                config: {},
               },
             ],
           });
@@ -2512,12 +2502,7 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
               {
                 connectionId,
                 kind: "agent",
-                config: {
-                  runtime: {
-                    runtimeId: "codex",
-                    config: {},
-                  },
-                },
+                config: {},
               },
             ],
           });
@@ -2859,12 +2844,7 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
               {
                 connectionId: openAiConnectionId,
                 kind: "agent",
-                config: {
-                  runtime: {
-                    runtimeId: "codex",
-                    config: {},
-                  },
-                },
+                config: {},
               },
               {
                 connectionId: githubConnectionId,

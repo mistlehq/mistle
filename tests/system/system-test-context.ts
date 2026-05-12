@@ -1241,12 +1241,7 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
                   {
                     connectionId: openAiConnection.id,
                     kind: "agent",
-                    config: {
-                      runtime: {
-                        runtimeId: "codex",
-                        config: {},
-                      },
-                    },
+                    config: {},
                   },
                 ],
               },

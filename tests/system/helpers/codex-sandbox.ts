@@ -664,12 +664,7 @@ async function updateSandboxBindings(input: {
             {
               connectionId: input.openAiConnectionId,
               kind: "agent",
-              config: {
-                runtime: {
-                  runtimeId: "codex",
-                  config: {},
-                },
-              },
+              config: {},
             },
           ],
         },

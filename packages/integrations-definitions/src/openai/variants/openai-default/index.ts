@@ -11,7 +11,6 @@ export {
 } from "./target-config-schema.js";
 export {
   OpenAiApiKeyBindingConfigSchema,
-  OpenAiAllowedRuntimeIds,
   type OpenAiApiKeyBindingConfig,
 } from "./binding-config-schema.js";
 export {

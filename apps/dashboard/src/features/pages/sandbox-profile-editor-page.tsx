@@ -251,28 +251,14 @@ const AgentRuntimeRequiredErrorCode = "AGENT_RUNTIME_REQUIRED";
 const SetupAssistantAgentRuntimeRequiredMessage =
   "Add an agent integration before using Setup Assistant.";
 
-function hasConfiguredAgentRuntime(value: unknown): boolean {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return false;
-  }
-
-  if (!("runtimeId" in value)) {
-    return false;
-  }
-
-  return typeof value.runtimeId === "string" && value.runtimeId.trim().length > 0;
-}
-
-function hasSetupAssistantAgentRuntime(
+function hasSetupAssistantAgentBinding(
   integrationRows: readonly SandboxProfileBindingEditorRow[] | null,
 ): boolean {
   if (integrationRows === null) {
     return false;
   }
 
-  return integrationRows.some(
-    (row) => row.kind === "agent" && hasConfiguredAgentRuntime(row.config["runtime"]),
-  );
+  return integrationRows.some((row) => row.kind === "agent");
 }
 
 const SetupScriptPlaceholder = `#!/usr/bin/env bash
@@ -1317,7 +1303,7 @@ function ReadySandboxProfileEditorPage(input: {
     integrationDraftState.integrationRows,
   );
   const setupAssistantHasAgentRuntime =
-    input.mode.kind === "draft" && hasSetupAssistantAgentRuntime(setupAssistantIntegrationRows);
+    input.mode.kind === "draft" && hasSetupAssistantAgentBinding(setupAssistantIntegrationRows);
   const metaState = useEditSandboxProfileMetaState({
     profileId: input.profileId,
     loadedProfile: input.profile,
@@ -2330,8 +2316,6 @@ function formatDraftAutomationImpactIssueMessage(
       return "This draft does not have an agent binding.";
     case "AGENT_BINDING_AMBIGUOUS":
       return "This draft has multiple agent bindings, but automations require exactly one.";
-    case "AGENT_BINDING_RUNTIME_INVALID":
-      return "The draft agent binding does not define a runtime.";
     case "INVALID_BINDING_CONNECTION_REFERENCE":
       return "The draft agent binding references a missing or inaccessible connection.";
     case "CONNECTION_NOT_ACTIVE":

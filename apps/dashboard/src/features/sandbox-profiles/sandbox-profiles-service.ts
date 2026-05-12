@@ -72,7 +72,6 @@ const SandboxProfileVersionDraftAutomationImpactSchema = z
                 code: z.enum([
                   "AGENT_BINDING_REQUIRED",
                   "AGENT_BINDING_AMBIGUOUS",
-                  "AGENT_BINDING_RUNTIME_INVALID",
                   "INVALID_BINDING_CONNECTION_REFERENCE",
                   "CONNECTION_NOT_ACTIVE",
                   "TARGET_DISABLED",

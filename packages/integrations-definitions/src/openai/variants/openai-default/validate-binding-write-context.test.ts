@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import type { OpenAiApiKeyBindingConfig } from "./binding-config-schema.js";
 import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
 import { validateOpenAiBindingWriteContext } from "./validate-binding-write-context.js";
 
@@ -9,13 +8,6 @@ function createTargetConfig() {
     api_base_url: "https://api.openai.com",
   });
 }
-
-const BindingConfig: OpenAiApiKeyBindingConfig = {
-  runtime: {
-    runtimeId: "codex",
-    config: {},
-  },
-};
 
 describe("validateOpenAiBindingWriteContext", () => {
   it("returns issue when connection method is missing", () => {
@@ -33,7 +25,7 @@ describe("validateOpenAiBindingWriteContext", () => {
       },
       binding: {
         kind: "agent",
-        config: BindingConfig,
+        config: {},
       },
     });
 
@@ -61,7 +53,7 @@ describe("validateOpenAiBindingWriteContext", () => {
       },
       binding: {
         kind: "agent",
-        config: BindingConfig,
+        config: {},
       },
     });
 
@@ -89,7 +81,7 @@ describe("validateOpenAiBindingWriteContext", () => {
       },
       binding: {
         kind: "agent",
-        config: BindingConfig,
+        config: {},
       },
     });
 
@@ -115,12 +107,7 @@ describe("validateOpenAiBindingWriteContext", () => {
       },
       binding: {
         kind: "agent",
-        config: {
-          runtime: {
-            runtimeId: "opencode",
-            config: {},
-          },
-        },
+        config: {},
       },
     });
 

@@ -70,16 +70,6 @@ export const AgentBindingAmbiguous: Story = {
   },
 };
 
-export const AgentRuntimeInvalid: Story = {
-  name: "Agent Runtime Missing",
-  args: {
-    draftAutomationImpactAffectedAutomations: createDraftAutomationImpactAutomations(
-      ["Release notes"],
-      "AGENT_BINDING_RUNTIME_INVALID",
-    ),
-  },
-};
-
 export const AgentConnectionMissing: Story = {
   name: "Agent Connection Missing",
   args: {

@@ -1943,12 +1943,7 @@ export async function startGitHubWebhookAutomationConversation(input: {
         {
           connectionId: openAiConnectionId,
           kind: "agent",
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         },
       ],
     });
@@ -1962,12 +1957,7 @@ export async function startGitHubWebhookAutomationConversation(input: {
         {
           connectionId: openAiConnectionId,
           kind: "agent",
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         },
         {
           connectionId: githubConnectionId,

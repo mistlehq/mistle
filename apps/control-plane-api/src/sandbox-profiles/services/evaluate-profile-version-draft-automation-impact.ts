@@ -43,16 +43,6 @@ type EvaluateProfileVersionDraftAutomationImpactOutput = {
   affectedAutomations: AutomationImpactAutomation[];
 };
 
-function hasRuntimeIdValue(input: unknown): input is { runtimeId: string } {
-  return (
-    typeof input === "object" &&
-    input !== null &&
-    !Array.isArray(input) &&
-    "runtimeId" in input &&
-    typeof input.runtimeId === "string"
-  );
-}
-
 async function assertProfileVersionExists(
   db: ControlPlaneDatabase,
   input: EvaluateProfileVersionDraftAutomationImpactInput,
@@ -102,7 +92,6 @@ async function resolveProfileVersionAgentIssues(
     columns: {
       id: true,
       connectionId: true,
-      config: true,
     },
     where: (table, { and: whereAnd, eq: whereEq }) =>
       whereAnd(
@@ -128,17 +117,6 @@ async function resolveProfileVersionAgentIssues(
       {
         code: SandboxProfileAutomationImpactIssueCodes.AGENT_BINDING_AMBIGUOUS,
         message: `Sandbox profile version '${String(input.profileVersion)}' has multiple agent bindings, but automations require exactly one.`,
-      },
-    ];
-  }
-
-  const runtime = agentBinding.config["runtime"];
-  if (!hasRuntimeIdValue(runtime) || runtime.runtimeId.trim().length === 0) {
-    return [
-      {
-        code: SandboxProfileAutomationImpactIssueCodes.AGENT_BINDING_RUNTIME_INVALID,
-        message: `Agent binding '${agentBinding.id}' must define a runtimeId for automations to run.`,
-        bindingId: agentBinding.id,
       },
     ];
   }

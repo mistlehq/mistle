@@ -54,7 +54,6 @@ export const AutomationRunFailureCodes = {
   AGENT_BINDING_AMBIGUOUS: "agent_binding_ambiguous",
   AGENT_BINDING_CONNECTION_NOT_FOUND: "agent_binding_connection_not_found",
   AGENT_BINDING_TARGET_NOT_FOUND: "agent_binding_target_not_found",
-  AGENT_BINDING_RUNTIME_INVALID: "agent_binding_runtime_invalid",
   WEBHOOK_EVENT_SOURCE_ORDER_KEY_MISSING: "webhook_event_source_order_key_missing",
   TEMPLATE_RENDER_FAILED: "template_render_failed",
   AUTOMATION_RUN_EXECUTION_FAILED: "automation_run_execution_failed",
@@ -155,16 +154,6 @@ function compileTemplates(input: {
   };
 }
 
-function hasRuntimeIdValue(input: unknown): input is { runtimeId: string } {
-  return (
-    typeof input === "object" &&
-    input !== null &&
-    !Array.isArray(input) &&
-    "runtimeId" in input &&
-    typeof input.runtimeId === "string"
-  );
-}
-
 function resolvePersistedPreparedAutomationRunSnapshot(input: {
   automationRun: {
     id: string;
@@ -258,22 +247,6 @@ function resolvePersistedPreparedAutomationRunSnapshot(input: {
   };
 }
 
-function readAgentBindingRuntimeId(input: {
-  automationRunId: string;
-  bindingId: string;
-  bindingConfig: Record<string, unknown>;
-}): string {
-  const runtime = input.bindingConfig["runtime"];
-  if (!hasRuntimeIdValue(runtime) || runtime.runtimeId.trim().length === 0) {
-    throw new AutomationRunExecutionError({
-      code: AutomationRunFailureCodes.AGENT_BINDING_RUNTIME_INVALID,
-      message: `Automation run '${input.automationRunId}' references AGENT binding '${input.bindingId}' with invalid runtimeId.`,
-    });
-  }
-
-  return runtime.runtimeId;
-}
-
 function resolveAutomationRunWorkingDirectory(input: {
   primaryRepositoryId: string | null;
 }): string {
@@ -303,63 +276,93 @@ async function resolveAutomationConversationBindingContext(
   integrationFamilyId: string;
   runtimeId: string;
 }> {
-  const agentBindings = await db.query.sandboxProfileVersionIntegrationBindings.findMany({
-    where: (table, { and: whereAnd, eq: whereEq }) =>
-      whereAnd(
-        whereEq(table.sandboxProfileId, input.sandboxProfileId),
-        whereEq(table.sandboxProfileVersion, input.sandboxProfileVersion),
-        whereEq(table.kind, IntegrationBindingKinds.AGENT),
+  const tables = getControlPlaneDatabaseSchema(db);
+  const agentBindingRows = await db
+    .select({
+      agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
+      bindingId: tables.sandboxProfileVersionIntegrationBindings.id,
+      bindingConnectionId: tables.sandboxProfileVersionIntegrationBindings.connectionId,
+      connectionId: tables.integrationConnections.id,
+      connectionTargetKey: tables.integrationConnections.targetKey,
+      targetFamilyId: tables.integrationTargets.familyId,
+    })
+    .from(tables.sandboxProfileVersions)
+    .leftJoin(
+      tables.sandboxProfileVersionIntegrationBindings,
+      and(
+        eq(
+          tables.sandboxProfileVersionIntegrationBindings.sandboxProfileId,
+          tables.sandboxProfileVersions.sandboxProfileId,
+        ),
+        eq(
+          tables.sandboxProfileVersionIntegrationBindings.sandboxProfileVersion,
+          tables.sandboxProfileVersions.version,
+        ),
+        eq(tables.sandboxProfileVersionIntegrationBindings.kind, IntegrationBindingKinds.AGENT),
       ),
-    orderBy: (table, { asc }) => [asc(table.id)],
-  });
+    )
+    .leftJoin(
+      tables.integrationConnections,
+      and(
+        eq(
+          tables.integrationConnections.id,
+          tables.sandboxProfileVersionIntegrationBindings.connectionId,
+        ),
+        eq(tables.integrationConnections.organizationId, input.organizationId),
+      ),
+    )
+    .leftJoin(
+      tables.integrationTargets,
+      eq(tables.integrationTargets.targetKey, tables.integrationConnections.targetKey),
+    )
+    .where(
+      and(
+        eq(tables.sandboxProfileVersions.sandboxProfileId, input.sandboxProfileId),
+        eq(tables.sandboxProfileVersions.version, input.sandboxProfileVersion),
+      ),
+    )
+    .orderBy(tables.sandboxProfileVersionIntegrationBindings.id)
+    .limit(2);
 
-  const agentBinding = agentBindings[0];
-  if (agentBinding === undefined) {
+  const agentBindingRow = agentBindingRows[0];
+  if (agentBindingRow === undefined) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
+      message: `Automation run '${input.automationRunId}' references missing sandbox profile '${input.sandboxProfileId}' version '${String(input.sandboxProfileVersion)}'.`,
+    });
+  }
+
+  if (agentBindingRow.bindingId === null) {
     throw new AutomationRunExecutionError({
       code: AutomationRunFailureCodes.AGENT_BINDING_NOT_FOUND,
       message: `Automation run '${input.automationRunId}' requires exactly one AGENT binding on sandbox profile '${input.sandboxProfileId}' version '${input.sandboxProfileVersion}', but none were found.`,
     });
   }
-  if (agentBindings[1] !== undefined) {
+  const secondAgentBindingRow = agentBindingRows[1];
+  if (secondAgentBindingRow !== undefined && secondAgentBindingRow.bindingId !== null) {
     throw new AutomationRunExecutionError({
       code: AutomationRunFailureCodes.AGENT_BINDING_AMBIGUOUS,
       message: `Automation run '${input.automationRunId}' requires exactly one AGENT binding on sandbox profile '${input.sandboxProfileId}' version '${input.sandboxProfileVersion}', but multiple were found.`,
     });
   }
 
-  const agentConnection = await db.query.integrationConnections.findFirst({
-    where: (table, { and: whereAnd, eq: whereEq }) =>
-      whereAnd(
-        whereEq(table.id, agentBinding.connectionId),
-        whereEq(table.organizationId, input.organizationId),
-      ),
-  });
-  if (agentConnection === undefined) {
+  if (agentBindingRow.connectionId === null) {
     throw new AutomationRunExecutionError({
       code: AutomationRunFailureCodes.AGENT_BINDING_CONNECTION_NOT_FOUND,
-      message: `Automation run '${input.automationRunId}' references AGENT binding '${agentBinding.id}' with connection '${agentBinding.connectionId}' that is missing or inaccessible.`,
+      message: `Automation run '${input.automationRunId}' references AGENT binding '${agentBindingRow.bindingId}' with connection '${agentBindingRow.bindingConnectionId}' that is missing or inaccessible.`,
     });
   }
 
-  const agentTarget = await db.query.integrationTargets.findFirst({
-    where: (table, { eq: whereEq }) => whereEq(table.targetKey, agentConnection.targetKey),
-  });
-  if (agentTarget === undefined) {
+  if (agentBindingRow.targetFamilyId === null) {
     throw new AutomationRunExecutionError({
       code: AutomationRunFailureCodes.AGENT_BINDING_TARGET_NOT_FOUND,
-      message: `Automation run '${input.automationRunId}' references AGENT connection '${agentConnection.id}' with target '${agentConnection.targetKey}' that does not exist.`,
+      message: `Automation run '${input.automationRunId}' references AGENT connection '${agentBindingRow.connectionId}' with target '${agentBindingRow.connectionTargetKey}' that does not exist.`,
     });
   }
 
-  const runtimeId = readAgentBindingRuntimeId({
-    automationRunId: input.automationRunId,
-    bindingId: agentBinding.id,
-    bindingConfig: agentBinding.config,
-  });
-
   return {
-    integrationFamilyId: agentTarget.familyId,
-    runtimeId,
+    integrationFamilyId: agentBindingRow.targetFamilyId,
+    runtimeId: agentBindingRow.agentRuntimeId,
   };
 }
 

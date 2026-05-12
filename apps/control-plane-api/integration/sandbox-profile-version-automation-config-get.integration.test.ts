@@ -87,12 +87,7 @@ describe.concurrent("sandbox profile version automation config get integration",
           sandboxProfileVersion: 1,
           connectionId: "icn_automation_config_agent_001",
           kind: IntegrationBindingKinds.AGENT,
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         }),
         sandboxProfileVersionIntegrationBindingRow({
           id: "ibd_automation_config_git_001",

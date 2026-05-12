@@ -2074,11 +2074,7 @@ describe("SandboxProfileEditorPage", () => {
           id: "binding-agent",
           connectionId: "connection-agent",
           kind: "agent",
-          config: {
-            runtime: {
-              runtimeId: "codex",
-            },
-          },
+          config: {},
         },
       ],
       routeSection: "sandbox-profile",
@@ -2112,11 +2108,7 @@ describe("SandboxProfileEditorPage", () => {
           id: "binding-agent",
           connectionId: "connection-agent",
           kind: "agent",
-          config: {
-            runtime: {
-              runtimeId: "codex",
-            },
-          },
+          config: {},
         },
       ],
       routeSection: "sandbox-profile",
@@ -2158,11 +2150,7 @@ describe("SandboxProfileEditorPage", () => {
           id: "binding-agent",
           connectionId: "connection-agent",
           kind: "agent",
-          config: {
-            runtime: {
-              runtimeId: "codex",
-            },
-          },
+          config: {},
         },
       ],
       routeSection: "sandbox-profile",

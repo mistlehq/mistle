@@ -474,12 +474,7 @@ async function seedProfileWithAgent(
       sandboxProfileVersion: 1,
       connectionId: input.openAiConnectionId,
       kind: IntegrationBindingKinds.AGENT,
-      config: {
-        runtime: {
-          runtimeId: "codex",
-          config: {},
-        },
-      },
+      config: {},
     });
 }
 

@@ -609,12 +609,7 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
           sandboxProfileVersion: 1,
           connectionId: "icn_compile_invalid_target_secrets",
           kind: IntegrationBindingKinds.AGENT,
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         }),
       );
 
@@ -747,12 +742,7 @@ async function seedOpenAiAgentBinding(
         sandboxProfileVersion: 1,
         connectionId: input.connectionId,
         kind: IntegrationBindingKinds.AGENT,
-        config: {
-          runtime: {
-            runtimeId: "codex",
-            config: {},
-          },
-        },
+        config: {},
       }),
     );
 }

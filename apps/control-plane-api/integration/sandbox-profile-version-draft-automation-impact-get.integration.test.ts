@@ -74,11 +74,7 @@ describe.concurrent("sandbox profile version draft automation impact get integra
           sandboxProfileVersion: 2,
           connectionId: "icn_draft_impact_agent",
           kind: IntegrationBindingKinds.AGENT,
-          config: {
-            runtime: {
-              runtimeId: "codex",
-            },
-          },
+          config: {},
         }),
       );
     await seedPersistedWebhookAutomation(env, {
@@ -194,11 +190,7 @@ describe.concurrent("sandbox profile version draft automation impact get integra
           sandboxProfileVersion: 2,
           connectionId: "icn_draft_impact_ok_agent",
           kind: IntegrationBindingKinds.AGENT,
-          config: {
-            runtime: {
-              runtimeId: "codex",
-            },
-          },
+          config: {},
         }),
         sandboxProfileVersionIntegrationBindingRow({
           id: "ibd_draft_impact_ok_webhook",

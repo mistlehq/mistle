@@ -943,12 +943,7 @@ describeIf("system github cli sandbox", () => {
                 {
                   connectionId: openAiConnectionId,
                   kind: "agent",
-                  config: {
-                    runtime: {
-                      runtimeId: "codex",
-                      config: {},
-                    },
-                  },
+                  config: {},
                 },
                 {
                   connectionId: githubConnection.id,

@@ -20,7 +20,6 @@ import {
   resolveOpenAiBindingConfigForm,
 } from "./binding-config-form.js";
 import {
-  OpenAiAllowedRuntimeIds,
   type OpenAiApiKeyBindingConfig,
   OpenAiApiKeyBindingConfigSchema,
 } from "./binding-config-schema.js";
@@ -44,6 +43,7 @@ type OpenAiApiKeyIntegrationDefinition = IntegrationDefinition<
 >;
 
 const OpenAiApiKeyTargetSecretSchema = z.object({}).strict();
+const OpenAiAllowedRuntimeIds = ["codex", "opencode"] as const;
 
 type OpenAiProviderRouteConfig = {
   apiBaseUrl: string;

@@ -222,12 +222,7 @@ describe.concurrent("sandbox profiles launchable integration", () => {
           sandboxProfileVersion: 1,
           connectionId: "icn_sandbox_profiles_launchable",
           kind: IntegrationBindingKinds.AGENT,
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         }),
         sandboxProfileVersionIntegrationBindingRow({
           id: "ibd_launchable_agent_with_repos_git_v1",
@@ -246,12 +241,7 @@ describe.concurrent("sandbox profiles launchable integration", () => {
           sandboxProfileVersion: 2,
           connectionId: "icn_sandbox_profiles_launchable",
           kind: IntegrationBindingKinds.AGENT,
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         }),
         sandboxProfileVersionIntegrationBindingRow({
           id: "ibd_launchable_git_only_v1",
@@ -266,12 +256,7 @@ describe.concurrent("sandbox profiles launchable integration", () => {
           sandboxProfileVersion: 1,
           connectionId: "icn_sandbox_profiles_launchable",
           kind: IntegrationBindingKinds.AGENT,
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         }),
         sandboxProfileVersionIntegrationBindingRow({
           id: "ibd_launchable_old_agent_v2",
@@ -286,12 +271,7 @@ describe.concurrent("sandbox profiles launchable integration", () => {
           sandboxProfileVersion: 1,
           connectionId: "icn_sandbox_profiles_launchable_inactive",
           kind: IntegrationBindingKinds.AGENT,
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         }),
         sandboxProfileVersionIntegrationBindingRow({
           id: "ibd_launchable_disabled_target_v1",
@@ -299,12 +279,7 @@ describe.concurrent("sandbox profiles launchable integration", () => {
           sandboxProfileVersion: 1,
           connectionId: "icn_sandbox_profiles_launchable_disabled_target",
           kind: IntegrationBindingKinds.AGENT,
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         }),
         sandboxProfileVersionIntegrationBindingRow({
           id: "ibd_launchable_mixed_bindings_valid_v1",
@@ -312,12 +287,7 @@ describe.concurrent("sandbox profiles launchable integration", () => {
           sandboxProfileVersion: 1,
           connectionId: "icn_sandbox_profiles_launchable",
           kind: IntegrationBindingKinds.AGENT,
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         }),
         sandboxProfileVersionIntegrationBindingRow({
           id: "ibd_launchable_mixed_bindings_invalid_v1",
@@ -332,12 +302,7 @@ describe.concurrent("sandbox profiles launchable integration", () => {
           sandboxProfileVersion: 1,
           connectionId: "icn_sandbox_profiles_launchable",
           kind: IntegrationBindingKinds.AGENT,
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         }),
         sandboxProfileVersionIntegrationBindingRow({
           id: "ibd_launchable_active_draft_v1",
@@ -345,12 +310,7 @@ describe.concurrent("sandbox profiles launchable integration", () => {
           sandboxProfileVersion: 1,
           connectionId: "icn_sandbox_profiles_launchable",
           kind: IntegrationBindingKinds.AGENT,
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         }),
       ]);
 

@@ -194,12 +194,7 @@ async function createAssistantProfile(input: {
         sandboxProfileVersion: 1,
         connectionId: input.connectionId,
         kind: IntegrationBindingKinds.AGENT,
-        config: {
-          runtime: {
-            runtimeId: "codex",
-            config: {},
-          },
-        },
+        config: {},
       }),
     );
 }

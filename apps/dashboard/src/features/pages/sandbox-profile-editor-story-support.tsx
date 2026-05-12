@@ -140,12 +140,7 @@ export const StoryBindings = [
     id: "binding-openai-agent",
     connectionId: StoryOpenAiConnection.id,
     kind: "agent" as const,
-    config: {
-      runtime: {
-        runtimeId: "codex",
-        config: {},
-      },
-    },
+    config: {},
   },
   {
     id: "binding-github-git",

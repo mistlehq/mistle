@@ -189,12 +189,7 @@ describe("SandboxProfileBindingConfigEditor", () => {
       clientId: "row-openai",
       connectionId: connection.id,
       kind: "agent",
-      config: {
-        runtime: {
-          runtimeId: "codex",
-          config: {},
-        },
-      },
+      config: {},
     };
 
     expect(

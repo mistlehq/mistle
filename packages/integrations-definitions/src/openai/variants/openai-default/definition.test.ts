@@ -35,12 +35,7 @@ describe("OpenAiApiKeyDefinition", () => {
         binding: {
           id: "ibd_123",
           kind: "agent",
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         },
         refs: {
           sandboxPaths: {
@@ -107,12 +102,7 @@ describe("OpenAiApiKeyDefinition", () => {
         binding: {
           id: "ibd_123",
           kind: "agent",
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         },
         refs: {
           sandboxPaths: {

@@ -106,12 +106,7 @@ describe.concurrent("sandbox profile versions create integration", () => {
           sandboxProfileVersion: 1,
           connectionId: "icn_version_create_latest_agent",
           kind: IntegrationBindingKinds.AGENT,
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         }),
         sandboxProfileVersionIntegrationBindingRow({
           id: "ibd_version_create_v2_agent",
@@ -119,12 +114,7 @@ describe.concurrent("sandbox profile versions create integration", () => {
           sandboxProfileVersion: 2,
           connectionId: "icn_version_create_latest_agent",
           kind: IntegrationBindingKinds.AGENT,
-          config: {
-            runtime: {
-              runtimeId: "codex",
-              config: {},
-            },
-          },
+          config: {},
         }),
         sandboxProfileVersionIntegrationBindingRow({
           id: "ibd_version_create_v2_git",
@@ -203,12 +193,7 @@ describe.concurrent("sandbox profile versions create integration", () => {
       {
         connectionId: "icn_version_create_latest_agent",
         kind: IntegrationBindingKinds.AGENT,
-        config: {
-          runtime: {
-            runtimeId: "codex",
-            config: {},
-          },
-        },
+        config: {},
       },
       {
         connectionId: "icn_version_create_latest_git",

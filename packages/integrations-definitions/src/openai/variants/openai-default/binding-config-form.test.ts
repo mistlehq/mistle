@@ -9,7 +9,7 @@ import {
 import { OpenAiApiKeyBindingConfigSchema } from "./binding-config-schema.js";
 
 describe("openai binding config forms", () => {
-  it("resolves the runtime-only binding config form", () => {
+  it("resolves an empty binding config form", () => {
     const resolvedForm = resolveIntegrationForm({
       schema: OpenAiApiKeyBindingConfigSchema,
       form: resolveOpenAiBindingConfigForm,
@@ -21,38 +21,13 @@ describe("openai binding config forms", () => {
     });
 
     expect(resolvedForm.schema).toMatchObject({
-      properties: {
-        runtime: {
-          default: {
-            runtimeId: "codex",
-            config: {},
-          },
-          properties: {
-            runtimeId: {
-              enum: ["codex", "opencode"],
-              default: "codex",
-            },
-            config: {
-              default: {},
-            },
-          },
-        },
-      },
+      properties: {},
     });
     if (resolvedForm.schema === undefined) {
       throw new Error("Expected resolved OpenAI binding config form schema.");
     }
     expect(resolvedForm.schema.properties).not.toHaveProperty("model");
-    expect(resolvedForm.uiSchema).toEqual({
-      runtime: {
-        runtimeId: {
-          "ui:widget": "hidden",
-        },
-        config: {
-          "ui:widget": "hidden",
-        },
-      },
-    });
+    expect(resolvedForm.uiSchema).toBeUndefined();
   });
 
   it("declares the OpenAI connection method form", () => {
