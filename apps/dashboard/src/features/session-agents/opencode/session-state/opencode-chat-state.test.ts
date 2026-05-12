@@ -87,7 +87,7 @@ describe("reduceOpenCodeChatState", () => {
               id: "part_text",
               messageID: "msg_assistant",
               sessionID: "ses_test",
-              text: "Hel",
+              text: "He",
               time: {
                 start: 1,
               },
@@ -108,7 +108,7 @@ describe("reduceOpenCodeChatState", () => {
           messageID: "msg_assistant",
           partID: "part_text",
           field: "text",
-          delta: "lo",
+          delta: "llo",
         },
       }),
     });
@@ -413,7 +413,7 @@ describe("reduceOpenCodeChatState", () => {
               id: "part_text",
               messageID: "msg_assistant",
               sessionID: "ses_test",
-              text: "Hel",
+              text: "He",
               time: {
                 start: 1,
               },
@@ -431,7 +431,7 @@ describe("reduceOpenCodeChatState", () => {
             messageID: "msg_assistant",
             partID: "part_text",
             field: "text",
-            delta: "lo",
+            delta: "llo",
           },
         }),
         createEvent({
@@ -508,7 +508,7 @@ describe("reduceOpenCodeChatState", () => {
               id: "part_text",
               messageID: "msg_assistant",
               sessionID: "ses_test",
-              text: "Hel",
+              text: "He",
               time: {
                 start: 1,
               },
@@ -549,7 +549,7 @@ describe("reduceOpenCodeChatState", () => {
           messageID: "msg_assistant",
           partID: "part_text",
           field: "text",
-          delta: "lo",
+          delta: "llo",
         },
       }),
     });
@@ -561,7 +561,7 @@ describe("reduceOpenCodeChatState", () => {
       expect.objectContaining({
         id: "part_text",
         kind: "assistant-message",
-        text: "Hel",
+        text: "He",
       }),
     );
   });
