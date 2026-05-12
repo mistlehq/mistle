@@ -425,6 +425,7 @@ export function useSessionWorkbenchController(input: {
     async (turnInput: Parameters<typeof chat.startTurn>[0]): Promise<void> => {
       if (isOpenCodeRuntime) {
         await openCodeSessionState.chat.sendPrompt({
+          ...(selectedRepositoryPath === null ? {} : { directory: selectedRepositoryPath }),
           submittedPrompt: turnInput.transcriptPrompt ?? turnInput.submittedPrompt,
         });
         return;

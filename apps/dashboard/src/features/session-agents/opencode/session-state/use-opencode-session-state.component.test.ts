@@ -36,6 +36,7 @@ type OpenCodeProxyTransportServer = {
     request: ObservedOpenCodeProxyRequest;
     status: number;
   }): void;
+  sendNoContentResponse(input: { request: ObservedOpenCodeProxyRequest }): void;
   sendSseOpenResponse(input: { request: ObservedOpenCodeProxyRequest }): void;
   readonly url: string;
 };
@@ -226,6 +227,21 @@ async function startOpenCodeProxyTransportServer(): Promise<OpenCodeProxyTranspo
         status: input.status,
       });
     },
+    sendNoContentResponse: (input) => {
+      if (socket === null) {
+        throw new Error("OpenCode proxy transport server has no connected socket.");
+      }
+      sendTextFrame(socket, {
+        streamId: input.request.streamId,
+        payload: {
+          body: "",
+          headers: {},
+          id: input.request.request.id,
+          status: 204,
+          type: "response",
+        },
+      });
+    },
     sendSseOpenResponse: (input) => {
       if (socket === null) {
         throw new Error("OpenCode proxy transport server has no connected socket.");
@@ -411,5 +427,89 @@ describe("useOpenCodeSessionState", () => {
     expect(result.current.lifecycle.sessionConnectionState).toBe("detached");
     expect(result.current.lifecycle.step).toBe("idle");
     expect(result.current.lifecycle.sessionSnapshot).toBeNull();
+  });
+
+  it("sends prompts with the selected repository directory", async () => {
+    const server = await startOpenCodeProxyTransportServer();
+    const transport = await connectTransport(server);
+    const { result } = renderHook(() =>
+      useOpenCodeSessionState({
+        ensureTransportConnected: async () => {
+          return {
+            sandboxInstanceId: "sbi_123",
+            transport,
+          };
+        },
+      }),
+    );
+
+    act(() => {
+      result.current.lifecycle.connectSession({
+        sandboxInstanceId: "sbi_123",
+        targetSessionId: "ses_test",
+      });
+    });
+
+    const healthRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: healthRequest,
+      body: {
+        healthy: true,
+        version: "1.14.41",
+      },
+    });
+
+    const getSessionRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: getSessionRequest,
+      body: createSessionResponse("ses_test"),
+    });
+
+    const eventRequest = await server.nextRequest();
+    server.sendSseOpenResponse({
+      request: eventRequest,
+    });
+
+    const messagesRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: messagesRequest,
+      body: [],
+    });
+
+    const permissionsRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: permissionsRequest,
+      body: [],
+    });
+
+    await waitFor(() => {
+      expect(result.current.lifecycle.sessionConnectionState).toBe("connected");
+    });
+
+    let promptPromise: Promise<void> | undefined;
+    act(() => {
+      promptPromise = result.current.chat.sendPrompt({
+        directory: "/workspace/selected-repo",
+        submittedPrompt: "Run tests",
+      });
+    });
+
+    const promptRequest = await server.nextRequest();
+    expect(promptRequest.request).toMatchObject({
+      method: "POST",
+      path: "/session/ses_test/prompt_async?directory=%2Fworkspace%2Fselected-repo",
+      body: {
+        parts: [
+          {
+            text: "Run tests",
+            type: "text",
+          },
+        ],
+      },
+    });
+    server.sendNoContentResponse({
+      request: promptRequest,
+    });
+    await expect(promptPromise).resolves.toBeUndefined();
   });
 });

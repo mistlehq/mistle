@@ -62,7 +62,7 @@ export type UseOpenCodeSessionStateResult = {
     respondToPermission: (
       input: Omit<OpenCodePermissionResponseInput, "sessionId">,
     ) => Promise<void>;
-    sendPrompt: (input: { submittedPrompt: string }) => Promise<void>;
+    sendPrompt: (input: { directory?: string; submittedPrompt: string }) => Promise<void>;
   };
   lifecycle: OpenCodeSessionLifecycleState;
   sessionMessage: {
@@ -314,7 +314,7 @@ export function useOpenCodeSessionState(input: {
   );
 
   const sendPrompt = useCallback(
-    async (promptInput: { submittedPrompt: string }): Promise<void> => {
+    async (promptInput: { directory?: string; submittedPrompt: string }): Promise<void> => {
       const client = clientRef.current;
       const sessionId = sessionSnapshot?.activeSessionId ?? null;
       if (client === null || sessionId === null) {
@@ -328,6 +328,7 @@ export function useOpenCodeSessionState(input: {
       try {
         await client.sendPrompt({
           sessionId,
+          ...(promptInput.directory === undefined ? {} : { directory: promptInput.directory }),
           parts: [
             {
               type: "text",
