@@ -20,6 +20,9 @@ const IntegrationsDefinitionsIndexPath = fileURLToPath(
 
 export default defineConfig({
   plugins: [react(), babel({ presets: [reactCompilerPreset()] }), tailwindcss()],
+  server: {
+    strictPort: true,
+  },
   resolve: {
     alias: [
       {
