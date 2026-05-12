@@ -20,6 +20,9 @@ import { createOpenCodeProxyFetch } from "./proxy-fetch.js";
 export type OpenCodeHealth = GlobalHealthResponse;
 export type OpenCodeSessionSummary = Session;
 export type OpenCodeEvent = GlobalEvent;
+export type OpenCodeMessage = Message;
+export type OpenCodeMessagePart = Part;
+export type OpenCodePermissionRequest = PermissionRequest;
 export type OpenCodePromptPartInput =
   | AgentPartInput
   | FilePartInput
