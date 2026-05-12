@@ -150,11 +150,6 @@ const OpenCodeComposerBootstrap: SessionBootstrapResult = {
   },
 };
 
-const OpenCodeUnavailableComposerBootstrap: SessionBootstrapResult = {
-  phase: { status: "unavailable" },
-  establishedSnapshot: OpenCodeComposerBootstrap.establishedSnapshot,
-};
-
 function mapOpenCodeChatStateForConversation(
   chatState: OpenCodeChatState,
 ): SessionConversationChatState {
@@ -436,10 +431,6 @@ export function useSessionWorkbenchController(input: {
   const activeConversationChatState = isOpenCodeRuntime
     ? mapOpenCodeChatStateForConversation(openCodeSessionState.chat.chatState)
     : chat.chatState;
-  const openCodeComposerBootstrap =
-    openCodeSessionState.lifecycle.sessionSnapshot === null
-      ? OpenCodeUnavailableComposerBootstrap
-      : OpenCodeComposerBootstrap;
   const activeSessionErrorMessage = isOpenCodeRuntime
     ? openCodeSessionState.sessionMessage.sessionErrorMessage
     : sessionMessage.sessionErrorMessage;
@@ -500,7 +491,7 @@ export function useSessionWorkbenchController(input: {
       chatState: activeConversationChatState,
       ...(isOpenCodeRuntime ? {} : { dismissUserMessageAction: chat.dismissUserMessageAction }),
       composerStateInput: {
-        bootstrap: isOpenCodeRuntime ? openCodeComposerBootstrap : sessionState.bootstrap,
+        bootstrap: isOpenCodeRuntime ? OpenCodeComposerBootstrap : sessionState.bootstrap,
         configControl,
         attachmentControl,
         turnControl: {
