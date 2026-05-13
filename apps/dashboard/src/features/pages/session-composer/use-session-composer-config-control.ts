@@ -44,10 +44,14 @@ function resolveSelectedReasoningEffort(input: {
 
 function buildModelOptions(
   availableModels: SessionBootstrapResult["establishedSnapshot"]["availableModels"],
+  includeDefaultMarker: boolean,
 ): SessionComposerConfigControl["modelOptions"] {
   return availableModels.map((model) => ({
     value: model.model,
-    label: model.displayName,
+    label:
+      includeDefaultMarker && model.isDefault
+        ? `${model.displayName} (default)`
+        : model.displayName,
   }));
 }
 
@@ -92,7 +96,7 @@ export function useSessionComposerConfigControl(input: {
     ],
   );
 
-  const modelOptions = useMemo(() => buildModelOptions(availableModels), [availableModels]);
+  const modelOptions = useMemo(() => buildModelOptions(availableModels, false), [availableModels]);
 
   const setModel = useCallback(
     (nextModel: string): void => {
@@ -172,7 +176,12 @@ export function useLocalSessionComposerConfigControl(input: {
   );
   const selectedModel = useMemo(() => {
     if (configuredModel === null) {
-      return null;
+      return (
+        resolveActiveComposerModel({
+          availableModels,
+          selectedModel: null,
+        })?.model ?? null
+      );
     }
 
     return availableModels.some((model) => model.model === configuredModel)
@@ -196,7 +205,7 @@ export function useLocalSessionComposerConfigControl(input: {
     ],
   );
 
-  const modelOptions = useMemo(() => buildModelOptions(availableModels), [availableModels]);
+  const modelOptions = useMemo(() => buildModelOptions(availableModels, true), [availableModels]);
 
   const setModel = useCallback(
     (nextModel: string): void => {
@@ -223,7 +232,7 @@ export function useLocalSessionComposerConfigControl(input: {
   return {
     selectedModel,
     selectedReasoningEffort,
-    hasExplicitModelSelection: selectedModel !== null,
+    hasExplicitModelSelection: configuredModel !== null && selectedModel !== null,
     modelOptions,
     canChangeReasoningEffort: input.canChangeReasoningEffort ?? true,
     isUpdating: false,

@@ -110,6 +110,9 @@ function LocalSessionComposerConfigControlHarness(input: {
       <div data-testid="has-explicit-model-selection">
         {configControl.hasExplicitModelSelection ? "true" : "false"}
       </div>
+      <div data-testid="model-options">
+        {configControl.modelOptions.map((option) => option.label).join(",")}
+      </div>
       <button
         type="button"
         onClick={() => {
@@ -174,7 +177,7 @@ describe("useSessionComposerConfigControl", () => {
     expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("low");
   });
 
-  it("leaves local runtime model selection unset until the user or config chooses a model", () => {
+  it("uses the local runtime default model when config is unset", () => {
     render(
       <LocalSessionComposerConfigControlHarness
         bootstrap={createReadyBootstrap({
@@ -185,9 +188,28 @@ describe("useSessionComposerConfigControl", () => {
       />,
     );
 
-    expect(screen.getByTestId("selected-model").textContent).toBe("");
-    expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("");
+    expect(screen.getByTestId("selected-model").textContent).toBe("gpt-5.4");
+    expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("medium");
     expect(screen.getByTestId("has-explicit-model-selection").textContent).toBe("false");
+    expect(screen.getByTestId("model-options").textContent).toBe(
+      "GPT-5.3 Codex Spark,GPT-5.4 (default)",
+    );
+  });
+
+  it("treats configured local runtime models as explicit selections", () => {
+    render(
+      <LocalSessionComposerConfigControlHarness
+        bootstrap={createReadyBootstrap({
+          availableModels: [DefaultModel, SparkModel],
+          model: "gpt-5.3-codex-spark",
+          modelReasoningEffort: null,
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId("selected-model").textContent).toBe("gpt-5.3-codex-spark");
+    expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("high");
+    expect(screen.getByTestId("has-explicit-model-selection").textContent).toBe("true");
   });
 
   it("ignores local runtime model selections that are missing from the current catalog", () => {
@@ -248,9 +270,9 @@ describe("useSessionComposerConfigControl", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("selected-model").textContent).toBe("");
+      expect(screen.getByTestId("selected-model").textContent).toBe("gpt-5.4");
     });
-    expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("");
+    expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("medium");
     expect(screen.getByTestId("has-explicit-model-selection").textContent).toBe("false");
   });
 });

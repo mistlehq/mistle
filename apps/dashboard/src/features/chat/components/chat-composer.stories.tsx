@@ -165,6 +165,29 @@ export const WithRepositoryStatusAndContextUsage: Story = {
   },
 };
 
+export const OpenCodeDefaultModel: Story = {
+  args: {
+    composerText: "Review the failing setup script and propose a minimal patch.",
+    modelOptions: [
+      {
+        value: "openai/gpt-5.3-codex",
+        label: "OpenAI / GPT-5.3 Codex (default)",
+      },
+      {
+        value: "openai/gpt-5.3-codex-spark",
+        label: "OpenAI / GPT-5.3 Codex Spark",
+      },
+      {
+        value: "anthropic/claude-sonnet-4-5",
+        label: "Anthropic / Claude Sonnet 4.5",
+      },
+    ],
+    selectedModel: "openai/gpt-5.3-codex",
+    selectedReasoningEffort: null,
+    showReasoningControl: false,
+  },
+};
+
 export const SteeringTurnShortcutHover: Story = {
   args: {
     composerText: "Focus only on Storybook asset ownership.",
