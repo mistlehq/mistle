@@ -1,4 +1,5 @@
 import { CodexAppServerListenUrl } from "@mistle/integrations-definitions/agent-runtimes/codex/app-server";
+import { OpenCodeServerListenUrl } from "@mistle/integrations-definitions/agent-runtimes/opencode/server";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -14,6 +15,7 @@ describe("buildCliPtyOpenInput", () => {
           type: "resume",
           threadId: "thread_123",
         },
+        runtimeId: "codex",
         sandboxInstanceId: "sandbox_123",
         selectedRepositoryPath: "/root/acme/repo-2",
       }),
@@ -35,6 +37,7 @@ describe("buildCliPtyOpenInput", () => {
           type: "start_new",
           shouldClearActiveThreadId: false,
         },
+        runtimeId: "codex",
         sandboxInstanceId: "sandbox_123",
         selectedRepositoryPath: null,
       }),
@@ -42,6 +45,56 @@ describe("buildCliPtyOpenInput", () => {
       args: ["--remote", CodexAppServerListenUrl],
       cols: 120,
       command: "codex",
+      ptySessionId: "cli",
+      rows: 32,
+      sandboxInstanceId: "sandbox_123",
+    });
+  });
+
+  it("attaches OpenCode TUI to the active server session and selected repository", () => {
+    expect(
+      buildCliPtyOpenInput({
+        launchTarget: {
+          type: "resume",
+          threadId: "ses_123",
+        },
+        runtimeId: "opencode",
+        sandboxInstanceId: "sandbox_123",
+        selectedRepositoryPath: "/root/acme/repo-2",
+      }),
+    ).toEqual({
+      args: [
+        "attach",
+        OpenCodeServerListenUrl,
+        "--session",
+        "ses_123",
+        "--dir",
+        "/root/acme/repo-2",
+      ],
+      cols: 120,
+      command: "opencode",
+      cwd: "/root/acme/repo-2",
+      ptySessionId: "cli",
+      rows: 32,
+      sandboxInstanceId: "sandbox_123",
+    });
+  });
+
+  it("starts OpenCode TUI without a session when no active session is selected", () => {
+    expect(
+      buildCliPtyOpenInput({
+        launchTarget: {
+          type: "start_new",
+          shouldClearActiveThreadId: false,
+        },
+        runtimeId: "opencode",
+        sandboxInstanceId: "sandbox_123",
+        selectedRepositoryPath: null,
+      }),
+    ).toEqual({
+      args: ["attach", OpenCodeServerListenUrl],
+      cols: 120,
+      command: "opencode",
       ptySessionId: "cli",
       rows: 32,
       sandboxInstanceId: "sandbox_123",

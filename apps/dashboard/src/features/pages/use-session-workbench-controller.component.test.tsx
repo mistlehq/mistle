@@ -81,6 +81,7 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.workbench.terminalPanelState.isVisible).toBe(false);
     expect(result.current.workbench.diffPanelState.isVisible).toBe(false);
     expect(result.current.workbench.diffPanelState.patch).toBe("");
+    expect(result.current.workbench.primaryPanelState.cliTerminalThemeMode).toBe("system");
     expect(result.current.workbench.portAccessState.processes).toEqual([]);
     expect(result.current.workbench.portAccessState.isPanelOpen).toBe(false);
     expect(result.current.workbench.sandboxLifecycleStatus).toBeNull();
@@ -126,8 +127,9 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.conversationPane.serverRequestsState.pendingServerRequests).toEqual([]);
     expect(result.current.workbench.primaryPanelState.canEnterCli).toBe(false);
     expect(result.current.workbench.primaryPanelState.disabledReason).toBe(
-      "OpenCode TUI handoff is not available from chat yet.",
+      "TUI is available after the session is connected.",
     );
+    expect(result.current.workbench.primaryPanelState.cliTerminalThemeMode).toBe("dark");
   });
 
   it("maps OpenCode permission requests to actionable server requests", () => {

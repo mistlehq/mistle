@@ -63,6 +63,8 @@ const LIGHT_TERMINAL_THEME: ITheme = {
   brightWhite: "#222222",
 };
 
+export type SessionTerminalThemeMode = "dark" | "light" | "system";
+
 function readIsDarkTheme(): boolean {
   if (typeof document === "undefined") {
     return false;
@@ -85,6 +87,7 @@ function resolveTerminalFontFamily(): string {
 
 type SessionTerminalSurfaceProps = {
   refitKey?: string;
+  themeMode?: SessionTerminalThemeMode;
   isVisible: boolean;
   lifecycleState: string;
   outputChunks: readonly Uint8Array[];
@@ -109,6 +112,7 @@ function resolveTerminalDimensions(fitAddon: FitAddon | null): { cols: number; r
 
 export function SessionTerminalSurface({
   refitKey,
+  themeMode = "system",
   isVisible,
   lifecycleState,
   outputChunks,
@@ -122,7 +126,8 @@ export function SessionTerminalSurface({
   const lastRenderedChunkCountRef = useRef(0);
   const outputDecoderRef = useRef(new TextDecoder());
   const [isDarkTheme, setIsDarkTheme] = useState(readIsDarkTheme);
-  const terminalTheme = isDarkTheme ? DARK_TERMINAL_THEME : LIGHT_TERMINAL_THEME;
+  const effectiveThemeMode = themeMode === "system" ? (isDarkTheme ? "dark" : "light") : themeMode;
+  const terminalTheme = effectiveThemeMode === "dark" ? DARK_TERMINAL_THEME : LIGHT_TERMINAL_THEME;
   const terminalBackgroundColor = terminalTheme.background ?? "#ffffff";
 
   lifecycleStateRef.current = lifecycleState;
