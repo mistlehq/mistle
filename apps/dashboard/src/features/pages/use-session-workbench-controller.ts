@@ -14,8 +14,8 @@ import type { ChatState } from "../chat/chat-state.js";
 import { formatCodexContextUsage } from "../session-agents/codex/session-state/codex-context-usage.js";
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import {
+  buildOpenCodeAttachmentParts,
   parseOpenCodePromptModelSelection,
-  resolveOpenCodeAttachmentTurnRepresentation,
   useOpenCodeSessionState,
   type OpenCodeChatState,
 } from "../session-agents/opencode/session-state/index.js";
@@ -642,13 +642,11 @@ export function useSessionWorkbenchController(input: {
           activeConfigControl.hasExplicitModelSelection,
           activeConfigControl.selectedModel,
         );
-        const attachments = resolveOpenCodeAttachmentTurnRepresentation({
-          uploadedAttachments: turnInput.uploadedAttachments ?? [],
-        });
+        const attachmentParts = buildOpenCodeAttachmentParts(turnInput.uploadedAttachments ?? []);
         await openCodeSessionState.chat.sendPrompt({
           ...(selectedRepositoryPath === null ? {} : { directory: selectedRepositoryPath }),
           ...(selectedOpenCodeModel === undefined ? {} : { model: selectedOpenCodeModel }),
-          submittedAttachments: attachments.submittedAttachments,
+          submittedAttachments: attachmentParts,
           submittedPrompt: turnInput.transcriptPrompt ?? turnInput.submittedPrompt,
         });
         return;

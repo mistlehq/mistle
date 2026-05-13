@@ -1,7 +1,7 @@
 import type { UploadedSandboxFile } from "@mistle/sandbox-session-client";
 import { describe, expect, it } from "vitest";
 
-import { resolveOpenCodeAttachmentTurnRepresentation } from "./opencode-attachment-presentation.js";
+import { buildOpenCodeAttachmentParts } from "./opencode-attachment-presentation.js";
 
 const UploadedImageAttachment: UploadedSandboxFile = {
   attachmentId: "att_image",
@@ -23,14 +23,10 @@ const UploadedFileAttachment: UploadedSandboxFile = {
   path: "/root/.local/attachments/ses_test/requirements.pdf",
 };
 
-describe("resolveOpenCodeAttachmentTurnRepresentation", () => {
+describe("buildOpenCodeAttachmentParts", () => {
   it("submits uploaded sandbox files as OpenCode file URL parts", () => {
-    expect(
-      resolveOpenCodeAttachmentTurnRepresentation({
-        uploadedAttachments: [UploadedImageAttachment, UploadedFileAttachment],
-      }),
-    ).toEqual({
-      submittedAttachments: [
+    expect(buildOpenCodeAttachmentParts([UploadedImageAttachment, UploadedFileAttachment])).toEqual(
+      [
         {
           type: "file",
           url: "file:///root/.local/attachments/ses_test/screen%20shot.png",
@@ -62,18 +58,6 @@ describe("resolveOpenCodeAttachmentTurnRepresentation", () => {
           },
         },
       ],
-      displayAttachments: [
-        {
-          kind: "image",
-          path: "/root/.local/attachments/ses_test/screen shot.png",
-          name: "screen shot.png",
-        },
-        {
-          kind: "file",
-          path: "/root/.local/attachments/ses_test/requirements.pdf",
-          name: "requirements.pdf",
-        },
-      ],
-    });
+    );
   });
 });

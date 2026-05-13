@@ -38,6 +38,23 @@ const DefaultSessionComposerAttachmentControlDependencies: SessionComposerAttach
     createUploadStreamClient: (transport) => new UploadStreamClient({ transport }),
   };
 
+function buildPreparedComposerAttachments(input: {
+  prompt: string;
+  supportsImageInspection: boolean;
+  uploadedAttachments: readonly UploadedSandboxFile[];
+}): PreparedComposerAttachments {
+  const representation = resolveMixedAttachmentTurnRepresentation({
+    prompt: input.prompt,
+    uploadedAttachments: input.uploadedAttachments,
+    supportsImageInspection: input.supportsImageInspection,
+  });
+
+  return {
+    ...representation,
+    uploadedAttachments: input.uploadedAttachments,
+  };
+}
+
 export function useSessionComposerAttachmentControl(input: {
   attachmentTarget: {
     sandboxInstanceId: string;
@@ -59,15 +76,11 @@ export function useSessionComposerAttachmentControl(input: {
       supportsImageInspection: boolean;
     }): Promise<PreparedComposerAttachments> => {
       if (prepareInput.files.length === 0) {
-        const representation = resolveMixedAttachmentTurnRepresentation({
+        return buildPreparedComposerAttachments({
           prompt: prepareInput.prompt,
           uploadedAttachments: [],
           supportsImageInspection: prepareInput.supportsImageInspection,
         });
-        return {
-          ...representation,
-          uploadedAttachments: [],
-        };
       }
 
       if (input.attachmentTarget === null) {
@@ -92,15 +105,11 @@ export function useSessionComposerAttachmentControl(input: {
           );
         }
 
-        const representation = resolveMixedAttachmentTurnRepresentation({
+        return buildPreparedComposerAttachments({
           prompt: prepareInput.prompt,
           uploadedAttachments,
           supportsImageInspection: prepareInput.supportsImageInspection,
         });
-        return {
-          ...representation,
-          uploadedAttachments,
-        };
       } catch (error) {
         throw new Error(resolveUploadErrorMessage(error));
       } finally {
