@@ -53,6 +53,22 @@ type ListSandboxInstancesContext = {
   tables: Pick<DataPlaneTables, "sandboxInstances">;
 };
 
+type StartedByFilterInput =
+  | {
+      startedByKind: "system" | "user";
+      startedById: string;
+    }
+  | {
+      startedByKind?: undefined;
+      startedById?: undefined;
+    };
+
+type ListSandboxInstancesServiceInput = Omit<
+  ListSandboxInstancesInput,
+  "startedById" | "startedByKind"
+> &
+  StartedByFilterInput;
+
 function createInvalidCursorErrorMessage(input: {
   cursorName: string;
   reason: (typeof KeysetCursorDecodeErrorReasons)[keyof typeof KeysetCursorDecodeErrorReasons];
@@ -70,7 +86,7 @@ function createInvalidCursorErrorMessage(input: {
 
 export async function listSandboxInstances(
   ctx: ListSandboxInstancesContext,
-  input: ListSandboxInstancesInput,
+  input: ListSandboxInstancesServiceInput,
 ): Promise<ListSandboxInstancesResponse> {
   try {
     const { sandboxInstances } = ctx.tables;
@@ -122,7 +138,7 @@ export async function listSandboxInstances(
               eq(table.purpose, SandboxInstancePurposes.SESSION),
             );
             const startedByScope =
-              input.startedByKind === undefined || input.startedById === undefined
+              input.startedByKind === undefined
                 ? organizationScope
                 : and(
                     organizationScope,
@@ -168,7 +184,7 @@ export async function listSandboxInstances(
             and(
               eq(sandboxInstances.organizationId, input.organizationId),
               eq(sandboxInstances.purpose, SandboxInstancePurposes.SESSION),
-              ...(input.startedByKind === undefined || input.startedById === undefined
+              ...(input.startedByKind === undefined
                 ? []
                 : [
                     eq(sandboxInstances.startedByKind, input.startedByKind),

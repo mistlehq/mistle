@@ -454,6 +454,24 @@ it("rejects invalid sandbox instance pagination cursors", async ({ env }) => {
   });
 });
 
+it("rejects started-by list filters unless kind and id are both provided", async ({ env }) => {
+  const response = await env.dataPlaneApi.http.fetch(
+    "/internal/sandbox/instances?organizationId=org_integration_new_partial_started_by&startedByKind=user",
+    {
+      headers: {
+        "x-mistle-service-token": "integration-new-internal-service-token",
+        [TestEnvironmentIdHeader]: env.id,
+      },
+    },
+  );
+
+  expect(response.status).toBe(400);
+  await expect(response.json()).resolves.toEqual({
+    code: "VALIDATION_ERROR",
+    message: "Invalid request.",
+  });
+});
+
 function clientFor(env: IntegrationTestEnvironment): DataPlaneSandboxInstancesClient {
   return createDataPlaneSandboxInstancesClient({
     baseUrl: env.dataPlaneApi.hostBaseUrl,
