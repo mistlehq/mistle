@@ -51,7 +51,7 @@ function CompletedHomeView(input: {
   recentSessions: readonly SandboxInstanceListItem[];
 }): React.JSX.Element {
   return (
-    <div className="mx-auto flex min-h-[calc(100svh-2rem)] w-full max-w-3xl flex-col justify-center gap-10">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 lg:min-h-[calc(100svh-2rem)] lg:justify-center">
       <section className="min-w-0 space-y-3">
         <h2 className="text-base font-semibold">Start new session</h2>
         {input.createSessionForm}
