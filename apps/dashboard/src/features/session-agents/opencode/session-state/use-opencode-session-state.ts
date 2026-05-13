@@ -17,6 +17,7 @@ import {
 } from "./opencode-chat-state.js";
 
 export type ConnectedOpenCodeSession = {
+  activeDirectory: string | null;
   activeSessionId: string;
   connectedAtIso: string;
   sandboxInstanceId: string;
@@ -100,16 +101,21 @@ export function resolveOpenCodeSessionSelection(input: {
 
 async function hydrateConnectedOpenCodeChat(input: {
   client: OpenCodeSessionClient;
+  directory?: string;
   dispatchChatAction: Dispatch<OpenCodeChatAction>;
   sessionId: string;
 }): Promise<void> {
   const messages = await input.client.listMessages({
     sessionId: input.sessionId,
   });
+  const pendingPermissions = await input.client.listPermissions({
+    ...(input.directory === undefined ? {} : { directory: input.directory }),
+  });
   input.dispatchChatAction({
     type: "hydrate_messages",
     sessionId: input.sessionId,
     messages,
+    pendingPermissions,
   });
 }
 
@@ -183,8 +189,10 @@ export function useOpenCodeSessionState(input: {
     }
     setIsHydratingChat(true);
     try {
+      const directory = sessionSnapshot?.activeDirectory ?? undefined;
       await hydrateConnectedOpenCodeChat({
         client,
+        ...(directory === undefined ? {} : { directory }),
         dispatchChatAction,
         sessionId,
       });
@@ -206,8 +214,10 @@ export function useOpenCodeSessionState(input: {
     }
     setIsHydratingChat(true);
     try {
+      const directory = sessionSnapshot?.activeDirectory ?? undefined;
       await hydrateConnectedOpenCodeChat({
         client,
+        ...(directory === undefined ? {} : { directory }),
         dispatchChatAction,
         sessionId,
       });
@@ -326,6 +336,7 @@ export function useOpenCodeSessionState(input: {
           });
           hydrationHasCompleted = true;
           setSessionSnapshot({
+            activeDirectory: directory ?? null,
             activeSessionId: session.id,
             connectedAtIso: new Date().toISOString(),
             sandboxInstanceId: connectInput.sandboxInstanceId,
