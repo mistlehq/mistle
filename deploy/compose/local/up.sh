@@ -3,9 +3,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPOSITORY_ROOT_PATH="$(cd -- "${SCRIPT_DIR}/../../.." && pwd)"
 COMPOSE_PATH="${SCRIPT_DIR}/compose.yaml"
 ENV_FILE_PATH="${SCRIPT_DIR}/.env"
 ENV_EXAMPLE_PATH="${SCRIPT_DIR}/.env.example"
+INSTALLED_VERSION_PATH="${SCRIPT_DIR}/VERSION"
+REPOSITORY_VERSION_PATH="${REPOSITORY_ROOT_PATH}/VERSION"
 GENERATED_DIRECTORY_PATH="${SCRIPT_DIR}/.generated"
 RUNTIME_ENV_PATH="${GENERATED_DIRECTORY_PATH}/runtime.env"
 CLOUDFLARED_LOG_PATH="${GENERATED_DIRECTORY_PATH}/cloudflared.log"
@@ -47,6 +50,29 @@ read_env_value() {
       exit
     }
   ' "${ENV_FILE_PATH}"
+}
+
+read_release_version() {
+  local version_path=""
+
+  if [[ -f "${INSTALLED_VERSION_PATH}" ]]; then
+    version_path="${INSTALLED_VERSION_PATH}"
+  elif [[ -f "${REPOSITORY_VERSION_PATH}" ]]; then
+    version_path="${REPOSITORY_VERSION_PATH}"
+  else
+    echo "VERSION file not found. Install deploy/compose/local/VERSION or run from a source checkout." >&2
+    exit 1
+  fi
+
+  local release_version
+  release_version="$(tr -d '[:space:]' <"${version_path}")"
+
+  if [[ -z "${release_version}" ]]; then
+    echo "VERSION file is empty: ${version_path}" >&2
+    exit 1
+  fi
+
+  printf '%s\n' "${release_version}"
 }
 
 set_runtime_env_value() {
@@ -99,14 +125,16 @@ configured_auth_base_url="$(read_env_value "MISTLE_SERVICES_CONTROL_PLANE_API_PU
 runtime_docker_image="$(read_env_value "MISTLE_DOCKER_IMAGE")"
 runtime_sandbox_base_image="$(read_env_value "MISTLE_SANDBOX_DEFAULT_BASE_IMAGE")"
 
-if [[ -z "${runtime_docker_image}" ]]; then
-  echo "MISTLE_DOCKER_IMAGE must be set in ${ENV_FILE_PATH}." >&2
-  exit 1
-fi
+if [[ -z "${runtime_docker_image}" || -z "${runtime_sandbox_base_image}" ]]; then
+  release_version="$(read_release_version)"
 
-if [[ -z "${runtime_sandbox_base_image}" ]]; then
-  echo "MISTLE_SANDBOX_DEFAULT_BASE_IMAGE must be set in ${ENV_FILE_PATH}." >&2
-  exit 1
+  if [[ -z "${runtime_docker_image}" ]]; then
+    runtime_docker_image="ghcr.io/mistlehq/mistle:docker-v${release_version}"
+  fi
+
+  if [[ -z "${runtime_sandbox_base_image}" ]]; then
+    runtime_sandbox_base_image="ghcr.io/mistlehq/sandbox-base:v${release_version}"
+  fi
 fi
 
 runtime_auth_base_url="${configured_auth_base_url}"
@@ -169,6 +197,7 @@ fi
 
 cp "${ENV_FILE_PATH}" "${RUNTIME_ENV_PATH}"
 set_runtime_env_value "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL" "${runtime_auth_base_url}"
+set_runtime_env_value "MISTLE_DOCKER_IMAGE" "${runtime_docker_image}"
 set_runtime_env_value "MISTLE_SANDBOX_DEFAULT_BASE_IMAGE" "${runtime_sandbox_base_image}"
 
 echo "Starting local infrastructure..."

@@ -31,7 +31,7 @@ confirm_install() {
   echo "Mistle local installer"
   echo
   echo "This will:"
-  echo "- write compose.yaml, .env.example, up.sh, and down.sh to ${install_directory_path}"
+  echo "- write compose.yaml, .env.example, up.sh, down.sh, and VERSION to ${install_directory_path}"
   echo "- create ${install_directory_path}/.env from .env.example if it does not already exist"
   echo "- preserve an existing ${install_directory_path}/.env"
   echo "- fetch files from ${local_compose_raw_base_url}"
@@ -82,6 +82,8 @@ install_file compose.yaml
 install_file .env.example
 install_file up.sh
 install_file down.sh
+download_file "${repository_raw_base_url}/main/VERSION" "${temporary_directory_path}/VERSION"
+cp "${temporary_directory_path}/VERSION" "${install_directory_path}/VERSION"
 
 chmod +x "${install_directory_path}/up.sh" "${install_directory_path}/down.sh"
 

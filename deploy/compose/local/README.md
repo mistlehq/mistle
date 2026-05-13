@@ -36,7 +36,7 @@ For repo-local development:
    ```
 
    `./up.sh` creates `.env` from `.env.example` automatically if it does not exist yet, pulls the
-   published single-container app image and sandbox image configured in `.env`, ensures local
+   published single-container app image and sandbox image derived from `VERSION`, ensures local
    object-store buckets exist, provisions the default integration targets, and ensures the control
    plane has a public webhook URL for the current run.
 
@@ -63,6 +63,10 @@ The main optional overrides are:
 - `MISTLE_DOCKER_IMAGE` to choose the published single-container app image
 - `MISTLE_SANDBOX_DEFAULT_BASE_IMAGE` to choose the sandbox base image used by Docker-backed sessions
 - `MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL`
+
+If the image values are blank, `./up.sh` derives them from the installed or repository `VERSION`
+file. For `VERSION=0.8.0`, that resolves to `ghcr.io/mistlehq/mistle:docker-v0.8.0` and
+`ghcr.io/mistlehq/sandbox-base:v0.8.0`.
 
 For `MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL`:
 

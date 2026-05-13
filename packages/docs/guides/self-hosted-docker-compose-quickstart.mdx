@@ -40,7 +40,7 @@ If you use the installer, keep your working files under `~/.mistle/local`.
 ## What `./up.sh` does
 
 - creates `.env` from `.env.example` when missing
-- validates required values such as `MISTLE_DOCKER_IMAGE` and `MISTLE_SANDBOX_DEFAULT_BASE_IMAGE`
+- derives default image tags from the installed or repository `VERSION` file
 - writes a per-run `./.generated/runtime.env` and starts Compose services
 - starts base infra (`postgres`, `valkey`, `seaweedfs`, `mailpit`) first
 - ensures the local object-store bucket exists
