@@ -45,7 +45,6 @@ import {
 } from "./sandbox-profile-integrations-setup-section.js";
 import { mapBindingsToEditorRows } from "./sandbox-profile-integrations-state.js";
 import { SandboxProfileRuntimeSection } from "./sandbox-profile-runtime-section.js";
-import { SandboxProfileSectionCard } from "./sandbox-profile-section-card.js";
 import {
   SandboxProfileSetupScriptTestButton,
   SandboxProfileSetupScriptTestPanel,
@@ -695,24 +694,23 @@ function SandboxProfileEditorPageStoryView(
                     integrationRows={integrationRows}
                     integrationSaveError={null}
                     runtimeSettings={
-                      <SandboxProfileSectionCard>
-                        <SandboxProfileRuntimeSection
-                          availableConnections={storyConnections}
-                          availableTargets={storyTargets}
-                          disabled={!isEditable}
-                          isDraft={mode.kind === "draft"}
-                          providers={createStorySandboxProviders({
-                            runtimeState: input.runtimeState,
-                          })}
-                          sectionChrome={false}
-                          version={createRuntimeStoryVersion({
-                            runtimeState: input.runtimeState,
-                            version: mode.version,
-                          })}
-                        />
-                      </SandboxProfileSectionCard>
+                      <SandboxProfileRuntimeSection
+                        availableConnections={storyConnections}
+                        availableTargets={storyTargets}
+                        disabled={!isEditable}
+                        isDraft={mode.kind === "draft"}
+                        providers={createStorySandboxProviders({
+                          runtimeState: input.runtimeState,
+                        })}
+                        sectionChrome={false}
+                        version={createRuntimeStoryVersion({
+                          runtimeState: input.runtimeState,
+                          version: mode.version,
+                        })}
+                      />
                     }
                     disabled={!isEditable}
+                    readOnly={!isEditable}
                     onAddIntegrationBindingRow={async (nextBinding) => {
                       setIntegrationRows((currentRows) => [
                         ...currentRows,

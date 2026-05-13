@@ -798,6 +798,8 @@ export function SandboxProfileIntegrationsSetupSection(
   const gitServiceChoice = gitChoices.find((choice) => choice.id === gitTargetKey);
   const showGitProxiedConnection =
     !hasNoGitProviderOptions && (gitIssue !== null || gitTargetKey !== null);
+  const showRuntimeResourcesAndToolsCard = connectorRows.length > 0 || !isReadOnly;
+  const addConnectorActionIsDisabled = controlsAreDisabled || addConnectorChoices.length === 0;
 
   return (
     <div className="flex flex-col gap-4">
@@ -851,105 +853,107 @@ export function SandboxProfileIntegrationsSetupSection(
               onRemoveIntegrationBindingRow={input.onRemoveIntegrationBindingRow}
               readOnly={input.readOnly}
             />
-            <SandboxProfileSectionCard>
-              <div className="grid gap-3">
-                {connectorRows.length === 0 ? null : (
-                  <ResponsiveFieldList columns={SandboxProfileToolsColumns} gapClassName="gap-6">
-                    {connectorRows.map((row) => {
-                      const presentation = resolveConnectorRowPresentation({
-                        row,
-                        availableConnections: input.availableConnections,
-                        availableTargets: input.availableTargets,
-                      });
-                      const hasResourcesAndTools =
-                        hasSandboxProfileBindingResourcesAndToolsCellContent({
+            {showRuntimeResourcesAndToolsCard ? (
+              <SandboxProfileSectionCard>
+                <div className="grid gap-3">
+                  {connectorRows.length === 0 ? null : (
+                    <ResponsiveFieldList columns={SandboxProfileToolsColumns} gapClassName="gap-6">
+                      {connectorRows.map((row) => {
+                        const presentation = resolveConnectorRowPresentation({
                           row,
                           availableConnections: input.availableConnections,
                           availableTargets: input.availableTargets,
                         });
+                        const hasResourcesAndTools =
+                          hasSandboxProfileBindingResourcesAndToolsCellContent({
+                            row,
+                            availableConnections: input.availableConnections,
+                            availableTargets: input.availableTargets,
+                          });
 
-                      return (
-                        <ResponsiveFieldListRow
-                          className={isReadOnly ? "py-4" : "py-4 pr-10 md:pr-0"}
-                          gapClassName="gap-6"
-                          gridClassName="md:items-start"
-                          key={row.clientId}
-                        >
-                          <ResponsiveFieldListCell columnKey="integration">
-                            {presentation.connection === undefined ? (
-                              <UnresolvedIntegrationCell title={presentation.title} />
-                            ) : (
-                              <IntegrationNameCell
-                                item={{
-                                  id:
-                                    presentation.target?.targetKey ??
-                                    presentation.connection.targetKey ??
-                                    row.clientId,
-                                  hasSelectableConnections: true,
-                                  kind: "connector",
-                                  logoKey: presentation.logoKey,
-                                  title: presentation.title,
-                                }}
-                              />
-                            )}
-                          </ResponsiveFieldListCell>
-                          <ResponsiveFieldListCell
-                            columnKey="resources-and-tools"
-                            hideOnMobile={!hasResourcesAndTools}
+                        return (
+                          <ResponsiveFieldListRow
+                            className={isReadOnly ? "py-4" : "py-4 pr-10 md:pr-0"}
+                            gapClassName="gap-6"
+                            gridClassName="md:items-start"
+                            key={row.clientId}
                           >
-                            <SandboxProfileBindingResourcesAndToolsCell
-                              availableConnections={input.availableConnections}
-                              availableTargets={input.availableTargets}
-                              disabled={controlsAreDisabled}
-                              readOnly={isReadOnly}
-                              onRowChange={input.onIntegrationBindingRowChange}
-                              row={row}
-                            />
-                          </ResponsiveFieldListCell>
-                          <ResponsiveFieldListCell
-                            className={SandboxProfileIntegrationActionCellClassName}
-                            columnKey="actions"
-                          >
-                            {isReadOnly ? null : (
-                              <RemoveIntegrationBindingButton
+                            <ResponsiveFieldListCell columnKey="integration">
+                              {presentation.connection === undefined ? (
+                                <UnresolvedIntegrationCell title={presentation.title} />
+                              ) : (
+                                <IntegrationNameCell
+                                  item={{
+                                    id:
+                                      presentation.target?.targetKey ??
+                                      presentation.connection.targetKey ??
+                                      row.clientId,
+                                    hasSelectableConnections: true,
+                                    kind: "connector",
+                                    logoKey: presentation.logoKey,
+                                    title: presentation.title,
+                                  }}
+                                />
+                              )}
+                            </ResponsiveFieldListCell>
+                            <ResponsiveFieldListCell
+                              columnKey="resources-and-tools"
+                              hideOnMobile={!hasResourcesAndTools}
+                            >
+                              <SandboxProfileBindingResourcesAndToolsCell
+                                availableConnections={input.availableConnections}
+                                availableTargets={input.availableTargets}
                                 disabled={controlsAreDisabled}
-                                label="Remove connector"
-                                onRemove={() => {
-                                  if (controlsAreDisabled) {
-                                    return;
-                                  }
-
-                                  input.onRemoveIntegrationBindingRow(row.clientId);
-                                }}
+                                readOnly={isReadOnly}
+                                onRowChange={input.onIntegrationBindingRowChange}
+                                row={row}
                               />
-                            )}
-                          </ResponsiveFieldListCell>
-                        </ResponsiveFieldListRow>
-                      );
-                    })}
-                  </ResponsiveFieldList>
-                )}
+                            </ResponsiveFieldListCell>
+                            <ResponsiveFieldListCell
+                              className={SandboxProfileIntegrationActionCellClassName}
+                              columnKey="actions"
+                            >
+                              {isReadOnly ? null : (
+                                <RemoveIntegrationBindingButton
+                                  disabled={controlsAreDisabled}
+                                  label="Remove connector"
+                                  onRemove={() => {
+                                    if (controlsAreDisabled) {
+                                      return;
+                                    }
 
-                {addConnectorChoices.length === 0 || isReadOnly ? null : (
-                  <Button
-                    className="px-0 text-sm"
-                    disabled={controlsAreDisabled}
-                    onClick={() => {
-                      if (controlsAreDisabled) {
-                        return;
-                      }
+                                    input.onRemoveIntegrationBindingRow(row.clientId);
+                                  }}
+                                />
+                              )}
+                            </ResponsiveFieldListCell>
+                          </ResponsiveFieldListRow>
+                        );
+                      })}
+                    </ResponsiveFieldList>
+                  )}
 
-                      setIsAddConnectorsDialogOpen(true);
-                    }}
-                    type="button"
-                    variant="link"
-                  >
-                    <PlusIcon aria-hidden className="size-4" />
-                    Add integration or tool
-                  </Button>
-                )}
-              </div>
-            </SandboxProfileSectionCard>
+                  {isReadOnly ? null : (
+                    <Button
+                      className="px-0 text-sm"
+                      disabled={addConnectorActionIsDisabled}
+                      onClick={() => {
+                        if (addConnectorActionIsDisabled) {
+                          return;
+                        }
+
+                        setIsAddConnectorsDialogOpen(true);
+                      }}
+                      type="button"
+                      variant="link"
+                    >
+                      <PlusIcon aria-hidden className="size-4" />
+                      Add integration or tool
+                    </Button>
+                  )}
+                </div>
+              </SandboxProfileSectionCard>
+            ) : null}
           </div>
         </SectionBlock>
       )}

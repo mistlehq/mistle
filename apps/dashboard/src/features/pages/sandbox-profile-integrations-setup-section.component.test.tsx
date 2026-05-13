@@ -27,6 +27,38 @@ afterEach(() => {
 });
 
 describe("SandboxProfileIntegrationsSetupSection", () => {
+  it("keeps the add integration or tool action visible in drafts when no connector integrations are configured", () => {
+    const { container } = render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [StoryOpenAiConnection, StoryGithubConnection],
+          availableTargets: [StoryOpenAiTarget, StoryGithubTarget],
+          integrationRows: [],
+        }}
+      />,
+    );
+
+    const addAction = screen.getByRole("button", { name: "Add integration or tool" });
+    expect(addAction.hasAttribute("disabled")).toBe(true);
+    expect(queryEmptySectionCards(container)).toHaveLength(0);
+  });
+
+  it("does not render an empty connector integrations card in read-only mode", () => {
+    const { container } = render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [StoryOpenAiConnection, StoryGithubConnection],
+          availableTargets: [StoryOpenAiTarget, StoryGithubTarget, StoryDatadogTarget],
+          integrationRows: [],
+          readOnly: true,
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Add integration or tool" })).toBeNull();
+    expect(queryEmptySectionCards(container)).toHaveLength(0);
+  });
+
   it("labels proxied connection service rows with their integration names", () => {
     const storyGithubConnectionWithoutResources = {
       ...StoryGithubConnection,
@@ -294,5 +326,11 @@ function TestSandboxProfileIntegrationsSetupSection(input: {
         <SandboxProfileIntegrationsSetupSection {...props} />
       </MemoryRouter>
     </QueryClientProvider>
+  );
+}
+
+function queryEmptySectionCards(container: HTMLElement): Element[] {
+  return Array.from(container.querySelectorAll(".rounded-md.border.bg-white")).filter(
+    (card) => card.textContent?.trim() === "",
   );
 }

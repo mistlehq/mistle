@@ -103,6 +103,15 @@ export const DraftWithNoGitProvidersSetup: Story = {
   },
 };
 
+export const PublishedWithoutConnectorIntegrations: Story = {
+  args: {
+    lifecycleState: "published",
+    initialBindings: StoryBindings.filter(
+      (binding) => binding.kind === "agent" || binding.kind === "git",
+    ),
+  },
+};
+
 export const StaleGitProviderMissingTarget: Story = {
   args: {
     availableConnections: StoryIntegrationConnections,
