@@ -222,7 +222,13 @@ impl std::error::Error for ControlError {}
 #[serde(tag = "type", rename_all = "camelCase")]
 enum ControlRequest {
     #[serde(rename = "init")]
-    Init { startup_input: StartupInput },
+    Init {
+        startup_input: StartupInput,
+        #[serde(default = "default_wait_for_completion")]
+        wait_for_completion: bool,
+        #[serde(default)]
+        wait_for_storage_attach: bool,
+    },
     #[serde(rename = "resume")]
     Resume { startup_input: StartupInput },
     #[serde(rename = "sign")]
@@ -498,11 +504,18 @@ where
 }
 
 /// Submits one startup payload to the running daemon over the local control socket.
-pub fn submit_init(socket_path: &Path, startup_input: &StartupInput) -> Result<(), ControlError> {
+pub fn submit_init(
+    socket_path: &Path,
+    startup_input: &StartupInput,
+    wait_for_completion: bool,
+    wait_for_storage_attach: bool,
+) -> Result<(), ControlError> {
     submit_startup_request(
         socket_path,
         ControlRequest::Init {
             startup_input: startup_input.clone(),
+            wait_for_completion,
+            wait_for_storage_attach,
         },
     )
 }
@@ -820,8 +833,18 @@ fn handle_connection(
         serde_json::from_slice(&raw_request).map_err(ControlError::InvalidRequest)?;
 
     match request {
-        ControlRequest::Init { startup_input } => {
-            begin_init(startup_input, state, init_thread)?;
+        ControlRequest::Init {
+            startup_input,
+            wait_for_completion,
+            wait_for_storage_attach,
+        } => {
+            begin_init(
+                startup_input,
+                state,
+                init_thread,
+                wait_for_completion,
+                wait_for_storage_attach,
+            )?;
             Ok(None)
         }
         ControlRequest::Resume { startup_input } => {
@@ -916,6 +939,8 @@ fn begin_init(
     startup_input: StartupInput,
     state: &Arc<Mutex<ControlServerState>>,
     init_thread: &SharedInitThread,
+    wait_for_completion: bool,
+    wait_for_storage_attach: bool,
 ) -> Result<(), ControlError> {
     {
         let mut state_guard = state
@@ -976,6 +1001,7 @@ fn begin_init(
             Arc::new(SystemClock),
             Arc::new(ThreadSleeper),
             diagnostics_logger.clone(),
+            wait_for_storage_attach,
         );
 
         match result {
@@ -1010,7 +1036,14 @@ fn begin_init(
     }));
     drop(init_thread_guard);
 
-    join_init_thread(init_thread)
+    if wait_for_completion {
+        join_init_thread(init_thread)?;
+    }
+    Ok(())
+}
+
+fn default_wait_for_completion() -> bool {
+    true
 }
 
 fn begin_resume(
@@ -1327,7 +1360,8 @@ mod tests {
             valid_startup_input(StartupMode::New, "bootstrap-token-value", &gateway.ws_url);
         let server = start_test_control_server(&socket_path, ThreadSleeper);
 
-        submit_init(&socket_path, &startup_input).expect("init submission should succeed");
+        submit_init(&socket_path, &startup_input, true, false)
+            .expect("init submission should succeed");
 
         wait_for_init_phase(&server, InitPhase::Initialized);
         assert_eq!(server.startup_input(), Some(startup_input));
@@ -1348,8 +1382,9 @@ mod tests {
             valid_startup_input(StartupMode::New, "bootstrap-token-value", &gateway.ws_url);
         let server = start_test_control_server(&socket_path, ThreadSleeper);
 
-        submit_init(&socket_path, &startup_input).expect("first init should succeed");
-        let error = submit_init(&socket_path, &startup_input).expect_err("second init should fail");
+        submit_init(&socket_path, &startup_input, true, false).expect("first init should succeed");
+        let error = submit_init(&socket_path, &startup_input, true, false)
+            .expect_err("second init should fail");
 
         assert!(
             error
@@ -1381,7 +1416,8 @@ mod tests {
         );
         let server = start_test_control_server(&socket_path, ThreadSleeper);
 
-        submit_init(&socket_path, &init_startup_input).expect("init submission should succeed");
+        submit_init(&socket_path, &init_startup_input, true, false)
+            .expect("init submission should succeed");
         submit_resume(&socket_path, &resume_startup_input)
             .expect("resume submission should succeed after init");
 
@@ -1432,7 +1468,8 @@ mod tests {
             valid_signing_startup_input(&gateway.ws_url, format!("key::{TEST_PUBLIC_KEY}"));
         let server = start_test_control_server(&socket_path, ThreadSleeper);
 
-        submit_init(&socket_path, &startup_input).expect("init submission should succeed");
+        submit_init(&socket_path, &startup_input, true, false)
+            .expect("init submission should succeed");
         wait_for_init_phase(&server, InitPhase::Initialized);
 
         let signature_base64 = submit_signing(
@@ -1465,7 +1502,8 @@ mod tests {
             valid_signing_startup_input(&gateway.ws_url, format!("key::{TEST_PUBLIC_KEY}"));
         let server = start_test_control_server(&socket_path, ThreadSleeper);
 
-        submit_init(&socket_path, &startup_input).expect("init submission should succeed");
+        submit_init(&socket_path, &startup_input, true, false)
+            .expect("init submission should succeed");
         wait_for_init_phase(&server, InitPhase::Initialized);
 
         let error = submit_signing(
@@ -1499,7 +1537,7 @@ mod tests {
         );
         let server = start_test_control_server(&socket_path, ThreadSleeper);
 
-        let error = submit_init(&socket_path, &startup_input)
+        let error = submit_init(&socket_path, &startup_input, true, false)
             .expect_err("init submission should fail when bootstrap tunnel cannot connect");
 
         assert!(error.to_string().contains(
@@ -1570,7 +1608,8 @@ mod tests {
             valid_startup_input(StartupMode::New, "bootstrap-token-value", &gateway.ws_url);
         let server = start_test_control_server(&socket_path, ThreadSleeper);
 
-        submit_init(&socket_path, &startup_input).expect("init submission should succeed");
+        submit_init(&socket_path, &startup_input, true, false)
+            .expect("init submission should succeed");
         wait_for_init_phase(&server, InitPhase::Initialized);
 
         let (status_code, body) = fetch_health_response(server.health_endpoint_addr());
@@ -1671,7 +1710,7 @@ mod tests {
             transparent_proxy: None,
         };
 
-        submit_init(&socket_path, &startup_input)
+        submit_init(&socket_path, &startup_input, true, false)
             .expect("snapshot materialization init submission should succeed");
 
         server

@@ -48,6 +48,7 @@ pub fn run_init<R, W>(
     reader: &mut R,
     writer: &mut W,
     control_socket_path: &Path,
+    detach: bool,
 ) -> Result<(), InitError>
 where
     R: Read,
@@ -82,7 +83,12 @@ where
         }
     };
 
-    match control::submit_init(control_socket_path, &startup_input) {
+    match control::submit_init(
+        control_socket_path,
+        &startup_input,
+        !detach,
+        should_wait_for_storage_attach_signal(),
+    ) {
         Ok(()) => {
             write_response(writer, &StartupInitOkResponse { ok: true })?;
             Ok(())
@@ -99,6 +105,10 @@ where
             Err(error)
         }
     }
+}
+
+fn should_wait_for_storage_attach_signal() -> bool {
+    std::env::var("MISTLE_SANDBOXD_WAIT_FOR_STORAGE_ATTACH").is_ok_and(|value| value == "1")
 }
 
 fn write_response<W, T>(writer: &mut W, response: &T) -> Result<(), InitError>
@@ -146,8 +156,13 @@ mod tests {
             control::DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
         );
 
-        run_init(&mut request.as_bytes(), &mut stdout, &control_socket_path)
-            .expect("init should submit a valid startup input");
+        run_init(
+            &mut request.as_bytes(),
+            &mut stdout,
+            &control_socket_path,
+            false,
+        )
+        .expect("init should submit a valid startup input");
 
         let response: StartupInitResponse =
             serde_json::from_slice(&stdout).expect("init should write a valid response");
@@ -181,6 +196,7 @@ mod tests {
             &mut br#"{"startupMode":null}"#.as_slice(),
             &mut stdout,
             &control_socket_path,
+            false,
         )
         .expect_err("invalid init request should fail");
 

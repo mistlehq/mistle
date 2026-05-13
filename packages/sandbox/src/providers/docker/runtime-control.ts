@@ -8,8 +8,13 @@ import {
   SandboxProviderNotImplementedError,
   SandboxResourceNotFoundError,
 } from "../../errors.js";
+import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
 import { SandboxdInstallCommand, SandboxdInstallEnvVars } from "../../sandboxd-install.js";
-import type { SandboxRuntimeControl, SandboxRuntimeEnsureSandboxdRequest } from "../../types.js";
+import type {
+  SandboxRuntimeControl,
+  SandboxRuntimeControlRequest,
+  SandboxRuntimeEnsureSandboxdRequest,
+} from "../../types.js";
 import {
   DockerClientError,
   DockerClientErrorCodes,
@@ -19,6 +24,7 @@ import {
 import type { DockerSandboxConfig } from "./config.js";
 
 const InitCommand = ["/opt/mistle/bin/sandboxd", "init"];
+const DetachedInitCommand = ["/opt/mistle/bin/sandboxd", "init", "--detach"];
 const VersionCommand = ["/opt/mistle/bin/sandboxd", "version"];
 const EnsureSandboxdCommand = ["sh", "-euc", SandboxdInstallCommand];
 const DockerExecExitPollIntervalMs = 50;
@@ -42,6 +48,12 @@ function chunkToUtf8String(chunk: unknown): string {
   }
 
   throw new Error("Docker exec stream yielded a non-text chunk.");
+}
+
+function toDockerEnv(env: Readonly<Record<string, string>>): string[] {
+  return Object.entries(withRequiredSandboxRuntimeEnv(env))
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, value]) => `${name}=${value}`);
 }
 
 function captureUtf8Stream(stream: NodeJS.ReadableStream): {
@@ -201,7 +213,28 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
     }
   }
 
-  async init(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void> {
+  async beginInit(input: SandboxRuntimeControlRequest): Promise<void> {
+    await this.#runInitCommand({
+      ...input,
+      command: DetachedInitCommand,
+      waitForCompletion: true,
+    });
+  }
+
+  async init(input: SandboxRuntimeControlRequest): Promise<void> {
+    await this.#runInitCommand({
+      ...input,
+      command: InitCommand,
+      waitForCompletion: true,
+    });
+  }
+
+  async #runInitCommand(
+    input: SandboxRuntimeControlRequest & {
+      command: string[];
+      waitForCompletion: boolean;
+    },
+  ): Promise<void> {
     if (input.id.trim().length === 0) {
       throw new SandboxConfigurationError("Sandbox id is required.");
     }
@@ -213,7 +246,8 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
           AttachStdin: true,
           AttachStdout: true,
           AttachStderr: true,
-          Cmd: InitCommand,
+          Cmd: input.command,
+          ...(input.env === undefined ? {} : { Env: toDockerEnv(input.env) }),
           Tty: false,
           User: "root",
         }),
@@ -222,7 +256,7 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
         exec.start({
           hijack: true,
           stdin: true,
-          Detach: false,
+          Detach: !input.waitForCompletion,
           Tty: false,
         }),
       );
@@ -234,6 +268,11 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
 
       await writePayloadToStream(execStream, input.payload);
       await endWritableStream(execStream);
+      if (!input.waitForCompletion) {
+        capturedStdout.stop();
+        capturedStderr.stop();
+        return;
+      }
 
       const exitCode = await this.#runDockerOperation(DockerClientOperationIds.INIT, () =>
         waitForDockerExecExitCode({
@@ -267,7 +306,7 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
     }
   }
 
-  async resume(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void> {
+  async resume(input: SandboxRuntimeControlRequest): Promise<void> {
     await this.init(input);
   }
 

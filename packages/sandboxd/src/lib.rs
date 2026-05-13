@@ -69,7 +69,7 @@ fn initialize_sandboxd_tracing() {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SandboxdCommand {
     Daemon,
-    Init,
+    Init { detach: bool },
     Resume,
     Sign,
     Version,
@@ -110,7 +110,17 @@ where
     };
 
     let command = match command.as_str() {
-        "init" => SandboxdCommand::Init,
+        "init" => {
+            let mut detach = false;
+            for argument in parsed_args.by_ref() {
+                if argument == "--detach" {
+                    detach = true;
+                } else {
+                    return Err(ParseSandboxdCommandError::UnexpectedArgument(argument));
+                }
+            }
+            return Ok(SandboxdCommand::Init { detach });
+        }
         "resume" => SandboxdCommand::Resume,
         "version" => SandboxdCommand::Version,
         _ => {
@@ -184,10 +194,11 @@ where
                 }
             }
         }
-        SandboxdCommand::Init => match init::run_init(
+        SandboxdCommand::Init { detach } => match init::run_init(
             stdin,
             stdout,
             Path::new(control::DEFAULT_CONTROL_SOCKET_PATH),
+            detach,
         ) {
             Ok(()) => 0,
             Err(_) => 1,
@@ -247,7 +258,14 @@ mod tests {
     fn parses_init() {
         let command = parse_sandboxd_command(["init"]);
 
-        assert_eq!(command, Ok(SandboxdCommand::Init));
+        assert_eq!(command, Ok(SandboxdCommand::Init { detach: false }));
+    }
+
+    #[test]
+    fn parses_detached_init() {
+        let command = parse_sandboxd_command(["init", "--detach"]);
+
+        assert_eq!(command, Ok(SandboxdCommand::Init { detach: true }));
     }
 
     #[test]

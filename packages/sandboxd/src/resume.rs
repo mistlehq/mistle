@@ -167,6 +167,7 @@ mod tests {
             &mut init_request.as_bytes(),
             &mut init_stdout,
             &control_socket_path,
+            false,
         )
         .expect("init should succeed before resume");
         run_resume(

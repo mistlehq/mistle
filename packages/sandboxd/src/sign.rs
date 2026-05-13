@@ -299,6 +299,8 @@ mod tests {
         control::submit_init(
             &control_socket_path,
             &valid_startup_input(&gateway.ws_url, true),
+            true,
+            false,
         )
         .expect("init submission should succeed");
 
@@ -398,6 +400,8 @@ mod tests {
         control::submit_init(
             &control_socket_path,
             &valid_startup_input(&gateway.ws_url, false),
+            true,
+            false,
         )
         .expect("init submission should succeed");
 

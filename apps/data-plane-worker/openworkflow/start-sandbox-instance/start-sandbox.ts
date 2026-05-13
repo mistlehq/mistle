@@ -9,13 +9,16 @@ import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 
 const SandboxRuntimeSandboxInstanceIDEnv = "SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID";
 const SandboxdTestFaultsEnabledEnv = "MISTLE_SANDBOXD_ENABLE_TEST_FAULTS";
+export const SandboxdWaitForStorageAttachEnv = "MISTLE_SANDBOXD_WAIT_FOR_STORAGE_ATTACH";
 
 export function createSandboxRuntimeEnv(input: {
   config: DataPlaneWorkerRuntimeConfig;
   sandboxInstanceId: string;
+  waitForStorageAttach?: boolean;
 }): Record<string, string> {
   return {
     [SandboxRuntimeSandboxInstanceIDEnv]: input.sandboxInstanceId,
+    ...(input.waitForStorageAttach === true ? { [SandboxdWaitForStorageAttachEnv]: "1" } : {}),
     ...(input.config.app.sandbox.sandboxdTestFaultsEnabled === true
       ? {
           [SandboxdTestFaultsEnabledEnv]: "1",

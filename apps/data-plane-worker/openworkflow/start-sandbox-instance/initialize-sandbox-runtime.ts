@@ -134,6 +134,8 @@ export async function initializeSandboxRuntime(
     providerSandboxId: string;
     startupMode: SandboxStartupInput["startupMode"];
     executionMode?: SandboxStartupInput["executionMode"];
+    waitForCompletion?: boolean;
+    waitForStorageAttach?: boolean;
     runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
     actingUserId?: StartSandboxInstanceWorkflowInput["actingUserId"];
     gitIdentity?: StartSandboxInstanceWorkflowInput["gitIdentity"];
@@ -142,6 +144,9 @@ export async function initializeSandboxRuntime(
   const runtimeEnv = createSandboxRuntimeEnv({
     config: ctx.config,
     sandboxInstanceId: input.sandboxInstanceId,
+    ...(input.waitForStorageAttach === undefined
+      ? {}
+      : { waitForStorageAttach: input.waitForStorageAttach }),
   });
   const sandboxdArtifact = await ctx.sandboxdArtifactResolver?.resolve();
   if (sandboxdArtifact !== undefined) {
@@ -186,11 +191,16 @@ export async function initializeSandboxRuntime(
     processEnv: ctx.processEnv,
   });
 
-  await ctx.sandboxRuntimeControl.init({
+  const initRequest = {
     id: input.providerSandboxId,
     payload: encodeSandboxStartupInput(startupInput),
     env: runtimeEnv,
-  });
+  };
+  if (input.waitForCompletion === false) {
+    await ctx.sandboxRuntimeControl.beginInit(initRequest);
+  } else {
+    await ctx.sandboxRuntimeControl.init(initRequest);
+  }
 }
 
 function createTransparentProxyStartupConfiguration(input: {

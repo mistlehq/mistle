@@ -122,6 +122,24 @@ export class E2BSandboxRuntimeControl implements SandboxRuntimeControl {
     }
   }
 
+  async beginInit(input: SandboxRuntimeControlRequest): Promise<void> {
+    requireSandboxId(input.id);
+
+    try {
+      await this.#client.beginInit({
+        sandboxId: input.id,
+        payload: input.payload,
+        ...(input.env === undefined ? {} : { env: input.env }),
+      });
+    } catch (error) {
+      if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
+        throw toSandboxNotFoundError(input.id, error);
+      }
+
+      throw error;
+    }
+  }
+
   async resume(input: SandboxRuntimeControlRequest): Promise<void> {
     requireSandboxId(input.id);
 

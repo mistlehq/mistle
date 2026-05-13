@@ -7,6 +7,7 @@ import {
 } from "../../types.js";
 
 const E2BArchilMountRoot = "/mnt/mistle/archil";
+const SandboxdStorageAttachSignalPath = "/run/mistle/storage-attached";
 const E2BArchilInitMarkerPath = `${E2BArchilMountRoot}/.mistle-init`;
 const E2BArchilInitMarkerTempPath = `${E2BArchilInitMarkerPath}.tmp`;
 
@@ -178,6 +179,8 @@ export function createE2BAttachStorageCommand(input: {
       storage: input.storage,
     }),
     ...bindMountCommands,
+    "mkdir -p /run/mistle",
+    `touch ${quoteShell(SandboxdStorageAttachSignalPath)}`,
   ].join("\n");
 }
 

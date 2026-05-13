@@ -108,6 +108,9 @@ const SETUP_SCRIPT_FILE_MODE: u32 = 0o700;
 const SNAPSHOT_RUNTIME_ARTIFACTS_DIRECTORY: &str = "/run/mistle";
 const SNAPSHOT_TRUST_STORE_CERT_PATH: &str =
     "/usr/local/share/ca-certificates/mistle-egress-proxy-ca.crt";
+const STORAGE_ATTACH_SIGNAL_PATH: &str = "/run/mistle/storage-attached";
+const STORAGE_ATTACH_SIGNAL_POLL_INTERVAL: std::time::Duration =
+    std::time::Duration::from_millis(100);
 
 /// Owns the initialized sandbox runtime resources for one daemon process.
 pub struct SandboxdState {
@@ -141,6 +144,7 @@ impl SandboxdState {
         clock: Arc<dyn Clock>,
         sleeper: Arc<dyn Sleeper>,
         diagnostics_logger: Option<StartupDiagnosticsLogger>,
+        wait_for_storage_attach: bool,
     ) -> Result<Self, SandboxdStateError> {
         let runtime_plan: runtime::CompiledRuntimePlan =
             serde_json::from_value(startup_input.runtime_plan.clone()).map_err(|error| {
@@ -176,7 +180,9 @@ impl SandboxdState {
                 diagnostics_logger: &diagnostics_logger,
             },
         )?);
-
+        if wait_for_storage_attach {
+            wait_for_storage_attach_signal(clock.as_ref(), sleeper.as_ref(), &diagnostics_logger);
+        }
         record_operation_phase_started(&diagnostics_logger, "apply_git_identity");
         if !startup_input.is_snapshot()
             && let Err(error) =
@@ -952,6 +958,26 @@ impl SandboxdState {
     }
 }
 
+fn wait_for_storage_attach_signal(
+    clock: &dyn Clock,
+    sleeper: &dyn Sleeper,
+    diagnostics_logger: &Option<StartupDiagnosticsLogger>,
+) {
+    record_operation_phase_started(diagnostics_logger, "wait_storage_attach");
+    let started_at_ms = clock.now_ms();
+    while !Path::new(STORAGE_ATTACH_SIGNAL_PATH).exists() {
+        sleeper.sleep(STORAGE_ATTACH_SIGNAL_POLL_INTERVAL);
+    }
+    record_operation_phase_completed_with_attributes(
+        diagnostics_logger,
+        "wait_storage_attach",
+        BTreeMap::from([(
+            "durationMs".to_string(),
+            startup_diagnostics_u64(clock.now_ms().saturating_sub(started_at_ms)),
+        )]),
+    );
+}
+
 fn record_operation_phase_failure(
     diagnostics_logger: &Option<StartupDiagnosticsLogger>,
     phase: &str,
@@ -979,8 +1005,16 @@ fn record_operation_phase_completed(
     diagnostics_logger: &Option<StartupDiagnosticsLogger>,
     phase: &str,
 ) {
+    record_operation_phase_completed_with_attributes(diagnostics_logger, phase, BTreeMap::new());
+}
+
+fn record_operation_phase_completed_with_attributes(
+    diagnostics_logger: &Option<StartupDiagnosticsLogger>,
+    phase: &str,
+    attributes: BTreeMap<String, serde_json::Value>,
+) {
     if let Some(logger) = diagnostics_logger
-        && let Err(error) = logger.record_phase_completed(phase)
+        && let Err(error) = logger.record_phase_completed_with_attributes(phase, attributes)
     {
         eprintln!("sandboxd failed to record startup diagnostics phase completion: {error}");
     }
@@ -2324,6 +2358,7 @@ mod tests {
             Arc::new(SystemClock),
             Arc::new(ThreadSleeper),
             None,
+            false,
         )
         .expect("snapshot materialization init should succeed after static runtime-plan setup");
         gateway_thread
@@ -2410,6 +2445,7 @@ mod tests {
                 StartupDiagnosticsLogger::initialize(StartupOperation::Init, &bootstrap_url)
                     .expect("startup diagnostics logger should initialize"),
             ),
+            false,
         )
         .expect("snapshot materialization init should use temporary gateway tunnel for setup");
 
@@ -2502,6 +2538,7 @@ mod tests {
                 StartupDiagnosticsLogger::initialize(StartupOperation::Init, &bootstrap_url)
                     .expect("startup diagnostics logger should initialize"),
             ),
+            false,
         )
         .expect("session initialization should use common gateway tunnel");
 
@@ -2591,6 +2628,7 @@ mod tests {
                 StartupDiagnosticsLogger::initialize(StartupOperation::Init, &bootstrap_url)
                     .expect("startup diagnostics logger should initialize"),
             ),
+            false,
         )
         .expect("session initialization should succeed");
         wait_for_runtime_ready_value(
@@ -2660,6 +2698,7 @@ mod tests {
             Arc::new(SystemClock),
             Arc::new(ThreadSleeper),
             None,
+            false,
         )
         .expect("snapshot materialization init should succeed");
         gateway_thread

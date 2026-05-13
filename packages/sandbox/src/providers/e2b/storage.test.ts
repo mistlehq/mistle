@@ -75,6 +75,11 @@ describe("createE2BAttachStorageCommand", () => {
     );
     expect(command).toContain("mount --bind '/mnt/mistle/archil/root' '/root'");
     expect(command).toContain("mount --bind '/mnt/mistle/archil/etc/codex' '/etc/codex'");
+    expect(command).toContain("mkdir -p /run/mistle");
+    expect(command).toContain("touch '/run/mistle/storage-attached'");
+    expect(command.indexOf("touch '/run/mistle/storage-attached'")).toBeGreaterThan(
+      command.indexOf("mount --bind '/mnt/mistle/archil/etc/codex' '/etc/codex'"),
+    );
     expect(command).not.toContain("/usr/local/bin");
   });
 
