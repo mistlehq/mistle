@@ -49,9 +49,16 @@ import {
   SlackNotLinkedCard,
 } from "./profile-settings-page-view.story-fixtures.js";
 import {
+  ProfileAutomations,
+  SandboxProfileAutomationsStory,
+  SelectedScheduleAutomationId,
+} from "./sandbox-profile-editor-automations.stories.js";
+import {
   DefaultSandboxProfileEditorStoryArgs,
   SandboxProfileEditorPageStory,
   StoryBindings,
+  StoryAnthropicConnection,
+  StoryOpenCodeGoConnection,
 } from "./sandbox-profile-editor-story-support.js";
 import { SessionConversationBottomPanel } from "./session-conversation-pane.js";
 import {
@@ -469,12 +476,14 @@ function DocsSessionHeaderActions(input: {
 function IdentityLinkingOrganizationSettingsStory(): React.JSX.Element {
   return (
     <DocsProductScreen>
-      <OrganizationIdentityLinkingSettingsPageView
-        loadErrorMessage={null}
-        onEnabledChange={async () => {}}
-        onProviderConnectionChange={async () => {}}
-        providers={IdentityLinkingProviders}
-      />
+      <div data-docs-screenshot="identity-linking-organization-settings">
+        <OrganizationIdentityLinkingSettingsPageView
+          loadErrorMessage={null}
+          onEnabledChange={async () => {}}
+          onProviderConnectionChange={async () => {}}
+          providers={IdentityLinkingProviders}
+        />
+      </div>
     </DocsProductScreen>
   );
 }
@@ -482,7 +491,9 @@ function IdentityLinkingOrganizationSettingsStory(): React.JSX.Element {
 function IdentityLinkingProfileSettingsStory(): React.JSX.Element {
   return (
     <DocsProductScreen>
-      <ProfileSettingsLinkedAccountsSection {...ProfileLinkedAccountsProps} />
+      <div data-docs-screenshot="identity-linking-profile-settings">
+        <ProfileSettingsLinkedAccountsSection {...ProfileLinkedAccountsProps} />
+      </div>
     </DocsProductScreen>
   );
 }
@@ -528,7 +539,24 @@ function SandboxProfileDraftStory(): React.JSX.Element {
   return (
     <SandboxProfileEditorPageStory
       {...DefaultSandboxProfileEditorStoryArgs}
-      initialBindings={[StoryBindings[0], StoryBindings[1], StoryBindings[2]]}
+      agentRuntimeId="opencode"
+      initialBindings={[
+        StoryBindings[1],
+        StoryBindings[2],
+        {
+          id: "binding-opencode-go-agent-docs",
+          connectionId: StoryOpenCodeGoConnection.id,
+          kind: "agent",
+          config: {},
+        },
+        {
+          id: "binding-anthropic-agent-docs",
+          connectionId: StoryAnthropicConnection.id,
+          kind: "agent",
+          config: {},
+        },
+      ]}
+      runtimeState="e2b-managed"
     />
   );
 }
@@ -564,6 +592,19 @@ function SandboxProfileSnapshotReadyStory(): React.JSX.Element {
       snapshotRefreshScheduleState="existing"
       snapshotState="snapshot-ready"
     />
+  );
+}
+
+function SandboxProfileAutomationsStoryForDocs(): React.JSX.Element {
+  return (
+    <DocsProductScreen>
+      <div className="mx-auto max-w-6xl px-6 py-8">
+        <SandboxProfileAutomationsStory
+          automations={ProfileAutomations}
+          selectedAutomationId={SelectedScheduleAutomationId}
+        />
+      </div>
+    </DocsProductScreen>
   );
 }
 
@@ -701,6 +742,10 @@ export const SandboxProfileSetupAssistant: Story = {
 
 export const SandboxProfileSnapshotReady: Story = {
   render: SandboxProfileSnapshotReadyStory,
+};
+
+export const SandboxProfileAutomations: Story = {
+  render: SandboxProfileAutomationsStoryForDocs,
 };
 
 export const NewSessionCreation: Story = {

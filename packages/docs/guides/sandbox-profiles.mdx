@@ -9,10 +9,12 @@ Sandbox profiles define the execution environment an agent starts with.
 
 Use a sandbox profile to control:
 
-- the base image or sandbox provider settings
+- the agent runtime, such as Codex or OpenCode
+- the sandbox runtime, such as Docker or E2B
 - installed tools and runtimes
 - setup scripts
 - allowed integrations and connection behavior
+- repository access through a Git connection
 - environment configuration required for agent work
 
 Profiles make agent environments repeatable. Instead of configuring every session by hand, teams publish profile versions and start sessions from those published versions.
@@ -28,22 +30,35 @@ Published versions are immutable from the point of view of future sessions. To c
 A usable profile usually needs more than a name and base image. Before publishing, configure the pieces the agent will need at runtime:
 
 1. Create or edit a sandbox profile draft.
-2. Select the integrations the profile should expose to sessions.
-3. Add repository or workspace configuration when the agent should work in source code.
-4. Write and test the setup script.
-5. Choose whether sessions from this profile should use persistent sandboxes.
-6. Publish the profile version.
-7. Wait for the snapshot to become ready.
-8. Start a session from the published profile.
+2. Choose the agent runtime.
+3. Choose the sandbox runtime and credentials.
+4. Select the model provider, Git connection, and connector integrations the profile should expose to sessions.
+5. Add repository or workspace configuration when the agent should work in source code.
+6. Write and test the setup script.
+7. Choose whether sessions from this profile should use persistent sandboxes.
+8. Publish the profile version.
+9. Wait for the snapshot to become ready.
+10. Start a session from the published profile.
 
 <Frame>
   <img
     src="/images/product-screens/sandbox-profile-draft.png"
-    alt="Sandbox profile draft editor showing integration bindings and setup script configuration"
+    alt="Sandbox profile draft editor showing runtime, Git connection, model provider, connector integrations, and tools"
   />
 </Frame>
 
 If the snapshot fails or stays unavailable, sessions cannot start from that published profile version until the snapshot is fixed or refreshed.
+
+## Runtime And Connections
+
+The **Runtime** section controls what kind of agent starts and where it runs:
+
+- **Agent** chooses the agent runtime. Codex profiles use OpenAI-compatible model provider connections. OpenCode profiles can use OpenCode-compatible provider connections such as Anthropic and OpenCode Go.
+- **Sandbox Runtime** chooses where the sandbox runs. Docker is used for local or self-hosted Docker deployments. E2B can be selected when the deployment and integration target expose it.
+- **Credentials** controls whether the sandbox runtime uses Mistle-managed credentials or a workspace API key connection, when that provider supports both.
+- **Git Connection** controls which Git provider connection supplies repositories and repository tools.
+
+Model provider connections, Git connection, and connector integrations are saved on the draft profile version. Publishing the profile version makes those choices available to new sessions and automations.
 
 ## Setup Scripts
 
@@ -68,7 +83,7 @@ Setup Assistant opens an agent workspace beside the setup script editor so you c
 To use Setup Assistant:
 
 1. Open a sandbox profile draft.
-2. Make sure the profile includes an agent integration binding.
+2. Make sure the profile includes a model provider connection for the selected agent runtime.
 3. Select **Setup Assistant** from the setup script controls.
 4. Ask the assistant to write a new setup script or fix the current script.
 5. Update the setup script field with the final script.
@@ -81,7 +96,7 @@ To use Setup Assistant:
   />
 </Frame>
 
-Setup Assistant is only available while editing a draft profile version, and it requires an agent integration binding. The assistant sandbox starts from the base image so the recommended script does not depend on state created only inside the assistant session.
+Setup Assistant is only available while editing a draft profile version, and it requires a model provider connection for the selected agent runtime. The assistant sandbox starts from the base image so the recommended script does not depend on state created only inside the assistant session.
 
 ## Experiment With Setup Scripts
 
@@ -119,6 +134,17 @@ Draft profile versions can opt into persistent sandboxes when organization persi
 Use persistent sandboxes when sessions from a profile should retain selected workspace state across compute stops, resumes, or provider expiry. This is experimental and should be used deliberately.
 
 Read [Persistent Sandboxes](/guides/persistent-sandboxes) for setup steps, limits, and how persistence differs from snapshots.
+
+## Automations On A Profile
+
+Open the **Automations** tab on a sandbox profile to see automations that use that profile. From there you can create a new automation preselected for the profile, or select an existing event or scheduled automation to edit it without leaving the profile.
+
+<Frame>
+  <img
+    src="/images/product-screens/sandbox-profile-automations.png"
+    alt="Sandbox profile Automations tab showing profile-scoped automation list and selected automation editor"
+  />
+</Frame>
 
 ## Next Steps
 

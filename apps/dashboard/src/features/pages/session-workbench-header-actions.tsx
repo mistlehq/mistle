@@ -26,7 +26,7 @@ import {
 } from "@phosphor-icons/react";
 import { useState } from "react";
 
-import { resolveIntegrationLogoPath } from "../integrations/logo.js";
+import { IntegrationLogo } from "../integrations/integration-logo.js";
 import { resolveSelectableValue } from "../shared/select-value.js";
 
 export type SessionWorkbenchHeaderRepositoryOption = {
@@ -213,11 +213,7 @@ export function SessionWorkbenchHeaderActions(input: {
         <DropdownMenuContent align="end" className="w-48 sm:hidden" sideOffset={8}>
           <DropdownMenuGroup>
             <HeaderMenuItem control={input.cliControl} label="TUI">
-              <img
-                alt=""
-                className="size-4"
-                src={resolveIntegrationLogoPath({ logoKey: "openai" })}
-              />
+              <IntegrationLogo alt="" className="size-4" logoKey="openai" />
             </HeaderMenuItem>
             <HeaderMenuItem control={input.diffControl} label="Changes">
               <GitDiffIcon className="size-4" />

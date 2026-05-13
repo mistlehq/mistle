@@ -36,10 +36,12 @@
             "group": "Integrations",
             "pages": [
               "guides/aws-integration-setup",
+              "guides/anthropic-integration-setup",
               "guides/datadog-integration-setup",
               "guides/github-integration-setup",
               "guides/jira-integration-setup",
               "guides/linear-integration-setup",
+              "guides/opencode-go-integration-setup",
               "guides/openai-integration-setup",
               "guides/planetscale-integration-setup",
               "guides/signoz-integration-setup",

@@ -1,0 +1,32 @@
+---
+title: OpenCode Go
+description: Connect OpenCode Go model access to Mistle
+icon: data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxzdHlsZT4uc3ZnbC1kYXJre2Rpc3BsYXk6bm9uZX1AbWVkaWEocHJlZmVycy1jb2xvci1zY2hlbWU6ZGFyayl7LnN2Z2wtbGlnaHR7ZGlzcGxheTpub25lfS5zdmdsLWRhcmt7ZGlzcGxheTppbmxpbmV9fTwvc3R5bGU+CjxzdmcgY2xhc3M9InN2Z2wtbGlnaHQiIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiB2aWV3Qm94PSIwIDAgNTEyIDUxMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iI0ZERkNGQyIvPgo8cGF0aCBkPSJNMzIwIDIyNFYzNTJIMTkyVjIyNEgzMjBaIiBmaWxsPSIjRTZFNUU2Ii8+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMzg0IDQxNkgxMjhWOTZIMzg0VjQxNlpNMzIwIDE2MEgxOTJWMzUySDMyMFYxNjBaIiBmaWxsPSIjMTcxODFDIi8+PC9zdmc+CjxzdmcgY2xhc3M9InN2Z2wtZGFyayIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB2ZXJzaW9uPSIxLjEiIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiI+PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSIjMTMxMDEwIj48L3JlY3Q+CjxwYXRoIGQ9Ik0zMjAgMjI0VjM1MkgxOTJWMjI0SDMyMFoiIGZpbGw9IiM1QTU4NTgiPjwvcGF0aD4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0zODQgNDE2SDEyOFY5NkgzODRWNDE2Wk0zMjAgMTYwSDE5MlYzNTJIMzIwVjE2MFoiIGZpbGw9IndoaXRlIj48L3BhdGg+Cjwvc3ZnPjxzdHlsZT5AbWVkaWEgKHByZWZlcnMtY29sb3Itc2NoZW1lOiBsaWdodCkgeyA6cm9vdCB7IGZpbHRlcjogbm9uZTsgfSB9CkBtZWRpYSAocHJlZmVycy1jb2xvci1zY2hlbWU6IGRhcmspIHsgOnJvb3QgeyBmaWx0ZXI6IG5vbmU7IH0gfQo8L3N0eWxlPjwvc3ZnPgo8L3N2Zz4K
+---
+
+## Overview
+
+OpenCode Go provides model access for sandbox profiles that use the OpenCode agent runtime.
+
+Use this connection when an OpenCode profile should be able to call OpenCode Go through an API key managed by Mistle.
+
+## Connect In Mistle
+
+Open **Integrations** in the dashboard, choose **OpenCode Go**, then select **API key**.
+
+Enter:
+
+| Field   | Value               |
+| ------- | ------------------- |
+| API key | OpenCode Go API key |
+
+## Use With A Sandbox Profile
+
+After the connection exists:
+
+1. Open the sandbox profile that should use OpenCode Go.
+2. In **Runtime**, set **Agent** to **OpenCode**.
+3. Add OpenCode Go as a model provider connection.
+4. Save and publish the profile version.
+
+OpenCode Go connections are only available to OpenCode profiles. Codex profiles use OpenAI-compatible model-provider connections instead.

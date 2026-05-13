@@ -23,7 +23,7 @@ import { useRef, useState } from "react";
 
 import { AutoSaveSelectField } from "../forms/auto-save-select-field.js";
 import { AutoSaveTextField } from "../forms/auto-save-text-field.js";
-import { resolveIntegrationLogoPath } from "../integrations/logo.js";
+import { IntegrationLogo } from "../integrations/integration-logo.js";
 import type {
   LinkedAccountCallbackNotice,
   LinkedAccountCardViewModel,
@@ -308,10 +308,10 @@ function LinkedAccountCard(input: {
     <div className="rounded border bg-background p-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
-          <img
+          <IntegrationLogo
             alt={`${input.linkedAccountCard.displayName} logo`}
             className="h-10 w-10 rounded-md border bg-background p-1.5"
-            src={resolveIntegrationLogoPath({ logoKey: input.linkedAccountCard.logoKey })}
+            logoKey={input.linkedAccountCard.logoKey}
           />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">

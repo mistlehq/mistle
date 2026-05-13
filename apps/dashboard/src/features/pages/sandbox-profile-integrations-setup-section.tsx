@@ -27,7 +27,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link as RouterLink } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { resolveIntegrationLogoPath } from "../integrations/logo.js";
+import { IntegrationLogo } from "../integrations/integration-logo.js";
 import type {
   SandboxIntegrationBindingKind,
   SandboxProfileVersion,
@@ -136,11 +136,7 @@ function IntegrationNameCell(input: {
   return (
     <div className={`${SandboxProfileIntegrationCellContentClassName} gap-2 text-sm`}>
       {input.logoKey === undefined ? null : (
-        <img
-          alt=""
-          className="h-5 w-5 rounded-sm"
-          src={resolveIntegrationLogoPath({ logoKey: input.logoKey })}
-        />
+        <IntegrationLogo alt="" className="h-5 w-5 rounded-sm" logoKey={input.logoKey} />
       )}
       <div className="min-w-0 truncate font-medium">{input.title}</div>
     </div>
@@ -273,11 +269,7 @@ function GitConnectionSelectionCell(input: {
           <SelectItem key={choice.id} value={choice.id}>
             <div className="flex items-center gap-2">
               {choice.logoKey === undefined ? null : (
-                <img
-                  alt=""
-                  className="h-5 w-5 rounded-sm"
-                  src={resolveIntegrationLogoPath({ logoKey: choice.logoKey })}
-                />
+                <IntegrationLogo alt="" className="h-5 w-5 rounded-sm" logoKey={choice.logoKey} />
               )}
               <span>{choice.displayName}</span>
             </div>
@@ -503,7 +495,7 @@ function AddConnectorTile(input: {
       description=""
       leading={
         input.choice.logoKey === undefined ? null : (
-          <img alt="" src={resolveIntegrationLogoPath({ logoKey: input.choice.logoKey })} />
+          <IntegrationLogo alt="" logoKey={input.choice.logoKey} />
         )
       }
       title={input.choice.title}

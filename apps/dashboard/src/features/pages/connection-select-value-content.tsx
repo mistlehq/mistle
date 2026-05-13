@@ -1,6 +1,6 @@
 import type React from "react";
 
-import { resolveIntegrationLogoPath } from "../integrations/logo.js";
+import { IntegrationLogo } from "../integrations/integration-logo.js";
 
 export function ConnectionSelectValueContent(input: {
   connectionDisplayName: string;
@@ -10,10 +10,10 @@ export function ConnectionSelectValueContent(input: {
   return (
     <div className="flex min-w-0 items-center gap-2">
       {input.targetLogoKey === undefined ? null : (
-        <img
+        <IntegrationLogo
           alt={`${input.targetDisplayName ?? "Integration"} logo`}
           className="size-4 shrink-0 rounded-sm"
-          src={resolveIntegrationLogoPath({ logoKey: input.targetLogoKey })}
+          logoKey={input.targetLogoKey}
         />
       )}
       {input.targetDisplayName === undefined ? (

@@ -39,9 +39,9 @@ To create an automation:
 
 1. Open **Automations**.
 2. Create a new automation.
-3. Choose whether it should be event-triggered or scheduled.
-4. Select the integration event or schedule.
-5. Choose the sandbox profile version that should run the work.
+3. Choose the sandbox profile that should run the work.
+4. Choose whether it should be event-triggered or scheduled.
+5. Select the integration event or schedule.
 6. Choose the primary repository when the selected profile provides repository options.
 7. Describe the task or instructions the agent should follow.
 8. Save the automation.
@@ -75,6 +75,17 @@ Scheduled automations run from a saved schedule. The schedule, timezone, sandbox
 For automations, the primary repository is saved with the automation target. Each run uses it as the agent's startup working directory, so event-triggered and scheduled work begins in the intended repository without a user choosing it at runtime.
 
 Set the primary repository to the repo where the automation should read instructions, discover skills, run commands, and collect code changes. If it is left unset, the automation can still start from the selected sandbox profile, but repository-specific behavior depends on the profile's default workspace rather than an explicit repository choice.
+
+## Manage Automations From A Profile
+
+Each sandbox profile has an **Automations** tab that lists event-triggered and scheduled automations using that profile. Use it when you want to review profile-specific automation behavior, edit an automation in place, or create a new automation already scoped to that profile.
+
+<Frame>
+  <img
+    src="/images/product-screens/sandbox-profile-automations.png"
+    alt="Sandbox profile Automations tab with a list of automations and an inline automation editor"
+  />
+</Frame>
 
 ## Event Flow
 

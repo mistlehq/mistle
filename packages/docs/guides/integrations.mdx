@@ -13,7 +13,7 @@ For example, integrations can let an agent:
 - work in GitHub and open pull requests
 - inspect logs and traces in Datadog or SigNoz
 - read or update issues in Jira or Linear
-- call model providers such as OpenAI
+- call model providers such as OpenAI, Anthropic, or OpenCode Go
 
 ## Recommended Starting Integrations
 
@@ -23,6 +23,8 @@ Most useful Mistle workflows need at least:
 - [GitHub](/guides/github-integration-setup), so agents can inspect repositories, make changes, and open pull requests.
 
 Other integrations are optional and should match the systems where your team wants agents to receive context, take action, or report results.
+
+Profiles that use the OpenCode agent runtime can use OpenCode-specific model provider connections such as [Anthropic](/guides/anthropic-integration-setup) and [OpenCode Go](/guides/opencode-go-integration-setup).
 
 ## After Connecting Integrations
 
@@ -54,10 +56,12 @@ When an official tool is unavailable or not well suited for agent workflows, Mis
 Mistle currently ships setup guides for:
 
 - [AWS](/guides/aws-integration-setup)
+- [Anthropic](/guides/anthropic-integration-setup)
 - [Datadog](/guides/datadog-integration-setup)
 - [GitHub](/guides/github-integration-setup)
 - [Jira](/guides/jira-integration-setup)
 - [Linear](/guides/linear-integration-setup)
+- [OpenCode Go](/guides/opencode-go-integration-setup)
 - [OpenAI](/guides/openai-integration-setup)
 - [PlanetScale](/guides/planetscale-integration-setup)
 - [SigNoz](/guides/signoz-integration-setup)

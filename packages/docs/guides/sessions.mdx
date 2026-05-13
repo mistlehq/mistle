@@ -62,7 +62,7 @@ The header controls expose the active sandbox and repository state:
 | ------------------ | -------------------------------------------------------------------------------------- |
 | Status indicator   | See whether the sandbox is connected, stopped, or in an error state.                   |
 | Primary repository | Choose which repository or workspace the chat, terminal, and changes panel should use. |
-| **TUI**            | Switch the main panel from chat to the Codex TUI running inside the sandbox.           |
+| **TUI**            | Switch the main panel from chat to the agent runtime's TUI inside the sandbox.         |
 | Changes            | Open the current code changes for the selected repository.                             |
 | Processes          | Open HTTP ports for loopback-listening processes running inside the sandbox.           |
 | Terminal           | Open a shell workspace at the bottom of the session.                                   |
@@ -71,7 +71,7 @@ The header controls expose the active sandbox and repository state:
 
 Profiles can expose one or more repositories or workspaces. Use the **Primary repository** selector to choose the working directory for the current turn.
 
-The primary repository sets where new agent threads, the Codex TUI, terminals, repository status checks, and code diffs run. Set it to the repository where the agent should do the work.
+The primary repository sets where new agent threads, the runtime TUI, terminals, repository status checks, and code diffs run. Set it to the repository where the agent should do the work.
 
 This matters because repo-local instructions and skills are discovered from the working directory. Choosing the wrong repository can start the agent without the project-specific guidance it needs.
 
@@ -81,7 +81,11 @@ If a session does not have a repository, repository-dependent controls show an u
 
 The default session view is chat. Use it for normal agent instructions, follow-up questions, file attachments, approvals, and review comments.
 
-Use **TUI** when you want to work directly in the agent's native terminal interface. The TUI replaces the chat pane while it is open, and you can return to chat from the same header control.
+Use **TUI** when you want to work directly in the selected agent runtime's native terminal interface. The TUI replaces the chat pane while it is open, and you can return to chat from the same header control.
+
+When the active runtime exposes model options, the composer shows model and reasoning controls. Use them before sending a message when a task needs a different model or reasoning effort.
+
+You can attach files from the composer by clicking the add-files control, pasting files, or dropping files into the composer. Attached files are sent with the next message.
 
 ## Review Code Changes
 
@@ -123,7 +127,7 @@ Ports are available only while the sandbox is running and Mistle can connect to 
 
 Agents can use configured integrations to interact with external systems. Credentials are managed by Mistle and are not placed directly inside the sandbox as long-lived secrets.
 
-The exact tools and provider access available in a session come from the profile, organization settings, and connected integrations.
+The exact runtime, tools, model providers, and external-system access available in a session come from the profile, organization settings, and connected integrations.
 
 ## External Activity Links
 

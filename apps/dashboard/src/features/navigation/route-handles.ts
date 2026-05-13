@@ -1,7 +1,7 @@
 import { listBrowserIntegrationDefinitions } from "@mistle/integrations-definitions/browser";
 import { createElement } from "react";
 
-import { resolveIntegrationLogoPath } from "../integrations/logo.js";
+import { IntegrationLogo } from "../integrations/integration-logo.js";
 import type { AppRouteHandle, RouteTextResolverInput, RouteTextValue } from "./route-meta.js";
 
 type SettingsPageRouteHandle = AppRouteHandle & {
@@ -76,10 +76,10 @@ function resolveIntegrationBreadcrumbIcon(input: RouteTextResolverInput): React.
     return null;
   }
 
-  return createElement("img", {
+  return createElement(IntegrationLogo, {
     alt: "",
     className: "h-5 w-5 rounded-sm",
-    src: resolveIntegrationLogoPath({ logoKey: metadata.logoKey }),
+    logoKey: metadata.logoKey,
   });
 }
 
@@ -113,10 +113,10 @@ function resolveIntegrationDetailHeaderIcon(input: RouteTextResolverInput): Reac
     );
   }
 
-  return createElement("img", {
+  return createElement(IntegrationLogo, {
     alt: `${metadata.displayName} logo`,
     className: "h-11 w-11 rounded-md border bg-background p-1.5",
-    src: resolveIntegrationLogoPath({ logoKey: metadata.logoKey }),
+    logoKey: metadata.logoKey,
   });
 }
 

@@ -24,8 +24,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
 
 import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
+import { IntegrationLogo } from "../integrations/integration-logo.js";
 import { listIntegrationConnectionResources } from "../integrations/integrations-service.js";
-import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
 import {
   resolveSelectedWebhookAutomationEventOptions,
@@ -107,11 +107,10 @@ export function WebhookAutomationTriggerPicker(input: {
                 <div className="min-w-0 self-start">
                   <div className="flex min-w-0 items-start gap-2.5">
                     {option.logoKey === undefined ? null : (
-                      <img
+                      <IntegrationLogo
                         alt=""
-                        aria-hidden
                         className="mt-0.5 size-4 shrink-0"
-                        src={resolveIntegrationLogoPath({ logoKey: option.logoKey })}
+                        logoKey={option.logoKey}
                       />
                     )}
                     <p className="min-w-0 text-sm leading-5 font-medium text-balance">
@@ -249,12 +248,7 @@ export function WebhookAutomationTriggerPickerAddButton(input: {
               <ComboboxGroup key={group.connectionLabel}>
                 <ComboboxLabel className="flex items-center gap-2">
                   {group.logoKey === undefined ? null : (
-                    <img
-                      alt=""
-                      aria-hidden
-                      className="size-3.5 shrink-0"
-                      src={resolveIntegrationLogoPath({ logoKey: group.logoKey })}
-                    />
+                    <IntegrationLogo alt="" className="size-3.5 shrink-0" logoKey={group.logoKey} />
                   )}
                   <span>{group.connectionLabel}</span>
                 </ComboboxLabel>

@@ -17,7 +17,7 @@ import {
 import { EyeIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 
-import { resolveIntegrationLogoPath } from "../integrations/logo.js";
+import { IntegrationLogo } from "../integrations/integration-logo.js";
 import { FormPageStack } from "../shared/form-page.js";
 import {
   ResponsiveFieldList,
@@ -159,10 +159,10 @@ function IdentityLinkingProviderRowView(input: {
     >
       <ResponsiveFieldListCell columnKey="integration">
         <div className="flex min-w-0 items-center gap-3">
-          <img
+          <IntegrationLogo
             alt={`${provider.displayName} logo`}
             className="h-9 w-9 rounded-md border bg-background p-1.5"
-            src={resolveIntegrationLogoPath({ logoKey: provider.logoKey })}
+            logoKey={provider.logoKey}
           />
           <div className="min-w-0">
             <div className="truncate text-sm font-medium">{provider.displayName}</div>

@@ -19,7 +19,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { Link as RouterLink } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { resolveIntegrationLogoPath } from "../integrations/logo.js";
+import { IntegrationLogo } from "../integrations/integration-logo.js";
 import type {
   SandboxProviderSummary,
   SandboxProfileVersion,
@@ -728,7 +728,7 @@ function AgentRuntimeOptionLabel(input: { runtimeId: AgentRuntimeId }): React.JS
 
   return (
     <span className="flex items-center gap-2">
-      <img alt="" className="size-4 rounded-sm" src={resolveIntegrationLogoPath({ logoKey })} />
+      <IntegrationLogo alt="" className="size-4 rounded-sm" logoKey={logoKey} />
       {label}
     </span>
   );
@@ -790,7 +790,7 @@ function ProviderOptionLabel(input: { provider: SandboxProviderSummary }): React
   return (
     <span className="flex items-center gap-2">
       {logoKey === undefined ? null : (
-        <img alt="" className="size-4 rounded-sm" src={resolveIntegrationLogoPath({ logoKey })} />
+        <IntegrationLogo alt="" className="size-4 rounded-sm" logoKey={logoKey} />
       )}
       {input.provider.displayName}
     </span>

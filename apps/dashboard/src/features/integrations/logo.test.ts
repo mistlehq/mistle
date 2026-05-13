@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveIntegrationLogoPath } from "./logo.js";
+import { resolveDarkIntegrationLogoPath, resolveIntegrationLogoPath } from "./logo.js";
 
 describe("resolveIntegrationLogoPath", () => {
   it("returns the dashboard public path for a logo key", () => {
@@ -38,6 +38,41 @@ describe("resolveIntegrationLogoPath", () => {
       "Integration logo key must be a non-empty string.",
     );
     expect(() => resolveIntegrationLogoPath({ logoKey: "   " })).toThrow(
+      "Integration logo key must be a non-empty string.",
+    );
+  });
+});
+
+describe("resolveDarkIntegrationLogoPath", () => {
+  it("returns the dashboard public dark variant path for logo keys with vendored SVGL dark assets", () => {
+    expect(resolveDarkIntegrationLogoPath({ logoKey: "anthropic" })).toBe(
+      "/integration-logos/anthropic-dark.svg",
+    );
+    expect(resolveDarkIntegrationLogoPath({ logoKey: "github" })).toBe(
+      "/integration-logos/github-dark.svg",
+    );
+    expect(resolveDarkIntegrationLogoPath({ logoKey: "openai" })).toBe(
+      "/integration-logos/openai-dark.svg",
+    );
+    expect(resolveDarkIntegrationLogoPath({ logoKey: "opencode" })).toBe(
+      "/integration-logos/opencode-dark.svg",
+    );
+    expect(resolveDarkIntegrationLogoPath({ logoKey: "planetscale" })).toBe(
+      "/integration-logos/planetscale-dark.svg",
+    );
+  });
+
+  it("returns no dark variant path for logo keys without SVGL dark assets", () => {
+    expect(resolveDarkIntegrationLogoPath({ logoKey: "slack" })).toBeUndefined();
+    expect(resolveDarkIntegrationLogoPath({ logoKey: "linear" })).toBeUndefined();
+    expect(resolveDarkIntegrationLogoPath({ logoKey: "datadog" })).toBeUndefined();
+  });
+
+  it("trims whitespace and throws for empty logo keys", () => {
+    expect(resolveDarkIntegrationLogoPath({ logoKey: "  github  " })).toBe(
+      "/integration-logos/github-dark.svg",
+    );
+    expect(() => resolveDarkIntegrationLogoPath({ logoKey: "" })).toThrow(
       "Integration logo key must be a non-empty string.",
     );
   });

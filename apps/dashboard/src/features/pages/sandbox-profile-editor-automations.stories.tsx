@@ -17,7 +17,7 @@ import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.
 import { SandboxProfileAutomationsSection } from "./sandbox-profile-automations-section.js";
 
 const ProfileId = "sbp_repo_maintainer";
-const SelectedScheduleAutomationId = "atm_schedule_daily_triage";
+export const SelectedScheduleAutomationId = "atm_schedule_daily_triage";
 
 const Profile: SandboxProfile = {
   id: ProfileId,
@@ -29,7 +29,7 @@ const Profile: SandboxProfile = {
   updatedAt: "2026-05-08T00:00:00.000Z",
 };
 
-const ProfileAutomations: AutomationsListResult = {
+export const ProfileAutomations: AutomationsListResult = {
   items: [
     {
       id: SelectedScheduleAutomationId,
@@ -296,7 +296,7 @@ function createStoryQueryClient(input: {
   return queryClient;
 }
 
-function SandboxProfileAutomationsStory(input: {
+export function SandboxProfileAutomationsStory(input: {
   additionalPages?: readonly StoryAutomationPage[];
   automations: AutomationsListResult;
   selectedAutomationId?: string;
@@ -341,6 +341,11 @@ const meta = {
   title: "Dashboard/SandboxProfiles/Editor/Automations",
   component: SandboxProfileAutomationsStory,
   decorators: [withDashboardCenteredStory],
+  excludeStories: [
+    "ProfileAutomations",
+    "SandboxProfileAutomationsStory",
+    "SelectedScheduleAutomationId",
+  ],
   args: {
     automations: ProfileAutomations,
   },

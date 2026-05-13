@@ -1,7 +1,7 @@
 import { Button } from "@mistle/ui";
 
 import { ActionTile } from "../shared/action-tile.js";
-import { resolveIntegrationLogoPath } from "./logo.js";
+import { IntegrationLogo } from "./integration-logo.js";
 
 type IntegrationTileProps = {
   actionLabel: string;
@@ -58,10 +58,10 @@ export function IntegrationTile(props: IntegrationTileProps) {
 function IntegrationNameBadge(input: { logoKey?: string; displayName: string }) {
   if (input.logoKey !== undefined) {
     return (
-      <img
+      <IntegrationLogo
         alt={`${input.displayName} logo`}
         className="h-5 w-5 rounded-sm"
-        src={resolveIntegrationLogoPath({ logoKey: input.logoKey })}
+        logoKey={input.logoKey}
       />
     );
   }

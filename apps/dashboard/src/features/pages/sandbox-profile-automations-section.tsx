@@ -96,27 +96,33 @@ function ProfileAutomationListRow(input: {
   onSelect: () => void;
 }): React.JSX.Element {
   return (
-    <button
-      aria-current={input.selected ? "true" : undefined}
-      aria-label={`Select automation ${input.item.name}`}
-      className={`flex w-full min-w-0 flex-col items-start gap-2 border-l-2 py-3 pl-4 pr-3 text-left transition-colors ${
+    <div
+      className={`flex w-full min-w-0 border-l-2 py-3 pl-4 pr-3 transition-colors ${
         input.selected
           ? "border-foreground text-foreground"
           : "border-transparent text-muted-foreground hover:text-foreground"
       }`}
-      onClick={input.onSelect}
-      type="button"
     >
-      <div className="flex w-full min-w-0 items-center gap-2">
+      <div className="flex w-full min-w-0 items-start gap-2">
         <AutomationIssueIndicator enabled={input.item.enabled} issue={input.item.issue} />
-        <span className="min-w-0 flex-1 truncate text-sm font-medium">{input.item.name}</span>
-        <AutomationKindIcon kind={input.item.kind} />
+        <button
+          aria-current={input.selected ? "true" : undefined}
+          aria-label={`Select automation ${input.item.name}`}
+          className="flex min-w-0 flex-1 flex-col items-start gap-2 text-left"
+          onClick={input.onSelect}
+          type="button"
+        >
+          <span className="flex w-full min-w-0 items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">{input.item.name}</span>
+            <AutomationKindIcon kind={input.item.kind} />
+          </span>
+          <span className="flex min-w-0 flex-col gap-1">
+            <SourceSummary item={input.item} />
+          </span>
+          <span className="text-xs text-muted-foreground">Updated {input.item.updatedAtLabel}</span>
+        </button>
       </div>
-      <div className="flex min-w-0 flex-col gap-1">
-        <SourceSummary item={input.item} />
-      </div>
-      <span className="text-xs text-muted-foreground">Updated {input.item.updatedAtLabel}</span>
-    </button>
+    </div>
   );
 }
 

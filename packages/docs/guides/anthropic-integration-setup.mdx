@@ -1,0 +1,32 @@
+---
+title: Anthropic
+description: Connect Anthropic model access to Mistle
+icon: data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjMDAwIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIHN0eWxlPSJmbGV4Om5vbmU7bGluZS1oZWlnaHQ6MSIgdmlld0JveD0iMCAwIDI0IDI0IiB3aWR0aD0iMWVtIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8c3R5bGU+LnN2Z2wtZGFya3tkaXNwbGF5Om5vbmV9QG1lZGlhKHByZWZlcnMtY29sb3Itc2NoZW1lOmRhcmspey5zdmdsLWxpZ2h0e2Rpc3BsYXk6bm9uZX0uc3ZnbC1kYXJre2Rpc3BsYXk6aW5saW5lfX08L3N0eWxlPgo8c3ZnIGNsYXNzPSJzdmdsLWxpZ2h0IiBmaWxsPSIjMDAwIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIHN0eWxlPSJmbGV4Om5vbmU7bGluZS1oZWlnaHQ6MSIgdmlld0JveD0iMCAwIDI0IDI0IiB3aWR0aD0iMWVtIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjx0aXRsZT5BbnRocm9waWM8L3RpdGxlPjxwYXRoIGQ9Ik0xMy44MjcgMy41MmgzLjYwM0wyNCAyMGgtMy42MDNsLTYuNTctMTYuNDh6bS03LjI1OCAwaDMuNzY3TDE2LjkwNiAyMGgtMy42NzRsLTEuMzQzLTMuNDYxSDUuMDE3bC0xLjM0NCAzLjQ2SDBMNi41NyAzLjUyMnptNC4xMzIgOS45NTlMOC40NTMgNy42ODcgNi4yMDUgMTMuNDhIMTAuN3oiPjwvcGF0aD48L3N2Zz4KPHN2ZyBjbGFzcz0ic3ZnbC1kYXJrIiBmaWxsPSIjZmZmZiIgZmlsbC1ydWxlPSJldmVub2RkIiBzdHlsZT0iZmxleDpub25lO2xpbmUtaGVpZ2h0OjEiIHZpZXdCb3g9IjAgMCAyNCAyNCIgd2lkdGg9IjFlbSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGl0bGU+QW50aHJvcGljPC90aXRsZT48cGF0aCBkPSJNMTMuODI3IDMuNTJoMy42MDNMMjQgMjBoLTMuNjAzbC02LjU3LTE2LjQ4em0tNy4yNTggMGgzLjc2N0wxNi45MDYgMjBoLTMuNjc0bC0xLjM0My0zLjQ2MUg1LjAxN2wtMS4zNDQgMy40NkgwTDYuNTcgMy41MjJ6bTQuMTMyIDkuOTU5TDguNDUzIDcuNjg3IDYuMjA1IDEzLjQ4SDEwLjd6Ij48L3BhdGg+PC9zdmc+Cjwvc3ZnPgo=
+---
+
+## Overview
+
+Anthropic provides model access for sandbox profiles that use the OpenCode agent runtime.
+
+Use this connection when an OpenCode profile should be able to call Anthropic models through an API key managed by Mistle.
+
+## Connect In Mistle
+
+Open **Integrations** in the dashboard, choose **Anthropic**, then select **API key**.
+
+Enter:
+
+| Field   | Value             |
+| ------- | ----------------- |
+| API key | Anthropic API key |
+
+## Use With A Sandbox Profile
+
+After the connection exists:
+
+1. Open the sandbox profile that should use Anthropic.
+2. In **Runtime**, set **Agent** to **OpenCode**.
+3. Add Anthropic as a model provider connection.
+4. Save and publish the profile version.
+
+Anthropic connections are only available to OpenCode profiles. Codex profiles use OpenAI-compatible model-provider connections instead.

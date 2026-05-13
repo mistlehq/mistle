@@ -9,7 +9,7 @@ import {
   textLinkVariants,
 } from "@mistle/ui";
 
-import { resolveIntegrationLogoPath } from "../integrations/logo.js";
+import { IntegrationLogo } from "../integrations/integration-logo.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 import { resolveEventSummary } from "./automation-list-event-summary.js";
@@ -73,11 +73,10 @@ function EventSummaryCell(input: {
   return (
     <div className="flex min-w-0 items-center gap-2" title={eventSummary.title}>
       {eventSummary.firstEvent.logoKey === undefined ? null : (
-        <img
+        <IntegrationLogo
           alt=""
-          aria-hidden
           className="size-4 shrink-0"
-          src={resolveIntegrationLogoPath({ logoKey: eventSummary.firstEvent.logoKey })}
+          logoKey={eventSummary.firstEvent.logoKey}
         />
       )}
       <span className="truncate">{eventSummary.firstEvent.label}</span>
