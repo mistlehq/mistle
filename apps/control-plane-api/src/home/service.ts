@@ -1,6 +1,5 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import {
-  AutomationKinds,
   IntegrationConnectionStatuses,
   type ControlPlaneDatabase,
   SandboxProfileVersionStates,
@@ -10,7 +9,10 @@ import { IntegrationKinds, type IntegrationRegistry } from "@mistle/integrations
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { listInstances } from "../sandbox-instances/services/list-instances.js";
 import type { HomeSummaryResponse } from "./schema.js";
+
+const HOME_RECENT_SESSIONS_LIMIT = 5;
 
 const HomeSummaryRowSchema = z
   .object({
@@ -28,6 +30,7 @@ export async function getHomeSummary(
   },
   params: {
     organizationId: string;
+    userId: string;
   },
 ): Promise<HomeSummaryResponse> {
   const tables = getControlPlaneDatabaseSchema(input.db);
@@ -46,27 +49,28 @@ export async function getHomeSummary(
       familyId: definition.familyId,
       variantId: definition.variantId,
     }));
-  const [agentCapableIntegrationResult, summaryResult, startedSessionResult] = await Promise.all([
-    input.db
-      .select({
-        familyId: tables.integrationTargets.familyId,
-        variantId: tables.integrationTargets.variantId,
-      })
-      .from(tables.integrationConnections)
-      .innerJoin(
-        tables.integrationTargets,
-        sql`${tables.integrationTargets.targetKey} = ${tables.integrationConnections.targetKey}`,
-      )
-      .where(
-        sql`${tables.integrationConnections.organizationId} = ${params.organizationId}
+  const [agentCapableIntegrationResult, summaryResult, startedSessionResult, recentSessionsResult] =
+    await Promise.all([
+      input.db
+        .select({
+          familyId: tables.integrationTargets.familyId,
+          variantId: tables.integrationTargets.variantId,
+        })
+        .from(tables.integrationConnections)
+        .innerJoin(
+          tables.integrationTargets,
+          sql`${tables.integrationTargets.targetKey} = ${tables.integrationConnections.targetKey}`,
+        )
+        .where(
+          sql`${tables.integrationConnections.organizationId} = ${params.organizationId}
           and ${tables.integrationConnections.status} = ${IntegrationConnectionStatuses.ACTIVE}
           and ${tables.integrationTargets.enabled} = true`,
-      ),
-    input.db.execute(sql<{
-      hasProfiles: boolean;
-      hasUsableProfiles: boolean;
-      hasAutomations: boolean;
-    }>`select
+        ),
+      input.db.execute(sql<{
+        hasProfiles: boolean;
+        hasUsableProfiles: boolean;
+        hasAutomations: boolean;
+      }>`select
         exists(
           select 1
           from ${tables.sandboxProfiles} as sp
@@ -89,17 +93,34 @@ export async function getHomeSummary(
           select 1
           from ${tables.automations} as a
           where a."organization_id" = ${params.organizationId}
-            and a."kind" = ${AutomationKinds.WEBHOOK}
         ) as "hasAutomations"`),
-    // This intentionally reuses the existing list API for now because the home
-    // onboarding flow is still provisional. If this surface becomes permanent,
-    // replace this with a lightweight persisted existence check instead of a
-    // paginated list request.
-    input.dataPlaneClient.listSandboxInstances({
-      organizationId: params.organizationId,
-      limit: 1,
-    }),
-  ]);
+      // This intentionally reuses the existing list API for now because the home
+      // onboarding flow is still provisional. If this surface becomes permanent,
+      // replace this with a lightweight persisted existence check instead of a
+      // paginated list request.
+      listInstances(
+        {
+          db: input.db,
+          dataPlaneClient: input.dataPlaneClient,
+        },
+        {
+          organizationId: params.organizationId,
+          limit: 1,
+        },
+      ),
+      listInstances(
+        {
+          db: input.db,
+          dataPlaneClient: input.dataPlaneClient,
+        },
+        {
+          organizationId: params.organizationId,
+          limit: HOME_RECENT_SESSIONS_LIMIT,
+          startedByKind: "user",
+          startedById: params.userId,
+        },
+      ),
+    ]);
 
   const summary = HomeSummaryRowSchema.parse(
     summaryResult.rows[0] ?? {
@@ -130,5 +151,6 @@ export async function getHomeSummary(
       hasWebhookCapableIntegration,
       hasAutomations: summary.hasAutomations,
     },
+    recentSessions: recentSessionsResult.items,
   };
 }

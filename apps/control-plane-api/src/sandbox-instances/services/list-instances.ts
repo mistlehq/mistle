@@ -140,6 +140,8 @@ export async function listInstances(
   input: {
     organizationId: string;
     limit?: number;
+    startedByKind?: "user" | "system";
+    startedById?: string;
     after?: string;
     before?: string;
   },
@@ -148,6 +150,8 @@ export async function listInstances(
     const sandboxInstances = await dataPlaneClient.listSandboxInstances({
       organizationId: input.organizationId,
       ...(input.limit === undefined ? {} : { limit: input.limit }),
+      ...(input.startedByKind === undefined ? {} : { startedByKind: input.startedByKind }),
+      ...(input.startedById === undefined ? {} : { startedById: input.startedById }),
       ...(input.after === undefined ? {} : { after: input.after }),
       ...(input.before === undefined ? {} : { before: input.before }),
     });

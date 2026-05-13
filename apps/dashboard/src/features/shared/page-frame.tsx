@@ -10,6 +10,7 @@ export type PageFrameVariant = "default" | "tabbed";
 export type PageFrameProps = {
   breadcrumbs?: React.ReactNode;
   children: React.ReactNode;
+  className?: string;
   description?: React.ReactNode;
   headerActions?: React.ReactNode;
   headerIcon?: React.ReactNode;
@@ -105,6 +106,7 @@ export function PageFrame(input: PageFrameProps): React.JSX.Element {
     "flex min-h-full flex-col",
     input.width === "form" ? "gap-6 bg-muted/30" : "gap-4",
     "p-4",
+    input.className,
   );
 
   return (

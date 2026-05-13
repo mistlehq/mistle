@@ -1,5 +1,7 @@
 import { z } from "@hono/zod-openapi";
 
+import { sandboxInstanceListItemSchema } from "../sandbox-instances/schemas.js";
+
 export const homeSummaryResponseSchema = z
   .object({
     onboarding: z
@@ -12,6 +14,7 @@ export const homeSummaryResponseSchema = z
         hasAutomations: z.boolean(),
       })
       .strict(),
+    recentSessions: z.array(sandboxInstanceListItemSchema),
   })
   .strict();
 

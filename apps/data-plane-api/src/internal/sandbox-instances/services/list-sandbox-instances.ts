@@ -121,14 +121,22 @@ export async function listSandboxInstances(
               eq(table.organizationId, input.organizationId),
               eq(table.purpose, SandboxInstancePurposes.SESSION),
             );
+            const startedByScope =
+              input.startedByKind === undefined || input.startedById === undefined
+                ? organizationScope
+                : and(
+                    organizationScope,
+                    eq(table.startedByKind, input.startedByKind),
+                    eq(table.startedById, input.startedById),
+                  );
 
             if (cursor === undefined) {
-              return organizationScope;
+              return startedByScope;
             }
 
             if (direction === KeysetPaginationDirections.FORWARD) {
               return and(
-                organizationScope,
+                startedByScope,
                 or(
                   lt(table.createdAt, cursor.createdAt),
                   and(eq(table.createdAt, cursor.createdAt), lt(table.id, cursor.id)),
@@ -137,7 +145,7 @@ export async function listSandboxInstances(
             }
 
             return and(
-              organizationScope,
+              startedByScope,
               or(
                 gt(table.createdAt, cursor.createdAt),
                 and(eq(table.createdAt, cursor.createdAt), gt(table.id, cursor.id)),
@@ -160,6 +168,12 @@ export async function listSandboxInstances(
             and(
               eq(sandboxInstances.organizationId, input.organizationId),
               eq(sandboxInstances.purpose, SandboxInstancePurposes.SESSION),
+              ...(input.startedByKind === undefined || input.startedById === undefined
+                ? []
+                : [
+                    eq(sandboxInstances.startedByKind, input.startedByKind),
+                    eq(sandboxInstances.startedById, input.startedById),
+                  ]),
             ),
           );
 

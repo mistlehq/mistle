@@ -1635,6 +1635,24 @@
           {
             "schema": {
               "type": "string",
+              "enum": ["user", "system"]
+            },
+            "required": false,
+            "name": "startedByKind",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "startedById",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "minLength": 1
             },
             "required": false,

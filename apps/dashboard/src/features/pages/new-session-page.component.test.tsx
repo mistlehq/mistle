@@ -74,6 +74,13 @@ describe("NewSessionPage", () => {
 
     expect(screen.getByRole("heading", { name: "Start new session" })).toBeDefined();
     expect(screen.getByRole("combobox", { name: "Sandbox profile" })).toBeDefined();
+    expect(
+      screen.getByRole("combobox", { name: "Primary repository" }).hasAttribute("disabled"),
+    ).toBe(true);
+    expect(
+      (screen.getByRole("combobox", { name: "Primary repository" }) as HTMLInputElement)
+        .placeholder,
+    ).toBe("Select a sandbox profile first");
     expect(screen.getByRole("button", { name: "Start session" })).toBeDefined();
   });
 

@@ -2,6 +2,29 @@ import { z } from "zod";
 
 import { requestControlPlane } from "../api/request-control-plane.js";
 
+const HomeSandboxInstanceListItemSchema = z
+  .object({
+    id: z.string().min(1),
+    sandboxProfileId: z.string().min(1),
+    sandboxProfileDisplayName: z.string().min(1).nullable(),
+    sandboxProfileVersion: z.number().int().min(1),
+    title: z.string().min(1).nullable(),
+    status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+    startedBy: z
+      .object({
+        kind: z.enum(["user", "system"]),
+        id: z.string().min(1),
+        name: z.string().min(1).nullable(),
+      })
+      .strict(),
+    source: z.enum(["dashboard", "webhook", "schedule"]),
+    createdAt: z.string().min(1),
+    updatedAt: z.string().min(1),
+    failureCode: z.string().min(1).nullable(),
+    failureMessage: z.string().min(1).nullable(),
+  })
+  .strict();
+
 export const HomeSummaryResponseSchema = z
   .object({
     onboarding: z
@@ -14,6 +37,7 @@ export const HomeSummaryResponseSchema = z
         hasAutomations: z.boolean(),
       })
       .strict(),
+    recentSessions: z.array(HomeSandboxInstanceListItemSchema),
   })
   .strict();
 

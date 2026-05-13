@@ -1489,6 +1489,27 @@ export interface paths {
                 hasUsableProfiles: boolean;
                 hasWebhookCapableIntegration: boolean;
               };
+              recentSessions: {
+                createdAt: string;
+                failureCode: string | null;
+                failureMessage: string | null;
+                id: string;
+                sandboxProfileDisplayName: string | null;
+                sandboxProfileId: string;
+                sandboxProfileVersion: number;
+                /** @enum {string} */
+                source: "dashboard" | "webhook" | "schedule";
+                startedBy: {
+                  id: string;
+                  /** @enum {string} */
+                  kind: "user" | "system";
+                  name: string | null;
+                };
+                /** @enum {string} */
+                status: "pending" | "starting" | "running" | "stopped" | "failed";
+                title: string | null;
+                updatedAt: string;
+              }[];
             };
           };
         };

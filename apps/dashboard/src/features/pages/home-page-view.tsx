@@ -1,15 +1,37 @@
 import { Button, cn } from "@mistle/ui";
 import { CheckCircleIcon } from "@phosphor-icons/react";
+import type { ReactNode } from "react";
 
+import { isSessionPageNavigableSandboxStatus } from "../sessions/session-connect-policy.js";
+import { resolveSessionTitleLabel } from "../sessions/session-title-presentation.js";
+import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
 import { ActionTile } from "../shared/action-tile.js";
+import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
 import type { HomeChecklistStep, HomeChecklistViewModel } from "./home-page-view-model.js";
 
 type HomePageViewProps = {
+  createSessionForm?: ReactNode;
   onboarding: HomeChecklistViewModel;
   onNavigate?: (href: string) => void;
+  recentSessions?: readonly SandboxInstanceListItem[];
 };
 
-export function HomePageView({ onboarding, onNavigate }: HomePageViewProps): React.JSX.Element {
+export function HomePageView({
+  createSessionForm,
+  onboarding,
+  onNavigate,
+  recentSessions = [],
+}: HomePageViewProps): React.JSX.Element {
+  if (onboarding.state === "completed") {
+    return (
+      <CompletedHomeView
+        createSessionForm={createSessionForm}
+        recentSessions={recentSessions}
+        {...(onNavigate === undefined ? {} : { onNavigate })}
+      />
+    );
+  }
+
   return (
     <div className="space-y-3">
       {onboarding.steps.map((step) => (
@@ -19,6 +41,83 @@ export function HomePageView({ onboarding, onNavigate }: HomePageViewProps): Rea
           {...(onNavigate === undefined ? {} : { onNavigate })}
         />
       ))}
+    </div>
+  );
+}
+
+function CompletedHomeView(input: {
+  createSessionForm?: ReactNode;
+  onNavigate?: (href: string) => void;
+  recentSessions: readonly SandboxInstanceListItem[];
+}): React.JSX.Element {
+  return (
+    <div className="mx-auto flex min-h-[calc(100svh-2rem)] w-full max-w-3xl flex-col justify-center gap-6">
+      <section className="min-w-0 space-y-3">
+        <h2 className="text-base font-semibold">Start new session</h2>
+        {input.createSessionForm}
+      </section>
+
+      <section className="mx-auto w-full max-w-lg space-y-3 rounded-lg border bg-background p-4">
+        <h2 className="text-base font-semibold">Recent sessions</h2>
+        <RecentSessionsList
+          recentSessions={input.recentSessions}
+          {...(input.onNavigate === undefined ? {} : { onNavigate: input.onNavigate })}
+        />
+      </section>
+    </div>
+  );
+}
+
+function RecentSessionsList(input: {
+  onNavigate?: (href: string) => void;
+  recentSessions: readonly SandboxInstanceListItem[];
+}): React.JSX.Element {
+  if (input.recentSessions.length === 0) {
+    return <p className="text-muted-foreground text-sm">No sessions yet.</p>;
+  }
+
+  return (
+    <div className="divide-y divide-border/70">
+      {input.recentSessions.map((session) => {
+        const isNavigable = isSessionPageNavigableSandboxStatus(session.status);
+        const sessionHref = `/sessions/${encodeURIComponent(session.id)}`;
+        const sessionTitle = resolveSessionTitleLabel(session.title);
+
+        return (
+          <button
+            aria-label={sessionTitle}
+            className={cn(
+              "group/session-row flex w-full min-w-0 items-center justify-between gap-4 rounded-md px-0 py-2 text-left",
+              isNavigable
+                ? "cursor-pointer hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none"
+                : "cursor-default",
+            )}
+            disabled={!isNavigable}
+            key={session.id}
+            onClick={() => {
+              input.onNavigate?.(sessionHref);
+            }}
+            type="button"
+          >
+            <span
+              className={cn(
+                "min-w-0 truncate text-sm font-medium",
+                isNavigable
+                  ? "group-hover/session-row:underline group-focus-visible/session-row:underline"
+                  : "text-muted-foreground",
+              )}
+            >
+              {sessionTitle}
+            </span>
+            <span className="text-muted-foreground flex shrink-0 items-center gap-2 text-sm">
+              <span className="hidden max-w-64 truncate sm:inline">
+                {session.sandboxProfileDisplayName ?? session.sandboxProfileId}
+              </span>
+              <span>{formatCompactRelativeOrDate(session.createdAt)}</span>
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

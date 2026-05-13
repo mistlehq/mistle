@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { HomePageStoryModels } from "./home-page-view-model.js";
 import { HomePageView } from "./home-page-view.js";
+import { buildSandboxInstanceListItemFixture } from "./sessions-page.story-fixtures.js";
 
 describe("HomePageView", () => {
   it("renders the current step status mark in desktop and mobile title positions", () => {
@@ -38,5 +39,32 @@ describe("HomePageView", () => {
     expect(actionButton.hasAttribute("disabled")).toBe(false);
     fireEvent.click(actionButton);
     expect(navigatedHref).toBe("/integrations");
+  });
+
+  it("shows recent sessions and the session creation form after onboarding is complete", () => {
+    let navigatedHref: string | null = null;
+
+    render(
+      <HomePageView
+        createSessionForm={<div>Session creation form</div>}
+        onboarding={HomePageStoryModels.completed}
+        onNavigate={(href) => {
+          navigatedHref = href;
+        }}
+        recentSessions={[
+          buildSandboxInstanceListItemFixture({
+            id: "sbi_home_recent",
+            title: "Investigate failing build",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Recent sessions" })).toBeDefined();
+    expect(screen.getByText("Investigate failing build")).toBeDefined();
+    expect(screen.getByText("Session creation form")).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "Investigate failing build" }));
+    expect(navigatedHref).toBe("/sessions/sbi_home_recent");
   });
 });

@@ -18,6 +18,8 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
     {
       organizationId: query.organizationId,
       ...(query.limit === undefined ? {} : { limit: query.limit }),
+      ...(query.startedByKind === undefined ? {} : { startedByKind: query.startedByKind }),
+      ...(query.startedById === undefined ? {} : { startedById: query.startedById }),
       ...(query.after === undefined ? {} : { after: query.after }),
       ...(query.before === undefined ? {} : { before: query.before }),
     },

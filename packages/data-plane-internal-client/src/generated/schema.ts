@@ -18,6 +18,8 @@ export interface paths {
           before?: string;
           limit?: number;
           organizationId: string;
+          startedById?: string;
+          startedByKind?: "user" | "system";
         };
         header?: never;
         path?: never;

@@ -7,6 +7,7 @@ import { useHomeSummary } from "../home/use-home-summary.js";
 import { PageFrame } from "../shared/page-frame.js";
 import { createHomeOnboardingViewModel } from "./home-page-view-model.js";
 import { HomePageView } from "./home-page-view.js";
+import { NewSessionForm } from "./new-session-form.js";
 
 export function HomePage(): React.JSX.Element {
   const navigate = useNavigate();
@@ -33,13 +34,21 @@ export function HomePage(): React.JSX.Element {
     );
   }
 
+  const onboarding = createHomeOnboardingViewModel(homeSummaryQuery.data.onboarding);
+
   return (
-    <PageFrame width="normal" title="Get started">
+    <PageFrame
+      width="normal"
+      {...(onboarding.state === "completed" ? { className: "bg-muted/30" } : {})}
+      {...(onboarding.state === "completed" ? {} : { title: "Get started" })}
+    >
       <HomePageView
-        onboarding={createHomeOnboardingViewModel(homeSummaryQuery.data.onboarding)}
+        createSessionForm={<NewSessionForm />}
+        onboarding={onboarding}
         onNavigate={(href) => {
           void navigate(href);
         }}
+        recentSessions={homeSummaryQuery.data.recentSessions}
       />
     </PageFrame>
   );

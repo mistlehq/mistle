@@ -42,6 +42,7 @@ describe.concurrent("home summary integration", () => {
         hasWebhookCapableIntegration: false,
         hasAutomations: false,
       },
+      recentSessions: [],
     });
 
     await seedAgentReadyHomeState({
@@ -60,7 +61,102 @@ describe.concurrent("home summary integration", () => {
         hasWebhookCapableIntegration: false,
         hasAutomations: true,
       },
+      recentSessions: [
+        {
+          id: "sbi_home_summary_ready",
+          sandboxProfileId: "sbp_home_summary_ready",
+          title: "Investigate issue",
+          sandboxProfileDisplayName: "Default Profile",
+          sandboxProfileVersion: 1,
+          status: SandboxInstanceStatuses.RUNNING,
+          startedBy: {
+            kind: "user",
+            id: session.userId,
+            name: "integration-new-home-summary@example.com",
+          },
+          source: SandboxInstanceSources.DASHBOARD,
+          createdAt: "2026-03-02 00:00:00+00",
+          updatedAt: "2026-03-02 00:00:00+00",
+          failureCode: null,
+          failureMessage: null,
+        },
+      ],
     });
+  });
+
+  it("returns recent sessions created by the authenticated user", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-home-summary-recent-user@example.com",
+    });
+
+    await seedAgentReadyHomeState({
+      env,
+      idPrefix: "recent_user",
+      organizationId: session.organizationId,
+      userId: session.userId,
+    });
+    await seedAgentReadyHomeState({
+      env,
+      idPrefix: "recent_other_user",
+      organizationId: session.organizationId,
+      userId: "usr_home_summary_other_user",
+    });
+    await seedAgentReadyHomeState({
+      env,
+      idPrefix: "recent_system",
+      organizationId: session.organizationId,
+      sandboxInstanceSource: SandboxInstanceSources.WEBHOOK,
+      startedById: "aru_home_summary_recent_system",
+      startedByKind: "system",
+      userId: session.userId,
+    });
+
+    const body = await readHomeSummary(env, session.cookie);
+    expect(body.recentSessions.map((recentSession) => recentSession.id)).toStrictEqual([
+      "sbi_home_summary_recent_user",
+    ]);
+  });
+
+  it("counts scheduled automations as completed automation onboarding", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-home-summary-scheduled-automation@example.com",
+    });
+
+    await seedAgentReadyHomeState({
+      env,
+      automationKind: AutomationKinds.SCHEDULE,
+      idPrefix: "scheduled_automation",
+      organizationId: session.organizationId,
+      userId: session.userId,
+    });
+
+    const body = await readHomeSummary(env, session.cookie);
+    expect(body.onboarding).toMatchObject({
+      hasWebhookCapableIntegration: false,
+      hasAutomations: true,
+    });
+  });
+
+  it("does not count another organization's automations as completed automation onboarding", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-home-summary-own-automation@example.com",
+    });
+    const otherSession = await env.auth.createSession({
+      email: "integration-new-home-summary-other-automation@example.com",
+    });
+
+    await seedAgentReadyHomeState({
+      env,
+      automationKind: AutomationKinds.SCHEDULE,
+      idPrefix: "other_org_automation",
+      organizationId: otherSession.organizationId,
+      userId: otherSession.userId,
+    });
+
+    const body = await readHomeSummary(env, session.cookie);
+    expect(body.onboarding.hasAutomations).toBe(false);
   });
 
   it("does not count inactive connections as completed integrations", async ({ env }) => {
@@ -251,6 +347,7 @@ async function seedAgentReadyHomeState(input: {
   idPrefix: string;
   organizationId: string;
   userId: string;
+  automationKind?: typeof AutomationKinds.SCHEDULE | typeof AutomationKinds.WEBHOOK;
   startedByKind?: "system" | "user";
   startedById?: string;
   sandboxInstanceSource?: SandboxInstanceSource;
@@ -303,7 +400,7 @@ async function seedAgentReadyHomeState(input: {
   await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.automations).values({
     id: `atm_home_summary_${input.idPrefix}`,
     organizationId: input.organizationId,
-    kind: AutomationKinds.WEBHOOK,
+    kind: input.automationKind ?? AutomationKinds.WEBHOOK,
     name: "Home Summary Automation",
     enabled: true,
     createdAt: "2026-03-01T00:00:00.000Z",

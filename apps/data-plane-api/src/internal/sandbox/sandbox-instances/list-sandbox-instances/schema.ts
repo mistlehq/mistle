@@ -22,10 +22,20 @@ export const ListSandboxInstancesQuerySchema = z
       },
       createKeysetPageSizeSchema({ defaultLimit: 20, maxLimit: 100 }),
     ),
+    startedByKind: z.enum(["user", "system"]).optional(),
+    startedById: z.string().min(1).optional(),
     after: z.string().min(1).optional(),
     before: z.string().min(1).optional(),
   })
   .strict()
   .refine((value) => !(value.after !== undefined && value.before !== undefined), {
     message: "Only one of `after` or `before` can be provided.",
-  });
+  })
+  .refine(
+    (value) =>
+      (value.startedByKind === undefined && value.startedById === undefined) ||
+      (value.startedByKind !== undefined && value.startedById !== undefined),
+    {
+      message: "`startedByKind` and `startedById` must be provided together.",
+    },
+  );

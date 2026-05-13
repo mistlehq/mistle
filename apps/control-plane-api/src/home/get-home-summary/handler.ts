@@ -22,6 +22,7 @@ const routeHandler = async (
     },
     {
       organizationId: session.activeOrganizationId,
+      userId: session.userId,
     },
   );
 
