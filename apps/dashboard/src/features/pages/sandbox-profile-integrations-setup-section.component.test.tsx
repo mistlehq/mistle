@@ -7,68 +7,24 @@ import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  StoryAnthropicConnection,
+  StoryAnthropicTarget,
   StoryDatadogTarget,
   StoryGithubConnection,
   StoryGithubTarget,
   StoryJiraConnection,
   StoryJiraTarget,
+  StoryOpenCodeGoConnection,
+  StoryOpenCodeGoTarget,
   StoryOpenAiConnection,
   StoryOpenAiTarget,
   StorySlackConnection,
 } from "./integrations-editor-section-story-support.js";
-import type {
-  IntegrationConnectionSummary,
-  IntegrationTargetSummary,
-} from "./sandbox-profile-binding-config-editor.js";
 import { SandboxProfileIntegrationsSetupSection } from "./sandbox-profile-integrations-setup-section.js";
 
 type SandboxProfileIntegrationsSetupSectionProps = ComponentProps<
   typeof SandboxProfileIntegrationsSetupSection
 >;
-
-const StoryAnthropicTarget: IntegrationTargetSummary = {
-  targetKey: "target-anthropic",
-  displayName: "Anthropic",
-  logoKey: "anthropic",
-  familyId: "anthropic",
-  variantId: "anthropic-default",
-  config: {},
-  targetHealth: {
-    configStatus: "valid",
-  },
-};
-
-const StoryAnthropicConnection: IntegrationConnectionSummary = {
-  id: "connection-anthropic",
-  displayName: "Anthropic Production",
-  targetKey: StoryAnthropicTarget.targetKey,
-  status: "active",
-  config: {
-    connection_method: "api-key",
-  },
-};
-
-const StoryOpenCodeGoTarget: IntegrationTargetSummary = {
-  targetKey: "target-opencode-go",
-  displayName: "OpenCode Go",
-  logoKey: "opencode",
-  familyId: "opencode",
-  variantId: "opencode-go",
-  config: {},
-  targetHealth: {
-    configStatus: "valid",
-  },
-};
-
-const StoryOpenCodeGoConnection: IntegrationConnectionSummary = {
-  id: "connection-opencode-go",
-  displayName: "OpenCode Go Production",
-  targetKey: StoryOpenCodeGoTarget.targetKey,
-  status: "active",
-  config: {
-    connection_method: "api-key",
-  },
-};
 
 afterEach(() => {
   cleanup();
