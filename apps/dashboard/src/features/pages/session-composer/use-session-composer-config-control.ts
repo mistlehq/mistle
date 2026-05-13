@@ -15,7 +15,6 @@ export type SessionComposerConfigControl = {
     value: string;
     label: string;
   }[];
-  canChangeModel: boolean;
   canChangeReasoningEffort: boolean;
   isUpdating: boolean;
   setModel: (value: string) => void;
@@ -136,7 +135,6 @@ export function useSessionComposerConfigControl(input: {
     selectedReasoningEffort,
     hasExplicitModelSelection: selectedModel !== null,
     modelOptions,
-    canChangeModel: true,
     canChangeReasoningEffort: true,
     isUpdating: isBatchWritingConfig || isWritingConfigValue,
     setModel,
@@ -227,7 +225,6 @@ export function useLocalSessionComposerConfigControl(input: {
     selectedReasoningEffort,
     hasExplicitModelSelection: selectedModel !== null,
     modelOptions,
-    canChangeModel: true,
     canChangeReasoningEffort: input.canChangeReasoningEffort ?? true,
     isUpdating: false,
     setModel,

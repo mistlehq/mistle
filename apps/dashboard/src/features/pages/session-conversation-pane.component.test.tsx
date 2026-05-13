@@ -132,7 +132,6 @@ function RenderedComposerPaneHarness(input: {
               label: ComposerModelFixture.displayName,
             },
           ],
-          canChangeModel: true,
           canChangeReasoningEffort: true,
           isUpdating: false,
           setModel: () => {
@@ -227,7 +226,6 @@ function QueuedPromptComposerHarness(): React.JSX.Element {
                 label: ComposerModelFixture.displayName,
               },
             ],
-            canChangeModel: true,
             canChangeReasoningEffort: true,
             isUpdating: false,
             setModel: () => {
