@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router";
 
-import { DashboardAuthenticatedAnalytics } from "../../lib/analytics/dashboard-authenticated-analytics.js";
+import { AuthenticatedAnalytics } from "../../lib/analytics/authenticated.js";
 import type { SessionData } from "../auth/types.js";
 import {
   MISSING_ACTIVE_ORGANIZATION_ERROR_MESSAGE,
@@ -55,7 +55,7 @@ export function RequireAuth(): React.JSX.Element {
 
   return (
     <>
-      <DashboardAuthenticatedAnalytics
+      <AuthenticatedAnalytics
         organizationId={activeOrganizationId}
         userId={sessionQuery.data.user.id}
       />

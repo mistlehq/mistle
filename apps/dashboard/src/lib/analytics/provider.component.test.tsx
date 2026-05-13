@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { resetDashboardConfigForTest } from "../../config.js";
-import { DashboardAnalyticsProvider } from "./dashboard-analytics-provider.js";
+import { AnalyticsProvider } from "./provider.js";
 
 afterEach(() => {
   resetDashboardConfigForTest();
@@ -16,14 +16,14 @@ afterEach(() => {
   Reflect.deleteProperty(import.meta.env, "VITE_POSTHOG_HOST");
 });
 
-describe("DashboardAnalyticsProvider", () => {
+describe("AnalyticsProvider", () => {
   it("renders children without PostHog config", () => {
     Reflect.deleteProperty(import.meta.env, "VITE_POSTHOG_ENABLED");
 
     render(
-      <DashboardAnalyticsProvider>
+      <AnalyticsProvider>
         <div>Dashboard content</div>
-      </DashboardAnalyticsProvider>,
+      </AnalyticsProvider>,
     );
 
     expect(screen.getByText("Dashboard content")).not.toBeNull();

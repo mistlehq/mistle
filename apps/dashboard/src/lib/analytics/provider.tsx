@@ -4,7 +4,7 @@ import { createContext, useContext, useMemo } from "react";
 
 import { getDashboardConfig, type DashboardPostHogConfig } from "../../config.js";
 
-type DashboardAnalytics = {
+type Analytics = {
   readonly identifyAuthenticatedContext: (input: {
     userId: string;
     organizationId: string;
@@ -12,12 +12,12 @@ type DashboardAnalytics = {
   readonly captureDashboardPageView: (input: { pathname: string; organizationId: string }) => void;
 };
 
-const DisabledDashboardAnalytics: DashboardAnalytics = {
+const DisabledAnalytics: Analytics = {
   identifyAuthenticatedContext: () => {},
   captureDashboardPageView: () => {},
 };
 
-const DashboardAnalyticsContext = createContext<DashboardAnalytics>(DisabledDashboardAnalytics);
+const AnalyticsContext = createContext<Analytics>(DisabledAnalytics);
 
 let initializedPostHogClient: PostHog | undefined;
 
@@ -39,7 +39,7 @@ function resolvePostHogClient(config: DashboardPostHogConfig): PostHog | undefin
   return initializedPostHogClient;
 }
 
-function createPostHogDashboardAnalytics(client: PostHog): DashboardAnalytics {
+function createPostHogAnalytics(client: PostHog): Analytics {
   return {
     identifyAuthenticatedContext: ({ userId, organizationId }) => {
       client.identify(userId);
@@ -54,13 +54,10 @@ function createPostHogDashboardAnalytics(client: PostHog): DashboardAnalytics {
   };
 }
 
-export function DashboardAnalyticsProvider(props: {
-  children: React.ReactNode;
-}): React.JSX.Element {
+export function AnalyticsProvider(props: { children: React.ReactNode }): React.JSX.Element {
   const client = resolvePostHogClient(getDashboardConfig().posthog);
   const analytics = useMemo(
-    () =>
-      client === undefined ? DisabledDashboardAnalytics : createPostHogDashboardAnalytics(client),
+    () => (client === undefined ? DisabledAnalytics : createPostHogAnalytics(client)),
     [client],
   );
   const children =
@@ -70,13 +67,9 @@ export function DashboardAnalyticsProvider(props: {
       <PostHogProvider client={client}>{props.children}</PostHogProvider>
     );
 
-  return (
-    <DashboardAnalyticsContext.Provider value={analytics}>
-      {children}
-    </DashboardAnalyticsContext.Provider>
-  );
+  return <AnalyticsContext.Provider value={analytics}>{children}</AnalyticsContext.Provider>;
 }
 
-export function useDashboardAnalytics(): DashboardAnalytics {
-  return useContext(DashboardAnalyticsContext);
+export function useAnalytics(): Analytics {
+  return useContext(AnalyticsContext);
 }

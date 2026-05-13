@@ -1,13 +1,10 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router";
 
-import { useDashboardAnalytics } from "./dashboard-analytics-provider.js";
+import { useAnalytics } from "./provider.js";
 
-export function DashboardAuthenticatedAnalytics(props: {
-  userId: string;
-  organizationId: string;
-}): null {
-  const analytics = useDashboardAnalytics();
+export function AuthenticatedAnalytics(props: { userId: string; organizationId: string }): null {
+  const analytics = useAnalytics();
   const location = useLocation();
 
   useEffect(() => {
