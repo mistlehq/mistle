@@ -164,42 +164,17 @@ describe("useSessionWorkbenchController", () => {
   });
 
   it("omits OpenCode prompt model overrides until the user selects a model", () => {
-    expect(
-      resolveOpenCodePromptModelOverride({
-        hasExplicitModelSelection: false,
-        selectedModel: "openai/gpt-5",
-      }),
-    ).toBeUndefined();
-    expect(
-      resolveOpenCodePromptModelOverride({
-        hasExplicitModelSelection: true,
-        selectedModel: null,
-      }),
-    ).toBeUndefined();
-    expect(
-      resolveOpenCodePromptModelOverride({
-        hasExplicitModelSelection: true,
-        selectedModel: "openai/gpt-5",
-      }),
-    ).toEqual({
+    expect(resolveOpenCodePromptModelOverride(false, "openai/gpt-5")).toBeUndefined();
+    expect(resolveOpenCodePromptModelOverride(true, null)).toBeUndefined();
+    expect(resolveOpenCodePromptModelOverride(true, "openai/gpt-5")).toEqual({
       providerID: "openai",
       modelID: "gpt-5",
     });
   });
 
   it("keys OpenCode composer model overrides by sandbox and session", () => {
-    expect(
-      buildOpenCodeComposerConfigResetKey({
-        sandboxInstanceId: "sbi_one",
-        sessionId: "ses_one",
-      }),
-    ).toBe("sbi_one:ses_one");
-    expect(
-      buildOpenCodeComposerConfigResetKey({
-        sandboxInstanceId: null,
-        sessionId: null,
-      }),
-    ).toBe(":");
+    expect(buildOpenCodeComposerConfigResetKey("sbi_one", "ses_one")).toBe("sbi_one:ses_one");
+    expect(buildOpenCodeComposerConfigResetKey(null, null)).toBe(":");
   });
 
   it("starts Codex recovery from a recoverable disconnect and preserves attempts for the same event", () => {

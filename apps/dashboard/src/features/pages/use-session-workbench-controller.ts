@@ -127,22 +127,22 @@ type SessionWorkbenchState = {
   portAccessState: ReturnType<typeof useSessionPortAccess>;
 };
 
-export function resolveOpenCodePromptModelOverride(input: {
-  hasExplicitModelSelection: boolean;
-  selectedModel: string | null;
-}): ReturnType<typeof parseOpenCodePromptModelSelection> | undefined {
-  if (!input.hasExplicitModelSelection || input.selectedModel === null) {
+export function resolveOpenCodePromptModelOverride(
+  hasExplicitModelSelection: boolean,
+  selectedModel: string | null,
+): ReturnType<typeof parseOpenCodePromptModelSelection> | undefined {
+  if (!hasExplicitModelSelection || selectedModel === null) {
     return undefined;
   }
 
-  return parseOpenCodePromptModelSelection(input.selectedModel);
+  return parseOpenCodePromptModelSelection(selectedModel);
 }
 
-export function buildOpenCodeComposerConfigResetKey(input: {
-  sandboxInstanceId: string | null;
-  sessionId: string | null;
-}): string {
-  return `${input.sandboxInstanceId ?? ""}:${input.sessionId ?? ""}`;
+export function buildOpenCodeComposerConfigResetKey(
+  sandboxInstanceId: string | null,
+  sessionId: string | null,
+): string {
+  return `${sandboxInstanceId ?? ""}:${sessionId ?? ""}`;
 }
 
 type SessionConversationChatState = Pick<
@@ -429,10 +429,10 @@ export function useSessionWorkbenchController(input: {
     bootstrap: openCodeComposerBootstrap,
     clearSessionErrorMessage: openCodeSessionState.sessionMessage.clearSessionErrorMessage,
     canChangeReasoningEffort: false,
-    resetKey: buildOpenCodeComposerConfigResetKey({
-      sandboxInstanceId: input.sandboxInstanceId,
-      sessionId: openCodeSessionState.lifecycle.sessionSnapshot?.activeSessionId ?? null,
-    }),
+    resetKey: buildOpenCodeComposerConfigResetKey(
+      input.sandboxInstanceId,
+      openCodeSessionState.lifecycle.sessionSnapshot?.activeSessionId ?? null,
+    ),
   });
   const activeConfigControl = isOpenCodeRuntime ? openCodeConfigControl : configControl;
   const sessionSnapshot = workbenchLifecycleState.sessionSnapshot;
@@ -489,10 +489,10 @@ export function useSessionWorkbenchController(input: {
   const startTurn = useCallback(
     async (turnInput: Parameters<typeof chat.startTurn>[0]): Promise<void> => {
       if (isOpenCodeRuntime) {
-        const selectedOpenCodeModel = resolveOpenCodePromptModelOverride({
-          hasExplicitModelSelection: activeConfigControl.hasExplicitModelSelection,
-          selectedModel: activeConfigControl.selectedModel,
-        });
+        const selectedOpenCodeModel = resolveOpenCodePromptModelOverride(
+          activeConfigControl.hasExplicitModelSelection,
+          activeConfigControl.selectedModel,
+        );
         await openCodeSessionState.chat.sendPrompt({
           ...(selectedRepositoryPath === null ? {} : { directory: selectedRepositoryPath }),
           ...(selectedOpenCodeModel === undefined ? {} : { model: selectedOpenCodeModel }),
