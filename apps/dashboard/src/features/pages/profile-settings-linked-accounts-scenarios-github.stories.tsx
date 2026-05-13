@@ -106,34 +106,6 @@ export const SigningNotRegisteredDialog: Story = {
   },
 };
 
-export const SigningPermissionMissingDialog: Story = {
-  args: {
-    linkedAccountCards: [GitHubLinkedWithSigningNotConfiguredCard],
-    onCheckLinkedAccountCommitSigningKey: async () => ({
-      status: "permission_missing",
-      publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMistle",
-      publicKeyFingerprint: "SHA256:mistle",
-    }),
-  },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-
-    await userEvent.click(canvas.getByRole("button", { name: "Add private key" }));
-    await userEvent.type(
-      canvas.getByPlaceholderText("Paste your SSH private key"),
-      "-----BEGIN OPENSSH PRIVATE KEY-----\nkey\n-----END OPENSSH PRIVATE KEY-----\n",
-    );
-    await userEvent.click(canvas.getByRole("button", { name: "Check key" }));
-
-    await expect(
-      canvas.getByText(
-        "Mistle could not confirm this key with GitHub because the GitHub App is missing SSH signing keys read access.",
-      ),
-    ).toBeTruthy();
-    await expect(canvas.getByRole("button", { name: "Add private key" })).toBeDisabled();
-  },
-};
-
 export const SigningLocalGenerationHelperDialog: Story = {
   args: {
     linkedAccountCards: [GitHubLinkedWithSigningNotConfiguredCard],

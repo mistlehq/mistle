@@ -711,35 +711,4 @@ describe("ProfileSettingsPageView", () => {
       true,
     );
   });
-
-  it("keeps saving disabled when GitHub App permissions cannot confirm the signing key", async () => {
-    render(
-      <ProfileSettingsPageView
-        {...baseProps}
-        linkedAccountCards={[createGitHubSigningNotConfiguredCard()]}
-        onCheckLinkedAccountCommitSigningKey={async () => ({
-          status: "permission_missing",
-          publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMistle",
-          publicKeyFingerprint: "SHA256:mistle",
-        })}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Add private key" }));
-    fireEvent.change(screen.getByPlaceholderText("Paste your SSH private key"), {
-      target: {
-        value: "-----BEGIN OPENSSH PRIVATE KEY-----\nkey\n-----END OPENSSH PRIVATE KEY-----\n",
-      },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Check key" }));
-
-    expect(
-      await screen.findByText(
-        "Mistle could not confirm this key with GitHub because the GitHub App is missing SSH signing keys read access.",
-      ),
-    ).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Add private key" }).hasAttribute("disabled")).toBe(
-      true,
-    );
-  });
 });

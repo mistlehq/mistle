@@ -34,8 +34,6 @@ type SignCommitPayloadInput = {
   encoding: "base64";
 };
 
-type SignCommitPayloadResult = CommitSignResult;
-
 function resolveRequestedKeyRefOrThrow(keyRef: string): string {
   const prefix = "key::";
   if (!keyRef.startsWith(prefix)) {
@@ -75,7 +73,7 @@ export async function signCommitPayload(
     };
   },
   input: SignCommitPayloadInput,
-): Promise<SignCommitPayloadResult> {
+): Promise<CommitSignResult> {
   const tables = getControlPlaneDatabaseSchema(ctx.db);
 
   if (input.format !== SshSigningFormat) {

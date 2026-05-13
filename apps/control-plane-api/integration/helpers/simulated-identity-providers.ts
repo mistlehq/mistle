@@ -22,7 +22,6 @@ export async function startSimulatedGitHubIdentityProvider(
     tokenResponse?: unknown;
     userResponse?: unknown;
     emailsResponse?: unknown;
-    sshSigningKeysStatusCode?: number;
     sshSigningKeysResponse?: unknown;
   } = {},
 ): Promise<SimulatedProvider> {
@@ -74,8 +73,7 @@ export async function startSimulatedGitHubIdentityProvider(
       return;
     }
 
-    if (requestUrl.pathname === "/user/ssh_signing_keys") {
-      response.statusCode = input.sshSigningKeysStatusCode ?? 200;
+    if (requestUrl.pathname === "/users/mistle-user/ssh_signing_keys") {
       writeJson(response, sshSigningKeysResponse);
       return;
     }

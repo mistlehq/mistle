@@ -793,19 +793,10 @@ function CommitSigningKeyCheckNotice(input: {
     );
   }
 
-  if (input.checkedCommitSigningKey.result.status === "not_registered") {
-    return (
-      <Notice variant="warning">
-        This private key can sign commits, but its public key is not registered as a GitHub signing
-        key.
-      </Notice>
-    );
-  }
-
   return (
     <Notice variant="warning">
-      Mistle could not confirm this key with GitHub because the GitHub App is missing SSH signing
-      keys read access.
+      This private key can sign commits, but its public key is not registered as a GitHub signing
+      key.
     </Notice>
   );
 }

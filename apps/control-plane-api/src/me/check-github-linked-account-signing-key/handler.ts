@@ -31,7 +31,6 @@ const routeHandler = async (
     {
       db: ctx.get("db"),
       integrationRegistry: ctx.get("integrationRegistry"),
-      integrationsConfig: config.integrations,
       ...(config.commitSign === undefined ? {} : { commitSignConfig: config.commitSign }),
     },
     {

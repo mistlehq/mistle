@@ -4944,7 +4944,7 @@ export interface paths {
               publicKey: string;
               publicKeyFingerprint: string;
               /** @enum {string} */
-              status: "registered" | "not_registered" | "permission_missing";
+              status: "registered" | "not_registered";
             };
           };
         };

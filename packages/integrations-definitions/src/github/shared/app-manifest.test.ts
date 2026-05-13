@@ -56,7 +56,6 @@ describe("GitHubAppManifestTemplate", () => {
         issues: "write",
         metadata: "read",
         pull_requests: "write",
-        ssh_signing_keys: "read",
       },
     });
   });

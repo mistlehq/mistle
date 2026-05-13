@@ -1,16 +1,9 @@
-import {
-  UserExternalPrincipalCredentialSecretKinds,
-  UserExternalPrincipalCredentialStatuses,
-  type ControlPlaneDatabase,
-  getControlPlaneDatabaseSchema,
-} from "@mistle/db/control-plane";
+import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { buildUrlWithPath } from "@mistle/http";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { GitHubTargetConfigSchema } from "@mistle/integrations-definitions";
-import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
-import { decryptOrganizationBackedValue } from "../../sandbox-storage/services/credential-crypto.js";
 import { GitHubProviderFamily, parseGitSshSigningPrivateKeyOrThrow } from "../github-signing.js";
 import {
   DefaultCommitSignBinaryPath,
@@ -19,7 +12,6 @@ import {
 } from "./commit-sign-binary.js";
 import { resolveActiveGitHubLinkedPrincipalOrThrow } from "./upsert-github-linked-account-signing-key.js";
 
-const GitHubUserAccessTokenCredentialKind = "github_app_user_access_token";
 const GitHubApiVersion = "2026-03-10";
 const CheckSigningPayloadBase64 = Buffer.from(
   "mistle github linked-account signing key check",
@@ -33,13 +25,15 @@ const GitHubSshSigningKeySchema = z
   .loose();
 
 const GitHubSshSigningKeysResponseSchema = z.array(GitHubSshSigningKeySchema);
-
 type GitHubSshSigningKey = z.infer<typeof GitHubSshSigningKeySchema>;
 
-export type GitHubLinkedAccountSigningKeyCheckStatus =
-  | "registered"
-  | "not_registered"
-  | "permission_missing";
+const GitHubPrincipalProfileSchema = z
+  .object({
+    login: z.string().min(1),
+  })
+  .loose();
+
+export type GitHubLinkedAccountSigningKeyCheckStatus = "registered" | "not_registered";
 
 export type GitHubLinkedAccountSigningKeyCheckResult = {
   status: GitHubLinkedAccountSigningKeyCheckStatus;
@@ -71,7 +65,11 @@ function sshPublicKeysMatch(input: {
   return githubPublicKey === uploadedKeyBody || githubParts[1] === uploadedKeyBody;
 }
 
-async function resolveGitHubApiBaseUrlOrThrow(
+function resolveGitHubPrincipalLoginOrThrow(profile: unknown): string {
+  return GitHubPrincipalProfileSchema.parse(profile).login;
+}
+
+async function resolveGitHubSigningKeyLookupContextOrThrow(
   ctx: {
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
@@ -80,10 +78,14 @@ async function resolveGitHubApiBaseUrlOrThrow(
     organizationId: string;
     principalId: string;
   },
-): Promise<string> {
+): Promise<{
+  apiBaseUrl: string;
+  login: string;
+}> {
   const principal = await ctx.db.query.userExternalPrincipals.findFirst({
     columns: {
       integrationConnectionId: true,
+      profile: true,
     },
     where: (table, { and, eq }) =>
       and(
@@ -95,6 +97,7 @@ async function resolveGitHubApiBaseUrlOrThrow(
   if (principal === undefined) {
     throw new Error(`GitHub linked principal '${input.principalId}' was not found.`);
   }
+  const login = resolveGitHubPrincipalLoginOrThrow(principal.profile);
 
   const connection = await ctx.db.query.integrationConnections.findFirst({
     columns: {
@@ -135,107 +138,30 @@ async function resolveGitHubApiBaseUrlOrThrow(
     );
   }
 
-  return GitHubTargetConfigSchema.parse(target.config).apiBaseUrl;
-}
-
-async function resolveGitHubAccessTokenOrThrow(
-  ctx: {
-    db: ControlPlaneDatabase;
-    integrationsConfig: {
-      masterEncryptionKeys: Record<string, string>;
-    };
-  },
-  input: {
-    organizationId: string;
-    principalId: string;
-  },
-): Promise<string> {
-  const tables = getControlPlaneDatabaseSchema(ctx.db);
-  const tokenSecrets = await ctx.db
-    .select({
-      credentialId: tables.userExternalPrincipalCredentials.id,
-      ciphertext: tables.userExternalPrincipalCredentialSecrets.ciphertext,
-      nonce: tables.userExternalPrincipalCredentialSecrets.nonce,
-      organizationCredentialKeyVersion:
-        tables.userExternalPrincipalCredentialSecrets.organizationCredentialKeyVersion,
-    })
-    .from(tables.userExternalPrincipalCredentials)
-    .innerJoin(
-      tables.userExternalPrincipalCredentialSecrets,
-      and(
-        eq(tables.userExternalPrincipalCredentialSecrets.organizationId, input.organizationId),
-        eq(
-          tables.userExternalPrincipalCredentialSecrets.credentialId,
-          tables.userExternalPrincipalCredentials.id,
-        ),
-        eq(
-          tables.userExternalPrincipalCredentialSecrets.secretKind,
-          UserExternalPrincipalCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
-        ),
-        isNull(tables.userExternalPrincipalCredentialSecrets.revokedAt),
-      ),
-    )
-    .where(
-      and(
-        eq(tables.userExternalPrincipalCredentials.organizationId, input.organizationId),
-        eq(tables.userExternalPrincipalCredentials.principalId, input.principalId),
-        eq(tables.userExternalPrincipalCredentials.providerFamily, GitHubProviderFamily),
-        eq(
-          tables.userExternalPrincipalCredentials.credentialKind,
-          GitHubUserAccessTokenCredentialKind,
-        ),
-        eq(
-          tables.userExternalPrincipalCredentials.status,
-          UserExternalPrincipalCredentialStatuses.ACTIVE,
-        ),
-      ),
-    );
-
-  if (tokenSecrets.length === 0) {
-    throw new Error(
-      `Active GitHub linked principal '${input.principalId}' is missing an OAuth access token secret.`,
-    );
-  }
-
-  if (tokenSecrets.length > 1) {
-    throw new Error(
-      `Active GitHub linked principal '${input.principalId}' has multiple OAuth access token secrets.`,
-    );
-  }
-
-  const tokenSecret = tokenSecrets[0];
-  if (tokenSecret === undefined) {
-    throw new Error("Expected GitHub OAuth access token secret candidate.");
-  }
-
-  return await decryptOrganizationBackedValue({
-    db: ctx.db,
-    organizationId: input.organizationId,
-    ciphertext: tokenSecret.ciphertext,
-    nonce: tokenSecret.nonce,
-    organizationCredentialKeyVersion: tokenSecret.organizationCredentialKeyVersion,
-    encryptionConfig: ctx.integrationsConfig,
-  });
+  return {
+    apiBaseUrl: GitHubTargetConfigSchema.parse(target.config).apiBaseUrl,
+    login,
+  };
 }
 
 async function listGitHubSshSigningKeys(input: {
   apiBaseUrl: string;
-  accessToken: string;
-}): Promise<"permission_missing" | readonly GitHubSshSigningKey[]> {
-  const url = new URL(buildUrlWithPath(input.apiBaseUrl, "/user/ssh_signing_keys"));
+  login: string;
+}): Promise<readonly GitHubSshSigningKey[]> {
+  const url = new URL(
+    buildUrlWithPath(
+      input.apiBaseUrl,
+      `/users/${encodeURIComponent(input.login)}/ssh_signing_keys`,
+    ),
+  );
   url.searchParams.set("per_page", "100");
 
   const response = await fetch(url, {
     headers: {
       accept: "application/vnd.github+json",
-      authorization: `Bearer ${input.accessToken}`,
       "x-github-api-version": GitHubApiVersion,
     },
   });
-
-  if (response.status === 403) {
-    return "permission_missing";
-  }
 
   if (!response.ok) {
     const responseText = await response.text();
@@ -252,9 +178,6 @@ export async function checkGitHubLinkedAccountSigningKey(
   ctx: {
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
-    integrationsConfig: {
-      masterEncryptionKeys: Record<string, string>;
-    };
     commitSignConfig?: {
       binaryPath: string;
     };
@@ -274,28 +197,14 @@ export async function checkGitHubLinkedAccountSigningKey(
     payloadBase64: CheckSigningPayloadBase64,
   });
 
-  const [apiBaseUrl, accessToken] = await Promise.all([
-    resolveGitHubApiBaseUrlOrThrow(ctx, {
-      organizationId: input.organizationId,
-      principalId,
-    }),
-    resolveGitHubAccessTokenOrThrow(ctx, {
-      organizationId: input.organizationId,
-      principalId,
-    }),
-  ]);
-  const gitHubSigningKeys = await listGitHubSshSigningKeys({
-    apiBaseUrl,
-    accessToken,
+  const lookupContext = await resolveGitHubSigningKeyLookupContextOrThrow(ctx, {
+    organizationId: input.organizationId,
+    principalId,
   });
-
-  if (gitHubSigningKeys === "permission_missing") {
-    return {
-      status: "permission_missing",
-      publicKey: parsedSigningKey.publicKey,
-      publicKeyFingerprint: parsedSigningKey.publicKeyFingerprint,
-    };
-  }
+  const gitHubSigningKeys = await listGitHubSshSigningKeys({
+    apiBaseUrl: lookupContext.apiBaseUrl,
+    login: lookupContext.login,
+  });
 
   const isRegistered = gitHubSigningKeys.some((candidate) =>
     sshPublicKeysMatch({

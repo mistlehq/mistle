@@ -9945,7 +9945,7 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": ["registered", "not_registered", "permission_missing"]
+                      "enum": ["registered", "not_registered"]
                     },
                     "publicKey": {
                       "type": "string",

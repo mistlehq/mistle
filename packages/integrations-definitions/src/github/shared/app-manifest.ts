@@ -87,7 +87,6 @@ export const GitHubAppManifestTemplate = {
     issues: "write",
     metadata: "read",
     pull_requests: "write",
-    ssh_signing_keys: "read",
   },
   request_oauth_on_install: false,
   setup_on_update: true,

@@ -67,7 +67,7 @@ const UpdateGitHubLinkedAccountPreferredEmailBodySchema = z
 
 const CheckGitHubLinkedAccountSigningKeyResponseSchema = z
   .object({
-    status: z.enum(["registered", "not_registered", "permission_missing"]),
+    status: z.enum(["registered", "not_registered"]),
     publicKey: z.string().min(1),
     publicKeyFingerprint: z.string().min(1),
   })
