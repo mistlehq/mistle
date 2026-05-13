@@ -200,10 +200,7 @@ function resolveConfigPath(
 }
 
 function envProvidesCompleteDashboardBuildConfig(environment: NodeJS.ProcessEnv): boolean {
-  if (
-    readNonEmptyEnvValue(environment, "MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN") ===
-    undefined
-  ) {
+  if (readDashboardControlPlaneApiOriginEnv(environment) === undefined) {
     return false;
   }
 
@@ -222,6 +219,16 @@ function envProvidesCompleteDashboardBuildConfig(environment: NodeJS.ProcessEnv)
   );
 }
 
+function isMissingDashboardConfigFileError(error: unknown): boolean {
+  return (
+    error instanceof Error && error.message.startsWith("Missing required dashboard config file:")
+  );
+}
+
+function readDashboardControlPlaneApiOriginEnv(environment: NodeJS.ProcessEnv): string | undefined {
+  return readNonEmptyEnvValue(environment, "MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN");
+}
+
 function resolveOptionalParsedConfig(input: {
   environment: NodeJS.ProcessEnv;
   dashboardBuildEnvironment: DashboardBuildEnvironment;
@@ -231,7 +238,10 @@ function resolveOptionalParsedConfig(input: {
     try {
       return DashboardBuildConfigSchema.parse(parseTomlFile(explicitConfigPath));
     } catch (error) {
-      if (envProvidesCompleteDashboardBuildConfig(input.environment)) {
+      if (
+        isMissingDashboardConfigFileError(error) &&
+        envProvidesCompleteDashboardBuildConfig(input.environment)
+      ) {
         return undefined;
       }
 
@@ -258,26 +268,21 @@ export function loadDashboardBuildConfig(
   environment: NodeJS.ProcessEnv,
   dashboardBuildEnvironment: DashboardBuildEnvironment,
 ): DashboardBuildConfig {
-  const explicitControlPlaneApiOrigin =
-    environment.MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN;
+  const explicitControlPlaneApiOrigin = readDashboardControlPlaneApiOriginEnv(environment);
   const parsedConfig = resolveOptionalParsedConfig({
     environment,
     dashboardBuildEnvironment,
   });
 
-  if (
-    (explicitControlPlaneApiOrigin === undefined ||
-      explicitControlPlaneApiOrigin.trim().length === 0) &&
-    parsedConfig === undefined
-  ) {
+  if (explicitControlPlaneApiOrigin === undefined && parsedConfig === undefined) {
     resolveConfigPath(environment, dashboardBuildEnvironment);
   }
 
   const controlPlaneApiOrigin = normalizeOrigin(
-    environment.MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN ??
+    explicitControlPlaneApiOrigin ??
       parsedConfig?.services.dashboard.control_plane_api_origin ??
       "",
-    explicitControlPlaneApiOrigin === undefined || explicitControlPlaneApiOrigin.trim().length === 0
+    explicitControlPlaneApiOrigin === undefined
       ? "MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN or services.dashboard.control_plane_api_origin"
       : "MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN",
   );

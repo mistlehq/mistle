@@ -215,6 +215,19 @@ describe("loadDashboardBuildConfig", () => {
     });
   });
 
+  it("uses file-backed dashboard origin when the origin env var is blank", () => {
+    const config = loadDashboardBuildConfigForTest({
+      configPath: createDashboardConfigFile({
+        dashboardOrigin: "https://api.from-file.test",
+      }),
+      env: {
+        MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN: "",
+      },
+    });
+
+    expect(config.controlPlaneApiOrigin).toBe("https://api.from-file.test");
+  });
+
   it("fails when services.dashboard.control_plane_api_origin is missing", () => {
     expect(() =>
       loadDashboardBuildConfigForTest({
@@ -305,6 +318,35 @@ describe("loadDashboardBuildConfig", () => {
       projectApiKey: "phc_env",
       host: "https://us.i.posthog.com",
     });
+  });
+
+  it("fails on invalid explicit config file even when env-backed dashboard config is complete", () => {
+    const directory = createTempDirectory();
+    const configPath = join(directory, "config.toml");
+    writeFileSync(
+      configPath,
+      [
+        "[services.dashboard]",
+        'control_plane_api_origin = "https://api.from-file.test"',
+        "",
+        "[services.dashboard.posthog]",
+        "enabled = true",
+        'project_api_key = "phc_file"',
+      ].join("\n"),
+      "utf8",
+    );
+
+    expect(() =>
+      loadDashboardBuildConfigForTest({
+        configPath,
+        env: {
+          MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN: "https://api.example.test",
+          MISTLE_SERVICES_DASHBOARD_POSTHOG_ENABLED: "true",
+          MISTLE_SERVICES_DASHBOARD_POSTHOG_PROJECT_API_KEY: "phc_env",
+          MISTLE_SERVICES_DASHBOARD_POSTHOG_HOST: "https://us.i.posthog.com",
+        },
+      }),
+    ).toThrow("Invalid input: expected string, received undefined");
   });
 
   it("requires PostHog project API key when PostHog is enabled", () => {
