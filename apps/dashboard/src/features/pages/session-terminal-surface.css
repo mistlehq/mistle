@@ -1,0 +1,72 @@
+.session-terminal-surface {
+  --session-terminal-background: var(--background);
+  --session-terminal-foreground: var(--foreground);
+  --session-terminal-cursor: var(--foreground);
+  --session-terminal-cursor-accent: var(--background);
+  --session-terminal-selection-background: var(--color-blue-200);
+  --session-terminal-black: var(--foreground);
+  --session-terminal-red: var(--color-red-600);
+  --session-terminal-green: var(--color-green-600);
+  --session-terminal-yellow: var(--color-yellow-700);
+  --session-terminal-blue: var(--color-blue-600);
+  --session-terminal-magenta: var(--color-purple-600);
+  --session-terminal-cyan: var(--color-cyan-600);
+  --session-terminal-white: var(--muted-foreground);
+  --session-terminal-bright-black: var(--color-stone-400);
+  --session-terminal-bright-red: var(--color-red-500);
+  --session-terminal-bright-green: var(--color-green-500);
+  --session-terminal-bright-yellow: var(--color-yellow-600);
+  --session-terminal-bright-blue: var(--color-blue-500);
+  --session-terminal-bright-magenta: var(--color-purple-500);
+  --session-terminal-bright-cyan: var(--color-cyan-500);
+  --session-terminal-bright-white: var(--foreground);
+}
+
+.dark .session-terminal-surface,
+.session-terminal-surface[data-terminal-theme="dark"] {
+  --session-terminal-background: oklch(0.13 0.004 286);
+  --session-terminal-foreground: oklch(0.92 0.003 286);
+  --session-terminal-cursor: oklch(0.92 0.003 286);
+  --session-terminal-cursor-accent: oklch(0.13 0.004 286);
+  --session-terminal-selection-background: var(--color-blue-800);
+  --session-terminal-black: oklch(0.13 0.004 286);
+  --session-terminal-red: var(--color-red-400);
+  --session-terminal-green: var(--color-green-400);
+  --session-terminal-yellow: var(--color-yellow-400);
+  --session-terminal-blue: var(--color-blue-400);
+  --session-terminal-magenta: var(--color-purple-400);
+  --session-terminal-cyan: var(--color-cyan-400);
+  --session-terminal-white: oklch(0.75 0.004 286);
+  --session-terminal-bright-black: oklch(0.42 0.006 286);
+  --session-terminal-bright-red: var(--color-red-300);
+  --session-terminal-bright-green: var(--color-green-300);
+  --session-terminal-bright-yellow: var(--color-yellow-300);
+  --session-terminal-bright-blue: var(--color-blue-300);
+  --session-terminal-bright-magenta: var(--color-purple-300);
+  --session-terminal-bright-cyan: var(--color-cyan-300);
+  --session-terminal-bright-white: oklch(0.98 0.001 286);
+}
+
+.session-terminal-surface[data-terminal-theme="light"] {
+  --session-terminal-background: var(--background);
+  --session-terminal-foreground: var(--foreground);
+  --session-terminal-cursor: var(--foreground);
+  --session-terminal-cursor-accent: var(--background);
+  --session-terminal-selection-background: var(--color-blue-200);
+  --session-terminal-black: var(--foreground);
+  --session-terminal-red: var(--color-red-600);
+  --session-terminal-green: var(--color-green-600);
+  --session-terminal-yellow: var(--color-yellow-700);
+  --session-terminal-blue: var(--color-blue-600);
+  --session-terminal-magenta: var(--color-purple-600);
+  --session-terminal-cyan: var(--color-cyan-600);
+  --session-terminal-white: var(--muted-foreground);
+  --session-terminal-bright-black: var(--color-stone-400);
+  --session-terminal-bright-red: var(--color-red-500);
+  --session-terminal-bright-green: var(--color-green-500);
+  --session-terminal-bright-yellow: var(--color-yellow-600);
+  --session-terminal-bright-blue: var(--color-blue-500);
+  --session-terminal-bright-magenta: var(--color-purple-500);
+  --session-terminal-bright-cyan: var(--color-cyan-500);
+  --session-terminal-bright-white: var(--foreground);
+}

@@ -674,7 +674,7 @@ export function useSessionWorkbenchController(input: {
         isCliToggleActive: handoff.isCliToggleActive,
         showsChatComposer: handoff.transitionState === "stable_chat",
         cliTerminalContentInset: isOpenCodeRuntime ? "none" : "default",
-        cliTerminalThemeMode: isOpenCodeRuntime ? "opencode-dark" : "system",
+        cliTerminalThemeMode: "system",
         enterCliMode: handoff.handoffToCli,
         exitCliMode: handoff.handoffToChat,
       },

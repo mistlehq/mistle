@@ -131,7 +131,7 @@ describe("useSessionWorkbenchController", () => {
       "TUI is available after the session is connected.",
     );
     expect(result.current.workbench.primaryPanelState.cliTerminalContentInset).toBe("none");
-    expect(result.current.workbench.primaryPanelState.cliTerminalThemeMode).toBe("opencode-dark");
+    expect(result.current.workbench.primaryPanelState.cliTerminalThemeMode).toBe("system");
   });
 
   it("maps OpenCode permission requests to actionable server requests", () => {
