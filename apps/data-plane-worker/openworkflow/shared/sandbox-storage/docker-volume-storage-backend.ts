@@ -31,6 +31,10 @@ import { withSandboxStorageTelemetry } from "./telemetry.js";
 type ManagedDockerVolumeConfig = NonNullable<
   NonNullable<DataPlaneWorkerConfig["sandboxStorage"]>["dockerVolume"]
 >;
+type EnabledWorkerDockerConfig = Extract<
+  NonNullable<DataPlaneWorkerConfig["sandbox"]["docker"]>,
+  { enabled: true }
+>;
 
 type DockerVolumeReadySandboxInstanceStorage = SandboxInstanceStorage & {
   provider: typeof SandboxStorageProviders.DOCKER_VOLUME;
@@ -74,6 +78,13 @@ function resolveDockerVolumeName(input: {
   });
 }
 
+function toDockerSandboxConfig(config: EnabledWorkerDockerConfig) {
+  return {
+    socketPath: config.socketPath,
+    ...(config.networkName === undefined ? {} : { networkName: config.networkName }),
+  };
+}
+
 function requireReadyDockerVolumeSandboxStorage(input: {
   sandboxInstanceId: string;
   storage: SandboxInstanceStorage | undefined;
@@ -115,7 +126,7 @@ async function tryDeleteDockerVolume(input: {
       throw new Error("Expected Docker config to be defined in worker config.");
     }
 
-    const dockerClient = createDockerClient(dockerConfig);
+    const dockerClient = createDockerClient(toDockerSandboxConfig(dockerConfig));
     await dockerClient.deleteVolume({
       volumeName: input.volumeName,
     });
@@ -196,7 +207,7 @@ class DockerVolumeSandboxStorageBackendAdapterImpl implements SandboxStorageBack
           throw new Error("Expected Docker config to be defined in worker config.");
         }
 
-        const dockerClient = createDockerClient(dockerConfig);
+        const dockerClient = createDockerClient(toDockerSandboxConfig(dockerConfig));
         const volumeName = resolveDockerVolumeName({
           managedDockerVolumeConfig: this.#workerConfig.sandboxStorage?.dockerVolume,
           sandboxInstanceId: input.sandboxInstanceId,
@@ -364,7 +375,7 @@ class DockerVolumeSandboxStorageBackendAdapterImpl implements SandboxStorageBack
       throw new Error("Expected Docker config to be defined in worker config.");
     }
 
-    const dockerClient = createDockerClient(dockerConfig);
+    const dockerClient = createDockerClient(toDockerSandboxConfig(dockerConfig));
 
     let volumeDeleteError: unknown;
     try {
