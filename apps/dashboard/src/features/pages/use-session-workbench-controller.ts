@@ -422,6 +422,7 @@ export function useSessionWorkbenchController(input: {
     bootstrap: openCodeComposerBootstrap,
     clearSessionErrorMessage: openCodeSessionState.sessionMessage.clearSessionErrorMessage,
     canChangeReasoningEffort: false,
+    resetKey: `${input.sandboxInstanceId ?? ""}:${openCodeSessionState.lifecycle.sessionSnapshot?.activeSessionId ?? ""}`,
   });
   const activeConfigControl = isOpenCodeRuntime ? openCodeConfigControl : configControl;
   const sessionSnapshot = workbenchLifecycleState.sessionSnapshot;

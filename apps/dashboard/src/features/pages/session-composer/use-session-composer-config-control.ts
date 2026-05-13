@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type {
   CodexSessionConfigState,
@@ -133,12 +133,20 @@ export function useLocalSessionComposerConfigControl(input: {
   bootstrap: SessionBootstrapResult;
   clearSessionErrorMessage: () => void;
   canChangeReasoningEffort?: boolean;
+  resetKey?: string | null;
 }): SessionComposerConfigControl {
   const { availableModels, configSnapshot } = input.bootstrap.establishedSnapshot;
   const [composerConfigOverrides, setComposerConfigOverrides] = useState<ComposerConfigSnapshot>({
     model: null,
     modelReasoningEffort: null,
   });
+
+  useEffect(() => {
+    setComposerConfigOverrides({
+      model: null,
+      modelReasoningEffort: null,
+    });
+  }, [input.resetKey]);
 
   const configuredModel = useMemo(
     () => composerConfigOverrides.model ?? configSnapshot.model ?? null,

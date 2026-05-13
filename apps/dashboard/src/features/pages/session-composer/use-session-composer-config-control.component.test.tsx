@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { CodexModelSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -91,12 +91,14 @@ function SessionComposerConfigControlHarness(input: {
 
 function LocalSessionComposerConfigControlHarness(input: {
   bootstrap: SessionBootstrapResult;
+  resetKey?: string | null;
 }): React.JSX.Element {
   const configControl = useLocalSessionComposerConfigControl({
     bootstrap: input.bootstrap,
     clearSessionErrorMessage: () => {
       return;
     },
+    ...(input.resetKey === undefined ? {} : { resetKey: input.resetKey }),
   });
 
   return (
@@ -214,6 +216,40 @@ describe("useSessionComposerConfigControl", () => {
     );
 
     expect(screen.getByTestId("selected-model").textContent).toBe("");
+    expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("");
+    expect(screen.getByTestId("has-explicit-model-selection").textContent).toBe("false");
+  });
+
+  it("resets local runtime model selections when the reset key changes", async () => {
+    const { rerender } = render(
+      <LocalSessionComposerConfigControlHarness
+        bootstrap={createReadyBootstrap({
+          availableModels: [SparkModel, DefaultModel],
+          model: null,
+          modelReasoningEffort: null,
+        })}
+        resetKey="sbi_one:ses_one"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select Spark" }));
+    expect(screen.getByTestId("selected-model").textContent).toBe("gpt-5.3-codex-spark");
+    expect(screen.getByTestId("has-explicit-model-selection").textContent).toBe("true");
+
+    rerender(
+      <LocalSessionComposerConfigControlHarness
+        bootstrap={createReadyBootstrap({
+          availableModels: [SparkModel, DefaultModel],
+          model: null,
+          modelReasoningEffort: null,
+        })}
+        resetKey="sbi_two:ses_two"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-model").textContent).toBe("");
+    });
     expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("");
     expect(screen.getByTestId("has-explicit-model-selection").textContent).toBe("false");
   });
