@@ -1,4 +1,7 @@
-import { createBrowserDefinitionsBundle } from "@mistle/integrations-definitions/browser";
+import {
+  agentDefinitionAllowsRuntime,
+  createBrowserDefinitionsBundle,
+} from "@mistle/integrations-definitions/browser";
 import {
   Button,
   Dialog,
@@ -20,7 +23,7 @@ import {
 } from "@mistle/ui";
 import { PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link as RouterLink } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -373,11 +376,55 @@ function targetAllowsAgentRuntime(input: {
     variantId: input.target.variantId,
   });
 
-  if (definition?.kind !== "agent") {
-    return false;
+  return agentDefinitionAllowsRuntime({
+    definition,
+    runtimeId: input.agentRuntimeId,
+  });
+}
+
+function resolveAgentBindingRowsForRuntime(input: {
+  agentRows: readonly SandboxProfileBindingEditorRow[];
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+  agentRuntimeId: SandboxProfileVersion["agentRuntimeId"];
+}): {
+  rowsByTargetKey: ReadonlyMap<string, SandboxProfileBindingEditorRow>;
+  staleRows: readonly SandboxProfileBindingEditorRow[];
+  runtimeIncompatibleRows: readonly SandboxProfileBindingEditorRow[];
+} {
+  const rowsByTargetKey = new Map<string, SandboxProfileBindingEditorRow>();
+  const staleRows: SandboxProfileBindingEditorRow[] = [];
+  const runtimeIncompatibleRows: SandboxProfileBindingEditorRow[] = [];
+
+  for (const row of input.agentRows) {
+    const metadata = resolveRowBindingMetadata({
+      row,
+      availableConnections: input.availableConnections,
+      availableTargets: input.availableTargets,
+    });
+    if (metadata === null || metadata.target === undefined) {
+      staleRows.push(row);
+      continue;
+    }
+
+    if (
+      !targetAllowsAgentRuntime({
+        target: metadata.target,
+        agentRuntimeId: input.agentRuntimeId,
+      })
+    ) {
+      runtimeIncompatibleRows.push(row);
+      continue;
+    }
+
+    rowsByTargetKey.set(metadata.target.targetKey, row);
   }
 
-  return definition.allowedRuntimeIds?.includes(input.agentRuntimeId) === true;
+  return {
+    rowsByTargetKey,
+    staleRows,
+    runtimeIncompatibleRows,
+  };
 }
 
 function resolveConnectionsForTarget(input: {
@@ -738,38 +785,22 @@ export function SandboxProfileIntegrationsSetupSection(
     includeDisconnectedTargets: true,
   });
 
-  const agentRows = input.integrationRows.filter((row) => row.kind === "agent");
+  const agentRows = useMemo(
+    () => input.integrationRows.filter((row) => row.kind === "agent"),
+    [input.integrationRows],
+  );
   const gitRow = input.integrationRows.find((row) => row.kind === "git") ?? null;
   const connectorRows = input.integrationRows.filter((row) => row.kind === "connector");
-  const agentRowsByTargetKey = new Map<string, SandboxProfileBindingEditorRow>();
-  const staleAgentRows: SandboxProfileBindingEditorRow[] = [];
-  for (const row of agentRows) {
-    const targetKey = findTargetForConnection({
-      connectionId: row.connectionId,
-      availableConnections: input.availableConnections,
-    });
-    if (targetKey === null) {
-      staleAgentRows.push(row);
-      continue;
-    }
-
-    const target = input.availableTargets.find((candidate) => candidate.targetKey === targetKey);
-    if (target === undefined) {
-      staleAgentRows.push(row);
-      continue;
-    }
-
-    if (
-      !targetAllowsAgentRuntime({
-        target,
+  const agentRowResolution = useMemo(
+    () =>
+      resolveAgentBindingRowsForRuntime({
+        agentRows,
+        availableConnections: input.availableConnections,
+        availableTargets: input.availableTargets,
         agentRuntimeId: input.agentRuntimeId,
-      })
-    ) {
-      continue;
-    }
-
-    agentRowsByTargetKey.set(targetKey, row);
-  }
+      }),
+    [agentRows, input.agentRuntimeId, input.availableConnections, input.availableTargets],
+  );
   const selectedConnectorTargetKeys = new Set(
     connectorRows
       .map(
@@ -815,28 +846,12 @@ export function SandboxProfileIntegrationsSetupSection(
       return;
     }
 
-    for (const row of agentRows) {
-      const target = resolveRowBindingMetadata({
-        row,
-        availableConnections: input.availableConnections,
-        availableTargets: input.availableTargets,
-      })?.target;
-      if (
-        target !== undefined &&
-        !targetAllowsAgentRuntime({
-          target,
-          agentRuntimeId: input.agentRuntimeId,
-        })
-      ) {
-        input.onRemoveIntegrationBindingRow(row.clientId);
-      }
+    for (const row of agentRowResolution.runtimeIncompatibleRows) {
+      input.onRemoveIntegrationBindingRow(row.clientId);
     }
   }, [
-    agentRows,
+    agentRowResolution.runtimeIncompatibleRows,
     controlsAreDisabled,
-    input.agentRuntimeId,
-    input.availableConnections,
-    input.availableTargets,
     input.onRemoveIntegrationBindingRow,
     isReadOnly,
   ]);
@@ -1061,7 +1076,7 @@ export function SandboxProfileIntegrationsSetupSection(
             columns={SandboxProfileProxiedConnectionColumns}
             gapClassName="gap-6"
           >
-            {staleAgentRows.length === 0 && agentChoices.length === 0 ? (
+            {agentRowResolution.staleRows.length === 0 && agentChoices.length === 0 ? (
               <ResponsiveFieldListRow
                 className="py-4"
                 gapClassName="gap-6"
@@ -1083,7 +1098,7 @@ export function SandboxProfileIntegrationsSetupSection(
               </ResponsiveFieldListRow>
             ) : null}
 
-            {staleAgentRows.map((row) => {
+            {agentRowResolution.staleRows.map((row) => {
               const agentIssue = resolveBindingIssue({
                 row,
                 availableConnections: input.availableConnections,
@@ -1132,7 +1147,7 @@ export function SandboxProfileIntegrationsSetupSection(
             })}
 
             {agentChoices.map((choice, choiceIndex) => {
-              const agentRow = agentRowsByTargetKey.get(choice.id) ?? null;
+              const agentRow = agentRowResolution.rowsByTargetKey.get(choice.id) ?? null;
 
               return (
                 <ResponsiveFieldListRow

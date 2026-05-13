@@ -7,12 +7,16 @@ import {
   AutomationConversationCreatedByKinds,
   AutomationConversationOwnerKinds,
   IntegrationBindingKinds,
-  SandboxProfileVersionAgentRuntimeIds,
   ScheduleTargetTypes,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { DefaultSandboxWorkspaceDir } from "@mistle/integrations-core";
-import { createDefinitionsBundle } from "@mistle/integrations-definitions/server";
+import {
+  agentDefinitionAllowsRuntime,
+  createAgentProviderKey,
+  createDefinitionsBundle,
+  resolvePrimaryConversationIntegrationFamilyId,
+} from "@mistle/integrations-definitions/server";
 import { and, eq, sql } from "drizzle-orm";
 
 import type {
@@ -385,8 +389,10 @@ async function resolveAutomationConversationBindingContext(
       variantId: row.targetVariantId,
     });
     if (
-      agentDefinition?.kind !== "agent" ||
-      agentDefinition.allowedRuntimeIds?.includes(agentBindingRow.agentRuntimeId) !== true
+      !agentDefinitionAllowsRuntime({
+        definition: agentDefinition,
+        runtimeId: agentBindingRow.agentRuntimeId,
+      })
     ) {
       throw new AutomationRunExecutionError({
         code: AutomationRunFailureCodes.AGENT_BINDING_RUNTIME_INCOMPATIBLE,
@@ -394,7 +400,10 @@ async function resolveAutomationConversationBindingContext(
       });
     }
 
-    const providerKey = `${row.targetFamilyId}:${row.targetVariantId}`;
+    const providerKey = createAgentProviderKey({
+      familyId: row.targetFamilyId,
+      variantId: row.targetVariantId,
+    });
     const firstBindingId = providerBindingIds.get(providerKey);
     if (firstBindingId !== undefined) {
       throw new AutomationRunExecutionError({
@@ -428,17 +437,6 @@ async function resolveAutomationConversationBindingContext(
     integrationFamilyId: preferredIntegrationFamilyId ?? integrationFamilyId,
     runtimeId: agentBindingRow.agentRuntimeId,
   };
-}
-
-function resolvePrimaryConversationIntegrationFamilyId(runtimeId: string): string | null {
-  switch (runtimeId) {
-    case SandboxProfileVersionAgentRuntimeIds.CODEX:
-      return "openai";
-    case SandboxProfileVersionAgentRuntimeIds.OPENCODE:
-      return "opencode";
-    default:
-      return null;
-  }
 }
 
 export async function prepareAutomationRun(

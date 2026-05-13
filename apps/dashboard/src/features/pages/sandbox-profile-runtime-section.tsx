@@ -66,7 +66,7 @@ type RuntimeConfigState = {
 
 type ResourceCapability = NonNullable<SandboxProviderSummary["resourceCapabilities"]>["vcpuCount"];
 
-function createRuntimeDraftSourceVersionKey(
+export function createRuntimeDraftSourceVersionKey(
   version: Pick<SandboxProfileVersion, "sandboxProfileId" | "version">,
 ): string {
   return `${version.sandboxProfileId}:${String(version.version)}`;

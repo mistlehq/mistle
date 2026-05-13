@@ -4,9 +4,13 @@ import {
   getControlPlaneDatabaseSchema,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
-  SandboxProfileVersionAgentRuntimeIds,
 } from "@mistle/db/control-plane";
-import { createDefinitionsBundle } from "@mistle/integrations-definitions/server";
+import {
+  agentDefinitionAllowsRuntime,
+  createAgentProviderKey,
+  createDefinitionsBundle,
+  resolvePrimaryConversationIntegrationFamilyId,
+} from "@mistle/integrations-definitions/server";
 import { and, eq } from "drizzle-orm";
 
 import {
@@ -212,8 +216,10 @@ async function resolveProfileVersionAgentIssues(
       variantId: agentTarget.variantId,
     });
     if (
-      agentDefinition?.kind !== "agent" ||
-      agentDefinition.allowedRuntimeIds?.includes(profileVersion.agentRuntimeId) !== true
+      !agentDefinitionAllowsRuntime({
+        definition: agentDefinition,
+        runtimeId: profileVersion.agentRuntimeId,
+      })
     ) {
       issues.push({
         code: SandboxProfileAutomationImpactIssueCodes.AGENT_BINDING_RUNTIME_INCOMPATIBLE,
@@ -225,7 +231,10 @@ async function resolveProfileVersionAgentIssues(
       continue;
     }
 
-    const providerKey = `${agentTarget.familyId}:${agentTarget.variantId}`;
+    const providerKey = createAgentProviderKey({
+      familyId: agentTarget.familyId,
+      variantId: agentTarget.variantId,
+    });
     const firstBindingId = providerBindingIds.get(providerKey);
     if (firstBindingId !== undefined) {
       issues.push({
@@ -251,17 +260,6 @@ async function resolveProfileVersionAgentIssues(
   }
 
   return issues;
-}
-
-function resolvePrimaryConversationIntegrationFamilyId(runtimeId: string): string | null {
-  switch (runtimeId) {
-    case SandboxProfileVersionAgentRuntimeIds.CODEX:
-      return "openai";
-    case SandboxProfileVersionAgentRuntimeIds.OPENCODE:
-      return "opencode";
-    default:
-      return null;
-  }
 }
 
 async function loadAutomationTargetRows(

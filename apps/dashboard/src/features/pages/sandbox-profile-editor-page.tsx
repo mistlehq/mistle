@@ -143,6 +143,7 @@ import {
   useEditSandboxProfileMetaState,
 } from "./sandbox-profile-meta-state.js";
 import {
+  createRuntimeDraftSourceVersionKey,
   SandboxProfileRuntimeSection,
   type SandboxProfileRuntimeDraftChanges,
   type SandboxProfileRuntimeDraftState,
@@ -247,12 +248,6 @@ function createIdleSandboxProfileRuntimeDraftState(): SandboxProfileRuntimeSetti
     sourceVersionKey: undefined,
     hasUnpersistedChanges: false,
   };
-}
-
-function createRuntimeDraftSourceVersionKey(
-  version: Pick<SandboxProfileVersion, "sandboxProfileId" | "version">,
-): string {
-  return `${version.sandboxProfileId}:${String(version.version)}`;
 }
 
 export function resolveSelectedSandboxProfileAgentRuntimeId(input: {

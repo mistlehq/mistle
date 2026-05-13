@@ -65,6 +65,7 @@ export function createBrowserDefinitionsBundle(): IntegrationDefinitionsBundle {
 }
 
 export * from "./anthropic/index.js";
+export * from "./agent-runtimes/provider-selection.js";
 export * from "./datadog/index.js";
 export * from "./github/browser.js";
 export * from "./jira/browser.js";

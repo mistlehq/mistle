@@ -40,6 +40,7 @@ export * from "./sandbox-runtimes/index.js";
 export * from "./signoz/server.js";
 export * from "./slack/index.js";
 export * from "./forms/index.js";
+export * from "./agent-runtimes/provider-selection.js";
 export * from "./registry/agent-runtimes.js";
 export * from "./shared/webhook-callback-url.server.js";
 

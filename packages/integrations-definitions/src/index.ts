@@ -32,6 +32,7 @@ export * from "./sandbox-runtimes/index.js";
 export * from "./signoz/browser.js";
 export * from "./slack/browser.js";
 export * from "./forms/index.js";
+export * from "./agent-runtimes/provider-selection.js";
 export * from "./registry/agent-runtimes.js";
 
 const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
