@@ -447,7 +447,9 @@ async fn run_opencode_proxy_runtime(
             joined = session_tasks.join_next(), if !session_tasks.is_empty() => {
                 match joined {
                     Some(Ok(Ok(()))) => {}
-                    Some(Ok(Err(error))) => return Err(error),
+                    // One client relay failure should not take down the shared proxy runtime.
+                    Some(Ok(Err(_error))) => {}
+                    Some(Err(error)) if error.is_cancelled() => {}
                     Some(Err(_)) => return Err(OpenCodeProxyError::SessionPanicked),
                     None => {}
                 }
@@ -458,8 +460,11 @@ async fn run_opencode_proxy_runtime(
 
     session_tasks.abort_all();
     while let Some(joined) = session_tasks.join_next().await {
-        if joined.is_err() {
-            return Err(OpenCodeProxyError::SessionPanicked);
+        match joined {
+            Ok(Ok(())) => {}
+            Ok(Err(_error)) => {}
+            Err(error) if error.is_cancelled() => {}
+            Err(_) => return Err(OpenCodeProxyError::SessionPanicked),
         }
     }
 
@@ -516,8 +521,11 @@ async fn relay_opencode_proxy_connection(
 
     request_tasks.abort_all();
     while let Some(joined) = request_tasks.join_next().await {
-        if joined.is_err() {
-            return Err(OpenCodeProxyError::SessionPanicked);
+        match joined {
+            Ok(Ok(())) => {}
+            Ok(Err(error)) => return Err(error),
+            Err(error) if error.is_cancelled() => {}
+            Err(_) => return Err(OpenCodeProxyError::SessionPanicked),
         }
     }
 

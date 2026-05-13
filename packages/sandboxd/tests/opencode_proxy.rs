@@ -1,14 +1,17 @@
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
-use std::sync::mpsc;
+use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, mpsc};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
-use tungstenite::{Message, connect};
+use tungstenite::stream::MaybeTlsStream;
+use tungstenite::{Message, WebSocket, connect};
 
 use sandboxd::opencode_proxy::{derive_opencode_raw_server_url, start_opencode_proxy};
 use sandboxd::runtime::readiness::RuntimeReadinessManager;
+use sandboxd::time::{Sleeper, ThreadSleeper};
 
 #[test]
 fn relays_http_requests_over_the_websocket_runtime_endpoint() {
@@ -110,6 +113,74 @@ fn relays_opencode_event_streams_as_websocket_sse_frames() {
     client.close(None).expect("websocket should close cleanly");
     proxy.close().expect("OpenCode proxy should close cleanly");
     simulated_server.join();
+}
+
+#[test]
+fn proxy_survives_client_disconnect_while_event_stream_is_open() {
+    let raw_server = start_simulated_streaming_opencode_server();
+    let runtime_readiness_manager =
+        std::sync::Arc::new(std::sync::Mutex::new(RuntimeReadinessManager::default()));
+    let proxy = start_opencode_proxy(
+        "ws://127.0.0.1:0/opencode",
+        &format!("http://{}", raw_server.listener_address),
+        runtime_readiness_manager,
+    )
+    .expect("OpenCode proxy should start");
+
+    let (mut event_client, _) = connect_to_proxy_with_retry(
+        proxy.listen_url(),
+        &ThreadSleeper,
+        sandboxd::time::Duration::from_secs(5),
+    );
+    event_client
+        .send(Message::Text(
+            json!({
+                "id": "events-1",
+                "method": "GET",
+                "path": "/event",
+                "headers": {}
+            })
+            .to_string()
+            .into(),
+        ))
+        .expect("event request should send");
+
+    let event_response = read_json_text_message(&mut event_client);
+    assert_eq!(event_response["type"], json!("response"));
+    assert_eq!(event_response["status"], json!(200));
+
+    drop(event_client);
+
+    ThreadSleeper.sleep(sandboxd::time::Duration::from_millis(150));
+
+    let (mut health_client, _) = connect_to_proxy_with_retry(
+        proxy.listen_url(),
+        &ThreadSleeper,
+        sandboxd::time::Duration::from_secs(2),
+    );
+    health_client
+        .send(Message::Text(
+            json!({
+                "id": "health-1",
+                "method": "GET",
+                "path": "/global/health",
+                "headers": {}
+            })
+            .to_string()
+            .into(),
+        ))
+        .expect("health request should send after event client disconnect");
+
+    let health_response = read_json_text_message(&mut health_client);
+    assert_eq!(health_response["type"], json!("response"));
+    assert_eq!(health_response["status"], json!(200));
+    assert_eq!(health_response["body"], json!("ok"));
+
+    health_client
+        .close(None)
+        .expect("health client should close cleanly");
+    proxy.close().expect("OpenCode proxy should close cleanly");
+    raw_server.close();
 }
 
 #[test]
@@ -237,10 +308,98 @@ impl SimulatedOpenCodeServer {
     }
 }
 
+struct StreamingSimulatedOpenCodeServer {
+    listener_address: SocketAddr,
+    shutdown_requested: Arc<AtomicBool>,
+    thread: Option<thread::JoinHandle<()>>,
+}
+
+impl StreamingSimulatedOpenCodeServer {
+    fn close(mut self) {
+        self.shutdown_requested.store(true, Ordering::Relaxed);
+        let _ = TcpStream::connect(self.listener_address);
+        if let Some(thread) = self.thread.take() {
+            thread
+                .join()
+                .expect("streaming simulated OpenCode server should stop cleanly");
+        }
+    }
+}
+
 struct SimulatedHttpRequest {
     method: String,
     path: String,
     body: String,
+}
+
+fn start_simulated_streaming_opencode_server() -> StreamingSimulatedOpenCodeServer {
+    let listener =
+        TcpListener::bind(("127.0.0.1", 0)).expect("simulated OpenCode server should bind");
+    let listener_address = listener
+        .local_addr()
+        .expect("simulated OpenCode server should expose its address");
+    listener
+        .set_nonblocking(true)
+        .expect("simulated OpenCode server listener should become nonblocking");
+    let shutdown_requested = Arc::new(AtomicBool::new(false));
+    let thread_shutdown_requested = shutdown_requested.clone();
+    let thread = thread::spawn(move || {
+        while !thread_shutdown_requested.load(Ordering::Relaxed) {
+            match listener.accept() {
+                Ok((stream, _)) => {
+                    let request_shutdown_requested = thread_shutdown_requested.clone();
+                    thread::spawn(move || {
+                        handle_streaming_simulated_opencode_request(
+                            stream,
+                            request_shutdown_requested,
+                        );
+                    });
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(10));
+                }
+                Err(error) => panic!("simulated OpenCode server accept failed: {error}"),
+            }
+        }
+    });
+
+    StreamingSimulatedOpenCodeServer {
+        listener_address,
+        shutdown_requested,
+        thread: Some(thread),
+    }
+}
+
+fn handle_streaming_simulated_opencode_request(
+    mut stream: TcpStream,
+    shutdown_requested: Arc<AtomicBool>,
+) {
+    let request = read_http_request_head(&mut stream);
+    if request.starts_with("GET /event ") {
+        // OpenCode's event feed is an HTTP SSE response. Keeping the response
+        // open exercises cleanup of an active proxy request task when the
+        // websocket client disconnects.
+        stream
+            .write_all(
+                b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\nevent: message\ndata: {\"type\":\"ready\"}\n\n",
+            )
+            .expect("simulated OpenCode SSE response should write");
+        while !shutdown_requested.load(Ordering::Relaxed) {
+            thread::sleep(Duration::from_millis(25));
+        }
+        return;
+    }
+
+    if request.starts_with("GET /global/health ") {
+        stream
+            .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok")
+            .expect("simulated OpenCode health response should write");
+        return;
+    }
+
+    stream
+        .write_all(b"HTTP/1.1 404 Not Found\r\ncontent-length: 9\r\n\r\nnot found")
+        .expect("simulated OpenCode not-found response should write");
 }
 
 fn read_http_request_from_stream(stream: &mut TcpStream) -> SimulatedHttpRequest {
@@ -302,7 +461,60 @@ fn read_http_request_from_stream(stream: &mut TcpStream) -> SimulatedHttpRequest
     SimulatedHttpRequest { method, path, body }
 }
 
-fn read_json_text_message<S>(client: &mut tungstenite::WebSocket<S>) -> Value
+fn read_http_request_head(stream: &mut TcpStream) -> String {
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let mut buffer = Vec::new();
+    loop {
+        let mut chunk = [0; 256];
+        match stream.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(count) => {
+                buffer.extend_from_slice(&chunk[..count]);
+                if buffer.windows(4).any(|window| window == b"\r\n\r\n") {
+                    break;
+                }
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {}
+            Err(error) => panic!("simulated OpenCode request read failed: {error}"),
+        }
+        assert!(
+            Instant::now() < deadline,
+            "timed out reading simulated OpenCode HTTP request"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+
+    String::from_utf8(buffer).expect("simulated OpenCode HTTP request should be UTF-8")
+}
+
+fn connect_to_proxy_with_retry(
+    proxy_url: &str,
+    sleeper: &dyn Sleeper,
+    timeout: sandboxd::time::Duration,
+) -> (
+    WebSocket<MaybeTlsStream<TcpStream>>,
+    tungstenite::handshake::client::Response,
+) {
+    let attempts = (timeout.as_millis() / 20).max(1);
+    let mut last_error = None;
+
+    for _ in 0..attempts {
+        match connect(proxy_url) {
+            Ok(connection) => return connection,
+            Err(error) => {
+                last_error = Some(error);
+                sleeper.sleep(sandboxd::time::Duration::from_millis(20));
+            }
+        }
+    }
+
+    panic!(
+        "timed out connecting to proxy {proxy_url}: {}",
+        last_error.expect("last proxy connection error should exist")
+    );
+}
+
+fn read_json_text_message<S>(client: &mut WebSocket<S>) -> Value
 where
     S: Read + Write,
 {
