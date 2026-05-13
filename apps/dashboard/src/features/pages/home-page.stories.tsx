@@ -56,7 +56,7 @@ function CompletedHomePageStory(args: ComponentProps<typeof HomePageView>): Reac
   return (
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={["/"]}>
-        <HomePageStoryFrame createSessionForm={<NewSessionForm />} {...args} />
+        <HomePageStoryFrame {...args} createSessionForm={<NewSessionForm />} />
       </MemoryRouter>
     </QueryClientProvider>
   );
@@ -71,7 +71,9 @@ const meta = {
   },
   decorators: [withDashboardPageStory],
   args: {
+    createSessionForm: null,
     onboarding: HomePageStoryModels.addIntegrations,
+    recentSessions: [],
   },
   render: function RenderStory(args): React.JSX.Element {
     return <HomePageStoryFrame {...args} />;

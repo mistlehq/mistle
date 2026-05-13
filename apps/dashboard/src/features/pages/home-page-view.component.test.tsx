@@ -9,7 +9,13 @@ import { buildSandboxInstanceListItemFixture } from "./sessions-page.story-fixtu
 
 describe("HomePageView", () => {
   it("renders the current step status mark in desktop and mobile title positions", () => {
-    render(<HomePageView onboarding={HomePageStoryModels.addIntegrations} />);
+    render(
+      <HomePageView
+        createSessionForm={null}
+        onboarding={HomePageStoryModels.addIntegrations}
+        recentSessions={[]}
+      />,
+    );
 
     const addIntegrationsTitle = screen.getByText("Add integrations", { selector: "p" });
     const titleRow = addIntegrationsTitle.parentElement;
@@ -27,10 +33,12 @@ describe("HomePageView", () => {
 
     render(
       <HomePageView
+        createSessionForm={null}
         onboarding={HomePageStoryModels.addIntegrations}
         onNavigate={(href) => {
           navigatedHref = href;
         }}
+        recentSessions={[]}
       />,
     );
 

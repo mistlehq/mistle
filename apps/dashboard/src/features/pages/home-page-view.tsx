@@ -10,17 +10,17 @@ import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
 import type { HomeChecklistStep, HomeChecklistViewModel } from "./home-page-view-model.js";
 
 type HomePageViewProps = {
-  createSessionForm?: ReactNode;
+  createSessionForm: ReactNode;
   onboarding: HomeChecklistViewModel;
   onNavigate?: (href: string) => void;
-  recentSessions?: readonly SandboxInstanceListItem[];
+  recentSessions: readonly SandboxInstanceListItem[];
 };
 
 export function HomePageView({
   createSessionForm,
   onboarding,
   onNavigate,
-  recentSessions = [],
+  recentSessions,
 }: HomePageViewProps): React.JSX.Element {
   if (onboarding.state === "completed") {
     return (
@@ -46,7 +46,7 @@ export function HomePageView({
 }
 
 function CompletedHomeView(input: {
-  createSessionForm?: ReactNode;
+  createSessionForm: ReactNode;
   onNavigate?: (href: string) => void;
   recentSessions: readonly SandboxInstanceListItem[];
 }): React.JSX.Element {
