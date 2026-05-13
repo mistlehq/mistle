@@ -112,6 +112,7 @@ const DEFAULT_SIGNING_REQUEST_TIMEOUT: StdDuration = StdDuration::from_secs(120)
 const DEFAULT_EGRESS_HTTP_REQUEST_TIMEOUT: StdDuration = StdDuration::from_secs(120);
 const EXEC_OUTPUT_READ_BUFFER_BYTES: usize = 8192;
 const DEFAULT_PROCESSES_SNAPSHOT_INTERVAL: Duration = Duration::from_millis(500);
+const DEFAULT_RUNTIME_ENV_UPDATE_TIMEOUT: StdDuration = StdDuration::from_secs(10);
 const TUNNEL_RECONNECT_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];
 const AGENT_STREAM_WINDOW_THRESHOLD_BYTES: [usize; 5] = [
     1024 * 1024,
@@ -371,6 +372,7 @@ pub enum TunnelSessionError {
     HandleTelemetry(String),
     PublishKeepalive(serde_json::Error),
     PublishRuntimeReady(serde_json::Error),
+    MissingRuntimeReadyState(String),
     WriteTunnelText(String),
     WriteTunnelBinary(String),
     ReadTunnel(String),
@@ -413,6 +415,9 @@ impl Display for TunnelSessionError {
             }
             Self::PublishRuntimeReady(error) => {
                 write!(f, "failed to serialize runtime readiness payload: {error}")
+            }
+            Self::MissingRuntimeReadyState(error) => {
+                write!(f, "failed to prepare runtime readiness payload: {error}")
             }
             Self::WriteTunnelText(error) => {
                 write!(f, "failed to write bootstrap tunnel text frame: {error}")
@@ -532,6 +537,10 @@ enum TunnelSessionEvent {
 enum TunnelSessionRequest {
     SetAgentEndpoint {
         agent_endpoint_url: Option<String>,
+        response_sender: std::sync::mpsc::Sender<Result<(), TunnelSessionError>>,
+    },
+    SetRuntimeEnvironment {
+        runtime_env: BTreeMap<String, String>,
         response_sender: std::sync::mpsc::Sender<Result<(), TunnelSessionError>>,
     },
     Signing {
@@ -762,8 +771,6 @@ impl TunnelSession {
         );
         supervisor_handle.mark_component_starting(SupervisedComponent::TunnelSession);
         let attachment_root = resolve_default_attachment_root();
-        fs::create_dir_all(&attachment_root)
-            .map_err(|error| TunnelSessionError::AttachmentRoot(error.to_string()))?;
 
         let shutdown_requested = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let (request_sender, request_receiver) = mpsc::unbounded_channel();
@@ -864,6 +871,27 @@ impl TunnelSession {
         })
     }
 
+    /// Starts a bootstrap tunnel with no runtime capabilities attached yet.
+    pub fn start_minimal_with_supervisor(
+        startup_input: &StartupInput,
+        keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+        runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
+        clock: Arc<dyn Clock>,
+        sleeper: Arc<dyn Sleeper>,
+        supervisor_handle: SandboxdSupervisorHandle,
+    ) -> Result<Self, TunnelSessionError> {
+        Self::start_with_supervisor(
+            startup_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            None,
+            BTreeMap::new(),
+            clock,
+            sleeper,
+            supervisor_handle,
+        )
+    }
+
     pub fn request_signing(
         &self,
         request: TunnelSigningRequest,
@@ -900,6 +928,23 @@ impl TunnelSession {
         response_receiver
             .recv_timeout(DEFAULT_AGENT_ENDPOINT_UPDATE_TIMEOUT)
             .map_err(|error| TunnelSessionError::AgentDial(error.to_string()))?
+    }
+
+    pub fn set_runtime_environment(
+        &self,
+        runtime_env: BTreeMap<String, String>,
+    ) -> Result<(), TunnelSessionError> {
+        let (response_sender, response_receiver) = std::sync::mpsc::channel();
+        self.request_sender
+            .send(TunnelSessionRequest::SetRuntimeEnvironment {
+                runtime_env,
+                response_sender,
+            })
+            .map_err(|error| TunnelSessionError::Processes(error.to_string()))?;
+
+        response_receiver
+            .recv_timeout(DEFAULT_RUNTIME_ENV_UPDATE_TIMEOUT)
+            .map_err(|error| TunnelSessionError::Processes(error.to_string()))?
     }
 
     /// Stops the live bootstrap tunnel session and waits for its thread to exit.
@@ -985,7 +1030,6 @@ struct TunnelSessionRuntime {
 struct TunnelSessionLoopContext<'a> {
     attachment_root: &'a Path,
     cgroup_root: &'a Path,
-    runtime_env: &'a BTreeMap<String, String>,
     sandbox_instance_id: &'a str,
     gateway_ws_url: &'a str,
     acting_user_id: Option<&'a str>,
@@ -1003,6 +1047,7 @@ struct PortAccessTcpStreamState {
 
 struct TunnelSessionMutableState {
     agent_endpoint_url: Option<String>,
+    runtime_env: BTreeMap<String, String>,
     telemetry_relay: TelemetryRelay,
     pending_signing_requests: BTreeMap<
         String,
@@ -1715,6 +1760,27 @@ async fn run_connected_tunnel_session_catching_panics(
     }
 }
 
+fn publish_initial_runtime_readiness(
+    runtime: &TunnelSessionRuntime,
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+) -> Result<(), TunnelSessionError> {
+    let publishable_state = runtime
+        .runtime_readiness_manager
+        .lock()
+        .expect("runtime readiness manager lock should not be poisoned")
+        .take_publishable_state()
+        .ok_or_else(|| {
+            TunnelSessionError::MissingRuntimeReadyState(
+                "runtime readiness manager did not produce an initial state after tunnel attachment"
+                    .to_string(),
+            )
+        })?;
+    let payload = serde_json::to_string(&publishable_state)
+        .map_err(TunnelSessionError::PublishRuntimeReady)?;
+
+    write_tunnel_text(tunnel_writer_sender, payload)
+}
+
 async fn run_connected_tunnel_session(
     runtime: &TunnelSessionRuntime,
     bootstrap_socket: TunnelWebSocket,
@@ -1737,6 +1803,7 @@ async fn run_connected_tunnel_session(
 
     let mut session_state = TunnelSessionMutableState {
         agent_endpoint_url: runtime.agent_endpoint_url.clone(),
+        runtime_env: runtime.runtime_env.clone(),
         telemetry_relay: TelemetryRelay::default(),
         pending_signing_requests: BTreeMap::new(),
         pending_egress_http_requests: BTreeMap::new(),
@@ -1789,10 +1856,6 @@ async fn run_connected_tunnel_session(
                 &mut session_state.telemetry_relay,
                 &tunnel_writer_sender,
             );
-            if let Some(startup_result_sender) = startup_result_sender {
-                let _ = startup_result_sender.send(Ok(()));
-            }
-            startup_completed.store(true, Ordering::Relaxed);
         }
         Err(error) => {
             let error_text = error.to_string();
@@ -1822,12 +1885,10 @@ async fn run_connected_tunnel_session(
             };
         }
     }
-    let startup_completed = startup_completed.load(Ordering::Relaxed);
 
     let loop_context = TunnelSessionLoopContext {
         attachment_root: &runtime.attachment_root,
         cgroup_root: &runtime.cgroup_root,
-        runtime_env: &runtime.runtime_env,
         sandbox_instance_id: &runtime.sandbox_instance_id,
         gateway_ws_url: &runtime.gateway_ws_url,
         acting_user_id: runtime.acting_user_id.as_deref(),
@@ -1835,6 +1896,39 @@ async fn run_connected_tunnel_session(
         sleeper: runtime.sleeper.as_ref(),
         supervisor_handle: &runtime.supervisor_handle,
     };
+
+    if let Err(error) = publish_initial_runtime_readiness(runtime, &tunnel_writer_sender) {
+        let error_text = error.to_string();
+        update_tunnel_supervision_details(
+            loop_context.supervisor_handle,
+            loop_context.gateway_ws_url,
+            Some("runtime_readiness_publish_failed"),
+            None,
+            None,
+        );
+        loop_context
+            .supervisor_handle
+            .mark_component_restarting(SupervisedComponent::TunnelSession, error_text.clone());
+        loop_context.supervisor_handle.emit_component_exited(
+            SupervisedComponent::TunnelSession,
+            "thread_returned",
+            Some(&error_text),
+            &[("exitKind", Value::String("thread_returned".to_string()))],
+        );
+        mark_tunnel_disconnected(runtime);
+        if let Some(startup_result_sender) = startup_result_sender {
+            let _ = startup_result_sender.send(Err(error));
+        }
+        return ConnectedTunnelSessionResult {
+            outcome: ConnectedTunnelSessionOutcome::RestartRequired,
+            startup_completed: false,
+        };
+    }
+    if let Some(startup_result_sender) = startup_result_sender {
+        let _ = startup_result_sender.send(Ok(()));
+    }
+    startup_completed.store(true, Ordering::Relaxed);
+    let startup_completed = true;
 
     loop {
         if let Err(error) = sync_pty_scope_keepalive(
@@ -4174,6 +4268,14 @@ fn handle_tunnel_session_request(
             let _ = response_sender.send(Ok(()));
             Ok(TunnelSessionControlFlow::Continue)
         }
+        TunnelSessionRequest::SetRuntimeEnvironment {
+            runtime_env,
+            response_sender,
+        } => {
+            session_state.runtime_env = runtime_env;
+            let _ = response_sender.send(Ok(()));
+            Ok(TunnelSessionControlFlow::Continue)
+        }
         TunnelSessionRequest::Signing {
             request,
             response_sender,
@@ -4525,7 +4627,7 @@ async fn handle_tunnel_control_message(
         StreamControlMessage::OpenPty(message) => {
             let mut pty_open_context = PtyOpenContext {
                 cgroup_root: context.cgroup_root,
-                runtime_env: context.runtime_env,
+                runtime_env: &session_state.runtime_env,
                 sandbox_instance_id: context.sandbox_instance_id,
                 pty_sessions: &mut session_state.pty_sessions,
                 clock: context.clock,
@@ -4554,7 +4656,7 @@ async fn handle_tunnel_control_message(
             );
             spawn_exec_task(
                 message.clone(),
-                context.runtime_env.clone(),
+                session_state.runtime_env.clone(),
                 cancel_requested,
                 child_pid,
                 event_sender.clone(),
@@ -6119,6 +6221,7 @@ mod tests {
     fn empty_tunnel_session_state() -> TunnelSessionMutableState {
         TunnelSessionMutableState {
             agent_endpoint_url: None,
+            runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
@@ -6162,6 +6265,37 @@ mod tests {
         );
     }
 
+    #[test]
+    fn set_runtime_environment_request_updates_the_existing_tunnel_session() {
+        let (tunnel_writer_sender, _tunnel_writer_receiver) =
+            tokio::sync::mpsc::unbounded_channel();
+        let (response_sender, response_receiver) = mpsc::channel();
+        let mut session_state = empty_tunnel_session_state();
+
+        handle_tunnel_session_request(
+            TunnelSessionRequest::SetRuntimeEnvironment {
+                runtime_env: BTreeMap::from([(
+                    "MISTLE_RUNTIME_ENV".to_string(),
+                    "ready".to_string(),
+                )]),
+                response_sender,
+            },
+            &tunnel_writer_sender,
+            None,
+            &mut session_state,
+        )
+        .expect("runtime environment update should be handled");
+
+        response_receiver
+            .recv()
+            .expect("runtime environment update should acknowledge")
+            .expect("runtime environment update should succeed");
+        assert_eq!(
+            session_state.runtime_env.get("MISTLE_RUNTIME_ENV"),
+            Some(&"ready".to_string())
+        );
+    }
+
     #[tokio::test]
     async fn gateway_egress_http_request_body_is_sent_as_stream_frames() {
         let (tunnel_writer_sender, mut tunnel_writer_receiver) =
@@ -6169,6 +6303,7 @@ mod tests {
         let (response_sender, _response_receiver) = mpsc::channel();
         let mut session_state = TunnelSessionMutableState {
             agent_endpoint_url: None,
+            runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
@@ -6310,6 +6445,7 @@ mod tests {
         let (response_sender, response_receiver) = mpsc::channel();
         let mut session_state = TunnelSessionMutableState {
             agent_endpoint_url: None,
+            runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::from([(
@@ -6390,6 +6526,7 @@ mod tests {
         let (response_sender, response_receiver) = mpsc::channel();
         let mut session_state = TunnelSessionMutableState {
             agent_endpoint_url: None,
+            runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::from([(
@@ -6456,6 +6593,7 @@ mod tests {
         let (response_sender, response_receiver) = mpsc::channel();
         let mut session_state = TunnelSessionMutableState {
             agent_endpoint_url: None,
+            runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::from([(
@@ -6533,6 +6671,7 @@ mod tests {
         let (response_sender, response_receiver) = mpsc::channel();
         let mut session_state = TunnelSessionMutableState {
             agent_endpoint_url: None,
+            runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::from([(
@@ -6584,11 +6723,11 @@ mod tests {
             tokio::sync::mpsc::unbounded_channel();
         let (event_sender, _event_receiver) = tokio::sync::mpsc::unbounded_channel();
         let (agent_sender, _agent_receiver) = tokio::sync::mpsc::unbounded_channel();
-        let runtime_env = BTreeMap::new();
         let clock = SystemClock;
         let sleeper = ThreadSleeper;
         let mut session_state = TunnelSessionMutableState {
             agent_endpoint_url: None,
+            runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
@@ -6613,7 +6752,6 @@ mod tests {
         let context = TunnelSessionLoopContext {
             attachment_root: std::path::Path::new("/tmp"),
             cgroup_root: std::path::Path::new("/tmp"),
-            runtime_env: &runtime_env,
             sandbox_instance_id: "sbi_test",
             gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
             acting_user_id: None,
@@ -6659,11 +6797,11 @@ mod tests {
         let (event_sender, _event_receiver) = tokio::sync::mpsc::unbounded_channel();
         let (tcp_sender, _tcp_receiver) =
             tokio::sync::mpsc::unbounded_channel::<PortAccessTcpCommand>();
-        let runtime_env = BTreeMap::new();
         let clock = SystemClock;
         let sleeper = ThreadSleeper;
         let mut session_state = TunnelSessionMutableState {
             agent_endpoint_url: None,
+            runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
@@ -6689,7 +6827,6 @@ mod tests {
         let context = TunnelSessionLoopContext {
             attachment_root: std::path::Path::new("/tmp"),
             cgroup_root: std::path::Path::new("/tmp"),
-            runtime_env: &runtime_env,
             sandbox_instance_id: "sbi_test",
             gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
             acting_user_id: None,
@@ -6803,6 +6940,7 @@ mod tests {
             tokio::sync::mpsc::unbounded_channel::<PortAccessTcpCommand>();
         let mut session_state = TunnelSessionMutableState {
             agent_endpoint_url: None,
+            runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
@@ -6852,6 +6990,7 @@ mod tests {
             tokio::sync::mpsc::unbounded_channel::<PortAccessTcpCommand>();
         let mut session_state = TunnelSessionMutableState {
             agent_endpoint_url: None,
+            runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
@@ -6893,6 +7032,7 @@ mod tests {
         let (agent_sender, _agent_receiver) = tokio::sync::mpsc::unbounded_channel();
         let mut session_state = TunnelSessionMutableState {
             agent_endpoint_url: None,
+            runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
@@ -6949,6 +7089,7 @@ mod tests {
             tokio::sync::mpsc::unbounded_channel::<PortAccessTcpCommand>();
         let mut session_state = TunnelSessionMutableState {
             agent_endpoint_url: None,
+            runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
@@ -7032,11 +7173,11 @@ mod tests {
         let (event_sender, _event_receiver) = tokio::sync::mpsc::unbounded_channel();
         let (tcp_sender, mut tcp_receiver) =
             tokio::sync::mpsc::unbounded_channel::<PortAccessTcpCommand>();
-        let runtime_env = BTreeMap::new();
         let clock = SystemClock;
         let sleeper = ThreadSleeper;
         let mut session_state = TunnelSessionMutableState {
             agent_endpoint_url: None,
+            runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
@@ -7062,7 +7203,6 @@ mod tests {
         let context = TunnelSessionLoopContext {
             attachment_root: std::path::Path::new("/tmp"),
             cgroup_root: std::path::Path::new("/tmp"),
-            runtime_env: &runtime_env,
             sandbox_instance_id: "sbi_test",
             gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
             acting_user_id: None,
@@ -7106,7 +7246,6 @@ mod tests {
             tokio::sync::mpsc::unbounded_channel();
         let (event_sender, _event_receiver) = tokio::sync::mpsc::unbounded_channel();
         let (agent_sender, mut agent_receiver) = tokio::sync::mpsc::unbounded_channel();
-        let runtime_env = BTreeMap::new();
         let clock = FixedClock { now_ms: 1_500 };
         let sleeper = ThreadSleeper;
         let mut stats = AgentStreamStats::new(500);
@@ -7116,6 +7255,7 @@ mod tests {
         stats.record_inbound_message(64);
         let mut session_state = TunnelSessionMutableState {
             agent_endpoint_url: None,
+            runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
@@ -7141,7 +7281,6 @@ mod tests {
         let context = TunnelSessionLoopContext {
             attachment_root: std::path::Path::new("/tmp"),
             cgroup_root: std::path::Path::new("/tmp"),
-            runtime_env: &runtime_env,
             sandbox_instance_id: "sbi_test",
             gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
             acting_user_id: None,
@@ -7201,11 +7340,11 @@ mod tests {
             tokio::sync::mpsc::unbounded_channel();
         let (event_sender, _event_receiver) = tokio::sync::mpsc::unbounded_channel();
         let (agent_sender, _agent_receiver) = tokio::sync::mpsc::unbounded_channel();
-        let runtime_env = BTreeMap::new();
         let clock = FixedClock { now_ms: 1_200 };
         let sleeper = ThreadSleeper;
         let mut session_state = TunnelSessionMutableState {
             agent_endpoint_url: None,
+            runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
@@ -7231,7 +7370,6 @@ mod tests {
         let context = TunnelSessionLoopContext {
             attachment_root: std::path::Path::new("/tmp"),
             cgroup_root: std::path::Path::new("/tmp"),
-            runtime_env: &runtime_env,
             sandbox_instance_id: "sbi_test",
             gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
             acting_user_id: None,

@@ -163,55 +163,89 @@ impl SandboxdState {
         );
         let gateway_egress_forwarder = Some(GatewayEgressForwarder::new());
         let execution_mode = startup_input.execution_mode;
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        let mut startup_tunnel_session = Some(start_minimal_tunnel_session(
+            StartMinimalTunnelSessionInput {
+                startup_input,
+                keepalive_manager: keepalive_manager.clone(),
+                runtime_readiness_manager: runtime_readiness_manager.clone(),
+                clock: clock.clone(),
+                sleeper: sleeper.clone(),
+                supervisor_handle: supervisor_handle.clone(),
+                diagnostics_logger: &diagnostics_logger,
+            },
+        )?);
+
         record_operation_phase_started(&diagnostics_logger, "apply_git_identity");
-        if !startup_input.is_snapshot() {
-            runtime::git_identity::apply_git_identity(startup_input, global_git_config_path)
-                .map_err(|error| {
-                    record_operation_phase_failure(
-                        &diagnostics_logger,
-                        "apply_git_identity",
-                        BTreeMap::from([(
-                            "error".to_string(),
-                            startup_diagnostics_string(error.clone()),
-                        )]),
-                    );
-                    SandboxdStateError::ApplyGitIdentity(error)
-                })?;
+        if !startup_input.is_snapshot()
+            && let Err(error) =
+                runtime::git_identity::apply_git_identity(startup_input, global_git_config_path)
+        {
+            record_operation_phase_failure(
+                &diagnostics_logger,
+                "apply_git_identity",
+                BTreeMap::from([(
+                    "error".to_string(),
+                    startup_diagnostics_string(error.clone()),
+                )]),
+            );
+            if let Some(tunnel_session) = startup_tunnel_session.take() {
+                close_tunnel_session(
+                    tunnel_session,
+                    &diagnostics_logger,
+                    "stop_tunnel_session_after_git_identity_failure",
+                );
+            }
+            return Err(SandboxdStateError::ApplyGitIdentity(error));
         }
         record_operation_phase_completed(&diagnostics_logger, "apply_git_identity");
 
-        let start_snapshot_gateway_egress_before_runtime_plan =
-            startup_input.is_snapshot() && gateway_egress_forwarder.is_some();
+        if let Some(tunnel_session) = &startup_tunnel_session
+            && let Some(forwarder) = &gateway_egress_forwarder
+        {
+            tunnel_session.attach_gateway_egress_forwarder(forwarder);
+        }
+
         let mut egress_proxy: Option<EgressProxy>;
         let runtime_env: BTreeMap<String, String>;
-        let mut startup_tunnel_session: Option<TunnelSession> = None;
-        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
-        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
 
-        if start_snapshot_gateway_egress_before_runtime_plan {
+        if startup_input.is_snapshot() {
             record_operation_phase_started(&diagnostics_logger, "start_egress_proxy");
-            egress_proxy = EgressProxy::start(
+            egress_proxy = match EgressProxy::start(
                 &runtime_plan,
                 startup_input,
                 gateway_egress_forwarder.clone(),
                 clock.clone(),
                 supervisor_handle.clone(),
-            )
-            .map_err(|error| {
-                record_operation_phase_failure(
-                    &diagnostics_logger,
-                    "start_egress_proxy",
-                    BTreeMap::from([(
-                        "error".to_string(),
-                        startup_diagnostics_string(error.to_string()),
-                    )]),
-                );
-                SandboxdStateError::StartEgressProxy(error.to_string())
-            })?;
+            ) {
+                Ok(egress_proxy) => egress_proxy,
+                Err(error) => {
+                    record_operation_phase_failure(
+                        &diagnostics_logger,
+                        "start_egress_proxy",
+                        BTreeMap::from([(
+                            "error".to_string(),
+                            startup_diagnostics_string(error.to_string()),
+                        )]),
+                    );
+                    close_tunnel_session_after_failure(
+                        &mut startup_tunnel_session,
+                        &diagnostics_logger,
+                        "stop_tunnel_session_after_egress_proxy_failure",
+                    );
+                    return Err(SandboxdStateError::StartEgressProxy(error.to_string()));
+                }
+            };
             record_operation_phase_completed(&diagnostics_logger, "start_egress_proxy");
             let base_runtime_env = match collect_runtime_environment(&runtime_plan) {
                 Ok(runtime_env) => runtime_env,
                 Err(error) => {
+                    close_tunnel_session_after_failure(
+                        &mut startup_tunnel_session,
+                        &diagnostics_logger,
+                        "stop_tunnel_session_after_runtime_env_failure",
+                    );
                     close_egress_proxy_after_failure(
                         &mut egress_proxy,
                         &diagnostics_logger,
@@ -224,6 +258,11 @@ impl SandboxdState {
                 match merge_managed_runtime_environment(base_runtime_env, egress_proxy.as_ref()) {
                     Ok(runtime_env) => runtime_env,
                     Err(error) => {
+                        close_tunnel_session_after_failure(
+                            &mut startup_tunnel_session,
+                            &diagnostics_logger,
+                            "stop_tunnel_session_after_runtime_env_failure",
+                        );
                         close_egress_proxy_after_failure(
                             &mut egress_proxy,
                             &diagnostics_logger,
@@ -233,40 +272,35 @@ impl SandboxdState {
                     }
                 };
 
-            record_operation_phase_started(&diagnostics_logger, "start_snapshot_tunnel_session");
-            let tunnel_session = match TunnelSession::start_with_supervisor(
-                startup_input,
-                keepalive_manager.clone(),
-                runtime_readiness_manager.clone(),
-                None,
-                runtime_env.clone(),
-                clock.clone(),
-                sleeper.clone(),
-                supervisor_handle.clone(),
-            ) {
-                Ok(tunnel_session) => tunnel_session,
-                Err(error) => {
-                    record_operation_phase_failure(
-                        &diagnostics_logger,
-                        "start_snapshot_tunnel_session",
-                        BTreeMap::from([(
-                            "error".to_string(),
-                            startup_diagnostics_string(error.to_string()),
-                        )]),
-                    );
-                    close_egress_proxy_after_failure(
-                        &mut egress_proxy,
-                        &diagnostics_logger,
-                        "stop_egress_proxy_after_snapshot_tunnel_failure",
-                    );
-                    return Err(SandboxdStateError::StartTunnelSession(error.to_string()));
-                }
+            let Some(tunnel_session) = startup_tunnel_session.as_ref() else {
+                close_egress_proxy_after_failure(
+                    &mut egress_proxy,
+                    &diagnostics_logger,
+                    "stop_egress_proxy_after_missing_tunnel_session",
+                );
+                return Err(SandboxdStateError::StartTunnelSession(
+                    "minimal bootstrap tunnel session is not initialized".to_string(),
+                ));
             };
-            if let Some(forwarder) = &gateway_egress_forwarder {
-                tunnel_session.attach_gateway_egress_forwarder(forwarder);
+            if let Err(error) = attach_runtime_environment_to_tunnel(
+                tunnel_session,
+                runtime_env.clone(),
+                &diagnostics_logger,
+            ) {
+                if let Some(tunnel_session) = startup_tunnel_session.take() {
+                    close_tunnel_session(
+                        tunnel_session,
+                        &diagnostics_logger,
+                        "stop_tunnel_session_after_runtime_environment_failure",
+                    );
+                }
+                close_egress_proxy_after_failure(
+                    &mut egress_proxy,
+                    &diagnostics_logger,
+                    "stop_egress_proxy_after_runtime_environment_failure",
+                );
+                return Err(error);
             }
-            record_operation_phase_completed(&diagnostics_logger, "start_snapshot_tunnel_session");
-            startup_tunnel_session = Some(tunnel_session);
 
             if !uses_pre_materialized_snapshot {
                 record_operation_phase_started(&diagnostics_logger, "apply_runtime_plan");
@@ -309,28 +343,40 @@ impl SandboxdState {
             }
         } else {
             record_operation_phase_started(&diagnostics_logger, "start_egress_proxy");
-            egress_proxy = EgressProxy::start(
+            egress_proxy = match EgressProxy::start(
                 &runtime_plan,
                 startup_input,
                 gateway_egress_forwarder.clone(),
                 clock.clone(),
                 supervisor_handle.clone(),
-            )
-            .map_err(|error| {
-                record_operation_phase_failure(
-                    &diagnostics_logger,
-                    "start_egress_proxy",
-                    BTreeMap::from([(
-                        "error".to_string(),
-                        startup_diagnostics_string(error.to_string()),
-                    )]),
-                );
-                SandboxdStateError::StartEgressProxy(error.to_string())
-            })?;
+            ) {
+                Ok(egress_proxy) => egress_proxy,
+                Err(error) => {
+                    record_operation_phase_failure(
+                        &diagnostics_logger,
+                        "start_egress_proxy",
+                        BTreeMap::from([(
+                            "error".to_string(),
+                            startup_diagnostics_string(error.to_string()),
+                        )]),
+                    );
+                    close_tunnel_session_after_failure(
+                        &mut startup_tunnel_session,
+                        &diagnostics_logger,
+                        "stop_tunnel_session_after_egress_proxy_failure",
+                    );
+                    return Err(SandboxdStateError::StartEgressProxy(error.to_string()));
+                }
+            };
             record_operation_phase_completed(&diagnostics_logger, "start_egress_proxy");
             let base_runtime_env = match collect_runtime_environment(&runtime_plan) {
                 Ok(runtime_env) => runtime_env,
                 Err(error) => {
+                    close_tunnel_session_after_failure(
+                        &mut startup_tunnel_session,
+                        &diagnostics_logger,
+                        "stop_tunnel_session_after_runtime_env_failure",
+                    );
                     close_egress_proxy_after_failure(
                         &mut egress_proxy,
                         &diagnostics_logger,
@@ -343,6 +389,11 @@ impl SandboxdState {
                 match merge_managed_runtime_environment(base_runtime_env, egress_proxy.as_ref()) {
                     Ok(runtime_env) => runtime_env,
                     Err(error) => {
+                        close_tunnel_session_after_failure(
+                            &mut startup_tunnel_session,
+                            &diagnostics_logger,
+                            "stop_tunnel_session_after_runtime_env_failure",
+                        );
                         close_egress_proxy_after_failure(
                             &mut egress_proxy,
                             &diagnostics_logger,
@@ -352,56 +403,34 @@ impl SandboxdState {
                     }
                 };
 
-            if egress_proxy.is_some() && !uses_pre_materialized_snapshot {
-                record_operation_phase_started(&diagnostics_logger, "start_tunnel_session");
-                let tunnel_session = match TunnelSession::start_with_supervisor(
-                    startup_input,
-                    keepalive_manager.clone(),
-                    runtime_readiness_manager.clone(),
-                    None,
-                    runtime_env.clone(),
-                    clock.clone(),
-                    sleeper.clone(),
-                    supervisor_handle.clone(),
-                ) {
-                    Ok(tunnel_session) => tunnel_session,
-                    Err(error) => {
-                        record_operation_phase_failure(
-                            &diagnostics_logger,
-                            "start_tunnel_session",
-                            BTreeMap::from([(
-                                "error".to_string(),
-                                startup_diagnostics_string(error.to_string()),
-                            )]),
-                        );
-                        if let Some(egress_proxy) = egress_proxy.take() {
-                            record_operation_phase_started(
-                                &diagnostics_logger,
-                                "stop_egress_proxy_after_start_tunnel_failure",
-                            );
-                            match egress_proxy.close() {
-                                Ok(()) => record_operation_phase_completed(
-                                    &diagnostics_logger,
-                                    "stop_egress_proxy_after_start_tunnel_failure",
-                                ),
-                                Err(close_error) => record_operation_phase_failure(
-                                    &diagnostics_logger,
-                                    "stop_egress_proxy_after_start_tunnel_failure",
-                                    BTreeMap::from([(
-                                        "error".to_string(),
-                                        startup_diagnostics_string(close_error.to_string()),
-                                    )]),
-                                ),
-                            }
-                        }
-                        return Err(SandboxdStateError::StartTunnelSession(error.to_string()));
-                    }
-                };
-                if let Some(forwarder) = &gateway_egress_forwarder {
-                    tunnel_session.attach_gateway_egress_forwarder(forwarder);
+            let Some(tunnel_session) = startup_tunnel_session.as_ref() else {
+                close_egress_proxy_after_failure(
+                    &mut egress_proxy,
+                    &diagnostics_logger,
+                    "stop_egress_proxy_after_missing_tunnel_session",
+                );
+                return Err(SandboxdStateError::StartTunnelSession(
+                    "minimal bootstrap tunnel session is not initialized".to_string(),
+                ));
+            };
+            if let Err(error) = attach_runtime_environment_to_tunnel(
+                tunnel_session,
+                runtime_env.clone(),
+                &diagnostics_logger,
+            ) {
+                if let Some(tunnel_session) = startup_tunnel_session.take() {
+                    close_tunnel_session(
+                        tunnel_session,
+                        &diagnostics_logger,
+                        "stop_tunnel_session_after_runtime_environment_failure",
+                    );
                 }
-                record_operation_phase_completed(&diagnostics_logger, "start_tunnel_session");
-                startup_tunnel_session = Some(tunnel_session);
+                close_egress_proxy_after_failure(
+                    &mut egress_proxy,
+                    &diagnostics_logger,
+                    "stop_egress_proxy_after_runtime_environment_failure",
+                );
+                return Err(error);
             }
 
             if !uses_pre_materialized_snapshot {
@@ -662,63 +691,42 @@ impl SandboxdState {
             runtime_readiness_shutdown_requested.clone(),
         ));
 
-        let tunnel_session = if let Some(tunnel_session) = startup_tunnel_session.take() {
-            record_operation_phase_started(&diagnostics_logger, "attach_runtime_agent_endpoint");
-            match tunnel_session.set_agent_endpoint_url(agent_endpoint_url.clone()) {
-                Ok(()) => {}
-                Err(error) => {
-                    record_operation_phase_failure(
-                        &diagnostics_logger,
-                        "attach_runtime_agent_endpoint",
-                        BTreeMap::from([(
-                            "error".to_string(),
-                            startup_diagnostics_string(error.to_string()),
-                        )]),
-                    );
-                    close_tunnel_session(
-                        tunnel_session,
-                        &diagnostics_logger,
-                        "stop_tunnel_session_after_agent_endpoint_attach_failure",
-                    );
-                    close_egress_proxy_after_failure(
-                        &mut egress_proxy,
-                        &diagnostics_logger,
-                        "stop_egress_proxy_after_agent_endpoint_attach_failure",
-                    );
-                    return Err(SandboxdStateError::StartTunnelSession(error.to_string()));
-                }
-            }
-            record_operation_phase_completed(&diagnostics_logger, "attach_runtime_agent_endpoint");
-            tunnel_session
-        } else {
-            record_operation_phase_started(&diagnostics_logger, "start_tunnel_session");
-            let tunnel_session = TunnelSession::start_with_supervisor(
-                startup_input,
-                keepalive_manager.clone(),
-                runtime_readiness_manager.clone(),
-                agent_endpoint_url.clone(),
-                runtime_env.clone(),
-                clock.clone(),
-                sleeper.clone(),
-                supervisor_handle.clone(),
-            )
-            .map_err(|error| {
+        let Some(tunnel_session) = startup_tunnel_session.take() else {
+            close_egress_proxy_after_failure(
+                &mut egress_proxy,
+                &diagnostics_logger,
+                "stop_egress_proxy_after_missing_tunnel_session",
+            );
+            return Err(SandboxdStateError::StartTunnelSession(
+                "minimal bootstrap tunnel session is not initialized".to_string(),
+            ));
+        };
+        record_operation_phase_started(&diagnostics_logger, "attach_runtime_agent_endpoint");
+        match tunnel_session.set_agent_endpoint_url(agent_endpoint_url.clone()) {
+            Ok(()) => {}
+            Err(error) => {
                 record_operation_phase_failure(
                     &diagnostics_logger,
-                    "start_tunnel_session",
+                    "attach_runtime_agent_endpoint",
                     BTreeMap::from([(
                         "error".to_string(),
                         startup_diagnostics_string(error.to_string()),
                     )]),
                 );
-                SandboxdStateError::StartTunnelSession(error.to_string())
-            })?;
-            if let Some(forwarder) = &gateway_egress_forwarder {
-                tunnel_session.attach_gateway_egress_forwarder(forwarder);
+                close_tunnel_session(
+                    tunnel_session,
+                    &diagnostics_logger,
+                    "stop_tunnel_session_after_agent_endpoint_attach_failure",
+                );
+                close_egress_proxy_after_failure(
+                    &mut egress_proxy,
+                    &diagnostics_logger,
+                    "stop_egress_proxy_after_agent_endpoint_attach_failure",
+                );
+                return Err(SandboxdStateError::StartTunnelSession(error.to_string()));
             }
-            record_operation_phase_completed(&diagnostics_logger, "start_tunnel_session");
-            tunnel_session
-        };
+        }
+        record_operation_phase_completed(&diagnostics_logger, "attach_runtime_agent_endpoint");
         let tunnel_session = Some(tunnel_session);
         let codex_coordination_shutdown_requested = Arc::new(AtomicBool::new(false));
         let codex_coordination_thread = match (
@@ -772,24 +780,13 @@ impl SandboxdState {
                 "snapshot materialization sandboxes do not support resume".to_string(),
             ));
         }
-        record_operation_phase_started(&diagnostics_logger, "apply_git_identity");
-        runtime::git_identity::apply_git_identity(startup_input, global_git_config_path).map_err(
-            |error| {
-                record_operation_phase_failure(
-                    &diagnostics_logger,
-                    "apply_git_identity",
-                    BTreeMap::from([(
-                        "error".to_string(),
-                        startup_diagnostics_string(error.clone()),
-                    )]),
-                );
-                SandboxdStateError::ApplyGitIdentity(error)
-            },
-        )?;
-        record_operation_phase_completed(&diagnostics_logger, "apply_git_identity");
         if let Some(tunnel_session) = self.tunnel_session.take() {
             tunnel_session.close();
         }
+        self.runtime_readiness_manager
+            .lock()
+            .expect("runtime readiness manager lock should not be poisoned")
+            .set_ready(false);
 
         let agent_endpoint_url =
             if let Some(codex_proxy_control_handle) = &self.codex_proxy_control_handle {
@@ -798,33 +795,75 @@ impl SandboxdState {
                 self.agent_endpoint_url.clone()
             };
 
-        record_operation_phase_started(&diagnostics_logger, "start_tunnel_session");
-        let tunnel_session = TunnelSession::start_with_supervisor(
+        let tunnel_session = start_minimal_tunnel_session(StartMinimalTunnelSessionInput {
             startup_input,
-            self.keepalive_manager.clone(),
-            self.runtime_readiness_manager.clone(),
-            agent_endpoint_url,
-            self.runtime_env.clone(),
-            self.clock.clone(),
-            self.sleeper.clone(),
-            self.supervisor_handle.clone(),
-        )
-        .map_err(|error| {
+            keepalive_manager: self.keepalive_manager.clone(),
+            runtime_readiness_manager: self.runtime_readiness_manager.clone(),
+            clock: self.clock.clone(),
+            sleeper: self.sleeper.clone(),
+            supervisor_handle: self.supervisor_handle.clone(),
+            diagnostics_logger: &diagnostics_logger,
+        })?;
+        record_operation_phase_started(&diagnostics_logger, "apply_git_identity");
+        if let Err(error) =
+            runtime::git_identity::apply_git_identity(startup_input, global_git_config_path)
+        {
             record_operation_phase_failure(
                 &diagnostics_logger,
-                "start_tunnel_session",
+                "apply_git_identity",
+                BTreeMap::from([(
+                    "error".to_string(),
+                    startup_diagnostics_string(error.clone()),
+                )]),
+            );
+            close_tunnel_session(
+                tunnel_session,
+                &diagnostics_logger,
+                "stop_tunnel_session_after_git_identity_failure",
+            );
+            return Err(SandboxdStateError::ApplyGitIdentity(error));
+        }
+        record_operation_phase_completed(&diagnostics_logger, "apply_git_identity");
+        if let Some(forwarder) = &self.gateway_egress_forwarder {
+            tunnel_session.attach_gateway_egress_forwarder(forwarder);
+        }
+        if let Err(error) = attach_runtime_environment_to_tunnel(
+            &tunnel_session,
+            self.runtime_env.clone(),
+            &diagnostics_logger,
+        ) {
+            close_tunnel_session(
+                tunnel_session,
+                &diagnostics_logger,
+                "stop_tunnel_session_after_runtime_environment_failure",
+            );
+            return Err(error);
+        }
+        record_operation_phase_started(&diagnostics_logger, "attach_runtime_agent_endpoint");
+        if let Err(error) = tunnel_session.set_agent_endpoint_url(agent_endpoint_url) {
+            record_operation_phase_failure(
+                &diagnostics_logger,
+                "attach_runtime_agent_endpoint",
                 BTreeMap::from([(
                     "error".to_string(),
                     startup_diagnostics_string(error.to_string()),
                 )]),
             );
-            SandboxdStateError::StartTunnelSession(error.to_string())
-        })?;
-        if let Some(forwarder) = &self.gateway_egress_forwarder {
-            tunnel_session.attach_gateway_egress_forwarder(forwarder);
+            close_tunnel_session(
+                tunnel_session,
+                &diagnostics_logger,
+                "stop_tunnel_session_after_agent_endpoint_attach_failure",
+            );
+            return Err(SandboxdStateError::StartTunnelSession(error.to_string()));
         }
+        record_operation_phase_completed(&diagnostics_logger, "attach_runtime_agent_endpoint");
         self.tunnel_session = Some(tunnel_session);
-        record_operation_phase_completed(&diagnostics_logger, "start_tunnel_session");
+        let runtime_readiness_mode = determine_runtime_readiness_mode(&self.supervisor_handle);
+        sync_runtime_readiness_from_snapshot(
+            &self.supervisor_handle,
+            &self.runtime_readiness_manager,
+            runtime_readiness_mode,
+        );
 
         Ok(())
     }
@@ -1417,6 +1456,68 @@ fn collect_tracked_components(
     tracked_components
 }
 
+struct StartMinimalTunnelSessionInput<'a> {
+    startup_input: &'a StartupInput,
+    keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
+    clock: Arc<dyn Clock>,
+    sleeper: Arc<dyn Sleeper>,
+    supervisor_handle: SandboxdSupervisorHandle,
+    diagnostics_logger: &'a Option<StartupDiagnosticsLogger>,
+}
+
+fn start_minimal_tunnel_session(
+    input: StartMinimalTunnelSessionInput<'_>,
+) -> Result<TunnelSession, SandboxdStateError> {
+    record_operation_phase_started(input.diagnostics_logger, "start_tunnel_session");
+    let tunnel_session = TunnelSession::start_minimal_with_supervisor(
+        input.startup_input,
+        input.keepalive_manager,
+        input.runtime_readiness_manager,
+        input.clock,
+        input.sleeper,
+        input.supervisor_handle,
+    )
+    .map_err(|error| {
+        record_operation_phase_failure(
+            input.diagnostics_logger,
+            "start_tunnel_session",
+            BTreeMap::from([(
+                "error".to_string(),
+                startup_diagnostics_string(error.to_string()),
+            )]),
+        );
+        SandboxdStateError::StartTunnelSession(error.to_string())
+    })?;
+    record_operation_phase_completed(input.diagnostics_logger, "start_tunnel_session");
+
+    Ok(tunnel_session)
+}
+
+fn attach_runtime_environment_to_tunnel(
+    tunnel_session: &TunnelSession,
+    runtime_env: BTreeMap<String, String>,
+    diagnostics_logger: &Option<StartupDiagnosticsLogger>,
+) -> Result<(), SandboxdStateError> {
+    record_operation_phase_started(diagnostics_logger, "attach_runtime_environment");
+    tunnel_session
+        .set_runtime_environment(runtime_env)
+        .map_err(|error| {
+            record_operation_phase_failure(
+                diagnostics_logger,
+                "attach_runtime_environment",
+                BTreeMap::from([(
+                    "error".to_string(),
+                    startup_diagnostics_string(error.to_string()),
+                )]),
+            );
+            SandboxdStateError::StartTunnelSession(error.to_string())
+        })?;
+    record_operation_phase_completed(diagnostics_logger, "attach_runtime_environment");
+
+    Ok(())
+}
+
 fn close_tunnel_session(
     tunnel_session: TunnelSession,
     diagnostics_logger: &Option<StartupDiagnosticsLogger>,
@@ -1425,6 +1526,17 @@ fn close_tunnel_session(
     record_operation_phase_started(diagnostics_logger, phase);
     tunnel_session.close();
     record_operation_phase_completed(diagnostics_logger, phase);
+}
+
+fn close_tunnel_session_after_failure(
+    tunnel_session: &mut Option<TunnelSession>,
+    diagnostics_logger: &Option<StartupDiagnosticsLogger>,
+    phase: &str,
+) {
+    let Some(tunnel_session) = tunnel_session.take() else {
+        return;
+    };
+    close_tunnel_session(tunnel_session, diagnostics_logger, phase);
 }
 
 fn close_egress_proxy_after_failure(
@@ -2231,7 +2343,7 @@ mod tests {
     }
 
     #[test]
-    fn snapshot_materialization_gateway_egress_uses_temporary_bootstrap_tunnel_for_setup() {
+    fn snapshot_materialization_gateway_egress_uses_common_minimal_bootstrap_tunnel_for_setup() {
         let log_dir = std::env::temp_dir().join(format!(
             "mistle-snapshot-materialization-gateway-log-{}",
             SystemTime::now()
@@ -2330,18 +2442,206 @@ mod tests {
             .collect::<Vec<_>>();
         let start_tunnel_index = phases
             .iter()
-            .position(|phase| phase == "start_snapshot_tunnel_session")
-            .expect("snapshot tunnel phase should be recorded");
+            .position(|phase| phase == "start_tunnel_session")
+            .expect("common tunnel phase should be recorded");
+        assert!(
+            !phases
+                .iter()
+                .any(|phase| phase == "start_snapshot_tunnel_session"),
+            "snapshot initialization must not use a snapshot-only tunnel phase; phases: {phases:?}"
+        );
         let apply_runtime_plan_index = phases
             .iter()
             .position(|phase| phase == "apply_runtime_plan")
             .expect("runtime plan phase should be recorded");
         assert!(
             start_tunnel_index < apply_runtime_plan_index,
-            "snapshot gateway tunnel must start before runtime plan materialization; phases: {phases:?}"
+            "common gateway tunnel must start before runtime plan materialization; phases: {phases:?}"
         );
 
         let _ = std::fs::remove_file(output_path);
+        let _ = fs::remove_dir_all(log_dir);
+    }
+
+    #[test]
+    fn session_initialization_uses_common_minimal_bootstrap_tunnel_phase() {
+        let log_dir = std::env::temp_dir().join(format!(
+            "mistle-session-initialization-gateway-log-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after unix epoch")
+                .as_nanos()
+        ));
+        let _ = fs::remove_dir_all(&log_dir);
+        fs::create_dir_all(&log_dir).expect("startup diagnostics log dir should be creatable");
+        let _env_guard = TestEnvVarsGuard::set([(
+            "MISTLE_SANDBOXD_OPERATION_LOG_DIR",
+            log_dir.to_string_lossy().to_string(),
+        )]);
+        let (bootstrap_url, gateway_thread) = start_snapshot_bootstrap_gateway();
+        let git_config_path = std::env::temp_dir().join(format!(
+            "mistle-session-initialization-git-config-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after unix epoch")
+                .as_nanos()
+        ));
+
+        let state = SandboxdState::initialize(
+            &build_startup_input(
+                StartupMode::New,
+                StartupExecutionMode::Session,
+                &bootstrap_url,
+                minimal_runtime_plan_json(),
+                None,
+            ),
+            git_config_path.as_path(),
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+            Some(
+                StartupDiagnosticsLogger::initialize(StartupOperation::Init, &bootstrap_url)
+                    .expect("startup diagnostics logger should initialize"),
+            ),
+        )
+        .expect("session initialization should use common gateway tunnel");
+
+        assert_eq!(state.execution_mode, StartupExecutionMode::Session);
+        assert!(state.tunnel_session.is_some());
+
+        let init_log = fs::read_to_string(log_dir.join("init.log"))
+            .expect("startup diagnostics init log should be readable");
+        let phases = init_log
+            .lines()
+            .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+            .filter(|event| event["event"] == "sandbox_init_phase_started")
+            .filter_map(|event| event["phase"].as_str().map(ToOwned::to_owned))
+            .collect::<Vec<_>>();
+        assert!(
+            phases.iter().any(|phase| phase == "start_tunnel_session"),
+            "session initialization should use the common tunnel phase; phases: {phases:?}"
+        );
+        let start_tunnel_index = phases
+            .iter()
+            .position(|phase| phase == "start_tunnel_session")
+            .expect("session tunnel phase should be recorded");
+        let apply_runtime_plan_index = phases
+            .iter()
+            .position(|phase| phase == "apply_runtime_plan")
+            .expect("runtime plan phase should be recorded");
+        assert!(
+            start_tunnel_index < apply_runtime_plan_index,
+            "common gateway tunnel must start before runtime plan materialization; phases: {phases:?}"
+        );
+        assert!(
+            phases
+                .iter()
+                .any(|phase| phase == "attach_runtime_environment"),
+            "session initialization should attach runtime env after minimal tunnel start; phases: {phases:?}"
+        );
+        assert!(
+            !phases
+                .iter()
+                .any(|phase| phase == "start_snapshot_tunnel_session"),
+            "session initialization must not use a snapshot-only tunnel phase; phases: {phases:?}"
+        );
+
+        state.close().expect("session state should close cleanly");
+        gateway_thread
+            .join()
+            .expect("session gateway thread should exit after tunnel shutdown");
+        let _ = fs::remove_file(git_config_path);
+        let _ = fs::remove_dir_all(log_dir);
+    }
+
+    #[test]
+    fn resume_reopens_minimal_bootstrap_tunnel_with_initial_runtime_not_ready() {
+        let log_dir = std::env::temp_dir().join(format!(
+            "mistle-sandboxd-resume-gateway-log-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after unix epoch")
+                .as_nanos()
+        ));
+        let _ = fs::remove_dir_all(&log_dir);
+        fs::create_dir_all(&log_dir).expect("startup diagnostics log dir should be creatable");
+        let _env_guard = TestEnvVarsGuard::set([(
+            "MISTLE_SANDBOXD_OPERATION_LOG_DIR",
+            log_dir.to_string_lossy().to_string(),
+        )]);
+        let (bootstrap_url, gateway_thread) = start_bootstrap_gateway_with_connections(2);
+        let git_config_path = std::env::temp_dir().join(format!(
+            "mistle-sandboxd-resume-git-config-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after unix epoch")
+                .as_nanos()
+        ));
+        let mut state = SandboxdState::initialize(
+            &build_startup_input(
+                StartupMode::New,
+                StartupExecutionMode::Session,
+                &bootstrap_url,
+                minimal_runtime_plan_json(),
+                None,
+            ),
+            git_config_path.as_path(),
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+            Some(
+                StartupDiagnosticsLogger::initialize(StartupOperation::Init, &bootstrap_url)
+                    .expect("startup diagnostics logger should initialize"),
+            ),
+        )
+        .expect("session initialization should succeed");
+        wait_for_runtime_ready_value(
+            &state.runtime_readiness_manager,
+            true,
+            Duration::from_secs(5),
+        );
+
+        state
+            .resume(
+                &build_startup_input(
+                    StartupMode::Existing,
+                    StartupExecutionMode::Session,
+                    &bootstrap_url,
+                    minimal_runtime_plan_json(),
+                    None,
+                ),
+                git_config_path.as_path(),
+                Some(
+                    StartupDiagnosticsLogger::initialize(StartupOperation::Resume, &bootstrap_url)
+                        .expect("resume diagnostics logger should initialize"),
+                ),
+            )
+            .expect("session resume should reopen the bootstrap tunnel");
+
+        let resume_log = fs::read_to_string(log_dir.join("resume.log"))
+            .expect("resume diagnostics log should be readable");
+        let phases = resume_log
+            .lines()
+            .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+            .filter(|event| event["event"] == "sandbox_resume_phase_started")
+            .filter_map(|event| event["phase"].as_str().map(ToOwned::to_owned))
+            .collect::<Vec<_>>();
+        let start_tunnel_index = phases
+            .iter()
+            .position(|phase| phase == "start_tunnel_session")
+            .expect("resume tunnel phase should be recorded");
+        let apply_git_identity_index = phases
+            .iter()
+            .position(|phase| phase == "apply_git_identity")
+            .expect("resume git identity phase should be recorded");
+        assert!(
+            start_tunnel_index < apply_git_identity_index,
+            "resume minimal gateway tunnel must start before git identity; phases: {phases:?}"
+        );
+
+        state.close().expect("session state should close cleanly");
+        gateway_thread
+            .join()
+            .expect("resume gateway thread should exit after tunnel shutdown");
+        let _ = fs::remove_file(git_config_path);
         let _ = fs::remove_dir_all(log_dir);
     }
 
@@ -2387,6 +2687,12 @@ mod tests {
     }
 
     fn start_snapshot_bootstrap_gateway() -> (String, thread::JoinHandle<()>) {
+        start_bootstrap_gateway_with_connections(1)
+    }
+
+    fn start_bootstrap_gateway_with_connections(
+        connection_count: usize,
+    ) -> (String, thread::JoinHandle<()>) {
         let bootstrap_listener =
             TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
         let bootstrap_url = format!(
@@ -2397,20 +2703,43 @@ mod tests {
                 .port()
         );
         let gateway_thread = thread::spawn(move || {
-            let (stream, _) = bootstrap_listener
-                .accept()
-                .expect("snapshot gateway should accept the bootstrap tunnel");
-            let mut websocket = accept(stream).expect("snapshot gateway handshake should succeed");
+            for _ in 0..connection_count {
+                let (stream, _) = bootstrap_listener
+                    .accept()
+                    .expect("gateway should accept the bootstrap tunnel");
+                let mut websocket =
+                    accept(stream).expect("gateway websocket handshake should succeed");
 
-            let telemetry_open = read_websocket_json_text_message(&mut websocket);
-            assert_eq!(telemetry_open["type"], "telemetry.open");
+                let telemetry_open = read_websocket_json_text_message(&mut websocket);
+                assert_eq!(telemetry_open["type"], "telemetry.open");
 
-            loop {
-                match websocket.read() {
-                    Ok(Message::Close(_)) => break,
-                    Ok(_) => {}
-                    Err(_) => break,
+                let mut saw_runtime_ready = false;
+                loop {
+                    match websocket.read() {
+                        Ok(Message::Close(_)) => break,
+                        Ok(Message::Text(payload)) => {
+                            let Ok(message) = serde_json::from_str::<serde_json::Value>(&payload)
+                            else {
+                                continue;
+                            };
+                            if message["type"] == "runtime.ready" {
+                                if !saw_runtime_ready {
+                                    assert_eq!(
+                                        message["ready"], false,
+                                        "the first runtime.ready publish after bootstrap attachment must be false"
+                                    );
+                                }
+                                saw_runtime_ready = true;
+                            }
+                        }
+                        Ok(_) => {}
+                        Err(_) => break,
+                    }
                 }
+                assert!(
+                    saw_runtime_ready,
+                    "gateway should observe a runtime.ready publish before tunnel shutdown"
+                );
             }
         });
 
