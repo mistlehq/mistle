@@ -658,6 +658,66 @@ describe("useOpenCodeSessionState", () => {
     await expect(promptPromise).resolves.toBeUndefined();
   });
 
+  it("waits for OpenCode to update the session title before returning it", async () => {
+    const server = await startOpenCodeProxyTransportServer();
+    const transport = await connectTransport(server);
+    const { result } = renderHook(() =>
+      useOpenCodeSessionState({
+        ensureTransportConnected: async () => {
+          return {
+            sandboxInstanceId: "sbi_123",
+            transport,
+          };
+        },
+      }),
+    );
+
+    const permissionsRequest = await connectOpenCodeSessionForTest({
+      result,
+      sandboxInstanceId: "sbi_123",
+      server,
+      sessionId: "ses_test",
+    });
+    server.sendJsonResponse({
+      request: permissionsRequest,
+      body: [],
+    });
+
+    await waitFor(() => {
+      expect(result.current.lifecycle.sessionConnectionState).toBe("connected");
+    });
+
+    let titlePromise: Promise<string> | undefined;
+    act(() => {
+      titlePromise = result.current.chat.waitForGeneratedSessionTitle();
+    });
+
+    const staleTitleRequest = await server.nextRequest();
+    expect(staleTitleRequest.request).toMatchObject({
+      method: "GET",
+      path: "/session/ses_test",
+    });
+    server.sendJsonResponse({
+      request: staleTitleRequest,
+      body: createSessionResponse("ses_test"),
+    });
+
+    const generatedTitleRequest = await server.nextRequest();
+    expect(generatedTitleRequest.request).toMatchObject({
+      method: "GET",
+      path: "/session/ses_test",
+    });
+    server.sendJsonResponse({
+      request: generatedTitleRequest,
+      body: {
+        ...createSessionResponse("ses_test"),
+        title: " Investigate   flaky tests. ",
+      },
+    });
+
+    await expect(titlePromise).resolves.toBe("Investigate flaky tests");
+  });
+
   it("rejects strict chat hydration when OpenCode message listing fails", async () => {
     const server = await startOpenCodeProxyTransportServer();
     const transport = await connectTransport(server);

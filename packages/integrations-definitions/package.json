@@ -84,6 +84,13 @@
       "import": "./src/agent-runtimes/opencode/pty-launch.ts",
       "default": "./src/agent-runtimes/opencode/pty-launch.ts"
     },
+    "./agent-runtimes/opencode/title-generation": {
+      "types": "./src/agent-runtimes/opencode/title-generation.ts",
+      "workspace-src": "./src/agent-runtimes/opencode/title-generation.ts",
+      "node": "./dist/agent-runtimes/opencode/title-generation.js",
+      "import": "./src/agent-runtimes/opencode/title-generation.ts",
+      "default": "./src/agent-runtimes/opencode/title-generation.ts"
+    },
     "./openai": {
       "types": "./src/openai/index.ts",
       "workspace-src": "./src/openai/index.ts",

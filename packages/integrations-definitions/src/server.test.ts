@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { createAgentRuntimeServerRegistry } from "./registry/agent-runtimes.server.js";
 import {
   createDefinitionsBundle,
   createIntegrationRegistry,
@@ -7,6 +8,20 @@ import {
 } from "./server.js";
 
 describe("integrations-definitions server", () => {
+  it("exposes conversation title generation for every server agent runtime provider", () => {
+    const registry = createAgentRuntimeServerRegistry();
+
+    const missingTitleGeneration = registry
+      .listRuntimes()
+      .filter((runtime) => {
+        const provider = runtime.createConversationProvider?.();
+        return typeof provider?.generateConversationTitle !== "function";
+      })
+      .map((runtime) => runtime.runtimeId);
+
+    expect(missingTitleGeneration).toEqual([]);
+  });
+
   it("registers built-in server integration definitions in a registry", () => {
     const registry = createIntegrationRegistry();
     const anthropicDefinition = registry.getDefinition({

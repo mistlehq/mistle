@@ -268,6 +268,7 @@ export async function deliverConversationAutomationPayload(
             workflowRunId: input.workflowRunId,
           }),
         providerConversationId: deliveryResult.providerConversationId,
+        providerState: deliveryResult.providerState,
         inputText: input.preparedAutomationRun.renderedInput,
       },
     );

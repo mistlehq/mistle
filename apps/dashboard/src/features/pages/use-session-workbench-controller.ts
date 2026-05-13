@@ -26,6 +26,7 @@ import type {
 import { applyPatchedSessionTitleToCache } from "../sessions/session-header-title-model.js";
 import { generateSessionTitleWithSandboxCodexExec } from "../sessions/session-title-generation.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
+import { patchSandboxInstanceTitle } from "../sessions/sessions-service.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
   useLocalSessionComposerConfigControl,
@@ -189,6 +190,18 @@ function mapOpenCodeChatStateForConversation(
     pendingTurnId: null,
     status: chatState.status === "busy" ? "inProgress" : chatState.status,
   };
+}
+
+export function shouldGenerateInitialSessionTitle(input: {
+  cachedTitle: string | null | undefined;
+  messageCount: number;
+  sandboxInstanceId: string | null;
+}): boolean {
+  return (
+    input.sandboxInstanceId !== null &&
+    input.messageCount === 0 &&
+    !(input.cachedTitle !== undefined && input.cachedTitle !== null)
+  );
 }
 
 function normalizeOpenCodePermissionPatterns(
@@ -637,7 +650,16 @@ export function useSessionWorkbenchController(input: {
     async (
       turnInput: Parameters<SessionComposerStateInput["turnControl"]["startTurn"]>[0],
     ): Promise<void> => {
+      const sandboxInstanceId = input.sandboxInstanceId;
+      const cachedTitle = sandboxStatus?.title;
+      const messagePayload = turnInput.transcriptPrompt ?? turnInput.submittedPrompt;
+
       if (isOpenCodeRuntime) {
+        const shouldGenerateSessionTitle = shouldGenerateInitialSessionTitle({
+          sandboxInstanceId,
+          cachedTitle,
+          messageCount: openCodeSessionState.chat.chatState.messageOrder.length,
+        });
         const selectedOpenCodeModel = resolveOpenCodePromptModelOverride(
           activeConfigControl.hasExplicitModelSelection,
           activeConfigControl.selectedModel,
@@ -647,17 +669,38 @@ export function useSessionWorkbenchController(input: {
           ...(selectedRepositoryPath === null ? {} : { directory: selectedRepositoryPath }),
           ...(selectedOpenCodeModel === undefined ? {} : { model: selectedOpenCodeModel }),
           submittedAttachments: attachmentParts,
-          submittedPrompt: turnInput.transcriptPrompt ?? turnInput.submittedPrompt,
+          submittedPrompt: messagePayload,
         });
+        if (!shouldGenerateSessionTitle || sandboxInstanceId === null) {
+          return;
+        }
+
+        void openCodeSessionState.chat
+          .waitForGeneratedSessionTitle()
+          .then(
+            async (title) =>
+              await patchSandboxInstanceTitle({
+                instanceId: sandboxInstanceId,
+                onlyIfUnset: true,
+                title,
+              }),
+          )
+          .then((patchedTitle) => {
+            applyPatchedSessionTitleToCache(queryClient, patchedTitle);
+          })
+          .catch((error: unknown) => {
+            console.warn(
+              error instanceof Error ? error.message : "Could not generate sandbox session title.",
+            );
+          });
         return;
       }
 
-      const sandboxInstanceId = input.sandboxInstanceId;
-      const cachedTitle = sandboxStatus?.title;
-      const shouldGenerateSessionTitle =
-        sandboxInstanceId !== null &&
-        chat.chatState.turnOrder.length === 0 &&
-        !(cachedTitle !== undefined && cachedTitle !== null);
+      const shouldGenerateSessionTitle = shouldGenerateInitialSessionTitle({
+        sandboxInstanceId,
+        cachedTitle,
+        messageCount: chat.chatState.turnOrder.length,
+      });
 
       await chat.startTurn({
         ...turnInput,
@@ -671,7 +714,7 @@ export function useSessionWorkbenchController(input: {
       void generateSessionTitleWithSandboxCodexExec({
         cwd: selectedRepositoryPath,
         ensureTransportConnected: transportManager.ensureTransportConnected,
-        messagePayload: turnInput.transcriptPrompt ?? turnInput.submittedPrompt,
+        messagePayload,
         sandboxInstanceId,
       })
         .then((patchedTitle) => {
@@ -690,6 +733,7 @@ export function useSessionWorkbenchController(input: {
       input.sandboxInstanceId,
       isOpenCodeRuntime,
       openCodeSessionState.chat,
+      openCodeSessionState.chat.chatState.messageOrder.length,
       queryClient,
       sandboxStatus?.title,
       selectedRepositoryPath,

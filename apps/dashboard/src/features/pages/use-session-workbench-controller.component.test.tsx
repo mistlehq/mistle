@@ -24,6 +24,7 @@ import {
   mapOpenCodePermissionsToServerRequests,
   resolveOpenCodePermissionResponse,
   resolveOpenCodePromptModelOverride,
+  shouldGenerateInitialSessionTitle,
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
 import { resolveSandboxStatusRefetchInterval } from "./use-session-workbench-lifecycle-state.js";
@@ -183,6 +184,48 @@ describe("useSessionWorkbenchController", () => {
   it("keys OpenCode composer model overrides by sandbox and session", () => {
     expect(buildOpenCodeComposerConfigResetKey("sbi_one", "ses_one")).toBe("sbi_one:ses_one");
     expect(buildOpenCodeComposerConfigResetKey(null, null)).toBe(":");
+  });
+
+  it("generates an initial session title only for the first message while the title is unset", () => {
+    expect(
+      shouldGenerateInitialSessionTitle({
+        sandboxInstanceId: "sbi_123",
+        cachedTitle: null,
+        messageCount: 0,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldGenerateInitialSessionTitle({
+        sandboxInstanceId: "sbi_123",
+        cachedTitle: undefined,
+        messageCount: 0,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldGenerateInitialSessionTitle({
+        sandboxInstanceId: "sbi_123",
+        cachedTitle: "Existing title",
+        messageCount: 0,
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldGenerateInitialSessionTitle({
+        sandboxInstanceId: "sbi_123",
+        cachedTitle: null,
+        messageCount: 1,
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldGenerateInitialSessionTitle({
+        sandboxInstanceId: null,
+        cachedTitle: null,
+        messageCount: 0,
+      }),
+    ).toBe(false);
   });
 
   it("starts Codex recovery from a recoverable disconnect and preserves attempts for the same event", () => {

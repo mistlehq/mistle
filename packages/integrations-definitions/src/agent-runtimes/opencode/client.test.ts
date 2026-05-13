@@ -396,6 +396,28 @@ describe("createOpenCodeSessionClient", () => {
       path: "/session?directory=%2Fworkspace%2Frepo&limit=1",
     });
 
+    const statusesPromise = client.listSessionStatuses({
+      directory: "/workspace/repo",
+    });
+    const statusesRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: statusesRequest,
+      body: {
+        ses_recent: {
+          type: "busy",
+        },
+      },
+    });
+    await expect(statusesPromise).resolves.toEqual({
+      ses_recent: {
+        type: "busy",
+      },
+    });
+    expect(statusesRequest.request).toMatchObject({
+      method: "GET",
+      path: "/session/status?directory=%2Fworkspace%2Frepo",
+    });
+
     const messagesPromise = client.listMessages({
       sessionId: "ses_test",
     });
@@ -501,6 +523,7 @@ describe("createOpenCodeSessionClient", () => {
           type: "text",
         },
       ],
+      system: "Always include a reproducible next step.",
     });
     const promptRequest = await server.nextRequest();
     server.sendNoContentResponse({
@@ -521,6 +544,7 @@ describe("createOpenCodeSessionClient", () => {
             type: "text",
           },
         ],
+        system: "Always include a reproducible next step.",
       },
     });
 

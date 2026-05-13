@@ -2,6 +2,7 @@ import { AgentRuntimeRegistry, type AgentRuntimeDefinition } from "@mistle/integ
 
 import { createOpenAiConversationProvider } from "../agent-runtimes/codex/conversation-provider.server.js";
 import { CodexRuntimeDefinition } from "../agent-runtimes/codex/definition.js";
+import { createOpenCodeConversationProvider } from "../agent-runtimes/opencode/conversation-provider.server.js";
 import { OpenCodeRuntimeDefinition } from "../agent-runtimes/opencode/definition.js";
 
 const CodexServerRuntimeDefinition: AgentRuntimeDefinition = {
@@ -9,9 +10,14 @@ const CodexServerRuntimeDefinition: AgentRuntimeDefinition = {
   createConversationProvider: createOpenAiConversationProvider,
 };
 
+const OpenCodeServerRuntimeDefinition: AgentRuntimeDefinition = {
+  ...OpenCodeRuntimeDefinition,
+  createConversationProvider: createOpenCodeConversationProvider,
+};
+
 export function createAgentRuntimeServerRegistry(): AgentRuntimeRegistry {
   const registry = new AgentRuntimeRegistry();
   registry.register(CodexServerRuntimeDefinition);
-  registry.register(OpenCodeRuntimeDefinition);
+  registry.register(OpenCodeServerRuntimeDefinition);
   return registry;
 }

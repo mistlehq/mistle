@@ -8,6 +8,7 @@ async function generateAutomationConversationTitle(input: {
   runtimeId: string;
   getConnectionUrl: () => Promise<string>;
   providerConversationId: string;
+  providerState?: unknown;
   inputText: string;
 }): Promise<string | null> {
   const adapter = getConversationProviderAdapter(input.runtimeId);
@@ -18,6 +19,7 @@ async function generateAutomationConversationTitle(input: {
   const result = await adapter.generateConversationTitle({
     connectionUrl: await input.getConnectionUrl(),
     providerConversationId: input.providerConversationId,
+    providerState: input.providerState,
     inputText: input.inputText,
   });
 
@@ -36,6 +38,7 @@ export async function seedSandboxInstanceTitle(
     inputText: string;
     organizationId: string;
     providerConversationId: string;
+    providerState?: unknown;
     runtimeId: string;
     sandboxInstanceId: string;
   },
@@ -55,6 +58,7 @@ export async function seedSandboxInstanceTitle(
     runtimeId: input.runtimeId,
     getConnectionUrl: input.getConnectionUrl,
     providerConversationId: input.providerConversationId,
+    providerState: input.providerState,
     inputText: input.inputText,
   });
   if (title === null) {

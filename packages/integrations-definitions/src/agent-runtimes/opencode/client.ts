@@ -11,6 +11,7 @@ import type {
   PermissionRuleset,
   Provider,
   Session,
+  SessionStatus,
   SubtaskPartInput,
   TextPartInput,
 } from "@opencode-ai/sdk/v2";
@@ -25,6 +26,7 @@ export type OpenCodeConfigProvidersResult = {
   default: Record<string, string>;
 };
 export type OpenCodeSessionSummary = Session;
+export type OpenCodeSessionStatus = SessionStatus;
 export type OpenCodeEvent = GlobalEvent;
 export type OpenCodeMessage = Message;
 export type OpenCodeMessagePart = Part;
@@ -126,6 +128,10 @@ export type OpenCodeSessionClient = {
     workspace?: string;
   }): Promise<readonly PermissionRequest[]>;
   listSessions(input?: OpenCodeListSessionsInput): Promise<readonly OpenCodeSessionSummary[]>;
+  listSessionStatuses(input?: {
+    directory?: string;
+    workspace?: string;
+  }): Promise<Readonly<Record<string, OpenCodeSessionStatus>>>;
   respondToPermission(input: OpenCodePermissionResponseInput): Promise<void>;
   sendPrompt(input: OpenCodeSendPromptInput): Promise<void>;
   subscribeEvents(input?: OpenCodeSubscribeEventsInput): Promise<OpenCodeEventSubscription>;
@@ -259,6 +265,12 @@ export function createOpenCodeSessionClient(
     },
     async listSessions(listInput = {}) {
       const result = await sdkClient.session.list(listInput, {
+        throwOnError: true,
+      });
+      return result.data;
+    },
+    async listSessionStatuses(statusInput = {}) {
+      const result = await sdkClient.session.status(statusInput, {
         throwOnError: true,
       });
       return result.data;

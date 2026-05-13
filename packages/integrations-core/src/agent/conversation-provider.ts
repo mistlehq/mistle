@@ -55,6 +55,7 @@ export type AgentConversationReadMetadataResult = {
 export type AgentConversationGenerateTitleInput = {
   connectionUrl: string;
   providerConversationId: string;
+  providerState?: unknown;
   inputText: string;
 };
 

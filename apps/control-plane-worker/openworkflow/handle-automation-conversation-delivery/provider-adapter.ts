@@ -56,6 +56,7 @@ export type ProviderCreateConversationInput = {
 export type ProviderGenerateConversationTitleInput = {
   connectionUrl: string;
   providerConversationId: string;
+  providerState?: unknown;
   inputText: string;
 };
 
