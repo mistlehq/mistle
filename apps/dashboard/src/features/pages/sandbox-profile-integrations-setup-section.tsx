@@ -231,7 +231,9 @@ function GitConnectionSelectionCell(input: {
         <p className="text-sm">None</p>
       </div>
     ) : (
-      <GitConnectionNameCell choice={selectedChoice} />
+      <IntegrationNameCell
+        item={{ logoKey: selectedChoice.logoKey, title: selectedChoice.displayName }}
+      />
     );
   }
 
@@ -255,7 +257,9 @@ function GitConnectionSelectionCell(input: {
           {selectedChoice === undefined ? (
             "None"
           ) : (
-            <GitConnectionNameCell choice={selectedChoice} />
+            <IntegrationNameCell
+              item={{ logoKey: selectedChoice.logoKey, title: selectedChoice.displayName }}
+            />
           )}
         </SelectValue>
       </SelectTrigger>
@@ -277,21 +281,6 @@ function GitConnectionSelectionCell(input: {
         ))}
       </SelectContent>
     </Select>
-  );
-}
-
-function GitConnectionNameCell(input: { choice: GitConnectionChoice }): React.JSX.Element {
-  return (
-    <div className={`${SandboxProfileIntegrationCellContentClassName} gap-2 text-sm`}>
-      {input.choice.logoKey === undefined ? null : (
-        <img
-          alt=""
-          className="h-5 w-5 rounded-sm"
-          src={resolveIntegrationLogoPath({ logoKey: input.choice.logoKey })}
-        />
-      )}
-      <span className="min-w-0 truncate">{input.choice.displayName}</span>
-    </div>
   );
 }
 
