@@ -43,7 +43,7 @@ const AvailableIntegrationGroupSpecs: readonly AvailableIntegrationGroupSpec[] =
   },
   {
     kind: "connector",
-    title: "Services",
+    title: "Tools",
   },
   {
     kind: "sandbox",
