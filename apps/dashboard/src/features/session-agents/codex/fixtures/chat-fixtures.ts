@@ -184,7 +184,7 @@ export const CodexFixtureExploringGroupEntry: ChatSemanticGroupEntry = {
       command: 'rg -n "semantic" docs apps/dashboard/src/features/codex-client',
       output: [
         "docs/codex-semantic-classification-scratchpad.md:42:Only adjacent exploring items group in v1.",
-        "apps/dashboard/src/features/session-agents/codex/session-state/codex-chat-state.ts:188:buildCodexTurnTimelineFromNormalized(...)",
+        "apps/dashboard/src/features/chat/chat-semantic-projection.ts:94:projectSemanticChatEntries(...)",
       ].join("\n"),
       status: "completed",
     },

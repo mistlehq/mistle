@@ -56,10 +56,18 @@ describe("reduceOpenCodeChatState", () => {
         turnId: "msg_user",
       },
       {
-        id: "part_reasoning",
-        kind: "reasoning",
-        summary: "I will inspect the repo.",
+        id: "msg_user:thinking:part_reasoning",
+        kind: "semantic-group",
+        semanticKind: "thinking",
         turnId: "msg_user",
+        items: [
+          {
+            id: "part_reasoning",
+            label: "Thought",
+            detail: "I will inspect the repo.",
+            sourceKind: "reasoning",
+          },
+        ],
       },
       {
         id: "part_text",
@@ -154,7 +162,7 @@ describe("reduceOpenCodeChatState", () => {
     );
   });
 
-  it("maps OpenCode shell tools to command entries and failed tools to visible items", () => {
+  it("groups OpenCode shell tools and keeps unknown tools visible as generic items", () => {
     const state = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
       type: "hydrate_messages",
       sessionId: "ses_test",
@@ -213,11 +221,21 @@ describe("reduceOpenCodeChatState", () => {
 
     expect(state.entries).toContainEqual(
       expect.objectContaining({
-        id: "part_bash",
-        kind: "command-execution",
-        command: "pnpm test",
-        output: "passed",
+        id: "msg_user:running-commands:part_bash",
+        kind: "semantic-group",
+        semanticKind: "running-commands",
         status: "completed",
+        items: [
+          expect.objectContaining({
+            id: "part_bash",
+            sourceKind: "command-execution",
+            label: "Command",
+            detail: "pnpm test",
+            command: "pnpm test",
+            output: "passed",
+            status: "completed",
+          }),
+        ],
       }),
     );
     expect(state.entries).toContainEqual(
@@ -228,6 +246,103 @@ describe("reduceOpenCodeChatState", () => {
         body: "tool failed",
       }),
     );
+  });
+
+  it("groups adjacent OpenCode semantic tools by semantic kind", () => {
+    const state = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "hydrate_messages",
+      sessionId: "ses_test",
+      messages: [
+        createUserMessage({
+          id: "msg_user",
+          text: "Update the docs",
+        }),
+        createAssistantMessage({
+          id: "msg_assistant",
+          parentId: "msg_user",
+          parts: [
+            {
+              callID: "call_read",
+              id: "part_read",
+              messageID: "msg_assistant",
+              sessionID: "ses_test",
+              state: {
+                input: {
+                  file: "README.md",
+                },
+                metadata: {},
+                output: "old docs",
+                status: "completed",
+                time: {
+                  start: 1,
+                  end: 2,
+                },
+                title: "Read README.md",
+              },
+              tool: "read",
+              type: "tool",
+            },
+            {
+              callID: "call_edit",
+              id: "part_edit",
+              messageID: "msg_assistant",
+              sessionID: "ses_test",
+              state: {
+                input: {
+                  file: "README.md",
+                },
+                metadata: {},
+                output: "updated",
+                status: "completed",
+                time: {
+                  start: 3,
+                  end: 4,
+                },
+                title: "Edit README.md",
+              },
+              tool: "edit",
+              type: "tool",
+            },
+          ],
+        }),
+      ],
+    });
+
+    expect(state.entries).toEqual([
+      expect.objectContaining({
+        id: "msg_user",
+        kind: "user-message",
+      }),
+      expect.objectContaining({
+        id: "msg_user:exploring:part_read",
+        kind: "semantic-group",
+        semanticKind: "exploring",
+        counts: {
+          reads: 1,
+          searches: 0,
+          lists: 0,
+        },
+        items: [
+          expect.objectContaining({
+            id: "part_read",
+            label: "Read",
+            detail: "README.md",
+          }),
+        ],
+      }),
+      expect.objectContaining({
+        id: "msg_user:making-edits:part_edit",
+        kind: "semantic-group",
+        semanticKind: "making-edits",
+        items: [
+          expect.objectContaining({
+            id: "part_edit",
+            label: "File change",
+            detail: "README.md",
+          }),
+        ],
+      }),
+    ]);
   });
 
   it("surfaces session errors and clears running state on idle", () => {
