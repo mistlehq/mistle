@@ -16,6 +16,7 @@ import { SessionComposerFixtureProps } from "../session-agents/codex/fixtures/se
 import {
   createIntegrationsEditorSectionStoryQueryClient,
   seedStoryIntegrationResources,
+  StoryAnthropicConnection,
   StoryAwsConnection,
   StoryGithubConnection,
   StoryGithubResources,
@@ -23,6 +24,7 @@ import {
   StoryIntegrationTargets,
   StoryJiraConnection,
   StoryLinearConnection,
+  StoryOpenCodeGoConnection,
   StoryOpenAiConnection,
   StoryPlanetScaleConnection,
   StorySlackConnection,
@@ -60,9 +62,11 @@ import { SessionConversationMainContent } from "./session-conversation-pane.js";
 import { buildSetupAssistantInitialComposerText } from "./setup-assistant-instructions.js";
 
 export {
+  StoryAnthropicConnection,
   StoryGithubConnection,
   StoryIntegrationConnections,
   StoryIntegrationTargets,
+  StoryOpenCodeGoConnection,
   StorySlackConnection,
 };
 
@@ -81,6 +85,7 @@ export type SandboxProfileEditorPageStoryArgs = {
   availableTargets?: readonly IntegrationTargetSummary[];
   initialSectionId?: StorySectionId;
   lifecycleState?: "draft" | "draft-with-published" | "published" | "published-with-draft";
+  agentRuntimeId?: SandboxProfileVersion["agentRuntimeId"];
   publishSuccessMessage?: boolean;
   snapshotState?:
     | "draft-unavailable"
@@ -376,6 +381,7 @@ function createSnapshotRefreshScheduleInitialDraft(
 }
 
 function createRuntimeStoryVersion(input: {
+  agentRuntimeId: SandboxProfileVersion["agentRuntimeId"];
   runtimeState: SandboxProfileEditorPageStoryArgs["runtimeState"];
   version: number;
 }): SandboxProfileVersion {
@@ -384,7 +390,7 @@ function createRuntimeStoryVersion(input: {
     sandboxProfileId: "sandbox-profile-story",
     version: input.version,
     state: "draft",
-    agentRuntimeId: "codex",
+    agentRuntimeId: input.agentRuntimeId,
     defaultPersistenceMode: "ephemeral",
     sandboxProvider: runtimeState === "docker" ? "docker" : "e2b",
     sandboxConnectionId: runtimeState === "e2b-connection" ? StoryE2BSandboxConnection.id : null,
@@ -629,6 +635,7 @@ function SandboxProfileEditorPageStoryView(
     ...(input.availableTargets ?? StoryIntegrationTargets),
     StoryE2BSandboxTarget,
   ];
+  const agentRuntimeId = input.agentRuntimeId ?? "codex";
   function handleToggleSetupAssistant(): void {
     if (setupAssistantPanelOpen) {
       setSetupAssistantPanelOpen(false);
@@ -679,6 +686,7 @@ function SandboxProfileEditorPageStoryView(
               {input.integrationsSectionState === undefined ? (
                 <SandboxProfilePanelSection>
                   <SandboxProfileIntegrationsSetupSection
+                    agentRuntimeId={agentRuntimeId}
                     availableConnections={storyConnections}
                     availableTargets={storyTargets}
                     integrationBindingsQuery={{
@@ -704,6 +712,7 @@ function SandboxProfileEditorPageStoryView(
                         })}
                         sectionChrome={false}
                         version={createRuntimeStoryVersion({
+                          agentRuntimeId,
                           runtimeState: input.runtimeState,
                           version: mode.version,
                         })}

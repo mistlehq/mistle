@@ -6,6 +6,7 @@ import {
   AutomationKinds,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
+  SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionStates,
   ScheduleTargetTypes,
 } from "@mistle/db/control-plane";
@@ -24,6 +25,7 @@ import {
 } from "./helpers/automation-webhooks.js";
 import {
   integrationConnectionRow,
+  integrationTargetRow,
   sandboxProfileVersionIntegrationBindingRow,
   sandboxProfileVersionRow,
 } from "./helpers/sandbox-profiles.js";
@@ -149,7 +151,7 @@ describe.concurrent("sandbox profile version draft automation impact get integra
     });
   });
 
-  it("returns no breaking changes when the draft keeps automation dependencies available", async ({
+  it("returns no breaking changes when multiple agent provider bindings are valid", async ({
     env,
   }) => {
     const session = await env.auth.createSession({
@@ -170,9 +172,26 @@ describe.concurrent("sandbox profile version draft automation impact get integra
         sandboxProfileId: "sbp_draft_impact_ok_001",
         version: 2,
         state: SandboxProfileVersionStates.DRAFT,
+        agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
       }),
     );
-    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values([
+      integrationTargetRow({
+        targetKey: "anthropic-default-draft-impact-ok",
+        familyId: "anthropic",
+        variantId: "anthropic-default",
+        enabled: true,
+        config: {},
+      }),
+      integrationTargetRow({
+        targetKey: "opencode-go-draft-impact-ok",
+        familyId: "opencode",
+        variantId: "opencode-go",
+        enabled: true,
+        config: {},
+      }),
+    ]);
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values([
       integrationConnectionRow({
         id: "icn_draft_impact_ok_agent",
         organizationId: session.organizationId,
@@ -180,7 +199,21 @@ describe.concurrent("sandbox profile version draft automation impact get integra
         displayName: "Draft impact ok agent",
         status: IntegrationConnectionStatuses.ACTIVE,
       }),
-    );
+      integrationConnectionRow({
+        id: "icn_draft_impact_ok_anthropic_agent",
+        organizationId: session.organizationId,
+        targetKey: "anthropic-default-draft-impact-ok",
+        displayName: "Draft impact ok Anthropic agent",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      }),
+      integrationConnectionRow({
+        id: "icn_draft_impact_ok_opencode_agent",
+        organizationId: session.organizationId,
+        targetKey: "opencode-go-draft-impact-ok",
+        displayName: "Draft impact ok OpenCode agent",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      }),
+    ]);
     await env.controlPlaneDb
       .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
       .values([
@@ -189,6 +222,22 @@ describe.concurrent("sandbox profile version draft automation impact get integra
           sandboxProfileId: "sbp_draft_impact_ok_001",
           sandboxProfileVersion: 2,
           connectionId: "icn_draft_impact_ok_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+        }),
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_draft_impact_ok_anthropic_agent",
+          sandboxProfileId: "sbp_draft_impact_ok_001",
+          sandboxProfileVersion: 2,
+          connectionId: "icn_draft_impact_ok_anthropic_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+        }),
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_draft_impact_ok_opencode_agent",
+          sandboxProfileId: "sbp_draft_impact_ok_001",
+          sandboxProfileVersion: 2,
+          connectionId: "icn_draft_impact_ok_opencode_agent",
           kind: IntegrationBindingKinds.AGENT,
           config: {},
         }),
@@ -226,6 +275,359 @@ describe.concurrent("sandbox profile version draft automation impact get integra
     expect(responseBody).toEqual({
       hasBreakingChanges: false,
       affectedAutomations: [],
+    });
+  });
+
+  it("reports duplicate agent provider bindings as breaking automation impact", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email:
+        "integration-new-sandbox-profile-version-draft-automation-impact-duplicate-agent@example.com",
+    });
+
+    await seedAutomationWebhookTargets(env);
+    await seedWebhookAutomationFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_draft_impact_duplicate_webhook",
+      webhookSourceId: "iws_draft_impact_duplicate_webhook",
+      profileId: "sbp_draft_impact_duplicate_001",
+      profileVersion: 1,
+      profileActiveVersion: 1,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_draft_impact_duplicate_001",
+        version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values([
+      integrationConnectionRow({
+        id: "icn_draft_impact_duplicate_agent_primary",
+        organizationId: session.organizationId,
+        targetKey: OpenAiAutomationTargetKey,
+        displayName: "Draft impact duplicate agent primary",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      }),
+      integrationConnectionRow({
+        id: "icn_draft_impact_duplicate_agent_secondary",
+        organizationId: session.organizationId,
+        targetKey: OpenAiAutomationTargetKey,
+        displayName: "Draft impact duplicate agent secondary",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      }),
+    ]);
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values([
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_draft_impact_duplicate_agent_primary",
+          sandboxProfileId: "sbp_draft_impact_duplicate_001",
+          sandboxProfileVersion: 2,
+          connectionId: "icn_draft_impact_duplicate_agent_primary",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+        }),
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_draft_impact_duplicate_agent_secondary",
+          sandboxProfileId: "sbp_draft_impact_duplicate_001",
+          sandboxProfileVersion: 2,
+          connectionId: "icn_draft_impact_duplicate_agent_secondary",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+        }),
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_draft_impact_duplicate_webhook",
+          sandboxProfileId: "sbp_draft_impact_duplicate_001",
+          sandboxProfileVersion: 2,
+          connectionId: "icn_draft_impact_duplicate_webhook",
+          kind: IntegrationBindingKinds.CONNECTOR,
+        }),
+      ]);
+    await seedPersistedWebhookAutomation(env, {
+      automationId: "atm_draft_impact_duplicate_webhook",
+      organizationId: session.organizationId,
+      webhookSourceId: "iws_draft_impact_duplicate_webhook",
+      profileId: "sbp_draft_impact_duplicate_001",
+      profileVersion: 1,
+      targetId: "atg_draft_impact_duplicate_webhook",
+      name: "Webhook triage duplicate agent",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_draft_impact_duplicate_001/versions/2/draft-automation-impact",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = GetSandboxProfileVersionDraftAutomationImpactResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody).toEqual({
+      hasBreakingChanges: true,
+      affectedAutomations: [
+        {
+          id: "atm_draft_impact_duplicate_webhook",
+          name: "Webhook triage duplicate agent",
+          kind: "webhook",
+          enabled: true,
+          issues: [
+            {
+              code: "AGENT_BINDING_AMBIGUOUS",
+              message:
+                "Agent binding 'ibd_draft_impact_duplicate_agent_secondary' duplicates provider 'openai' already bound by 'ibd_draft_impact_duplicate_agent_primary'.",
+              bindingId: "ibd_draft_impact_duplicate_agent_secondary",
+              connectionId: "icn_draft_impact_duplicate_agent_secondary",
+              targetKey: OpenAiAutomationTargetKey,
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("reports agent provider bindings that are incompatible with the draft runtime", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email:
+        "integration-new-sandbox-profile-version-draft-automation-impact-runtime-agent@example.com",
+    });
+
+    await seedAutomationWebhookTargets(env);
+    await seedWebhookAutomationFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_draft_impact_runtime_webhook",
+      webhookSourceId: "iws_draft_impact_runtime_webhook",
+      profileId: "sbp_draft_impact_runtime_001",
+      profileVersion: 1,
+      profileActiveVersion: 1,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_draft_impact_runtime_001",
+        version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "anthropic-default-draft-impact-runtime",
+        familyId: "anthropic",
+        variantId: "anthropic-default",
+        enabled: true,
+        config: {},
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values([
+      integrationConnectionRow({
+        id: "icn_draft_impact_runtime_openai_agent",
+        organizationId: session.organizationId,
+        targetKey: OpenAiAutomationTargetKey,
+        displayName: "Draft impact runtime OpenAI agent",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      }),
+      integrationConnectionRow({
+        id: "icn_draft_impact_runtime_anthropic_agent",
+        organizationId: session.organizationId,
+        targetKey: "anthropic-default-draft-impact-runtime",
+        displayName: "Draft impact runtime Anthropic agent",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      }),
+    ]);
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values([
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_draft_impact_runtime_openai_agent",
+          sandboxProfileId: "sbp_draft_impact_runtime_001",
+          sandboxProfileVersion: 2,
+          connectionId: "icn_draft_impact_runtime_openai_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+        }),
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_draft_impact_runtime_anthropic_agent",
+          sandboxProfileId: "sbp_draft_impact_runtime_001",
+          sandboxProfileVersion: 2,
+          connectionId: "icn_draft_impact_runtime_anthropic_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+        }),
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_draft_impact_runtime_webhook",
+          sandboxProfileId: "sbp_draft_impact_runtime_001",
+          sandboxProfileVersion: 2,
+          connectionId: "icn_draft_impact_runtime_webhook",
+          kind: IntegrationBindingKinds.CONNECTOR,
+        }),
+      ]);
+    await seedPersistedWebhookAutomation(env, {
+      automationId: "atm_draft_impact_runtime_webhook",
+      organizationId: session.organizationId,
+      webhookSourceId: "iws_draft_impact_runtime_webhook",
+      profileId: "sbp_draft_impact_runtime_001",
+      profileVersion: 1,
+      targetId: "atg_draft_impact_runtime_webhook",
+      name: "Webhook triage runtime mismatch",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_draft_impact_runtime_001/versions/2/draft-automation-impact",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = GetSandboxProfileVersionDraftAutomationImpactResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody).toEqual({
+      hasBreakingChanges: true,
+      affectedAutomations: [
+        {
+          id: "atm_draft_impact_runtime_webhook",
+          name: "Webhook triage runtime mismatch",
+          kind: "webhook",
+          enabled: true,
+          issues: [
+            {
+              code: "AGENT_BINDING_RUNTIME_INCOMPATIBLE",
+              message:
+                "Agent binding 'ibd_draft_impact_runtime_anthropic_agent' references provider 'anthropic' that is not compatible with runtime 'codex'.",
+              bindingId: "ibd_draft_impact_runtime_anthropic_agent",
+              connectionId: "icn_draft_impact_runtime_anthropic_agent",
+              targetKey: "anthropic-default-draft-impact-runtime",
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("reports OpenCode drafts that are missing the primary OpenCode agent provider", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email:
+        "integration-new-sandbox-profile-version-draft-automation-impact-primary-agent@example.com",
+    });
+
+    await seedAutomationWebhookTargets(env);
+    await seedWebhookAutomationFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_draft_impact_primary_webhook",
+      webhookSourceId: "iws_draft_impact_primary_webhook",
+      profileId: "sbp_draft_impact_primary_001",
+      profileVersion: 1,
+      profileActiveVersion: 1,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_draft_impact_primary_001",
+        version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
+        agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "anthropic-default-draft-impact-primary",
+        familyId: "anthropic",
+        variantId: "anthropic-default",
+        enabled: true,
+        config: {},
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values([
+      integrationConnectionRow({
+        id: "icn_draft_impact_primary_openai_agent",
+        organizationId: session.organizationId,
+        targetKey: OpenAiAutomationTargetKey,
+        displayName: "Draft impact primary OpenAI agent",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      }),
+      integrationConnectionRow({
+        id: "icn_draft_impact_primary_anthropic_agent",
+        organizationId: session.organizationId,
+        targetKey: "anthropic-default-draft-impact-primary",
+        displayName: "Draft impact primary Anthropic agent",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      }),
+    ]);
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values([
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_draft_impact_primary_openai_agent",
+          sandboxProfileId: "sbp_draft_impact_primary_001",
+          sandboxProfileVersion: 2,
+          connectionId: "icn_draft_impact_primary_openai_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+        }),
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_draft_impact_primary_anthropic_agent",
+          sandboxProfileId: "sbp_draft_impact_primary_001",
+          sandboxProfileVersion: 2,
+          connectionId: "icn_draft_impact_primary_anthropic_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+        }),
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_draft_impact_primary_webhook",
+          sandboxProfileId: "sbp_draft_impact_primary_001",
+          sandboxProfileVersion: 2,
+          connectionId: "icn_draft_impact_primary_webhook",
+          kind: IntegrationBindingKinds.CONNECTOR,
+        }),
+      ]);
+    await seedPersistedWebhookAutomation(env, {
+      automationId: "atm_draft_impact_primary_webhook",
+      organizationId: session.organizationId,
+      webhookSourceId: "iws_draft_impact_primary_webhook",
+      profileId: "sbp_draft_impact_primary_001",
+      profileVersion: 1,
+      targetId: "atg_draft_impact_primary_webhook",
+      name: "Webhook triage missing primary agent",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_draft_impact_primary_001/versions/2/draft-automation-impact",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = GetSandboxProfileVersionDraftAutomationImpactResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody).toEqual({
+      hasBreakingChanges: true,
+      affectedAutomations: [
+        {
+          id: "atm_draft_impact_primary_webhook",
+          name: "Webhook triage missing primary agent",
+          kind: "webhook",
+          enabled: true,
+          issues: [
+            {
+              code: "AGENT_BINDING_PRIMARY_REQUIRED",
+              message:
+                "Sandbox profile version '2' must have an agent binding for provider 'opencode' to run automations with runtime 'opencode'.",
+            },
+          ],
+        },
+      ],
     });
   });
 });

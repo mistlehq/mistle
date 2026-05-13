@@ -4,10 +4,12 @@ import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import {
   DefaultSandboxProfileEditorStoryArgs,
   SandboxProfileEditorPageStory,
+  StoryAnthropicConnection,
   StoryBindings,
   StoryGithubConnection,
   StoryIntegrationConnections,
   StoryIntegrationTargets,
+  StoryOpenCodeGoConnection,
   StorySlackConnection,
 } from "./sandbox-profile-editor-story-support.js";
 
@@ -100,6 +102,63 @@ export const DraftWithNoGitProvidersSetup: Story = {
     availableConnections: StoryConnectionsWithoutGitProviders,
     availableTargets: StoryTargetsWithoutGitProviders,
     initialBindings: StoryBindings.filter((binding) => binding.kind !== "git"),
+  },
+};
+
+export const CodexOnlyOpenAiProxiedConnection: Story = {
+  args: {
+    agentRuntimeId: "codex",
+    initialBindings: [
+      ...StoryBindings,
+      {
+        id: "binding-opencode-go-agent",
+        connectionId: StoryOpenCodeGoConnection.id,
+        kind: "agent",
+        config: {},
+      },
+      {
+        id: "binding-anthropic-agent",
+        connectionId: StoryAnthropicConnection.id,
+        kind: "agent",
+        config: {},
+      },
+    ],
+  },
+};
+
+export const OpenCodeProviderProxiedConnections: Story = {
+  args: {
+    agentRuntimeId: "opencode",
+    initialBindings: [
+      ...StoryBindings,
+      {
+        id: "binding-opencode-go-agent",
+        connectionId: StoryOpenCodeGoConnection.id,
+        kind: "agent",
+        config: {},
+      },
+      {
+        id: "binding-anthropic-agent",
+        connectionId: StoryAnthropicConnection.id,
+        kind: "agent",
+        config: {},
+      },
+    ],
+  },
+};
+
+export const StaleOpenCodeAgentProviderBinding: Story = {
+  args: {
+    agentRuntimeId: "opencode",
+    initialBindings: [
+      ...StoryBindings.filter((binding) => binding.kind !== "agent"),
+      {
+        id: "binding-stale-agent-provider",
+        connectionId: "missing-agent-connection",
+        kind: "agent",
+        config: {},
+      },
+    ],
   },
 };
 

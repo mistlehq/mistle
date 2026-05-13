@@ -243,8 +243,38 @@ function createIdleSandboxProfilePersistenceDraftState(): SandboxProfilePersiste
 
 function createIdleSandboxProfileRuntimeDraftState(): SandboxProfileRuntimeSettingsDraftState {
   return {
+    agentRuntimeId: undefined,
+    sourceVersionKey: undefined,
     hasUnpersistedChanges: false,
   };
+}
+
+function createRuntimeDraftSourceVersionKey(
+  version: Pick<SandboxProfileVersion, "sandboxProfileId" | "version">,
+): string {
+  return `${version.sandboxProfileId}:${String(version.version)}`;
+}
+
+export function resolveSelectedSandboxProfileAgentRuntimeId(input: {
+  currentVersion: SandboxProfileVersion | null;
+  runtimeDraftState: Pick<
+    SandboxProfileRuntimeSettingsDraftState,
+    "agentRuntimeId" | "sourceVersionKey"
+  >;
+}): SandboxProfileVersion["agentRuntimeId"] {
+  const currentVersionRuntimeId = input.currentVersion?.agentRuntimeId ?? "codex";
+  if (input.currentVersion === null || input.runtimeDraftState.sourceVersionKey === undefined) {
+    return currentVersionRuntimeId;
+  }
+
+  if (
+    input.runtimeDraftState.sourceVersionKey !==
+    createRuntimeDraftSourceVersionKey(input.currentVersion)
+  ) {
+    return currentVersionRuntimeId;
+  }
+
+  return input.runtimeDraftState.agentRuntimeId ?? currentVersionRuntimeId;
 }
 
 const AgentRuntimeRequiredErrorCode = "AGENT_RUNTIME_REQUIRED";
@@ -1661,6 +1691,10 @@ function ReadySandboxProfileEditorPage(input: {
           setupScriptLoader={setupScriptLoader}
           snapshotPanelState={snapshotPanelState}
           snapshotVersion={snapshotVersion}
+          selectedAgentRuntimeId={resolveSelectedSandboxProfileAgentRuntimeId({
+            currentVersion: input.currentVersion,
+            runtimeDraftState,
+          })}
           versionActionIsPending={input.versionActionIsPending}
         />
       )}
@@ -1995,6 +2029,7 @@ function SandboxProfileEditorSectionPanels(input: {
   setupScriptLoader: ReturnType<typeof useSandboxProfileSetupScriptLoader>;
   snapshotPanelState: SnapshotPanelState;
   snapshotVersion: SandboxProfileVersion | null;
+  selectedAgentRuntimeId: SandboxProfileVersion["agentRuntimeId"];
   versionActionIsPending: boolean;
 }): React.JSX.Element {
   if (input.activeSectionId === SandboxProfileEditorSectionIds.AUTOMATIONS) {
@@ -2031,6 +2066,7 @@ function SandboxProfileEditorSectionPanels(input: {
     <div className="flex w-full flex-col gap-8">
       <LoadedSandboxProfileIntegrationSetupSection
         key={`${input.profileId}:${String(input.mode.version)}:${String(input.draftEditorResetKey)}:integration-setup`}
+        agentRuntimeId={input.selectedAgentRuntimeId}
         loader={input.integrationsLoader}
         onDraftStateChange={input.onIntegrationDraftStateChange}
         profileId={input.profileId}
@@ -2314,8 +2350,12 @@ function formatDraftAutomationImpactIssueMessage(
   switch (issue.code) {
     case "AGENT_BINDING_REQUIRED":
       return "This draft does not have an agent binding.";
+    case "AGENT_BINDING_PRIMARY_REQUIRED":
+      return "This draft does not have the agent provider required by the selected runtime.";
     case "AGENT_BINDING_AMBIGUOUS":
-      return "This draft has multiple agent bindings, but automations require exactly one.";
+      return "This draft has duplicate agent provider bindings.";
+    case "AGENT_BINDING_RUNTIME_INCOMPATIBLE":
+      return "The draft agent binding is not compatible with the selected agent runtime.";
     case "INVALID_BINDING_CONNECTION_REFERENCE":
       return "The draft agent binding references a missing or inaccessible connection.";
     case "CONNECTION_NOT_ACTIVE":
@@ -2714,6 +2754,7 @@ function resolveDiscardDraftInput(
 function LoadedSandboxProfileIntegrationSetupSection(input: {
   profileId: string;
   version: number;
+  agentRuntimeId: SandboxProfileVersion["agentRuntimeId"];
   disabled: boolean;
   readOnly: boolean;
   loader: ReturnType<typeof useSandboxProfileIntegrationsLoader>;
@@ -2762,6 +2803,7 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
       key={`${input.profileId}:${String(input.version)}`}
       profileId={input.profileId}
       version={input.version}
+      agentRuntimeId={input.agentRuntimeId}
       initialRows={input.loader.initialRows}
       availableConnections={input.loader.availableConnections}
       availableTargets={input.loader.availableTargets}
@@ -2791,6 +2833,7 @@ function RuntimeSettingsSection(input: { children: ReactNode | null }): React.JS
 function ReadySandboxProfileIntegrationSetupSection(input: {
   profileId: string;
   version: number;
+  agentRuntimeId: SandboxProfileVersion["agentRuntimeId"];
   initialRows: readonly SandboxProfileBindingEditorRow[];
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
@@ -2824,6 +2867,7 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
   return (
     <SandboxProfilePanelSection>
       <SandboxProfileIntegrationsSetupSection
+        agentRuntimeId={input.agentRuntimeId}
         availableConnections={integrationsState.availableConnections}
         availableTargets={integrationsState.availableTargets}
         integrationBindingsQuery={{

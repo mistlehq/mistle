@@ -7,10 +7,12 @@ import {
   AutomationConversationCreatedByKinds,
   AutomationConversationOwnerKinds,
   IntegrationBindingKinds,
+  SandboxProfileVersionAgentRuntimeIds,
   ScheduleTargetTypes,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { DefaultSandboxWorkspaceDir } from "@mistle/integrations-core";
+import { createDefinitionsBundle } from "@mistle/integrations-definitions/server";
 import { and, eq, sql } from "drizzle-orm";
 
 import type {
@@ -21,6 +23,9 @@ import type {
 } from "./automation-run-types.js";
 import { claimAutomationConversation } from "./claim-conversation.js";
 import { renderTemplateString } from "./render-template-string.js";
+
+const Definitions = createDefinitionsBundle();
+const IntegrationRegistry = Definitions.integrationRegistry;
 
 type AutomationRunIdInput = {
   automationRunId: string;
@@ -52,6 +57,7 @@ export const AutomationRunFailureCodes = {
   SCHEDULE_AUTOMATION_NOT_FOUND: "schedule_automation_not_found",
   AGENT_BINDING_NOT_FOUND: "agent_binding_not_found",
   AGENT_BINDING_AMBIGUOUS: "agent_binding_ambiguous",
+  AGENT_BINDING_RUNTIME_INCOMPATIBLE: "agent_binding_runtime_incompatible",
   AGENT_BINDING_CONNECTION_NOT_FOUND: "agent_binding_connection_not_found",
   AGENT_BINDING_TARGET_NOT_FOUND: "agent_binding_target_not_found",
   WEBHOOK_EVENT_SOURCE_ORDER_KEY_MISSING: "webhook_event_source_order_key_missing",
@@ -285,6 +291,7 @@ async function resolveAutomationConversationBindingContext(
       connectionId: tables.integrationConnections.id,
       connectionTargetKey: tables.integrationConnections.targetKey,
       targetFamilyId: tables.integrationTargets.familyId,
+      targetVariantId: tables.integrationTargets.variantId,
     })
     .from(tables.sandboxProfileVersions)
     .leftJoin(
@@ -321,8 +328,7 @@ async function resolveAutomationConversationBindingContext(
         eq(tables.sandboxProfileVersions.version, input.sandboxProfileVersion),
       ),
     )
-    .orderBy(tables.sandboxProfileVersionIntegrationBindings.id)
-    .limit(2);
+    .orderBy(tables.sandboxProfileVersionIntegrationBindings.id);
 
   const agentBindingRow = agentBindingRows[0];
   if (agentBindingRow === undefined) {
@@ -335,35 +341,104 @@ async function resolveAutomationConversationBindingContext(
   if (agentBindingRow.bindingId === null) {
     throw new AutomationRunExecutionError({
       code: AutomationRunFailureCodes.AGENT_BINDING_NOT_FOUND,
-      message: `Automation run '${input.automationRunId}' requires exactly one AGENT binding on sandbox profile '${input.sandboxProfileId}' version '${input.sandboxProfileVersion}', but none were found.`,
-    });
-  }
-  const secondAgentBindingRow = agentBindingRows[1];
-  if (secondAgentBindingRow !== undefined && secondAgentBindingRow.bindingId !== null) {
-    throw new AutomationRunExecutionError({
-      code: AutomationRunFailureCodes.AGENT_BINDING_AMBIGUOUS,
-      message: `Automation run '${input.automationRunId}' requires exactly one AGENT binding on sandbox profile '${input.sandboxProfileId}' version '${input.sandboxProfileVersion}', but multiple were found.`,
+      message: `Automation run '${input.automationRunId}' requires at least one AGENT binding on sandbox profile '${input.sandboxProfileId}' version '${input.sandboxProfileVersion}', but none were found.`,
     });
   }
 
-  if (agentBindingRow.connectionId === null) {
+  let integrationFamilyId: string | null = null;
+  let preferredIntegrationFamilyId: string | null = null;
+  const primaryIntegrationFamilyId = resolvePrimaryConversationIntegrationFamilyId(
+    agentBindingRow.agentRuntimeId,
+  );
+  const providerBindingIds = new Map<string, string>();
+  for (const row of agentBindingRows) {
+    if (row.bindingId === null) {
+      throw new AutomationRunExecutionError({
+        code: AutomationRunFailureCodes.AGENT_BINDING_NOT_FOUND,
+        message: `Automation run '${input.automationRunId}' requires at least one AGENT binding on sandbox profile '${input.sandboxProfileId}' version '${input.sandboxProfileVersion}', but none were found.`,
+      });
+    }
+
+    if (row.connectionId === null) {
+      throw new AutomationRunExecutionError({
+        code: AutomationRunFailureCodes.AGENT_BINDING_CONNECTION_NOT_FOUND,
+        message: `Automation run '${input.automationRunId}' references AGENT binding '${row.bindingId}' with connection '${row.bindingConnectionId}' that is missing or inaccessible.`,
+      });
+    }
+
+    if (row.targetFamilyId === null) {
+      throw new AutomationRunExecutionError({
+        code: AutomationRunFailureCodes.AGENT_BINDING_TARGET_NOT_FOUND,
+        message: `Automation run '${input.automationRunId}' references AGENT connection '${row.connectionId}' with target '${row.connectionTargetKey}' that does not exist.`,
+      });
+    }
+
+    if (row.targetVariantId === null) {
+      throw new AutomationRunExecutionError({
+        code: AutomationRunFailureCodes.AGENT_BINDING_TARGET_NOT_FOUND,
+        message: `Automation run '${input.automationRunId}' references AGENT connection '${row.connectionId}' with target '${row.connectionTargetKey}' that does not define a variant.`,
+      });
+    }
+
+    const agentDefinition = IntegrationRegistry.getDefinition({
+      familyId: row.targetFamilyId,
+      variantId: row.targetVariantId,
+    });
+    if (
+      agentDefinition?.kind !== "agent" ||
+      agentDefinition.allowedRuntimeIds?.includes(agentBindingRow.agentRuntimeId) !== true
+    ) {
+      throw new AutomationRunExecutionError({
+        code: AutomationRunFailureCodes.AGENT_BINDING_RUNTIME_INCOMPATIBLE,
+        message: `Automation run '${input.automationRunId}' references AGENT binding '${row.bindingId}' for provider '${row.targetFamilyId}' that is not compatible with runtime '${agentBindingRow.agentRuntimeId}'.`,
+      });
+    }
+
+    const providerKey = `${row.targetFamilyId}:${row.targetVariantId}`;
+    const firstBindingId = providerBindingIds.get(providerKey);
+    if (firstBindingId !== undefined) {
+      throw new AutomationRunExecutionError({
+        code: AutomationRunFailureCodes.AGENT_BINDING_AMBIGUOUS,
+        message: `Automation run '${input.automationRunId}' references AGENT binding '${row.bindingId}' that duplicates provider '${row.targetFamilyId}' already bound by '${firstBindingId}'.`,
+      });
+    }
+    providerBindingIds.set(providerKey, row.bindingId);
+
+    if (row.targetFamilyId === primaryIntegrationFamilyId) {
+      preferredIntegrationFamilyId ??= row.targetFamilyId;
+    }
+    integrationFamilyId ??= row.targetFamilyId;
+  }
+
+  if (primaryIntegrationFamilyId !== null && preferredIntegrationFamilyId === null) {
     throw new AutomationRunExecutionError({
-      code: AutomationRunFailureCodes.AGENT_BINDING_CONNECTION_NOT_FOUND,
-      message: `Automation run '${input.automationRunId}' references AGENT binding '${agentBindingRow.bindingId}' with connection '${agentBindingRow.bindingConnectionId}' that is missing or inaccessible.`,
+      code: AutomationRunFailureCodes.AGENT_BINDING_NOT_FOUND,
+      message: `Automation run '${input.automationRunId}' requires an AGENT binding for provider '${primaryIntegrationFamilyId}' on sandbox profile '${input.sandboxProfileId}' version '${input.sandboxProfileVersion}', but none were found.`,
     });
   }
 
-  if (agentBindingRow.targetFamilyId === null) {
+  if (integrationFamilyId === null) {
     throw new AutomationRunExecutionError({
-      code: AutomationRunFailureCodes.AGENT_BINDING_TARGET_NOT_FOUND,
-      message: `Automation run '${input.automationRunId}' references AGENT connection '${agentBindingRow.connectionId}' with target '${agentBindingRow.connectionTargetKey}' that does not exist.`,
+      code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
+      message: `Automation run '${input.automationRunId}' could not resolve an automation conversation integration family.`,
     });
   }
 
   return {
-    integrationFamilyId: agentBindingRow.targetFamilyId,
+    integrationFamilyId: preferredIntegrationFamilyId ?? integrationFamilyId,
     runtimeId: agentBindingRow.agentRuntimeId,
   };
+}
+
+function resolvePrimaryConversationIntegrationFamilyId(runtimeId: string): string | null {
+  switch (runtimeId) {
+    case SandboxProfileVersionAgentRuntimeIds.CODEX:
+      return "openai";
+    case SandboxProfileVersionAgentRuntimeIds.OPENCODE:
+      return "opencode";
+    default:
+      return null;
+  }
 }
 
 export async function prepareAutomationRun(

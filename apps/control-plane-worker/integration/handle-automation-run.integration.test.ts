@@ -12,6 +12,7 @@ import {
   AutomationRunStatuses,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
+  SandboxProfileVersionAgentRuntimeIds,
 } from "@mistle/db/control-plane";
 import { OpenAiApiKeyDefinition } from "@mistle/integrations-definitions";
 import {
@@ -36,6 +37,8 @@ const it = createIntegrationTest({
 const OpenAiAgentTargetConfig = {
   api_base_url: "https://api.openai.com/v1",
 };
+const AnthropicAgentTargetConfig = {};
+const OpenCodeAgentTargetConfig = {};
 
 describe.concurrent("control-plane worker automation run handling", () => {
   it("prepares a structured automation run context with rendered GitHub templates", async ({
@@ -151,6 +154,271 @@ describe.concurrent("control-plane worker automation run handling", () => {
       conversationKey: "issue-777",
       status: AutomationConversationStatuses.PENDING,
     });
+  });
+
+  it("prepares automation runs when the profile has multiple agent provider bindings", async ({
+    env,
+  }) => {
+    const scope = await seedAutomationRun({
+      env,
+      suffix: createSuffix("multi_agent_prepare"),
+      familyId: "github",
+      variantId: "github-cloud",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      connectionConfig: {},
+      eventType: "github.issue_comment.created",
+      providerEventType: "issue_comment",
+      inputTemplate: "Handle {{payload.comment.body}}",
+      conversationKeyTemplate: "issue-{{payload.issue.number}}",
+      idempotencyKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
+      payload: {
+        issue: {
+          number: 778,
+        },
+        comment: {
+          body: "@mistlebot prepare with providers",
+        },
+      },
+      externalEventId: "evt_multi_agent_prepare",
+      externalDeliveryId: "delivery_multi_agent_prepare",
+      sourceOrderKey: "2026-03-09T00:00:00Z#0010",
+    });
+    await seedAnthropicAgentBinding({
+      env,
+      organizationId: scope.organizationId,
+      sandboxProfileId: scope.sandboxProfileId,
+      sandboxProfileVersion: 7,
+      suffix: "multi_agent_prepare",
+    });
+    await seedOpenCodeAgentBinding({
+      env,
+      organizationId: scope.organizationId,
+      sandboxProfileId: scope.sandboxProfileId,
+      sandboxProfileVersion: 7,
+      suffix: "multi_agent_prepare",
+    });
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.sandboxProfileVersions)
+      .set({
+        agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
+      })
+      .where(
+        eq(env.controlPlaneTables.sandboxProfileVersions.sandboxProfileId, scope.sandboxProfileId),
+      );
+
+    const preparedRun = await prepareAutomationRun(
+      {
+        db: env.controlPlaneDb,
+      },
+      {
+        automationRunId: scope.automationRunId,
+      },
+    );
+    const persistedConversation = await env.controlPlaneDb.query.automationConversations.findFirst({
+      where: (table, { eq }) => eq(table.id, preparedRun.conversationId),
+    });
+
+    expect(preparedRun).toMatchObject({
+      automationRunId: scope.automationRunId,
+      sandboxProfileId: scope.sandboxProfileId,
+      sandboxProfileVersion: 7,
+      renderedInput: "Handle @mistlebot prepare with providers",
+    });
+    expect(persistedConversation).toMatchObject({
+      id: preparedRun.conversationId,
+      sandboxProfileId: scope.sandboxProfileId,
+      integrationFamilyId: "opencode",
+      runtimeId: "opencode",
+    });
+  });
+
+  it("rejects duplicate agent provider bindings before preparing automation runs", async ({
+    env,
+  }) => {
+    const scope = await seedAutomationRun({
+      env,
+      suffix: createSuffix("duplicate_agent_prepare"),
+      familyId: "github",
+      variantId: "github-cloud",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      connectionConfig: {},
+      eventType: "github.issue_comment.created",
+      providerEventType: "issue_comment",
+      inputTemplate: "Handle {{payload.comment.body}}",
+      conversationKeyTemplate: "issue-{{payload.issue.number}}",
+      idempotencyKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
+      payload: {
+        issue: {
+          number: 779,
+        },
+        comment: {
+          body: "@mistlebot prepare duplicate providers",
+        },
+      },
+      externalEventId: "evt_duplicate_agent_prepare",
+      externalDeliveryId: "delivery_duplicate_agent_prepare",
+      sourceOrderKey: "2026-03-09T00:00:00Z#0011",
+    });
+    await seedDuplicateOpenAiAgentBinding({
+      env,
+      organizationId: scope.organizationId,
+      sandboxProfileId: scope.sandboxProfileId,
+      sandboxProfileVersion: 7,
+      suffix: "duplicate_agent_prepare",
+    });
+
+    let failure: { code: string; message: string } | null = null;
+    try {
+      await prepareAutomationRun(
+        {
+          db: env.controlPlaneDb,
+        },
+        {
+          automationRunId: scope.automationRunId,
+        },
+      );
+    } catch (error) {
+      failure = resolveAutomationRunFailure(error);
+    }
+
+    expect(failure?.code).toBe("agent_binding_ambiguous");
+    expect(failure?.message).toContain("duplicates provider 'openai'");
+  });
+
+  it("rejects agent provider bindings that are incompatible with the profile runtime", async ({
+    env,
+  }) => {
+    const scope = await seedAutomationRun({
+      env,
+      suffix: createSuffix("incompatible_agent_prepare"),
+      familyId: "github",
+      variantId: "github-cloud",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      connectionConfig: {},
+      eventType: "github.issue_comment.created",
+      providerEventType: "issue_comment",
+      inputTemplate: "Handle {{payload.comment.body}}",
+      conversationKeyTemplate: "issue-{{payload.issue.number}}",
+      idempotencyKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
+      payload: {
+        issue: {
+          number: 781,
+        },
+        comment: {
+          body: "@mistlebot prepare incompatible provider",
+        },
+      },
+      externalEventId: "evt_incompatible_agent_prepare",
+      externalDeliveryId: "delivery_incompatible_agent_prepare",
+      sourceOrderKey: "2026-03-09T00:00:00Z#0013",
+    });
+    await seedAnthropicAgentBinding({
+      env,
+      organizationId: scope.organizationId,
+      sandboxProfileId: scope.sandboxProfileId,
+      sandboxProfileVersion: 7,
+      suffix: "incompatible_agent_prepare",
+    });
+
+    let failure: { code: string; message: string } | null = null;
+    try {
+      await prepareAutomationRun(
+        {
+          db: env.controlPlaneDb,
+        },
+        {
+          automationRunId: scope.automationRunId,
+        },
+      );
+    } catch (error) {
+      failure = resolveAutomationRunFailure(error);
+    }
+
+    expect(failure?.code).toBe("agent_binding_runtime_incompatible");
+    expect(failure?.message).toContain(
+      "provider 'anthropic' that is not compatible with runtime 'codex'",
+    );
+  });
+
+  it("rejects automation runs when the runtime primary agent provider is missing", async ({
+    env,
+  }) => {
+    const scope = await seedAutomationRun({
+      env,
+      suffix: createSuffix("missing_primary_agent_prepare"),
+      familyId: "github",
+      variantId: "github-cloud",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      connectionConfig: {},
+      eventType: "github.issue_comment.created",
+      providerEventType: "issue_comment",
+      inputTemplate: "Handle {{payload.comment.body}}",
+      conversationKeyTemplate: "issue-{{payload.issue.number}}",
+      idempotencyKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
+      payload: {
+        issue: {
+          number: 780,
+        },
+        comment: {
+          body: "@mistlebot prepare without primary provider",
+        },
+      },
+      externalEventId: "evt_missing_primary_agent_prepare",
+      externalDeliveryId: "delivery_missing_primary_agent_prepare",
+      sourceOrderKey: "2026-03-09T00:00:00Z#0012",
+    });
+    await env.controlPlaneDb
+      .delete(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .where(
+        eq(
+          env.controlPlaneTables.sandboxProfileVersionIntegrationBindings.id,
+          "ibd_openai_agent_integration_new_missing_primary_agent_prepare",
+        ),
+      );
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.sandboxProfileVersions)
+      .set({
+        agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
+      })
+      .where(
+        eq(env.controlPlaneTables.sandboxProfileVersions.sandboxProfileId, scope.sandboxProfileId),
+      );
+    await seedAnthropicAgentBinding({
+      env,
+      organizationId: scope.organizationId,
+      sandboxProfileId: scope.sandboxProfileId,
+      sandboxProfileVersion: 7,
+      suffix: "missing_primary_agent_prepare",
+    });
+
+    let failure: { code: string; message: string } | null = null;
+    try {
+      await prepareAutomationRun(
+        {
+          db: env.controlPlaneDb,
+        },
+        {
+          automationRunId: scope.automationRunId,
+        },
+      );
+    } catch (error) {
+      failure = resolveAutomationRunFailure(error);
+    }
+
+    expect(failure?.code).toBe("agent_binding_not_found");
+    expect(failure?.message).toContain("requires an AGENT binding for provider 'opencode'");
   });
 
   it("renders Slack thread and fallback templates from the provider payload", async ({ env }) => {
@@ -685,6 +953,135 @@ async function seedOpenAiAgentBinding(input: {
     .values({
       sandboxProfileId: input.sandboxProfileId,
       version: input.sandboxProfileVersion,
+    });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+    .values({
+      id: bindingId,
+      sandboxProfileId: input.sandboxProfileId,
+      sandboxProfileVersion: input.sandboxProfileVersion,
+      connectionId,
+      kind: IntegrationBindingKinds.AGENT,
+      config: {},
+    });
+}
+
+async function seedAnthropicAgentBinding(input: {
+  env: IntegrationTestEnvironment;
+  organizationId: string;
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+  suffix: string;
+}): Promise<void> {
+  const targetKey = `anthropic-agent-${input.suffix}`;
+  const connectionId = `icn_anthropic_agent_${input.suffix}`;
+  const bindingId = `ibd_anthropic_agent_${input.suffix}`;
+
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.integrationTargets).values({
+    targetKey,
+    familyId: "anthropic",
+    variantId: "anthropic-default",
+    enabled: true,
+    config: AnthropicAgentTargetConfig,
+  });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.integrationConnections)
+    .values({
+      id: connectionId,
+      organizationId: input.organizationId,
+      targetKey,
+      displayName: "Anthropic agent connection",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      externalSubjectId: "anthropic-agent-subject",
+      config: {
+        connection_method: "api-key",
+      },
+    });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+    .values({
+      id: bindingId,
+      sandboxProfileId: input.sandboxProfileId,
+      sandboxProfileVersion: input.sandboxProfileVersion,
+      connectionId,
+      kind: IntegrationBindingKinds.AGENT,
+      config: {},
+    });
+}
+
+async function seedDuplicateOpenAiAgentBinding(input: {
+  env: IntegrationTestEnvironment;
+  organizationId: string;
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+  suffix: string;
+}): Promise<void> {
+  const targetKey = `openai-agent-duplicate-${input.suffix}`;
+  const connectionId = `icn_openai_agent_duplicate_${input.suffix}`;
+  const bindingId = `ibd_openai_agent_duplicate_${input.suffix}`;
+
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.integrationTargets).values({
+    targetKey,
+    familyId: OpenAiApiKeyDefinition.familyId,
+    variantId: OpenAiApiKeyDefinition.variantId,
+    enabled: true,
+    config: OpenAiAgentTargetConfig,
+  });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.integrationConnections)
+    .values({
+      id: connectionId,
+      organizationId: input.organizationId,
+      targetKey,
+      displayName: "Duplicate OpenAI agent connection",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      externalSubjectId: "duplicate-openai-agent-subject",
+      config: {
+        connection_method: "api-key",
+      },
+    });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+    .values({
+      id: bindingId,
+      sandboxProfileId: input.sandboxProfileId,
+      sandboxProfileVersion: input.sandboxProfileVersion,
+      connectionId,
+      kind: IntegrationBindingKinds.AGENT,
+      config: {},
+    });
+}
+
+async function seedOpenCodeAgentBinding(input: {
+  env: IntegrationTestEnvironment;
+  organizationId: string;
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+  suffix: string;
+}): Promise<void> {
+  const targetKey = `opencode-agent-${input.suffix}`;
+  const connectionId = `icn_opencode_agent_${input.suffix}`;
+  const bindingId = `ibd_opencode_agent_${input.suffix}`;
+
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.integrationTargets).values({
+    targetKey,
+    familyId: "opencode",
+    variantId: "opencode-go",
+    enabled: true,
+    config: OpenCodeAgentTargetConfig,
+  });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.integrationConnections)
+    .values({
+      id: connectionId,
+      organizationId: input.organizationId,
+      targetKey,
+      displayName: "OpenCode agent connection",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      externalSubjectId: "opencode-agent-subject",
+      config: {
+        connection_method: "api-key",
+      },
     });
   await input.env.controlPlaneDb
     .insert(input.env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)

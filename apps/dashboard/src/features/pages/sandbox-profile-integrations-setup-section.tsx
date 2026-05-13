@@ -1,3 +1,4 @@
+import { createBrowserDefinitionsBundle } from "@mistle/integrations-definitions/browser";
 import {
   Button,
   Dialog,
@@ -19,12 +20,15 @@ import {
 } from "@mistle/ui";
 import { PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
-import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type {
+  SandboxIntegrationBindingKind,
+  SandboxProfileVersion,
+} from "../sandbox-profiles/sandbox-profiles-types.js";
 import { ActionTile } from "../shared/action-tile.js";
 import {
   ResponsiveFieldList,
@@ -51,10 +55,11 @@ type IntegrationChoice = {
   kind: SandboxIntegrationBindingKind;
   hasSelectableConnections: boolean;
   logoKey: string | undefined;
-  title: React.ReactNode;
+  title: string;
 };
 
 type SandboxProfileIntegrationsSetupSectionProps = {
+  agentRuntimeId: SandboxProfileVersion["agentRuntimeId"];
   integrationBindingsQuery: {
     isError: boolean;
     error: unknown;
@@ -98,6 +103,8 @@ type SandboxProfileRuntimeIntegrationRowsProps = Pick<
 >;
 
 const NoIntegrationValue = "none";
+const Definitions = createBrowserDefinitionsBundle();
+const IntegrationRegistry = Definitions.integrationRegistry;
 
 const SandboxProfileToolsColumns = [
   { key: "integration", label: "Integration", desktopWidth: "minmax(12rem,0.9fr)" },
@@ -232,6 +239,7 @@ function ConnectionSelectionCell(input: {
   availableConnections: readonly IntegrationConnectionSummary[];
   selectedConnectionId: string | undefined;
   onConnectionChange: (nextConnectionId: string) => void;
+  allowNone?: boolean;
   disabled?: boolean | undefined;
   readOnly?: boolean | undefined;
 }): React.JSX.Element {
@@ -277,6 +285,7 @@ function ConnectionSelectionCell(input: {
         </SelectValue>
       </SelectTrigger>
       <SelectContent>
+        {input.allowNone === true ? <SelectItem value={NoIntegrationValue}>None</SelectItem> : null}
         {input.availableConnections.map((connection) => (
           <SelectItem key={connection.id} value={connection.id}>
             {connection.displayName}
@@ -310,6 +319,7 @@ function resolveKindChoices(input: {
   kind: SandboxIntegrationBindingKind;
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
+  agentRuntimeId?: SandboxProfileVersion["agentRuntimeId"];
   includeDisconnectedTargets?: boolean;
 }): IntegrationChoice[] {
   const choices: IntegrationChoice[] = [];
@@ -319,6 +329,17 @@ function resolveKindChoices(input: {
     if (
       resolveBindingKindFromTarget(target) !== input.kind ||
       seenTargetKeys.has(target.targetKey)
+    ) {
+      continue;
+    }
+
+    if (
+      input.kind === "agent" &&
+      input.agentRuntimeId !== undefined &&
+      !targetAllowsAgentRuntime({
+        target,
+        agentRuntimeId: input.agentRuntimeId,
+      })
     ) {
       continue;
     }
@@ -341,6 +362,22 @@ function resolveKindChoices(input: {
   }
 
   return choices;
+}
+
+function targetAllowsAgentRuntime(input: {
+  target: IntegrationTargetSummary;
+  agentRuntimeId: SandboxProfileVersion["agentRuntimeId"];
+}): boolean {
+  const definition = IntegrationRegistry.getDefinition({
+    familyId: input.target.familyId,
+    variantId: input.target.variantId,
+  });
+
+  if (definition?.kind !== "agent") {
+    return false;
+  }
+
+  return definition.allowedRuntimeIds?.includes(input.agentRuntimeId) === true;
 }
 
 function resolveConnectionsForTarget(input: {
@@ -687,6 +724,7 @@ export function SandboxProfileIntegrationsSetupSection(
     kind: "agent",
     availableConnections: input.availableConnections,
     availableTargets: input.availableTargets,
+    agentRuntimeId: input.agentRuntimeId,
   });
   const gitChoices = resolveKindChoices({
     kind: "git",
@@ -700,9 +738,38 @@ export function SandboxProfileIntegrationsSetupSection(
     includeDisconnectedTargets: true,
   });
 
-  const agentRow = input.integrationRows.find((row) => row.kind === "agent") ?? null;
+  const agentRows = input.integrationRows.filter((row) => row.kind === "agent");
   const gitRow = input.integrationRows.find((row) => row.kind === "git") ?? null;
   const connectorRows = input.integrationRows.filter((row) => row.kind === "connector");
+  const agentRowsByTargetKey = new Map<string, SandboxProfileBindingEditorRow>();
+  const staleAgentRows: SandboxProfileBindingEditorRow[] = [];
+  for (const row of agentRows) {
+    const targetKey = findTargetForConnection({
+      connectionId: row.connectionId,
+      availableConnections: input.availableConnections,
+    });
+    if (targetKey === null) {
+      staleAgentRows.push(row);
+      continue;
+    }
+
+    const target = input.availableTargets.find((candidate) => candidate.targetKey === targetKey);
+    if (target === undefined) {
+      staleAgentRows.push(row);
+      continue;
+    }
+
+    if (
+      !targetAllowsAgentRuntime({
+        target,
+        agentRuntimeId: input.agentRuntimeId,
+      })
+    ) {
+      continue;
+    }
+
+    agentRowsByTargetKey.set(targetKey, row);
+  }
   const selectedConnectorTargetKeys = new Set(
     connectorRows
       .map(
@@ -718,11 +785,13 @@ export function SandboxProfileIntegrationsSetupSection(
   const addConnectorChoices = connectorChoices.filter(
     (choice) => !selectedConnectorTargetKeys.has(choice.id),
   );
-  const agentIssue = resolveBindingIssue({
-    row: agentRow,
-    availableConnections: input.availableConnections,
-    availableTargets: input.availableTargets,
-  });
+  const agentIssues = agentRows.map((row) =>
+    resolveBindingIssue({
+      row,
+      availableConnections: input.availableConnections,
+      availableTargets: input.availableTargets,
+    }),
+  );
   const gitIssue = resolveBindingIssue({
     row: gitRow,
     availableConnections: input.availableConnections,
@@ -737,7 +806,40 @@ export function SandboxProfileIntegrationsSetupSection(
         availableTargets: input.availableTargets,
       }) !== null,
   );
-  const hasUnresolvedRows = agentIssue !== null || gitIssue !== null || hasUnresolvedConnectorRows;
+  const hasUnresolvedAgentRows = agentIssues.some((issue) => issue !== null);
+  const hasUnresolvedRows =
+    hasUnresolvedAgentRows || gitIssue !== null || hasUnresolvedConnectorRows;
+
+  useEffect(() => {
+    if (controlsAreDisabled || isReadOnly) {
+      return;
+    }
+
+    for (const row of agentRows) {
+      const target = resolveRowBindingMetadata({
+        row,
+        availableConnections: input.availableConnections,
+        availableTargets: input.availableTargets,
+      })?.target;
+      if (
+        target !== undefined &&
+        !targetAllowsAgentRuntime({
+          target,
+          agentRuntimeId: input.agentRuntimeId,
+        })
+      ) {
+        input.onRemoveIntegrationBindingRow(row.clientId);
+      }
+    }
+  }, [
+    agentRows,
+    controlsAreDisabled,
+    input.agentRuntimeId,
+    input.availableConnections,
+    input.availableTargets,
+    input.onRemoveIntegrationBindingRow,
+    isReadOnly,
+  ]);
 
   function updateBindingConnection(
     row: SandboxProfileBindingEditorRow,
@@ -787,10 +889,6 @@ export function SandboxProfileIntegrationsSetupSection(
     }
   }
 
-  const agentTargetKey = findTargetForConnection({
-    connectionId: agentRow?.connectionId,
-    availableConnections: input.availableConnections,
-  });
   const gitTargetKey = findTargetForConnection({
     connectionId: gitRow?.connectionId,
     availableConnections: input.availableConnections,
@@ -963,54 +1061,142 @@ export function SandboxProfileIntegrationsSetupSection(
             columns={SandboxProfileProxiedConnectionColumns}
             gapClassName="gap-6"
           >
-            <ResponsiveFieldListRow
-              className="py-4"
-              gapClassName="gap-6"
-              gridClassName="md:items-start"
-              isLastRow={!showGitProxiedConnection && connectorRows.length === 0}
-            >
-              <ResponsiveFieldListCell columnKey="connection">
-                <RuntimeSettingLabel>OpenAI</RuntimeSettingLabel>
-              </ResponsiveFieldListCell>
-              <ResponsiveFieldListCell columnKey="account">
-                <ConnectionSelectionCell
-                  ariaLabel="agent harness connection"
-                  availableConnections={resolveConnectionsForTarget({
-                    targetKey: agentTargetKey ?? agentChoices[0]?.id ?? null,
-                    availableConnections: input.availableConnections,
-                  })}
-                  onConnectionChange={(nextConnectionId) => {
-                    if (controlsAreDisabled) {
-                      return;
-                    }
-                    if (agentRow === null) {
-                      const nextConfig = buildDefaultConfig({
-                        connectionId: nextConnectionId,
-                        availableConnections: input.availableConnections,
-                        availableTargets: input.availableTargets,
-                      });
-                      if (nextConfig === null) {
-                        return;
-                      }
-                      void input.onAddIntegrationBindingRow({
-                        kind: "agent",
-                        connectionId: nextConnectionId,
-                        config: nextConfig,
-                      });
-                      return;
-                    }
-                    updateBindingConnection(agentRow, nextConnectionId);
-                  }}
-                  selectedConnectionId={agentRow?.connectionId}
-                  disabled={controlsAreDisabled}
-                  readOnly={isReadOnly}
+            {staleAgentRows.length === 0 && agentChoices.length === 0 ? (
+              <ResponsiveFieldListRow
+                className="py-4"
+                gapClassName="gap-6"
+                gridClassName="md:items-start"
+                isLastRow={!showGitProxiedConnection && connectorRows.length === 0}
+              >
+                <ResponsiveFieldListCell columnKey="connection">
+                  <RuntimeSettingLabel>Model provider</RuntimeSettingLabel>
+                </ResponsiveFieldListCell>
+                <ResponsiveFieldListCell columnKey="account">
+                  <div className={SandboxProfileIntegrationCellContentClassName}>
+                    <p className="text-muted-foreground text-sm">No providers configured.</p>
+                  </div>
+                </ResponsiveFieldListCell>
+                <ResponsiveFieldListCell
+                  className={SandboxProfileIntegrationActionCellClassName}
+                  columnKey="actions"
                 />
-              </ResponsiveFieldListCell>
-              <ResponsiveFieldListCell
-                className={SandboxProfileIntegrationActionCellClassName}
-                columnKey="actions"
-              />
-            </ResponsiveFieldListRow>
+              </ResponsiveFieldListRow>
+            ) : null}
+
+            {staleAgentRows.map((row) => {
+              const agentIssue = resolveBindingIssue({
+                row,
+                availableConnections: input.availableConnections,
+                availableTargets: input.availableTargets,
+              });
+
+              return (
+                <ResponsiveFieldListRow
+                  className={isReadOnly ? "py-4" : "py-4 pr-10 md:pr-0"}
+                  gapClassName="gap-6"
+                  gridClassName="md:items-start"
+                  key={row.clientId}
+                >
+                  <ResponsiveFieldListCell columnKey="connection">
+                    <RuntimeSettingLabel>Agent provider</RuntimeSettingLabel>
+                  </ResponsiveFieldListCell>
+                  <ResponsiveFieldListCell columnKey="account">
+                    <UnresolvedConnectionCell
+                      message={
+                        agentIssue === "missing-target"
+                          ? "Integration no longer available."
+                          : "Connection cannot be found"
+                      }
+                    />
+                  </ResponsiveFieldListCell>
+                  <ResponsiveFieldListCell
+                    className={SandboxProfileIntegrationActionCellClassName}
+                    columnKey="actions"
+                  >
+                    {isReadOnly ? null : (
+                      <RemoveIntegrationBindingButton
+                        disabled={controlsAreDisabled}
+                        label="Remove agent provider"
+                        onRemove={() => {
+                          if (controlsAreDisabled) {
+                            return;
+                          }
+
+                          input.onRemoveIntegrationBindingRow(row.clientId);
+                        }}
+                      />
+                    )}
+                  </ResponsiveFieldListCell>
+                </ResponsiveFieldListRow>
+              );
+            })}
+
+            {agentChoices.map((choice, choiceIndex) => {
+              const agentRow = agentRowsByTargetKey.get(choice.id) ?? null;
+
+              return (
+                <ResponsiveFieldListRow
+                  className="py-4"
+                  gapClassName="gap-6"
+                  gridClassName="md:items-start"
+                  isLastRow={
+                    choiceIndex === agentChoices.length - 1 &&
+                    !showGitProxiedConnection &&
+                    connectorRows.length === 0
+                  }
+                  key={choice.id}
+                >
+                  <ResponsiveFieldListCell columnKey="connection">
+                    <RuntimeSettingLabel>{choice.title}</RuntimeSettingLabel>
+                  </ResponsiveFieldListCell>
+                  <ResponsiveFieldListCell columnKey="account">
+                    <ConnectionSelectionCell
+                      allowNone={true}
+                      ariaLabel={`${choice.title} connection`}
+                      availableConnections={resolveConnectionsForTarget({
+                        targetKey: choice.id,
+                        availableConnections: input.availableConnections,
+                      })}
+                      onConnectionChange={(nextConnectionId) => {
+                        if (controlsAreDisabled) {
+                          return;
+                        }
+                        if (nextConnectionId === NoIntegrationValue) {
+                          if (agentRow !== null) {
+                            input.onRemoveIntegrationBindingRow(agentRow.clientId);
+                          }
+                          return;
+                        }
+                        if (agentRow === null) {
+                          const nextConfig = buildDefaultConfig({
+                            connectionId: nextConnectionId,
+                            availableConnections: input.availableConnections,
+                            availableTargets: input.availableTargets,
+                          });
+                          if (nextConfig === null) {
+                            return;
+                          }
+                          void input.onAddIntegrationBindingRow({
+                            kind: "agent",
+                            connectionId: nextConnectionId,
+                            config: nextConfig,
+                          });
+                          return;
+                        }
+                        updateBindingConnection(agentRow, nextConnectionId);
+                      }}
+                      selectedConnectionId={agentRow?.connectionId}
+                      disabled={controlsAreDisabled}
+                      readOnly={isReadOnly}
+                    />
+                  </ResponsiveFieldListCell>
+                  <ResponsiveFieldListCell
+                    className={SandboxProfileIntegrationActionCellClassName}
+                    columnKey="actions"
+                  />
+                </ResponsiveFieldListRow>
+              );
+            })}
 
             {!showGitProxiedConnection ? null : (
               <ResponsiveFieldListRow

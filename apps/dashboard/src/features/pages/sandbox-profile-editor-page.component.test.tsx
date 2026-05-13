@@ -51,6 +51,7 @@ import {
   SandboxProfileEditorShell,
   SandboxProfileEditorView,
   SandboxProfileSetupScriptPanel,
+  resolveSelectedSandboxProfileAgentRuntimeId,
 } from "./sandbox-profile-editor-page.js";
 
 beforeAll(() => {
@@ -78,6 +79,7 @@ function createSandboxProfileVersionFixture(input: {
   sandboxProfileId: string;
   version: number;
   state: SandboxProfileVersion["state"];
+  agentRuntimeId?: SandboxProfileVersion["agentRuntimeId"];
   defaultPersistenceMode?: SandboxProfileVersion["defaultPersistenceMode"];
   isActive: boolean;
   usable?: boolean;
@@ -88,7 +90,7 @@ function createSandboxProfileVersionFixture(input: {
     sandboxProfileId: input.sandboxProfileId,
     version: input.version,
     state: input.state,
-    agentRuntimeId: "codex",
+    agentRuntimeId: input.agentRuntimeId ?? "codex",
     defaultPersistenceMode: input.defaultPersistenceMode ?? "ephemeral",
     sandboxConnectionId: null,
     sandboxProvider: "docker",
@@ -865,6 +867,46 @@ describe("SandboxProfileEditorPage", () => {
         hasDraft: true,
       },
     });
+  });
+
+  it("ignores stale runtime draft state from a different profile version", () => {
+    const currentVersion = createSandboxProfileVersionFixture({
+      sandboxProfileId: "sbp_current",
+      version: 2,
+      state: "draft",
+      agentRuntimeId: "opencode",
+      isActive: false,
+    });
+
+    expect(
+      resolveSelectedSandboxProfileAgentRuntimeId({
+        currentVersion,
+        runtimeDraftState: {
+          agentRuntimeId: "codex",
+          sourceVersionKey: "sbp_previous:1",
+        },
+      }),
+    ).toBe("opencode");
+  });
+
+  it("uses matching runtime draft state for unsaved agent runtime edits", () => {
+    const currentVersion = createSandboxProfileVersionFixture({
+      sandboxProfileId: "sbp_current",
+      version: 2,
+      state: "draft",
+      agentRuntimeId: "opencode",
+      isActive: false,
+    });
+
+    expect(
+      resolveSelectedSandboxProfileAgentRuntimeId({
+        currentVersion,
+        runtimeDraftState: {
+          agentRuntimeId: "codex",
+          sourceVersionKey: "sbp_current:2",
+        },
+      }),
+    ).toBe("codex");
   });
 
   it("returns an explicit unavailable state when the published resolver has no published version", () => {
@@ -2229,17 +2271,19 @@ describe("SandboxProfileEditorPage", () => {
         {
           id: "connection-agent",
           displayName: "Codex connection",
-          targetKey: "codex",
+          targetKey: "openai-default",
           status: "active",
         },
       ],
       targets: [
         {
-          targetKey: "codex",
-          displayName: "Codex",
-          familyId: "agent",
-          variantId: "default",
-          config: {},
+          targetKey: "openai-default",
+          displayName: "OpenAI",
+          familyId: "openai",
+          variantId: "openai-default",
+          config: {
+            api_base_url: "https://api.openai.com",
+          },
           targetHealth: {
             configStatus: "valid",
           },
@@ -2249,7 +2293,7 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(screen.getByText("Viewing: Published (v3)")).toBeDefined();
     expect(screen.getByRole("button", { name: "Edit" })).toBeDefined();
-    expect(screen.queryByRole("combobox", { name: "agent harness connection" })).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "OpenAI connection" })).toBeNull();
     expect(screen.getByText("Codex connection")).toBeDefined();
     expect(screen.queryByRole("button", { name: "Setup script behavior" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Environment and installed tools" })).toBeNull();

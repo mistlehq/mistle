@@ -61,11 +61,31 @@ export const AgentBindingRequired: Story = {
 };
 
 export const AgentBindingAmbiguous: Story = {
-  name: "Multiple Agent Bindings",
+  name: "Duplicate Agent Provider Bindings",
   args: {
     draftAutomationImpactAffectedAutomations: createDraftAutomationImpactAutomations(
       ["Support escalation"],
       "AGENT_BINDING_AMBIGUOUS",
+    ),
+  },
+};
+
+export const AgentBindingPrimaryRequired: Story = {
+  name: "Primary Agent Provider Required",
+  args: {
+    draftAutomationImpactAffectedAutomations: createDraftAutomationImpactAutomations(
+      ["Support escalation"],
+      "AGENT_BINDING_PRIMARY_REQUIRED",
+    ),
+  },
+};
+
+export const AgentBindingRuntimeIncompatible: Story = {
+  name: "Agent Binding Runtime Incompatible",
+  args: {
+    draftAutomationImpactAffectedAutomations: createDraftAutomationImpactAutomations(
+      ["Support escalation"],
+      "AGENT_BINDING_RUNTIME_INCOMPATIBLE",
     ),
   },
 };

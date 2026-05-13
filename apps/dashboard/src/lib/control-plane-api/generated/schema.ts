@@ -8818,7 +8818,9 @@ export interface paths {
                   /** @enum {string} */
                   code:
                     | "AGENT_BINDING_REQUIRED"
+                    | "AGENT_BINDING_PRIMARY_REQUIRED"
                     | "AGENT_BINDING_AMBIGUOUS"
+                    | "AGENT_BINDING_RUNTIME_INCOMPATIBLE"
                     | "INVALID_BINDING_CONNECTION_REFERENCE"
                     | "CONNECTION_NOT_ACTIVE"
                     | "TARGET_DISABLED"

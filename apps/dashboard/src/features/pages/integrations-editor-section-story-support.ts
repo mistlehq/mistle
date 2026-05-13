@@ -59,6 +59,50 @@ export const StoryOpenAiConnection: IntegrationConnectionSummary = {
   },
 };
 
+export const StoryAnthropicTarget: IntegrationTargetSummary = {
+  targetKey: "target-anthropic",
+  displayName: "Anthropic",
+  logoKey: "anthropic",
+  familyId: "anthropic",
+  variantId: "anthropic-default",
+  config: {},
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+export const StoryAnthropicConnection: IntegrationConnectionSummary = {
+  id: "connection-anthropic",
+  displayName: "Anthropic Production",
+  targetKey: StoryAnthropicTarget.targetKey,
+  status: "active",
+  config: {
+    connection_method: "api-key",
+  },
+};
+
+export const StoryOpenCodeGoTarget: IntegrationTargetSummary = {
+  targetKey: "target-opencode-go",
+  displayName: "OpenCode Go",
+  logoKey: "opencode",
+  familyId: "opencode",
+  variantId: "opencode-go",
+  config: {},
+  targetHealth: {
+    configStatus: "valid",
+  },
+};
+
+export const StoryOpenCodeGoConnection: IntegrationConnectionSummary = {
+  id: "connection-opencode-go",
+  displayName: "OpenCode Go Production",
+  targetKey: StoryOpenCodeGoTarget.targetKey,
+  status: "active",
+  config: {
+    connection_method: "api-key",
+  },
+};
+
 export const StoryGithubTarget: IntegrationTargetSummary = {
   targetKey: "target-github",
   displayName: "GitHub",
@@ -302,6 +346,8 @@ export const StorySlackConnection: IntegrationConnectionSummary = {
 
 export const StoryIntegrationTargets = [
   StoryOpenAiTarget,
+  StoryAnthropicTarget,
+  StoryOpenCodeGoTarget,
   StoryGithubTarget,
   StoryGithubEnterpriseServerTarget,
   StoryAwsTarget,
@@ -314,6 +360,8 @@ export const StoryIntegrationTargets = [
 ] as const;
 export const StoryIntegrationConnections = [
   StoryOpenAiConnection,
+  StoryAnthropicConnection,
+  StoryOpenCodeGoConnection,
   StoryGithubConnection,
   StoryGithubEnterpriseServerConnection,
   StoryAwsConnection,

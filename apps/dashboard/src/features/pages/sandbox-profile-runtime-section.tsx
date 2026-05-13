@@ -48,6 +48,8 @@ export type SandboxProfileRuntimeDraftChanges = {
 };
 
 export type SandboxProfileRuntimeDraftState = {
+  agentRuntimeId: AgentRuntimeId | undefined;
+  sourceVersionKey: string | undefined;
   hasUnpersistedChanges: boolean;
   applyDraftSaveError?: (error: unknown) => void;
   applySavedRuntimeConfig?: (runtimeConfig: SandboxProfileRuntimeDraftChanges) => void;
@@ -63,6 +65,12 @@ type RuntimeConfigState = {
 };
 
 type ResourceCapability = NonNullable<SandboxProviderSummary["resourceCapabilities"]>["vcpuCount"];
+
+function createRuntimeDraftSourceVersionKey(
+  version: Pick<SandboxProfileVersion, "sandboxProfileId" | "version">,
+): string {
+  return `${version.sandboxProfileId}:${String(version.version)}`;
+}
 
 export function SandboxProfileRuntimeSection(input: {
   availableConnections: readonly IntegrationConnectionSummary[];
@@ -171,6 +179,8 @@ export function SandboxProfileRuntimeSection(input: {
 
   useEffect(() => {
     input.onDraftStateChange?.({
+      agentRuntimeId: draftRuntime.agentRuntimeId,
+      sourceVersionKey: createRuntimeDraftSourceVersionKey(input.version),
       applyDraftSaveError,
       applySavedRuntimeConfig,
       buildDraftChanges,

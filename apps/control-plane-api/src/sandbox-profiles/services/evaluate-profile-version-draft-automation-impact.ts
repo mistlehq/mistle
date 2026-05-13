@@ -4,7 +4,9 @@ import {
   getControlPlaneDatabaseSchema,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
+  SandboxProfileVersionAgentRuntimeIds,
 } from "@mistle/db/control-plane";
+import { createDefinitionsBundle } from "@mistle/integrations-definitions/server";
 import { and, eq } from "drizzle-orm";
 
 import {
@@ -14,6 +16,9 @@ import {
   SandboxProfilesNotFoundError,
 } from "../errors.js";
 import { listProfileVersionRepositoryOptions } from "./repository-options.js";
+
+const Definitions = createDefinitionsBundle();
+const IntegrationRegistry = Definitions.integrationRegistry;
 
 type AutomationImpactIssue = {
   code: SandboxProfileAutomationImpactIssueCode;
@@ -88,6 +93,23 @@ async function resolveProfileVersionAgentIssues(
   db: ControlPlaneDatabase,
   input: EvaluateProfileVersionDraftAutomationImpactInput,
 ): Promise<AutomationImpactIssue[]> {
+  const profileVersion = await db.query.sandboxProfileVersions.findFirst({
+    columns: {
+      agentRuntimeId: true,
+    },
+    where: (table, { and: whereAnd, eq: whereEq }) =>
+      whereAnd(
+        whereEq(table.sandboxProfileId, input.profileId),
+        whereEq(table.version, input.profileVersion),
+      ),
+  });
+  if (profileVersion === undefined) {
+    throw new SandboxProfilesNotFoundError(
+      SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
+      "Sandbox profile version was not found.",
+    );
+  }
+
   const agentBindings = await db.query.sandboxProfileVersionIntegrationBindings.findMany({
     columns: {
       id: true,
@@ -107,88 +129,139 @@ async function resolveProfileVersionAgentIssues(
     return [
       {
         code: SandboxProfileAutomationImpactIssueCodes.AGENT_BINDING_REQUIRED,
-        message: `Sandbox profile version '${String(input.profileVersion)}' must have exactly one agent binding for automations to run.`,
+        message: `Sandbox profile version '${String(input.profileVersion)}' must have at least one agent binding for automations to run.`,
       },
     ];
   }
 
-  if (agentBindings[1] !== undefined) {
-    return [
-      {
-        code: SandboxProfileAutomationImpactIssueCodes.AGENT_BINDING_AMBIGUOUS,
-        message: `Sandbox profile version '${String(input.profileVersion)}' has multiple agent bindings, but automations require exactly one.`,
+  const issues: AutomationImpactIssue[] = [];
+  const providerBindingIds = new Map<string, string>();
+  const primaryIntegrationFamilyId = resolvePrimaryConversationIntegrationFamilyId(
+    profileVersion.agentRuntimeId,
+  );
+  let hasPrimaryIntegrationFamily = primaryIntegrationFamilyId === null;
+
+  for (const binding of agentBindings) {
+    const agentConnection = await db.query.integrationConnections.findFirst({
+      columns: {
+        id: true,
+        status: true,
+        targetKey: true,
       },
-    ];
-  }
+      where: (table, { and: whereAnd, eq: whereEq }) =>
+        whereAnd(
+          whereEq(table.id, binding.connectionId),
+          whereEq(table.organizationId, input.organizationId),
+        ),
+    });
 
-  const agentConnection = await db.query.integrationConnections.findFirst({
-    columns: {
-      id: true,
-      status: true,
-      targetKey: true,
-    },
-    where: (table, { and: whereAnd, eq: whereEq }) =>
-      whereAnd(
-        whereEq(table.id, agentBinding.connectionId),
-        whereEq(table.organizationId, input.organizationId),
-      ),
-  });
-
-  if (agentConnection === undefined) {
-    return [
-      {
+    if (agentConnection === undefined) {
+      issues.push({
         code: SandboxProfileAutomationImpactIssueCodes.INVALID_BINDING_CONNECTION_REFERENCE,
-        message: `Agent binding '${agentBinding.id}' references connection '${agentBinding.connectionId}' that is missing or inaccessible.`,
-        bindingId: agentBinding.id,
-        connectionId: agentBinding.connectionId,
-      },
-    ];
-  }
+        message: `Agent binding '${binding.id}' references connection '${binding.connectionId}' that is missing or inaccessible.`,
+        bindingId: binding.id,
+        connectionId: binding.connectionId,
+      });
+      continue;
+    }
 
-  if (agentConnection.status !== IntegrationConnectionStatuses.ACTIVE) {
-    return [
-      {
+    if (agentConnection.status !== IntegrationConnectionStatuses.ACTIVE) {
+      issues.push({
         code: SandboxProfileAutomationImpactIssueCodes.CONNECTION_NOT_ACTIVE,
-        message: `Agent binding '${agentBinding.id}' references connection '${agentConnection.id}' that is not active.`,
-        bindingId: agentBinding.id,
+        message: `Agent binding '${binding.id}' references connection '${agentConnection.id}' that is not active.`,
+        bindingId: binding.id,
         connectionId: agentConnection.id,
+      });
+      continue;
+    }
+
+    const agentTarget = await db.query.integrationTargets.findFirst({
+      columns: {
+        enabled: true,
+        familyId: true,
+        targetKey: true,
+        variantId: true,
       },
-    ];
-  }
+      where: (table, { eq: whereEq }) => whereEq(table.targetKey, agentConnection.targetKey),
+    });
 
-  const agentTarget = await db.query.integrationTargets.findFirst({
-    columns: {
-      enabled: true,
-      targetKey: true,
-    },
-    where: (table, { eq: whereEq }) => whereEq(table.targetKey, agentConnection.targetKey),
-  });
-
-  if (agentTarget === undefined) {
-    return [
-      {
+    if (agentTarget === undefined) {
+      issues.push({
         code: SandboxProfileAutomationImpactIssueCodes.TARGET_MISSING,
         message: `Agent connection '${agentConnection.id}' references target '${agentConnection.targetKey}' that is missing.`,
-        bindingId: agentBinding.id,
+        bindingId: binding.id,
         connectionId: agentConnection.id,
         targetKey: agentConnection.targetKey,
-      },
-    ];
-  }
+      });
+      continue;
+    }
 
-  if (!agentTarget.enabled) {
-    return [
-      {
+    if (!agentTarget.enabled) {
+      issues.push({
         code: SandboxProfileAutomationImpactIssueCodes.TARGET_DISABLED,
-        message: `Agent binding '${agentBinding.id}' references disabled target '${agentTarget.targetKey}'.`,
-        bindingId: agentBinding.id,
+        message: `Agent binding '${binding.id}' references disabled target '${agentTarget.targetKey}'.`,
+        bindingId: binding.id,
         connectionId: agentConnection.id,
         targetKey: agentTarget.targetKey,
-      },
-    ];
+      });
+      continue;
+    }
+
+    const agentDefinition = IntegrationRegistry.getDefinition({
+      familyId: agentTarget.familyId,
+      variantId: agentTarget.variantId,
+    });
+    if (
+      agentDefinition?.kind !== "agent" ||
+      agentDefinition.allowedRuntimeIds?.includes(profileVersion.agentRuntimeId) !== true
+    ) {
+      issues.push({
+        code: SandboxProfileAutomationImpactIssueCodes.AGENT_BINDING_RUNTIME_INCOMPATIBLE,
+        message: `Agent binding '${binding.id}' references provider '${agentTarget.familyId}' that is not compatible with runtime '${profileVersion.agentRuntimeId}'.`,
+        bindingId: binding.id,
+        connectionId: agentConnection.id,
+        targetKey: agentTarget.targetKey,
+      });
+      continue;
+    }
+
+    const providerKey = `${agentTarget.familyId}:${agentTarget.variantId}`;
+    const firstBindingId = providerBindingIds.get(providerKey);
+    if (firstBindingId !== undefined) {
+      issues.push({
+        code: SandboxProfileAutomationImpactIssueCodes.AGENT_BINDING_AMBIGUOUS,
+        message: `Agent binding '${binding.id}' duplicates provider '${agentTarget.familyId}' already bound by '${firstBindingId}'.`,
+        bindingId: binding.id,
+        connectionId: agentConnection.id,
+        targetKey: agentTarget.targetKey,
+      });
+      continue;
+    }
+    providerBindingIds.set(providerKey, binding.id);
+    if (agentTarget.familyId === primaryIntegrationFamilyId) {
+      hasPrimaryIntegrationFamily = true;
+    }
   }
 
-  return [];
+  if (primaryIntegrationFamilyId !== null && !hasPrimaryIntegrationFamily) {
+    issues.push({
+      code: SandboxProfileAutomationImpactIssueCodes.AGENT_BINDING_PRIMARY_REQUIRED,
+      message: `Sandbox profile version '${String(input.profileVersion)}' must have an agent binding for provider '${primaryIntegrationFamilyId}' to run automations with runtime '${profileVersion.agentRuntimeId}'.`,
+    });
+  }
+
+  return issues;
+}
+
+function resolvePrimaryConversationIntegrationFamilyId(runtimeId: string): string | null {
+  switch (runtimeId) {
+    case SandboxProfileVersionAgentRuntimeIds.CODEX:
+      return "openai";
+    case SandboxProfileVersionAgentRuntimeIds.OPENCODE:
+      return "opencode";
+    default:
+      return null;
+  }
 }
 
 async function loadAutomationTargetRows(
