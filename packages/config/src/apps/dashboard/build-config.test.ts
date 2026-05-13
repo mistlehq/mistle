@@ -191,6 +191,30 @@ describe("loadDashboardBuildConfig", () => {
     expect(config.posthog).toEqual({ enabled: false });
   });
 
+  it("preserves file-backed PostHog config when dashboard origin is overridden by env", () => {
+    const config = loadDashboardBuildConfigForTest({
+      configPath: createDashboardConfigFile({
+        postHogConfigLines: [
+          "",
+          "[services.dashboard.posthog]",
+          "enabled = true",
+          'project_api_key = "phc_from_file"',
+          'host = "https://eu.i.posthog.com"',
+        ],
+      }),
+      env: {
+        MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN: "https://api.override.test",
+      },
+    });
+
+    expect(config.controlPlaneApiOrigin).toBe("https://api.override.test");
+    expect(config.posthog).toEqual({
+      enabled: true,
+      projectApiKey: "phc_from_file",
+      host: "https://eu.i.posthog.com",
+    });
+  });
+
   it("fails when services.dashboard.control_plane_api_origin is missing", () => {
     expect(() =>
       loadDashboardBuildConfigForTest({

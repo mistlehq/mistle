@@ -199,43 +199,63 @@ function resolveConfigPath(
   );
 }
 
+function resolveOptionalParsedConfig(input: {
+  environment: NodeJS.ProcessEnv;
+  dashboardBuildEnvironment: DashboardBuildEnvironment;
+}): z.infer<typeof DashboardBuildConfigSchema> | undefined {
+  const explicitConfigPath = input.environment.MISTLE_CONFIG_PATH;
+  if (typeof explicitConfigPath === "string" && explicitConfigPath.trim().length > 0) {
+    return DashboardBuildConfigSchema.parse(parseTomlFile(explicitConfigPath));
+  }
+
+  try {
+    const configPath = resolveConfigPath(input.environment, input.dashboardBuildEnvironment);
+    return DashboardBuildConfigSchema.parse(parseTomlFile(configPath));
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.startsWith("Missing required dashboard config file.")
+    ) {
+      return undefined;
+    }
+
+    throw error;
+  }
+}
+
 export function loadDashboardBuildConfig(
   environment: NodeJS.ProcessEnv,
   dashboardBuildEnvironment: DashboardBuildEnvironment,
 ): DashboardBuildConfig {
   const explicitControlPlaneApiOrigin =
     environment.MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN;
+  const parsedConfig = resolveOptionalParsedConfig({
+    environment,
+    dashboardBuildEnvironment,
+  });
+
   if (
-    typeof explicitControlPlaneApiOrigin === "string" &&
-    explicitControlPlaneApiOrigin.trim().length > 0
+    (explicitControlPlaneApiOrigin === undefined ||
+      explicitControlPlaneApiOrigin.trim().length === 0) &&
+    parsedConfig === undefined
   ) {
-    return {
-      controlPlaneApiOrigin: normalizeOrigin(
-        explicitControlPlaneApiOrigin,
-        "MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN",
-      ),
-      posthog: resolveDashboardPostHogBuildConfig({
-        environment,
-        configuredPostHog: undefined,
-      }),
-    };
+    resolveConfigPath(environment, dashboardBuildEnvironment);
   }
 
-  const configPath = resolveConfigPath(environment, dashboardBuildEnvironment);
-  const parsedRoot = parseTomlFile(configPath);
-
-  const parsedConfig = DashboardBuildConfigSchema.parse(parsedRoot);
   const controlPlaneApiOrigin = normalizeOrigin(
     environment.MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN ??
-      parsedConfig.services.dashboard.control_plane_api_origin,
-    "MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN or services.dashboard.control_plane_api_origin",
+      parsedConfig?.services.dashboard.control_plane_api_origin ??
+      "",
+    explicitControlPlaneApiOrigin === undefined || explicitControlPlaneApiOrigin.trim().length === 0
+      ? "MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN or services.dashboard.control_plane_api_origin"
+      : "MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN",
   );
 
   return {
     controlPlaneApiOrigin,
     posthog: resolveDashboardPostHogBuildConfig({
       environment,
-      configuredPostHog: parsedConfig.services.dashboard.posthog,
+      configuredPostHog: parsedConfig?.services.dashboard.posthog,
     }),
   };
 }
