@@ -23,9 +23,11 @@ type RegisterSandboxRuntimeStateRouteInput = {
  * Registers the internal worker-facing runtime-state read route.
  *
  * This route is authenticated with the shared internal service token and
- * The gateway remains the sole owner of runtime-state backend selection, so
- * workers read owner, attachment, presence, keepalive, and runtime-readiness summaries through
- * this route regardless of whether the gateway is running in `memory` or `valkey` mode.
+ * the gateway remains the sole owner of runtime-state backend selection.
+ *
+ * Workers and data-plane API read owner, bootstrap attachment, runtime
+ * readiness, presence, and keepalive summaries through this route regardless of
+ * whether the gateway is running in `memory` or `valkey` mode.
  */
 export function registerSandboxRuntimeStateRoute(
   input: RegisterSandboxRuntimeStateRouteInput,

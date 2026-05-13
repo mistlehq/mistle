@@ -1,10 +1,12 @@
 import type { SandboxRuntimeStateSnapshot } from "./sandbox-runtime-state-reader.js";
 
 /**
- * Returns `true` when runtime state shows a fenced bootstrap attachment that
- * matches the current owner lease, regardless of adapter readiness.
+ * Returns `true` when the gateway snapshot has a fenced bootstrap tunnel
+ * attachment for the current owner lease. This only proves sandboxd is
+ * attached to the gateway; it does not prove runtime initialization has
+ * completed.
  */
-export function isSandboxRuntimeAttached(snapshot: SandboxRuntimeStateSnapshot): boolean {
+export function isSandboxBootstrapAttached(snapshot: SandboxRuntimeStateSnapshot): boolean {
   if (snapshot.ownerLeaseId === null) {
     return false;
   }
@@ -13,11 +15,11 @@ export function isSandboxRuntimeAttached(snapshot: SandboxRuntimeStateSnapshot):
 }
 
 /**
- * Returns `true` when runtime state shows both a fenced bootstrap attachment
- * and a runtime session that has finished adapter-level initialization.
+ * Returns `true` when the sandbox has a fenced bootstrap attachment and the
+ * runtime has finished adapter-level initialization.
  */
 export function isSandboxRuntimeReady(snapshot: SandboxRuntimeStateSnapshot): boolean {
-  if (!isSandboxRuntimeAttached(snapshot)) {
+  if (!isSandboxBootstrapAttached(snapshot)) {
     return false;
   }
 

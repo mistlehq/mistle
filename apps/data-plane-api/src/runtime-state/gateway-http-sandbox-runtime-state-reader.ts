@@ -12,9 +12,9 @@ const DataPlaneInternalAuthHeader = "x-mistle-service-token";
  * Reads runtime-state snapshots from the gateway's internal HTTP route.
  *
  * Gateway remains the sole owner of the runtime-state backend choice, so
- * data-plane API reads owner/attachment and presence/keepalive summaries
- * through the gateway
- * regardless of whether gateway uses `memory` or `valkey`.
+ * data-plane API reads bootstrap attachment, runtime readiness,
+ * presence/keepalive, and owner summaries through the gateway regardless of
+ * whether gateway uses `memory` or `valkey`.
  */
 export class GatewayHttpSandboxRuntimeStateReader implements SandboxRuntimeStateReader {
   public constructor(
@@ -28,7 +28,8 @@ export class GatewayHttpSandboxRuntimeStateReader implements SandboxRuntimeState
   ) {}
 
   /**
-   * Reads the latest runtime-state snapshot for one sandbox instance.
+   * Reads the latest bootstrap attachment and readiness snapshot for one
+   * sandbox instance.
    */
   public async readSnapshot({
     sandboxInstanceId,

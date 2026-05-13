@@ -2,18 +2,19 @@ import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 
 import type { SandboxRuntimeStateSnapshot } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import {
-  isSandboxRuntimeAttached,
+  isSandboxBootstrapAttached,
   isSandboxRuntimeReady,
 } from "../../runtime-state/sandbox-runtime-state-readiness.js";
 import { DataPlaneSandboxInstanceStatuses, type GetSandboxInstanceResponse } from "./schemas.js";
 
 /**
  * Composes the effective user-facing sandbox status from durable lifecycle
- * state and live gateway attachment state.
+ * state, live gateway bootstrap attachment, and runtime readiness.
  *
  * Durable `pending` and `failed` states always win. For durable `stopped`,
- * `starting`, and `running`, gateway attachment determines whether the sandbox
- * is effectively still `stopped`, `starting`, or `running`.
+ * `starting`, and `running`, bootstrap attachment can only move the sandbox to
+ * `starting`. Runtime readiness is required before the effective status becomes
+ * `running`.
  */
 export function resolveEffectiveSandboxInstanceStatus(input: {
   persistedStatus: string;
@@ -39,7 +40,10 @@ export function resolveEffectiveSandboxInstanceStatus(input: {
     return DataPlaneSandboxInstanceStatuses.RUNNING;
   }
 
-  if (input.runtimeStateSnapshot !== null && isSandboxRuntimeAttached(input.runtimeStateSnapshot)) {
+  if (
+    input.runtimeStateSnapshot !== null &&
+    isSandboxBootstrapAttached(input.runtimeStateSnapshot)
+  ) {
     return DataPlaneSandboxInstanceStatuses.STARTING;
   }
 
