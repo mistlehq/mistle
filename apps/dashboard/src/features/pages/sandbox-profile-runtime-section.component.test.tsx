@@ -48,7 +48,7 @@ const OrganizationE2BProvider = {
   managed: false,
 } satisfies SandboxProviderSummary;
 
-const StorageProvider = {
+const OrganizationStorageE2BProvider = {
   id: "e2b",
   displayName: "E2B",
   managed: true,
@@ -205,7 +205,7 @@ describe("SandboxProfileRuntimeSection", () => {
         availableTargets={[E2BRuntimeTarget]}
         disabled={false}
         isDraft={false}
-        providers={[DockerProvider, StorageProvider]}
+        providers={[DockerProvider, OrganizationStorageE2BProvider]}
         sectionChrome={false}
         version={createVersion({
           sandboxProvider: "e2b",
@@ -310,7 +310,7 @@ describe("SandboxProfileRuntimeSection", () => {
         availableTargets={[]}
         disabled={false}
         isDraft={true}
-        providers={[StorageProvider]}
+        providers={[OrganizationStorageE2BProvider]}
         version={createVersion({
           sandboxProvider: "e2b",
           sandboxConnectionId: null,
