@@ -32,6 +32,10 @@ type AvailableIntegrationGroupSpec = {
   title: string;
 };
 
+type AvailableIntegrationGroup = AvailableIntegrationGroupSpec & {
+  cards: readonly OrganizationIntegrationsSettingsPageCard[];
+};
+
 const AvailableIntegrationGroupSpecs: readonly AvailableIntegrationGroupSpec[] = [
   {
     kind: "agent",
@@ -112,9 +116,7 @@ function AvailableIntegrationsSection(input: {
     cards: input.cards,
     searchValue,
   });
-  const groups = AvailableIntegrationGroupSpecs.filter(
-    (group) => getIntegrationGroupCards(matchingCards, group.kind).length > 0,
-  );
+  const groups = buildAvailableIntegrationGroups(matchingCards);
   const defaultGroup = groups[0];
   const activeGroupKind = resolveAvailableIntegrationActiveGroupKind({
     groups,
@@ -168,7 +170,7 @@ function AvailableIntegrationsSection(input: {
 
             {groups.map((group) => (
               <TabsContent key={group.kind} value={group.kind}>
-                {renderIntegrationSettingsGrid(getIntegrationGroupCards(matchingCards, group.kind))}
+                {renderIntegrationSettingsGrid(group.cards)}
               </TabsContent>
             ))}
           </Tabs>
@@ -179,7 +181,7 @@ function AvailableIntegrationsSection(input: {
 }
 
 function resolveAvailableIntegrationActiveGroupKind(input: {
-  groups: readonly AvailableIntegrationGroupSpec[];
+  groups: readonly AvailableIntegrationGroup[];
   selectedGroupKind: IntegrationKind | null;
 }): IntegrationKind | null {
   if (
@@ -190,6 +192,15 @@ function resolveAvailableIntegrationActiveGroupKind(input: {
   }
 
   return input.groups[0]?.kind ?? null;
+}
+
+function buildAvailableIntegrationGroups(
+  cards: readonly OrganizationIntegrationsSettingsPageCard[],
+): readonly AvailableIntegrationGroup[] {
+  return AvailableIntegrationGroupSpecs.map((group) => ({
+    ...group,
+    cards: cards.filter((card) => card.integrationKind === group.kind),
+  })).filter((group) => group.cards.length > 0);
 }
 
 function parseAvailableIntegrationGroupKind(value: string): IntegrationKind {
@@ -213,13 +224,6 @@ function filterIntegrationCards(input: {
     const haystack = [card.displayName, card.description, card.targetKey].join(" ").toLowerCase();
     return haystack.includes(normalizedSearchValue);
   });
-}
-
-function getIntegrationGroupCards(
-  cards: readonly OrganizationIntegrationsSettingsPageCard[],
-  kind: IntegrationKind,
-): readonly OrganizationIntegrationsSettingsPageCard[] {
-  return cards.filter((card) => card.integrationKind === kind);
 }
 
 function renderIntegrationSettingsGrid(

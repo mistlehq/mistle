@@ -148,7 +148,7 @@ describe("buildWebhookAutomationEventOptions", () => {
           {
             targetKey: "linear-cloud",
             familyId: "linear",
-            variantId: "linear-cloud",
+            variantId: "linear-default",
             kind: "connector",
             enabled: true,
             config: {},
@@ -677,7 +677,7 @@ describe("resolveEligibleProfileAutomationConnectionIds", () => {
           {
             targetKey: "linear-cloud",
             familyId: "linear",
-            variantId: "linear-cloud",
+            variantId: "linear-default",
             kind: "connector",
             enabled: true,
             config: {},

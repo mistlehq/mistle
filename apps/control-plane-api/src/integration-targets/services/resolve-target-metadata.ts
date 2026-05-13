@@ -26,6 +26,8 @@ function getTargetDefinition(input: { familyId: string; variantId: string }) {
   });
 }
 
+type RegisteredIntegrationDefinition = NonNullable<ReturnType<typeof getTargetDefinition>>;
+
 export function hasTargetDefinition(input: { familyId: string; variantId: string }): boolean {
   return getTargetDefinition(input) !== undefined;
 }
@@ -642,28 +644,11 @@ export function resolveTargetMetadata(input: {
 
   if (definition.description === undefined || definition.description.trim().length === 0) {
     if (input.descriptionOverride !== null) {
-      return {
-        kind: definition.kind,
+      return buildResolvedIntegrationTargetMetadata({
+        definition,
         displayName: input.displayNameOverride ?? definition.displayName,
         description: input.descriptionOverride,
-        logoKey: definition.logoKey,
-        connectionMethods: definition.connectionMethods.map((method) =>
-          resolveConnectionMethod(method),
-        ),
-        ...(definition.webhookSource === undefined
-          ? {}
-          : {
-              webhookSource: {
-                lifecycle: definition.webhookSource.lifecycle,
-                requiresSourceSelection: true,
-              },
-            }),
-        ...(definition.supportedWebhookEvents === undefined
-          ? {}
-          : {
-              supportedWebhookEvents: cloneWebhookEvents(definition.supportedWebhookEvents),
-            }),
-      };
+      });
     }
 
     throw new Error(
@@ -671,26 +656,38 @@ export function resolveTargetMetadata(input: {
     );
   }
 
-  return {
-    kind: definition.kind,
+  return buildResolvedIntegrationTargetMetadata({
+    definition,
     displayName: input.displayNameOverride ?? definition.displayName,
     description: input.descriptionOverride ?? definition.description,
-    logoKey: definition.logoKey,
-    connectionMethods: definition.connectionMethods.map((method) =>
+  });
+}
+
+function buildResolvedIntegrationTargetMetadata(input: {
+  definition: RegisteredIntegrationDefinition;
+  displayName: string;
+  description: string;
+}): ResolvedIntegrationTargetMetadata {
+  return {
+    kind: input.definition.kind,
+    displayName: input.displayName,
+    description: input.description,
+    logoKey: input.definition.logoKey,
+    connectionMethods: input.definition.connectionMethods.map((method) =>
       resolveConnectionMethod(method),
     ),
-    ...(definition.webhookSource === undefined
+    ...(input.definition.webhookSource === undefined
       ? {}
       : {
           webhookSource: {
-            lifecycle: definition.webhookSource.lifecycle,
+            lifecycle: input.definition.webhookSource.lifecycle,
             requiresSourceSelection: true,
           },
         }),
-    ...(definition.supportedWebhookEvents === undefined
+    ...(input.definition.supportedWebhookEvents === undefined
       ? {}
       : {
-          supportedWebhookEvents: cloneWebhookEvents(definition.supportedWebhookEvents),
+          supportedWebhookEvents: cloneWebhookEvents(input.definition.supportedWebhookEvents),
         }),
   };
 }

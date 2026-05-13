@@ -5,7 +5,10 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { createAvailableCardsOverview } from "./organization-integrations-settings-page-story-support.js";
-import { OrganizationIntegrationsSettingsPageView } from "./organization-integrations-settings-page-view.js";
+import {
+  OrganizationIntegrationsSettingsPageView,
+  type OrganizationIntegrationsSettingsPageCard,
+} from "./organization-integrations-settings-page-view.js";
 
 describe("OrganizationIntegrationsSettingsPageView", () => {
   it("builds the overview story cards from every browser integration definition", () => {
@@ -34,41 +37,26 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
     render(
       <OrganizationIntegrationsSettingsPageView
         availableCards={[
-          {
-            targetKey: "openai-default",
-            integrationKind: "agent",
-            displayName: "OpenAI",
-            description: "Bring organization API access into Mistle.",
-            configStatus: "valid",
-            actionLabel: "Add",
+          createOpenAiCard({
             onAction: () => {
               selectedTargetKey = "openai-default";
             },
-          },
-          {
-            targetKey: "github-cloud",
-            integrationKind: "git",
-            displayName: "GitHub",
-            description: "Connect repository access and GitHub events.",
-            configStatus: "valid",
-            actionLabel: "Add",
+          }),
+          createGitHubCard({
             onAction: () => {
               selectedTargetKey = "github-cloud";
             },
-          },
+          }),
         ]}
         connectedCards={[
-          {
+          createGitHubCard({
             targetKey: "github",
-            integrationKind: "git",
-            displayName: "GitHub",
             description: "2 connections",
-            configStatus: "valid",
             actionLabel: "View",
             onAction: () => {
               selectedTargetKey = "github";
             },
-          },
+          }),
         ]}
         loadErrorMessage={null}
       />,
@@ -98,26 +86,7 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
   it("filters available integrations across category tabs", () => {
     render(
       <OrganizationIntegrationsSettingsPageView
-        availableCards={[
-          {
-            targetKey: "openai-default",
-            integrationKind: "agent",
-            displayName: "OpenAI",
-            description: "Bring organization API access into Mistle.",
-            configStatus: "valid",
-            actionLabel: "Add",
-            onAction: () => {},
-          },
-          {
-            targetKey: "github-cloud",
-            integrationKind: "git",
-            displayName: "GitHub",
-            description: "Connect repository access and GitHub events.",
-            configStatus: "valid",
-            actionLabel: "Add",
-            onAction: () => {},
-          },
-        ]}
+        availableCards={[createOpenAiCard(), createGitHubCard()]}
         connectedCards={[]}
         loadErrorMessage={null}
       />,
@@ -140,26 +109,7 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
   it("keeps matching integrations visible when search removes the selected category tab", () => {
     render(
       <OrganizationIntegrationsSettingsPageView
-        availableCards={[
-          {
-            targetKey: "openai-default",
-            integrationKind: "agent",
-            displayName: "OpenAI",
-            description: "Bring organization API access into Mistle.",
-            configStatus: "valid",
-            actionLabel: "Add",
-            onAction: () => {},
-          },
-          {
-            targetKey: "github-cloud",
-            integrationKind: "git",
-            displayName: "GitHub",
-            description: "Connect repository access and GitHub events.",
-            configStatus: "valid",
-            actionLabel: "Add",
-            onAction: () => {},
-          },
-        ]}
+        availableCards={[createOpenAiCard(), createGitHubCard()]}
         connectedCards={[]}
         loadErrorMessage={null}
       />,
@@ -179,27 +129,13 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
   it("hides integration directory sections when rendering a detail surface", () => {
     render(
       <OrganizationIntegrationsSettingsPageView
-        availableCards={[
-          {
-            targetKey: "openai-default",
-            integrationKind: "agent",
-            displayName: "OpenAI",
-            description: "Bring organization API access into Mistle.",
-            configStatus: "valid",
-            actionLabel: "Add",
-            onAction: () => {},
-          },
-        ]}
+        availableCards={[createOpenAiCard()]}
         connectedCards={[
-          {
+          createGitHubCard({
             targetKey: "github",
-            integrationKind: "git",
-            displayName: "GitHub",
             description: "1 connection",
-            configStatus: "valid",
             actionLabel: "View",
-            onAction: () => {},
-          },
+          }),
         ]}
         detailSurface={<div>GitHub connection detail</div>}
         loadErrorMessage={null}
@@ -211,3 +147,42 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
     expect(screen.getByRole("region", { name: "Integration detail" })).toBeTruthy();
   });
 });
+
+function createOpenAiCard(
+  input: Partial<OrganizationIntegrationsSettingsPageCard> = {},
+): OrganizationIntegrationsSettingsPageCard {
+  return createSettingsPageCard({
+    targetKey: "openai-default",
+    integrationKind: "agent",
+    displayName: "OpenAI",
+    description: "Bring organization API access into Mistle.",
+    ...input,
+  });
+}
+
+function createGitHubCard(
+  input: Partial<OrganizationIntegrationsSettingsPageCard> = {},
+): OrganizationIntegrationsSettingsPageCard {
+  return createSettingsPageCard({
+    targetKey: "github-cloud",
+    integrationKind: "git",
+    displayName: "GitHub",
+    description: "Connect repository access and GitHub events.",
+    ...input,
+  });
+}
+
+function createSettingsPageCard(
+  input: Pick<
+    OrganizationIntegrationsSettingsPageCard,
+    "description" | "displayName" | "integrationKind" | "targetKey"
+  > &
+    Partial<OrganizationIntegrationsSettingsPageCard>,
+): OrganizationIntegrationsSettingsPageCard {
+  return {
+    actionLabel: "Add",
+    configStatus: "valid",
+    onAction: () => {},
+    ...input,
+  };
+}
