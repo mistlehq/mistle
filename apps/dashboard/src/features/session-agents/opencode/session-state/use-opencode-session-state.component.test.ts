@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import type { OpenCodeProviderSummary } from "@mistle/integrations-definitions/agent-runtimes/opencode/client";
 import { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { createNodeSandboxSessionRuntime } from "@mistle/sandbox-session-client/node";
 import {
@@ -13,7 +14,11 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { type RawData, type WebSocket, WebSocketServer } from "ws";
 
-import { useOpenCodeSessionState } from "./use-opencode-session-state.js";
+import {
+  mapOpenCodeProvidersToComposerModels,
+  parseOpenCodePromptModelSelection,
+  useOpenCodeSessionState,
+} from "./use-opencode-session-state.js";
 
 type OpenCodeProxyRequest = {
   body?: unknown;
@@ -316,6 +321,75 @@ function createSessionResponse(id: string) {
   };
 }
 
+function createOpenCodeProviderCatalogResponse(): {
+  providers: readonly OpenCodeProviderSummary[];
+  default: Record<string, string>;
+} {
+  return {
+    providers: [
+      {
+        id: "openai",
+        name: "OpenAI",
+        source: "api",
+        env: [],
+        options: {},
+        models: {
+          "gpt-5": {
+            id: "gpt-5",
+            providerID: "openai",
+            api: {
+              id: "gpt-5",
+              url: "https://api.openai.com/v1",
+              npm: "@ai-sdk/openai",
+            },
+            name: "GPT-5",
+            capabilities: {
+              temperature: true,
+              reasoning: true,
+              attachment: true,
+              toolcall: true,
+              input: {
+                text: true,
+                audio: false,
+                image: true,
+                video: false,
+                pdf: false,
+              },
+              output: {
+                text: true,
+                audio: false,
+                image: false,
+                video: false,
+                pdf: false,
+              },
+              interleaved: false,
+            },
+            cost: {
+              input: 1,
+              output: 1,
+              cache: {
+                read: 0,
+                write: 0,
+              },
+            },
+            limit: {
+              context: 100_000,
+              output: 16_000,
+            },
+            status: "active",
+            options: {},
+            headers: {},
+            release_date: "2026-01-01",
+          },
+        },
+      },
+    ],
+    default: {
+      openai: "gpt-5",
+    },
+  };
+}
+
 function closeTransport(transport: SandboxSessionTransport): void {
   transport.disconnect();
 }
@@ -344,6 +418,16 @@ async function connectOpenCodeSessionForTest(input: {
       healthy: true,
       version: "1.14.41",
     },
+  });
+
+  const providersRequest = await input.server.nextRequest();
+  expect(providersRequest.request).toMatchObject({
+    method: "GET",
+    path: "/config/providers",
+  });
+  input.server.sendJsonResponse({
+    request: providersRequest,
+    body: createOpenCodeProviderCatalogResponse(),
   });
 
   const getSessionRequest = await input.server.nextRequest();
@@ -389,6 +473,42 @@ afterEach(async () => {
 });
 
 describe("useOpenCodeSessionState", () => {
+  it("parses OpenCode provider/model selections", () => {
+    expect(parseOpenCodePromptModelSelection("openai/gpt-5")).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5",
+    });
+    expect(parseOpenCodePromptModelSelection("openrouter/openai/gpt-5")).toEqual({
+      providerID: "openrouter",
+      modelID: "openai/gpt-5",
+    });
+    expect(() => parseOpenCodePromptModelSelection("gpt-5")).toThrow(
+      "OpenCode model selection must use provider/model format.",
+    );
+  });
+
+  it("maps OpenCode config providers to composer model options", () => {
+    expect(
+      mapOpenCodeProvidersToComposerModels({
+        providers: createOpenCodeProviderCatalogResponse().providers,
+        defaultModelByProvider: {
+          openai: "gpt-5",
+        },
+      }),
+    ).toEqual([
+      {
+        id: "openai/gpt-5",
+        model: "openai/gpt-5",
+        displayName: "OpenAI / GPT-5",
+        hidden: false,
+        defaultReasoningEffort: null,
+        inputModalities: ["text", "image"],
+        supportsPersonality: false,
+        isDefault: true,
+      },
+    ]);
+  });
+
   it("keeps lifecycle callbacks stable across rerenders", () => {
     const { result, rerender } = renderHook(() =>
       useOpenCodeSessionState({
@@ -477,6 +597,10 @@ describe("useOpenCodeSessionState", () => {
     act(() => {
       promptPromise = result.current.chat.sendPrompt({
         directory: "/workspace/selected-repo",
+        model: {
+          modelID: "gpt-5",
+          providerID: "openai",
+        },
         submittedPrompt: "Run tests",
       });
     });
@@ -486,6 +610,10 @@ describe("useOpenCodeSessionState", () => {
       method: "POST",
       path: "/session/ses_test/prompt_async?directory=%2Fworkspace%2Fselected-repo",
       body: {
+        model: {
+          modelID: "gpt-5",
+          providerID: "openai",
+        },
         parts: [
           {
             text: "Run tests",

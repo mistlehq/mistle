@@ -77,6 +77,20 @@ function readOpenCodeAuthContent(
   return authFile === undefined ? undefined : JSON.parse(authFile.content);
 }
 
+function readOpenCodeConfigContent(
+  compiled: CompileAgentRuntimeResult,
+  egressRoutes: ReadonlyArray<EgressCredentialRoute>,
+) {
+  const runtimeClients = renderRuntimeClients({
+    compiled,
+    egressRoutes,
+  });
+  const configFile = runtimeClients[0]?.setup.files.find(
+    (file) => file.fileId === "opencode_config",
+  );
+  return configFile === undefined ? undefined : JSON.parse(configFile.content);
+}
+
 function compileDefaultOpenCodeRuntime(): CompileAgentRuntimeResult {
   return compileOpenCodeRuntime({
     organizationId: "org_123",
@@ -437,6 +451,67 @@ describe("compileOpenCodeRuntime", () => {
 
     expect(rendered[0]?.setup.env).toEqual({});
     expect(rendered[0]?.setup.files.some((file) => file.fileId === "opencode_auth")).toBe(false);
+    expect(
+      rendered[0]?.setup.files.find((file) => file.fileId === "opencode_config")?.content,
+    ).toBe(
+      JSON.stringify(
+        {
+          server: {
+            hostname: "127.0.0.1",
+            port: 4511,
+            mdns: false,
+          },
+          enabled_providers: [],
+        },
+        null,
+        2,
+      ) + "\n",
+    );
+  });
+
+  it("constrains OpenCode providers to the compiled credential routes", () => {
+    expect(
+      readOpenCodeConfigContent(compileDefaultOpenCodeRuntime(), [
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_openai",
+          bindingId: "bind_openai",
+          familyId: "openai",
+          variantId: "openai-default",
+          host: "api.openai.com",
+          baseUrl: "https://api.openai.com",
+          secretType: "api_key",
+        }),
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_anthropic",
+          bindingId: "bind_anthropic",
+          familyId: "anthropic",
+          variantId: "anthropic-default",
+          host: "api.anthropic.com",
+          baseUrl: "https://api.anthropic.com",
+          secretType: "api_key",
+          authInjection: {
+            type: "header",
+            target: "x-api-key",
+          },
+        }),
+        createCompiledRoute({
+          egressRuleId: "egress_rule_bind_opencode_go",
+          bindingId: "bind_opencode_go",
+          familyId: "opencode",
+          variantId: "opencode-go",
+          host: "opencode.ai",
+          baseUrl: "https://opencode.ai/zen/go/v1",
+          secretType: "api_key",
+        }),
+      ]),
+    ).toEqual({
+      server: {
+        hostname: "127.0.0.1",
+        port: 4511,
+        mdns: false,
+      },
+      enabled_providers: ["anthropic", "openai", "opencode-go"],
+    });
   });
 
   it("renders OpenAI API auth file from proxied egress routes", () => {

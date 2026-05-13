@@ -431,12 +431,70 @@ describe("createOpenCodeSessionClient", () => {
     });
   });
 
+  it("lists the OpenCode config providers through the proxy", async () => {
+    const server = await startOpenCodeProxyTransportServer();
+    const client = await createConnectedClient(server);
+
+    const providersPromise = client.listConfigProviders({
+      directory: "/workspace/repo",
+    });
+    const request = await server.nextRequest();
+    server.sendJsonResponse({
+      request,
+      body: {
+        providers: [
+          {
+            id: "openai",
+            name: "OpenAI",
+            source: "api",
+            env: [],
+            options: {},
+            models: {
+              "gpt-5": {
+                id: "gpt-5",
+                providerID: "openai",
+                name: "GPT-5",
+              },
+            },
+          },
+        ],
+        default: {
+          openai: "gpt-5",
+        },
+      },
+    });
+
+    await expect(providersPromise).resolves.toMatchObject({
+      providers: [
+        {
+          id: "openai",
+          models: {
+            "gpt-5": {
+              name: "GPT-5",
+            },
+          },
+        },
+      ],
+      default: {
+        openai: "gpt-5",
+      },
+    });
+    expect(request.request).toMatchObject({
+      method: "GET",
+      path: "/config/providers?directory=%2Fworkspace%2Frepo",
+    });
+  });
+
   it("uses promptAsync for prompts and abort endpoint for interrupts", async () => {
     const server = await startOpenCodeProxyTransportServer();
     const client = await createConnectedClient(server);
 
     const promptPromise = client.sendPrompt({
       sessionId: "ses_test",
+      model: {
+        modelID: "gpt-5",
+        providerID: "openai",
+      },
       parts: [
         {
           text: "Implement this",
@@ -453,6 +511,10 @@ describe("createOpenCodeSessionClient", () => {
       method: "POST",
       path: "/session/ses_test/prompt_async",
       body: {
+        model: {
+          modelID: "gpt-5",
+          providerID: "openai",
+        },
         parts: [
           {
             text: "Implement this",

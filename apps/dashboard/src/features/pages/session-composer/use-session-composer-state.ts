@@ -672,6 +672,7 @@ export function useSessionComposerState(input: {
         composerStateInput.configControl.isUpdating ||
         composerStateInput.attachmentControl.isUploadingAttachments,
       showConfigControls: requiresModelSelection,
+      showReasoningControl: composerStateInput.configControl.canChangeReasoningEffort,
       onComposerTextChange: handleComposerTextChange,
       onSubmit: submitComposer,
       onSecondarySubmit: queuePrompt,

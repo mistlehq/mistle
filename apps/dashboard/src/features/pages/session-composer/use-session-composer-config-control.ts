@@ -122,3 +122,89 @@ export function useSessionComposerConfigControl(input: {
     setReasoningEffort,
   };
 }
+
+export function useLocalSessionComposerConfigControl(input: {
+  bootstrap: SessionBootstrapResult;
+  clearSessionErrorMessage: () => void;
+  canChangeReasoningEffort?: boolean;
+}): SessionComposerConfigControl {
+  const { availableModels, configSnapshot } = input.bootstrap.establishedSnapshot;
+  const [composerConfigOverrides, setComposerConfigOverrides] = useState<ComposerConfigSnapshot>({
+    model: null,
+    modelReasoningEffort: null,
+  });
+
+  const selectedModel = useMemo(
+    () =>
+      composerConfigOverrides.model ??
+      configSnapshot.model ??
+      resolveActiveComposerModel({
+        availableModels,
+        selectedModel: null,
+      })?.model ??
+      null,
+    [availableModels, composerConfigOverrides.model, configSnapshot.model],
+  );
+
+  const selectedReasoningEffort = useMemo(() => {
+    const explicitReasoningEffort =
+      composerConfigOverrides.modelReasoningEffort ?? configSnapshot.modelReasoningEffort;
+    if (explicitReasoningEffort !== null) {
+      return explicitReasoningEffort;
+    }
+
+    return (
+      resolveActiveComposerModel({
+        availableModels,
+        selectedModel,
+      })?.defaultReasoningEffort ?? null
+    );
+  }, [
+    availableModels,
+    composerConfigOverrides.modelReasoningEffort,
+    configSnapshot.modelReasoningEffort,
+    selectedModel,
+  ]);
+
+  const modelOptions = useMemo(
+    () =>
+      availableModels.map((model) => ({
+        value: model.model,
+        label: model.displayName,
+      })),
+    [availableModels],
+  );
+
+  const setModel = useCallback(
+    (nextModel: string): void => {
+      input.clearSessionErrorMessage();
+      setComposerConfigOverrides((currentConfig) => ({
+        model: nextModel,
+        modelReasoningEffort: currentConfig.modelReasoningEffort,
+      }));
+    },
+    [input.clearSessionErrorMessage],
+  );
+
+  const setReasoningEffort = useCallback(
+    (nextReasoningEffort: string): void => {
+      input.clearSessionErrorMessage();
+      setComposerConfigOverrides((currentConfig) => ({
+        model: currentConfig.model,
+        modelReasoningEffort: nextReasoningEffort,
+      }));
+    },
+    [input.clearSessionErrorMessage],
+  );
+
+  return {
+    selectedModel,
+    selectedReasoningEffort,
+    modelOptions,
+    canChangeModel: true,
+    canChangeReasoningEffort: input.canChangeReasoningEffort ?? true,
+    isUpdating: false,
+    setModel,
+    setReasoningEffort,
+  };
+}

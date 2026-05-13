@@ -1,7 +1,9 @@
+import type { CodexModelSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import {
   createOpenCodeSessionClient,
   type OpenCodeEvent,
   type OpenCodeEventSubscription,
+  type OpenCodeProviderSummary,
   type OpenCodePermissionResponseInput,
   type OpenCodeSessionClient,
   type OpenCodeSessionSummary,
@@ -9,6 +11,7 @@ import {
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
+import type { SessionBootstrapResult } from "../../codex/session-state/session-bootstrap/index.js";
 import {
   createInitialOpenCodeChatState,
   reduceOpenCodeChatState,
@@ -30,6 +33,11 @@ export type OpenCodeSessionSelection =
       sessionId: string;
     };
 
+export type OpenCodePromptModelSelection = {
+  modelID: string;
+  providerID: string;
+};
+
 export type OpenCodeSessionLifecycleState = {
   clearLifecycleErrorMessage: () => void;
   connectSession: (input: {
@@ -50,6 +58,7 @@ export type OpenCodeSessionLifecycleState = {
 };
 
 export type UseOpenCodeSessionStateResult = {
+  bootstrap: SessionBootstrapResult;
   chat: {
     abortSession: () => Promise<void>;
     canInterruptTurn: boolean;
@@ -62,7 +71,11 @@ export type UseOpenCodeSessionStateResult = {
     respondToPermission: (
       input: Omit<OpenCodePermissionResponseInput, "sessionId">,
     ) => Promise<void>;
-    sendPrompt: (input: { directory?: string; submittedPrompt: string }) => Promise<void>;
+    sendPrompt: (input: {
+      directory?: string;
+      model?: OpenCodePromptModelSelection;
+      submittedPrompt: string;
+    }) => Promise<void>;
   };
   lifecycle: OpenCodeSessionLifecycleState;
   sessionMessage: {
@@ -70,6 +83,11 @@ export type UseOpenCodeSessionStateResult = {
     reportSessionErrorMessage: (message: string) => void;
     sessionErrorMessage: string | null;
   };
+};
+
+const EmptyOpenCodeComposerConfig = {
+  model: null,
+  modelReasoningEffort: null,
 };
 
 export function resolveOpenCodeSessionSelection(input: {
@@ -96,6 +114,61 @@ export function resolveOpenCodeSessionSelection(input: {
   };
 }
 
+export function parseOpenCodePromptModelSelection(model: string): OpenCodePromptModelSelection {
+  const [providerID, ...modelIdParts] = model.split("/");
+  const modelID = modelIdParts.join("/");
+  if (providerID === undefined || providerID.trim().length === 0 || modelID.trim().length === 0) {
+    throw new Error("OpenCode model selection must use provider/model format.");
+  }
+
+  return {
+    providerID,
+    modelID,
+  };
+}
+
+function resolveOpenCodeModelInputModalities(
+  model: OpenCodeProviderSummary["models"][string],
+): readonly string[] {
+  const modalities: string[] = [];
+  if (model.capabilities.input.text) {
+    modalities.push("text");
+  }
+  if (model.capabilities.input.audio) {
+    modalities.push("audio");
+  }
+  if (model.capabilities.input.image) {
+    modalities.push("image");
+  }
+  if (model.capabilities.input.video) {
+    modalities.push("video");
+  }
+  if (model.capabilities.input.pdf) {
+    modalities.push("pdf");
+  }
+  return modalities;
+}
+
+export function mapOpenCodeProvidersToComposerModels(input: {
+  defaultModelByProvider: Record<string, string>;
+  providers: readonly OpenCodeProviderSummary[];
+}): readonly CodexModelSummary[] {
+  return input.providers.flatMap((provider) =>
+    Object.entries(provider.models)
+      .sort(([leftModelId], [rightModelId]) => leftModelId.localeCompare(rightModelId))
+      .map(([modelId, model]) => ({
+        id: `${provider.id}/${modelId}`,
+        model: `${provider.id}/${modelId}`,
+        displayName: `${provider.name} / ${model.name}`,
+        hidden: false,
+        defaultReasoningEffort: null,
+        inputModalities: resolveOpenCodeModelInputModalities(model),
+        supportsPersonality: false,
+        isDefault: input.defaultModelByProvider[provider.id] === modelId,
+      })),
+  );
+}
+
 export function useOpenCodeSessionState(input: {
   ensureTransportConnected: (input: { sandboxInstanceId: string }) => Promise<{
     sandboxInstanceId: string;
@@ -112,6 +185,10 @@ export function useOpenCodeSessionState(input: {
     useState<OpenCodeSessionLifecycleState["sessionConnectionState"]>("detached");
   const [lifecycleErrorMessage, setLifecycleErrorMessage] = useState<string | null>(null);
   const [sessionErrorMessage, setSessionErrorMessage] = useState<string | null>(null);
+  const [availableModels, setAvailableModels] = useState<readonly CodexModelSummary[]>([]);
+  const [bootstrapPhase, setBootstrapPhase] = useState<SessionBootstrapResult["phase"]>({
+    status: "unavailable",
+  });
   const [chatState, dispatchChatAction] = useReducer(
     reduceOpenCodeChatState,
     undefined,
@@ -147,6 +224,8 @@ export function useOpenCodeSessionState(input: {
     clearEventSubscription();
     clientRef.current?.close();
     clientRef.current = null;
+    setAvailableModels([]);
+    setBootstrapPhase({ status: "unavailable" });
     setSessionSnapshot(null);
     setSessionConnectionState("detached");
     setStep("idle");
@@ -196,6 +275,8 @@ export function useOpenCodeSessionState(input: {
       clearEventSubscription();
       clientRef.current?.close();
       clientRef.current = null;
+      setAvailableModels([]);
+      setBootstrapPhase({ status: "bootstrapping" });
       setStep("securing");
       setSessionConnectionState("connecting");
       setLifecycleErrorMessage(null);
@@ -217,6 +298,13 @@ export function useOpenCodeSessionState(input: {
           const targetSessionId =
             connectInput.targetSessionId ?? connectInput.targetThreadId ?? null;
           const directory = connectInput.initialCwd ?? undefined;
+          const providerCatalog = await client.listConfigProviders({
+            ...(directory === undefined ? {} : { directory }),
+          });
+          const composerModels = mapOpenCodeProvidersToComposerModels({
+            providers: providerCatalog.providers,
+            defaultModelByProvider: providerCatalog.default,
+          });
           const sessionSelection = resolveOpenCodeSessionSelection({
             targetSessionId,
             listedSessions:
@@ -292,6 +380,8 @@ export function useOpenCodeSessionState(input: {
             connectedAtIso: new Date().toISOString(),
             sandboxInstanceId: connectInput.sandboxInstanceId,
           });
+          setAvailableModels(composerModels);
+          setBootstrapPhase({ status: "ready" });
           setStep("connected");
           setSessionConnectionState("connected");
         } catch (error) {
@@ -301,6 +391,11 @@ export function useOpenCodeSessionState(input: {
           clearEventSubscription();
           clientRef.current?.close();
           clientRef.current = null;
+          setAvailableModels([]);
+          setBootstrapPhase({
+            status: "failed",
+            message: error instanceof Error ? error.message : "Could not connect OpenCode session.",
+          });
           setSessionSnapshot(null);
           setLifecycleErrorMessage(
             error instanceof Error ? error.message : "Could not connect OpenCode session.",
@@ -314,7 +409,11 @@ export function useOpenCodeSessionState(input: {
   );
 
   const sendPrompt = useCallback(
-    async (promptInput: { directory?: string; submittedPrompt: string }): Promise<void> => {
+    async (promptInput: {
+      directory?: string;
+      model?: OpenCodePromptModelSelection;
+      submittedPrompt: string;
+    }): Promise<void> => {
       const client = clientRef.current;
       const sessionId = sessionSnapshot?.activeSessionId ?? null;
       if (client === null || sessionId === null) {
@@ -329,6 +428,7 @@ export function useOpenCodeSessionState(input: {
         await client.sendPrompt({
           sessionId,
           ...(promptInput.directory === undefined ? {} : { directory: promptInput.directory }),
+          ...(promptInput.model === undefined ? {} : { model: promptInput.model }),
           parts: [
             {
               type: "text",
@@ -395,6 +495,13 @@ export function useOpenCodeSessionState(input: {
   );
 
   return {
+    bootstrap: {
+      phase: bootstrapPhase,
+      establishedSnapshot: {
+        availableModels,
+        configSnapshot: EmptyOpenCodeComposerConfig,
+      },
+    },
     lifecycle: {
       clearLifecycleErrorMessage,
       connectSession,

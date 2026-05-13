@@ -70,6 +70,7 @@ type OpenCodeConfig = {
     port: number;
     mdns: boolean;
   };
+  enabled_providers?: readonly string[];
 };
 
 type OpenCodeApiAuth = {
@@ -89,13 +90,36 @@ type OpenCodeAuth = OpenCodeApiAuth | OpenCodeOauthAuth;
 
 type OpenCodeAuthContent = Record<string, OpenCodeAuth>;
 
-function renderOpenCodeConfig(): string {
+function resolveOpenCodeEnabledProviders(input: {
+  egressRoutes: ReadonlyArray<EgressCredentialRoute>;
+}): readonly string[] {
+  const providers = new Set<string>();
+
+  for (const route of input.egressRoutes) {
+    if (isOpenAiApiRoute(route) || isOpenAiChatGptSubscriptionRoute(route)) {
+      providers.add("openai");
+    }
+
+    if (isAnthropicApiRoute(route)) {
+      providers.add("anthropic");
+    }
+
+    if (isOpenCodeGoRoute(route)) {
+      providers.add("opencode-go");
+    }
+  }
+
+  return [...providers].sort((left, right) => left.localeCompare(right));
+}
+
+function renderOpenCodeConfig(input?: { enabledProviders?: readonly string[] }): string {
   const config: OpenCodeConfig = {
     server: {
       hostname: OpenCodeServerListenHost,
       port: OpenCodeServerListenPort,
       mdns: false,
     },
+    ...(input?.enabledProviders === undefined ? {} : { enabled_providers: input.enabledProviders }),
   };
 
   return `${JSON.stringify(config, null, 2)}\n`;
@@ -190,6 +214,7 @@ function renderOpenCodeAuthContent(input: {
 
 function buildOpenCodeSetupFiles(input: {
   authContent: string | undefined;
+  enabledProviders?: readonly string[];
 }): ReadonlyArray<RuntimeClientSetupFile> {
   const files: RuntimeClientSetupFile[] = [
     {
@@ -197,7 +222,11 @@ function buildOpenCodeSetupFiles(input: {
       path: OpenCodeConfigPath,
       mode: 384,
       writeMode: "if-absent",
-      content: renderOpenCodeConfig(),
+      content: renderOpenCodeConfig(
+        input.enabledProviders === undefined
+          ? undefined
+          : { enabledProviders: input.enabledProviders },
+      ),
     },
     {
       fileId: "opencode_global_agents",
@@ -224,6 +253,7 @@ function buildOpenCodeSetupFiles(input: {
 function buildOpenCodeRuntimeClients(input: {
   openCodeCliInstallPath: string;
   authContent?: string;
+  enabledProviders?: readonly string[];
 }): ReadonlyArray<RuntimeClient> {
   return [
     {
@@ -232,6 +262,9 @@ function buildOpenCodeRuntimeClients(input: {
         env: {},
         files: buildOpenCodeSetupFiles({
           authContent: input.authContent,
+          ...(input.enabledProviders === undefined
+            ? {}
+            : { enabledProviders: input.enabledProviders }),
         }),
       },
       processes: [
@@ -321,10 +354,14 @@ export function compileOpenCodeRuntime(
       const authContent = renderOpenCodeAuthContent({
         egressRoutes,
       });
+      const enabledProviders = resolveOpenCodeEnabledProviders({
+        egressRoutes,
+      });
 
       return buildOpenCodeRuntimeClients({
         openCodeCliInstallPath,
         ...(authContent === undefined ? {} : { authContent }),
+        enabledProviders,
       });
     },
     agentRuntimes: [

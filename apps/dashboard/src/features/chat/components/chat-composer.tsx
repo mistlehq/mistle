@@ -108,6 +108,7 @@ export type ChatComposerViewModel = {
   isUploadingAttachments: boolean;
   configControlsDisabled: boolean;
   showConfigControls?: boolean;
+  showReasoningControl?: boolean;
   onComposerTextChange: (value: string) => void;
   onSubmit: () => void;
   onSecondarySubmit?: () => void;
@@ -138,6 +139,7 @@ export function ChatComposer({
   isUploadingAttachments,
   configControlsDisabled,
   showConfigControls = true,
+  showReasoningControl = true,
   onComposerTextChange,
   onSubmit,
   onSecondarySubmit,
@@ -328,35 +330,37 @@ export function ChatComposer({
                   </SelectContent>
                 </Select>
 
-                <Select
-                  disabled={configControlsDisabled}
-                  onValueChange={(value) => {
-                    if (value === null) {
-                      return;
-                    }
-                    onReasoningEffortChange(value);
-                  }}
-                  value={selectedReasoningEffortValue}
-                >
-                  <SelectTrigger
-                    aria-label="Reasoning switcher"
-                    className="text-muted-foreground h-8 w-full min-w-0 border-0 bg-transparent px-2 shadow-none hover:bg-muted/60 md:w-fit md:px-2.5 data-[state=open]:bg-muted/70"
-                    size="sm"
+                {showReasoningControl ? (
+                  <Select
+                    disabled={configControlsDisabled}
+                    onValueChange={(value) => {
+                      if (value === null) {
+                        return;
+                      }
+                      onReasoningEffortChange(value);
+                    }}
+                    value={selectedReasoningEffortValue}
                   >
-                    <SelectValue className="text-muted-foreground" placeholder="Reasoning">
-                      {selectedReasoningEffortValue === null
-                        ? "Reasoning"
-                        : formatReasoningEffortLabel(selectedReasoningEffortValue)}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {REASONING_EFFORT_OPTIONS.map((reasoningOption) => (
-                      <SelectItem key={reasoningOption} value={reasoningOption}>
-                        {formatReasoningEffortLabel(reasoningOption)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                    <SelectTrigger
+                      aria-label="Reasoning switcher"
+                      className="text-muted-foreground h-8 w-full min-w-0 border-0 bg-transparent px-2 shadow-none hover:bg-muted/60 md:w-fit md:px-2.5 data-[state=open]:bg-muted/70"
+                      size="sm"
+                    >
+                      <SelectValue className="text-muted-foreground" placeholder="Reasoning">
+                        {selectedReasoningEffortValue === null
+                          ? "Reasoning"
+                          : formatReasoningEffortLabel(selectedReasoningEffortValue)}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {REASONING_EFFORT_OPTIONS.map((reasoningOption) => (
+                        <SelectItem key={reasoningOption} value={reasoningOption}>
+                          {formatReasoningEffortLabel(reasoningOption)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : null}
               </>
             ) : null}
           </div>
