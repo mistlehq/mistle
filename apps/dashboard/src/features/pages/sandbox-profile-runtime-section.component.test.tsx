@@ -198,6 +198,60 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(screen.queryByText("E2B (Managed)")).toBeNull();
   });
 
+  it("renders read-only inline runtime settings with the same row labels as the draft view", () => {
+    render(
+      <SandboxProfileRuntimeSection
+        availableConnections={[
+          {
+            id: "icn_e2b_runtime_test",
+            displayName: "E2B Production",
+            targetKey: "e2b-default",
+            status: "active",
+            config: {},
+          },
+        ]}
+        availableTargets={[
+          {
+            targetKey: "e2b-default",
+            displayName: "E2B",
+            familyId: "e2b",
+            variantId: "e2b-default",
+            config: {},
+            targetHealth: {
+              configStatus: "valid",
+            },
+          },
+        ]}
+        disabled={false}
+        isDraft={false}
+        providers={[DockerProvider, E2BProvider]}
+        sectionChrome={false}
+        version={createVersion({
+          sandboxProvider: "e2b",
+          sandboxConnectionId: "icn_e2b_runtime_test",
+          sandboxResources: {
+            vcpuCount: 2,
+            memoryMb: 4096,
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Agent")).toBeTruthy();
+    expect(screen.getByText("Codex")).toBeTruthy();
+    expect(screen.getByText("Sandbox Runtime")).toBeTruthy();
+    expect(screen.queryByText("Provider")).toBeNull();
+    expect(screen.getByText("Credentials")).toBeTruthy();
+    expect(screen.getByText("Use workspace API key")).toBeTruthy();
+    expect(screen.getByText("Connection")).toBeTruthy();
+    expect(screen.getByText("E2B Production")).toBeTruthy();
+    expect(screen.getByText("CPU")).toBeTruthy();
+    expect(screen.getByText("2 vCPU")).toBeTruthy();
+    expect(screen.getByText("Memory (MB)")).toBeTruthy();
+    expect(screen.getByText("4096 MB")).toBeTruthy();
+    expect(screen.queryByText("Resources")).toBeNull();
+  });
+
   it("requires BYOK credentials for a non-managed provider without a saved connection", () => {
     render(
       <MemoryRouter>

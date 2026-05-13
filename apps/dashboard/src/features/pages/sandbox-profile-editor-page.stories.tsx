@@ -31,6 +31,13 @@ export const Published: Story = {
   },
 };
 
+export const PublishedOrganizationE2BRuntime: Story = {
+  args: {
+    lifecycleState: "published",
+    runtimeState: "e2b-connection",
+  },
+};
+
 export const ManagedE2BRuntime: Story = {
   args: {
     runtimeState: "e2b-managed",
