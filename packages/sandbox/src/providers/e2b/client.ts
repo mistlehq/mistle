@@ -11,6 +11,7 @@ import {
   TemplateError,
   type ConnectionOpts,
 } from "e2b";
+import { z } from "zod";
 
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
 import { SandboxInspectDispositions, SandboxInspectStates } from "../../types.js";
@@ -53,6 +54,7 @@ import type { E2BSandboxInspectResult } from "./types.js";
 
 const InitCommand = "/opt/mistle/bin/sandboxd init";
 const DetachedInitCommand = "/opt/mistle/bin/sandboxd init --detach";
+const WaitInitCommand = "/opt/mistle/bin/sandboxd wait-init";
 const ResumeCommand = "/opt/mistle/bin/sandboxd resume";
 const StartDaemonCommand = "/usr/bin/tini -s -- /opt/mistle/bin/sandboxd";
 const DaemonSocketPath = "/run/mistle/sandboxd/control.sock";
@@ -66,6 +68,10 @@ const E2BTransientRetryDelayMs = 1_000;
 const E2BCreateSandboxTemplateReadinessRetryAttempts = 10;
 const E2BCreateSandboxTemplateReadinessRetryDelayMs = 1_000;
 const E2BTemplateLockDirectoryEnvVar = "MISTLE_SANDBOX_E2B_TEMPLATE_LOCK_DIR";
+const StartupInitResponseSchema = z.discriminatedUnion("ok", [
+  z.object({ ok: z.literal(true) }),
+  z.object({ ok: z.literal(false), error: z.string() }),
+]);
 export type E2BStartSandboxResponse = {
   sandboxId: string;
 };
@@ -85,6 +91,7 @@ export interface E2BClient {
   destroySandbox(request: E2BDestroySandboxRequest): Promise<void>;
   beginInit(request: E2BInitRequest): Promise<void>;
   init(request: E2BInitRequest): Promise<void>;
+  waitInit(request: Omit<E2BInitRequest, "payload">): Promise<void>;
   resume(request: E2BInitRequest): Promise<void>;
   runCommand(request: {
     sandboxId: string;
@@ -365,6 +372,18 @@ export function createE2BStartupCommandOptions(env?: Readonly<Record<string, str
   };
 }
 
+function createE2BStartupResponseCommandOptions(env?: Readonly<Record<string, string>>): {
+  envs?: Record<string, string>;
+  timeoutMs: 0;
+  user: "root";
+} {
+  return {
+    ...(env === undefined ? {} : { envs: withRequiredSandboxRuntimeEnv(env) }),
+    timeoutMs: E2BCommandTimeoutDisabledMs,
+    user: "root",
+  };
+}
+
 export class E2BApiClient implements E2BClient {
   readonly #connectionOptions: ConnectionOpts;
   readonly #startRateLimiter: E2BStartRateLimiter;
@@ -575,6 +594,33 @@ export class E2BApiClient implements E2BClient {
     }
   }
 
+  async waitInit(request: Omit<E2BInitRequest, "payload">): Promise<void> {
+    const parsedRequest = E2BInitRequestSchema.omit({ payload: true }).parse(request);
+
+    try {
+      const sandbox = await runE2BOperationWithTransientRetries({
+        operation: E2BClientOperationIds.INIT,
+        run: async () => Sandbox.connect(parsedRequest.sandboxId, this.#connectionOptions),
+      });
+      await this.#ensureDaemonReady(sandbox, parsedRequest.env);
+      await this.#runCommandAndValidateStartupResponse(sandbox, {
+        command: WaitInitCommand,
+        ...(parsedRequest.env === undefined ? {} : { env: parsedRequest.env }),
+        commandDescription: "E2B sandbox wait-init command",
+      });
+    } catch (error) {
+      if (error instanceof CommandExitError) {
+        throw createCommandExitError({
+          operation: E2BClientOperationIds.INIT,
+          error,
+          commandDescription: "E2B sandbox wait-init command",
+        });
+      }
+
+      throw mapE2BClientError(E2BClientOperationIds.INIT, error);
+    }
+  }
+
   async resume(request: E2BInitRequest): Promise<void> {
     const parsedRequest = E2BInitRequestSchema.parse(request);
 
@@ -668,6 +714,38 @@ export class E2BApiClient implements E2BClient {
     } catch (error) {
       await handle.kill().catch(() => undefined);
       throw error;
+    }
+  }
+
+  async #runCommandAndValidateStartupResponse(
+    sandbox: Sandbox,
+    input: {
+      command: string;
+      env?: Readonly<Record<string, string>>;
+      commandDescription: string;
+    },
+  ): Promise<void> {
+    const result = await runE2BOperationWithTransientRetries({
+      operation: E2BClientOperationIds.INIT,
+      run: async () =>
+        sandbox.commands.run(input.command, {
+          ...createE2BStartupResponseCommandOptions(input.env),
+        }),
+    });
+    const parsedResponse = StartupInitResponseSchema.safeParse(JSON.parse(result.stdout));
+    if (!parsedResponse.success) {
+      throw createUnknownClientError({
+        operation: E2BClientOperationIds.INIT,
+        message: `${input.commandDescription} returned an invalid response: ${parsedResponse.error.message}`,
+        cause: parsedResponse.error,
+      });
+    }
+    if (!parsedResponse.data.ok) {
+      throw createUnknownClientError({
+        operation: E2BClientOperationIds.INIT,
+        message: `${input.commandDescription} failed: ${parsedResponse.data.error}`,
+        cause: parsedResponse.data.error,
+      });
     }
   }
 

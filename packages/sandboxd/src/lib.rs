@@ -41,6 +41,7 @@ pub mod supervision;
 pub mod test_support;
 pub mod time;
 pub mod tunnel;
+pub mod wait_init;
 
 use crate::time::ThreadSleeper;
 
@@ -73,6 +74,7 @@ pub enum SandboxdCommand {
     Resume,
     Sign,
     Version,
+    WaitInit,
 }
 
 /// Describes why CLI argument parsing failed before any command-specific work ran.
@@ -90,7 +92,7 @@ impl fmt::Display for ParseSandboxdCommandError {
             }
             Self::UnknownCommand(command) => write!(
                 f,
-                "unknown sandboxd subcommand '{command}' (expected 'init', 'resume', or 'version')"
+                "unknown sandboxd subcommand '{command}' (expected 'init', 'resume', 'wait-init', or 'version')"
             ),
         }
     }
@@ -122,6 +124,7 @@ where
             return Ok(SandboxdCommand::Init { detach });
         }
         "resume" => SandboxdCommand::Resume,
+        "wait-init" => SandboxdCommand::WaitInit,
         "version" => SandboxdCommand::Version,
         _ => {
             return Err(ParseSandboxdCommandError::UnknownCommand(command));
@@ -211,6 +214,13 @@ where
             Ok(()) => 0,
             Err(_) => 1,
         },
+        SandboxdCommand::WaitInit => {
+            match wait_init::run_wait_init(stdout, Path::new(control::DEFAULT_CONTROL_SOCKET_PATH))
+            {
+                Ok(()) => 0,
+                Err(_) => 1,
+            }
+        }
         SandboxdCommand::Version => match writeln!(stdout, "{}", env!("CARGO_PKG_VERSION")) {
             Ok(()) => 0,
             Err(error) => {
@@ -273,6 +283,13 @@ mod tests {
         let command = parse_sandboxd_command(["resume"]);
 
         assert_eq!(command, Ok(SandboxdCommand::Resume));
+    }
+
+    #[test]
+    fn parses_wait_init() {
+        let command = parse_sandboxd_command(["wait-init"]);
+
+        assert_eq!(command, Ok(SandboxdCommand::WaitInit));
     }
 
     #[test]

@@ -21,7 +21,7 @@ import { markSandboxInstanceFailed } from "./mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "./mark-sandbox-instance-running.js";
 import { persistSandboxInstanceProvisioning } from "./persist-sandbox-instance-provisioning.js";
 import { SandboxExecutionModes, SandboxStartupModes } from "./sandbox-startup-input.js";
-import { startSandbox } from "./start-sandbox.js";
+import { createSandboxRuntimeEnv, startSandbox } from "./start-sandbox.js";
 import { waitForSandboxBootstrapAttachment } from "./wait-for-sandbox-bootstrap-attachment.js";
 import { waitForSandboxRuntimeReadiness } from "./wait-for-sandbox-runtime-readiness.js";
 
@@ -823,6 +823,46 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           failureCode: StartSandboxFailureCodes.SANDBOX_STORAGE_ATTACH_FAILED,
           failureMessage: formatPersistedFailureMessage({
             summary: "Sandbox storage attach failed after bootstrap attachment.",
+            error,
+          }),
+        });
+        throw error;
+      }
+    }
+
+    if (waitForPostStartStorageAttach) {
+      try {
+        await step.run({ name: "wait-for-sandbox-runtime-initialization" }, async () => {
+          logger.info("Waiting for sandbox runtime initialization after storage attach.");
+          const resolvedRuntime =
+            await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+          await resolvedRuntime.sandboxRuntimeControl.waitInit({
+            id: startedSandbox.providerSandboxId,
+            env: createSandboxRuntimeEnv({
+              config: ctx.config,
+              sandboxInstanceId: workflowInput.sandboxInstanceId,
+              waitForStorageAttach: waitForPostStartStorageAttach,
+            }),
+          });
+        });
+        logger.info("Sandbox runtime initialization completed after storage attach.");
+      } catch (error) {
+        rethrowDurableStepErrorForRetry(error);
+        logger.error({ err: error }, "Sandbox runtime initialization failed after storage attach.");
+        await emitStartupDiagnostics({
+          providerSandboxId: startedSandbox.providerSandboxId,
+          sandboxInstanceId: startedSandbox.sandboxInstanceId,
+          runtimeProvider: startedSandbox.runtimeProvider,
+          persistenceMode: workflowInput.persistenceMode,
+        });
+        await handleFailedStartup({
+          sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
+          persistenceMode: workflowInput.persistenceMode,
+          runtimeProvider: startedSandbox.runtimeProvider,
+          providerSandboxId: startedSandbox.providerSandboxId,
+          failureCode: StartSandboxFailureCodes.SANDBOX_INIT_FAILED,
+          failureMessage: formatPersistedFailureMessage({
+            summary: "Sandbox runtime initialization failed after storage attach.",
             error,
           }),
         });

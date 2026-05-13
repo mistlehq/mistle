@@ -231,6 +231,8 @@ enum ControlRequest {
     },
     #[serde(rename = "resume")]
     Resume { startup_input: StartupInput },
+    #[serde(rename = "waitInit")]
+    WaitInit,
     #[serde(rename = "sign")]
     Sign { sign_request: ControlSignRequest },
 }
@@ -528,6 +530,11 @@ pub fn submit_resume(socket_path: &Path, startup_input: &StartupInput) -> Result
             startup_input: startup_input.clone(),
         },
     )
+}
+
+/// Waits for the in-flight daemon initialization thread to complete.
+pub fn submit_wait_init(socket_path: &Path) -> Result<(), ControlError> {
+    submit_startup_request(socket_path, ControlRequest::WaitInit)
 }
 
 /// Submits one signing request to the running daemon over the local control socket.
@@ -849,6 +856,10 @@ fn handle_connection(
         }
         ControlRequest::Resume { startup_input } => {
             begin_resume(startup_input, state)?;
+            Ok(None)
+        }
+        ControlRequest::WaitInit => {
+            join_init_thread(init_thread)?;
             Ok(None)
         }
         ControlRequest::Sign { sign_request } => begin_sign(sign_request, state).map(Some),

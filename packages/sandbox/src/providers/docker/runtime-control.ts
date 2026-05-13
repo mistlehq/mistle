@@ -25,6 +25,7 @@ import type { DockerSandboxConfig } from "./config.js";
 
 const InitCommand = ["/opt/mistle/bin/sandboxd", "init"];
 const DetachedInitCommand = ["/opt/mistle/bin/sandboxd", "init", "--detach"];
+const WaitInitCommand = ["/opt/mistle/bin/sandboxd", "wait-init"];
 const VersionCommand = ["/opt/mistle/bin/sandboxd", "version"];
 const EnsureSandboxdCommand = ["sh", "-euc", SandboxdInstallCommand];
 const DockerExecExitPollIntervalMs = 50;
@@ -227,6 +228,32 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
       command: InitCommand,
       waitForCompletion: true,
     });
+  }
+
+  async waitInit(input: { id: string; env?: Readonly<Record<string, string>> }): Promise<void> {
+    if (input.id.trim().length === 0) {
+      throw new SandboxConfigurationError("Sandbox id is required.");
+    }
+
+    try {
+      await this.#runExecCommand({
+        id: input.id,
+        operation: DockerClientOperationIds.INIT,
+        command: WaitInitCommand,
+        ...(input.env === undefined ? {} : { env: input.env }),
+        failureDescription: "Docker sandbox wait-init command",
+      });
+    } catch (error) {
+      if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
+        throw new SandboxResourceNotFoundError({
+          resourceType: "sandbox",
+          resourceId: input.id,
+          cause: error,
+        });
+      }
+
+      throw error;
+    }
   }
 
   async #runInitCommand(
