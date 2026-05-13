@@ -53,11 +53,6 @@ type IntegrationChoice = {
   title: React.ReactNode;
 };
 
-type IntegrationNameItem = {
-  logoKey: string | undefined;
-  title: React.ReactNode;
-};
-
 type GitConnectionChoice = {
   id: string;
   displayName: string;
@@ -131,17 +126,20 @@ function RuntimeSettingLabel(input: { children: React.ReactNode }): React.JSX.El
   );
 }
 
-function IntegrationNameCell(input: { item: IntegrationNameItem }): React.JSX.Element {
+function IntegrationNameCell(input: {
+  logoKey: string | undefined;
+  title: React.ReactNode;
+}): React.JSX.Element {
   return (
     <div className={`${SandboxProfileIntegrationCellContentClassName} gap-2 text-sm`}>
-      {input.item.logoKey === undefined ? null : (
+      {input.logoKey === undefined ? null : (
         <img
           alt=""
           className="h-5 w-5 rounded-sm"
-          src={resolveIntegrationLogoPath({ logoKey: input.item.logoKey })}
+          src={resolveIntegrationLogoPath({ logoKey: input.logoKey })}
         />
       )}
-      <div className="min-w-0 truncate font-medium">{input.item.title}</div>
+      <div className="min-w-0 truncate font-medium">{input.title}</div>
     </div>
   );
 }
@@ -231,9 +229,7 @@ function GitConnectionSelectionCell(input: {
         <p className="text-sm">None</p>
       </div>
     ) : (
-      <IntegrationNameCell
-        item={{ logoKey: selectedChoice.logoKey, title: selectedChoice.displayName }}
-      />
+      <IntegrationNameCell logoKey={selectedChoice.logoKey} title={selectedChoice.displayName} />
     );
   }
 
@@ -258,7 +254,8 @@ function GitConnectionSelectionCell(input: {
             "None"
           ) : (
             <IntegrationNameCell
-              item={{ logoKey: selectedChoice.logoKey, title: selectedChoice.displayName }}
+              logoKey={selectedChoice.logoKey}
+              title={selectedChoice.displayName}
             />
           )}
         </SelectValue>
@@ -791,7 +788,10 @@ export function SandboxProfileIntegrationsSetupSection(
                       {agentIntegrationChoice === undefined ? (
                         <RuntimeSettingLabel>OpenAI</RuntimeSettingLabel>
                       ) : (
-                        <IntegrationNameCell item={agentIntegrationChoice} />
+                        <IntegrationNameCell
+                          logoKey={agentIntegrationChoice.logoKey}
+                          title={agentIntegrationChoice.title}
+                        />
                       )}
                     </ResponsiveFieldListCell>
                     <ResponsiveFieldListCell columnKey="proxied-connection">
@@ -847,10 +847,8 @@ export function SandboxProfileIntegrationsSetupSection(
                             <UnresolvedIntegrationCell title={presentation.title} />
                           ) : (
                             <IntegrationNameCell
-                              item={{
-                                logoKey: presentation.logoKey,
-                                title: presentation.title,
-                              }}
+                              logoKey={presentation.logoKey}
+                              title={presentation.title}
                             />
                           )}
                         </ResponsiveFieldListCell>

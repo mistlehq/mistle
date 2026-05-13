@@ -1877,9 +1877,7 @@ describe("SandboxProfileEditorPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Sandbox Profile" }));
 
     expect(
-      screen.queryByText(
-        "Choose a Git provider in Integrations before selecting repository resources.",
-      ),
+      screen.queryByText("Choose a Git connection before selecting repository resources."),
     ).toBeNull();
   });
 
@@ -1947,9 +1945,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.queryByText("Loading integrations and resources...")).toBeNull();
     expect(screen.queryByText("Loading integrations...")).toBeNull();
     expect(
-      screen.queryByText(
-        "Choose a Git provider in Integrations before selecting repository resources.",
-      ),
+      screen.queryByText("Choose a Git connection before selecting repository resources."),
     ).toBeNull();
   });
 
