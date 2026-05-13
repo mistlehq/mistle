@@ -151,6 +151,17 @@ export function createRuntimePublicAccessProxyPoolKey(input: { tunnelId: string 
   return `runtime-public-access:${input.tunnelId}`;
 }
 
+export function createRuntimePublicAccessRouteStatePath(input: {
+  coordinatorDir: string;
+  tunnelId: string;
+}): string {
+  return join(
+    input.coordinatorDir,
+    "runtime-public-access-routes",
+    `${encodeURIComponent(input.tunnelId)}.json`,
+  );
+}
+
 export function normalizeRuntimePublicAccessHostnames(
   publicHostnames: readonly string[],
 ): readonly string[] {
@@ -185,6 +196,11 @@ async function startRuntimePublicAccessProxy(input: {
   const scriptPath = join(workDirectoryPath, "proxy.mjs");
   const readyPath = join(workDirectoryPath, "ready.json");
   const logPath = join(workDirectoryPath, "proxy.log");
+  const routeStatePath = createRuntimePublicAccessRouteStatePath({
+    coordinatorDir: input.coordinatorDir,
+    tunnelId: input.tunnelId,
+  });
+  await mkdir(join(input.coordinatorDir, "runtime-public-access-routes"), { recursive: true });
   await writeFile(scriptPath, createRuntimePublicAccessProxyScript(), "utf8");
   const proxyPort = await reserveAvailablePort({
     host: RuntimePublicAccessProxyHost,
@@ -202,6 +218,7 @@ async function startRuntimePublicAccessProxy(input: {
       MISTLE_RUNTIME_PUBLIC_ACCESS_OWNER_PID: String(input.ownerPid),
       MISTLE_RUNTIME_PUBLIC_ACCESS_READY_PATH: readyPath,
       MISTLE_RUNTIME_PUBLIC_ACCESS_LOG_PATH: logPath,
+      MISTLE_RUNTIME_PUBLIC_ACCESS_ROUTE_STATE_PATH: routeStatePath,
       MISTLE_RUNTIME_PUBLIC_ACCESS_PROXY_PORT: String(proxyPort),
       MISTLE_RUNTIME_PUBLIC_ACCESS_CLOUDFLARED_IMAGE: CloudflaredImageReference,
       MISTLE_RUNTIME_PUBLIC_ACCESS_TUNNEL_LABEL: RuntimePublicAccessTunnelLabel,
@@ -246,6 +263,7 @@ async function startRuntimePublicAccessProxy(input: {
       metadata: {
         logPath,
         proxyPort: String(proxyPort),
+        routeStatePath,
         workDirectoryPath,
       },
       stop: async () => {
@@ -827,7 +845,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { createWriteStream } from "node:fs";
 import http from "node:http";
 import net from "node:net";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -845,6 +863,8 @@ if (!Number.isSafeInteger(ownerPid) || ownerPid <= 0) {
 }
 const readyPath = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_READY_PATH");
 const logPath = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_LOG_PATH");
+const routeStatePath = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_ROUTE_STATE_PATH");
+const routeStateLockPath = routeStatePath + ".lock";
 const cloudflaredImage = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_CLOUDFLARED_IMAGE");
 const tunnelLabel = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_TUNNEL_LABEL");
 const publicHostnames = JSON.parse(readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_PUBLIC_HOSTNAMES"));
@@ -859,7 +879,7 @@ if (!Number.isSafeInteger(proxyPort) || proxyPort <= 0) {
 const logStream = createWriteStream(logPath, { flags: "a" });
 const routes = new Map();
 const recentUpgradeFailures = [];
-const server = http.createServer(handleRequest);
+const server = http.createServer(dispatchRequest);
 server.on("upgrade", handleUpgrade);
 server.once("error", (error) => {
   startupFailed(error);
@@ -873,6 +893,7 @@ server.listen(proxyPort, "0.0.0.0", async () => {
 
   const proxyBaseUrl = "http://127.0.0.1:" + String(address.port);
   try {
+    await loadRoutes();
     await startCloudflared(proxyBaseUrl);
     await writeFile(readyPath, JSON.stringify({ baseUrl: proxyBaseUrl }), "utf8");
   } catch (error) {
@@ -923,6 +944,16 @@ function formatUnknownError(error) {
   return error instanceof Error ? error.stack ?? error.message : String(error);
 }
 
+function dispatchRequest(request, response) {
+  void handleRequest(request, response).catch((error) => {
+    logStream.write("runtime public access proxy request failed: " + formatUnknownError(error) + "\n");
+    if (!response.headersSent) {
+      response.writeHead(500);
+    }
+    response.end("Runtime public access proxy request failed.");
+  });
+}
+
 async function handleRequest(request, response) {
   if (request.url === "/__healthz") {
     response.writeHead(200, { "content-type": "application/json" });
@@ -946,15 +977,19 @@ async function handleRequest(request, response) {
       return;
     }
 
-    for (const route of parsed.routes) {
-      if (typeof route !== "object" || route === null || typeof route.publicHostname !== "string" || typeof route.localBaseUrl !== "string") {
-        response.writeHead(400);
-        response.end("Invalid route payload.");
-        return;
-      }
-      routes.set(createRouteKey(route.publicHostname, parsed.environmentId), route.localBaseUrl);
+    if (parsed.routes.some((route) => typeof route !== "object" || route === null || typeof route.publicHostname !== "string" || typeof route.localBaseUrl !== "string")) {
+      response.writeHead(400);
+      response.end("Invalid route payload.");
+      return;
     }
-    logStream.write("registered runtime public access routes environmentId=" + parsed.environmentId + " routeCount=" + String(parsed.routes.length) + " totalRouteCount=" + String(routes.size) + "\n");
+    await mutateRoutes(async () => {
+      await loadRoutes();
+      for (const route of parsed.routes) {
+        routes.set(createRouteKey(route.publicHostname, parsed.environmentId), route.localBaseUrl);
+      }
+      await persistRoutes();
+      logStream.write("registered runtime public access routes environmentId=" + parsed.environmentId + " routeCount=" + String(parsed.routes.length) + " totalRouteCount=" + String(routes.size) + "\n");
+    });
     response.writeHead(204);
     response.end();
     return;
@@ -964,19 +999,23 @@ async function handleRequest(request, response) {
     const body = await readBody(request);
     const parsed = JSON.parse(body);
     if (typeof parsed === "object" && parsed !== null && typeof parsed.environmentId === "string") {
-      for (const key of routes.keys()) {
-        if (key.endsWith(":" + parsed.environmentId)) {
-          routes.delete(key);
+      await mutateRoutes(async () => {
+        await loadRoutes();
+        for (const key of routes.keys()) {
+          if (key.endsWith(":" + parsed.environmentId)) {
+            routes.delete(key);
+          }
         }
-      }
-      logStream.write("unregistered runtime public access routes environmentId=" + parsed.environmentId + " totalRouteCount=" + String(routes.size) + "\n");
+        await persistRoutes();
+        logStream.write("unregistered runtime public access routes environmentId=" + parsed.environmentId + " totalRouteCount=" + String(routes.size) + "\n");
+      });
     }
     response.writeHead(204);
     response.end();
     return;
   }
 
-  const target = resolveTarget(request);
+  const target = await resolveTarget(request);
   if (target === undefined) {
     response.writeHead(404);
     response.end("No runtime public access route registered.");
@@ -1003,7 +1042,22 @@ async function handleRequest(request, response) {
 }
 
 function handleUpgrade(request, socket, head) {
-  const target = resolveTarget(request);
+  void handleUpgradeRequest(request, socket, head).catch((error) => {
+    const routeContext = readRouteContext(request);
+    recordUpgradeFailure({
+      reason: "proxy_error",
+      host: routeContext.host,
+      environmentId: routeContext.environmentId,
+      requestUrl: request.url ?? "",
+      errorName: error instanceof Error ? error.name : "Error",
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    endSocketResponse(socket, 500, "Internal Server Error", "Runtime public access upgrade failed.");
+  });
+}
+
+async function handleUpgradeRequest(request, socket, head) {
+  const target = await resolveTarget(request);
   if (target === undefined) {
     const routeContext = readRouteContext(request);
     recordUpgradeFailure({
@@ -1074,6 +1128,7 @@ function recordUpgradeFailure(event) {
 }
 
 async function buildDiagnostics() {
+  await loadRoutes();
   const routeDiagnostics = await Promise.all(
     Array.from(routes.entries()).map(async ([key, localBaseUrl]) => {
       const separatorIndex = key.lastIndexOf(":");
@@ -1101,10 +1156,88 @@ async function buildDiagnostics() {
     cloudflaredContainer: readCloudflaredContainerDiagnostics(),
     proxyLogTail: await readFileTail(logPath, DiagnosticsLogTailBytes),
     cloudflaredDockerLogTail: readCloudflaredDockerLogTail(),
+    routeStatePath,
     routeCount: routes.size,
     recentUpgradeFailures,
     routes: routeDiagnostics,
   };
+}
+
+async function mutateRoutes(callback) {
+  await withRouteStateLock(callback);
+}
+
+async function withRouteStateLock(callback) {
+  const deadline = Date.now() + 30_000;
+  let lockAcquired = false;
+  while (!lockAcquired) {
+    try {
+      await mkdir(routeStateLockPath);
+      lockAcquired = true;
+    } catch (error) {
+      if (typeof error !== "object" || error === null || error.code !== "EEXIST") {
+        throw error;
+      }
+      if (Date.now() >= deadline) {
+        throw new Error("Timed out waiting for runtime public access route state lock.", {
+          cause: error,
+        });
+      }
+      await sleep(50);
+    }
+  }
+
+  try {
+    return await callback();
+  } finally {
+    await rm(routeStateLockPath, { recursive: true, force: true });
+  }
+}
+
+async function loadRoutes() {
+  let content;
+  try {
+    content = await readFile(routeStatePath, "utf8");
+  } catch (error) {
+    if (typeof error === "object" && error !== null && error.code === "ENOENT") {
+      routes.clear();
+      return;
+    }
+    throw error;
+  }
+
+  const parsed = JSON.parse(content);
+  if (typeof parsed !== "object" || parsed === null || !Array.isArray(parsed.routes)) {
+    throw new Error("Invalid runtime public access route state file.");
+  }
+
+  routes.clear();
+  for (const route of parsed.routes) {
+    if (typeof route !== "object" || route === null || typeof route.key !== "string" || typeof route.localBaseUrl !== "string") {
+      throw new Error("Invalid runtime public access route state entry.");
+    }
+    routes.set(route.key, route.localBaseUrl);
+  }
+}
+
+async function persistRoutes() {
+  const tempPath = routeStatePath + "." + String(process.pid) + "." + randomUUID() + ".tmp";
+  await writeFile(
+    tempPath,
+    JSON.stringify({
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      routes: Array.from(routes.entries()).map(([key, localBaseUrl]) => ({ key, localBaseUrl })),
+    }),
+    "utf8",
+  );
+  await rename(tempPath, routeStatePath);
+}
+
+function sleep(delayMs) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, delayMs);
+  });
 }
 
 async function probeLocalOriginHealth(input) {
@@ -1214,11 +1347,12 @@ function connectUpgradeTarget(input) {
   });
 }
 
-function resolveTarget(request) {
+async function resolveTarget(request) {
   const routeContext = readRouteContext(request);
   if (routeContext.host.length === 0 || routeContext.environmentId.length === 0) {
     return undefined;
   }
+  await loadRoutes();
   const localBaseUrl = routes.get(createRouteKey(routeContext.host, routeContext.environmentId));
   if (localBaseUrl === undefined) {
     return undefined;

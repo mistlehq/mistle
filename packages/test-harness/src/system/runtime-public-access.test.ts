@@ -4,6 +4,7 @@ import {
   createRuntimePublicAccessProxyScript,
   createRuntimePublicAccessProxyPoolKey,
   createRuntimePublicAccessRouteHealthUrl,
+  createRuntimePublicAccessRouteStatePath,
   createRuntimePublicAccessRouteUpgradeProbeUrl,
   isRuntimePublicAccessUpgradeProbeReadyStatus,
   normalizeRuntimePublicAccessHostnames,
@@ -15,6 +16,17 @@ describe("createRuntimePublicAccessProxyPoolKey", () => {
     expect(createRuntimePublicAccessProxyPoolKey({ tunnelId: "tun_123" })).toBe(
       "runtime-public-access:tun_123",
     );
+  });
+});
+
+describe("createRuntimePublicAccessRouteStatePath", () => {
+  it("creates a stable shared route state path for proxy replacements", () => {
+    expect(
+      createRuntimePublicAccessRouteStatePath({
+        coordinatorDir: "/tmp/mistle-test-run",
+        tunnelId: "tun/123",
+      }),
+    ).toBe("/tmp/mistle-test-run/runtime-public-access-routes/tun%2F123.json");
   });
 });
 
@@ -38,6 +50,19 @@ describe("createRuntimePublicAccessProxyScript", () => {
     expect(script).toContain("runtime public access proxy shutdown reason=");
     expect(script).toContain("cloudflared container process exited code=");
     expect(script).toContain("shuttingDown=");
+  });
+
+  it("persists environment routes so proxy replacement does not lose registered services", () => {
+    const script = createRuntimePublicAccessProxyScript();
+
+    expect(script).toContain(
+      'const routeStatePath = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_ROUTE_STATE_PATH");',
+    );
+    expect(script).toContain("async function loadRoutes()");
+    expect(script).toContain("async function persistRoutes()");
+    expect(script).toContain("async function withRouteStateLock(callback)");
+    expect(script).toContain("await loadRoutes();");
+    expect(script).toContain("await persistRoutes();");
   });
 });
 
