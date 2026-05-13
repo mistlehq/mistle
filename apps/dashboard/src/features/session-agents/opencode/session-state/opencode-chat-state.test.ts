@@ -78,6 +78,41 @@ describe("reduceOpenCodeChatState", () => {
     ]);
   });
 
+  it("suppresses OpenCode placeholder reasoning parts before semantic grouping", () => {
+    const state = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "hydrate_messages",
+      sessionId: "ses_test",
+      messages: [
+        createUserMessage({
+          id: "msg_user",
+          text: "Please update the docs",
+        }),
+        createAssistantMessage({
+          id: "msg_assistant",
+          parentId: "msg_user",
+          parts: ["", "[]", "{}", "null"].map((text, index) => ({
+            id: `part_reasoning_${String(index)}`,
+            messageID: "msg_assistant",
+            sessionID: "ses_test",
+            text,
+            time: {
+              start: index + 2,
+              end: index + 3,
+            },
+            type: "reasoning" as const,
+          })),
+        }),
+      ],
+    });
+
+    expect(state.entries).toEqual([
+      expect.objectContaining({
+        id: "msg_user",
+        kind: "user-message",
+      }),
+    ]);
+  });
+
   it("applies text deltas and part updates by OpenCode ids", () => {
     const hydrated = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
       type: "hydrate_messages",

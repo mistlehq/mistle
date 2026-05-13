@@ -366,6 +366,16 @@ function readErrorMessage(
   return error.name;
 }
 
+function shouldSuppressOpenCodeReasoningText(text: string): boolean {
+  const normalizedText = text.trim();
+  return (
+    normalizedText.length === 0 ||
+    normalizedText === "[]" ||
+    normalizedText === "{}" ||
+    normalizedText === "null"
+  );
+}
+
 function createAssistantEntries(input: {
   message: OpenCodeMessage;
   parts: readonly OpenCodeMessagePart[];
@@ -392,6 +402,10 @@ function createAssistantEntries(input: {
       continue;
     }
     if (part.type === "reasoning") {
+      if (shouldSuppressOpenCodeReasoningText(part.text)) {
+        continue;
+      }
+
       projectionItems.push({
         id: part.id,
         kind: "semantic",

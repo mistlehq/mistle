@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
-import { within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { ChatThread } from "./chat-thread.js";
@@ -269,7 +268,7 @@ describe("ChatThread", () => {
               null,
               2,
             ),
-            status: "streaming",
+            status: "completed",
           },
         ]}
         isRespondingToServerRequest={false}
@@ -278,17 +277,16 @@ describe("ChatThread", () => {
       />,
     );
 
-    expect(screen.getByText("Activity")).toBeTruthy();
-    expect(screen.getByText("1 item")).toBeTruthy();
-    expect(screen.getByText("Context compaction")).toBeTruthy();
-    expect(screen.getByText("Running")).toBeTruthy();
+    const groupSummary = rendered.container.querySelector("[data-chat-semantic-group-summary]");
+    if (groupSummary === null) {
+      throw new Error("Expected a semantic group summary.");
+    }
+
+    expect(within(groupSummary as HTMLElement).getByText("Context compaction")).toBeTruthy();
+    expect(screen.queryByText("Activity")).toBeNull();
+    expect(screen.queryByText("1 item")).toBeNull();
+    expect(screen.queryByText("Running")).toBeNull();
     expect(rendered.container.querySelector("[data-chat-semantic-group]")).toBeTruthy();
-    expect(
-      screen.getByText("Compacted the current session context before continuing.", {
-        selector: "p",
-      }),
-    ).toBeTruthy();
-    expect(screen.getByText(/drop-superseded-read-output/)).toBeTruthy();
   });
 
   it("renders user image attachments as attachment rows", () => {

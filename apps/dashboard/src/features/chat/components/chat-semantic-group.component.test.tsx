@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -20,6 +20,15 @@ function openSemanticGroup(): void {
   }
 
   fireEvent.click(groupSummary);
+}
+
+function getSemanticGroupSummaryElement(container: HTMLElement): HTMLElement {
+  const groupSummary = container.querySelector("[data-chat-semantic-group-summary]");
+  if (groupSummary === null) {
+    throw new Error("Expected a semantic group summary.");
+  }
+
+  return groupSummary as HTMLElement;
 }
 
 describe("ChatSemanticGroup", () => {
@@ -321,14 +330,15 @@ describe("ChatSemanticGroup", () => {
     );
 
     const groupDisclosure = container.querySelector("[data-chat-semantic-group]");
+    const groupSummary = getSemanticGroupSummaryElement(container);
     expect(groupDisclosure?.hasAttribute("open")).toBe(false);
-    expect(screen.getByText("Activity")).toBeTruthy();
-    expect(screen.getByText("1 item")).toBeTruthy();
+    expect(within(groupSummary).getByText("Context compaction")).toBeTruthy();
+    expect(screen.queryByText("Activity")).toBeNull();
+    expect(screen.queryByText("1 item")).toBeNull();
 
     openSemanticGroup();
 
     expect(groupDisclosure?.hasAttribute("open")).toBe(true);
-    expect(screen.getByText("Context compaction")).toBeTruthy();
     expect(
       screen.getByText("Compacted the current session context before continuing.", {
         selector: "p",
@@ -372,12 +382,13 @@ describe("ChatSemanticGroup", () => {
     );
 
     const groupDisclosure = container.querySelector("[data-chat-semantic-group]");
+    const groupSummary = getSemanticGroupSummaryElement(container);
     expect(groupDisclosure?.hasAttribute("open")).toBe(false);
+    expect(within(groupSummary).getByText("OpenCode error")).toBeTruthy();
 
     openSemanticGroup();
 
-    expect(screen.getByText("Activity")).toBeTruthy();
-    expect(screen.getByText("OpenCode error")).toBeTruthy();
+    expect(screen.queryByText("Activity")).toBeNull();
 
     const itemSummary = screen.getByText("Toggle results").closest("summary");
     if (itemSummary === null) {
