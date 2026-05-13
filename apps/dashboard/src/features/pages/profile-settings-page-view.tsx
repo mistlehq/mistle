@@ -28,6 +28,7 @@ import type {
   LinkedAccountCallbackNotice,
   LinkedAccountCardViewModel,
 } from "../settings/identity-linking/linked-accounts-model.js";
+import type { CheckGitHubLinkedAccountSigningKeyResult } from "../settings/identity-linking/linked-accounts-service.js";
 import { ActionTile } from "../shared/action-tile.js";
 import { getErrorMessage } from "../shared/auto-save-behavior.js";
 import { FormPageSection, FormPageStack } from "../shared/form-page.js";
@@ -48,6 +49,10 @@ export type ProfileSettingsPageViewProps = {
   onDeleteProfileImage: () => Promise<void>;
   onLinkLinkedAccount: (providerFamily: string) => Promise<void>;
   onSaveChanges: (displayName: string) => Promise<void>;
+  onCheckLinkedAccountCommitSigningKey: (
+    providerFamily: string,
+    file: File,
+  ) => Promise<CheckGitHubLinkedAccountSigningKeyResult>;
   onDeleteLinkedAccountCommitSigningKey: (providerFamily: string) => Promise<void>;
   onUnlinkLinkedAccount: (providerFamily: string) => Promise<void>;
   onUpdateLinkedAccountPreferredEmail: (
@@ -82,6 +87,7 @@ export type ProfileSettingsLinkedAccountsSectionProps = Pick<
   | "linkedAccountsEmptyStateMessage"
   | "linkedAccountsLoading"
   | "linkedAccountsLoadErrorMessage"
+  | "onCheckLinkedAccountCommitSigningKey"
   | "onDeleteLinkedAccountCommitSigningKey"
   | "onLinkLinkedAccount"
   | "onUnlinkLinkedAccount"
@@ -169,6 +175,7 @@ export function ProfileSettingsLinkedAccountsSection(
             <LinkedAccountCard
               key={linkedAccountCard.providerFamily}
               linkedAccountCard={linkedAccountCard}
+              onCheckLinkedAccountCommitSigningKey={props.onCheckLinkedAccountCommitSigningKey}
               onDeleteLinkedAccountCommitSigningKey={props.onDeleteLinkedAccountCommitSigningKey}
               onLinkLinkedAccount={props.onLinkLinkedAccount}
               onUnlinkLinkedAccount={props.onUnlinkLinkedAccount}
@@ -233,6 +240,10 @@ function LinkedAccountsFeedbackStack(
 function LinkedAccountCard(input: {
   linkedAccountCard: LinkedAccountCardViewModel;
   onDeleteLinkedAccountCommitSigningKey: (providerFamily: string) => Promise<void>;
+  onCheckLinkedAccountCommitSigningKey: (
+    providerFamily: string,
+    file: File,
+  ) => Promise<CheckGitHubLinkedAccountSigningKeyResult>;
   onLinkLinkedAccount: (providerFamily: string) => Promise<void>;
   onUnlinkLinkedAccount: (providerFamily: string) => Promise<void>;
   onUpdateLinkedAccountPreferredEmail: (
@@ -250,11 +261,16 @@ function LinkedAccountCard(input: {
   const commitSigningUploadInputRef = useRef<HTMLInputElement | null>(null);
   const [isCommitSigningDialogOpen, setIsCommitSigningDialogOpen] = useState(false);
   const [pastedCommitSigningKey, setPastedCommitSigningKey] = useState("");
+  const [selectedCommitSigningKeyFile, setSelectedCommitSigningKeyFile] = useState<File | null>(
+    null,
+  );
   const [showCommitSigningLocalGenerationHelp, setShowCommitSigningLocalGenerationHelp] =
     useState(false);
   const [commitSigningDialogErrorMessage, setCommitSigningDialogErrorMessage] = useState<
     string | null
   >(null);
+  const [checkedCommitSigningKey, setCheckedCommitSigningKey] =
+    useState<CommitSigningKeyCheckedDraft | null>(null);
 
   function closeCommitSigningDialog(): void {
     if (linkedAccountActionPending) {
@@ -263,24 +279,46 @@ function LinkedAccountCard(input: {
 
     setIsCommitSigningDialogOpen(false);
     setPastedCommitSigningKey("");
+    setSelectedCommitSigningKeyFile(null);
     setShowCommitSigningLocalGenerationHelp(false);
     setCommitSigningDialogErrorMessage(null);
+    setCheckedCommitSigningKey(null);
   }
 
   function openCommitSigningDialog(): void {
     setCommitSigningDialogErrorMessage(null);
+    setCheckedCommitSigningKey(null);
     setShowCommitSigningLocalGenerationHelp(false);
     setIsCommitSigningDialogOpen(true);
   }
 
-  async function uploadCommitSigningKeyFile(file: File): Promise<void> {
+  async function checkCommitSigningKey(draft: CommitSigningKeyDraft): Promise<void> {
+    try {
+      const result = await input.onCheckLinkedAccountCommitSigningKey(
+        input.linkedAccountCard.providerFamily,
+        draft.file,
+      );
+      setCheckedCommitSigningKey({
+        ...toCheckedCommitSigningKeyDraft(draft),
+        result,
+      });
+      setCommitSigningDialogErrorMessage(null);
+    } catch (error) {
+      setCheckedCommitSigningKey(null);
+      setCommitSigningDialogErrorMessage(getErrorMessage(error));
+    }
+  }
+
+  async function uploadCommitSigningKey(draft: CommitSigningKeyDraft): Promise<void> {
     try {
       await input.onUploadLinkedAccountCommitSigningKey(
         input.linkedAccountCard.providerFamily,
-        file,
+        draft.file,
       );
       setIsCommitSigningDialogOpen(false);
       setPastedCommitSigningKey("");
+      setSelectedCommitSigningKeyFile(null);
+      setCheckedCommitSigningKey(null);
       setCommitSigningDialogErrorMessage(null);
     } catch (error) {
       setCommitSigningDialogErrorMessage(getErrorMessage(error));
@@ -293,16 +331,33 @@ function LinkedAccountCard(input: {
     event.preventDefault();
 
     const normalizedPrivateKey = pastedCommitSigningKey.trim();
-    if (linkedAccountActionPending || normalizedPrivateKey.length === 0) {
+    const draft = resolveCommitSigningKeyDraft({
+      normalizedPrivateKey,
+      selectedFile: selectedCommitSigningKeyFile,
+    });
+    if (linkedAccountActionPending || draft === null) {
       return;
     }
 
-    await uploadCommitSigningKeyFile(
-      new File([normalizedPrivateKey], "my-signing-key", {
-        type: "text/plain",
-      }),
-    );
+    if (!isCheckedCommitSigningKeyDraftCurrent({ checked: checkedCommitSigningKey, draft })) {
+      return;
+    }
+
+    await uploadCommitSigningKey(draft);
   }
+
+  const normalizedCommitSigningPrivateKey = pastedCommitSigningKey.trim();
+  const commitSigningKeyDraft = resolveCommitSigningKeyDraft({
+    normalizedPrivateKey: normalizedCommitSigningPrivateKey,
+    selectedFile: selectedCommitSigningKeyFile,
+  });
+  const canCheckCommitSigningKey = commitSigningKeyDraft !== null;
+  const canSaveCheckedCommitSigningKey =
+    commitSigningKeyDraft !== null &&
+    isCheckedCommitSigningKeyDraftCurrent({
+      checked: checkedCommitSigningKey,
+      draft: commitSigningKeyDraft,
+    });
 
   return (
     <div className="rounded border bg-background p-4">
@@ -389,21 +444,6 @@ function LinkedAccountCard(input: {
             <FieldContent>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
                 <div className="flex flex-wrap gap-2">
-                  <input
-                    aria-label={`Upload ${input.linkedAccountCard.displayName} commit signing private key`}
-                    className="hidden"
-                    ref={commitSigningUploadInputRef}
-                    onChange={(event) => {
-                      const selectedFile = event.currentTarget.files?.[0];
-                      event.currentTarget.value = "";
-                      if (selectedFile === null || selectedFile === undefined) {
-                        return;
-                      }
-
-                      void uploadCommitSigningKeyFile(selectedFile);
-                    }}
-                    type="file"
-                  />
                   {commitSigning.removeActionLabel === null &&
                   commitSigning.keySummaryLabel === null ? (
                     <Button
@@ -546,6 +586,8 @@ function LinkedAccountCard(input: {
                   className="field-sizing-fixed min-w-0 max-w-full text-sm"
                   onChange={(event) => {
                     setCommitSigningDialogErrorMessage(null);
+                    setCheckedCommitSigningKey(null);
+                    setSelectedCommitSigningKeyFile(null);
                     setPastedCommitSigningKey(event.currentTarget.value);
                   }}
                   placeholder="Paste your SSH private key"
@@ -556,6 +598,10 @@ function LinkedAccountCard(input: {
                 {commitSigningDialogErrorMessage === null ? null : (
                   <Notice variant="alert">{commitSigningDialogErrorMessage}</Notice>
                 )}
+                {selectedCommitSigningKeyFile === null ? null : (
+                  <Notice>Selected file: {selectedCommitSigningKeyFile.name}</Notice>
+                )}
+                <CommitSigningKeyCheckNotice checkedCommitSigningKey={checkedCommitSigningKey} />
                 <div className="flex flex-col gap-4">
                   <InlineDividerLabel label="Or" />
                   <input
@@ -569,8 +615,10 @@ function LinkedAccountCard(input: {
                         return;
                       }
 
+                      setPastedCommitSigningKey("");
+                      setSelectedCommitSigningKeyFile(selectedFile);
+                      setCheckedCommitSigningKey(null);
                       setCommitSigningDialogErrorMessage(null);
-                      void uploadCommitSigningKeyFile(selectedFile);
                     }}
                     type="file"
                   />
@@ -597,9 +645,23 @@ function LinkedAccountCard(input: {
                   Cancel
                 </Button>
                 <Button
-                  disabled={
-                    linkedAccountActionPending || pastedCommitSigningKey.trim().length === 0
-                  }
+                  disabled={linkedAccountActionPending || !canCheckCommitSigningKey}
+                  onClick={() => {
+                    if (commitSigningKeyDraft !== null) {
+                      void checkCommitSigningKey(commitSigningKeyDraft);
+                    }
+                  }}
+                  type="button"
+                  variant="outline"
+                >
+                  {linkedAccountActionPending ? (
+                    <Spinner aria-hidden className="size-4" />
+                  ) : (
+                    "Check key"
+                  )}
+                </Button>
+                <Button
+                  disabled={linkedAccountActionPending || !canSaveCheckedCommitSigningKey}
                   type="submit"
                 >
                   Add private key
@@ -616,6 +678,135 @@ function LinkedAccountCard(input: {
         </p>
       )}
     </div>
+  );
+}
+
+type CommitSigningKeyDraft =
+  | {
+      kind: "text";
+      normalizedPrivateKey: string;
+      file: File;
+    }
+  | {
+      kind: "file";
+      selectedFile: File;
+      file: File;
+    };
+
+type CommitSigningKeyCheckedDraft =
+  | {
+      kind: "text";
+      normalizedPrivateKey: string;
+      result: CheckGitHubLinkedAccountSigningKeyResult;
+    }
+  | {
+      kind: "file";
+      selectedFile: File;
+      result: CheckGitHubLinkedAccountSigningKeyResult;
+    };
+
+type CommitSigningKeyCheckedDraftIdentity =
+  | {
+      kind: "text";
+      normalizedPrivateKey: string;
+    }
+  | {
+      kind: "file";
+      selectedFile: File;
+    };
+
+function resolveCommitSigningKeyDraft(input: {
+  normalizedPrivateKey: string;
+  selectedFile: File | null;
+}): CommitSigningKeyDraft | null {
+  if (input.selectedFile !== null) {
+    return {
+      kind: "file",
+      selectedFile: input.selectedFile,
+      file: input.selectedFile,
+    };
+  }
+
+  if (input.normalizedPrivateKey.length === 0) {
+    return null;
+  }
+
+  return {
+    kind: "text",
+    normalizedPrivateKey: input.normalizedPrivateKey,
+    file: new File([input.normalizedPrivateKey], "my-signing-key", {
+      type: "text/plain",
+    }),
+  };
+}
+
+function toCheckedCommitSigningKeyDraft(
+  draft: CommitSigningKeyDraft,
+): CommitSigningKeyCheckedDraftIdentity {
+  if (draft.kind === "file") {
+    return {
+      kind: "file",
+      selectedFile: draft.selectedFile,
+    };
+  }
+
+  return {
+    kind: "text",
+    normalizedPrivateKey: draft.normalizedPrivateKey,
+  };
+}
+
+function isCheckedCommitSigningKeyDraftCurrent(input: {
+  checked: CommitSigningKeyCheckedDraft | null;
+  draft: CommitSigningKeyDraft;
+}): boolean {
+  if (input.checked === null || input.checked.result.status !== "registered") {
+    return false;
+  }
+
+  if (input.checked.kind !== input.draft.kind) {
+    return false;
+  }
+
+  if (input.checked.kind === "file") {
+    return input.draft.kind === "file" && input.checked.selectedFile === input.draft.selectedFile;
+  }
+
+  return (
+    input.draft.kind === "text" &&
+    input.checked.normalizedPrivateKey === input.draft.normalizedPrivateKey
+  );
+}
+
+function CommitSigningKeyCheckNotice(input: {
+  checkedCommitSigningKey: CommitSigningKeyCheckedDraft | null;
+}): React.JSX.Element | null {
+  if (input.checkedCommitSigningKey === null) {
+    return null;
+  }
+
+  if (input.checkedCommitSigningKey.result.status === "registered") {
+    return (
+      <Notice variant="success">
+        This private key can sign commits and matches a GitHub SSH signing key.
+      </Notice>
+    );
+  }
+
+  if (input.checkedCommitSigningKey.result.status === "not_registered") {
+    return (
+      <Notice variant="warning">
+        This private key can sign commits, but its public key is not registered as a GitHub signing
+        key.
+      </Notice>
+    );
+  }
+
+  return (
+    <Notice variant="warning">
+      Mistle could not confirm this key with GitHub because the GitHub App is missing SSH signing
+      keys read access.
+    </Notice>
   );
 }
 

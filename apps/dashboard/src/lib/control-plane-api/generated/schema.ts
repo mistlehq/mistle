@@ -4909,6 +4909,105 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/me/linked-accounts/github/signing-key/check": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "multipart/form-data": {
+            /** Format: binary */
+            file: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Check whether the authenticated user's GitHub SSH signing key is valid and registered with GitHub. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              publicKey: string;
+              publicKeyFingerprint: string;
+              /** @enum {string} */
+              status: "registered" | "not_registered" | "permission_missing";
+            };
+          };
+        };
+        /** @description Invalid signing key input. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "INVALID_LINKED_ACCOUNT_SIGNING_KEY_INPUT";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description GitHub linked account was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "LINKED_ACCOUNT_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Validation error. */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/me/profile-image": {
     parameters: {
       query?: never;

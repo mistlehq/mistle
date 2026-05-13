@@ -11,6 +11,7 @@ import {
   type LinkedAccountCallbackNotice,
 } from "../settings/identity-linking/linked-accounts-model.js";
 import {
+  checkGitHubLinkedAccountSigningKey,
   deleteGitHubLinkedAccountSigningKey,
   linkedAccountsQueryKey,
   listLinkedAccounts,
@@ -193,6 +194,12 @@ export function ProfileSettingsPage(): React.JSX.Element {
       });
     },
   });
+  const checkGitHubLinkedAccountSigningKeyMutation = useMutation({
+    mutationFn: async (file: File) => checkGitHubLinkedAccountSigningKey({ file }),
+    onMutate: async () => {
+      setLinkedAccountOperationErrorMessage(null);
+    },
+  });
   const deleteGitHubLinkedAccountSigningKeyMutation = useMutation({
     mutationFn: deleteGitHubLinkedAccountSigningKey,
     onMutate: async () => {
@@ -303,6 +310,11 @@ export function ProfileSettingsPage(): React.JSX.Element {
             startLinkedAccountAuthorizationMutation.mutateAsync(providerFamily),
           );
         }}
+        onCheckLinkedAccountCommitSigningKey={async (providerFamily, file) =>
+          await runLinkedAccountAction(providerFamily, async () =>
+            checkGitHubLinkedAccountSigningKeyMutation.mutateAsync(file),
+          )
+        }
         onDeleteLinkedAccountCommitSigningKey={async (providerFamily) => {
           await runLinkedAccountAction(providerFamily, async () =>
             deleteGitHubLinkedAccountSigningKeyMutation.mutateAsync(),

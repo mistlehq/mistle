@@ -65,9 +65,20 @@ const UpdateGitHubLinkedAccountPreferredEmailBodySchema = z
   })
   .strict();
 
+const CheckGitHubLinkedAccountSigningKeyResponseSchema = z
+  .object({
+    status: z.enum(["registered", "not_registered", "permission_missing"]),
+    publicKey: z.string().min(1),
+    publicKeyFingerprint: z.string().min(1),
+  })
+  .strict();
+
 export type LinkedAccount = z.infer<typeof LinkedAccountSchema>;
 export type StartLinkedAccountAuthorizationResult = z.infer<
   typeof StartLinkedAccountAuthorizationResponseSchema
+>;
+export type CheckGitHubLinkedAccountSigningKeyResult = z.infer<
+  typeof CheckGitHubLinkedAccountSigningKeyResponseSchema
 >;
 
 export function linkedAccountsQueryKey(
@@ -245,6 +256,35 @@ export async function uploadGitHubLinkedAccountSigningKey(input: { file: File })
       operation: "uploadGitHubLinkedAccountSigningKey",
       error,
       fallbackMessage: "Could not upload GitHub signing key.",
+    });
+  }
+}
+
+export async function checkGitHubLinkedAccountSigningKey(input: {
+  file: File;
+}): Promise<CheckGitHubLinkedAccountSigningKeyResult> {
+  const body = new FormData();
+  body.set("file", input.file);
+
+  try {
+    const response = await requestControlPlane({
+      operation: "checkGitHubLinkedAccountSigningKey",
+      method: "POST",
+      pathname: "/v1/me/linked-accounts/github/signing-key/check",
+      body,
+      fallbackMessage: "Could not check GitHub signing key.",
+    });
+
+    return await readJsonWithSchema({
+      response,
+      schema: CheckGitHubLinkedAccountSigningKeyResponseSchema,
+      operation: "checkGitHubLinkedAccountSigningKey",
+    });
+  } catch (error) {
+    throw wrapLinkedAccountsApiError({
+      operation: "checkGitHubLinkedAccountSigningKey",
+      error,
+      fallbackMessage: "Could not check GitHub signing key.",
     });
   }
 }

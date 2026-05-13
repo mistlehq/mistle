@@ -32,6 +32,11 @@ export function createProfileSettingsFixtureContent(): React.JSX.Element {
       linkedAccountsEmptyStateMessage={null}
       linkedAccountsLoading={false}
       linkedAccountsLoadErrorMessage={null}
+      onCheckLinkedAccountCommitSigningKey={async () => ({
+        status: "registered",
+        publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMistle",
+        publicKeyFingerprint: "SHA256:mistle",
+      })}
       onDeleteLinkedAccountCommitSigningKey={async () => {}}
       onDeleteProfileImage={async () => {}}
       onLinkLinkedAccount={async () => {}}

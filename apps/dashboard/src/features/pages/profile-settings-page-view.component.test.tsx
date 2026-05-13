@@ -18,6 +18,11 @@ const baseProps = {
   linkedAccountsEmptyStateMessage: null,
   linkedAccountsLoading: false,
   linkedAccountsLoadErrorMessage: null,
+  onCheckLinkedAccountCommitSigningKey: async () => ({
+    status: "registered",
+    publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMistle",
+    publicKeyFingerprint: "SHA256:mistle",
+  }),
   onDeleteLinkedAccountCommitSigningKey: async () => {},
   onDeleteProfileImage: async () => {},
   onLinkLinkedAccount: async () => {},
@@ -551,6 +556,13 @@ describe("ProfileSettingsPageView", () => {
         value: "-----BEGIN OPENSSH PRIVATE KEY-----\nkey\n-----END OPENSSH PRIVATE KEY-----\n",
       },
     });
+    fireEvent.click(screen.getByRole("button", { name: "Check key" }));
+    expect(
+      await screen.findByText(
+        "This private key can sign commits and matches a GitHub SSH signing key.",
+      ),
+    ).toBeTruthy();
+
     fireEvent.click(screen.getByRole("button", { name: "Add private key" }));
 
     await waitFor(() => {
@@ -599,7 +611,7 @@ describe("ProfileSettingsPageView", () => {
     expect(screen.queryByText('ssh-keygen -t ed25519 -N "" -f ~/.ssh/mistle-signing')).toBeNull();
   });
 
-  it("uploads a GitHub commit signing key from the file chooser", async () => {
+  it("loads and uploads a GitHub commit signing key from the file chooser after checking it", async () => {
     const uploadedFiles: File[] = [];
 
     render(
@@ -631,17 +643,27 @@ describe("ProfileSettingsPageView", () => {
       },
     });
 
+    expect(await screen.findByText("Selected file: my-signing-key")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Check key" }));
+    expect(
+      await screen.findByText(
+        "This private key can sign commits and matches a GitHub SSH signing key.",
+      ),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Add private key" }));
+
     await waitFor(() => {
-      expect(uploadedFiles).toEqual([uploadFile]);
+      expect(uploadedFiles).toHaveLength(1);
     });
+    expect(uploadedFiles).toEqual([uploadFile]);
   });
 
-  it("shows a dialog error when a pasted GitHub commit signing key upload fails", async () => {
+  it("shows a dialog error when a pasted GitHub commit signing key check fails", async () => {
     render(
       <ProfileSettingsPageView
         {...baseProps}
         linkedAccountCards={[createGitHubSigningNotConfiguredCard()]}
-        onUploadLinkedAccountCommitSigningKey={async () => {
+        onCheckLinkedAccountCommitSigningKey={async () => {
           throw new Error("Invalid private key.");
         }}
       />,
@@ -653,39 +675,71 @@ describe("ProfileSettingsPageView", () => {
         value: "-----BEGIN OPENSSH PRIVATE KEY-----\ninvalid\n-----END OPENSSH PRIVATE KEY-----\n",
       },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Add private key" }));
+    fireEvent.click(screen.getByRole("button", { name: "Check key" }));
 
     expect(await screen.findByText("Invalid private key.")).toBeTruthy();
     expect(screen.getByRole("dialog")).toBeTruthy();
   });
 
-  it("shows a dialog error when a file-based GitHub commit signing key upload fails", async () => {
+  it("keeps saving disabled when GitHub does not have the pasted signing key", async () => {
     render(
       <ProfileSettingsPageView
         {...baseProps}
         linkedAccountCards={[createGitHubSigningNotConfiguredCard()]}
-        onUploadLinkedAccountCommitSigningKey={async () => {
-          throw new Error("Upload failed.");
-        }}
+        onCheckLinkedAccountCommitSigningKey={async () => ({
+          status: "not_registered",
+          publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMistle",
+          publicKeyFingerprint: "SHA256:mistle",
+        })}
       />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Add private key" }));
-
-    const uploadInput = screen.getByLabelText("Choose GitHub commit signing private key file", {
-      selector: "input",
-    });
-    const uploadFile = new File(["bad"], "bad-key", {
-      type: "application/octet-stream",
-    });
-
-    fireEvent.change(uploadInput, {
+    fireEvent.change(screen.getByPlaceholderText("Paste your SSH private key"), {
       target: {
-        files: [uploadFile],
+        value: "-----BEGIN OPENSSH PRIVATE KEY-----\nkey\n-----END OPENSSH PRIVATE KEY-----\n",
       },
     });
+    fireEvent.click(screen.getByRole("button", { name: "Check key" }));
 
-    expect(await screen.findByText("Upload failed.")).toBeTruthy();
-    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(
+      await screen.findByText(
+        "This private key can sign commits, but its public key is not registered as a GitHub signing key.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add private key" }).hasAttribute("disabled")).toBe(
+      true,
+    );
+  });
+
+  it("keeps saving disabled when GitHub App permissions cannot confirm the signing key", async () => {
+    render(
+      <ProfileSettingsPageView
+        {...baseProps}
+        linkedAccountCards={[createGitHubSigningNotConfiguredCard()]}
+        onCheckLinkedAccountCommitSigningKey={async () => ({
+          status: "permission_missing",
+          publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMistle",
+          publicKeyFingerprint: "SHA256:mistle",
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add private key" }));
+    fireEvent.change(screen.getByPlaceholderText("Paste your SSH private key"), {
+      target: {
+        value: "-----BEGIN OPENSSH PRIVATE KEY-----\nkey\n-----END OPENSSH PRIVATE KEY-----\n",
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Check key" }));
+
+    expect(
+      await screen.findByText(
+        "Mistle could not confirm this key with GitHub because the GitHub App is missing SSH signing keys read access.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Add private key" }).hasAttribute("disabled")).toBe(
+      true,
+    );
   });
 });
