@@ -1,9 +1,9 @@
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, mpsc};
+use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde_json::{Value, json};
 use tungstenite::stream::MaybeTlsStream;
@@ -26,12 +26,10 @@ fn relays_http_requests_over_the_websocket_runtime_endpoint() {
             .to_string()
     });
 
-    let runtime_readiness_manager =
-        std::sync::Arc::new(std::sync::Mutex::new(RuntimeReadinessManager::default()));
     let proxy = start_opencode_proxy(
         "ws://127.0.0.1:0/opencode",
         &simulated_server.base_url,
-        runtime_readiness_manager,
+        runtime_readiness_manager(),
     )
     .expect("OpenCode proxy should start");
 
@@ -73,12 +71,10 @@ fn relays_opencode_event_streams_as_websocket_sse_frames() {
             .to_string()
     });
 
-    let runtime_readiness_manager =
-        std::sync::Arc::new(std::sync::Mutex::new(RuntimeReadinessManager::default()));
     let proxy = start_opencode_proxy(
         "ws://127.0.0.1:0/opencode",
         &simulated_server.base_url,
-        runtime_readiness_manager,
+        runtime_readiness_manager(),
     )
     .expect("OpenCode proxy should start");
 
@@ -118,12 +114,10 @@ fn relays_opencode_event_streams_as_websocket_sse_frames() {
 #[test]
 fn proxy_survives_client_disconnect_while_event_stream_is_open() {
     let raw_server = start_simulated_streaming_opencode_server();
-    let runtime_readiness_manager =
-        std::sync::Arc::new(std::sync::Mutex::new(RuntimeReadinessManager::default()));
     let proxy = start_opencode_proxy(
         "ws://127.0.0.1:0/opencode",
         &format!("http://{}", raw_server.listener_address),
-        runtime_readiness_manager,
+        runtime_readiness_manager(),
     )
     .expect("OpenCode proxy should start");
 
@@ -193,12 +187,10 @@ fn returns_bad_gateway_when_raw_opencode_server_is_unavailable_and_keeps_proxy_a
         .port();
     drop(unavailable_listener);
 
-    let runtime_readiness_manager =
-        std::sync::Arc::new(std::sync::Mutex::new(RuntimeReadinessManager::default()));
     let proxy = start_opencode_proxy(
         "ws://127.0.0.1:0/opencode",
         &format!("http://127.0.0.1:{unavailable_port}"),
-        runtime_readiness_manager,
+        runtime_readiness_manager(),
     )
     .expect("OpenCode proxy should start");
 
@@ -374,11 +366,16 @@ fn handle_streaming_simulated_opencode_request(
     mut stream: TcpStream,
     shutdown_requested: Arc<AtomicBool>,
 ) {
-    let request = read_http_request_head(&mut stream);
-    if request.starts_with("GET /event ") {
-        // OpenCode's event feed is an HTTP SSE response. Keeping the response
-        // open exercises cleanup of an active proxy request task when the
-        // websocket client disconnects.
+    stream
+        .set_nonblocking(false)
+        .expect("simulated OpenCode request stream should become blocking");
+    let request = read_http_request_from_stream(&mut stream);
+    if request.method == "GET" && request.path == "/event" {
+        // OpenCode's EventApi returns a long-lived text/event-stream response;
+        // production clients subscribe through
+        // packages/integrations-definitions/src/agent-runtimes/opencode/client.ts.
+        // Keeping the response open exercises cleanup of an active proxy
+        // request task when the websocket client disconnects.
         stream
             .write_all(
                 b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\nevent: message\ndata: {\"type\":\"ready\"}\n\n",
@@ -390,7 +387,9 @@ fn handle_streaming_simulated_opencode_request(
         return;
     }
 
-    if request.starts_with("GET /global/health ") {
+    if request.method == "GET" && request.path == "/global/health" {
+        // The compiled OpenCode runtime uses /global/health as its readiness
+        // check in packages/integrations-definitions/src/agent-runtimes/opencode/compile-runtime.ts.
         stream
             .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok")
             .expect("simulated OpenCode health response should write");
@@ -461,32 +460,6 @@ fn read_http_request_from_stream(stream: &mut TcpStream) -> SimulatedHttpRequest
     SimulatedHttpRequest { method, path, body }
 }
 
-fn read_http_request_head(stream: &mut TcpStream) -> String {
-    let deadline = Instant::now() + Duration::from_secs(2);
-    let mut buffer = Vec::new();
-    loop {
-        let mut chunk = [0; 256];
-        match stream.read(&mut chunk) {
-            Ok(0) => break,
-            Ok(count) => {
-                buffer.extend_from_slice(&chunk[..count]);
-                if buffer.windows(4).any(|window| window == b"\r\n\r\n") {
-                    break;
-                }
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {}
-            Err(error) => panic!("simulated OpenCode request read failed: {error}"),
-        }
-        assert!(
-            Instant::now() < deadline,
-            "timed out reading simulated OpenCode HTTP request"
-        );
-        thread::sleep(Duration::from_millis(10));
-    }
-
-    String::from_utf8(buffer).expect("simulated OpenCode HTTP request should be UTF-8")
-}
-
 fn connect_to_proxy_with_retry(
     proxy_url: &str,
     sleeper: &dyn Sleeper,
@@ -525,4 +498,8 @@ where
         panic!("expected websocket text message");
     };
     serde_json::from_str(payload.as_str()).expect("websocket payload should be json")
+}
+
+fn runtime_readiness_manager() -> Arc<Mutex<RuntimeReadinessManager>> {
+    Arc::new(Mutex::new(RuntimeReadinessManager::default()))
 }
