@@ -530,7 +530,6 @@ export const SessionTerminalWorkspaceView = forwardRef<
               onApiReady?.(event.api);
             }}
             leftHeaderActionsComponent={DockviewTerminalNewTabAction}
-            tabAnimation="smooth"
           />
         </div>
       </TerminalWorkspaceContext.Provider>
