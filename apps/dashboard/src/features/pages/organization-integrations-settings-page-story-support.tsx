@@ -1,5 +1,8 @@
 import type { AnyIntegrationDefinition } from "@mistle/integrations-core";
-import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
+import {
+  createBrowserIntegrationRegistry,
+  listBrowserIntegrationDefinitions,
+} from "@mistle/integrations-definitions/browser";
 import { useState } from "react";
 import type React from "react";
 
@@ -258,27 +261,23 @@ function createOpenAiDeviceAuthorizationPendingState(input: {
 }
 
 export function createAvailableCardsOverview(): readonly OrganizationIntegrationsSettingsPageCard[] {
-  const specs: readonly StoryIntegrationSpec[] = [
-    { variantId: "jira-default" },
-    { variantId: "github-cloud" },
-    { variantId: "github-enterprise-server" },
-    { variantId: "linear-default" },
-    { variantId: "openai-default" },
-  ];
+  return listBrowserIntegrationDefinitions()
+    .map(createAvailableCardOverview)
+    .sort((left, right) => left.displayName.localeCompare(right.displayName));
+}
 
-  return specs.map((spec) => {
-    const definition = getStoryDefinitionOrThrow(spec.variantId);
-
-    return {
-      actionLabel: "Add",
-      configStatus: "valid",
-      description: resolveDescriptionOrThrow(definition),
-      displayName: definition.displayName,
-      ...(definition.logoKey === undefined ? {} : { logoKey: definition.logoKey }),
-      onAction: () => {},
-      targetKey: definition.variantId,
-    };
-  });
+function createAvailableCardOverview(
+  definition: AnyIntegrationDefinition,
+): OrganizationIntegrationsSettingsPageCard {
+  return {
+    actionLabel: "Add",
+    configStatus: "valid",
+    description: resolveDescriptionOrThrow(definition),
+    displayName: definition.displayName,
+    ...(definition.logoKey === undefined ? {} : { logoKey: definition.logoKey }),
+    onAction: () => {},
+    targetKey: definition.variantId,
+  };
 }
 
 export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): React.JSX.Element {

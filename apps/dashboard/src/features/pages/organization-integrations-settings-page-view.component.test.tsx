@@ -1,11 +1,32 @@
 // @vitest-environment jsdom
 
+import { listBrowserIntegrationDefinitions } from "@mistle/integrations-definitions/browser";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { createAvailableCardsOverview } from "./organization-integrations-settings-page-story-support.js";
 import { OrganizationIntegrationsSettingsPageView } from "./organization-integrations-settings-page-view.js";
 
 describe("OrganizationIntegrationsSettingsPageView", () => {
+  it("builds the overview story cards from every browser integration definition", () => {
+    const cards = createAvailableCardsOverview();
+    const definitions = [...listBrowserIntegrationDefinitions()].sort((left, right) =>
+      left.displayName.localeCompare(right.displayName),
+    );
+
+    expect(cards.map((card) => card.targetKey)).toEqual(
+      definitions.map((definition) => definition.variantId),
+    );
+
+    for (const definition of definitions) {
+      const card = cards.find((candidate) => candidate.targetKey === definition.variantId);
+      expect(card).toBeDefined();
+      expect(card?.displayName).toBe(definition.displayName);
+      expect(card?.description).toBe(definition.description);
+      expect(card?.actionLabel).toBe("Add");
+    }
+  });
+
   it("renders integration sections and forwards card actions", () => {
     let selectedTargetKey: string | null = null;
 
