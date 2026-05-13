@@ -6,6 +6,7 @@ import {
   buildCliPtyOpenInput,
   resolveChatRestoreConnectionInput,
   resolveCliRestoreConversationId,
+  resolveCliRestoreInitialCwd,
 } from "./use-session-main-panel-handoff.js";
 
 describe("buildCliPtyOpenInput", () => {
@@ -146,14 +147,36 @@ describe("resolveCliRestoreConversationId", () => {
   });
 });
 
+describe("resolveCliRestoreInitialCwd", () => {
+  it("preserves the launch directory for runtimes that restore exact CLI sessions", () => {
+    expect(
+      resolveCliRestoreInitialCwd({
+        launchDirectory: "/root/acme/repo-2",
+        preserveLaunchDirectory: true,
+      }),
+    ).toBe("/root/acme/repo-2");
+  });
+
+  it("does not preserve the launch directory for Codex handoffs", () => {
+    expect(
+      resolveCliRestoreInitialCwd({
+        launchDirectory: "/root/acme/repo-2",
+        preserveLaunchDirectory: false,
+      }),
+    ).toBeNull();
+  });
+});
+
 describe("resolveChatRestoreConnectionInput", () => {
   it("preserves durable provider thread authority without a selection policy", () => {
     expect(
       resolveChatRestoreConnectionInput({
+        initialCwd: "/root/acme/repo-2",
         sandboxInstanceId: "sandbox_123",
         durableThreadId: "thread_provider",
       }),
     ).toEqual({
+      initialCwd: "/root/acme/repo-2",
       sandboxInstanceId: "sandbox_123",
       targetThreadId: "thread_provider",
       providerThreadId: "thread_provider",
@@ -163,10 +186,12 @@ describe("resolveChatRestoreConnectionInput", () => {
   it("uses most recently updated selection for local sessions without durable authority", () => {
     expect(
       resolveChatRestoreConnectionInput({
+        initialCwd: null,
         sandboxInstanceId: "sandbox_123",
         durableThreadId: null,
       }),
     ).toEqual({
+      initialCwd: null,
       sandboxInstanceId: "sandbox_123",
       targetThreadId: null,
       selectionPolicy: "most_recently_updated",

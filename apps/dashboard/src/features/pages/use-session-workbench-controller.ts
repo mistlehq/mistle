@@ -271,7 +271,29 @@ export function useSessionWorkbenchController(input: {
   const codexLifecycleForHandoff = useMemo<SessionMainPanelHandoffLifecycle>(
     () => ({
       clearLifecycleErrorMessage: lifecycle.clearLifecycleErrorMessage,
-      connectSession: lifecycle.connectSession,
+      connectSession: (connectInput): void => {
+        if (connectInput.targetThreadId === null) {
+          lifecycle.connectSession({
+            ...(connectInput.initialCwd === undefined
+              ? {}
+              : { initialCwd: connectInput.initialCwd }),
+            sandboxInstanceId: connectInput.sandboxInstanceId,
+            ...(connectInput.selectionPolicy === undefined
+              ? {}
+              : { selectionPolicy: connectInput.selectionPolicy }),
+            targetThreadId: null,
+          });
+          return;
+        }
+
+        lifecycle.connectSession({
+          ...(connectInput.providerThreadId === undefined
+            ? {}
+            : { providerThreadId: connectInput.providerThreadId }),
+          sandboxInstanceId: connectInput.sandboxInstanceId,
+          targetThreadId: connectInput.targetThreadId,
+        });
+      },
       detachSessionConnection: lifecycle.detachSessionConnection,
       lifecycleErrorMessage: lifecycle.lifecycleErrorMessage,
       sessionConnectionState: lifecycle.sessionConnectionState,
@@ -296,6 +318,7 @@ export function useSessionWorkbenchController(input: {
       clearLifecycleErrorMessage: openCodeLifecycle.clearLifecycleErrorMessage,
       connectSession: (connectInput): void => {
         openCodeLifecycle.connectSession({
+          ...(connectInput.initialCwd === undefined ? {} : { initialCwd: connectInput.initialCwd }),
           sandboxInstanceId: connectInput.sandboxInstanceId,
           ...(connectInput.targetThreadId === null
             ? {}
@@ -379,6 +402,7 @@ export function useSessionWorkbenchController(input: {
       displayName: "Codex",
       hydrateChatFromConversation: chat.hydrateChatFromThread,
       lifecycle: codexLifecycleForHandoff,
+      preserveCliLaunchDirectoryForRestore: false,
       preserveCliLaunchTargetForRestore: false,
       resetServerRequests: serverRequests.resetServerRequests,
       restoreConversationId: sessionState.threadAuthority.providerThreadId,
@@ -397,6 +421,7 @@ export function useSessionWorkbenchController(input: {
       displayName: "OpenCode",
       hydrateChatFromConversation: openCodeSessionState.chat.hydrateChatFromSession,
       lifecycle: openCodeLifecycleForHandoff,
+      preserveCliLaunchDirectoryForRestore: true,
       preserveCliLaunchTargetForRestore: true,
       resetServerRequests: () => {},
       restoreConversationId:

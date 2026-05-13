@@ -4,7 +4,6 @@ import { OpenCodePtyLaunchSpec } from "@mistle/integrations-definitions/agent-ru
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 import { useCallback, useEffect, useReducer, useRef, type RefObject } from "react";
 
-import type { ConnectCodexSessionInput } from "../session-agents/codex/session-state/session-connection/index.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
   InitialSessionMainPanelHandoffState,
@@ -14,7 +13,21 @@ import {
 } from "./session-main-panel-handoff-state.js";
 
 type SessionMainPanelRuntimeId = "codex" | "opencode";
-type ChatRestoreConnectionInput = ConnectCodexSessionInput;
+type ChatRestoreConnectionInput =
+  | {
+      initialCwd?: string | null;
+      providerThreadId?: string | null;
+      sandboxInstanceId: string;
+      selectionPolicy?: never;
+      targetThreadId: string;
+    }
+  | {
+      initialCwd?: string | null;
+      providerThreadId?: never;
+      sandboxInstanceId: string;
+      selectionPolicy?: "most_recently_updated" | "oldest";
+      targetThreadId: null;
+    };
 
 type SessionCliLaunchTarget =
   | {
@@ -44,6 +57,7 @@ type SessionMainPanelHandoffRuntime = {
   displayName: "Codex" | "OpenCode";
   hydrateChatFromConversation: () => Promise<void>;
   lifecycle: SessionMainPanelHandoffLifecycle;
+  preserveCliLaunchDirectoryForRestore: boolean;
   preserveCliLaunchTargetForRestore: boolean;
   resetServerRequests: () => void;
   restoreConversationId: string | null;
@@ -130,11 +144,13 @@ export function buildCliPtyOpenInput(input: {
 }
 
 export function resolveChatRestoreConnectionInput(input: {
+  initialCwd: string | null;
   sandboxInstanceId: string;
   durableThreadId: string | null;
-}): ConnectCodexSessionInput {
+}): ChatRestoreConnectionInput {
   if (input.durableThreadId === null) {
     return {
+      initialCwd: input.initialCwd,
       sandboxInstanceId: input.sandboxInstanceId,
       targetThreadId: null,
       selectionPolicy: "most_recently_updated",
@@ -142,6 +158,7 @@ export function resolveChatRestoreConnectionInput(input: {
   }
 
   return {
+    initialCwd: input.initialCwd,
     sandboxInstanceId: input.sandboxInstanceId,
     targetThreadId: input.durableThreadId,
     providerThreadId: input.durableThreadId,
@@ -158,6 +175,13 @@ export function resolveCliRestoreConversationId(input: {
   }
 
   return input.fallbackConversationId;
+}
+
+export function resolveCliRestoreInitialCwd(input: {
+  launchDirectory: string | null;
+  preserveLaunchDirectory: boolean;
+}): string | null {
+  return input.preserveLaunchDirectory ? input.launchDirectory : null;
 }
 
 export type {
@@ -181,6 +205,7 @@ export function useSessionMainPanelHandoff(
   const restoreGenerationRef = useRef<number | null>(null);
   const restoreTimeoutIdRef = useRef<TimerHandle | null>(null);
   const restoreExecutionGenerationRef = useRef<number | null>(null);
+  const cliRestoreInitialCwdRef = useRef<string | null>(null);
   const cliRestoreConversationIdRef = useRef<string | null>(null);
 
   const nextGeneration = useCallback((): number => {
@@ -205,6 +230,7 @@ export function useSessionMainPanelHandoff(
     clearRestoreTimeout();
     restoreGenerationRef.current = null;
     restoreExecutionGenerationRef.current = null;
+    cliRestoreInitialCwdRef.current = null;
     cliRestoreConversationIdRef.current = null;
   }, [clearRestoreTimeout]);
 
@@ -264,6 +290,7 @@ export function useSessionMainPanelHandoff(
     // updated thread.
     activeRuntime.lifecycle.connectSession(
       resolveChatRestoreConnectionInput({
+        initialCwd: cliRestoreInitialCwdRef.current,
         sandboxInstanceId: input.sandboxInstanceId,
         durableThreadId,
       }),
@@ -298,6 +325,11 @@ export function useSessionMainPanelHandoff(
         return;
       }
 
+      const selectedRepositoryPath = input.selectedRepositoryPathRef.current;
+      cliRestoreInitialCwdRef.current = resolveCliRestoreInitialCwd({
+        launchDirectory: selectedRepositoryPath,
+        preserveLaunchDirectory: activeRuntime.preserveCliLaunchDirectoryForRestore,
+      });
       cliRestoreConversationIdRef.current = resolveCliRestoreConversationId({
         fallbackConversationId: activeRuntime.restoreConversationId,
         launchTarget,
@@ -313,7 +345,7 @@ export function useSessionMainPanelHandoff(
             launchTarget,
             runtimeId: input.activeRuntimeIdRef.current,
             sandboxInstanceId: input.sandboxInstanceId,
-            selectedRepositoryPath: input.selectedRepositoryPathRef.current,
+            selectedRepositoryPath,
           }),
         });
         cliOpened = true;
@@ -339,6 +371,7 @@ export function useSessionMainPanelHandoff(
       }
 
       cliRestoreConversationIdRef.current = null;
+      cliRestoreInitialCwdRef.current = null;
       dispatch({
         type: "cli_handoff_failed",
         errorMessage:
