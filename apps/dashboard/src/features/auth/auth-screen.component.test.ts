@@ -25,6 +25,7 @@ function renderAuthScreen(input: { initialEntry: string; googleAuthEnabled?: boo
       emailOtp: true,
       google: input.googleAuthEnabled ?? true,
     },
+    allowSignups: true,
   });
 
   const router = createMemoryRouter(

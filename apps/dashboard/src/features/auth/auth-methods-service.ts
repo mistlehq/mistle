@@ -10,6 +10,7 @@ export const AuthMethodsResponseSchema = z
         google: z.boolean(),
       })
       .strict(),
+    allowSignups: z.boolean(),
   })
   .strict();
 

@@ -33,9 +33,12 @@
                       },
                       "required": ["emailOtp", "google"],
                       "additionalProperties": false
+                    },
+                    "allowSignups": {
+                      "type": "boolean"
                     }
                   },
-                  "required": ["methods"],
+                  "required": ["methods", "allowSignups"],
                   "additionalProperties": false
                 }
               }

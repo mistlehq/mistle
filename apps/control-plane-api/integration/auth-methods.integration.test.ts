@@ -21,6 +21,31 @@ describe.concurrent("auth methods integration", () => {
         emailOtp: true,
         google: false,
       },
+      allowSignups: true,
+    });
+  });
+});
+
+const signupsDisabledIt = createIntegrationTest({
+  services: ["control-plane-api"],
+  __serviceOptions: {
+    controlPlaneApi: {
+      allowSignups: false,
+    },
+  },
+});
+
+describe.concurrent("auth methods with disabled signups integration", () => {
+  signupsDisabledIt("returns signup allowance metadata", async ({ env }) => {
+    const response = await env.controlPlaneApi.http.fetch("/v1/auth/methods");
+
+    expect(response.status).toBe(200);
+    expect(authMethodsResponseSchema.parse(await response.json())).toStrictEqual({
+      methods: {
+        emailOtp: true,
+        google: false,
+      },
+      allowSignups: false,
     });
   });
 });

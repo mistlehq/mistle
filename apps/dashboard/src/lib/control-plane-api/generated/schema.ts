@@ -401,6 +401,7 @@ export interface paths {
           };
           content: {
             "application/json": {
+              allowSignups: boolean;
               methods: {
                 /** @enum {boolean} */
                 emailOtp: true;

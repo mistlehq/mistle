@@ -29,7 +29,11 @@ describe.concurrent("auth signup allowance integration", () => {
     const email = `integration-disabled-otp-new-${randomUUID()}@example.com`;
 
     const sendResponse = await sendOtp({ env, email });
-    expect(sendResponse.status).toBe(200);
+    expect(sendResponse.status).toBe(403);
+    expect(await sendResponse.json()).toStrictEqual({
+      code: "SIGNUPS_DISABLED",
+      message: "Signups are disabled. Use an existing account email.",
+    });
 
     const verification = await env.controlPlaneDb.query.verifications.findFirst({
       columns: {

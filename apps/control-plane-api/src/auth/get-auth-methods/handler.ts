@@ -12,6 +12,7 @@ const routeHandler = (ctx: Parameters<RouteHandler<typeof route, AppContextBindi
         emailOtp: true,
         google: config.auth.google !== undefined,
       },
+      allowSignups: config.auth.allowSignups,
     },
     200,
   );
