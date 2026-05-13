@@ -22,6 +22,10 @@ import { parseSessionDiffPatch } from "./session-diff-panel-model.js";
 import { SessionDiffPanel } from "./session-diff-panel.js";
 import { SessionPortAccessPopover, SessionPortAccessSheet } from "./session-port-access-popover.js";
 import { SessionStartupStatus } from "./session-startup-status.js";
+import type {
+  SessionTerminalContentInset,
+  SessionTerminalThemeMode,
+} from "./session-terminal-surface.js";
 import {
   SessionTerminalWorkspace,
   type SessionTerminalWorkspaceHandle,
@@ -510,10 +514,12 @@ type PrimaryPanelConversationContent = Pick<
   | "serverRequestPanelEntries"
 >;
 
-type PrimaryPanelCliContent = Pick<
-  React.ComponentProps<typeof SessionCliPanel>,
-  "ptyState" | "refitKey" | "terminalContentInset" | "terminalThemeMode"
->;
+type PrimaryPanelCliContent = {
+  ptyState: React.ComponentProps<typeof SessionCliPanel>["ptyState"];
+  refitKey?: string;
+  terminalContentInset: SessionTerminalContentInset;
+  terminalThemeMode: SessionTerminalThemeMode;
+};
 
 function renderPrimaryPanelMainContent(input: {
   cli: PrimaryPanelCliContent;
@@ -541,12 +547,8 @@ function renderPrimaryPanelMainContent(input: {
       return (
         <SessionCliPanel
           ptyState={input.cli.ptyState}
-          {...(input.cli.terminalContentInset === undefined
-            ? {}
-            : { terminalContentInset: input.cli.terminalContentInset })}
-          {...(input.cli.terminalThemeMode === undefined
-            ? {}
-            : { terminalThemeMode: input.cli.terminalThemeMode })}
+          terminalContentInset={input.cli.terminalContentInset}
+          terminalThemeMode={input.cli.terminalThemeMode}
           {...(input.cli.refitKey === undefined ? {} : { refitKey: input.cli.refitKey })}
         />
       );

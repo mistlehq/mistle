@@ -308,7 +308,8 @@ export function useSessionMainPanelHandoff(
   ]);
 
   const handoffToCli = useCallback(async (): Promise<void> => {
-    const activeRuntime = getActiveRuntime();
+    const activeRuntimeId = input.activeRuntimeIdRef.current;
+    const activeRuntime = input.runtimes[activeRuntimeId];
     if (
       input.sandboxInstanceId === null ||
       activeRuntime.lifecycle.sessionSnapshot === null ||
@@ -338,23 +339,14 @@ export function useSessionMainPanelHandoff(
       activeRuntime.lifecycle.detachSessionConnection();
       activeRuntime.resetServerRequests();
 
-      let cliOpened = false;
-      try {
-        await input.cliPtyState.actions.openPty({
-          ...buildCliPtyOpenInput({
-            launchTarget,
-            runtimeId: input.activeRuntimeIdRef.current,
-            sandboxInstanceId: input.sandboxInstanceId,
-            selectedRepositoryPath,
-          }),
-        });
-        cliOpened = true;
-      } catch (error) {
-        if (cliOpened) {
-          await closeAndDisconnectCliPty(input.cliPtyState);
-        }
-        throw error;
-      }
+      await input.cliPtyState.actions.openPty({
+        ...buildCliPtyOpenInput({
+          launchTarget,
+          runtimeId: activeRuntimeId,
+          sandboxInstanceId: input.sandboxInstanceId,
+          selectedRepositoryPath,
+        }),
+      });
 
       if (!isCurrentGeneration(generation)) {
         await closeAndDisconnectCliPty(input.cliPtyState);
@@ -380,9 +372,9 @@ export function useSessionMainPanelHandoff(
       });
     }
   }, [
-    getActiveRuntime,
     input.activeRuntimeIdRef,
     input.cliPtyState,
+    input.runtimes,
     input.selectedRepositoryPathRef,
     input.sandboxInstanceId,
     isCurrentGeneration,
@@ -415,7 +407,7 @@ export function useSessionMainPanelHandoff(
 
     clearRestoreTimeout();
     failRestore(activeRuntime.lifecycle.lifecycleErrorMessage);
-  }, [failRestore, getActiveRuntime, input.runtimes, isCurrentGeneration, state.transitionState]);
+  }, [failRestore, getActiveRuntime, isCurrentGeneration, state.transitionState]);
 
   useEffect(() => {
     const restoreGeneration = restoreGenerationRef.current;
@@ -461,7 +453,6 @@ export function useSessionMainPanelHandoff(
   }, [
     failRestore,
     getActiveRuntime,
-    input.runtimes,
     isCurrentGeneration,
     resetToStableChat,
     state.transitionState,

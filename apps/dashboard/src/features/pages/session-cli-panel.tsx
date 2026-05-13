@@ -16,14 +16,11 @@ type SessionCliPanelProps = {
 export function SessionCliPanel({
   ptyState,
   refitKey,
-  terminalContentInset,
-  terminalThemeMode,
+  terminalContentInset = "default",
+  terminalThemeMode = "system",
 }: SessionCliPanelProps): React.JSX.Element {
   const { lifecycle, output, actions } = ptyState;
   const refitKeyProps = refitKey === undefined ? {} : { refitKey };
-  const contentInsetProps =
-    terminalContentInset === undefined ? {} : { contentInset: terminalContentInset };
-  const themeModeProps = terminalThemeMode === undefined ? {} : { themeMode: terminalThemeMode };
 
   return (
     <SessionPtyPanelShell
@@ -34,8 +31,8 @@ export function SessionCliPanel({
           onResize={actions.resizePty}
           onWriteInput={actions.writeInput}
           outputChunks={output.chunks}
-          {...contentInsetProps}
-          {...themeModeProps}
+          contentInset={terminalContentInset}
+          themeMode={terminalThemeMode}
           {...refitKeyProps}
         />
       }
