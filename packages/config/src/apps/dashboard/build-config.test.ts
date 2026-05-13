@@ -301,25 +301,6 @@ describe("loadDashboardBuildConfig", () => {
     });
   });
 
-  it("loads env-backed dashboard config when explicit config path is unavailable", () => {
-    const config = loadDashboardBuildConfigForTest({
-      configPath: "/missing/runtime/config.toml",
-      env: {
-        MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN: "https://api.example.test",
-        MISTLE_SERVICES_DASHBOARD_POSTHOG_ENABLED: "true",
-        MISTLE_SERVICES_DASHBOARD_POSTHOG_PROJECT_API_KEY: "phc_env",
-        MISTLE_SERVICES_DASHBOARD_POSTHOG_HOST: "https://us.i.posthog.com",
-      },
-    });
-
-    expect(config.controlPlaneApiOrigin).toBe("https://api.example.test");
-    expect(config.posthog).toEqual({
-      enabled: true,
-      projectApiKey: "phc_env",
-      host: "https://us.i.posthog.com",
-    });
-  });
-
   it("fails on invalid explicit config file even when env-backed dashboard config is complete", () => {
     const directory = createTempDirectory();
     const configPath = join(directory, "config.toml");
@@ -347,6 +328,20 @@ describe("loadDashboardBuildConfig", () => {
         },
       }),
     ).toThrow("Invalid input: expected string, received undefined");
+  });
+
+  it("fails when an explicit config path is unavailable even when env-backed dashboard config is complete", () => {
+    expect(() =>
+      loadDashboardBuildConfigForTest({
+        configPath: "/missing/runtime/config.toml",
+        env: {
+          MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN: "https://api.example.test",
+          MISTLE_SERVICES_DASHBOARD_POSTHOG_ENABLED: "true",
+          MISTLE_SERVICES_DASHBOARD_POSTHOG_PROJECT_API_KEY: "phc_env",
+          MISTLE_SERVICES_DASHBOARD_POSTHOG_HOST: "https://us.i.posthog.com",
+        },
+      }),
+    ).toThrow("Missing required dashboard config file: /missing/runtime/config.toml");
   });
 
   it("requires PostHog project API key when PostHog is enabled", () => {

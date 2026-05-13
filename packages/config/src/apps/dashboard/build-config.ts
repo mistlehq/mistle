@@ -199,32 +199,6 @@ function resolveConfigPath(
   );
 }
 
-function envProvidesCompleteDashboardBuildConfig(environment: NodeJS.ProcessEnv): boolean {
-  if (readDashboardControlPlaneApiOriginEnv(environment) === undefined) {
-    return false;
-  }
-
-  const postHogEnabled = readBooleanEnvValue(
-    environment,
-    "MISTLE_SERVICES_DASHBOARD_POSTHOG_ENABLED",
-  );
-  if (postHogEnabled !== true) {
-    return true;
-  }
-
-  return (
-    readNonEmptyEnvValue(environment, "MISTLE_SERVICES_DASHBOARD_POSTHOG_PROJECT_API_KEY") !==
-      undefined &&
-    readNonEmptyEnvValue(environment, "MISTLE_SERVICES_DASHBOARD_POSTHOG_HOST") !== undefined
-  );
-}
-
-function isMissingDashboardConfigFileError(error: unknown): boolean {
-  return (
-    error instanceof Error && error.message.startsWith("Missing required dashboard config file:")
-  );
-}
-
 function readDashboardControlPlaneApiOriginEnv(environment: NodeJS.ProcessEnv): string | undefined {
   return readNonEmptyEnvValue(environment, "MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN");
 }
@@ -235,18 +209,7 @@ function resolveOptionalParsedConfig(input: {
 }): z.infer<typeof DashboardBuildConfigSchema> | undefined {
   const explicitConfigPath = input.environment.MISTLE_CONFIG_PATH;
   if (typeof explicitConfigPath === "string" && explicitConfigPath.trim().length > 0) {
-    try {
-      return DashboardBuildConfigSchema.parse(parseTomlFile(explicitConfigPath));
-    } catch (error) {
-      if (
-        isMissingDashboardConfigFileError(error) &&
-        envProvidesCompleteDashboardBuildConfig(input.environment)
-      ) {
-        return undefined;
-      }
-
-      throw error;
-    }
+    return DashboardBuildConfigSchema.parse(parseTomlFile(explicitConfigPath));
   }
 
   try {
