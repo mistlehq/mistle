@@ -1876,9 +1876,7 @@ describe("SandboxProfileEditorPage", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Sandbox Profile" }));
 
-    expect(
-      screen.queryByText("Choose a Git connection before selecting repository resources."),
-    ).toBeNull();
+    expect(screen.getByText("Git Connection")).toBeDefined();
   });
 
   it("keeps git connection separate from the combined integration table", () => {
@@ -1944,9 +1942,6 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByRole("combobox", { name: "Sandbox Runtime" })).toBeDefined();
     expect(screen.queryByText("Loading integrations and resources...")).toBeNull();
     expect(screen.queryByText("Loading integrations...")).toBeNull();
-    expect(
-      screen.queryByText("Choose a Git connection before selecting repository resources."),
-    ).toBeNull();
   });
 
   it("keeps the runtime section quiet while sandbox providers are loading", () => {
