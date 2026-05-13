@@ -9,6 +9,7 @@ import type {
 import {
   formatSemanticChatDetail,
   projectSemanticChatEntries,
+  shouldSuppressChatReasoningText,
   type SemanticChatProjectionItem,
 } from "../../../chat/chat-semantic-projection.js";
 import type { ChatAttachment, ChatEntry, ChatGenericItemEntry } from "../../../chat/chat-types.js";
@@ -366,16 +367,6 @@ function readErrorMessage(
   return error.name;
 }
 
-function shouldSuppressOpenCodeReasoningText(text: string): boolean {
-  const normalizedText = text.trim();
-  return (
-    normalizedText.length === 0 ||
-    normalizedText === "[]" ||
-    normalizedText === "{}" ||
-    normalizedText === "null"
-  );
-}
-
 function createAssistantEntries(input: {
   message: OpenCodeMessage;
   parts: readonly OpenCodeMessagePart[];
@@ -402,7 +393,7 @@ function createAssistantEntries(input: {
       continue;
     }
     if (part.type === "reasoning") {
-      if (shouldSuppressOpenCodeReasoningText(part.text)) {
+      if (shouldSuppressChatReasoningText(part.text)) {
         continue;
       }
 
@@ -426,7 +417,7 @@ function createAssistantEntries(input: {
         sourcePath: null,
         detailKind: "plain",
         command: null,
-        output: null,
+        output: part.text,
       });
       continue;
     }

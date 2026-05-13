@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   projectSemanticChatEntries,
+  shouldSuppressChatReasoningText,
   type SemanticChatProjectionItem,
 } from "./chat-semantic-projection.js";
 
@@ -106,5 +107,19 @@ describe("projectSemanticChatEntries", () => {
         kind: "semantic-group",
       },
     ]);
+  });
+});
+
+describe("shouldSuppressChatReasoningText", () => {
+  it("suppresses empty placeholder reasoning text", () => {
+    expect(shouldSuppressChatReasoningText("")).toBe(true);
+    expect(shouldSuppressChatReasoningText("   ")).toBe(true);
+    expect(shouldSuppressChatReasoningText("[]")).toBe(true);
+    expect(shouldSuppressChatReasoningText("{}")).toBe(true);
+    expect(shouldSuppressChatReasoningText("null")).toBe(true);
+  });
+
+  it("keeps non-placeholder reasoning text", () => {
+    expect(shouldSuppressChatReasoningText("I will inspect the repository.")).toBe(false);
   });
 });

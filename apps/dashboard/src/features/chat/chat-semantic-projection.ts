@@ -20,6 +20,16 @@ export function formatSemanticChatDetail(input: {
   return `${normalizedDetail.slice(0, input.maxLength - 1).trimEnd()}…`;
 }
 
+export function shouldSuppressChatReasoningText(text: string): boolean {
+  const normalizedText = text.trim();
+  return (
+    normalizedText.length === 0 ||
+    normalizedText === "[]" ||
+    normalizedText === "{}" ||
+    normalizedText === "null"
+  );
+}
+
 export type SemanticChatProjectionItem =
   | {
       kind: "semantic";

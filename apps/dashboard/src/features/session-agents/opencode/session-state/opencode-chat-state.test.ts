@@ -65,6 +65,7 @@ describe("reduceOpenCodeChatState", () => {
             id: "part_reasoning",
             label: "Thought",
             detail: "I will inspect the repo.",
+            output: "I will inspect the repo.",
             sourceKind: "reasoning",
           },
         ],
@@ -76,6 +77,57 @@ describe("reduceOpenCodeChatState", () => {
         turnId: "msg_user",
       },
     ]);
+  });
+
+  it("preserves full OpenCode reasoning text beyond the compact row detail", () => {
+    const fullReasoningText = [
+      "I will inspect the repository structure, compare the current OpenCode projection against the shared semantic renderer contract,",
+      "and then preserve the full reasoning body inside the expandable semantic output.",
+    ].join(" ");
+
+    const state = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "hydrate_messages",
+      sessionId: "ses_test",
+      messages: [
+        createUserMessage({
+          id: "msg_user",
+          text: "Please update the docs",
+        }),
+        createAssistantMessage({
+          id: "msg_assistant",
+          parentId: "msg_user",
+          parts: [
+            {
+              id: "part_reasoning",
+              messageID: "msg_assistant",
+              sessionID: "ses_test",
+              text: fullReasoningText,
+              time: {
+                start: 2,
+                end: 3,
+              },
+              type: "reasoning",
+            },
+          ],
+        }),
+      ],
+    });
+
+    expect(state.entries).toContainEqual(
+      expect.objectContaining({
+        id: "msg_user:thinking:part_reasoning",
+        kind: "semantic-group",
+        semanticKind: "thinking",
+        items: [
+          expect.objectContaining({
+            id: "part_reasoning",
+            detail:
+              "I will inspect the repository structure, compare the current OpenCode projection agains…",
+            output: fullReasoningText,
+          }),
+        ],
+      }),
+    );
   });
 
   it("suppresses OpenCode placeholder reasoning parts before semantic grouping", () => {

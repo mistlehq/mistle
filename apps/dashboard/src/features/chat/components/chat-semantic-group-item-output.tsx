@@ -71,6 +71,27 @@ function parseWebSearchResults(output: string): readonly WebSearchResult[] | nul
   });
 }
 
+function ChatSemanticGroupProseOutput({
+  isRootOutput,
+  text,
+}: {
+  isRootOutput: boolean;
+  text: string;
+}): React.JSX.Element {
+  return (
+    <p
+      className="text-muted-foreground text-sm whitespace-pre-wrap"
+      {...(isRootOutput ? { "data-chat-semantic-group-output": true } : {})}
+      style={{
+        lineHeight: "var(--chat-semantic-group-output-leading, 1.25rem)",
+        ...(isRootOutput ? { marginTop: "0px" } : {}),
+      }}
+    >
+      {text}
+    </p>
+  );
+}
+
 export function ChatSemanticGroupItemOutput({
   item,
   semanticKind,
@@ -92,14 +113,7 @@ export function ChatSemanticGroupItemOutput({
         }}
       >
         {item.detail === null ? null : (
-          <p
-            className="text-muted-foreground text-sm whitespace-pre-wrap"
-            style={{
-              lineHeight: "var(--chat-semantic-group-output-leading, 1.25rem)",
-            }}
-          >
-            {item.detail}
-          </p>
+          <ChatSemanticGroupProseOutput isRootOutput={false} text={item.detail} />
         )}
         {item.output === null || item.output.length === 0 ? null : (
           <pre
@@ -200,6 +214,10 @@ export function ChatSemanticGroupItemOutput({
         </div>
       );
     }
+  }
+
+  if (semanticKind === "thinking") {
+    return <ChatSemanticGroupProseOutput isRootOutput text={output} />;
   }
 
   if (semanticKind === "making-edits" && item.detail !== null && !item.detail.includes(", ")) {

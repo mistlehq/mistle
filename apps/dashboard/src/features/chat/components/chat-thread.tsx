@@ -1,4 +1,5 @@
 import type { ServerRequestEntry } from "../../session-agents/server-requests/index.js";
+import { shouldSuppressChatReasoningText } from "../chat-semantic-projection.js";
 import type { ChatEntry, ChatGenericItemEntry, ChatSemanticGroupEntry } from "../chat-types.js";
 import {
   buildChatTurnGroups,
@@ -167,13 +168,8 @@ export function ChatThread({
               </div>
             );
           } else if (block.kind === "reasoning") {
-            const normalizedSummary = block.summary.trim();
             const isSuppressedRawReasoning =
-              block.source === "content" &&
-              (normalizedSummary.length === 0 ||
-                normalizedSummary === "[]" ||
-                normalizedSummary === "{}" ||
-                normalizedSummary === "null");
+              block.source === "content" && shouldSuppressChatReasoningText(block.summary);
             if (isSuppressedRawReasoning) {
               return null;
             }
