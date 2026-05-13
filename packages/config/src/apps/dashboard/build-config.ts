@@ -199,13 +199,44 @@ function resolveConfigPath(
   );
 }
 
+function envProvidesCompleteDashboardBuildConfig(environment: NodeJS.ProcessEnv): boolean {
+  if (
+    readNonEmptyEnvValue(environment, "MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN") ===
+    undefined
+  ) {
+    return false;
+  }
+
+  const postHogEnabled = readBooleanEnvValue(
+    environment,
+    "MISTLE_SERVICES_DASHBOARD_POSTHOG_ENABLED",
+  );
+  if (postHogEnabled !== true) {
+    return true;
+  }
+
+  return (
+    readNonEmptyEnvValue(environment, "MISTLE_SERVICES_DASHBOARD_POSTHOG_PROJECT_API_KEY") !==
+      undefined &&
+    readNonEmptyEnvValue(environment, "MISTLE_SERVICES_DASHBOARD_POSTHOG_HOST") !== undefined
+  );
+}
+
 function resolveOptionalParsedConfig(input: {
   environment: NodeJS.ProcessEnv;
   dashboardBuildEnvironment: DashboardBuildEnvironment;
 }): z.infer<typeof DashboardBuildConfigSchema> | undefined {
   const explicitConfigPath = input.environment.MISTLE_CONFIG_PATH;
   if (typeof explicitConfigPath === "string" && explicitConfigPath.trim().length > 0) {
-    return DashboardBuildConfigSchema.parse(parseTomlFile(explicitConfigPath));
+    try {
+      return DashboardBuildConfigSchema.parse(parseTomlFile(explicitConfigPath));
+    } catch (error) {
+      if (envProvidesCompleteDashboardBuildConfig(input.environment)) {
+        return undefined;
+      }
+
+      throw error;
+    }
   }
 
   try {
