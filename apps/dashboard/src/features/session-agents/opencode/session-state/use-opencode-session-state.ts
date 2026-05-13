@@ -52,7 +52,7 @@ export type OpenCodeSessionLifecycleState = {
   lifecycleErrorMessage: string | null;
   recoverSession: (input: { sandboxInstanceId: string; targetThreadId: string | null }) => void;
   recoverableDisconnect: null;
-  refreshModelCatalog: (input: { directory?: string | null }) => Promise<void>;
+  refreshModelCatalog: (input: { directory?: string | null; force?: boolean }) => Promise<void>;
   sessionConnectionState: "connected" | "connecting" | "detached";
   sessionSnapshot: ConnectedOpenCodeSession | null;
   step: "connected" | "connecting" | "idle" | "securing";
@@ -186,6 +186,13 @@ export function useOpenCodeSessionState(input: {
   const eventSubscriptionRef = useRef<OpenCodeEventSubscription | null>(null);
   const generationRef = useRef(0);
   const modelCatalogGenerationRef = useRef(0);
+  const modelCatalogStateRef = useRef<{
+    directory: string | null;
+    phase: SessionBootstrapResult["phase"];
+  }>({
+    directory: null,
+    phase: { status: "unavailable" },
+  });
   const [step, setStep] = useState<OpenCodeSessionLifecycleState["step"]>("idle");
   const [sessionSnapshot, setSessionSnapshot] = useState<ConnectedOpenCodeSession | null>(null);
   const [sessionConnectionState, setSessionConnectionState] =
@@ -219,6 +226,13 @@ export function useOpenCodeSessionState(input: {
     setSessionErrorMessage(message);
   }, []);
 
+  useEffect(() => {
+    modelCatalogStateRef.current = {
+      directory: modelCatalogDirectory,
+      phase: bootstrapPhase,
+    };
+  }, [bootstrapPhase, modelCatalogDirectory]);
+
   const clearEventSubscription = useCallback((): void => {
     const subscription = eventSubscriptionRef.current;
     eventSubscriptionRef.current = null;
@@ -233,6 +247,10 @@ export function useOpenCodeSessionState(input: {
     clientRef.current?.close();
     clientRef.current = null;
     modelCatalogGenerationRef.current += 1;
+    modelCatalogStateRef.current = {
+      directory: null,
+      phase: { status: "unavailable" },
+    };
     setAvailableModels([]);
     setModelCatalogDirectory(null);
     setBootstrapPhase({ status: "unavailable" });
@@ -274,18 +292,27 @@ export function useOpenCodeSessionState(input: {
   }, [sessionSnapshot?.activeSessionId]);
 
   const refreshModelCatalog = useCallback(
-    async (refreshInput: { directory?: string | null }): Promise<void> => {
+    async (refreshInput: { directory?: string | null; force?: boolean }): Promise<void> => {
       const client = clientRef.current;
       if (client === null) {
         throw new Error("Connect OpenCode before refreshing model providers.");
       }
 
       const directory = normalizeOpenCodeCatalogDirectory(refreshInput.directory);
-      if (modelCatalogDirectory === directory && bootstrapPhase.status === "ready") {
+      const currentCatalogState = modelCatalogStateRef.current;
+      if (
+        refreshInput.force !== true &&
+        currentCatalogState.directory === directory &&
+        currentCatalogState.phase.status === "ready"
+      ) {
         return;
       }
       const generation = modelCatalogGenerationRef.current + 1;
       modelCatalogGenerationRef.current = generation;
+      modelCatalogStateRef.current = {
+        directory,
+        phase: { status: "bootstrapping" },
+      };
       setAvailableModels([]);
       setModelCatalogDirectory(directory);
       setBootstrapPhase({ status: "bootstrapping" });
@@ -301,6 +328,10 @@ export function useOpenCodeSessionState(input: {
         if (modelCatalogGenerationRef.current !== generation) {
           return;
         }
+        modelCatalogStateRef.current = {
+          directory,
+          phase: { status: "ready" },
+        };
         setAvailableModels(composerModels);
         setBootstrapPhase({ status: "ready" });
       } catch (error) {
@@ -309,15 +340,20 @@ export function useOpenCodeSessionState(input: {
         }
         const message =
           error instanceof Error ? error.message : "Could not load OpenCode model providers.";
-        setAvailableModels([]);
-        setBootstrapPhase({
+        const failedPhase: SessionBootstrapResult["phase"] = {
           status: "failed",
           message,
-        });
+        };
+        modelCatalogStateRef.current = {
+          directory,
+          phase: failedPhase,
+        };
+        setAvailableModels([]);
+        setBootstrapPhase(failedPhase);
         throw error;
       }
     },
-    [bootstrapPhase.status, modelCatalogDirectory],
+    [],
   );
 
   const connectSession = useCallback(
@@ -333,6 +369,10 @@ export function useOpenCodeSessionState(input: {
       clientRef.current?.close();
       clientRef.current = null;
       modelCatalogGenerationRef.current += 1;
+      modelCatalogStateRef.current = {
+        directory: null,
+        phase: { status: "bootstrapping" },
+      };
       setAvailableModels([]);
       setModelCatalogDirectory(null);
       setBootstrapPhase({ status: "bootstrapping" });
@@ -357,7 +397,9 @@ export function useOpenCodeSessionState(input: {
           const targetSessionId =
             connectInput.targetSessionId ?? connectInput.targetThreadId ?? null;
           const directory = connectInput.initialCwd ?? undefined;
-          await refreshModelCatalog(directory === undefined ? {} : { directory });
+          await refreshModelCatalog(
+            directory === undefined ? { force: true } : { directory, force: true },
+          );
           const sessionSelection = resolveOpenCodeSessionSelection({
             targetSessionId,
             listedSessions:
@@ -443,12 +485,17 @@ export function useOpenCodeSessionState(input: {
           clientRef.current?.close();
           clientRef.current = null;
           modelCatalogGenerationRef.current += 1;
-          setAvailableModels([]);
-          setModelCatalogDirectory(null);
-          setBootstrapPhase({
+          const failedPhase: SessionBootstrapResult["phase"] = {
             status: "failed",
             message: error instanceof Error ? error.message : "Could not connect OpenCode session.",
-          });
+          };
+          modelCatalogStateRef.current = {
+            directory: null,
+            phase: failedPhase,
+          };
+          setAvailableModels([]);
+          setModelCatalogDirectory(null);
+          setBootstrapPhase(failedPhase);
           setSessionSnapshot(null);
           setLifecycleErrorMessage(
             error instanceof Error ? error.message : "Could not connect OpenCode session.",
