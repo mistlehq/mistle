@@ -8,7 +8,7 @@ import type {
 } from "@mistle/integrations-definitions/agent-runtimes/opencode/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import type { ChatState } from "../chat/chat-state.js";
 import { formatCodexContextUsage } from "../session-agents/codex/session-state/codex-context-usage.js";
@@ -356,13 +356,59 @@ export function useSessionWorkbenchController(input: {
     sandboxInstanceId: input.sandboxInstanceId,
     stoppedSessionMessage: workbenchLifecycleState.stoppedSessionMessage,
   });
+  const openCodeRefreshModelCatalog = openCodeSessionState.lifecycle.refreshModelCatalog;
+  const openCodeSessionConnectionState = openCodeSessionState.lifecycle.sessionConnectionState;
+  const reportOpenCodeSessionError = openCodeSessionState.sessionMessage.reportSessionErrorMessage;
+  useEffect(() => {
+    if (!isOpenCodeRuntime || openCodeSessionConnectionState !== "connected") {
+      return;
+    }
+
+    void openCodeRefreshModelCatalog({
+      directory: selectedRepositoryPath,
+    }).catch((error: unknown) => {
+      reportOpenCodeSessionError(
+        error instanceof Error ? error.message : "Could not refresh OpenCode model providers.",
+      );
+    });
+  }, [
+    isOpenCodeRuntime,
+    openCodeRefreshModelCatalog,
+    openCodeSessionConnectionState,
+    reportOpenCodeSessionError,
+    selectedRepositoryPath,
+  ]);
+  const openCodeComposerBootstrap = useMemo(() => {
+    if (
+      openCodeSessionConnectionState === "connected" &&
+      openCodeSessionState.modelCatalogDirectory !== selectedRepositoryPath
+    ) {
+      return {
+        phase: { status: "bootstrapping" as const },
+        establishedSnapshot: {
+          availableModels: [],
+          configSnapshot: {
+            model: null,
+            modelReasoningEffort: null,
+          },
+        },
+      };
+    }
+
+    return openCodeSessionState.bootstrap;
+  }, [
+    openCodeSessionState.bootstrap,
+    openCodeSessionState.modelCatalogDirectory,
+    openCodeSessionConnectionState,
+    selectedRepositoryPath,
+  ]);
   const configControl = useSessionComposerConfigControl({
     bootstrap: sessionState.bootstrap,
     clearSessionErrorMessage: sessionMessage.clearSessionErrorMessage,
     codexConfig,
   });
   const openCodeConfigControl = useLocalSessionComposerConfigControl({
-    bootstrap: openCodeSessionState.bootstrap,
+    bootstrap: openCodeComposerBootstrap,
     clearSessionErrorMessage: openCodeSessionState.sessionMessage.clearSessionErrorMessage,
     canChangeReasoningEffort: false,
   });
@@ -558,7 +604,7 @@ export function useSessionWorkbenchController(input: {
       chatState: activeConversationChatState,
       ...(isOpenCodeRuntime ? {} : { dismissUserMessageAction: chat.dismissUserMessageAction }),
       composerStateInput: {
-        bootstrap: isOpenCodeRuntime ? openCodeSessionState.bootstrap : sessionState.bootstrap,
+        bootstrap: isOpenCodeRuntime ? openCodeComposerBootstrap : sessionState.bootstrap,
         configControl: activeConfigControl,
         attachmentControl,
         turnControl: {

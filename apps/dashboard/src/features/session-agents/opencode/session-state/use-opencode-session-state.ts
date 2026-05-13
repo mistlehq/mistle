@@ -52,6 +52,7 @@ export type OpenCodeSessionLifecycleState = {
   lifecycleErrorMessage: string | null;
   recoverSession: (input: { sandboxInstanceId: string; targetThreadId: string | null }) => void;
   recoverableDisconnect: null;
+  refreshModelCatalog: (input: { directory?: string | null }) => Promise<void>;
   sessionConnectionState: "connected" | "connecting" | "detached";
   sessionSnapshot: ConnectedOpenCodeSession | null;
   step: "connected" | "connecting" | "idle" | "securing";
@@ -59,6 +60,7 @@ export type OpenCodeSessionLifecycleState = {
 
 export type UseOpenCodeSessionStateResult = {
   bootstrap: SessionBootstrapResult;
+  modelCatalogDirectory: string | null;
   chat: {
     abortSession: () => Promise<void>;
     canInterruptTurn: boolean;
@@ -89,6 +91,10 @@ const EmptyOpenCodeComposerConfig = {
   model: null,
   modelReasoningEffort: null,
 };
+
+function normalizeOpenCodeCatalogDirectory(directory: string | null | undefined): string | null {
+  return directory === undefined || directory === null ? null : directory;
+}
 
 export function resolveOpenCodeSessionSelection(input: {
   listedSessions: readonly OpenCodeSessionSummary[];
@@ -179,6 +185,7 @@ export function useOpenCodeSessionState(input: {
   const clientRef = useRef<OpenCodeSessionClient | null>(null);
   const eventSubscriptionRef = useRef<OpenCodeEventSubscription | null>(null);
   const generationRef = useRef(0);
+  const modelCatalogGenerationRef = useRef(0);
   const [step, setStep] = useState<OpenCodeSessionLifecycleState["step"]>("idle");
   const [sessionSnapshot, setSessionSnapshot] = useState<ConnectedOpenCodeSession | null>(null);
   const [sessionConnectionState, setSessionConnectionState] =
@@ -186,6 +193,7 @@ export function useOpenCodeSessionState(input: {
   const [lifecycleErrorMessage, setLifecycleErrorMessage] = useState<string | null>(null);
   const [sessionErrorMessage, setSessionErrorMessage] = useState<string | null>(null);
   const [availableModels, setAvailableModels] = useState<readonly CodexModelSummary[]>([]);
+  const [modelCatalogDirectory, setModelCatalogDirectory] = useState<string | null>(null);
   const [bootstrapPhase, setBootstrapPhase] = useState<SessionBootstrapResult["phase"]>({
     status: "unavailable",
   });
@@ -224,7 +232,9 @@ export function useOpenCodeSessionState(input: {
     clearEventSubscription();
     clientRef.current?.close();
     clientRef.current = null;
+    modelCatalogGenerationRef.current += 1;
     setAvailableModels([]);
+    setModelCatalogDirectory(null);
     setBootstrapPhase({ status: "unavailable" });
     setSessionSnapshot(null);
     setSessionConnectionState("detached");
@@ -263,6 +273,53 @@ export function useOpenCodeSessionState(input: {
     }
   }, [sessionSnapshot?.activeSessionId]);
 
+  const refreshModelCatalog = useCallback(
+    async (refreshInput: { directory?: string | null }): Promise<void> => {
+      const client = clientRef.current;
+      if (client === null) {
+        throw new Error("Connect OpenCode before refreshing model providers.");
+      }
+
+      const directory = normalizeOpenCodeCatalogDirectory(refreshInput.directory);
+      if (modelCatalogDirectory === directory && bootstrapPhase.status === "ready") {
+        return;
+      }
+      const generation = modelCatalogGenerationRef.current + 1;
+      modelCatalogGenerationRef.current = generation;
+      setAvailableModels([]);
+      setModelCatalogDirectory(directory);
+      setBootstrapPhase({ status: "bootstrapping" });
+
+      try {
+        const providerCatalog = await client.listConfigProviders({
+          ...(directory === null ? {} : { directory }),
+        });
+        const composerModels = mapOpenCodeProvidersToComposerModels({
+          providers: providerCatalog.providers,
+          defaultModelByProvider: providerCatalog.default,
+        });
+        if (modelCatalogGenerationRef.current !== generation) {
+          return;
+        }
+        setAvailableModels(composerModels);
+        setBootstrapPhase({ status: "ready" });
+      } catch (error) {
+        if (modelCatalogGenerationRef.current !== generation) {
+          return;
+        }
+        const message =
+          error instanceof Error ? error.message : "Could not load OpenCode model providers.";
+        setAvailableModels([]);
+        setBootstrapPhase({
+          status: "failed",
+          message,
+        });
+        throw error;
+      }
+    },
+    [bootstrapPhase.status, modelCatalogDirectory],
+  );
+
   const connectSession = useCallback(
     (connectInput: {
       initialCwd?: string | null;
@@ -275,7 +332,9 @@ export function useOpenCodeSessionState(input: {
       clearEventSubscription();
       clientRef.current?.close();
       clientRef.current = null;
+      modelCatalogGenerationRef.current += 1;
       setAvailableModels([]);
+      setModelCatalogDirectory(null);
       setBootstrapPhase({ status: "bootstrapping" });
       setStep("securing");
       setSessionConnectionState("connecting");
@@ -298,13 +357,7 @@ export function useOpenCodeSessionState(input: {
           const targetSessionId =
             connectInput.targetSessionId ?? connectInput.targetThreadId ?? null;
           const directory = connectInput.initialCwd ?? undefined;
-          const providerCatalog = await client.listConfigProviders({
-            ...(directory === undefined ? {} : { directory }),
-          });
-          const composerModels = mapOpenCodeProvidersToComposerModels({
-            providers: providerCatalog.providers,
-            defaultModelByProvider: providerCatalog.default,
-          });
+          await refreshModelCatalog(directory === undefined ? {} : { directory });
           const sessionSelection = resolveOpenCodeSessionSelection({
             targetSessionId,
             listedSessions:
@@ -380,8 +433,6 @@ export function useOpenCodeSessionState(input: {
             connectedAtIso: new Date().toISOString(),
             sandboxInstanceId: connectInput.sandboxInstanceId,
           });
-          setAvailableModels(composerModels);
-          setBootstrapPhase({ status: "ready" });
           setStep("connected");
           setSessionConnectionState("connected");
         } catch (error) {
@@ -391,7 +442,9 @@ export function useOpenCodeSessionState(input: {
           clearEventSubscription();
           clientRef.current?.close();
           clientRef.current = null;
+          modelCatalogGenerationRef.current += 1;
           setAvailableModels([]);
+          setModelCatalogDirectory(null);
           setBootstrapPhase({
             status: "failed",
             message: error instanceof Error ? error.message : "Could not connect OpenCode session.",
@@ -405,7 +458,7 @@ export function useOpenCodeSessionState(input: {
         }
       })();
     },
-    [clearEventSubscription, ensureTransportConnected],
+    [clearEventSubscription, ensureTransportConnected, refreshModelCatalog],
   );
 
   const sendPrompt = useCallback(
@@ -502,6 +555,7 @@ export function useOpenCodeSessionState(input: {
         configSnapshot: EmptyOpenCodeComposerConfig,
       },
     },
+    modelCatalogDirectory,
     lifecycle: {
       clearLifecycleErrorMessage,
       connectSession,
@@ -511,6 +565,7 @@ export function useOpenCodeSessionState(input: {
       lifecycleErrorMessage,
       recoverSession,
       recoverableDisconnect: null,
+      refreshModelCatalog,
       sessionConnectionState,
       sessionSnapshot,
       step,

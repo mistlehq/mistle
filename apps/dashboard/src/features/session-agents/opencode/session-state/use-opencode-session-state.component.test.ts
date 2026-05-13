@@ -627,4 +627,69 @@ describe("useOpenCodeSessionState", () => {
     });
     await expect(promptPromise).resolves.toBeUndefined();
   });
+
+  it("refreshes the model catalog for a new repository directory", async () => {
+    const server = await startOpenCodeProxyTransportServer();
+    const transport = await connectTransport(server);
+    const { result } = renderHook(() =>
+      useOpenCodeSessionState({
+        ensureTransportConnected: async () => {
+          return {
+            sandboxInstanceId: "sbi_123",
+            transport,
+          };
+        },
+      }),
+    );
+
+    const permissionsRequest = await connectOpenCodeSessionForTest({
+      result,
+      sandboxInstanceId: "sbi_123",
+      server,
+      sessionId: "ses_test",
+    });
+    server.sendJsonResponse({
+      request: permissionsRequest,
+      body: [],
+    });
+
+    await waitFor(() => {
+      expect(result.current.lifecycle.sessionConnectionState).toBe("connected");
+    });
+    expect(result.current.modelCatalogDirectory).toBeNull();
+    expect(result.current.bootstrap.establishedSnapshot.availableModels).toHaveLength(1);
+
+    let refreshPromise: Promise<void> | undefined;
+    act(() => {
+      refreshPromise = result.current.lifecycle.refreshModelCatalog({
+        directory: "/workspace/other-repo",
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.bootstrap.phase).toEqual({ status: "bootstrapping" });
+    });
+    expect(result.current.bootstrap.establishedSnapshot.availableModels).toEqual([]);
+
+    const providersRequest = await server.nextRequest();
+    expect(providersRequest.request).toMatchObject({
+      method: "GET",
+      path: "/config/providers?directory=%2Fworkspace%2Fother-repo",
+    });
+    server.sendJsonResponse({
+      request: providersRequest,
+      body: createOpenCodeProviderCatalogResponse(),
+    });
+
+    await expect(refreshPromise).resolves.toBeUndefined();
+    await waitFor(() => {
+      expect(result.current.bootstrap.phase).toEqual({ status: "ready" });
+    });
+    expect(result.current.modelCatalogDirectory).toBe("/workspace/other-repo");
+    expect(result.current.bootstrap.establishedSnapshot.availableModels).toEqual([
+      expect.objectContaining({
+        model: "openai/gpt-5",
+      }),
+    ]);
+  });
 });
