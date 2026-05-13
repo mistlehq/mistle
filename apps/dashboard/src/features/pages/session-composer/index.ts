@@ -17,6 +17,7 @@ export {
   type PreparedComposerAttachments,
 } from "./use-session-composer-attachment-control.js";
 export {
+  useLocalSessionComposerConfigControl,
   useSessionComposerConfigControl,
   type SessionComposerConfigControl,
 } from "./use-session-composer-config-control.js";

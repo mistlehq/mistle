@@ -52,6 +52,15 @@ describe("createRuntimePublicAccessProxyScript", () => {
     expect(script).toContain("shuttingDown=");
   });
 
+  it("handles upgraded socket errors without crashing the shared proxy", () => {
+    const script = createRuntimePublicAccessProxyScript();
+
+    expect(script).toContain("function pipeUpgradeSockets(input)");
+    expect(script).toContain('recordSocketError("client_socket_error", error);');
+    expect(script).toContain('recordSocketError("target_socket_error", error);');
+    expect(script).toContain("if (socket.destroyed) {");
+  });
+
   it("persists environment routes so proxy replacement does not lose registered services", () => {
     const script = createRuntimePublicAccessProxyScript();
 

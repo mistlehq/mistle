@@ -77,6 +77,13 @@
       "import": "./src/agent-runtimes/opencode/server.ts",
       "default": "./src/agent-runtimes/opencode/server.ts"
     },
+    "./agent-runtimes/opencode/pty-launch": {
+      "types": "./src/agent-runtimes/opencode/pty-launch.ts",
+      "workspace-src": "./src/agent-runtimes/opencode/pty-launch.ts",
+      "node": "./dist/agent-runtimes/opencode/pty-launch.js",
+      "import": "./src/agent-runtimes/opencode/pty-launch.ts",
+      "default": "./src/agent-runtimes/opencode/pty-launch.ts"
+    },
     "./openai": {
       "types": "./src/openai/index.ts",
       "workspace-src": "./src/openai/index.ts",

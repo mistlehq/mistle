@@ -121,4 +121,29 @@ describe("ChatSemanticGroupItemOutput", () => {
 
     expect(container.querySelector('[data-semantic-output="command-log"]')).toBeTruthy();
   });
+
+  it("renders thinking output as prose instead of raw preformatted output", () => {
+    const { container } = render(
+      <ChatSemanticGroupItemOutput
+        item={{
+          id: "thought-item-1",
+          sourceKind: "reasoning",
+          label: "Thought",
+          detail: "I will inspect the repository structure…",
+          detailKind: "plain",
+          command: null,
+          output: "I will inspect the repository structure and keep the full reasoning visible.",
+          status: "completed",
+        }}
+        semanticKind="thinking"
+      />,
+    );
+
+    expect(container.querySelector("pre")).toBeNull();
+    expect(
+      screen.getByText(
+        "I will inspect the repository structure and keep the full reasoning visible.",
+      ),
+    ).toBeTruthy();
+  });
 });

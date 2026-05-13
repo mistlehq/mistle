@@ -460,8 +460,9 @@ async function planServiceEndpoints(
       continue;
     }
 
+    const reservedHost = http.bindHost ?? http.host;
     const port = await reserveAvailablePort({
-      host: http.host,
+      host: reservedHost,
     });
     const hostBaseUrl = `http://${http.host}:${String(port)}`;
 
@@ -469,6 +470,7 @@ async function planServiceEndpoints(
       http: {
         hostBaseUrl,
         internalBaseUrl: hostBaseUrl,
+        reservedHost,
       },
     });
   }
@@ -491,9 +493,12 @@ async function releasePlannedEndpoints(
       if (!Number.isInteger(port)) {
         throw new Error(`Cannot release planned HTTP endpoint '${httpEndpoint.hostBaseUrl}'.`);
       }
+      if (httpEndpoint.reservedHost === undefined) {
+        throw new Error(`Cannot release planned HTTP endpoint '${httpEndpoint.hostBaseUrl}'.`);
+      }
 
       await releaseReservedPort({
-        host: url.hostname,
+        host: httpEndpoint.reservedHost,
         port,
       });
     }),

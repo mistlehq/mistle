@@ -22,6 +22,10 @@ import { parseSessionDiffPatch } from "./session-diff-panel-model.js";
 import { SessionDiffPanel } from "./session-diff-panel.js";
 import { SessionPortAccessPopover, SessionPortAccessSheet } from "./session-port-access-popover.js";
 import { SessionStartupStatus } from "./session-startup-status.js";
+import type {
+  SessionTerminalContentInset,
+  SessionTerminalThemeMode,
+} from "./session-terminal-surface.js";
 import {
   SessionTerminalWorkspace,
   type SessionTerminalWorkspaceHandle,
@@ -103,9 +107,10 @@ function SessionWorkbenchPageContent(input: {
     ? (workbench.stoppedSessionMessage ?? "Changes are available only when the sandbox is running.")
     : diffButtonLabel;
   const cliButtonLabel = "TUI";
+  const cliRuntimeDisplayName = workbench.primaryPanelState.cliRuntimeDisplayName;
   const cliButtonTitle = workbench.primaryPanelState.isCliToggleActive
     ? "Return to chat"
-    : (workbench.primaryPanelState.disabledReason ?? "Open Codex TUI");
+    : (workbench.primaryPanelState.disabledReason ?? `Open ${cliRuntimeDisplayName} TUI`);
   const headerStatusKind = workbench.workbenchStatus.kind;
   const headerStatusLabel =
     headerStatusKind === "error"
@@ -320,12 +325,12 @@ function SessionWorkbenchPageContent(input: {
             title:
               workbench.primaryPanelState.error.kind === "chat_restore_failed"
                 ? "Could not restore chat"
-                : "Could not start Codex TUI",
+                : `Could not start ${cliRuntimeDisplayName} TUI`,
             description:
               workbench.primaryPanelState.error.message ??
               (workbench.primaryPanelState.error.kind === "chat_restore_failed"
                 ? "Could not restore chat."
-                : "Could not start Codex TUI."),
+                : `Could not start ${cliRuntimeDisplayName} TUI.`),
           }
         : null;
   useEffect(() => {
@@ -441,6 +446,8 @@ function SessionWorkbenchPageContent(input: {
             refitKey: workbench.terminalPanelState.isVisible
               ? "cli:terminal-open"
               : "cli:terminal-closed",
+            terminalContentInset: workbench.primaryPanelState.cliTerminalContentInset,
+            terminalThemeMode: workbench.primaryPanelState.cliTerminalThemeMode,
           },
           initialEntryStartupState,
           transitionState: workbench.primaryPanelState.transitionState,
@@ -508,10 +515,12 @@ type PrimaryPanelConversationContent = Pick<
   | "serverRequestPanelEntries"
 >;
 
-type PrimaryPanelCliContent = Pick<
-  React.ComponentProps<typeof SessionCliPanel>,
-  "ptyState" | "refitKey"
->;
+type PrimaryPanelCliContent = {
+  ptyState: React.ComponentProps<typeof SessionCliPanel>["ptyState"];
+  refitKey?: string;
+  terminalContentInset: SessionTerminalContentInset;
+  terminalThemeMode: SessionTerminalThemeMode;
+};
 
 function renderPrimaryPanelMainContent(input: {
   cli: PrimaryPanelCliContent;
@@ -539,6 +548,8 @@ function renderPrimaryPanelMainContent(input: {
       return (
         <SessionCliPanel
           ptyState={input.cli.ptyState}
+          terminalContentInset={input.cli.terminalContentInset}
+          terminalThemeMode={input.cli.terminalThemeMode}
           {...(input.cli.refitKey === undefined ? {} : { refitKey: input.cli.refitKey })}
         />
       );

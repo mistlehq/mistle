@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
-import { within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { ChatThread } from "./chat-thread.js";
@@ -243,8 +242,8 @@ describe("ChatThread", () => {
     expect(submittedResults).toEqual([{ decision: "accept" }]);
   });
 
-  it("renders generic items collapsed by default and expands their content on demand", () => {
-    render(
+  it("renders generic items through the shared semantic group fallback", () => {
+    const rendered = render(
       <ChatThread
         entries={[
           {
@@ -269,7 +268,7 @@ describe("ChatThread", () => {
               null,
               2,
             ),
-            status: "streaming",
+            status: "completed",
           },
         ]}
         isRespondingToServerRequest={false}
@@ -278,18 +277,16 @@ describe("ChatThread", () => {
       />,
     );
 
-    expect(screen.getByText("Context compaction")).toBeTruthy();
-    expect(screen.getByText("Running")).toBeTruthy();
-    const genericDisclosure = screen.getByText("Context compaction").closest("details");
-    expect(genericDisclosure?.hasAttribute("open")).toBe(false);
+    const groupSummary = rendered.container.querySelector("[data-chat-semantic-group-summary]");
+    if (groupSummary === null) {
+      throw new Error("Expected a semantic group summary.");
+    }
 
-    fireEvent.click(screen.getByText("Context compaction"));
-
-    expect(genericDisclosure?.hasAttribute("open")).toBe(true);
-    expect(
-      screen.getByText("Compacted the current session context before continuing."),
-    ).toBeTruthy();
-    expect(screen.getByText(/drop-superseded-read-output/)).toBeTruthy();
+    expect(within(groupSummary as HTMLElement).getByText("Context compaction")).toBeTruthy();
+    expect(screen.queryByText("Activity")).toBeNull();
+    expect(screen.queryByText("1 item")).toBeNull();
+    expect(screen.queryByText("Running")).toBeNull();
+    expect(rendered.container.querySelector("[data-chat-semantic-group]")).toBeTruthy();
   });
 
   it("renders user image attachments as attachment rows", () => {

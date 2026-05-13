@@ -1,10 +1,29 @@
-import type { AgentPtyLaunchSpec } from "@mistle/integrations-core";
+import type { AgentPtyLaunchArgument, AgentPtyLaunchSpec } from "@mistle/integrations-core";
 
 import { OpenCodeServerListenUrl } from "./server.js";
 
 export const OpenCodeCliPtySessionId = "cli";
 export const OpenCodeCliDefaultCols = 120;
 export const OpenCodeCliDefaultRows = 32;
+
+const OpenCodeCliAttachArgs: readonly AgentPtyLaunchArgument[] = [
+  {
+    kind: "literal",
+    value: "run",
+  },
+  {
+    kind: "literal",
+    value: "--interactive",
+  },
+  {
+    kind: "literal",
+    value: "--attach",
+  },
+  {
+    kind: "literal",
+    value: OpenCodeServerListenUrl,
+  },
+];
 
 export const OpenCodePtyLaunchSpec: AgentPtyLaunchSpec = {
   runtimeId: "opencode",
@@ -14,24 +33,7 @@ export const OpenCodePtyLaunchSpec: AgentPtyLaunchSpec = {
     cols: OpenCodeCliDefaultCols,
     rows: OpenCodeCliDefaultRows,
     command: "opencode",
-    args: [
-      {
-        kind: "literal",
-        value: "run",
-      },
-      {
-        kind: "literal",
-        value: "--interactive",
-      },
-      {
-        kind: "literal",
-        value: "--attach",
-      },
-      {
-        kind: "literal",
-        value: OpenCodeServerListenUrl,
-      },
-    ],
+    args: OpenCodeCliAttachArgs,
   },
   resumeLaunch: {
     ptySessionId: OpenCodeCliPtySessionId,
@@ -39,22 +41,7 @@ export const OpenCodePtyLaunchSpec: AgentPtyLaunchSpec = {
     rows: OpenCodeCliDefaultRows,
     command: "opencode",
     args: [
-      {
-        kind: "literal",
-        value: "run",
-      },
-      {
-        kind: "literal",
-        value: "--interactive",
-      },
-      {
-        kind: "literal",
-        value: "--attach",
-      },
-      {
-        kind: "literal",
-        value: OpenCodeServerListenUrl,
-      },
+      ...OpenCodeCliAttachArgs,
       {
         kind: "literal",
         value: "--session",

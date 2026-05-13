@@ -9,6 +9,7 @@ import type {
   Part,
   PermissionRequest,
   PermissionRuleset,
+  Provider,
   Session,
   SubtaskPartInput,
   TextPartInput,
@@ -18,6 +19,11 @@ import { createOpencodeClient } from "@opencode-ai/sdk/v2/client";
 import { createOpenCodeProxyFetch } from "./proxy-fetch.js";
 
 export type OpenCodeHealth = GlobalHealthResponse;
+export type OpenCodeProviderSummary = Provider;
+export type OpenCodeConfigProvidersResult = {
+  providers: readonly OpenCodeProviderSummary[];
+  default: Record<string, string>;
+};
 export type OpenCodeSessionSummary = Session;
 export type OpenCodeEvent = GlobalEvent;
 export type OpenCodeMessage = Message;
@@ -104,6 +110,10 @@ export type OpenCodeSessionClient = {
     workspace?: string;
   }): Promise<OpenCodeSessionSummary>;
   health(): Promise<OpenCodeHealth>;
+  listConfigProviders(input?: {
+    directory?: string;
+    workspace?: string;
+  }): Promise<OpenCodeConfigProvidersResult>;
   listMessages(input: {
     before?: string;
     directory?: string;
@@ -211,6 +221,18 @@ export function createOpenCodeSessionClient(
       const result = await sdkClient.global.health({
         throwOnError: true,
       });
+      return result.data;
+    },
+    async listConfigProviders(listInput = {}) {
+      const result = await sdkClient.config.providers(
+        {
+          ...(listInput.directory !== undefined ? { directory: listInput.directory } : {}),
+          ...(listInput.workspace !== undefined ? { workspace: listInput.workspace } : {}),
+        },
+        {
+          throwOnError: true,
+        },
+      );
       return result.data;
     },
     async listMessages(listInput) {

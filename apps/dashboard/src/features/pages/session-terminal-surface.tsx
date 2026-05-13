@@ -2,6 +2,7 @@ import { SandboxPtyStates } from "@mistle/sandbox-session-client";
 import { cn } from "@mistle/ui";
 
 import "@xterm/xterm/css/xterm.css";
+import "./session-terminal-surface.css";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal, type ITheme } from "@xterm/xterm";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -15,61 +16,10 @@ const INITIAL_PTY_DIMENSIONS = {
 const FALLBACK_TERMINAL_FONT_FAMILY =
   '"JetBrains Mono Variable", "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
 
-const DARK_TERMINAL_THEME: ITheme = {
-  background: "#132723",
-  foreground: "#dbf1ec",
-  cursor: "#9fd3c8",
-  cursorAccent: "#9fd3c8",
-  selectionBackground: "#6b9bd9",
-  black: "#23403b",
-  red: "#d97780",
-  green: "#7aa860",
-  yellow: "#bc904f",
-  blue: "#6b9bd9",
-  magenta: "#b77ed1",
-  cyan: "#52a9a9",
-  white: "#9fd3c8",
-  brightBlack: "#46756b",
-  brightRed: "#e6949a",
-  brightGreen: "#8ebf73",
-  brightYellow: "#d3a563",
-  brightBlue: "#88b1e5",
-  brightMagenta: "#c899de",
-  brightCyan: "#63c0bf",
-  brightWhite: "#f0f9f7",
-};
+export type SessionTerminalContentInset = "default" | "none";
+export type SessionTerminalThemeMode = "dark" | "light" | "system";
 
-const LIGHT_TERMINAL_THEME: ITheme = {
-  background: "#ffffff",
-  foreground: "#111111",
-  cursor: "#444444",
-  cursorAccent: "#ffffff",
-  selectionBackground: "#cfe0ff",
-  black: "#111111",
-  red: "#c65a4b",
-  green: "#3f9a52",
-  yellow: "#8c6d1f",
-  blue: "#4f86e8",
-  magenta: "#a855b7",
-  cyan: "#2f93a3",
-  white: "#555555",
-  brightBlack: "#9a9a9a",
-  brightRed: "#d96f61",
-  brightGreen: "#56ad68",
-  brightYellow: "#a8842d",
-  brightBlue: "#679cf0",
-  brightMagenta: "#bb6ac9",
-  brightCyan: "#46aaba",
-  brightWhite: "#222222",
-};
-
-function readIsDarkTheme(): boolean {
-  if (typeof document === "undefined") {
-    return false;
-  }
-
-  return document.documentElement.classList.contains("dark");
-}
+const TerminalBackgroundColor = "var(--session-terminal-background)";
 
 function resolveTerminalFontFamily(): string {
   if (typeof document === "undefined") {
@@ -83,8 +33,47 @@ function resolveTerminalFontFamily(): string {
   return fontFamily.length > 0 ? fontFamily : FALLBACK_TERMINAL_FONT_FAMILY;
 }
 
+function readRequiredCssVariable(style: CSSStyleDeclaration, variableName: string): string {
+  const value = style.getPropertyValue(variableName).trim();
+  if (value.length === 0) {
+    throw new Error(`Missing required terminal CSS variable: ${variableName}`);
+  }
+
+  return value;
+}
+
+function resolveTerminalTheme(element: HTMLElement): ITheme {
+  const style = getComputedStyle(element);
+
+  return {
+    background: readRequiredCssVariable(style, "--session-terminal-background"),
+    foreground: readRequiredCssVariable(style, "--session-terminal-foreground"),
+    cursor: readRequiredCssVariable(style, "--session-terminal-cursor"),
+    cursorAccent: readRequiredCssVariable(style, "--session-terminal-cursor-accent"),
+    selectionBackground: readRequiredCssVariable(style, "--session-terminal-selection-background"),
+    black: readRequiredCssVariable(style, "--session-terminal-black"),
+    red: readRequiredCssVariable(style, "--session-terminal-red"),
+    green: readRequiredCssVariable(style, "--session-terminal-green"),
+    yellow: readRequiredCssVariable(style, "--session-terminal-yellow"),
+    blue: readRequiredCssVariable(style, "--session-terminal-blue"),
+    magenta: readRequiredCssVariable(style, "--session-terminal-magenta"),
+    cyan: readRequiredCssVariable(style, "--session-terminal-cyan"),
+    white: readRequiredCssVariable(style, "--session-terminal-white"),
+    brightBlack: readRequiredCssVariable(style, "--session-terminal-bright-black"),
+    brightRed: readRequiredCssVariable(style, "--session-terminal-bright-red"),
+    brightGreen: readRequiredCssVariable(style, "--session-terminal-bright-green"),
+    brightYellow: readRequiredCssVariable(style, "--session-terminal-bright-yellow"),
+    brightBlue: readRequiredCssVariable(style, "--session-terminal-bright-blue"),
+    brightMagenta: readRequiredCssVariable(style, "--session-terminal-bright-magenta"),
+    brightCyan: readRequiredCssVariable(style, "--session-terminal-bright-cyan"),
+    brightWhite: readRequiredCssVariable(style, "--session-terminal-bright-white"),
+  };
+}
+
 type SessionTerminalSurfaceProps = {
   refitKey?: string;
+  contentInset?: SessionTerminalContentInset;
+  themeMode?: SessionTerminalThemeMode;
   isVisible: boolean;
   lifecycleState: string;
   outputChunks: readonly Uint8Array[];
@@ -109,6 +98,8 @@ function resolveTerminalDimensions(fitAddon: FitAddon | null): { cols: number; r
 
 export function SessionTerminalSurface({
   refitKey,
+  contentInset = "default",
+  themeMode = "system",
   isVisible,
   lifecycleState,
   outputChunks,
@@ -121,9 +112,7 @@ export function SessionTerminalSurface({
   const lifecycleStateRef = useRef(lifecycleState);
   const lastRenderedChunkCountRef = useRef(0);
   const outputDecoderRef = useRef(new TextDecoder());
-  const [isDarkTheme, setIsDarkTheme] = useState(readIsDarkTheme);
-  const terminalTheme = isDarkTheme ? DARK_TERMINAL_THEME : LIGHT_TERMINAL_THEME;
-  const terminalBackgroundColor = terminalTheme.background ?? "#ffffff";
+  const [themeRevision, setThemeRevision] = useState(0);
 
   lifecycleStateRef.current = lifecycleState;
 
@@ -133,7 +122,7 @@ export function SessionTerminalSurface({
     }
 
     const observer = new MutationObserver(() => {
-      setIsDarkTheme(readIsDarkTheme());
+      setThemeRevision((currentRevision) => currentRevision + 1);
     });
     observer.observe(document.documentElement, {
       attributes: true,
@@ -171,6 +160,7 @@ export function SessionTerminalSurface({
       return;
     }
 
+    const terminalTheme = resolveTerminalTheme(container);
     const terminal = new Terminal({
       allowTransparency: true,
       convertEol: true,
@@ -230,12 +220,13 @@ export function SessionTerminalSurface({
 
   useEffect(() => {
     const terminal = terminalRef.current;
-    if (terminal === null) {
+    const container = containerRef.current;
+    if (terminal === null || container === null) {
       return;
     }
 
-    terminal.options.theme = terminalTheme;
-  }, [terminalTheme]);
+    terminal.options.theme = resolveTerminalTheme(container);
+  }, [themeMode, themeRevision]);
 
   useEffect(() => {
     if (!isVisible) {
@@ -317,8 +308,9 @@ export function SessionTerminalSurface({
 
   return (
     <div
-      className="relative h-full min-h-0 overflow-hidden"
-      style={{ backgroundColor: terminalBackgroundColor }}
+      className="session-terminal-surface relative h-full min-h-0 overflow-hidden"
+      data-terminal-theme={themeMode}
+      style={{ backgroundColor: TerminalBackgroundColor }}
     >
       <div
         className={cn(
@@ -328,9 +320,9 @@ export function SessionTerminalSurface({
         )}
       >
         <div
-          className="h-full w-full pl-3"
+          className={cn("h-full w-full", contentInset === "default" && "pl-3")}
           ref={containerRef}
-          style={{ backgroundColor: terminalBackgroundColor }}
+          style={{ backgroundColor: TerminalBackgroundColor }}
         />
       </div>
     </div>

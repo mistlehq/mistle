@@ -1,9 +1,9 @@
+import { resolveAgentPtyLaunchTemplate } from "@mistle/integrations-core";
 import { CodexAppServerListenUrl } from "@mistle/integrations-definitions/agent-runtimes/codex/app-server";
+import { OpenCodePtyLaunchSpec } from "@mistle/integrations-definitions/agent-runtimes/opencode/pty-launch";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 import { useCallback, useEffect, useReducer, useRef, type RefObject } from "react";
 
-import type { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
-import type { ConnectCodexSessionInput } from "../session-agents/codex/session-state/session-connection/index.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
   InitialSessionMainPanelHandoffState,
@@ -12,25 +12,63 @@ import {
   type MainPanelTransitionState,
 } from "./session-main-panel-handoff-state.js";
 
+type SessionMainPanelRuntimeId = "codex" | "opencode";
+type ChatRestoreConnectionInput =
+  | {
+      initialCwd?: string | null;
+      providerThreadId?: string;
+      sandboxInstanceId: string;
+      selectionPolicy?: never;
+      targetThreadId: string;
+    }
+  | {
+      initialCwd?: string | null;
+      providerThreadId?: never;
+      sandboxInstanceId: string;
+      selectionPolicy?: "most_recently_updated";
+      targetThreadId: null;
+    };
+
+type SessionCliLaunchTarget =
+  | {
+      type: "resume";
+      threadId: string;
+    }
+  | {
+      type: "start_new";
+      shouldClearActiveThreadId: boolean;
+    };
+
+type SessionMainPanelHandoffLifecycleSnapshot = {
+  activeConversationId: string | null;
+};
+
+type SessionMainPanelHandoffLifecycle = {
+  clearLifecycleErrorMessage: () => void;
+  connectSession: (input: ChatRestoreConnectionInput) => void;
+  detachSessionConnection: () => void;
+  lifecycleErrorMessage: string | null;
+  sessionConnectionState: "connected" | "connecting" | "detached" | "recovering";
+  sessionSnapshot: SessionMainPanelHandoffLifecycleSnapshot | null;
+};
+
+type SessionMainPanelHandoffRuntime = {
+  clearActiveThreadIdAfterCliLaunch: (launchTarget: SessionCliLaunchTarget) => void;
+  displayName: "Codex" | "OpenCode";
+  hydrateChatFromConversation: () => Promise<void>;
+  lifecycle: SessionMainPanelHandoffLifecycle;
+  preserveCliLaunchForRestore: boolean;
+  resetServerRequests: () => void;
+  restoreConversationId: string | null;
+  resolveCliLaunchTarget: () => Promise<SessionCliLaunchTarget>;
+};
+
 type UseSessionMainPanelHandoffInput = {
+  activeRuntimeIdRef: RefObject<SessionMainPanelRuntimeId>;
   cliPtyState: ReturnType<typeof useSandboxPtyState>;
-  lifecycle: Pick<
-    ReturnType<typeof useCodexSessionState>["lifecycle"],
-    | "clearLifecycleErrorMessage"
-    | "connectSession"
-    | "detachSessionConnection"
-    | "lifecycleErrorMessage"
-    | "sessionSnapshot"
-    | "sessionConnectionState"
-  >;
+  runtimes: Record<SessionMainPanelRuntimeId, SessionMainPanelHandoffRuntime>;
   selectedRepositoryPathRef: RefObject<string | null>;
   sandboxInstanceId: string | null;
-  serverRequests: Pick<
-    ReturnType<typeof useCodexSessionState>["serverRequests"],
-    "resetServerRequests"
-  >;
-  threadAuthority: ReturnType<typeof useCodexSessionState>["threadAuthority"];
-  chat: Pick<ReturnType<typeof useCodexSessionState>["chat"], "hydrateChatFromThread">;
 };
 
 type SessionMainPanelHandoffResult = {
@@ -57,15 +95,8 @@ async function closeAndDisconnectCliPty(
 }
 
 export function buildCliPtyOpenInput(input: {
-  launchTarget:
-    | {
-        type: "resume";
-        threadId: string;
-      }
-    | {
-        type: "start_new";
-        shouldClearActiveThreadId: boolean;
-      };
+  launchTarget: SessionCliLaunchTarget;
+  runtimeId: SessionMainPanelRuntimeId;
   sandboxInstanceId: string;
   selectedRepositoryPath: string | null;
 }): {
@@ -73,10 +104,30 @@ export function buildCliPtyOpenInput(input: {
   ptySessionId: "cli";
   cols: number;
   rows: number;
-  command: "codex";
+  command: "codex" | "opencode";
   args: string[];
   cwd?: string;
 } {
+  if (input.runtimeId === "opencode") {
+    const launch = resolveAgentPtyLaunchTemplate({
+      launch: OpenCodePtyLaunchSpec,
+      threadId: input.launchTarget.type === "resume" ? input.launchTarget.threadId : null,
+    });
+
+    return {
+      sandboxInstanceId: input.sandboxInstanceId,
+      ptySessionId: "cli",
+      cols: launch.cols,
+      rows: launch.rows,
+      command: "opencode",
+      args:
+        input.selectedRepositoryPath === null
+          ? launch.args
+          : [...launch.args, "--dir", input.selectedRepositoryPath],
+      ...(input.selectedRepositoryPath === null ? {} : { cwd: input.selectedRepositoryPath }),
+    };
+  }
+
   return {
     sandboxInstanceId: input.sandboxInstanceId,
     ptySessionId: "cli",
@@ -92,11 +143,13 @@ export function buildCliPtyOpenInput(input: {
 }
 
 export function resolveChatRestoreConnectionInput(input: {
+  initialCwd: string | null;
   sandboxInstanceId: string;
   durableThreadId: string | null;
-}): ConnectCodexSessionInput {
+}): ChatRestoreConnectionInput {
   if (input.durableThreadId === null) {
     return {
+      initialCwd: input.initialCwd,
       sandboxInstanceId: input.sandboxInstanceId,
       targetThreadId: null,
       selectionPolicy: "most_recently_updated",
@@ -104,15 +157,45 @@ export function resolveChatRestoreConnectionInput(input: {
   }
 
   return {
+    initialCwd: input.initialCwd,
     sandboxInstanceId: input.sandboxInstanceId,
     targetThreadId: input.durableThreadId,
     providerThreadId: input.durableThreadId,
   };
 }
 
+type CliRestoreContext = {
+  conversationId: string | null;
+  initialCwd: string | null;
+};
+
+const EmptyCliRestoreContext: CliRestoreContext = {
+  conversationId: null,
+  initialCwd: null,
+};
+
+export function resolveCliRestoreContext(input: {
+  fallbackConversationId: string | null;
+  launchDirectory: string | null;
+  launchTarget: SessionCliLaunchTarget;
+  preserveLaunchContext: boolean;
+}): CliRestoreContext {
+  return {
+    conversationId:
+      input.preserveLaunchContext && input.launchTarget.type === "resume"
+        ? input.launchTarget.threadId
+        : input.fallbackConversationId,
+    initialCwd: input.preserveLaunchContext ? input.launchDirectory : null,
+  };
+}
+
 export type {
-  ConnectCodexSessionInput as ChatRestoreConnectionInput,
+  ChatRestoreConnectionInput,
+  SessionMainPanelHandoffLifecycle,
+  SessionMainPanelHandoffRuntime,
+  SessionMainPanelRuntimeId,
   SessionMainPanelHandoffResult,
+  SessionCliLaunchTarget,
   UseSessionMainPanelHandoffInput,
 };
 
@@ -127,6 +210,7 @@ export function useSessionMainPanelHandoff(
   const restoreGenerationRef = useRef<number | null>(null);
   const restoreTimeoutIdRef = useRef<TimerHandle | null>(null);
   const restoreExecutionGenerationRef = useRef<number | null>(null);
+  const cliRestoreContextRef = useRef<CliRestoreContext>(EmptyCliRestoreContext);
 
   const nextGeneration = useCallback((): number => {
     generationRef.current += 1;
@@ -150,6 +234,7 @@ export function useSessionMainPanelHandoff(
     clearRestoreTimeout();
     restoreGenerationRef.current = null;
     restoreExecutionGenerationRef.current = null;
+    cliRestoreContextRef.current = EmptyCliRestoreContext;
   }, [clearRestoreTimeout]);
 
   const failRestore = useCallback(
@@ -170,9 +255,15 @@ export function useSessionMainPanelHandoff(
     });
   }, [resetRestoreState]);
 
+  const getActiveRuntime = useCallback((): SessionMainPanelHandoffRuntime => {
+    return input.runtimes[input.activeRuntimeIdRef.current];
+  }, [input.activeRuntimeIdRef, input.runtimes]);
+
   const startChatRestore = useCallback((): void => {
     const generation = nextGeneration();
-    const durableThreadId = input.threadAuthority.providerThreadId;
+    const activeRuntime = getActiveRuntime();
+    const durableThreadId =
+      cliRestoreContextRef.current.conversationId ?? activeRuntime.restoreConversationId;
 
     restoreGenerationRef.current = generation;
     restoreExecutionGenerationRef.current = null;
@@ -184,11 +275,11 @@ export function useSessionMainPanelHandoff(
 
       failRestore("Timed out while restoring chat.");
     }, ChatRestoreTimeoutMs);
-    input.lifecycle.clearLifecycleErrorMessage();
+    activeRuntime.lifecycle.clearLifecycleErrorMessage();
     dispatch({
       type: "chat_restore_requested",
     });
-    input.serverRequests.resetServerRequests();
+    activeRuntime.resetServerRequests();
 
     void closeAndDisconnectCliPty(input.cliPtyState);
 
@@ -197,29 +288,31 @@ export function useSessionMainPanelHandoff(
       return;
     }
 
-    // Restore honors durable provider authority when one exists. Otherwise local
-    // sessions intentionally reconnect using the most recently updated thread.
-    input.lifecycle.connectSession(
+    // Restore honors the exact conversation launched into the CLI when known.
+    // Otherwise local sessions intentionally reconnect using the most recently
+    // updated thread.
+    activeRuntime.lifecycle.connectSession(
       resolveChatRestoreConnectionInput({
+        initialCwd: cliRestoreContextRef.current.initialCwd,
         sandboxInstanceId: input.sandboxInstanceId,
         durableThreadId,
       }),
     );
   }, [
     clearRestoreTimeout,
+    getActiveRuntime,
     input.cliPtyState,
-    input.lifecycle,
     input.sandboxInstanceId,
-    input.serverRequests,
-    input.threadAuthority,
     isCurrentGeneration,
     nextGeneration,
   ]);
 
   const handoffToCli = useCallback(async (): Promise<void> => {
+    const activeRuntimeId = input.activeRuntimeIdRef.current;
+    const activeRuntime = input.runtimes[activeRuntimeId];
     if (
       input.sandboxInstanceId === null ||
-      input.lifecycle.sessionSnapshot === null ||
+      activeRuntime.lifecycle.sessionSnapshot === null ||
       state.transitionState !== "stable_chat"
     ) {
       return;
@@ -231,37 +324,36 @@ export function useSessionMainPanelHandoff(
     });
 
     try {
-      const launchTarget = await input.threadAuthority.resolveCliLaunchTarget();
+      const launchTarget = await activeRuntime.resolveCliLaunchTarget();
       if (!isCurrentGeneration(generation)) {
         return;
       }
 
-      input.lifecycle.detachSessionConnection();
-      input.serverRequests.resetServerRequests();
+      const selectedRepositoryPath = input.selectedRepositoryPathRef.current;
+      cliRestoreContextRef.current = resolveCliRestoreContext({
+        fallbackConversationId: activeRuntime.restoreConversationId,
+        launchDirectory: selectedRepositoryPath,
+        launchTarget,
+        preserveLaunchContext: activeRuntime.preserveCliLaunchForRestore,
+      });
+      activeRuntime.lifecycle.detachSessionConnection();
+      activeRuntime.resetServerRequests();
 
-      let cliOpened = false;
-      try {
-        await input.cliPtyState.actions.openPty({
-          ...buildCliPtyOpenInput({
-            launchTarget,
-            sandboxInstanceId: input.sandboxInstanceId,
-            selectedRepositoryPath: input.selectedRepositoryPathRef.current,
-          }),
-        });
-        cliOpened = true;
-      } catch (error) {
-        if (cliOpened) {
-          await closeAndDisconnectCliPty(input.cliPtyState);
-        }
-        throw error;
-      }
+      await input.cliPtyState.actions.openPty({
+        ...buildCliPtyOpenInput({
+          launchTarget,
+          runtimeId: activeRuntimeId,
+          sandboxInstanceId: input.sandboxInstanceId,
+          selectedRepositoryPath,
+        }),
+      });
 
       if (!isCurrentGeneration(generation)) {
         await closeAndDisconnectCliPty(input.cliPtyState);
         return;
       }
 
-      input.threadAuthority.clearActiveThreadIdAfterCliLaunch(launchTarget);
+      activeRuntime.clearActiveThreadIdAfterCliLaunch(launchTarget);
       dispatch({
         type: "cli_handoff_succeeded",
       });
@@ -270,18 +362,21 @@ export function useSessionMainPanelHandoff(
         return;
       }
 
+      cliRestoreContextRef.current = EmptyCliRestoreContext;
       dispatch({
         type: "cli_handoff_failed",
-        errorMessage: error instanceof Error ? error.message : "Could not start Codex TUI.",
+        errorMessage:
+          error instanceof Error
+            ? error.message
+            : `Could not start ${activeRuntime.displayName} TUI.`,
       });
     }
   }, [
+    input.activeRuntimeIdRef,
     input.cliPtyState,
-    input.lifecycle,
+    input.runtimes,
     input.selectedRepositoryPathRef,
     input.sandboxInstanceId,
-    input.serverRequests,
-    input.threadAuthority,
     isCurrentGeneration,
     nextGeneration,
     state.transitionState,
@@ -301,7 +396,8 @@ export function useSessionMainPanelHandoff(
       return;
     }
 
-    if (input.lifecycle.lifecycleErrorMessage === null) {
+    const activeRuntime = getActiveRuntime();
+    if (activeRuntime.lifecycle.lifecycleErrorMessage === null) {
       return;
     }
 
@@ -310,13 +406,8 @@ export function useSessionMainPanelHandoff(
     }
 
     clearRestoreTimeout();
-    failRestore(input.lifecycle.lifecycleErrorMessage);
-  }, [
-    failRestore,
-    input.lifecycle.lifecycleErrorMessage,
-    isCurrentGeneration,
-    state.transitionState,
-  ]);
+    failRestore(activeRuntime.lifecycle.lifecycleErrorMessage);
+  }, [failRestore, getActiveRuntime, isCurrentGeneration, state.transitionState]);
 
   useEffect(() => {
     const restoreGeneration = restoreGenerationRef.current;
@@ -324,11 +415,15 @@ export function useSessionMainPanelHandoff(
       return;
     }
 
-    if (input.lifecycle.sessionConnectionState !== "connected") {
+    const activeRuntime = getActiveRuntime();
+    if (activeRuntime.lifecycle.sessionConnectionState !== "connected") {
       return;
     }
 
-    if (input.lifecycle.sessionSnapshot?.activeThreadId === null) {
+    if (
+      activeRuntime.lifecycle.sessionSnapshot === null ||
+      activeRuntime.lifecycle.sessionSnapshot.activeConversationId === null
+    ) {
       return;
     }
 
@@ -340,7 +435,7 @@ export function useSessionMainPanelHandoff(
 
     void (async () => {
       try {
-        await input.chat.hydrateChatFromThread();
+        await activeRuntime.hydrateChatFromConversation();
         if (!isCurrentGeneration(restoreGeneration)) {
           return;
         }
@@ -357,9 +452,7 @@ export function useSessionMainPanelHandoff(
     })();
   }, [
     failRestore,
-    input.chat,
-    input.lifecycle.sessionSnapshot?.activeThreadId,
-    input.lifecycle.sessionConnectionState,
+    getActiveRuntime,
     isCurrentGeneration,
     resetToStableChat,
     state.transitionState,

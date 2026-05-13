@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   CodexSessionConfigState,
@@ -10,16 +10,46 @@ import { resolveActiveComposerModel } from "./session-composer-model-readiness.j
 export type SessionComposerConfigControl = {
   selectedModel: string | null;
   selectedReasoningEffort: string | null;
+  hasExplicitModelSelection: boolean;
   modelOptions: readonly {
     value: string;
     label: string;
   }[];
-  canChangeModel: boolean;
   canChangeReasoningEffort: boolean;
   isUpdating: boolean;
   setModel: (value: string) => void;
   setReasoningEffort: (value: string) => void;
 };
+
+function resolveSelectedReasoningEffort(input: {
+  availableModels: SessionBootstrapResult["establishedSnapshot"]["availableModels"];
+  configuredReasoningEffort: string | null;
+  selectedModel: string | null;
+}): string | null {
+  if (input.selectedModel === null) {
+    return null;
+  }
+
+  if (input.configuredReasoningEffort !== null) {
+    return input.configuredReasoningEffort;
+  }
+
+  return (
+    resolveActiveComposerModel({
+      availableModels: input.availableModels,
+      selectedModel: input.selectedModel,
+    })?.defaultReasoningEffort ?? null
+  );
+}
+
+function buildModelOptions(
+  availableModels: SessionBootstrapResult["establishedSnapshot"]["availableModels"],
+): SessionComposerConfigControl["modelOptions"] {
+  return availableModels.map((model) => ({
+    value: model.model,
+    label: model.displayName,
+  }));
+}
 
 export function useSessionComposerConfigControl(input: {
   bootstrap: SessionBootstrapResult;
@@ -46,34 +76,23 @@ export function useSessionComposerConfigControl(input: {
     [availableModels, composerConfigOverrides.model, configSnapshot.model],
   );
 
-  const selectedReasoningEffort = useMemo(() => {
-    const explicitReasoningEffort =
-      composerConfigOverrides.modelReasoningEffort ?? configSnapshot.modelReasoningEffort;
-    if (explicitReasoningEffort !== null) {
-      return explicitReasoningEffort;
-    }
-
-    return (
-      resolveActiveComposerModel({
-        availableModels,
-        selectedModel,
-      })?.defaultReasoningEffort ?? null
-    );
-  }, [
-    availableModels,
-    composerConfigOverrides.modelReasoningEffort,
-    configSnapshot.modelReasoningEffort,
-    selectedModel,
-  ]);
-
-  const modelOptions = useMemo(
+  const selectedReasoningEffort = useMemo(
     () =>
-      availableModels.map((model) => ({
-        value: model.model,
-        label: model.displayName,
-      })),
-    [availableModels],
+      resolveSelectedReasoningEffort({
+        availableModels,
+        configuredReasoningEffort:
+          composerConfigOverrides.modelReasoningEffort ?? configSnapshot.modelReasoningEffort,
+        selectedModel,
+      }),
+    [
+      availableModels,
+      composerConfigOverrides.modelReasoningEffort,
+      configSnapshot.modelReasoningEffort,
+      selectedModel,
+    ],
   );
+
+  const modelOptions = useMemo(() => buildModelOptions(availableModels), [availableModels]);
 
   const setModel = useCallback(
     (nextModel: string): void => {
@@ -114,10 +133,100 @@ export function useSessionComposerConfigControl(input: {
   return {
     selectedModel,
     selectedReasoningEffort,
+    hasExplicitModelSelection: selectedModel !== null,
     modelOptions,
-    canChangeModel: true,
     canChangeReasoningEffort: true,
     isUpdating: isBatchWritingConfig || isWritingConfigValue,
+    setModel,
+    setReasoningEffort,
+  };
+}
+
+export function useLocalSessionComposerConfigControl(input: {
+  bootstrap: SessionBootstrapResult;
+  clearSessionErrorMessage: () => void;
+  canChangeReasoningEffort?: boolean;
+  resetKey?: string | null;
+}): SessionComposerConfigControl {
+  const { availableModels, configSnapshot } = input.bootstrap.establishedSnapshot;
+  const [composerConfigOverrides, setComposerConfigOverrides] = useState<ComposerConfigSnapshot>({
+    model: null,
+    modelReasoningEffort: null,
+  });
+  const appliedResetKeyRef = useRef<string | null | undefined>(input.resetKey);
+
+  useEffect(() => {
+    if (appliedResetKeyRef.current === input.resetKey) {
+      return;
+    }
+    appliedResetKeyRef.current = input.resetKey;
+    setComposerConfigOverrides({
+      model: null,
+      modelReasoningEffort: null,
+    });
+  }, [input.resetKey]);
+
+  const configuredModel = useMemo(
+    () => composerConfigOverrides.model ?? configSnapshot.model ?? null,
+    [composerConfigOverrides.model, configSnapshot.model],
+  );
+  const selectedModel = useMemo(() => {
+    if (configuredModel === null) {
+      return null;
+    }
+
+    return availableModels.some((model) => model.model === configuredModel)
+      ? configuredModel
+      : null;
+  }, [availableModels, configuredModel]);
+
+  const selectedReasoningEffort = useMemo(
+    () =>
+      resolveSelectedReasoningEffort({
+        availableModels,
+        configuredReasoningEffort:
+          composerConfigOverrides.modelReasoningEffort ?? configSnapshot.modelReasoningEffort,
+        selectedModel,
+      }),
+    [
+      availableModels,
+      composerConfigOverrides.modelReasoningEffort,
+      configSnapshot.modelReasoningEffort,
+      selectedModel,
+    ],
+  );
+
+  const modelOptions = useMemo(() => buildModelOptions(availableModels), [availableModels]);
+
+  const setModel = useCallback(
+    (nextModel: string): void => {
+      input.clearSessionErrorMessage();
+      setComposerConfigOverrides((currentConfig) => ({
+        model: nextModel,
+        modelReasoningEffort: currentConfig.modelReasoningEffort,
+      }));
+    },
+    [input.clearSessionErrorMessage],
+  );
+
+  const setReasoningEffort = useCallback(
+    (nextReasoningEffort: string): void => {
+      input.clearSessionErrorMessage();
+      setComposerConfigOverrides((currentConfig) => ({
+        model: currentConfig.model,
+        modelReasoningEffort: nextReasoningEffort,
+      }));
+    },
+    [input.clearSessionErrorMessage],
+  );
+
+  return {
+    selectedModel,
+    selectedReasoningEffort,
+    hasExplicitModelSelection: selectedModel !== null,
+    modelOptions,
+    canChangeReasoningEffort: input.canChangeReasoningEffort ?? true,
+    isUpdating: false,
     setModel,
     setReasoningEffort,
   };

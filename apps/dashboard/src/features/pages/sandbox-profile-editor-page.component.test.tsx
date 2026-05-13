@@ -381,6 +381,7 @@ function renderSandboxProfileEditor(input?: {
   }[];
   integrationBindingsError?: string;
   integrationsLoading?: boolean;
+  sandboxProvidersLoading?: boolean;
   defaultPersistenceMode?: SandboxProfileVersion["defaultPersistenceMode"];
   persistentSandboxesEnabled?: boolean;
   profileAutomationsListResult?: AutomationsListResult;
@@ -430,37 +431,53 @@ function renderSandboxProfileEditor(input?: {
     storageConfigVersion: null,
     organizationStorageConfigSummary: null,
   });
-  queryClient.setQueryData(sandboxProvidersQueryKey(), {
-    items: [
-      {
-        id: "docker",
-        displayName: "Docker",
-        managed: true,
-        supportsOrganizationConnection: false,
-        resourceCapabilities: null,
-      },
-      {
-        id: "e2b",
-        displayName: "E2B",
-        managed: true,
-        supportsOrganizationConnection: true,
-        resourceCapabilities: {
-          vcpuCount: {
-            min: 1,
-            max: 8,
-            step: 1,
-            default: 2,
-          },
-          memoryMb: {
-            min: 1024,
-            max: 8192,
-            step: 1024,
-            default: 4096,
+  if (input?.sandboxProvidersLoading === true) {
+    const sandboxProvidersQuery = queryClient.getQueryCache().build(queryClient, {
+      queryKey: sandboxProvidersQueryKey(),
+      queryFn: async () => ({
+        items: [],
+      }),
+    });
+
+    sandboxProvidersQuery.setState({
+      ...sandboxProvidersQuery.state,
+      data: undefined,
+      fetchStatus: "fetching",
+      status: "pending",
+    });
+  } else {
+    queryClient.setQueryData(sandboxProvidersQueryKey(), {
+      items: [
+        {
+          id: "docker",
+          displayName: "Docker",
+          managed: true,
+          supportsOrganizationConnection: false,
+          resourceCapabilities: null,
+        },
+        {
+          id: "e2b",
+          displayName: "E2B",
+          managed: true,
+          supportsOrganizationConnection: true,
+          resourceCapabilities: {
+            vcpuCount: {
+              min: 1,
+              max: 8,
+              step: 1,
+              default: 2,
+            },
+            memoryMb: {
+              min: 1024,
+              max: 8192,
+              step: 1024,
+              default: 4096,
+            },
           },
         },
-      },
-    ],
-  });
+      ],
+    });
+  }
   queryClient.setQueryData(sandboxProfileDetailQueryKey(profileId), {
     id: profileId,
     displayName: "Prototype Profile",
@@ -1901,14 +1918,10 @@ describe("SandboxProfileEditorPage", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Sandbox Profile" }));
 
-    expect(
-      screen.queryByText(
-        "Choose a Git provider in Integrations before selecting repository resources.",
-      ),
-    ).toBeNull();
+    expect(screen.getByText("Git Connection")).toBeDefined();
   });
 
-  it("groups runtime rows without an integrations and tools label", () => {
+  it("keeps git connection separate from the combined integration table", () => {
     renderSandboxProfileEditor();
 
     fireEvent.click(screen.getByRole("tab", { name: "Sandbox Profile" }));
@@ -1918,18 +1931,32 @@ describe("SandboxProfileEditorPage", () => {
     if (agentLabel === undefined) {
       throw new Error("Expected runtime Agent label to render.");
     }
-    const gitProviderLabel = screen.getByText("Git Provider");
     const sandboxRuntimeLabel = screen.getByText("Sandbox Runtime");
-    const proxiedConnectionsHeading = screen.getByRole("heading", { name: "Proxied Connections" });
+    const gitConnectionLabel = screen.getByText("Git Connection");
+    const integrationColumnLabel = screen.getAllByText("Integration")[0];
+    if (integrationColumnLabel === undefined) {
+      throw new Error("Expected combined integration column label to render.");
+    }
+    const proxiedConnectionColumnLabel = screen.getAllByText("Proxied Connection")[0];
+    if (proxiedConnectionColumnLabel === undefined) {
+      throw new Error("Expected proxied connection column label to render.");
+    }
+    const resourcesAndToolsColumnLabel = screen.getAllByText("Resources & Tools")[0];
+    if (resourcesAndToolsColumnLabel === undefined) {
+      throw new Error("Expected resources and tools column label to render.");
+    }
 
     expectElementToFollow(runtimeHeading, agentLabel);
     expectElementToFollow(agentLabel, sandboxRuntimeLabel);
-    expectElementToFollow(sandboxRuntimeLabel, gitProviderLabel);
-    expectElementToFollow(gitProviderLabel, proxiedConnectionsHeading);
+    expectElementToFollow(sandboxRuntimeLabel, gitConnectionLabel);
+    expectElementToFollow(gitConnectionLabel, integrationColumnLabel);
+    expect(proxiedConnectionColumnLabel).toBeDefined();
+    expect(resourcesAndToolsColumnLabel).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "Proxied Connections" })).toBeNull();
     expect(screen.queryByText("Integrations & Tools")).toBeNull();
   });
 
-  it("shows stale git guidance when a persisted git binding cannot be resolved", () => {
+  it("shows stale git connection errors when a persisted git binding cannot be resolved", () => {
     renderSandboxProfileEditor({
       bindings: [
         {
@@ -1957,11 +1984,18 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByRole("combobox", { name: "Sandbox Runtime" })).toBeDefined();
     expect(screen.queryByText("Loading integrations and resources...")).toBeNull();
     expect(screen.queryByText("Loading integrations...")).toBeNull();
-    expect(
-      screen.queryByText(
-        "Choose a Git provider in Integrations before selecting repository resources.",
-      ),
-    ).toBeNull();
+  });
+
+  it("keeps the runtime section quiet while sandbox providers are loading", () => {
+    renderSandboxProfileEditor({
+      sandboxProvidersLoading: true,
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Sandbox Profile" }));
+
+    expect(screen.getByRole("heading", { name: "Runtime" })).toBeDefined();
+    expect(screen.queryByText("Loading sandbox providers...")).toBeNull();
+    expect(screen.queryByRole("status", { name: "Loading sandbox providers..." })).toBeNull();
   });
 
   it("shows integration binding load failures without a loading placeholder", async () => {

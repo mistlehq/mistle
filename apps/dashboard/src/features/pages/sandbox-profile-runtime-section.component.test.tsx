@@ -48,11 +48,11 @@ const OrganizationE2BProvider = {
   managed: false,
 } satisfies SandboxProviderSummary;
 
-const StorageProvider = {
+const OrganizationStorageE2BProvider = {
   id: "e2b",
   displayName: "E2B",
   managed: true,
-  supportsOrganizationConnection: false,
+  supportsOrganizationConnection: true,
   resourceCapabilities: {
     vcpuCount: {
       min: 1,
@@ -74,6 +74,25 @@ const StorageProvider = {
     },
   },
 } satisfies SandboxProviderSummary;
+
+const E2BRuntimeConnection = {
+  id: "icn_e2b_runtime_test",
+  displayName: "E2B Production",
+  targetKey: "e2b-default",
+  status: "active",
+  config: {},
+} as const;
+
+const E2BRuntimeTarget = {
+  targetKey: "e2b-default",
+  displayName: "E2B",
+  familyId: "e2b",
+  variantId: "e2b-default",
+  config: {},
+  targetHealth: {
+    configStatus: "valid",
+  },
+} as const;
 
 function createVersion(
   input: Pick<
@@ -155,33 +174,14 @@ describe("SandboxProfileRuntimeSection", () => {
   it("renders organization-owned E2B as BYOK credentials for the selected provider", () => {
     render(
       <SandboxProfileRuntimeSection
-        availableConnections={[
-          {
-            id: "icn_e2b_runtime_test",
-            displayName: "E2B Production",
-            targetKey: "e2b-default",
-            status: "active",
-            config: {},
-          },
-        ]}
-        availableTargets={[
-          {
-            targetKey: "e2b-default",
-            displayName: "E2B",
-            familyId: "e2b",
-            variantId: "e2b-default",
-            config: {},
-            targetHealth: {
-              configStatus: "valid",
-            },
-          },
-        ]}
+        availableConnections={[E2BRuntimeConnection]}
+        availableTargets={[E2BRuntimeTarget]}
         disabled={false}
         isDraft={true}
         providers={[DockerProvider, E2BProvider]}
         version={createVersion({
           sandboxProvider: "e2b",
-          sandboxConnectionId: "icn_e2b_runtime_test",
+          sandboxConnectionId: E2BRuntimeConnection.id,
           sandboxResources: {
             vcpuCount: 2,
             memoryMb: 4096,
@@ -196,6 +196,44 @@ describe("SandboxProfileRuntimeSection", () => {
     );
     expect(screen.getByText("E2B Production")).toBeTruthy();
     expect(screen.queryByText("E2B (Managed)")).toBeNull();
+  });
+
+  it("renders read-only inline runtime settings with the same row labels as the draft view", () => {
+    render(
+      <SandboxProfileRuntimeSection
+        availableConnections={[E2BRuntimeConnection]}
+        availableTargets={[E2BRuntimeTarget]}
+        disabled={false}
+        isDraft={false}
+        providers={[DockerProvider, OrganizationStorageE2BProvider]}
+        sectionChrome={false}
+        version={createVersion({
+          sandboxProvider: "e2b",
+          sandboxConnectionId: E2BRuntimeConnection.id,
+          sandboxResources: {
+            vcpuCount: 4,
+            memoryMb: 8192,
+            storageMb: 20480,
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Agent")).toBeTruthy();
+    expect(screen.getByText("Codex")).toBeTruthy();
+    expect(screen.getByText("Sandbox Runtime")).toBeTruthy();
+    expect(screen.queryByText("Provider")).toBeNull();
+    expect(screen.getByText("Credentials")).toBeTruthy();
+    expect(screen.getByText("Use workspace API key")).toBeTruthy();
+    expect(screen.getByText("Connection")).toBeTruthy();
+    expect(screen.getByText("E2B Production")).toBeTruthy();
+    expect(screen.getByText("CPU")).toBeTruthy();
+    expect(screen.getByText("4 vCPU")).toBeTruthy();
+    expect(screen.getByText("Memory (MB)")).toBeTruthy();
+    expect(screen.getByText("8192 MB")).toBeTruthy();
+    expect(screen.getByText("Storage (MB)")).toBeTruthy();
+    expect(screen.getByText("20480 MB")).toBeTruthy();
+    expect(screen.queryByText("Resources")).toBeNull();
   });
 
   it("requires BYOK credentials for a non-managed provider without a saved connection", () => {
@@ -272,7 +310,7 @@ describe("SandboxProfileRuntimeSection", () => {
         availableTargets={[]}
         disabled={false}
         isDraft={true}
-        providers={[StorageProvider]}
+        providers={[OrganizationStorageE2BProvider]}
         version={createVersion({
           sandboxProvider: "e2b",
           sandboxConnectionId: null,

@@ -87,6 +87,7 @@ export type SessionComposerStateInput = {
   contextUsage: CodexContextUsageViewModel | null;
   collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
   requiresModelSelection?: boolean;
+  showConfigControls?: boolean;
   sessionErrorMessage: string | null;
   turnControl: SessionTurnControl;
 };
@@ -112,6 +113,7 @@ export function useSessionComposerState(input: {
   const { composerStateInput, draftState } = input;
   const { clearSessionErrorMessage, sessionErrorMessage } = composerStateInput;
   const requiresModelSelection = composerStateInput.requiresModelSelection !== false;
+  const showConfigControls = composerStateInput.showConfigControls ?? requiresModelSelection;
   const composerText = draftState.composerText;
   const [composerErrorMessage, setComposerErrorMessage] = useState<string | null>(null);
   const [pendingComposerAttachments, setPendingComposerAttachments] = useState<
@@ -671,7 +673,8 @@ export function useSessionComposerState(input: {
         composerStateInput.bootstrap.phase.status !== "ready" ||
         composerStateInput.configControl.isUpdating ||
         composerStateInput.attachmentControl.isUploadingAttachments,
-      showConfigControls: requiresModelSelection,
+      showConfigControls,
+      showReasoningControl: composerStateInput.configControl.canChangeReasoningEffort,
       onComposerTextChange: handleComposerTextChange,
       onSubmit: submitComposer,
       onSecondarySubmit: queuePrompt,

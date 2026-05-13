@@ -438,7 +438,7 @@ export function SandboxProfileAutomationsSection(input: { profileId: string }): 
 
       <div className="flex flex-col gap-6 md:grid md:grid-cols-[16rem_1px_minmax(0,1fr)] md:gap-0 lg:grid-cols-[18rem_1px_minmax(0,1fr)]">
         <nav aria-label="Automations" className="hidden min-h-0 flex-col md:flex">
-          <div className="pb-3 pl-4 pr-3">
+          <div className="py-3 pl-4 pr-3">
             <Button
               className="w-full justify-start"
               onClick={() => {

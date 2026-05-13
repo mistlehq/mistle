@@ -63,6 +63,7 @@ export function service(
     endpoints: {
       http: {
         host: Host,
+        bindHost: serverHostForSandbox(options.sandbox),
       },
     },
     poolScope: "environment",
