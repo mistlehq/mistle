@@ -307,6 +307,9 @@ describe("loadDashboardBuildConfig", () => {
   });
 
   it("loads enabled PostHog config from explicit env without a config file", () => {
+    removeWorkspaceConfigFile("config/config.development.toml");
+    removeWorkspaceConfigFile("config/config.production.toml");
+
     const config = loadDashboardBuildConfigForTest({
       env: {
         MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN: "https://api.example.test",
@@ -324,18 +327,23 @@ describe("loadDashboardBuildConfig", () => {
     });
   });
 
-  it("does not read default config files when dashboard build config is fully supplied by env", () => {
+  it("preserves discovered file-backed PostHog config when dashboard origin is overridden by env", () => {
     writeWorkspaceConfigFile({
       relativePath: "config/config.development.toml",
-      content: "not valid toml",
+      content: [
+        "[services.dashboard]",
+        'control_plane_api_origin = "https://api.from-file.test"',
+        "",
+        "[services.dashboard.posthog]",
+        "enabled = true",
+        'project_api_key = "phc_file"',
+        'host = "https://eu.i.posthog.com"',
+      ].join("\n"),
     });
 
     const config = loadDashboardBuildConfigForTest({
       env: {
         MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN: "https://api.example.test",
-        MISTLE_SERVICES_DASHBOARD_POSTHOG_ENABLED: "true",
-        MISTLE_SERVICES_DASHBOARD_POSTHOG_PROJECT_API_KEY: "phc_env",
-        MISTLE_SERVICES_DASHBOARD_POSTHOG_HOST: "https://us.i.posthog.com",
       },
       configPath: "",
     });
@@ -343,8 +351,8 @@ describe("loadDashboardBuildConfig", () => {
     expect(config.controlPlaneApiOrigin).toBe("https://api.example.test");
     expect(config.posthog).toEqual({
       enabled: true,
-      projectApiKey: "phc_env",
-      host: "https://us.i.posthog.com",
+      projectApiKey: "phc_file",
+      host: "https://eu.i.posthog.com",
     });
   });
 

@@ -63,18 +63,16 @@ export function DashboardAnalyticsProvider(props: {
       client === undefined ? DisabledDashboardAnalytics : createPostHogDashboardAnalytics(client),
     [client],
   );
-
-  if (client === undefined) {
-    return (
-      <DashboardAnalyticsContext.Provider value={analytics}>
-        {props.children}
-      </DashboardAnalyticsContext.Provider>
+  const children =
+    client === undefined ? (
+      props.children
+    ) : (
+      <PostHogProvider client={client}>{props.children}</PostHogProvider>
     );
-  }
 
   return (
     <DashboardAnalyticsContext.Provider value={analytics}>
-      <PostHogProvider client={client}>{props.children}</PostHogProvider>
+      {children}
     </DashboardAnalyticsContext.Provider>
   );
 }

@@ -15,14 +15,14 @@ Minimal dashboard scaffold using Vite + React.
 
 - Dashboard config is resolved at build time through `@mistle/config` and injected into the Vite build as `VITE_*` values.
 - The built static dashboard does not read or generate runtime config files.
-- `MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN` can provide the control-plane API origin directly without a TOML config file.
+- `MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN` can provide the control-plane API origin directly when no TOML config file is present.
 - Build config uses the shared root config files:
   - default precedence when `MISTLE_CONFIG_PATH` is unset:
     1. `config/config.development.toml`
     2. `config/config.production.toml`
   - this applies for `dev`, `build`, and `preview`
 - CI should pass `MISTLE_CONFIG_PATH` (for example `config/config.integration.docker.toml`) instead of relying on production defaults.
-- Docker image builds can set `MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN` directly or override the dashboard config file with `MISTLE_CONFIG_PATH`.
+- Docker image builds can set `MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN` directly when no config file is present, or override the dashboard config file with `MISTLE_CONFIG_PATH`.
 - Override config file path by setting:
   - `MISTLE_CONFIG_PATH`
 - Override the control-plane API origin directly by setting:
