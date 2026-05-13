@@ -45,6 +45,8 @@ You can edit the manifest before creating the app. Mistle will use your manifest
 
 To keep the integration working, Mistle always overrides the webhook and callback settings when it submits the manifest. This ensures GitHub delivers webhook events to Mistle, returns the manifest flow to Mistle after app creation, supports GitHub identity linking, and redirects post-installation setup back to Mistle so the installation can be verified and the connection can be completed.
 
+The default manifest includes the GitHub App **Email addresses** user permission with **Read-only** access. This is required for GitHub account linking because Mistle reads the authenticated GitHub user's verified email addresses during linked-account authorization.
+
 ### Option 1B: Use An Existing GitHub App
 
 If you already created a GitHub App in GitHub.com or GHES, you can connect it directly in Mistle.
@@ -66,8 +68,9 @@ Configure these values in GitHub:
    | Metadata      | Read-only      | List repos.<br />Read basic repo context.                                                             |
    | Pull requests | Read and write | Open/update PRs.<br />Request reviewers.<br />Comment/review PRs.<br />Merge PRs (repo rules apply).  |
 
-6. For **Subscribe to events**, enable the events you want Mistle to take action on. This can be changed later.
-7. **Private key** - Generate and download a PEM private key from GitHub App settings.
+6. If this app will be used for GitHub account linking, enable the **Email addresses** user permission with **Read-only** access.
+7. For **Subscribe to events**, enable the events you want Mistle to take action on. This can be changed later.
+8. **Private key** - Generate and download a PEM private key from GitHub App settings.
 
 ### Connect The Existing App In Mistle
 

@@ -52,6 +52,7 @@ describe("GitHubAppManifestTemplate", () => {
       default_permissions: {
         checks: "write",
         contents: "write",
+        emails: "read",
         issues: "write",
         metadata: "read",
         pull_requests: "write",
