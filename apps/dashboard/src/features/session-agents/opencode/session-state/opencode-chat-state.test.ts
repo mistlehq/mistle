@@ -5,6 +5,7 @@ import type {
 } from "@mistle/integrations-definitions/agent-runtimes/opencode/client";
 import { describe, expect, it } from "vitest";
 
+import { formatSemanticChatDetail } from "../../../chat/chat-semantic-projection.js";
 import { createInitialOpenCodeChatState, reduceOpenCodeChatState } from "./opencode-chat-state.js";
 
 describe("reduceOpenCodeChatState", () => {
@@ -121,8 +122,10 @@ describe("reduceOpenCodeChatState", () => {
         items: [
           expect.objectContaining({
             id: "part_reasoning",
-            detail:
-              "I will inspect the repository structure, compare the current OpenCode projection agains…",
+            detail: formatSemanticChatDetail({
+              detail: fullReasoningText,
+              maxLength: 88,
+            }),
             output: fullReasoningText,
           }),
         ],
