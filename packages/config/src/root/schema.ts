@@ -13,6 +13,43 @@ const ServiceEndpointSchema = z
   })
   .strict();
 
+function withDisabledPostHogDefault(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return value;
+  }
+
+  if ("enabled" in value) {
+    return value;
+  }
+
+  return {
+    ...value,
+    enabled: false,
+  };
+}
+
+const DashboardPostHogConfigSchema = z
+  .preprocess(
+    withDisabledPostHogDefault,
+    z.discriminatedUnion("enabled", [
+      z
+        .object({
+          enabled: z.literal(true),
+          project_api_key: z.string().trim().min(1),
+          host: UrlSchema,
+        })
+        .strict(),
+      z
+        .object({
+          enabled: z.literal(false),
+          project_api_key: z.string().trim().min(1).optional(),
+          host: UrlSchema.optional(),
+        })
+        .strict(),
+    ]),
+  )
+  .default({ enabled: false });
+
 const TokenConfigSchema = z
   .object({
     secret: z.string().trim().min(1),
@@ -136,6 +173,7 @@ export const ConfigSchema = z
           .object({
             public_url: UrlSchema,
             control_plane_api_origin: UrlSchema,
+            posthog: DashboardPostHogConfigSchema,
           })
           .strict(),
         control_plane_api: ServiceEndpointSchema.extend({

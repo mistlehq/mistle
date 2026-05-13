@@ -22,6 +22,9 @@ endpoint = "http://otel-collector:4318/v1/metrics"
 public_url = "https://app.mistle.example"
 control_plane_api_origin = "https://api.mistle.example"
 
+[services.dashboard.posthog]
+enabled = false
+
 [services.control_plane_api]
 host = "0.0.0.0"
 port = 8080

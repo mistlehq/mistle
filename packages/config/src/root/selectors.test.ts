@@ -23,6 +23,9 @@ function createRootConfig(input: {
       dashboard: {
         public_url: "https://app.example.com",
         control_plane_api_origin: "https://api.example.com",
+        posthog: {
+          enabled: false,
+        },
       },
       control_plane_api: {
         host: "0.0.0.0",

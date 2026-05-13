@@ -5,20 +5,69 @@ import { fileURLToPath } from "node:url";
 import { parse } from "smol-toml";
 import { z } from "zod";
 
+import { parseBooleanEnv } from "../../core/load-env.js";
+
 export type DashboardBuildEnvironment = "development" | "production";
 
 type UnknownRecord = Record<string, unknown>;
+
+function withDisabledPostHogDefault(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return value;
+  }
+
+  if ("enabled" in value) {
+    return value;
+  }
+
+  return {
+    ...value,
+    enabled: false,
+  };
+}
+
+const DashboardPostHogBuildConfigSchema = z.preprocess(
+  withDisabledPostHogDefault,
+  z.discriminatedUnion("enabled", [
+    z
+      .object({
+        enabled: z.literal(true),
+        project_api_key: z.string().trim().min(1),
+        host: z.string().trim().min(1),
+      })
+      .strict(),
+    z
+      .object({
+        enabled: z.literal(false),
+        project_api_key: z.string().trim().min(1).optional(),
+        host: z.string().trim().min(1).optional(),
+      })
+      .strict(),
+  ]),
+);
 
 const DashboardBuildConfigSchema = z.object({
   services: z.object({
     dashboard: z.object({
       control_plane_api_origin: z.string().min(1),
+      posthog: DashboardPostHogBuildConfigSchema.optional(),
     }),
   }),
 });
 
+export type DashboardPostHogBuildConfig =
+  | {
+      enabled: false;
+    }
+  | {
+      enabled: true;
+      projectApiKey: string;
+      host: string;
+    };
+
 export type DashboardBuildConfig = {
   controlPlaneApiOrigin: string;
+  posthog: DashboardPostHogBuildConfig;
 };
 
 const SameOriginControlPlaneApiOrigin = "same-origin";
@@ -65,6 +114,65 @@ function normalizeOrigin(value: string, key: string): string {
   return parsed.origin;
 }
 
+function readNonEmptyEnvValue(environment: NodeJS.ProcessEnv, key: string): string | undefined {
+  const value = environment[key];
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return undefined;
+  }
+
+  return value;
+}
+
+function readBooleanEnvValue(environment: NodeJS.ProcessEnv, key: string): boolean | undefined {
+  const value = readNonEmptyEnvValue(environment, key);
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return parseBooleanEnv(value, key);
+}
+
+function resolveDashboardPostHogBuildConfig(input: {
+  environment: NodeJS.ProcessEnv;
+  configuredPostHog: z.infer<typeof DashboardPostHogBuildConfigSchema> | undefined;
+}): DashboardPostHogBuildConfig {
+  const enabled =
+    readBooleanEnvValue(input.environment, "MISTLE_SERVICES_DASHBOARD_POSTHOG_ENABLED") ??
+    input.configuredPostHog?.enabled ??
+    false;
+  const projectApiKey =
+    readNonEmptyEnvValue(input.environment, "MISTLE_SERVICES_DASHBOARD_POSTHOG_PROJECT_API_KEY") ??
+    input.configuredPostHog?.project_api_key;
+  const rawHost =
+    readNonEmptyEnvValue(input.environment, "MISTLE_SERVICES_DASHBOARD_POSTHOG_HOST") ??
+    input.configuredPostHog?.host;
+
+  if (!enabled) {
+    return { enabled: false };
+  }
+
+  if (projectApiKey === undefined || projectApiKey.trim().length === 0) {
+    throw new Error(
+      "MISTLE_SERVICES_DASHBOARD_POSTHOG_PROJECT_API_KEY or services.dashboard.posthog.project_api_key is required when PostHog is enabled.",
+    );
+  }
+
+  if (rawHost === undefined || rawHost.trim().length === 0) {
+    throw new Error(
+      "MISTLE_SERVICES_DASHBOARD_POSTHOG_HOST or services.dashboard.posthog.host is required when PostHog is enabled.",
+    );
+  }
+
+  return {
+    enabled: true,
+    projectApiKey,
+    host: normalizeOrigin(
+      rawHost,
+      "MISTLE_SERVICES_DASHBOARD_POSTHOG_HOST or services.dashboard.posthog.host",
+    ),
+  };
+}
+
 function resolveConfigPath(
   environment: NodeJS.ProcessEnv,
   dashboardBuildEnvironment: DashboardBuildEnvironment,
@@ -106,6 +214,10 @@ export function loadDashboardBuildConfig(
         explicitControlPlaneApiOrigin,
         "MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN",
       ),
+      posthog: resolveDashboardPostHogBuildConfig({
+        environment,
+        configuredPostHog: undefined,
+      }),
     };
   }
 
@@ -121,5 +233,9 @@ export function loadDashboardBuildConfig(
 
   return {
     controlPlaneApiOrigin,
+    posthog: resolveDashboardPostHogBuildConfig({
+      environment,
+      configuredPostHog: parsedConfig.services.dashboard.posthog,
+    }),
   };
 }

@@ -45,6 +45,9 @@ describe("loadRootConfigFromEnv", () => {
       MISTLE_EMAIL_SMTP_PASSWORD: "smtp-password",
       MISTLE_SERVICES_DASHBOARD_PUBLIC_URL: "https://app.example.com",
       MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN: "https://api.example.com",
+      MISTLE_SERVICES_DASHBOARD_POSTHOG_ENABLED: "true",
+      MISTLE_SERVICES_DASHBOARD_POSTHOG_PROJECT_API_KEY: "phc_example",
+      MISTLE_SERVICES_DASHBOARD_POSTHOG_HOST: "https://us.i.posthog.com",
       MISTLE_SERVICES_CONTROL_PLANE_API_HOST: "0.0.0.0",
       MISTLE_SERVICES_CONTROL_PLANE_API_PORT: "8080",
       MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: "https://api.example.com",
@@ -182,6 +185,11 @@ describe("loadRootConfigFromEnv", () => {
         dashboard: {
           public_url: "https://app.example.com",
           control_plane_api_origin: "https://api.example.com",
+          posthog: {
+            enabled: true,
+            project_api_key: "phc_example",
+            host: "https://us.i.posthog.com",
+          },
         },
         control_plane_api: {
           host: "0.0.0.0",

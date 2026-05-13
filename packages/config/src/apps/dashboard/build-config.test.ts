@@ -52,14 +52,21 @@ afterEach(() => {
   }
 });
 
-function createDashboardConfigFile(input?: { dashboardOrigin?: string }): string {
+function createDashboardConfigFile(input?: {
+  dashboardOrigin?: string;
+  postHogConfigLines?: readonly string[];
+}): string {
   const directory = createTempDirectory();
   const configPath = join(directory, "config.toml");
   const dashboardOrigin = input?.dashboardOrigin ?? "http://127.0.0.1:5100";
 
   writeFileSync(
     configPath,
-    ["[services.dashboard]", `control_plane_api_origin = "${dashboardOrigin}"`]
+    [
+      "[services.dashboard]",
+      `control_plane_api_origin = "${dashboardOrigin}"`,
+      ...(input?.postHogConfigLines ?? []),
+    ]
       .filter((line) => line.length > 0)
       .join("\n"),
     "utf8",
@@ -92,6 +99,7 @@ describe("loadDashboardBuildConfig", () => {
     });
 
     expect(config.controlPlaneApiOrigin).toBe("https://api.example.test");
+    expect(config.posthog).toEqual({ enabled: false });
   });
 
   it("allows explicit single-image same-origin routing without a config file", () => {
@@ -103,6 +111,7 @@ describe("loadDashboardBuildConfig", () => {
     });
 
     expect(config.controlPlaneApiOrigin).toBe("same-origin");
+    expect(config.posthog).toEqual({ enabled: false });
   });
 
   it("fails when explicit dashboard origin is not an absolute URL origin or same-origin", () => {
@@ -141,6 +150,7 @@ describe("loadDashboardBuildConfig", () => {
     const config = loadDashboardBuildConfig({}, "production");
 
     expect(config.controlPlaneApiOrigin).toBe("http://127.0.0.1:5100");
+    expect(config.posthog).toEqual({ enabled: false });
   });
 
   it("loads dashboard origin from MISTLE_CONFIG_PATH", () => {
@@ -149,6 +159,7 @@ describe("loadDashboardBuildConfig", () => {
     });
 
     expect(config.controlPlaneApiOrigin).toBe("http://127.0.0.1:5100");
+    expect(config.posthog).toEqual({ enabled: false });
   });
 
   it("loads dashboard origin from dashboard-only config shape", () => {
@@ -165,6 +176,7 @@ describe("loadDashboardBuildConfig", () => {
     });
 
     expect(config.controlPlaneApiOrigin).toBe("http://127.0.0.1:5100");
+    expect(config.posthog).toEqual({ enabled: false });
   });
 
   it("allows single-image builds to use same-origin control-plane API routing", () => {
@@ -176,6 +188,7 @@ describe("loadDashboardBuildConfig", () => {
     });
 
     expect(config.controlPlaneApiOrigin).toBe("same-origin");
+    expect(config.posthog).toEqual({ enabled: false });
   });
 
   it("fails when services.dashboard.control_plane_api_origin is missing", () => {
@@ -198,6 +211,85 @@ describe("loadDashboardBuildConfig", () => {
       }),
     ).toThrow(
       "MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN or services.dashboard.control_plane_api_origin must use http:// or https://.",
+    );
+  });
+
+  it("loads enabled PostHog config from dashboard config", () => {
+    const config = loadDashboardBuildConfigForTest({
+      configPath: createDashboardConfigFile({
+        postHogConfigLines: [
+          "",
+          "[services.dashboard.posthog]",
+          "enabled = true",
+          'project_api_key = "phc_example"',
+          'host = "https://us.i.posthog.com"',
+        ],
+      }),
+    });
+
+    expect(config.posthog).toEqual({
+      enabled: true,
+      projectApiKey: "phc_example",
+      host: "https://us.i.posthog.com",
+    });
+  });
+
+  it("keeps PostHog disabled when only PostHog secrets are present", () => {
+    const config = loadDashboardBuildConfigForTest({
+      env: {
+        MISTLE_SERVICES_DASHBOARD_POSTHOG_PROJECT_API_KEY: "phc_example",
+        MISTLE_SERVICES_DASHBOARD_POSTHOG_HOST: "https://us.i.posthog.com",
+      },
+      configPath: createDashboardConfigFile(),
+    });
+
+    expect(config.posthog).toEqual({ enabled: false });
+  });
+
+  it("loads enabled PostHog config from explicit env without a config file", () => {
+    const config = loadDashboardBuildConfigForTest({
+      env: {
+        MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN: "https://api.example.test",
+        MISTLE_SERVICES_DASHBOARD_POSTHOG_ENABLED: "true",
+        MISTLE_SERVICES_DASHBOARD_POSTHOG_PROJECT_API_KEY: "phc_example",
+        MISTLE_SERVICES_DASHBOARD_POSTHOG_HOST: "https://us.i.posthog.com",
+      },
+      configPath: "",
+    });
+
+    expect(config.posthog).toEqual({
+      enabled: true,
+      projectApiKey: "phc_example",
+      host: "https://us.i.posthog.com",
+    });
+  });
+
+  it("requires PostHog project API key when PostHog is enabled", () => {
+    expect(() =>
+      loadDashboardBuildConfigForTest({
+        env: {
+          MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN: "https://api.example.test",
+          MISTLE_SERVICES_DASHBOARD_POSTHOG_ENABLED: "true",
+          MISTLE_SERVICES_DASHBOARD_POSTHOG_HOST: "https://us.i.posthog.com",
+        },
+        configPath: "",
+      }),
+    ).toThrow(
+      "MISTLE_SERVICES_DASHBOARD_POSTHOG_PROJECT_API_KEY or services.dashboard.posthog.project_api_key is required when PostHog is enabled.",
+    );
+  });
+
+  it("requires PostHog host when PostHog is enabled", () => {
+    expect(() =>
+      loadDashboardBuildConfigForTest({
+        env: {
+          MISTLE_SERVICES_DASHBOARD_POSTHOG_ENABLED: "true",
+          MISTLE_SERVICES_DASHBOARD_POSTHOG_PROJECT_API_KEY: "phc_example",
+        },
+        configPath: createDashboardConfigFile(),
+      }),
+    ).toThrow(
+      "MISTLE_SERVICES_DASHBOARD_POSTHOG_HOST or services.dashboard.posthog.host is required when PostHog is enabled.",
     );
   });
 });

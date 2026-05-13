@@ -34,6 +34,13 @@ function main(): void {
     env: {
       ...process.env,
       VITE_CONTROL_PLANE_API_ORIGIN: config.controlPlaneApiOrigin,
+      VITE_POSTHOG_ENABLED: config.posthog.enabled ? "true" : "false",
+      ...(config.posthog.enabled
+        ? {
+            VITE_POSTHOG_PROJECT_API_KEY: config.posthog.projectApiKey,
+            VITE_POSTHOG_HOST: config.posthog.host,
+          }
+        : {}),
     },
   });
 

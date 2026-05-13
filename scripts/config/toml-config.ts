@@ -203,6 +203,9 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
       dashboard: {
         public_url: "http://localhost:5173",
         control_plane_api_origin: controlPlaneApiUrl,
+        posthog: {
+          enabled: false,
+        },
       },
       control_plane_api: {
         host: "127.0.0.1",

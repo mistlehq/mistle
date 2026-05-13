@@ -250,6 +250,19 @@ const RootEnvDescriptors = [
     path: ["services", "dashboard", "control_plane_api_origin"],
   },
   {
+    envVar: "MISTLE_SERVICES_DASHBOARD_POSTHOG_ENABLED",
+    path: ["services", "dashboard", "posthog", "enabled"],
+    parse: parseBooleanEnv,
+  },
+  {
+    envVar: "MISTLE_SERVICES_DASHBOARD_POSTHOG_PROJECT_API_KEY",
+    path: ["services", "dashboard", "posthog", "project_api_key"],
+  },
+  {
+    envVar: "MISTLE_SERVICES_DASHBOARD_POSTHOG_HOST",
+    path: ["services", "dashboard", "posthog", "host"],
+  },
+  {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_HOST",
     path: ["services", "control_plane_api", "host"],
   },
