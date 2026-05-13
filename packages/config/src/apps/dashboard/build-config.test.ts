@@ -37,6 +37,18 @@ function writeWorkspaceConfigFile(input: { relativePath: string; content: string
   writeFileSync(configPath, input.content, "utf8");
 }
 
+function removeWorkspaceConfigFile(relativePath: string): void {
+  const configPath = resolve(resolveWorkspaceRootForTest(), relativePath);
+  const previousContent = existsSync(configPath) ? readFileSync(configPath, "utf8") : null;
+
+  workspaceConfigRestores.push({
+    path: configPath,
+    previousContent,
+  });
+
+  rmSync(configPath, { force: true });
+}
+
 afterEach(() => {
   for (const directory of tempDirectories.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
@@ -123,6 +135,17 @@ describe("loadDashboardBuildConfig", () => {
         configPath: "",
       }),
     ).toThrow("MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN must use http:// or https://.");
+  });
+
+  it("fails when neither env nor config file provides dashboard build config", () => {
+    removeWorkspaceConfigFile("config/config.development.toml");
+    removeWorkspaceConfigFile("config/config.production.toml");
+
+    expect(() =>
+      loadDashboardBuildConfigForTest({
+        configPath: "",
+      }),
+    ).toThrow("Missing required dashboard config file.");
   });
 
   it("falls back to config/config.development.toml when MISTLE_CONFIG_PATH is unset", () => {
@@ -297,6 +320,30 @@ describe("loadDashboardBuildConfig", () => {
     expect(config.posthog).toEqual({
       enabled: true,
       projectApiKey: "phc_example",
+      host: "https://us.i.posthog.com",
+    });
+  });
+
+  it("does not read default config files when dashboard build config is fully supplied by env", () => {
+    writeWorkspaceConfigFile({
+      relativePath: "config/config.development.toml",
+      content: "not valid toml",
+    });
+
+    const config = loadDashboardBuildConfigForTest({
+      env: {
+        MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN: "https://api.example.test",
+        MISTLE_SERVICES_DASHBOARD_POSTHOG_ENABLED: "true",
+        MISTLE_SERVICES_DASHBOARD_POSTHOG_PROJECT_API_KEY: "phc_env",
+        MISTLE_SERVICES_DASHBOARD_POSTHOG_HOST: "https://us.i.posthog.com",
+      },
+      configPath: "",
+    });
+
+    expect(config.controlPlaneApiOrigin).toBe("https://api.example.test");
+    expect(config.posthog).toEqual({
+      enabled: true,
+      projectApiKey: "phc_env",
       host: "https://us.i.posthog.com",
     });
   });

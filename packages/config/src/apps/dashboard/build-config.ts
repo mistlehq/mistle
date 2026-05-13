@@ -203,6 +203,26 @@ function readDashboardControlPlaneApiOriginEnv(environment: NodeJS.ProcessEnv): 
   return readNonEmptyEnvValue(environment, "MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN");
 }
 
+function envProvidesCompleteDashboardBuildConfig(environment: NodeJS.ProcessEnv): boolean {
+  if (readDashboardControlPlaneApiOriginEnv(environment) === undefined) {
+    return false;
+  }
+
+  const postHogEnabled = readBooleanEnvValue(
+    environment,
+    "MISTLE_SERVICES_DASHBOARD_POSTHOG_ENABLED",
+  );
+  if (postHogEnabled !== true) {
+    return true;
+  }
+
+  return (
+    readNonEmptyEnvValue(environment, "MISTLE_SERVICES_DASHBOARD_POSTHOG_PROJECT_API_KEY") !==
+      undefined &&
+    readNonEmptyEnvValue(environment, "MISTLE_SERVICES_DASHBOARD_POSTHOG_HOST") !== undefined
+  );
+}
+
 function resolveOptionalParsedConfig(input: {
   environment: NodeJS.ProcessEnv;
   dashboardBuildEnvironment: DashboardBuildEnvironment;
@@ -210,6 +230,10 @@ function resolveOptionalParsedConfig(input: {
   const explicitConfigPath = input.environment.MISTLE_CONFIG_PATH;
   if (typeof explicitConfigPath === "string" && explicitConfigPath.trim().length > 0) {
     return DashboardBuildConfigSchema.parse(parseTomlFile(explicitConfigPath));
+  }
+
+  if (envProvidesCompleteDashboardBuildConfig(input.environment)) {
+    return undefined;
   }
 
   try {

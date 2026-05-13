@@ -8,40 +8,16 @@ function setDashboardControlPlaneApiOrigin(value: string): void {
   });
 }
 
-function setDashboardPostHogEnv(input: {
-  enabled?: string;
-  projectApiKey?: string;
-  host?: string;
-}): void {
-  if (input.enabled === undefined) {
-    Reflect.deleteProperty(import.meta.env, "VITE_POSTHOG_ENABLED");
-  } else {
-    Object.assign(import.meta.env, {
-      VITE_POSTHOG_ENABLED: input.enabled,
-    });
-  }
-
-  if (input.projectApiKey === undefined) {
-    Reflect.deleteProperty(import.meta.env, "VITE_POSTHOG_PROJECT_API_KEY");
-  } else {
-    Object.assign(import.meta.env, {
-      VITE_POSTHOG_PROJECT_API_KEY: input.projectApiKey,
-    });
-  }
-
-  if (input.host === undefined) {
-    Reflect.deleteProperty(import.meta.env, "VITE_POSTHOG_HOST");
-  } else {
-    Object.assign(import.meta.env, {
-      VITE_POSTHOG_HOST: input.host,
-    });
-  }
+function clearDashboardPostHogEnv(): void {
+  Reflect.deleteProperty(import.meta.env, "VITE_POSTHOG_ENABLED");
+  Reflect.deleteProperty(import.meta.env, "VITE_POSTHOG_PROJECT_API_KEY");
+  Reflect.deleteProperty(import.meta.env, "VITE_POSTHOG_HOST");
 }
 
 afterEach(() => {
   resetDashboardConfigForTest();
   setDashboardControlPlaneApiOrigin("http://localhost:3000");
-  setDashboardPostHogEnv({});
+  clearDashboardPostHogEnv();
   Reflect.deleteProperty(globalThis, "location");
 });
 
