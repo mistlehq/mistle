@@ -61,7 +61,6 @@ export function defineIntegrationCredentials(schema: PgSchema) {
           organizationCredentialKeys.version,
         ],
       }).onDelete("restrict"),
-      index("integration_credentials_organization_id_idx").on(table.organizationId),
       index("integration_credentials_organization_id_secret_kind_idx").on(
         table.organizationId,
         table.secretKind,

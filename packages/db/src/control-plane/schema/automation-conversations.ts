@@ -77,13 +77,7 @@ export function defineAutomationConversations(schema: PgSchema) {
         table.ownerId,
         table.conversationKey,
       ),
-      index("automation_conversations_organization_id_idx").on(table.organizationId),
       index("automation_conversations_sandbox_profile_id_idx").on(table.sandboxProfileId),
-      index("automation_conversations_org_owner_idx").on(
-        table.organizationId,
-        table.ownerKind,
-        table.ownerId,
-      ),
     ],
   );
 }

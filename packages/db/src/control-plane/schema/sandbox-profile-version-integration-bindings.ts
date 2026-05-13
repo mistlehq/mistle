@@ -53,10 +53,6 @@ export function defineSandboxProfileVersionIntegrationBindings(schema: PgSchema)
         columns: [table.sandboxProfileId, table.sandboxProfileVersion],
         foreignColumns: [sandboxProfileVersions.sandboxProfileId, sandboxProfileVersions.version],
       }).onDelete("cascade"),
-      index("spv_integration_bindings_profile_id_version_idx").on(
-        table.sandboxProfileId,
-        table.sandboxProfileVersion,
-      ),
       index("spv_integration_bindings_connection_id_idx").on(table.connectionId),
       index("spv_integration_bindings_profile_id_version_kind_idx").on(
         table.sandboxProfileId,

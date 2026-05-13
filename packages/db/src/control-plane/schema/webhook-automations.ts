@@ -31,7 +31,6 @@ export function defineWebhookAutomations(schema: PgSchema) {
       index("webhook_automations_integration_webhook_source_id_idx").on(
         table.integrationWebhookSourceId,
       ),
-      index("webhook_automations_automation_id_idx").on(table.automationId),
     ],
   );
 }

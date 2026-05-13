@@ -71,8 +71,6 @@ export function defineUserExternalPrincipalCredentialSecrets(schema: PgSchema) {
           organizationCredentialKeys.version,
         ],
       }).onDelete("restrict"),
-      index("user_ext_principal_cred_secrets_org_id_idx").on(table.organizationId),
-      index("user_ext_principal_cred_secrets_cred_id_idx").on(table.credentialId),
       index("user_ext_principal_cred_secrets_org_key_version_idx").on(
         table.organizationId,
         table.organizationCredentialKeyVersion,

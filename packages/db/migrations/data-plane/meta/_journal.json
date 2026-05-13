@@ -64,6 +64,13 @@
       "when": 1778410744389,
       "tag": "0008_add-sandbox-instance-runtime-config",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1778653800775,
+      "tag": "0009_remove-redundant-indexes",
+      "breakpoints": true
     }
   ]
 }

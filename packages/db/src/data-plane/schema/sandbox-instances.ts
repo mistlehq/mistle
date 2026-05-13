@@ -114,7 +114,6 @@ export function defineSandboxInstances(schema: PgSchema) {
         .defaultNow(),
     },
     (table) => [
-      index("sandbox_instances_organization_id_idx").on(table.organizationId),
       index("sandbox_instances_org_profile_version_idx").on(
         table.organizationId,
         table.sandboxProfileId,

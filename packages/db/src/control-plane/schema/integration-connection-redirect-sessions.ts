@@ -28,9 +28,6 @@ export function defineIntegrationConnectionRedirectSessions(schema: PgSchema) {
         .defaultNow(),
     },
     (table) => [
-      index("integration_connection_redirect_sessions_organization_id_idx").on(
-        table.organizationId,
-      ),
       index("integration_connection_redirect_sessions_organization_id_target_key_idx").on(
         table.organizationId,
         table.targetKey,

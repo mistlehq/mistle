@@ -73,7 +73,6 @@ export function defineScheduledActions(schema: PgSchema) {
         table.localScheduledDate,
         table.localScheduledTime,
       ),
-      index("scheduled_actions_schedule_id_idx").on(table.scheduleId),
       index("scheduled_actions_organization_id_idx").on(table.organizationId),
       index("scheduled_actions_status_idx").on(table.status),
       index("scheduled_actions_scheduled_at_idx").on(table.scheduledAt),

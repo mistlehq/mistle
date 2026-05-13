@@ -35,9 +35,6 @@ export function defineAutomationConversationRoutes(schema: PgSchema) {
         .defaultNow(),
     },
     (table) => [
-      index("automation_conversation_routes_automation_conversation_id_idx").on(
-        table.conversationId,
-      ),
       index("automation_conversation_routes_sandbox_instance_id_idx").on(table.sandboxInstanceId),
       uniqueIndex("automation_conversation_routes_automation_conversation_id_uidx").on(
         table.conversationId,

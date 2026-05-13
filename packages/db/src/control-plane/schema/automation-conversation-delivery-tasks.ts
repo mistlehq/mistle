@@ -75,9 +75,6 @@ export function defineAutomationConversationDeliveryTasks(schema: PgSchema) {
       uniqueIndex("automation_conversation_delivery_tasks_automation_run_id_uidx").on(
         table.automationRunId,
       ),
-      index("automation_conversation_delivery_tasks_automation_conversation_id_idx").on(
-        table.conversationId,
-      ),
       index("automation_conversation_delivery_tasks_source_webhook_event_id_idx").on(
         table.sourceWebhookEventId,
       ),

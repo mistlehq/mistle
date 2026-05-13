@@ -32,7 +32,6 @@ export function defineAutomations(schema: PgSchema) {
         .defaultNow(),
     },
     (table) => [
-      index("automations_organization_id_idx").on(table.organizationId),
       index("automations_organization_id_kind_idx").on(table.organizationId, table.kind),
       index("automations_organization_id_enabled_idx").on(table.organizationId, table.enabled),
       index("automations_organization_id_created_at_id_idx").on(

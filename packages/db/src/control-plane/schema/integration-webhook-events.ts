@@ -71,10 +71,6 @@ export function defineIntegrationWebhookEvents(schema: PgSchema) {
       index("integration_webhook_events_integration_connection_id_idx").on(
         table.integrationConnectionId,
       ),
-      index("integration_webhook_events_integration_webhook_source_id_idx").on(
-        table.integrationWebhookSourceId,
-      ),
-      index("integration_webhook_events_target_key_idx").on(table.targetKey),
       index("integration_webhook_events_status_idx").on(table.status),
       index("integration_webhook_events_event_type_idx").on(table.eventType),
       index("integration_webhook_events_external_delivery_id_idx").on(table.externalDeliveryId),

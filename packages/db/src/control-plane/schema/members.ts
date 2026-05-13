@@ -31,7 +31,6 @@ export function defineMembers(schema: PgSchema) {
     },
     (table) => [
       uniqueIndex("members_org_user_uidx").on(table.organizationId, table.userId),
-      index("members_organization_id_idx").on(table.organizationId),
       index("members_user_id_idx").on(table.userId),
     ],
   );

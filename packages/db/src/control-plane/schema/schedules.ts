@@ -40,7 +40,6 @@ export function defineSchedules(schema: PgSchema) {
         .defaultNow(),
     },
     (table) => [
-      index("schedules_organization_id_idx").on(table.organizationId),
       index("schedules_organization_id_target_type_idx").on(table.organizationId, table.targetType),
       index("schedules_due_idx")
         .on(table.nextScheduledAt, table.id)

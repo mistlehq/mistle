@@ -169,6 +169,13 @@
       "when": 1778511256904,
       "tag": "0023_add-agent-runtime-id-to-sandbox-profile-versions",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1778653796886,
+      "tag": "0024_remove-redundant-indexes",
+      "breakpoints": true
     }
   ]
 }

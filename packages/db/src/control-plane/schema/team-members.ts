@@ -22,7 +22,6 @@ export function defineTeamMembers(schema: PgSchema) {
     },
     (table) => [
       uniqueIndex("team_members_team_user_uidx").on(table.teamId, table.userId),
-      index("team_members_team_id_idx").on(table.teamId),
       index("team_members_user_id_idx").on(table.userId),
     ],
   );

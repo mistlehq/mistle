@@ -55,7 +55,6 @@ export function defineIntegrationConnectionDeviceAuthorizationAttempts(schema: P
         .defaultNow(),
     },
     (table) => [
-      index("int_conn_dev_auth_attempts_org_idx").on(table.organizationId),
       index("int_conn_dev_auth_attempts_org_target_idx").on(table.organizationId, table.targetKey),
       index("int_conn_dev_auth_attempts_org_status_idx").on(table.organizationId, table.status),
       index("int_conn_dev_auth_attempts_expires_at_idx").on(table.expiresAt),

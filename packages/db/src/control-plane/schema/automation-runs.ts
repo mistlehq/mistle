@@ -74,7 +74,6 @@ export function defineAutomationRuns(schema: PgSchema) {
         table.sourceWebhookEventId,
       ),
       index("automation_runs_automation_id_idx").on(table.automationId),
-      index("automation_runs_automation_target_id_idx").on(table.automationTargetId),
       index("automation_runs_source_webhook_event_id_idx").on(table.sourceWebhookEventId),
       uniqueIndex("automation_runs_source_scheduled_action_id_uidx")
         .on(table.sourceScheduledActionId)

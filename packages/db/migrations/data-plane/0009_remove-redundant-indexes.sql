@@ -1,0 +1,1 @@
+DROP INDEX "data_plane"."sandbox_instances_organization_id_idx";

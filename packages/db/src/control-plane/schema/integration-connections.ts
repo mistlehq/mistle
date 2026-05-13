@@ -48,7 +48,6 @@ export function defineIntegrationConnections(schema: PgSchema) {
         table.targetKey,
         table.id,
       ),
-      index("integration_connections_organization_id_idx").on(table.organizationId),
       index("integration_connections_organization_id_target_key_idx").on(
         table.organizationId,
         table.targetKey,
