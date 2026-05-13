@@ -173,6 +173,7 @@ describe("useSessionComposerAttachmentControl", () => {
           path: UploadedImageFixture.path,
         },
       ],
+      uploadedAttachments: [UploadedImageFixture],
     });
     expect(result.current.isUploadingAttachments).toBe(false);
   });
@@ -201,6 +202,7 @@ describe("useSessionComposerAttachmentControl", () => {
           path: UploadedFileFixture.path,
         },
       ],
+      uploadedAttachments: [UploadedFileFixture],
     });
   });
 });

@@ -242,6 +242,7 @@ function QueuedPromptComposerHarness(): React.JSX.Element {
               displayAttachments: [],
               prompt,
               submittedAttachments: [],
+              uploadedAttachments: [],
             }),
           },
           repositoryStatus: {

@@ -71,9 +71,9 @@ function createUserEntry(input: {
   const attachments: ChatAttachment[] = input.parts
     .filter((part) => part.type === "file")
     .map((part) => ({
-      kind: "file",
+      kind: part.mime.startsWith("image/") ? "image" : "file",
       name: part.filename ?? part.url,
-      path: part.url,
+      path: part.source?.type === "file" ? part.source.path : part.url,
     }));
 
   return {

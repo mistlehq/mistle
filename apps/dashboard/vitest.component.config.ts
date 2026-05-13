@@ -65,6 +65,12 @@ export default defineConfig({
         ),
       },
       {
+        find: /^@mistle\/sandbox-session-client\/node$/,
+        replacement: fileURLToPath(
+          new URL("../../packages/sandbox-session-client/src/node.ts", import.meta.url),
+        ),
+      },
+      {
         find: /^@mistle\/sandbox-session-protocol$/,
         replacement: fileURLToPath(
           new URL("../../packages/sandbox-session-protocol/src/index.ts", import.meta.url),

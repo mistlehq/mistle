@@ -5,6 +5,7 @@ import {
   type OpenCodeEventSubscription,
   type OpenCodeProviderSummary,
   type OpenCodePermissionResponseInput,
+  type OpenCodePromptPartInput,
   type OpenCodeSessionClient,
   type OpenCodeSessionSummary,
 } from "@mistle/integrations-definitions/agent-runtimes/opencode/client";
@@ -79,6 +80,7 @@ export type UseOpenCodeSessionStateResult = {
     sendPrompt: (input: {
       directory?: string;
       model?: OpenCodePromptModelSelection;
+      submittedAttachments?: readonly OpenCodePromptPartInput[];
       submittedPrompt: string;
     }) => Promise<void>;
   };
@@ -551,6 +553,7 @@ export function useOpenCodeSessionState(input: {
     async (promptInput: {
       directory?: string;
       model?: OpenCodePromptModelSelection;
+      submittedAttachments?: readonly OpenCodePromptPartInput[];
       submittedPrompt: string;
     }): Promise<void> => {
       const client = clientRef.current;
@@ -559,21 +562,26 @@ export function useOpenCodeSessionState(input: {
         throw new Error("Connect OpenCode before sending a prompt.");
       }
       const prompt = promptInput.submittedPrompt.trim();
-      if (prompt.length === 0) {
+      const submittedAttachments = promptInput.submittedAttachments ?? [];
+      if (prompt.length === 0 && submittedAttachments.length === 0) {
         throw new Error("OpenCode prompt must not be empty.");
       }
+      const textParts: readonly OpenCodePromptPartInput[] =
+        prompt.length === 0
+          ? []
+          : [
+              {
+                type: "text",
+                text: prompt,
+              },
+            ];
       setIsStartingTurn(true);
       try {
         await client.sendPrompt({
           sessionId,
           ...(promptInput.directory === undefined ? {} : { directory: promptInput.directory }),
           ...(promptInput.model === undefined ? {} : { model: promptInput.model }),
-          parts: [
-            {
-              type: "text",
-              text: prompt,
-            },
-          ],
+          parts: [...submittedAttachments, ...textParts],
         });
         setSessionErrorMessage(null);
       } catch (error) {

@@ -15,6 +15,7 @@ import { formatCodexContextUsage } from "../session-agents/codex/session-state/c
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import {
   parseOpenCodePromptModelSelection,
+  resolveOpenCodeAttachmentTurnRepresentation,
   useOpenCodeSessionState,
   type OpenCodeChatState,
 } from "../session-agents/opencode/session-state/index.js";
@@ -604,13 +605,12 @@ export function useSessionWorkbenchController(input: {
             : null;
   const attachmentControl = useSessionComposerAttachmentControl({
     attachmentTarget:
-      !isOpenCodeRuntime &&
       input.sandboxInstanceId !== null &&
       sessionSnapshot !== null &&
-      activeSessionThreadId !== null
+      activeConversationThreadId !== null
         ? {
             sandboxInstanceId: input.sandboxInstanceId,
-            threadId: activeSessionThreadId,
+            threadId: activeConversationThreadId,
           }
         : null,
     ensureTransportConnected: transportManager.ensureTransportConnected,
@@ -634,15 +634,21 @@ export function useSessionWorkbenchController(input: {
     ],
   );
   const startTurn = useCallback(
-    async (turnInput: Parameters<typeof chat.startTurn>[0]): Promise<void> => {
+    async (
+      turnInput: Parameters<SessionComposerStateInput["turnControl"]["startTurn"]>[0],
+    ): Promise<void> => {
       if (isOpenCodeRuntime) {
         const selectedOpenCodeModel = resolveOpenCodePromptModelOverride(
           activeConfigControl.hasExplicitModelSelection,
           activeConfigControl.selectedModel,
         );
+        const attachments = resolveOpenCodeAttachmentTurnRepresentation({
+          uploadedAttachments: turnInput.uploadedAttachments ?? [],
+        });
         await openCodeSessionState.chat.sendPrompt({
           ...(selectedRepositoryPath === null ? {} : { directory: selectedRepositoryPath }),
           ...(selectedOpenCodeModel === undefined ? {} : { model: selectedOpenCodeModel }),
+          submittedAttachments: attachments.submittedAttachments,
           submittedPrompt: turnInput.transcriptPrompt ?? turnInput.submittedPrompt,
         });
         return;

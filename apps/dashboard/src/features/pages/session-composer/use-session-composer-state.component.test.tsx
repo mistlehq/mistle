@@ -111,6 +111,7 @@ function SessionComposerStateHarness(input: {
           prompt,
           submittedAttachments: [],
           displayAttachments: [],
+          uploadedAttachments: [],
         }),
       },
       repositoryStatus: {

@@ -80,6 +80,63 @@ describe("reduceOpenCodeChatState", () => {
     ]);
   });
 
+  it("hydrates OpenCode user file parts as display attachments with sandbox paths", () => {
+    const state = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "hydrate_messages",
+      sessionId: "ses_test",
+      messages: [
+        {
+          ...createUserMessage({
+            id: "msg_user",
+            text: "Inspect this",
+          }),
+          parts: [
+            {
+              id: "part_text",
+              messageID: "msg_user",
+              sessionID: "ses_test",
+              text: "Inspect this",
+              type: "text",
+            },
+            {
+              id: "part_file",
+              messageID: "msg_user",
+              sessionID: "ses_test",
+              type: "file",
+              mime: "image/png",
+              filename: "screenshot.png",
+              url: "file:///root/.local/attachments/ses_test/screenshot.png",
+              source: {
+                type: "file",
+                path: "/root/.local/attachments/ses_test/screenshot.png",
+                text: {
+                  value: "@screenshot.png",
+                  start: 0,
+                  end: 15,
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(state.entries).toMatchObject([
+      {
+        id: "msg_user",
+        kind: "user-message",
+        text: "Inspect this",
+        attachments: [
+          {
+            kind: "image",
+            name: "screenshot.png",
+            path: "/root/.local/attachments/ses_test/screenshot.png",
+          },
+        ],
+      },
+    ]);
+  });
+
   it("preserves full OpenCode reasoning text beyond the compact row detail", () => {
     const fullReasoningText = [
       "I will inspect the repository structure, compare the current OpenCode projection against the shared semantic renderer contract,",

@@ -3,6 +3,7 @@ import type {
   CodexTurnCollaborationModeSettings,
   CodexTurnInputLocalImageItem,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
+import type { UploadedSandboxFile } from "@mistle/sandbox-session-client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { ChatAttachment } from "../../chat/chat-types.js";
@@ -62,6 +63,7 @@ export type SessionTurnControl = {
   startTurn: (input: {
     submittedPrompt: string;
     submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
+    uploadedAttachments?: readonly UploadedSandboxFile[];
     transcriptPrompt?: string;
     displayAttachments?: readonly ChatAttachment[];
     collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
@@ -69,6 +71,7 @@ export type SessionTurnControl = {
   steerTurn: (input: {
     submittedPrompt: string;
     submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
+    uploadedAttachments?: readonly UploadedSandboxFile[];
     transcriptPrompt?: string;
     displayAttachments?: readonly ChatAttachment[];
   }) => Promise<void>;
@@ -365,6 +368,7 @@ export function useSessionComposerState(input: {
         await composerStateInput.turnControl.startTurn({
           submittedPrompt: preparedAttachments.prompt,
           submittedAttachments: preparedAttachments.submittedAttachments,
+          uploadedAttachments: preparedAttachments.uploadedAttachments,
           displayAttachments: preparedAttachments.displayAttachments,
           transcriptPrompt: submittedPrompt,
           ...(turnCollaborationModeSettings === undefined
@@ -458,6 +462,7 @@ export function useSessionComposerState(input: {
           await composerStateInput.turnControl.steerTurn({
             submittedPrompt: preparedAttachments.prompt,
             submittedAttachments: preparedAttachments.submittedAttachments,
+            uploadedAttachments: preparedAttachments.uploadedAttachments,
             displayAttachments: preparedAttachments.displayAttachments,
             transcriptPrompt: submittedPrompt,
           });
@@ -465,6 +470,7 @@ export function useSessionComposerState(input: {
           await composerStateInput.turnControl.startTurn({
             submittedPrompt: preparedAttachments.prompt,
             submittedAttachments: preparedAttachments.submittedAttachments,
+            uploadedAttachments: preparedAttachments.uploadedAttachments,
             displayAttachments: preparedAttachments.displayAttachments,
             transcriptPrompt: submittedPrompt,
             ...(turnCollaborationModeSettings === undefined

@@ -617,6 +617,14 @@ describe("useOpenCodeSessionState", () => {
           modelID: "gpt-5",
           providerID: "openai",
         },
+        submittedAttachments: [
+          {
+            type: "file",
+            url: "file:///root/.local/attachments/ses_test/screenshot.png",
+            filename: "screenshot.png",
+            mime: "image/png",
+          },
+        ],
         submittedPrompt: "Run tests",
       });
     });
@@ -631,6 +639,12 @@ describe("useOpenCodeSessionState", () => {
           providerID: "openai",
         },
         parts: [
+          {
+            filename: "screenshot.png",
+            mime: "image/png",
+            type: "file",
+            url: "file:///root/.local/attachments/ses_test/screenshot.png",
+          },
           {
             text: "Run tests",
             type: "text",
