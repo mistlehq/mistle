@@ -1147,7 +1147,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.queryByText("Comment updated")).toBeNull();
     expect(screen.getByText("Webhook URL")).toBeTruthy();
     expect(screen.getByText("whsec_jira_123")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Create webhook" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Register webhook" })).toBeNull();
     expect(screen.queryByText("Endpoint key")).toBeNull();
 
     fireEvent.click(
@@ -1435,7 +1435,7 @@ describe("IntegrationConnectionDetailView", () => {
     ).toBeTruthy();
     expect(screen.queryByText("Webhook")).toBeNull();
     expect(screen.queryByText("No webhook is configured for this connection.")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Create webhook" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Register webhook" })).toBeNull();
     expect(screen.queryByText("Webhook URL")).toBeNull();
   });
 
@@ -1483,7 +1483,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(screen.getByText("Webhook")).toBeTruthy();
     expect(screen.getByText("No webhook is configured for this connection.")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Create webhook" }));
+    fireEvent.click(screen.getByRole("button", { name: "Register webhook" }));
     expect(createdConnectionId).toBe("icn_jira_empty");
   });
 
@@ -1708,7 +1708,7 @@ describe("IntegrationConnectionDetailView", () => {
           },
         ]}
         onCreateWebhookSource={() => {
-          throw new Error("Create webhook should not be available for implicit sources.");
+          throw new Error("Register webhook should not be available for implicit sources.");
         }}
         webhookPolicy={ImplicitWebhookPolicy}
         webhookSourceStateByConnectionId={
@@ -1745,7 +1745,7 @@ describe("IntegrationConnectionDetailView", () => {
       />,
     );
 
-    expect(screen.queryByRole("button", { name: "Create webhook" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Register webhook" })).toBeNull();
     expect(screen.getByRole("button", { name: "Copy Webhook URL" })).toBeTruthy();
     expect(screen.getByText("Webhook")).toBeTruthy();
     expect(screen.getByText("Webhook callback URL")).toBeTruthy();

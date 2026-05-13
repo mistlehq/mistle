@@ -787,7 +787,7 @@ function resolveWebhookManagementAction(input: {
         type="button"
         variant="outline"
       >
-        {input.webhookSourceState.isCreating ? "Creating..." : "Create webhook"}
+        {input.webhookSourceState.isCreating ? "Registering..." : "Register webhook"}
       </Button>
     );
   }
@@ -920,7 +920,7 @@ function WebhookSourcesSection(input: {
             type="button"
             variant="outline"
           >
-            {input.state.isCreating ? "Creating..." : "Create webhook"}
+            {input.state.isCreating ? "Registering..." : "Register webhook"}
           </Button>
         </div>
       ) : null}
