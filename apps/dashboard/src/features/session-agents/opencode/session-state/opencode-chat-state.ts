@@ -6,12 +6,13 @@ import type {
   OpenCodePermissionRequest,
 } from "@mistle/integrations-definitions/agent-runtimes/opencode/client";
 
-import type {
-  ChatAttachment,
-  ChatCommandEntry,
-  ChatEntry,
-  ChatGenericItemEntry,
-} from "../../../chat/chat-types.js";
+import {
+  formatSemanticChatDetail,
+  projectSemanticChatEntries,
+  shouldSuppressChatReasoningText,
+  type SemanticChatProjectionItem,
+} from "../../../chat/chat-semantic-projection.js";
+import type { ChatAttachment, ChatEntry, ChatGenericItemEntry } from "../../../chat/chat-types.js";
 
 type OpenCodeMessageState = {
   info: OpenCodeMessage;
@@ -90,29 +91,38 @@ function readStringProperty(record: Record<string, unknown>, key: string): strin
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-function createToolEntry(input: {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readRecordProperty(
+  record: Record<string, unknown>,
+  key: string,
+): Record<string, unknown> | null {
+  const value = record[key];
+  return isRecord(value) ? value : null;
+}
+
+function readFirstStringProperty(
+  record: Record<string, unknown>,
+  keys: readonly string[],
+): string | null {
+  for (const key of keys) {
+    const value = readStringProperty(record, key);
+    if (value !== null) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function createOpenCodeToolGenericEntry(input: {
   message: OpenCodeMessage;
   part: Extract<OpenCodeMessagePart, { type: "tool" }>;
   turnId: string;
-}): ChatCommandEntry | ChatGenericItemEntry {
+}): ChatGenericItemEntry {
   const state = input.part.state;
-  const command = "input" in state ? readStringProperty(state.input, "command") : null;
-  if ((input.part.tool === "bash" || input.part.tool === "shell") && command !== null) {
-    return {
-      id: input.part.id,
-      kind: "command-execution",
-      command,
-      output:
-        state.status === "completed" ? state.output : state.status === "error" ? state.error : null,
-      cwd: readStringProperty(state.input, "cwd"),
-      exitCode: null,
-      commandStatus: state.status,
-      reason: input.part.tool,
-      status: isTerminalPart(input.part, input.message) ? "completed" : "streaming",
-      turnId: input.turnId,
-    };
-  }
-
   return {
     id: input.part.id,
     kind: "generic-item",
@@ -127,6 +137,218 @@ function createToolEntry(input: {
     detailsJson: JSON.stringify(state),
     status: isTerminalPart(input.part, input.message) ? "completed" : "streaming",
     turnId: input.turnId,
+  };
+}
+
+function getOpenCodeToolOutput(
+  part: Extract<OpenCodeMessagePart, { type: "tool" }>,
+): string | null {
+  const state = part.state;
+  if (state.status === "completed") {
+    return state.output;
+  }
+  if (state.status === "error") {
+    return state.error;
+  }
+  return null;
+}
+
+function getOpenCodeToolInput(
+  part: Extract<OpenCodeMessagePart, { type: "tool" }>,
+): Record<string, unknown> | null {
+  return "input" in part.state ? part.state.input : null;
+}
+
+function getOpenCodeToolMetadata(
+  part: Extract<OpenCodeMessagePart, { type: "tool" }>,
+): Record<string, unknown> | null {
+  if (isRecord(part.state)) {
+    const stateMetadata = readRecordProperty(part.state, "metadata");
+    if (stateMetadata !== null) {
+      return stateMetadata;
+    }
+  }
+
+  return part.metadata === undefined ? null : part.metadata;
+}
+
+function getOpenCodeReadPath(toolInput: Record<string, unknown>): string | null {
+  return readFirstStringProperty(toolInput, ["filePath", "path", "file"]);
+}
+
+function getOpenCodeExploreDetail(input: {
+  toolInput: Record<string, unknown>;
+  toolName: string;
+}): string | null {
+  if (input.toolName === "read") {
+    return getOpenCodeReadPath(input.toolInput);
+  }
+
+  return readFirstStringProperty(input.toolInput, ["filePath", "path", "file", "pattern", "query"]);
+}
+
+function getOpenCodeEditPath(toolInput: Record<string, unknown>): string | null {
+  return readFirstStringProperty(toolInput, ["filePath", "path", "file"]);
+}
+
+function getOpenCodeEditDiff(part: Extract<OpenCodeMessagePart, { type: "tool" }>): string | null {
+  const metadata = getOpenCodeToolMetadata(part);
+  if (metadata === null) {
+    return null;
+  }
+
+  return readStringProperty(metadata, "diff");
+}
+
+function getOpenCodeToolProjection(input: {
+  message: OpenCodeMessage;
+  part: Extract<OpenCodeMessagePart, { type: "tool" }>;
+  turnId: string;
+}): SemanticChatProjectionItem {
+  const toolName = input.part.tool.toLowerCase();
+  const toolInput = getOpenCodeToolInput(input.part);
+  const output = getOpenCodeToolOutput(input.part);
+  const status = isTerminalPart(input.part, input.message) ? "completed" : "streaming";
+
+  if ((toolName === "bash" || toolName === "shell") && toolInput !== null) {
+    const command = readStringProperty(toolInput, "command");
+    if (command !== null) {
+      return {
+        kind: "semantic",
+        id: input.part.id,
+        turnId: input.turnId,
+        semanticKind: "running-commands",
+        status,
+        displayKeys: {
+          active: "running-commands.active",
+          completed: "running-commands.done",
+        },
+        counts: null,
+        sourceKind: "command-execution",
+        label: "Command",
+        detail: formatSemanticChatDetail({
+          detail: command,
+          maxLength: 80,
+        }),
+        sourcePath: null,
+        detailKind: "code",
+        command,
+        output,
+      };
+    }
+  }
+
+  if (
+    toolInput !== null &&
+    (toolName === "read" ||
+      toolName === "grep" ||
+      toolName === "glob" ||
+      toolName === "list" ||
+      toolName === "ls")
+  ) {
+    const detail = getOpenCodeExploreDetail({
+      toolInput,
+      toolName,
+    });
+    return {
+      kind: "semantic",
+      id: input.part.id,
+      turnId: input.turnId,
+      semanticKind: "exploring",
+      status,
+      displayKeys: {
+        active: "exploring.active",
+        completed: "exploring.done",
+      },
+      counts: {
+        reads: toolName === "read" ? 1 : 0,
+        searches: toolName === "grep" || toolName === "glob" ? 1 : 0,
+        lists: toolName === "list" || toolName === "ls" ? 1 : 0,
+      },
+      sourceKind: "tool-call",
+      label:
+        toolName === "read"
+          ? "Read"
+          : toolName === "grep" || toolName === "glob"
+            ? "Search"
+            : "List files",
+      detail: formatSemanticChatDetail({
+        detail,
+        maxLength: 72,
+      }),
+      sourcePath: detail,
+      detailKind: toolName === "grep" || toolName === "glob" ? "plain" : "code",
+      command: null,
+      output,
+    };
+  }
+
+  if (toolInput !== null && (toolName === "edit" || toolName === "write" || toolName === "patch")) {
+    const detail = getOpenCodeEditPath(toolInput);
+    const diff = getOpenCodeEditDiff(input.part);
+    if (diff === null) {
+      return {
+        kind: "standalone",
+        entry: createOpenCodeToolGenericEntry(input),
+      };
+    }
+
+    return {
+      kind: "semantic",
+      id: input.part.id,
+      turnId: input.turnId,
+      semanticKind: "making-edits",
+      status,
+      displayKeys: {
+        active: "making-edits.active",
+        completed: "making-edits.done",
+      },
+      counts: null,
+      sourceKind: "tool-call",
+      label: toolName === "write" ? "Updated" : "File change",
+      detail: formatSemanticChatDetail({
+        detail,
+        maxLength: 88,
+      }),
+      sourcePath: null,
+      detailKind: "code",
+      command: null,
+      output: diff,
+    };
+  }
+
+  if (
+    toolInput !== null &&
+    (toolName === "webfetch" || toolName === "web-search" || toolName === "web_search")
+  ) {
+    const detail = readFirstStringProperty(toolInput, ["url", "query"]);
+    return {
+      kind: "semantic",
+      id: input.part.id,
+      turnId: input.turnId,
+      semanticKind: "searching-web",
+      status,
+      displayKeys: {
+        active: "searching-web.active",
+        completed: "searching-web.done",
+      },
+      counts: null,
+      sourceKind: "tool-call",
+      label: "Web search",
+      detail: formatSemanticChatDetail({
+        detail,
+        maxLength: 72,
+      }),
+      sourcePath: null,
+      detailKind: "plain",
+      command: null,
+      output,
+    };
+  }
+
+  return {
+    kind: "standalone",
+    entry: createOpenCodeToolGenericEntry(input),
   };
 }
 
@@ -154,33 +376,54 @@ function createAssistantEntries(input: {
   }
 
   const turnId = input.message.parentID;
-  const entries: ChatEntry[] = [];
+  const projectionItems: SemanticChatProjectionItem[] = [];
   for (const part of input.parts) {
     if (part.type === "text") {
-      entries.push({
-        id: part.id,
-        kind: "assistant-message",
-        phase: null,
-        status: isTerminalPart(part, input.message) ? "completed" : "streaming",
-        text: part.text,
-        turnId,
+      projectionItems.push({
+        kind: "standalone",
+        entry: {
+          id: part.id,
+          kind: "assistant-message",
+          phase: null,
+          status: isTerminalPart(part, input.message) ? "completed" : "streaming",
+          text: part.text,
+          turnId,
+        },
       });
       continue;
     }
     if (part.type === "reasoning") {
-      entries.push({
+      if (shouldSuppressChatReasoningText(part.text)) {
+        continue;
+      }
+
+      projectionItems.push({
         id: part.id,
-        kind: "reasoning",
-        source: "content",
-        status: isTerminalPart(part, input.message) ? "completed" : "streaming",
-        summary: part.text,
+        kind: "semantic",
         turnId,
+        semanticKind: "thinking",
+        status: isTerminalPart(part, input.message) ? "completed" : "streaming",
+        displayKeys: {
+          active: "thinking.active",
+          completed: "thinking.done",
+        },
+        counts: null,
+        sourceKind: "reasoning",
+        label: "Thought",
+        detail: formatSemanticChatDetail({
+          detail: part.text,
+          maxLength: 88,
+        }),
+        sourcePath: null,
+        detailKind: "plain",
+        command: null,
+        output: part.text,
       });
       continue;
     }
     if (part.type === "tool") {
-      entries.push(
-        createToolEntry({
+      projectionItems.push(
+        getOpenCodeToolProjection({
           message: input.message,
           part,
           turnId,
@@ -189,6 +432,7 @@ function createAssistantEntries(input: {
     }
   }
 
+  const entries = [...projectSemanticChatEntries(projectionItems)];
   const errorMessage = readErrorMessage(input.message.error);
   if (errorMessage !== null) {
     entries.push({

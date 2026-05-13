@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { CodexModelSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -9,7 +9,10 @@ import type {
   CodexSessionConfigState,
   SessionBootstrapResult,
 } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
-import { useSessionComposerConfigControl } from "./use-session-composer-config-control.js";
+import {
+  useLocalSessionComposerConfigControl,
+  useSessionComposerConfigControl,
+} from "./use-session-composer-config-control.js";
 
 const DefaultModel: CodexModelSummary = {
   id: "model-default",
@@ -78,7 +81,43 @@ function SessionComposerConfigControlHarness(input: {
       <div data-testid="selected-reasoning-effort">
         {configControl.selectedReasoningEffort ?? ""}
       </div>
+      <div data-testid="has-explicit-model-selection">
+        {configControl.hasExplicitModelSelection ? "true" : "false"}
+      </div>
       <div data-testid="last-write">{lastWrite}</div>
+    </div>
+  );
+}
+
+function LocalSessionComposerConfigControlHarness(input: {
+  bootstrap: SessionBootstrapResult;
+  resetKey?: string | null;
+}): React.JSX.Element {
+  const configControl = useLocalSessionComposerConfigControl({
+    bootstrap: input.bootstrap,
+    clearSessionErrorMessage: () => {
+      return;
+    },
+    ...(input.resetKey === undefined ? {} : { resetKey: input.resetKey }),
+  });
+
+  return (
+    <div>
+      <div data-testid="selected-model">{configControl.selectedModel ?? ""}</div>
+      <div data-testid="selected-reasoning-effort">
+        {configControl.selectedReasoningEffort ?? ""}
+      </div>
+      <div data-testid="has-explicit-model-selection">
+        {configControl.hasExplicitModelSelection ? "true" : "false"}
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          configControl.setModel("gpt-5.3-codex-spark");
+        }}
+      >
+        Select Spark
+      </button>
     </div>
   );
 }
@@ -101,6 +140,7 @@ describe("useSessionComposerConfigControl", () => {
 
     expect(screen.getByTestId("selected-model").textContent).toBe("gpt-5.4");
     expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("medium");
+    expect(screen.getByTestId("has-explicit-model-selection").textContent).toBe("true");
     expect(screen.getByTestId("last-write").textContent).toBe("");
   });
 
@@ -132,5 +172,85 @@ describe("useSessionComposerConfigControl", () => {
 
     expect(screen.getByTestId("selected-model").textContent).toBe("gpt-5.3-codex-spark");
     expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("low");
+  });
+
+  it("leaves local runtime model selection unset until the user or config chooses a model", () => {
+    render(
+      <LocalSessionComposerConfigControlHarness
+        bootstrap={createReadyBootstrap({
+          availableModels: [SparkModel, DefaultModel],
+          model: null,
+          modelReasoningEffort: null,
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId("selected-model").textContent).toBe("");
+    expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("");
+    expect(screen.getByTestId("has-explicit-model-selection").textContent).toBe("false");
+  });
+
+  it("ignores local runtime model selections that are missing from the current catalog", () => {
+    const { rerender } = render(
+      <LocalSessionComposerConfigControlHarness
+        bootstrap={createReadyBootstrap({
+          availableModels: [SparkModel, DefaultModel],
+          model: null,
+          modelReasoningEffort: null,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select Spark" }));
+    expect(screen.getByTestId("selected-model").textContent).toBe("gpt-5.3-codex-spark");
+    expect(screen.getByTestId("has-explicit-model-selection").textContent).toBe("true");
+
+    rerender(
+      <LocalSessionComposerConfigControlHarness
+        bootstrap={createReadyBootstrap({
+          availableModels: [DefaultModel],
+          model: null,
+          modelReasoningEffort: null,
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId("selected-model").textContent).toBe("");
+    expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("");
+    expect(screen.getByTestId("has-explicit-model-selection").textContent).toBe("false");
+  });
+
+  it("resets local runtime model selections when the reset key changes", async () => {
+    const { rerender } = render(
+      <LocalSessionComposerConfigControlHarness
+        bootstrap={createReadyBootstrap({
+          availableModels: [SparkModel, DefaultModel],
+          model: null,
+          modelReasoningEffort: null,
+        })}
+        resetKey="sbi_one:ses_one"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select Spark" }));
+    expect(screen.getByTestId("selected-model").textContent).toBe("gpt-5.3-codex-spark");
+    expect(screen.getByTestId("has-explicit-model-selection").textContent).toBe("true");
+
+    rerender(
+      <LocalSessionComposerConfigControlHarness
+        bootstrap={createReadyBootstrap({
+          availableModels: [SparkModel, DefaultModel],
+          model: null,
+          modelReasoningEffort: null,
+        })}
+        resetKey="sbi_two:ses_two"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("selected-model").textContent).toBe("");
+    });
+    expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("");
+    expect(screen.getByTestId("has-explicit-model-selection").textContent).toBe("false");
   });
 });

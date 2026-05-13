@@ -1086,8 +1086,13 @@ async function handleUpgradeRequest(request, socket, head) {
     if (head.length > 0) {
       targetSocket.write(head);
     }
-    socket.pipe(targetSocket);
-    targetSocket.pipe(socket);
+    pipeUpgradeSockets({
+      request,
+      socket,
+      targetSocket,
+      target,
+      targetUrl,
+    });
   }).catch((error) => {
     recordUpgradeFailure({
       reason: "target_connect_failed",
@@ -1103,7 +1108,49 @@ async function handleUpgradeRequest(request, socket, head) {
   });
 }
 
+function pipeUpgradeSockets(input) {
+  let closed = false;
+  const closeSockets = () => {
+    if (closed) {
+      return;
+    }
+
+    closed = true;
+    input.socket.destroy();
+    input.targetSocket.destroy();
+  };
+  const recordSocketError = (reason, error) => {
+    recordUpgradeFailure({
+      reason,
+      host: String(input.request.headers.host ?? "").split(":")[0],
+      environmentId: input.target.environmentId,
+      requestUrl: input.request.url ?? "",
+      targetHost: input.targetUrl.hostname,
+      targetPort: input.targetUrl.port,
+      errorName: error instanceof Error ? error.name : "Error",
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+  };
+
+  input.socket.on("error", (error) => {
+    recordSocketError("client_socket_error", error);
+    closeSockets();
+  });
+  input.targetSocket.on("error", (error) => {
+    recordSocketError("target_socket_error", error);
+    closeSockets();
+  });
+  input.socket.on("close", closeSockets);
+  input.targetSocket.on("close", closeSockets);
+  input.socket.pipe(input.targetSocket);
+  input.targetSocket.pipe(input.socket);
+}
+
 function endSocketResponse(socket, status, statusText, body) {
+  if (socket.destroyed) {
+    return;
+  }
+
   socket.end(
     "HTTP/1.1 " + String(status) + " " + statusText + "\r\n" +
       "content-type: text/plain; charset=utf-8\r\n" +

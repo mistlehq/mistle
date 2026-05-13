@@ -8,13 +8,13 @@ import type {
 } from "@mistle/integrations-definitions/agent-runtimes/opencode/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import type { ChatState } from "../chat/chat-state.js";
 import { formatCodexContextUsage } from "../session-agents/codex/session-state/codex-context-usage.js";
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
-import type { SessionBootstrapResult } from "../session-agents/codex/session-state/session-bootstrap/index.js";
 import {
+  parseOpenCodePromptModelSelection,
   useOpenCodeSessionState,
   type OpenCodeChatState,
 } from "../session-agents/opencode/session-state/index.js";
@@ -27,6 +27,7 @@ import { generateSessionTitleWithSandboxCodexExec } from "../sessions/session-ti
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
+  useLocalSessionComposerConfigControl,
   useSessionComposerAttachmentControl,
   useSessionComposerConfigControl,
   type SessionComposerStateInput,
@@ -138,6 +139,24 @@ type SessionWorkbenchState = {
   portAccessState: ReturnType<typeof useSessionPortAccess>;
 };
 
+export function resolveOpenCodePromptModelOverride(
+  hasExplicitModelSelection: boolean,
+  selectedModel: string | null,
+): ReturnType<typeof parseOpenCodePromptModelSelection> | undefined {
+  if (!hasExplicitModelSelection || selectedModel === null) {
+    return undefined;
+  }
+
+  return parseOpenCodePromptModelSelection(selectedModel);
+}
+
+export function buildOpenCodeComposerConfigResetKey(
+  sandboxInstanceId: string | null,
+  sessionId: string | null,
+): string {
+  return `${sandboxInstanceId ?? ""}:${sessionId ?? ""}`;
+}
+
 type SessionConversationChatState = Pick<
   ChatState,
   "activeTurnId" | "entries" | "pendingTurnId" | "status"
@@ -155,17 +174,6 @@ type SessionConversationPaneState = {
     pendingServerRequests: readonly ServerRequestEntry[];
     respondToServerRequest: (requestId: string | number, result: unknown) => void;
   };
-};
-
-const OpenCodeComposerBootstrap: SessionBootstrapResult = {
-  phase: { status: "ready" },
-  establishedSnapshot: {
-    availableModels: [],
-    configSnapshot: {
-      model: null,
-      modelReasoningEffort: null,
-    },
-  },
 };
 
 function mapOpenCodeChatStateForConversation(
@@ -513,11 +521,67 @@ export function useSessionWorkbenchController(input: {
     sandboxInstanceId: input.sandboxInstanceId,
     stoppedSessionMessage: workbenchLifecycleState.stoppedSessionMessage,
   });
+  const openCodeRefreshModelCatalog = openCodeSessionState.lifecycle.refreshModelCatalog;
+  const openCodeSessionConnectionState = openCodeSessionState.lifecycle.sessionConnectionState;
+  const reportOpenCodeSessionError = openCodeSessionState.sessionMessage.reportSessionErrorMessage;
+  useEffect(() => {
+    if (!isOpenCodeRuntime || openCodeSessionConnectionState !== "connected") {
+      return;
+    }
+
+    void openCodeRefreshModelCatalog({
+      directory: selectedRepositoryPath,
+    }).catch((error: unknown) => {
+      reportOpenCodeSessionError(
+        error instanceof Error ? error.message : "Could not refresh OpenCode model providers.",
+      );
+    });
+  }, [
+    isOpenCodeRuntime,
+    openCodeRefreshModelCatalog,
+    openCodeSessionConnectionState,
+    reportOpenCodeSessionError,
+    selectedRepositoryPath,
+  ]);
+  const openCodeComposerBootstrap = useMemo(() => {
+    if (
+      openCodeSessionConnectionState === "connected" &&
+      openCodeSessionState.modelCatalogDirectory !== selectedRepositoryPath
+    ) {
+      return {
+        phase: { status: "bootstrapping" as const },
+        establishedSnapshot: {
+          availableModels: [],
+          configSnapshot: {
+            model: null,
+            modelReasoningEffort: null,
+          },
+        },
+      };
+    }
+
+    return openCodeSessionState.bootstrap;
+  }, [
+    openCodeSessionState.bootstrap,
+    openCodeSessionState.modelCatalogDirectory,
+    openCodeSessionConnectionState,
+    selectedRepositoryPath,
+  ]);
   const configControl = useSessionComposerConfigControl({
     bootstrap: sessionState.bootstrap,
     clearSessionErrorMessage: sessionMessage.clearSessionErrorMessage,
     codexConfig,
   });
+  const openCodeConfigControl = useLocalSessionComposerConfigControl({
+    bootstrap: openCodeComposerBootstrap,
+    clearSessionErrorMessage: openCodeSessionState.sessionMessage.clearSessionErrorMessage,
+    canChangeReasoningEffort: false,
+    resetKey: buildOpenCodeComposerConfigResetKey(
+      input.sandboxInstanceId,
+      openCodeSessionState.lifecycle.sessionSnapshot?.activeSessionId ?? null,
+    ),
+  });
+  const activeConfigControl = isOpenCodeRuntime ? openCodeConfigControl : configControl;
   const sessionSnapshot = workbenchLifecycleState.sessionSnapshot;
   const activeSessionThreadId = isOpenCodeRuntime
     ? null
@@ -572,8 +636,13 @@ export function useSessionWorkbenchController(input: {
   const startTurn = useCallback(
     async (turnInput: Parameters<typeof chat.startTurn>[0]): Promise<void> => {
       if (isOpenCodeRuntime) {
+        const selectedOpenCodeModel = resolveOpenCodePromptModelOverride(
+          activeConfigControl.hasExplicitModelSelection,
+          activeConfigControl.selectedModel,
+        );
         await openCodeSessionState.chat.sendPrompt({
           ...(selectedRepositoryPath === null ? {} : { directory: selectedRepositoryPath }),
+          ...(selectedOpenCodeModel === undefined ? {} : { model: selectedOpenCodeModel }),
           submittedPrompt: turnInput.transcriptPrompt ?? turnInput.submittedPrompt,
         });
         return;
@@ -612,6 +681,8 @@ export function useSessionWorkbenchController(input: {
     },
     [
       chat,
+      activeConfigControl.hasExplicitModelSelection,
+      activeConfigControl.selectedModel,
       input.sandboxInstanceId,
       isOpenCodeRuntime,
       openCodeSessionState.chat,
@@ -715,8 +786,8 @@ export function useSessionWorkbenchController(input: {
       chatState: activeConversationChatState,
       ...(isOpenCodeRuntime ? {} : { dismissUserMessageAction: chat.dismissUserMessageAction }),
       composerStateInput: {
-        bootstrap: isOpenCodeRuntime ? OpenCodeComposerBootstrap : sessionState.bootstrap,
-        configControl,
+        bootstrap: isOpenCodeRuntime ? openCodeComposerBootstrap : sessionState.bootstrap,
+        configControl: activeConfigControl,
         attachmentControl,
         turnControl: {
           activeTurnState: isOpenCodeRuntime
@@ -749,6 +820,7 @@ export function useSessionWorkbenchController(input: {
         repositoryStatus,
         contextUsage: isOpenCodeRuntime ? null : contextUsage,
         requiresModelSelection: !isOpenCodeRuntime,
+        showConfigControls: true,
       },
       serverRequestsState: {
         isRespondingToServerRequest: isOpenCodeRuntime

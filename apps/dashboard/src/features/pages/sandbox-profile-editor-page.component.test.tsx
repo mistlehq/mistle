@@ -379,6 +379,7 @@ function renderSandboxProfileEditor(input?: {
   }[];
   integrationBindingsError?: string;
   integrationsLoading?: boolean;
+  sandboxProvidersLoading?: boolean;
   defaultPersistenceMode?: SandboxProfileVersion["defaultPersistenceMode"];
   persistentSandboxesEnabled?: boolean;
   profileAutomationsListResult?: AutomationsListResult;
@@ -428,37 +429,53 @@ function renderSandboxProfileEditor(input?: {
     storageConfigVersion: null,
     organizationStorageConfigSummary: null,
   });
-  queryClient.setQueryData(sandboxProvidersQueryKey(), {
-    items: [
-      {
-        id: "docker",
-        displayName: "Docker",
-        managed: true,
-        supportsOrganizationConnection: false,
-        resourceCapabilities: null,
-      },
-      {
-        id: "e2b",
-        displayName: "E2B",
-        managed: true,
-        supportsOrganizationConnection: true,
-        resourceCapabilities: {
-          vcpuCount: {
-            min: 1,
-            max: 8,
-            step: 1,
-            default: 2,
-          },
-          memoryMb: {
-            min: 1024,
-            max: 8192,
-            step: 1024,
-            default: 4096,
+  if (input?.sandboxProvidersLoading === true) {
+    const sandboxProvidersQuery = queryClient.getQueryCache().build(queryClient, {
+      queryKey: sandboxProvidersQueryKey(),
+      queryFn: async () => ({
+        items: [],
+      }),
+    });
+
+    sandboxProvidersQuery.setState({
+      ...sandboxProvidersQuery.state,
+      data: undefined,
+      fetchStatus: "fetching",
+      status: "pending",
+    });
+  } else {
+    queryClient.setQueryData(sandboxProvidersQueryKey(), {
+      items: [
+        {
+          id: "docker",
+          displayName: "Docker",
+          managed: true,
+          supportsOrganizationConnection: false,
+          resourceCapabilities: null,
+        },
+        {
+          id: "e2b",
+          displayName: "E2B",
+          managed: true,
+          supportsOrganizationConnection: true,
+          resourceCapabilities: {
+            vcpuCount: {
+              min: 1,
+              max: 8,
+              step: 1,
+              default: 2,
+            },
+            memoryMb: {
+              min: 1024,
+              max: 8192,
+              step: 1024,
+              default: 4096,
+            },
           },
         },
-      },
-    ],
-  });
+      ],
+    });
+  }
   queryClient.setQueryData(sandboxProfileDetailQueryKey(profileId), {
     id: profileId,
     displayName: "Prototype Profile",
@@ -1920,6 +1937,18 @@ describe("SandboxProfileEditorPage", () => {
         "Choose a Git provider in Integrations before selecting repository resources.",
       ),
     ).toBeNull();
+  });
+
+  it("keeps the runtime section quiet while sandbox providers are loading", () => {
+    renderSandboxProfileEditor({
+      sandboxProvidersLoading: true,
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Sandbox Profile" }));
+
+    expect(screen.getByRole("heading", { name: "Runtime" })).toBeDefined();
+    expect(screen.queryByText("Loading sandbox providers...")).toBeNull();
+    expect(screen.queryByRole("status", { name: "Loading sandbox providers..." })).toBeNull();
   });
 
   it("shows integration binding load failures without a loading placeholder", async () => {

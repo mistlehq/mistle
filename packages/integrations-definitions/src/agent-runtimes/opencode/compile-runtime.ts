@@ -72,6 +72,10 @@ type OpenCodeConfig = {
   };
 };
 
+type OpenCodeManagedConfig = {
+  enabled_providers: readonly string[];
+};
+
 type OpenCodeApiAuth = {
   type: "api";
   key: string;
@@ -89,6 +93,28 @@ type OpenCodeAuth = OpenCodeApiAuth | OpenCodeOauthAuth;
 
 type OpenCodeAuthContent = Record<string, OpenCodeAuth>;
 
+function resolveOpenCodeEnabledProviders(
+  egressRoutes: ReadonlyArray<EgressCredentialRoute>,
+): readonly string[] {
+  const providers = new Set<string>();
+
+  for (const route of egressRoutes) {
+    if (isOpenAiApiRoute(route) || isOpenAiChatGptSubscriptionRoute(route)) {
+      providers.add("openai");
+    }
+
+    if (isAnthropicApiRoute(route)) {
+      providers.add("anthropic");
+    }
+
+    if (isOpenCodeGoRoute(route)) {
+      providers.add("opencode-go");
+    }
+  }
+
+  return [...providers].sort((left, right) => left.localeCompare(right));
+}
+
 function renderOpenCodeConfig(): string {
   const config: OpenCodeConfig = {
     server: {
@@ -99,6 +125,14 @@ function renderOpenCodeConfig(): string {
   };
 
   return `${JSON.stringify(config, null, 2)}\n`;
+}
+
+function renderOpenCodeManagedConfigContent(enabledProviders: readonly string[]): string {
+  const config: OpenCodeManagedConfig = {
+    enabled_providers: enabledProviders,
+  };
+
+  return JSON.stringify(config);
 }
 
 function renderOpenCodeGlobalAgentsMd(): string {
@@ -130,12 +164,12 @@ function insertOpenCodeAuth(input: {
   input.auth[input.providerId] = input.value;
 }
 
-function renderOpenCodeAuthContent(input: {
-  egressRoutes: ReadonlyArray<EgressCredentialRoute>;
-}): string | undefined {
+function renderOpenCodeAuthContent(
+  egressRoutes: ReadonlyArray<EgressCredentialRoute>,
+): string | undefined {
   const auth: OpenCodeAuthContent = {};
 
-  for (const route of input.egressRoutes) {
+  for (const route of egressRoutes) {
     if (isOpenAiApiRoute(route)) {
       insertOpenCodeAuth({
         auth,
@@ -188,9 +222,9 @@ function renderOpenCodeAuthContent(input: {
   return Object.keys(auth).length === 0 ? undefined : `${JSON.stringify(auth, null, 2)}\n`;
 }
 
-function buildOpenCodeSetupFiles(input: {
-  authContent: string | undefined;
-}): ReadonlyArray<RuntimeClientSetupFile> {
+function buildOpenCodeSetupFiles(
+  authContent: string | undefined,
+): ReadonlyArray<RuntimeClientSetupFile> {
   const files: RuntimeClientSetupFile[] = [
     {
       fileId: "opencode_config",
@@ -208,13 +242,13 @@ function buildOpenCodeSetupFiles(input: {
     },
   ];
 
-  if (input.authContent !== undefined) {
+  if (authContent !== undefined) {
     files.push({
       fileId: "opencode_auth",
       path: OpenCodeAuthPath,
       mode: 384,
       writeMode: "overwrite",
-      content: input.authContent,
+      content: authContent,
     });
   }
 
@@ -224,15 +258,19 @@ function buildOpenCodeSetupFiles(input: {
 function buildOpenCodeRuntimeClients(input: {
   openCodeCliInstallPath: string;
   authContent?: string;
+  enabledProviders?: readonly string[];
 }): ReadonlyArray<RuntimeClient> {
   return [
     {
       clientId: "opencode-cli",
       setup: {
-        env: {},
-        files: buildOpenCodeSetupFiles({
-          authContent: input.authContent,
-        }),
+        env:
+          input.enabledProviders === undefined
+            ? {}
+            : {
+                OPENCODE_CONFIG_CONTENT: renderOpenCodeManagedConfigContent(input.enabledProviders),
+              },
+        files: buildOpenCodeSetupFiles(input.authContent),
       },
       processes: [
         {
@@ -318,13 +356,13 @@ export function compileOpenCodeRuntime(
       openCodeCliInstallPath,
     }),
     renderRuntimeClients: ({ egressRoutes }) => {
-      const authContent = renderOpenCodeAuthContent({
-        egressRoutes,
-      });
+      const authContent = renderOpenCodeAuthContent(egressRoutes);
+      const enabledProviders = resolveOpenCodeEnabledProviders(egressRoutes);
 
       return buildOpenCodeRuntimeClients({
         openCodeCliInstallPath,
         ...(authContent === undefined ? {} : { authContent }),
+        enabledProviders,
       });
     },
     agentRuntimes: [

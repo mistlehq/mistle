@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import type { OpenCodeProviderSummary } from "@mistle/integrations-definitions/agent-runtimes/opencode/client";
 import { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { createNodeSandboxSessionRuntime } from "@mistle/sandbox-session-client/node";
 import {
@@ -13,7 +14,11 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { type RawData, type WebSocket, WebSocketServer } from "ws";
 
-import { useOpenCodeSessionState } from "./use-opencode-session-state.js";
+import {
+  mapOpenCodeProvidersToComposerModels,
+  parseOpenCodePromptModelSelection,
+  useOpenCodeSessionState,
+} from "./use-opencode-session-state.js";
 
 type OpenCodeProxyRequest = {
   body?: unknown;
@@ -316,11 +321,81 @@ function createSessionResponse(id: string) {
   };
 }
 
+function createOpenCodeProviderCatalogResponse(): {
+  providers: readonly OpenCodeProviderSummary[];
+  default: Record<string, string>;
+} {
+  return {
+    providers: [
+      {
+        id: "openai",
+        name: "OpenAI",
+        source: "api",
+        env: [],
+        options: {},
+        models: {
+          "gpt-5": {
+            id: "gpt-5",
+            providerID: "openai",
+            api: {
+              id: "gpt-5",
+              url: "https://api.openai.com/v1",
+              npm: "@ai-sdk/openai",
+            },
+            name: "GPT-5",
+            capabilities: {
+              temperature: true,
+              reasoning: true,
+              attachment: true,
+              toolcall: true,
+              input: {
+                text: true,
+                audio: false,
+                image: true,
+                video: false,
+                pdf: false,
+              },
+              output: {
+                text: true,
+                audio: false,
+                image: false,
+                video: false,
+                pdf: false,
+              },
+              interleaved: false,
+            },
+            cost: {
+              input: 1,
+              output: 1,
+              cache: {
+                read: 0,
+                write: 0,
+              },
+            },
+            limit: {
+              context: 100_000,
+              output: 16_000,
+            },
+            status: "active",
+            options: {},
+            headers: {},
+            release_date: "2026-01-01",
+          },
+        },
+      },
+    ],
+    default: {
+      openai: "gpt-5",
+    },
+  };
+}
+
 function closeTransport(transport: SandboxSessionTransport): void {
   transport.disconnect();
 }
 
 async function connectOpenCodeSessionForTest(input: {
+  initialCwd?: string;
   result: { current: ReturnType<typeof useOpenCodeSessionState> };
   sandboxInstanceId: string;
   server: OpenCodeProxyTransportServer;
@@ -328,6 +403,7 @@ async function connectOpenCodeSessionForTest(input: {
 }): Promise<ObservedOpenCodeProxyRequest> {
   act(() => {
     input.result.current.lifecycle.connectSession({
+      ...(input.initialCwd === undefined ? {} : { initialCwd: input.initialCwd }),
       sandboxInstanceId: input.sandboxInstanceId,
       targetSessionId: input.sessionId,
     });
@@ -346,10 +422,28 @@ async function connectOpenCodeSessionForTest(input: {
     },
   });
 
+  const providersRequest = await input.server.nextRequest();
+  const providersPath =
+    input.initialCwd === undefined
+      ? "/config/providers"
+      : `/config/providers?directory=${encodeURIComponent(input.initialCwd)}`;
+  expect(providersRequest.request).toMatchObject({
+    method: "GET",
+    path: providersPath,
+  });
+  input.server.sendJsonResponse({
+    request: providersRequest,
+    body: createOpenCodeProviderCatalogResponse(),
+  });
+
   const getSessionRequest = await input.server.nextRequest();
+  const getSessionPath =
+    input.initialCwd === undefined
+      ? `/session/${input.sessionId}`
+      : `/session/${input.sessionId}?directory=${encodeURIComponent(input.initialCwd)}`;
   expect(getSessionRequest.request).toMatchObject({
     method: "GET",
-    path: `/session/${input.sessionId}`,
+    path: getSessionPath,
   });
   input.server.sendJsonResponse({
     request: getSessionRequest,
@@ -372,9 +466,13 @@ async function connectOpenCodeSessionForTest(input: {
   });
 
   const permissionsRequest = await input.server.nextRequest();
+  const permissionsPath =
+    input.initialCwd === undefined
+      ? "/permission"
+      : `/permission?directory=${encodeURIComponent(input.initialCwd)}`;
   expect(permissionsRequest.request).toMatchObject({
     method: "GET",
-    path: "/permission",
+    path: permissionsPath,
   });
   return permissionsRequest;
 }
@@ -389,6 +487,42 @@ afterEach(async () => {
 });
 
 describe("useOpenCodeSessionState", () => {
+  it("parses OpenCode provider/model selections", () => {
+    expect(parseOpenCodePromptModelSelection("openai/gpt-5")).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5",
+    });
+    expect(parseOpenCodePromptModelSelection("openrouter/openai/gpt-5")).toEqual({
+      providerID: "openrouter",
+      modelID: "openai/gpt-5",
+    });
+    expect(() => parseOpenCodePromptModelSelection("gpt-5")).toThrow(
+      "OpenCode model selection must use provider/model format.",
+    );
+  });
+
+  it("maps OpenCode config providers to composer model options", () => {
+    expect(
+      mapOpenCodeProvidersToComposerModels({
+        providers: createOpenCodeProviderCatalogResponse().providers,
+        defaultModelByProvider: {
+          openai: "gpt-5",
+        },
+      }),
+    ).toEqual([
+      {
+        id: "openai/gpt-5",
+        model: "openai/gpt-5",
+        displayName: "OpenAI / GPT-5",
+        hidden: false,
+        defaultReasoningEffort: null,
+        inputModalities: ["text", "image"],
+        supportsPersonality: false,
+        isDefault: true,
+      },
+    ]);
+  });
+
   it("keeps lifecycle callbacks stable across rerenders", () => {
     const { result, rerender } = renderHook(() =>
       useOpenCodeSessionState({
@@ -399,6 +533,7 @@ describe("useOpenCodeSessionState", () => {
     const connectSession = result.current.lifecycle.connectSession;
     const disconnectSession = result.current.lifecycle.disconnectSession;
     const recoverSession = result.current.lifecycle.recoverSession;
+    const refreshModelCatalog = result.current.lifecycle.refreshModelCatalog;
 
     rerender();
 
@@ -406,6 +541,7 @@ describe("useOpenCodeSessionState", () => {
     expect(result.current.lifecycle.connectSession).toBe(connectSession);
     expect(result.current.lifecycle.disconnectSession).toBe(disconnectSession);
     expect(result.current.lifecycle.recoverSession).toBe(recoverSession);
+    expect(result.current.lifecycle.refreshModelCatalog).toBe(refreshModelCatalog);
   });
 
   it("does not keep a connected session snapshot after hydration fails", async () => {
@@ -477,6 +613,10 @@ describe("useOpenCodeSessionState", () => {
     act(() => {
       promptPromise = result.current.chat.sendPrompt({
         directory: "/workspace/selected-repo",
+        model: {
+          modelID: "gpt-5",
+          providerID: "openai",
+        },
         submittedPrompt: "Run tests",
       });
     });
@@ -486,6 +626,10 @@ describe("useOpenCodeSessionState", () => {
       method: "POST",
       path: "/session/ses_test/prompt_async?directory=%2Fworkspace%2Fselected-repo",
       body: {
+        model: {
+          modelID: "gpt-5",
+          providerID: "openai",
+        },
         parts: [
           {
             text: "Run tests",
@@ -626,6 +770,179 @@ describe("useOpenCodeSessionState", () => {
     await expect(hydrationPromise).resolves.toBeUndefined();
     await waitFor(() => {
       expect(result.current.chat.chatState.pendingPermissions).toEqual([pendingPermission]);
+    });
+  });
+
+  it("refreshes the model catalog for a new repository directory", async () => {
+    const server = await startOpenCodeProxyTransportServer();
+    const transport = await connectTransport(server);
+    const { result } = renderHook(() =>
+      useOpenCodeSessionState({
+        ensureTransportConnected: async () => {
+          return {
+            sandboxInstanceId: "sbi_123",
+            transport,
+          };
+        },
+      }),
+    );
+
+    const permissionsRequest = await connectOpenCodeSessionForTest({
+      result,
+      sandboxInstanceId: "sbi_123",
+      server,
+      sessionId: "ses_test",
+    });
+    server.sendJsonResponse({
+      request: permissionsRequest,
+      body: [],
+    });
+
+    await waitFor(() => {
+      expect(result.current.lifecycle.sessionConnectionState).toBe("connected");
+    });
+    expect(result.current.modelCatalogDirectory).toBeNull();
+    expect(result.current.bootstrap.establishedSnapshot.availableModels).toHaveLength(1);
+
+    let refreshPromise: Promise<void> | undefined;
+    act(() => {
+      refreshPromise = result.current.lifecycle.refreshModelCatalog({
+        directory: "/workspace/other-repo",
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.bootstrap.phase).toEqual({ status: "bootstrapping" });
+    });
+    expect(result.current.bootstrap.establishedSnapshot.availableModels).toEqual([]);
+
+    const providersRequest = await server.nextRequest();
+    expect(providersRequest.request).toMatchObject({
+      method: "GET",
+      path: "/config/providers?directory=%2Fworkspace%2Fother-repo",
+    });
+    server.sendJsonResponse({
+      request: providersRequest,
+      body: createOpenCodeProviderCatalogResponse(),
+    });
+
+    await expect(refreshPromise).resolves.toBeUndefined();
+    await waitFor(() => {
+      expect(result.current.bootstrap.phase).toEqual({ status: "ready" });
+    });
+    expect(result.current.modelCatalogDirectory).toBe("/workspace/other-repo");
+    expect(result.current.bootstrap.establishedSnapshot.availableModels).toEqual([
+      expect.objectContaining({
+        model: "openai/gpt-5",
+      }),
+    ]);
+  });
+
+  it("reloads model providers when reconnecting to the same repository directory", async () => {
+    const server = await startOpenCodeProxyTransportServer();
+    const transport = await connectTransport(server);
+    const { result } = renderHook(() =>
+      useOpenCodeSessionState({
+        ensureTransportConnected: async () => {
+          return {
+            sandboxInstanceId: "sbi_123",
+            transport,
+          };
+        },
+      }),
+    );
+
+    const firstPermissionsRequest = await connectOpenCodeSessionForTest({
+      initialCwd: "/workspace/repo",
+      result,
+      sandboxInstanceId: "sbi_123",
+      server,
+      sessionId: "ses_test",
+    });
+    server.sendJsonResponse({
+      request: firstPermissionsRequest,
+      body: [],
+    });
+
+    await waitFor(() => {
+      expect(result.current.lifecycle.sessionConnectionState).toBe("connected");
+    });
+    expect(result.current.modelCatalogDirectory).toBe("/workspace/repo");
+    expect(result.current.bootstrap.establishedSnapshot.availableModels).toHaveLength(1);
+
+    act(() => {
+      result.current.lifecycle.connectSession({
+        initialCwd: "/workspace/repo",
+        sandboxInstanceId: "sbi_123",
+        targetSessionId: "ses_test",
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.bootstrap.phase).toEqual({ status: "bootstrapping" });
+    });
+    expect(result.current.bootstrap.establishedSnapshot.availableModels).toEqual([]);
+
+    const healthRequest = await server.nextRequest();
+    expect(healthRequest.request).toMatchObject({
+      method: "GET",
+      path: "/global/health",
+    });
+    server.sendJsonResponse({
+      request: healthRequest,
+      body: {
+        healthy: true,
+        version: "1.14.41",
+      },
+    });
+
+    const providersRequest = await server.nextRequest();
+    expect(providersRequest.request).toMatchObject({
+      method: "GET",
+      path: "/config/providers?directory=%2Fworkspace%2Frepo",
+    });
+    server.sendJsonResponse({
+      request: providersRequest,
+      body: createOpenCodeProviderCatalogResponse(),
+    });
+
+    const getSessionRequest = await server.nextRequest();
+    expect(getSessionRequest.request).toMatchObject({
+      method: "GET",
+      path: "/session/ses_test?directory=%2Fworkspace%2Frepo",
+    });
+    server.sendJsonResponse({
+      request: getSessionRequest,
+      body: createSessionResponse("ses_test"),
+    });
+
+    const eventRequest = await server.nextRequest();
+    server.sendSseOpenResponse({
+      request: eventRequest,
+    });
+
+    const messagesRequest = await server.nextRequest();
+    expect(messagesRequest.request).toMatchObject({
+      method: "GET",
+      path: "/session/ses_test/message",
+    });
+    server.sendJsonResponse({
+      request: messagesRequest,
+      body: [],
+    });
+
+    const permissionsRequest = await server.nextRequest();
+    expect(permissionsRequest.request).toMatchObject({
+      method: "GET",
+      path: "/permission?directory=%2Fworkspace%2Frepo",
+    });
+    server.sendJsonResponse({
+      request: permissionsRequest,
+      body: [],
+    });
+
+    await waitFor(() => {
+      expect(result.current.lifecycle.sessionConnectionState).toBe("connected");
     });
   });
 });

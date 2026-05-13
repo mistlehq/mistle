@@ -37,6 +37,7 @@ const SemanticGroupDisplayKeyLabels = {
   "tool-call.active": "Using tools",
   "tool-call.done": "Used tools",
   "generic.active": "Activity",
+  "generic.done": "Activity",
 } as const;
 
 function isSemanticGroupDisplayKey(
@@ -45,14 +46,20 @@ function isSemanticGroupDisplayKey(
   return value in SemanticGroupDisplayKeyLabels;
 }
 
-function getSemanticGroupTitle(input: {
-  displayKeys: {
-    active: string | null;
-    completed: string | null;
-  };
-  status: "streaming" | "completed";
-}): string {
-  const key = input.status === "streaming" ? input.displayKeys.active : input.displayKeys.completed;
+function getSemanticGroupTitle(input: { block: ChatSemanticGroupEntry }): string {
+  const singleItem = input.block.items[0];
+  if (
+    input.block.semanticKind === "generic" &&
+    input.block.items.length === 1 &&
+    singleItem !== undefined
+  ) {
+    return singleItem.label;
+  }
+
+  const key =
+    input.block.status === "streaming"
+      ? input.block.displayKeys.active
+      : input.block.displayKeys.completed;
   if (key === null) {
     throw new Error("Missing semantic group display key.");
   }
@@ -69,6 +76,10 @@ function getSemanticGroupSummary(input: {
   counts: { reads: number; searches: number; lists: number } | null;
   itemCount: number;
 }): string | null {
+  if (input.semanticKind === "generic" && input.itemCount === 1) {
+    return null;
+  }
+
   if (input.semanticKind === "exploring" && input.counts !== null) {
     const summary = [
       input.counts.reads > 0
@@ -180,10 +191,7 @@ export function ChatSemanticGroup({
               active={block.status === "streaming"}
               className="font-medium text-sm"
             >
-              {getSemanticGroupTitle({
-                displayKeys: block.displayKeys,
-                status: block.status,
-              })}
+              {getSemanticGroupTitle({ block })}
             </AnimatedStatusText>
             <span className="text-muted-foreground flex size-4 items-center justify-center">
               <span className="sr-only">Toggle group</span>
@@ -218,7 +226,9 @@ export function ChatSemanticGroup({
             item.sourceKind === "file-change"
               ? findFileChangeApprovalRequest(pendingServerRequests, item.id)
               : null;
-          const hasExpandableOutput = item.output !== null && item.output.length > 0;
+          const hasExpandableOutput =
+            (item.output !== null && item.output.length > 0) ||
+            (block.semanticKind === "generic" && item.detail !== null && item.detail.length > 0);
 
           return (
             <details

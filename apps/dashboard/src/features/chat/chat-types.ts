@@ -101,7 +101,8 @@ export type ChatSemanticGroupKind =
   | "making-edits"
   | "thinking"
   | "searching-web"
-  | "tool-call";
+  | "tool-call"
+  | "generic";
 
 export type ChatSemanticGroupDetailKind = "plain" | "code";
 
@@ -122,7 +123,13 @@ export type ChatSemanticGroupEntry = {
   } | null;
   items: readonly {
     id: string;
-    sourceKind: "command-execution" | "reasoning" | "file-change" | "web-search" | "tool-call";
+    sourceKind:
+      | "command-execution"
+      | "reasoning"
+      | "file-change"
+      | "web-search"
+      | "tool-call"
+      | "generic-item";
     label: string;
     detail: string | null;
     sourcePath?: string;

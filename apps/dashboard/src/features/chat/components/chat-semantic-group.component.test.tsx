@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -20,6 +20,15 @@ function openSemanticGroup(): void {
   }
 
   fireEvent.click(groupSummary);
+}
+
+function getSemanticGroupSummaryElement(container: HTMLElement): HTMLElement {
+  const groupSummary = container.querySelector("[data-chat-semantic-group-summary]");
+  if (groupSummary === null) {
+    throw new Error("Expected a semantic group summary.");
+  }
+
+  return groupSummary as HTMLElement;
 }
 
 describe("ChatSemanticGroup", () => {
@@ -279,6 +288,119 @@ describe("ChatSemanticGroup", () => {
     const commandLog = container.querySelector('[data-semantic-output="command-log"]');
     expect(commandLog).toBeTruthy();
     expect(commandLog?.textContent?.length).toBeGreaterThan(0);
+  });
+
+  it("renders generic groups with body and json details in the shared semantic UI", () => {
+    const { container } = render(
+      <ChatSemanticGroup
+        block={{
+          id: "turn_generic:generic:generic_context_compaction",
+          turnId: "turn_generic",
+          kind: "semantic-group",
+          semanticKind: "generic",
+          status: "completed",
+          displayKeys: {
+            active: "generic.active",
+            completed: "generic.done",
+          },
+          counts: null,
+          items: [
+            {
+              id: "generic_context_compaction",
+              sourceKind: "generic-item",
+              label: "Context compaction",
+              detail: "Compacted the current session context before continuing.",
+              detailKind: "plain",
+              command: null,
+              output: JSON.stringify(
+                {
+                  strategy: "drop-superseded-read-output",
+                },
+                null,
+                2,
+              ),
+              status: "completed",
+            },
+          ],
+        }}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={() => {}}
+        pendingServerRequests={[]}
+      />,
+    );
+
+    const groupDisclosure = container.querySelector("[data-chat-semantic-group]");
+    const groupSummary = getSemanticGroupSummaryElement(container);
+    expect(groupDisclosure?.hasAttribute("open")).toBe(false);
+    expect(within(groupSummary).getByText("Context compaction")).toBeTruthy();
+    expect(screen.queryByText("Activity")).toBeNull();
+    expect(screen.queryByText("1 item")).toBeNull();
+
+    openSemanticGroup();
+
+    expect(groupDisclosure?.hasAttribute("open")).toBe(true);
+    expect(
+      screen.getByText("Compacted the current session context before continuing.", {
+        selector: "p",
+      }),
+    ).toBeTruthy();
+    expect(screen.getByText(/drop-superseded-read-output/)).toBeTruthy();
+    expect(screen.getByText("Done")).toBeTruthy();
+  });
+
+  it("keeps body-only generic groups expandable through the semantic item row", () => {
+    const { container } = render(
+      <ChatSemanticGroup
+        block={{
+          id: "turn_opencode:generic:opencode_error",
+          turnId: "turn_opencode",
+          kind: "semantic-group",
+          semanticKind: "generic",
+          status: "completed",
+          displayKeys: {
+            active: "generic.active",
+            completed: "generic.done",
+          },
+          counts: null,
+          items: [
+            {
+              id: "opencode_error",
+              sourceKind: "generic-item",
+              label: "OpenCode error",
+              detail: "The selected model is not available for this account.",
+              detailKind: "plain",
+              command: null,
+              output: null,
+              status: "completed",
+            },
+          ],
+        }}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={() => {}}
+        pendingServerRequests={[]}
+      />,
+    );
+
+    const groupDisclosure = container.querySelector("[data-chat-semantic-group]");
+    const groupSummary = getSemanticGroupSummaryElement(container);
+    expect(groupDisclosure?.hasAttribute("open")).toBe(false);
+    expect(within(groupSummary).getByText("OpenCode error")).toBeTruthy();
+
+    openSemanticGroup();
+
+    expect(screen.queryByText("Activity")).toBeNull();
+
+    const itemSummary = screen.getByText("Toggle results").closest("summary");
+    if (itemSummary === null) {
+      throw new Error("Expected a semantic group item summary.");
+    }
+    fireEvent.click(itemSummary);
+
+    expect(
+      screen.getByText("The selected model is not available for this account.", {
+        selector: "p",
+      }),
+    ).toBeTruthy();
   });
 
   it("renders grouped command approvals inline with the matching semantic item", () => {

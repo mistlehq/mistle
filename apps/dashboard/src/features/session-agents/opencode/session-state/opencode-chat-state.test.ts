@@ -5,6 +5,7 @@ import type {
 } from "@mistle/integrations-definitions/agent-runtimes/opencode/client";
 import { describe, expect, it } from "vitest";
 
+import { formatSemanticChatDetail } from "../../../chat/chat-semantic-projection.js";
 import { createInitialOpenCodeChatState, reduceOpenCodeChatState } from "./opencode-chat-state.js";
 
 describe("reduceOpenCodeChatState", () => {
@@ -56,10 +57,19 @@ describe("reduceOpenCodeChatState", () => {
         turnId: "msg_user",
       },
       {
-        id: "part_reasoning",
-        kind: "reasoning",
-        summary: "I will inspect the repo.",
+        id: "msg_user:thinking:part_reasoning",
+        kind: "semantic-group",
+        semanticKind: "thinking",
         turnId: "msg_user",
+        items: [
+          {
+            id: "part_reasoning",
+            label: "Thought",
+            detail: "I will inspect the repo.",
+            output: "I will inspect the repo.",
+            sourceKind: "reasoning",
+          },
+        ],
       },
       {
         id: "part_text",
@@ -67,6 +77,94 @@ describe("reduceOpenCodeChatState", () => {
         text: "Updated the docs.",
         turnId: "msg_user",
       },
+    ]);
+  });
+
+  it("preserves full OpenCode reasoning text beyond the compact row detail", () => {
+    const fullReasoningText = [
+      "I will inspect the repository structure, compare the current OpenCode projection against the shared semantic renderer contract,",
+      "and then preserve the full reasoning body inside the expandable semantic output.",
+    ].join(" ");
+
+    const state = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "hydrate_messages",
+      sessionId: "ses_test",
+      messages: [
+        createUserMessage({
+          id: "msg_user",
+          text: "Please update the docs",
+        }),
+        createAssistantMessage({
+          id: "msg_assistant",
+          parentId: "msg_user",
+          parts: [
+            {
+              id: "part_reasoning",
+              messageID: "msg_assistant",
+              sessionID: "ses_test",
+              text: fullReasoningText,
+              time: {
+                start: 2,
+                end: 3,
+              },
+              type: "reasoning",
+            },
+          ],
+        }),
+      ],
+    });
+
+    expect(state.entries).toContainEqual(
+      expect.objectContaining({
+        id: "msg_user:thinking:part_reasoning",
+        kind: "semantic-group",
+        semanticKind: "thinking",
+        items: [
+          expect.objectContaining({
+            id: "part_reasoning",
+            detail: formatSemanticChatDetail({
+              detail: fullReasoningText,
+              maxLength: 88,
+            }),
+            output: fullReasoningText,
+          }),
+        ],
+      }),
+    );
+  });
+
+  it("suppresses OpenCode placeholder reasoning parts before semantic grouping", () => {
+    const state = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "hydrate_messages",
+      sessionId: "ses_test",
+      messages: [
+        createUserMessage({
+          id: "msg_user",
+          text: "Please update the docs",
+        }),
+        createAssistantMessage({
+          id: "msg_assistant",
+          parentId: "msg_user",
+          parts: ["", "[]", "{}", "null"].map((text, index) => ({
+            id: `part_reasoning_${String(index)}`,
+            messageID: "msg_assistant",
+            sessionID: "ses_test",
+            text,
+            time: {
+              start: index + 2,
+              end: index + 3,
+            },
+            type: "reasoning" as const,
+          })),
+        }),
+      ],
+    });
+
+    expect(state.entries).toEqual([
+      expect.objectContaining({
+        id: "msg_user",
+        kind: "user-message",
+      }),
     ]);
   });
 
@@ -154,7 +252,7 @@ describe("reduceOpenCodeChatState", () => {
     );
   });
 
-  it("maps OpenCode shell tools to command entries and failed tools to visible items", () => {
+  it("groups OpenCode shell tools and keeps unknown tools visible as generic items", () => {
     const state = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
       type: "hydrate_messages",
       sessionId: "ses_test",
@@ -213,11 +311,21 @@ describe("reduceOpenCodeChatState", () => {
 
     expect(state.entries).toContainEqual(
       expect.objectContaining({
-        id: "part_bash",
-        kind: "command-execution",
-        command: "pnpm test",
-        output: "passed",
+        id: "msg_user:running-commands:part_bash",
+        kind: "semantic-group",
+        semanticKind: "running-commands",
         status: "completed",
+        items: [
+          expect.objectContaining({
+            id: "part_bash",
+            sourceKind: "command-execution",
+            label: "Command",
+            detail: "pnpm test",
+            command: "pnpm test",
+            output: "passed",
+            status: "completed",
+          }),
+        ],
       }),
     );
     expect(state.entries).toContainEqual(
@@ -226,6 +334,175 @@ describe("reduceOpenCodeChatState", () => {
         kind: "generic-item",
         itemType: "opencode-tool",
         body: "tool failed",
+      }),
+    );
+  });
+
+  it("groups adjacent OpenCode semantic tools by semantic kind", () => {
+    const state = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "hydrate_messages",
+      sessionId: "ses_test",
+      messages: [
+        createUserMessage({
+          id: "msg_user",
+          text: "Update the docs",
+        }),
+        createAssistantMessage({
+          id: "msg_assistant",
+          parentId: "msg_user",
+          parts: [
+            {
+              callID: "call_read",
+              id: "part_read",
+              messageID: "msg_assistant",
+              sessionID: "ses_test",
+              state: {
+                input: {
+                  filePath: "README.md",
+                },
+                metadata: {},
+                output: "old docs",
+                status: "completed",
+                time: {
+                  start: 1,
+                  end: 2,
+                },
+                title: "Read README.md",
+              },
+              tool: "read",
+              type: "tool",
+            },
+            {
+              callID: "call_edit",
+              id: "part_edit",
+              messageID: "msg_assistant",
+              sessionID: "ses_test",
+              state: {
+                input: {
+                  filePath: "README.md",
+                },
+                metadata: {
+                  diff: [
+                    "--- a/README.md",
+                    "+++ b/README.md",
+                    "@@ -1 +1 @@",
+                    "-old docs",
+                    "+new docs",
+                  ].join("\n"),
+                },
+                output: "Edit applied successfully.",
+                status: "completed",
+                time: {
+                  start: 3,
+                  end: 4,
+                },
+                title: "Edit README.md",
+              },
+              tool: "edit",
+              type: "tool",
+            },
+          ],
+        }),
+      ],
+    });
+
+    expect(state.entries).toEqual([
+      expect.objectContaining({
+        id: "msg_user",
+        kind: "user-message",
+      }),
+      expect.objectContaining({
+        id: "msg_user:exploring:part_read",
+        kind: "semantic-group",
+        semanticKind: "exploring",
+        counts: {
+          reads: 1,
+          searches: 0,
+          lists: 0,
+        },
+        items: [
+          expect.objectContaining({
+            id: "part_read",
+            label: "Read",
+            detail: "README.md",
+            sourcePath: "README.md",
+            output: "old docs",
+          }),
+        ],
+      }),
+      expect.objectContaining({
+        id: "msg_user:making-edits:part_edit",
+        kind: "semantic-group",
+        semanticKind: "making-edits",
+        items: [
+          expect.objectContaining({
+            id: "part_edit",
+            label: "File change",
+            detail: "README.md",
+            output: [
+              "--- a/README.md",
+              "+++ b/README.md",
+              "@@ -1 +1 @@",
+              "-old docs",
+              "+new docs",
+            ].join("\n"),
+          }),
+        ],
+      }),
+    ]);
+  });
+
+  it("keeps OpenCode edit status text generic when no diff metadata is available", () => {
+    const state = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "hydrate_messages",
+      sessionId: "ses_test",
+      messages: [
+        createUserMessage({
+          id: "msg_user",
+          text: "Update the docs",
+        }),
+        createAssistantMessage({
+          id: "msg_assistant",
+          parentId: "msg_user",
+          parts: [
+            {
+              callID: "call_edit",
+              id: "part_edit",
+              messageID: "msg_assistant",
+              sessionID: "ses_test",
+              state: {
+                input: {
+                  filePath: "README.md",
+                },
+                metadata: {},
+                output: "Edit applied successfully.",
+                status: "completed",
+                time: {
+                  start: 1,
+                  end: 2,
+                },
+                title: "Edit README.md",
+              },
+              tool: "edit",
+              type: "tool",
+            },
+          ],
+        }),
+      ],
+    });
+
+    expect(state.entries).toContainEqual(
+      expect.objectContaining({
+        id: "part_edit",
+        kind: "generic-item",
+        itemType: "opencode-tool",
+        title: "edit",
+        body: "Edit applied successfully.",
+      }),
+    );
+    expect(state.entries).not.toContainEqual(
+      expect.objectContaining({
+        semanticKind: "making-edits",
       }),
     );
   });

@@ -93,8 +93,8 @@ function SessionComposerStateHarness(input: {
       configControl: {
         selectedModel: "gpt-5.4",
         selectedReasoningEffort: "medium",
+        hasExplicitModelSelection: true,
         modelOptions: [{ value: "gpt-5.4", label: "GPT-5.4" }],
-        canChangeModel: true,
         canChangeReasoningEffort: true,
         isUpdating: false,
         setModel: () => {

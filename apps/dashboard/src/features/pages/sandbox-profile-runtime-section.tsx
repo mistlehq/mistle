@@ -99,6 +99,7 @@ export function SandboxProfileRuntimeSection(input: {
           providerId: selectedProvider.id,
         });
   const providerOptions = createProviderOptions(input.providers);
+  const inlineRuntimeFields = input.sectionChrome === false;
 
   const buildDraftChanges = useCallback((): SandboxProfileRuntimeDraftChanges => {
     const runtime = draftRuntimeRef.current;
@@ -262,11 +263,11 @@ export function SandboxProfileRuntimeSection(input: {
     setSaveErrorMessage(null);
   }
 
-  const providerFieldLabel = input.sectionChrome === false ? "Sandbox Runtime" : "Provider";
+  const providerFieldLabel = inlineRuntimeFields ? "Sandbox Runtime" : "Provider";
   const agentRuntimeField = (
     <Field
-      contentWidth={input.sectionChrome === false ? "fill" : "fit"}
-      orientation={input.sectionChrome === false ? "horizontal" : "vertical"}
+      contentWidth={inlineRuntimeFields ? "fill" : "fit"}
+      orientation={inlineRuntimeFields ? "horizontal" : "vertical"}
     >
       <FieldHeader>
         <FieldLabel htmlFor="sandbox-profile-agent-runtime">Agent</FieldLabel>
@@ -291,14 +292,17 @@ export function SandboxProfileRuntimeSection(input: {
     </Field>
   );
   const agentRuntimeContent = fieldIsReadOnly ? (
-    <SandboxProfileAgentRuntimeReadOnlySummary runtimeId={draftRuntime.agentRuntimeId} />
+    <SandboxProfileAgentRuntimeReadOnlySummary
+      horizontal={inlineRuntimeFields}
+      runtimeId={draftRuntime.agentRuntimeId}
+    />
   ) : (
     agentRuntimeField
   );
   const providerField = (
     <Field
-      contentWidth={input.sectionChrome === false ? "fill" : "fit"}
-      orientation={input.sectionChrome === false ? "horizontal" : "vertical"}
+      contentWidth={inlineRuntimeFields ? "fill" : "fit"}
+      orientation={inlineRuntimeFields ? "horizontal" : "vertical"}
     >
       <FieldHeader>
         <FieldLabel htmlFor="sandbox-profile-runtime-provider">{providerFieldLabel}</FieldLabel>
@@ -338,11 +342,13 @@ export function SandboxProfileRuntimeSection(input: {
         connections: input.availableConnections,
       })}
       provider={selectedProvider}
+      providerFieldLabel={providerFieldLabel}
       runtime={draftRuntime}
+      horizontal={inlineRuntimeFields}
     />
   ) : (
     <div className="grid gap-4">
-      {input.sectionChrome === false ? (
+      {inlineRuntimeFields ? (
         providerField
       ) : (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -355,7 +361,7 @@ export function SandboxProfileRuntimeSection(input: {
           />
         </div>
       )}
-      {input.sectionChrome === false ? (
+      {inlineRuntimeFields ? (
         <SandboxProviderCredentialSourceField
           credentialSource={draftRuntime.credentialSource}
           horizontal={true}
@@ -372,7 +378,7 @@ export function SandboxProfileRuntimeSection(input: {
           availableTargets: input.availableTargets,
           providerId: selectedProvider?.id ?? null,
         })}
-        horizontal={input.sectionChrome === false}
+        horizontal={inlineRuntimeFields}
         provider={selectedProvider}
       />
 
@@ -385,7 +391,7 @@ export function SandboxProfileRuntimeSection(input: {
     </div>
   );
 
-  if (input.sectionChrome === false) {
+  if (inlineRuntimeFields) {
     return (
       <div className="grid gap-3">
         {saveErrorMessage === null ? null : <Notice variant="alert">{saveErrorMessage}</Notice>}
@@ -652,40 +658,57 @@ function ResourceSliderField(input: {
 
 function SandboxProfileRuntimeReadOnlySummary(input: {
   connection: IntegrationConnectionSummary | null;
+  horizontal: boolean;
   provider: SandboxProviderSummary | null;
+  providerFieldLabel: string;
   runtime: RuntimeConfigState;
 }): React.JSX.Element {
-  const shouldShowCredentials = input.runtime.sandboxConnectionId !== null;
+  const shouldShowCredentialSource =
+    input.provider !== null &&
+    input.provider.managed &&
+    input.provider.supportsOrganizationConnection;
+  const shouldShowConnection =
+    input.provider !== null &&
+    input.provider.supportsOrganizationConnection &&
+    input.runtime.credentialSource === "organization";
   return (
-    <div className="grid gap-4 text-sm md:grid-cols-4">
-      <ReadOnlyRuntimeItem label="Provider">
+    <div className="grid gap-4">
+      <ReadOnlyRuntimeField horizontal={input.horizontal} label={input.providerFieldLabel}>
         {input.provider === null ? (
           input.runtime.sandboxProvider
         ) : (
           <ProviderOptionLabel provider={input.provider} />
         )}
-      </ReadOnlyRuntimeItem>
-      {shouldShowCredentials ? (
-        <ReadOnlyRuntimeItem label="Connection">
-          {input.connection?.displayName ?? input.runtime.sandboxConnectionId}
-        </ReadOnlyRuntimeItem>
+      </ReadOnlyRuntimeField>
+      {shouldShowCredentialSource ? (
+        <ReadOnlyRuntimeField horizontal={input.horizontal} label="Credentials">
+          {formatCredentialSource(input.runtime.credentialSource)}
+        </ReadOnlyRuntimeField>
       ) : null}
-      <ReadOnlyRuntimeItem label="Resources">
-        {formatResources(input.runtime.sandboxResources)}
-      </ReadOnlyRuntimeItem>
+      {shouldShowConnection ? (
+        <ReadOnlyRuntimeField horizontal={input.horizontal} label="Connection">
+          {input.connection?.displayName ??
+            input.runtime.sandboxConnectionId ??
+            "Select connection"}
+        </ReadOnlyRuntimeField>
+      ) : null}
+      <SandboxProviderReadOnlyResourceFields
+        horizontal={input.horizontal}
+        provider={input.provider}
+        resources={input.runtime.sandboxResources}
+      />
     </div>
   );
 }
 
 function SandboxProfileAgentRuntimeReadOnlySummary(input: {
+  horizontal: boolean;
   runtimeId: AgentRuntimeId;
 }): React.JSX.Element {
   return (
-    <div className="text-sm">
-      <ReadOnlyRuntimeItem label="Agent">
-        <AgentRuntimeOptionLabel runtimeId={input.runtimeId} />
-      </ReadOnlyRuntimeItem>
-    </div>
+    <ReadOnlyRuntimeField horizontal={input.horizontal} label="Agent">
+      <AgentRuntimeOptionLabel runtimeId={input.runtimeId} />
+    </ReadOnlyRuntimeField>
   );
 }
 
@@ -701,14 +724,54 @@ function AgentRuntimeOptionLabel(input: { runtimeId: AgentRuntimeId }): React.JS
   );
 }
 
-function ReadOnlyRuntimeItem(input: { children: ReactNode; label: string }): React.JSX.Element {
+function SandboxProviderReadOnlyResourceFields(input: {
+  horizontal: boolean;
+  provider: SandboxProviderSummary | null;
+  resources: SandboxProfileVersion["sandboxResources"];
+}): React.JSX.Element | null {
+  if (
+    input.provider === null ||
+    input.provider.resourceCapabilities === null ||
+    input.resources === null
+  ) {
+    return null;
+  }
+
+  const capabilities = input.provider.resourceCapabilities;
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-        {input.label}
-      </span>
-      <span className="font-medium">{input.children}</span>
-    </div>
+    <>
+      <ReadOnlyRuntimeField horizontal={input.horizontal} label="CPU">
+        {formatCpuResourceValue(input.resources.vcpuCount)}
+      </ReadOnlyRuntimeField>
+      <ReadOnlyRuntimeField horizontal={input.horizontal} label="Memory (MB)">
+        {formatMemoryResourceValue(input.resources.memoryMb)}
+      </ReadOnlyRuntimeField>
+      {capabilities.storageMb === undefined ? null : (
+        <ReadOnlyRuntimeField horizontal={input.horizontal} label="Storage (MB)">
+          {formatMemoryResourceValue(input.resources.storageMb ?? capabilities.storageMb.default)}
+        </ReadOnlyRuntimeField>
+      )}
+    </>
+  );
+}
+
+function ReadOnlyRuntimeField(input: {
+  children: ReactNode;
+  horizontal: boolean;
+  label: string;
+}): React.JSX.Element {
+  return (
+    <Field
+      contentWidth={input.horizontal ? "fill" : "fit"}
+      orientation={input.horizontal ? "horizontal" : "vertical"}
+    >
+      <FieldHeader>
+        <FieldLabel>{input.label}</FieldLabel>
+      </FieldHeader>
+      <FieldContent>
+        <span className="flex min-h-9 items-center text-sm font-medium">{input.children}</span>
+      </FieldContent>
+    </Field>
   );
 }
 
@@ -920,16 +983,4 @@ function formatCpuResourceValue(value: number): string {
 
 function formatMemoryResourceValue(value: number): string {
   return `${String(value)} MB`;
-}
-
-function formatResources(resources: SandboxProfileVersion["sandboxResources"]): string {
-  if (resources === null) {
-    return "Provider managed";
-  }
-
-  return [
-    `${String(resources.vcpuCount)} vCPU`,
-    `${String(resources.memoryMb)} MB memory`,
-    ...(resources.storageMb === undefined ? [] : [`${String(resources.storageMb)} MB storage`]),
-  ].join(", ");
 }

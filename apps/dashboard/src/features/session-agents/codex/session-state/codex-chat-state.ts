@@ -3,14 +3,18 @@ import type {
   CodexThreadReadTurn,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import {
-  buildCodexTurnTimelineFromNormalized,
+  classifyCodexThreadItemSemantics,
   normalizeCodexLocalImageAttachment,
   normalizeCodexThreadItem,
-  type CodexTimelineEntry,
   type NormalizedCodexThreadItem,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { z } from "zod";
 
+import {
+  formatSemanticChatDetail,
+  projectSemanticChatEntries,
+  type SemanticChatProjectionItem,
+} from "../../../chat/chat-semantic-projection.js";
 import type {
   ChatAssistantEntry,
   ChatAttachment,
@@ -20,7 +24,6 @@ import type {
   ChatGenericItemEntry,
   ChatPlanEntry,
   ChatReasoningEntry,
-  ChatSemanticGroupEntry,
   ChatUserEntry,
 } from "../../../chat/chat-types.js";
 import { parseTurnPlanSnapshot } from "./codex-session-events.js";
@@ -273,12 +276,9 @@ function mapRenderedItemsToEntries(
     return [];
   }
 
-  const timeline = buildCodexTurnTimelineFromNormalized({
-    turnId: input.turnId,
-    items: input.items,
-  });
-
-  return timeline.flatMap((timelineEntry) => mapTimelineEntryToChatEntries(timelineEntry));
+  return projectSemanticChatEntries(
+    input.items.flatMap((item) => mapNormalizedItemToProjection(item)),
+  );
 }
 
 function createGenericEntry(input: {
@@ -400,26 +400,6 @@ function summarizeExploringItem(
   };
 }
 
-function formatSemanticGroupDetail(input: {
-  detail: string | null;
-  maxLength: number;
-}): string | null {
-  if (input.detail === null) {
-    return null;
-  }
-
-  const normalizedDetail = input.detail.replaceAll(/\s+/g, " ").trim();
-  if (normalizedDetail.length === 0) {
-    return null;
-  }
-
-  if (normalizedDetail.length <= input.maxLength) {
-    return normalizedDetail;
-  }
-
-  return `${normalizedDetail.slice(0, input.maxLength - 1).trimEnd()}…`;
-}
-
 function summarizeFileChangeOutput(
   item: Extract<NormalizedCodexThreadItem, { kind: "file-change" }>,
 ): string | null {
@@ -479,7 +459,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
       return {
         sourceKind: "command-execution",
         label: exploringSummary.label,
-        detail: formatSemanticGroupDetail({
+        detail: formatSemanticChatDetail({
           detail: exploringSummary.detail,
           maxLength: 72,
         }),
@@ -492,7 +472,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
     return {
       sourceKind: "command-execution",
       label: "Command",
-      detail: formatSemanticGroupDetail({
+      detail: formatSemanticChatDetail({
         detail: item.command ?? item.reason,
         maxLength: 80,
       }),
@@ -506,7 +486,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
     return {
       sourceKind: "reasoning",
       label: "Thought",
-      detail: formatSemanticGroupDetail({
+      detail: formatSemanticChatDetail({
         detail: item.text,
         maxLength: 88,
       }),
@@ -521,7 +501,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
     return {
       sourceKind: "file-change",
       label: getFileChangeLabel(item.changes[0]?.kind ?? null, item.changes.length),
-      detail: formatSemanticGroupDetail({
+      detail: formatSemanticChatDetail({
         detail: paths.length === 0 ? null : paths.join(", "),
         maxLength: 88,
       }),
@@ -535,7 +515,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
     return {
       sourceKind: "web-search",
       label: "Web search",
-      detail: formatSemanticGroupDetail({
+      detail: formatSemanticChatDetail({
         detail: item.query,
         maxLength: 72,
       }),
@@ -549,7 +529,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
     return {
       sourceKind: "tool-call",
       label: item.title,
-      detail: formatSemanticGroupDetail({
+      detail: formatSemanticChatDetail({
         detail: item.body ?? item.toolType,
         maxLength: 72,
       }),
@@ -569,155 +549,174 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
   };
 }
 
-function mapTimelineEntryToChatEntries(entry: CodexTimelineEntry): readonly ChatEntry[] {
-  if (!("item" in entry)) {
+function mapNormalizedItemToProjection(
+  item: NormalizedCodexThreadItem,
+): readonly SemanticChatProjectionItem[] {
+  const classified = classifyCodexThreadItemSemantics(item);
+  if (classified.semanticKind !== "generic") {
+    const summary = summarizeSemanticGroupItem(item);
     return [
       {
-        id: entry.id,
-        turnId: entry.items[0]?.turnId ?? "",
-        kind: "semantic-group",
-        semanticKind: entry.kind,
-        status: entry.status,
-        displayKeys: entry.displayKeys,
-        counts: entry.counts,
-        items: entry.items.map((item) => {
-          const summary = summarizeSemanticGroupItem(item);
-
-          return {
-            id: item.id,
-            sourceKind: summary.sourceKind,
-            label: summary.label,
-            detail: summary.detail,
-            ...(summary.sourcePath === null ? {} : { sourcePath: summary.sourcePath }),
-            detailKind: summary.detailKind,
-            command: item.kind === "command-execution" ? item.command : null,
-            output: summary.output,
-            status: "status" in item ? item.status : "completed",
-          };
-        }),
-      } satisfies ChatSemanticGroupEntry,
+        kind: "semantic",
+        id: item.id,
+        turnId: item.turnId,
+        semanticKind: classified.semanticKind,
+        status: classified.status,
+        displayKeys: classified.displayKeys,
+        counts: classified.summaryCounts,
+        sourceKind: summary.sourceKind,
+        label: summary.label,
+        detail: summary.detail,
+        sourcePath: summary.sourcePath,
+        detailKind: summary.detailKind,
+        command: item.kind === "command-execution" ? item.command : null,
+        output: summary.output,
+      },
     ];
   }
 
-  const item = entry.item;
   if (item.kind === "assistant-message") {
     return [
       {
-        id: item.id,
-        turnId: item.turnId,
-        kind: "assistant-message",
-        text: item.text,
-        phase: item.phase,
-        status: item.status,
-      } satisfies ChatAssistantEntry,
+        kind: "standalone",
+        entry: {
+          id: item.id,
+          turnId: item.turnId,
+          kind: "assistant-message",
+          text: item.text,
+          phase: item.phase,
+          status: item.status,
+        } satisfies ChatAssistantEntry,
+      },
     ];
   }
 
   if (item.kind === "plan") {
     return [
-      buildPlanEntry({
-        id: item.id,
-        turnId: item.turnId,
-        text: item.text,
-        status: item.status,
-        planSnapshot: null,
-      }),
+      {
+        kind: "standalone",
+        entry: buildPlanEntry({
+          id: item.id,
+          turnId: item.turnId,
+          text: item.text,
+          status: item.status,
+          planSnapshot: null,
+        }),
+      },
     ];
   }
 
   if (item.kind === "reasoning") {
     return [
       {
-        id: item.id,
-        turnId: item.turnId,
-        kind: "reasoning",
-        summary: item.text,
-        source: item.source,
-        status: item.status,
-      } satisfies ChatReasoningEntry,
+        kind: "standalone",
+        entry: {
+          id: item.id,
+          turnId: item.turnId,
+          kind: "reasoning",
+          summary: item.text,
+          source: item.source,
+          status: item.status,
+        } satisfies ChatReasoningEntry,
+      },
     ];
   }
 
   if (item.kind === "command-execution") {
     return [
       {
-        id: item.id,
-        turnId: item.turnId,
-        kind: "command-execution",
-        command: item.command,
-        output: item.output,
-        cwd: item.cwd,
-        exitCode: item.exitCode,
-        commandStatus: item.commandStatus,
-        reason: item.reason,
-        status: item.status,
-      } satisfies ChatCommandEntry,
+        kind: "standalone",
+        entry: {
+          id: item.id,
+          turnId: item.turnId,
+          kind: "command-execution",
+          command: item.command,
+          output: item.output,
+          cwd: item.cwd,
+          exitCode: item.exitCode,
+          commandStatus: item.commandStatus,
+          reason: item.reason,
+          status: item.status,
+        } satisfies ChatCommandEntry,
+      },
     ];
   }
 
   if (item.kind === "file-change") {
     return [
       {
-        id: item.id,
-        turnId: item.turnId,
-        kind: "file-change",
-        changes: item.changes,
-        output: item.output,
-        fileChangeStatus: item.fileChangeStatus,
-        status: item.status,
-      } satisfies ChatFileChangeEntry,
+        kind: "standalone",
+        entry: {
+          id: item.id,
+          turnId: item.turnId,
+          kind: "file-change",
+          changes: item.changes,
+          output: item.output,
+          fileChangeStatus: item.fileChangeStatus,
+          status: item.status,
+        } satisfies ChatFileChangeEntry,
+      },
     ];
   }
 
   if (item.kind === "tool-call") {
     return [
-      createGenericEntry({
-        id: item.id,
-        turnId: item.turnId,
-        itemType:
-          item.toolType === "dynamic"
-            ? "dynamicToolCall"
-            : item.toolType === "mcp"
-              ? "mcpToolCall"
-              : "collabAgentToolCall",
-        title:
-          item.toolType === "dynamic"
-            ? "Dynamic Tool Call"
-            : item.toolType === "mcp"
-              ? "MCP Tool Call"
-              : "Collab Tool Call",
-        body: item.body ?? item.title,
-        detailsJson: item.detailsJson,
-        status: item.status,
-      }),
+      {
+        kind: "standalone",
+        entry: createGenericEntry({
+          id: item.id,
+          turnId: item.turnId,
+          itemType:
+            item.toolType === "dynamic"
+              ? "dynamicToolCall"
+              : item.toolType === "mcp"
+                ? "mcpToolCall"
+                : "collabAgentToolCall",
+          title:
+            item.toolType === "dynamic"
+              ? "Dynamic Tool Call"
+              : item.toolType === "mcp"
+                ? "MCP Tool Call"
+                : "Collab Tool Call",
+          body: item.body ?? item.title,
+          detailsJson: item.detailsJson,
+          status: item.status,
+        }),
+      },
     ];
   }
 
   if (item.kind === "web-search") {
     return [
-      createGenericEntry({
-        id: item.id,
-        turnId: item.turnId,
-        itemType: "web-search",
-        title: entry.status === "streaming" ? "Searching the web" : "Searched the web",
-        body: item.query,
-        detailsJson: item.detailsJson,
-        status: item.status,
-      }),
+      {
+        kind: "standalone",
+        entry: createGenericEntry({
+          id: item.id,
+          turnId: item.turnId,
+          itemType: "web-search",
+          title: item.status === "streaming" ? "Searching the web" : "Searched the web",
+          body: item.query,
+          detailsJson: item.detailsJson,
+          status: item.status,
+        }),
+      },
     ];
   }
 
   if (item.kind === "generic-item") {
     return [
-      createGenericEntry({
-        id: item.id,
-        turnId: item.turnId,
-        itemType: item.itemType,
-        title: item.title,
-        body: item.body,
-        detailsJson: item.detailsJson,
-        status: item.status,
-      }),
+      {
+        kind: "standalone",
+        entry: createGenericEntry({
+          id: item.id,
+          turnId: item.turnId,
+          itemType: item.itemType,
+          title: item.title,
+          body: item.body,
+          detailsJson: item.detailsJson,
+          status: item.status,
+        }),
+      },
     ];
   }
 
