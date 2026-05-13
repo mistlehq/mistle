@@ -203,9 +203,10 @@ function readDashboardControlPlaneApiOriginEnv(environment: NodeJS.ProcessEnv): 
   return readNonEmptyEnvValue(environment, "MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN");
 }
 
-function resolveOptionalParsedConfig(input: {
+function resolveParsedConfig(input: {
   environment: NodeJS.ProcessEnv;
   dashboardBuildEnvironment: DashboardBuildEnvironment;
+  allowMissingConfig: boolean;
 }): z.infer<typeof DashboardBuildConfigSchema> | undefined {
   const explicitConfigPath = input.environment.MISTLE_CONFIG_PATH;
   if (typeof explicitConfigPath === "string" && explicitConfigPath.trim().length > 0) {
@@ -217,6 +218,7 @@ function resolveOptionalParsedConfig(input: {
     return DashboardBuildConfigSchema.parse(parseTomlFile(configPath));
   } catch (error) {
     if (
+      input.allowMissingConfig &&
       error instanceof Error &&
       error.message.startsWith("Missing required dashboard config file.")
     ) {
@@ -232,14 +234,11 @@ export function loadDashboardBuildConfig(
   dashboardBuildEnvironment: DashboardBuildEnvironment,
 ): DashboardBuildConfig {
   const explicitControlPlaneApiOrigin = readDashboardControlPlaneApiOriginEnv(environment);
-  const parsedConfig = resolveOptionalParsedConfig({
+  const parsedConfig = resolveParsedConfig({
     environment,
     dashboardBuildEnvironment,
+    allowMissingConfig: explicitControlPlaneApiOrigin !== undefined,
   });
-
-  if (explicitControlPlaneApiOrigin === undefined && parsedConfig === undefined) {
-    resolveConfigPath(environment, dashboardBuildEnvironment);
-  }
 
   const controlPlaneApiOrigin = normalizeOrigin(
     explicitControlPlaneApiOrigin ??

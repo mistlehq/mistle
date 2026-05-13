@@ -49,6 +49,11 @@ function removeWorkspaceConfigFile(relativePath: string): void {
   rmSync(configPath, { force: true });
 }
 
+function removeDefaultDashboardConfigFiles(): void {
+  removeWorkspaceConfigFile("config/config.development.toml");
+  removeWorkspaceConfigFile("config/config.production.toml");
+}
+
 afterEach(() => {
   for (const directory of tempDirectories.splice(0)) {
     rmSync(directory, { recursive: true, force: true });
@@ -103,6 +108,8 @@ function loadDashboardBuildConfigForTest(input?: {
 
 describe("loadDashboardBuildConfig", () => {
   it("loads explicit dashboard origin from MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN without a config file", () => {
+    removeDefaultDashboardConfigFiles();
+
     const config = loadDashboardBuildConfigForTest({
       env: {
         MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN: "https://api.example.test",
@@ -115,6 +122,8 @@ describe("loadDashboardBuildConfig", () => {
   });
 
   it("allows explicit single-image same-origin routing without a config file", () => {
+    removeDefaultDashboardConfigFiles();
+
     const config = loadDashboardBuildConfigForTest({
       env: {
         MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN: "same-origin",
@@ -127,6 +136,8 @@ describe("loadDashboardBuildConfig", () => {
   });
 
   it("fails when explicit dashboard origin is not an absolute URL origin or same-origin", () => {
+    removeDefaultDashboardConfigFiles();
+
     expect(() =>
       loadDashboardBuildConfigForTest({
         env: {
@@ -138,8 +149,7 @@ describe("loadDashboardBuildConfig", () => {
   });
 
   it("fails when neither env nor config file provides dashboard build config", () => {
-    removeWorkspaceConfigFile("config/config.development.toml");
-    removeWorkspaceConfigFile("config/config.production.toml");
+    removeDefaultDashboardConfigFiles();
 
     expect(() =>
       loadDashboardBuildConfigForTest({
@@ -307,8 +317,7 @@ describe("loadDashboardBuildConfig", () => {
   });
 
   it("loads enabled PostHog config from explicit env without a config file", () => {
-    removeWorkspaceConfigFile("config/config.development.toml");
-    removeWorkspaceConfigFile("config/config.production.toml");
+    removeDefaultDashboardConfigFiles();
 
     const config = loadDashboardBuildConfigForTest({
       env: {
@@ -400,6 +409,8 @@ describe("loadDashboardBuildConfig", () => {
   });
 
   it("requires PostHog project API key when PostHog is enabled", () => {
+    removeDefaultDashboardConfigFiles();
+
     expect(() =>
       loadDashboardBuildConfigForTest({
         env: {
