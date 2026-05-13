@@ -16,6 +16,7 @@ function createTarget(input: {
     targetKey: input.targetKey,
     familyId: input.familyId,
     variantId: input.variantId,
+    kind: "git",
     enabled: true,
     config: {},
     targetHealth: {

@@ -4294,6 +4294,8 @@ export interface paths {
                 displayNameOverride?: string;
                 enabled: boolean;
                 familyId: string;
+                /** @enum {string} */
+                kind: "agent" | "git" | "connector" | "sandbox";
                 logoKey?: string;
                 supportedWebhookEvents?: {
                   category?: string;

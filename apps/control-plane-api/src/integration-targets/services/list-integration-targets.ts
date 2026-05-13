@@ -138,6 +138,7 @@ export async function listIntegrationTargets(
           targetKey: target.targetKey,
           familyId: target.familyId,
           variantId: target.variantId,
+          kind: resolvedMetadata.kind,
           enabled: target.enabled,
           config: target.config,
           displayName: resolvedMetadata.displayName,

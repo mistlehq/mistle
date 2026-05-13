@@ -110,6 +110,7 @@ describe.concurrent("integration targets discovery integration", () => {
       targetKey: "github_cloud_integration_new_targets_list",
       familyId: "github",
       variantId: "github-cloud",
+      kind: "git",
       enabled: true,
       config: {
         api_base_url: "https://api.github.com",
@@ -196,6 +197,7 @@ describe.concurrent("integration targets discovery integration", () => {
       targetKey: "linear_cloud_integration_new_targets_list",
       familyId: "linear",
       variantId: "linear-cloud",
+      kind: "connector",
       enabled: true,
       config: {
         base_url: "https://api.linear.app",
@@ -210,6 +212,7 @@ describe.concurrent("integration targets discovery integration", () => {
       targetKey: "openai_integration_new_targets_list",
       familyId: "openai",
       variantId: "openai-default",
+      kind: "agent",
       enabled: true,
       displayName: "OpenAI",
       description:
@@ -298,6 +301,7 @@ describe.concurrent("integration targets discovery integration", () => {
       targetKey: "github_dashboard_contract_integration_new",
       familyId: "github",
       variantId: "github-cloud",
+      kind: "git",
       enabled: true,
       displayName: "GitHub Dashboard Contract",
       description: "GitHub contract target",
@@ -401,6 +405,7 @@ describe.concurrent("integration targets discovery integration", () => {
     });
     const openAiTarget = findTarget(page, "openai_projection_integration_new");
 
+    expect(openAiTarget.kind).toBe("agent");
     expect(openAiTarget.targetHealth.configStatus).toBe("valid");
     expect(openAiTarget.connectionMethods).toEqual([
       {

@@ -200,6 +200,7 @@ export const IntegrationTargetSchema = z
     targetKey: z.string().min(1),
     familyId: z.string().min(1),
     variantId: z.string().min(1),
+    kind: z.enum(["agent", "git", "connector", "sandbox"]),
     enabled: z.boolean(),
     config: z.record(z.string(), z.unknown()),
     displayName: z.string().min(1),

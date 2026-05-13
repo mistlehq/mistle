@@ -79,6 +79,7 @@ function createDirectoryData(input?: {
         targetKey: "linear-cloud",
         familyId: "linear",
         variantId: "linear-default",
+        kind: "connector" as const,
         enabled: true,
         config: {},
         displayName: "Linear",

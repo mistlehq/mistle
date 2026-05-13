@@ -1,8 +1,4 @@
-import type {
-  IntegrationConnectionMethodDetailFieldSource,
-  IntegrationKind,
-} from "@mistle/integrations-core";
-import { listBrowserIntegrationDefinitions } from "@mistle/integrations-definitions/browser";
+import type { IntegrationConnectionMethodDetailFieldSource } from "@mistle/integrations-core";
 
 import type { IntegrationCardViewModel } from "../integrations/directory-model.js";
 import { formatConnectionCount } from "../integrations/format-connection-count.js";
@@ -16,10 +12,6 @@ import type {
 import type { OpenIntegrationConnectionEditorInput } from "./integration-connection-editor-state-types.js";
 import type { OrganizationIntegrationsSettingsPageCard } from "./organization-integrations-settings-page-view.js";
 import { resolveVisibleConnectionMethodConfigFields } from "./use-integration-connection-editor-state-helpers.js";
-
-const IntegrationKindByVariantId = new Map(
-  listBrowserIntegrationDefinitions().map((definition) => [definition.variantId, definition.kind]),
-);
 
 function resolveTargetConfig(value: unknown): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -39,24 +31,13 @@ export function toConnectionMethods(
   return connectionMethods;
 }
 
-function resolveIntegrationKind(card: IntegrationCardViewModel): IntegrationKind {
-  const integrationKind = IntegrationKindByVariantId.get(card.target.variantId);
-  if (integrationKind === undefined) {
-    throw new Error(
-      `Integration target '${card.target.targetKey}' uses unknown variant '${card.target.variantId}'.`,
-    );
-  }
-
-  return integrationKind;
-}
-
 export function buildConnectedIntegrationViewCards(input: {
   connectedCards: readonly IntegrationCardViewModel[];
   onOpenTarget: (targetKey: string) => void;
 }): readonly OrganizationIntegrationsSettingsPageCard[] {
   return input.connectedCards.map((card) => ({
     targetKey: card.target.targetKey,
-    integrationKind: resolveIntegrationKind(card),
+    integrationKind: card.target.kind,
     displayName: card.displayName,
     description: formatConnectionCount(card.connections.length),
     configStatus: card.configStatus,
@@ -77,7 +58,7 @@ export function buildAvailableIntegrationViewCards(input: {
 
     return {
       targetKey: card.target.targetKey,
-      integrationKind: resolveIntegrationKind(card),
+      integrationKind: card.target.kind,
       displayName: card.displayName,
       description: card.description,
       configStatus: card.configStatus,

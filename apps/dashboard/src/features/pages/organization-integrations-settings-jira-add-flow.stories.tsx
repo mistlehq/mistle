@@ -69,6 +69,7 @@ function createJiraTargetFixture(): IntegrationTarget {
     targetKey: "jira-default",
     familyId: JiraDefinition.familyId,
     variantId: JiraDefinition.variantId,
+    kind: JiraDefinition.kind,
     enabled: true,
     config: {},
     displayName: JiraDefinition.displayName,

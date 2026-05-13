@@ -17,6 +17,7 @@ const GitHubTarget: IntegrationTarget = {
   targetKey: "github-cloud",
   familyId: "github",
   variantId: "github-cloud",
+  kind: "git",
   enabled: true,
   config: {},
   displayName: "GitHub",

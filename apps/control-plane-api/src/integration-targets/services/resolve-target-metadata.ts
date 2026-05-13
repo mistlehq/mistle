@@ -1,4 +1,5 @@
 import type { IntegrationTarget as PersistedIntegrationTarget } from "@mistle/db/control-plane";
+import { IntegrationKinds } from "@mistle/integrations-core";
 import type {
   IntegrationConnectionMethodDetailFieldSource,
   IntegrationConnectionMethodDetailFieldSourceLeaf,
@@ -10,6 +11,7 @@ import type {
   IntegrationFormConnectionMethodProviderAppSetup,
   IntegrationFormConnectionMethodSetupPaneMetadata,
   IntegrationFormConnectionMethodSetupStartForm,
+  IntegrationKind,
   IntegrationWebhookEventDefinition,
   IntegrationWebhookEventParameterDefinition,
   IntegrationWebhookSourceLifecycle,
@@ -94,6 +96,7 @@ type ResolvedWebhookEvent = {
 };
 
 export type ResolvedIntegrationTargetMetadata = {
+  kind: IntegrationKind;
   displayName: string;
   description: string;
   logoKey?: string;
@@ -635,6 +638,7 @@ export function resolveTargetMetadata(input: {
   if (definition === undefined) {
     if (input.displayNameOverride !== null && input.descriptionOverride !== null) {
       return {
+        kind: IntegrationKinds.CONNECTOR,
         displayName: input.displayNameOverride,
         description: input.descriptionOverride,
       };
@@ -648,6 +652,7 @@ export function resolveTargetMetadata(input: {
   if (definition.description === undefined || definition.description.trim().length === 0) {
     if (input.descriptionOverride !== null) {
       return {
+        kind: definition.kind,
         displayName: input.displayNameOverride ?? definition.displayName,
         description: input.descriptionOverride,
         logoKey: definition.logoKey,
@@ -676,6 +681,7 @@ export function resolveTargetMetadata(input: {
   }
 
   return {
+    kind: definition.kind,
     displayName: input.displayNameOverride ?? definition.displayName,
     description: input.descriptionOverride ?? definition.description,
     logoKey: definition.logoKey,

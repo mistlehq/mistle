@@ -90,6 +90,7 @@ function createGitHubTargetFixture(): IntegrationTarget {
     targetKey: "github-cloud",
     familyId: GitHubDefinition.familyId,
     variantId: GitHubDefinition.variantId,
+    kind: GitHubDefinition.kind,
     enabled: true,
     config: {
       api_base_url: "https://api.github.com",

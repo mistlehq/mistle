@@ -7574,6 +7574,10 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "kind": {
+                            "type": "string",
+                            "enum": ["agent", "git", "connector", "sandbox"]
+                          },
                           "enabled": {
                             "type": "boolean"
                           },
@@ -9078,6 +9082,7 @@
                           "targetKey",
                           "familyId",
                           "variantId",
+                          "kind",
                           "enabled",
                           "config",
                           "displayName",

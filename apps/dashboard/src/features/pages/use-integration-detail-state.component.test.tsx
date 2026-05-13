@@ -223,6 +223,7 @@ function createCard(input: {
       targetKey: input.targetKey,
       familyId: "github",
       variantId: "github-cloud",
+      kind: "git",
       enabled: true,
       config: {},
       displayName: "GitHub",

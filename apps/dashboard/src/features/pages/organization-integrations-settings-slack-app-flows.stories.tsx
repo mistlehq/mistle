@@ -110,6 +110,7 @@ function createSlackTargetFixture(): IntegrationTarget {
     targetKey: "slack-default",
     familyId: SlackDefinition.familyId,
     variantId: SlackDefinition.variantId,
+    kind: SlackDefinition.kind,
     enabled: true,
     config: {
       api_base_url: "https://slack.com/api",

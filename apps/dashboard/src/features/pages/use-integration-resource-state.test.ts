@@ -14,6 +14,7 @@ describe("useIntegrationResourceState helpers", () => {
               targetKey: "github",
               familyId: "github",
               variantId: "github-cloud",
+              kind: "git",
               enabled: true,
               config: {},
               displayName: "GitHub",
