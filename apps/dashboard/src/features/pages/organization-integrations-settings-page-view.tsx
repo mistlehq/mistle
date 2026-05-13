@@ -1,6 +1,6 @@
 import type { IntegrationKind } from "@mistle/integrations-core";
 import { Notice, SectionBlock, Tabs, TabsContent, TabsList, TabsTrigger } from "@mistle/ui";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
 import { IntegrationSection } from "../integrations/integration-section.js";
@@ -106,9 +106,7 @@ function AvailableIntegrationsSection(input: {
   cards: readonly OrganizationIntegrationsSettingsPageCard[];
 }): React.JSX.Element | null {
   const [searchValue, setSearchValue] = useState("");
-  if (input.cards.length === 0) {
-    return null;
-  }
+  const [selectedGroupKind, setSelectedGroupKind] = useState<IntegrationKind | null>(null);
 
   const matchingCards = filterIntegrationCards({
     cards: input.cards,
@@ -118,6 +116,21 @@ function AvailableIntegrationsSection(input: {
     (group) => getIntegrationGroupCards(matchingCards, group.kind).length > 0,
   );
   const defaultGroup = groups[0];
+  const activeGroupKind = resolveAvailableIntegrationActiveGroupKind({
+    groups,
+    selectedGroupKind,
+  });
+
+  useEffect(() => {
+    if (selectedGroupKind !== activeGroupKind) {
+      setSelectedGroupKind(activeGroupKind);
+    }
+  }, [activeGroupKind, selectedGroupKind]);
+
+  if (input.cards.length === 0) {
+    return null;
+  }
+
   if (defaultGroup === undefined && searchValue.trim().length === 0) {
     throw new Error("Available integration cards could not be grouped by integration kind.");
   }
@@ -138,7 +151,13 @@ function AvailableIntegrationsSection(input: {
             No integrations match "{normalizedSearchValue}".
           </p>
         ) : (
-          <Tabs className="w-full" defaultValue={defaultGroup.kind}>
+          <Tabs
+            className="w-full"
+            onValueChange={(value) => {
+              setSelectedGroupKind(parseAvailableIntegrationGroupKind(value));
+            }}
+            value={activeGroupKind ?? defaultGroup.kind}
+          >
             <TabsList variant="line">
               {groups.map((group) => (
                 <TabsTrigger key={group.kind} value={group.kind}>
@@ -157,6 +176,28 @@ function AvailableIntegrationsSection(input: {
       </div>
     </SectionBlock>
   );
+}
+
+function resolveAvailableIntegrationActiveGroupKind(input: {
+  groups: readonly AvailableIntegrationGroupSpec[];
+  selectedGroupKind: IntegrationKind | null;
+}): IntegrationKind | null {
+  if (
+    input.selectedGroupKind !== null &&
+    input.groups.some((group) => group.kind === input.selectedGroupKind)
+  ) {
+    return input.selectedGroupKind;
+  }
+
+  return input.groups[0]?.kind ?? null;
+}
+
+function parseAvailableIntegrationGroupKind(value: string): IntegrationKind {
+  if (value === "agent" || value === "git" || value === "connector" || value === "sandbox") {
+    return value;
+  }
+
+  throw new Error(`Unknown integration group kind '${value}'.`);
 }
 
 function filterIntegrationCards(input: {
