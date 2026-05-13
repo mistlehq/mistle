@@ -499,4 +499,62 @@ describe("useOpenCodeSessionState", () => {
     });
     await expect(promptPromise).resolves.toBeUndefined();
   });
+
+  it("rejects strict chat hydration when OpenCode message listing fails", async () => {
+    const server = await startOpenCodeProxyTransportServer();
+    const transport = await connectTransport(server);
+    const { result } = renderHook(() =>
+      useOpenCodeSessionState({
+        ensureTransportConnected: async () => {
+          return {
+            sandboxInstanceId: "sbi_123",
+            transport,
+          };
+        },
+      }),
+    );
+
+    const permissionsRequest = await connectOpenCodeSessionForTest({
+      result,
+      sandboxInstanceId: "sbi_123",
+      server,
+      sessionId: "ses_test",
+    });
+    server.sendJsonResponse({
+      request: permissionsRequest,
+      body: [],
+    });
+
+    await waitFor(() => {
+      expect(result.current.lifecycle.sessionConnectionState).toBe("connected");
+    });
+
+    let hydrationPromise: Promise<void> | undefined;
+    act(() => {
+      hydrationPromise = result.current.chat.hydrateChatFromSessionOrThrow();
+    });
+    if (hydrationPromise === undefined) {
+      throw new Error("Hydration promise was not initialized.");
+    }
+
+    const messagesRequest = await server.nextRequest();
+    expect(messagesRequest.request).toMatchObject({
+      method: "GET",
+      path: "/session/ses_test/message",
+    });
+    server.sendJsonError({
+      request: messagesRequest,
+      status: 500,
+      body: {
+        message: "message listing failed",
+      },
+    });
+
+    await expect(hydrationPromise).rejects.toThrow("Could not hydrate OpenCode messages.");
+    await waitFor(() => {
+      expect(result.current.sessionMessage.sessionErrorMessage).toBe(
+        "Could not hydrate OpenCode messages.",
+      );
+    });
+  });
 });

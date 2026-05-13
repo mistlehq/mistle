@@ -418,7 +418,7 @@ export function useSessionWorkbenchController(input: {
     () => ({
       clearActiveThreadIdAfterCliLaunch: () => {},
       displayName: "OpenCode",
-      hydrateChatFromConversation: openCodeSessionState.chat.hydrateChatFromSession,
+      hydrateChatFromConversation: openCodeSessionState.chat.hydrateChatFromSessionOrThrow,
       lifecycle: openCodeLifecycleForHandoff,
       preserveCliLaunchForRestore: true,
       resetServerRequests: () => {},
@@ -443,7 +443,7 @@ export function useSessionWorkbenchController(input: {
     }),
     [
       openCodeLifecycleForHandoff,
-      openCodeSessionState.chat.hydrateChatFromSession,
+      openCodeSessionState.chat.hydrateChatFromSessionOrThrow,
       openCodeSessionState.lifecycle.sessionSnapshot?.activeSessionId,
     ],
   );

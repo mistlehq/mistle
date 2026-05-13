@@ -7,11 +7,12 @@ import {
   type OpenCodeSessionSummary,
 } from "@mistle/integrations-definitions/agent-runtimes/opencode/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState, type Dispatch } from "react";
 
 import {
   createInitialOpenCodeChatState,
   reduceOpenCodeChatState,
+  type OpenCodeChatAction,
   type OpenCodeChatState,
 } from "./opencode-chat-state.js";
 
@@ -55,6 +56,7 @@ export type UseOpenCodeSessionStateResult = {
     canInterruptTurn: boolean;
     chatState: OpenCodeChatState;
     hydrateChatFromSession: () => Promise<void>;
+    hydrateChatFromSessionOrThrow: () => Promise<void>;
     isHydratingChat: boolean;
     isInterruptingTurn: boolean;
     isRespondingToPermission: boolean;
@@ -94,6 +96,21 @@ export function resolveOpenCodeSessionSelection(input: {
     kind: "resume",
     sessionId: mostRecentSession.id,
   };
+}
+
+async function hydrateConnectedOpenCodeChat(input: {
+  client: OpenCodeSessionClient;
+  dispatchChatAction: Dispatch<OpenCodeChatAction>;
+  sessionId: string;
+}): Promise<void> {
+  const messages = await input.client.listMessages({
+    sessionId: input.sessionId,
+  });
+  input.dispatchChatAction({
+    type: "hydrate_messages",
+    sessionId: input.sessionId,
+    messages,
+  });
 }
 
 export function useOpenCodeSessionState(input: {
@@ -166,19 +183,40 @@ export function useOpenCodeSessionState(input: {
     }
     setIsHydratingChat(true);
     try {
-      const messages = await client.listMessages({
+      await hydrateConnectedOpenCodeChat({
+        client,
+        dispatchChatAction,
         sessionId,
-      });
-      dispatchChatAction({
-        type: "hydrate_messages",
-        sessionId,
-        messages,
       });
       setSessionErrorMessage(null);
     } catch (error) {
       setSessionErrorMessage(
         error instanceof Error ? error.message : "Could not hydrate OpenCode messages.",
       );
+    } finally {
+      setIsHydratingChat(false);
+    }
+  }, [sessionSnapshot?.activeSessionId]);
+
+  const hydrateChatFromSessionOrThrow = useCallback(async (): Promise<void> => {
+    const client = clientRef.current;
+    const sessionId = sessionSnapshot?.activeSessionId ?? null;
+    if (client === null || sessionId === null) {
+      throw new Error("Connect OpenCode before hydrating messages.");
+    }
+    setIsHydratingChat(true);
+    try {
+      await hydrateConnectedOpenCodeChat({
+        client,
+        dispatchChatAction,
+        sessionId,
+      });
+      setSessionErrorMessage(null);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Could not hydrate OpenCode messages.";
+      setSessionErrorMessage(errorMessage);
+      throw error instanceof Error ? error : new Error(errorMessage);
     } finally {
       setIsHydratingChat(false);
     }
@@ -413,6 +451,7 @@ export function useOpenCodeSessionState(input: {
       canInterruptTurn: chatState.status === "busy",
       chatState,
       hydrateChatFromSession,
+      hydrateChatFromSessionOrThrow,
       isHydratingChat,
       isInterruptingTurn,
       isRespondingToPermission,
