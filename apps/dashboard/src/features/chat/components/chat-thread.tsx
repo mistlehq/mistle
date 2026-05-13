@@ -1,4 +1,4 @@
-import type { CodexApprovalRequestEntry } from "../../session-agents/codex/approvals/index.js";
+import type { ServerRequestEntry } from "../../session-agents/server-requests/index.js";
 import type { ChatEntry } from "../chat-types.js";
 import {
   buildChatTurnGroups,
@@ -22,7 +22,7 @@ type ChatThreadProps = {
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
   onUserMessageAction?: (actionId: string) => void;
-  pendingServerRequests: readonly CodexApprovalRequestEntry[];
+  pendingServerRequests: readonly ServerRequestEntry[];
 };
 
 function getAssistantBlockSpacingClass(input: {

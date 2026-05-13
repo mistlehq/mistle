@@ -1,15 +1,15 @@
 import type {
-  CodexCommandApprovalRequestEntry,
-  CodexFileChangeApprovalRequestEntry,
-  CodexApprovalRequestEntry,
-} from "../../session-agents/codex/approvals/index.js";
+  CommandApprovalRequestEntry,
+  FileChangeApprovalRequestEntry,
+  ServerRequestEntry,
+} from "../../session-agents/server-requests/index.js";
 
 export function findCommandApprovalRequest(
-  requests: readonly CodexApprovalRequestEntry[],
+  requests: readonly ServerRequestEntry[],
   itemId: string,
-): CodexCommandApprovalRequestEntry | null {
+): CommandApprovalRequestEntry | null {
   const request = requests.find(
-    (entry): entry is CodexCommandApprovalRequestEntry =>
+    (entry): entry is CommandApprovalRequestEntry =>
       entry.kind === "command-approval" && entry.itemId === itemId,
   );
 
@@ -17,11 +17,11 @@ export function findCommandApprovalRequest(
 }
 
 export function findFileChangeApprovalRequest(
-  requests: readonly CodexApprovalRequestEntry[],
+  requests: readonly ServerRequestEntry[],
   itemId: string,
-): CodexFileChangeApprovalRequestEntry | null {
+): FileChangeApprovalRequestEntry | null {
   const request = requests.find(
-    (entry): entry is CodexFileChangeApprovalRequestEntry =>
+    (entry): entry is FileChangeApprovalRequestEntry =>
       entry.kind === "file-change-approval" && entry.itemId === itemId,
   );
 

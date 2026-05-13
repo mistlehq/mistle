@@ -1,10 +1,10 @@
-import type { CodexFileChangeApprovalRequestEntry } from "../../session-agents/codex/approvals/index.js";
+import type { FileChangeApprovalRequestEntry } from "../../session-agents/server-requests/index.js";
 import type { ChatFileChangeEntry } from "../chat-types.js";
 import { ChatDiffView } from "./chat-diff-view.js";
 import { ChatFileChangeApproval } from "./chat-file-change-approval.js";
 
 type ChatFileChangeBlockProps = {
-  approvalRequest: CodexFileChangeApprovalRequestEntry | null;
+  approvalRequest: FileChangeApprovalRequestEntry | null;
   block: ChatFileChangeEntry;
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: (requestId: string | number, result: unknown) => void;

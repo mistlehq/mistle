@@ -1,9 +1,9 @@
-import type { CodexCommandApprovalRequestEntry } from "../../session-agents/codex/approvals/index.js";
+import type { CommandApprovalRequestEntry } from "../../session-agents/server-requests/index.js";
 import type { ChatCommandEntry } from "../chat-types.js";
 import { ChatCommandApproval } from "./chat-command-approval.js";
 
 type ChatCommandBlockProps = {
-  approvalRequest: CodexCommandApprovalRequestEntry | null;
+  approvalRequest: CommandApprovalRequestEntry | null;
   block: ChatCommandEntry;
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: (requestId: string | number, result: unknown) => void;

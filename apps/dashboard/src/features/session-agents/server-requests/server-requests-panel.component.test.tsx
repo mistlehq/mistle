@@ -3,14 +3,14 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { CodexApprovalRequestsPanel } from "./codex-approval-requests-panel.js";
+import { ServerRequestsPanel } from "./server-requests-panel.js";
 
-describe("CodexApprovalRequestsPanel", () => {
+describe("ServerRequestsPanel", () => {
   it("renders command approvals in the standalone panel when passed through", () => {
     const submittedResults: unknown[] = [];
 
     render(
-      <CodexApprovalRequestsPanel
+      <ServerRequestsPanel
         entries={[
           {
             requestId: 11,
@@ -50,7 +50,7 @@ describe("CodexApprovalRequestsPanel", () => {
     const submittedResults: unknown[] = [];
 
     render(
-      <CodexApprovalRequestsPanel
+      <ServerRequestsPanel
         entries={[
           {
             requestId: 17,
@@ -101,6 +101,43 @@ describe("CodexApprovalRequestsPanel", () => {
             value: "Custom answer",
           },
         ],
+      },
+    ]);
+  });
+
+  it("renders OpenCode permission requests in the standalone panel", () => {
+    const submittedResults: unknown[] = [];
+
+    render(
+      <ServerRequestsPanel
+        entries={[
+          {
+            requestId: "permission-1",
+            method: "opencode/permission/requestApproval",
+            kind: "opencode-permission",
+            sessionId: "session-1",
+            permission: "bash",
+            patterns: ["pnpm test"],
+            availableDecisions: ["once", "always", "reject"],
+            status: "pending",
+            responseErrorMessage: null,
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={(_requestId, result) => {
+          submittedResults.push(result);
+        }}
+      />,
+    );
+
+    expect(screen.getByText("OpenCode permission").textContent).toBe("OpenCode permission");
+    expect(screen.getByText("bash: pnpm test").textContent).toBe("bash: pnpm test");
+
+    fireEvent.click(screen.getByRole("button", { name: "once" }));
+
+    expect(submittedResults).toEqual([
+      {
+        decision: "once",
       },
     ]);
   });

@@ -1,8 +1,10 @@
-import { ApprovalDecisionButtons } from "../../session-agents/codex/approvals/approval-decision-buttons.js";
-import type { CodexFileChangeApprovalRequestEntry } from "../../session-agents/codex/approvals/index.js";
+import {
+  ApprovalDecisionButtons,
+  type FileChangeApprovalRequestEntry,
+} from "../../session-agents/server-requests/index.js";
 
 type ChatFileChangeApprovalProps = {
-  approvalRequest: CodexFileChangeApprovalRequestEntry;
+  approvalRequest: FileChangeApprovalRequestEntry;
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
 };

@@ -11,7 +11,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef } from "react";
 
 import type { ChatState } from "../chat/chat-state.js";
-import type { OpenCodePermissionApprovalRequestEntry } from "../session-agents/codex/approvals/index.js";
 import { formatCodexContextUsage } from "../session-agents/codex/session-state/codex-context-usage.js";
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import type { SessionBootstrapResult } from "../session-agents/codex/session-state/session-bootstrap/index.js";
@@ -19,6 +18,10 @@ import {
   useOpenCodeSessionState,
   type OpenCodeChatState,
 } from "../session-agents/opencode/session-state/index.js";
+import type {
+  OpenCodePermissionApprovalRequestEntry,
+  ServerRequestEntry,
+} from "../session-agents/server-requests/index.js";
 import { applyPatchedSessionTitleToCache } from "../sessions/session-header-title-model.js";
 import { generateSessionTitleWithSandboxCodexExec } from "../sessions/session-title-generation.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
@@ -137,9 +140,7 @@ type SessionConversationPaneState = {
   composerStateInput: SessionComposerStateInput;
   serverRequestsState: {
     isRespondingToServerRequest: boolean;
-    pendingServerRequests: ReturnType<
-      typeof useCodexSessionState
-    >["serverRequests"]["pendingServerRequests"];
+    pendingServerRequests: readonly ServerRequestEntry[];
     respondToServerRequest: (requestId: string | number, result: unknown) => void;
   };
 };

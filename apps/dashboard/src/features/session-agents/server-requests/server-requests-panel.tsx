@@ -2,10 +2,10 @@ import { Button, Input } from "@mistle/ui";
 import { useState } from "react";
 
 import { ApprovalDecisionButtons } from "./approval-decision-buttons.js";
-import type { CodexApprovalRequestEntry } from "./codex-approval-requests-state.js";
+import type { ServerRequestEntry } from "./server-request-entries.js";
 
-type CodexApprovalRequestsPanelProps = {
-  entries: readonly CodexApprovalRequestEntry[];
+type ServerRequestsPanelProps = {
+  entries: readonly ServerRequestEntry[];
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
 };
@@ -14,11 +14,15 @@ function createRequestKey(requestId: string | number): string {
   return String(requestId);
 }
 
-export function CodexApprovalRequestsPanel({
+function assertUnsupportedServerRequestEntry(_entry: never): never {
+  throw new Error("Unsupported server request entry.");
+}
+
+export function ServerRequestsPanel({
   entries,
   isRespondingToServerRequest,
   onRespondToServerRequest,
-}: CodexApprovalRequestsPanelProps): React.JSX.Element | null {
+}: ServerRequestsPanelProps): React.JSX.Element | null {
   const [userInputAnswers, setUserInputAnswers] = useState<Record<string, string>>({});
 
   if (entries.length === 0) {
@@ -26,7 +30,7 @@ export function CodexApprovalRequestsPanel({
   }
 
   return (
-    <div className="space-y-3 pb-4" role="region" aria-label="Pending Codex approvals">
+    <div className="space-y-3 pb-4" role="region" aria-label="Pending server requests">
       {entries.map((entry) => {
         const requestKey = createRequestKey(entry.requestId);
 
@@ -206,9 +210,11 @@ export function CodexApprovalRequestsPanel({
             </div>
           );
         }
+
+        return assertUnsupportedServerRequestEntry(entry);
       })}
     </div>
   );
 }
 
-export type { CodexApprovalRequestsPanelProps };
+export type { ServerRequestsPanelProps };

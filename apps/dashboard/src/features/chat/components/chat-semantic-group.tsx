@@ -2,7 +2,7 @@ import { AnimatedStatusText } from "@mistle/ui";
 import { CaretRightIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 
-import type { CodexApprovalRequestEntry } from "../../session-agents/codex/approvals/index.js";
+import type { ServerRequestEntry } from "../../session-agents/server-requests/index.js";
 import type {
   ChatSemanticGroupDetailKind,
   ChatSemanticGroupEntry,
@@ -20,7 +20,7 @@ type ChatSemanticGroupProps = {
   block: ChatSemanticGroupEntry;
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
-  pendingServerRequests: readonly CodexApprovalRequestEntry[];
+  pendingServerRequests: readonly ServerRequestEntry[];
 };
 
 const SemanticGroupDisplayKeyLabels = {
@@ -101,7 +101,7 @@ function getSemanticGroupDetailClassName(input: {
 
 function shouldAutoOpenSemanticGroup(input: {
   block: ChatSemanticGroupEntry;
-  pendingServerRequests: readonly CodexApprovalRequestEntry[];
+  pendingServerRequests: readonly ServerRequestEntry[];
 }): boolean {
   if (input.block.status === "streaming") {
     return true;

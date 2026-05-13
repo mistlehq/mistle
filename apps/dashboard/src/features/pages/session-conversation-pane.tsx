@@ -8,8 +8,10 @@ import {
 } from "../chat/components/chat-composer.js";
 import { ChatThread } from "../chat/components/chat-thread.js";
 import { ChatUserMessage } from "../chat/components/chat-user-message.js";
-import { CodexApprovalRequestsPanel } from "../session-agents/codex/approvals/index.js";
-import type { CodexApprovalRequestEntry } from "../session-agents/codex/approvals/index.js";
+import {
+  ServerRequestsPanel,
+  type ServerRequestEntry,
+} from "../session-agents/server-requests/index.js";
 import {
   ComposerStatusBanner,
   SessionComposerActivityRow,
@@ -34,7 +36,7 @@ type SessionConversationMainContentProps = {
   scrollBehavior?: SessionConversationScrollBehavior;
   chatEntries: readonly ChatEntry[];
   onUserMessageAction?: ((actionId: string) => void) | undefined;
-  serverRequestPanelEntries: readonly CodexApprovalRequestEntry[];
+  serverRequestPanelEntries: readonly ServerRequestEntry[];
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
@@ -42,7 +44,7 @@ type SessionConversationMainContentProps = {
 
 type SessionConversationSharedPanelProps = {
   chatEntries: readonly ChatEntry[];
-  serverRequestPanelEntries: readonly CodexApprovalRequestEntry[];
+  serverRequestPanelEntries: readonly ServerRequestEntry[];
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
 };
@@ -133,7 +135,7 @@ export function SessionConversationBottomPanel({
 }: SessionConversationBottomPanelProps): React.JSX.Element {
   return (
     <>
-      <CodexApprovalRequestsPanel
+      <ServerRequestsPanel
         entries={serverRequestPanelEntries}
         isRespondingToServerRequest={isRespondingToServerRequest}
         onRespondToServerRequest={onRespondToServerRequest}

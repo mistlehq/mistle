@@ -5,6 +5,12 @@ import type {
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { z } from "zod";
 
+import type {
+  CommandApprovalRequestEntry,
+  FileChangeApprovalRequestEntry,
+  ToolRequestUserInputEntry,
+} from "../../server-requests/server-request-entries.js";
+
 const AvailableDecisionsSchema = z.array(z.string()).optional();
 const DefaultCommandApprovalDecisions = ["accept", "acceptForSession", "decline", "cancel"];
 const DefaultFileChangeApprovalDecisions = ["accept", "acceptForSession", "decline", "cancel"];
@@ -84,73 +90,13 @@ const ServerRequestResolvedNotificationSchema = z.object({
   }),
 });
 
-export type CodexCommandApprovalRequestEntry = {
-  requestId: CodexJsonRpcId;
-  method: "item/commandExecution/requestApproval";
-  kind: "command-approval";
-  threadId: string;
-  turnId: string;
-  itemId: string;
-  reason: string | null;
-  command: string | null;
-  cwd: string | null;
-  availableDecisions: readonly string[];
-  networkHost: string | null;
-  networkProtocol: string | null;
-  networkPort: string | null;
-  status: "pending" | "responding";
-  responseErrorMessage: string | null;
-};
-
-export type CodexFileChangeApprovalRequestEntry = {
-  requestId: CodexJsonRpcId;
-  method: "item/fileChange/requestApproval";
-  kind: "file-change-approval";
-  threadId: string;
-  turnId: string;
-  itemId: string;
-  reason: string | null;
-  grantRoot: string | null;
-  availableDecisions: readonly string[];
-  status: "pending" | "responding";
-  responseErrorMessage: string | null;
-};
-
-export type CodexToolRequestUserInputEntry = {
-  requestId: CodexJsonRpcId;
-  method: "tool/requestUserInput";
-  kind: "tool-user-input";
-  questions: readonly {
-    header: string | null;
-    id: string;
-    options: readonly {
-      label: string;
-      description: string | null;
-      isOther: boolean;
-    }[];
-    question: string;
-  }[];
-  status: "pending" | "responding";
-  responseErrorMessage: string | null;
-};
-
-export type OpenCodePermissionApprovalRequestEntry = {
-  requestId: string;
-  method: "opencode/permission/requestApproval";
-  kind: "opencode-permission";
-  sessionId: string;
-  permission: string;
-  patterns: readonly string[];
-  availableDecisions: readonly string[];
-  status: "pending" | "responding";
-  responseErrorMessage: string | null;
-};
-
+export type CodexCommandApprovalRequestEntry = CommandApprovalRequestEntry;
+export type CodexFileChangeApprovalRequestEntry = FileChangeApprovalRequestEntry;
+export type CodexToolRequestUserInputEntry = ToolRequestUserInputEntry;
 export type CodexApprovalRequestEntry =
   | CodexCommandApprovalRequestEntry
   | CodexFileChangeApprovalRequestEntry
-  | CodexToolRequestUserInputEntry
-  | OpenCodePermissionApprovalRequestEntry;
+  | CodexToolRequestUserInputEntry;
 
 export type CodexApprovalRequestsState = {
   entries: readonly CodexApprovalRequestEntry[];
