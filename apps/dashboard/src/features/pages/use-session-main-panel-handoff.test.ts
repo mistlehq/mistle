@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCliPtyOpenInput,
   resolveChatRestoreConnectionInput,
+  resolveCliRestoreConversationId,
 } from "./use-session-main-panel-handoff.js";
 
 describe("buildCliPtyOpenInput", () => {
@@ -64,7 +65,9 @@ describe("buildCliPtyOpenInput", () => {
       }),
     ).toEqual({
       args: [
-        "attach",
+        "run",
+        "--interactive",
+        "--attach",
         OpenCodeServerListenUrl,
         "--session",
         "ses_123",
@@ -92,13 +95,39 @@ describe("buildCliPtyOpenInput", () => {
         selectedRepositoryPath: null,
       }),
     ).toEqual({
-      args: ["attach", OpenCodeServerListenUrl],
+      args: ["run", "--interactive", "--attach", OpenCodeServerListenUrl],
       cols: 120,
       command: "opencode",
       ptySessionId: "cli",
       rows: 32,
       sandboxInstanceId: "sandbox_123",
     });
+  });
+});
+
+describe("resolveCliRestoreConversationId", () => {
+  it("preserves the launched conversation id for resume handoffs", () => {
+    expect(
+      resolveCliRestoreConversationId({
+        fallbackConversationId: null,
+        launchTarget: {
+          type: "resume",
+          threadId: "ses_launched",
+        },
+      }),
+    ).toBe("ses_launched");
+  });
+
+  it("uses the fallback conversation id for start-new handoffs", () => {
+    expect(
+      resolveCliRestoreConversationId({
+        fallbackConversationId: "thread_fallback",
+        launchTarget: {
+          type: "start_new",
+          shouldClearActiveThreadId: false,
+        },
+      }),
+    ).toBe("thread_fallback");
   });
 });
 

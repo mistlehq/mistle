@@ -38,7 +38,10 @@ import {
   resolveSessionTerminalCwd,
 } from "./session-primary-repository-policy.js";
 import type { SessionStartupState } from "./session-startup-status.js";
-import type { SessionTerminalThemeMode } from "./session-terminal-surface.js";
+import type {
+  SessionTerminalContentInset,
+  SessionTerminalThemeMode,
+} from "./session-terminal-surface.js";
 import {
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
@@ -105,6 +108,7 @@ type SessionWorkbenchState = {
     error: ReturnType<typeof useSessionMainPanelHandoff>["error"];
     isCliToggleActive: boolean;
     showsChatComposer: boolean;
+    cliTerminalContentInset: SessionTerminalContentInset;
     cliTerminalThemeMode: SessionTerminalThemeMode;
     enterCliMode: () => Promise<void>;
     exitCliMode: () => Promise<void>;
@@ -644,7 +648,8 @@ export function useSessionWorkbenchController(input: {
         error: handoff.error,
         isCliToggleActive: handoff.isCliToggleActive,
         showsChatComposer: handoff.transitionState === "stable_chat",
-        cliTerminalThemeMode: isOpenCodeRuntime ? "dark" : "system",
+        cliTerminalContentInset: isOpenCodeRuntime ? "none" : "default",
+        cliTerminalThemeMode: isOpenCodeRuntime ? "opencode-dark" : "system",
         enterCliMode: handoff.handoffToCli,
         exitCliMode: handoff.handoffToChat,
       },

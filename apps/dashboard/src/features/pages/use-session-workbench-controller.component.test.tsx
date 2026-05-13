@@ -81,6 +81,7 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.workbench.terminalPanelState.isVisible).toBe(false);
     expect(result.current.workbench.diffPanelState.isVisible).toBe(false);
     expect(result.current.workbench.diffPanelState.patch).toBe("");
+    expect(result.current.workbench.primaryPanelState.cliTerminalContentInset).toBe("default");
     expect(result.current.workbench.primaryPanelState.cliTerminalThemeMode).toBe("system");
     expect(result.current.workbench.portAccessState.processes).toEqual([]);
     expect(result.current.workbench.portAccessState.isPanelOpen).toBe(false);
@@ -129,7 +130,8 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.workbench.primaryPanelState.disabledReason).toBe(
       "TUI is available after the session is connected.",
     );
-    expect(result.current.workbench.primaryPanelState.cliTerminalThemeMode).toBe("dark");
+    expect(result.current.workbench.primaryPanelState.cliTerminalContentInset).toBe("none");
+    expect(result.current.workbench.primaryPanelState.cliTerminalThemeMode).toBe("opencode-dark");
   });
 
   it("maps OpenCode permission requests to actionable server requests", () => {

@@ -39,6 +39,16 @@ const DARK_TERMINAL_THEME: ITheme = {
   brightWhite: "#f0f9f7",
 };
 
+const OPENCODE_TERMINAL_THEME: ITheme = {
+  ...DARK_TERMINAL_THEME,
+  background: "#050505",
+  foreground: "#e6e6e6",
+  cursor: "#e6e6e6",
+  cursorAccent: "#050505",
+  black: "#050505",
+  brightBlack: "#4f4f4f",
+};
+
 const LIGHT_TERMINAL_THEME: ITheme = {
   background: "#ffffff",
   foreground: "#111111",
@@ -63,7 +73,8 @@ const LIGHT_TERMINAL_THEME: ITheme = {
   brightWhite: "#222222",
 };
 
-export type SessionTerminalThemeMode = "dark" | "light" | "system";
+export type SessionTerminalContentInset = "default" | "none";
+export type SessionTerminalThemeMode = "dark" | "light" | "opencode-dark" | "system";
 
 function readIsDarkTheme(): boolean {
   if (typeof document === "undefined") {
@@ -87,6 +98,7 @@ function resolveTerminalFontFamily(): string {
 
 type SessionTerminalSurfaceProps = {
   refitKey?: string;
+  contentInset?: SessionTerminalContentInset;
   themeMode?: SessionTerminalThemeMode;
   isVisible: boolean;
   lifecycleState: string;
@@ -112,6 +124,7 @@ function resolveTerminalDimensions(fitAddon: FitAddon | null): { cols: number; r
 
 export function SessionTerminalSurface({
   refitKey,
+  contentInset = "default",
   themeMode = "system",
   isVisible,
   lifecycleState,
@@ -127,7 +140,12 @@ export function SessionTerminalSurface({
   const outputDecoderRef = useRef(new TextDecoder());
   const [isDarkTheme, setIsDarkTheme] = useState(readIsDarkTheme);
   const effectiveThemeMode = themeMode === "system" ? (isDarkTheme ? "dark" : "light") : themeMode;
-  const terminalTheme = effectiveThemeMode === "dark" ? DARK_TERMINAL_THEME : LIGHT_TERMINAL_THEME;
+  const terminalTheme =
+    effectiveThemeMode === "opencode-dark"
+      ? OPENCODE_TERMINAL_THEME
+      : effectiveThemeMode === "dark"
+        ? DARK_TERMINAL_THEME
+        : LIGHT_TERMINAL_THEME;
   const terminalBackgroundColor = terminalTheme.background ?? "#ffffff";
 
   lifecycleStateRef.current = lifecycleState;
@@ -333,7 +351,7 @@ export function SessionTerminalSurface({
         )}
       >
         <div
-          className="h-full w-full pl-3"
+          className={cn("h-full w-full", contentInset === "default" && "pl-3")}
           ref={containerRef}
           style={{ backgroundColor: terminalBackgroundColor }}
         />

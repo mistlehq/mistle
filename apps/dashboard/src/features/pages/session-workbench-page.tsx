@@ -441,6 +441,7 @@ function SessionWorkbenchPageContent(input: {
             refitKey: workbench.terminalPanelState.isVisible
               ? "cli:terminal-open"
               : "cli:terminal-closed",
+            terminalContentInset: workbench.primaryPanelState.cliTerminalContentInset,
             terminalThemeMode: workbench.primaryPanelState.cliTerminalThemeMode,
           },
           initialEntryStartupState,
@@ -511,7 +512,7 @@ type PrimaryPanelConversationContent = Pick<
 
 type PrimaryPanelCliContent = Pick<
   React.ComponentProps<typeof SessionCliPanel>,
-  "ptyState" | "refitKey" | "terminalThemeMode"
+  "ptyState" | "refitKey" | "terminalContentInset" | "terminalThemeMode"
 >;
 
 function renderPrimaryPanelMainContent(input: {
@@ -540,6 +541,9 @@ function renderPrimaryPanelMainContent(input: {
       return (
         <SessionCliPanel
           ptyState={input.cli.ptyState}
+          {...(input.cli.terminalContentInset === undefined
+            ? {}
+            : { terminalContentInset: input.cli.terminalContentInset })}
           {...(input.cli.terminalThemeMode === undefined
             ? {}
             : { terminalThemeMode: input.cli.terminalThemeMode })}
