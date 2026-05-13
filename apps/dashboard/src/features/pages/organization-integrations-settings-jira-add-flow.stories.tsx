@@ -360,7 +360,7 @@ function JiraAddFlowStory(input: {
   initialEntry: JiraAddFlowInitialEntry;
   connections?: readonly IntegrationConnection[];
   webhookSources?: readonly IntegrationWebhookSource[];
-  managedWebhookSetup: ManagedWebhookSetupResult;
+  managedWebhookSetup?: ManagedWebhookSetupResult;
 }): React.JSX.Element {
   const [queryClient] = useState(() =>
     createStoryQueryClient({
@@ -392,7 +392,7 @@ function JiraAddFlowStory(input: {
 
   return (
     <StoryQueryClientProvider
-      managedWebhookSetup={input.managedWebhookSetup}
+      managedWebhookSetup={input.managedWebhookSetup ?? StoryJiraWebhookCreatedSetup}
       queryClient={queryClient}
     >
       <RouterProvider router={router} />
@@ -496,7 +496,6 @@ export const WebhookNotConfigured: PageStory = {
       <JiraAddFlowStory
         connections={[createJiraConnection()]}
         initialEntry="/integrations/jira-default?connectionId=icn_jira_story"
-        managedWebhookSetup={StoryJiraWebhookFailureSetup}
       />
     );
   },
@@ -514,7 +513,6 @@ export const ServiceAccountApiTokenDetail: PageStory = {
           }),
         ]}
         initialEntry="/integrations/jira-default?connectionId=icn_jira_service_account"
-        managedWebhookSetup={StoryJiraWebhookCreatedSetup}
       />
     );
   },
@@ -532,7 +530,6 @@ export const ServiceAccountOAuthClientCredentialsDetail: PageStory = {
           }),
         ]}
         initialEntry="/integrations/jira-default?connectionId=icn_jira_oauth_service_account"
-        managedWebhookSetup={StoryJiraWebhookCreatedSetup}
       />
     );
   },
