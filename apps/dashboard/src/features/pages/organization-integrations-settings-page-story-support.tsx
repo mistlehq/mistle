@@ -429,9 +429,6 @@ export const AddFlowStorySpecs = {
   GitHubEnterpriseServer: {
     variantId: "github-enterprise-server",
   },
-  Jira: {
-    variantId: "jira-default",
-  },
   Linear: {
     variantId: "linear-default",
   },
