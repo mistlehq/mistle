@@ -53,6 +53,11 @@ type IntegrationChoice = {
   title: React.ReactNode;
 };
 
+type IntegrationNameItem = {
+  logoKey: string | undefined;
+  title: React.ReactNode;
+};
+
 type GitConnectionChoice = {
   id: string;
   displayName: string;
@@ -90,7 +95,7 @@ type SandboxProfileIntegrationsSetupSectionProps = {
   readOnly?: boolean | undefined;
 };
 
-const NoIntegrationValue = "none";
+const NoGitConnectionValue = "none";
 
 const SandboxProfileIntegrationConnectionColumns = [
   { key: "integration", label: "Integration", desktopWidth: "minmax(12rem,0.9fr)" },
@@ -126,7 +131,7 @@ function RuntimeSettingLabel(input: { children: React.ReactNode }): React.JSX.El
   );
 }
 
-function IntegrationNameCell(input: { item: IntegrationChoice }): React.JSX.Element {
+function IntegrationNameCell(input: { item: IntegrationNameItem }): React.JSX.Element {
   return (
     <div className={`${SandboxProfileIntegrationCellContentClassName} gap-2 text-sm`}>
       {input.item.logoKey === undefined ? null : (
@@ -237,13 +242,13 @@ function GitConnectionSelectionCell(input: {
         if (nextConnectionId === null) {
           return;
         }
-        if (nextConnectionId === NoIntegrationValue) {
+        if (nextConnectionId === NoGitConnectionValue) {
           input.onNone();
           return;
         }
         input.onConnectionChange(nextConnectionId);
       }}
-      value={input.selectedConnectionId ?? NoIntegrationValue}
+      value={input.selectedConnectionId ?? NoGitConnectionValue}
     >
       <SelectTrigger aria-label={input.ariaLabel} className="w-full min-w-0">
         <SelectValue placeholder="Choose a git connection">
@@ -255,7 +260,7 @@ function GitConnectionSelectionCell(input: {
         </SelectValue>
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={NoIntegrationValue}>None</SelectItem>
+        <SelectItem value={NoGitConnectionValue}>None</SelectItem>
         {input.choices.map((choice) => (
           <SelectItem key={choice.id} value={choice.id}>
             <div className="flex items-center gap-2">
@@ -477,24 +482,6 @@ function NoResourcesAndToolsCell(): React.JSX.Element {
   return <div aria-hidden className={SandboxProfileIntegrationCellContentClassName} />;
 }
 
-function resolveConnectorRowIssue(input: {
-  row: SandboxProfileBindingEditorRow;
-  availableConnections: readonly IntegrationConnectionSummary[];
-  availableTargets: readonly IntegrationTargetSummary[];
-}): "missing-connection" | "missing-target" | null {
-  const connection = input.availableConnections.find(
-    (candidate) => candidate.id === input.row.connectionId,
-  );
-  if (connection === undefined) {
-    return "missing-connection";
-  }
-
-  const target = input.availableTargets.find(
-    (candidate) => candidate.targetKey === connection.targetKey,
-  );
-  return target === undefined ? "missing-target" : null;
-}
-
 function resolveBindingIssue(input: {
   row: SandboxProfileBindingEditorRow | null;
   availableConnections: readonly IntegrationConnectionSummary[];
@@ -613,7 +600,7 @@ export function SandboxProfileIntegrationsSetupSection(
   });
   const hasUnresolvedConnectorRows = connectorRows.some(
     (row) =>
-      resolveConnectorRowIssue({
+      resolveBindingIssue({
         row,
         availableConnections: input.availableConnections,
         availableTargets: input.availableTargets,
@@ -872,11 +859,6 @@ export function SandboxProfileIntegrationsSetupSection(
                           ) : (
                             <IntegrationNameCell
                               item={{
-                                id:
-                                  presentation.target?.targetKey ??
-                                  presentation.connection.targetKey ??
-                                  row.clientId,
-                                hasSelectableConnections: true,
                                 logoKey: presentation.logoKey,
                                 title: presentation.title,
                               }}
