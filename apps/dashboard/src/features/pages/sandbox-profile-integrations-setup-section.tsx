@@ -118,14 +118,6 @@ const SandboxProfileIntegrationCellContentClassName = "flex items-center md:min-
 const SandboxProfileIntegrationActionCellClassName =
   "absolute right-0 top-0 md:static md:flex md:justify-end";
 
-function RuntimeSettingLabel(input: { children: React.ReactNode }): React.JSX.Element {
-  return (
-    <div className={`${SandboxProfileIntegrationCellContentClassName} text-sm font-medium`}>
-      {input.children}
-    </div>
-  );
-}
-
 function IntegrationNameCell(input: {
   logoKey: string | undefined;
   title: React.ReactNode;
@@ -336,17 +328,15 @@ function resolveKindChoices(input: {
   return choices;
 }
 
-function resolveConnectionsForTarget(input: {
-  targetKey: string | null;
-  availableConnections: readonly IntegrationConnectionSummary[];
-}): IntegrationConnectionSummary[] {
-  if (input.targetKey === null) {
+function resolveConnectionsForTarget(
+  targetKey: string | null,
+  availableConnections: readonly IntegrationConnectionSummary[],
+): IntegrationConnectionSummary[] {
+  if (targetKey === null) {
     return [];
   }
 
-  return input.availableConnections.filter(
-    (connection) => connection.targetKey === input.targetKey,
-  );
+  return availableConnections.filter((connection) => connection.targetKey === targetKey);
 }
 
 function resolveGitConnectionChoices(input: {
@@ -373,17 +363,16 @@ function resolveGitConnectionChoices(input: {
   return choices;
 }
 
-function findTargetForConnection(input: {
-  connectionId: string | undefined;
-  availableConnections: readonly IntegrationConnectionSummary[];
-}): string | null {
-  if (input.connectionId === undefined) {
+function findTargetForConnection(
+  connectionId: string | undefined,
+  availableConnections: readonly IntegrationConnectionSummary[],
+): string | null {
+  if (connectionId === undefined) {
     return null;
   }
 
   return (
-    input.availableConnections.find((connection) => connection.id === input.connectionId)
-      ?.targetKey ?? null
+    availableConnections.find((connection) => connection.id === connectionId)?.targetKey ?? null
   );
 }
 
@@ -462,10 +451,6 @@ function UnresolvedIntegrationCell(input: { title: string }): React.JSX.Element 
       <p className="text-destructive truncate text-sm">{input.title}</p>
     </div>
   );
-}
-
-function NoResourcesAndToolsCell(): React.JSX.Element {
-  return <div aria-hidden className={SandboxProfileIntegrationCellContentClassName} />;
 }
 
 function resolveBindingIssue(input: {
@@ -624,10 +609,7 @@ export function SandboxProfileIntegrationsSetupSection(
   }
 
   async function addConnector(targetKey: string): Promise<void> {
-    const connections = resolveConnectionsForTarget({
-      targetKey,
-      availableConnections: input.availableConnections,
-    });
+    const connections = resolveConnectionsForTarget(targetKey, input.availableConnections);
     const nextConnection = connections[0];
     if (nextConnection === undefined) {
       return;
@@ -652,10 +634,10 @@ export function SandboxProfileIntegrationsSetupSection(
     }
   }
 
-  const agentTargetKey = findTargetForConnection({
-    connectionId: agentRow?.connectionId,
-    availableConnections: input.availableConnections,
-  });
+  const agentTargetKey = findTargetForConnection(
+    agentRow?.connectionId,
+    input.availableConnections,
+  );
   const agentIntegrationChoice =
     agentChoices.find((choice) => choice.id === agentTargetKey) ?? agentChoices[0];
   const addConnectorActionIsDisabled = controlsAreDisabled || addConnectorChoices.length === 0;
@@ -786,7 +768,11 @@ export function SandboxProfileIntegrationsSetupSection(
                   >
                     <ResponsiveFieldListCell columnKey="integration">
                       {agentIntegrationChoice === undefined ? (
-                        <RuntimeSettingLabel>OpenAI</RuntimeSettingLabel>
+                        <div
+                          className={`${SandboxProfileIntegrationCellContentClassName} text-sm font-medium`}
+                        >
+                          OpenAI
+                        </div>
                       ) : (
                         <IntegrationNameCell
                           logoKey={agentIntegrationChoice.logoKey}
@@ -797,10 +783,10 @@ export function SandboxProfileIntegrationsSetupSection(
                     <ResponsiveFieldListCell columnKey="proxied-connection">
                       <ConnectionSelectionCell
                         ariaLabel="agent harness connection"
-                        availableConnections={resolveConnectionsForTarget({
-                          targetKey: agentTargetKey ?? agentChoices[0]?.id ?? null,
-                          availableConnections: input.availableConnections,
-                        })}
+                        availableConnections={resolveConnectionsForTarget(
+                          agentTargetKey ?? agentChoices[0]?.id ?? null,
+                          input.availableConnections,
+                        )}
                         onConnectionChange={(nextConnectionId) => {
                           if (controlsAreDisabled) {
                             return;
@@ -813,7 +799,7 @@ export function SandboxProfileIntegrationsSetupSection(
                       />
                     </ResponsiveFieldListCell>
                     <ResponsiveFieldListCell columnKey="resources-and-tools" hideOnMobile>
-                      <NoResourcesAndToolsCell />
+                      <div aria-hidden className={SandboxProfileIntegrationCellContentClassName} />
                     </ResponsiveFieldListCell>
                     <ResponsiveFieldListCell
                       className={SandboxProfileIntegrationActionCellClassName}
@@ -857,10 +843,10 @@ export function SandboxProfileIntegrationsSetupSection(
                           presentation.target !== undefined ? (
                             <ConnectionSelectionCell
                               ariaLabel={`${presentation.target.displayName} connection`}
-                              availableConnections={resolveConnectionsForTarget({
-                                targetKey: presentation.target.targetKey,
-                                availableConnections: input.availableConnections,
-                              })}
+                              availableConnections={resolveConnectionsForTarget(
+                                presentation.target.targetKey,
+                                input.availableConnections,
+                              )}
                               onConnectionChange={(nextConnectionId) => {
                                 if (controlsAreDisabled) {
                                   return;

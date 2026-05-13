@@ -1914,7 +1914,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.queryByText("Integrations & Tools")).toBeNull();
   });
 
-  it("shows stale git guidance when a persisted git binding cannot be resolved", () => {
+  it("shows stale git connection errors when a persisted git binding cannot be resolved", () => {
     renderSandboxProfileEditor({
       bindings: [
         {
