@@ -127,6 +127,17 @@ type SessionWorkbenchState = {
   portAccessState: ReturnType<typeof useSessionPortAccess>;
 };
 
+export function resolveOpenCodePromptModelOverride(input: {
+  hasExplicitModelSelection: boolean;
+  selectedModel: string | null;
+}): ReturnType<typeof parseOpenCodePromptModelSelection> | undefined {
+  if (!input.hasExplicitModelSelection || input.selectedModel === null) {
+    return undefined;
+  }
+
+  return parseOpenCodePromptModelSelection(input.selectedModel);
+}
+
 type SessionConversationChatState = Pick<
   ChatState,
   "activeTurnId" | "entries" | "pendingTurnId" | "status"
@@ -467,10 +478,10 @@ export function useSessionWorkbenchController(input: {
   const startTurn = useCallback(
     async (turnInput: Parameters<typeof chat.startTurn>[0]): Promise<void> => {
       if (isOpenCodeRuntime) {
-        const selectedOpenCodeModel =
-          activeConfigControl.selectedModel === null
-            ? undefined
-            : parseOpenCodePromptModelSelection(activeConfigControl.selectedModel);
+        const selectedOpenCodeModel = resolveOpenCodePromptModelOverride({
+          hasExplicitModelSelection: activeConfigControl.hasExplicitModelSelection,
+          selectedModel: activeConfigControl.selectedModel,
+        });
         await openCodeSessionState.chat.sendPrompt({
           ...(selectedRepositoryPath === null ? {} : { directory: selectedRepositoryPath }),
           ...(selectedOpenCodeModel === undefined ? {} : { model: selectedOpenCodeModel }),
@@ -512,6 +523,7 @@ export function useSessionWorkbenchController(input: {
     },
     [
       chat,
+      activeConfigControl.hasExplicitModelSelection,
       activeConfigControl.selectedModel,
       input.sandboxInstanceId,
       isOpenCodeRuntime,
@@ -637,7 +649,8 @@ export function useSessionWorkbenchController(input: {
         clearSessionErrorMessage: activeClearSessionErrorMessage,
         repositoryStatus,
         contextUsage: isOpenCodeRuntime ? null : contextUsage,
-        requiresModelSelection: true,
+        requiresModelSelection: !isOpenCodeRuntime,
+        showConfigControls: true,
       },
       serverRequestsState: {
         isRespondingToServerRequest: isOpenCodeRuntime

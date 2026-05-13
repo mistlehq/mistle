@@ -125,6 +125,7 @@ function RenderedComposerPaneHarness(input: {
         configControl: {
           selectedModel: ComposerModelFixture.model,
           selectedReasoningEffort: ComposerModelFixture.defaultReasoningEffort,
+          hasExplicitModelSelection: true,
           modelOptions: [
             {
               value: ComposerModelFixture.model,
@@ -219,6 +220,7 @@ function QueuedPromptComposerHarness(): React.JSX.Element {
           configControl: {
             selectedModel: ComposerModelFixture.model,
             selectedReasoningEffort: ComposerModelFixture.defaultReasoningEffort,
+            hasExplicitModelSelection: true,
             modelOptions: [
               {
                 value: ComposerModelFixture.model,

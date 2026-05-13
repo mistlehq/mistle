@@ -9,7 +9,10 @@ import type {
   CodexSessionConfigState,
   SessionBootstrapResult,
 } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
-import { useSessionComposerConfigControl } from "./use-session-composer-config-control.js";
+import {
+  useLocalSessionComposerConfigControl,
+  useSessionComposerConfigControl,
+} from "./use-session-composer-config-control.js";
 
 const DefaultModel: CodexModelSummary = {
   id: "model-default",
@@ -78,7 +81,33 @@ function SessionComposerConfigControlHarness(input: {
       <div data-testid="selected-reasoning-effort">
         {configControl.selectedReasoningEffort ?? ""}
       </div>
+      <div data-testid="has-explicit-model-selection">
+        {configControl.hasExplicitModelSelection ? "true" : "false"}
+      </div>
       <div data-testid="last-write">{lastWrite}</div>
+    </div>
+  );
+}
+
+function LocalSessionComposerConfigControlHarness(input: {
+  bootstrap: SessionBootstrapResult;
+}): React.JSX.Element {
+  const configControl = useLocalSessionComposerConfigControl({
+    bootstrap: input.bootstrap,
+    clearSessionErrorMessage: () => {
+      return;
+    },
+  });
+
+  return (
+    <div>
+      <div data-testid="selected-model">{configControl.selectedModel ?? ""}</div>
+      <div data-testid="selected-reasoning-effort">
+        {configControl.selectedReasoningEffort ?? ""}
+      </div>
+      <div data-testid="has-explicit-model-selection">
+        {configControl.hasExplicitModelSelection ? "true" : "false"}
+      </div>
     </div>
   );
 }
@@ -101,6 +130,7 @@ describe("useSessionComposerConfigControl", () => {
 
     expect(screen.getByTestId("selected-model").textContent).toBe("gpt-5.4");
     expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("medium");
+    expect(screen.getByTestId("has-explicit-model-selection").textContent).toBe("true");
     expect(screen.getByTestId("last-write").textContent).toBe("");
   });
 
@@ -132,5 +162,21 @@ describe("useSessionComposerConfigControl", () => {
 
     expect(screen.getByTestId("selected-model").textContent).toBe("gpt-5.3-codex-spark");
     expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("low");
+  });
+
+  it("leaves local runtime model selection unset until the user or config chooses a model", () => {
+    render(
+      <LocalSessionComposerConfigControlHarness
+        bootstrap={createReadyBootstrap({
+          availableModels: [SparkModel, DefaultModel],
+          model: null,
+          modelReasoningEffort: null,
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId("selected-model").textContent).toBe("");
+    expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("");
+    expect(screen.getByTestId("has-explicit-model-selection").textContent).toBe("false");
   });
 });

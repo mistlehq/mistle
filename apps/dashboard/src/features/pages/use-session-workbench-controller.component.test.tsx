@@ -22,6 +22,7 @@ import {
   shouldWaitForAutomationSessionThread,
   mapOpenCodePermissionsToServerRequests,
   resolveOpenCodePermissionResponse,
+  resolveOpenCodePromptModelOverride,
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
 import { resolveSandboxStatusRefetchInterval } from "./use-session-workbench-lifecycle-state.js";
@@ -118,7 +119,8 @@ describe("useSessionWorkbenchController", () => {
       sandboxInstanceId: "sbi_opencode",
     });
 
-    expect(result.current.conversationPane.composerStateInput.requiresModelSelection).toBe(true);
+    expect(result.current.conversationPane.composerStateInput.requiresModelSelection).toBe(false);
+    expect(result.current.conversationPane.composerStateInput.showConfigControls).toBe(true);
     expect(result.current.conversationPane.composerStateInput.bootstrap.phase).toEqual({
       status: "unavailable",
     });
@@ -158,6 +160,30 @@ describe("useSessionWorkbenchController", () => {
 
     expect(resolveOpenCodePermissionResponse({ decision: "always" })).toBe("always");
     expect(resolveOpenCodePermissionResponse({ decision: "decline" })).toBe("reject");
+  });
+
+  it("omits OpenCode prompt model overrides until the user selects a model", () => {
+    expect(
+      resolveOpenCodePromptModelOverride({
+        hasExplicitModelSelection: false,
+        selectedModel: "openai/gpt-5",
+      }),
+    ).toBeUndefined();
+    expect(
+      resolveOpenCodePromptModelOverride({
+        hasExplicitModelSelection: true,
+        selectedModel: null,
+      }),
+    ).toBeUndefined();
+    expect(
+      resolveOpenCodePromptModelOverride({
+        hasExplicitModelSelection: true,
+        selectedModel: "openai/gpt-5",
+      }),
+    ).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5",
+    });
   });
 
   it("starts Codex recovery from a recoverable disconnect and preserves attempts for the same event", () => {

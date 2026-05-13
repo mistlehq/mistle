@@ -77,7 +77,7 @@ function readOpenCodeAuthContent(
   return authFile === undefined ? undefined : JSON.parse(authFile.content);
 }
 
-function readOpenCodeConfigContent(
+function readOpenCodeManagedConfigContent(
   compiled: CompileAgentRuntimeResult,
   egressRoutes: ReadonlyArray<EgressCredentialRoute>,
 ) {
@@ -85,10 +85,8 @@ function readOpenCodeConfigContent(
     compiled,
     egressRoutes,
   });
-  const configFile = runtimeClients[0]?.setup.files.find(
-    (file) => file.fileId === "opencode_config",
-  );
-  return configFile === undefined ? undefined : JSON.parse(configFile.content);
+  const envContent = runtimeClients[0]?.setup.env.OPENCODE_CONFIG_CONTENT;
+  return envContent === undefined ? undefined : JSON.parse(envContent);
 }
 
 function compileDefaultOpenCodeRuntime(): CompileAgentRuntimeResult {
@@ -449,7 +447,9 @@ describe("compileOpenCodeRuntime", () => {
       ],
     });
 
-    expect(rendered[0]?.setup.env).toEqual({});
+    expect(rendered[0]?.setup.env).toEqual({
+      OPENCODE_CONFIG_CONTENT: JSON.stringify({ enabled_providers: [] }),
+    });
     expect(rendered[0]?.setup.files.some((file) => file.fileId === "opencode_auth")).toBe(false);
     expect(
       rendered[0]?.setup.files.find((file) => file.fileId === "opencode_config")?.content,
@@ -461,7 +461,6 @@ describe("compileOpenCodeRuntime", () => {
             port: 4511,
             mdns: false,
           },
-          enabled_providers: [],
         },
         null,
         2,
@@ -471,7 +470,7 @@ describe("compileOpenCodeRuntime", () => {
 
   it("constrains OpenCode providers to the compiled credential routes", () => {
     expect(
-      readOpenCodeConfigContent(compileDefaultOpenCodeRuntime(), [
+      readOpenCodeManagedConfigContent(compileDefaultOpenCodeRuntime(), [
         createCompiledRoute({
           egressRuleId: "egress_rule_bind_openai",
           bindingId: "bind_openai",
@@ -504,14 +503,7 @@ describe("compileOpenCodeRuntime", () => {
           secretType: "api_key",
         }),
       ]),
-    ).toEqual({
-      server: {
-        hostname: "127.0.0.1",
-        port: 4511,
-        mdns: false,
-      },
-      enabled_providers: ["anthropic", "openai", "opencode-go"],
-    });
+    ).toEqual({ enabled_providers: ["anthropic", "openai", "opencode-go"] });
   });
 
   it("renders OpenAI API auth file from proxied egress routes", () => {

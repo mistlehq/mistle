@@ -70,7 +70,10 @@ type OpenCodeConfig = {
     port: number;
     mdns: boolean;
   };
-  enabled_providers?: readonly string[];
+};
+
+type OpenCodeManagedConfig = {
+  enabled_providers: readonly string[];
 };
 
 type OpenCodeApiAuth = {
@@ -112,17 +115,26 @@ function resolveOpenCodeEnabledProviders(input: {
   return [...providers].sort((left, right) => left.localeCompare(right));
 }
 
-function renderOpenCodeConfig(input?: { enabledProviders?: readonly string[] }): string {
+function renderOpenCodeConfig(): string {
   const config: OpenCodeConfig = {
     server: {
       hostname: OpenCodeServerListenHost,
       port: OpenCodeServerListenPort,
       mdns: false,
     },
-    ...(input?.enabledProviders === undefined ? {} : { enabled_providers: input.enabledProviders }),
   };
 
   return `${JSON.stringify(config, null, 2)}\n`;
+}
+
+function renderOpenCodeManagedConfigContent(input: {
+  enabledProviders: readonly string[];
+}): string {
+  const config: OpenCodeManagedConfig = {
+    enabled_providers: input.enabledProviders,
+  };
+
+  return JSON.stringify(config);
 }
 
 function renderOpenCodeGlobalAgentsMd(): string {
@@ -214,7 +226,6 @@ function renderOpenCodeAuthContent(input: {
 
 function buildOpenCodeSetupFiles(input: {
   authContent: string | undefined;
-  enabledProviders?: readonly string[];
 }): ReadonlyArray<RuntimeClientSetupFile> {
   const files: RuntimeClientSetupFile[] = [
     {
@@ -222,11 +233,7 @@ function buildOpenCodeSetupFiles(input: {
       path: OpenCodeConfigPath,
       mode: 384,
       writeMode: "if-absent",
-      content: renderOpenCodeConfig(
-        input.enabledProviders === undefined
-          ? undefined
-          : { enabledProviders: input.enabledProviders },
-      ),
+      content: renderOpenCodeConfig(),
     },
     {
       fileId: "opencode_global_agents",
@@ -259,12 +266,16 @@ function buildOpenCodeRuntimeClients(input: {
     {
       clientId: "opencode-cli",
       setup: {
-        env: {},
+        env:
+          input.enabledProviders === undefined
+            ? {}
+            : {
+                OPENCODE_CONFIG_CONTENT: renderOpenCodeManagedConfigContent({
+                  enabledProviders: input.enabledProviders,
+                }),
+              },
         files: buildOpenCodeSetupFiles({
           authContent: input.authContent,
-          ...(input.enabledProviders === undefined
-            ? {}
-            : { enabledProviders: input.enabledProviders }),
         }),
       },
       processes: [

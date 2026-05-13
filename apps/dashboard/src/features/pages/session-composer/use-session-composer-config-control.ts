@@ -10,6 +10,7 @@ import { resolveActiveComposerModel } from "./session-composer-model-readiness.j
 export type SessionComposerConfigControl = {
   selectedModel: string | null;
   selectedReasoningEffort: string | null;
+  hasExplicitModelSelection: boolean;
   modelOptions: readonly {
     value: string;
     label: string;
@@ -47,6 +48,10 @@ export function useSessionComposerConfigControl(input: {
   );
 
   const selectedReasoningEffort = useMemo(() => {
+    if (selectedModel === null) {
+      return null;
+    }
+
     const explicitReasoningEffort =
       composerConfigOverrides.modelReasoningEffort ?? configSnapshot.modelReasoningEffort;
     if (explicitReasoningEffort !== null) {
@@ -114,6 +119,7 @@ export function useSessionComposerConfigControl(input: {
   return {
     selectedModel,
     selectedReasoningEffort,
+    hasExplicitModelSelection: selectedModel !== null,
     modelOptions,
     canChangeModel: true,
     canChangeReasoningEffort: true,
@@ -135,18 +141,15 @@ export function useLocalSessionComposerConfigControl(input: {
   });
 
   const selectedModel = useMemo(
-    () =>
-      composerConfigOverrides.model ??
-      configSnapshot.model ??
-      resolveActiveComposerModel({
-        availableModels,
-        selectedModel: null,
-      })?.model ??
-      null,
-    [availableModels, composerConfigOverrides.model, configSnapshot.model],
+    () => composerConfigOverrides.model ?? configSnapshot.model ?? null,
+    [composerConfigOverrides.model, configSnapshot.model],
   );
 
   const selectedReasoningEffort = useMemo(() => {
+    if (selectedModel === null) {
+      return null;
+    }
+
     const explicitReasoningEffort =
       composerConfigOverrides.modelReasoningEffort ?? configSnapshot.modelReasoningEffort;
     if (explicitReasoningEffort !== null) {
@@ -200,6 +203,7 @@ export function useLocalSessionComposerConfigControl(input: {
   return {
     selectedModel,
     selectedReasoningEffort,
+    hasExplicitModelSelection: selectedModel !== null,
     modelOptions,
     canChangeModel: true,
     canChangeReasoningEffort: input.canChangeReasoningEffort ?? true,
