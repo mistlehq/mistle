@@ -205,7 +205,7 @@ run_compose up -d --wait postgres valkey seaweedfs mailpit
 ensure_object_store_bucket "$(read_env_value "MISTLE_OBJECT_STORE_ASSETS_BUCKET_NAME")"
 
 echo "Starting Mistle..."
-run_compose up -d mistle
+run_compose up -d --wait mistle
 
 echo "Active callback base URL: ${runtime_auth_base_url}"
 echo "Mistle image: ${runtime_docker_image}"
