@@ -1,9 +1,11 @@
 import type { IntegrationKind } from "@mistle/integrations-core";
 import { Notice, SectionBlock, Tabs, TabsContent, TabsList, TabsTrigger } from "@mistle/ui";
+import { useState } from "react";
 import type { ReactNode } from "react";
 
 import { IntegrationSection } from "../integrations/integration-section.js";
 import { IntegrationTile } from "../integrations/integration-tile.js";
+import { ToolbarSearchInput } from "../shared/toolbar-search-input.js";
 
 export type OrganizationIntegrationsSettingsPageCard = {
   actionDisabled?: boolean;
@@ -103,37 +105,73 @@ export function OrganizationIntegrationsSettingsPageView(
 function AvailableIntegrationsSection(input: {
   cards: readonly OrganizationIntegrationsSettingsPageCard[];
 }): React.JSX.Element | null {
+  const [searchValue, setSearchValue] = useState("");
   if (input.cards.length === 0) {
     return null;
   }
 
+  const matchingCards = filterIntegrationCards({
+    cards: input.cards,
+    searchValue,
+  });
   const groups = AvailableIntegrationGroupSpecs.filter(
-    (group) => getIntegrationGroupCards(input.cards, group.kind).length > 0,
+    (group) => getIntegrationGroupCards(matchingCards, group.kind).length > 0,
   );
   const defaultGroup = groups[0];
-  if (defaultGroup === undefined) {
+  if (defaultGroup === undefined && searchValue.trim().length === 0) {
     throw new Error("Available integration cards could not be grouped by integration kind.");
   }
+  const normalizedSearchValue = searchValue.trim();
 
   return (
     <SectionBlock title="Available Integrations">
-      <Tabs className="w-full" defaultValue={defaultGroup.kind}>
-        <TabsList variant="line">
-          {groups.map((group) => (
-            <TabsTrigger key={group.kind} value={group.kind}>
-              {group.title}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      <div className="flex flex-col gap-3">
+        <ToolbarSearchInput
+          ariaLabel="Search integrations"
+          onValueChange={setSearchValue}
+          placeholder="Search integrations"
+          value={searchValue}
+        />
 
-        {groups.map((group) => (
-          <TabsContent key={group.kind} value={group.kind}>
-            {renderIntegrationSettingsGrid(getIntegrationGroupCards(input.cards, group.kind))}
-          </TabsContent>
-        ))}
-      </Tabs>
+        {defaultGroup === undefined ? (
+          <p className="text-muted-foreground text-sm">
+            No integrations match "{normalizedSearchValue}".
+          </p>
+        ) : (
+          <Tabs className="w-full" defaultValue={defaultGroup.kind}>
+            <TabsList variant="line">
+              {groups.map((group) => (
+                <TabsTrigger key={group.kind} value={group.kind}>
+                  {group.title}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            {groups.map((group) => (
+              <TabsContent key={group.kind} value={group.kind}>
+                {renderIntegrationSettingsGrid(getIntegrationGroupCards(matchingCards, group.kind))}
+              </TabsContent>
+            ))}
+          </Tabs>
+        )}
+      </div>
     </SectionBlock>
   );
+}
+
+function filterIntegrationCards(input: {
+  cards: readonly OrganizationIntegrationsSettingsPageCard[];
+  searchValue: string;
+}): readonly OrganizationIntegrationsSettingsPageCard[] {
+  const normalizedSearchValue = input.searchValue.trim().toLowerCase();
+  if (normalizedSearchValue.length === 0) {
+    return input.cards;
+  }
+
+  return input.cards.filter((card) => {
+    const haystack = [card.displayName, card.description, card.targetKey].join(" ").toLowerCase();
+    return haystack.includes(normalizedSearchValue);
+  });
 }
 
 function getIntegrationGroupCards(

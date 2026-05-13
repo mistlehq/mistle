@@ -95,6 +95,48 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
     expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
   });
 
+  it("filters available integrations across category tabs", () => {
+    render(
+      <OrganizationIntegrationsSettingsPageView
+        availableCards={[
+          {
+            targetKey: "openai-default",
+            integrationKind: "agent",
+            displayName: "OpenAI",
+            description: "Bring organization API access into Mistle.",
+            configStatus: "valid",
+            actionLabel: "Add",
+            onAction: () => {},
+          },
+          {
+            targetKey: "github-cloud",
+            integrationKind: "git",
+            displayName: "GitHub",
+            description: "Connect repository access and GitHub events.",
+            configStatus: "valid",
+            actionLabel: "Add",
+            onAction: () => {},
+          },
+        ]}
+        connectedCards={[]}
+        loadErrorMessage={null}
+      />,
+    );
+
+    const searchInput = screen.getByRole("textbox", { name: "Search integrations" });
+    fireEvent.change(searchInput, { target: { value: "github" } });
+
+    expect(screen.queryByRole("tab", { name: "Models" })).toBeNull();
+    expect(screen.getByRole("tab", { name: "Git" })).toBeTruthy();
+    expect(screen.getByText("GitHub")).toBeTruthy();
+    expect(screen.queryByText("OpenAI")).toBeNull();
+
+    fireEvent.change(searchInput, { target: { value: "not-present" } });
+
+    expect(screen.queryByRole("tab", { name: "Git" })).toBeNull();
+    expect(screen.getByText('No integrations match "not-present".')).toBeTruthy();
+  });
+
   it("hides integration directory sections when rendering a detail surface", () => {
     render(
       <OrganizationIntegrationsSettingsPageView
