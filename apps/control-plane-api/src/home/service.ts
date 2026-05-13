@@ -94,20 +94,10 @@ export async function getHomeSummary(
           from ${tables.automations} as a
           where a."organization_id" = ${params.organizationId}
         ) as "hasAutomations"`),
-      // This intentionally reuses the existing list API for now because the home
-      // onboarding flow is still provisional. If this surface becomes permanent,
-      // replace this with a lightweight persisted existence check instead of a
-      // paginated list request.
-      listInstances(
-        {
-          db: input.db,
-          dataPlaneClient: input.dataPlaneClient,
-        },
-        {
-          organizationId: params.organizationId,
-          limit: 1,
-        },
-      ),
+      input.dataPlaneClient.listSandboxInstances({
+        organizationId: params.organizationId,
+        limit: 1,
+      }),
       listInstances(
         {
           db: input.db,

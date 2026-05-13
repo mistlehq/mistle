@@ -51,18 +51,20 @@ function CompletedHomeView(input: {
   recentSessions: readonly SandboxInstanceListItem[];
 }): React.JSX.Element {
   return (
-    <div className="mx-auto flex min-h-[calc(100svh-2rem)] w-full max-w-3xl flex-col justify-center gap-6">
+    <div className="mx-auto flex min-h-[calc(100svh-2rem)] w-full max-w-3xl flex-col justify-center gap-10">
       <section className="min-w-0 space-y-3">
         <h2 className="text-base font-semibold">Start new session</h2>
         {input.createSessionForm}
       </section>
 
-      <section className="mx-auto w-full max-w-lg space-y-3 rounded-lg border bg-background p-4">
+      <section className="mx-auto w-full max-w-lg space-y-3">
         <h2 className="text-base font-semibold">Recent sessions</h2>
-        <RecentSessionsList
-          recentSessions={input.recentSessions}
-          {...(input.onNavigate === undefined ? {} : { onNavigate: input.onNavigate })}
-        />
+        <div className="rounded-lg border bg-background p-4">
+          <RecentSessionsList
+            recentSessions={input.recentSessions}
+            {...(input.onNavigate === undefined ? {} : { onNavigate: input.onNavigate })}
+          />
+        </div>
       </section>
     </div>
   );

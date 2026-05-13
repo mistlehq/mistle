@@ -17,7 +17,7 @@ import { SingleSelectStringComboboxField } from "../forms/single-select-string-c
 import type { LaunchableSandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { useLaunchableSandboxProfiles } from "../sandbox-profiles/use-launchable-sandbox-profiles.js";
 import { startSandboxInstanceFromProfileVersion } from "../sessions/sessions-service.js";
-import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
+import { FormPageSection, FormPageStack } from "../shared/form-page.js";
 
 type NewSessionPageRepositoryOption = {
   value: string;
@@ -214,7 +214,7 @@ export function NewSessionForm(input?: { initialSelectedProfileId?: string }): R
 
       {hasNoLaunchableProfiles ? null : (
         <form onSubmit={handleCreateSessionSubmit}>
-          <FormPageStack>
+          <FormPageStack className="gap-3">
             <FormPageSection>
               <div className="flex flex-col gap-4 p-4">
                 <Field contentWidth="fill" orientation="horizontal">
@@ -274,35 +274,36 @@ export function NewSessionForm(input?: { initialSelectedProfileId?: string }): R
               </div>
             </FormPageSection>
 
-            {selectedLocationPath === null ? null : (
-              <div className="text-muted-foreground flex flex-col gap-1 text-sm">
-                <p>
-                  {selectedNoneOption ? (
-                    "The agent will start its session at the workspace root."
-                  ) : (
-                    <>
-                      The agent will start its session in{" "}
-                      <span className="font-mono text-foreground">{selectedLocationPath}</span>.
-                    </>
-                  )}
-                </p>
-                <p>
-                  {selectedNoneOption
-                    ? "Git, diffs, and repo-local instructions will not be tied to a specific repository by default."
-                    : "Git, diffs, and repo-local instructions will use this repository by default."}
-                </p>
-              </div>
-            )}
-
             {selectableProfilesErrorMessage ? (
               <FieldError errors={[{ message: selectableProfilesErrorMessage }]} />
             ) : null}
 
-            <FormPageActionBar>
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div className="text-muted-foreground min-h-11 min-w-0 flex-1 text-sm">
+                {selectedLocationPath === null ? null : (
+                  <div className="flex flex-col gap-1">
+                    <p className="truncate">
+                      {selectedNoneOption ? (
+                        "The agent will start its session at the workspace root."
+                      ) : (
+                        <>
+                          The agent will start its session in{" "}
+                          <span className="font-mono text-foreground">{selectedLocationPath}</span>.
+                        </>
+                      )}
+                    </p>
+                    <p className="truncate">
+                      {selectedNoneOption
+                        ? "Git, diffs, and repo-local instructions will not be tied to a specific repository by default."
+                        : "Git, diffs, and repo-local instructions will use this repository by default."}
+                    </p>
+                  </div>
+                )}
+              </div>
               <Button disabled={!canStartSession} size="lg" type="submit">
                 {startSessionMutation.isPending ? "Starting sandbox..." : "Start session"}
               </Button>
-            </FormPageActionBar>
+            </div>
           </FormPageStack>
         </form>
       )}
