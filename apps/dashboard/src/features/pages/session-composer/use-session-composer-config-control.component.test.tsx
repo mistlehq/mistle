@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { CodexModelSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -108,6 +108,14 @@ function LocalSessionComposerConfigControlHarness(input: {
       <div data-testid="has-explicit-model-selection">
         {configControl.hasExplicitModelSelection ? "true" : "false"}
       </div>
+      <button
+        type="button"
+        onClick={() => {
+          configControl.setModel("gpt-5.3-codex-spark");
+        }}
+      >
+        Select Spark
+      </button>
     </div>
   );
 }
@@ -169,6 +177,36 @@ describe("useSessionComposerConfigControl", () => {
       <LocalSessionComposerConfigControlHarness
         bootstrap={createReadyBootstrap({
           availableModels: [SparkModel, DefaultModel],
+          model: null,
+          modelReasoningEffort: null,
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId("selected-model").textContent).toBe("");
+    expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("");
+    expect(screen.getByTestId("has-explicit-model-selection").textContent).toBe("false");
+  });
+
+  it("ignores local runtime model selections that are missing from the current catalog", () => {
+    const { rerender } = render(
+      <LocalSessionComposerConfigControlHarness
+        bootstrap={createReadyBootstrap({
+          availableModels: [SparkModel, DefaultModel],
+          model: null,
+          modelReasoningEffort: null,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select Spark" }));
+    expect(screen.getByTestId("selected-model").textContent).toBe("gpt-5.3-codex-spark");
+    expect(screen.getByTestId("has-explicit-model-selection").textContent).toBe("true");
+
+    rerender(
+      <LocalSessionComposerConfigControlHarness
+        bootstrap={createReadyBootstrap({
+          availableModels: [DefaultModel],
           model: null,
           modelReasoningEffort: null,
         })}

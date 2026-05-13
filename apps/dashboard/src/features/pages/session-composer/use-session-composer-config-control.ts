@@ -140,10 +140,19 @@ export function useLocalSessionComposerConfigControl(input: {
     modelReasoningEffort: null,
   });
 
-  const selectedModel = useMemo(
+  const configuredModel = useMemo(
     () => composerConfigOverrides.model ?? configSnapshot.model ?? null,
     [composerConfigOverrides.model, configSnapshot.model],
   );
+  const selectedModel = useMemo(() => {
+    if (configuredModel === null) {
+      return null;
+    }
+
+    return availableModels.some((model) => model.model === configuredModel)
+      ? configuredModel
+      : null;
+  }, [availableModels, configuredModel]);
 
   const selectedReasoningEffort = useMemo(() => {
     if (selectedModel === null) {
