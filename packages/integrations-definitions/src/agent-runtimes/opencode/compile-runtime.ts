@@ -93,12 +93,12 @@ type OpenCodeAuth = OpenCodeApiAuth | OpenCodeOauthAuth;
 
 type OpenCodeAuthContent = Record<string, OpenCodeAuth>;
 
-function resolveOpenCodeEnabledProviders(input: {
-  egressRoutes: ReadonlyArray<EgressCredentialRoute>;
-}): readonly string[] {
+function resolveOpenCodeEnabledProviders(
+  egressRoutes: ReadonlyArray<EgressCredentialRoute>,
+): readonly string[] {
   const providers = new Set<string>();
 
-  for (const route of input.egressRoutes) {
+  for (const route of egressRoutes) {
     if (isOpenAiApiRoute(route) || isOpenAiChatGptSubscriptionRoute(route)) {
       providers.add("openai");
     }
@@ -127,11 +127,9 @@ function renderOpenCodeConfig(): string {
   return `${JSON.stringify(config, null, 2)}\n`;
 }
 
-function renderOpenCodeManagedConfigContent(input: {
-  enabledProviders: readonly string[];
-}): string {
+function renderOpenCodeManagedConfigContent(enabledProviders: readonly string[]): string {
   const config: OpenCodeManagedConfig = {
-    enabled_providers: input.enabledProviders,
+    enabled_providers: enabledProviders,
   };
 
   return JSON.stringify(config);
@@ -166,12 +164,12 @@ function insertOpenCodeAuth(input: {
   input.auth[input.providerId] = input.value;
 }
 
-function renderOpenCodeAuthContent(input: {
-  egressRoutes: ReadonlyArray<EgressCredentialRoute>;
-}): string | undefined {
+function renderOpenCodeAuthContent(
+  egressRoutes: ReadonlyArray<EgressCredentialRoute>,
+): string | undefined {
   const auth: OpenCodeAuthContent = {};
 
-  for (const route of input.egressRoutes) {
+  for (const route of egressRoutes) {
     if (isOpenAiApiRoute(route)) {
       insertOpenCodeAuth({
         auth,
@@ -224,9 +222,9 @@ function renderOpenCodeAuthContent(input: {
   return Object.keys(auth).length === 0 ? undefined : `${JSON.stringify(auth, null, 2)}\n`;
 }
 
-function buildOpenCodeSetupFiles(input: {
-  authContent: string | undefined;
-}): ReadonlyArray<RuntimeClientSetupFile> {
+function buildOpenCodeSetupFiles(
+  authContent: string | undefined,
+): ReadonlyArray<RuntimeClientSetupFile> {
   const files: RuntimeClientSetupFile[] = [
     {
       fileId: "opencode_config",
@@ -244,13 +242,13 @@ function buildOpenCodeSetupFiles(input: {
     },
   ];
 
-  if (input.authContent !== undefined) {
+  if (authContent !== undefined) {
     files.push({
       fileId: "opencode_auth",
       path: OpenCodeAuthPath,
       mode: 384,
       writeMode: "overwrite",
-      content: input.authContent,
+      content: authContent,
     });
   }
 
@@ -270,13 +268,9 @@ function buildOpenCodeRuntimeClients(input: {
           input.enabledProviders === undefined
             ? {}
             : {
-                OPENCODE_CONFIG_CONTENT: renderOpenCodeManagedConfigContent({
-                  enabledProviders: input.enabledProviders,
-                }),
+                OPENCODE_CONFIG_CONTENT: renderOpenCodeManagedConfigContent(input.enabledProviders),
               },
-        files: buildOpenCodeSetupFiles({
-          authContent: input.authContent,
-        }),
+        files: buildOpenCodeSetupFiles(input.authContent),
       },
       processes: [
         {
@@ -362,12 +356,8 @@ export function compileOpenCodeRuntime(
       openCodeCliInstallPath,
     }),
     renderRuntimeClients: ({ egressRoutes }) => {
-      const authContent = renderOpenCodeAuthContent({
-        egressRoutes,
-      });
-      const enabledProviders = resolveOpenCodeEnabledProviders({
-        egressRoutes,
-      });
+      const authContent = renderOpenCodeAuthContent(egressRoutes);
+      const enabledProviders = resolveOpenCodeEnabledProviders(egressRoutes);
 
       return buildOpenCodeRuntimeClients({
         openCodeCliInstallPath,

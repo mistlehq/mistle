@@ -24,18 +24,15 @@ export type SessionComposerConfigControl = {
 
 function resolveSelectedReasoningEffort(input: {
   availableModels: SessionBootstrapResult["establishedSnapshot"]["availableModels"];
-  configSnapshot: ComposerConfigSnapshot;
-  overrides: ComposerConfigSnapshot;
+  configuredReasoningEffort: string | null;
   selectedModel: string | null;
 }): string | null {
   if (input.selectedModel === null) {
     return null;
   }
 
-  const explicitReasoningEffort =
-    input.overrides.modelReasoningEffort ?? input.configSnapshot.modelReasoningEffort;
-  if (explicitReasoningEffort !== null) {
-    return explicitReasoningEffort;
+  if (input.configuredReasoningEffort !== null) {
+    return input.configuredReasoningEffort;
   }
 
   return (
@@ -84,11 +81,16 @@ export function useSessionComposerConfigControl(input: {
     () =>
       resolveSelectedReasoningEffort({
         availableModels,
-        configSnapshot,
-        overrides: composerConfigOverrides,
+        configuredReasoningEffort:
+          composerConfigOverrides.modelReasoningEffort ?? configSnapshot.modelReasoningEffort,
         selectedModel,
       }),
-    [availableModels, composerConfigOverrides, configSnapshot, selectedModel],
+    [
+      availableModels,
+      composerConfigOverrides.modelReasoningEffort,
+      configSnapshot.modelReasoningEffort,
+      selectedModel,
+    ],
   );
 
   const modelOptions = useMemo(() => buildModelOptions(availableModels), [availableModels]);
@@ -184,11 +186,16 @@ export function useLocalSessionComposerConfigControl(input: {
     () =>
       resolveSelectedReasoningEffort({
         availableModels,
-        configSnapshot,
-        overrides: composerConfigOverrides,
+        configuredReasoningEffort:
+          composerConfigOverrides.modelReasoningEffort ?? configSnapshot.modelReasoningEffort,
         selectedModel,
       }),
-    [availableModels, composerConfigOverrides, configSnapshot, selectedModel],
+    [
+      availableModels,
+      composerConfigOverrides.modelReasoningEffort,
+      configSnapshot.modelReasoningEffort,
+      selectedModel,
+    ],
   );
 
   const modelOptions = useMemo(() => buildModelOptions(availableModels), [availableModels]);
