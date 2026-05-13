@@ -5,11 +5,7 @@ import type {
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { z } from "zod";
 
-import type {
-  CommandApprovalRequestEntry,
-  FileChangeApprovalRequestEntry,
-  ToolRequestUserInputEntry,
-} from "../../server-requests/server-request-entries.js";
+import type { ServerRequestEntry } from "../../server-requests/server-request-entries.js";
 
 const AvailableDecisionsSchema = z.array(z.string()).optional();
 const DefaultCommandApprovalDecisions = ["accept", "acceptForSession", "decline", "cancel"];
@@ -90,13 +86,10 @@ const ServerRequestResolvedNotificationSchema = z.object({
   }),
 });
 
-export type CodexCommandApprovalRequestEntry = CommandApprovalRequestEntry;
-export type CodexFileChangeApprovalRequestEntry = FileChangeApprovalRequestEntry;
-export type CodexToolRequestUserInputEntry = ToolRequestUserInputEntry;
-export type CodexApprovalRequestEntry =
-  | CodexCommandApprovalRequestEntry
-  | CodexFileChangeApprovalRequestEntry
-  | CodexToolRequestUserInputEntry;
+export type CodexApprovalRequestEntry = Extract<
+  ServerRequestEntry,
+  { kind: "command-approval" | "file-change-approval" | "tool-user-input" }
+>;
 
 export type CodexApprovalRequestsState = {
   entries: readonly CodexApprovalRequestEntry[];
