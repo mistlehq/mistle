@@ -31,7 +31,7 @@ import {
   SectionBlock,
   TextLink,
 } from "@mistle/ui";
-import { SidebarSimpleIcon, SpinnerGapIcon, TerminalIcon } from "@phosphor-icons/react";
+import { SidebarSimpleIcon, TerminalIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   useCallback,
@@ -2096,7 +2096,7 @@ function LoadedSandboxProfileRuntimeSection(input: {
   onDraftStateChange: (state: SandboxProfileRuntimeSettingsDraftState) => void;
   sectionChrome?: boolean;
   version: SandboxProfileVersion;
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   const sandboxProvidersQuery = useQuery({
     queryKey: sandboxProvidersQueryKey(),
     queryFn: async ({ signal }) => listSandboxProviders({ signal }),
@@ -2104,16 +2104,7 @@ function LoadedSandboxProfileRuntimeSection(input: {
   });
 
   if (sandboxProvidersQuery.isPending) {
-    return (
-      <div
-        aria-live="polite"
-        className="text-muted-foreground flex items-center gap-2 text-sm"
-        role="status"
-      >
-        <SpinnerGapIcon aria-hidden className="size-4 animate-spin" />
-        <span>Loading sandbox providers...</span>
-      </div>
-    );
+    return null;
   }
 
   if (sandboxProvidersQuery.isError) {
