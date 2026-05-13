@@ -44,9 +44,12 @@ describe("resolveIntegrationLogoPath", () => {
 });
 
 describe("resolveDarkIntegrationLogoPath", () => {
-  it("returns the dashboard public dark variant path for logo keys with vendored SVGL dark assets", () => {
+  it("returns the dashboard public dark variant path for logo keys with vendored dark assets", () => {
     expect(resolveDarkIntegrationLogoPath({ logoKey: "anthropic" })).toBe(
       "/integration-logos/anthropic-dark.svg",
+    );
+    expect(resolveDarkIntegrationLogoPath({ logoKey: "e2b" })).toBe(
+      "/integration-logos/e2b-dark.svg",
     );
     expect(resolveDarkIntegrationLogoPath({ logoKey: "github" })).toBe(
       "/integration-logos/github-dark.svg",
@@ -62,7 +65,10 @@ describe("resolveDarkIntegrationLogoPath", () => {
     );
   });
 
-  it("returns no dark variant path for logo keys without SVGL dark assets", () => {
+  it("returns no dark variant path for logo keys whose single asset works across themes", () => {
+    expect(resolveDarkIntegrationLogoPath({ logoKey: "aws" })).toBeUndefined();
+    expect(resolveDarkIntegrationLogoPath({ logoKey: "jira" })).toBeUndefined();
+    expect(resolveDarkIntegrationLogoPath({ logoKey: "signoz" })).toBeUndefined();
     expect(resolveDarkIntegrationLogoPath({ logoKey: "slack" })).toBeUndefined();
     expect(resolveDarkIntegrationLogoPath({ logoKey: "linear" })).toBeUndefined();
     expect(resolveDarkIntegrationLogoPath({ logoKey: "datadog" })).toBeUndefined();

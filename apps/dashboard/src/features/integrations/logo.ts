@@ -1,6 +1,13 @@
 const PUBLIC_INTEGRATION_LOGOS_BASE_PATH = "/integration-logos";
 
-const DARK_MODE_LOGO_KEYS = new Set(["anthropic", "github", "openai", "opencode", "planetscale"]);
+const DARK_MODE_LOGO_KEYS = new Set([
+  "anthropic",
+  "e2b",
+  "github",
+  "openai",
+  "opencode",
+  "planetscale",
+]);
 
 export function resolveIntegrationLogoPath(input: { logoKey: string }): string {
   const logoKey = normalizeIntegrationLogoKey(input.logoKey);
