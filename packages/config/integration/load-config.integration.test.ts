@@ -45,7 +45,6 @@ const globalDevelopmentConfig = {
     serviceToken,
   },
   sandbox: {
-    provider: "docker",
     storage: {
       backend: "archil",
     },
@@ -96,7 +95,6 @@ const globalProductionConfig = {
     serviceToken,
   },
   sandbox: {
-    provider: "docker",
     storage: {
       backend: "archil",
     },
@@ -131,7 +129,6 @@ const globalProductionDockerConfig = {
   ...globalProductionConfig,
   sandbox: {
     ...globalProductionConfig.sandbox,
-    provider: "docker",
   },
 } as const;
 
@@ -190,11 +187,13 @@ const controlPlaneApiEnvConfig = {
     },
   },
   sandbox: {
-    provider: "docker",
     defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
     gatewayWsUrl: globalDevelopmentConfig.sandbox.gatewayWsUrl,
     bootstrap: globalDevelopmentConfig.sandbox.bootstrap,
     storageBackend: "archil",
+    docker: {
+      enabled: true,
+    },
   },
   integrations: {
     activeMasterEncryptionKeyVersion: 1,
@@ -297,11 +296,11 @@ const dataPlaneApiEnvConfig = {
     serviceToken,
   },
   sandbox: {
-    provider: "docker",
     storage: {
       backend: "archil",
     },
     docker: {
+      enabled: true,
       socketPath: "/var/run/docker.sock",
     },
   },
@@ -393,13 +392,13 @@ const dataPlaneWorkerEnvConfig = {
     baseUrl: "http://127.0.0.1:5000",
   },
   sandbox: {
-    provider: "docker",
     storage: {
       backend: "archil",
     },
     internalGatewayWsUrl: globalDevelopmentConfig.sandbox.internalGatewayWsUrl,
     bootstrap: globalDevelopmentConfig.sandbox.bootstrap,
     docker: {
+      enabled: true,
       socketPath: "/var/run/docker.sock",
       networkName: "mistle-sandbox-dev",
     },
@@ -458,7 +457,6 @@ const dataPlaneWorkerDockerFixtureConfig = {
     baseUrl: "http://127.0.0.1:5100",
   },
   sandbox: {
-    provider: "docker",
     storage: {
       backend: "archil",
     },
@@ -466,6 +464,7 @@ const dataPlaneWorkerDockerFixtureConfig = {
     bootstrap: globalDevelopmentConfig.sandbox.bootstrap,
     sandboxdTestFaultsEnabled: true,
     docker: {
+      enabled: true,
       socketPath: "/var/run/docker.sock",
       networkName: "mistle-sandbox-dev",
     },
@@ -1034,7 +1033,7 @@ describe("loadConfig integrations", () => {
       env: createIntegrationEnv({
         MISTLE_ENV: "production",
         NODE_ENV: "production",
-        MISTLE_SANDBOX_PROVIDER: "docker",
+        MISTLE_SANDBOX_DOCKER_ENABLED: "true",
         MISTLE_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
         MISTLE_SANDBOX_DOCKER_NETWORK_NAME: "mistle-sandbox-dev",
         MISTLE_TEST_SANDBOXD_TEST_FAULTS_ENABLED: "true",
@@ -1088,7 +1087,7 @@ describe("loadConfig integrations", () => {
       app: AppIds.DATA_PLANE_WORKER,
       configPath: tomlConfigFixturePath,
       env: {
-        MISTLE_SANDBOX_PROVIDER: "docker",
+        MISTLE_SANDBOX_DOCKER_ENABLED: "true",
         MISTLE_SANDBOX_DOCKER_SOCKET_PATH: "/tmp/docker.sock",
       },
     });
@@ -1108,19 +1107,19 @@ describe("loadConfig integrations", () => {
     });
   });
 
-  it("rejects data-plane-worker config when the selected sandbox provider is missing worker settings", () => {
+  it("rejects data-plane-worker config when Docker sandbox provider is enabled without worker settings", () => {
     expect(() =>
       loadConfig({
         app: AppIds.DATA_PLANE_WORKER,
         env: createIntegrationEnv({
           MISTLE_ENV: "production",
           NODE_ENV: "production",
-          MISTLE_SANDBOX_PROVIDER: "docker",
+          MISTLE_SANDBOX_DOCKER_ENABLED: "true",
           MISTLE_SANDBOX_DOCKER_SOCKET_PATH: undefined,
           MISTLE_SANDBOX_DOCKER_NETWORK_NAME: undefined,
         }),
       }),
-    ).toThrow(/sandbox\.docker/i);
+    ).toThrow(/socketPath|sandbox.*docker/is);
   });
 
   it("rejects data-plane-worker config when control-plane API config is missing", () => {

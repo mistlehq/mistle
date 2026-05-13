@@ -280,10 +280,6 @@ const TelemetryEnvDescriptors = [
 
 const SandboxEnvDescriptors = [
   {
-    envVar: "MISTLE_SANDBOX_PROVIDER",
-    path: ["provider"],
-  },
-  {
     envVar: "MISTLE_SANDBOX_DEFAULT_BASE_IMAGE",
     path: ["defaultBaseImage"],
   },
@@ -475,7 +471,6 @@ const ControlPlaneApiEnvDescriptors = [
     path: ["portAccess", "access", "tokenAudience"],
   },
   { envVar: "MISTLE_SANDBOX_DEFAULT_BASE_IMAGE", path: ["sandbox", "defaultBaseImage"] },
-  { envVar: "MISTLE_SANDBOX_PROVIDER", path: ["sandbox", "provider"] },
   {
     envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL",
     path: ["sandbox", "gatewayWsUrl"],
@@ -493,6 +488,16 @@ const ControlPlaneApiEnvDescriptors = [
     path: ["sandbox", "bootstrap", "tokenAudience"],
   },
   { envVar: "MISTLE_SANDBOX_STORAGE_BACKEND", path: ["sandbox", "storageBackend"] },
+  {
+    envVar: "MISTLE_SANDBOX_DOCKER_ENABLED",
+    path: ["sandbox", "docker", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  {
+    envVar: "MISTLE_SANDBOX_E2B_ENABLED",
+    path: ["sandbox", "e2b", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
   { envVar: "MISTLE_SANDBOX_E2B_API_KEY", path: ["sandbox", "e2b", "apiKey"] },
   { envVar: "MISTLE_SANDBOX_E2B_DOMAIN", path: ["sandbox", "e2b", "domain"] },
   {
@@ -563,11 +568,18 @@ const DataPlaneApiEnvDescriptors = [
     path: ["controlPlaneApi", "baseUrl"],
   },
   { envVar: "MISTLE_INTERNAL_AUTH_SHARED_TOKEN", path: ["internalAuth", "serviceToken"] },
-  { envVar: "MISTLE_SANDBOX_PROVIDER", path: ["sandbox", "provider"] },
   { envVar: "MISTLE_SANDBOX_STORAGE_BACKEND", path: ["sandbox", "storage", "backend"] },
+  {
+    envVar: "MISTLE_SANDBOX_DOCKER_ENABLED",
+    path: ["sandbox", "docker", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
   { envVar: "MISTLE_SANDBOX_DOCKER_SOCKET_PATH", path: ["sandbox", "docker", "socketPath"] },
-  { envVar: "MISTLE_SANDBOX_E2B_API_KEY", path: ["sandbox", "e2b", "apiKey"] },
-  { envVar: "MISTLE_SANDBOX_E2B_DOMAIN", path: ["sandbox", "e2b", "domain"] },
+  {
+    envVar: "MISTLE_SANDBOX_E2B_ENABLED",
+    path: ["sandbox", "e2b", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
 ] satisfies readonly EnvDescriptor[];
 
 const DataPlaneGatewayEnvDescriptors = [
@@ -611,7 +623,6 @@ const DataPlaneWorkerEnvDescriptors = [
     path: ["controlPlaneApi", "baseUrl"],
   },
   { envVar: "MISTLE_INTERNAL_AUTH_SHARED_TOKEN", path: ["internalAuth", "serviceToken"] },
-  { envVar: "MISTLE_SANDBOX_PROVIDER", path: ["sandbox", "provider"] },
   { envVar: "MISTLE_SANDBOX_STORAGE_BACKEND", path: ["sandbox", "storage", "backend"] },
   {
     envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL",
@@ -634,20 +645,13 @@ const DataPlaneWorkerEnvDescriptors = [
     path: ["sandbox", "sandboxdTestFaultsEnabled"],
     parse: parseStrictBooleanEnv,
   },
+  {
+    envVar: "MISTLE_SANDBOX_DOCKER_ENABLED",
+    path: ["sandbox", "docker", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
   { envVar: "MISTLE_SANDBOX_DOCKER_SOCKET_PATH", path: ["sandbox", "docker", "socketPath"] },
   { envVar: "MISTLE_SANDBOX_DOCKER_NETWORK_NAME", path: ["sandbox", "docker", "networkName"] },
-  { envVar: "MISTLE_SANDBOX_E2B_API_KEY", path: ["sandbox", "e2b", "apiKey"] },
-  { envVar: "MISTLE_SANDBOX_E2B_DOMAIN", path: ["sandbox", "e2b", "domain"] },
-  {
-    envVar: "MISTLE_SANDBOX_E2B_CPU_COUNT",
-    path: ["sandbox", "e2b", "cpuCount"],
-    parse: parseNumberEnv,
-  },
-  {
-    envVar: "MISTLE_SANDBOX_E2B_MEMORY_MB",
-    path: ["sandbox", "e2b", "memoryMb"],
-    parse: parseNumberEnv,
-  },
   {
     envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY",
     path: ["sandboxStorage", "archil", "apiKey"],

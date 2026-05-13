@@ -131,8 +131,11 @@ instead of relying on long-lived worker startup.
 
 ## Sandbox
 
-Use `sandbox.provider = "docker"` for local or simple single-node deployments.
-Use `sandbox.provider = "e2b"` for cloud sandboxes.
+Managed sandbox providers are enabled per provider section. Docker is enabled
+with `sandbox.docker.enabled = true` plus its socket settings. E2B is enabled
+with `sandbox.e2b.enabled = true` plus its API credentials. A provider is
+available as a managed provider only when it is enabled and its required
+provider config is present.
 
 Sandbox storage is configured independently:
 
@@ -235,7 +238,6 @@ This table covers the operator-facing TOML keys accepted by `@mistle/config`.
 | `email.smtp.password`                                                          | Yes                                        | SMTP password.                                                                                            |
 | `internal_auth.method`                                                         | No                                         | Optional; currently `shared_token` when present.                                                          |
 | `internal_auth.shared_token.token`                                             | Yes                                        | Shared service-to-service token.                                                                          |
-| `sandbox.provider`                                                             | Yes                                        | `docker` or `e2b`.                                                                                        |
 | `sandbox.default_base_image`                                                   | Yes                                        | Sandbox base image reference.                                                                             |
 | `sandbox.publish_base_domain`                                                  | Yes                                        | Base domain for published sandbox URLs.                                                                   |
 | `sandbox.storage.backend`                                                      | Yes                                        | `archil` or `docker_volume`.                                                                              |
@@ -244,6 +246,12 @@ This table covers the operator-facing TOML keys accepted by `@mistle/config`.
 | `sandbox.storage.archil.name_prefix`                                           | No                                         | Prefix for Archil storage names.                                                                          |
 | `sandbox.storage.archil.mount_object_store`                                    | No                                         | Currently only `sandbox_storage`.                                                                         |
 | `sandbox.storage.docker_volume.name_prefix`                                    | No                                         | Prefix for Docker volume names; section required when storage backend is `docker_volume`.                 |
+| `sandbox.docker.enabled`                                                       | No                                         | Enables managed Docker sandbox provider config when Docker credentials are present.                       |
+| `sandbox.docker.socket_path`                                                   | Required when Docker is enabled            | Docker daemon socket path.                                                                                |
+| `sandbox.docker.network_name`                                                  | No                                         | Docker network name for sandbox containers.                                                               |
+| `sandbox.e2b.enabled`                                                          | No                                         | Enables managed E2B sandbox provider config when E2B credentials are present.                             |
+| `sandbox.e2b.api_key`                                                          | Required when E2B is enabled               | E2B API key.                                                                                              |
+| `sandbox.e2b.domain`                                                           | No                                         | E2B API domain.                                                                                           |
 | `sandbox.tokens.connect.secret`                                                | Yes                                        | Connect token signing secret.                                                                             |
 | `sandbox.tokens.connect.issuer`                                                | Yes                                        | Connect token issuer.                                                                                     |
 | `sandbox.tokens.connect.audience`                                              | Yes                                        | Connect token audience.                                                                                   |

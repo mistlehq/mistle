@@ -82,7 +82,8 @@ describe("toml config generation", () => {
       }),
     });
 
-    expect(content).toContain('provider = "e2b"');
+    expect(content).toContain("[sandbox.e2b]");
+    expect(content).toContain("enabled = true");
     expect(content).toContain('mount_object_store = "sandbox_storage"');
     loadEveryAppFromContent(content);
   });

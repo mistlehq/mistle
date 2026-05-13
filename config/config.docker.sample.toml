@@ -106,7 +106,6 @@ method = "shared_token"
 token = "replace-with-internal-service-token"
 
 [sandbox]
-provider = "docker"
 default_base_image = "replace-with-sandbox-base-image"
 publish_base_domain = "replace-with-sandbox-publish-base-domain"
 
@@ -117,6 +116,7 @@ backend = "docker_volume"
 name_prefix = "mistle-"
 
 [sandbox.docker]
+enabled = true
 socket_path = "/var/run/docker.sock"
 network_name = "mistle-single-container-network"
 

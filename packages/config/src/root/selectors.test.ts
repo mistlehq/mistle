@@ -117,7 +117,6 @@ function createRootConfig(input: {
       },
     },
     sandbox: {
-      provider: "e2b",
       default_base_image: "registry.example.com/sandbox:latest",
       publish_base_domain: "mistle.example",
       tokens: {
@@ -143,6 +142,7 @@ function createRootConfig(input: {
         },
       },
       e2b: {
+        enabled: true,
         api_key: "e2b-api-key",
         domain: "e2b.example.com",
         cpu_count: 4,

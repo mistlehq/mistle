@@ -17,7 +17,9 @@ describe("integration provider presets", () => {
 
     expect(configRoot).toMatchObject({
       sandbox: {
-        provider: IntegrationSandboxProvider.DOCKER,
+        docker: {
+          enabled: true,
+        },
         storage: {
           backend: "docker_volume",
           docker_volume: {
@@ -67,7 +69,10 @@ describe("integration provider presets", () => {
 
     expect(configRoot).toMatchObject({
       sandbox: {
-        provider: IntegrationSandboxProvider.E2B,
+        e2b: {
+          enabled: true,
+          api_key: "e2b-test-key",
+        },
         storage: {
           backend: "archil",
           archil: {

@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-const SandboxProviders = ["docker", "e2b"] as const;
-
 export const SandboxStorageBackend = {
   ARCHIL: "archil",
   DOCKER_VOLUME: "docker_volume",
@@ -121,7 +119,6 @@ export const PartialGlobalSandboxStorageConfigSchema = z
 
 export const GlobalSandboxConfigSchema = z
   .object({
-    provider: z.enum(SandboxProviders),
     defaultBaseImage: z.string().trim().min(1),
     gatewayWsUrl: z.string().trim().min(1),
     internalGatewayWsUrl: z.string().trim().min(1),
@@ -134,7 +131,6 @@ export const GlobalSandboxConfigSchema = z
 
 export const PartialGlobalSandboxConfigSchema = z
   .object({
-    provider: z.enum(SandboxProviders).optional(),
     defaultBaseImage: z.string().trim().min(1).optional(),
     gatewayWsUrl: z.string().trim().min(1).optional(),
     internalGatewayWsUrl: z.string().trim().min(1).optional(),

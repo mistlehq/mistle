@@ -71,7 +71,7 @@ describe("generateContainerRuntimeConfig", () => {
         secretsPath: join(tempDir, "secrets.env"),
       });
 
-      expect(getValueAtPath(config, ["sandbox", "provider"])).toBe("docker");
+      expect(getValueAtPath(config, ["sandbox", "docker", "enabled"])).toBe(true);
       expect(getValueAtPath(config, ["sandbox", "storage", "backend"])).toBe("docker_volume");
       expect(getValueAtPath(config, ["sandbox", "docker", "socket_path"])).toBe(
         "/var/run/docker.sock",
@@ -96,7 +96,7 @@ describe("generateContainerRuntimeConfig", () => {
         secretsPath: join(tempDir, "secrets.env"),
       });
 
-      expect(getValueAtPath(config, ["sandbox", "provider"])).toBe("e2b");
+      expect(getValueAtPath(config, ["sandbox", "e2b", "enabled"])).toBe(true);
       expect(getValueAtPath(config, ["sandbox", "storage", "backend"])).toBe("archil");
       expect(getValueAtPath(config, ["sandbox", "storage", "archil", "mount_object_store"])).toBe(
         "sandbox_storage",

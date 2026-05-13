@@ -109,7 +109,6 @@ method = "shared_token"
 token = "replace-with-internal-service-token"
 
 [sandbox]
-provider = "e2b"
 default_base_image = "replace-with-sandbox-base-image"
 publish_base_domain = "replace-with-sandbox-publish-base-domain"
 
@@ -123,6 +122,7 @@ name_prefix = "mistle-"
 mount_object_store = "sandbox_storage"
 
 [sandbox.e2b]
+enabled = true
 api_key = "replace-with-e2b-api-key"
 domain = "e2b.app"
 cpu_count = 4

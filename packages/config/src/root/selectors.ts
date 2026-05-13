@@ -116,7 +116,6 @@ export function selectGlobalConfig(config: Config): GlobalConfig {
       serviceToken: config.internal_auth.shared_token.token,
     },
     sandbox: {
-      provider: config.sandbox.provider,
       storage: sandboxStorage,
       defaultBaseImage: config.sandbox.default_base_image,
       gatewayWsUrl: config.services.data_plane_gateway.sandbox_ws_public_url,
@@ -214,7 +213,6 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
       },
     },
     sandbox: {
-      provider: config.sandbox.provider,
       defaultBaseImage: config.sandbox.default_base_image,
       gatewayWsUrl: config.services.data_plane_gateway.sandbox_ws_public_url,
       bootstrap: {
@@ -223,14 +221,20 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
         tokenAudience: config.sandbox.tokens.bootstrap.audience,
       },
       storageBackend: config.sandbox.storage?.backend,
-      ...(config.sandbox.e2b === undefined
-        ? {}
-        : {
+      docker: {
+        enabled: config.sandbox.docker?.enabled === true,
+      },
+      ...(config.sandbox.e2b?.enabled === true
+        ? {
             e2b: {
+              enabled: true,
               apiKey: config.sandbox.e2b.api_key,
               domain: config.sandbox.e2b.domain,
             },
-          }),
+          }
+        : config.sandbox.e2b?.enabled === false
+          ? { e2b: { enabled: false } }
+          : {}),
     },
     integrations: {
       activeMasterEncryptionKeyVersion:
@@ -311,18 +315,21 @@ export function selectDataPlaneApiConfig(config: Config): DataPlaneApiConfig {
       serviceToken: config.internal_auth.shared_token.token,
     },
     sandbox: {
-      provider: config.sandbox.provider,
       storage:
         config.sandbox.storage === undefined
           ? undefined
           : {
               backend: config.sandbox.storage.backend,
             },
-      docker: config.sandbox.docker
-        ? {
-            socketPath: config.sandbox.docker.socket_path,
-          }
-        : undefined,
+      docker:
+        config.sandbox.docker?.enabled === true
+          ? {
+              enabled: true,
+              socketPath: config.sandbox.docker.socket_path,
+            }
+          : config.sandbox.docker?.enabled === false
+            ? { enabled: false }
+            : undefined,
     },
   };
 }
@@ -385,7 +392,6 @@ export function selectDataPlaneWorkerConfig(config: Config): DataPlaneWorkerConf
       baseUrl: config.services.control_plane_api.internal_url,
     },
     sandbox: {
-      provider: config.sandbox.provider,
       storage: sandboxStorage,
       internalGatewayWsUrl: config.services.data_plane_gateway.sandbox_ws_internal_url,
       bootstrap: {
@@ -397,12 +403,15 @@ export function selectDataPlaneWorkerConfig(config: Config): DataPlaneWorkerConf
         ? {}
         : { sandboxdTestFaultsEnabled: config.sandbox.sandboxd_test_faults_enabled }),
       docker:
-        config.sandbox.docker === undefined
-          ? undefined
-          : {
+        config.sandbox.docker?.enabled === true
+          ? {
+              enabled: true,
               socketPath: config.sandbox.docker.socket_path,
               networkName: config.sandbox.docker.network_name,
-            },
+            }
+          : config.sandbox.docker?.enabled === false
+            ? { enabled: false }
+            : undefined,
     },
     sandboxStorage: buildSandboxStorage(config),
     internalAuth: {

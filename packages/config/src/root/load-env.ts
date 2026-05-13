@@ -371,10 +371,6 @@ const RootEnvDescriptors = [
     path: ["workflow", "data_plane", "namespace_id"],
   },
   {
-    envVar: "MISTLE_SANDBOX_PROVIDER",
-    path: ["sandbox", "provider"],
-  },
-  {
     envVar: "MISTLE_SANDBOX_DEFAULT_BASE_IMAGE",
     path: ["sandbox", "default_base_image"],
   },
@@ -383,12 +379,22 @@ const RootEnvDescriptors = [
     path: ["sandbox", "storage", "backend"],
   },
   {
+    envVar: "MISTLE_SANDBOX_DOCKER_ENABLED",
+    path: ["sandbox", "docker", "enabled"],
+    parse: parseBooleanEnv,
+  },
+  {
     envVar: "MISTLE_SANDBOX_DOCKER_SOCKET_PATH",
     path: ["sandbox", "docker", "socket_path"],
   },
   {
     envVar: "MISTLE_SANDBOX_DOCKER_NETWORK_NAME",
     path: ["sandbox", "docker", "network_name"],
+  },
+  {
+    envVar: "MISTLE_SANDBOX_E2B_ENABLED",
+    path: ["sandbox", "e2b", "enabled"],
+    parse: parseBooleanEnv,
   },
   {
     envVar: "MISTLE_SANDBOX_E2B_API_KEY",

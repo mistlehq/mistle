@@ -316,7 +316,6 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
       },
     },
     sandbox: {
-      provider: "docker",
       default_base_image: getLocalDevDockerRegistrySandboxBaseImageRef(),
       publish_base_domain: "mistle.localhost",
       storage: {
@@ -351,6 +350,7 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
         },
       },
       docker: {
+        enabled: true,
         socket_path: "/var/run/docker.sock",
         network_name: "mistle-sandbox-dev",
       },
@@ -386,7 +386,7 @@ export function buildIntegrationTomlConfig(input: {
     "ws://data-plane-gateway:5202/tunnel/sandbox",
   );
   if (input.provider === "docker") {
-    configRoot = setValueAtPath(configRoot, ["sandbox", "provider"], "docker");
+    configRoot = setValueAtPath(configRoot, ["sandbox", "docker", "enabled"], true);
     configRoot = setValueAtPath(configRoot, ["sandbox", "storage"], {
       backend: "docker_volume",
       docker_volume: {
@@ -401,7 +401,6 @@ export function buildIntegrationTomlConfig(input: {
   const e2bApiKey = readRequiredEnv(input.environment, "MISTLE_SANDBOX_E2B_API_KEY");
   const e2bDomain = readOptionalEnv(input.environment, "MISTLE_SANDBOX_E2B_DOMAIN") ?? "e2b.app";
 
-  configRoot = setValueAtPath(configRoot, ["sandbox", "provider"], "e2b");
   configRoot = setValueAtPath(
     configRoot,
     ["sandbox", "default_base_image"],
@@ -419,6 +418,7 @@ export function buildIntegrationTomlConfig(input: {
     },
   });
   configRoot = setValueAtPath(configRoot, ["sandbox", "e2b"], {
+    enabled: true,
     api_key: e2bApiKey,
     domain: e2bDomain,
     cpu_count: readOptionalIntegerEnv(input.environment, "MISTLE_SANDBOX_E2B_CPU_COUNT") ?? 4,
@@ -452,8 +452,13 @@ export function applyTomlConfigEnvOverrides(input: {
 
   configRoot = upsertOptionalValueAtPath(
     configRoot,
-    ["sandbox", "provider"],
-    readOptionalEnv(input.environment, "MISTLE_SANDBOX_PROVIDER"),
+    ["sandbox", "docker", "enabled"],
+    readOptionalBooleanEnv(input.environment, "MISTLE_SANDBOX_DOCKER_ENABLED"),
+  );
+  configRoot = upsertOptionalValueAtPath(
+    configRoot,
+    ["sandbox", "e2b", "enabled"],
+    readOptionalBooleanEnv(input.environment, "MISTLE_SANDBOX_E2B_ENABLED"),
   );
   configRoot = upsertOptionalValueAtPath(
     configRoot,

@@ -41,7 +41,6 @@ const GlobalResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
     path: ["telemetry", "resourceAttributes"],
     envVar: "MISTLE_TELEMETRY_RESOURCE_ATTRIBUTES",
   },
-  { path: ["sandbox", "provider"], envVar: "MISTLE_SANDBOX_PROVIDER" },
   { path: ["sandbox", "defaultBaseImage"], envVar: "MISTLE_SANDBOX_DEFAULT_BASE_IMAGE" },
   {
     path: ["sandbox", "gatewayWsUrl"],
@@ -158,6 +157,8 @@ const ControlPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON",
     valueFormat: "json",
   },
+  { path: ["sandbox", "docker", "enabled"], envVar: "MISTLE_SANDBOX_DOCKER_ENABLED" },
+  { path: ["sandbox", "e2b", "enabled"], envVar: "MISTLE_SANDBOX_E2B_ENABLED" },
   { path: ["sandbox", "e2b", "apiKey"], envVar: "MISTLE_SANDBOX_E2B_API_KEY" },
   { path: ["sandbox", "e2b", "domain"], envVar: "MISTLE_SANDBOX_E2B_DOMAIN" },
 ];
@@ -198,11 +199,10 @@ const DataPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor
     path: ["controlPlaneApi", "baseUrl"],
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL",
   },
-  { path: ["sandbox", "provider"], envVar: "MISTLE_SANDBOX_PROVIDER" },
   { path: ["sandbox", "storage", "backend"], envVar: "MISTLE_SANDBOX_STORAGE_BACKEND" },
+  { path: ["sandbox", "docker", "enabled"], envVar: "MISTLE_SANDBOX_DOCKER_ENABLED" },
   { path: ["sandbox", "docker", "socketPath"], envVar: "MISTLE_SANDBOX_DOCKER_SOCKET_PATH" },
-  { path: ["sandbox", "e2b", "apiKey"], envVar: "MISTLE_SANDBOX_E2B_API_KEY" },
-  { path: ["sandbox", "e2b", "domain"], envVar: "MISTLE_SANDBOX_E2B_DOMAIN" },
+  { path: ["sandbox", "e2b", "enabled"], envVar: "MISTLE_SANDBOX_E2B_ENABLED" },
 ];
 
 const DataPlaneGatewayResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
@@ -253,7 +253,6 @@ const DataPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
     path: ["controlPlaneApi", "baseUrl"],
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL",
   },
-  { path: ["sandbox", "provider"], envVar: "MISTLE_SANDBOX_PROVIDER" },
   { path: ["sandbox", "storage", "backend"], envVar: "MISTLE_SANDBOX_STORAGE_BACKEND" },
   {
     path: ["sandbox", "internalGatewayWsUrl"],
@@ -275,12 +274,9 @@ const DataPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
     path: ["sandbox", "sandboxdTestFaultsEnabled"],
     envVar: "MISTLE_TEST_SANDBOXD_TEST_FAULTS_ENABLED",
   },
+  { path: ["sandbox", "docker", "enabled"], envVar: "MISTLE_SANDBOX_DOCKER_ENABLED" },
   { path: ["sandbox", "docker", "socketPath"], envVar: "MISTLE_SANDBOX_DOCKER_SOCKET_PATH" },
   { path: ["sandbox", "docker", "networkName"], envVar: "MISTLE_SANDBOX_DOCKER_NETWORK_NAME" },
-  { path: ["sandbox", "e2b", "apiKey"], envVar: "MISTLE_SANDBOX_E2B_API_KEY" },
-  { path: ["sandbox", "e2b", "domain"], envVar: "MISTLE_SANDBOX_E2B_DOMAIN" },
-  { path: ["sandbox", "e2b", "cpuCount"], envVar: "MISTLE_SANDBOX_E2B_CPU_COUNT" },
-  { path: ["sandbox", "e2b", "memoryMb"], envVar: "MISTLE_SANDBOX_E2B_MEMORY_MB" },
   {
     path: ["sandboxStorage", "archil", "apiKey"],
     envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY",

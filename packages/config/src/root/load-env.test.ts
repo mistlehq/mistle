@@ -75,11 +75,12 @@ describe("loadRootConfigFromEnv", () => {
       MISTLE_SERVICES_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY: "5",
       MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: "control",
       MISTLE_WORKFLOW_DATA_PLANE_NAMESPACE_ID: "data",
-      MISTLE_SANDBOX_PROVIDER: "e2b",
       MISTLE_SANDBOX_DEFAULT_BASE_IMAGE: "registry.example.com/sandbox:latest",
       MISTLE_SANDBOX_STORAGE_BACKEND: "archil",
+      MISTLE_SANDBOX_DOCKER_ENABLED: "true",
       MISTLE_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
       MISTLE_SANDBOX_DOCKER_NETWORK_NAME: "mistle-sandbox",
+      MISTLE_SANDBOX_E2B_ENABLED: "true",
       MISTLE_SANDBOX_E2B_API_KEY: "e2b-api-key",
       MISTLE_SANDBOX_E2B_DOMAIN: "e2b.example.com",
       MISTLE_SANDBOX_E2B_CPU_COUNT: "4",
@@ -238,7 +239,6 @@ describe("loadRootConfigFromEnv", () => {
         },
       },
       sandbox: {
-        provider: "e2b",
         default_base_image: "registry.example.com/sandbox:latest",
         publish_base_domain: "mistle.example",
         storage: {
@@ -254,10 +254,12 @@ describe("loadRootConfigFromEnv", () => {
           },
         },
         docker: {
+          enabled: true,
           socket_path: "/var/run/docker.sock",
           network_name: "mistle-sandbox",
         },
         e2b: {
+          enabled: true,
           api_key: "e2b-api-key",
           domain: "e2b.example.com",
           cpu_count: 4,

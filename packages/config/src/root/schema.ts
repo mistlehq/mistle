@@ -61,6 +61,38 @@ const SandboxStorageDockerVolumeSchema = z
   })
   .strict();
 
+const SandboxDockerProviderConfigSchema = z
+  .object({
+    enabled: z.literal(true).default(true),
+    socket_path: z.string().trim().min(1),
+    network_name: z.string().trim().min(1).optional(),
+  })
+  .strict()
+  .or(
+    z
+      .object({
+        enabled: z.literal(false),
+      })
+      .strict(),
+  );
+
+const SandboxE2BProviderConfigSchema = z
+  .object({
+    enabled: z.literal(true).default(true),
+    api_key: z.string().trim().min(1),
+    domain: z.string().trim().min(1).default(DefaultE2BCloudDomain),
+    cpu_count: z.number().int().min(1).default(DefaultE2BCpuCount),
+    memory_mb: z.number().int().min(1).default(DefaultE2BMemoryMb),
+  })
+  .strict()
+  .or(
+    z
+      .object({
+        enabled: z.literal(false),
+      })
+      .strict(),
+  );
+
 const ControlPlaneApiAuthSchema = z
   .object({
     secret: z.string().trim().min(1),
@@ -237,7 +269,6 @@ export const ConfigSchema = z
       .strict(),
     sandbox: z
       .object({
-        provider: z.enum(["docker", "e2b"]),
         default_base_image: z.string().trim().min(1),
         publish_base_domain: z.string().trim().min(1),
         storage: z
@@ -283,23 +314,9 @@ export const ConfigSchema = z
               .strict(),
           })
           .strict(),
-        docker: z
-          .object({
-            socket_path: z.string().trim().min(1),
-            network_name: z.string().trim().min(1).optional(),
-          })
-          .strict()
-          .optional(),
+        docker: SandboxDockerProviderConfigSchema.optional(),
         sandboxd_test_faults_enabled: z.boolean().optional(),
-        e2b: z
-          .object({
-            api_key: z.string().trim().min(1),
-            domain: z.string().trim().min(1).default(DefaultE2BCloudDomain),
-            cpu_count: z.number().int().min(1).default(DefaultE2BCpuCount),
-            memory_mb: z.number().int().min(1).default(DefaultE2BMemoryMb),
-          })
-          .strict()
-          .optional(),
+        e2b: SandboxE2BProviderConfigSchema.optional(),
       })
       .strict(),
   })

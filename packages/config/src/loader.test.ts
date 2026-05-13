@@ -38,8 +38,9 @@ function buildControlPlaneApiServiceEnv(): NodeJS.ProcessEnv {
     MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET: "publish-access-secret",
     MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_ISSUER: "mistle",
     MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_AUDIENCE: "sandbox-publish",
-    MISTLE_SANDBOX_PROVIDER: "docker",
     MISTLE_SANDBOX_DEFAULT_BASE_IMAGE: "ghcr.io/mistlehq/sandbox-base:test",
+    MISTLE_SANDBOX_DOCKER_ENABLED: "true",
+    MISTLE_SANDBOX_E2B_ENABLED: "true",
     MISTLE_SANDBOX_E2B_API_KEY: "shared-e2b-secret",
     MISTLE_SANDBOX_TOKENS_BOOTSTRAP_SECRET: "bootstrap-secret",
     MISTLE_SANDBOX_TOKENS_BOOTSTRAP_ISSUER: "mistle",
@@ -60,9 +61,8 @@ function buildDataPlaneApiServiceEnv(): NodeJS.ProcessEnv {
     MISTLE_SERVICES_DATA_PLANE_GATEWAY_INTERNAL_URL: "http://data-plane-gateway:8084",
     MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: "http://control-plane-api:8080",
     MISTLE_INTERNAL_AUTH_SHARED_TOKEN: "internal-service-token",
-    MISTLE_SANDBOX_PROVIDER: "docker",
+    MISTLE_SANDBOX_DOCKER_ENABLED: "true",
     MISTLE_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
-    MISTLE_SANDBOX_E2B_API_KEY: "shared-e2b-secret",
   };
 }
 
@@ -240,6 +240,7 @@ describe("loadConfig", () => {
       namespaceId: "staging",
     });
     expect(loadedConfig.app.sandbox.e2b).toEqual({
+      enabled: true,
       apiKey: "shared-e2b-secret",
       domain: "e2b.app",
     });
@@ -253,13 +254,9 @@ describe("loadConfig", () => {
     });
 
     expect(loadedConfig.app.sandbox).toEqual({
-      provider: "docker",
       docker: {
+        enabled: true,
         socketPath: "/var/run/docker.sock",
-      },
-      e2b: {
-        apiKey: "shared-e2b-secret",
-        domain: "e2b.app",
       },
     });
   });
