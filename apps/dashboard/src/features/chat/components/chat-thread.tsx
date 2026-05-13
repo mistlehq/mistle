@@ -1,5 +1,5 @@
 import type { ServerRequestEntry } from "../../session-agents/server-requests/index.js";
-import type { ChatEntry } from "../chat-types.js";
+import type { ChatEntry, ChatGenericItemEntry, ChatSemanticGroupEntry } from "../chat-types.js";
 import {
   buildChatTurnGroups,
   type ChatAssistantBlock,
@@ -12,7 +12,6 @@ import {
 import { ChatAssistantMessage } from "./chat-assistant-message.js";
 import { ChatCommandBlock } from "./chat-command-block.js";
 import { ChatFileChangeBlock } from "./chat-file-change-block.js";
-import { ChatGenericItem } from "./chat-generic-item.js";
 import { ChatPlanEntry } from "./chat-plan-entry.js";
 import { ChatSemanticGroup } from "./chat-semantic-group.js";
 import { ChatUserMessage } from "./chat-user-message.js";
@@ -66,6 +65,33 @@ function getAssistantBlockSpacingStyle(input: {
 
   return {
     marginTop: "var(--chat-thread-assistant-block-gap, 1rem)",
+  };
+}
+
+function mapGenericItemToSemanticGroup(block: ChatGenericItemEntry): ChatSemanticGroupEntry {
+  return {
+    id: `${block.turnId}:generic:${block.id}`,
+    turnId: block.turnId,
+    kind: "semantic-group",
+    semanticKind: "generic",
+    status: block.status,
+    displayKeys: {
+      active: "generic.active",
+      completed: "generic.done",
+    },
+    counts: null,
+    items: [
+      {
+        id: block.id,
+        sourceKind: "generic-item",
+        label: block.title,
+        detail: block.body,
+        detailKind: "plain",
+        command: null,
+        output: block.detailsJson,
+        status: block.status,
+      },
+    ],
   };
 }
 
@@ -176,7 +202,15 @@ export function ChatThread({
               />
             );
           } else if (block.kind === "generic-item") {
-            renderedBlock = <ChatGenericItem block={block} key={block.id} />;
+            renderedBlock = (
+              <ChatSemanticGroup
+                block={mapGenericItemToSemanticGroup(block)}
+                isRespondingToServerRequest={isRespondingToServerRequest}
+                key={block.id}
+                onRespondToServerRequest={onRespondToServerRequest}
+                pendingServerRequests={pendingServerRequests}
+              />
+            );
           } else {
             const approvalRequest = findCommandApprovalRequest(pendingServerRequests, block.id);
             renderedBlock = (

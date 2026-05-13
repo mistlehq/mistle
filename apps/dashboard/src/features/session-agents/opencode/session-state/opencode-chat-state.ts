@@ -90,6 +90,18 @@ function readStringProperty(record: Record<string, unknown>, key: string): strin
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readRecordProperty(
+  record: Record<string, unknown>,
+  key: string,
+): Record<string, unknown> | null {
+  const value = record[key];
+  return isRecord(value) ? value : null;
+}
+
 function readFirstStringProperty(
   record: Record<string, unknown>,
   keys: readonly string[],
@@ -146,6 +158,47 @@ function getOpenCodeToolInput(
   return "input" in part.state ? part.state.input : null;
 }
 
+function getOpenCodeToolMetadata(
+  part: Extract<OpenCodeMessagePart, { type: "tool" }>,
+): Record<string, unknown> | null {
+  if (isRecord(part.state)) {
+    const stateMetadata = readRecordProperty(part.state, "metadata");
+    if (stateMetadata !== null) {
+      return stateMetadata;
+    }
+  }
+
+  return part.metadata === undefined ? null : part.metadata;
+}
+
+function getOpenCodeReadPath(toolInput: Record<string, unknown>): string | null {
+  return readFirstStringProperty(toolInput, ["filePath", "path", "file"]);
+}
+
+function getOpenCodeExploreDetail(input: {
+  toolInput: Record<string, unknown>;
+  toolName: string;
+}): string | null {
+  if (input.toolName === "read") {
+    return getOpenCodeReadPath(input.toolInput);
+  }
+
+  return readFirstStringProperty(input.toolInput, ["filePath", "path", "file", "pattern", "query"]);
+}
+
+function getOpenCodeEditPath(toolInput: Record<string, unknown>): string | null {
+  return readFirstStringProperty(toolInput, ["filePath", "path", "file"]);
+}
+
+function getOpenCodeEditDiff(part: Extract<OpenCodeMessagePart, { type: "tool" }>): string | null {
+  const metadata = getOpenCodeToolMetadata(part);
+  if (metadata === null) {
+    return null;
+  }
+
+  return readStringProperty(metadata, "diff");
+}
+
 function getOpenCodeToolProjection(input: {
   message: OpenCodeMessage;
   part: Extract<OpenCodeMessagePart, { type: "tool" }>;
@@ -192,7 +245,10 @@ function getOpenCodeToolProjection(input: {
       toolName === "list" ||
       toolName === "ls")
   ) {
-    const detail = readFirstStringProperty(toolInput, ["file", "path", "pattern", "query"]);
+    const detail = getOpenCodeExploreDetail({
+      toolInput,
+      toolName,
+    });
     return {
       kind: "semantic",
       id: input.part.id,
@@ -227,7 +283,15 @@ function getOpenCodeToolProjection(input: {
   }
 
   if (toolInput !== null && (toolName === "edit" || toolName === "write" || toolName === "patch")) {
-    const detail = readFirstStringProperty(toolInput, ["file", "path"]);
+    const detail = getOpenCodeEditPath(toolInput);
+    const diff = getOpenCodeEditDiff(input.part);
+    if (diff === null) {
+      return {
+        kind: "standalone",
+        entry: createOpenCodeToolGenericEntry(input),
+      };
+    }
+
     return {
       kind: "semantic",
       id: input.part.id,
@@ -248,7 +312,7 @@ function getOpenCodeToolProjection(input: {
       sourcePath: null,
       detailKind: "code",
       command: null,
-      output,
+      output: diff,
     };
   }
 

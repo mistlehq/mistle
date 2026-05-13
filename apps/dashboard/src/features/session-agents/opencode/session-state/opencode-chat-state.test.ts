@@ -268,7 +268,7 @@ describe("reduceOpenCodeChatState", () => {
               sessionID: "ses_test",
               state: {
                 input: {
-                  file: "README.md",
+                  filePath: "README.md",
                 },
                 metadata: {},
                 output: "old docs",
@@ -289,10 +289,18 @@ describe("reduceOpenCodeChatState", () => {
               sessionID: "ses_test",
               state: {
                 input: {
-                  file: "README.md",
+                  filePath: "README.md",
                 },
-                metadata: {},
-                output: "updated",
+                metadata: {
+                  diff: [
+                    "--- a/README.md",
+                    "+++ b/README.md",
+                    "@@ -1 +1 @@",
+                    "-old docs",
+                    "+new docs",
+                  ].join("\n"),
+                },
+                output: "Edit applied successfully.",
                 status: "completed",
                 time: {
                   start: 3,
@@ -327,6 +335,8 @@ describe("reduceOpenCodeChatState", () => {
             id: "part_read",
             label: "Read",
             detail: "README.md",
+            sourcePath: "README.md",
+            output: "old docs",
           }),
         ],
       }),
@@ -339,10 +349,72 @@ describe("reduceOpenCodeChatState", () => {
             id: "part_edit",
             label: "File change",
             detail: "README.md",
+            output: [
+              "--- a/README.md",
+              "+++ b/README.md",
+              "@@ -1 +1 @@",
+              "-old docs",
+              "+new docs",
+            ].join("\n"),
           }),
         ],
       }),
     ]);
+  });
+
+  it("keeps OpenCode edit status text generic when no diff metadata is available", () => {
+    const state = reduceOpenCodeChatState(createInitialOpenCodeChatState(), {
+      type: "hydrate_messages",
+      sessionId: "ses_test",
+      messages: [
+        createUserMessage({
+          id: "msg_user",
+          text: "Update the docs",
+        }),
+        createAssistantMessage({
+          id: "msg_assistant",
+          parentId: "msg_user",
+          parts: [
+            {
+              callID: "call_edit",
+              id: "part_edit",
+              messageID: "msg_assistant",
+              sessionID: "ses_test",
+              state: {
+                input: {
+                  filePath: "README.md",
+                },
+                metadata: {},
+                output: "Edit applied successfully.",
+                status: "completed",
+                time: {
+                  start: 1,
+                  end: 2,
+                },
+                title: "Edit README.md",
+              },
+              tool: "edit",
+              type: "tool",
+            },
+          ],
+        }),
+      ],
+    });
+
+    expect(state.entries).toContainEqual(
+      expect.objectContaining({
+        id: "part_edit",
+        kind: "generic-item",
+        itemType: "opencode-tool",
+        title: "edit",
+        body: "Edit applied successfully.",
+      }),
+    );
+    expect(state.entries).not.toContainEqual(
+      expect.objectContaining({
+        semanticKind: "making-edits",
+      }),
+    );
   });
 
   it("surfaces session errors and clears running state on idle", () => {
