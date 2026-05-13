@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { assertValidReleaseVersion, releaseBranchName } from "./lib.js";
+import { updateSandboxdCargoTomlVersionFile } from "./sandboxd-version.js";
 
 const RepositoryRootPath = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const VersionFilePath = join(RepositoryRootPath, "VERSION");
@@ -23,6 +24,7 @@ function main(): void {
 
   const version = readRepositoryVersion();
   const branch = releaseBranchName(version);
+  updateSandboxdCargoTomlVersionFile(RepositoryRootPath, version);
 
   execFileSync("git", ["switch", "-c", branch], {
     cwd: RepositoryRootPath,

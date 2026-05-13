@@ -33,6 +33,7 @@ pnpm release:start --release-as 0.1.0
 3. Review the changes to:
    - the current branch, which will now be `release/v$(cat VERSION)`
    - `VERSION`
+   - `packages/sandboxd/Cargo.toml`
    - committed OpenAPI specs
 4. Run:
 
