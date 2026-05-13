@@ -59,7 +59,7 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     expect(queryEmptySectionCards(container)).toHaveLength(0);
   });
 
-  it("labels proxied connection service rows with their integration names", () => {
+  it("keeps git connection separate while labeling integration rows with proxied connections and tools", () => {
     const storyGithubConnectionWithoutResources = {
       ...StoryGithubConnection,
       resources: [],
@@ -98,22 +98,26 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
       />,
     );
 
-    const proxiedConnectionsSection = screen
-      .getByRole("heading", { name: "Proxied Connections" })
-      .closest("section");
-    if (proxiedConnectionsSection === null) {
-      throw new Error("Expected Proxied Connections heading to be inside a section.");
+    const runtimeSection = screen.getByRole("heading", { name: "Runtime" }).closest("section");
+    if (runtimeSection === null) {
+      throw new Error("Expected Runtime heading to be inside a section.");
     }
-    const proxiedConnections = within(proxiedConnectionsSection);
+    const runtime = within(runtimeSection);
 
-    expect(proxiedConnections.getAllByText("Service").length).toBeGreaterThan(0);
-    expect(proxiedConnections.getAllByText("Credential Connection").length).toBeGreaterThan(0);
-    expect(proxiedConnections.getByText("OpenAI")).toBeDefined();
-    expect(proxiedConnections.getByText("GitHub")).toBeDefined();
-    expect(proxiedConnections.getByText("Jira")).toBeDefined();
-    expect(proxiedConnections.getByText("Primary OpenAI Workspace")).toBeDefined();
-    expect(proxiedConnections.getByText("GitHub Production")).toBeDefined();
-    expect(proxiedConnections.getByText("Jira Production")).toBeDefined();
+    expect(runtime.getByText("Git Connection")).toBeDefined();
+    expect(runtime.getAllByText("Integration").length).toBeGreaterThan(0);
+    expect(runtime.getAllByText("Proxied Connection").length).toBeGreaterThan(0);
+    expect(runtime.getAllByText("Resources & Tools").length).toBeGreaterThan(0);
+    expect(runtime.getByText("OpenAI")).toBeDefined();
+    expect(runtime.getByText("Jira")).toBeDefined();
+    const openAiLogo = runtime
+      .getByText("OpenAI")
+      .closest("div")
+      ?.querySelector('img[src="/integration-logos/openai.svg"]');
+    expect(openAiLogo).toBeDefined();
+    expect(runtime.getByText("Primary OpenAI Workspace")).toBeDefined();
+    expect(runtime.getByText("GitHub - GitHub Production")).toBeDefined();
+    expect(runtime.getByText("Jira Production")).toBeDefined();
   });
 
   it("links disconnected connector setup to the integration add flow", () => {
@@ -192,7 +196,7 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     expect(screen.getAllByText("Integration no longer available.").length).toBeGreaterThan(0);
   });
 
-  it("keeps stale git provider bindings visible so they can be removed", () => {
+  it("keeps stale git connection bindings visible so they can be removed", () => {
     render(
       <TestSandboxProfileIntegrationsSetupSection
         overrides={{
@@ -211,33 +215,37 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     );
 
     expect(screen.getByText("Some integrations need attention")).toBeDefined();
-    expect(screen.getByText("None")).toBeDefined();
-    expect(screen.queryByRole("combobox", { name: "git provider integration" })).toBeNull();
+    expect(screen.getByText("Git Connection")).toBeDefined();
+    expect(screen.queryByRole("combobox", { name: "git connection" })).toBeNull();
     expect(screen.getByText("Connection cannot be found")).toBeDefined();
-    expect(screen.getByRole("button", { name: "Remove git provider" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Remove git connection" })).toBeDefined();
   });
 
-  it("shows a static empty state when no git provider integrations are available", () => {
-    for (const readOnly of [false, true]) {
-      const { unmount } = render(
-        <TestSandboxProfileIntegrationsSetupSection
-          overrides={{
-            availableConnections: [StoryOpenAiConnection, StoryJiraConnection],
-            availableTargets: [StoryOpenAiTarget, StoryJiraTarget],
-            readOnly,
-          }}
-        />,
-      );
+  it("shows none in the git connection field when no git connection is selected", () => {
+    render(
+      <TestSandboxProfileIntegrationsSetupSection
+        overrides={{
+          availableConnections: [StoryOpenAiConnection, StoryJiraConnection],
+          availableTargets: [StoryOpenAiTarget, StoryJiraTarget],
+        }}
+      />,
+    );
 
-      expect(screen.getByText("No git providers setup")).toBeDefined();
-      expect(screen.queryByRole("combobox", { name: "git provider integration" })).toBeNull();
-      expect(screen.queryByRole("combobox", { name: "git provider connection" })).toBeNull();
-
-      unmount();
-    }
+    expect(screen.getByRole("combobox", { name: "git connection" })).toBeDefined();
+    expect(screen.getByText("None")).toBeDefined();
   });
 
-  it("shows stale git provider rows when the target is missing", () => {
+  it("shows the git connection dropdown with provider and connection labels", () => {
+    render(<TestSandboxProfileIntegrationsSetupSection overrides={{}} />);
+
+    fireEvent.click(screen.getByRole("combobox", { name: "git connection" }));
+
+    const listbox = screen.getByRole("listbox");
+    expect(within(listbox).getByText("None")).toBeDefined();
+    expect(within(listbox).getByText("GitHub - GitHub Production")).toBeDefined();
+  });
+
+  it("shows stale git connection rows when the target is missing", () => {
     render(
       <TestSandboxProfileIntegrationsSetupSection
         overrides={{

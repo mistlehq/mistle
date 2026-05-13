@@ -27,16 +27,18 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-const StoryTargetsWithoutGitProviders = StoryIntegrationTargets.filter(
+export const CombinedIntegrationsConnectionsAndTools: Story = {};
+
+const StoryTargetsWithoutGitConnections = StoryIntegrationTargets.filter(
   (target) => target.familyId !== "github",
 );
-const StoryGitProviderTargetKeys = new Set(
+const StoryGitConnectionTargetKeys = new Set(
   StoryIntegrationTargets.filter((target) => target.familyId === "github").map(
     (target) => target.targetKey,
   ),
 );
-const StoryConnectionsWithoutGitProviders = StoryIntegrationConnections.filter(
-  (connection) => !StoryGitProviderTargetKeys.has(connection.targetKey),
+const StoryConnectionsWithoutGitConnections = StoryIntegrationConnections.filter(
+  (connection) => !StoryGitConnectionTargetKeys.has(connection.targetKey),
 );
 
 export const RuntimeAndConnectionsLoadError: Story = {
@@ -81,7 +83,7 @@ export const StaleConnectorMissingTarget: Story = {
   },
 };
 
-export const StaleGitProviderBinding: Story = {
+export const StaleGitConnectionBinding: Story = {
   args: {
     initialBindings: [
       ...StoryBindings.filter((binding) => binding.kind !== "git"),
@@ -95,10 +97,10 @@ export const StaleGitProviderBinding: Story = {
   },
 };
 
-export const DraftWithNoGitProvidersSetup: Story = {
+export const DraftWithNoGitConnectionsSetup: Story = {
   args: {
-    availableConnections: StoryConnectionsWithoutGitProviders,
-    availableTargets: StoryTargetsWithoutGitProviders,
+    availableConnections: StoryConnectionsWithoutGitConnections,
+    availableTargets: StoryTargetsWithoutGitConnections,
     initialBindings: StoryBindings.filter((binding) => binding.kind !== "git"),
   },
 };
@@ -112,7 +114,7 @@ export const PublishedWithoutConnectorIntegrations: Story = {
   },
 };
 
-export const StaleGitProviderMissingTarget: Story = {
+export const StaleGitConnectionMissingTarget: Story = {
   args: {
     availableConnections: StoryIntegrationConnections,
     availableTargets: StoryIntegrationTargets.filter(

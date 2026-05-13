@@ -1883,7 +1883,7 @@ describe("SandboxProfileEditorPage", () => {
     ).toBeNull();
   });
 
-  it("groups runtime rows without an integrations and tools label", () => {
+  it("keeps git connection separate from the combined integration table", () => {
     renderSandboxProfileEditor();
 
     fireEvent.click(screen.getByRole("tab", { name: "Sandbox Profile" }));
@@ -1893,14 +1893,28 @@ describe("SandboxProfileEditorPage", () => {
     if (agentLabel === undefined) {
       throw new Error("Expected runtime Agent label to render.");
     }
-    const gitProviderLabel = screen.getByText("Git Provider");
     const sandboxRuntimeLabel = screen.getByText("Sandbox Runtime");
-    const proxiedConnectionsHeading = screen.getByRole("heading", { name: "Proxied Connections" });
+    const gitConnectionLabel = screen.getByText("Git Connection");
+    const integrationColumnLabel = screen.getAllByText("Integration")[0];
+    if (integrationColumnLabel === undefined) {
+      throw new Error("Expected combined integration column label to render.");
+    }
+    const proxiedConnectionColumnLabel = screen.getAllByText("Proxied Connection")[0];
+    if (proxiedConnectionColumnLabel === undefined) {
+      throw new Error("Expected proxied connection column label to render.");
+    }
+    const resourcesAndToolsColumnLabel = screen.getAllByText("Resources & Tools")[0];
+    if (resourcesAndToolsColumnLabel === undefined) {
+      throw new Error("Expected resources and tools column label to render.");
+    }
 
     expectElementToFollow(runtimeHeading, agentLabel);
     expectElementToFollow(agentLabel, sandboxRuntimeLabel);
-    expectElementToFollow(sandboxRuntimeLabel, gitProviderLabel);
-    expectElementToFollow(gitProviderLabel, proxiedConnectionsHeading);
+    expectElementToFollow(sandboxRuntimeLabel, gitConnectionLabel);
+    expectElementToFollow(gitConnectionLabel, integrationColumnLabel);
+    expect(proxiedConnectionColumnLabel).toBeDefined();
+    expect(resourcesAndToolsColumnLabel).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "Proxied Connections" })).toBeNull();
     expect(screen.queryByText("Integrations & Tools")).toBeNull();
   });
 

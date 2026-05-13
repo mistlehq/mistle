@@ -48,10 +48,15 @@ import { SandboxProfileSectionCard } from "./sandbox-profile-section-card.js";
 
 type IntegrationChoice = {
   id: string;
-  kind: SandboxIntegrationBindingKind;
   hasSelectableConnections: boolean;
   logoKey: string | undefined;
   title: React.ReactNode;
+};
+
+type GitConnectionChoice = {
+  id: string;
+  displayName: string;
+  logoKey: string | undefined;
 };
 
 type SandboxProfileIntegrationsSetupSectionProps = {
@@ -85,40 +90,21 @@ type SandboxProfileIntegrationsSetupSectionProps = {
   readOnly?: boolean | undefined;
 };
 
-type SandboxProfileRuntimeIntegrationRowsProps = Pick<
-  SandboxProfileIntegrationsSetupSectionProps,
-  | "integrationRows"
-  | "availableConnections"
-  | "availableTargets"
-  | "onAddIntegrationBindingRow"
-  | "onIntegrationBindingRowChange"
-  | "onRemoveIntegrationBindingRow"
-  | "disabled"
-  | "readOnly"
->;
-
 const NoIntegrationValue = "none";
 
-const SandboxProfileToolsColumns = [
+const SandboxProfileIntegrationConnectionColumns = [
   { key: "integration", label: "Integration", desktopWidth: "minmax(12rem,0.9fr)" },
+  {
+    key: "proxied-connection",
+    label: "Proxied Connection",
+    desktopWidth: "minmax(14rem,1fr)",
+  },
   {
     key: "resources-and-tools",
     label: "Resources & Tools",
     desktopWidth: "minmax(16rem,1.35fr)",
     hideMobileLabel: true,
   },
-  {
-    key: "actions",
-    label: <span className="sr-only">Actions</span>,
-    desktopWidth: "2rem",
-    align: "end",
-    hideMobileLabel: true,
-  },
-] satisfies readonly ResponsiveFieldListColumn[];
-
-const SandboxProfileProxiedConnectionColumns = [
-  { key: "connection", label: "Service", desktopWidth: "minmax(10rem,0.8fr)" },
-  { key: "account", label: "Credential Connection", desktopWidth: "minmax(14rem,1fr)" },
   {
     key: "actions",
     label: <span className="sr-only">Actions</span>,
@@ -160,70 +146,6 @@ function ConnectionNameCell(input: { displayName: string }): React.JSX.Element {
     <div className={`${SandboxProfileIntegrationCellContentClassName} text-sm`}>
       <span className="min-w-0 truncate">{input.displayName}</span>
     </div>
-  );
-}
-
-function IntegrationSelectionCell(input: {
-  ariaLabel: string;
-  choices: readonly IntegrationChoice[];
-  selectedIntegrationId: string;
-  onIntegrationChange: (nextIntegrationId: string) => void;
-  allowNone?: boolean;
-  disabled?: boolean | undefined;
-  readOnly?: boolean | undefined;
-}): React.JSX.Element {
-  const selectedIntegration = input.choices.find(
-    (choice) => choice.id === input.selectedIntegrationId,
-  );
-
-  if (input.readOnly === true) {
-    return selectedIntegration === undefined ? (
-      <div className={SandboxProfileIntegrationCellContentClassName}>
-        <p className="text-muted-foreground text-sm">None</p>
-      </div>
-    ) : (
-      <IntegrationNameCell item={selectedIntegration} />
-    );
-  }
-
-  return (
-    <Select
-      disabled={input.disabled === true}
-      onValueChange={(nextIntegrationId) => {
-        if (nextIntegrationId === null) {
-          return;
-        }
-        input.onIntegrationChange(nextIntegrationId);
-      }}
-      value={input.selectedIntegrationId}
-    >
-      <SelectTrigger aria-label={input.ariaLabel} className="w-full min-w-0">
-        <SelectValue placeholder="Choose an integration">
-          {selectedIntegration === undefined ? (
-            "None"
-          ) : (
-            <IntegrationNameCell item={selectedIntegration} />
-          )}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent>
-        {input.allowNone === true ? <SelectItem value={NoIntegrationValue}>None</SelectItem> : null}
-        {input.choices.map((choice) => (
-          <SelectItem key={choice.id} value={choice.id}>
-            <div className="flex items-center gap-2">
-              {choice.logoKey === undefined ? null : (
-                <img
-                  alt=""
-                  className="h-5 w-5 rounded-sm"
-                  src={resolveIntegrationLogoPath({ logoKey: choice.logoKey })}
-                />
-              )}
-              <span>{choice.title}</span>
-            </div>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
   );
 }
 
@@ -287,6 +209,87 @@ function ConnectionSelectionCell(input: {
   );
 }
 
+function GitConnectionSelectionCell(input: {
+  ariaLabel: string;
+  choices: readonly GitConnectionChoice[];
+  selectedConnectionId: string | undefined;
+  onConnectionChange: (nextConnectionId: string) => void;
+  onNone: () => void;
+  disabled?: boolean | undefined;
+  readOnly?: boolean | undefined;
+}): React.JSX.Element {
+  const selectedChoice = input.choices.find((choice) => choice.id === input.selectedConnectionId);
+
+  if (input.readOnly === true) {
+    return selectedChoice === undefined ? (
+      <div className={SandboxProfileIntegrationCellContentClassName}>
+        <p className="text-sm">None</p>
+      </div>
+    ) : (
+      <GitConnectionNameCell choice={selectedChoice} />
+    );
+  }
+
+  return (
+    <Select
+      disabled={input.disabled === true}
+      onValueChange={(nextConnectionId) => {
+        if (nextConnectionId === null) {
+          return;
+        }
+        if (nextConnectionId === NoIntegrationValue) {
+          input.onNone();
+          return;
+        }
+        input.onConnectionChange(nextConnectionId);
+      }}
+      value={input.selectedConnectionId ?? NoIntegrationValue}
+    >
+      <SelectTrigger aria-label={input.ariaLabel} className="w-full min-w-0">
+        <SelectValue placeholder="Choose a git connection">
+          {selectedChoice === undefined ? (
+            "None"
+          ) : (
+            <GitConnectionNameCell choice={selectedChoice} />
+          )}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={NoIntegrationValue}>None</SelectItem>
+        {input.choices.map((choice) => (
+          <SelectItem key={choice.id} value={choice.id}>
+            <div className="flex items-center gap-2">
+              {choice.logoKey === undefined ? null : (
+                <img
+                  alt=""
+                  className="h-5 w-5 rounded-sm"
+                  src={resolveIntegrationLogoPath({ logoKey: choice.logoKey })}
+                />
+              )}
+              <span>{choice.displayName}</span>
+            </div>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function GitConnectionNameCell(input: { choice: GitConnectionChoice }): React.JSX.Element {
+  return (
+    <div className={`${SandboxProfileIntegrationCellContentClassName} gap-2 text-sm`}>
+      {input.choice.logoKey === undefined ? null : (
+        <img
+          alt=""
+          className="h-5 w-5 rounded-sm"
+          src={resolveIntegrationLogoPath({ logoKey: input.choice.logoKey })}
+        />
+      )}
+      <span className="min-w-0 truncate">{input.choice.displayName}</span>
+    </div>
+  );
+}
+
 function RemoveIntegrationBindingButton(input: {
   label: string;
   disabled?: boolean | undefined;
@@ -334,7 +337,6 @@ function resolveKindChoices(input: {
     choices.push({
       id: target.targetKey,
       hasSelectableConnections,
-      kind: input.kind,
       logoKey: target.logoKey,
       title: target.displayName,
     });
@@ -354,6 +356,30 @@ function resolveConnectionsForTarget(input: {
   return input.availableConnections.filter(
     (connection) => connection.targetKey === input.targetKey,
   );
+}
+
+function resolveGitConnectionChoices(input: {
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+}): GitConnectionChoice[] {
+  const choices: GitConnectionChoice[] = [];
+
+  for (const connection of input.availableConnections) {
+    const target = input.availableTargets.find(
+      (candidate) => candidate.targetKey === connection.targetKey,
+    );
+    if (target === undefined || resolveBindingKindFromTarget(target) !== "git") {
+      continue;
+    }
+
+    choices.push({
+      id: connection.id,
+      displayName: `${target.displayName} - ${connection.displayName}`,
+      logoKey: target.logoKey,
+    });
+  }
+
+  return choices;
 }
 
 function findTargetForConnection(input: {
@@ -447,20 +473,8 @@ function UnresolvedIntegrationCell(input: { title: string }): React.JSX.Element 
   );
 }
 
-function UnresolvedNoneCell(): React.JSX.Element {
-  return (
-    <div className={SandboxProfileIntegrationCellContentClassName}>
-      <p className="text-sm">None</p>
-    </div>
-  );
-}
-
-function NoGitProvidersCell(): React.JSX.Element {
-  return (
-    <div className={SandboxProfileIntegrationCellContentClassName}>
-      <p className="text-muted-foreground text-sm">No git providers setup</p>
-    </div>
-  );
+function NoResourcesAndToolsCell(): React.JSX.Element {
+  return <div aria-hidden className={SandboxProfileIntegrationCellContentClassName} />;
 }
 
 function resolveConnectorRowIssue(input: {
@@ -547,136 +561,6 @@ function resolveConnectorRowPresentation(input: {
   };
 }
 
-function SandboxProfileRuntimeIntegrationRows(
-  input: SandboxProfileRuntimeIntegrationRowsProps,
-): React.JSX.Element {
-  const controlsAreDisabled = input.disabled === true;
-  const isReadOnly = input.readOnly === true;
-  const gitChoices = resolveKindChoices({
-    kind: "git",
-    availableConnections: input.availableConnections,
-    availableTargets: input.availableTargets,
-  });
-  const gitRow = input.integrationRows.find((row) => row.kind === "git") ?? null;
-  const gitIssue = resolveBindingIssue({
-    row: gitRow,
-    availableConnections: input.availableConnections,
-    availableTargets: input.availableTargets,
-  });
-  const hasNoGitProviderOptions = gitIssue === null && gitChoices.length === 0;
-  const gitTargetKey = findTargetForConnection({
-    connectionId: gitRow?.connectionId,
-    availableConnections: input.availableConnections,
-  });
-
-  async function upsertGitBinding(targetKey: string): Promise<void> {
-    const connections = resolveConnectionsForTarget({
-      targetKey,
-      availableConnections: input.availableConnections,
-    });
-    const nextConnection = connections[0];
-    if (nextConnection === undefined) {
-      return;
-    }
-    const nextConfig = buildDefaultConfig({
-      connectionId: nextConnection.id,
-      availableConnections: input.availableConnections,
-      availableTargets: input.availableTargets,
-    });
-    if (nextConfig === null) {
-      return;
-    }
-
-    if (gitRow === null) {
-      await input.onAddIntegrationBindingRow({
-        kind: "git",
-        connectionId: nextConnection.id,
-        config: nextConfig,
-      });
-      return;
-    }
-
-    input.onIntegrationBindingRowChange(gitRow.clientId, {
-      connectionId: nextConnection.id,
-      config: nextConfig,
-    });
-  }
-
-  return (
-    <SandboxProfileSectionCard>
-      <div className="grid gap-4">
-        <Field contentWidth="fill" orientation="horizontal">
-          <FieldHeader>
-            <FieldLabel>Git Provider</FieldLabel>
-          </FieldHeader>
-          <FieldContent>
-            <div className="flex items-start gap-2">
-              <div className="min-w-0 flex-1">
-                {hasNoGitProviderOptions ? (
-                  <NoGitProvidersCell />
-                ) : gitIssue === null ? (
-                  <IntegrationSelectionCell
-                    allowNone={true}
-                    ariaLabel="git provider integration"
-                    choices={gitChoices}
-                    onIntegrationChange={(nextTargetKey) => {
-                      if (controlsAreDisabled) {
-                        return;
-                      }
-                      if (nextTargetKey === NoIntegrationValue) {
-                        if (gitRow !== null) {
-                          input.onRemoveIntegrationBindingRow(gitRow.clientId);
-                        }
-                        return;
-                      }
-                      void upsertGitBinding(nextTargetKey);
-                    }}
-                    selectedIntegrationId={gitTargetKey ?? NoIntegrationValue}
-                    disabled={controlsAreDisabled}
-                    readOnly={isReadOnly}
-                  />
-                ) : (
-                  <UnresolvedNoneCell />
-                )}
-              </div>
-              {gitIssue === null || gitRow === null || isReadOnly ? null : (
-                <RemoveIntegrationBindingButton
-                  disabled={controlsAreDisabled}
-                  label="Remove git provider"
-                  onRemove={() => {
-                    if (controlsAreDisabled) {
-                      return;
-                    }
-
-                    input.onRemoveIntegrationBindingRow(gitRow.clientId);
-                  }}
-                />
-              )}
-            </div>
-          </FieldContent>
-        </Field>
-
-        {gitRow === null ||
-        !hasSandboxProfileBindingResourcesAndToolsCellContent({
-          row: gitRow,
-          availableConnections: input.availableConnections,
-          availableTargets: input.availableTargets,
-        }) ? null : (
-          <SandboxProfileBindingResourcesAndToolsCell
-            availableConnections={input.availableConnections}
-            availableTargets={input.availableTargets}
-            disabled={controlsAreDisabled}
-            showGroupLabels={true}
-            readOnly={isReadOnly}
-            onRowChange={input.onIntegrationBindingRowChange}
-            row={gitRow}
-          />
-        )}
-      </div>
-    </SandboxProfileSectionCard>
-  );
-}
-
 export function SandboxProfileIntegrationsSetupSection(
   input: SandboxProfileIntegrationsSetupSectionProps,
 ): React.JSX.Element {
@@ -688,8 +572,7 @@ export function SandboxProfileIntegrationsSetupSection(
     availableConnections: input.availableConnections,
     availableTargets: input.availableTargets,
   });
-  const gitChoices = resolveKindChoices({
-    kind: "git",
+  const gitConnectionChoices = resolveGitConnectionChoices({
     availableConnections: input.availableConnections,
     availableTargets: input.availableTargets,
   });
@@ -728,7 +611,6 @@ export function SandboxProfileIntegrationsSetupSection(
     availableConnections: input.availableConnections,
     availableTargets: input.availableTargets,
   });
-  const hasNoGitProviderOptions = gitIssue === null && gitChoices.length === 0;
   const hasUnresolvedConnectorRows = connectorRows.some(
     (row) =>
       resolveConnectorRowIssue({
@@ -739,8 +621,9 @@ export function SandboxProfileIntegrationsSetupSection(
   );
   const hasUnresolvedRows = agentIssue !== null || gitIssue !== null || hasUnresolvedConnectorRows;
 
-  function updateBindingConnection(
-    row: SandboxProfileBindingEditorRow,
+  function saveBindingConnection(
+    kind: SandboxIntegrationBindingKind,
+    row: SandboxProfileBindingEditorRow | null,
     nextConnectionId: string,
   ): void {
     const nextConfig = buildDefaultConfig({
@@ -749,6 +632,15 @@ export function SandboxProfileIntegrationsSetupSection(
       availableTargets: input.availableTargets,
     });
     if (nextConfig === null) {
+      return;
+    }
+
+    if (row === null) {
+      void input.onAddIntegrationBindingRow({
+        kind,
+        connectionId: nextConnectionId,
+        config: nextConfig,
+      });
       return;
     }
 
@@ -791,14 +683,8 @@ export function SandboxProfileIntegrationsSetupSection(
     connectionId: agentRow?.connectionId,
     availableConnections: input.availableConnections,
   });
-  const gitTargetKey = findTargetForConnection({
-    connectionId: gitRow?.connectionId,
-    availableConnections: input.availableConnections,
-  });
-  const gitServiceChoice = gitChoices.find((choice) => choice.id === gitTargetKey);
-  const showGitProxiedConnection =
-    !hasNoGitProviderOptions && (gitIssue !== null || gitTargetKey !== null);
-  const showRuntimeResourcesAndToolsCard = connectorRows.length > 0 || !isReadOnly;
+  const agentIntegrationChoice =
+    agentChoices.find((choice) => choice.id === agentTargetKey) ?? agentChoices[0];
   const addConnectorActionIsDisabled = controlsAreDisabled || addConnectorChoices.length === 0;
 
   return (
@@ -843,291 +729,246 @@ export function SandboxProfileIntegrationsSetupSection(
         <SectionBlock title="Runtime">
           <div className="grid gap-4">
             {input.runtimeSettings}
-            <SandboxProfileRuntimeIntegrationRows
-              availableConnections={input.availableConnections}
-              availableTargets={input.availableTargets}
-              disabled={input.disabled}
-              integrationRows={input.integrationRows}
-              onAddIntegrationBindingRow={input.onAddIntegrationBindingRow}
-              onIntegrationBindingRowChange={input.onIntegrationBindingRowChange}
-              onRemoveIntegrationBindingRow={input.onRemoveIntegrationBindingRow}
-              readOnly={input.readOnly}
-            />
-            {showRuntimeResourcesAndToolsCard ? (
-              <SandboxProfileSectionCard>
-                <div className="grid gap-3">
-                  {connectorRows.length === 0 ? null : (
-                    <ResponsiveFieldList columns={SandboxProfileToolsColumns} gapClassName="gap-6">
-                      {connectorRows.map((row) => {
-                        const presentation = resolveConnectorRowPresentation({
-                          row,
-                          availableConnections: input.availableConnections,
-                          availableTargets: input.availableTargets,
-                        });
-                        const hasResourcesAndTools =
-                          hasSandboxProfileBindingResourcesAndToolsCellContent({
-                            row,
-                            availableConnections: input.availableConnections,
-                            availableTargets: input.availableTargets,
-                          });
+            <SandboxProfileSectionCard>
+              <div className="grid gap-4">
+                <Field contentWidth="fill" orientation="horizontal">
+                  <FieldHeader>
+                    <FieldLabel>Git Connection</FieldLabel>
+                  </FieldHeader>
+                  <FieldContent>
+                    <div className="flex items-start gap-2">
+                      <div className="min-w-0 flex-1">
+                        {gitIssue === null ? (
+                          <GitConnectionSelectionCell
+                            ariaLabel="git connection"
+                            choices={gitConnectionChoices}
+                            onConnectionChange={(nextConnectionId) => {
+                              if (controlsAreDisabled) {
+                                return;
+                              }
+                              saveBindingConnection("git", gitRow, nextConnectionId);
+                            }}
+                            onNone={() => {
+                              if (controlsAreDisabled || gitRow === null) {
+                                return;
+                              }
+                              input.onRemoveIntegrationBindingRow(gitRow.clientId);
+                            }}
+                            selectedConnectionId={gitRow?.connectionId}
+                            disabled={controlsAreDisabled}
+                            readOnly={isReadOnly}
+                          />
+                        ) : gitIssue === "missing-connection" ? (
+                          <UnresolvedConnectionCell message="Connection cannot be found" />
+                        ) : (
+                          <UnresolvedConnectionCell message="Integration no longer available." />
+                        )}
+                      </div>
+                      {gitIssue === null || gitRow === null || isReadOnly ? null : (
+                        <RemoveIntegrationBindingButton
+                          disabled={controlsAreDisabled}
+                          label="Remove git connection"
+                          onRemove={() => {
+                            if (controlsAreDisabled) {
+                              return;
+                            }
 
-                        return (
-                          <ResponsiveFieldListRow
-                            className={isReadOnly ? "py-4" : "py-4 pr-10 md:pr-0"}
-                            gapClassName="gap-6"
-                            gridClassName="md:items-start"
-                            key={row.clientId}
-                          >
-                            <ResponsiveFieldListCell columnKey="integration">
-                              {presentation.connection === undefined ? (
-                                <UnresolvedIntegrationCell title={presentation.title} />
-                              ) : (
-                                <IntegrationNameCell
-                                  item={{
-                                    id:
-                                      presentation.target?.targetKey ??
-                                      presentation.connection.targetKey ??
-                                      row.clientId,
-                                    hasSelectableConnections: true,
-                                    kind: "connector",
-                                    logoKey: presentation.logoKey,
-                                    title: presentation.title,
-                                  }}
-                                />
-                              )}
-                            </ResponsiveFieldListCell>
-                            <ResponsiveFieldListCell
-                              columnKey="resources-and-tools"
-                              hideOnMobile={!hasResourcesAndTools}
-                            >
-                              <SandboxProfileBindingResourcesAndToolsCell
-                                availableConnections={input.availableConnections}
-                                availableTargets={input.availableTargets}
-                                disabled={controlsAreDisabled}
-                                readOnly={isReadOnly}
-                                onRowChange={input.onIntegrationBindingRowChange}
-                                row={row}
-                              />
-                            </ResponsiveFieldListCell>
-                            <ResponsiveFieldListCell
-                              className={SandboxProfileIntegrationActionCellClassName}
-                              columnKey="actions"
-                            >
-                              {isReadOnly ? null : (
-                                <RemoveIntegrationBindingButton
-                                  disabled={controlsAreDisabled}
-                                  label="Remove connector"
-                                  onRemove={() => {
-                                    if (controlsAreDisabled) {
-                                      return;
-                                    }
+                            input.onRemoveIntegrationBindingRow(gitRow.clientId);
+                          }}
+                        />
+                      )}
+                    </div>
+                  </FieldContent>
+                </Field>
 
-                                    input.onRemoveIntegrationBindingRow(row.clientId);
-                                  }}
-                                />
-                              )}
-                            </ResponsiveFieldListCell>
-                          </ResponsiveFieldListRow>
-                        );
-                      })}
-                    </ResponsiveFieldList>
-                  )}
-
-                  {isReadOnly ? null : (
-                    <Button
-                      className="px-0 text-sm"
-                      disabled={addConnectorActionIsDisabled}
-                      onClick={() => {
-                        if (addConnectorActionIsDisabled) {
-                          return;
-                        }
-
-                        setIsAddConnectorsDialogOpen(true);
-                      }}
-                      type="button"
-                      variant="link"
-                    >
-                      <PlusIcon aria-hidden className="size-4" />
-                      Add integration or tool
-                    </Button>
-                  )}
-                </div>
-              </SandboxProfileSectionCard>
-            ) : null}
-          </div>
-        </SectionBlock>
-      )}
-      <SectionBlock title="Proxied Connections">
-        <SandboxProfileSectionCard>
-          <ResponsiveFieldList
-            columns={SandboxProfileProxiedConnectionColumns}
-            gapClassName="gap-6"
-          >
-            <ResponsiveFieldListRow
-              className="py-4"
-              gapClassName="gap-6"
-              gridClassName="md:items-start"
-              isLastRow={!showGitProxiedConnection && connectorRows.length === 0}
-            >
-              <ResponsiveFieldListCell columnKey="connection">
-                <RuntimeSettingLabel>OpenAI</RuntimeSettingLabel>
-              </ResponsiveFieldListCell>
-              <ResponsiveFieldListCell columnKey="account">
-                <ConnectionSelectionCell
-                  ariaLabel="agent harness connection"
-                  availableConnections={resolveConnectionsForTarget({
-                    targetKey: agentTargetKey ?? agentChoices[0]?.id ?? null,
-                    availableConnections: input.availableConnections,
-                  })}
-                  onConnectionChange={(nextConnectionId) => {
-                    if (controlsAreDisabled) {
-                      return;
-                    }
-                    if (agentRow === null) {
-                      const nextConfig = buildDefaultConfig({
-                        connectionId: nextConnectionId,
-                        availableConnections: input.availableConnections,
-                        availableTargets: input.availableTargets,
-                      });
-                      if (nextConfig === null) {
-                        return;
-                      }
-                      void input.onAddIntegrationBindingRow({
-                        kind: "agent",
-                        connectionId: nextConnectionId,
-                        config: nextConfig,
-                      });
-                      return;
-                    }
-                    updateBindingConnection(agentRow, nextConnectionId);
-                  }}
-                  selectedConnectionId={agentRow?.connectionId}
-                  disabled={controlsAreDisabled}
-                  readOnly={isReadOnly}
-                />
-              </ResponsiveFieldListCell>
-              <ResponsiveFieldListCell
-                className={SandboxProfileIntegrationActionCellClassName}
-                columnKey="actions"
-              />
-            </ResponsiveFieldListRow>
-
-            {!showGitProxiedConnection ? null : (
-              <ResponsiveFieldListRow
-                className={
-                  gitIssue === null || gitRow === null || isReadOnly ? "py-4" : "py-4 pr-10 md:pr-0"
-                }
-                gapClassName="gap-6"
-                gridClassName="md:items-start"
-                isLastRow={connectorRows.length === 0}
-              >
-                <ResponsiveFieldListCell columnKey="connection">
-                  <RuntimeSettingLabel>
-                    {gitIssue === null && gitServiceChoice !== undefined
-                      ? gitServiceChoice.title
-                      : "Git provider"}
-                  </RuntimeSettingLabel>
-                </ResponsiveFieldListCell>
-                <ResponsiveFieldListCell columnKey="account">
-                  {gitIssue === "missing-connection" ? (
-                    <UnresolvedConnectionCell message="Connection cannot be found" />
-                  ) : gitIssue === "missing-target" ? (
-                    <UnresolvedConnectionCell message="Integration no longer available." />
-                  ) : (
-                    <ConnectionSelectionCell
-                      ariaLabel="git provider connection"
-                      availableConnections={resolveConnectionsForTarget({
-                        targetKey: gitTargetKey,
-                        availableConnections: input.availableConnections,
-                      })}
-                      onConnectionChange={(nextConnectionId) => {
-                        if (controlsAreDisabled) {
-                          return;
-                        }
-                        if (gitRow === null) {
-                          const nextConfig = buildDefaultConfig({
-                            connectionId: nextConnectionId,
-                            availableConnections: input.availableConnections,
-                            availableTargets: input.availableTargets,
-                          });
-                          if (nextConfig === null) {
-                            return;
-                          }
-                          void input.onAddIntegrationBindingRow({
-                            kind: "git",
-                            connectionId: nextConnectionId,
-                            config: nextConfig,
-                          });
-                          return;
-                        }
-                        updateBindingConnection(gitRow, nextConnectionId);
-                      }}
-                      selectedConnectionId={gitRow?.connectionId}
-                      disabled={controlsAreDisabled}
-                      readOnly={isReadOnly}
-                    />
-                  )}
-                </ResponsiveFieldListCell>
-                <ResponsiveFieldListCell
-                  className={SandboxProfileIntegrationActionCellClassName}
-                  columnKey="actions"
-                />
-              </ResponsiveFieldListRow>
-            )}
-
-            {connectorRows.map((row, rowIndex) => {
-              const presentation = resolveConnectorRowPresentation({
-                row,
-                availableConnections: input.availableConnections,
-                availableTargets: input.availableTargets,
-              });
-
-              return (
-                <ResponsiveFieldListRow
-                  className={isReadOnly ? "py-4" : "py-4 pr-10 md:pr-0"}
+                {gitRow === null ||
+                !hasSandboxProfileBindingResourcesAndToolsCellContent({
+                  row: gitRow,
+                  availableConnections: input.availableConnections,
+                  availableTargets: input.availableTargets,
+                }) ? null : (
+                  <SandboxProfileBindingResourcesAndToolsCell
+                    availableConnections={input.availableConnections}
+                    availableTargets={input.availableTargets}
+                    disabled={controlsAreDisabled}
+                    showGroupLabels={true}
+                    readOnly={isReadOnly}
+                    onRowChange={input.onIntegrationBindingRowChange}
+                    row={gitRow}
+                  />
+                )}
+              </div>
+            </SandboxProfileSectionCard>
+            <SandboxProfileSectionCard>
+              <div className="grid gap-3">
+                <ResponsiveFieldList
+                  columns={SandboxProfileIntegrationConnectionColumns}
                   gapClassName="gap-6"
-                  gridClassName="md:items-start"
-                  isLastRow={rowIndex === connectorRows.length - 1}
-                  key={row.clientId}
                 >
-                  <ResponsiveFieldListCell columnKey="connection">
-                    <RuntimeSettingLabel>{presentation.title}</RuntimeSettingLabel>
-                  </ResponsiveFieldListCell>
-                  <ResponsiveFieldListCell columnKey="account">
-                    {presentation.connectionMessage === null &&
-                    presentation.target !== undefined ? (
+                  <ResponsiveFieldListRow
+                    className="py-4"
+                    gapClassName="gap-6"
+                    gridClassName="md:items-start"
+                    isLastRow={connectorRows.length === 0}
+                  >
+                    <ResponsiveFieldListCell columnKey="integration">
+                      {agentIntegrationChoice === undefined ? (
+                        <RuntimeSettingLabel>OpenAI</RuntimeSettingLabel>
+                      ) : (
+                        <IntegrationNameCell item={agentIntegrationChoice} />
+                      )}
+                    </ResponsiveFieldListCell>
+                    <ResponsiveFieldListCell columnKey="proxied-connection">
                       <ConnectionSelectionCell
-                        ariaLabel={`${presentation.target.displayName} connection`}
+                        ariaLabel="agent harness connection"
                         availableConnections={resolveConnectionsForTarget({
-                          targetKey: presentation.target.targetKey,
+                          targetKey: agentTargetKey ?? agentChoices[0]?.id ?? null,
                           availableConnections: input.availableConnections,
                         })}
                         onConnectionChange={(nextConnectionId) => {
                           if (controlsAreDisabled) {
                             return;
                           }
-                          updateBindingConnection(row, nextConnectionId);
+                          saveBindingConnection("agent", agentRow, nextConnectionId);
                         }}
-                        selectedConnectionId={row.connectionId}
+                        selectedConnectionId={agentRow?.connectionId}
                         disabled={controlsAreDisabled}
                         readOnly={isReadOnly}
                       />
-                    ) : (
-                      <UnresolvedConnectionCell
-                        message={presentation.connectionMessage ?? "Connection cannot be found"}
-                      />
-                    )}
-                  </ResponsiveFieldListCell>
-                  <ResponsiveFieldListCell
-                    className={SandboxProfileIntegrationActionCellClassName}
-                    columnKey="actions"
-                  />
-                </ResponsiveFieldListRow>
-              );
-            })}
-          </ResponsiveFieldList>
-        </SandboxProfileSectionCard>
-      </SectionBlock>
+                    </ResponsiveFieldListCell>
+                    <ResponsiveFieldListCell columnKey="resources-and-tools" hideOnMobile>
+                      <NoResourcesAndToolsCell />
+                    </ResponsiveFieldListCell>
+                    <ResponsiveFieldListCell
+                      className={SandboxProfileIntegrationActionCellClassName}
+                      columnKey="actions"
+                    />
+                  </ResponsiveFieldListRow>
+
+                  {connectorRows.map((row, rowIndex) => {
+                    const presentation = resolveConnectorRowPresentation({
+                      row,
+                      availableConnections: input.availableConnections,
+                      availableTargets: input.availableTargets,
+                    });
+                    const hasResourcesAndTools =
+                      hasSandboxProfileBindingResourcesAndToolsCellContent({
+                        row,
+                        availableConnections: input.availableConnections,
+                        availableTargets: input.availableTargets,
+                      });
+
+                    return (
+                      <ResponsiveFieldListRow
+                        className={isReadOnly ? "py-4" : "py-4 pr-10 md:pr-0"}
+                        gapClassName="gap-6"
+                        gridClassName="md:items-start"
+                        isLastRow={rowIndex === connectorRows.length - 1}
+                        key={row.clientId}
+                      >
+                        <ResponsiveFieldListCell columnKey="integration">
+                          {presentation.connection === undefined ? (
+                            <UnresolvedIntegrationCell title={presentation.title} />
+                          ) : (
+                            <IntegrationNameCell
+                              item={{
+                                id:
+                                  presentation.target?.targetKey ??
+                                  presentation.connection.targetKey ??
+                                  row.clientId,
+                                hasSelectableConnections: true,
+                                logoKey: presentation.logoKey,
+                                title: presentation.title,
+                              }}
+                            />
+                          )}
+                        </ResponsiveFieldListCell>
+                        <ResponsiveFieldListCell columnKey="proxied-connection">
+                          {presentation.connectionMessage === null &&
+                          presentation.target !== undefined ? (
+                            <ConnectionSelectionCell
+                              ariaLabel={`${presentation.target.displayName} connection`}
+                              availableConnections={resolveConnectionsForTarget({
+                                targetKey: presentation.target.targetKey,
+                                availableConnections: input.availableConnections,
+                              })}
+                              onConnectionChange={(nextConnectionId) => {
+                                if (controlsAreDisabled) {
+                                  return;
+                                }
+                                saveBindingConnection("connector", row, nextConnectionId);
+                              }}
+                              selectedConnectionId={row.connectionId}
+                              disabled={controlsAreDisabled}
+                              readOnly={isReadOnly}
+                            />
+                          ) : (
+                            <UnresolvedConnectionCell
+                              message={
+                                presentation.connectionMessage ?? "Connection cannot be found"
+                              }
+                            />
+                          )}
+                        </ResponsiveFieldListCell>
+                        <ResponsiveFieldListCell
+                          columnKey="resources-and-tools"
+                          hideOnMobile={!hasResourcesAndTools}
+                        >
+                          <SandboxProfileBindingResourcesAndToolsCell
+                            availableConnections={input.availableConnections}
+                            availableTargets={input.availableTargets}
+                            disabled={controlsAreDisabled}
+                            readOnly={isReadOnly}
+                            onRowChange={input.onIntegrationBindingRowChange}
+                            row={row}
+                          />
+                        </ResponsiveFieldListCell>
+                        <ResponsiveFieldListCell
+                          className={SandboxProfileIntegrationActionCellClassName}
+                          columnKey="actions"
+                        >
+                          {isReadOnly ? null : (
+                            <RemoveIntegrationBindingButton
+                              disabled={controlsAreDisabled}
+                              label="Remove connector"
+                              onRemove={() => {
+                                if (controlsAreDisabled) {
+                                  return;
+                                }
+
+                                input.onRemoveIntegrationBindingRow(row.clientId);
+                              }}
+                            />
+                          )}
+                        </ResponsiveFieldListCell>
+                      </ResponsiveFieldListRow>
+                    );
+                  })}
+                </ResponsiveFieldList>
+
+                {isReadOnly ? null : (
+                  <Button
+                    className="px-0 text-sm"
+                    disabled={addConnectorActionIsDisabled}
+                    onClick={() => {
+                      if (addConnectorActionIsDisabled) {
+                        return;
+                      }
+
+                      setIsAddConnectorsDialogOpen(true);
+                    }}
+                    type="button"
+                    variant="link"
+                  >
+                    <PlusIcon aria-hidden className="size-4" />
+                    Add integration or tool
+                  </Button>
+                )}
+              </div>
+            </SandboxProfileSectionCard>
+          </div>
+        </SectionBlock>
+      )}
 
       <Dialog
         onOpenChange={(nextOpen) => {
