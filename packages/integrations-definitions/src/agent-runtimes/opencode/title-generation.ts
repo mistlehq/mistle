@@ -1,7 +1,5 @@
 import { systemSleeper, type Sleeper } from "@mistle/time";
 
-import type { OpenCodeSessionSummary } from "./client.js";
-
 const OpenCodeConversationTitleMaxLength = 50;
 const OpenCodeGeneratedTitlePollIntervalMs = 250;
 const OpenCodeGeneratedTitleWaitTimeoutMs = 30_000;
@@ -30,10 +28,6 @@ export function normalizeGeneratedOpenCodeConversationTitle(title: string): stri
   }
 
   return titleWithoutTrailingPunctuation;
-}
-
-export function readGeneratedOpenCodeConversationTitle(session: OpenCodeSessionSummary): string {
-  return normalizeGeneratedOpenCodeConversationTitle(session.title);
 }
 
 export async function waitForGeneratedOpenCodeConversationTitle(

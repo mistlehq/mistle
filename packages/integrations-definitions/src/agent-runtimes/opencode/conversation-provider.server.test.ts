@@ -18,6 +18,7 @@ describe("renderOpenCodePromptSystem", () => {
           conversationId: "conversation_123",
           sandboxInstanceId: "sandbox_123",
           routeId: "route_123",
+          customDeliveryField: "preserved",
           traceparent: "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01",
           tracestate: "vendor=value",
           baggage: "organization_id=org_123",
@@ -35,6 +36,7 @@ Mistle automation delivery context:
   "conversationId": "conversation_123",
   "sandboxInstanceId": "sandbox_123",
   "routeId": "route_123",
+  "customDeliveryField": "preserved",
   "traceparent": "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01",
   "tracestate": "vendor=value",
   "baggage": "organization_id=org_123"

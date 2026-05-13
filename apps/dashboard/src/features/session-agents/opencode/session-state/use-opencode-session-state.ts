@@ -9,12 +9,8 @@ import {
   type OpenCodeSessionClient,
   type OpenCodeSessionSummary,
 } from "@mistle/integrations-definitions/agent-runtimes/opencode/client";
-import {
-  normalizeGeneratedOpenCodeConversationTitle,
-  readGeneratedOpenCodeConversationTitle,
-} from "@mistle/integrations-definitions/agent-runtimes/opencode/title-generation";
+import { waitForGeneratedOpenCodeConversationTitle } from "@mistle/integrations-definitions/agent-runtimes/opencode/title-generation";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
-import { systemSleeper } from "@mistle/time";
 import { useCallback, useEffect, useReducer, useRef, useState, type Dispatch } from "react";
 
 import type { SessionBootstrapResult } from "../../codex/session-state/session-bootstrap/index.js";
@@ -103,8 +99,6 @@ const EmptyOpenCodeComposerConfig = {
   model: null,
   modelReasoningEffort: null,
 };
-const OpenCodeGeneratedTitlePollIntervalMs = 250;
-const OpenCodeGeneratedTitleWaitTimeoutMs = 30_000;
 
 function normalizeOpenCodeCatalogDirectory(directory: string | null | undefined): string | null {
   return directory === undefined || directory === null ? null : directory;
@@ -614,21 +608,15 @@ export function useOpenCodeSessionState(input: {
     }
 
     const sessionId = connectedSession.activeSessionId;
-    const previousTitle = normalizeGeneratedOpenCodeConversationTitle(connectedSession.activeTitle);
-    const deadlineEpochMs = Date.now() + OpenCodeGeneratedTitleWaitTimeoutMs;
-    while (Date.now() < deadlineEpochMs) {
-      const session = await client.getSession({
-        sessionId,
-      });
-      const generatedTitle = readGeneratedOpenCodeConversationTitle(session);
-      if (generatedTitle !== previousTitle) {
-        return generatedTitle;
-      }
-
-      await systemSleeper.sleep(OpenCodeGeneratedTitlePollIntervalMs);
-    }
-
-    throw new Error("Timed out waiting for OpenCode to generate a session title.");
+    return await waitForGeneratedOpenCodeConversationTitle({
+      previousTitle: connectedSession.activeTitle,
+      readCurrentTitle: async () => {
+        const session = await client.getSession({
+          sessionId,
+        });
+        return session.title;
+      },
+    });
   }, [sessionSnapshot]);
 
   const abortSession = useCallback(async (): Promise<void> => {

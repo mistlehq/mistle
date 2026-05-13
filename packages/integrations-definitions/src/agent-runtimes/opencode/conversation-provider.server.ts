@@ -11,6 +11,7 @@ import { z } from "zod";
 
 import {
   createOpenCodeSessionClient,
+  type OpenCodeSendPromptInput,
   type OpenCodeSessionClient,
   type OpenCodeSessionStatus,
 } from "./client.js";
@@ -25,20 +26,22 @@ const OpenCodeProviderStateSchema = z.object({
 
 type OpenCodeProviderState = z.output<typeof OpenCodeProviderStateSchema>;
 
-const OpenCodeDeliveryContextNotificationParamsSchema = z.object({
-  source: z.enum(["webhook", "schedule"]),
-  webhookEventId: z.string().optional(),
-  scheduledActionId: z.string().optional(),
-  deliveryTaskId: z.string(),
-  externalDeliveryId: z.string().optional(),
-  automationRunId: z.string(),
-  conversationId: z.string(),
-  sandboxInstanceId: z.string(),
-  routeId: z.string().optional(),
-  traceparent: z.string(),
-  tracestate: z.string().optional(),
-  baggage: z.string().optional(),
-});
+const OpenCodeDeliveryContextNotificationParamsSchema = z
+  .object({
+    source: z.enum(["webhook", "schedule"]),
+    webhookEventId: z.string().optional(),
+    scheduledActionId: z.string().optional(),
+    deliveryTaskId: z.string(),
+    externalDeliveryId: z.string().optional(),
+    automationRunId: z.string(),
+    conversationId: z.string(),
+    sandboxInstanceId: z.string(),
+    routeId: z.string().optional(),
+    traceparent: z.string(),
+    tracestate: z.string().optional(),
+    baggage: z.string().optional(),
+  })
+  .loose();
 
 type OpenCodeDeliveryContextNotificationParams = z.output<
   typeof OpenCodeDeliveryContextNotificationParamsSchema
@@ -113,7 +116,7 @@ function createOpenCodePromptInput(input: {
   deliveryContextNotificationParams?: OpenCodeDeliveryContextNotificationParams | undefined;
   inputText: string;
   providerConversationId: string;
-}) {
+}): OpenCodeSendPromptInput {
   const system = renderOpenCodePromptSystem({
     collaborationModeSettings: input.collaborationModeSettings,
     deliveryContextNotificationParams: input.deliveryContextNotificationParams,
@@ -123,7 +126,7 @@ function createOpenCodePromptInput(input: {
     sessionId: input.providerConversationId,
     parts: [
       {
-        type: "text" as const,
+        type: "text",
         text: input.inputText,
       },
     ],
