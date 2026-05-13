@@ -59,6 +59,7 @@ export type ResolvedTestInfra = {
 export type TestServiceHttpEndpoint = {
   hostBaseUrl: string;
   internalBaseUrl?: string;
+  reservedHost?: string;
 };
 
 export type TestServiceEndpoints = {
@@ -68,6 +69,7 @@ export type TestServiceEndpoints = {
 export type TestServiceEndpointPlan = {
   http?: {
     host: string;
+    bindHost?: string;
   };
 };
 

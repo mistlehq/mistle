@@ -34,6 +34,7 @@ function createResolvedInfra(input: {
 function createRestartableHttpService(input: {
   id: string;
   requirement: TestInfraRequirement;
+  bindHost?: string;
   startEvents: string[];
   cleanupEvents: string[];
 }): TestServiceDefinition {
@@ -44,6 +45,7 @@ function createRestartableHttpService(input: {
     endpoints: {
       http: {
         host: "127.0.0.1",
+        ...(input.bindHost === undefined ? {} : { bindHost: input.bindHost }),
       },
     },
     supportedModes: ["runtime", "process"],
@@ -54,7 +56,11 @@ function createRestartableHttpService(input: {
         throw new Error("Expected HTTP endpoint to be planned.");
       }
 
-      input.startEvents.push(httpEndpoint.hostBaseUrl);
+      input.startEvents.push(
+        input.bindHost === undefined
+          ? httpEndpoint.hostBaseUrl
+          : `${httpEndpoint.hostBaseUrl}:${httpEndpoint.reservedHost ?? ""}`,
+      );
 
       return {
         id: input.id,
@@ -311,6 +317,33 @@ describe("startTestEnvironment", () => {
       "control-plane-api:env_registry:postgres.control-plane",
       "control-plane-worker:env_registry:postgres.control-plane",
     ]);
+
+    await environment.stop();
+  });
+
+  it("can reserve an HTTP port on a distinct bind host while keeping the client URL on loopback", async () => {
+    const startEvents: string[] = [];
+    const cleanupEvents: string[] = [];
+    const postgresProvisioner = createPostgresProvisioner(cleanupEvents);
+    const postgresRequirement = createPostgresRequirement(postgresProvisioner);
+    const registry = defineTestServiceRegistry({
+      "data-plane-gateway": createRestartableHttpService({
+        id: "data-plane-gateway",
+        requirement: postgresRequirement,
+        bindHost: "0.0.0.0",
+        startEvents,
+        cleanupEvents,
+      }),
+    });
+
+    const environment = await startTestEnvironment({
+      id: "env_bind_host",
+      registry,
+      services: [{ service: "data-plane-gateway", mode: "runtime" }],
+    });
+
+    expect(startEvents).toHaveLength(1);
+    expect(startEvents[0]).toMatch(/^http:\/\/127\.0\.0\.1:\d+:0\.0\.0\.0$/u);
 
     await environment.stop();
   });
