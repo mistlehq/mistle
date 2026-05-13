@@ -5,8 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCliPtyOpenInput,
   resolveChatRestoreConnectionInput,
-  resolveCliRestoreConversationId,
-  resolveCliRestoreInitialCwd,
+  resolveCliRestoreContext,
 } from "./use-session-main-panel-handoff.js";
 
 describe("buildCliPtyOpenInput", () => {
@@ -106,64 +105,56 @@ describe("buildCliPtyOpenInput", () => {
   });
 });
 
-describe("resolveCliRestoreConversationId", () => {
-  it("preserves the launched conversation id for runtimes that restore exact CLI sessions", () => {
+describe("resolveCliRestoreContext", () => {
+  it("preserves the launched conversation and directory for runtimes that restore exact CLI sessions", () => {
     expect(
-      resolveCliRestoreConversationId({
+      resolveCliRestoreContext({
         fallbackConversationId: null,
+        launchDirectory: "/root/acme/repo-2",
         launchTarget: {
           type: "resume",
           threadId: "ses_launched",
         },
-        preserveLaunchTarget: true,
+        preserveLaunchContext: true,
       }),
-    ).toBe("ses_launched");
+    ).toEqual({
+      conversationId: "ses_launched",
+      initialCwd: "/root/acme/repo-2",
+    });
   });
 
   it("keeps Codex local handoffs on fallback restore authority", () => {
     expect(
-      resolveCliRestoreConversationId({
+      resolveCliRestoreContext({
         fallbackConversationId: null,
+        launchDirectory: "/root/acme/repo-2",
         launchTarget: {
           type: "resume",
           threadId: "local_thread",
         },
-        preserveLaunchTarget: false,
+        preserveLaunchContext: false,
       }),
-    ).toBeNull();
+    ).toEqual({
+      conversationId: null,
+      initialCwd: null,
+    });
   });
 
   it("uses the fallback conversation id for start-new handoffs", () => {
     expect(
-      resolveCliRestoreConversationId({
+      resolveCliRestoreContext({
         fallbackConversationId: "thread_fallback",
+        launchDirectory: "/root/acme/repo-2",
         launchTarget: {
           type: "start_new",
           shouldClearActiveThreadId: false,
         },
-        preserveLaunchTarget: true,
+        preserveLaunchContext: true,
       }),
-    ).toBe("thread_fallback");
-  });
-});
-
-describe("resolveCliRestoreInitialCwd", () => {
-  it("preserves the launch directory for runtimes that restore exact CLI sessions", () => {
-    expect(
-      resolveCliRestoreInitialCwd({
-        launchDirectory: "/root/acme/repo-2",
-        preserveLaunchDirectory: true,
-      }),
-    ).toBe("/root/acme/repo-2");
-  });
-
-  it("does not preserve the launch directory for Codex handoffs", () => {
-    expect(
-      resolveCliRestoreInitialCwd({
-        launchDirectory: "/root/acme/repo-2",
-        preserveLaunchDirectory: false,
-      }),
-    ).toBeNull();
+    ).toEqual({
+      conversationId: "thread_fallback",
+      initialCwd: "/root/acme/repo-2",
+    });
   });
 });
 
