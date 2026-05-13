@@ -83,6 +83,7 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.workbench.diffPanelState.patch).toBe("");
     expect(result.current.workbench.primaryPanelState.cliTerminalContentInset).toBe("default");
     expect(result.current.workbench.primaryPanelState.cliTerminalThemeMode).toBe("system");
+    expect(result.current.workbench.primaryPanelState.cliRuntimeDisplayName).toBe("Codex");
     expect(result.current.workbench.portAccessState.processes).toEqual([]);
     expect(result.current.workbench.portAccessState.isPanelOpen).toBe(false);
     expect(result.current.workbench.sandboxLifecycleStatus).toBeNull();
@@ -132,6 +133,7 @@ describe("useSessionWorkbenchController", () => {
     );
     expect(result.current.workbench.primaryPanelState.cliTerminalContentInset).toBe("none");
     expect(result.current.workbench.primaryPanelState.cliTerminalThemeMode).toBe("system");
+    expect(result.current.workbench.primaryPanelState.cliRuntimeDisplayName).toBe("OpenCode");
   });
 
   it("maps OpenCode permission requests to actionable server requests", () => {
@@ -161,7 +163,9 @@ describe("useSessionWorkbenchController", () => {
     ]);
 
     expect(resolveOpenCodePermissionResponse({ decision: "always" })).toBe("always");
-    expect(resolveOpenCodePermissionResponse({ decision: "decline" })).toBe("reject");
+    expect(() => resolveOpenCodePermissionResponse({ decision: "decline" })).toThrow(
+      "OpenCode permission response has an unsupported decision.",
+    );
   });
 
   it("starts Codex recovery from a recoverable disconnect and preserves attempts for the same event", () => {

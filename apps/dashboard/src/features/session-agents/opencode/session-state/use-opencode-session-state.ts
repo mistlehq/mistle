@@ -204,7 +204,7 @@ export function useOpenCodeSessionState(input: {
     } finally {
       setIsHydratingChat(false);
     }
-  }, [sessionSnapshot?.activeSessionId]);
+  }, [sessionSnapshot?.activeDirectory, sessionSnapshot?.activeSessionId]);
 
   const hydrateChatFromSessionOrThrow = useCallback(async (): Promise<void> => {
     const client = clientRef.current;
@@ -230,7 +230,7 @@ export function useOpenCodeSessionState(input: {
     } finally {
       setIsHydratingChat(false);
     }
-  }, [sessionSnapshot?.activeSessionId]);
+  }, [sessionSnapshot?.activeDirectory, sessionSnapshot?.activeSessionId]);
 
   const connectSession = useCallback(
     (connectInput: {

@@ -110,6 +110,7 @@ type SessionWorkbenchState = {
     showsChatComposer: boolean;
     cliTerminalContentInset: SessionTerminalContentInset;
     cliTerminalThemeMode: SessionTerminalThemeMode;
+    cliRuntimeDisplayName: "Codex" | "OpenCode";
     enterCliMode: () => Promise<void>;
     exitCliMode: () => Promise<void>;
   };
@@ -207,7 +208,7 @@ function resolveOpenCodePermissionResponse(
   result: unknown,
 ): OpenCodePermissionResponseInput["response"] {
   if (typeof result !== "object" || result === null || !("decision" in result)) {
-    return "reject";
+    throw new Error("OpenCode permission response is missing a decision.");
   }
 
   const decision = result.decision;
@@ -215,7 +216,7 @@ function resolveOpenCodePermissionResponse(
     return decision;
   }
 
-  return "reject";
+  throw new Error("OpenCode permission response has an unsupported decision.");
 }
 
 type UseSessionWorkbenchControllerResult = {
@@ -635,7 +636,16 @@ export function useSessionWorkbenchController(input: {
   }, [openCodeSessionState.chat]);
   const respondToOpenCodePermission = useCallback(
     (requestId: string | number, result: unknown): void => {
-      const response = resolveOpenCodePermissionResponse(result);
+      let response: OpenCodePermissionResponseInput["response"];
+      try {
+        response = resolveOpenCodePermissionResponse(result);
+      } catch (error) {
+        openCodeSessionState.sessionMessage.reportSessionErrorMessage(
+          error instanceof Error ? error.message : "Could not respond to OpenCode permission.",
+        );
+        return;
+      }
+
       void openCodeSessionState.chat
         .respondToPermission({
           requestId: String(requestId),
@@ -675,6 +685,7 @@ export function useSessionWorkbenchController(input: {
         showsChatComposer: handoff.transitionState === "stable_chat",
         cliTerminalContentInset: isOpenCodeRuntime ? "none" : "default",
         cliTerminalThemeMode: "system",
+        cliRuntimeDisplayName: isOpenCodeRuntime ? "OpenCode" : "Codex",
         enterCliMode: handoff.handoffToCli,
         exitCliMode: handoff.handoffToChat,
       },
