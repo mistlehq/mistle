@@ -7,7 +7,7 @@ import {
 } from "./organization-integrations-settings-page-story-support.js";
 
 function OrganizationIntegrationsAddFlowStory(): React.JSX.Element {
-  return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.Jira} />;
+  return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.GitHubEnterpriseServer} />;
 }
 
 const meta = {
@@ -24,12 +24,6 @@ export const GitHubEnterpriseServer: Story = {
   name: "GitHub Enterprise Server",
   render: function RenderStory() {
     return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.GitHubEnterpriseServer} />;
-  },
-};
-
-export const Jira: Story = {
-  render: function RenderStory() {
-    return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.Jira} />;
   },
 };
 

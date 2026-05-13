@@ -13,8 +13,13 @@ import {
 import { z } from "zod";
 
 import { getDashboardStoryControlPlaneApiOrigin } from "../../storybook/dashboard-story-config.js";
-import { withDashboardPageStory } from "../../storybook/decorators.js";
-import { createStoryWebhookTriggerCapabilitiesProviderMetadata } from "../integrations/integration-story-harness.js";
+import { withDashboardCenteredStory, withDashboardPageStory } from "../../storybook/decorators.js";
+import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
+import {
+  createJiraDetailViewStoryProps,
+  createJiraWebhookNotConfiguredDetailViewStoryProps,
+  createStoryWebhookTriggerCapabilitiesProviderMetadata,
+} from "../integrations/integration-story-harness.js";
 import type { ManagedWebhookSetupResult } from "../integrations/integrations-service-shared.js";
 import type {
   IntegrationConnection,
@@ -25,7 +30,10 @@ import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query.js";
 import { IntegrationConnectionCreatePage } from "./integration-connection-create-page.js";
 import { IntegrationsPage } from "./integrations-page.js";
-import { createStoryConnectionMethods } from "./organization-integrations-settings-page-story-support.js";
+import {
+  createStoryConnectionMethods,
+  IntegrationSettingsAddFlowStory,
+} from "./organization-integrations-settings-page-story-support.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 const IntegrationRegistry = createBrowserIntegrationRegistry();
@@ -38,6 +46,17 @@ const StoryJiraWebhookFailureSetup = {
   status: "failed",
   message: "Jira admin webhook creation failed (403): Forbidden",
 } satisfies ManagedWebhookSetupResult;
+
+const JiraConnectionMethodLabels = {
+  "jira-personal-api-token": "Personal API token",
+  "jira-service-account-api-token": "Service account API token",
+  "jira-service-account-oauth-client-credentials": "Service account OAuth client credentials",
+} satisfies Record<JiraConnectionMethodId, string>;
+
+type JiraConnectionMethodId =
+  | "jira-personal-api-token"
+  | "jira-service-account-api-token"
+  | "jira-service-account-oauth-client-credentials";
 
 type JiraAddFlowInitialEntry =
   | string
@@ -92,23 +111,46 @@ function createJiraTargetFixture(): IntegrationTarget {
 function createJiraConnection(input?: {
   id?: string;
   displayName?: string;
+  methodId?: JiraConnectionMethodId;
 }): IntegrationConnection {
+  const methodId = input?.methodId ?? "jira-personal-api-token";
+  const methodLabel = JiraConnectionMethodLabels[methodId];
+
   return {
     id: input?.id ?? "icn_jira_story",
     targetKey: "jira-default",
     displayName: input?.displayName ?? "Engineering Jira",
     status: "active",
-    connectionMethodId: "jira-personal-api-token",
-    connectionMethodLabel: "Personal API token",
-    config: {
-      connection_method: "jira-personal-api-token",
-      site_url: "https://mistle.atlassian.net",
-      email: "jon@example.com",
-    },
-    configuredSecretNames: ["Personal API token"],
-    supportsWebhookSources: true,
+    connectionMethodId: methodId,
+    connectionMethodLabel: methodLabel,
+    config: createJiraConnectionConfig(methodId),
+    configuredSecretNames: [methodLabel],
+    supportsWebhookSources: methodId === "jira-personal-api-token",
     createdAt: StoryNow,
     updatedAt: StoryNow,
+  };
+}
+
+function createJiraConnectionConfig(methodId: JiraConnectionMethodId): Record<string, unknown> {
+  if (methodId === "jira-personal-api-token") {
+    return {
+      connection_method: methodId,
+      site_url: "https://mistle.atlassian.net",
+      email: "jon@example.com",
+    };
+  }
+
+  if (methodId === "jira-service-account-api-token") {
+    return {
+      connection_method: methodId,
+      cloud_id: "cloud-mistle-engineering",
+    };
+  }
+
+  return {
+    connection_method: methodId,
+    cloud_id: "cloud-mistle-engineering",
+    client_id: "jira-client-story",
   };
 }
 
@@ -160,7 +202,11 @@ function createPageResponse<T>(items: readonly T[]): {
 
 const StoryCreateFormConnectionRequestBodySchema = z.object({
   displayName: z.string(),
-  methodId: z.literal("jira-personal-api-token"),
+  methodId: z.enum([
+    "jira-personal-api-token",
+    "jira-service-account-api-token",
+    "jira-service-account-oauth-client-credentials",
+  ]),
   config: z.record(z.string(), z.unknown()),
   secrets: z.record(z.string(), z.string()),
 });
@@ -255,6 +301,7 @@ function useJiraStoryControlPlane(input: {
         const createdConnection = createJiraConnection({
           id: "icn_jira_created",
           displayName: body.displayName,
+          methodId: body.methodId,
         });
 
         input.queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
@@ -262,7 +309,10 @@ function useJiraStoryControlPlane(input: {
           connections: [...directoryData.connections, createdConnection],
         });
 
-        if (input.managedWebhookSetup.status === "created") {
+        if (
+          body.methodId === "jira-personal-api-token" &&
+          input.managedWebhookSetup.status === "created"
+        ) {
           input.queryClient.setQueryData(
             ["integration-webhook-sources", createdConnection.id],
             [createJiraWebhookSource({ connectionId: createdConnection.id })],
@@ -273,7 +323,9 @@ function useJiraStoryControlPlane(input: {
           {
             ...createdConnection,
             config: body.config,
-            managedWebhookSetup: input.managedWebhookSetup,
+            ...(body.methodId === "jira-personal-api-token"
+              ? { managedWebhookSetup: input.managedWebhookSetup }
+              : {}),
           },
           201,
         );
@@ -380,6 +432,39 @@ export const AddConnection: PageStory = {
   },
 };
 
+export const AddPersonalApiToken: PageStory = {
+  render: function RenderStory() {
+    return (
+      <IntegrationSettingsAddFlowStory
+        initialMethodId="jira-personal-api-token"
+        variantId="jira-default"
+      />
+    );
+  },
+};
+
+export const AddServiceAccountApiToken: PageStory = {
+  render: function RenderStory() {
+    return (
+      <IntegrationSettingsAddFlowStory
+        initialMethodId="jira-service-account-api-token"
+        variantId="jira-default"
+      />
+    );
+  },
+};
+
+export const AddServiceAccountOAuthClientCredentials: PageStory = {
+  render: function RenderStory() {
+    return (
+      <IntegrationSettingsAddFlowStory
+        initialMethodId="jira-service-account-oauth-client-credentials"
+        variantId="jira-default"
+      />
+    );
+  },
+};
+
 export const WebhookCreated: PageStory = {
   render: function RenderStory() {
     return (
@@ -400,6 +485,96 @@ export const WebhookFailed: PageStory = {
         connections={[createJiraConnection()]}
         initialEntry={createJiraResultInitialEntry(StoryJiraWebhookFailureSetup)}
         managedWebhookSetup={StoryJiraWebhookFailureSetup}
+      />
+    );
+  },
+};
+
+export const WebhookNotConfigured: PageStory = {
+  render: function RenderStory() {
+    return (
+      <JiraAddFlowStory
+        connections={[createJiraConnection()]}
+        initialEntry="/integrations/jira-default?connectionId=icn_jira_story"
+        managedWebhookSetup={StoryJiraWebhookFailureSetup}
+      />
+    );
+  },
+};
+
+export const ServiceAccountApiTokenDetail: PageStory = {
+  render: function RenderStory() {
+    return (
+      <JiraAddFlowStory
+        connections={[
+          createJiraConnection({
+            displayName: "Jira Service Account",
+            id: "icn_jira_service_account",
+            methodId: "jira-service-account-api-token",
+          }),
+        ]}
+        initialEntry="/integrations/jira-default?connectionId=icn_jira_service_account"
+        managedWebhookSetup={StoryJiraWebhookCreatedSetup}
+      />
+    );
+  },
+};
+
+export const ServiceAccountOAuthClientCredentialsDetail: PageStory = {
+  render: function RenderStory() {
+    return (
+      <JiraAddFlowStory
+        connections={[
+          createJiraConnection({
+            displayName: "Jira OAuth Service Account",
+            id: "icn_jira_oauth_service_account",
+            methodId: "jira-service-account-oauth-client-credentials",
+          }),
+        ]}
+        initialEntry="/integrations/jira-default?connectionId=icn_jira_oauth_service_account"
+        managedWebhookSetup={StoryJiraWebhookCreatedSetup}
+      />
+    );
+  },
+};
+
+export const ConnectedWebhookConfiguredDetailPreview: PageStory = {
+  decorators: [withDashboardCenteredStory],
+  render: function RenderStory() {
+    return (
+      <IntegrationConnectionDetailView
+        {...createJiraDetailViewStoryProps()}
+        onCreateWebhookSource={() => {}}
+        onDeleteWebhookSource={() => {}}
+        onEditAuthentication={() => {}}
+        onRefreshResource={() => {}}
+        titleEditor={{
+          disabled: false,
+          errorMessageByConnectionId: {},
+          onStartEditing: () => {},
+          onSave: async () => {},
+        }}
+      />
+    );
+  },
+};
+
+export const ConnectedWebhookMissingDetailPreview: PageStory = {
+  decorators: [withDashboardCenteredStory],
+  render: function RenderStory() {
+    return (
+      <IntegrationConnectionDetailView
+        {...createJiraWebhookNotConfiguredDetailViewStoryProps()}
+        onCreateWebhookSource={() => {}}
+        onDeleteWebhookSource={() => {}}
+        onEditAuthentication={() => {}}
+        onRefreshResource={() => {}}
+        titleEditor={{
+          disabled: false,
+          errorMessageByConnectionId: {},
+          onStartEditing: () => {},
+          onSave: async () => {},
+        }}
       />
     );
   },
