@@ -1,5 +1,3 @@
-import { spawn } from "node:child_process";
-
 import {
   OrganizationIdentityLinkProviderConfigStatus,
   UserExternalPrincipalCredentialSecretKinds,
@@ -10,26 +8,19 @@ import {
 } from "@mistle/db/control-plane";
 import { SigningGrantError, verifySigningGrant } from "@mistle/sandbox-signing-auth";
 import { and, eq, isNull } from "drizzle-orm";
-import { z } from "zod";
 
 import {
   GitSshSigningCredentialKind,
   GitSshSigningSecretMetadataSchema,
 } from "../../../identity-linking/github-signing.js";
+import {
+  DefaultCommitSignBinaryPath,
+  runCommitSignBinary,
+  SshSigningFormat,
+  type CommitSignResult,
+} from "../../../identity-linking/services/commit-sign-binary.js";
 import { createCredentialSecretResolver } from "./credential-secret-resolution.js";
 import { InternalIdentityLinkingError, InternalIdentityLinkingErrorCodes } from "./errors.js";
-
-const SshSigningFormat = "ssh";
-const CommitSignSignatureEncoding = "pem";
-const DefaultCommitSignBinaryPath = "/usr/local/bin/commit-sign";
-
-const CommitSignResponseSchema = z
-  .object({
-    format: z.literal(SshSigningFormat),
-    signature: z.string().min(1),
-    signatureEncoding: z.literal(CommitSignSignatureEncoding),
-  })
-  .strict();
 
 type SignCommitPayloadInput = {
   organizationId: string;
@@ -43,7 +34,7 @@ type SignCommitPayloadInput = {
   encoding: "base64";
 };
 
-type SignCommitPayloadResult = z.infer<typeof CommitSignResponseSchema>;
+type SignCommitPayloadResult = CommitSignResult;
 
 function resolveRequestedKeyRefOrThrow(keyRef: string): string {
   const prefix = "key::";
@@ -65,59 +56,6 @@ function resolveRequestedKeyRefOrThrow(keyRef: string): string {
   }
 
   return publicKey;
-}
-
-async function runCommitSignBinary(input: {
-  binaryPath: string;
-  format: "ssh";
-  privateKey: string;
-  payloadBase64: string;
-}): Promise<SignCommitPayloadResult> {
-  const child = spawn(input.binaryPath, [], {
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-
-  const stdoutChunks: Buffer[] = [];
-  const stderrChunks: Buffer[] = [];
-
-  child.stdout.on("data", (chunk: Buffer | string) => {
-    stdoutChunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
-  });
-  child.stderr.on("data", (chunk: Buffer | string) => {
-    stderrChunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
-  });
-
-  const requestPayload = JSON.stringify({
-    format: input.format,
-    privateKey: input.privateKey,
-    payloadBase64: input.payloadBase64,
-  });
-  child.stdin.end(requestPayload);
-
-  const { exitCode, signal } = await new Promise<{
-    exitCode: number | null;
-    signal: NodeJS.Signals | null;
-  }>((resolve, reject) => {
-    child.once("error", reject);
-    child.once("close", (closeCode, closeSignal) => {
-      resolve({
-        exitCode: closeCode,
-        signal: closeSignal,
-      });
-    });
-  });
-  const stdout = Buffer.concat(stdoutChunks).toString("utf8");
-  const stderr = Buffer.concat(stderrChunks).toString("utf8").trim();
-
-  if (exitCode !== 0) {
-    const failureMessage =
-      stderr.length > 0
-        ? stderr
-        : `commit-sign exited with code ${String(exitCode)}${signal === null ? "" : ` (signal ${signal})`}.`;
-    throw new Error(`commit-sign failed: ${failureMessage}`);
-  }
-
-  return CommitSignResponseSchema.parse(JSON.parse(stdout) as unknown);
 }
 
 export async function signCommitPayload(

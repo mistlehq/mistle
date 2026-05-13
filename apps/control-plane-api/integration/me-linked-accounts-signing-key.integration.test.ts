@@ -15,23 +15,29 @@ import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
-import { describe, expect } from "vitest";
+import { beforeAll, describe, expect } from "vitest";
 
 import {
   GitSshSigningCredentialKind,
   GitSshSigningSecretMetadataSchema,
   parseGitSshSigningPrivateKeyOrThrow,
 } from "../src/identity-linking/github-signing.js";
-import { LinkedAccountsResponseSchema } from "../src/me/index.js";
+import {
+  CheckGitHubLinkedAccountSigningKeyResponseSchema,
+  LinkedAccountsResponseSchema,
+} from "../src/me/index.js";
+import { ensureCommitSignBinary } from "./helpers/commit-sign.js";
 import {
   decryptPrincipalCredentialSecret,
   insertGitHubSigningCredential,
+  insertPrincipalCredentialSecret,
   seedGitHubLinkedPrincipal,
   seedIdentityConnection,
   seedIdentityProviderConfig,
   seedPrincipalCredential,
   upsertGitHubIdentityTarget,
 } from "./helpers/identity-linking.js";
+import { startSimulatedGitHubIdentityProvider } from "./helpers/simulated-identity-providers.js";
 
 const TestGitSigningPrivateKeyPath = fileURLToPath(
   new URL("../../../packages/commit-sign/tests/fixtures/ed25519_private_key", import.meta.url),
@@ -43,7 +49,198 @@ const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
 
+beforeAll(async () => {
+  await ensureCommitSignBinary();
+});
+
 describe.concurrent("me linked accounts signing key integration", () => {
+  it("checks a GitHub signing key without saving it when GitHub has the public signing key", async ({
+    env,
+  }) => {
+    const simulatedGitHub = await startSimulatedGitHubIdentityProvider({
+      sshSigningKeysResponse: [
+        {
+          id: 1,
+          key: TestGitSigningKeyMetadata.publicKey,
+          title: "Mistle test signing key",
+          created_at: "2026-01-01T00:00:00Z",
+        },
+      ],
+    });
+    try {
+      const session = await env.auth.createSession({
+        email: "integration-new-me-linked-accounts-check-signing-key@example.com",
+      });
+      await seedGitHubLinkedAccount(env, {
+        organizationId: session.organizationId,
+        userId: session.userId,
+        providerConfigId: "ilp_me_linked_accounts_signing_key_check",
+        connectionId: "icn_me_linked_accounts_signing_key_check",
+        principalId: "uep_me_linked_accounts_signing_key_check",
+        targetKey: "github-signing-key-check",
+        apiBaseUrl: simulatedGitHub.baseUrl,
+        accessToken: "ghu_user_token",
+      });
+
+      const formData = new FormData();
+      formData.set(
+        "file",
+        new File([TestGitSigningPrivateKey], "id_signing", {
+          type: "application/octet-stream",
+        }),
+      );
+
+      const response = await env.controlPlaneApi.http.fetch(
+        "/v1/me/linked-accounts/github/signing-key/check",
+        {
+          method: "POST",
+          headers: {
+            cookie: session.cookie,
+          },
+          body: formData,
+        },
+      );
+
+      expect(response.status).toBe(200);
+      expect(CheckGitHubLinkedAccountSigningKeyResponseSchema.parse(await response.json())).toEqual(
+        {
+          status: "registered",
+          publicKey: TestGitSigningKeyMetadata.publicKey,
+          publicKeyFingerprint: TestGitSigningKeyMetadata.publicKeyFingerprint,
+        },
+      );
+      expect(simulatedGitHub.requests).toContainEqual({
+        method: "GET",
+        pathname: "/user/ssh_signing_keys",
+        search: "?per_page=100",
+        body: "",
+        authorization: "Bearer ghu_user_token",
+      });
+
+      const signingCredential =
+        await env.controlPlaneDb.query.userExternalPrincipalCredentials.findFirst({
+          where: (table, { and, eq }) =>
+            and(
+              eq(table.organizationId, session.organizationId),
+              eq(table.principalId, "uep_me_linked_accounts_signing_key_check"),
+              eq(table.credentialKind, GitSshSigningCredentialKind),
+            ),
+        });
+      expect(signingCredential).toBeUndefined();
+    } finally {
+      await simulatedGitHub.stop();
+    }
+  });
+
+  it("checks a valid GitHub signing key as not registered when GitHub lacks the public signing key", async ({
+    env,
+  }) => {
+    const simulatedGitHub = await startSimulatedGitHubIdentityProvider({
+      sshSigningKeysResponse: [],
+    });
+    try {
+      const session = await env.auth.createSession({
+        email: "integration-new-me-linked-accounts-check-signing-key-not-registered@example.com",
+      });
+      await seedGitHubLinkedAccount(env, {
+        organizationId: session.organizationId,
+        userId: session.userId,
+        providerConfigId: "ilp_me_linked_accounts_signing_key_check_not_registered",
+        connectionId: "icn_me_linked_accounts_signing_key_check_not_registered",
+        principalId: "uep_me_linked_accounts_signing_key_check_not_registered",
+        targetKey: "github-signing-key-check-not-registered",
+        apiBaseUrl: simulatedGitHub.baseUrl,
+        accessToken: "ghu_user_token",
+      });
+
+      const formData = new FormData();
+      formData.set(
+        "file",
+        new File([TestGitSigningPrivateKey], "id_signing", {
+          type: "application/octet-stream",
+        }),
+      );
+
+      const response = await env.controlPlaneApi.http.fetch(
+        "/v1/me/linked-accounts/github/signing-key/check",
+        {
+          method: "POST",
+          headers: {
+            cookie: session.cookie,
+          },
+          body: formData,
+        },
+      );
+
+      expect(response.status).toBe(200);
+      expect(CheckGitHubLinkedAccountSigningKeyResponseSchema.parse(await response.json())).toEqual(
+        {
+          status: "not_registered",
+          publicKey: TestGitSigningKeyMetadata.publicKey,
+          publicKeyFingerprint: TestGitSigningKeyMetadata.publicKeyFingerprint,
+        },
+      );
+    } finally {
+      await simulatedGitHub.stop();
+    }
+  });
+
+  it("reports missing GitHub App SSH signing key permission when GitHub rejects the lookup", async ({
+    env,
+  }) => {
+    const simulatedGitHub = await startSimulatedGitHubIdentityProvider({
+      sshSigningKeysStatusCode: 403,
+      sshSigningKeysResponse: {
+        message: "Resource not accessible by integration",
+      },
+    });
+    try {
+      const session = await env.auth.createSession({
+        email: "integration-new-me-linked-accounts-check-signing-key-permission@example.com",
+      });
+      await seedGitHubLinkedAccount(env, {
+        organizationId: session.organizationId,
+        userId: session.userId,
+        providerConfigId: "ilp_me_linked_accounts_signing_key_check_permission",
+        connectionId: "icn_me_linked_accounts_signing_key_check_permission",
+        principalId: "uep_me_linked_accounts_signing_key_check_permission",
+        targetKey: "github-signing-key-check-permission",
+        apiBaseUrl: simulatedGitHub.baseUrl,
+        accessToken: "ghu_user_token",
+      });
+
+      const formData = new FormData();
+      formData.set(
+        "file",
+        new File([TestGitSigningPrivateKey], "id_signing", {
+          type: "application/octet-stream",
+        }),
+      );
+
+      const response = await env.controlPlaneApi.http.fetch(
+        "/v1/me/linked-accounts/github/signing-key/check",
+        {
+          method: "POST",
+          headers: {
+            cookie: session.cookie,
+          },
+          body: formData,
+        },
+      );
+
+      expect(response.status).toBe(200);
+      expect(CheckGitHubLinkedAccountSigningKeyResponseSchema.parse(await response.json())).toEqual(
+        {
+          status: "permission_missing",
+          publicKey: TestGitSigningKeyMetadata.publicKey,
+          publicKeyFingerprint: TestGitSigningKeyMetadata.publicKeyFingerprint,
+        },
+      );
+    } finally {
+      await simulatedGitHub.stop();
+    }
+  });
+
   it("uploads a GitHub signing key and exposes a commit-signing summary", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-me-linked-accounts-upload-signing-key@example.com",
@@ -284,15 +481,22 @@ async function seedGitHubLinkedAccount(
     providerConfigId: string;
     connectionId: string;
     principalId: string;
+    targetKey?: string;
+    apiBaseUrl?: string;
+    accessToken?: string;
   },
 ): Promise<void> {
-  await upsertGitHubIdentityTarget(env);
+  const targetKey = input.targetKey ?? "github-cloud";
+  await upsertGitHubIdentityTarget(env, {
+    targetKey,
+    ...(input.apiBaseUrl === undefined ? {} : { apiBaseUrl: input.apiBaseUrl }),
+  });
   await seedIdentityConnection(env, {
     connectionId: input.connectionId,
     displayName: "GitHub Identity",
     methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
     organizationId: input.organizationId,
-    targetKey: "github-cloud",
+    targetKey,
   });
   await seedIdentityProviderConfig(env, {
     configId: input.providerConfigId,
@@ -300,7 +504,7 @@ async function seedGitHubLinkedAccount(
     organizationId: input.organizationId,
     providerFamily: "github",
     status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
-    targetKey: "github-cloud",
+    targetKey,
     userId: input.userId,
   });
   await seedGitHubLinkedPrincipal(env, {
@@ -328,4 +532,12 @@ async function seedGitHubLinkedAccount(
     providerFamily: "github",
     credentialKind: "github_app_user_access_token",
   });
+  if (input.accessToken !== undefined) {
+    await insertPrincipalCredentialSecret(env, {
+      organizationId: input.organizationId,
+      credentialId: `upc_oauth_${input.principalId}`,
+      secretKind: UserExternalPrincipalCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+      plaintext: input.accessToken,
+    });
+  }
 }

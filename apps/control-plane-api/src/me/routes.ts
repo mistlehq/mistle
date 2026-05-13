@@ -2,6 +2,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { OpenApiValidationHook } from "@mistle/http/errors.js";
 
 import type { AppContextBindings, AppRoutes } from "../types.js";
+import * as checkGitHubLinkedAccountSigningKey from "./check-github-linked-account-signing-key/index.js";
 import { ME_ROUTE_BASE_PATH } from "./constants.js";
 import * as deleteGitHubLinkedAccountSigningKey from "./delete-github-linked-account-signing-key/index.js";
 import * as deleteLinkedAccount from "./delete-linked-account/index.js";
@@ -24,6 +25,10 @@ export function createMeRoutes(): AppRoutes<typeof ME_ROUTE_BASE_PATH> {
   routes.openapi(putProfileImage.route, putProfileImage.handler);
   routes.openapi(deleteProfileImage.route, deleteProfileImage.handler);
   routes.openapi(listLinkedAccounts.route, listLinkedAccounts.handler);
+  routes.openapi(
+    checkGitHubLinkedAccountSigningKey.route,
+    checkGitHubLinkedAccountSigningKey.handler,
+  );
   routes.openapi(putGitHubLinkedAccountSigningKey.route, putGitHubLinkedAccountSigningKey.handler);
   routes.openapi(
     putGitHubLinkedAccountPreferredEmail.route,

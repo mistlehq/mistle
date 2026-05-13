@@ -5,11 +5,13 @@ export { route as getProfileImageContentRoute } from "./get-profile-image-conten
 export { route as putProfileImageRoute } from "./put-profile-image/route.js";
 export { route as deleteProfileImageRoute } from "./delete-profile-image/route.js";
 export { route as deleteLinkedAccountRoute } from "./delete-linked-account/route.js";
+export { route as checkGitHubLinkedAccountSigningKeyRoute } from "./check-github-linked-account-signing-key/route.js";
 export { route as deleteGitHubLinkedAccountSigningKeyRoute } from "./delete-github-linked-account-signing-key/route.js";
 export { route as listLinkedAccountsRoute } from "./list-linked-accounts/route.js";
 export { route as putGitHubLinkedAccountSigningKeyRoute } from "./put-github-linked-account-signing-key/route.js";
 export { route as putGitHubLinkedAccountPreferredEmailRoute } from "./put-github-linked-account-preferred-email/route.js";
 export { route as startLinkedAccountAuthorizationRoute } from "./start-linked-account-authorization/route.js";
+export { CheckGitHubLinkedAccountSigningKeyResponseSchema } from "./check-github-linked-account-signing-key/schema.js";
 export {
   LinkedAccountSchema,
   LinkedAccountsResponseSchema,

@@ -22,6 +22,8 @@ export async function startSimulatedGitHubIdentityProvider(
     tokenResponse?: unknown;
     userResponse?: unknown;
     emailsResponse?: unknown;
+    sshSigningKeysStatusCode?: number;
+    sshSigningKeysResponse?: unknown;
   } = {},
 ): Promise<SimulatedProvider> {
   const tokenResponse = input.tokenResponse ?? {
@@ -46,6 +48,7 @@ export async function startSimulatedGitHubIdentityProvider(
       verified: true,
     },
   ];
+  const sshSigningKeysResponse = input.sshSigningKeysResponse ?? [];
 
   return startSimulatedProvider(async ({ requestUrl, response }) => {
     // Simulates GitHub's user-to-server token and user profile boundaries used by
@@ -54,6 +57,7 @@ export async function startSimulatedGitHubIdentityProvider(
     // https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app
     // https://docs.github.com/en/rest/users/users
     // https://docs.github.com/en/rest/users/emails
+    // https://docs.github.com/en/rest/users/ssh-signing-keys
     if (requestUrl.pathname === "/login/oauth/access_token") {
       response.statusCode = input.tokenStatusCode ?? 200;
       writeJson(response, tokenResponse);
@@ -67,6 +71,12 @@ export async function startSimulatedGitHubIdentityProvider(
 
     if (requestUrl.pathname === "/user/emails") {
       writeJson(response, emailsResponse);
+      return;
+    }
+
+    if (requestUrl.pathname === "/user/ssh_signing_keys") {
+      response.statusCode = input.sshSigningKeysStatusCode ?? 200;
+      writeJson(response, sshSigningKeysResponse);
       return;
     }
 
