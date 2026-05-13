@@ -243,8 +243,8 @@ describe("ChatThread", () => {
     expect(submittedResults).toEqual([{ decision: "accept" }]);
   });
 
-  it("renders generic items collapsed by default and expands their content on demand", () => {
-    render(
+  it("renders generic items through the shared semantic group fallback", () => {
+    const rendered = render(
       <ChatThread
         entries={[
           {
@@ -278,16 +278,15 @@ describe("ChatThread", () => {
       />,
     );
 
+    expect(screen.getByText("Activity")).toBeTruthy();
+    expect(screen.getByText("1 item")).toBeTruthy();
     expect(screen.getByText("Context compaction")).toBeTruthy();
     expect(screen.getByText("Running")).toBeTruthy();
-    const genericDisclosure = screen.getByText("Context compaction").closest("details");
-    expect(genericDisclosure?.hasAttribute("open")).toBe(false);
-
-    fireEvent.click(screen.getByText("Context compaction"));
-
-    expect(genericDisclosure?.hasAttribute("open")).toBe(true);
+    expect(rendered.container.querySelector("[data-chat-semantic-group]")).toBeTruthy();
     expect(
-      screen.getByText("Compacted the current session context before continuing."),
+      screen.getByText("Compacted the current session context before continuing.", {
+        selector: "p",
+      }),
     ).toBeTruthy();
     expect(screen.getByText(/drop-superseded-read-output/)).toBeTruthy();
   });

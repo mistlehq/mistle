@@ -75,7 +75,49 @@ export function ChatSemanticGroupItemOutput({
   item,
   semanticKind,
 }: ChatSemanticGroupItemOutputProps): React.JSX.Element | null {
-  if (item.output === null || item.output.length === 0) {
+  if (
+    (item.output === null || item.output.length === 0) &&
+    (semanticKind !== "generic" || item.detail === null || item.detail.length === 0)
+  ) {
+    return null;
+  }
+
+  if (semanticKind === "generic") {
+    return (
+      <div
+        className="space-y-2"
+        data-chat-semantic-group-output
+        style={{
+          marginTop: "0px",
+        }}
+      >
+        {item.detail === null ? null : (
+          <p
+            className="text-muted-foreground text-sm whitespace-pre-wrap"
+            style={{
+              lineHeight: "var(--chat-semantic-group-output-leading, 1.25rem)",
+            }}
+          >
+            {item.detail}
+          </p>
+        )}
+        {item.output === null || item.output.length === 0 ? null : (
+          <pre
+            className="bg-muted overflow-x-auto rounded-md text-xs whitespace-pre-wrap"
+            style={{
+              lineHeight: "var(--chat-semantic-group-output-leading, 1.25rem)",
+              padding: "var(--chat-semantic-group-output-padding, 0.75rem)",
+            }}
+          >
+            {item.output}
+          </pre>
+        )}
+      </div>
+    );
+  }
+
+  const output = item.output;
+  if (output === null) {
     return null;
   }
 
@@ -83,7 +125,7 @@ export function ChatSemanticGroupItemOutput({
     semanticKind === "exploring" && item.label === "Read" && item.sourcePath !== undefined
       ? getReadRenderMarkdown({
           path: item.sourcePath,
-          output: item.output,
+          output,
         })
       : null;
 
@@ -107,7 +149,7 @@ export function ChatSemanticGroupItemOutput({
   }
 
   if (semanticKind === "searching-web") {
-    const results = parseWebSearchResults(item.output);
+    const results = parseWebSearchResults(output);
     if (results !== null) {
       return (
         <div
@@ -161,7 +203,7 @@ export function ChatSemanticGroupItemOutput({
   }
 
   if (semanticKind === "making-edits" && item.detail !== null && !item.detail.includes(", ")) {
-    return <ChatDiffView diff={item.output} path={item.detail} />;
+    return <ChatDiffView diff={output} path={item.detail} />;
   }
 
   if (semanticKind === "running-commands") {
@@ -191,7 +233,7 @@ export function ChatSemanticGroupItemOutput({
         padding: "var(--chat-semantic-group-output-padding, 0.75rem)",
       }}
     >
-      {item.output}
+      {output}
     </pre>
   );
 }

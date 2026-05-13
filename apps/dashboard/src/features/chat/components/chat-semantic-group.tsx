@@ -37,6 +37,7 @@ const SemanticGroupDisplayKeyLabels = {
   "tool-call.active": "Using tools",
   "tool-call.done": "Used tools",
   "generic.active": "Activity",
+  "generic.done": "Activity",
 } as const;
 
 function isSemanticGroupDisplayKey(
@@ -218,7 +219,9 @@ export function ChatSemanticGroup({
             item.sourceKind === "file-change"
               ? findFileChangeApprovalRequest(pendingServerRequests, item.id)
               : null;
-          const hasExpandableOutput = item.output !== null && item.output.length > 0;
+          const hasExpandableOutput =
+            (item.output !== null && item.output.length > 0) ||
+            (block.semanticKind === "generic" && item.detail !== null && item.detail.length > 0);
 
           return (
             <details
