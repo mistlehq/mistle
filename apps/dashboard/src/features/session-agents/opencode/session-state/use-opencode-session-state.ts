@@ -241,23 +241,27 @@ export function useOpenCodeSessionState(input: {
     }
   }, []);
 
+  const resetModelCatalog = useCallback((phase: SessionBootstrapResult["phase"]): void => {
+    modelCatalogGenerationRef.current += 1;
+    modelCatalogStateRef.current = {
+      directory: null,
+      phase,
+    };
+    setAvailableModels([]);
+    setModelCatalogDirectory(null);
+    setBootstrapPhase(phase);
+  }, []);
+
   const disconnectSession = useCallback((): void => {
     generationRef.current += 1;
     clearEventSubscription();
     clientRef.current?.close();
     clientRef.current = null;
-    modelCatalogGenerationRef.current += 1;
-    modelCatalogStateRef.current = {
-      directory: null,
-      phase: { status: "unavailable" },
-    };
-    setAvailableModels([]);
-    setModelCatalogDirectory(null);
-    setBootstrapPhase({ status: "unavailable" });
+    resetModelCatalog({ status: "unavailable" });
     setSessionSnapshot(null);
     setSessionConnectionState("detached");
     setStep("idle");
-  }, [clearEventSubscription]);
+  }, [clearEventSubscription, resetModelCatalog]);
 
   useEffect(() => {
     return () => {
@@ -368,14 +372,7 @@ export function useOpenCodeSessionState(input: {
       clearEventSubscription();
       clientRef.current?.close();
       clientRef.current = null;
-      modelCatalogGenerationRef.current += 1;
-      modelCatalogStateRef.current = {
-        directory: null,
-        phase: { status: "bootstrapping" },
-      };
-      setAvailableModels([]);
-      setModelCatalogDirectory(null);
-      setBootstrapPhase({ status: "bootstrapping" });
+      resetModelCatalog({ status: "bootstrapping" });
       setStep("securing");
       setSessionConnectionState("connecting");
       setLifecycleErrorMessage(null);
@@ -484,18 +481,11 @@ export function useOpenCodeSessionState(input: {
           clearEventSubscription();
           clientRef.current?.close();
           clientRef.current = null;
-          modelCatalogGenerationRef.current += 1;
           const failedPhase: SessionBootstrapResult["phase"] = {
             status: "failed",
             message: error instanceof Error ? error.message : "Could not connect OpenCode session.",
           };
-          modelCatalogStateRef.current = {
-            directory: null,
-            phase: failedPhase,
-          };
-          setAvailableModels([]);
-          setModelCatalogDirectory(null);
-          setBootstrapPhase(failedPhase);
+          resetModelCatalog(failedPhase);
           setSessionSnapshot(null);
           setLifecycleErrorMessage(
             error instanceof Error ? error.message : "Could not connect OpenCode session.",
@@ -505,7 +495,7 @@ export function useOpenCodeSessionState(input: {
         }
       })();
     },
-    [clearEventSubscription, ensureTransportConnected, refreshModelCatalog],
+    [clearEventSubscription, ensureTransportConnected, refreshModelCatalog, resetModelCatalog],
   );
 
   const sendPrompt = useCallback(

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   CodexSessionConfigState,
@@ -153,8 +153,13 @@ export function useLocalSessionComposerConfigControl(input: {
     model: null,
     modelReasoningEffort: null,
   });
+  const appliedResetKeyRef = useRef<string | null | undefined>(input.resetKey);
 
   useEffect(() => {
+    if (appliedResetKeyRef.current === input.resetKey) {
+      return;
+    }
+    appliedResetKeyRef.current = input.resetKey;
     setComposerConfigOverrides({
       model: null,
       modelReasoningEffort: null,
