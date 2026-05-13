@@ -53,7 +53,7 @@ Practical consequence: provider targets are the capability boundary. Users canno
 
 - `apps/data-plane-worker`, `apps/data-plane-gateway`, `packages/sandboxd`
 - Execute compiled runtime plans.
-- Enforce egress route policy and inject credentials via internal resolver calls.
+- Forward sandbox egress through the data-plane gateway, enforce managed egress route policy, and inject credentials via internal resolver calls.
 
 ## Core Domain Model
 
@@ -124,9 +124,10 @@ flowchart TD
   E --> I[CompiledRuntimePlan]
   I --> J[Data-plane worker]
   J --> K[Sandbox runtime]
-  K --> L[Tokenizer proxy]
+  K --> L[Data-plane gateway]
   L --> M[Internal credential resolver]
   M --> G
+  L --> N[Upstream provider API]
 ```
 
 ### 1) Target discovery and metadata
@@ -172,8 +173,9 @@ flowchart TD
 ### 5) Runtime execution and egress
 
 - Compiled plan is passed through workflow to data-plane and sandbox runtime.
-- Sandbox runtime forwards egress requests with route metadata headers.
-- Tokenizer proxy resolves credentials from control-plane internal resolver and injects auth to upstream requests.
+- Sandbox runtime forwards egress requests over the sandbox tunnel to the data-plane gateway.
+- Data-plane gateway loads the active runtime plan, classifies the outbound request against compiled `egressRoutes`, and handles unmatched requests as passthrough egress.
+- For matched managed routes, data-plane gateway resolves credentials through control-plane internal APIs and injects auth before forwarding to the upstream provider.
 
 ### 6) Webhooks
 

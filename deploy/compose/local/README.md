@@ -45,7 +45,6 @@ For repo-local development:
 - Dashboard: `http://localhost:3000`
 - Control Plane API: `http://localhost:5100`
 - Data Plane Gateway: `http://localhost:5202`
-- Tokenizer Proxy: `http://localhost:5205`
 - Mailpit UI: `http://localhost:8025`
 
 4. Run the acceptance smoke test from the repo root:

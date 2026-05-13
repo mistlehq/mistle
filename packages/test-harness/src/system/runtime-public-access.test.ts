@@ -79,12 +79,12 @@ describe("normalizeRuntimePublicAccessHostnames", () => {
   it("creates a stable complete hostname set for the shared Cloudflare ingress config", () => {
     expect(
       normalizeRuntimePublicAccessHostnames([
-        "tokenizer.example.com",
+        "dashboard.example.com",
         "control.example.com",
-        "tokenizer.example.com",
+        "dashboard.example.com",
         "gateway.example.com",
       ]),
-    ).toEqual(["control.example.com", "gateway.example.com", "tokenizer.example.com"]);
+    ).toEqual(["control.example.com", "dashboard.example.com", "gateway.example.com"]);
   });
 
   it("fails fast when no public hostnames are configured", () => {

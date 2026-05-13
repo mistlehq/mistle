@@ -30,8 +30,7 @@ services:
         - >
           wget -q -O /dev/null http://127.0.0.1:3000/ &&
           wget -q -O /dev/null http://127.0.0.1:5100/__healthz &&
-          wget -q -O /dev/null http://127.0.0.1:5202/__healthz &&
-          wget -q -O /dev/null http://127.0.0.1:5205/__healthz
+          wget -q -O /dev/null http://127.0.0.1:5202/__healthz
       interval: 5s
       timeout: 3s
       retries: 20
@@ -39,7 +38,6 @@ services:
       - "3000:3000"
       - "5100:5100"
       - "5202:5202"
-      - "5205:5205"
 
   postgres:
     image: postgres:18-alpine

@@ -32,7 +32,7 @@ describe("http echo service integration", () => {
         method: "POST",
         headers: {
           "content-type": "text/plain",
-          "x-tokenizer-test": "hello",
+          "x-echo-test": "hello",
         },
         body: "hello-echo",
       });
@@ -47,7 +47,7 @@ describe("http echo service integration", () => {
 
       expect(responseRecord["method"]).toBe("POST");
       expect(responseRecord["path"]).toBe("/echo-path");
-      expect(readHeaderValue(responseRecord["headers"], "x-tokenizer-test")).toBe("hello");
+      expect(readHeaderValue(responseRecord["headers"], "x-echo-test")).toBe("hello");
       expect(responseRecord["body"]).toBe("hello-echo");
     } finally {
       await echoService.stop();

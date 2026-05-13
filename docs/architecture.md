@@ -3,7 +3,7 @@
 Mistle is split into control-plane and data-plane services.
 
 - **Control plane**: The dashboard, control-plane APIs, and control-plane workflows manage integrations, sandbox profiles, sessions, and automation setup, while data-plane APIs and workflows handle sandbox startup, lifecycle, and runtime execution.
-- **Data plane**: The data-plane gateway handles sandbox tunnels, token exchange, runtime-state access, interactive stream routing, and other runtime connectivity concerns.
+- **Data plane**: The data-plane gateway handles sandbox tunnels, token exchange, runtime-state access, interactive stream routing, managed egress, and other runtime connectivity concerns.
 
 ```text
 +--------------------------------------------------------------+
@@ -38,7 +38,7 @@ Mistle is split into control-plane and data-plane services.
 
 Mistle is built around isolated agent execution and explicit configuration. Sandboxes are credentialless by default. This means that any supported integration that is configured with credentials will not have these credentials set inside the sandboxes directly (no setting environment variables, dotenv files etc.).
 
-Instead, managed HTTP requests are mediated through the data-plane gateway over the sandbox tunnel. The gateway resolves the right credentials and injects them at request-time. This ensures that agents never see sensitive credentials accidentally (or intentionally).
+Instead, managed HTTP requests are mediated through the data-plane gateway over the sandbox tunnel. The gateway loads the sandbox's active runtime plan, matches outbound requests against compiled egress routes, resolves the right credentials through control-plane internal APIs, and injects them at request-time. This ensures that agents never see sensitive credentials accidentally (or intentionally).
 
 ```text
 +----------------------+     credentialless HTTP request     +----------------------+     authorized upstream request    +----------------------+
