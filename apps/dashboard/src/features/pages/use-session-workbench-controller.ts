@@ -138,6 +138,13 @@ export function resolveOpenCodePromptModelOverride(input: {
   return parseOpenCodePromptModelSelection(input.selectedModel);
 }
 
+export function buildOpenCodeComposerConfigResetKey(input: {
+  sandboxInstanceId: string | null;
+  sessionId: string | null;
+}): string {
+  return `${input.sandboxInstanceId ?? ""}:${input.sessionId ?? ""}`;
+}
+
 type SessionConversationChatState = Pick<
   ChatState,
   "activeTurnId" | "entries" | "pendingTurnId" | "status"
@@ -422,7 +429,10 @@ export function useSessionWorkbenchController(input: {
     bootstrap: openCodeComposerBootstrap,
     clearSessionErrorMessage: openCodeSessionState.sessionMessage.clearSessionErrorMessage,
     canChangeReasoningEffort: false,
-    resetKey: `${input.sandboxInstanceId ?? ""}:${openCodeSessionState.lifecycle.sessionSnapshot?.activeSessionId ?? ""}`,
+    resetKey: buildOpenCodeComposerConfigResetKey({
+      sandboxInstanceId: input.sandboxInstanceId,
+      sessionId: openCodeSessionState.lifecycle.sessionSnapshot?.activeSessionId ?? null,
+    }),
   });
   const activeConfigControl = isOpenCodeRuntime ? openCodeConfigControl : configControl;
   const sessionSnapshot = workbenchLifecycleState.sessionSnapshot;

@@ -22,6 +22,39 @@ export type SessionComposerConfigControl = {
   setReasoningEffort: (value: string) => void;
 };
 
+function resolveSelectedReasoningEffort(input: {
+  availableModels: SessionBootstrapResult["establishedSnapshot"]["availableModels"];
+  configSnapshot: ComposerConfigSnapshot;
+  overrides: ComposerConfigSnapshot;
+  selectedModel: string | null;
+}): string | null {
+  if (input.selectedModel === null) {
+    return null;
+  }
+
+  const explicitReasoningEffort =
+    input.overrides.modelReasoningEffort ?? input.configSnapshot.modelReasoningEffort;
+  if (explicitReasoningEffort !== null) {
+    return explicitReasoningEffort;
+  }
+
+  return (
+    resolveActiveComposerModel({
+      availableModels: input.availableModels,
+      selectedModel: input.selectedModel,
+    })?.defaultReasoningEffort ?? null
+  );
+}
+
+function buildModelOptions(
+  availableModels: SessionBootstrapResult["establishedSnapshot"]["availableModels"],
+): SessionComposerConfigControl["modelOptions"] {
+  return availableModels.map((model) => ({
+    value: model.model,
+    label: model.displayName,
+  }));
+}
+
 export function useSessionComposerConfigControl(input: {
   bootstrap: SessionBootstrapResult;
   clearSessionErrorMessage: () => void;
@@ -47,38 +80,18 @@ export function useSessionComposerConfigControl(input: {
     [availableModels, composerConfigOverrides.model, configSnapshot.model],
   );
 
-  const selectedReasoningEffort = useMemo(() => {
-    if (selectedModel === null) {
-      return null;
-    }
-
-    const explicitReasoningEffort =
-      composerConfigOverrides.modelReasoningEffort ?? configSnapshot.modelReasoningEffort;
-    if (explicitReasoningEffort !== null) {
-      return explicitReasoningEffort;
-    }
-
-    return (
-      resolveActiveComposerModel({
-        availableModels,
-        selectedModel,
-      })?.defaultReasoningEffort ?? null
-    );
-  }, [
-    availableModels,
-    composerConfigOverrides.modelReasoningEffort,
-    configSnapshot.modelReasoningEffort,
-    selectedModel,
-  ]);
-
-  const modelOptions = useMemo(
+  const selectedReasoningEffort = useMemo(
     () =>
-      availableModels.map((model) => ({
-        value: model.model,
-        label: model.displayName,
-      })),
-    [availableModels],
+      resolveSelectedReasoningEffort({
+        availableModels,
+        configSnapshot,
+        overrides: composerConfigOverrides,
+        selectedModel,
+      }),
+    [availableModels, composerConfigOverrides, configSnapshot, selectedModel],
   );
+
+  const modelOptions = useMemo(() => buildModelOptions(availableModels), [availableModels]);
 
   const setModel = useCallback(
     (nextModel: string): void => {
@@ -162,38 +175,18 @@ export function useLocalSessionComposerConfigControl(input: {
       : null;
   }, [availableModels, configuredModel]);
 
-  const selectedReasoningEffort = useMemo(() => {
-    if (selectedModel === null) {
-      return null;
-    }
-
-    const explicitReasoningEffort =
-      composerConfigOverrides.modelReasoningEffort ?? configSnapshot.modelReasoningEffort;
-    if (explicitReasoningEffort !== null) {
-      return explicitReasoningEffort;
-    }
-
-    return (
-      resolveActiveComposerModel({
-        availableModels,
-        selectedModel,
-      })?.defaultReasoningEffort ?? null
-    );
-  }, [
-    availableModels,
-    composerConfigOverrides.modelReasoningEffort,
-    configSnapshot.modelReasoningEffort,
-    selectedModel,
-  ]);
-
-  const modelOptions = useMemo(
+  const selectedReasoningEffort = useMemo(
     () =>
-      availableModels.map((model) => ({
-        value: model.model,
-        label: model.displayName,
-      })),
-    [availableModels],
+      resolveSelectedReasoningEffort({
+        availableModels,
+        configSnapshot,
+        overrides: composerConfigOverrides,
+        selectedModel,
+      }),
+    [availableModels, composerConfigOverrides, configSnapshot, selectedModel],
   );
+
+  const modelOptions = useMemo(() => buildModelOptions(availableModels), [availableModels]);
 
   const setModel = useCallback(
     (nextModel: string): void => {

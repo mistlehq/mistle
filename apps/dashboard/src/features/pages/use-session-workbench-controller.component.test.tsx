@@ -20,6 +20,7 @@ import {
   resolveStoppedSessionMessageForWorkbenchEntryPhase,
   resolveWorkbenchEntryPhase,
   shouldWaitForAutomationSessionThread,
+  buildOpenCodeComposerConfigResetKey,
   mapOpenCodePermissionsToServerRequests,
   resolveOpenCodePermissionResponse,
   resolveOpenCodePromptModelOverride,
@@ -184,6 +185,21 @@ describe("useSessionWorkbenchController", () => {
       providerID: "openai",
       modelID: "gpt-5",
     });
+  });
+
+  it("keys OpenCode composer model overrides by sandbox and session", () => {
+    expect(
+      buildOpenCodeComposerConfigResetKey({
+        sandboxInstanceId: "sbi_one",
+        sessionId: "ses_one",
+      }),
+    ).toBe("sbi_one:ses_one");
+    expect(
+      buildOpenCodeComposerConfigResetKey({
+        sandboxInstanceId: null,
+        sessionId: null,
+      }),
+    ).toBe(":");
   });
 
   it("starts Codex recovery from a recoverable disconnect and preserves attempts for the same event", () => {
