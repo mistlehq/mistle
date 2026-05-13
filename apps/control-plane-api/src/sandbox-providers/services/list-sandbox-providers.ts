@@ -19,14 +19,14 @@ export function listSandboxProviders(ctx: {
       {
         id: SandboxProvider.DOCKER,
         displayName: "Docker",
-        managed: ctx.sandboxConfig.provider === SandboxProvider.DOCKER,
+        managed: ctx.sandboxConfig.docker?.enabled === true,
         supportsOrganizationConnection: false,
         resourceCapabilities: null,
       },
       {
         id: e2bDefinition.sandboxRuntime.providerId,
         displayName: e2bDefinition.sandboxRuntime.displayName,
-        managed: ctx.sandboxConfig.provider === SandboxProvider.E2B,
+        managed: ctx.sandboxConfig.e2b?.enabled === true,
         supportsOrganizationConnection: true,
         resourceCapabilities: e2bDefinition.sandboxRuntime.resourceCapabilities,
       },

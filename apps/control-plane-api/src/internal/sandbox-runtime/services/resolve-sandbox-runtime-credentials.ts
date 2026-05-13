@@ -55,7 +55,7 @@ export async function resolveSandboxRuntimeCredentials(
       );
     }
 
-    if (ctx.sandboxConfig.provider !== SandboxProvider.DOCKER) {
+    if (ctx.sandboxConfig.docker?.enabled !== true) {
       throw new BadRequestError(
         "MANAGED_SANDBOX_PROVIDER_UNAVAILABLE",
         "Managed Docker sandbox runtime is not configured for this deployment.",
@@ -90,7 +90,7 @@ function assertUnreachableSandboxProvider(_provider: never): never {
 function resolveManagedE2BCredentials(
   ctx: ResolveSandboxRuntimeCredentialsContext,
 ): ResolvedSandboxRuntimeCredentials {
-  if (ctx.sandboxConfig.provider !== SandboxProvider.E2B || ctx.sandboxConfig.e2b === undefined) {
+  if (ctx.sandboxConfig.e2b?.enabled !== true) {
     throw new BadRequestError(
       "MANAGED_SANDBOX_PROVIDER_UNAVAILABLE",
       "Managed E2B sandbox runtime is not configured for this deployment.",

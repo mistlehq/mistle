@@ -24,6 +24,9 @@ const itManagedE2BDeployment = createIntegrationTest({
   __serviceOptions: {
     sandbox: {
       provider: "e2b",
+      e2b: {
+        apiKey: "integration-managed-e2b-api-key",
+      },
     },
   },
 });
@@ -170,58 +173,55 @@ describe.concurrent("sandbox profile version publishability get integration", ()
     },
   );
 
-  itManagedE2BDeployment(
-    "returns a managed provider issue when E2B credentials are not configured",
-    async ({ env }) => {
-      const session = await env.auth.createSession({
-        email:
-          "integration-new-sandbox-profile-version-publishability-e2b-managed-missing@example.com",
-      });
+  it("returns a managed provider issue when E2B is not enabled", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email:
+        "integration-new-sandbox-profile-version-publishability-e2b-managed-missing@example.com",
+    });
 
-      await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
-        sandboxProfileRow({
-          id: "sbp_publishability_e2b_managed_missing",
-          organizationId: session.organizationId,
-          displayName: "Publishability E2B Managed Missing Profile",
-          activeVersion: null,
-          createdAt: "2026-05-10T00:05:00.000Z",
-        }),
-      );
-      await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
-        sandboxProfileVersionRow({
-          sandboxProfileId: "sbp_publishability_e2b_managed_missing",
-          version: 1,
-          state: SandboxProfileVersionStates.DRAFT,
-          sandboxProvider: SandboxProvider.E2B,
-          sandboxVcpuCount: 2,
-          sandboxMemoryMb: 4096,
-        }),
-      );
-      const response = await env.controlPlaneApi.http.fetch(
-        "/v1/sandbox/profiles/sbp_publishability_e2b_managed_missing/versions/1/publishability",
-        {
-          headers: {
-            cookie: session.cookie,
-          },
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_publishability_e2b_managed_missing",
+        organizationId: session.organizationId,
+        displayName: "Publishability E2B Managed Missing Profile",
+        activeVersion: null,
+        createdAt: "2026-05-10T00:05:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_publishability_e2b_managed_missing",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.E2B,
+        sandboxVcpuCount: 2,
+        sandboxMemoryMb: 4096,
+      }),
+    );
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_publishability_e2b_managed_missing/versions/1/publishability",
+      {
+        headers: {
+          cookie: session.cookie,
         },
-      );
+      },
+    );
 
-      expect(response.status).toBe(200);
-      const responseBody = GetSandboxProfileVersionPublishabilityResponseSchema.parse(
-        await response.json(),
-      );
-      expect(responseBody).toEqual({
-        publishable: false,
-        issues: [
-          {
-            code: "SANDBOX_MANAGED_PROVIDER_UNAVAILABLE",
-            message:
-              "Managed E2B sandbox provider credentials are not configured for this deployment.",
-          },
-        ],
-      });
-    },
-  );
+    expect(response.status).toBe(200);
+    const responseBody = GetSandboxProfileVersionPublishabilityResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody).toEqual({
+      publishable: false,
+      issues: [
+        {
+          code: "SANDBOX_MANAGED_PROVIDER_UNAVAILABLE",
+          message:
+            "Managed E2B sandbox provider credentials are not configured for this deployment.",
+        },
+      ],
+    });
+  });
 
   it("returns profile version not draft for published versions", async ({ env }) => {
     const session = await env.auth.createSession({

@@ -81,32 +81,14 @@ export function createDefaultProfileVersionRuntimeConfig(input: {
   integrationRegistry: IntegrationRegistry;
   sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
 }): SandboxProfileVersionRuntimeConfigColumns {
-  if (input.sandboxConfig.provider === SandboxProvider.DOCKER) {
-    return {
-      sandboxProvider: SandboxProvider.DOCKER,
-      sandboxConnectionId: null,
-      sandboxVcpuCount: null,
-      sandboxMemoryMb: null,
-      sandboxStorageMb: null,
-    };
-  }
-
-  if (input.sandboxConfig.provider === SandboxProvider.E2B) {
-    const resourceCapabilities = findSandboxRuntimeResourceCapabilities({
-      integrationRegistry: input.integrationRegistry,
-      providerId: SandboxProvider.E2B,
-    });
-
-    return {
-      sandboxProvider: SandboxProvider.E2B,
-      sandboxConnectionId: null,
-      sandboxVcpuCount: resourceCapabilities.vcpuCount.default,
-      sandboxMemoryMb: resourceCapabilities.memoryMb.default,
-      sandboxStorageMb: resourceCapabilities.storageMb?.default ?? null,
-    };
-  }
-
-  throw new Error("Unsupported sandbox provider.");
+  void input;
+  return {
+    sandboxProvider: null,
+    sandboxConnectionId: null,
+    sandboxVcpuCount: null,
+    sandboxMemoryMb: null,
+    sandboxStorageMb: null,
+  };
 }
 
 export function mapProfileVersionRuntimeConfig(
@@ -283,16 +265,15 @@ function validateManagedSandboxProviderAvailability(input: {
   providerId: string;
   sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
 }): SandboxRuntimeConfigValidationIssue[] {
-  if (input.sandboxConfig.provider !== input.providerId) {
-    return [
-      {
-        code: SandboxProfilePublishabilityIssueCodes.SANDBOX_MANAGED_PROVIDER_UNAVAILABLE,
-        message: `Managed sandbox provider '${input.providerId}' is not configured for this deployment.`,
-      },
-    ];
+  if (input.providerId === SandboxProvider.DOCKER && input.sandboxConfig.docker?.enabled === true) {
+    return [];
   }
 
-  if (input.providerId === SandboxProvider.E2B && input.sandboxConfig.e2b === undefined) {
+  if (input.providerId === SandboxProvider.E2B && input.sandboxConfig.e2b?.enabled === true) {
+    return [];
+  }
+
+  if (input.providerId === SandboxProvider.E2B && input.sandboxConfig.e2b?.enabled !== true) {
     return [
       {
         code: SandboxProfilePublishabilityIssueCodes.SANDBOX_MANAGED_PROVIDER_UNAVAILABLE,
@@ -301,7 +282,12 @@ function validateManagedSandboxProviderAvailability(input: {
     ];
   }
 
-  return [];
+  return [
+    {
+      code: SandboxProfilePublishabilityIssueCodes.SANDBOX_MANAGED_PROVIDER_UNAVAILABLE,
+      message: `Managed sandbox provider '${input.providerId}' is not configured for this deployment.`,
+    },
+  ];
 }
 
 function validateSandboxResources(input: {
