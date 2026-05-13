@@ -53,20 +53,22 @@ export const PartialDataPlaneWorkerControlPlaneApiConfigSchema = z
   })
   .strict();
 
-export const DataPlaneWorkerSandboxDockerConfigSchema = z
-  .object({
-    enabled: z.literal(true),
-    socketPath: z.string().min(1),
-    networkName: z.string().min(1).optional(),
-  })
-  .strict()
-  .or(
-    z
-      .object({
-        enabled: z.literal(false),
-      })
-      .strict(),
-  );
+export const DataPlaneWorkerSandboxDockerConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      socketPath: z.string().min(1),
+      networkName: z.string().min(1).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      socketPath: z.string().min(1).optional(),
+      networkName: z.string().min(1).optional(),
+    })
+    .strict(),
+]);
 
 export const PartialDataPlaneWorkerSandboxDockerConfigSchema = z
   .object({
@@ -76,26 +78,30 @@ export const PartialDataPlaneWorkerSandboxDockerConfigSchema = z
   })
   .strict();
 
-export const DataPlaneWorkerSandboxE2BConfigSchema = z
-  .object({
-    enabled: z.literal(true),
-    apiKey: z.string().min(1),
-    domain: z.string().min(1).default(DefaultE2BCloudDomain),
-    cpuCount: z.number().int().min(1).default(2),
-    memoryMb: z
-      .number()
-      .int()
-      .min(1)
-      .default(4 * 1024),
-  })
-  .strict()
-  .or(
-    z
-      .object({
-        enabled: z.literal(false),
-      })
-      .strict(),
-  );
+export const DataPlaneWorkerSandboxE2BConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      apiKey: z.string().min(1),
+      domain: z.string().min(1).default(DefaultE2BCloudDomain),
+      cpuCount: z.number().int().min(1).default(2),
+      memoryMb: z
+        .number()
+        .int()
+        .min(1)
+        .default(4 * 1024),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      apiKey: z.string().min(1).optional(),
+      domain: z.string().min(1).optional(),
+      cpuCount: z.number().int().min(1).optional(),
+      memoryMb: z.number().int().min(1).optional(),
+    })
+    .strict(),
+]);
 
 export const PartialDataPlaneWorkerSandboxE2BConfigSchema = z
   .object({

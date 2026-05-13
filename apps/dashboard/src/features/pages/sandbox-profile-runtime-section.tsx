@@ -322,7 +322,11 @@ export function SandboxProfileRuntimeSection(input: {
           <SelectTrigger id="sandbox-profile-runtime-provider">
             <SelectValue placeholder="Select provider">
               {selectedProvider === null ? (
-                <span className="text-muted-foreground">Unknown provider</span>
+                <span className="text-muted-foreground">
+                  {draftRuntime.sandboxProvider === null
+                    ? "Select provider"
+                    : "Provider unavailable"}
+                </span>
               ) : (
                 <ProviderOptionLabel provider={selectedProvider} />
               )}
@@ -331,7 +335,7 @@ export function SandboxProfileRuntimeSection(input: {
           <SelectContent>
             {selectedProvider === null ? (
               <SelectItem disabled value={MissingProviderValue}>
-                Unknown provider
+                {draftRuntime.sandboxProvider === null ? "Select provider" : "Provider unavailable"}
               </SelectItem>
             ) : null}
             {providerOptions.map((provider) => (

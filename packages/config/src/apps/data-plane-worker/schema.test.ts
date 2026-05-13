@@ -106,6 +106,24 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
     });
   });
 
+  it("accepts disabled Docker settings without enabling Docker execution", () => {
+    const parsed = DataPlaneWorkerSandboxConfigSchema.parse({
+      internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      bootstrap: SandboxTokenConfig,
+      docker: {
+        enabled: false,
+        socketPath: "/var/run/docker.sock",
+        networkName: "mistle-sandbox-dev",
+      },
+    });
+
+    expect(parsed.docker).toEqual({
+      enabled: false,
+      socketPath: "/var/run/docker.sock",
+      networkName: "mistle-sandbox-dev",
+    });
+  });
+
   it("accepts the optional sandboxd test faults toggle", () => {
     const parsed = DataPlaneWorkerSandboxConfigSchema.parse({
       internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",

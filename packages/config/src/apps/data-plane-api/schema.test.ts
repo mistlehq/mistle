@@ -60,6 +60,20 @@ describe("DataPlaneApiSandboxConfigSchema", () => {
     });
   });
 
+  it("accepts disabled Docker settings without enabling Docker runtime inspection", () => {
+    const parsed = DataPlaneApiSandboxConfigSchema.parse({
+      docker: {
+        enabled: false,
+        socketPath: "/var/run/docker.sock",
+      },
+    });
+
+    expect(parsed.docker).toEqual({
+      enabled: false,
+      socketPath: "/var/run/docker.sock",
+    });
+  });
+
   it("requires control-plane API config", () => {
     expect(() =>
       DataPlaneApiConfigSchema.parse({

@@ -58,19 +58,20 @@ export const PartialDataPlaneApiControlPlaneApiConfigSchema = z
   })
   .strict();
 
-export const DataPlaneApiSandboxDockerConfigSchema = z
-  .object({
-    enabled: z.literal(true),
-    socketPath: z.string().min(1),
-  })
-  .strict()
-  .or(
-    z
-      .object({
-        enabled: z.literal(false),
-      })
-      .strict(),
-  );
+export const DataPlaneApiSandboxDockerConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      socketPath: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      socketPath: z.string().min(1).optional(),
+    })
+    .strict(),
+]);
 
 const PartialDataPlaneApiSandboxDockerConfigSchema = z
   .object({
@@ -79,20 +80,22 @@ const PartialDataPlaneApiSandboxDockerConfigSchema = z
   })
   .strict();
 
-export const DataPlaneApiSandboxE2BConfigSchema = z
-  .object({
-    enabled: z.literal(true),
-    apiKey: z.string().min(1),
-    domain: z.string().min(1).default(DefaultE2BCloudDomain),
-  })
-  .strict()
-  .or(
-    z
-      .object({
-        enabled: z.literal(false),
-      })
-      .strict(),
-  );
+export const DataPlaneApiSandboxE2BConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      apiKey: z.string().min(1),
+      domain: z.string().min(1).default(DefaultE2BCloudDomain),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      apiKey: z.string().min(1).optional(),
+      domain: z.string().min(1).optional(),
+    })
+    .strict(),
+]);
 
 const PartialDataPlaneApiSandboxE2BConfigSchema = z
   .object({

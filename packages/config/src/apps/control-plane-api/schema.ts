@@ -14,20 +14,22 @@ const ControlPlaneApiSandboxDockerConfigSchema = z
   })
   .strict();
 
-const ControlPlaneApiSandboxE2BConfigSchema = z
-  .object({
-    enabled: z.literal(true),
-    apiKey: z.string().min(1),
-    domain: z.string().min(1).default(DefaultE2BCloudDomain),
-  })
-  .strict()
-  .or(
-    z
-      .object({
-        enabled: z.literal(false),
-      })
-      .strict(),
-  );
+const ControlPlaneApiSandboxE2BConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      apiKey: z.string().min(1),
+      domain: z.string().min(1).default(DefaultE2BCloudDomain),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      apiKey: z.string().min(1).optional(),
+      domain: z.string().min(1).optional(),
+    })
+    .strict(),
+]);
 
 const ControlPlaneApiAuthGoogleConfigSchema = z
   .object({

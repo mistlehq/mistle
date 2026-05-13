@@ -171,6 +171,50 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(screen.getByText("OpenCode")).toBeTruthy();
   });
 
+  it("prompts for provider selection when no sandbox provider is configured", () => {
+    render(
+      <SandboxProfileRuntimeSection
+        availableConnections={[]}
+        availableTargets={[]}
+        disabled={false}
+        isDraft={true}
+        providers={[DockerProvider, E2BProvider]}
+        version={createVersion({
+          sandboxProvider: null,
+          sandboxConnectionId: null,
+          sandboxResources: null,
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("combobox", { name: "Provider" })).toBeTruthy();
+    expect(screen.getByText("Select provider")).toBeTruthy();
+    expect(screen.queryByText("Unknown provider")).toBeNull();
+  });
+
+  it("marks a saved sandbox provider as unavailable when it is no longer listed", () => {
+    render(
+      <SandboxProfileRuntimeSection
+        availableConnections={[]}
+        availableTargets={[]}
+        disabled={false}
+        isDraft={true}
+        providers={[DockerProvider]}
+        version={createVersion({
+          sandboxProvider: "e2b",
+          sandboxConnectionId: null,
+          sandboxResources: {
+            vcpuCount: 2,
+            memoryMb: 4096,
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Provider unavailable")).toBeTruthy();
+    expect(screen.queryByText("Unknown provider")).toBeNull();
+  });
+
   it("renders organization-owned E2B as BYOK credentials for the selected provider", () => {
     render(
       <SandboxProfileRuntimeSection

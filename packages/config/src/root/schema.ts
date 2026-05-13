@@ -61,37 +61,43 @@ const SandboxStorageDockerVolumeSchema = z
   })
   .strict();
 
-const SandboxDockerProviderConfigSchema = z
-  .object({
-    enabled: z.literal(true),
-    socket_path: z.string().trim().min(1),
-    network_name: z.string().trim().min(1).optional(),
-  })
-  .strict()
-  .or(
-    z
-      .object({
-        enabled: z.literal(false),
-      })
-      .strict(),
-  );
+const SandboxDockerProviderConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      socket_path: z.string().trim().min(1),
+      network_name: z.string().trim().min(1).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      socket_path: z.string().trim().min(1).optional(),
+      network_name: z.string().trim().min(1).optional(),
+    })
+    .strict(),
+]);
 
-const SandboxE2BProviderConfigSchema = z
-  .object({
-    enabled: z.literal(true),
-    api_key: z.string().trim().min(1),
-    domain: z.string().trim().min(1).default(DefaultE2BCloudDomain),
-    cpu_count: z.number().int().min(1).default(DefaultE2BCpuCount),
-    memory_mb: z.number().int().min(1).default(DefaultE2BMemoryMb),
-  })
-  .strict()
-  .or(
-    z
-      .object({
-        enabled: z.literal(false),
-      })
-      .strict(),
-  );
+const SandboxE2BProviderConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      api_key: z.string().trim().min(1),
+      domain: z.string().trim().min(1).default(DefaultE2BCloudDomain),
+      cpu_count: z.number().int().min(1).default(DefaultE2BCpuCount),
+      memory_mb: z.number().int().min(1).default(DefaultE2BMemoryMb),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      api_key: z.string().trim().min(1).optional(),
+      domain: z.string().trim().min(1).optional(),
+      cpu_count: z.number().int().min(1).optional(),
+      memory_mb: z.number().int().min(1).optional(),
+    })
+    .strict(),
+]);
 
 const ControlPlaneApiAuthSchema = z
   .object({
