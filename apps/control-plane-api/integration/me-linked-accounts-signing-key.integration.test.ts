@@ -408,7 +408,7 @@ describe.concurrent("me linked accounts signing key integration", () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
       code: "INVALID_LINKED_ACCOUNT_SIGNING_KEY_INPUT",
-      message: "GitHub signing key must be a valid SSH private key.",
+      message: "GitHub signing key must be an OpenSSH private key.",
     });
   });
 });

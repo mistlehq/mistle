@@ -61,6 +61,20 @@ describe("parseGitSshSigningPrivateKeyOrThrow", () => {
     });
   });
 
+  it("rejects PEM private keys that are not in OpenSSH format", () => {
+    const error = captureThrownError(() =>
+      parseGitSshSigningPrivateKeyOrThrow(
+        "-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----",
+      ),
+    );
+
+    expect(error).toBeInstanceOf(BadRequestError);
+    expect(error).toMatchObject({
+      code: "INVALID_LINKED_ACCOUNT_SIGNING_KEY_INPUT",
+      message: "GitHub signing key must be an OpenSSH private key.",
+    });
+  });
+
   it("rejects invalid ssh private keys", () => {
     const error = captureThrownError(() =>
       parseGitSshSigningPrivateKeyOrThrow(

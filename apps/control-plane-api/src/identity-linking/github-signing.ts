@@ -7,6 +7,8 @@ import { IdentityLinkingBadRequestCodes } from "./constants.js";
 export const GitHubProviderFamily = "github";
 export const GitSshSigningCredentialKind = "git_ssh_signing_key";
 const GitSshPrivateKeyMaxBytes = 64 * 1024;
+const OpenSshPrivateKeyHeader = "-----BEGIN OPENSSH PRIVATE KEY-----";
+const OpenSshPrivateKeyFooter = "-----END OPENSSH PRIVATE KEY-----";
 
 export const GitSshSigningSecretMetadataSchema = z
   .object({
@@ -42,6 +44,13 @@ export function parseGitSshSigningPrivateKeyOrThrow(
 
   if (Buffer.byteLength(normalizedPrivateKey, "utf8") > GitSshPrivateKeyMaxBytes) {
     throw createInvalidSigningKeyError("GitHub signing key upload is too large.");
+  }
+
+  if (
+    !normalizedPrivateKey.startsWith(OpenSshPrivateKeyHeader) ||
+    !normalizedPrivateKey.endsWith(OpenSshPrivateKeyFooter)
+  ) {
+    throw createInvalidSigningKeyError("GitHub signing key must be an OpenSSH private key.");
   }
 
   let privateKey: sshpk.PrivateKey;
