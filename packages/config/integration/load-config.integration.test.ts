@@ -678,6 +678,7 @@ describe("loadConfig integrations", () => {
       app: AppIds.DATA_PLANE_API,
       configPath: tomlConfigFixturePath,
       env: {
+        MISTLE_SANDBOX_E2B_ENABLED: "true",
         MISTLE_SANDBOX_E2B_API_KEY: "fixture-e2b-api-key",
       },
     });

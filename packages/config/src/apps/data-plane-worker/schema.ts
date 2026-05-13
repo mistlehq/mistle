@@ -55,7 +55,7 @@ export const PartialDataPlaneWorkerControlPlaneApiConfigSchema = z
 
 export const DataPlaneWorkerSandboxDockerConfigSchema = z
   .object({
-    enabled: z.literal(true).default(true),
+    enabled: z.literal(true),
     socketPath: z.string().min(1),
     networkName: z.string().min(1).optional(),
   })
@@ -78,7 +78,7 @@ export const PartialDataPlaneWorkerSandboxDockerConfigSchema = z
 
 export const DataPlaneWorkerSandboxE2BConfigSchema = z
   .object({
-    enabled: z.literal(true).default(true),
+    enabled: z.literal(true),
     apiKey: z.string().min(1),
     domain: z.string().min(1).default(DefaultE2BCloudDomain),
     cpuCount: z.number().int().min(1).default(2),

@@ -16,7 +16,7 @@ const ControlPlaneApiSandboxDockerConfigSchema = z
 
 const ControlPlaneApiSandboxE2BConfigSchema = z
   .object({
-    enabled: z.literal(true).default(true),
+    enabled: z.literal(true),
     apiKey: z.string().min(1),
     domain: z.string().min(1).default(DefaultE2BCloudDomain),
   })

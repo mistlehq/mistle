@@ -10,6 +10,7 @@ describe("DataPlaneApiSandboxConfigSchema", () => {
   it("defaults the E2B domain to the hosted cloud domain", () => {
     const parsed = DataPlaneApiSandboxConfigSchema.parse({
       e2b: {
+        enabled: true,
         apiKey: "test-api-key",
       },
     });
@@ -45,6 +46,7 @@ describe("DataPlaneApiSandboxConfigSchema", () => {
       },
       sandbox: {
         docker: {
+          enabled: true,
           socketPath: "/var/run/docker.sock",
         },
       },
@@ -78,6 +80,7 @@ describe("DataPlaneApiSandboxConfigSchema", () => {
         },
         sandbox: {
           docker: {
+            enabled: true,
             socketPath: "/var/run/docker.sock",
           },
         },

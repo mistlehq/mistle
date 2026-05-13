@@ -60,6 +60,7 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
       internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
       bootstrap: SandboxTokenConfig,
       e2b: {
+        enabled: true,
         apiKey: "test-api-key",
       },
     });
@@ -83,6 +84,7 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
       bootstrap: SandboxTokenConfig,
       sandboxdTestFaultsEnabled: true,
       e2b: {
+        enabled: true,
         apiKey: "test-api-key",
         domain: "e2b.example.com",
         cpuCount: 4,

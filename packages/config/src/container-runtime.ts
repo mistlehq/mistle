@@ -328,6 +328,9 @@ function buildRemoteSandboxBaseConfig(env: NodeJS.ProcessEnv): ConfigRecord {
           mount_object_store: "sandbox_storage",
         },
       },
+      e2b: {
+        enabled: true,
+      },
     },
   });
 }

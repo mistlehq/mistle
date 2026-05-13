@@ -63,7 +63,7 @@ const SandboxStorageDockerVolumeSchema = z
 
 const SandboxDockerProviderConfigSchema = z
   .object({
-    enabled: z.literal(true).default(true),
+    enabled: z.literal(true),
     socket_path: z.string().trim().min(1),
     network_name: z.string().trim().min(1).optional(),
   })
@@ -78,7 +78,7 @@ const SandboxDockerProviderConfigSchema = z
 
 const SandboxE2BProviderConfigSchema = z
   .object({
-    enabled: z.literal(true).default(true),
+    enabled: z.literal(true),
     api_key: z.string().trim().min(1),
     domain: z.string().trim().min(1).default(DefaultE2BCloudDomain),
     cpu_count: z.number().int().min(1).default(DefaultE2BCpuCount),
