@@ -379,6 +379,7 @@ export function useSessionWorkbenchController(input: {
       displayName: "Codex",
       hydrateChatFromConversation: chat.hydrateChatFromThread,
       lifecycle: codexLifecycleForHandoff,
+      preserveCliLaunchTargetForRestore: false,
       resetServerRequests: serverRequests.resetServerRequests,
       restoreConversationId: sessionState.threadAuthority.providerThreadId,
       resolveCliLaunchTarget: sessionState.threadAuthority.resolveCliLaunchTarget,
@@ -396,6 +397,7 @@ export function useSessionWorkbenchController(input: {
       displayName: "OpenCode",
       hydrateChatFromConversation: openCodeSessionState.chat.hydrateChatFromSession,
       lifecycle: openCodeLifecycleForHandoff,
+      preserveCliLaunchTargetForRestore: true,
       resetServerRequests: () => {},
       restoreConversationId:
         openCodeSessionState.lifecycle.sessionSnapshot?.activeSessionId ?? null,

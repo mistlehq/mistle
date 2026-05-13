@@ -44,6 +44,7 @@ type SessionMainPanelHandoffRuntime = {
   displayName: "Codex" | "OpenCode";
   hydrateChatFromConversation: () => Promise<void>;
   lifecycle: SessionMainPanelHandoffLifecycle;
+  preserveCliLaunchTargetForRestore: boolean;
   resetServerRequests: () => void;
   restoreConversationId: string | null;
   resolveCliLaunchTarget: () => Promise<SessionCliLaunchTarget>;
@@ -150,8 +151,9 @@ export function resolveChatRestoreConnectionInput(input: {
 export function resolveCliRestoreConversationId(input: {
   fallbackConversationId: string | null;
   launchTarget: SessionCliLaunchTarget;
+  preserveLaunchTarget: boolean;
 }): string | null {
-  if (input.launchTarget.type === "resume") {
+  if (input.preserveLaunchTarget && input.launchTarget.type === "resume") {
     return input.launchTarget.threadId;
   }
 
@@ -299,6 +301,7 @@ export function useSessionMainPanelHandoff(
       cliRestoreConversationIdRef.current = resolveCliRestoreConversationId({
         fallbackConversationId: activeRuntime.restoreConversationId,
         launchTarget,
+        preserveLaunchTarget: activeRuntime.preserveCliLaunchTargetForRestore,
       });
       activeRuntime.lifecycle.detachSessionConnection();
       activeRuntime.resetServerRequests();

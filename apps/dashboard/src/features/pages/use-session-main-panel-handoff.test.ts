@@ -106,7 +106,7 @@ describe("buildCliPtyOpenInput", () => {
 });
 
 describe("resolveCliRestoreConversationId", () => {
-  it("preserves the launched conversation id for resume handoffs", () => {
+  it("preserves the launched conversation id for runtimes that restore exact CLI sessions", () => {
     expect(
       resolveCliRestoreConversationId({
         fallbackConversationId: null,
@@ -114,8 +114,22 @@ describe("resolveCliRestoreConversationId", () => {
           type: "resume",
           threadId: "ses_launched",
         },
+        preserveLaunchTarget: true,
       }),
     ).toBe("ses_launched");
+  });
+
+  it("keeps Codex local handoffs on fallback restore authority", () => {
+    expect(
+      resolveCliRestoreConversationId({
+        fallbackConversationId: null,
+        launchTarget: {
+          type: "resume",
+          threadId: "local_thread",
+        },
+        preserveLaunchTarget: false,
+      }),
+    ).toBeNull();
   });
 
   it("uses the fallback conversation id for start-new handoffs", () => {
@@ -126,6 +140,7 @@ describe("resolveCliRestoreConversationId", () => {
           type: "start_new",
           shouldClearActiveThreadId: false,
         },
+        preserveLaunchTarget: true,
       }),
     ).toBe("thread_fallback");
   });
