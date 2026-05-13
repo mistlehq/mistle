@@ -23,6 +23,7 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
       expect(card).toBeDefined();
       expect(card?.displayName).toBe(definition.displayName);
       expect(card?.description).toBe(definition.description);
+      expect(card?.integrationKind).toBe(definition.kind);
       expect(card?.actionLabel).toBe("Add");
     }
   });
@@ -35,6 +36,7 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
         availableCards={[
           {
             targetKey: "openai-default",
+            integrationKind: "agent",
             displayName: "OpenAI",
             description: "Bring organization API access into Mistle.",
             configStatus: "valid",
@@ -43,10 +45,22 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
               selectedTargetKey = "openai-default";
             },
           },
+          {
+            targetKey: "github-cloud",
+            integrationKind: "git",
+            displayName: "GitHub",
+            description: "Connect repository access and GitHub events.",
+            configStatus: "valid",
+            actionLabel: "Add",
+            onAction: () => {
+              selectedTargetKey = "github-cloud";
+            },
+          },
         ]}
         connectedCards={[
           {
             targetKey: "github",
+            integrationKind: "git",
             displayName: "GitHub",
             description: "2 connections",
             configStatus: "valid",
@@ -62,8 +76,10 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "View" }));
     expect(selectedTargetKey).toBe("github");
-    expect(screen.getByRole("button", { name: "Add" })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Add" }).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "View" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Models" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Git" })).toBeTruthy();
   });
 
   it("renders load errors without a retry action", () => {
@@ -85,6 +101,7 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
         availableCards={[
           {
             targetKey: "openai-default",
+            integrationKind: "agent",
             displayName: "OpenAI",
             description: "Bring organization API access into Mistle.",
             configStatus: "valid",
@@ -95,6 +112,7 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
         connectedCards={[
           {
             targetKey: "github",
+            integrationKind: "git",
             displayName: "GitHub",
             description: "1 connection",
             configStatus: "valid",

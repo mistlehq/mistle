@@ -274,6 +274,7 @@ function createAvailableCardOverview(
     configStatus: "valid",
     description: resolveDescriptionOrThrow(definition),
     displayName: definition.displayName,
+    integrationKind: definition.kind,
     ...(definition.logoKey === undefined ? {} : { logoKey: definition.logoKey }),
     onAction: () => {},
     targetKey: definition.variantId,
