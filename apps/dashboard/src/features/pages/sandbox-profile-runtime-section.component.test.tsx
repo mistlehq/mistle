@@ -52,7 +52,7 @@ const StorageProvider = {
   id: "e2b",
   displayName: "E2B",
   managed: true,
-  supportsOrganizationConnection: false,
+  supportsOrganizationConnection: true,
   resourceCapabilities: {
     vcpuCount: {
       min: 1,
@@ -74,6 +74,25 @@ const StorageProvider = {
     },
   },
 } satisfies SandboxProviderSummary;
+
+const E2BRuntimeConnection = {
+  id: "icn_e2b_runtime_test",
+  displayName: "E2B Production",
+  targetKey: "e2b-default",
+  status: "active",
+  config: {},
+} as const;
+
+const E2BRuntimeTarget = {
+  targetKey: "e2b-default",
+  displayName: "E2B",
+  familyId: "e2b",
+  variantId: "e2b-default",
+  config: {},
+  targetHealth: {
+    configStatus: "valid",
+  },
+} as const;
 
 function createVersion(
   input: Pick<
@@ -155,33 +174,14 @@ describe("SandboxProfileRuntimeSection", () => {
   it("renders organization-owned E2B as BYOK credentials for the selected provider", () => {
     render(
       <SandboxProfileRuntimeSection
-        availableConnections={[
-          {
-            id: "icn_e2b_runtime_test",
-            displayName: "E2B Production",
-            targetKey: "e2b-default",
-            status: "active",
-            config: {},
-          },
-        ]}
-        availableTargets={[
-          {
-            targetKey: "e2b-default",
-            displayName: "E2B",
-            familyId: "e2b",
-            variantId: "e2b-default",
-            config: {},
-            targetHealth: {
-              configStatus: "valid",
-            },
-          },
-        ]}
+        availableConnections={[E2BRuntimeConnection]}
+        availableTargets={[E2BRuntimeTarget]}
         disabled={false}
         isDraft={true}
         providers={[DockerProvider, E2BProvider]}
         version={createVersion({
           sandboxProvider: "e2b",
-          sandboxConnectionId: "icn_e2b_runtime_test",
+          sandboxConnectionId: E2BRuntimeConnection.id,
           sandboxResources: {
             vcpuCount: 2,
             memoryMb: 4096,
@@ -201,37 +201,19 @@ describe("SandboxProfileRuntimeSection", () => {
   it("renders read-only inline runtime settings with the same row labels as the draft view", () => {
     render(
       <SandboxProfileRuntimeSection
-        availableConnections={[
-          {
-            id: "icn_e2b_runtime_test",
-            displayName: "E2B Production",
-            targetKey: "e2b-default",
-            status: "active",
-            config: {},
-          },
-        ]}
-        availableTargets={[
-          {
-            targetKey: "e2b-default",
-            displayName: "E2B",
-            familyId: "e2b",
-            variantId: "e2b-default",
-            config: {},
-            targetHealth: {
-              configStatus: "valid",
-            },
-          },
-        ]}
+        availableConnections={[E2BRuntimeConnection]}
+        availableTargets={[E2BRuntimeTarget]}
         disabled={false}
         isDraft={false}
-        providers={[DockerProvider, E2BProvider]}
+        providers={[DockerProvider, StorageProvider]}
         sectionChrome={false}
         version={createVersion({
           sandboxProvider: "e2b",
-          sandboxConnectionId: "icn_e2b_runtime_test",
+          sandboxConnectionId: E2BRuntimeConnection.id,
           sandboxResources: {
-            vcpuCount: 2,
-            memoryMb: 4096,
+            vcpuCount: 4,
+            memoryMb: 8192,
+            storageMb: 20480,
           },
         })}
       />,
@@ -246,9 +228,11 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(screen.getByText("Connection")).toBeTruthy();
     expect(screen.getByText("E2B Production")).toBeTruthy();
     expect(screen.getByText("CPU")).toBeTruthy();
-    expect(screen.getByText("2 vCPU")).toBeTruthy();
+    expect(screen.getByText("4 vCPU")).toBeTruthy();
     expect(screen.getByText("Memory (MB)")).toBeTruthy();
-    expect(screen.getByText("4096 MB")).toBeTruthy();
+    expect(screen.getByText("8192 MB")).toBeTruthy();
+    expect(screen.getByText("Storage (MB)")).toBeTruthy();
+    expect(screen.getByText("20480 MB")).toBeTruthy();
     expect(screen.queryByText("Resources")).toBeNull();
   });
 
