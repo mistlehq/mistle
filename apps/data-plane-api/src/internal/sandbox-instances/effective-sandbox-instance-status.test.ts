@@ -1,6 +1,7 @@
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { describe, expect, it } from "vitest";
 
+import type { SandboxRuntimeStateSnapshot } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import { resolveEffectiveSandboxInstanceStatus } from "./effective-sandbox-instance-status.js";
 
 describe("resolveEffectiveSandboxInstanceStatus", () => {
@@ -17,25 +18,7 @@ describe("resolveEffectiveSandboxInstanceStatus", () => {
     expect(
       resolveEffectiveSandboxInstanceStatus({
         persistedStatus: SandboxInstanceStatuses.STOPPED,
-        runtimeStateSnapshot: {
-          ownerLeaseId: "dtl_stopped_attached",
-          attachment: {
-            sandboxInstanceId: "sbi_stopped_attached",
-            ownerLeaseId: "dtl_stopped_attached",
-            nodeId: "dpg_node",
-            sessionId: "dts_session",
-            attachedAtMs: 1,
-          },
-          keepalive: {
-            active: true,
-          },
-          presence: {
-            activeCount: 1,
-          },
-          runtime: {
-            ready: false,
-          },
-        },
+        runtimeStateSnapshot: runtimeStateSnapshot({ ready: false }),
       }),
     ).toBe("starting");
   });
@@ -44,26 +27,93 @@ describe("resolveEffectiveSandboxInstanceStatus", () => {
     expect(
       resolveEffectiveSandboxInstanceStatus({
         persistedStatus: SandboxInstanceStatuses.STOPPED,
-        runtimeStateSnapshot: {
-          ownerLeaseId: "dtl_stopped_ready",
-          attachment: {
-            sandboxInstanceId: "sbi_stopped_ready",
-            ownerLeaseId: "dtl_stopped_ready",
-            nodeId: "dpg_node",
-            sessionId: "dts_session",
-            attachedAtMs: 1,
-          },
-          keepalive: {
-            active: true,
-          },
-          presence: {
-            activeCount: 1,
-          },
-          runtime: {
-            ready: true,
-          },
-        },
+        runtimeStateSnapshot: runtimeStateSnapshot({ ready: true }),
+      }),
+    ).toBe("running");
+  });
+
+  it("keeps pending sandboxes pending even when no runtime is attached", () => {
+    expect(
+      resolveEffectiveSandboxInstanceStatus({
+        persistedStatus: SandboxInstanceStatuses.PENDING,
+        runtimeStateSnapshot: null,
+      }),
+    ).toBe("pending");
+  });
+
+  it("keeps failed sandboxes failed even when a ready runtime is attached", () => {
+    expect(
+      resolveEffectiveSandboxInstanceStatus({
+        persistedStatus: SandboxInstanceStatuses.FAILED,
+        runtimeStateSnapshot: runtimeStateSnapshot({ ready: true }),
+      }),
+    ).toBe("failed");
+  });
+
+  it("keeps persisted starting sandboxes starting when no runtime is attached", () => {
+    expect(
+      resolveEffectiveSandboxInstanceStatus({
+        persistedStatus: SandboxInstanceStatuses.STARTING,
+        runtimeStateSnapshot: null,
+      }),
+    ).toBe("starting");
+  });
+
+  it("keeps persisted starting sandboxes starting when bootstrap is attached but runtime is not ready", () => {
+    expect(
+      resolveEffectiveSandboxInstanceStatus({
+        persistedStatus: SandboxInstanceStatuses.STARTING,
+        runtimeStateSnapshot: runtimeStateSnapshot({ ready: false }),
+      }),
+    ).toBe("starting");
+  });
+
+  it("treats persisted starting sandboxes as running only when runtime readiness is true", () => {
+    expect(
+      resolveEffectiveSandboxInstanceStatus({
+        persistedStatus: SandboxInstanceStatuses.STARTING,
+        runtimeStateSnapshot: runtimeStateSnapshot({ ready: true }),
+      }),
+    ).toBe("running");
+  });
+
+  it("downgrades persisted running sandboxes to starting when bootstrap is attached but runtime is not ready", () => {
+    expect(
+      resolveEffectiveSandboxInstanceStatus({
+        persistedStatus: SandboxInstanceStatuses.RUNNING,
+        runtimeStateSnapshot: runtimeStateSnapshot({ ready: false }),
+      }),
+    ).toBe("starting");
+  });
+
+  it("keeps persisted running sandboxes running when runtime readiness is true", () => {
+    expect(
+      resolveEffectiveSandboxInstanceStatus({
+        persistedStatus: SandboxInstanceStatuses.RUNNING,
+        runtimeStateSnapshot: runtimeStateSnapshot({ ready: true }),
       }),
     ).toBe("running");
   });
 });
+
+function runtimeStateSnapshot(input: { ready: boolean }): SandboxRuntimeStateSnapshot {
+  return {
+    ownerLeaseId: "dtl_attached",
+    attachment: {
+      sandboxInstanceId: "sbi_attached",
+      ownerLeaseId: "dtl_attached",
+      nodeId: "dpg_node",
+      sessionId: "dts_session",
+      attachedAtMs: 1,
+    },
+    keepalive: {
+      active: true,
+    },
+    presence: {
+      activeCount: 1,
+    },
+    runtime: {
+      ready: input.ready,
+    },
+  };
+}
