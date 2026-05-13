@@ -1,5 +1,4 @@
 import type { IntegrationTarget as PersistedIntegrationTarget } from "@mistle/db/control-plane";
-import { IntegrationKinds } from "@mistle/integrations-core";
 import type {
   IntegrationConnectionMethodDetailFieldSource,
   IntegrationConnectionMethodDetailFieldSourceLeaf,
@@ -636,16 +635,8 @@ export function resolveTargetMetadata(input: {
   });
 
   if (definition === undefined) {
-    if (input.displayNameOverride !== null && input.descriptionOverride !== null) {
-      return {
-        kind: IntegrationKinds.CONNECTOR,
-        displayName: input.displayNameOverride,
-        description: input.descriptionOverride,
-      };
-    }
-
     throw new Error(
-      `Integration definition '${input.familyId}::${input.variantId}' was not found and target metadata overrides are incomplete.`,
+      `Integration definition '${input.familyId}::${input.variantId}' was not found.`,
     );
   }
 

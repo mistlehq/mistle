@@ -37,11 +37,9 @@ describe.concurrent("integration targets discovery integration", () => {
     await seedTarget(env, {
       targetKey: "linear_cloud_integration_new_targets_list",
       familyId: "linear",
-      variantId: "linear-cloud",
+      variantId: "linear-default",
       enabled: true,
-      config: {
-        base_url: "https://api.linear.app",
-      },
+      config: {},
       displayNameOverride: "Linear Cloud",
       descriptionOverride: "Linear Cloud target",
     });
@@ -196,12 +194,10 @@ describe.concurrent("integration targets discovery integration", () => {
     expect(findTarget(allTargets, "linear_cloud_integration_new_targets_list")).toMatchObject({
       targetKey: "linear_cloud_integration_new_targets_list",
       familyId: "linear",
-      variantId: "linear-cloud",
+      variantId: "linear-default",
       kind: "connector",
       enabled: true,
-      config: {
-        base_url: "https://api.linear.app",
-      },
+      config: {},
       displayName: "Linear Cloud",
       description: "Linear Cloud target",
       targetHealth: {
