@@ -240,12 +240,16 @@ function createControlPlaneWorkerEnv(input: {
     MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL: input.peer.url(ServiceIds.DATA_PLANE_API),
     MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: input.peer.url(ServiceIds.CONTROL_PLANE_API),
     MISTLE_INTERNAL_AUTH_SHARED_TOKEN: "integration-new-internal-service-token",
-    MISTLE_SANDBOX_PROVIDER: input.sandbox?.provider ?? "docker",
     MISTLE_SANDBOX_DEFAULT_BASE_IMAGE: readSandboxBaseImageRef({
       sandbox: input.sandbox,
       sandboxBaseImage: input.sandboxBaseImage,
     }),
-    ...(input.sandbox?.provider === "e2b" ? createE2BEnv(input.sandbox) : {}),
+    ...(input.sandbox?.provider === "e2b"
+      ? {
+          MISTLE_SANDBOX_DOCKER_ENABLED: "false",
+          ...createE2BEnv(input.sandbox),
+        }
+      : { MISTLE_SANDBOX_DOCKER_ENABLED: "true" }),
     MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL: input.peer.ws(
       ServiceIds.DATA_PLANE_GATEWAY,
       "/tunnel/sandbox",
@@ -277,6 +281,7 @@ function createE2BEnv(input: IntegrationSandboxOptions): Record<string, string> 
   }
 
   return {
+    MISTLE_SANDBOX_E2B_ENABLED: "true",
     MISTLE_SANDBOX_E2B_API_KEY: input.e2b.apiKey,
     ...(input.e2b.domain === undefined ? {} : { MISTLE_SANDBOX_E2B_DOMAIN: input.e2b.domain }),
     ...(input.e2b.cpuCount === undefined

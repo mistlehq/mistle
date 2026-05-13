@@ -22,7 +22,6 @@ const TestConfig: DataPlaneWorkerRuntimeConfig = {
       baseUrl: "http://127.0.0.1:5100",
     },
     sandbox: {
-      provider: "docker",
       internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
       bootstrap: {
         tokenSecret: "integration-bootstrap-secret",
@@ -30,6 +29,7 @@ const TestConfig: DataPlaneWorkerRuntimeConfig = {
         tokenAudience: "integration-data-plane-gateway",
       },
       docker: {
+        enabled: true,
         socketPath: "/var/run/docker.sock",
         networkName: "mistle-sandbox-dev",
       },
@@ -43,7 +43,6 @@ const TestConfig: DataPlaneWorkerRuntimeConfig = {
     },
   },
   sandbox: {
-    provider: "docker",
     internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     bootstrap: {
       tokenSecret: "integration-bootstrap-secret",
@@ -51,6 +50,7 @@ const TestConfig: DataPlaneWorkerRuntimeConfig = {
       tokenAudience: "integration-data-plane-gateway",
     },
     docker: {
+      enabled: true,
       socketPath: "/var/run/docker.sock",
       networkName: "mistle-sandbox-dev",
     },

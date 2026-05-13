@@ -183,7 +183,6 @@ function config(input: {
       serviceToken: "integration-new-internal-service-token",
     },
     sandbox: {
-      provider: input.sandbox?.provider ?? "docker",
       defaultBaseImage: readSandboxBaseImageRef({
         sandbox: input.sandbox,
         sandboxBaseImage: input.sandboxBaseImage,

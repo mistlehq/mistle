@@ -60,8 +60,6 @@ type RunInput = {
   stdio?: "inherit" | "pipe";
 };
 
-type SandboxProvider = "docker" | "e2b";
-
 function readDevStartOptions(): void {
   const args = process.argv.slice(2);
   if (args.length > 0) {
@@ -128,27 +126,20 @@ function readDataPlaneGatewayLocalPort(configPath: string): number {
   );
 }
 
-function readSandboxProvider(configPath: string): SandboxProvider {
-  const configuredProvider = process.env.MISTLE_SANDBOX_PROVIDER?.trim();
-
-  if (configuredProvider === "docker" || configuredProvider === "e2b") {
-    return configuredProvider;
+function readDockerSandboxProviderEnabled(configPath: string): boolean {
+  const configuredEnabled = process.env.MISTLE_SANDBOX_DOCKER_ENABLED?.trim();
+  if (configuredEnabled === "true") {
+    return true;
   }
-
-  if (configuredProvider !== undefined && configuredProvider.length > 0) {
-    throw new Error(
-      `Unsupported sandbox provider '${configuredProvider}' in MISTLE_SANDBOX_PROVIDER.`,
-    );
+  if (configuredEnabled === "false") {
+    return false;
   }
-
+  if (configuredEnabled !== undefined && configuredEnabled.length > 0) {
+    throw new Error("MISTLE_SANDBOX_DOCKER_ENABLED must be 'true' or 'false' when set.");
+  }
   const parsed = readTomlConfigRoot(configPath);
-  const resolvedValue = getValueAtPath(parsed, ["sandbox", "provider"]);
-
-  if (resolvedValue === "docker" || resolvedValue === "e2b") {
-    return resolvedValue;
-  }
-
-  throw new Error("Missing or invalid sandbox.provider in config/config.development.toml.");
+  const resolvedValue = getValueAtPath(parsed, ["sandbox", "docker", "enabled"]);
+  return resolvedValue !== false && getValueAtPath(parsed, ["sandbox", "docker"]) !== undefined;
 }
 
 function readRequiredEnv(envVarName: string): string {
@@ -390,11 +381,10 @@ function dockerImageExists(imageTag: string): boolean {
 
 async function start(): Promise<void> {
   readDevStartOptions();
-  const sandboxProvider = readSandboxProvider(DEV_CONFIG_PATH);
-  const infraSummary =
-    sandboxProvider === "docker"
-      ? "SeaweedFS, Postgres 18, PgBouncer, Mailpit, Registry, OTel LGTM, gateway relay"
-      : "SeaweedFS, Postgres 18, PgBouncer, Mailpit, OTel LGTM";
+  const dockerSandboxProviderEnabled = readDockerSandboxProviderEnabled(DEV_CONFIG_PATH);
+  const infraSummary = dockerSandboxProviderEnabled
+    ? "SeaweedFS, Postgres 18, PgBouncer, Mailpit, Registry, OTel LGTM, gateway relay"
+    : "SeaweedFS, Postgres 18, PgBouncer, Mailpit, OTel LGTM";
   console.log(`Starting local infra dependencies (${infraSummary})...`);
   const controlPlaneApiLocalPort = readControlPlaneApiLocalPort(DEV_CONFIG_PATH);
   const dataPlaneGatewayLocalPort = readDataPlaneGatewayLocalPort(DEV_CONFIG_PATH);
@@ -432,7 +422,7 @@ async function start(): Promise<void> {
     "valkey",
   ];
 
-  if (sandboxProvider === "docker") {
+  if (dockerSandboxProviderEnabled) {
     infraServiceNames.splice(4, 0, "registry");
     infraServiceNames.push("data-plane-gateway-relay");
   }
@@ -448,7 +438,7 @@ async function start(): Promise<void> {
     env: sharedDevEnv,
   });
 
-  if (sandboxProvider === "docker") {
+  if (dockerSandboxProviderEnabled) {
     console.log("Checking sandbox base image cache...");
     const { hit: sandboxBaseCacheHit, cacheKey: sandboxBaseCacheKey } =
       checkSandboxBaseBuildCache();
@@ -490,9 +480,7 @@ async function start(): Promise<void> {
       writeSandboxBaseBuildCacheKey(sandboxBaseCacheKey);
     }
   } else {
-    console.log(
-      `Skipping local sandbox image build and registry push because sandbox provider is '${sandboxProvider}'.`,
-    );
+    console.log("Skipping local sandbox image build and registry push because Docker is disabled.");
   }
 
   console.log("Building migration dependencies...");
@@ -549,7 +537,7 @@ async function start(): Promise<void> {
   console.log(`- data-plane tunnel route: ${dataPlaneGatewayPublicUrl}/tunnel`);
   console.log("- mailpit ui: http://127.0.0.1:8025");
   console.log("- grafana (otel-lgtm): http://127.0.0.1:3000");
-  if (sandboxProvider === "docker") {
+  if (dockerSandboxProviderEnabled) {
     console.log(`- local registry: http://${LOCAL_REGISTRY_HOST}`);
   }
   console.log("");

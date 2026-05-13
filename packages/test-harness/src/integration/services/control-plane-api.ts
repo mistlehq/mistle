@@ -260,9 +260,11 @@ function config(input: {
       },
     },
     sandbox: {
-      provider: input.sandbox?.provider ?? "docker",
       defaultBaseImage: input.sandboxBaseImageRef ?? getLocalDevDockerRegistrySandboxBaseImageRef(),
       gatewayWsUrl: input.gatewayWsUrl,
+      docker: {
+        enabled: input.sandbox?.provider !== "e2b",
+      },
       ...(input.sandbox?.e2b === undefined ? {} : { e2b: mapE2BOptions(input.sandbox.e2b) }),
       bootstrap: {
         tokenSecret: "integration-new-bootstrap-token-secret",
@@ -334,10 +336,12 @@ function config(input: {
 }
 
 function mapE2BOptions(input: NonNullable<IntegrationSandboxOptions["e2b"]>): {
+  enabled: true;
   apiKey: string;
   domain: string;
 } {
   return {
+    enabled: true,
     apiKey: input.apiKey,
     domain: input.domain ?? DefaultE2BCloudDomain,
   };

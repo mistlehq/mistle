@@ -8,7 +8,6 @@ import { SandboxStartupModes } from "./sandbox-startup-input.js";
 
 function createTestRuntimeConfig(): DataPlaneWorkerRuntimeConfig {
   const sandbox: DataPlaneWorkerRuntimeConfig["sandbox"] = {
-    provider: SandboxProvider.DOCKER,
     internalGatewayWsUrl: "ws://gateway/tunnel/sandbox",
     bootstrap: {
       tokenSecret: "bootstrap-secret",
@@ -16,6 +15,7 @@ function createTestRuntimeConfig(): DataPlaneWorkerRuntimeConfig {
       tokenAudience: "audience",
     },
     docker: {
+      enabled: true,
       socketPath: "/var/run/docker.sock",
       networkName: "mistle-sandbox-dev",
     },

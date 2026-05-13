@@ -7,7 +7,6 @@ function createTestRuntimeConfig(input: {
   sandboxdTestFaultsEnabled?: boolean;
 }): DataPlaneWorkerRuntimeConfig {
   const sandbox: DataPlaneWorkerRuntimeConfig["sandbox"] = {
-    provider: "docker",
     internalGatewayWsUrl: "ws://gateway/tunnel/sandbox",
     bootstrap: {
       tokenSecret: "bootstrap-secret",

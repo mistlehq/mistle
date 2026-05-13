@@ -246,7 +246,6 @@ function createDataPlaneWorkerEnv(input: {
     MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL: input.sandboxEndpoints.gatewayWsUrl,
     MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: input.peer.url(ServiceIds.CONTROL_PLANE_API),
     MISTLE_INTERNAL_AUTH_SHARED_TOKEN: "integration-new-internal-service-token",
-    MISTLE_SANDBOX_PROVIDER: provider,
     MISTLE_SANDBOX_DEFAULT_BASE_IMAGE: readSandboxBaseImageRef({
       sandbox: input.sandbox,
       sandboxBaseImage: input.sandboxBaseImage,
@@ -254,10 +253,11 @@ function createDataPlaneWorkerEnv(input: {
     MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL: input.sandboxEndpoints.gatewayWsUrl,
     ...(provider === "docker"
       ? {
+          MISTLE_SANDBOX_DOCKER_ENABLED: "true",
           MISTLE_SANDBOX_DOCKER_SOCKET_PATH: DockerSocketPath,
         }
       : {
-          ...createE2BEnv(input.sandbox),
+          MISTLE_SANDBOX_DOCKER_ENABLED: "false",
         }),
     ...(input.sandboxEndpoints.dockerNetworkName === undefined
       ? {}
@@ -350,26 +350,6 @@ function readSandboxBaseImageRef(input: {
   }
 
   return getLocalDevDockerRegistrySandboxBaseImageRef();
-}
-
-function createE2BEnv(input: IntegrationSandboxOptions | undefined): Record<string, string> {
-  if (input?.e2b === undefined) {
-    throw new Error("data-plane-worker requires E2B sandbox options when provider is e2b.");
-  }
-
-  return {
-    MISTLE_SANDBOX_E2B_API_KEY: input.e2b.apiKey,
-    ...(input.e2b.domain === undefined ? {} : { MISTLE_SANDBOX_E2B_DOMAIN: input.e2b.domain }),
-    ...(input.e2b.cpuCount === undefined
-      ? {}
-      : { MISTLE_SANDBOX_E2B_CPU_COUNT: input.e2b.cpuCount }),
-    ...(input.e2b.memoryMb === undefined
-      ? {}
-      : { MISTLE_SANDBOX_E2B_MEMORY_MB: input.e2b.memoryMb }),
-    ...(input.e2b.templateLockDirectoryPath === undefined
-      ? {}
-      : { MISTLE_SANDBOX_E2B_TEMPLATE_LOCK_DIR: input.e2b.templateLockDirectoryPath }),
-  };
 }
 
 function createPublicGatewayWsUrl(publicGatewayBaseUrl: string): string {

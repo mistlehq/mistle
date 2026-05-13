@@ -1342,7 +1342,7 @@ async function startDataPlaneWorkerDockerService(input: {
       MISTLE_SERVICES_DATA_PLANE_GATEWAY_INTERNAL_URL: gatewayBaseUrl,
       MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL:
         createWebSocketBaseUrl(gatewayBaseUrl),
-      MISTLE_SANDBOX_PROVIDER: "docker",
+      MISTLE_SANDBOX_DOCKER_ENABLED: "true",
       MISTLE_SANDBOX_DOCKER_SOCKET_PATH: DockerSocketPath,
       MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: readOptionalServiceContainerBaseUrl({
         services: input.startInput.services,

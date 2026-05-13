@@ -274,7 +274,6 @@ function createWorkerConfig(env: IntegrationTestEnvironment): DataPlaneWorkerCon
       baseUrl: env.controlPlaneApi.hostBaseUrl,
     },
     sandbox: {
-      provider: "docker",
       storage: {
         backend: "docker_volume",
       },
@@ -285,6 +284,7 @@ function createWorkerConfig(env: IntegrationTestEnvironment): DataPlaneWorkerCon
         tokenAudience: "integration-new-data-plane-gateway",
       },
       docker: {
+        enabled: true,
         socketPath: DockerSocketPath,
       },
     },

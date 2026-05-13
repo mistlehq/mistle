@@ -111,7 +111,7 @@ async function tryDeleteDockerVolume(input: {
 }): Promise<void> {
   try {
     const dockerConfig = input.workerConfig.sandbox.docker;
-    if (dockerConfig === undefined) {
+    if (dockerConfig?.enabled !== true) {
       throw new Error("Expected Docker config to be defined in worker config.");
     }
 
@@ -192,7 +192,7 @@ class DockerVolumeSandboxStorageBackendAdapterImpl implements SandboxStorageBack
         }
 
         const dockerConfig = this.#workerConfig.sandbox.docker;
-        if (dockerConfig === undefined) {
+        if (dockerConfig?.enabled !== true) {
           throw new Error("Expected Docker config to be defined in worker config.");
         }
 
@@ -360,7 +360,7 @@ class DockerVolumeSandboxStorageBackendAdapterImpl implements SandboxStorageBack
     });
 
     const dockerConfig = this.#workerConfig.sandbox.docker;
-    if (dockerConfig === undefined) {
+    if (dockerConfig?.enabled !== true) {
       throw new Error("Expected Docker config to be defined in worker config.");
     }
 

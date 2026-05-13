@@ -220,7 +220,6 @@ function createWorkerConfig(): DataPlaneWorkerConfig {
       baseUrl: "http://127.0.0.1:5100",
     },
     sandbox: {
-      provider: "e2b",
       storage: {
         backend: "archil",
       },

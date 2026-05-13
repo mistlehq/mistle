@@ -210,7 +210,6 @@ function createWorkerConfig(): DataPlaneWorkerConfig {
       baseUrl: "http://127.0.0.1:5100",
     },
     sandbox: {
-      provider: "docker",
       storage: {
         backend: "docker_volume",
       },
@@ -221,6 +220,7 @@ function createWorkerConfig(): DataPlaneWorkerConfig {
         tokenAudience: "integration-new-data-plane-gateway",
       },
       docker: {
+        enabled: true,
         socketPath: DockerSocketPath,
       },
     },

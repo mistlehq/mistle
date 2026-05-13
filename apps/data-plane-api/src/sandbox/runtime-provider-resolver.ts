@@ -35,7 +35,7 @@ export async function resolveSandboxRuntimeAdapter(
       throw new Error("Docker sandbox runtime cannot use a sandbox connection.");
     }
 
-    if (ctx.config.app.sandbox.docker === undefined) {
+    if (ctx.config.app.sandbox.docker?.enabled !== true) {
       throw new Error("Expected data-plane API Docker sandbox config.");
     }
 

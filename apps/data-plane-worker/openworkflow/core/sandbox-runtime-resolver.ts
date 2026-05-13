@@ -68,7 +68,7 @@ export function createSandboxRuntimeProviderResolver(input: {
           throw new Error("Docker sandbox runtime cannot use a sandbox connection.");
         }
 
-        if (input.config.app.sandbox.docker === undefined) {
+        if (input.config.app.sandbox.docker?.enabled !== true) {
           throw new Error("Expected data-plane worker Docker sandbox config.");
         }
 

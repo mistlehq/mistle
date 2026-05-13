@@ -127,18 +127,17 @@ function config(input: {
     runtimeState: {
       gatewayBaseUrl: input.gatewayBaseUrl,
     },
-    sandbox: {
-      provider: input.sandbox?.provider ?? "docker",
-      ...(input.sandbox?.provider === "e2b"
+    sandbox:
+      input.sandbox?.provider === "e2b"
         ? {
             e2b: requireE2BOptions(input.sandbox),
           }
         : {
             docker: {
+              enabled: true,
               socketPath: DockerSocketPath,
             },
-          }),
-    },
+          },
     controlPlaneApi: {
       baseUrl: input.controlPlaneBaseUrl,
     },
@@ -152,6 +151,7 @@ function config(input: {
 }
 
 function requireE2BOptions(input: IntegrationSandboxOptions): {
+  enabled: true;
   apiKey: string;
   domain: string;
 } {
@@ -160,6 +160,7 @@ function requireE2BOptions(input: IntegrationSandboxOptions): {
   }
 
   return {
+    enabled: true,
     apiKey: input.e2b.apiKey,
     domain: input.e2b.domain ?? "e2b.app",
   };

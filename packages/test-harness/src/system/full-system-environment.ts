@@ -718,11 +718,13 @@ export async function startFullSystemEnvironment(
           MISTLE_SERVICES_DATA_PLANE_GATEWAY_INTERNAL_URL: DATA_PLANE_GATEWAY_CONTAINER_BASE_URL,
           ...(isDockerSandboxProvider
             ? {
+                MISTLE_SANDBOX_DOCKER_ENABLED: "true",
                 MISTLE_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
                 MISTLE_SANDBOX_DOCKER_NETWORK_NAME: activeNetwork.getName(),
               }
-            : {}),
-          MISTLE_SANDBOX_PROVIDER: input.sandboxProvider,
+            : {
+                MISTLE_SANDBOX_DOCKER_ENABLED: "false",
+              }),
           MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL: gatewayWsUrl,
           MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL: gatewayWsUrl,
         },
