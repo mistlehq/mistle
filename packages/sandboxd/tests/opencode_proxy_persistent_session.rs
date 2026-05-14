@@ -4,6 +4,7 @@ use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
+use std::time::Duration as StdDuration;
 
 use serde_json::{Value, json};
 use tempfile::TempDir;
@@ -11,7 +12,7 @@ use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{Message, WebSocket, connect};
 
 use sandboxd::keepalive::KeepaliveManager;
-use sandboxd::opencode_proxy::start_opencode_proxy;
+use sandboxd::opencode_proxy::{OpenCodeProxy, start_opencode_proxy};
 use sandboxd::runtime::readiness::RuntimeReadinessManager;
 use sandboxd::time::{Duration, Sleeper, ThreadSleeper};
 
@@ -23,13 +24,15 @@ fn shell_command_survives_client_disconnect_after_proxy_activity_retention() {
 
     let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
     let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
-    let proxy = start_opencode_proxy(
-        "ws://127.0.0.1:0/opencode",
-        &raw_url,
-        keepalive_manager.clone(),
-        runtime_readiness_manager.clone(),
-    )
-    .expect("OpenCode proxy should start");
+    let proxy = OpenCodeProxyGuard::new(
+        start_opencode_proxy(
+            "ws://127.0.0.1:0/opencode",
+            &raw_url,
+            keepalive_manager.clone(),
+            runtime_readiness_manager.clone(),
+        )
+        .expect("OpenCode proxy should start"),
+    );
 
     wait_for_runtime_readiness(&runtime_readiness_manager, true);
     wait_for_keepalive_activity(&keepalive_manager, false);
@@ -79,7 +82,7 @@ fn shell_command_survives_client_disconnect_after_proxy_activity_retention() {
     wait_for_raw_session_idle(&raw_url, &session_id);
     wait_for_keepalive_activity(&keepalive_manager, false);
 
-    proxy.close().expect("OpenCode proxy should close cleanly");
+    proxy.close();
 }
 
 fn start_opencode_server(port: u16) -> OpenCodeServerProcess {
@@ -257,7 +260,10 @@ where
 }
 
 fn raw_json_request(method: &str, url: &str, body: Option<Value>) -> Value {
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::blocking::Client::builder()
+        .timeout(StdDuration::from_secs(5))
+        .build()
+        .expect("raw OpenCode HTTP client should build");
     let request = match method {
         "GET" => client.get(url),
         "POST" => client.post(url),
@@ -342,5 +348,36 @@ impl Drop for OpenCodeServerProcess {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
+    }
+}
+
+struct OpenCodeProxyGuard {
+    proxy: Option<OpenCodeProxy>,
+}
+
+impl OpenCodeProxyGuard {
+    fn new(proxy: OpenCodeProxy) -> Self {
+        Self { proxy: Some(proxy) }
+    }
+
+    fn listen_url(&self) -> &str {
+        self.proxy
+            .as_ref()
+            .expect("OpenCode proxy guard should still own proxy")
+            .listen_url()
+    }
+
+    fn close(mut self) {
+        if let Some(proxy) = self.proxy.take() {
+            proxy.close().expect("OpenCode proxy should close cleanly");
+        }
+    }
+}
+
+impl Drop for OpenCodeProxyGuard {
+    fn drop(&mut self) {
+        if let Some(proxy) = self.proxy.take() {
+            let _ = proxy.close();
+        }
     }
 }
