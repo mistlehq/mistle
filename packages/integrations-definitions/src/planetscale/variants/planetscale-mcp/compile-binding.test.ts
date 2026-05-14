@@ -1,3 +1,4 @@
+import { routesOverlap, type EgressCredentialRoute } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import { PlanetScaleCredentialSlotKeys } from "./auth.js";
@@ -13,6 +14,18 @@ const SandboxPaths = {
 
 function artifactBinPath(name: string): string {
   return `/usr/local/bin/${name}`;
+}
+
+function requireRoute(
+  routes: ReturnType<typeof compilePlanetScaleBinding>["egressRoutes"],
+  index: number,
+): ReturnType<typeof compilePlanetScaleBinding>["egressRoutes"][number] {
+  const route = routes[index];
+  if (route === undefined) {
+    throw new Error(`Expected route at index ${String(index)}.`);
+  }
+
+  return route;
 }
 
 describe("compilePlanetScaleBinding", () => {
@@ -167,6 +180,27 @@ describe("compilePlanetScaleBinding", () => {
     });
 
     expect(compiled.egressRoutes).toHaveLength(2);
+    const fullMcpRoute: EgressCredentialRoute = {
+      egressRuleId: "egress_rule_planetscale",
+      bindingId: "ibd_123",
+      familyId: "planetscale",
+      variantId: "planetscale-mcp",
+      ...requireRoute(compiled.egressRoutes, 0),
+    };
+    const insightsMcpRoute: EgressCredentialRoute = {
+      egressRuleId: "egress_rule_planetscale_insights",
+      bindingId: "ibd_123",
+      familyId: "planetscale",
+      variantId: "planetscale-mcp",
+      ...requireRoute(compiled.egressRoutes, 1),
+    };
+
+    expect(
+      routesOverlap({
+        left: fullMcpRoute,
+        right: insightsMcpRoute,
+      }),
+    ).toBe(false);
     expect(compiled.artifacts).toEqual([]);
     expect(compiled.runtimeClients).toEqual([]);
   });

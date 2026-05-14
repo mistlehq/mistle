@@ -122,7 +122,16 @@ function hasPathPrefixOverlap(
 
   for (const leftPrefix of leftPathPrefixes) {
     for (const rightPrefix of rightPathPrefixes) {
-      if (leftPrefix.startsWith(rightPrefix) || rightPrefix.startsWith(leftPrefix)) {
+      if (
+        pathBelongsToPrefix({
+          path: leftPrefix,
+          pathPrefix: rightPrefix,
+        }) ||
+        pathBelongsToPrefix({
+          path: rightPrefix,
+          pathPrefix: leftPrefix,
+        })
+      ) {
         return true;
       }
     }
@@ -144,6 +153,17 @@ function getLongestPathPrefixLength(route: EgressCredentialRoute): number {
   }
 
   return longestLength;
+}
+
+function pathBelongsToPrefix(input: { path: string; pathPrefix: string }): boolean {
+  const normalizedPath = normalizePath(input.path);
+  const normalizedPathPrefix = normalizeRoutePathPrefix(input.pathPrefix);
+
+  return (
+    normalizedPathPrefix === "/" ||
+    normalizedPath === normalizedPathPrefix ||
+    normalizedPath.startsWith(`${normalizedPathPrefix}/`)
+  );
 }
 
 export function matchesRoute(input: {
@@ -171,7 +191,10 @@ export function matchesRoute(input: {
 
   if (input.route.match.pathPrefixes !== undefined) {
     const hasMatchingPathPrefix = input.route.match.pathPrefixes.some((pathPrefix) =>
-      normalizedPath.startsWith(pathPrefix),
+      pathBelongsToPrefix({
+        path: normalizedPath,
+        pathPrefix,
+      }),
     );
 
     if (!hasMatchingPathPrefix) {

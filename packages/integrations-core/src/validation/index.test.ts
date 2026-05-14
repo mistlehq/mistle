@@ -279,6 +279,33 @@ describe("validateCompiledRuntimePlanFragments", () => {
     expect(caughtError).toMatchObject({ code: CompilerErrorCodes.ROUTE_CONFLICT });
   });
 
+  it("accepts same-host sibling path prefixes that only share a string prefix", () => {
+    const resultA = createCompiledRuntimePlanFragment({
+      route: createRoute({
+        egressRuleId: "egress_rule_planetscale",
+        bindingId: "bind_planetscale",
+        hosts: ["mcp.pscale.dev"],
+        pathPrefixes: ["/mcp/planetscale"],
+      }),
+      artifactKey: "artifact-a",
+    });
+    const resultB = createCompiledRuntimePlanFragment({
+      route: createRoute({
+        egressRuleId: "egress_rule_planetscale_insights",
+        bindingId: "bind_planetscale",
+        hosts: ["mcp.pscale.dev"],
+        pathPrefixes: ["/mcp/planetscale-insights-only"],
+      }),
+      artifactKey: "artifact-b",
+    });
+
+    expect(() =>
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [resultA, resultB],
+      }),
+    ).not.toThrow();
+  });
+
   it("fails on duplicate workspace source paths", () => {
     const resultA = createCompiledRuntimePlanFragment({
       route: createRoute({

@@ -93,6 +93,26 @@ describe("egress route matching", () => {
     expect(doesMatch).toBe(true);
   });
 
+  it("does not match sibling path prefixes that only share a string prefix", () => {
+    const route = createRoute({
+      egressRuleId: "egress_rule_planetscale",
+      bindingId: "bind_planetscale",
+      hosts: ["mcp.pscale.dev"],
+      pathPrefixes: ["/mcp/planetscale"],
+    });
+
+    expect(
+      matchesRoute({
+        route,
+        request: {
+          host: "mcp.pscale.dev",
+          path: "/mcp/planetscale-insights-only",
+          method: "POST",
+        },
+      }),
+    ).toBe(false);
+  });
+
   it("detects overlapping routes", () => {
     const left = createRoute({
       egressRuleId: "egress_rule_openai_v1",
@@ -115,6 +135,30 @@ describe("egress route matching", () => {
         right,
       }),
     ).toBe(true);
+  });
+
+  it("does not detect overlap for sibling path prefixes that only share a string prefix", () => {
+    const left = createRoute({
+      egressRuleId: "egress_rule_planetscale",
+      bindingId: "bind_planetscale",
+      hosts: ["mcp.pscale.dev"],
+      methods: ["POST"],
+      pathPrefixes: ["/mcp/planetscale"],
+    });
+    const right = createRoute({
+      egressRuleId: "egress_rule_planetscale_insights",
+      bindingId: "bind_planetscale",
+      hosts: ["mcp.pscale.dev"],
+      methods: ["POST"],
+      pathPrefixes: ["/mcp/planetscale-insights-only"],
+    });
+
+    expect(
+      routesOverlap({
+        left,
+        right,
+      }),
+    ).toBe(false);
   });
 
   it("orders routes by specificity for deterministic matching", () => {
