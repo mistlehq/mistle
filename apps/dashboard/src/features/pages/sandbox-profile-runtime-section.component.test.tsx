@@ -171,6 +171,29 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(screen.getByText("OpenCode")).toBeTruthy();
   });
 
+  it("renders the Docker provider with the Docker logo", () => {
+    render(
+      <SandboxProfileRuntimeSection
+        availableConnections={[]}
+        availableTargets={[]}
+        disabled={false}
+        isDraft={true}
+        providers={[DockerProvider]}
+        version={createVersion({
+          sandboxProvider: "docker",
+          sandboxConnectionId: null,
+          sandboxResources: null,
+        })}
+      />,
+    );
+
+    const providerLogo = screen
+      .getByRole("combobox", { name: "Provider" })
+      .querySelector('img[src="/integration-logos/docker.svg"]');
+    expect(providerLogo).not.toBeNull();
+    expect(screen.getByText("Docker")).toBeTruthy();
+  });
+
   it("prompts for provider selection when no sandbox provider is configured", () => {
     render(
       <SandboxProfileRuntimeSection

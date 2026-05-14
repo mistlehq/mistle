@@ -829,7 +829,7 @@ function resolveDefaultCredentialSourceForProvider(
 
 function resolveSandboxProviderLogoKey(provider: SandboxProviderSummary): string | undefined {
   if (provider.id === DockerSandboxProviderId) {
-    return undefined;
+    return DockerSandboxProviderId;
   }
 
   const definition = IntegrationRegistry.listDefinitions().find(
