@@ -6,21 +6,21 @@ import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
-import type { ChatState } from "../chat/chat-state.js";
 import { formatCodexContextUsage } from "../session-agents/codex/session-state/codex-context-usage.js";
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import {
   buildOpenCodeAttachmentParts,
   buildOpenCodeComposerConfigResetKey,
   buildRefreshingOpenCodeComposerBootstrap,
-  mapOpenCodeChatStateForConversation,
-  mapOpenCodePermissionsToServerRequests,
   resolveOpenCodePromptModelOverride,
-  resolveOpenCodePermissionResponse,
   useOpenCodeSessionState,
 } from "../session-agents/opencode/session-state/index.js";
-import type { ServerRequestEntry } from "../session-agents/server-requests/index.js";
 import { SessionRuntimeWorkbenchCapabilities } from "../session-agents/session-runtime-workbench-capabilities.js";
+import {
+  buildCodexConversationRuntime,
+  buildOpenCodeConversationRuntime,
+  type SessionWorkbenchRuntimeAdapter,
+} from "../session-agents/session-workbench-conversation-runtimes.js";
 import {
   buildCodexHandoffRuntime,
   buildCodexLifecycleForHandoff,
@@ -42,7 +42,6 @@ import {
   usePersistedSessionComposerConfigControl,
   useSessionComposerAttachmentControl,
   type SessionComposerConfigWriter,
-  type SessionComposerRuntimeInput,
   type SessionComposerSharedInput,
   type SessionComposerStateInput,
   type SessionTurnControl,
@@ -146,37 +145,9 @@ type SessionWorkbenchState = {
   portAccessState: ReturnType<typeof useSessionPortAccess>;
 };
 
-type SessionConversationChatState = Pick<
-  ChatState,
-  "activeTurnId" | "entries" | "pendingTurnId" | "status"
->;
-
-type SessionConversationPaneState = {
-  activeConversationId: string | null;
-  chatState: SessionConversationChatState;
-  dismissUserMessageAction?: ReturnType<
-    typeof useCodexSessionState
-  >["chat"]["dismissUserMessageAction"];
+type SessionConversationPaneState = SessionWorkbenchRuntimeAdapter["conversation"] & {
   composerStateInput: SessionComposerStateInput;
-  serverRequestsState: {
-    isRespondingToServerRequest: boolean;
-    pendingServerRequests: readonly ServerRequestEntry[];
-    respondToServerRequest: (requestId: string | number, result: unknown) => void;
-  };
-};
-
-type SessionWorkbenchRuntimeAdapter = {
-  displayName: string;
-  cliTerminalContentInset: SessionTerminalContentInset;
-  conversation: {
-    activeConversationId: string | null;
-    chatState: SessionConversationChatState;
-    dismissUserMessageAction?: ReturnType<
-      typeof useCodexSessionState
-    >["chat"]["dismissUserMessageAction"];
-  };
-  composerRuntimeInput: SessionComposerRuntimeInput;
-  serverRequestsState: SessionConversationPaneState["serverRequestsState"];
+  serverRequestsState: SessionWorkbenchRuntimeAdapter["serverRequestsState"];
 };
 
 const CodexWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
@@ -634,76 +605,18 @@ export function useSessionWorkbenchController(input: {
       selectedRepositoryPath,
     ],
   );
-  const isOpenCodeTurnRunning = openCodeSessionState.chat.chatState.status === "busy";
-  const interruptOpenCodeTurn = useCallback((): void => {
-    void openCodeSessionState.chat.abortSession();
-  }, [openCodeSessionState.chat]);
-  const steerOpenCodeTurn = useCallback(async (): Promise<void> => {
-    throw new Error("OpenCode does not support steering an active turn.");
-  }, []);
-  const respondToOpenCodePermission = useCallback(
-    (requestId: string | number, result: unknown): void => {
-      let response: ReturnType<typeof resolveOpenCodePermissionResponse>;
-      try {
-        response = resolveOpenCodePermissionResponse(result);
-      } catch (error) {
-        openCodeSessionState.sessionMessage.reportSessionErrorMessage(
-          error instanceof Error ? error.message : "Could not respond to OpenCode permission.",
-        );
-        return;
-      }
-
-      void openCodeSessionState.chat
-        .respondToPermission({
-          requestId: String(requestId),
-          response,
-        })
-        .catch((error: unknown) => {
-          openCodeSessionState.sessionMessage.reportSessionErrorMessage(
-            error instanceof Error ? error.message : "Could not respond to OpenCode permission.",
-          );
-        });
-    },
-    [openCodeSessionState.chat, openCodeSessionState.sessionMessage],
-  );
-  const openCodePendingServerRequests = mapOpenCodePermissionsToServerRequests(
-    openCodeSessionState.chat.chatState.pendingPermissions,
-  );
   const codexRuntime = useMemo<SessionWorkbenchRuntimeAdapter>(
-    () => ({
-      displayName: CodexWorkbenchCapabilities.displayName,
-      cliTerminalContentInset: CodexWorkbenchCapabilities.cliTerminalContentInset,
-      conversation: {
+    () =>
+      buildCodexConversationRuntime({
         activeConversationId: activeSessionThreadId,
-        chatState: chat.chatState,
-        dismissUserMessageAction: chat.dismissUserMessageAction,
-      },
-      composerRuntimeInput: {
         bootstrap: sessionState.bootstrap,
+        chat,
         configControl,
-        turnControl: {
-          activeTurnState: chat.canInterruptTurn || chat.canSteerTurn ? "running" : "idle",
-          canInterrupt: chat.canInterruptTurn,
-          canSteer: CodexWorkbenchCapabilities.supportsSteering && chat.canSteerTurn,
-          completedTurnErrorMessage: chat.chatState.completedErrorMessage,
-          interruptTurn: chat.interruptTurn,
-          isInterrupting: chat.isInterruptingTurn,
-          isStarting: chat.isStartingTurn,
-          isSteering: chat.isSteeringTurn,
-          startTurn: startCodexTurn,
-          steerTurn: chat.steerTurn,
-        },
-        sessionErrorMessage: sessionMessage.sessionErrorMessage,
-        clearSessionErrorMessage: sessionMessage.clearSessionErrorMessage,
-        contextUsage: CodexWorkbenchCapabilities.hasContextUsage ? contextUsage : null,
-        modelSelection: CodexWorkbenchCapabilities.composerModelSelection,
-      },
-      serverRequestsState: {
-        isRespondingToServerRequest: serverRequests.isRespondingToServerRequest,
-        pendingServerRequests: serverRequests.pendingServerRequests,
-        respondToServerRequest: serverRequests.respondToServerRequest,
-      },
-    }),
+        contextUsage,
+        serverRequests,
+        sessionMessage,
+        startTurn: startCodexTurn,
+      }),
     [
       activeSessionThreadId,
       chat.canInterruptTurn,
@@ -727,57 +640,30 @@ export function useSessionWorkbenchController(input: {
     ],
   );
   const openCodeRuntime = useMemo<SessionWorkbenchRuntimeAdapter>(
-    () => ({
-      displayName: OpenCodeWorkbenchCapabilities.displayName,
-      cliTerminalContentInset: OpenCodeWorkbenchCapabilities.cliTerminalContentInset,
-      conversation: {
-        activeConversationId:
-          openCodeSessionState.lifecycle.sessionSnapshot?.activeSessionId ?? null,
-        chatState: mapOpenCodeChatStateForConversation(openCodeSessionState.chat.chatState),
-      },
-      composerRuntimeInput: {
+    () =>
+      buildOpenCodeConversationRuntime({
         bootstrap: openCodeComposerBootstrap,
+        chat: openCodeSessionState.chat,
         configControl: openCodeConfigControl,
-        turnControl: {
-          activeTurnState: isOpenCodeTurnRunning ? "running" : "idle",
-          canInterrupt: openCodeSessionState.chat.canInterruptTurn,
-          canSteer: OpenCodeWorkbenchCapabilities.supportsSteering,
-          completedTurnErrorMessage: openCodeSessionState.chat.chatState.completedErrorMessage,
-          interruptTurn: interruptOpenCodeTurn,
-          isInterrupting: openCodeSessionState.chat.isInterruptingTurn,
-          isStarting: openCodeSessionState.chat.isStartingTurn,
-          isSteering: false,
-          startTurn: startOpenCodeTurn,
-          steerTurn: steerOpenCodeTurn,
-        },
-        sessionErrorMessage: openCodeSessionState.sessionMessage.sessionErrorMessage,
-        clearSessionErrorMessage: openCodeSessionState.sessionMessage.clearSessionErrorMessage,
-        contextUsage: null,
-        modelSelection: OpenCodeWorkbenchCapabilities.composerModelSelection,
-      },
-      serverRequestsState: {
-        isRespondingToServerRequest: openCodeSessionState.chat.isRespondingToPermission,
-        pendingServerRequests: openCodePendingServerRequests,
-        respondToServerRequest: respondToOpenCodePermission,
-      },
-    }),
+        sessionMessage: openCodeSessionState.sessionMessage,
+        sessionSnapshot: openCodeSessionState.lifecycle.sessionSnapshot,
+        startTurn: startOpenCodeTurn,
+      }),
     [
-      interruptOpenCodeTurn,
-      isOpenCodeTurnRunning,
       openCodeComposerBootstrap,
       openCodeConfigControl,
-      openCodePendingServerRequests,
+      openCodeSessionState.chat.abortSession,
       openCodeSessionState.chat.canInterruptTurn,
       openCodeSessionState.chat.chatState,
       openCodeSessionState.chat.isInterruptingTurn,
       openCodeSessionState.chat.isRespondingToPermission,
       openCodeSessionState.chat.isStartingTurn,
-      openCodeSessionState.lifecycle.sessionSnapshot?.activeSessionId,
+      openCodeSessionState.chat.respondToPermission,
+      openCodeSessionState.lifecycle.sessionSnapshot,
       openCodeSessionState.sessionMessage.clearSessionErrorMessage,
+      openCodeSessionState.sessionMessage.reportSessionErrorMessage,
       openCodeSessionState.sessionMessage.sessionErrorMessage,
-      respondToOpenCodePermission,
       startOpenCodeTurn,
-      steerOpenCodeTurn,
     ],
   );
   const activeRuntime = isOpenCodeRuntime ? openCodeRuntime : codexRuntime;
