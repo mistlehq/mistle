@@ -102,7 +102,6 @@ type SessionWorkbenchState = {
   >["sandboxLifecycleStatus"];
   initialEntryStartupState: SessionStartupState | null;
   sandboxStatusQuery: ReturnType<typeof useSessionWorkbenchLifecycleState>["sandboxStatusQuery"];
-  lifecycleStep: ReturnType<typeof useCodexSessionState>["lifecycle"]["step"];
   cliPtyState: ReturnType<typeof useSandboxPtyState>;
   primaryPanelState: {
     transitionState: MainPanelTransitionState;
@@ -185,7 +184,6 @@ type RuntimeComposerStateInput = Omit<
 
 type SessionWorkbenchRuntimeAdapter = {
   displayName: "Codex" | "OpenCode";
-  lifecycleStep: SessionWorkbenchState["lifecycleStep"];
   cliTerminalContentInset: SessionTerminalContentInset;
   conversation: {
     activeConversationId: string | null;
@@ -815,7 +813,6 @@ export function useSessionWorkbenchController(input: {
   const codexRuntime = useMemo<SessionWorkbenchRuntimeAdapter>(
     () => ({
       displayName: "Codex",
-      lifecycleStep: lifecycle.step,
       cliTerminalContentInset: "default",
       conversation: {
         activeConversationId: activeSessionThreadId,
@@ -862,7 +859,6 @@ export function useSessionWorkbenchController(input: {
       chat.steerTurn,
       configControl,
       contextUsage,
-      lifecycle.step,
       serverRequests.isRespondingToServerRequest,
       serverRequests.pendingServerRequests,
       serverRequests.respondToServerRequest,
@@ -875,7 +871,6 @@ export function useSessionWorkbenchController(input: {
   const openCodeRuntime = useMemo<SessionWorkbenchRuntimeAdapter>(
     () => ({
       displayName: "OpenCode",
-      lifecycleStep: openCodeSessionState.lifecycle.step,
       cliTerminalContentInset: "none",
       conversation: {
         activeConversationId:
@@ -921,7 +916,6 @@ export function useSessionWorkbenchController(input: {
       openCodeSessionState.chat.isRespondingToPermission,
       openCodeSessionState.chat.isStartingTurn,
       openCodeSessionState.lifecycle.sessionSnapshot?.activeSessionId,
-      openCodeSessionState.lifecycle.step,
       openCodeSessionState.sessionMessage.clearSessionErrorMessage,
       openCodeSessionState.sessionMessage.sessionErrorMessage,
       respondToOpenCodePermission,
@@ -943,7 +937,6 @@ export function useSessionWorkbenchController(input: {
       sandboxLifecycleStatus: workbenchLifecycleState.sandboxLifecycleStatus,
       initialEntryStartupState: workbenchLifecycleState.initialEntryStartupState,
       sandboxStatusQuery: workbenchLifecycleState.sandboxStatusQuery,
-      lifecycleStep: activeRuntime.lifecycleStep,
       primaryPanelState: {
         transitionState: handoff.transitionState,
         canEnterCli: enterCliDisabledReason === null,
