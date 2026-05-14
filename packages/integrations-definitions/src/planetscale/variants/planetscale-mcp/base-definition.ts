@@ -42,6 +42,10 @@ export const PlanetScaleMcpBaseDefinition: PlanetScaleMcpBaseIntegrationDefiniti
           submitLabel: "Connect PlanetScale",
           helperText: "Authorize PlanetScale hosted MCP access.",
         },
+        reauthorize: {
+          actionLabel: "Re-authorize",
+          pendingLabel: "Starting...",
+        },
       },
     },
   ],

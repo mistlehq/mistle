@@ -1,0 +1,3 @@
+ALTER TABLE "control_plane"."integration_connection_redirect_sessions" ADD COLUMN "intent" text DEFAULT 'create' NOT NULL;--> statement-breakpoint
+ALTER TABLE "control_plane"."integration_connection_redirect_sessions" ADD COLUMN "connection_id" text;--> statement-breakpoint
+ALTER TABLE "control_plane"."integration_connection_redirect_sessions" ADD CONSTRAINT "integration_connection_redirect_sessions_connection_id_integration_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "control_plane"."integration_connections"("id") ON DELETE cascade ON UPDATE no action;

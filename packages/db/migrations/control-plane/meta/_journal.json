@@ -197,6 +197,13 @@
       "when": 1778754633312,
       "tag": "0027_add-snapshot-job-sandbox-instance-id",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1778768033638,
+      "tag": "0028_add-integration-connection-reauthorization",
+      "breakpoints": true
     }
   ]
 }

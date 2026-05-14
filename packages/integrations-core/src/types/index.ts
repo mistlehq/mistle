@@ -491,6 +491,11 @@ export type IntegrationConnectionMethodCreateUi = {
   helperText: string;
 };
 
+export type IntegrationConnectionMethodReauthorizeUi = {
+  actionLabel: string;
+  pendingLabel: string;
+};
+
 export type IntegrationDeviceAuthorizationConnectionMethodCreateUi = {
   submitLabel: string;
 };
@@ -889,6 +894,7 @@ export type IntegrationRedirectConnectionMethodDefinition<
   >;
   ui: {
     create: IntegrationConnectionMethodCreateUi;
+    reauthorize?: IntegrationConnectionMethodReauthorizeUi;
   };
 };
 

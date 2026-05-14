@@ -126,8 +126,10 @@ export type {
 } from "./organization-identity-link-provider-configs.js";
 export {
   integrationConnectionRedirectSessions,
+  IntegrationConnectionRedirectSessionIntents,
   type InsertIntegrationConnectionRedirectSession,
   type IntegrationConnectionRedirectSession,
+  type IntegrationConnectionRedirectSessionIntent,
 } from "./integration-connection-redirect-sessions.js";
 export {
   integrationConnectionDeviceAuthorizationAttempts,
