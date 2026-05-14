@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { defaultMissingEnabledToFalse } from "../core/discriminated-union.js";
+
 const UrlSchema = z.string().trim().min(1);
 const DefaultE2BCloudDomain = "e2b.app";
 const DefaultE2BCpuCount = 2;
@@ -13,24 +15,9 @@ const ServiceEndpointSchema = z
   })
   .strict();
 
-function withDisabledPostHogDefault(value: unknown): unknown {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return value;
-  }
-
-  if ("enabled" in value) {
-    return value;
-  }
-
-  return {
-    ...value,
-    enabled: false,
-  };
-}
-
 const DashboardPostHogConfigSchema = z
   .preprocess(
-    withDisabledPostHogDefault,
+    defaultMissingEnabledToFalse,
     z.discriminatedUnion("enabled", [
       z
         .object({
@@ -136,24 +123,9 @@ const SandboxE2BProviderConfigSchema = z.discriminatedUnion("enabled", [
     .strict(),
 ]);
 
-function withDisabledStripeBillingDefault(value: unknown): unknown {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return value;
-  }
-
-  if ("enabled" in value) {
-    return value;
-  }
-
-  return {
-    ...value,
-    enabled: false,
-  };
-}
-
 const BillingStripeConfigSchema = z
   .preprocess(
-    withDisabledStripeBillingDefault,
+    defaultMissingEnabledToFalse,
     z.discriminatedUnion("enabled", [
       z
         .object({

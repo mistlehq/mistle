@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { defaultMissingEnabledToFalse } from "../../core/discriminated-union.js";
+
 export const ControlPlaneWorkerDatabaseConfigSchema = z
   .object({
     url: z.string().min(1),
@@ -51,23 +53,8 @@ export const ControlPlaneWorkerSandboxConfigSchema = z
   })
   .strict();
 
-function withDisabledStripeBillingDefault(value: unknown): unknown {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return value;
-  }
-
-  if ("enabled" in value) {
-    return value;
-  }
-
-  return {
-    ...value,
-    enabled: false,
-  };
-}
-
 const ControlPlaneWorkerStripeBillingConfigSchema = z.preprocess(
-  withDisabledStripeBillingDefault,
+  defaultMissingEnabledToFalse,
   z.discriminatedUnion("enabled", [
     z
       .object({
