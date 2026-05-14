@@ -154,12 +154,8 @@ function resolveActiveSandboxProfileVersion(
 
 function isTriggerTemplateAvailable(input: {
   eventOptions: readonly WebhookAutomationEventOption[];
-  template: TriggerTemplate;
+  template: Extract<TriggerTemplate, { kind: "trigger" }>;
 }): boolean {
-  if (input.template.kind === "scheduled") {
-    return true;
-  }
-
   return input.template.eventTypes.every((eventType) =>
     input.eventOptions.some((option) => option.eventType === eventType),
   );
@@ -629,11 +625,7 @@ export function SandboxProfileAutomationsSection(input: { profileId: string }): 
   }
 
   function createFromTemplate(templateId: string): void {
-    void navigate(
-      templateId.length === 0
-        ? createAutomationCreatePath(input.profileId)
-        : createAutomationCreatePath(input.profileId, templateId),
-    );
+    void navigate(createAutomationCreatePath(input.profileId, templateId));
   }
 
   function goToNextPage(): void {
