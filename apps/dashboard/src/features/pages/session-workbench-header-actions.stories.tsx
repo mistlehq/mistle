@@ -109,9 +109,9 @@ export const WithRepositorySelectorError = createStory({
   status: "connected",
 });
 
-export const WithNestedCodexCwdUnavailable = createStory({
+export const WithNestedRuntimeCwdUnavailable = createStory({
   repositoryErrorMessage:
-    "Codex is running in /root/acme/repo-1/packages/app, which is not a selectable repository root.",
+    "OpenCode is running in /root/acme/repo-1/packages/app, which is not a selectable repository root.",
   repositoryOptions: [
     { value: "__none__", label: "None" },
     {

@@ -31,6 +31,7 @@ function renderSessionPrimaryRepositoryState(initialProps: HookProps) {
         ...(props.initialSelectedRepositoryPath === undefined
           ? {}
           : { initialSelectedRepositoryPath: props.initialSelectedRepositoryPath }),
+        runtimeDisplayName: "Codex",
         sandboxInstanceId: props.sandboxInstanceId,
       }),
     {

@@ -112,13 +112,14 @@ function resolvePrimaryRepositorySelection(input: {
 function resolveUnavailableRepositoryErrorMessage(input: {
   repositoryOptions: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
   selectedRepositoryPath: string;
+  runtimeDisplayName: string;
 }): string {
   const hasContainingRepository = hasContainingRepositoryOption({
     repositoryOptions: input.repositoryOptions,
     selectedRepositoryPath: input.selectedRepositoryPath,
   });
   if (hasContainingRepository) {
-    return `Codex is running in ${input.selectedRepositoryPath}, which is not a selectable repository root.`;
+    return `${input.runtimeDisplayName} is running in ${input.selectedRepositoryPath}, which is not a selectable repository root.`;
   }
 
   return "The selected repository is no longer available in this sandbox.";
@@ -164,6 +165,7 @@ export function resolvePrimaryRepositoryPresentation(input: {
   selectedRepositoryPath: string | null;
   queryState: "idle" | "loaded" | "error";
   queryErrorMessage: string | null;
+  runtimeDisplayName: string;
   workspaceRoot?: string;
 }): {
   errorMessage: string | null;
@@ -186,6 +188,7 @@ export function resolvePrimaryRepositoryPresentation(input: {
       (selection.kind === "unavailable"
         ? resolveUnavailableRepositoryErrorMessage({
             repositoryOptions: input.repositoryOptions,
+            runtimeDisplayName: input.runtimeDisplayName,
             selectedRepositoryPath: selection.path,
           })
         : null),

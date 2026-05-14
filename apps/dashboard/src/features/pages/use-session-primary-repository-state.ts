@@ -126,6 +126,7 @@ export function useSessionPrimaryRepositoryState(input: {
   enabled: boolean;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
   initialSelectedRepositoryPath?: string | null;
+  runtimeDisplayName: string;
   sandboxInstanceId: string | null;
 }): SessionPrimaryRepositoryState {
   const [selectedRepositoryState, setSelectedRepositoryState] = useState<SelectedRepositoryState>(
@@ -166,6 +167,7 @@ export function useSessionPrimaryRepositoryState(input: {
     selectedRepositoryPath,
     queryErrorMessage,
     queryState: query.isError ? "error" : query.data !== undefined ? "loaded" : "idle",
+    runtimeDisplayName: input.runtimeDisplayName,
     workspaceRoot: DefaultSandboxWorkspaceDir,
   });
 

@@ -68,6 +68,7 @@ describe("session primary repository policy", () => {
         selectedRepositoryPath: "/root/acme/repo-1",
         queryErrorMessage: null,
         queryState: "loaded",
+        runtimeDisplayName: "Codex",
       }),
     ).toEqual({
       errorMessage: "The selected repository is no longer available in this sandbox.",
@@ -78,7 +79,7 @@ describe("session primary repository policy", () => {
     });
   });
 
-  it("surfaces a specific error when the restored Codex cwd is inside a selectable repository", () => {
+  it("surfaces a runtime-specific error when the restored cwd is inside a selectable repository", () => {
     expect(
       resolvePrimaryRepositoryPresentation({
         repositoryOptions: [
@@ -88,10 +89,11 @@ describe("session primary repository policy", () => {
         selectedRepositoryPath: "/root/acme/repo-1/packages/app",
         queryErrorMessage: null,
         queryState: "loaded",
+        runtimeDisplayName: "OpenCode",
       }),
     ).toEqual({
       errorMessage:
-        "Codex is running in /root/acme/repo-1/packages/app, which is not a selectable repository root.",
+        "OpenCode is running in /root/acme/repo-1/packages/app, which is not a selectable repository root.",
       options: [
         {
           value: "/root/acme/repo-1/packages/app",

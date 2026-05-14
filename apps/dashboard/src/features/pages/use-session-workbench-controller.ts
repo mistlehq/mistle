@@ -8,9 +8,13 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import type { ChatState } from "../chat/chat-state.js";
 import { formatCodexContextUsage } from "../session-agents/codex/session-state/codex-context-usage.js";
-import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
+import {
+  buildCodexCliPtyOpenInput,
+  useCodexSessionState,
+} from "../session-agents/codex/session-state/index.js";
 import {
   buildOpenCodeAttachmentParts,
+  buildOpenCodeCliPtyOpenInput,
   mapOpenCodePermissionsToServerRequests,
   parseOpenCodePromptModelSelection,
   resolveOpenCodePermissionResponse,
@@ -441,6 +445,7 @@ export function useSessionWorkbenchController(input: {
   const sessionMessage = sessionState.sessionMessage;
   const codexHandoffRuntime = useMemo<SessionMainPanelHandoffRuntime>(
     () => ({
+      buildCliPtyOpenInput: buildCodexCliPtyOpenInput,
       clearActiveThreadIdAfterCliLaunch:
         sessionState.threadAuthority.clearActiveThreadIdAfterCliLaunch,
       displayName: CodexWorkbenchCapabilities.displayName,
@@ -460,6 +465,7 @@ export function useSessionWorkbenchController(input: {
   );
   const openCodeHandoffRuntime = useMemo<SessionMainPanelHandoffRuntime>(
     () => ({
+      buildCliPtyOpenInput: buildOpenCodeCliPtyOpenInput,
       clearActiveThreadIdAfterCliLaunch: () => {},
       displayName: OpenCodeWorkbenchCapabilities.displayName,
       hydrateChatFromConversation: openCodeSessionState.chat.hydrateChatFromSessionOrThrow,
@@ -530,6 +536,7 @@ export function useSessionWorkbenchController(input: {
     enabled: workbenchLifecycleState.connectionReadiness.canConnect,
     ensureTransportConnected: transportManager.ensureTransportConnected,
     initialSelectedRepositoryPath,
+    runtimeDisplayName: activeRuntimeCapabilities.displayName,
     sandboxInstanceId: input.sandboxInstanceId,
   });
   const selectedRepositoryPath = primaryRepositoryState.selectedRepositoryPath;

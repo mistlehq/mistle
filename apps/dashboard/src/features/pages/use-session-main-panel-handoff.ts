@@ -1,6 +1,10 @@
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 import { useCallback, useEffect, useReducer, useRef, type RefObject } from "react";
 
+import type {
+  SessionCliLaunchTarget,
+  SessionRuntimeCliLaunchBuilder,
+} from "../session-agents/session-runtime-cli-launch.js";
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
   InitialSessionMainPanelHandoffState,
@@ -8,7 +12,6 @@ import {
   reduceSessionMainPanelHandoffState,
   type MainPanelTransitionState,
 } from "./session-main-panel-handoff-state.js";
-import { buildCliPtyOpenInput, type SessionCliLaunchTarget } from "./session-runtime-cli-launch.js";
 
 type SessionMainPanelRuntimeId = "codex" | "opencode";
 type ChatRestoreConnectionInput =
@@ -41,6 +44,7 @@ type SessionMainPanelHandoffLifecycle = {
 };
 
 type SessionMainPanelHandoffRuntime = {
+  buildCliPtyOpenInput: SessionRuntimeCliLaunchBuilder;
   clearActiveThreadIdAfterCliLaunch: (launchTarget: SessionCliLaunchTarget) => void;
   displayName: string;
   hydrateChatFromConversation: () => Promise<void>;
@@ -280,9 +284,8 @@ export function useSessionMainPanelHandoff(
       activeRuntime.resetServerRequests();
 
       await input.cliPtyState.actions.openPty(
-        buildCliPtyOpenInput({
+        activeRuntime.buildCliPtyOpenInput({
           launchTarget,
-          runtimeId: activeRuntimeId,
           sandboxInstanceId: input.sandboxInstanceId,
           selectedRepositoryPath,
         }),
