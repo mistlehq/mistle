@@ -11,7 +11,7 @@ Mistle is an open-source platform for running and automating sandboxed coding ag
 - **Sandbox profiles** define the tools, permissions, and environment an agent starts with.
 - **Snapshots** capture prepared sandbox environments so sessions can start quickly with the required tools, dependencies, and configuration already in place.
 - **Sessions** start interactive agent work such as debugging, code review, and repository changes.
-- **Automations** respond to external events, such as webhook deliveries from connected systems.
+- **Triggers** respond to external events, such as webhook deliveries from connected systems.
 
 ## Run Mistle locally
 

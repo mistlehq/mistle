@@ -2,7 +2,7 @@
 
 Mistle is split into control-plane and data-plane services.
 
-- **Control plane**: The dashboard, control-plane APIs, and control-plane workflows manage integrations, sandbox profiles, sessions, and automation setup, while data-plane APIs and workflows handle sandbox startup, lifecycle, and runtime execution.
+- **Control plane**: The dashboard, control-plane APIs, and control-plane workflows manage integrations, sandbox profiles, sessions, and trigger setup, while data-plane APIs and workflows handle sandbox startup, lifecycle, and runtime execution.
 - **Data plane**: The data-plane gateway handles sandbox tunnels, token exchange, runtime-state access, interactive stream routing, managed egress, and other runtime connectivity concerns.
 
 ```text
