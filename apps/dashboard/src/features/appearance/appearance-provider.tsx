@@ -85,10 +85,3 @@ export function SystemAppearanceProvider(input: { children: React.ReactNode }): 
     <AppearanceProvider appearance={UserAppearances.SYSTEM}>{input.children}</AppearanceProvider>
   );
 }
-
-export function AuthenticatedAppearanceProvider(input: {
-  appearance: UserAppearance;
-  children: React.ReactNode;
-}): React.JSX.Element {
-  return <AppearanceProvider appearance={input.appearance}>{input.children}</AppearanceProvider>;
-}

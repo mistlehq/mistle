@@ -1,10 +1,7 @@
 import { Navigate, Outlet, useLocation } from "react-router";
 
 import { AuthenticatedAnalytics } from "../../lib/analytics/authenticated.js";
-import {
-  AuthenticatedAppearanceProvider,
-  SystemAppearanceProvider,
-} from "../appearance/appearance-provider.js";
+import { AppearanceProvider, SystemAppearanceProvider } from "../appearance/appearance-provider.js";
 import { readUserAppearanceFromSession } from "../appearance/appearance.js";
 import type { SessionData } from "../auth/types.js";
 import {
@@ -61,19 +58,19 @@ export function RequireAuth(): React.JSX.Element {
   const activeOrganizationId = resolveActiveOrganizationIdFromSession(sessionQuery.data);
   if (activeOrganizationId === null) {
     return (
-      <AuthenticatedAppearanceProvider appearance={appearance}>
+      <AppearanceProvider appearance={appearance}>
         <NoOrganizationAccessView />
-      </AuthenticatedAppearanceProvider>
+      </AppearanceProvider>
     );
   }
 
   return (
-    <AuthenticatedAppearanceProvider appearance={appearance}>
+    <AppearanceProvider appearance={appearance}>
       <AuthenticatedAnalytics
         organizationId={activeOrganizationId}
         userId={sessionQuery.data.user.id}
       />
       <Outlet />
-    </AuthenticatedAppearanceProvider>
+    </AppearanceProvider>
   );
 }

@@ -296,9 +296,9 @@ export const CliSplitWithTerminalAndSecondaryPane: Story = {
       />
     ),
     secondaryPanel: (
-      <div className="h-full w-full border-l bg-stone-50 p-4">
-        <div className="text-sm font-medium text-stone-900">Current changes</div>
-        <div className="mt-2 text-sm text-stone-600">
+      <div className="h-full w-full border-l bg-card p-4">
+        <div className="text-sm font-medium text-foreground">Current changes</div>
+        <div className="mt-2 text-sm text-muted-foreground">
           Secondary diff pane enabled to exercise the nested horizontal and vertical resizable
           layout together.
         </div>
