@@ -135,6 +135,11 @@ method = "shared_token"
 [internal_auth.shared_token]
 token = "replace-with-internal-service-token"
 
+[billing.stripe]
+enabled = false
+# Required when enabled = true.
+#secret_key = "replace-with-stripe-secret-key"
+
 [sandbox]
 default_base_image = "registry.example.com/mistle/sandbox-base:prod"
 publish_base_domain = "mistle.example"

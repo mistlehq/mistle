@@ -281,6 +281,11 @@ function config(input: {
     dashboard: {
       baseUrl: "http://localhost:5173",
     },
+    billing: {
+      stripe: {
+        enabled: false,
+      },
+    },
     auth: {
       baseUrl: input.controlPlaneBaseUrl,
       secret: "integration-new-auth-secret",

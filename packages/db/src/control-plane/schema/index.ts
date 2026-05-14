@@ -167,6 +167,15 @@ export { CONTROL_PLANE_SCHEMA_NAME } from "./namespace.js";
 export { createControlPlaneDbSchema } from "./factory.js";
 export type { ControlPlaneDbSchema } from "./factory.js";
 export {
+  BillingCustomerProviders,
+  organizationBillingCustomers,
+  OrganizationBillingCustomerStatuses,
+  type BillingCustomerProvider,
+  type InsertOrganizationBillingCustomer,
+  type OrganizationBillingCustomer,
+  type OrganizationBillingCustomerStatus,
+} from "./organization-billing-customers.js";
+export {
   organizationCredentialKeys,
   type InsertOrganizationCredentialKey,
   type OrganizationCredentialKey,

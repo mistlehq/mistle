@@ -15,6 +15,7 @@ import { applyActiveOrganizationToSession } from "./services/apply-active-organi
 import { createInitialOrganizationCredentialKey } from "./services/create-initial-organization-credential-key.js";
 import { createSendOrganizationInvitationService } from "./services/create-send-organization-invitation.js";
 import { createSendVerificationOTPService } from "./services/create-send-verification-otp.js";
+import { enqueueStripeCustomerProvisioning } from "./services/enqueue-stripe-customer-provisioning.js";
 
 export type ControlPlaneAuthConfig = {
   authBaseUrl: string;
@@ -30,6 +31,11 @@ export type ControlPlaneAuthConfig = {
   authGoogleProviderOverrides?: Omit<GoogleProviderConfig, "clientId" | "clientSecret">;
   activeMasterEncryptionKeyVersion: number;
   masterEncryptionKeys: Record<string, string>;
+  billing: {
+    stripe: {
+      enabled: boolean;
+    };
+  };
 };
 
 type CreateControlPlaneAuthOptions = {
@@ -176,14 +182,21 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
                 masterEncryptionKeys: config.masterEncryptionKeys,
                 table: tables.organizationCredentialKeys,
               });
+              await enqueueStripeCustomerProvisioning({
+                db,
+                table: tables.organizationBillingCustomers,
+                openWorkflow,
+                stripeEnabled: config.billing.stripe.enabled,
+                organizationId: organization.id,
+                organizationName: organization.name,
+              });
             } catch (error) {
               await db
                 .delete(tables.organizations)
                 .where(eq(tables.organizations.id, organization.id));
-              throw new Error(
-                `Failed to initialize credential key for organization '${organization.id}'.`,
-                { cause: error },
-              );
+              throw new Error(`Failed to initialize organization '${organization.id}'.`, {
+                cause: error,
+              });
             }
           },
         },

@@ -22,6 +22,7 @@ import { defineIntegrationWebhookEvents } from "./integration-webhook-events.js"
 import { defineIntegrationWebhookSources } from "./integration-webhook-sources.js";
 import { defineInvitations } from "./invitations.js";
 import { defineMembers } from "./members.js";
+import { defineOrganizationBillingCustomers } from "./organization-billing-customers.js";
 import { defineOrganizationCredentialKeys } from "./organization-credential-keys.js";
 import { defineOrganizationIdentityLinkProviderConfigs } from "./organization-identity-link-provider-configs.js";
 import { defineOrganizationSandboxStorageSettings } from "./organization-sandbox-storage-settings.js";
@@ -77,6 +78,7 @@ export function createControlPlaneDbSchema(schemaName: string) {
   const integrationWebhookSources = defineIntegrationWebhookSources(schema);
   const invitations = defineInvitations(schema);
   const members = defineMembers(schema);
+  const organizationBillingCustomers = defineOrganizationBillingCustomers(schema);
   const organizationCredentialKeys = defineOrganizationCredentialKeys(schema);
   const organizationIdentityLinkProviderConfigs =
     defineOrganizationIdentityLinkProviderConfigs(schema);
@@ -136,6 +138,7 @@ export function createControlPlaneDbSchema(schemaName: string) {
     integrationWebhookSources,
     invitations,
     members,
+    organizationBillingCustomers,
     organizationCredentialKeys,
     organizationIdentityLinkProviderConfigs,
     organizationSandboxStorageSettings,

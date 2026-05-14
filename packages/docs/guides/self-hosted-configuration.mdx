@@ -113,6 +113,13 @@ Service-to-service auth is configured under `internal_auth`. The `method` field 
 currently optional and kept for future expansion; the runtime uses shared-token
 auth while using `internal_auth.shared_token.token`.
 
+## Billing
+
+Stripe billing provisioning is configured under `billing.stripe`. It is disabled
+by default. When `enabled = true`, the control plane enqueues Stripe customer
+provisioning for newly created organizations and the control-plane worker uses
+`secret_key` to create the Stripe customer.
+
 ## Workflows
 
 Workflow config is split by plane:
@@ -238,6 +245,8 @@ This table covers the operator-facing TOML keys accepted by `@mistle/config`.
 | `email.smtp.password`                                                          | Yes                                        | SMTP password.                                                                                            |
 | `internal_auth.method`                                                         | No                                         | Optional; currently `shared_token` when present.                                                          |
 | `internal_auth.shared_token.token`                                             | Yes                                        | Shared service-to-service token.                                                                          |
+| `billing.stripe.enabled`                                                       | No                                         | Enables Stripe customer provisioning for newly created organizations.                                     |
+| `billing.stripe.secret_key`                                                    | Yes, when `billing.stripe.enabled = true`  | Stripe secret key used by the control-plane worker to create Stripe customers.                            |
 | `sandbox.default_base_image`                                                   | Yes                                        | Sandbox base image reference.                                                                             |
 | `sandbox.publish_base_domain`                                                  | Yes                                        | Base domain for published sandbox URLs.                                                                   |
 | `sandbox.storage.backend`                                                      | Yes                                        | `archil` or `docker_volume`.                                                                              |

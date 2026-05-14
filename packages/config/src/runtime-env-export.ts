@@ -145,6 +145,7 @@ const ControlPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
     path: ["auth", "google", "clientSecret"],
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET",
   },
+  { path: ["billing", "stripe", "enabled"], envVar: "MISTLE_BILLING_STRIPE_ENABLED" },
   { path: ["dashboard", "baseUrl"], envVar: "MISTLE_SERVICES_DASHBOARD_PUBLIC_URL" },
   { path: ["workflow", "namespaceId"], envVar: "MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID" },
   { path: ["dataPlaneApi", "baseUrl"], envVar: "MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL" },
@@ -178,6 +179,8 @@ const ControlPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDesc
   { path: ["email", "smtpSecure"], envVar: "MISTLE_EMAIL_SMTP_SECURE" },
   { path: ["email", "smtpUsername"], envVar: "MISTLE_EMAIL_SMTP_USERNAME" },
   { path: ["email", "smtpPassword"], envVar: "MISTLE_EMAIL_SMTP_PASSWORD" },
+  { path: ["billing", "stripe", "enabled"], envVar: "MISTLE_BILLING_STRIPE_ENABLED" },
+  { path: ["billing", "stripe", "secretKey"], envVar: "MISTLE_BILLING_STRIPE_SECRET_KEY" },
   { path: ["dataPlaneApi", "baseUrl"], envVar: "MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL" },
   {
     path: ["controlPlaneApi", "baseUrl"],

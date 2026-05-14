@@ -144,5 +144,6 @@ function createAuthConfig(config: ControlPlaneApiRuntimeConfig["app"]): ControlP
         }),
     activeMasterEncryptionKeyVersion: config.integrations.activeMasterEncryptionKeyVersion,
     masterEncryptionKeys: config.integrations.masterEncryptionKeys,
+    billing: config.billing,
   };
 }

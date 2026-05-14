@@ -51,6 +51,48 @@ export const ControlPlaneWorkerSandboxConfigSchema = z
   })
   .strict();
 
+function withDisabledStripeBillingDefault(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return value;
+  }
+
+  if ("enabled" in value) {
+    return value;
+  }
+
+  return {
+    ...value,
+    enabled: false,
+  };
+}
+
+const ControlPlaneWorkerStripeBillingConfigSchema = z.preprocess(
+  withDisabledStripeBillingDefault,
+  z.discriminatedUnion("enabled", [
+    z
+      .object({
+        enabled: z.literal(true),
+        secretKey: z.string().min(1),
+      })
+      .strict(),
+    z
+      .object({
+        enabled: z.literal(false),
+        secretKey: z.string().min(1).optional(),
+      })
+      .strict(),
+  ]),
+);
+
+const ControlPlaneWorkerBillingConfigObjectSchema = z
+  .object({
+    stripe: ControlPlaneWorkerStripeBillingConfigSchema,
+  })
+  .strict();
+
+export const ControlPlaneWorkerBillingConfigSchema =
+  ControlPlaneWorkerBillingConfigObjectSchema.default({ stripe: { enabled: false } });
+
 export const ControlPlaneWorkerConfigSchema = z
   .object({
     database: ControlPlaneWorkerDatabaseConfigSchema,
@@ -60,6 +102,7 @@ export const ControlPlaneWorkerConfigSchema = z
     controlPlaneApi: ControlPlaneWorkerControlPlaneApiConfigSchema,
     internalAuth: ControlPlaneWorkerInternalAuthConfigSchema,
     sandbox: ControlPlaneWorkerSandboxConfigSchema,
+    billing: ControlPlaneWorkerBillingConfigSchema,
   })
   .strict();
 
@@ -72,6 +115,7 @@ export const PartialControlPlaneWorkerConfigSchema = z
     controlPlaneApi: ControlPlaneWorkerControlPlaneApiConfigSchema.partial().optional(),
     internalAuth: ControlPlaneWorkerInternalAuthConfigSchema.partial().optional(),
     sandbox: ControlPlaneWorkerSandboxConfigSchema.partial().optional(),
+    billing: ControlPlaneWorkerBillingConfigObjectSchema.partial().optional(),
   })
   .strict();
 

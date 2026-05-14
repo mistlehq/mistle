@@ -82,6 +82,20 @@ export const ControlPlaneApiDashboardConfigSchema = z
   })
   .strict();
 
+const ControlPlaneApiBillingConfigObjectSchema = z
+  .object({
+    stripe: z
+      .object({
+        enabled: z.boolean(),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const ControlPlaneApiBillingConfigSchema = ControlPlaneApiBillingConfigObjectSchema.default({
+  stripe: { enabled: false },
+});
+
 const ControlPlaneApiWorkflowConfigObjectSchema = z
   .object({
     databaseUrl: z.string().min(1),
@@ -178,6 +192,7 @@ export const ControlPlaneApiConfigSchema = z
     objectStore: ControlPlaneApiObjectStoreConfigSchema,
     auth: ControlPlaneApiAuthConfigSchema,
     dashboard: ControlPlaneApiDashboardConfigSchema,
+    billing: ControlPlaneApiBillingConfigSchema,
     workflow: ControlPlaneApiWorkflowConfigSchema,
     dataPlaneApi: ControlPlaneApiDataPlaneApiConfigSchema,
     internalAuth: ControlPlaneApiInternalAuthConfigSchema,
@@ -207,6 +222,7 @@ export const PartialControlPlaneApiConfigSchema = z
     objectStore: ControlPlaneApiObjectStoreConfigSchema.partial().optional(),
     auth: ControlPlaneApiAuthConfigSchema.partial().optional(),
     dashboard: ControlPlaneApiDashboardConfigSchema.partial().optional(),
+    billing: ControlPlaneApiBillingConfigObjectSchema.partial().optional(),
     workflow: ControlPlaneApiWorkflowConfigObjectSchema.partial().optional(),
     dataPlaneApi: ControlPlaneApiDataPlaneApiConfigSchema.partial().optional(),
     internalAuth: ControlPlaneApiInternalAuthConfigSchema.partial().optional(),

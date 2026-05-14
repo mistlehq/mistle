@@ -183,6 +183,13 @@
       "when": 1778723871359,
       "tag": "0025_add-user-appearance",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1778743444660,
+      "tag": "0026_add-organization-billing-customers",
+      "breakpoints": true
     }
   ]
 }

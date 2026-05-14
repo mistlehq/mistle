@@ -12,6 +12,28 @@ import type {
 import type { GlobalConfig, GlobalTelemetryConfig } from "../global/schema.js";
 import { type Config } from "./schema.js";
 
+function selectControlPlaneWorkerStripeBillingConfig(
+  config: Config,
+): ControlPlaneWorkerConfig["billing"]["stripe"] {
+  if (config.billing.stripe.enabled === true) {
+    return {
+      enabled: true,
+      secretKey: config.billing.stripe.secret_key,
+    };
+  }
+
+  if (config.billing.stripe.secret_key === undefined) {
+    return {
+      enabled: false,
+    };
+  }
+
+  return {
+    enabled: false,
+    secretKey: config.billing.stripe.secret_key,
+  };
+}
+
 function buildArchilMount(config: Config): DataPlaneWorkerSandboxStorageConfig {
   const archilConfig = config.sandbox.storage?.archil;
 
@@ -187,6 +209,11 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
     dashboard: {
       baseUrl: config.services.dashboard.public_url,
     },
+    billing: {
+      stripe: {
+        enabled: config.billing.stripe.enabled,
+      },
+    },
     workflow: {
       databaseUrl: config.postgres.control_plane.direct_url,
       migrationUrl: config.postgres.control_plane.direct_url,
@@ -286,6 +313,9 @@ export function selectControlPlaneWorkerConfig(config: Config): ControlPlaneWork
     },
     sandbox: {
       defaultBaseImage: config.sandbox.default_base_image,
+    },
+    billing: {
+      stripe: selectControlPlaneWorkerStripeBillingConfig(config),
     },
   };
 }

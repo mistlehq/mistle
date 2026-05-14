@@ -136,6 +136,41 @@ const SandboxE2BProviderConfigSchema = z.discriminatedUnion("enabled", [
     .strict(),
 ]);
 
+function withDisabledStripeBillingDefault(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return value;
+  }
+
+  if ("enabled" in value) {
+    return value;
+  }
+
+  return {
+    ...value,
+    enabled: false,
+  };
+}
+
+const BillingStripeConfigSchema = z
+  .preprocess(
+    withDisabledStripeBillingDefault,
+    z.discriminatedUnion("enabled", [
+      z
+        .object({
+          enabled: z.literal(true),
+          secret_key: z.string().trim().min(1),
+        })
+        .strict(),
+      z
+        .object({
+          enabled: z.literal(false),
+          secret_key: z.string().trim().min(1).optional(),
+        })
+        .strict(),
+    ]),
+  )
+  .default({ enabled: false });
+
 const ControlPlaneApiAuthSchema = z
   .object({
     secret: z.string().trim().min(1),
@@ -311,6 +346,12 @@ export const ConfigSchema = z
           .strict(),
       })
       .strict(),
+    billing: z
+      .object({
+        stripe: BillingStripeConfigSchema,
+      })
+      .strict()
+      .default({ stripe: { enabled: false } }),
     sandbox: z
       .object({
         default_base_image: z.string().trim().min(1),

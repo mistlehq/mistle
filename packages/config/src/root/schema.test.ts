@@ -43,3 +43,40 @@ describe("ConfigSchema sandbox provider config", () => {
     });
   });
 });
+
+describe("ConfigSchema billing config", () => {
+  it("defaults Stripe billing to disabled", () => {
+    const parsed = ConfigSchema.shape.billing.parse(undefined);
+
+    expect(parsed).toEqual({
+      stripe: {
+        enabled: false,
+      },
+    });
+  });
+
+  it("requires a Stripe secret key when Stripe billing is enabled", () => {
+    expect(() =>
+      ConfigSchema.shape.billing.parse({
+        stripe: {
+          enabled: true,
+        },
+      }),
+    ).toThrow(/secret_key/u);
+  });
+
+  it("keeps Stripe billing disabled when only the secret is provisioned", () => {
+    const parsed = ConfigSchema.shape.billing.parse({
+      stripe: {
+        secret_key: "sk_test_secret",
+      },
+    });
+
+    expect(parsed).toEqual({
+      stripe: {
+        enabled: false,
+        secret_key: "sk_test_secret",
+      },
+    });
+  });
+});

@@ -66,6 +66,26 @@ function buildDataPlaneApiServiceEnv(): NodeJS.ProcessEnv {
   };
 }
 
+function buildControlPlaneWorkerServiceEnv(): NodeJS.ProcessEnv {
+  return {
+    MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL: "postgresql://control-pooled.example/mistle",
+    MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: "postgresql://control-direct.example/mistle",
+    MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: "staging",
+    MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY: "4",
+    MISTLE_EMAIL_SMTP_FROM_ADDRESS: "no-reply@example.com",
+    MISTLE_EMAIL_SMTP_FROM_NAME: "Mistle",
+    MISTLE_EMAIL_SMTP_HOST: "smtp.example.com",
+    MISTLE_EMAIL_SMTP_PORT: "587",
+    MISTLE_EMAIL_SMTP_SECURE: "false",
+    MISTLE_EMAIL_SMTP_USERNAME: "smtp-user",
+    MISTLE_EMAIL_SMTP_PASSWORD: "smtp-password",
+    MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL: "http://data-plane-api:8082",
+    MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: "http://control-plane-api:8080",
+    MISTLE_INTERNAL_AUTH_SHARED_TOKEN: "internal-service-token",
+    MISTLE_SANDBOX_DEFAULT_BASE_IMAGE: "ghcr.io/mistlehq/sandbox-base:test",
+  };
+}
+
 function runtimeEnvEntriesToProcessEnv(entries: RuntimeEnvExportEntry[]): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
 
@@ -258,6 +278,22 @@ describe("loadConfig", () => {
         enabled: true,
         socketPath: "/var/run/docker.sock",
       },
+    });
+  });
+
+  it("keeps control-plane worker Stripe billing disabled when only the secret is provisioned", () => {
+    const loadedConfig = loadConfig({
+      app: AppIds.CONTROL_PLANE_WORKER,
+      includeGlobal: false,
+      env: {
+        ...buildControlPlaneWorkerServiceEnv(),
+        MISTLE_BILLING_STRIPE_SECRET_KEY: "sk_test_secret",
+      },
+    });
+
+    expect(loadedConfig.app.billing.stripe).toEqual({
+      enabled: false,
+      secretKey: "sk_test_secret",
     });
   });
 

@@ -426,6 +426,11 @@ const ControlPlaneApiEnvDescriptors = [
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET",
     path: ["auth", "google", "clientSecret"],
   },
+  {
+    envVar: "MISTLE_BILLING_STRIPE_ENABLED",
+    path: ["billing", "stripe", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
   { envVar: "MISTLE_SERVICES_DASHBOARD_PUBLIC_URL", path: ["dashboard", "baseUrl"] },
   {
     envVar: "MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL",
@@ -542,6 +547,12 @@ const ControlPlaneWorkerEnvDescriptors = [
   },
   { envVar: "MISTLE_INTERNAL_AUTH_SHARED_TOKEN", path: ["internalAuth", "serviceToken"] },
   { envVar: "MISTLE_SANDBOX_DEFAULT_BASE_IMAGE", path: ["sandbox", "defaultBaseImage"] },
+  {
+    envVar: "MISTLE_BILLING_STRIPE_ENABLED",
+    path: ["billing", "stripe", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  { envVar: "MISTLE_BILLING_STRIPE_SECRET_KEY", path: ["billing", "stripe", "secretKey"] },
 ] satisfies readonly EnvDescriptor[];
 
 const DataPlaneApiEnvDescriptors = [

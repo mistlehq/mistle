@@ -96,6 +96,15 @@ const RootEnvDescriptors = [
     path: ["internal_auth", "shared_token", "token"],
   },
   {
+    envVar: "MISTLE_BILLING_STRIPE_ENABLED",
+    path: ["billing", "stripe", "enabled"],
+    parse: parseBooleanEnv,
+  },
+  {
+    envVar: "MISTLE_BILLING_STRIPE_SECRET_KEY",
+    path: ["billing", "stripe", "secret_key"],
+  },
+  {
     envVar: "MISTLE_TELEMETRY_ENABLED",
     path: ["telemetry", "enabled"],
     parse: parseBooleanEnv,

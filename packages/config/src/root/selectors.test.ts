@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { Config } from "./schema.js";
-import { selectControlPlaneApiConfig } from "./selectors.js";
+import { selectControlPlaneApiConfig, selectControlPlaneWorkerConfig } from "./selectors.js";
 
 function createRootConfig(input: {
   allowSignups?: boolean;
+  billingStripe?: { enabled: false; secret_key?: string } | { enabled: true; secret_key: string };
   enabledMethods?: Array<"otp" | "google">;
   google?: {
     client_id: string;
@@ -119,6 +120,11 @@ function createRootConfig(input: {
         token: "internal-token",
       },
     },
+    billing: {
+      stripe: input.billingStripe ?? {
+        enabled: false,
+      },
+    },
     sandbox: {
       default_base_image: "registry.example.com/sandbox:latest",
       publish_base_domain: "mistle.example",
@@ -207,5 +213,62 @@ describe("selectControlPlaneApiConfig", () => {
     const config = selectControlPlaneApiConfig(createRootConfig({ allowSignups: false }));
 
     expect(config.auth.allowSignups).toBe(false);
+  });
+
+  it("selects disabled Stripe billing for the control-plane API", () => {
+    const config = selectControlPlaneApiConfig(createRootConfig({}));
+
+    expect(config.billing.stripe).toEqual({
+      enabled: false,
+    });
+  });
+
+  it("selects enabled Stripe billing for the control-plane API without exposing the secret", () => {
+    const config = selectControlPlaneApiConfig(
+      createRootConfig({
+        billingStripe: {
+          enabled: true,
+          secret_key: "sk_test_secret",
+        },
+      }),
+    );
+
+    expect(config.billing.stripe).toEqual({
+      enabled: true,
+    });
+  });
+});
+
+describe("selectControlPlaneWorkerConfig", () => {
+  it("selects enabled Stripe billing with the worker secret", () => {
+    const config = selectControlPlaneWorkerConfig(
+      createRootConfig({
+        billingStripe: {
+          enabled: true,
+          secret_key: "sk_test_secret",
+        },
+      }),
+    );
+
+    expect(config.billing.stripe).toEqual({
+      enabled: true,
+      secretKey: "sk_test_secret",
+    });
+  });
+
+  it("selects disabled Stripe billing with a provisioned worker secret", () => {
+    const config = selectControlPlaneWorkerConfig(
+      createRootConfig({
+        billingStripe: {
+          enabled: false,
+          secret_key: "sk_test_secret",
+        },
+      }),
+    );
+
+    expect(config.billing.stripe).toEqual({
+      enabled: false,
+      secretKey: "sk_test_secret",
+    });
   });
 });
