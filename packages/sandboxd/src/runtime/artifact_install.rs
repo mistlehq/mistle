@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::fs::{self, File};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 
 use flate2::read::GzDecoder;
@@ -12,7 +13,10 @@ use serde::Deserialize;
 use tar::Archive;
 use tempfile::TempDir;
 
-use crate::command::{CommandSpec, DEFAULT_COMMAND_POLL_INTERVAL, run_command};
+use crate::command::{
+    CommandOutputSink, CommandSpec, DEFAULT_COMMAND_POLL_INTERVAL,
+    run_command_with_details_and_output_sink,
+};
 use crate::time::{Clock, Sleeper, SystemClock, ThreadSleeper};
 
 use super::plan::{
@@ -40,13 +44,21 @@ pub(crate) fn artifact_install_step_op(step: &RuntimeArtifactInstallStep) -> &'s
 pub(crate) fn apply_artifact_install_step(
     step: &RuntimeArtifactInstallStep,
     managed_env: Option<&BTreeMap<String, String>>,
+    output_sink: Option<Arc<dyn CommandOutputSink>>,
 ) -> Result<(), String> {
-    apply_artifact_install_step_with_dependencies(step, managed_env, &SystemClock, &ThreadSleeper)
+    apply_artifact_install_step_with_dependencies(
+        step,
+        managed_env,
+        output_sink,
+        &SystemClock,
+        &ThreadSleeper,
+    )
 }
 
 fn apply_artifact_install_step_with_dependencies<C, S>(
     step: &RuntimeArtifactInstallStep,
     managed_env: Option<&BTreeMap<String, String>>,
+    output_sink: Option<Arc<dyn CommandOutputSink>>,
     clock: &C,
     sleeper: &S,
 ) -> Result<(), String>
@@ -56,7 +68,7 @@ where
 {
     match step {
         RuntimeArtifactInstallStep::Exec { command } => {
-            apply_exec_command(command, managed_env, clock, sleeper)
+            apply_exec_command(command, managed_env, output_sink, clock, sleeper)
         }
         RuntimeArtifactInstallStep::MiseInstall {
             tools,
@@ -64,7 +76,7 @@ where
             timeout_ms,
         } => {
             let command = build_mise_install_command(tools, *force, *timeout_ms);
-            apply_exec_command(&command, managed_env, clock, sleeper)
+            apply_exec_command(&command, managed_env, output_sink, clock, sleeper)
         }
         RuntimeArtifactInstallStep::GitHubReleaseInstall {
             repository,
@@ -90,6 +102,7 @@ where
 fn apply_exec_command<C, S>(
     command: &RuntimeExecCommand,
     managed_env: Option<&BTreeMap<String, String>>,
+    output_sink: Option<Arc<dyn CommandOutputSink>>,
     clock: &C,
     sleeper: &S,
 ) -> Result<(), String>
@@ -98,7 +111,7 @@ where
     S: Sleeper,
 {
     let env = merge_exec_environment(command.env.as_ref(), managed_env)?;
-    run_command(
+    run_command_with_details_and_output_sink(
         CommandSpec {
             args: &command.args,
             env: env.as_ref(),
@@ -108,7 +121,9 @@ where
         clock,
         sleeper,
         DEFAULT_COMMAND_POLL_INTERVAL,
+        output_sink,
     )
+    .map_err(|error| error.message)
 }
 
 fn merge_exec_environment(

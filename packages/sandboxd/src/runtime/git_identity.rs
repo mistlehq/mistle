@@ -125,6 +125,7 @@ mod tests {
 
         apply_git_identity(&StartupInput {
             startup_mode: StartupMode::New,
+        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token".to_string(),
             tunnel_exchange_token: "exchange-token".to_string(),
@@ -181,6 +182,7 @@ mod tests {
         apply_git_identity(
             &StartupInput {
                 startup_mode: StartupMode::New,
+        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
                 execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
                 bootstrap_token: "bootstrap-token".to_string(),
                 tunnel_exchange_token: "exchange-token".to_string(),
@@ -225,6 +227,7 @@ mod tests {
 
         apply_git_identity(&StartupInput {
             startup_mode: StartupMode::New,
+        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token".to_string(),
             tunnel_exchange_token: "exchange-token".to_string(),
@@ -294,6 +297,7 @@ mod tests {
 
         apply_git_identity(&StartupInput {
             startup_mode: StartupMode::New,
+        operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token".to_string(),
             tunnel_exchange_token: "exchange-token".to_string(),

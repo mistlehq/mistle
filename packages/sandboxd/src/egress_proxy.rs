@@ -3772,6 +3772,7 @@ mod tests {
     fn sample_startup_input() -> StartupInput {
         StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token".to_string(),
             tunnel_exchange_token: "exchange-token".to_string(),
@@ -3789,8 +3790,10 @@ mod tests {
             .expect("system time should be after unix epoch")
             .as_nanos();
         let counter = TEST_PROXY_CA_PATH_COUNTER.fetch_add(1, Ordering::Relaxed);
-        let root_directory =
-            std::env::temp_dir().join(format!("mistle-egress-proxy-test-{unique_id}-{counter}"));
+        let process_id = std::process::id();
+        let root_directory = std::env::temp_dir().join(format!(
+            "mistle-egress-proxy-test-{process_id}-{unique_id}-{counter}"
+        ));
         let system_certificate_bundle_path =
             root_directory.join("etc/ssl/certs/ca-certificates.crt");
         let runtime_certificate_path =

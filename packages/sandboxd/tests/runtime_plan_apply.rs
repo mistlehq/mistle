@@ -29,6 +29,7 @@ fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
 
     let startup_input = StartupInput {
         startup_mode: StartupMode::New,
+        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
         execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -490,6 +491,7 @@ fn applies_typed_exec_artifact_install_steps() {
 
     let startup_input = StartupInput {
         startup_mode: StartupMode::New,
+        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
         execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -542,6 +544,7 @@ fn applies_typed_exec_artifact_install_steps() {
 fn accepts_runtime_plan_egress_routes_with_additional_headers_and_slot_key_credential_resolvers() {
     let startup_input = StartupInput {
         startup_mode: StartupMode::New,
+        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
         execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -616,6 +619,7 @@ fn create_runtime_plan_apply_input(
 ) -> StartupInput {
     StartupInput {
         startup_mode: StartupMode::New,
+        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
         execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),

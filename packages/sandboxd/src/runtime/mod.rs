@@ -14,7 +14,9 @@ mod workspace_source;
 
 use std::collections::BTreeMap;
 use std::fmt;
+use std::sync::Arc;
 
+use crate::command::CommandOutputSink;
 use crate::protocol::startup::StartupInput;
 
 pub use plan::{
@@ -120,19 +122,32 @@ pub fn apply_compiled_runtime_plan(
     runtime_plan: &CompiledRuntimePlan,
     managed_env: Option<&BTreeMap<String, String>>,
 ) -> Result<(), RuntimePlanApplyError> {
+    apply_compiled_runtime_plan_with_output_sink(runtime_plan, managed_env, None)
+}
+
+/// Applies the artifact, workspace-source, and setup-file portions of one compiled runtime plan,
+/// teeing subprocess output to the provided sink when runtime setup commands run.
+pub fn apply_compiled_runtime_plan_with_output_sink(
+    runtime_plan: &CompiledRuntimePlan,
+    managed_env: Option<&BTreeMap<String, String>>,
+    output_sink: Option<Arc<dyn CommandOutputSink>>,
+) -> Result<(), RuntimePlanApplyError> {
     // Materialize artifacts, workspace sources, and setup files before later PRs add
     // long-lived process supervision on top of this state.
     for (artifact_index, artifact) in runtime_plan.artifacts.iter().enumerate() {
         for (install_index, install_step) in artifact.lifecycle.install.iter().enumerate() {
-            artifact_install::apply_artifact_install_step(install_step, managed_env).map_err(
-                |error| RuntimePlanApplyError::ArtifactInstall {
-                    artifact_index,
-                    install_index,
-                    artifact_key: artifact.artifact_key.clone(),
-                    op: artifact_install::artifact_install_step_op(install_step),
-                    error,
-                },
-            )?;
+            artifact_install::apply_artifact_install_step(
+                install_step,
+                managed_env,
+                output_sink.clone(),
+            )
+            .map_err(|error| RuntimePlanApplyError::ArtifactInstall {
+                artifact_index,
+                install_index,
+                artifact_key: artifact.artifact_key.clone(),
+                op: artifact_install::artifact_install_step_op(install_step),
+                error,
+            })?;
         }
     }
 
@@ -150,16 +165,19 @@ pub fn apply_compiled_runtime_plan(
                 clone_url.clone(),
             ),
         };
-        workspace_source::apply_workspace_source(workspace_source, managed_env).map_err(
-            |error| RuntimePlanApplyError::WorkspaceSource {
-                source_index,
-                source_kind,
-                path,
-                origin_url,
-                clone_url,
-                error,
-            },
-        )?;
+        workspace_source::apply_workspace_source(
+            workspace_source,
+            managed_env,
+            output_sink.clone(),
+        )
+        .map_err(|error| RuntimePlanApplyError::WorkspaceSource {
+            source_index,
+            source_kind,
+            path,
+            origin_url,
+            clone_url,
+            error,
+        })?;
     }
 
     for (client_index, runtime_client) in runtime_plan.runtime_clients.iter().enumerate() {

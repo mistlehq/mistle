@@ -1655,6 +1655,7 @@ mod tests {
         let server = start_test_control_server(&socket_path, ThreadSleeper);
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: StartupExecutionMode::Snapshot,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -1878,6 +1879,7 @@ mod tests {
     ) -> StartupInput {
         StartupInput {
             startup_mode,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: bootstrap_token.to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -1904,6 +1906,7 @@ mod tests {
     fn valid_signing_startup_input(tunnel_gateway_ws_url: &str, key_ref: String) -> StartupInput {
         StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),

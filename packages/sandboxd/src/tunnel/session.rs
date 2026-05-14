@@ -94,6 +94,7 @@ use crate::tunnel::upload_classification::{UploadClassificationError, classify_u
 pub const DEFAULT_ATTACHMENT_ROOT: &str = "/root/.local/attachments";
 /// Poll interval while the live tunnel session has no immediately available work.
 pub const DEFAULT_TUNNEL_SESSION_POLL_INTERVAL: Duration = Duration::from_millis(10);
+pub const SANDBOX_OPERATION_STREAM_ID: u32 = 0xffff_fffd;
 /// Poll interval while PTY output threads wait for the next blocking event.
 pub const DEFAULT_PTY_EVENT_POLL_INTERVAL: Duration = Duration::from_millis(10);
 /// Maximum time to wait for bootstrap tunnel DNS resolution.
@@ -106,6 +107,9 @@ const MAX_UPLOAD_SIZE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_UPLOAD_THREAD_ID_LENGTH: usize = 128;
 static UPLOAD_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 const DEFAULT_EXEC_TIMEOUT_MS: u64 = 15_000;
+const OPERATION_RECORD_CHANNEL_CAPACITY: usize = 1024;
+const PENDING_OPERATION_RECORD_CAPACITY: usize = 1024;
+const SANDBOX_OPERATION_STREAM_FORMAT: &str = "mistle.sandbox-operation.v1+jsonl";
 const DEFAULT_EXEC_MAX_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
 const DEFAULT_AGENT_ENDPOINT_UPDATE_TIMEOUT: StdDuration = StdDuration::from_secs(10);
 const DEFAULT_SIGNING_REQUEST_TIMEOUT: StdDuration = StdDuration::from_secs(120);
@@ -181,6 +185,13 @@ pub struct TunnelEgressHttpResponse {
     pub status: u16,
     pub headers: RepeatedHeaderValues,
     pub body: mpsc::UnboundedReceiver<Result<Bytes, TunnelSessionError>>,
+}
+
+pub enum OperationStreamMessage {
+    Record(String),
+    Close {
+        response_sender: std::sync::mpsc::Sender<Result<(), String>>,
+    },
 }
 
 impl std::fmt::Debug for TunnelEgressHttpResponse {
@@ -503,6 +514,9 @@ enum TunnelWriterMessage {
     Text(String),
     Binary(Vec<u8>),
     Pong(Vec<u8>),
+    Flush {
+        response_sender: std::sync::mpsc::Sender<Result<(), String>>,
+    },
     Close,
 }
 
@@ -567,6 +581,12 @@ enum TunnelSessionRequest {
     },
     EgressTcpClose {
         stream_id: u32,
+    },
+    OperationRecord {
+        line: String,
+    },
+    OperationClose {
+        response_sender: std::sync::mpsc::Sender<Result<(), String>>,
     },
 }
 
@@ -791,6 +811,8 @@ impl TunnelSession {
                 attachment_root,
                 sandbox_instance_id,
                 gateway_ws_url: startup_input.tunnel_gateway_ws_url.clone(),
+                operation_id: derive_startup_operation_id(&startup_input.tunnel_gateway_ws_url),
+                operation_kind: startup_operation_kind(startup_input),
                 acting_user_id: startup_input.acting_user_id.clone(),
                 transparent_passthrough_socket_mark: startup_transparent_passthrough_socket_mark(
                     startup_input,
@@ -950,6 +972,27 @@ impl TunnelSession {
             .map_err(|error| TunnelSessionError::Processes(error.to_string()))?
     }
 
+    pub fn operation_record_sender(&self) -> mpsc::Sender<OperationStreamMessage> {
+        let (record_sender, mut record_receiver) = mpsc::channel(OPERATION_RECORD_CHANNEL_CAPACITY);
+        let request_sender = self.request_sender.clone();
+        thread::spawn(move || {
+            while let Some(message) = record_receiver.blocking_recv() {
+                let request = match message {
+                    OperationStreamMessage::Record(line) => {
+                        TunnelSessionRequest::OperationRecord { line }
+                    }
+                    OperationStreamMessage::Close { response_sender } => {
+                        TunnelSessionRequest::OperationClose { response_sender }
+                    }
+                };
+                if request_sender.send(request).is_err() {
+                    return;
+                }
+            }
+        });
+        record_sender
+    }
+
     /// Stops the live bootstrap tunnel session and waits for its thread to exit.
     pub fn close(mut self) {
         self.shutdown_requested.store(true, Ordering::Relaxed);
@@ -1022,6 +1065,8 @@ struct TunnelSessionRuntime {
     attachment_root: PathBuf,
     sandbox_instance_id: String,
     gateway_ws_url: String,
+    operation_id: Option<String>,
+    operation_kind: &'static str,
     acting_user_id: Option<String>,
     transparent_passthrough_socket_mark: Option<u32>,
     shutdown_requested: Arc<AtomicBool>,
@@ -1069,6 +1114,11 @@ struct TunnelSessionMutableState {
     port_access_tcp_streams: BTreeMap<u32, PortAccessTcpStreamState>,
     processes_stream_send_windows: BTreeMap<u32, StreamSendWindow>,
     last_processes_snapshot_at_ms: Option<u64>,
+    operation_stream_requested: bool,
+    operation_stream_close_requested: bool,
+    operation_stream_close_response_sender: Option<std::sync::mpsc::Sender<Result<(), String>>>,
+    operation_stream_send_window: Option<StreamSendWindow>,
+    pending_operation_records: VecDeque<String>,
     pty_sessions: BTreeMap<String, PtySessionState>,
     file_uploads: BTreeMap<u32, FileUploadState>,
 }
@@ -1868,6 +1918,11 @@ async fn run_connected_tunnel_session(
         port_access_tcp_streams: BTreeMap::new(),
         processes_stream_send_windows: BTreeMap::new(),
         last_processes_snapshot_at_ms: None,
+        operation_stream_requested: false,
+        operation_stream_close_requested: false,
+        operation_stream_close_response_sender: None,
+        operation_stream_send_window: None,
+        pending_operation_records: VecDeque::new(),
         pty_sessions: BTreeMap::new(),
         file_uploads: BTreeMap::new(),
     };
@@ -1905,6 +1960,16 @@ async fn run_connected_tunnel_session(
     match send_telemetry_frames(&tunnel_writer_sender, telemetry_frames) {
         Ok(()) => {
             mark_tunnel_connected(runtime);
+            if let Some(operation_id) = runtime.operation_id.as_deref()
+                && let Err(error) = write_tunnel_text(
+                    &tunnel_writer_sender,
+                    operation_open(operation_id, runtime.operation_kind),
+                )
+            {
+                eprintln!("sandboxd failed to open operation stream: {error}");
+            } else if runtime.operation_id.is_some() {
+                session_state.operation_stream_requested = true;
+            }
             forward_supervisor_lifecycle_events(
                 &runtime.supervisor_handle,
                 &mut session_state.telemetry_relay,
@@ -2852,6 +2917,9 @@ fn spawn_bootstrap_socket_task(
                                 )));
                                 return Err(TunnelSessionError::WriteTunnelText(error.to_string()));
                             }
+                        }
+                        TunnelWriterMessage::Flush { response_sender } => {
+                            let _ = response_sender.send(Ok(()));
                         }
                         TunnelWriterMessage::Close => {
                             if let Err(error) = socket.send(Message::Close(None)).await {
@@ -3835,6 +3903,10 @@ async fn handle_tunnel_session_event(
                     }
                 }
 
+                if handle_operation_control_message(&payload, tunnel_writer_sender, session_state) {
+                    return Ok(TunnelSessionControlFlow::Continue);
+                }
+
                 let control_message = match parse_stream_control_message(&payload) {
                     Ok(message) => message,
                     Err(error) => {
@@ -4511,7 +4583,205 @@ fn handle_tunnel_session_request(
             write_tunnel_text(tunnel_writer_sender, close_payload)?;
             Ok(TunnelSessionControlFlow::Continue)
         }
+        TunnelSessionRequest::OperationRecord { line } => {
+            enqueue_operation_record(session_state, line);
+            flush_pending_operation_records(tunnel_writer_sender, session_state);
+            Ok(TunnelSessionControlFlow::Continue)
+        }
+        TunnelSessionRequest::OperationClose { response_sender } => {
+            close_operation_stream(tunnel_writer_sender, session_state, response_sender);
+            Ok(TunnelSessionControlFlow::Continue)
+        }
     }
+}
+
+fn startup_operation_kind(startup_input: &StartupInput) -> &'static str {
+    startup_input.operation_kind.as_str()
+}
+
+fn derive_startup_operation_id(tunnel_gateway_ws_url: &str) -> Option<String> {
+    let Ok(url) = Url::parse(tunnel_gateway_ws_url) else {
+        return None;
+    };
+    url.query_pairs().find_map(|(name, value)| {
+        if name == "operation_id" && !value.is_empty() {
+            Some(value.into_owned())
+        } else {
+            None
+        }
+    })
+}
+
+fn operation_open(operation_id: &str, operation_kind: &str) -> String {
+    serde_json::json!({
+        "type": "operation.open",
+        "streamId": SANDBOX_OPERATION_STREAM_ID,
+        "operationId": operation_id,
+        "operationKind": operation_kind,
+        "format": SANDBOX_OPERATION_STREAM_FORMAT
+    })
+    .to_string()
+}
+
+fn operation_close() -> String {
+    serde_json::json!({
+        "type": "operation.close",
+        "streamId": SANDBOX_OPERATION_STREAM_ID
+    })
+    .to_string()
+}
+
+fn write_operation_record(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    payload: &[u8],
+) -> Result<(), TunnelSessionError> {
+    let frame =
+        encode_stream_data_frame(SANDBOX_OPERATION_STREAM_ID, PAYLOAD_KIND_RAW_BYTES, payload)
+            .map_err(|error| TunnelSessionError::ParseDataFrame(error.to_string()))?;
+    write_tunnel_binary(tunnel_writer_sender, frame)
+}
+
+fn close_operation_stream(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    session_state: &mut TunnelSessionMutableState,
+    response_sender: std::sync::mpsc::Sender<Result<(), String>>,
+) {
+    session_state.operation_stream_close_requested = true;
+    session_state.operation_stream_close_response_sender = Some(response_sender);
+    flush_pending_operation_records(tunnel_writer_sender, session_state);
+    close_operation_stream_if_drained(tunnel_writer_sender, session_state);
+}
+
+fn close_operation_stream_if_drained(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    session_state: &mut TunnelSessionMutableState,
+) {
+    if !session_state.operation_stream_close_requested
+        || !session_state.pending_operation_records.is_empty()
+    {
+        return;
+    }
+
+    let response_sender = session_state.operation_stream_close_response_sender.take();
+
+    if session_state.operation_stream_requested {
+        if let Err(error) = write_tunnel_text(tunnel_writer_sender, operation_close()) {
+            if let Some(response_sender) = response_sender {
+                let _ = response_sender.send(Err(error.to_string()));
+            }
+            eprintln!("sandboxd failed to close operation stream: {error}");
+        } else if let Some(response_sender) = response_sender
+            && let Err(error) = write_tunnel_flush(tunnel_writer_sender, response_sender)
+        {
+            eprintln!("sandboxd failed to wait for operation stream flush: {error}");
+        }
+    } else if let Some(response_sender) = response_sender {
+        let _ = response_sender.send(Ok(()));
+    }
+    session_state.operation_stream_requested = false;
+    session_state.operation_stream_close_requested = false;
+    session_state.operation_stream_send_window = None;
+}
+
+fn handle_operation_control_message(
+    payload: &str,
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    session_state: &mut TunnelSessionMutableState,
+) -> bool {
+    let Ok(value) = serde_json::from_str::<Value>(payload) else {
+        return false;
+    };
+    let Some(message_type) = value.get("type").and_then(Value::as_str) else {
+        return false;
+    };
+    match message_type {
+        "operation.open.ok" => {
+            if value
+                .get("streamId")
+                .and_then(Value::as_u64)
+                .and_then(|stream_id| u32::try_from(stream_id).ok())
+                != Some(SANDBOX_OPERATION_STREAM_ID)
+            {
+                return true;
+            }
+            let Some(initial_window_bytes) = value
+                .get("initialWindowBytes")
+                .and_then(Value::as_u64)
+                .and_then(|bytes| usize::try_from(bytes).ok())
+            else {
+                session_state.operation_stream_send_window = None;
+                return true;
+            };
+            session_state.operation_stream_send_window =
+                Some(StreamSendWindow::new(initial_window_bytes));
+            flush_pending_operation_records(tunnel_writer_sender, session_state);
+            close_operation_stream_if_drained(tunnel_writer_sender, session_state);
+            true
+        }
+        "operation.window" => {
+            if value
+                .get("streamId")
+                .and_then(Value::as_u64)
+                .and_then(|stream_id| u32::try_from(stream_id).ok())
+                != Some(SANDBOX_OPERATION_STREAM_ID)
+            {
+                return true;
+            }
+            if let Some(send_window) = session_state.operation_stream_send_window.as_mut()
+                && let Some(bytes) = value
+                    .get("bytes")
+                    .and_then(Value::as_u64)
+                    .and_then(|bytes| usize::try_from(bytes).ok())
+            {
+                let _ = send_window.add(bytes);
+            }
+            flush_pending_operation_records(tunnel_writer_sender, session_state);
+            close_operation_stream_if_drained(tunnel_writer_sender, session_state);
+            true
+        }
+        "operation.open.error" | "operation.reset" => {
+            session_state.operation_stream_requested = false;
+            session_state.operation_stream_close_requested = false;
+            if let Some(response_sender) =
+                session_state.operation_stream_close_response_sender.take()
+            {
+                let _ = response_sender.send(Err(format!("{message_type} received")));
+            }
+            session_state.operation_stream_send_window = None;
+            session_state.pending_operation_records.clear();
+            true
+        }
+        _ => message_type.starts_with("operation."),
+    }
+}
+
+fn enqueue_operation_record(session_state: &mut TunnelSessionMutableState, line: String) {
+    if session_state.pending_operation_records.len() >= PENDING_OPERATION_RECORD_CAPACITY {
+        return;
+    }
+    session_state.pending_operation_records.push_back(line);
+}
+
+fn flush_pending_operation_records(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    session_state: &mut TunnelSessionMutableState,
+) {
+    let Some(send_window) = session_state.operation_stream_send_window.as_mut() else {
+        return;
+    };
+    while let Some(line) = session_state.pending_operation_records.front() {
+        if !send_window.try_consume(line.len()) {
+            return;
+        }
+        if let Some(line) = session_state.pending_operation_records.pop_front()
+            && let Err(error) = write_operation_record(tunnel_writer_sender, line.as_bytes())
+        {
+            eprintln!("sandboxd failed to publish operation record: {error}");
+            session_state.operation_stream_send_window = None;
+            return;
+        }
+    }
+    close_operation_stream_if_drained(tunnel_writer_sender, session_state);
 }
 
 fn handle_signing_control_message(
@@ -6069,6 +6339,28 @@ fn write_tunnel_pong(
         })
 }
 
+fn write_tunnel_flush(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    response_sender: std::sync::mpsc::Sender<Result<(), String>>,
+) -> Result<(), TunnelSessionError> {
+    match tunnel_writer_sender.send(TunnelWriterMessage::Flush { response_sender }) {
+        Ok(()) => Ok(()),
+        Err(error) => {
+            let error_message = "bootstrap tunnel writer is closed".to_string();
+            match error.0 {
+                TunnelWriterMessage::Flush { response_sender } => {
+                    let _ = response_sender.send(Err(error_message.clone()));
+                }
+                TunnelWriterMessage::Text(_)
+                | TunnelWriterMessage::Binary(_)
+                | TunnelWriterMessage::Pong(_)
+                | TunnelWriterMessage::Close => {}
+            }
+            Err(TunnelSessionError::WriteTunnelText(error_message))
+        }
+    }
+}
+
 fn write_tunnel_close(
     tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
 ) -> Result<(), TunnelSessionError> {
@@ -6126,8 +6418,9 @@ fn derive_upload_thread_directory_path(
 mod tests {
     use super::{
         AgentStreamState, AgentStreamStats, ConnectedTunnelSessionOutcome, DEFAULT_ATTACHMENT_ROOT,
-        FIRST_GATEWAY_EGRESS_STREAM_ID, GatewayEgressForwarder, PTY_OUTCOME_CLOSED,
-        PendingEgressHttpRequest, PortAccessTcpStreamState, PtySessionStats, PtySessionTermination,
+        FIRST_GATEWAY_EGRESS_STREAM_ID, GatewayEgressForwarder, OperationStreamMessage,
+        PTY_OUTCOME_CLOSED, PendingEgressHttpRequest, PortAccessTcpStreamState, PtySessionStats,
+        PtySessionTermination, SANDBOX_OPERATION_STREAM_FORMAT, SANDBOX_OPERATION_STREAM_ID,
         TunnelEgressHttpRequest, TunnelSessionError, TunnelSessionEvent, TunnelSessionLoopContext,
         TunnelSessionMutableState, TunnelSessionRequest, TunnelSessionRuntime,
         TunnelSessionRuntimeConnectionState, TunnelWriterMessage, connect_bootstrap_websocket,
@@ -6291,6 +6584,11 @@ mod tests {
             port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
+            operation_stream_requested: false,
+            operation_stream_close_requested: false,
+            operation_stream_close_response_sender: None,
+            operation_stream_send_window: None,
+            pending_operation_records: Default::default(),
             pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         }
@@ -6308,6 +6606,8 @@ mod tests {
             attachment_root: PathBuf::from(DEFAULT_ATTACHMENT_ROOT),
             sandbox_instance_id: "sbi_test".to_string(),
             gateway_ws_url: "ws://127.0.0.1:1/v1/bootstrap".to_string(),
+            operation_id: None,
+            operation_kind: "start",
             acting_user_id: None,
             transparent_passthrough_socket_mark: None,
             shutdown_requested: Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -6436,6 +6736,11 @@ mod tests {
             port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
+            operation_stream_requested: false,
+            operation_stream_close_requested: false,
+            operation_stream_close_response_sender: None,
+            operation_stream_send_window: None,
+            pending_operation_records: Default::default(),
             pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
@@ -6590,6 +6895,11 @@ mod tests {
             port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
+            operation_stream_requested: false,
+            operation_stream_close_requested: false,
+            operation_stream_close_response_sender: None,
+            operation_stream_send_window: None,
+            pending_operation_records: Default::default(),
             pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
@@ -6671,6 +6981,11 @@ mod tests {
             port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
+            operation_stream_requested: false,
+            operation_stream_close_requested: false,
+            operation_stream_close_response_sender: None,
+            operation_stream_send_window: None,
+            pending_operation_records: Default::default(),
             pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
@@ -6738,6 +7053,11 @@ mod tests {
             port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
+            operation_stream_requested: false,
+            operation_stream_close_requested: false,
+            operation_stream_close_response_sender: None,
+            operation_stream_send_window: None,
+            pending_operation_records: Default::default(),
             pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
@@ -6816,6 +7136,11 @@ mod tests {
             port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
+            operation_stream_requested: false,
+            operation_stream_close_requested: false,
+            operation_stream_close_response_sender: None,
+            operation_stream_send_window: None,
+            pending_operation_records: Default::default(),
             pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
@@ -6872,6 +7197,11 @@ mod tests {
             port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
+            operation_stream_requested: false,
+            operation_stream_close_requested: false,
+            operation_stream_close_response_sender: None,
+            operation_stream_send_window: None,
+            pending_operation_records: Default::default(),
             pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
@@ -6947,6 +7277,11 @@ mod tests {
             )]),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
+            operation_stream_requested: false,
+            operation_stream_close_requested: false,
+            operation_stream_close_response_sender: None,
+            operation_stream_send_window: None,
+            pending_operation_records: Default::default(),
             pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
@@ -7086,6 +7421,11 @@ mod tests {
             )]),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
+            operation_stream_requested: false,
+            operation_stream_close_requested: false,
+            operation_stream_close_response_sender: None,
+            operation_stream_send_window: None,
+            pending_operation_records: Default::default(),
             pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
@@ -7136,6 +7476,11 @@ mod tests {
             )]),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
+            operation_stream_requested: false,
+            operation_stream_close_requested: false,
+            operation_stream_close_response_sender: None,
+            operation_stream_send_window: None,
+            pending_operation_records: Default::default(),
             pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
@@ -7177,6 +7522,11 @@ mod tests {
             port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
+            operation_stream_requested: false,
+            operation_stream_close_requested: false,
+            operation_stream_close_response_sender: None,
+            operation_stream_send_window: None,
+            pending_operation_records: Default::default(),
             pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
@@ -7235,6 +7585,11 @@ mod tests {
             )]),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
+            operation_stream_requested: false,
+            operation_stream_close_requested: false,
+            operation_stream_close_response_sender: None,
+            operation_stream_send_window: None,
+            pending_operation_records: Default::default(),
             pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
@@ -7323,6 +7678,11 @@ mod tests {
             )]),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
+            operation_stream_requested: false,
+            operation_stream_close_requested: false,
+            operation_stream_close_response_sender: None,
+            operation_stream_send_window: None,
+            pending_operation_records: Default::default(),
             pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
@@ -7400,6 +7760,11 @@ mod tests {
             port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
+            operation_stream_requested: false,
+            operation_stream_close_requested: false,
+            operation_stream_close_response_sender: None,
+            operation_stream_send_window: None,
+            pending_operation_records: Default::default(),
             pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
@@ -7489,6 +7854,11 @@ mod tests {
             port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
+            operation_stream_requested: false,
+            operation_stream_close_requested: false,
+            operation_stream_close_response_sender: None,
+            operation_stream_send_window: None,
+            pending_operation_records: Default::default(),
             pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
@@ -7874,6 +8244,9 @@ mod tests {
                             saw_runtime_ready = true;
                         }
                     }
+                    Some("operation.open") => {
+                        acknowledge_operation_open(&mut websocket, &control_message);
+                    }
                     other => {
                         panic!("unexpected bootstrap control message before streams: {other:?}")
                     }
@@ -8168,6 +8541,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -8433,6 +8807,9 @@ mod tests {
                             saw_runtime_ready = true;
                         }
                     }
+                    Some("operation.open") => {
+                        acknowledge_operation_open(&mut websocket, &control_message);
+                    }
                     other => {
                         panic!("unexpected bootstrap control message before streams: {other:?}")
                     }
@@ -8523,6 +8900,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -8763,6 +9141,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -8874,6 +9253,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -8946,6 +9326,308 @@ mod tests {
     }
 
     #[test]
+    fn operation_stream_opens_records_and_closes_over_the_reserved_stream() {
+        let bootstrap_listener =
+            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+        let bootstrap_url = format!(
+            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session?operation_id=op_tunnel_session",
+            bootstrap_listener
+                .local_addr()
+                .expect("bootstrap listener should expose an address")
+                .port()
+        );
+        let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
+        let (operation_open_sender, operation_open_receiver) = mpsc::channel::<()>();
+        let (operation_record_sender, operation_record_receiver) = mpsc::channel::<()>();
+        let gateway_thread = thread::spawn(move || {
+            let (stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the bootstrap tunnel");
+            let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
+
+            let telemetry_open = read_json_text_message(&mut websocket);
+            assert_eq!(telemetry_open["type"], "telemetry.open");
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "telemetry.open.ok",
+                        "streamId": telemetry_open["streamId"],
+                        "initialWindowBytes": 1024
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should acknowledge telemetry.open");
+
+            let operation_open = read_stream_text_message(&mut websocket);
+            assert_eq!(
+                operation_open,
+                json!({
+                    "type": "operation.open",
+                    "streamId": SANDBOX_OPERATION_STREAM_ID,
+                    "operationId": "op_tunnel_session",
+                    "operationKind": "start",
+                    "format": SANDBOX_OPERATION_STREAM_FORMAT
+                })
+            );
+            acknowledge_operation_open(&mut websocket, &operation_open);
+            operation_open_sender
+                .send(())
+                .expect("gateway should signal operation open acknowledgement");
+
+            let operation_record =
+                read_binary_frame_for_stream(&mut websocket, SANDBOX_OPERATION_STREAM_ID);
+            assert_eq!(operation_record.stream_id, SANDBOX_OPERATION_STREAM_ID);
+            assert_eq!(operation_record.payload_kind, PAYLOAD_KIND_RAW_BYTES);
+            let payload = std::str::from_utf8(&operation_record.payload)
+                .expect("operation record payload should be utf8");
+            assert!(payload.contains(r#""kind":"lifecycle""#));
+            assert!(payload.contains(r#""phase":"sandboxd""#));
+            operation_record_sender
+                .send(())
+                .expect("gateway should signal operation record receipt");
+
+            let operation_close = read_stream_text_message(&mut websocket);
+            assert_eq!(
+                operation_close,
+                json!({
+                    "type": "operation.close",
+                    "streamId": SANDBOX_OPERATION_STREAM_ID
+                })
+            );
+
+            gateway_done_sender
+                .send(())
+                .expect("gateway should signal the operation stream was closed");
+            websocket
+                .close(None)
+                .expect("gateway websocket should close cleanly");
+        });
+
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+            bootstrap_token: "bootstrap-token-value".to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+            tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            }),
+            git_identity: None,
+            transparent_proxy: None,
+        };
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        let tunnel_session = TunnelSession::start_minimal_with_supervisor(
+            &startup_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+            test_tunnel_supervisor_handle("sbi_tunnel_session", Arc::new(PanicClock::default())),
+        )
+        .expect("minimal tunnel session should start");
+
+        operation_open_receiver
+            .recv()
+            .expect("gateway should acknowledge the operation stream open");
+        let operation_sender = tunnel_session.operation_record_sender();
+        operation_sender
+            .blocking_send(OperationStreamMessage::Record(
+                json!({
+                    "kind": "lifecycle",
+                    "observedAt": "2026-05-13T00:00:00.000Z",
+                    "phase": "sandboxd",
+                    "status": "started",
+                    "source": "sandboxd",
+                    "message": "sandboxd init started",
+                    "attributes": {}
+                })
+                .to_string()
+                    + "\n",
+            ))
+            .expect("operation record should enqueue");
+        operation_record_receiver
+            .recv()
+            .expect("gateway should observe the operation record");
+        let (close_response_sender, close_response_receiver) = mpsc::channel();
+        operation_sender
+            .blocking_send(OperationStreamMessage::Close {
+                response_sender: close_response_sender,
+            })
+            .expect("operation close should enqueue");
+
+        gateway_done_receiver
+            .recv()
+            .expect("gateway should observe the operation stream close");
+        close_response_receiver
+            .recv()
+            .expect("operation close response should be sent")
+            .expect("operation close should flush");
+        tunnel_session.close();
+        gateway_thread
+            .join()
+            .expect("gateway thread should exit cleanly");
+    }
+
+    #[test]
+    fn operation_stream_flushes_pending_records_before_close_after_open_ack() {
+        let bootstrap_listener =
+            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+        let bootstrap_url = format!(
+            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session?operation_id=op_tunnel_session",
+            bootstrap_listener
+                .local_addr()
+                .expect("bootstrap listener should expose an address")
+                .port()
+        );
+        let (operation_open_sender, operation_open_receiver) = mpsc::channel::<()>();
+        let (ack_operation_open_sender, ack_operation_open_receiver) = mpsc::channel::<()>();
+        let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
+        let gateway_thread = thread::spawn(move || {
+            let (stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the bootstrap tunnel");
+            let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
+
+            let telemetry_open = read_json_text_message(&mut websocket);
+            assert_eq!(telemetry_open["type"], "telemetry.open");
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "telemetry.open.ok",
+                        "streamId": telemetry_open["streamId"],
+                        "initialWindowBytes": 1024
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should acknowledge telemetry.open");
+
+            let operation_open = read_stream_text_message(&mut websocket);
+            assert_eq!(operation_open["type"], "operation.open");
+            operation_open_sender
+                .send(())
+                .expect("gateway should signal operation open");
+            ack_operation_open_receiver
+                .recv()
+                .expect("test should allow operation open acknowledgement");
+            acknowledge_operation_open(&mut websocket, &operation_open);
+
+            let operation_record =
+                read_binary_frame_for_stream(&mut websocket, SANDBOX_OPERATION_STREAM_ID);
+            let payload = std::str::from_utf8(&operation_record.payload)
+                .expect("operation record payload should be utf8");
+            assert!(payload.contains(r#""phase":"runtime_adapters""#));
+
+            let operation_close = read_stream_text_message(&mut websocket);
+            assert_eq!(
+                operation_close,
+                json!({
+                    "type": "operation.close",
+                    "streamId": SANDBOX_OPERATION_STREAM_ID
+                })
+            );
+
+            gateway_done_sender
+                .send(())
+                .expect("gateway should signal operation stream close");
+            websocket
+                .close(None)
+                .expect("gateway websocket should close cleanly");
+        });
+
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+            bootstrap_token: "bootstrap-token-value".to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+            tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            }),
+            git_identity: None,
+            transparent_proxy: None,
+        };
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        let tunnel_session = TunnelSession::start_minimal_with_supervisor(
+            &startup_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+            test_tunnel_supervisor_handle("sbi_tunnel_session", Arc::new(PanicClock::default())),
+        )
+        .expect("minimal tunnel session should start");
+
+        operation_open_receiver
+            .recv()
+            .expect("gateway should observe operation open");
+        let operation_sender = tunnel_session.operation_record_sender();
+        operation_sender
+            .blocking_send(OperationStreamMessage::Record(
+                json!({
+                    "kind": "lifecycle",
+                    "observedAt": "2026-05-13T00:00:00.000Z",
+                    "phase": "runtime_adapters",
+                    "status": "completed",
+                    "source": "sandboxd",
+                    "message": "start_runtime_adapters completed",
+                    "attributes": {}
+                })
+                .to_string()
+                    + "\n",
+            ))
+            .expect("operation record should enqueue before open acknowledgement");
+        let (close_response_sender, close_response_receiver) = mpsc::channel();
+        operation_sender
+            .blocking_send(OperationStreamMessage::Close {
+                response_sender: close_response_sender,
+            })
+            .expect("operation close should enqueue before open acknowledgement");
+        ack_operation_open_sender
+            .send(())
+            .expect("test should allow operation open acknowledgement");
+
+        gateway_done_receiver
+            .recv()
+            .expect("gateway should observe record before close");
+        close_response_receiver
+            .recv()
+            .expect("operation close response should be sent")
+            .expect("operation close should flush");
+        tunnel_session.close();
+        gateway_thread
+            .join()
+            .expect("gateway thread should exit cleanly");
+    }
+
+    #[test]
     fn returns_authorization_failures_from_gateway_signing_results() {
         let bootstrap_listener =
             TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
@@ -8994,6 +9676,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -9119,6 +9802,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -9208,6 +9892,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -9307,6 +9992,7 @@ mod tests {
     fn derives_transparent_passthrough_socket_mark_for_bootstrap_tunnel() {
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token".to_string(),
@@ -9462,6 +10148,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-initial".to_string(),
             tunnel_exchange_token: "exchange-token-initial".to_string(),
@@ -9566,6 +10253,8 @@ mod tests {
             attachment_root: PathBuf::from(DEFAULT_ATTACHMENT_ROOT),
             sandbox_instance_id: "sbi_tunnel_session".to_string(),
             gateway_ws_url: bootstrap_url.clone(),
+            operation_id: None,
+            operation_kind: "start",
             acting_user_id: None,
             transparent_passthrough_socket_mark: None,
             shutdown_requested,
@@ -9719,6 +10408,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-initial".to_string(),
             tunnel_exchange_token: "exchange-token-initial".to_string(),
@@ -9828,6 +10518,7 @@ mod tests {
 
             let startup_input = StartupInput {
                 startup_mode: StartupMode::New,
+                operation_kind: crate::protocol::startup::StartupOperationKind::Start,
                 execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
                 bootstrap_token: "bootstrap-token-initial".to_string(),
                 tunnel_exchange_token: "exchange-token-initial".to_string(),
@@ -10036,6 +10727,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -10180,6 +10872,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -10391,6 +11084,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -10595,6 +11289,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -10722,6 +11417,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -10925,6 +11621,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -11065,6 +11762,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -11215,6 +11913,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -11407,6 +12106,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -11577,6 +12277,40 @@ mod tests {
             let frame = read_binary_frame(socket);
             if frame.stream_id != SANDBOX_TELEMETRY_LOG_STREAM_ID {
                 return frame;
+            }
+        }
+    }
+
+    fn read_binary_frame_for_stream<S>(
+        socket: &mut WebSocket<S>,
+        expected_stream_id: u32,
+    ) -> crate::tunnel::protocol::StreamDataFrame
+    where
+        S: std::io::Read + std::io::Write,
+    {
+        loop {
+            match socket.read().expect("websocket should receive one message") {
+                Message::Text(payload) => {
+                    let message: Value = serde_json::from_str(payload.as_str())
+                        .expect("text payload should be valid json");
+                    match message["type"].as_str() {
+                        Some("keepalive.state") | Some("runtime.ready") => continue,
+                        other => panic!(
+                            "expected binary frame for stream {expected_stream_id}, got text control message {other:?}"
+                        ),
+                    }
+                }
+                Message::Binary(payload) => {
+                    if decode_telemetry_data_frame(payload.as_ref()).is_ok() {
+                        continue;
+                    }
+                    let frame = decode_stream_data_frame(payload.as_ref())
+                        .expect("binary payload should be stream data");
+                    if frame.stream_id == expected_stream_id {
+                        return frame;
+                    }
+                }
+                _ => panic!("expected websocket text or binary message"),
             }
         }
     }
@@ -11803,12 +12537,29 @@ mod tests {
             let control_message = read_json_text_message(socket);
             match control_message["type"].as_str() {
                 Some("keepalive.state") => saw_keepalive = true,
+                Some("operation.open") => {
+                    acknowledge_operation_open(socket, &control_message);
+                }
                 Some("runtime.ready") => saw_runtime_ready = true,
                 other => panic!(
                     "unexpected bootstrap control message while waiting for reconnect readiness: {other:?}"
                 ),
             }
         }
+    }
+
+    fn acknowledge_operation_open(socket: &mut WebSocket<TcpStream>, message: &Value) {
+        socket
+            .send(Message::Text(
+                json!({
+                    "type": "operation.open.ok",
+                    "streamId": message["streamId"],
+                    "initialWindowBytes": 1024
+                })
+                .to_string()
+                .into(),
+            ))
+            .expect("gateway should acknowledge operation.open");
     }
 
     fn read_http_request(stream: &mut TcpStream) -> String {
