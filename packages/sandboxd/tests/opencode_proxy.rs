@@ -9,6 +9,7 @@ use serde_json::{Value, json};
 use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{Message, WebSocket, connect};
 
+use sandboxd::keepalive::KeepaliveManager;
 use sandboxd::opencode_proxy::{derive_opencode_raw_server_url, start_opencode_proxy};
 use sandboxd::runtime::readiness::RuntimeReadinessManager;
 use sandboxd::time::{Sleeper, ThreadSleeper};
@@ -29,6 +30,7 @@ fn relays_http_requests_over_the_websocket_runtime_endpoint() {
     let proxy = start_opencode_proxy(
         "ws://127.0.0.1:0/opencode",
         &simulated_server.base_url,
+        keepalive_manager(),
         runtime_readiness_manager(),
     )
     .expect("OpenCode proxy should start");
@@ -74,6 +76,7 @@ fn relays_opencode_event_streams_as_websocket_sse_frames() {
     let proxy = start_opencode_proxy(
         "ws://127.0.0.1:0/opencode",
         &simulated_server.base_url,
+        keepalive_manager(),
         runtime_readiness_manager(),
     )
     .expect("OpenCode proxy should start");
@@ -117,6 +120,7 @@ fn proxy_survives_client_disconnect_while_event_stream_is_open() {
     let proxy = start_opencode_proxy(
         "ws://127.0.0.1:0/opencode",
         &format!("http://{}", raw_server.listener_address),
+        keepalive_manager(),
         runtime_readiness_manager(),
     )
     .expect("OpenCode proxy should start");
@@ -190,6 +194,7 @@ fn returns_bad_gateway_when_raw_opencode_server_is_unavailable_and_keeps_proxy_a
     let proxy = start_opencode_proxy(
         "ws://127.0.0.1:0/opencode",
         &format!("http://127.0.0.1:{unavailable_port}"),
+        keepalive_manager(),
         runtime_readiness_manager(),
     )
     .expect("OpenCode proxy should start");
@@ -255,48 +260,309 @@ fn derives_raw_server_origin_from_opencode_health_url() {
     assert_eq!(raw_server_url, "http://127.0.0.1:4511");
 }
 
+#[test]
+fn activity_monitor_marks_busy_status_active_and_idle_event_inactive() {
+    let simulated_server =
+        SimulatedOpenCodeActivityServer::start(json!({ "ses_busy": { "type": "busy" } }));
+    let keepalive_manager = keepalive_manager();
+    let proxy = start_opencode_proxy(
+        "ws://127.0.0.1:0/opencode",
+        &simulated_server.base_url,
+        keepalive_manager.clone(),
+        runtime_readiness_manager(),
+    )
+    .expect("OpenCode proxy should start");
+
+    wait_for_keepalive_activity(&keepalive_manager, true);
+    simulated_server.send_event(json!({
+        "type": "session.idle",
+        "properties": {
+            "sessionID": "ses_busy"
+        }
+    }));
+    wait_for_keepalive_activity(&keepalive_manager, false);
+
+    proxy.close().expect("OpenCode proxy should close cleanly");
+    simulated_server.close();
+}
+
+#[test]
+fn activity_monitor_treats_retry_status_as_active() {
+    let simulated_server = SimulatedOpenCodeActivityServer::start(json!({
+        "ses_retry": {
+            "type": "retry",
+            "attempt": 2,
+            "message": "provider temporarily unavailable",
+            "next": 123
+        }
+    }));
+    let keepalive_manager = keepalive_manager();
+    let proxy = start_opencode_proxy(
+        "ws://127.0.0.1:0/opencode",
+        &simulated_server.base_url,
+        keepalive_manager.clone(),
+        runtime_readiness_manager(),
+    )
+    .expect("OpenCode proxy should start");
+
+    wait_for_keepalive_activity(&keepalive_manager, true);
+
+    proxy.close().expect("OpenCode proxy should close cleanly");
+    simulated_server.close();
+}
+
+#[test]
+fn activity_monitor_rebuilds_activity_after_event_stream_reconnects() {
+    let simulated_server = SimulatedOpenCodeActivityServer::start(json!({}));
+    let keepalive_manager = keepalive_manager();
+    let proxy = start_opencode_proxy(
+        "ws://127.0.0.1:0/opencode",
+        &simulated_server.base_url,
+        keepalive_manager.clone(),
+        runtime_readiness_manager(),
+    )
+    .expect("OpenCode proxy should start");
+
+    wait_for_keepalive_activity(&keepalive_manager, false);
+    simulated_server.send_event(json!({
+        "payload": {
+            "type": "session.status",
+            "properties": {
+                "sessionID": "ses_reconnect",
+                "status": {
+                    "type": "busy"
+                }
+            }
+        }
+    }));
+    wait_for_keepalive_activity(&keepalive_manager, true);
+
+    simulated_server.set_statuses(json!({ "ses_reconnect": { "type": "busy" } }));
+    simulated_server.close_current_event_stream();
+    wait_for_keepalive_activity(&keepalive_manager, false);
+    wait_for_keepalive_activity(&keepalive_manager, true);
+
+    proxy.close().expect("OpenCode proxy should close cleanly");
+    simulated_server.close();
+}
+
+enum SimulatedOpenCodeActivityCommand {
+    CloseEventStream,
+    Event(Value),
+}
+
+struct SimulatedOpenCodeActivityServer {
+    base_url: String,
+    command_sender: mpsc::Sender<SimulatedOpenCodeActivityCommand>,
+    shutdown_requested: Arc<AtomicBool>,
+    statuses: Arc<Mutex<Value>>,
+    thread: Option<thread::JoinHandle<()>>,
+}
+
+impl SimulatedOpenCodeActivityServer {
+    fn start(initial_statuses: Value) -> Self {
+        let listener =
+            TcpListener::bind("127.0.0.1:0").expect("simulated activity server should bind");
+        let listener_address = listener
+            .local_addr()
+            .expect("simulated activity server should expose address");
+        listener
+            .set_nonblocking(true)
+            .expect("simulated activity server listener should become nonblocking");
+        let shutdown_requested = Arc::new(AtomicBool::new(false));
+        let statuses = Arc::new(Mutex::new(initial_statuses));
+        let (command_sender, command_receiver) = mpsc::channel();
+        let shared_command_receiver = Arc::new(Mutex::new(command_receiver));
+        let thread_shutdown_requested = shutdown_requested.clone();
+        let thread_statuses = statuses.clone();
+        let thread = thread::spawn(move || {
+            while !thread_shutdown_requested.load(Ordering::Relaxed) {
+                match listener.accept() {
+                    Ok((stream, _)) => {
+                        let request_shutdown_requested = thread_shutdown_requested.clone();
+                        let request_statuses = thread_statuses.clone();
+                        let request_command_receiver = shared_command_receiver.clone();
+                        thread::spawn(move || {
+                            handle_simulated_opencode_activity_request(
+                                stream,
+                                request_shutdown_requested,
+                                request_statuses,
+                                request_command_receiver,
+                            );
+                        });
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(error) => panic!("simulated activity server accept failed: {error}"),
+                }
+            }
+        });
+
+        Self {
+            base_url: format!("http://{listener_address}"),
+            command_sender,
+            shutdown_requested,
+            statuses,
+            thread: Some(thread),
+        }
+    }
+
+    fn send_event(&self, event: Value) {
+        self.command_sender
+            .send(SimulatedOpenCodeActivityCommand::Event(event))
+            .expect("simulated OpenCode activity event should send");
+    }
+
+    fn close_current_event_stream(&self) {
+        self.command_sender
+            .send(SimulatedOpenCodeActivityCommand::CloseEventStream)
+            .expect("simulated OpenCode activity stream close should send");
+    }
+
+    fn set_statuses(&self, statuses: Value) {
+        *self
+            .statuses
+            .lock()
+            .expect("simulated OpenCode statuses lock should not be poisoned") = statuses;
+    }
+
+    fn close(mut self) {
+        self.shutdown_requested.store(true, Ordering::Relaxed);
+        let _ = TcpStream::connect(
+            self.base_url
+                .strip_prefix("http://")
+                .expect("simulated activity base URL should have http scheme"),
+        );
+        if let Some(thread) = self.thread.take() {
+            thread
+                .join()
+                .expect("simulated activity server thread should exit cleanly");
+        }
+    }
+}
+
+fn handle_simulated_opencode_activity_request(
+    mut stream: TcpStream,
+    shutdown_requested: Arc<AtomicBool>,
+    statuses: Arc<Mutex<Value>>,
+    command_receiver: Arc<Mutex<mpsc::Receiver<SimulatedOpenCodeActivityCommand>>>,
+) {
+    let request = read_http_request_from_stream(&mut stream);
+    if request.method == "GET" && request.path == "/session/status" {
+        let body = statuses
+            .lock()
+            .expect("simulated OpenCode statuses lock should not be poisoned")
+            .to_string();
+        let response = format!(
+            "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        stream
+            .write_all(response.as_bytes())
+            .expect("simulated OpenCode status response should write");
+        return;
+    }
+
+    if request.method == "GET" && request.path == "/global/event" {
+        // OpenCode v2's SDK models /global/event as an SSE stream whose data
+        // includes session.status and session.idle events. These payload shapes
+        // are grounded in @opencode-ai/sdk's generated EventSessionStatus and
+        // EventSessionIdle types.
+        stream
+            .write_all(b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\n")
+            .expect("simulated OpenCode SSE response should write");
+        while !shutdown_requested.load(Ordering::Relaxed) {
+            let command = command_receiver
+                .lock()
+                .expect("simulated OpenCode command receiver lock should not be poisoned")
+                .recv_timeout(Duration::from_millis(25));
+            match command {
+                Ok(SimulatedOpenCodeActivityCommand::Event(event)) => {
+                    let frame = format!("event: message\ndata: {}\n\n", event);
+                    if stream.write_all(frame.as_bytes()).is_err() {
+                        return;
+                    }
+                }
+                Ok(SimulatedOpenCodeActivityCommand::CloseEventStream) => return,
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(mpsc::RecvTimeoutError::Disconnected) => return,
+            }
+        }
+        return;
+    }
+
+    stream
+        .write_all(b"HTTP/1.1 404 Not Found\r\ncontent-length: 9\r\n\r\nnot found")
+        .expect("simulated OpenCode activity not-found response should write");
+}
+
 struct SimulatedOpenCodeServer {
     base_url: String,
     request_receiver: mpsc::Receiver<()>,
-    thread: thread::JoinHandle<()>,
+    shutdown_requested: Arc<AtomicBool>,
+    thread: Option<thread::JoinHandle<()>>,
 }
 
 impl SimulatedOpenCodeServer {
     fn start(handle_request: fn(SimulatedHttpRequest) -> String) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").expect("simulated server should bind");
-        let port = listener
+        let listener_address = listener
             .local_addr()
-            .expect("simulated server should expose address")
-            .port();
+            .expect("simulated server should expose address");
+        listener
+            .set_nonblocking(true)
+            .expect("simulated server listener should become nonblocking");
         let (request_sender, request_receiver) = mpsc::channel();
+        let shutdown_requested = Arc::new(AtomicBool::new(false));
+        let thread_shutdown_requested = shutdown_requested.clone();
         let thread = thread::spawn(move || {
-            let (mut stream, _) = listener
-                .accept()
-                .expect("simulated server should accept proxied request");
-            let request = read_http_request_from_stream(&mut stream);
-            let response = handle_request(request);
-            stream
-                .write_all(response.as_bytes())
-                .expect("simulated response should write");
-            request_sender
-                .send(())
-                .expect("simulated server completion should send");
+            while !thread_shutdown_requested.load(Ordering::Relaxed) {
+                match listener.accept() {
+                    Ok((stream, _)) => {
+                        let request_sender = request_sender.clone();
+                        let request_shutdown_requested = thread_shutdown_requested.clone();
+                        thread::spawn(move || {
+                            handle_simulated_opencode_request(
+                                stream,
+                                request_shutdown_requested,
+                                request_sender,
+                                handle_request,
+                            );
+                        });
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(error) => panic!("simulated server accept failed: {error}"),
+                }
+            }
         });
 
         Self {
-            base_url: format!("http://127.0.0.1:{port}"),
+            base_url: format!("http://{listener_address}"),
             request_receiver,
-            thread,
+            shutdown_requested,
+            thread: Some(thread),
         }
     }
 
-    fn join(self) {
+    fn join(mut self) {
         self.request_receiver
             .recv_timeout(Duration::from_secs(5))
             .expect("simulated server should receive proxied request");
-        self.thread
-            .join()
-            .expect("simulated server thread should exit cleanly");
+        self.shutdown_requested.store(true, Ordering::Relaxed);
+        let _ = TcpStream::connect(
+            self.base_url
+                .strip_prefix("http://")
+                .expect("simulated base URL should have http scheme"),
+        );
+        if let Some(thread) = self.thread.take() {
+            thread
+                .join()
+                .expect("simulated server thread should exit cleanly");
+        }
     }
 }
 
@@ -322,6 +588,41 @@ struct SimulatedHttpRequest {
     method: String,
     path: String,
     body: String,
+}
+
+fn handle_simulated_opencode_request(
+    mut stream: TcpStream,
+    shutdown_requested: Arc<AtomicBool>,
+    request_sender: mpsc::Sender<()>,
+    handle_request: fn(SimulatedHttpRequest) -> String,
+) {
+    let request = read_http_request_from_stream(&mut stream);
+    if request.method == "GET" && request.path == "/session/status" {
+        stream
+            .write_all(b"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n\r\n{}")
+            .expect("simulated OpenCode status response should write");
+        return;
+    }
+
+    if request.method == "GET" && request.path == "/global/event" {
+        stream
+            .write_all(
+                b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\nevent: message\ndata: {\"type\":\"server.connected\"}\n\n",
+            )
+            .expect("simulated OpenCode monitor SSE response should write");
+        while !shutdown_requested.load(Ordering::Relaxed) {
+            thread::sleep(Duration::from_millis(25));
+        }
+        return;
+    }
+
+    let response = handle_request(request);
+    stream
+        .write_all(response.as_bytes())
+        .expect("simulated response should write");
+    request_sender
+        .send(())
+        .expect("simulated server completion should send");
 }
 
 fn start_simulated_streaming_opencode_server() -> StreamingSimulatedOpenCodeServer {
@@ -370,6 +671,25 @@ fn handle_streaming_simulated_opencode_request(
         .set_nonblocking(false)
         .expect("simulated OpenCode request stream should become blocking");
     let request = read_http_request_from_stream(&mut stream);
+    if request.method == "GET" && request.path == "/session/status" {
+        stream
+            .write_all(b"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n\r\n{}")
+            .expect("simulated OpenCode status response should write");
+        return;
+    }
+
+    if request.method == "GET" && request.path == "/global/event" {
+        stream
+            .write_all(
+                b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\nevent: message\ndata: {\"type\":\"server.connected\"}\n\n",
+            )
+            .expect("simulated OpenCode monitor SSE response should write");
+        while !shutdown_requested.load(Ordering::Relaxed) {
+            thread::sleep(Duration::from_millis(25));
+        }
+        return;
+    }
+
     if request.method == "GET" && request.path == "/event" {
         // OpenCode's EventApi returns a long-lived text/event-stream response;
         // production clients subscribe through
@@ -502,4 +822,27 @@ where
 
 fn runtime_readiness_manager() -> Arc<Mutex<RuntimeReadinessManager>> {
     Arc::new(Mutex::new(RuntimeReadinessManager::default()))
+}
+
+fn keepalive_manager() -> Arc<Mutex<KeepaliveManager>> {
+    Arc::new(Mutex::new(KeepaliveManager::default()))
+}
+
+fn wait_for_keepalive_activity(
+    keepalive_manager: &Arc<Mutex<KeepaliveManager>>,
+    expected_active: bool,
+) {
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while std::time::Instant::now() < deadline {
+        let active = keepalive_manager
+            .lock()
+            .expect("keepalive manager lock should not be poisoned")
+            .active();
+        if active == expected_active {
+            return;
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+
+    panic!("timed out waiting for keepalive activity to become {expected_active}");
 }

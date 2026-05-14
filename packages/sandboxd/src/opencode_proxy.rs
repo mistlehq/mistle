@@ -7,8 +7,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::net::SocketAddr;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -31,6 +31,7 @@ use tokio_tungstenite::accept_async;
 use tungstenite::{Error as WebSocketError, Message};
 use url::Url;
 
+use crate::keepalive::KeepaliveManager;
 use crate::runtime::readiness::{
     RuntimeReadinessManager, RuntimeReadinessMode, derive_runtime_ready,
 };
@@ -40,6 +41,7 @@ use crate::time::SystemClock;
 const OPENCODE_PROXY_STARTUP_HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(5);
 const OPENCODE_PROXY_HEALTHCHECK_INTERVAL: Duration = Duration::from_millis(50);
 const OPENCODE_PROXY_READINESS_PROJECTION_INTERVAL: Duration = Duration::from_millis(100);
+const OPENCODE_ACTIVITY_MONITOR_RECONNECT_INTERVAL: Duration = Duration::from_millis(100);
 
 type OpenCodeHttpClient = Client<HttpsConnector<HttpConnector>, Full<Bytes>>;
 
@@ -167,9 +169,15 @@ pub struct OpenCodeProxy {
 }
 
 struct LocalRuntimeReadinessProjection {
-    runtime_readiness_manager: Arc<std::sync::Mutex<RuntimeReadinessManager>>,
+    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     shutdown_requested: Arc<AtomicBool>,
     thread: JoinHandle<()>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum OpenCodeSessionActivityUpdate {
+    Active(String),
+    Idle(String),
 }
 
 #[derive(Debug, Deserialize)]
@@ -255,7 +263,8 @@ impl OpenCodeProxy {
 pub fn start_opencode_proxy(
     proxy_listen_url: &str,
     raw_server_url: &str,
-    runtime_readiness_manager: Arc<std::sync::Mutex<RuntimeReadinessManager>>,
+    keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
 ) -> Result<OpenCodeProxy, OpenCodeProxyError> {
     let supervisor_handle = SandboxdSupervisorHandle::new(
         "sandboxd-opencode-proxy",
@@ -266,6 +275,7 @@ pub fn start_opencode_proxy(
     start_opencode_proxy_with_supervisor(
         proxy_listen_url,
         raw_server_url,
+        keepalive_manager,
         runtime_readiness_manager,
         supervisor_handle,
     )
@@ -275,7 +285,8 @@ pub fn start_opencode_proxy(
 pub fn start_opencode_proxy_with_supervisor(
     proxy_listen_url: &str,
     raw_server_url: &str,
-    runtime_readiness_manager: Arc<std::sync::Mutex<RuntimeReadinessManager>>,
+    keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     supervisor_handle: SandboxdSupervisorHandle,
 ) -> Result<OpenCodeProxy, OpenCodeProxyError> {
     let listen_url = Url::parse(proxy_listen_url)
@@ -319,6 +330,7 @@ pub fn start_opencode_proxy_with_supervisor(
                 listener_address,
                 proxy_listen_url,
                 raw_server_url,
+                keepalive_manager,
                 shutdown_requested,
                 startup_sender,
             ))
@@ -372,7 +384,7 @@ pub fn start_opencode_proxy_with_supervisor(
 
 fn sync_opencode_proxy_runtime_readiness_from_snapshot(
     supervisor_handle: &SandboxdSupervisorHandle,
-    runtime_readiness_manager: &Arc<std::sync::Mutex<RuntimeReadinessManager>>,
+    runtime_readiness_manager: &Arc<Mutex<RuntimeReadinessManager>>,
 ) {
     let ready = derive_runtime_ready(
         &supervisor_handle.snapshot(),
@@ -386,7 +398,7 @@ fn sync_opencode_proxy_runtime_readiness_from_snapshot(
 
 fn spawn_opencode_proxy_runtime_readiness_projection(
     supervisor_handle: SandboxdSupervisorHandle,
-    runtime_readiness_manager: Arc<std::sync::Mutex<RuntimeReadinessManager>>,
+    runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     shutdown_requested: Arc<AtomicBool>,
 ) -> JoinHandle<()> {
     thread::spawn(move || {
@@ -413,6 +425,7 @@ async fn run_opencode_proxy_runtime(
     listener_address: SocketAddr,
     listen_url: String,
     raw_server_url: String,
+    keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     shutdown_requested: Arc<AtomicBool>,
     startup_result_sender: std::sync::mpsc::Sender<Result<String, OpenCodeProxyError>>,
 ) -> Result<(), OpenCodeProxyError> {
@@ -433,6 +446,12 @@ async fn run_opencode_proxy_runtime(
     let _ = startup_result_sender.send(Ok(final_listen_url));
 
     let client = build_opencode_http_client()?;
+    let mut activity_monitor_task = tokio::spawn(run_opencode_activity_monitor(
+        raw_server_url.clone(),
+        client.clone(),
+        keepalive_manager,
+        shutdown_requested.clone(),
+    ));
     let mut session_tasks = JoinSet::<Result<(), OpenCodeProxyError>>::new();
     while !shutdown_requested.load(Ordering::Relaxed) {
         tokio::select! {
@@ -455,7 +474,22 @@ async fn run_opencode_proxy_runtime(
                 }
             }
             _ = tokio::time::sleep(OPENCODE_PROXY_HEALTHCHECK_INTERVAL) => {}
+            monitor_result = &mut activity_monitor_task => {
+                return match monitor_result {
+                    Ok(Ok(())) => Ok(()),
+                    Ok(Err(error)) => Err(error),
+                    Err(_) => Err(OpenCodeProxyError::SessionPanicked),
+                };
+            }
         }
+    }
+
+    activity_monitor_task.abort();
+    match activity_monitor_task.await {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => return Err(error),
+        Err(error) if error.is_cancelled() => {}
+        Err(_) => return Err(OpenCodeProxyError::SessionPanicked),
     }
 
     session_tasks.abort_all();
@@ -469,6 +503,213 @@ async fn run_opencode_proxy_runtime(
     }
 
     Ok(())
+}
+
+async fn run_opencode_activity_monitor(
+    raw_server_url: String,
+    client: OpenCodeHttpClient,
+    keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    shutdown_requested: Arc<AtomicBool>,
+) -> Result<(), OpenCodeProxyError> {
+    let mut active_sessions = BTreeSet::<String>::new();
+    while !shutdown_requested.load(Ordering::Relaxed) {
+        let session_result = run_opencode_activity_monitor_session(
+            &raw_server_url,
+            client.clone(),
+            &keepalive_manager,
+            &mut active_sessions,
+            &shutdown_requested,
+        )
+        .await;
+
+        set_opencode_platform_activity(&keepalive_manager, false);
+        active_sessions.clear();
+
+        if let Err(error) = session_result {
+            eprintln!("sandboxd OpenCode activity monitor disconnected: {error}");
+        }
+
+        if shutdown_requested.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+
+        tokio::time::sleep(OPENCODE_ACTIVITY_MONITOR_RECONNECT_INTERVAL).await;
+    }
+
+    Ok(())
+}
+
+async fn run_opencode_activity_monitor_session(
+    raw_server_url: &str,
+    client: OpenCodeHttpClient,
+    keepalive_manager: &Arc<Mutex<KeepaliveManager>>,
+    active_sessions: &mut BTreeSet<String>,
+    shutdown_requested: &Arc<AtomicBool>,
+) -> Result<(), OpenCodeProxyError> {
+    rebuild_opencode_activity_from_status(raw_server_url, client.clone(), active_sessions).await?;
+    set_opencode_platform_activity(keepalive_manager, !active_sessions.is_empty());
+
+    let response = issue_opencode_get_request(raw_server_url, client, "/global/event").await?;
+    let mut body = response.into_body();
+    let mut buffer = String::new();
+    while !shutdown_requested.load(Ordering::Relaxed) {
+        let Some(frame) = body.frame().await else {
+            return Ok(());
+        };
+        let frame = frame.map_err(|error| OpenCodeProxyError::HttpRequest(error.to_string()))?;
+        let Ok(chunk) = frame.into_data() else {
+            continue;
+        };
+        let chunk_text = std::str::from_utf8(chunk.as_ref())
+            .map_err(|error| OpenCodeProxyError::ConfigureRuntime(error.to_string()))?;
+        buffer.push_str(chunk_text);
+        while let Some(event_end_index) = buffer.find("\n\n") {
+            let event_text = buffer[..event_end_index].to_string();
+            buffer.drain(..event_end_index + 2);
+            if let Some(update) = parse_opencode_session_activity_sse_event(&event_text)? {
+                apply_opencode_session_activity_update(active_sessions, update);
+                set_opencode_platform_activity(keepalive_manager, !active_sessions.is_empty());
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn rebuild_opencode_activity_from_status(
+    raw_server_url: &str,
+    client: OpenCodeHttpClient,
+    active_sessions: &mut BTreeSet<String>,
+) -> Result<(), OpenCodeProxyError> {
+    let response = issue_opencode_get_request(raw_server_url, client, "/session/status").await?;
+    let body = read_response_body(response.into_body()).await?;
+    let value: Value = serde_json::from_str(&body).map_err(OpenCodeProxyError::InvalidRequest)?;
+    let Some(statuses) = value.as_object() else {
+        return Err(OpenCodeProxyError::ConfigureRuntime(
+            "OpenCode /session/status response must be a JSON object".to_string(),
+        ));
+    };
+
+    active_sessions.clear();
+    for (session_id, status) in statuses {
+        if opencode_status_is_active(status)? {
+            active_sessions.insert(session_id.clone());
+        }
+    }
+
+    Ok(())
+}
+
+async fn issue_opencode_get_request(
+    raw_server_url: &str,
+    client: OpenCodeHttpClient,
+    path: &str,
+) -> Result<hyper::Response<hyper::body::Incoming>, OpenCodeProxyError> {
+    let target_uri = build_opencode_target_uri(raw_server_url, path)?;
+    let request = Request::builder()
+        .method(Method::GET)
+        .uri(target_uri)
+        .body(Full::new(Bytes::new()))
+        .map_err(|error| OpenCodeProxyError::ConfigureRuntime(error.to_string()))?;
+
+    client
+        .request(request)
+        .await
+        .map_err(|error| OpenCodeProxyError::HttpRequest(error.to_string()))
+}
+
+fn parse_opencode_session_activity_sse_event(
+    event_text: &str,
+) -> Result<Option<OpenCodeSessionActivityUpdate>, OpenCodeProxyError> {
+    let Some(event) = parse_sse_event(&json!(null), event_text) else {
+        return Ok(None);
+    };
+    let value: Value =
+        serde_json::from_str(&event.data).map_err(OpenCodeProxyError::InvalidRequest)?;
+    let event_payload = value.get("payload").unwrap_or(&value);
+    let Some(event_type) = event_payload.get("type").and_then(Value::as_str) else {
+        return Ok(None);
+    };
+
+    match event_type {
+        "session.status" => {
+            let session_id = read_required_string(event_payload, &["properties", "sessionID"])?;
+            let status = event_payload
+                .get("properties")
+                .and_then(|properties| properties.get("status"))
+                .ok_or_else(|| {
+                    OpenCodeProxyError::ConfigureRuntime(
+                        "OpenCode session.status event is missing properties.status".to_string(),
+                    )
+                })?;
+            if opencode_status_is_active(status)? {
+                Ok(Some(OpenCodeSessionActivityUpdate::Active(session_id)))
+            } else {
+                Ok(Some(OpenCodeSessionActivityUpdate::Idle(session_id)))
+            }
+        }
+        "session.idle" => {
+            let session_id = read_required_string(event_payload, &["properties", "sessionID"])?;
+            Ok(Some(OpenCodeSessionActivityUpdate::Idle(session_id)))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn apply_opencode_session_activity_update(
+    active_sessions: &mut BTreeSet<String>,
+    update: OpenCodeSessionActivityUpdate,
+) {
+    match update {
+        OpenCodeSessionActivityUpdate::Active(session_id) => {
+            active_sessions.insert(session_id);
+        }
+        OpenCodeSessionActivityUpdate::Idle(session_id) => {
+            active_sessions.remove(&session_id);
+        }
+    }
+}
+
+fn opencode_status_is_active(status: &Value) -> Result<bool, OpenCodeProxyError> {
+    let Some(status_type) = status.get("type").and_then(Value::as_str) else {
+        return Err(OpenCodeProxyError::ConfigureRuntime(
+            "OpenCode session status is missing type".to_string(),
+        ));
+    };
+
+    match status_type {
+        "busy" | "retry" => Ok(true),
+        "idle" => Ok(false),
+        _ => Err(OpenCodeProxyError::ConfigureRuntime(format!(
+            "OpenCode session status type '{status_type}' is not supported"
+        ))),
+    }
+}
+
+fn read_required_string(value: &Value, path: &[&str]) -> Result<String, OpenCodeProxyError> {
+    let mut current = value;
+    for segment in path {
+        current = current.get(*segment).ok_or_else(|| {
+            OpenCodeProxyError::ConfigureRuntime(format!(
+                "OpenCode event is missing required field '{}'",
+                path.join(".")
+            ))
+        })?;
+    }
+
+    current.as_str().map(ToString::to_string).ok_or_else(|| {
+        OpenCodeProxyError::ConfigureRuntime(format!(
+            "OpenCode event field '{}' must be a string",
+            path.join(".")
+        ))
+    })
+}
+
+fn set_opencode_platform_activity(keepalive_manager: &Arc<Mutex<KeepaliveManager>>, active: bool) {
+    keepalive_manager
+        .lock()
+        .expect("OpenCode keepalive manager lock should not be poisoned")
+        .set_platform_active(active);
 }
 
 async fn relay_opencode_proxy_connection(

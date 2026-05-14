@@ -283,6 +283,7 @@ impl RuntimeAdapterRegistry {
                     let adapter = start_opencode_runtime_adapter(
                         agent_runtime,
                         &runtime_plan,
+                        keepalive_manager.clone(),
                         runtime_readiness_manager.clone(),
                         supervisor_handle.clone(),
                     )?;
@@ -324,6 +325,7 @@ fn collect_runtime_adapter_components(
 fn start_opencode_runtime_adapter(
     agent_runtime: &CompiledAgentRuntime,
     runtime_plan: &CompiledRuntimePlan,
+    keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     supervisor_handle: SandboxdSupervisorHandle,
 ) -> Result<RuntimeAdapter, RuntimeAdapterRegistryError> {
@@ -380,6 +382,7 @@ fn start_opencode_runtime_adapter(
     let proxy = start_opencode_proxy_with_supervisor(
         listen_url,
         &raw_server_url,
+        keepalive_manager,
         runtime_readiness_manager,
         supervisor_handle,
     )

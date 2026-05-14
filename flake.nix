@@ -13,6 +13,7 @@
         nodejs = if pkgs ? nodejs_25 then pkgs.nodejs_25 else pkgs.nodejs;
         docsNodejs = if pkgs ? nodejs_22 then pkgs.nodejs_22 else pkgs.nodejs;
         codexVersion = "0.130.0";
+        opencodeVersion = "1.14.50";
         codexReleaseAsset =
           {
             x86_64-linux = {
@@ -38,6 +39,31 @@
           }
           .${system}
           or (throw "Unsupported system for pinned Codex CLI: ${system}");
+        opencodeReleaseAsset =
+          {
+            x86_64-linux = {
+              fileName = "opencode-linux-x64-baseline.tar.gz";
+              hash = "sha256-9M+Kht14eISvfutTSX5NSNd3JXmrLG4QvM6AYumS6ts=";
+              unpackPhase = ''tar -xzf "$src"'';
+            };
+            aarch64-linux = {
+              fileName = "opencode-linux-arm64.tar.gz";
+              hash = "sha256-YO93fcv4sQgNEOYV/wVE2pdc1yuQbQD17nV4vbPNONQ=";
+              unpackPhase = ''tar -xzf "$src"'';
+            };
+            x86_64-darwin = {
+              fileName = "opencode-darwin-x64-baseline.zip";
+              hash = "sha256-herzB17X5WmySPGKb+OrIaKeYDADoQw2vrcKAU2dcJ8=";
+              unpackPhase = ''unzip "$src"'';
+            };
+            aarch64-darwin = {
+              fileName = "opencode-darwin-arm64.zip";
+              hash = "sha256-pcbZRA1F4YrH2ccWK4NwnYLsGywo5nfTEHwb6jafcs8=";
+              unpackPhase = ''unzip "$src"'';
+            };
+          }
+          .${system}
+          or (throw "Unsupported system for pinned OpenCode CLI: ${system}");
         codexPinned = pkgs.stdenvNoCC.mkDerivation {
           pname = "codex";
           version = codexVersion;
@@ -58,6 +84,27 @@
           installPhase = ''
             mkdir -p "$out/bin"
             install -m755 "${codexReleaseAsset.binaryName}" "$out/bin/codex"
+          '';
+        };
+        opencodePinned = pkgs.stdenvNoCC.mkDerivation {
+          pname = "opencode";
+          version = opencodeVersion;
+
+          src = pkgs.fetchurl {
+            url =
+              "https://github.com/anomalyco/opencode/releases/download/v${opencodeVersion}/${opencodeReleaseAsset.fileName}";
+            hash = opencodeReleaseAsset.hash;
+          };
+
+          nativeBuildInputs = [ pkgs.unzip ];
+          dontConfigure = true;
+          dontBuild = true;
+
+          unpackPhase = opencodeReleaseAsset.unpackPhase;
+
+          installPhase = ''
+            mkdir -p "$out/bin"
+            install -m755 opencode "$out/bin/opencode"
           '';
         };
         commonPackages = [
@@ -84,12 +131,14 @@
       in
       {
         packages.codex = codexPinned;
+        packages.opencode = opencodePinned;
 
         devShells.default = pkgs.mkShell {
-          packages = [nodejs codexPinned] ++ commonPackages;
+          packages = [nodejs codexPinned opencodePinned] ++ commonPackages;
           shellHook = ''
             ${commonShellHook}
             export PATH=${codexPinned}/bin:$PATH
+            export PATH=${opencodePinned}/bin:$PATH
           '';
         };
 

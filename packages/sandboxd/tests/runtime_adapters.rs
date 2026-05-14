@@ -1,6 +1,6 @@
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 
@@ -282,28 +282,69 @@ fn runtime_adapter_registry_starts_codex_proxy_adapter() {
 #[test]
 fn runtime_adapter_registry_starts_opencode_proxy_adapter() {
     let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
-    let raw_port = raw_listener
+    let raw_address = raw_listener
         .local_addr()
-        .expect("raw listener should expose an address")
-        .port();
-    let raw_health_url = format!("http://127.0.0.1:{raw_port}/global/health");
+        .expect("raw listener should expose an address");
+    raw_listener
+        .set_nonblocking(true)
+        .expect("raw listener should become nonblocking");
+    let raw_health_url = format!("http://{raw_address}/global/health");
 
     let (server_complete_sender, server_complete_receiver) = mpsc::channel();
+    let shutdown_requested = Arc::new(AtomicBool::new(false));
+    let thread_shutdown_requested = shutdown_requested.clone();
     let raw_server_thread = thread::spawn(move || {
-        let (mut stream, _) = raw_listener
-            .accept()
-            .expect("raw server should accept the proxied OpenCode request");
-        let request = read_http_request(&mut stream);
-        assert_eq!(request.method, "GET");
-        assert_eq!(request.path, "/event");
-        stream
-            .write_all(
-                b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n\r\nevent: message\ndata: {\"type\":\"server.connected\"}\n\n",
-            )
-            .expect("raw OpenCode response should send");
-        server_complete_sender
-            .send(())
-            .expect("raw server completion should send");
+        while !thread_shutdown_requested.load(Ordering::Relaxed) {
+            match raw_listener.accept() {
+                Ok((mut stream, _)) => {
+                    let request_shutdown_requested = thread_shutdown_requested.clone();
+                    let request_complete_sender = server_complete_sender.clone();
+                    thread::spawn(move || {
+                        let request = read_http_request(&mut stream);
+                        match (request.method.as_str(), request.path.as_str()) {
+                            ("GET", "/session/status") => {
+                                stream
+                                    .write_all(
+                                        b"HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n\r\n{\"ses_registry\":{\"type\":\"busy\"}}",
+                                    )
+                                    .expect("raw OpenCode status response should send");
+                            }
+                            ("GET", "/global/event") => {
+                                stream
+                                    .write_all(
+                                        b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\n",
+                                    )
+                                    .expect("raw OpenCode monitor stream should open");
+                                while !request_shutdown_requested.load(Ordering::Relaxed) {
+                                    thread::sleep(std::time::Duration::from_millis(25));
+                                }
+                            }
+                            ("GET", "/event") => {
+                                stream
+                                    .write_all(
+                                        b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n\r\nevent: message\ndata: {\"type\":\"server.connected\"}\n\n",
+                                    )
+                                    .expect("raw OpenCode response should send");
+                                request_complete_sender
+                                    .send(())
+                                    .expect("raw server completion should send");
+                            }
+                            _ => {
+                                stream
+                                    .write_all(
+                                        b"HTTP/1.1 404 Not Found\r\ncontent-length: 9\r\n\r\nnot found",
+                                    )
+                                    .expect("raw OpenCode not-found response should send");
+                            }
+                        }
+                    });
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    thread::sleep(std::time::Duration::from_millis(10));
+                }
+                Err(error) => panic!("raw OpenCode server accept failed: {error}"),
+            }
+        }
     });
 
     let startup_input = StartupInput {
@@ -406,6 +447,7 @@ fn runtime_adapter_registry_starts_opencode_proxy_adapter() {
     assert_eq!(adapters.adapters().len(), 1);
     assert_eq!(adapters.adapters()[0].runtime_id(), "opencode");
     wait_for_runtime_readiness(&runtime_readiness_manager, true);
+    wait_for_keepalive_state(&keepalive_manager, true);
 
     let (mut proxy_client, _) = connect(adapters.adapters()[0].listen_url())
         .expect("client should connect through the OpenCode runtime adapter");
@@ -440,6 +482,8 @@ fn runtime_adapter_registry_starts_opencode_proxy_adapter() {
     server_complete_receiver
         .recv()
         .expect("raw server should complete OpenCode request");
+    shutdown_requested.store(true, Ordering::Relaxed);
+    let _ = TcpStream::connect(raw_address);
     raw_server_thread
         .join()
         .expect("raw OpenCode server thread should exit cleanly");
