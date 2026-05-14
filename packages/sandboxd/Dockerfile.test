@@ -5,6 +5,8 @@ FROM ${NODE_IMAGE} AS node
 FROM rust:1.93-bookworm
 
 ARG CODEX_CLI_VERSION=0.130.0
+ARG OPENCODE_CLI_VERSION=1.14.50
+ARG TARGETARCH
 ARG MISE_VERSION=v2026.4.19
 ARG CARGO_NEXTEST_VERSION=0.9.133
 
@@ -26,3 +28,11 @@ RUN apt-get update \
 RUN cargo install --locked cargo-nextest --version ${CARGO_NEXTEST_VERSION}
 RUN curl https://mise.run | MISE_INSTALL_PATH=/usr/local/bin/mise MISE_VERSION=${MISE_VERSION} sh
 RUN npm install -g @openai/codex@${CODEX_CLI_VERSION}
+RUN case "${TARGETARCH}" in \
+    amd64) opencode_asset="opencode-linux-x64-baseline.tar.gz" ;; \
+    arm64) opencode_asset="opencode-linux-arm64.tar.gz" ;; \
+    *) echo "Unsupported OpenCode CLI architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+  esac \
+  && curl -fsSL "https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_CLI_VERSION}/${opencode_asset}" \
+    | tar -xz -C /usr/local/bin opencode \
+  && chmod 755 /usr/local/bin/opencode
