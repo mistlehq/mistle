@@ -3,11 +3,7 @@ import { z } from "zod";
 const EnabledTensorlakeAdapterIntegrationConfigSchema = z
   .object({
     TENSORLAKE_API_KEY: z.string().trim().min(1),
-    MISTLE_TEST_TENSORLAKE_BASE_IMAGE: z
-      .string()
-      .trim()
-      .min(1)
-      .default("tensorlake/ubuntu-minimal"),
+    MISTLE_TEST_TENSORLAKE_BASE_IMAGE: z.string().trim().min(1),
   })
   .strip();
 

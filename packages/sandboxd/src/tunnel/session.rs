@@ -12500,6 +12500,7 @@ mod tests {
     fn accept_bootstrap_websocket(stream: TcpStream) -> (WebSocket<TcpStream>, String) {
         let request_uri = Arc::new(Mutex::new(None::<String>));
         let request_uri_capture = request_uri.clone();
+        #[allow(clippy::result_large_err)]
         let websocket = accept_hdr(stream, move |request: &Request, response: Response| {
             *request_uri_capture
                 .lock()

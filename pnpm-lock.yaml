@@ -1000,8 +1000,8 @@ importers:
         specifier: ^2.19.0
         version: 2.19.0
       tensorlake:
-        specifier: 0.5.10
-        version: 0.5.10
+        specifier: 0.5.11
+        version: 0.5.11
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -11407,8 +11407,8 @@ packages:
   teex@1.0.1:
     resolution: {integrity: sha512-eYE6iEI62Ni1H8oIa7KlDU6uQBtqr4Eajni3wX7rpfXD8ysFx8z0+dri+KWEPWpBsxXfxu58x/0jvTVT1ekOSg==}
 
-  tensorlake@0.5.10:
-    resolution: {integrity: sha512-ZFYEvYrAElvbTDyLZxhkBQTwdVu+AM/Ptz5iUK2pIoYkVSDAYCfLVgGy3xGs/7hCp3kF6NTc3istNCqgQyBUsA==}
+  tensorlake@0.5.11:
+    resolution: {integrity: sha512-iIth9BWTTUwlzTbLTrJ8Dps69tw75nYuss5oEfN4Gr3d6J9F7kzk7Z7OZZqEcyixyXwnfI87XxS78fCjT9CuKA==}
     engines: {node: '>=22.0.0'}
     hasBin: true
 
@@ -24596,7 +24596,7 @@ snapshots:
       - bare-abort-controller
       - react-native-b4a
 
-  tensorlake@0.5.10:
+  tensorlake@0.5.11:
     dependencies:
       undici: 8.2.0
       ws: 8.20.0

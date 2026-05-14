@@ -27,6 +27,12 @@ const SANDBOX_BASE_SYSTEM_TESTS_TARGET = "sandbox-base-system-tests";
 const SANDBOXD_BUILD_ARTIFACT_PATH = "/app/packages/sandboxd/target/release/sandboxd";
 const TENSORLAKE_COPY_PART_SIZE = "512k";
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
+const SandboxBaseImageRefEnv = "MISTLE_SANDBOX_BASE_IMAGE_REF";
+const E2BApiKeyEnv = "E2B_API_KEY";
+const E2BConfigApiKeyEnv = "MISTLE_SANDBOX_E2B_API_KEY";
+const TensorlakeApiKeyEnv = "TENSORLAKE_API_KEY";
+const TensorlakeConfigApiKeyEnv = "MISTLE_SANDBOX_TENSORLAKE_API_KEY";
+const TensorlakeBaseImageEnv = "MISTLE_SANDBOX_TENSORLAKE_BASE_IMAGE";
 
 const TensorlakeSandboxdSources = {
   LOCAL: "local",
@@ -80,8 +86,9 @@ E2B options:
 
 Tensorlake options:
   --output-image-ref <name>            Tensorlake registered sandbox image name
+  --source-image-ref <ref>             OCI image ref to import into Tensorlake
   --api-key <key>                      Tensorlake API key
-  --sandboxd-source <local|release>    sandboxd source for the Tensorlake SDK image
+  --sandboxd-source <local|release>    optional sandboxd override for the Tensorlake SDK image
   --sandboxd-artifact-url <url>        Release sandboxd artifact URL when --sandboxd-source release
   --sandboxd-artifact-sha256 <sha256>  Release sandboxd artifact SHA256 when --sandboxd-source release
   --sandboxd-artifact-version <value>  Release sandboxd version when --sandboxd-source release
@@ -355,6 +362,11 @@ function readGitHeadSha(): string {
   }).trim();
 }
 
+function readOptionalEnv(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value === undefined || value === "" ? undefined : value;
+}
+
 function createDevTag(gitHeadSha: string): string {
   const uniqueInput = [gitHeadSha, new Date().toISOString(), randomUUID()].join("\n");
   const uniqueHash = createHash("sha256").update(uniqueInput).digest("hex").slice(0, 16);
@@ -461,14 +473,18 @@ function prepareTensorlakeSandboxdBinary(platform: string): void {
   }
 }
 
-function requireTensorlakeSandboxdSource(
+function requireTensorlakeSourceImageRef(
   argumentsList: ParsedCliArguments,
-): NonNullable<ParsedCliArguments["sandboxdSource"]> {
-  if (argumentsList.sandboxdSource === undefined) {
-    throw new Error("--sandboxd-source is required when --provider is tensorlake.");
+): NonNullable<ParsedCliArguments["sourceImageRef"]> {
+  const sourceImageRef = argumentsList.sourceImageRef ?? readOptionalEnv(SandboxBaseImageRefEnv);
+
+  if (sourceImageRef === undefined || sourceImageRef.trim() === "") {
+    throw new Error(
+      `--source-image-ref or ${SandboxBaseImageRefEnv} is required when --provider is tensorlake.`,
+    );
   }
 
-  return argumentsList.sandboxdSource;
+  return sourceImageRef;
 }
 
 function createTensorlakeSandboxdSource(argumentsList: ParsedCliArguments):
@@ -482,8 +498,13 @@ function createTensorlakeSandboxdSource(argumentsList: ParsedCliArguments):
         url: string;
         sha256: string;
       };
-    } {
-  const sandboxdSource = requireTensorlakeSandboxdSource(argumentsList);
+    }
+  | undefined {
+  const sandboxdSource = argumentsList.sandboxdSource;
+  if (sandboxdSource === undefined) {
+    return undefined;
+  }
+
   if (sandboxdSource === TensorlakeSandboxdSources.LOCAL) {
     return {
       kind: SandboxSdkImageSandboxdSourceKinds.LOCAL,
@@ -560,12 +581,22 @@ async function buildDockerBaseImage(argumentsList: ParsedCliArguments): Promise<
 }
 
 async function buildTensorlakeBaseImage(argumentsList: ParsedCliArguments): Promise<void> {
-  if (argumentsList.outputImageRef === undefined || argumentsList.outputImageRef.trim() === "") {
-    throw new Error("--output-image-ref is required when --provider is tensorlake.");
+  const outputImageRef = argumentsList.outputImageRef ?? readOptionalEnv(TensorlakeBaseImageEnv);
+  const apiKey =
+    argumentsList.apiKey ??
+    readOptionalEnv(TensorlakeApiKeyEnv) ??
+    readOptionalEnv(TensorlakeConfigApiKeyEnv);
+
+  if (outputImageRef === undefined || outputImageRef.trim() === "") {
+    throw new Error(
+      `--output-image-ref or ${TensorlakeBaseImageEnv} is required when --provider is tensorlake.`,
+    );
   }
 
-  if (argumentsList.apiKey === undefined || argumentsList.apiKey.trim() === "") {
-    throw new Error("--api-key is required when --provider is tensorlake.");
+  if (apiKey === undefined || apiKey.trim() === "") {
+    throw new Error(
+      `--api-key, ${TensorlakeApiKeyEnv}, or ${TensorlakeConfigApiKeyEnv} is required when --provider is tensorlake.`,
+    );
   }
 
   if (argumentsList.target !== undefined) {
@@ -582,8 +613,9 @@ async function buildTensorlakeBaseImage(argumentsList: ParsedCliArguments): Prom
     throw new Error("--label is not supported when --provider is tensorlake.");
   }
 
+  const sourceImageRef = requireTensorlakeSourceImageRef(argumentsList);
   const sandboxd = createTensorlakeSandboxdSource(argumentsList);
-  if (sandboxd.kind === SandboxSdkImageSandboxdSourceKinds.LOCAL) {
+  if (sandboxd?.kind === SandboxSdkImageSandboxdSourceKinds.LOCAL) {
     const platform = argumentsList.platform ?? DEFAULT_PLATFORM;
     prepareTensorlakeSandboxdBinary(platform);
   } else if (argumentsList.platform !== undefined) {
@@ -593,17 +625,18 @@ async function buildTensorlakeBaseImage(argumentsList: ParsedCliArguments): Prom
   const builder = createSandboxBaseImageBuilder({
     provider: SandboxProvider.TENSORLAKE,
     tensorlake: {
-      apiKey: argumentsList.apiKey,
+      apiKey,
     },
   });
 
-  console.log(`Registering Tensorlake sandbox image ${argumentsList.outputImageRef}.`);
+  console.log(`Registering Tensorlake sandbox image ${outputImageRef}.`);
   const image = await builder.ensureBaseImage({
     source: {
       kind: SandboxBaseImageSourceKinds.SDK_IMAGE,
+      baseImageRef: sourceImageRef,
       contextPath: REPO_ROOT,
-      imageId: argumentsList.outputImageRef,
-      sandboxd,
+      imageId: outputImageRef,
+      ...(sandboxd === undefined ? {} : { sandboxd }),
     },
   });
 
@@ -611,29 +644,37 @@ async function buildTensorlakeBaseImage(argumentsList: ParsedCliArguments): Prom
 }
 
 async function buildE2BBaseImage(argumentsList: ParsedCliArguments): Promise<void> {
-  if (argumentsList.sourceImageRef === undefined) {
-    throw new Error("--source-image-ref is required when --provider is e2b.");
+  const sourceImageRef = argumentsList.sourceImageRef ?? readOptionalEnv(SandboxBaseImageRefEnv);
+  const apiKey =
+    argumentsList.apiKey ?? readOptionalEnv(E2BApiKeyEnv) ?? readOptionalEnv(E2BConfigApiKeyEnv);
+
+  if (sourceImageRef === undefined || sourceImageRef.trim() === "") {
+    throw new Error(
+      `--source-image-ref or ${SandboxBaseImageRefEnv} is required when --provider is e2b.`,
+    );
   }
 
-  if (argumentsList.apiKey === undefined) {
-    throw new Error("--api-key is required when --provider is e2b.");
+  if (apiKey === undefined || apiKey.trim() === "") {
+    throw new Error(
+      `--api-key, ${E2BApiKeyEnv}, or ${E2BConfigApiKeyEnv} is required when --provider is e2b.`,
+    );
   }
 
   const builder = createSandboxBaseImageBuilder({
     provider: SandboxProvider.E2B,
     e2b: {
-      apiKey: argumentsList.apiKey,
+      apiKey,
       ...(argumentsList.cpuCount === undefined ? {} : { cpuCount: argumentsList.cpuCount }),
       ...(argumentsList.domain === undefined ? {} : { domain: argumentsList.domain }),
       ...(argumentsList.memoryMb === undefined ? {} : { memoryMb: argumentsList.memoryMb }),
     },
   });
 
-  console.log(`Ensuring E2B template for ${argumentsList.sourceImageRef}.`);
+  console.log(`Ensuring E2B template for ${sourceImageRef}.`);
   const image = await builder.ensureBaseImage({
     source: {
       kind: SandboxBaseImageSourceKinds.IMAGE,
-      imageId: argumentsList.sourceImageRef,
+      imageId: sourceImageRef,
     },
   });
 

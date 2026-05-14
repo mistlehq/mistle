@@ -29,6 +29,7 @@ describe("TensorlakeBaseImageBuilder", () => {
   it("defines the sandbox base image through the Tensorlake SDK builder", () => {
     const dockerfileText = dockerfileContent(
       createTensorlakeSandboxBaseImage({
+        baseImageRef: "ghcr.io/mistlehq/sandbox-base:v1.2.3",
         name: "mistle-base",
         sandboxd: {
           kind: SandboxSdkImageSandboxdSourceKinds.LOCAL,
@@ -36,13 +37,17 @@ describe("TensorlakeBaseImageBuilder", () => {
       }),
     );
 
-    expect(dockerfileText).toContain("FROM tensorlake/ubuntu-minimal");
+    expect(dockerfileText).toContain("FROM ghcr.io/mistlehq/sandbox-base:v1.2.3");
     expect(dockerfileText).toContain("apt-get install -y --no-install-recommends");
     expect(dockerfileText).toContain("linux-modules-$(uname -r)");
     expect(dockerfileText).toContain("modprobe nf_tables");
-    expect(dockerfileText).toContain("libfuse2");
-    expect(dockerfileText).toContain("https://mise.run");
-    expect(dockerfileText).toContain("https://archil.com/install");
+    expect(dockerfileText).not.toContain("DEBIAN_FRONTEND");
+    expect(dockerfileText).not.toContain("WORKDIR /root");
+    expect(dockerfileText).not.toContain("test -x /opt/mistle/bin/sandboxd");
+    expect(dockerfileText).not.toContain("command -v mise");
+    expect(dockerfileText).not.toContain("command -v archil");
+    expect(dockerfileText).not.toContain("https://mise.run");
+    expect(dockerfileText).not.toContain("https://archil.com/install");
     expect(dockerfileText).toContain(
       "COPY packages/sandboxd/.generated/tensorlake/sandboxd-parts /tmp/sandboxd-parts",
     );
@@ -53,6 +58,7 @@ describe("TensorlakeBaseImageBuilder", () => {
   it("can define the sandboxd install through a release artifact", () => {
     const dockerfileText = dockerfileContent(
       createTensorlakeSandboxBaseImage({
+        baseImageRef: "ghcr.io/mistlehq/sandbox-base:v1.2.3",
         name: "mistle-base",
         sandboxd: {
           kind: SandboxSdkImageSandboxdSourceKinds.RELEASE,
@@ -96,6 +102,7 @@ describe("TensorlakeBaseImageBuilder", () => {
         platform: "linux/amd64",
         source: {
           kind: SandboxBaseImageSourceKinds.SDK_IMAGE,
+          baseImageRef: "ghcr.io/mistlehq/sandbox-base:v1.2.3",
           contextPath: ".",
           imageId: "mistle-base",
           sandboxd: {

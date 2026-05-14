@@ -49,8 +49,9 @@ export class TensorlakeBaseImageBuilder implements SandboxBaseImageBuilder {
       await withTensorlakeApiKey(config.apiKey, async () => {
         await createSandboxImage(
           createTensorlakeSandboxBaseImage({
+            baseImageRef: source.baseImageRef,
             name: source.imageId,
-            sandboxd: source.sandboxd,
+            ...(source.sandboxd === undefined ? {} : { sandboxd: source.sandboxd }),
           }),
           {
             registeredName: source.imageId,
@@ -86,6 +87,12 @@ function validateSdkImageSource(request: {
   if (request.source.contextPath.trim() === "") {
     throw new SandboxConfigurationError(
       "Tensorlake base image builder requires a non-empty SDK image context path.",
+    );
+  }
+
+  if (request.source.baseImageRef.trim() === "") {
+    throw new SandboxConfigurationError(
+      "Tensorlake base image builder requires a non-empty source image ref.",
     );
   }
 }

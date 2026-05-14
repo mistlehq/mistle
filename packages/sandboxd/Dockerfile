@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM debian:bookworm-slim AS sandbox-base-common
+FROM ubuntu:24.04 AS sandbox-base-common
 
 ARG MISE_VERSION=v2026.4.28
 
@@ -19,6 +19,7 @@ RUN apt-get update \
     grep \
     iproute2 \
     jq \
+    kmod \
     less \
     lsof \
     nftables \
@@ -29,7 +30,7 @@ RUN apt-get update \
     unzip \
   && rm -rf /var/lib/apt/lists/*
 
-# Login shells source /etc/profile, which resets PATH on Debian. Re-add the
+# Login shells source /etc/profile, which can reset PATH. Re-add the
 # sandbox tool location so runtime artifacts remain discoverable.
 RUN cat > /etc/profile.d/mistle-path.sh <<'EOF'
 for p in /opt/mistle/bin; do

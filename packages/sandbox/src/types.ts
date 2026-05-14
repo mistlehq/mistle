@@ -70,9 +70,10 @@ export type SandboxSdkImageSandboxdSource =
 
 export interface SandboxSdkImageBaseImageSource {
   readonly kind: typeof SandboxBaseImageSourceKinds.SDK_IMAGE;
+  readonly baseImageRef: string;
   readonly contextPath: string;
   readonly imageId: string;
-  readonly sandboxd: SandboxSdkImageSandboxdSource;
+  readonly sandboxd?: SandboxSdkImageSandboxdSource;
 }
 
 export type SandboxBaseImageSource =
