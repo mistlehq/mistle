@@ -153,6 +153,10 @@ domain = "e2b.app"
 cpu_count = 4
 memory_mb = 8192
 
+[sandbox.tensorlake]
+enabled = true
+api_key = "replace-with-tensorlake-api-key"
+
 #[sandbox.docker]
 #enabled = true
 #socket_path = "/var/run/docker.sock"

@@ -42,6 +42,8 @@ function buildControlPlaneApiServiceEnv(): NodeJS.ProcessEnv {
     MISTLE_SANDBOX_DOCKER_ENABLED: "true",
     MISTLE_SANDBOX_E2B_ENABLED: "true",
     MISTLE_SANDBOX_E2B_API_KEY: "shared-e2b-secret",
+    MISTLE_SANDBOX_TENSORLAKE_ENABLED: "true",
+    MISTLE_SANDBOX_TENSORLAKE_API_KEY: "shared-tensorlake-secret",
     MISTLE_SANDBOX_TOKENS_BOOTSTRAP_SECRET: "bootstrap-secret",
     MISTLE_SANDBOX_TOKENS_BOOTSTRAP_ISSUER: "mistle",
     MISTLE_SANDBOX_TOKENS_BOOTSTRAP_AUDIENCE: "sandbox-bootstrap",
@@ -263,6 +265,10 @@ describe("loadConfig", () => {
       enabled: true,
       apiKey: "shared-e2b-secret",
       domain: "e2b.app",
+    });
+    expect(loadedConfig.app.sandbox.tensorlake).toEqual({
+      enabled: true,
+      apiKey: "shared-tensorlake-secret",
     });
   });
 

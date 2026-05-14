@@ -506,6 +506,12 @@ const ControlPlaneApiEnvDescriptors = [
   { envVar: "MISTLE_SANDBOX_E2B_API_KEY", path: ["sandbox", "e2b", "apiKey"] },
   { envVar: "MISTLE_SANDBOX_E2B_DOMAIN", path: ["sandbox", "e2b", "domain"] },
   {
+    envVar: "MISTLE_SANDBOX_TENSORLAKE_ENABLED",
+    path: ["sandbox", "tensorlake", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  { envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY", path: ["sandbox", "tensorlake", "apiKey"] },
+  {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION",
     path: ["integrations", "activeMasterEncryptionKeyVersion"],
     parse: parseNumberEnv,
