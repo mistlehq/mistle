@@ -60,6 +60,24 @@ type TunnelDevEnvInput = {
   dataPlaneGatewayLocalPort: number;
 };
 
+type TunnelDevConfig = {
+  dataPlaneGatewayPublicUrl: string;
+  env: NodeJS.ProcessEnv;
+  controlPlaneApiPublicUrl: string;
+};
+
+type DevModeConfig = {
+  controlPlaneApiLocalUrl: string;
+  env: NodeJS.ProcessEnv;
+} & (
+  | {
+      mode: "ios";
+    }
+  | ({
+      mode: "tunnel";
+    } & Omit<TunnelDevConfig, "env">)
+);
+
 type RunInput = {
   command: string;
   args: readonly string[];
@@ -180,11 +198,12 @@ function writeCloudflaredConfig(input: CloudflaredConfigInput): void {
   writeFileSync(DEV_CLOUDFLARED_CONFIG_PATH, configContent, "utf8");
 }
 
-function createTunnelDevEnv(input: TunnelDevEnvInput): NodeJS.ProcessEnv {
+function createTunnelDevConfig(input: TunnelDevEnvInput): TunnelDevConfig {
   const cloudflareTunnelToken = readRequiredEnv("CLOUDFLARE_TUNNEL_TOKEN");
   const controlPlaneApiTunnelHostname = readRequiredEnv("CONTROL_PLANE_API_TUNNEL_HOSTNAME");
   const dataPlaneGatewayTunnelHostname = readRequiredEnv("DATA_PLANE_API_TUNNEL_HOSTNAME");
   const controlPlaneApiPublicUrl = `https://${controlPlaneApiTunnelHostname}`;
+  const dataPlaneGatewayPublicUrl = `https://${dataPlaneGatewayTunnelHostname}`;
 
   writeCloudflaredConfig({
     controlPlaneApiTunnelHostname,
@@ -194,11 +213,44 @@ function createTunnelDevEnv(input: TunnelDevEnvInput): NodeJS.ProcessEnv {
   });
 
   return {
-    CLOUDFLARE_TUNNEL_TOKEN: cloudflareTunnelToken,
-    CONTROL_PLANE_API_TUNNEL_HOSTNAME: controlPlaneApiTunnelHostname,
-    DATA_PLANE_API_TUNNEL_HOSTNAME: dataPlaneGatewayTunnelHostname,
-    CLOUDFLARED_CONFIG_PATH: DEV_CLOUDFLARED_CONFIG_PATH,
-    MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: controlPlaneApiPublicUrl,
+    controlPlaneApiPublicUrl,
+    dataPlaneGatewayPublicUrl,
+    env: {
+      CLOUDFLARE_TUNNEL_TOKEN: cloudflareTunnelToken,
+      CONTROL_PLANE_API_TUNNEL_HOSTNAME: controlPlaneApiTunnelHostname,
+      DATA_PLANE_API_TUNNEL_HOSTNAME: dataPlaneGatewayTunnelHostname,
+      CLOUDFLARED_CONFIG_PATH: DEV_CLOUDFLARED_CONFIG_PATH,
+      MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: controlPlaneApiPublicUrl,
+    },
+  };
+}
+
+function createDevModeConfig(input: {
+  controlPlaneApiLocalPort: number;
+  dataPlaneGatewayLocalPort: number;
+  mode: DevStartMode;
+}): DevModeConfig {
+  const controlPlaneApiLocalUrl = `http://localhost:${String(input.controlPlaneApiLocalPort)}`;
+  if (input.mode === "ios") {
+    return {
+      controlPlaneApiLocalUrl,
+      mode: "ios",
+      env: {
+        // iOS simulator Safari drops Secure cookies on localhost HTTP, so keep
+        // both dashboard requests and Better Auth's cookie base URL local.
+        MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN: controlPlaneApiLocalUrl,
+        MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: controlPlaneApiLocalUrl,
+      },
+    };
+  }
+
+  return {
+    controlPlaneApiLocalUrl,
+    mode: "tunnel",
+    ...createTunnelDevConfig({
+      controlPlaneApiLocalPort: input.controlPlaneApiLocalPort,
+      dataPlaneGatewayLocalPort: input.dataPlaneGatewayLocalPort,
+    }),
   };
 }
 
@@ -423,21 +475,16 @@ async function start(): Promise<void> {
   console.log(`Starting local infra dependencies (${infraSummary})...`);
   const controlPlaneApiLocalPort = readControlPlaneApiLocalPort(DEV_CONFIG_PATH);
   const dataPlaneGatewayLocalPort = readDataPlaneGatewayLocalPort(DEV_CONFIG_PATH);
-  const controlPlaneApiLocalUrl = `http://localhost:${String(controlPlaneApiLocalPort)}`;
+  const modeConfig = createDevModeConfig({
+    controlPlaneApiLocalPort,
+    dataPlaneGatewayLocalPort,
+    mode,
+  });
 
   const sharedDevEnv: NodeJS.ProcessEnv = {
     MISTLE_CONFIG_PATH: DEV_CONFIG_PATH,
     CONTROL_PLANE_API_LOCAL_PORT: String(controlPlaneApiLocalPort),
-    ...(mode === "ios"
-      ? {
-          // iOS simulator Safari drops the Secure auth cookie when the dashboard is
-          // loaded over http://localhost, so keep Better Auth's base URL local.
-          MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: controlPlaneApiLocalUrl,
-        }
-      : createTunnelDevEnv({
-          controlPlaneApiLocalPort,
-          dataPlaneGatewayLocalPort,
-        })),
+    ...modeConfig.env,
   };
   localInfraEnv = sharedDevEnv;
   localInfraStartAttempted = true;
@@ -553,12 +600,7 @@ async function start(): Promise<void> {
   });
 
   console.log("");
-  if (mode === "tunnel") {
-    const controlPlaneApiTunnelHostname = readRequiredEnv("CONTROL_PLANE_API_TUNNEL_HOSTNAME");
-    const dataPlaneGatewayTunnelHostname = readRequiredEnv("DATA_PLANE_API_TUNNEL_HOSTNAME");
-    const controlPlaneApiPublicUrl = `https://${controlPlaneApiTunnelHostname}`;
-    const dataPlaneGatewayPublicUrl = `https://${dataPlaneGatewayTunnelHostname}`;
-
+  if (modeConfig.mode === "tunnel") {
     console.log("Starting public tunnels...");
     runOrThrow({
       command: "docker",
@@ -568,13 +610,13 @@ async function start(): Promise<void> {
 
     console.log("");
     console.log("Public tunnel URLs:");
-    console.log(`- control-plane-api: ${controlPlaneApiPublicUrl}`);
-    console.log(`- data-plane-gateway: ${dataPlaneGatewayPublicUrl}`);
-    console.log(`- data-plane tunnel route: ${dataPlaneGatewayPublicUrl}/tunnel`);
+    console.log(`- control-plane-api: ${modeConfig.controlPlaneApiPublicUrl}`);
+    console.log(`- data-plane-gateway: ${modeConfig.dataPlaneGatewayPublicUrl}`);
+    console.log(`- data-plane tunnel route: ${modeConfig.dataPlaneGatewayPublicUrl}/tunnel`);
   } else {
     console.log("iOS simulator local dev URLs:");
     console.log("- dashboard: http://localhost:5173");
-    console.log(`- control-plane-api: ${controlPlaneApiLocalUrl}`);
+    console.log(`- control-plane-api: ${modeConfig.controlPlaneApiLocalUrl}`);
   }
   console.log("- mailpit ui: http://127.0.0.1:8025");
   console.log("- grafana (otel-lgtm): http://127.0.0.1:3000");
