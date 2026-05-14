@@ -16,6 +16,10 @@ import { getWorkflowContext, type WorkflowContext } from "../core/context.js";
 import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
 import { destroySandbox } from "../shared/destroy-sandbox.js";
 import { formatPersistedFailureMessage } from "../shared/format-persisted-failure-message.js";
+import {
+  createWorkerSandboxLifecycleEventRecorder,
+  recordWorkerSandboxLifecyclePhase,
+} from "../shared/sandbox-operation-events.js";
 import { ensureSandboxInstance } from "../start-sandbox-instance/ensure-sandbox-instance.js";
 import { initializeSandboxRuntime } from "../start-sandbox-instance/initialize-sandbox-runtime.js";
 import { markSandboxInstanceFailed } from "../start-sandbox-instance/mark-sandbox-instance-failed.js";
@@ -44,6 +48,7 @@ type MaterializeSnapshotWorkflowExecutionContext = Pick<
   WorkflowContext,
   | "config"
   | "controlPlaneInternalClient"
+  | "clock"
   | "db"
   | "tables"
   | "logger"
@@ -94,6 +99,14 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     sandboxProfileId: workflowInput.sandboxProfileId,
     sandboxProfileVersion: workflowInput.sandboxProfileVersion,
     runtimeProvider: workflowInput.sandboxRuntime.provider,
+  });
+  const operationEvents = createWorkerSandboxLifecycleEventRecorder({
+    clock: ctx.clock,
+    db: ctx.db,
+    logger,
+    operationId: workflowInput.snapshotJobId,
+    operationKind: "snapshot",
+    sandboxInstanceId: workflowInput.sandboxInstanceId,
   });
   const requestedRuntimeProvider = workflowInput.sandboxRuntime.provider;
   const sandboxRuntimeInput = {
@@ -342,22 +355,38 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     ensuredSandboxInstance = true;
 
     currentPhase = "start";
-    const startedSandbox = await step.run({ name: "start-snapshot-sandbox" }, async () => {
-      const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
-
-      return startSandbox(
-        {
-          config: ctx.config,
-          processEnv: ctx.processEnv,
-          sandboxAdapter: resolvedRuntime.sandboxAdapter,
-        },
-        {
-          sandboxInstanceId: workflowInput.sandboxInstanceId,
-          image: workflowInput.image,
+    const startedSandbox = await recordWorkerSandboxLifecyclePhase(
+      operationEvents,
+      {
+        attributes: {
           runtimeProvider: requestedRuntimeProvider,
+          snapshotJobId: workflowInput.snapshotJobId,
         },
-      );
-    });
+        completedMessage: "Snapshot sandbox provider start completed.",
+        failedMessage: "Snapshot sandbox provider start failed.",
+        phase: "provider",
+        startedMessage: "Snapshot sandbox provider start started.",
+      },
+      async () => {
+        return step.run({ name: "start-snapshot-sandbox" }, async () => {
+          const resolvedRuntime =
+            await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+
+          return startSandbox(
+            {
+              config: ctx.config,
+              processEnv: ctx.processEnv,
+              sandboxAdapter: resolvedRuntime.sandboxAdapter,
+            },
+            {
+              sandboxInstanceId: workflowInput.sandboxInstanceId,
+              image: workflowInput.image,
+              runtimeProvider: requestedRuntimeProvider,
+            },
+          );
+        });
+      },
+    );
     startedSandboxCleanupState = {
       providerSandboxId: startedSandbox.providerSandboxId,
       runtimeProvider: startedSandbox.runtimeProvider,
@@ -381,72 +410,141 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     });
 
     currentPhase = "init";
-    await step.run({ name: "initialize-snapshot-sandbox-runtime" }, async () => {
-      const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
-
-      await initializeSandboxRuntime(
-        {
-          config: ctx.config,
-          logger,
-          processEnv: ctx.processEnv,
-          sandboxAdapter: resolvedRuntime.sandboxAdapter,
-          sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
-          sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
-        },
-        {
-          organizationId: workflowInput.organizationId,
-          sandboxInstanceId: workflowInput.sandboxInstanceId,
+    await recordWorkerSandboxLifecyclePhase(
+      operationEvents,
+      {
+        attributes: {
           providerSandboxId: startedSandbox.providerSandboxId,
-          startupMode: SandboxStartupModes.NEW,
-          executionMode: SandboxExecutionModes.SNAPSHOT,
-          runtimePlan: compiledRuntimePlan,
+          runtimeProvider: startedSandbox.runtimeProvider,
+          snapshotJobId: workflowInput.snapshotJobId,
         },
-      );
-    });
+        completedMessage: "Snapshot sandboxd initialization completed.",
+        failedMessage: "Snapshot sandboxd initialization failed.",
+        phase: "sandboxd",
+        startedMessage: "Snapshot sandboxd initialization started.",
+      },
+      async () => {
+        await step.run({ name: "initialize-snapshot-sandbox-runtime" }, async () => {
+          const resolvedRuntime =
+            await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+
+          await initializeSandboxRuntime(
+            {
+              config: ctx.config,
+              logger,
+              processEnv: ctx.processEnv,
+              sandboxAdapter: resolvedRuntime.sandboxAdapter,
+              sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
+              sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
+            },
+            {
+              organizationId: workflowInput.organizationId,
+              operationId: workflowInput.snapshotJobId,
+              operationKind: "snapshot",
+              sandboxInstanceId: workflowInput.sandboxInstanceId,
+              providerSandboxId: startedSandbox.providerSandboxId,
+              startupMode: SandboxStartupModes.NEW,
+              executionMode: SandboxExecutionModes.SNAPSHOT,
+              runtimePlan: compiledRuntimePlan,
+            },
+          );
+        });
+      },
+    );
 
     currentPhase = "mark_running";
-    await step.run({ name: "mark-snapshot-sandbox-running" }, async () => {
-      await markSandboxInstanceRunning(
-        {
-          db: ctx.db,
-          tables: ctx.tables,
+    await recordWorkerSandboxLifecyclePhase(
+      operationEvents,
+      {
+        attributes: {
+          providerSandboxId: startedSandbox.providerSandboxId,
+          runtimeProvider: startedSandbox.runtimeProvider,
+          snapshotJobId: workflowInput.snapshotJobId,
         },
-        {
-          sandboxInstanceId: workflowInput.sandboxInstanceId,
-        },
-      );
-    });
+        completedMessage: "Snapshot sandbox running status transition completed.",
+        failedMessage: "Snapshot sandbox running status transition failed.",
+        phase: "running",
+        startedMessage: "Snapshot sandbox running status transition started.",
+      },
+      async () => {
+        await step.run({ name: "mark-snapshot-sandbox-running" }, async () => {
+          await markSandboxInstanceRunning(
+            {
+              db: ctx.db,
+              tables: ctx.tables,
+            },
+            {
+              sandboxInstanceId: workflowInput.sandboxInstanceId,
+            },
+          );
+        });
+      },
+    );
 
     currentPhase = "capture";
-    const capturedSnapshot = await step.run({ name: "capture-snapshot-image" }, async () => {
-      const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+    const capturedSnapshot = await recordWorkerSandboxLifecyclePhase(
+      operationEvents,
+      {
+        attributes: {
+          providerSandboxId: startedSandbox.providerSandboxId,
+          runtimeProvider: startedSandbox.runtimeProvider,
+          snapshotJobId: workflowInput.snapshotJobId,
+        },
+        completedMessage: "Snapshot image capture completed.",
+        failedMessage: "Snapshot image capture failed.",
+        phase: "snapshot",
+        startedMessage: "Snapshot image capture started.",
+      },
+      async () => {
+        return step.run({ name: "capture-snapshot-image" }, async () => {
+          const resolvedRuntime =
+            await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
 
-      return resolvedRuntime.sandboxAdapter.captureSnapshot({
-        id: startedSandbox.providerSandboxId,
-      });
-    });
+          return resolvedRuntime.sandboxAdapter.captureSnapshot({
+            id: startedSandbox.providerSandboxId,
+          });
+        });
+      },
+    );
 
     currentPhase = "destroy";
-    await step.run({ name: "destroy-snapshot-sandbox-after-capture" }, async () => {
-      const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
-
-      await destroySandbox(
-        {
-          db: ctx.db,
-          tables: ctx.tables,
-          controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-          config: ctx.config,
-          sandboxAdapter: resolvedRuntime.sandboxAdapter,
-        },
-        {
-          sandboxInstanceId: workflowInput.sandboxInstanceId,
-          organizationId: workflowInput.organizationId,
-          persistenceMode: "ephemeral",
-          runtimeProvider: startedSandbox.runtimeProvider,
+    await recordWorkerSandboxLifecyclePhase(
+      operationEvents,
+      {
+        attributes: {
           providerSandboxId: startedSandbox.providerSandboxId,
+          runtimeProvider: startedSandbox.runtimeProvider,
+          snapshotJobId: workflowInput.snapshotJobId,
         },
-      );
-    });
+        completedMessage: "Snapshot sandbox teardown completed.",
+        failedMessage: "Snapshot sandbox teardown failed.",
+        phase: "teardown",
+        startedMessage: "Snapshot sandbox teardown started.",
+      },
+      async () => {
+        await step.run({ name: "destroy-snapshot-sandbox-after-capture" }, async () => {
+          const resolvedRuntime =
+            await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+
+          await destroySandbox(
+            {
+              db: ctx.db,
+              tables: ctx.tables,
+              controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+              config: ctx.config,
+              sandboxAdapter: resolvedRuntime.sandboxAdapter,
+            },
+            {
+              sandboxInstanceId: workflowInput.sandboxInstanceId,
+              organizationId: workflowInput.organizationId,
+              persistenceMode: "ephemeral",
+              runtimeProvider: startedSandbox.runtimeProvider,
+              providerSandboxId: startedSandbox.providerSandboxId,
+            },
+          );
+        });
+      },
+    );
     sandboxDestroyed = true;
 
     currentPhase = "mark_stopped";

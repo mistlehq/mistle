@@ -13,6 +13,10 @@ import {
 } from "@mistle/sandbox";
 
 import type { DataPlaneWorkerConfig } from "../core/config.js";
+import {
+  recordWorkerSandboxLifecyclePhase,
+  type WorkerSandboxLifecycleEventRecorder,
+} from "./sandbox-operation-events.js";
 import { createSandboxStorageBackendAdapter } from "./sandbox-storage/create-sandbox-storage-backend-adapter.js";
 import { withSandboxStorageTelemetry } from "./sandbox-storage/telemetry.js";
 
@@ -33,12 +37,56 @@ export async function attachSandboxStorage(
     runtimeProvider: SandboxProvider;
     providerSandboxId: string;
     lifecycle: "start" | "resume";
+    operationEventRecorder?: WorkerSandboxLifecycleEventRecorder;
   },
 ): Promise<void> {
   if (input.persistenceMode === SandboxInstancePersistenceModes.EPHEMERAL) {
     return;
   }
 
+  const attach = async (): Promise<void> => {
+    await attachPersistentSandboxStorage(ctx, input);
+  };
+  if (input.operationEventRecorder === undefined) {
+    await attach();
+    return;
+  }
+
+  await recordWorkerSandboxLifecyclePhase(
+    input.operationEventRecorder,
+    {
+      attributes: {
+        lifecycle: input.lifecycle,
+        runtimeProvider: input.runtimeProvider,
+      },
+      completedMessage: "Sandbox persistent storage attachment completed.",
+      failedMessage: "Sandbox persistent storage attachment failed.",
+      phase: "storage_attach",
+      startedMessage: "Sandbox persistent storage attachment started.",
+    },
+    attach,
+  );
+}
+
+async function attachPersistentSandboxStorage(
+  ctx: {
+    db: DataPlaneDatabase;
+    tables: Pick<DataPlaneTables, "sandboxInstanceStorages" | "sandboxInstances">;
+    controlPlaneInternalClient: ControlPlaneInternalClient;
+    workerConfig: DataPlaneWorkerConfig;
+    configuredSandboxProvider: SandboxProvider;
+    sandboxAdapter: SandboxAdapter;
+    storageBackend: SandboxStorageBackend | undefined;
+  },
+  input: {
+    organizationId: string;
+    sandboxInstanceId: string;
+    persistenceMode: SandboxInstancePersistenceMode;
+    runtimeProvider: SandboxProvider;
+    providerSandboxId: string;
+    lifecycle: "start" | "resume";
+  },
+): Promise<void> {
   if (input.runtimeProvider !== ctx.configuredSandboxProvider) {
     throw new Error(
       "Attempted to attach sandbox storage using provider different from configured runtime sandbox provider.",

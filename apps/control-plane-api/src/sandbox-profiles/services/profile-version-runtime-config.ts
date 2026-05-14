@@ -10,6 +10,8 @@ import type { SandboxRuntimeProviderInput } from "@mistle/workflow-registry/data
 
 import type { ControlPlaneApiSandboxRuntimeConfig } from "../../types.js";
 import {
+  SandboxProfilesCompileError,
+  SandboxProfilesCompileErrorCodes,
   SandboxProfilePublishabilityIssueCodes,
   type SandboxProfilePublishabilityIssueCode,
 } from "../errors.js";
@@ -67,14 +69,20 @@ export function createWorkflowSandboxRuntime(
 
 function assertSandboxRuntimeProvider(provider: string | null): SandboxProvider {
   if (provider === null) {
-    throw new Error("Sandbox profile version runtime provider is missing.");
+    throw new SandboxProfilesCompileError(
+      SandboxProfilesCompileErrorCodes.SANDBOX_PROVIDER_REQUIRED,
+      "Select a sandbox provider before starting this sandbox.",
+    );
   }
 
   if (provider === SandboxProvider.DOCKER || provider === SandboxProvider.E2B) {
     return provider;
   }
 
-  throw new Error(`Unsupported sandbox profile version runtime provider '${provider}'.`);
+  throw new SandboxProfilesCompileError(
+    SandboxProfilesCompileErrorCodes.INVALID_SANDBOX_PROVIDER,
+    `Sandbox provider '${provider}' is not supported.`,
+  );
 }
 
 export function createDefaultProfileVersionRuntimeConfig(input: {

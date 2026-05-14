@@ -1,20 +1,30 @@
 import { randomUUID } from "node:crypto";
 
-import { getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
+import {
+  getControlPlaneDatabaseSchema,
+  type SandboxProfileVersionAgentRuntimeId,
+} from "@mistle/db/control-plane";
 import {
   SandboxInstancePersistenceModes,
   SandboxInstancePurposes,
   type SandboxInstanceSource,
+  type SandboxInstanceStarterKind,
 } from "@mistle/db/data-plane";
-import { type SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 import { and, eq } from "drizzle-orm";
 
 import { compileProfileVersionRuntimePlan } from "../compile-profile-version-runtime-plan.js";
-import { SandboxProfilesCompileError, SandboxProfilesCompileErrorCodes } from "../errors.js";
+import {
+  SandboxProfilesBadRequestCodes,
+  SandboxProfilesBadRequestError,
+  SandboxProfilesCompileError,
+  SandboxProfilesCompileErrorCodes,
+} from "../errors.js";
 import { SandboxProfilesNotFoundCodes, SandboxProfilesNotFoundError } from "../errors.js";
 import {
   createWorkflowSandboxRuntime,
   mapProfileVersionRuntimeConfig,
+  type SandboxProfileVersionResources,
+  validateSandboxProfileVersionRuntimeConfig,
 } from "./profile-version-runtime-config.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
@@ -22,6 +32,13 @@ type StartProfileSetupCheckSandboxInput = {
   organizationId: string;
   profileId: string;
   profileVersion: number;
+  agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
+  setupScript?: string;
+  sandboxRuntimeConfig?: {
+    sandboxProvider: string;
+    sandboxConnectionId: string | null;
+    sandboxResources: SandboxProfileVersionResources | null;
+  };
   idempotencyKey?: string;
   startedBy: {
     kind: SandboxInstanceStarterKind;
@@ -36,7 +53,7 @@ type StartProfileSetupCheckSandboxOutput = {
   sandboxInstanceId: string;
 };
 
-async function resolveSetupCheckSandboxRuntime(
+async function resolveSetupCheckSandboxRuntimeConfig(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
   input: {
     organizationId: string;
@@ -84,22 +101,26 @@ async function resolveSetupCheckSandboxRuntime(
     );
   }
 
-  return createWorkflowSandboxRuntime(mapProfileVersionRuntimeConfig(sandboxProfileVersion));
+  return mapProfileVersionRuntimeConfig(sandboxProfileVersion);
 }
 
 export async function startProfileSetupCheckSandbox(
   {
     db,
+    integrationRegistry,
     integrationsConfig,
+    sandboxConfig,
     dataPlaneClient,
     defaultBaseImage,
   }: Pick<CreateSandboxProfilesServiceInput, "db" | "integrationsConfig" | "dataPlaneClient"> & {
+    integrationRegistry: CreateSandboxProfilesServiceInput["integrationRegistry"];
+    sandboxConfig: CreateSandboxProfilesServiceInput["sandboxConfig"];
     defaultBaseImage: string;
   },
   input: StartProfileSetupCheckSandboxInput,
 ): Promise<StartProfileSetupCheckSandboxOutput> {
   const idempotencyKey = input.idempotencyKey ?? randomUUID();
-  const sandboxRuntime = await resolveSetupCheckSandboxRuntime(
+  const persistedSandboxRuntimeConfig = await resolveSetupCheckSandboxRuntimeConfig(
     {
       db,
     },
@@ -109,6 +130,32 @@ export async function startProfileSetupCheckSandbox(
       profileVersion: input.profileVersion,
     },
   );
+  const sandboxRuntimeConfig = input.sandboxRuntimeConfig ?? persistedSandboxRuntimeConfig;
+  if (input.sandboxRuntimeConfig !== undefined) {
+    const runtimeConfigIssues = await validateSandboxProfileVersionRuntimeConfig(
+      {
+        db,
+        integrationRegistry,
+        sandboxConfig,
+      },
+      {
+        organizationId: input.organizationId,
+        runtimeConfig: sandboxRuntimeConfig,
+      },
+    );
+    if (runtimeConfigIssues.length > 0) {
+      const firstIssue = runtimeConfigIssues[0];
+      if (firstIssue === undefined) {
+        throw new Error("Expected sandbox runtime validation issue.");
+      }
+
+      throw new SandboxProfilesBadRequestError(
+        SandboxProfilesBadRequestCodes.INVALID_SANDBOX_RUNTIME_CONFIG,
+        firstIssue.message,
+      );
+    }
+  }
+  const sandboxRuntime = createWorkflowSandboxRuntime(sandboxRuntimeConfig);
   const compiledRuntimePlan = await compileProfileVersionRuntimePlan(
     {
       db,
@@ -118,6 +165,7 @@ export async function startProfileSetupCheckSandbox(
       organizationId: input.organizationId,
       profileId: input.profileId,
       profileVersion: input.profileVersion,
+      ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
       image: {
         source: "base",
         imageRef: defaultBaseImage,
@@ -130,7 +178,15 @@ export async function startProfileSetupCheckSandbox(
       `Sandbox profile '${input.profileId}' version ${String(input.profileVersion)} does not declare an agent runtime. Add an agent integration binding before starting the Setup Assistant.`,
     );
   }
-  const { setupScript: _setupScript, ...runtimePlanWithoutSetupScript } = compiledRuntimePlan;
+  const { setupScript: _compiledSetupScript, ...runtimePlanWithoutSetupScript } =
+    compiledRuntimePlan;
+  const runtimePlan =
+    input.setupScript === undefined
+      ? runtimePlanWithoutSetupScript
+      : {
+          ...runtimePlanWithoutSetupScript,
+          setupScript: input.setupScript,
+        };
 
   const startedSandbox = await dataPlaneClient.startSandboxInstance({
     organizationId: input.organizationId,
@@ -139,7 +195,7 @@ export async function startProfileSetupCheckSandbox(
     persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
     purpose: SandboxInstancePurposes.SETUP_CHECK,
     idempotencyKey,
-    runtimePlan: runtimePlanWithoutSetupScript,
+    runtimePlan,
     startedBy: input.startedBy,
     source: input.source,
     image: {

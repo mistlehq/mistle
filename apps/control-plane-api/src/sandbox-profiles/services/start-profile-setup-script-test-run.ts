@@ -1,6 +1,7 @@
-import { type SandboxInstanceSource } from "@mistle/db/data-plane";
-import { type SandboxInstanceStarterKind } from "@mistle/db/data-plane";
+import type { SandboxProfileVersionAgentRuntimeId } from "@mistle/db/control-plane";
+import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 
+import type { SandboxProfileVersionResources } from "./profile-version-runtime-config.js";
 import { startProfileSetupCheckSandbox } from "./start-profile-setup-check-sandbox.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
@@ -8,6 +9,13 @@ type StartProfileSetupScriptTestRunInput = {
   organizationId: string;
   profileId: string;
   profileVersion: number;
+  setupScript: string;
+  agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
+  sandboxRuntimeConfig?: {
+    sandboxProvider: string;
+    sandboxConnectionId: string | null;
+    sandboxResources: SandboxProfileVersionResources | null;
+  };
   idempotencyKey?: string;
   startedBy: {
     kind: SandboxInstanceStarterKind;
@@ -25,10 +33,14 @@ type StartProfileSetupScriptTestRunOutput = {
 export async function startProfileSetupScriptTestRun(
   {
     db,
+    integrationRegistry,
     integrationsConfig,
+    sandboxConfig,
     dataPlaneClient,
     defaultBaseImage,
   }: Pick<CreateSandboxProfilesServiceInput, "db" | "integrationsConfig" | "dataPlaneClient"> & {
+    integrationRegistry: CreateSandboxProfilesServiceInput["integrationRegistry"];
+    sandboxConfig: CreateSandboxProfilesServiceInput["sandboxConfig"];
     defaultBaseImage: string;
   },
   input: StartProfileSetupScriptTestRunInput,
@@ -36,7 +48,9 @@ export async function startProfileSetupScriptTestRun(
   return await startProfileSetupCheckSandbox(
     {
       db,
+      integrationRegistry,
       integrationsConfig,
+      sandboxConfig,
       dataPlaneClient,
       defaultBaseImage,
     },
@@ -44,6 +58,11 @@ export async function startProfileSetupScriptTestRun(
       organizationId: input.organizationId,
       profileId: input.profileId,
       profileVersion: input.profileVersion,
+      setupScript: input.setupScript,
+      ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
+      ...(input.sandboxRuntimeConfig === undefined
+        ? {}
+        : { sandboxRuntimeConfig: input.sandboxRuntimeConfig }),
       startedBy: input.startedBy,
       source: input.source,
       ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),

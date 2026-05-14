@@ -7,6 +7,7 @@ import type { SandboxdArtifactResolver } from "../core/sandboxd-artifact-resolve
 import { createSandboxStartupInput } from "./initialize-sandbox-runtime.js";
 import {
   SandboxStartupModes,
+  type SandboxStartupInput,
   type SandboxStartupMode,
   encodeSandboxStartupInput,
 } from "./sandbox-startup-input.js";
@@ -41,6 +42,8 @@ export async function resumeSandboxRuntime(
   },
   input: {
     organizationId: string;
+    operationId: string;
+    operationKind: SandboxStartupInput["operationKind"];
     sandboxInstanceId: string;
     providerSandboxId: string;
     runtimeProvider: SandboxProvider;
@@ -88,6 +91,8 @@ export async function resumeSandboxRuntime(
   const startupInput = await createSandboxStartupInput({
     config: ctx.config,
     organizationId: input.organizationId,
+    operationId: input.operationId,
+    operationKind: input.operationKind,
     sandboxInstanceId: input.sandboxInstanceId,
     startupMode: resolveResumeStartupMode({
       runtimeProvider: input.runtimeProvider,

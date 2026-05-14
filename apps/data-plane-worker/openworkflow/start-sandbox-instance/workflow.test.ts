@@ -1,4 +1,4 @@
-import { SandboxInstancePersistenceModes } from "@mistle/db/data-plane";
+import { SandboxInstancePersistenceModes, SandboxInstancePurposes } from "@mistle/db/data-plane";
 import { SandboxProvider } from "@mistle/sandbox";
 import { describe, expect, it } from "vitest";
 
@@ -30,5 +30,23 @@ describe("StartSandboxInstanceWorkflow storage attach ordering", () => {
         runtimeProvider: SandboxProvider.E2B,
       }),
     ).toBe(false);
+  });
+});
+
+describe("StartSandboxInstanceWorkflow operation kind", () => {
+  it("uses setup_check operation streams for setup-check sandboxes", () => {
+    expect(
+      startSandboxWorkflowTestInternals.resolveStartSandboxOperationKind(
+        SandboxInstancePurposes.SETUP_CHECK,
+      ),
+    ).toBe("setup_check");
+  });
+
+  it("uses start operation streams for session sandboxes", () => {
+    expect(
+      startSandboxWorkflowTestInternals.resolveStartSandboxOperationKind(
+        SandboxInstancePurposes.SESSION,
+      ),
+    ).toBe("start");
   });
 });

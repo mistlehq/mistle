@@ -66,6 +66,7 @@ const sandboxProfileVersionResourcesSchema = z
 const sandboxProfileVersionSnapshotJobSummarySchema = z
   .object({
     id: z.string().min(1),
+    sandboxInstanceId: z.string().min(1).nullable(),
     trigger: sandboxProfileVersionSnapshotJobTriggerSchema,
     state: sandboxProfileVersionSnapshotJobStateSchema,
     errorCode: z.string().min(1).nullable(),
@@ -255,6 +256,7 @@ export const publishSandboxProfileVersionResponseSchema = z
     snapshotJob: z
       .object({
         id: z.string().min(1),
+        sandboxInstanceId: z.string().min(1).nullable(),
         trigger: sandboxProfileVersionSnapshotJobTriggerSchema,
         state: sandboxProfileVersionSnapshotJobStateSchema,
         errorCode: z.string().min(1).nullable(),
@@ -431,8 +433,20 @@ export const startSandboxProfileSetupScriptTestRunBodySchema = z
         message: "Setup script must not be blank.",
       }),
     idempotencyKey: z.string().min(1).max(255).optional(),
+    agentRuntimeId: sandboxProfileVersionAgentRuntimeIdSchema.optional(),
+    sandboxProvider: z.string().min(1).optional(),
+    sandboxConnectionId: z.string().min(1).nullable().optional(),
+    sandboxResources: sandboxProfileVersionResourcesSchema.nullable().optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (value) =>
+      (value.sandboxConnectionId === undefined && value.sandboxResources === undefined) ||
+      value.sandboxProvider !== undefined,
+    {
+      message: "Sandbox provider is required when sandbox runtime override fields are provided.",
+    },
+  );
 
 export const startSandboxProfileSetupAssistantBodySchema = z
   .object({

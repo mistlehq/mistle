@@ -269,6 +269,186 @@ describe.concurrent("sandbox profile version start instance integration", () => 
     expect(response.status).toBe(400);
   });
 
+  it("returns 400 when a setup script test profile version has no sandbox provider", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-setup-script-test-missing-provider@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_setup_script_test_missing_provider",
+        organizationId: session.organizationId,
+        displayName: "Setup Script Test Missing Provider Profile",
+        createdAt: "2026-04-24T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_setup_script_test_missing_provider",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_setup_script_test_missing_provider/versions/1/setup-script/test-runs",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          setupScript: "echo hello",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const body = StartSandboxProfileInstanceBadRequestResponseSchema.parse(await response.json());
+    expect(body.code).toBe("SANDBOX_PROVIDER_REQUIRED");
+  });
+
+  it("queues setup script test runs with transient runtime settings without saving the draft", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-setup-script-test-runtime-override@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_setup_script_test_runtime_override",
+        organizationId: session.organizationId,
+        displayName: "Setup Script Test Runtime Override Profile",
+        createdAt: "2026-04-24T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_setup_script_test_runtime_override",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "openai-setup-script-test-runtime-override",
+        variantId: "openai-default",
+        enabled: true,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_setup_script_test_runtime_override_agent",
+        organizationId: session.organizationId,
+        targetKey: "openai-setup-script-test-runtime-override",
+        displayName: "Setup script test runtime override agent connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      }),
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_setup_script_test_runtime_override_agent",
+          sandboxProfileId: "sbp_setup_script_test_runtime_override",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_setup_script_test_runtime_override_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+        }),
+      );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_setup_script_test_runtime_override/versions/1/setup-script/test-runs",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          setupScript: "echo transient runtime",
+          agentRuntimeId: "opencode",
+          sandboxProvider: "docker",
+          sandboxConnectionId: null,
+          sandboxResources: null,
+        }),
+      },
+    );
+
+    expect(response.status).toBe(201);
+    const body = StartSandboxProfileSetupScriptTestRunResponseSchema.parse(await response.json());
+    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+      env,
+      sandboxInstanceId: body.sandboxInstanceId,
+    });
+    const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.sandboxProfileId, "sbp_setup_script_test_runtime_override"),
+          eq(table.version, 1),
+        ),
+    });
+
+    expect(queuedWorkflowInput.sandboxRuntime).toEqual({
+      provider: "docker",
+    });
+    expect(queuedWorkflowInput.runtimePlan.agentRuntimes[0]).toMatchObject({
+      runtimeId: "opencode",
+    });
+    expect(persistedVersion?.sandboxProvider).toBeNull();
+    expect(persistedVersion?.agentRuntimeId).toBe("codex");
+  });
+
+  it("returns 400 when transient setup script test runtime settings are invalid", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-setup-script-test-invalid-runtime@example.com",
+    });
+
+    await createStartableProfile({
+      env,
+      organizationId: session.organizationId,
+      profileId: "sbp_setup_script_test_invalid_runtime",
+      targetKey: "openai-setup-script-test-invalid-runtime",
+      connectionId: "icn_setup_script_test_invalid_runtime_agent",
+      bindingId: "ibd_setup_script_test_invalid_runtime_agent",
+      versionState: SandboxProfileVersionStates.DRAFT,
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_setup_script_test_invalid_runtime/versions/1/setup-script/test-runs",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          setupScript: "echo invalid transient runtime",
+          sandboxProvider: "docker",
+          sandboxConnectionId: null,
+          sandboxResources: {
+            vcpuCount: 4,
+            memoryMb: 8192,
+          },
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const body = StartSandboxProfileInstanceBadRequestResponseSchema.parse(await response.json());
+    expect(body.code).toBe("INVALID_SANDBOX_RUNTIME_CONFIG");
+  });
+
   it("returns 404 when the setup script test run profile belongs to another organization", async ({
     env,
   }) => {
@@ -306,6 +486,9 @@ describe.concurrent("sandbox profile version start instance integration", () => 
         },
         body: JSON.stringify({
           setupScript: "pnpm install",
+          sandboxProvider: "invalid-provider",
+          sandboxConnectionId: null,
+          sandboxResources: null,
         }),
       },
     );
@@ -315,7 +498,7 @@ describe.concurrent("sandbox profile version start instance integration", () => 
     expect(body.code).toBe("PROFILE_NOT_FOUND");
   });
 
-  it("queues setup script test runs from the base image without passing the persisted setup script", async ({
+  it("queues setup script test runs from the base image with the requested setup script", async ({
     env,
   }) => {
     const session = await env.auth.createSession({
@@ -398,7 +581,7 @@ describe.concurrent("sandbox profile version start instance integration", () => 
     expect(queuedWorkflowInput.image?.kind).toBe("base");
     expect(queuedWorkflowInput.runtimePlan.image.source).toBe("base");
     expect(queuedWorkflowInput.runtimePlan.agentRuntimes).toHaveLength(1);
-    expect(queuedWorkflowInput.runtimePlan).not.toHaveProperty("setupScript");
+    expect(queuedWorkflowInput.runtimePlan.setupScript).toBe("echo visible editor setup script");
   });
 
   it("queues launches for usable published versions from the stored snapshot image", async ({

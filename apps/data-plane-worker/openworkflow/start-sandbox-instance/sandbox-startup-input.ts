@@ -1,5 +1,6 @@
 import {
   SandboxdExecutionModes,
+  type SandboxdOperationKind,
   type SandboxdStartupInput,
   type SandboxdTransparentProxyConfiguration,
 } from "@mistle/sandbox-runtime-contract";
@@ -29,6 +30,7 @@ function trimTrailingSlash(value: string): string {
 export type SandboxStartupInput = {
   startupMode: SandboxStartupMode;
   executionMode?: SandboxExecutionMode;
+  operationKind: SandboxdOperationKind;
   bootstrapToken: string;
   tunnelExchangeToken: string;
   tunnelGatewayWsUrl: string;
@@ -40,10 +42,14 @@ export type SandboxStartupInput = {
 
 export function createSandboxTunnelGatewayWsUrl(input: {
   gatewayWebsocketUrl: string;
+  operationId?: string;
   sandboxInstanceId: string;
 }): string {
   const gatewayUrl = new URL(input.gatewayWebsocketUrl);
   gatewayUrl.pathname = `${trimTrailingSlash(gatewayUrl.pathname)}/${encodeURIComponent(input.sandboxInstanceId)}`;
+  if (input.operationId !== undefined) {
+    gatewayUrl.searchParams.set("operation_id", input.operationId);
+  }
 
   return gatewayUrl.toString();
 }

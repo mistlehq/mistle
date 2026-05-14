@@ -76,6 +76,8 @@ describe("createSandboxStartupInput", () => {
     const startupInput = await createSandboxStartupInput({
       config: createTestRuntimeConfig(),
       organizationId: "org_123",
+      operationId: "op_test_001",
+      operationKind: "start",
       sandboxInstanceId: "sbi_123",
       startupMode: SandboxStartupModes.NEW,
       runtimePlan: createRuntimePlan(),
@@ -98,6 +100,8 @@ describe("createSandboxStartupInput", () => {
     const startupInput = await createSandboxStartupInput({
       config: createTestRuntimeConfig(),
       organizationId: "org_123",
+      operationId: "op_test_001",
+      operationKind: "resume",
       sandboxInstanceId: "sbi_123",
       startupMode: SandboxStartupModes.EXISTING,
       runtimePlan: createRuntimePlan({
@@ -136,6 +140,8 @@ describe("createSandboxStartupInput", () => {
     const startupInput = await createSandboxStartupInput({
       config: createTestRuntimeConfig(),
       organizationId: "org_123",
+      operationId: "op_test_001",
+      operationKind: "resume",
       sandboxInstanceId: "sbi_123",
       startupMode: SandboxStartupModes.EXISTING,
       runtimePlan: createRuntimePlan(),
@@ -156,6 +162,8 @@ describe("createSandboxStartupInput", () => {
     const startupInput = await createSandboxStartupInput({
       config: createTestRuntimeConfig(),
       organizationId: "org_123",
+      operationId: "op_test_001",
+      operationKind: "start",
       sandboxInstanceId: "sbi_123",
       startupMode: SandboxStartupModes.NEW,
       runtimePlan: createRuntimePlan(),

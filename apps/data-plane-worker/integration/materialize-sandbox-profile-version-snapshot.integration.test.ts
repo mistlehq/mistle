@@ -14,6 +14,7 @@ import {
   TestEnvironmentIdHeader,
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
+import { systemClock } from "@mistle/time";
 import { describe, expect } from "vitest";
 
 import { logger as dataPlaneWorkerLogger } from "../logger.js";
@@ -83,6 +84,7 @@ describe.concurrent("data-plane worker snapshot materialization", () => {
       ctx: {
         config: runtimeConfig,
         controlPlaneInternalClient,
+        clock: systemClock,
         db: env.dataPlaneDb,
         tables: env.dataPlaneTables,
         logger: dataPlaneWorkerLogger,
@@ -187,6 +189,7 @@ describe.concurrent("data-plane worker snapshot materialization", () => {
         ctx: {
           config: runtimeConfig,
           controlPlaneInternalClient,
+          clock: systemClock,
           db: env.dataPlaneDb,
           tables: env.dataPlaneTables,
           logger: dataPlaneWorkerLogger,

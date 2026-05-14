@@ -1,5 +1,14 @@
-import { SandboxInstancePersistenceModes } from "@mistle/db/data-plane";
-import { SandboxProvider, type SandboxStartStoragePreparation } from "@mistle/sandbox";
+import {
+  SandboxInstancePersistenceModes,
+  SandboxInstancePurposes,
+  SandboxOperationKinds,
+} from "@mistle/db/data-plane";
+import {
+  SandboxProvider,
+  isSandboxResourceNotFoundError,
+  type SandboxStartStoragePreparation,
+} from "@mistle/sandbox";
+import type { SandboxdOperationKind } from "@mistle/sandbox-runtime-contract";
 import {
   type StartSandboxInstanceWorkflowInput,
   StartSandboxInstanceWorkflowSpec,
@@ -13,8 +22,14 @@ import { attachSandboxStorage } from "../shared/attach-sandbox-storage.js";
 import { destroySandbox } from "../shared/destroy-sandbox.js";
 import { formatPersistedFailureMessage } from "../shared/format-persisted-failure-message.js";
 import { prepareSandboxStorageForStart } from "../shared/prepare-sandbox-storage-for-start.js";
+import {
+  createWorkerSandboxLifecycleEventRecorder,
+  recordWorkerSandboxLifecyclePhase,
+} from "../shared/sandbox-operation-events.js";
 import { emitSandboxStartupDiagnostics } from "../shared/sandbox-startup-diagnostics.js";
 import { createSandboxStorageBackendAdapter } from "../shared/sandbox-storage/create-sandbox-storage-backend-adapter.js";
+import { stopSandbox } from "../shared/stop-sandbox.js";
+import { markSandboxInstanceStopped } from "../stop-sandbox-instance/mark-sandbox-instance-stopped.js";
 import { ensureSandboxInstance } from "./ensure-sandbox-instance.js";
 import { initializeSandboxRuntime } from "./initialize-sandbox-runtime.js";
 import { markSandboxInstanceFailed } from "./mark-sandbox-instance-failed.js";
@@ -42,10 +57,11 @@ const StartSandboxFailureCodes = {
 
 export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
   StartSandboxInstanceWorkflowSpec,
-  async ({ input: workflowInput, step }): Promise<StartSandboxInstanceWorkflowOutput> => {
+  async ({ input: workflowInput, run, step }): Promise<StartSandboxInstanceWorkflowOutput> => {
     const ctx = await getWorkflowContext();
     const logger = ctx.logger.child({
       workflow: StartSandboxInstanceWorkflowSpec.name,
+      workflowRunId: run.id,
       sandboxInstanceId: workflowInput.sandboxInstanceId,
       organizationId: workflowInput.organizationId,
       sandboxProfileId: workflowInput.sandboxProfileId,
@@ -55,6 +71,15 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       runtimeProvider: workflowInput.sandboxRuntime.provider,
     });
     const runtimeProvider = workflowInput.sandboxRuntime.provider;
+    const operationKind = resolveStartSandboxOperationKind(workflowInput.purpose);
+    const operationEvents = createWorkerSandboxLifecycleEventRecorder({
+      clock: ctx.clock,
+      db: ctx.db,
+      logger,
+      operationId: run.id,
+      operationKind,
+      sandboxInstanceId: workflowInput.sandboxInstanceId,
+    });
     const sandboxRuntimeInput = {
       organizationId: workflowInput.organizationId,
       provider: runtimeProvider,
@@ -304,6 +329,89 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       }
     }
 
+    async function cleanupSetupCheckSandbox(input: {
+      providerSandboxId: string;
+      runtimeProvider: SandboxProvider;
+      sandboxInstanceId: string;
+    }): Promise<void> {
+      await operationEvents.record({
+        attributes: {
+          providerSandboxId: input.providerSandboxId,
+          runtimeProvider: input.runtimeProvider,
+        },
+        message: "Setup-check sandbox cleanup started.",
+        phase: "stop",
+        status: "started",
+      });
+
+      try {
+        const resolvedRuntime =
+          await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+        await step.run({ name: "stop-setup-check-sandbox" }, async () => {
+          try {
+            await stopSandbox(
+              {
+                db: ctx.db,
+                tables: ctx.tables,
+                controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+                config: ctx.config,
+                sandboxAdapter: resolvedRuntime.sandboxAdapter,
+              },
+              {
+                sandboxInstanceId: input.sandboxInstanceId,
+                persistenceMode: workflowInput.persistenceMode,
+                runtimeProvider: input.runtimeProvider,
+                providerSandboxId: input.providerSandboxId,
+              },
+            );
+          } catch (error) {
+            if (!isSandboxResourceNotFoundError(error)) {
+              throw error;
+            }
+          }
+        });
+
+        const markOutcome = await step.run({ name: "mark-setup-check-sandbox-stopped" }, async () =>
+          markSandboxInstanceStopped({
+            db: ctx.db,
+            tables: ctx.tables,
+            sandboxInstanceId: input.sandboxInstanceId,
+            stopReason: "system",
+          }),
+        );
+
+        await operationEvents.record({
+          attributes: {
+            markOutcome,
+            providerSandboxId: input.providerSandboxId,
+            runtimeProvider: input.runtimeProvider,
+          },
+          message: "Setup-check sandbox cleanup completed.",
+          phase: "stop",
+          status: "completed",
+        });
+      } catch (error) {
+        logger.error(
+          {
+            err: error,
+            providerSandboxId: input.providerSandboxId,
+            sandboxInstanceId: input.sandboxInstanceId,
+          },
+          "Failed to clean up setup-check sandbox after successful setup test.",
+        );
+        await operationEvents.record({
+          attributes: {
+            error: formatLifecycleEventError(error),
+            providerSandboxId: input.providerSandboxId,
+            runtimeProvider: input.runtimeProvider,
+          },
+          message: "Setup-check sandbox cleanup failed.",
+          phase: "stop",
+          status: "failed",
+        });
+      }
+    }
+
     function rethrowDurableStepErrorForRetry(error: unknown): void {
       if (shouldRethrowDurableStepErrorForRetry(error)) {
         throw error;
@@ -366,21 +474,35 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
 
     if (workflowInput.persistenceMode === "persistent") {
       try {
-        await step.run({ name: "provision-sandbox-storage" }, async () => {
-          logger.info("Provisioning persistent sandbox storage.");
-          const storageBackendAdapter = createSandboxStorageBackendAdapter({
-            db: ctx.db,
-            tables: ctx.tables,
-            controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-            workerConfig: ctx.config.app,
-            runtimeProvider,
-            storageBackend: ctx.config.sandbox.storage?.backend,
-          });
-          await storageBackendAdapter.provision({
-            organizationId: workflowInput.organizationId,
-            sandboxInstanceId: workflowInput.sandboxInstanceId,
-          });
-        });
+        await recordWorkerSandboxLifecyclePhase(
+          operationEvents,
+          {
+            attributes: {
+              runtimeProvider,
+            },
+            completedMessage: "Sandbox persistent storage provisioning completed.",
+            failedMessage: "Sandbox persistent storage provisioning failed.",
+            phase: "storage_provision",
+            startedMessage: "Sandbox persistent storage provisioning started.",
+          },
+          async () => {
+            await step.run({ name: "provision-sandbox-storage" }, async () => {
+              logger.info("Provisioning persistent sandbox storage.");
+              const storageBackendAdapter = createSandboxStorageBackendAdapter({
+                db: ctx.db,
+                tables: ctx.tables,
+                controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+                workerConfig: ctx.config.app,
+                runtimeProvider,
+                storageBackend: ctx.config.sandbox.storage?.backend,
+              });
+              await storageBackendAdapter.provision({
+                organizationId: workflowInput.organizationId,
+                sandboxInstanceId: workflowInput.sandboxInstanceId,
+              });
+            });
+          },
+        );
         logger.info("Provisioned persistent sandbox storage.");
       } catch (error) {
         rethrowDurableStepErrorForRetry(error);
@@ -448,31 +570,45 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
     }
 
     try {
-      startedSandbox = await step.run({ name: "start-sandbox" }, async () => {
-        logger.info(
-          {
-            image: workflowInput.image,
+      startedSandbox = await recordWorkerSandboxLifecyclePhase(
+        operationEvents,
+        {
+          attributes: {
             runtimeProvider,
           },
-          "Starting sandbox with provider.",
-        );
-        const resolvedRuntime =
-          await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+          completedMessage: "Sandbox provider start completed.",
+          failedMessage: "Sandbox provider start failed.",
+          phase: "provider",
+          startedMessage: "Sandbox provider start started.",
+        },
+        async () => {
+          return step.run({ name: "start-sandbox" }, async () => {
+            logger.info(
+              {
+                image: workflowInput.image,
+                runtimeProvider,
+              },
+              "Starting sandbox with provider.",
+            );
+            const resolvedRuntime =
+              await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
 
-        return startSandbox(
-          {
-            config: ctx.config,
-            processEnv: ctx.processEnv,
-            sandboxAdapter: resolvedRuntime.sandboxAdapter,
-          },
-          {
-            sandboxInstanceId: workflowInput.sandboxInstanceId,
-            image: workflowInput.image,
-            runtimeProvider,
-            storagePreparation,
-          },
-        );
-      });
+            return startSandbox(
+              {
+                config: ctx.config,
+                processEnv: ctx.processEnv,
+                sandboxAdapter: resolvedRuntime.sandboxAdapter,
+              },
+              {
+                sandboxInstanceId: workflowInput.sandboxInstanceId,
+                image: workflowInput.image,
+                runtimeProvider,
+                storagePreparation,
+              },
+            );
+          });
+        },
+      );
       logger.info(
         {
           runtimeProvider: startedSandbox.runtimeProvider,
@@ -573,43 +709,79 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
     }
 
     try {
-      await step.run({ name: "initialize-sandbox-runtime" }, async () => {
-        const resolvedRuntime =
-          await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+      const sandboxdLifecycleAttributes = {
+        providerSandboxId: startedSandbox.providerSandboxId,
+        runtimeProvider: startedSandbox.runtimeProvider,
+      };
+      await operationEvents.record({
+        attributes: sandboxdLifecycleAttributes,
+        message: "Sandboxd initialization started.",
+        phase: "sandboxd",
+        status: "started",
+      });
 
-        logger.info(
-          {
-            providerSandboxId: startedSandbox.providerSandboxId,
-            runtimePlan: createRuntimePlanStartupLogFields(workflowInput.runtimePlan),
+      try {
+        await step.run({ name: "initialize-sandbox-runtime" }, async () => {
+          const resolvedRuntime =
+            await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+
+          logger.info(
+            {
+              providerSandboxId: startedSandbox.providerSandboxId,
+              runtimePlan: createRuntimePlanStartupLogFields(workflowInput.runtimePlan),
+            },
+            "Initializing sandbox runtime.",
+          );
+          await initializeSandboxRuntime(
+            {
+              config: ctx.config,
+              logger,
+              processEnv: ctx.processEnv,
+              sandboxAdapter: resolvedRuntime.sandboxAdapter,
+              sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
+              sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
+            },
+            {
+              organizationId: workflowInput.organizationId,
+              operationId: run.id,
+              operationKind,
+              sandboxInstanceId: startedSandbox.sandboxInstanceId,
+              providerSandboxId: startedSandbox.providerSandboxId,
+              startupMode: SandboxStartupModes.NEW,
+              executionMode: SandboxExecutionModes.SESSION,
+              waitForCompletion: !waitForPostStartStorageAttach,
+              waitForStorageAttach: waitForPostStartStorageAttach,
+              runtimePlan: workflowInput.runtimePlan,
+              ...(workflowInput.actingUserId === undefined
+                ? {}
+                : { actingUserId: workflowInput.actingUserId }),
+              ...(workflowInput.gitIdentity === undefined
+                ? {}
+                : { gitIdentity: workflowInput.gitIdentity }),
+            },
+          );
+        });
+      } catch (error) {
+        const retryable = shouldRethrowDurableStepErrorForRetry(error);
+        await operationEvents.record({
+          attributes: {
+            ...sandboxdLifecycleAttributes,
+            error: formatLifecycleEventError(error),
           },
-          "Initializing sandbox runtime.",
-        );
-        await initializeSandboxRuntime(
-          {
-            config: ctx.config,
-            logger,
-            processEnv: ctx.processEnv,
-            sandboxAdapter: resolvedRuntime.sandboxAdapter,
-            sandboxdArtifactResolver: ctx.sandboxdArtifactResolver,
-            sandboxRuntimeControl: resolvedRuntime.sandboxRuntimeControl,
-          },
-          {
-            organizationId: workflowInput.organizationId,
-            sandboxInstanceId: startedSandbox.sandboxInstanceId,
-            providerSandboxId: startedSandbox.providerSandboxId,
-            startupMode: SandboxStartupModes.NEW,
-            executionMode: SandboxExecutionModes.SESSION,
-            waitForCompletion: !waitForPostStartStorageAttach,
-            waitForStorageAttach: waitForPostStartStorageAttach,
-            runtimePlan: workflowInput.runtimePlan,
-            ...(workflowInput.actingUserId === undefined
-              ? {}
-              : { actingUserId: workflowInput.actingUserId }),
-            ...(workflowInput.gitIdentity === undefined
-              ? {}
-              : { gitIdentity: workflowInput.gitIdentity }),
-          },
-        );
+          message: retryable
+            ? "Sandboxd initialization attempt failed and will retry."
+            : "Sandboxd initialization failed.",
+          phase: "sandboxd",
+          status: retryable ? "warning" : "failed",
+        });
+        throw error;
+      }
+
+      await operationEvents.record({
+        attributes: sandboxdLifecycleAttributes,
+        message: "Sandboxd initialization completed.",
+        phase: "sandboxd",
+        status: "completed",
       });
       logger.info(
         {
@@ -802,6 +974,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               runtimeProvider: startedSandbox.runtimeProvider,
               providerSandboxId: startedSandbox.providerSandboxId,
               lifecycle: "start",
+              operationEventRecorder: operationEvents,
             },
           );
         });
@@ -872,6 +1045,16 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
 
     let didSandboxBecomeReady: boolean;
     try {
+      const readinessAttributes = {
+        providerSandboxId: startedSandbox.providerSandboxId,
+        runtimeProvider: startedSandbox.runtimeProvider,
+      };
+      await operationEvents.record({
+        attributes: readinessAttributes,
+        message: "Sandbox runtime readiness wait started.",
+        phase: "ready",
+        status: "started",
+      });
       didSandboxBecomeReady = await step.run(
         { name: "wait-for-sandbox-runtime-readiness" },
         async () => {
@@ -896,6 +1079,14 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           );
         },
       );
+      if (didSandboxBecomeReady) {
+        await operationEvents.record({
+          attributes: readinessAttributes,
+          message: "Sandbox runtime readiness wait completed.",
+          phase: "ready",
+          status: "completed",
+        });
+      }
       logger.info(
         {
           providerSandboxId: startedSandbox.providerSandboxId,
@@ -905,6 +1096,15 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       );
     } catch (error) {
       rethrowDurableStepErrorForRetry(error);
+      await operationEvents.record({
+        attributes: {
+          providerSandboxId: startedSandbox.providerSandboxId,
+          runtimeProvider: startedSandbox.runtimeProvider,
+        },
+        message: "Sandbox runtime readiness wait failed.",
+        phase: "ready",
+        status: "failed",
+      });
       logger.error(
         {
           err: error,
@@ -951,6 +1151,16 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
     }
 
     if (!didSandboxBecomeReady) {
+      await operationEvents.record({
+        attributes: {
+          providerSandboxId: startedSandbox.providerSandboxId,
+          runtimeProvider: startedSandbox.runtimeProvider,
+          timeoutMs: ctx.tunnelReadinessPolicy.timeoutMs,
+        },
+        message: "Sandbox runtime readiness timed out.",
+        phase: "ready",
+        status: "failed",
+      });
       logger.error(
         {
           providerSandboxId: startedSandbox.providerSandboxId,
@@ -988,23 +1198,38 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
     }
 
     try {
-      await step.run({ name: "mark-sandbox-instance-running" }, async () => {
-        logger.info(
-          {
+      await recordWorkerSandboxLifecyclePhase(
+        operationEvents,
+        {
+          attributes: {
             providerSandboxId: startedSandbox.providerSandboxId,
+            runtimeProvider: startedSandbox.runtimeProvider,
           },
-          "Marking sandbox instance as running.",
-        );
-        await markSandboxInstanceRunning(
-          {
-            db: ctx.db,
-            tables: ctx.tables,
-          },
-          {
-            sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
-          },
-        );
-      });
+          completedMessage: "Sandbox instance running status transition completed.",
+          failedMessage: "Sandbox instance running status transition failed.",
+          phase: "running",
+          startedMessage: "Sandbox instance running status transition started.",
+        },
+        async () => {
+          await step.run({ name: "mark-sandbox-instance-running" }, async () => {
+            logger.info(
+              {
+                providerSandboxId: startedSandbox.providerSandboxId,
+              },
+              "Marking sandbox instance as running.",
+            );
+            await markSandboxInstanceRunning(
+              {
+                db: ctx.db,
+                tables: ctx.tables,
+              },
+              {
+                sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
+              },
+            );
+          });
+        },
+      );
       logger.info(
         {
           providerSandboxId: startedSandbox.providerSandboxId,
@@ -1050,6 +1275,14 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           cause: error,
         },
       );
+    }
+
+    if (workflowInput.purpose === SandboxInstancePurposes.SETUP_CHECK) {
+      await cleanupSetupCheckSandbox({
+        providerSandboxId: startedSandbox.providerSandboxId,
+        runtimeProvider: startedSandbox.runtimeProvider,
+        sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
+      });
     }
 
     return {
@@ -1130,6 +1363,37 @@ function shouldWaitForPostStartStorageAttach(input: {
   );
 }
 
+function resolveStartSandboxOperationKind(
+  purpose: StartSandboxInstanceWorkflowInput["purpose"],
+): SandboxdOperationKind {
+  if (purpose === SandboxInstancePurposes.SESSION) {
+    return SandboxOperationKinds.START;
+  }
+
+  if (purpose === SandboxInstancePurposes.SETUP_CHECK) {
+    return SandboxOperationKinds.SETUP_CHECK;
+  }
+
+  if (purpose === SandboxInstancePurposes.SNAPSHOT) {
+    return SandboxOperationKinds.SNAPSHOT;
+  }
+
+  return assertUnsupportedSandboxInstancePurpose(purpose);
+}
+
+function assertUnsupportedSandboxInstancePurpose(_purpose: never): never {
+  throw new Error("Unsupported sandbox instance purpose.");
+}
+
+function formatLifecycleEventError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
+}
+
 export const startSandboxWorkflowTestInternals = {
+  resolveStartSandboxOperationKind,
   shouldWaitForPostStartStorageAttach,
 };
