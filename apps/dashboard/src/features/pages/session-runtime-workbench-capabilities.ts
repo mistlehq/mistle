@@ -12,8 +12,6 @@ type SessionRuntimeWorkbenchCapability = {
   hasContextUsage: boolean;
 };
 
-type SessionRuntimeWorkbenchCapabilityKey = "CODEX" | "OPENCODE";
-
 export const SessionRuntimeWorkbenchCapabilities = {
   CODEX: {
     runtimeId: "codex",
@@ -39,4 +37,4 @@ export const SessionRuntimeWorkbenchCapabilities = {
     preservesCliLaunchContext: true,
     hasContextUsage: false,
   },
-} satisfies Record<SessionRuntimeWorkbenchCapabilityKey, SessionRuntimeWorkbenchCapability>;
+} satisfies Record<string, SessionRuntimeWorkbenchCapability>;
