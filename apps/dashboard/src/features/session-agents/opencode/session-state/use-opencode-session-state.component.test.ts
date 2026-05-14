@@ -511,13 +511,10 @@ describe("useOpenCodeSessionState", () => {
       }),
     ).toEqual([
       {
-        id: "openai/gpt-5",
         model: "openai/gpt-5",
         displayName: "OpenAI / GPT-5",
-        hidden: false,
         defaultReasoningEffort: null,
         inputModalities: ["text", "image"],
-        supportsPersonality: false,
         isDefault: true,
       },
     ]);

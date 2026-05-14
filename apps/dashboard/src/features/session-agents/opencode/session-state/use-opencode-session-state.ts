@@ -1,4 +1,3 @@
-import type { CodexModelSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import {
   createOpenCodeSessionClient,
   type OpenCodeEvent,
@@ -13,7 +12,11 @@ import { waitForGeneratedOpenCodeConversationTitle } from "@mistle/integrations-
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useCallback, useEffect, useReducer, useRef, useState, type Dispatch } from "react";
 
-import type { SessionBootstrapResult } from "../../codex/session-state/session-bootstrap/index.js";
+import type {
+  SessionComposerBootstrapPhase,
+  SessionComposerBootstrapResult,
+  SessionComposerModel,
+} from "../../../pages/session-composer/session-composer-runtime-contracts.js";
 import {
   createInitialOpenCodeChatState,
   reduceOpenCodeChatState,
@@ -64,7 +67,7 @@ export type OpenCodeSessionLifecycleState = {
 };
 
 export type UseOpenCodeSessionStateResult = {
-  bootstrap: SessionBootstrapResult;
+  bootstrap: SessionComposerBootstrapResult;
   modelCatalogDirectory: string | null;
   chat: {
     abortSession: () => Promise<void>;
@@ -166,18 +169,15 @@ function resolveOpenCodeModelInputModalities(
 export function mapOpenCodeProvidersToComposerModels(input: {
   defaultModelByProvider: Record<string, string>;
   providers: readonly OpenCodeProviderSummary[];
-}): readonly CodexModelSummary[] {
+}): readonly SessionComposerModel[] {
   return input.providers.flatMap((provider) =>
     Object.entries(provider.models)
       .sort(([leftModelId], [rightModelId]) => leftModelId.localeCompare(rightModelId))
       .map(([modelId, model]) => ({
-        id: `${provider.id}/${modelId}`,
         model: `${provider.id}/${modelId}`,
         displayName: `${provider.name} / ${model.name}`,
-        hidden: false,
         defaultReasoningEffort: null,
         inputModalities: resolveOpenCodeModelInputModalities(model),
-        supportsPersonality: false,
         isDefault: input.defaultModelByProvider[provider.id] === modelId,
       })),
   );
@@ -216,7 +216,7 @@ export function useOpenCodeSessionState(input: {
   const modelCatalogGenerationRef = useRef(0);
   const modelCatalogStateRef = useRef<{
     directory: string | null;
-    phase: SessionBootstrapResult["phase"];
+    phase: SessionComposerBootstrapPhase;
   }>({
     directory: null,
     phase: { status: "unavailable" },
@@ -227,9 +227,9 @@ export function useOpenCodeSessionState(input: {
     useState<OpenCodeSessionLifecycleState["sessionConnectionState"]>("detached");
   const [lifecycleErrorMessage, setLifecycleErrorMessage] = useState<string | null>(null);
   const [sessionErrorMessage, setSessionErrorMessage] = useState<string | null>(null);
-  const [availableModels, setAvailableModels] = useState<readonly CodexModelSummary[]>([]);
+  const [availableModels, setAvailableModels] = useState<readonly SessionComposerModel[]>([]);
   const [modelCatalogDirectory, setModelCatalogDirectory] = useState<string | null>(null);
-  const [bootstrapPhase, setBootstrapPhase] = useState<SessionBootstrapResult["phase"]>({
+  const [bootstrapPhase, setBootstrapPhase] = useState<SessionComposerBootstrapPhase>({
     status: "unavailable",
   });
   const [chatState, dispatchChatAction] = useReducer(
@@ -269,7 +269,7 @@ export function useOpenCodeSessionState(input: {
     }
   }, []);
 
-  const resetModelCatalog = useCallback((phase: SessionBootstrapResult["phase"]): void => {
+  const resetModelCatalog = useCallback((phase: SessionComposerBootstrapPhase): void => {
     modelCatalogGenerationRef.current += 1;
     modelCatalogStateRef.current = {
       directory: null,
@@ -397,7 +397,7 @@ export function useOpenCodeSessionState(input: {
         }
         const message =
           error instanceof Error ? error.message : "Could not load OpenCode model providers.";
-        const failedPhase: SessionBootstrapResult["phase"] = {
+        const failedPhase: SessionComposerBootstrapPhase = {
           status: "failed",
           message,
         };
@@ -536,7 +536,7 @@ export function useOpenCodeSessionState(input: {
           clearEventSubscription();
           clientRef.current?.close();
           clientRef.current = null;
-          const failedPhase: SessionBootstrapResult["phase"] = {
+          const failedPhase: SessionComposerBootstrapPhase = {
             status: "failed",
             message: error instanceof Error ? error.message : "Could not connect OpenCode session.",
           };
