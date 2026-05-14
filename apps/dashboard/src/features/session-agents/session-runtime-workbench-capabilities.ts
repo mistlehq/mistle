@@ -1,6 +1,6 @@
-import type { SessionComposerModelSelectionInput } from "./session-composer/index.js";
-import type { SessionTerminalContentInset } from "./session-terminal-surface.js";
-import type { SessionMainPanelRuntimeId } from "./use-session-main-panel-handoff.js";
+import type { SessionComposerModelSelectionInput } from "../pages/session-composer/index.js";
+import type { SessionTerminalContentInset } from "../pages/session-terminal-surface.js";
+import type { SessionMainPanelRuntimeId } from "../pages/use-session-main-panel-handoff.js";
 
 type SessionRuntimeWorkbenchCapability = {
   runtimeId: SessionMainPanelRuntimeId;

@@ -8,13 +8,9 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import type { ChatState } from "../chat/chat-state.js";
 import { formatCodexContextUsage } from "../session-agents/codex/session-state/codex-context-usage.js";
-import {
-  buildCodexCliPtyOpenInput,
-  useCodexSessionState,
-} from "../session-agents/codex/session-state/index.js";
+import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import {
   buildOpenCodeAttachmentParts,
-  buildOpenCodeCliPtyOpenInput,
   buildOpenCodeComposerConfigResetKey,
   buildRefreshingOpenCodeComposerBootstrap,
   mapOpenCodeChatStateForConversation,
@@ -24,6 +20,15 @@ import {
   useOpenCodeSessionState,
 } from "../session-agents/opencode/session-state/index.js";
 import type { ServerRequestEntry } from "../session-agents/server-requests/index.js";
+import { SessionRuntimeWorkbenchCapabilities } from "../session-agents/session-runtime-workbench-capabilities.js";
+import {
+  buildCodexHandoffRuntime,
+  buildCodexLifecycleForHandoff,
+  buildOpenCodeHandoffRuntime,
+  buildOpenCodeLifecycleForHandoff,
+  buildOpenCodeLifecycleForWorkbench,
+  resolveSessionLifecycleForWorkbench,
+} from "../session-agents/session-workbench-handoff-runtimes.js";
 import { applyPatchedSessionTitleToCache } from "../sessions/session-header-title-model.js";
 import { generateSessionTitleWithSandboxCodexExec } from "../sessions/session-title-generation.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
@@ -42,14 +47,12 @@ import {
   type SessionComposerStateInput,
   type SessionTurnControl,
 } from "./session-composer/index.js";
-import type { InitialSessionConnectInput } from "./session-initial-connect-policy.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import {
   resolveInitialSelectedRepositoryPath,
   resolvePrimaryRepositoryTurnStartCwd,
   resolveSessionTerminalCwd,
 } from "./session-primary-repository-policy.js";
-import { SessionRuntimeWorkbenchCapabilities } from "./session-runtime-workbench-capabilities.js";
 import type { SessionStartupState } from "./session-startup-status.js";
 import type {
   SessionTerminalContentInset,
@@ -70,8 +73,6 @@ import { useSessionBranchDiff } from "./use-session-branch-diff.js";
 import { useSessionDiffWorkbenchState } from "./use-session-diff-workbench-state.js";
 import {
   useSessionMainPanelHandoff,
-  type SessionMainPanelHandoffLifecycle,
-  type SessionMainPanelHandoffRuntime,
   type SessionMainPanelRuntimeId,
 } from "./use-session-main-panel-handoff.js";
 import { useSessionPortAccess } from "./use-session-port-access.js";
@@ -256,42 +257,8 @@ export function useSessionWorkbenchController(input: {
     ensureTransportConnected: transportManager.ensureTransportConnected,
   });
   const openCodeLifecycle = openCodeSessionState.lifecycle;
-  const codexLifecycleForHandoff = useMemo<SessionMainPanelHandoffLifecycle>(
-    () => ({
-      clearLifecycleErrorMessage: lifecycle.clearLifecycleErrorMessage,
-      connectSession: (connectInput): void => {
-        if (connectInput.targetThreadId === null) {
-          lifecycle.connectSession({
-            ...(connectInput.initialCwd === undefined
-              ? {}
-              : { initialCwd: connectInput.initialCwd }),
-            sandboxInstanceId: connectInput.sandboxInstanceId,
-            ...(connectInput.selectionPolicy === undefined
-              ? {}
-              : { selectionPolicy: connectInput.selectionPolicy }),
-            targetThreadId: null,
-          });
-          return;
-        }
-
-        lifecycle.connectSession({
-          ...(connectInput.providerThreadId === undefined
-            ? {}
-            : { providerThreadId: connectInput.providerThreadId }),
-          sandboxInstanceId: connectInput.sandboxInstanceId,
-          targetThreadId: connectInput.targetThreadId,
-        });
-      },
-      detachSessionConnection: lifecycle.detachSessionConnection,
-      lifecycleErrorMessage: lifecycle.lifecycleErrorMessage,
-      sessionConnectionState: lifecycle.sessionConnectionState,
-      sessionSnapshot:
-        lifecycle.sessionSnapshot === null
-          ? null
-          : {
-              activeConversationId: lifecycle.sessionSnapshot.activeThreadId,
-            },
-    }),
+  const codexLifecycleForHandoff = useMemo(
+    () => buildCodexLifecycleForHandoff(lifecycle),
     [
       lifecycle.clearLifecycleErrorMessage,
       lifecycle.connectSession,
@@ -301,28 +268,8 @@ export function useSessionWorkbenchController(input: {
       lifecycle.sessionSnapshot,
     ],
   );
-  const openCodeLifecycleForHandoff = useMemo<SessionMainPanelHandoffLifecycle>(
-    () => ({
-      clearLifecycleErrorMessage: openCodeLifecycle.clearLifecycleErrorMessage,
-      connectSession: (connectInput): void => {
-        openCodeLifecycle.connectSession({
-          ...(connectInput.initialCwd === undefined ? {} : { initialCwd: connectInput.initialCwd }),
-          sandboxInstanceId: connectInput.sandboxInstanceId,
-          ...(connectInput.targetThreadId === null
-            ? {}
-            : { targetSessionId: connectInput.targetThreadId }),
-        });
-      },
-      detachSessionConnection: openCodeLifecycle.detachSessionConnection,
-      lifecycleErrorMessage: openCodeLifecycle.lifecycleErrorMessage,
-      sessionConnectionState: openCodeLifecycle.sessionConnectionState,
-      sessionSnapshot:
-        openCodeLifecycle.sessionSnapshot === null
-          ? null
-          : {
-              activeConversationId: openCodeLifecycle.sessionSnapshot.activeSessionId,
-            },
-    }),
+  const openCodeLifecycleForHandoff = useMemo(
+    () => buildOpenCodeLifecycleForHandoff(openCodeLifecycle),
     [
       openCodeLifecycle.clearLifecycleErrorMessage,
       openCodeLifecycle.connectSession,
@@ -333,33 +280,7 @@ export function useSessionWorkbenchController(input: {
     ],
   );
   const openCodeLifecycleForWorkbench = useMemo(
-    () => ({
-      clearLifecycleErrorMessage: openCodeLifecycle.clearLifecycleErrorMessage,
-      connectSession: (connectInput: InitialSessionConnectInput): void => {
-        if (connectInput.targetThreadId === null) {
-          openCodeLifecycle.connectSession({
-            ...(connectInput.initialCwd === undefined
-              ? {}
-              : { initialCwd: connectInput.initialCwd }),
-            sandboxInstanceId: connectInput.sandboxInstanceId,
-          });
-          return;
-        }
-
-        openCodeLifecycle.connectSession({
-          sandboxInstanceId: connectInput.sandboxInstanceId,
-          targetThreadId: connectInput.targetThreadId,
-        });
-      },
-      detachSessionConnection: openCodeLifecycle.detachSessionConnection,
-      disconnectSession: openCodeLifecycle.disconnectSession,
-      isStartingSession: openCodeLifecycle.isStartingSession,
-      lifecycleErrorMessage: openCodeLifecycle.lifecycleErrorMessage,
-      recoverSession: openCodeLifecycle.recoverSession,
-      recoverableDisconnect: openCodeLifecycle.recoverableDisconnect,
-      sessionConnectionState: openCodeLifecycle.sessionConnectionState,
-      sessionSnapshot: openCodeLifecycle.sessionSnapshot,
-    }),
+    () => buildOpenCodeLifecycleForWorkbench(openCodeLifecycle),
     [
       openCodeLifecycle.clearLifecycleErrorMessage,
       openCodeLifecycle.connectSession,
@@ -375,9 +296,11 @@ export function useSessionWorkbenchController(input: {
   );
   const resolveLifecycleForWorkbench = useCallback(
     (agentRuntimeId: string | null) =>
-      agentRuntimeId === OpenCodeWorkbenchCapabilities.runtimeId
-        ? openCodeLifecycleForWorkbench
-        : lifecycle,
+      resolveSessionLifecycleForWorkbench({
+        agentRuntimeId,
+        codexLifecycle: lifecycle,
+        openCodeLifecycle: openCodeLifecycleForWorkbench,
+      }),
     [lifecycle, openCodeLifecycleForWorkbench],
   );
   const contextUsage =
@@ -398,58 +321,34 @@ export function useSessionWorkbenchController(input: {
   const codexConfig = sessionState.codexConfig;
   const serverRequests = sessionState.serverRequests;
   const sessionMessage = sessionState.sessionMessage;
-  const codexHandoffRuntime = useMemo<SessionMainPanelHandoffRuntime>(
-    () => ({
-      buildCliPtyOpenInput: buildCodexCliPtyOpenInput,
-      clearActiveThreadIdAfterCliLaunch:
-        sessionState.threadAuthority.clearActiveThreadIdAfterCliLaunch,
-      displayName: CodexWorkbenchCapabilities.displayName,
-      hydrateChatFromConversation: chat.hydrateChatFromThread,
-      lifecycle: codexLifecycleForHandoff,
-      preserveCliLaunchForRestore: CodexWorkbenchCapabilities.preservesCliLaunchContext,
-      resetServerRequests: serverRequests.resetServerRequests,
-      restoreConversationId: sessionState.threadAuthority.providerThreadId,
-      resolveCliLaunchTarget: sessionState.threadAuthority.resolveCliLaunchTarget,
-    }),
+  const codexHandoffRuntime = useMemo(
+    () =>
+      buildCodexHandoffRuntime({
+        chat,
+        lifecycle: codexLifecycleForHandoff,
+        serverRequests,
+        threadAuthority: sessionState.threadAuthority,
+      }),
     [
       chat.hydrateChatFromThread,
       codexLifecycleForHandoff,
       serverRequests.resetServerRequests,
-      sessionState.threadAuthority,
+      sessionState.threadAuthority.clearActiveThreadIdAfterCliLaunch,
+      sessionState.threadAuthority.providerThreadId,
+      sessionState.threadAuthority.resolveCliLaunchTarget,
     ],
   );
-  const openCodeHandoffRuntime = useMemo<SessionMainPanelHandoffRuntime>(
-    () => ({
-      buildCliPtyOpenInput: buildOpenCodeCliPtyOpenInput,
-      clearActiveThreadIdAfterCliLaunch: () => {},
-      displayName: OpenCodeWorkbenchCapabilities.displayName,
-      hydrateChatFromConversation: openCodeSessionState.chat.hydrateChatFromSessionOrThrow,
-      lifecycle: openCodeLifecycleForHandoff,
-      preserveCliLaunchForRestore: OpenCodeWorkbenchCapabilities.preservesCliLaunchContext,
-      resetServerRequests: () => {},
-      restoreConversationId:
-        openCodeSessionState.lifecycle.sessionSnapshot?.activeSessionId ?? null,
-      resolveCliLaunchTarget: async () => {
-        const activeSessionId =
-          openCodeSessionState.lifecycle.sessionSnapshot?.activeSessionId ?? null;
-
-        if (activeSessionId === null) {
-          return {
-            type: "start_new",
-            shouldClearActiveThreadId: false,
-          };
-        }
-
-        return {
-          type: "resume",
-          threadId: activeSessionId,
-        };
-      },
-    }),
+  const openCodeHandoffRuntime = useMemo(
+    () =>
+      buildOpenCodeHandoffRuntime({
+        chat: openCodeSessionState.chat,
+        lifecycle: openCodeLifecycleForHandoff,
+        sessionSnapshot: openCodeSessionState.lifecycle.sessionSnapshot,
+      }),
     [
       openCodeLifecycleForHandoff,
       openCodeSessionState.chat.hydrateChatFromSessionOrThrow,
-      openCodeSessionState.lifecycle.sessionSnapshot?.activeSessionId,
+      openCodeSessionState.lifecycle.sessionSnapshot,
     ],
   );
   const handoffRuntimes = useMemo(
