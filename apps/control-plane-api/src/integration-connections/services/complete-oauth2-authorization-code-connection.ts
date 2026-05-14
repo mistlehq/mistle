@@ -1,4 +1,5 @@
 import {
+  IntegrationConnectionRedirectSessionIntents,
   IntegrationConnectionStatuses,
   IntegrationCredentialSecretKinds,
   getControlPlaneDatabaseSchema,
@@ -10,7 +11,7 @@ import {
   IntegrationConnectionMethodIds,
 } from "@mistle/integrations-core";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import {
   decryptRedirectSessionSecretUtf8,
@@ -35,6 +36,7 @@ type CompleteOAuth2AuthorizationCodeConnectionInput = {
 
 type CompletedConnection = {
   id: string;
+  authorizationIntent: "create" | "reauthorize";
   targetKey: string;
   displayName: string;
   status: "active" | "error" | "revoked";
@@ -44,6 +46,122 @@ type CompletedConnection = {
   createdAt: string;
   updatedAt: string;
 };
+
+async function revokeLinkedCredentialSlot(input: {
+  tx: ControlPlaneDatabase;
+  connectionId: string;
+  slotKey: string;
+}): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(input.tx);
+  const linkedCredential = await input.tx.query.integrationConnectionCredentials.findFirst({
+    where: (table, { and, eq }) =>
+      and(eq(table.connectionId, input.connectionId), eq(table.slotKey, input.slotKey)),
+  });
+
+  if (linkedCredential === undefined) {
+    return;
+  }
+
+  await input.tx
+    .delete(tables.integrationConnectionCredentials)
+    .where(
+      and(
+        eq(tables.integrationConnectionCredentials.connectionId, input.connectionId),
+        eq(tables.integrationConnectionCredentials.slotKey, input.slotKey),
+      ),
+    );
+  await input.tx
+    .update(tables.integrationCredentials)
+    .set({
+      revokedAt: sql`now()`,
+      updatedAt: sql`now()`,
+    })
+    .where(
+      and(
+        eq(tables.integrationCredentials.id, linkedCredential.credentialId),
+        isNull(tables.integrationCredentials.revokedAt),
+      ),
+    );
+}
+
+async function createAndLinkOAuth2Credential(input: {
+  tx: ControlPlaneDatabase;
+  organizationId: string;
+  familyId: string;
+  connectionId: string;
+  slotKey: string;
+  secretKind:
+    | typeof IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN
+    | typeof IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN
+    | typeof IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET;
+  plaintext: string;
+  organizationCredentialKeyVersion: number;
+  organizationCredentialKey: Buffer;
+  credentialMetadata?: Record<string, unknown>;
+  expiresAt?: string;
+}): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(input.tx);
+  const existingLink = await input.tx.query.integrationConnectionCredentials.findFirst({
+    where: (table, { and, eq }) =>
+      and(eq(table.connectionId, input.connectionId), eq(table.slotKey, input.slotKey)),
+  });
+  const encryptedCredential = encryptCredentialUtf8({
+    plaintext: input.plaintext,
+    organizationCredentialKey: input.organizationCredentialKey,
+  });
+
+  const [createdCredential] = await input.tx
+    .insert(tables.integrationCredentials)
+    .values({
+      organizationId: input.organizationId,
+      secretKind: input.secretKind,
+      ciphertext: encryptedCredential.ciphertext,
+      nonce: encryptedCredential.nonce,
+      organizationCredentialKeyVersion: input.organizationCredentialKeyVersion,
+      intendedFamilyId: input.familyId,
+      ...(input.credentialMetadata === undefined ? {} : { metadata: input.credentialMetadata }),
+      ...(input.expiresAt === undefined ? {} : { expiresAt: input.expiresAt }),
+    })
+    .returning({
+      id: tables.integrationCredentials.id,
+    });
+
+  if (createdCredential === undefined) {
+    throw new Error("Failed to create OAuth 2.0 (Authorization Code) credential.");
+  }
+
+  await input.tx
+    .insert(tables.integrationConnectionCredentials)
+    .values({
+      connectionId: input.connectionId,
+      credentialId: createdCredential.id,
+      slotKey: input.slotKey,
+    })
+    .onConflictDoUpdate({
+      target: [
+        tables.integrationConnectionCredentials.connectionId,
+        tables.integrationConnectionCredentials.slotKey,
+      ],
+      set: {
+        credentialId: createdCredential.id,
+      },
+    });
+
+  if (existingLink !== undefined && existingLink.credentialId !== createdCredential.id) {
+    await input.tx
+      .update(tables.integrationCredentials)
+      .set({
+        revokedAt: sql`now()`,
+        updatedAt: sql`now()`,
+      })
+      .where(
+        and(
+          eq(tables.integrationCredentials.id, existingLink.credentialId),
+          isNull(tables.integrationCredentials.revokedAt),
+        ),
+      );
+  }
+}
 
 function buildOAuth2AuthorizationCodeCompleteUrl(input: {
   controlPlaneBaseUrl: string;
@@ -189,6 +307,182 @@ export async function completeOAuth2AuthorizationCodeConnection(
         IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_ALREADY_USED,
         "Redirect state has already been used.",
       );
+    }
+
+    if (redirectSession.intent === IntegrationConnectionRedirectSessionIntents.REAUTHORIZE) {
+      const reauthorizedConnectionId = redirectSession.connectionId;
+      if (reauthorizedConnectionId === null) {
+        throw new Error(
+          "OAuth 2.0 (Authorization Code) reauthorization session is missing a connection id.",
+        );
+      }
+
+      const existingConnection = await tx.query.integrationConnections.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.id, reauthorizedConnectionId),
+            eq(table.organizationId, redirectSession.organizationId),
+            eq(table.targetKey, input.targetKey),
+          ),
+      });
+
+      if (existingConnection === undefined) {
+        throw new BadRequestError(
+          IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
+          "Redirect state references a connection that is no longer available.",
+        );
+      }
+
+      const organizationCredentialKey = await tx.query.organizationCredentialKeys.findFirst({
+        where: (table, { eq }) => eq(table.organizationId, redirectSession.organizationId),
+        orderBy: (table, { desc }) => [desc(table.version)],
+      });
+
+      if (organizationCredentialKey === undefined) {
+        throw new Error(
+          `Organization credential key is missing for '${redirectSession.organizationId}'.`,
+        );
+      }
+
+      const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+        masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+        masterEncryptionKeys: integrationsConfig.masterEncryptionKeys,
+      });
+      const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
+        wrappedCiphertext: organizationCredentialKey.ciphertext,
+        masterEncryptionKeyMaterial,
+      });
+
+      try {
+        const oauth2AuthorizationCodeSlotKeys = createOAuth2AuthorizationCodeCredentialSlotKeys({
+          familyId: resolved.target.familyId,
+          variantId: resolved.target.variantId,
+        });
+
+        await createAndLinkOAuth2Credential({
+          tx,
+          organizationId: redirectSession.organizationId,
+          familyId: resolved.target.familyId,
+          connectionId: existingConnection.id,
+          slotKey: oauth2AuthorizationCodeSlotKeys.accessToken,
+          secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+          plaintext: completedOAuth2AuthorizationCodeConnection.accessToken,
+          organizationCredentialKeyVersion: organizationCredentialKey.version,
+          organizationCredentialKey: unwrappedOrganizationCredentialKey,
+          ...(completedOAuth2AuthorizationCodeConnection.credentialMetadata === undefined
+            ? {}
+            : {
+                credentialMetadata: completedOAuth2AuthorizationCodeConnection.credentialMetadata,
+              }),
+          ...(completedOAuth2AuthorizationCodeConnection.accessTokenExpiresAt === undefined
+            ? {}
+            : { expiresAt: completedOAuth2AuthorizationCodeConnection.accessTokenExpiresAt }),
+        });
+
+        if (completedOAuth2AuthorizationCodeConnection.refreshToken === undefined) {
+          await revokeLinkedCredentialSlot({
+            tx,
+            connectionId: existingConnection.id,
+            slotKey: oauth2AuthorizationCodeSlotKeys.refreshToken,
+          });
+        } else {
+          await createAndLinkOAuth2Credential({
+            tx,
+            organizationId: redirectSession.organizationId,
+            familyId: resolved.target.familyId,
+            connectionId: existingConnection.id,
+            slotKey: oauth2AuthorizationCodeSlotKeys.refreshToken,
+            secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
+            plaintext: completedOAuth2AuthorizationCodeConnection.refreshToken,
+            organizationCredentialKeyVersion: organizationCredentialKey.version,
+            organizationCredentialKey: unwrappedOrganizationCredentialKey,
+            ...(completedOAuth2AuthorizationCodeConnection.credentialMetadata === undefined
+              ? {}
+              : {
+                  credentialMetadata: completedOAuth2AuthorizationCodeConnection.credentialMetadata,
+                }),
+            ...(completedOAuth2AuthorizationCodeConnection.refreshTokenExpiresAt === undefined
+              ? {}
+              : { expiresAt: completedOAuth2AuthorizationCodeConnection.refreshTokenExpiresAt }),
+          });
+        }
+
+        if (completedOAuth2AuthorizationCodeConnection.clientSecret === undefined) {
+          await revokeLinkedCredentialSlot({
+            tx,
+            connectionId: existingConnection.id,
+            slotKey: oauth2AuthorizationCodeSlotKeys.clientSecret,
+          });
+        } else {
+          await createAndLinkOAuth2Credential({
+            tx,
+            organizationId: redirectSession.organizationId,
+            familyId: resolved.target.familyId,
+            connectionId: existingConnection.id,
+            slotKey: oauth2AuthorizationCodeSlotKeys.clientSecret,
+            secretKind: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+            plaintext: completedOAuth2AuthorizationCodeConnection.clientSecret,
+            organizationCredentialKeyVersion: organizationCredentialKey.version,
+            organizationCredentialKey: unwrappedOrganizationCredentialKey,
+            ...(completedOAuth2AuthorizationCodeConnection.credentialMetadata === undefined
+              ? {}
+              : {
+                  credentialMetadata: completedOAuth2AuthorizationCodeConnection.credentialMetadata,
+                }),
+          });
+        }
+      } finally {
+        unwrappedOrganizationCredentialKey.fill(0);
+      }
+
+      const [updatedConnection] = await tx
+        .update(tables.integrationConnections)
+        .set({
+          status: IntegrationConnectionStatuses.ACTIVE,
+          ...(completedOAuth2AuthorizationCodeConnection.externalSubjectId === undefined
+            ? {}
+            : {
+                externalSubjectId: completedOAuth2AuthorizationCodeConnection.externalSubjectId,
+              }),
+          config: {
+            ...completedOAuth2AuthorizationCodeConnection.connectionConfig,
+            connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+          },
+          targetSnapshotConfig: resolved.target.config,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(tables.integrationConnections.id, existingConnection.id))
+        .returning();
+
+      if (updatedConnection === undefined) {
+        throw new Error(
+          "Failed to update integration connection from OAuth 2.0 (Authorization Code) reauthorization callback.",
+        );
+      }
+
+      return {
+        id: updatedConnection.id,
+        authorizationIntent: "reauthorize",
+        targetKey: updatedConnection.targetKey,
+        displayName: updatedConnection.displayName,
+        status: updatedConnection.status,
+        ...(updatedConnection.externalSubjectId === null
+          ? {}
+          : { externalSubjectId: updatedConnection.externalSubjectId }),
+        ...(updatedConnection.config === null ? {} : { config: updatedConnection.config }),
+        ...(updatedConnection.targetSnapshotConfig === null
+          ? {}
+          : { targetSnapshotConfig: updatedConnection.targetSnapshotConfig }),
+        createdAt: updatedConnection.createdAt,
+        updatedAt: updatedConnection.updatedAt,
+      };
+    }
+
+    if (
+      redirectSession.intent !== IntegrationConnectionRedirectSessionIntents.CREATE ||
+      redirectSession.connectionId !== null
+    ) {
+      throw new Error("OAuth 2.0 (Authorization Code) redirect session has invalid create state.");
     }
 
     const [createdConnection] = await tx
@@ -395,6 +689,7 @@ export async function completeOAuth2AuthorizationCodeConnection(
 
     return {
       id: createdConnection.id,
+      authorizationIntent: "create",
       targetKey: createdConnection.targetKey,
       displayName: createdConnection.displayName,
       status: createdConnection.status,

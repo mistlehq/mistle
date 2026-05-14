@@ -13,7 +13,7 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
   const { targetKey } = ctx.req.valid("param");
   const query = ctx.req.valid("query");
 
-  await completeOAuth2AuthorizationCodeConnection(
+  const completedConnection = await completeOAuth2AuthorizationCodeConnection(
     {
       db,
       integrationRegistry,
@@ -26,10 +26,15 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
     },
   );
 
-  return ctx.redirect(
-    buildDashboardUrl(config.dashboard.baseUrl, `/integrations/${encodeURIComponent(targetKey)}`),
-    302,
-  );
+  const dashboardPath =
+    completedConnection.authorizationIntent === "reauthorize"
+      ? `/integrations/${encodeURIComponent(targetKey)}?${new URLSearchParams({
+          connectionId: completedConnection.id,
+          connectionNotice: "reauthorized",
+        }).toString()}`
+      : `/integrations/${encodeURIComponent(targetKey)}`;
+
+  return ctx.redirect(buildDashboardUrl(config.dashboard.baseUrl, dashboardPath), 302);
 };
 
 export const handler: RouteHandler<typeof route, AppContextBindings> =
