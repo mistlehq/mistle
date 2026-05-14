@@ -23,7 +23,18 @@ export function resolveInstalledIntegrationConnectionNotice(input: {
     return null;
   }
 
-  if (input.searchParams.get("connectionNotice") !== "installed") {
+  const connectionNotice = input.searchParams.get("connectionNotice");
+
+  if (connectionNotice === "reauthorized") {
+    return {
+      connectionId: input.detailConnectionId,
+      resetKey: `reauthorized:${input.detailConnectionId}`,
+      title: "Re-authorized",
+      variant: "success",
+    };
+  }
+
+  if (connectionNotice !== "installed") {
     return null;
   }
 

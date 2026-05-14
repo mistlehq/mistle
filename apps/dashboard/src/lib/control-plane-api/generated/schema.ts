@@ -2149,6 +2149,120 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/integration/connections/:connectionId/oauth2-authorization-code/reauthorize/start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          connectionId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Create an OAuth 2.0 (Authorization Code) reauthorization URL for an integration connection. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** Format: uri */
+              authorizationUrl: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_OAUTH2_START_INPUT"
+                    | "OAUTH2_NOT_SUPPORTED"
+                    | "OAUTH2_CAPABILITY_NOT_CONFIGURED";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration connection or target was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "CONNECTION_NOT_FOUND" | "TARGET_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration connection cannot be reauthorized. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "CONNECTION_USED_BY_IDENTITY_LINKING";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/integration/connections/:connectionId/resources": {
     parameters: {
       query?: never;
@@ -4254,6 +4368,10 @@ export interface paths {
                         create: {
                           helperText: string;
                           submitLabel: string;
+                        };
+                        reauthorize?: {
+                          actionLabel: string;
+                          pendingLabel: string;
                         };
                       };
                     }

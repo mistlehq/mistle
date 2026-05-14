@@ -85,6 +85,14 @@ export type IntegrationConnectionDetailItem = {
       }
     | undefined;
   resources: readonly IntegrationConnectionDetailResourceSummary[];
+  reauthorization?:
+    | {
+        actionLabel: string;
+        errorMessage?: string;
+        isPending: boolean;
+        pendingLabel: string;
+      }
+    | undefined;
   status: "active" | "error" | "revoked";
 };
 
@@ -527,16 +535,21 @@ function ConnectionDetailPane(input: {
             })}
             title="Authentication"
           >
-            <ConnectionAuthSection
-              authMethodId={input.connection.authMethodId}
-              authMethodLabel={input.connection.authMethodLabel}
-              {...(input.connection.authFields === undefined
-                ? {}
-                : { authFields: input.connection.authFields })}
-              {...(input.connection.authSecretLabels === undefined
-                ? {}
-                : { authSecretLabels: input.connection.authSecretLabels })}
-            />
+            <div className="flex flex-col gap-4">
+              <ConnectionAuthSection
+                authMethodId={input.connection.authMethodId}
+                authMethodLabel={input.connection.authMethodLabel}
+                {...(input.connection.authFields === undefined
+                  ? {}
+                  : { authFields: input.connection.authFields })}
+                {...(input.connection.authSecretLabels === undefined
+                  ? {}
+                  : { authSecretLabels: input.connection.authSecretLabels })}
+              />
+              {input.connection.reauthorization?.errorMessage === undefined ? null : (
+                <Notice variant="alert">{input.connection.reauthorization.errorMessage}</Notice>
+              )}
+            </div>
           </SectionBlock>
 
           {input.connection.resources.length === 0 ? null : (
@@ -610,7 +623,10 @@ function resolveDeleteConnectionMessage(
 }
 
 function resolveEditAuthenticationAction(input: {
-  connection: Pick<IntegrationConnectionDetailItem, "authMethodId" | "id" | "isIdentityLinked">;
+  connection: Pick<
+    IntegrationConnectionDetailItem,
+    "authMethodId" | "id" | "isIdentityLinked" | "reauthorization"
+  >;
   onEditAuthentication: ((connectionId: string) => void) | undefined;
 }): ReactNode {
   const onEditAuthentication = input.onEditAuthentication;
@@ -642,6 +658,25 @@ function resolveEditAuthenticationAction(input: {
         </TooltipTrigger>
         <TooltipContent side="top">{disabledMessage}</TooltipContent>
       </Tooltip>
+    );
+  }
+
+  if (input.connection.reauthorization !== undefined) {
+    return (
+      <Button
+        aria-label={input.connection.reauthorization.actionLabel}
+        disabled={input.connection.reauthorization.isPending}
+        onClick={() => {
+          onEditAuthentication(input.connection.id);
+        }}
+        size="sm"
+        type="button"
+        variant="outline"
+      >
+        {input.connection.reauthorization.isPending
+          ? input.connection.reauthorization.pendingLabel
+          : input.connection.reauthorization.actionLabel}
+      </Button>
     );
   }
 
