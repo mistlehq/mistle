@@ -12,7 +12,10 @@ import { sql } from "drizzle-orm";
 
 import { type createControlPlaneOpenWorkflow } from "../../openworkflow.js";
 
-type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenWorkflow>;
+type ControlPlaneOpenWorkflow = Pick<
+  ReturnType<typeof createControlPlaneOpenWorkflow>,
+  "runWorkflow"
+>;
 
 type EnqueueStripeCustomerProvisioningInput = {
   db: ControlPlaneDatabase;
@@ -30,12 +33,17 @@ export async function enqueueStripeCustomerProvisioning(
     return;
   }
 
-  await input.db.insert(input.table).values({
-    organizationId: input.organizationId,
-    provider: BillingCustomerProviders.STRIPE,
-    status: OrganizationBillingCustomerStatuses.PROVISIONING,
-    updatedAt: sql`now()`,
-  });
+  await input.db
+    .insert(input.table)
+    .values({
+      organizationId: input.organizationId,
+      provider: BillingCustomerProviders.STRIPE,
+      status: OrganizationBillingCustomerStatuses.PROVISIONING,
+      updatedAt: sql`now()`,
+    })
+    .onConflictDoNothing({
+      target: [input.table.organizationId, input.table.provider],
+    });
 
   await input.openWorkflow.runWorkflow(
     ProvisionStripeCustomerWorkflowSpec,
