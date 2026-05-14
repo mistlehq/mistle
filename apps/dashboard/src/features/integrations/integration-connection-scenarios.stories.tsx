@@ -88,6 +88,7 @@ function buildIdentityLinkedSlackDetailViewStoryProps(): React.ComponentProps<
 function buildPlanetScaleReauthorizationStateStoryProps(input: {
   errorMessage?: string;
   isPending?: boolean;
+  status?: "active" | "error" | "revoked";
 }): React.ComponentProps<typeof IntegrationConnectionDetailView> {
   const props = createPlanetScaleDetailViewStoryProps();
 
@@ -103,6 +104,7 @@ function buildPlanetScaleReauthorizationStateStoryProps(input: {
               ...(input.errorMessage === undefined ? {} : { errorMessage: input.errorMessage }),
               isPending: input.isPending ?? connection.reauthorization.isPending,
             },
+      status: input.status ?? connection.status,
     })),
   };
 }
@@ -199,6 +201,18 @@ export const PlanetScaleReauthorizeStarting: Story = {
   name: "PlanetScale reauthorize - starting",
   args: {
     ...withoutStoryHandlers(buildPlanetScaleReauthorizationStateStoryProps({ isPending: true })),
+  },
+};
+
+export const PlanetScaleReauthorizationRequired: Story = {
+  name: "PlanetScale reauthorization required",
+  args: {
+    ...withoutStoryHandlers(
+      buildPlanetScaleReauthorizationStateStoryProps({
+        errorMessage: "This connection needs to be re-authorized.",
+        status: "error",
+      }),
+    ),
   },
 };
 
