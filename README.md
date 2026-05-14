@@ -58,6 +58,10 @@ Remember to delete the necessary Docker volumes, as well as images that were pul
 
 Refer to [docs/architecture.md](./docs/architecture.md).
 
+## Roadmap
+
+Refer to [docs/roadmap.md](./docs/roadmap.md).
+
 ## Local development
 
 If you want to run the dev stack locally, refer to [CONTRIBUTING.md](CONTRIBUTING.md).
