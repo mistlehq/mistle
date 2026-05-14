@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { createTestQueryClient } from "../../test-support/query-client.js";
+import { createTestQueryClient, flushScheduledReactWork } from "../../test-support/query-client.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
 import { resolveInitialSessionConnectInput } from "./session-initial-connect-policy.js";
@@ -825,6 +825,54 @@ describe("useSessionWorkbenchController", () => {
 
     expect(result.current.workbench.connectionReadiness.reason).toBe("unknown");
     expect(result.current.workbench.stoppedSessionMessage).toBeNull();
+  });
+
+  it("waits for a fresh route-entry status read before trusting a seeded connectable cache", async () => {
+    const sandboxInstanceId = `sbi-connectable-${Date.now()}`;
+    const sandboxStatus: SandboxInstanceStatusResult = {
+      title: null,
+      id: sandboxInstanceId,
+      status: "running",
+      connectable: true,
+      failureCode: null,
+      failureMessage: null,
+      runtimeContext: {
+        agentRuntimeId: "codex",
+        launchCwd: "/workspace/repo",
+        primaryRepositoryRoot: "/workspace/repo",
+      },
+      automationConversation: null,
+    };
+    const queryClient = createControllerQueryClient({
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    queryClient.setQueryData(sandboxInstanceStatusQueryKey(sandboxInstanceId), sandboxStatus, {
+      updatedAt: 1,
+    });
+
+    const { result } = renderSessionWorkbenchController({
+      queryClient,
+      sandboxInstanceId,
+    });
+
+    expect(result.current.workbench.connectionReadiness.reason).toBe("unknown");
+
+    await act(async () => {
+      await flushScheduledReactWork();
+    });
+
+    await act(async () => {
+      queryClient.setQueryData(sandboxInstanceStatusQueryKey(sandboxInstanceId), sandboxStatus, {
+        updatedAt: 2,
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.workbench.connectionReadiness).toEqual({
+        canConnect: true,
+        reason: "ready",
+      });
+    });
   });
 
   it("stops polling once a session is connectable", () => {
