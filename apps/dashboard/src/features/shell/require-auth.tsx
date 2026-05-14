@@ -1,7 +1,10 @@
 import { Navigate, Outlet, useLocation } from "react-router";
 
 import { AuthenticatedAnalytics } from "../../lib/analytics/authenticated.js";
-import { AuthenticatedAppearanceProvider } from "../appearance/appearance-provider.js";
+import {
+  AuthenticatedAppearanceProvider,
+  SystemAppearanceProvider,
+} from "../appearance/appearance-provider.js";
 import { readUserAppearanceFromSession } from "../appearance/appearance.js";
 import type { SessionData } from "../auth/types.js";
 import {
@@ -39,7 +42,11 @@ export function RequireAuth(): React.JSX.Element {
   const location = useLocation();
 
   if (sessionQuery.isPending) {
-    return <PendingSessionShell />;
+    return (
+      <SystemAppearanceProvider>
+        <PendingSessionShell />
+      </SystemAppearanceProvider>
+    );
   }
 
   if (sessionQuery.isError) {
@@ -50,13 +57,18 @@ export function RequireAuth(): React.JSX.Element {
     return <Navigate replace state={{ from: location }} to="/auth/login" />;
   }
 
+  const appearance = readUserAppearanceFromSession(sessionQuery.data);
   const activeOrganizationId = resolveActiveOrganizationIdFromSession(sessionQuery.data);
   if (activeOrganizationId === null) {
-    return <NoOrganizationAccessView />;
+    return (
+      <AuthenticatedAppearanceProvider appearance={appearance}>
+        <NoOrganizationAccessView />
+      </AuthenticatedAppearanceProvider>
+    );
   }
 
   return (
-    <AuthenticatedAppearanceProvider appearance={readUserAppearanceFromSession(sessionQuery.data)}>
+    <AuthenticatedAppearanceProvider appearance={appearance}>
       <AuthenticatedAnalytics
         organizationId={activeOrganizationId}
         userId={sessionQuery.data.user.id}

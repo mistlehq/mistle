@@ -1,6 +1,11 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
-import { resolveAppearance, type ResolvedAppearance, type UserAppearance } from "./appearance.js";
+import {
+  resolveAppearance,
+  type ResolvedAppearance,
+  type UserAppearance,
+  UserAppearances,
+} from "./appearance.js";
 
 const ColorSchemeMediaQuery = "(prefers-color-scheme: dark)";
 const ResolvedAppearanceContext = createContext<ResolvedAppearance | null>(null);
@@ -38,7 +43,7 @@ export function ResolvedAppearanceProvider(input: {
   );
 }
 
-export function AuthenticatedAppearanceProvider(input: {
+export function AppearanceProvider(input: {
   appearance: UserAppearance;
   children: React.ReactNode;
 }): React.JSX.Element {
@@ -73,4 +78,17 @@ export function AuthenticatedAppearanceProvider(input: {
       {input.children}
     </ResolvedAppearanceProvider>
   );
+}
+
+export function SystemAppearanceProvider(input: { children: React.ReactNode }): React.JSX.Element {
+  return (
+    <AppearanceProvider appearance={UserAppearances.SYSTEM}>{input.children}</AppearanceProvider>
+  );
+}
+
+export function AuthenticatedAppearanceProvider(input: {
+  appearance: UserAppearance;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return <AppearanceProvider appearance={input.appearance}>{input.children}</AppearanceProvider>;
 }

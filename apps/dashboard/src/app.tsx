@@ -7,6 +7,7 @@ import {
   RouterProvider,
 } from "react-router";
 
+import { SystemAppearanceProvider } from "./features/appearance/appearance-provider.js";
 import { AuthLoginCallbackPage } from "./features/auth/auth-login-callback-page.js";
 import { AuthScreen } from "./features/auth/auth-screen.js";
 import {
@@ -49,22 +50,12 @@ export function App(): React.JSX.Element {
 
 export const APP_ROUTES = createRoutesFromElements(
   <>
-    <Route element={<AuthScreen />} errorElement={<RouteErrorBoundary />} path="/auth/login" />
-    <Route
-      element={<AuthLoginCallbackPage />}
-      errorElement={<RouteErrorBoundary />}
-      path="/auth/login/callback"
-    />
-    <Route
-      element={<AuthSwitchOrganizationPage />}
-      errorElement={<RouteErrorBoundary />}
-      path={AUTH_SWITCH_ORGANIZATION_PATH}
-    />
-    <Route
-      element={<InvitationAcceptPage />}
-      errorElement={<RouteErrorBoundary />}
-      path="/invitations/accept"
-    />
+    <Route element={<SystemAppearanceRoute />} errorElement={<RouteErrorBoundary />}>
+      <Route element={<AuthScreen />} path="/auth/login" />
+      <Route element={<AuthLoginCallbackPage />} path="/auth/login/callback" />
+      <Route element={<AuthSwitchOrganizationPage />} path={AUTH_SWITCH_ORGANIZATION_PATH} />
+      <Route element={<InvitationAcceptPage />} path="/invitations/accept" />
+    </Route>
     <Route element={<RequireAuth />} errorElement={<RouteErrorBoundary />}>
       <Route element={<AppShell />} errorElement={<RouteErrorBoundary />}>
         <Route element={<HomePage />} handle={ROUTE_HANDLES.dashboard} index />
@@ -212,4 +203,12 @@ const appRouter = createBrowserRouter(APP_ROUTES);
 
 function RouteOutlet(): React.JSX.Element {
   return <Outlet />;
+}
+
+function SystemAppearanceRoute(): React.JSX.Element {
+  return (
+    <SystemAppearanceProvider>
+      <Outlet />
+    </SystemAppearanceProvider>
+  );
 }
