@@ -127,7 +127,7 @@ const SandboxProfileIntegrationConnectionColumns = [
 
 const SandboxProfileIntegrationCellContentClassName = "flex items-center md:min-h-9";
 const SandboxProfileIntegrationActionCellClassName =
-  "absolute right-0 top-0 md:static md:flex md:justify-end";
+  "absolute right-0 top-0 md:static md:flex md:min-h-9 md:items-center md:justify-end";
 
 function IntegrationNameCell(input: {
   logoKey: string | undefined;
@@ -288,7 +288,7 @@ function RemoveIntegrationBindingButton(input: {
   return (
     <Button
       aria-label={input.label}
-      className="h-7 w-7"
+      className="h-9 w-8"
       disabled={input.disabled === true}
       onClick={input.onRemove}
       type="button"

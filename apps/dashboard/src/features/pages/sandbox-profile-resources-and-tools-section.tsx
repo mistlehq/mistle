@@ -23,6 +23,8 @@ import {
 
 const SearchDebounceMs = 300;
 const SandboxProfileResourcesAndToolsSimpleControlClassName = "flex items-center md:min-h-9";
+const BindingToolsOptionClassName = "flex min-h-7 items-center gap-2 text-sm";
+const BindingToolsTableFirstOptionClassName = `${BindingToolsOptionClassName} md:min-h-9`;
 
 function resolveRepositorySummary(
   connection: IntegrationConnectionSummary | undefined,
@@ -241,41 +243,56 @@ function BindingToolsControl(input: {
     return null;
   }
 
+  const toolsControlClassName =
+    input.showLabel === true
+      ? "flex flex-col gap-1"
+      : "flex min-w-0 flex-col justify-center md:min-h-9";
   const toolsControl = (
-    <div className="flex flex-col gap-1">
-      {toolToggleModel.options.map((option) => (
-        <label className="flex min-h-7 items-center gap-2 text-sm" key={option.value}>
-          <Checkbox
-            aria-label={option.label}
-            checked={option.checked}
-            disabled={input.disabled === true}
-            onCheckedChange={(checked) => {
-              if (input.disabled === true) {
-                return;
-              }
+    <div className={toolsControlClassName}>
+      {toolToggleModel.options.map((option, optionIndex) => {
+        const alignOptionWithTableControlRow = input.showLabel !== true && optionIndex === 0;
 
-              input.onRowChange(input.row.clientId, {
-                config: {
-                  ...toolToggleModel.config,
-                  tools:
-                    checked === true
-                      ? toolToggleModel.options
-                          .filter(
-                            (candidate) => candidate.checked || candidate.value === option.value,
-                          )
-                          .map((candidate) => candidate.value)
-                      : toolToggleModel.options
-                          .filter(
-                            (candidate) => candidate.checked && candidate.value !== option.value,
-                          )
-                          .map((candidate) => candidate.value),
-                },
-              });
-            }}
-          />
-          <span>{option.label}</span>
-        </label>
-      ))}
+        return (
+          <label
+            className={
+              alignOptionWithTableControlRow
+                ? BindingToolsTableFirstOptionClassName
+                : BindingToolsOptionClassName
+            }
+            key={option.value}
+          >
+            <Checkbox
+              aria-label={option.label}
+              checked={option.checked}
+              disabled={input.disabled === true}
+              onCheckedChange={(checked) => {
+                if (input.disabled === true) {
+                  return;
+                }
+
+                input.onRowChange(input.row.clientId, {
+                  config: {
+                    ...toolToggleModel.config,
+                    tools:
+                      checked === true
+                        ? toolToggleModel.options
+                            .filter(
+                              (candidate) => candidate.checked || candidate.value === option.value,
+                            )
+                            .map((candidate) => candidate.value)
+                        : toolToggleModel.options
+                            .filter(
+                              (candidate) => candidate.checked && candidate.value !== option.value,
+                            )
+                            .map((candidate) => candidate.value),
+                  },
+                });
+              }}
+            />
+            <span>{option.label}</span>
+          </label>
+        );
+      })}
     </div>
   );
 
