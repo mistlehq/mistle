@@ -1,12 +1,13 @@
-import type { CodexModelSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
-
-import type { SessionBootstrapPhase } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
 import {
   buildModelSelectionRequiredMessage,
   buildNonImageCapableModelWarningMessage,
   buildUnavailableModelErrorMessage,
   supportsImageInspection,
 } from "./session-composer-model-readiness.js";
+import type {
+  SessionComposerBootstrapPhase,
+  SessionComposerModel,
+} from "./session-composer-runtime-contracts.js";
 
 export type ComposerStatusMessage = {
   message: string;
@@ -15,8 +16,8 @@ export type ComposerStatusMessage = {
 };
 
 export function resolveComposerBootstrapMessage(input: {
-  activeComposerModel: CodexModelSummary | null;
-  bootstrapState: SessionBootstrapPhase;
+  activeComposerModel: SessionComposerModel | null;
+  bootstrapState: SessionComposerBootstrapPhase;
   requiresModelSelection: boolean;
   selectedModel: string | null;
 }): string | null {
@@ -42,8 +43,8 @@ export function resolveComposerBootstrapMessage(input: {
 }
 
 export function resolveComposerStatusMessage(input: {
-  activeComposerModel: CodexModelSummary | null;
-  bootstrapState: SessionBootstrapPhase;
+  activeComposerModel: SessionComposerModel | null;
+  bootstrapState: SessionComposerBootstrapPhase;
   composerErrorMessage: string | null;
   completedTurnErrorMessage: string | null;
   hasPendingImageAttachments: boolean;

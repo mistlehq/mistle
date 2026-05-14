@@ -1,27 +1,21 @@
-import type { CodexModelSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { describe, expect, it } from "vitest";
 
+import type { SessionComposerModel } from "./session-composer-runtime-contracts.js";
 import { resolveComposerStatusMessage } from "./session-composer-status.js";
 
-const ImageCapableModel: CodexModelSummary = {
-  id: "model_image",
+const ImageCapableModel: SessionComposerModel = {
   model: "gpt-5.4",
   displayName: "GPT-5.4",
-  hidden: false,
   defaultReasoningEffort: null,
   inputModalities: ["text", "image"],
-  supportsPersonality: false,
   isDefault: true,
 };
 
-const TextOnlyModel: CodexModelSummary = {
-  id: "model_text",
+const TextOnlyModel: SessionComposerModel = {
   model: "codex-spark",
   displayName: "Codex Spark",
-  hidden: false,
   defaultReasoningEffort: null,
   inputModalities: ["text"],
-  supportsPersonality: false,
   isDefault: false,
 };
 
@@ -61,7 +55,7 @@ describe("session-composer-status", () => {
     ).toBeNull();
   });
 
-  it("does not require a Codex model when the active runtime owns model selection elsewhere", () => {
+  it("does not require a composer model when the active runtime owns model selection elsewhere", () => {
     expect(
       resolveComposerStatusMessage({
         activeComposerModel: null,

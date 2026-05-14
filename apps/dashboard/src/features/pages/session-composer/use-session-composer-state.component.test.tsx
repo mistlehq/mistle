@@ -1,31 +1,28 @@
 // @vitest-environment jsdom
 
-import type {
-  CodexModelSummary,
-  CodexTurnCollaborationModeSettings,
-} from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { SessionBootstrapResult } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
 import type { PendingSessionDiffComment } from "../session-diff-comment.js";
+import type {
+  SessionComposerBootstrapResult,
+  SessionComposerCollaborationModeSettings,
+  SessionComposerModel,
+} from "./session-composer-runtime-contracts.js";
 import { useSessionComposerState } from "./use-session-composer-state.js";
 
-const ReadyBootstrap: SessionBootstrapResult = {
+const ReadyBootstrap: SessionComposerBootstrapResult = {
   phase: { status: "ready" },
   establishedSnapshot: {
     availableModels: [
       {
-        id: "model-1",
         model: "gpt-5.4",
         displayName: "GPT-5.4",
-        hidden: false,
         defaultReasoningEffort: "medium",
         inputModalities: ["text"],
-        supportsPersonality: true,
         isDefault: true,
-      } satisfies CodexModelSummary,
+      } satisfies SessionComposerModel,
     ],
     configSnapshot: {
       model: "gpt-5.4",
@@ -81,7 +78,7 @@ function SessionComposerStateHarness(input: {
   const [submittedPrompt, setSubmittedPrompt] = useState<string | null>(null);
   const [transcriptPrompt, setTranscriptPrompt] = useState<string | null>(null);
   const [collaborationModeSettings, setCollaborationModeSettings] =
-    useState<CodexTurnCollaborationModeSettings | null>(null);
+    useState<SessionComposerCollaborationModeSettings | null>(null);
   const [resolveSubmit, setResolveSubmit] = useState<(() => void) | null>(null);
 
   const composerState = useSessionComposerState({

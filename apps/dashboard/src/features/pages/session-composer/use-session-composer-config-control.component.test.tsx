@@ -1,46 +1,40 @@
 // @vitest-environment jsdom
 
-import type { CodexModelSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import type { CodexSessionConfigState } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
 import type {
-  CodexSessionConfigState,
-  SessionBootstrapResult,
-} from "../../session-agents/codex/session-state/session-bootstrap/index.js";
+  SessionComposerBootstrapResult,
+  SessionComposerModel,
+} from "./session-composer-runtime-contracts.js";
 import {
   useLocalSessionComposerConfigControl,
   useSessionComposerConfigControl,
 } from "./use-session-composer-config-control.js";
 
-const DefaultModel: CodexModelSummary = {
-  id: "model-default",
+const DefaultModel: SessionComposerModel = {
   model: "gpt-5.4",
   displayName: "GPT-5.4",
-  hidden: false,
   defaultReasoningEffort: "medium",
   inputModalities: ["text", "image"],
-  supportsPersonality: true,
   isDefault: true,
 };
 
-const SparkModel: CodexModelSummary = {
-  id: "model-spark",
+const SparkModel: SessionComposerModel = {
   model: "gpt-5.3-codex-spark",
   displayName: "GPT-5.3 Codex Spark",
-  hidden: false,
   defaultReasoningEffort: "high",
   inputModalities: ["text"],
-  supportsPersonality: false,
   isDefault: false,
 };
 
 function createReadyBootstrap(input: {
-  availableModels: readonly CodexModelSummary[];
+  availableModels: readonly SessionComposerModel[];
   model: string | null;
   modelReasoningEffort: string | null;
-}): SessionBootstrapResult {
+}): SessionComposerBootstrapResult {
   return {
     phase: { status: "ready" },
     establishedSnapshot: {
@@ -54,7 +48,7 @@ function createReadyBootstrap(input: {
 }
 
 function SessionComposerConfigControlHarness(input: {
-  bootstrap: SessionBootstrapResult;
+  bootstrap: SessionComposerBootstrapResult;
 }): React.JSX.Element {
   const [lastWrite, setLastWrite] = useState("");
   const codexConfig: CodexSessionConfigState = {
@@ -90,7 +84,7 @@ function SessionComposerConfigControlHarness(input: {
 }
 
 function LocalSessionComposerConfigControlHarness(input: {
-  bootstrap: SessionBootstrapResult;
+  bootstrap: SessionComposerBootstrapResult;
   resetKey?: string | null;
 }): React.JSX.Element {
   const configControl = useLocalSessionComposerConfigControl({

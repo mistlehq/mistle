@@ -1,4 +1,3 @@
-import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import {
   UploadStreamClient,
   type SandboxSessionTransport,
@@ -8,11 +7,12 @@ import { useCallback, useState } from "react";
 
 import type { ChatAttachment } from "../../chat/chat-types.js";
 import { resolveMixedAttachmentTurnRepresentation } from "../../session-agents/codex/session-state/codex-attachment-presentation.js";
+import type { SessionComposerSubmittedLocalImageAttachment } from "./session-composer-runtime-contracts.js";
 import { resolveUploadErrorMessage } from "./session-composer-upload-errors.js";
 
 export type PreparedComposerAttachments = {
   prompt: string;
-  submittedAttachments: readonly CodexTurnInputLocalImageItem[];
+  submittedAttachments: readonly SessionComposerSubmittedLocalImageAttachment[];
   displayAttachments: readonly ChatAttachment[];
   uploadedAttachments: readonly UploadedSandboxFile[];
 };

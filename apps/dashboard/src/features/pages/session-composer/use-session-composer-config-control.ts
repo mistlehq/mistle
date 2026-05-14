@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type {
-  CodexSessionConfigState,
-  SessionBootstrapResult,
-} from "../../session-agents/codex/session-state/session-bootstrap/index.js";
+import type { CodexSessionConfigState } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
 import type { ComposerConfigSnapshot } from "./session-composer-config.js";
 import { resolveActiveComposerModel } from "./session-composer-model-readiness.js";
+import type { SessionComposerBootstrapResult } from "./session-composer-runtime-contracts.js";
 
 export type SessionComposerConfigControl = {
   selectedModel: string | null;
@@ -22,7 +20,7 @@ export type SessionComposerConfigControl = {
 };
 
 function resolveSelectedReasoningEffort(input: {
-  availableModels: SessionBootstrapResult["establishedSnapshot"]["availableModels"];
+  availableModels: SessionComposerBootstrapResult["establishedSnapshot"]["availableModels"];
   configuredReasoningEffort: string | null;
   selectedModel: string | null;
 }): string | null {
@@ -43,7 +41,7 @@ function resolveSelectedReasoningEffort(input: {
 }
 
 function buildModelOptions(
-  availableModels: SessionBootstrapResult["establishedSnapshot"]["availableModels"],
+  availableModels: SessionComposerBootstrapResult["establishedSnapshot"]["availableModels"],
   includeDefaultMarker: boolean,
 ): SessionComposerConfigControl["modelOptions"] {
   return availableModels.map((model) => ({
@@ -56,7 +54,7 @@ function buildModelOptions(
 }
 
 export function useSessionComposerConfigControl(input: {
-  bootstrap: SessionBootstrapResult;
+  bootstrap: SessionComposerBootstrapResult;
   clearSessionErrorMessage: () => void;
   codexConfig: CodexSessionConfigState;
 }): SessionComposerConfigControl {
@@ -147,7 +145,7 @@ export function useSessionComposerConfigControl(input: {
 }
 
 export function useLocalSessionComposerConfigControl(input: {
-  bootstrap: SessionBootstrapResult;
+  bootstrap: SessionComposerBootstrapResult;
   clearSessionErrorMessage: () => void;
   canChangeReasoningEffort?: boolean;
   resetKey?: string | null;

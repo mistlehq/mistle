@@ -9,6 +9,13 @@ export {
   type SessionComposerUiState,
   type SessionTurnControl,
 } from "./use-session-composer-state.js";
+export type {
+  SessionComposerBootstrapPhase,
+  SessionComposerBootstrapResult,
+  SessionComposerCollaborationModeSettings,
+  SessionComposerModel,
+  SessionComposerSubmittedLocalImageAttachment,
+} from "./session-composer-runtime-contracts.js";
 export { ComposerStatusBanner } from "./composer-status-banner.js";
 export { SessionComposerActivityRow } from "./session-composer-activity-row.js";
 export { resolveComposerSubmitAction } from "./session-composer-capabilities.js";

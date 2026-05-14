@@ -14,23 +14,17 @@ describe("session-composer-model-readiness", () => {
       resolveActiveComposerModel({
         availableModels: [
           {
-            id: "model_default",
             model: "gpt-5.4",
             displayName: "GPT-5.4",
-            hidden: false,
             defaultReasoningEffort: null,
             inputModalities: ["text", "image"],
-            supportsPersonality: false,
             isDefault: true,
           },
           {
-            id: "model_fast",
             model: "gpt-5.3-codex-spark",
             displayName: "GPT-5.3 Codex Spark",
-            hidden: false,
             defaultReasoningEffort: null,
             inputModalities: ["text"],
-            supportsPersonality: false,
             isDefault: false,
           },
         ],
@@ -44,13 +38,10 @@ describe("session-composer-model-readiness", () => {
       resolveActiveComposerModel({
         availableModels: [
           {
-            id: "model_default",
             model: "gpt-5.4",
             displayName: "GPT-5.4",
-            hidden: false,
             defaultReasoningEffort: null,
             inputModalities: ["text", "image"],
-            supportsPersonality: false,
             isDefault: true,
           },
         ],
@@ -81,13 +72,10 @@ describe("session-composer-model-readiness", () => {
   it("detects image inspection support", () => {
     expect(
       supportsImageInspection({
-        id: "image_model",
         model: "gpt-5.4",
         displayName: "GPT-5.4",
-        hidden: false,
         defaultReasoningEffort: null,
         inputModalities: ["text", "image"],
-        supportsPersonality: false,
         isDefault: true,
       }),
     ).toBe(true);

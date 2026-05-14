@@ -1,15 +1,9 @@
 import type { AgentConversationCollaborationModeSettings } from "@mistle/integrations-core";
-import type {
-  CodexTurnCollaborationModeSettings,
-  CodexTurnInputLocalImageItem,
-} from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import type { UploadedSandboxFile } from "@mistle/sandbox-session-client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { ChatAttachment } from "../../chat/chat-types.js";
 import type { ChatComposerViewModel } from "../../chat/components/chat-composer.js";
-import type { CodexContextUsageViewModel } from "../../session-agents/codex/session-state/codex-context-usage.js";
-import type { SessionBootstrapResult } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
 import {
   buildSessionComposerPrompt,
   buildPendingSessionDiffCommentSummaryLabel,
@@ -24,6 +18,11 @@ import {
   resolveActiveComposerModel,
   supportsImageInspection,
 } from "./session-composer-model-readiness.js";
+import type {
+  SessionComposerBootstrapResult,
+  SessionComposerCollaborationModeSettings,
+  SessionComposerSubmittedLocalImageAttachment,
+} from "./session-composer-runtime-contracts.js";
 import {
   resolveComposerStatusMessage,
   type ComposerStatusMessage,
@@ -62,15 +61,15 @@ export type SessionTurnControl = {
   completedTurnErrorMessage: string | null;
   startTurn: (input: {
     submittedPrompt: string;
-    submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
+    submittedAttachments?: readonly SessionComposerSubmittedLocalImageAttachment[];
     uploadedAttachments?: readonly UploadedSandboxFile[];
     transcriptPrompt?: string;
     displayAttachments?: readonly ChatAttachment[];
-    collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
+    collaborationModeSettings?: SessionComposerCollaborationModeSettings | undefined;
   }) => Promise<void>;
   steerTurn: (input: {
     submittedPrompt: string;
-    submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
+    submittedAttachments?: readonly SessionComposerSubmittedLocalImageAttachment[];
     uploadedAttachments?: readonly UploadedSandboxFile[];
     transcriptPrompt?: string;
     displayAttachments?: readonly ChatAttachment[];
@@ -84,10 +83,10 @@ export type SessionComposerModelSelectionInput = {
 };
 
 export type SessionComposerRuntimeInput = {
-  bootstrap: SessionBootstrapResult;
+  bootstrap: SessionComposerBootstrapResult;
   clearSessionErrorMessage: () => void;
   configControl: SessionComposerConfigControl;
-  contextUsage: CodexContextUsageViewModel | null;
+  contextUsage: ChatComposerViewModel["contextUsage"];
   collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
   modelSelection: SessionComposerModelSelectionInput;
   sessionErrorMessage: string | null;
@@ -147,7 +146,7 @@ export function useSessionComposerState(input: {
   );
 
   const turnCollaborationModeSettings = useMemo(():
-    | CodexTurnCollaborationModeSettings
+    | SessionComposerCollaborationModeSettings
     | undefined => {
     if (composerStateInput.collaborationModeSettings === undefined) {
       return undefined;
