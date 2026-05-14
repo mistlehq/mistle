@@ -1,4 +1,5 @@
 import {
+  SandboxOperationKinds,
   SandboxInstancePersistenceModes,
   SandboxInstancePurposes,
   SandboxInstanceStatuses,
@@ -77,6 +78,43 @@ async function readPersistedRuntimePlan(input: {
 }
 
 type PersistedRuntimePlan = Awaited<ReturnType<typeof readPersistedRuntimePlan>>;
+
+async function readLatestStartupOperation(input: {
+  db: DataPlaneDatabase;
+  sandboxInstanceId: string;
+}): Promise<NonNullable<NonNullable<GetSandboxInstanceResponse>["startupOperation"]> | null> {
+  const operationEvent = await input.db.query.sandboxOperationEvents.findFirst({
+    columns: {
+      operationId: true,
+      operationKind: true,
+    },
+    where: (table, { and, eq, or }) =>
+      and(
+        eq(table.sandboxInstanceId, input.sandboxInstanceId),
+        or(
+          eq(table.operationKind, SandboxOperationKinds.START),
+          eq(table.operationKind, SandboxOperationKinds.RESUME),
+        ),
+      ),
+    orderBy: (table, { desc }) => [desc(table.createdAt), desc(table.sequence)],
+  });
+
+  if (operationEvent === undefined) {
+    return null;
+  }
+
+  if (
+    operationEvent.operationKind !== SandboxOperationKinds.START &&
+    operationEvent.operationKind !== SandboxOperationKinds.RESUME
+  ) {
+    throw new Error("Expected latest sandbox startup operation to be start or resume.");
+  }
+
+  return {
+    operationId: operationEvent.operationId,
+    operationKind: operationEvent.operationKind,
+  };
+}
 
 async function markRunningSandboxInstanceStopped(
   ctx: Pick<GetSandboxInstanceContext, "db" | "tables">,
@@ -317,6 +355,7 @@ async function inspectStartingSandboxInstance(
       failureCode: null,
       failureMessage: null,
       runtimePlan: sandboxInstance.runtimePlan,
+      startupOperation: null,
     };
   }
 
@@ -346,6 +385,7 @@ async function inspectStartingSandboxInstance(
         failureCode: null,
         failureMessage: null,
         runtimePlan: sandboxInstance.runtimePlan,
+        startupOperation: null,
       };
     }
 
@@ -362,6 +402,7 @@ async function inspectStartingSandboxInstance(
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during startup inspection.",
       runtimePlan: sandboxInstance.runtimePlan,
+      startupOperation: null,
     };
   }
 
@@ -388,6 +429,7 @@ async function inspectStartingSandboxInstance(
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
       runtimePlan: sandboxInstance.runtimePlan,
+      startupOperation: null,
     };
   }
 
@@ -404,6 +446,7 @@ async function inspectStartingSandboxInstance(
       failureCode: null,
       failureMessage: null,
       runtimePlan: sandboxInstance.runtimePlan,
+      startupOperation: null,
     };
   }
 
@@ -421,6 +464,7 @@ async function inspectStartingSandboxInstance(
     failureCode: dispositionOutcome.failureCode,
     failureMessage: dispositionOutcome.failureMessage,
     runtimePlan: sandboxInstance.runtimePlan,
+    startupOperation: null,
   };
 }
 
@@ -439,6 +483,7 @@ function readPendingSandboxInstance(sandboxInstance: {
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
     runtimePlan: sandboxInstance.runtimePlan,
+    startupOperation: null,
   };
 }
 
@@ -458,6 +503,7 @@ async function inspectStoppedSandboxInstance(
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
       runtimePlan: sandboxInstance.runtimePlan,
+      startupOperation: null,
     };
   }
 
@@ -485,6 +531,7 @@ async function inspectStoppedSandboxInstance(
         failureCode: sandboxInstance.failureCode,
         failureMessage: sandboxInstance.failureMessage,
         runtimePlan: sandboxInstance.runtimePlan,
+        startupOperation: null,
       };
     }
 
@@ -501,6 +548,7 @@ async function inspectStoppedSandboxInstance(
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during inspection.",
       runtimePlan: sandboxInstance.runtimePlan,
+      startupOperation: null,
     };
   }
 
@@ -516,6 +564,7 @@ async function inspectStoppedSandboxInstance(
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
       runtimePlan: sandboxInstance.runtimePlan,
+      startupOperation: null,
     };
   }
 
@@ -531,6 +580,7 @@ async function inspectStoppedSandboxInstance(
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
       runtimePlan: sandboxInstance.runtimePlan,
+      startupOperation: null,
     };
   }
 
@@ -547,6 +597,7 @@ async function inspectStoppedSandboxInstance(
     failureCode: "provider_runtime_not_resumable",
     failureMessage: "Sandbox runtime was not resumable at the provider during inspection.",
     runtimePlan: sandboxInstance.runtimePlan,
+    startupOperation: null,
   };
 }
 
@@ -579,6 +630,7 @@ async function inspectRunningSandboxInstance(
         failureCode: sandboxInstance.failureCode,
         failureMessage: sandboxInstance.failureMessage,
         runtimePlan: sandboxInstance.runtimePlan,
+        startupOperation: null,
       };
     }
 
@@ -595,6 +647,7 @@ async function inspectRunningSandboxInstance(
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during inspection.",
       runtimePlan: sandboxInstance.runtimePlan,
+      startupOperation: null,
     };
   }
 
@@ -617,6 +670,7 @@ async function inspectRunningSandboxInstance(
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
       runtimePlan: sandboxInstance.runtimePlan,
+      startupOperation: null,
     };
   }
 
@@ -632,6 +686,7 @@ async function inspectRunningSandboxInstance(
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
     runtimePlan: sandboxInstance.runtimePlan,
+    startupOperation: null,
   };
 }
 
@@ -744,9 +799,10 @@ export async function getSandboxInstance(
 
   assertRuntimeSandboxProvider(sandboxInstance.runtimeProvider);
 
+  let response: NonNullable<GetSandboxInstanceResponse>;
   switch (sandboxInstance.status) {
-    case SandboxInstanceStatuses.FAILED:
-      return {
+    case SandboxInstanceStatuses.FAILED: {
+      response = {
         id: sandboxInstance.id,
         title: sandboxInstance.title,
         status: SandboxInstanceStatuses.FAILED,
@@ -754,30 +810,45 @@ export async function getSandboxInstance(
         failureCode: sandboxInstance.failureCode,
         failureMessage: sandboxInstance.failureMessage,
         runtimePlan,
+        startupOperation: null,
       };
+      break;
+    }
     case SandboxInstanceStatuses.STOPPED:
-      return inspectStoppedSandboxInstance(ctx, {
+      response = await inspectStoppedSandboxInstance(ctx, {
         ...sandboxInstance,
         runtimePlan,
       });
+      break;
     case SandboxInstanceStatuses.PENDING:
-      return readPendingSandboxInstance({
+      response = readPendingSandboxInstance({
         ...sandboxInstance,
         runtimePlan,
       });
+      break;
     case SandboxInstanceStatuses.STARTING: {
-      return inspectStartingSandboxInstance(ctx, {
+      response = await inspectStartingSandboxInstance(ctx, {
         ...sandboxInstance,
         runtimePlan,
       });
+      break;
     }
     case SandboxInstanceStatuses.RUNNING: {
-      return inspectRunningSandboxInstance(ctx, {
+      response = await inspectRunningSandboxInstance(ctx, {
         ...sandboxInstance,
         runtimePlan,
       });
+      break;
     }
     default:
       throw new Error("Unsupported sandbox instance status.");
   }
+
+  return {
+    ...response,
+    startupOperation: await readLatestStartupOperation({
+      db: ctx.db,
+      sandboxInstanceId: sandboxInstance.id,
+    }),
+  };
 }

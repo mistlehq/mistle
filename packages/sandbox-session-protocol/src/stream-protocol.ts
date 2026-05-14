@@ -449,6 +449,47 @@ const TelemetryResetSchema = z.object({
   message: NonEmptyStringSchema,
 });
 
+const SandboxOperationKindSchema = z.enum(["start", "resume", "setup_check", "snapshot", "stop"]);
+
+const OperationOpenSchema = z.object({
+  type: z.literal("operation.open"),
+  streamId: PositiveIntegerSchema,
+  operationId: NonEmptyStringSchema,
+  operationKind: SandboxOperationKindSchema,
+  format: z.literal("mistle.sandbox-operation.v1+jsonl"),
+});
+
+const OperationOpenOKSchema = z.object({
+  type: z.literal("operation.open.ok"),
+  streamId: PositiveIntegerSchema,
+  initialWindowBytes: PositiveIntegerSchema,
+});
+
+const OperationOpenErrorSchema = z.object({
+  type: z.literal("operation.open.error"),
+  streamId: PositiveIntegerSchema,
+  code: NonEmptyStringSchema,
+  message: NonEmptyStringSchema,
+});
+
+const OperationWindowSchema = z.object({
+  type: z.literal("operation.window"),
+  streamId: PositiveIntegerSchema,
+  bytes: PositiveIntegerSchema,
+});
+
+const OperationCloseSchema = z.object({
+  type: z.literal("operation.close"),
+  streamId: PositiveIntegerSchema,
+});
+
+const OperationResetSchema = z.object({
+  type: z.literal("operation.reset"),
+  streamId: PositiveIntegerSchema,
+  code: NonEmptyStringSchema,
+  message: NonEmptyStringSchema,
+});
+
 const SigningFormatSchema = z.enum(["ssh"]);
 
 const SigningRequestSchema = z.object({
@@ -519,6 +560,15 @@ const TelemetryControlMessageSchema = z.discriminatedUnion("type", [
   TelemetryResetSchema,
 ]);
 
+const OperationControlMessageSchema = z.discriminatedUnion("type", [
+  OperationOpenSchema,
+  OperationOpenOKSchema,
+  OperationOpenErrorSchema,
+  OperationWindowSchema,
+  OperationCloseSchema,
+  OperationResetSchema,
+]);
+
 const BootstrapControlMessageSchema = z.discriminatedUnion("type", [
   StreamOpenOKSchema,
   StreamOpenErrorSchema,
@@ -528,6 +578,8 @@ const BootstrapControlMessageSchema = z.discriminatedUnion("type", [
   StreamWindowSchema,
   TelemetryOpenSchema,
   TelemetryCloseSchema,
+  OperationOpenSchema,
+  OperationCloseSchema,
   SandboxKeepaliveStateSchema,
   SandboxRuntimeReadySchema,
 ]);
@@ -607,6 +659,14 @@ export type TelemetryWindow = z.infer<typeof TelemetryWindowSchema>;
 export type TelemetryClose = z.infer<typeof TelemetryCloseSchema>;
 export type TelemetryReset = z.infer<typeof TelemetryResetSchema>;
 export type TelemetryControlMessage = z.infer<typeof TelemetryControlMessageSchema>;
+export type SandboxOperationKind = z.infer<typeof SandboxOperationKindSchema>;
+export type OperationOpen = z.infer<typeof OperationOpenSchema>;
+export type OperationOpenOK = z.infer<typeof OperationOpenOKSchema>;
+export type OperationOpenError = z.infer<typeof OperationOpenErrorSchema>;
+export type OperationWindow = z.infer<typeof OperationWindowSchema>;
+export type OperationClose = z.infer<typeof OperationCloseSchema>;
+export type OperationReset = z.infer<typeof OperationResetSchema>;
+export type OperationControlMessage = z.infer<typeof OperationControlMessageSchema>;
 export type SigningFormat = z.infer<typeof SigningFormatSchema>;
 export type SigningRequest = z.infer<typeof SigningRequestSchema>;
 export type SigningSuccessResult = z.infer<typeof SigningSuccessResultSchema>;
@@ -646,6 +706,16 @@ export function parseTelemetryControlMessage(payload: string): TelemetryControlM
   }
 
   const result = TelemetryControlMessageSchema.safeParse(parsedPayload);
+  return result.success ? result.data : undefined;
+}
+
+export function parseOperationControlMessage(payload: string): OperationControlMessage | undefined {
+  const parsedPayload = parseJSON(payload);
+  if (parsedPayload === undefined) {
+    return undefined;
+  }
+
+  const result = OperationControlMessageSchema.safeParse(parsedPayload);
   return result.success ? result.data : undefined;
 }
 
@@ -711,6 +781,7 @@ export function parseEgressTransportMessage(payload: string): EgressTransportMes
 export type SandboxSessionControlMessage =
   | StreamControlMessage
   | TelemetryControlMessage
+  | OperationControlMessage
   | SigningControlMessage
   | KeepaliveControlMessage
   | RuntimeReadyControlMessage;

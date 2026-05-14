@@ -193,6 +193,13 @@ const GetSandboxInstanceResponseSchema = z
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
     runtimePlan: CompiledRuntimePlanSchema.nullable(),
+    startupOperation: z
+      .object({
+        operationId: z.string().min(1),
+        operationKind: z.enum(["start", "resume"]),
+      })
+      .strict()
+      .nullable(),
   })
   .strict()
   .nullable();
@@ -201,6 +208,15 @@ export type ListSandboxInstancesInput =
   paths["/internal/sandbox/instances"]["get"]["parameters"]["query"];
 export type ListSandboxInstancesResponse =
   paths["/internal/sandbox/instances"]["get"]["responses"]["200"]["content"]["application/json"];
+export type ListSandboxOperationEventsInput = {
+  sandboxInstanceId: string;
+  organizationId: string;
+  operationId: string;
+  afterSequence?: number;
+  limit?: number;
+};
+export type ListSandboxOperationEventsResponse =
+  paths["/internal/sandbox/instances/:id/operation-events"]["get"]["responses"]["200"]["content"]["application/json"];
 
 type InternalErrorBody = z.infer<typeof InternalErrorSchema>;
 
@@ -246,6 +262,9 @@ export type DataPlaneSandboxInstancesClient = {
   ) => Promise<MaterializeSandboxProfileVersionSnapshotJobAcceptedResponse>;
   getSandboxInstance: (input: GetSandboxInstanceInput) => Promise<GetSandboxInstanceResponse>;
   listSandboxInstances: (input: ListSandboxInstancesInput) => Promise<ListSandboxInstancesResponse>;
+  listSandboxOperationEvents: (
+    input: ListSandboxOperationEventsInput,
+  ) => Promise<ListSandboxOperationEventsResponse>;
 };
 
 function extractErrorMessage(input: unknown): string {
@@ -284,7 +303,8 @@ function createClientError(input: {
     | "deleteDeadline"
     | "patch"
     | "read"
-    | "list";
+    | "list"
+    | "listOperationEvents";
 }): DataPlaneSandboxInstancesClientError {
   const operationLabel = {
     start: "start",
@@ -297,6 +317,7 @@ function createClientError(input: {
     patch: "patch",
     read: "read",
     list: "list",
+    listOperationEvents: "list operation events",
   } as const;
 
   return new DataPlaneSandboxInstancesClientError({
@@ -860,6 +881,50 @@ export function createDataPlaneSandboxInstancesClient(
         status: result.response.status,
         error: result.error,
         operation: "list",
+      });
+    },
+
+    async listSandboxOperationEvents(listInput): Promise<ListSandboxOperationEventsResponse> {
+      const response = await fetch(
+        createSandboxInstanceMemberUrl({
+          baseUrl: internalClient.baseUrl,
+          instanceId: listInput.sandboxInstanceId,
+          suffix: "/operation-events",
+          query: {
+            organizationId: listInput.organizationId,
+            operationId: listInput.operationId,
+            ...(listInput.afterSequence === undefined
+              ? {}
+              : { afterSequence: String(listInput.afterSequence) }),
+            ...(listInput.limit === undefined ? {} : { limit: String(listInput.limit) }),
+          },
+        }),
+        {
+          headers: createAuthedHeaders({
+            serviceToken: internalClient.serviceToken,
+            ...(internalClient.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: internalClient.testEnvironmentId }),
+            ...(internalClient.testEnvironmentIdHeader === undefined
+              ? {}
+              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
+          }),
+          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+        },
+      );
+
+      if (response.status === 200) {
+        const responseBody: ListSandboxOperationEventsResponse = await response.json();
+
+        return responseBody;
+      }
+
+      const errorBody = await readResponseBody(response);
+
+      throw createClientError({
+        status: response.status,
+        error: errorBody,
+        operation: "listOperationEvents",
       });
     },
   };

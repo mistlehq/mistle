@@ -3087,6 +3087,21 @@
                         "agentRuntimes"
                       ],
                       "additionalProperties": false
+                    },
+                    "startupOperation": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "operationId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operationKind": {
+                          "type": "string",
+                          "enum": ["start", "resume"]
+                        }
+                      },
+                      "required": ["operationId", "operationKind"],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -3096,7 +3111,8 @@
                     "connectable",
                     "failureCode",
                     "failureMessage",
-                    "runtimePlan"
+                    "runtimePlan",
+                    "startupOperation"
                   ],
                   "additionalProperties": false
                 }
@@ -3279,6 +3295,233 @@
                     "code": {
                       "type": "string",
                       "enum": ["NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/sandbox/instances/:id/operation-events": {
+      "get": {
+        "tags": ["Internal"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "organizationId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "operationId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "required": false,
+            "name": "afterSequence",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List persisted sandbox operation events for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "sandboxInstanceId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "operationKind": {
+                            "type": "string",
+                            "enum": ["start", "resume", "setup_check", "snapshot", "stop"]
+                          },
+                          "operationId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "sequence": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "recordKind": {
+                            "type": "string",
+                            "enum": ["lifecycle", "transcript"]
+                          },
+                          "observedAt": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": ["worker", "gateway", "sandboxd"]
+                          },
+                          "phase": {
+                            "type": ["string", "null"],
+                            "enum": [
+                              "provider",
+                              "storage_provision",
+                              "storage_attach",
+                              "sandboxd",
+                              "operation_stream",
+                              "git_identity",
+                              "egress",
+                              "runtime_plan",
+                              "setup_script",
+                              "runtime_processes",
+                              "runtime_adapters",
+                              "agent_endpoint",
+                              "ready",
+                              "running",
+                              "snapshot",
+                              "stop",
+                              "teardown",
+                              null
+                            ]
+                          },
+                          "status": {
+                            "type": ["string", "null"],
+                            "enum": ["started", "completed", "failed", "warning", null]
+                          },
+                          "stream": {
+                            "type": ["string", "null"],
+                            "enum": ["stdout", "stderr", "system", null]
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "payloadBase64": {
+                            "type": ["string", "null"]
+                          },
+                          "attributes": {
+                            "type": "object",
+                            "additionalProperties": {}
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "sandboxInstanceId",
+                          "operationKind",
+                          "operationId",
+                          "sequence",
+                          "recordKind",
+                          "observedAt",
+                          "source",
+                          "phase",
+                          "status",
+                          "stream",
+                          "message",
+                          "payloadBase64",
+                          "attributes",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["events"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",

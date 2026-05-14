@@ -13856,6 +13856,21 @@
                         }
                       },
                       "required": ["conversationId", "routeId", "providerConversationId"]
+                    },
+                    "startupOperation": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "operationId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operationKind": {
+                          "type": "string",
+                          "enum": ["start", "resume"]
+                        }
+                      },
+                      "required": ["operationId", "operationKind"],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -13866,8 +13881,272 @@
                     "failureCode",
                     "failureMessage",
                     "runtimeContext",
-                    "automationConversation"
+                    "automationConversation",
+                    "startupOperation"
                   ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sandbox instance was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["INSTANCE_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sandbox/instances/{instanceId}/operation-events": {
+      "get": {
+        "tags": ["Sandbox Instances"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^sbi_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "instanceId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "operationId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "required": false,
+            "name": "afterSequence",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List sandbox operation events.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "sandboxInstanceId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "operationKind": {
+                            "type": "string",
+                            "enum": ["start", "resume", "setup_check", "snapshot", "stop"]
+                          },
+                          "operationId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "sequence": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "recordKind": {
+                            "type": "string",
+                            "enum": ["lifecycle", "transcript"]
+                          },
+                          "observedAt": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": ["worker", "gateway", "sandboxd"]
+                          },
+                          "phase": {
+                            "type": ["string", "null"],
+                            "enum": [
+                              "provider",
+                              "storage_provision",
+                              "storage_attach",
+                              "sandboxd",
+                              "operation_stream",
+                              "git_identity",
+                              "egress",
+                              "runtime_plan",
+                              "setup_script",
+                              "runtime_processes",
+                              "runtime_adapters",
+                              "agent_endpoint",
+                              "ready",
+                              "running",
+                              "snapshot",
+                              "stop",
+                              "teardown",
+                              null
+                            ]
+                          },
+                          "status": {
+                            "type": ["string", "null"],
+                            "enum": ["started", "completed", "failed", "warning", null]
+                          },
+                          "stream": {
+                            "type": ["string", "null"],
+                            "enum": ["stdout", "stderr", "system", null]
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "payloadBase64": {
+                            "type": ["string", "null"]
+                          },
+                          "attributes": {
+                            "type": "object",
+                            "additionalProperties": {}
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "sandboxInstanceId",
+                          "operationKind",
+                          "operationId",
+                          "sequence",
+                          "recordKind",
+                          "observedAt",
+                          "source",
+                          "phase",
+                          "status",
+                          "stream",
+                          "message",
+                          "payloadBase64",
+                          "attributes",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["events"],
                   "additionalProperties": false
                 }
               }
@@ -14370,6 +14649,21 @@
                         }
                       },
                       "required": ["conversationId", "routeId", "providerConversationId"]
+                    },
+                    "startupOperation": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "operationId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "operationKind": {
+                          "type": "string",
+                          "enum": ["start", "resume"]
+                        }
+                      },
+                      "required": ["operationId", "operationKind"],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
@@ -14380,7 +14674,8 @@
                     "failureCode",
                     "failureMessage",
                     "runtimeContext",
-                    "automationConversation"
+                    "automationConversation",
+                    "startupOperation"
                   ],
                   "additionalProperties": false
                 }
@@ -15874,6 +16169,10 @@
                           "type": "string",
                           "minLength": 1
                         },
+                        "sandboxInstanceId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
                         "trigger": {
                           "type": "string",
                           "enum": ["publish", "manual_refresh", "scheduled_refresh"]
@@ -15905,6 +16204,7 @@
                       },
                       "required": [
                         "id",
+                        "sandboxInstanceId",
                         "trigger",
                         "state",
                         "errorCode",
@@ -16181,6 +16481,10 @@
                                 "type": "string",
                                 "minLength": 1
                               },
+                              "sandboxInstanceId": {
+                                "type": ["string", "null"],
+                                "minLength": 1
+                              },
                               "trigger": {
                                 "type": "string",
                                 "enum": ["publish", "manual_refresh", "scheduled_refresh"]
@@ -16212,6 +16516,7 @@
                             },
                             "required": [
                               "id",
+                              "sandboxInstanceId",
                               "trigger",
                               "state",
                               "errorCode",
@@ -18900,6 +19205,10 @@
                               "type": "string",
                               "minLength": 1
                             },
+                            "sandboxInstanceId": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            },
                             "trigger": {
                               "type": "string",
                               "enum": ["publish", "manual_refresh", "scheduled_refresh"]
@@ -18931,6 +19240,7 @@
                           },
                           "required": [
                             "id",
+                            "sandboxInstanceId",
                             "trigger",
                             "state",
                             "errorCode",
@@ -18969,6 +19279,10 @@
                           "type": "string",
                           "minLength": 1
                         },
+                        "sandboxInstanceId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
                         "trigger": {
                           "type": "string",
                           "enum": ["publish", "manual_refresh", "scheduled_refresh"]
@@ -19000,6 +19314,7 @@
                       },
                       "required": [
                         "id",
+                        "sandboxInstanceId",
                         "trigger",
                         "state",
                         "errorCode",
@@ -19272,6 +19587,10 @@
                               "type": "string",
                               "minLength": 1
                             },
+                            "sandboxInstanceId": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            },
                             "trigger": {
                               "type": "string",
                               "enum": ["publish", "manual_refresh", "scheduled_refresh"]
@@ -19303,6 +19622,7 @@
                           },
                           "required": [
                             "id",
+                            "sandboxInstanceId",
                             "trigger",
                             "state",
                             "errorCode",
@@ -19341,6 +19661,10 @@
                           "type": "string",
                           "minLength": 1
                         },
+                        "sandboxInstanceId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
                         "trigger": {
                           "type": "string",
                           "enum": ["publish", "manual_refresh", "scheduled_refresh"]
@@ -19372,6 +19696,7 @@
                       },
                       "required": [
                         "id",
+                        "sandboxInstanceId",
                         "trigger",
                         "state",
                         "errorCode",
@@ -19644,6 +19969,10 @@
                               "type": "string",
                               "minLength": 1
                             },
+                            "sandboxInstanceId": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            },
                             "trigger": {
                               "type": "string",
                               "enum": ["publish", "manual_refresh", "scheduled_refresh"]
@@ -19675,6 +20004,7 @@
                           },
                           "required": [
                             "id",
+                            "sandboxInstanceId",
                             "trigger",
                             "state",
                             "errorCode",
@@ -19713,6 +20043,10 @@
                           "type": "string",
                           "minLength": 1
                         },
+                        "sandboxInstanceId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
                         "trigger": {
                           "type": "string",
                           "enum": ["publish", "manual_refresh", "scheduled_refresh"]
@@ -19744,6 +20078,7 @@
                       },
                       "required": [
                         "id",
+                        "sandboxInstanceId",
                         "trigger",
                         "state",
                         "errorCode",
@@ -19924,6 +20259,37 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 255
+                  },
+                  "agentRuntimeId": {
+                    "type": "string",
+                    "enum": ["codex", "opencode"]
+                  },
+                  "sandboxProvider": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sandboxConnectionId": {
+                    "type": ["string", "null"],
+                    "minLength": 1
+                  },
+                  "sandboxResources": {
+                    "type": ["object", "null"],
+                    "properties": {
+                      "vcpuCount": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "memoryMb": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "storageMb": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
+                    },
+                    "required": ["vcpuCount", "memoryMb"],
+                    "additionalProperties": false
                   }
                 },
                 "required": ["setupScript"],
@@ -19970,7 +20336,7 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": ["INVALID_PRIMARY_REPOSITORY"]
+                          "enum": ["INVALID_PRIMARY_REPOSITORY", "INVALID_SANDBOX_RUNTIME_CONFIG"]
                         },
                         "message": {
                           "type": "string",
@@ -19987,6 +20353,8 @@
                           "type": "string",
                           "enum": [
                             "AGENT_RUNTIME_REQUIRED",
+                            "SANDBOX_PROVIDER_REQUIRED",
+                            "INVALID_SANDBOX_PROVIDER",
                             "INVALID_BINDING_CONNECTION_REFERENCE",
                             "INVALID_CONNECTION_TARGET_REFERENCE",
                             "CONNECTION_MISMATCH",
@@ -20190,7 +20558,7 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": ["INVALID_PRIMARY_REPOSITORY"]
+                          "enum": ["INVALID_PRIMARY_REPOSITORY", "INVALID_SANDBOX_RUNTIME_CONFIG"]
                         },
                         "message": {
                           "type": "string",
@@ -20207,6 +20575,8 @@
                           "type": "string",
                           "enum": [
                             "AGENT_RUNTIME_REQUIRED",
+                            "SANDBOX_PROVIDER_REQUIRED",
+                            "INVALID_SANDBOX_PROVIDER",
                             "INVALID_BINDING_CONNECTION_REFERENCE",
                             "INVALID_CONNECTION_TARGET_REFERENCE",
                             "CONNECTION_MISMATCH",
@@ -20414,7 +20784,7 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": ["INVALID_PRIMARY_REPOSITORY"]
+                          "enum": ["INVALID_PRIMARY_REPOSITORY", "INVALID_SANDBOX_RUNTIME_CONFIG"]
                         },
                         "message": {
                           "type": "string",
@@ -20431,6 +20801,8 @@
                           "type": "string",
                           "enum": [
                             "AGENT_RUNTIME_REQUIRED",
+                            "SANDBOX_PROVIDER_REQUIRED",
+                            "INVALID_SANDBOX_PROVIDER",
                             "INVALID_BINDING_CONNECTION_REFERENCE",
                             "INVALID_CONNECTION_TARGET_REFERENCE",
                             "CONNECTION_MISMATCH",

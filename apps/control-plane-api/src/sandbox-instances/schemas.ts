@@ -76,6 +76,67 @@ export const sandboxInstanceStatusResponseSchema = z
         providerConversationId: z.string().min(1).nullable(),
       })
       .nullable(),
+    startupOperation: z
+      .object({
+        operationId: z.string().min(1),
+        operationKind: z.enum(["start", "resume"]),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+
+export const sandboxOperationEventsQuerySchema = z
+  .object({
+    operationId: z.string().min(1),
+    afterSequence: z.coerce.number().int().min(0).optional(),
+    limit: z.coerce.number().int().min(1).max(500).optional(),
+  })
+  .strict();
+
+export const sandboxOperationEventSchema = z
+  .object({
+    id: z.string().min(1),
+    sandboxInstanceId: z.string().min(1),
+    operationKind: z.enum(["start", "resume", "setup_check", "snapshot", "stop"]),
+    operationId: z.string().min(1),
+    sequence: z.number().int().min(0),
+    recordKind: z.enum(["lifecycle", "transcript"]),
+    observedAt: z.string().min(1),
+    source: z.enum(["worker", "gateway", "sandboxd"]),
+    phase: z
+      .enum([
+        "provider",
+        "storage_provision",
+        "storage_attach",
+        "sandboxd",
+        "operation_stream",
+        "git_identity",
+        "egress",
+        "runtime_plan",
+        "setup_script",
+        "runtime_processes",
+        "runtime_adapters",
+        "agent_endpoint",
+        "ready",
+        "running",
+        "snapshot",
+        "stop",
+        "teardown",
+      ])
+      .nullable(),
+    status: z.enum(["started", "completed", "failed", "warning"]).nullable(),
+    stream: z.enum(["stdout", "stderr", "system"]).nullable(),
+    message: z.string(),
+    payloadBase64: z.string().nullable(),
+    attributes: z.record(z.string(), z.unknown()),
+    createdAt: z.string().min(1),
+  })
+  .strict();
+
+export const sandboxOperationEventsResponseSchema = z
+  .object({
+    events: z.array(sandboxOperationEventSchema),
   })
   .strict();
 
