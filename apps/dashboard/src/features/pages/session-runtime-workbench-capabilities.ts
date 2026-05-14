@@ -2,11 +2,9 @@ import type { SessionComposerModelSelectionInput } from "./session-composer/inde
 import type { SessionTerminalContentInset } from "./session-terminal-surface.js";
 import type { SessionMainPanelRuntimeId } from "./use-session-main-panel-handoff.js";
 
-export type SessionRuntimeDisplayName = "Codex" | "OpenCode";
-
-export type SessionRuntimeWorkbenchCapability = {
+type SessionRuntimeWorkbenchCapability = {
   runtimeId: SessionMainPanelRuntimeId;
-  displayName: SessionRuntimeDisplayName;
+  displayName: string;
   cliTerminalContentInset: SessionTerminalContentInset;
   composerModelSelection: SessionComposerModelSelectionInput;
   supportsSteering: boolean;
@@ -42,3 +40,6 @@ export const SessionRuntimeWorkbenchCapabilities = {
     hasContextUsage: false,
   },
 } satisfies Record<SessionRuntimeWorkbenchCapabilityKey, SessionRuntimeWorkbenchCapability>;
+
+export type SessionRuntimeDisplayName =
+  (typeof SessionRuntimeWorkbenchCapabilities)[keyof typeof SessionRuntimeWorkbenchCapabilities]["displayName"];

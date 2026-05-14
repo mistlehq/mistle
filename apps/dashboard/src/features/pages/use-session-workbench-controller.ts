@@ -335,7 +335,9 @@ export function useSessionWorkbenchController(input: {
   const sessionClientRef = useRef<AgentStreamClient | null>(null);
   const rpcClientRef = useRef<CodexJsonRpcClient | null>(null);
   const sessionEventUnsubscribersRef = useRef<(() => void)[]>([]);
-  const activeHandoffRuntimeIdRef = useRef<SessionMainPanelRuntimeId>("codex");
+  const activeHandoffRuntimeIdRef = useRef<SessionMainPanelRuntimeId>(
+    CodexWorkbenchCapabilities.runtimeId,
+  );
   const selectedRepositoryPathRef = useRef<string | null>(null);
   const sessionState = useCodexSessionState({
     ensureTransportConnected: transportManager.ensureTransportConnected,
@@ -529,8 +531,8 @@ export function useSessionWorkbenchController(input: {
   );
   const handoffRuntimes = useMemo(
     () => ({
-      codex: codexHandoffRuntime,
-      opencode: openCodeHandoffRuntime,
+      [CodexWorkbenchCapabilities.runtimeId]: codexHandoffRuntime,
+      [OpenCodeWorkbenchCapabilities.runtimeId]: openCodeHandoffRuntime,
     }),
     [codexHandoffRuntime, openCodeHandoffRuntime],
   );
@@ -550,7 +552,8 @@ export function useSessionWorkbenchController(input: {
     queryClient,
   });
   const sandboxStatus = workbenchLifecycleState.sandboxStatusQuery.data;
-  const isOpenCodeRuntime = sandboxStatus?.runtimeContext?.agentRuntimeId === "opencode";
+  const isOpenCodeRuntime =
+    sandboxStatus?.runtimeContext?.agentRuntimeId === OpenCodeWorkbenchCapabilities.runtimeId;
   const activeRuntimeCapabilities = isOpenCodeRuntime
     ? OpenCodeWorkbenchCapabilities
     : CodexWorkbenchCapabilities;

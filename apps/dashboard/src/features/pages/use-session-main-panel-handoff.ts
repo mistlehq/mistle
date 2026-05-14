@@ -54,7 +54,7 @@ type SessionMainPanelHandoffLifecycle = {
 
 type SessionMainPanelHandoffRuntime = {
   clearActiveThreadIdAfterCliLaunch: (launchTarget: SessionCliLaunchTarget) => void;
-  displayName: "Codex" | "OpenCode";
+  displayName: string;
   hydrateChatFromConversation: () => Promise<void>;
   lifecycle: SessionMainPanelHandoffLifecycle;
   preserveCliLaunchForRestore: boolean;
