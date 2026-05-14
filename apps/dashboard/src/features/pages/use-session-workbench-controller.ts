@@ -706,8 +706,8 @@ export function useSessionWorkbenchController(input: {
       }
 
       applyGeneratedSessionTitlePatch({
-        patchTitle: async () =>
-          await generateSessionTitleWithSandboxCodexExec({
+        patchTitle: () =>
+          generateSessionTitleWithSandboxCodexExec({
             cwd: selectedRepositoryPath,
             ensureTransportConnected: transportManager.ensureTransportConnected,
             messagePayload,
@@ -755,7 +755,7 @@ export function useSessionWorkbenchController(input: {
       applyGeneratedSessionTitlePatch({
         patchTitle: async () => {
           const title = await openCodeSessionState.chat.waitForGeneratedSessionTitle();
-          return await patchSandboxInstanceTitle({
+          return patchSandboxInstanceTitle({
             instanceId: sandboxInstanceId,
             onlyIfUnset: true,
             title,
