@@ -60,6 +60,10 @@ describe("integrations-definitions server", () => {
       familyId: "planetscale",
       variantId: "planetscale-mcp",
     });
+    const sentryDefinition = registry.getDefinition({
+      familyId: "sentry",
+      variantId: "sentry-mcp",
+    });
     const signozDefinition = registry.getDefinition({
       familyId: "signoz",
       variantId: "signoz-mcp",
@@ -125,6 +129,9 @@ describe("integrations-definitions server", () => {
     expect(planetscaleDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(planetscaleDefinition?.webhookHandler).toBeUndefined();
     expect(planetscaleDefinition?.webhookSource).toBeUndefined();
+    expect(sentryDefinition?.oauth2AuthorizationCode).toBeDefined();
+    expect(sentryDefinition?.webhookHandler).toBeUndefined();
+    expect(sentryDefinition?.webhookSource).toBeUndefined();
     expect(signozDefinition?.oauth2AuthorizationCode).toBeDefined();
     expect(signozDefinition?.webhookHandler).toBeUndefined();
     expect(signozDefinition?.webhookSource).toBeUndefined();
@@ -174,7 +181,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(13);
+    expect(definitions).toHaveLength(14);
   });
 
   it("builds the server definitions bundle with an agent runtime registry", () => {

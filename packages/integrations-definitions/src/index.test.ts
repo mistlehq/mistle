@@ -53,6 +53,10 @@ describe("integrations-definitions index", () => {
       familyId: "planetscale",
       variantId: "planetscale-mcp",
     });
+    const sentryDefinition = registry.getDefinition({
+      familyId: "sentry",
+      variantId: "sentry-mcp",
+    });
     const signozDefinition = registry.getDefinition({
       familyId: "signoz",
       variantId: "signoz-mcp",
@@ -253,6 +257,26 @@ describe("integrations-definitions index", () => {
       ],
     });
     expect(planetscaleDefinition?.oauth2AuthorizationCode).toBeUndefined();
+    expect(sentryDefinition).toMatchObject({
+      familyId: "sentry",
+      variantId: "sentry-mcp",
+      kind: "connector",
+      displayName: "Sentry",
+      connectionMethods: [
+        {
+          id: "oauth2-authorization-code",
+          label: "Sentry MCP OAuth",
+          kind: "redirect",
+          ui: {
+            create: {
+              submitLabel: "Connect Sentry",
+              helperText: "Authorize Sentry hosted MCP access.",
+            },
+          },
+        },
+      ],
+    });
+    expect(sentryDefinition?.oauth2AuthorizationCode).toBeUndefined();
     expect(signozDefinition).toMatchObject({
       familyId: "signoz",
       variantId: "signoz-mcp",
@@ -499,7 +523,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(13);
+    expect(definitions).toHaveLength(14);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -514,6 +538,7 @@ describe("integrations-definitions index", () => {
       "opencode::opencode-go",
       "planetscale::planetscale-mcp",
       "e2b::e2b-default",
+      "sentry::sentry-mcp",
       "signoz::signoz-mcp",
       "slack::slack-default",
     ]);

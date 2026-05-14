@@ -15,6 +15,7 @@ import { OpenCodeGoDefinition } from "./opencode/index.js";
 import { PlanetScaleDefinition } from "./planetscale/browser.js";
 import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
 import { E2BSandboxRuntimeDefinition } from "./sandbox-runtimes/index.js";
+import { SentryDefinition } from "./sentry/browser.js";
 import { SignozDefinition } from "./signoz/browser.js";
 import { SlackDefinition } from "./slack/browser.js";
 
@@ -29,6 +30,7 @@ export * from "./openai/index.js";
 export * from "./opencode/index.js";
 export * from "./planetscale/browser.js";
 export * from "./sandbox-runtimes/index.js";
+export * from "./sentry/browser.js";
 export * from "./signoz/browser.js";
 export * from "./slack/browser.js";
 export * from "./forms/index.js";
@@ -47,6 +49,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   OpenCodeGoDefinition,
   PlanetScaleDefinition,
   E2BSandboxRuntimeDefinition,
+  SentryDefinition,
   SignozDefinition,
   SlackDefinition,
 ];

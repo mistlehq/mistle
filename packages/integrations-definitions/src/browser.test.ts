@@ -7,6 +7,7 @@ import {
   E2BSandboxRuntimeBrowserDefinition,
   GitHubCloudBrowserDefinition,
   JiraBrowserDefinition,
+  SentryBrowserDefinition,
   SignozBrowserDefinition,
   SlackBrowserDefinition,
 } from "./browser.js";
@@ -69,6 +70,10 @@ describe("browser definitions", () => {
 
   it("keeps signoz browser definitions free of server-only OAuth handlers", () => {
     expect(SignozBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+  });
+
+  it("keeps sentry browser definitions free of server-only OAuth handlers", () => {
+    expect(SentryBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
   });
 
   it("registers E2B sandbox runtime in the browser-safe definitions bundle", () => {

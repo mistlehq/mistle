@@ -49,6 +49,11 @@
       "config": {}
     },
     {
+      "targetKey": "sentry-mcp",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "signoz-mcp",
       "enabled": true,
       "config": {}

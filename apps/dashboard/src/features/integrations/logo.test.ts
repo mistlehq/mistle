@@ -21,6 +21,7 @@ describe("resolveIntegrationLogoPath", () => {
     expect(resolveIntegrationLogoPath({ logoKey: "planetscale" })).toBe(
       "/integration-logos/planetscale.svg",
     );
+    expect(resolveIntegrationLogoPath({ logoKey: "sentry" })).toBe("/integration-logos/sentry.svg");
     expect(resolveIntegrationLogoPath({ logoKey: "signoz" })).toBe("/integration-logos/signoz.svg");
     expect(resolveIntegrationLogoPath({ logoKey: "opencode" })).toBe(
       "/integration-logos/opencode.svg",

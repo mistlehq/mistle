@@ -16,6 +16,7 @@ import { OpenCodeGoDefinition } from "./opencode/index.js";
 import { PlanetScaleMcpBaseDefinition } from "./planetscale/variants/planetscale-mcp/base-definition.js";
 import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
 import { E2BSandboxRuntimeDefinition } from "./sandbox-runtimes/index.js";
+import { SentryMcpBaseDefinition } from "./sentry/variants/sentry-mcp/base-definition.js";
 import { SignozMcpBaseDefinition } from "./signoz/variants/signoz-mcp/base-definition.js";
 import { SlackBaseDefinition } from "./slack/variants/slack-default/base-definition.js";
 export const AnthropicBrowserDefinition = AnthropicDefinition;
@@ -28,6 +29,7 @@ export const LinearBrowserDefinition = LinearDefinition;
 export const OpenCodeGoBrowserDefinition = OpenCodeGoDefinition;
 export const PlanetScaleBrowserDefinition = PlanetScaleMcpBaseDefinition;
 export const E2BSandboxRuntimeBrowserDefinition = E2BSandboxRuntimeDefinition;
+export const SentryBrowserDefinition = SentryMcpBaseDefinition;
 export const SignozBrowserDefinition = SignozMcpBaseDefinition;
 export const SlackBrowserDefinition = SlackBaseDefinition;
 
@@ -43,6 +45,7 @@ const BrowserIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   OpenCodeGoBrowserDefinition,
   PlanetScaleBrowserDefinition,
   E2BSandboxRuntimeBrowserDefinition,
+  SentryBrowserDefinition,
   SignozBrowserDefinition,
   SlackBrowserDefinition,
 ];
@@ -71,4 +74,5 @@ export * from "./github/browser.js";
 export * from "./jira/browser.js";
 export * from "./opencode/index.js";
 export * from "./sandbox-runtimes/index.js";
+export * from "./sentry/browser.js";
 export * from "./slack/browser.js";

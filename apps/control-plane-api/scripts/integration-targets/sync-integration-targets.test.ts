@@ -87,6 +87,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "sentry-mcp",
+        familyId: "sentry",
+        variantId: "sentry-mcp",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "signoz-mcp",
         familyId: "signoz",
         variantId: "signoz-mcp",
