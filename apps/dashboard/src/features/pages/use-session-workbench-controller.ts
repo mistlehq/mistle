@@ -46,6 +46,10 @@ import {
   resolvePrimaryRepositoryTurnStartCwd,
   resolveSessionTerminalCwd,
 } from "./session-primary-repository-policy.js";
+import {
+  SessionRuntimeWorkbenchCapabilities,
+  type SessionRuntimeDisplayName,
+} from "./session-runtime-workbench-capabilities.js";
 import type { SessionStartupState } from "./session-startup-status.js";
 import type {
   SessionTerminalContentInset,
@@ -118,7 +122,7 @@ type SessionWorkbenchState = {
     showsChatComposer: boolean;
     cliTerminalContentInset: SessionTerminalContentInset;
     cliTerminalThemeMode: SessionTerminalThemeMode;
-    cliRuntimeDisplayName: "Codex" | "OpenCode";
+    cliRuntimeDisplayName: SessionRuntimeDisplayName;
     enterCliMode: () => Promise<void>;
     exitCliMode: () => Promise<void>;
   };
@@ -184,7 +188,7 @@ type SessionConversationPaneState = {
 };
 
 type SessionWorkbenchRuntimeAdapter = {
-  displayName: "Codex" | "OpenCode";
+  displayName: SessionRuntimeDisplayName;
   cliTerminalContentInset: SessionTerminalContentInset;
   conversation: {
     activeConversationId: string | null;
@@ -196,6 +200,9 @@ type SessionWorkbenchRuntimeAdapter = {
   composerRuntimeInput: SessionComposerRuntimeInput;
   serverRequestsState: SessionConversationPaneState["serverRequestsState"];
 };
+
+const CodexWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
+const OpenCodeWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.OPENCODE;
 
 function mapOpenCodeChatStateForConversation(
   chatState: OpenCodeChatState,
@@ -472,10 +479,10 @@ export function useSessionWorkbenchController(input: {
     () => ({
       clearActiveThreadIdAfterCliLaunch:
         sessionState.threadAuthority.clearActiveThreadIdAfterCliLaunch,
-      displayName: "Codex",
+      displayName: CodexWorkbenchCapabilities.displayName,
       hydrateChatFromConversation: chat.hydrateChatFromThread,
       lifecycle: codexLifecycleForHandoff,
-      preserveCliLaunchForRestore: false,
+      preserveCliLaunchForRestore: CodexWorkbenchCapabilities.preservesCliLaunchContext,
       resetServerRequests: serverRequests.resetServerRequests,
       restoreConversationId: sessionState.threadAuthority.providerThreadId,
       resolveCliLaunchTarget: sessionState.threadAuthority.resolveCliLaunchTarget,
@@ -490,10 +497,10 @@ export function useSessionWorkbenchController(input: {
   const openCodeHandoffRuntime = useMemo<SessionMainPanelHandoffRuntime>(
     () => ({
       clearActiveThreadIdAfterCliLaunch: () => {},
-      displayName: "OpenCode",
+      displayName: OpenCodeWorkbenchCapabilities.displayName,
       hydrateChatFromConversation: openCodeSessionState.chat.hydrateChatFromSessionOrThrow,
       lifecycle: openCodeLifecycleForHandoff,
-      preserveCliLaunchForRestore: true,
+      preserveCliLaunchForRestore: OpenCodeWorkbenchCapabilities.preservesCliLaunchContext,
       resetServerRequests: () => {},
       restoreConversationId:
         openCodeSessionState.lifecycle.sessionSnapshot?.activeSessionId ?? null,
@@ -544,7 +551,10 @@ export function useSessionWorkbenchController(input: {
   });
   const sandboxStatus = workbenchLifecycleState.sandboxStatusQuery.data;
   const isOpenCodeRuntime = sandboxStatus?.runtimeContext?.agentRuntimeId === "opencode";
-  activeHandoffRuntimeIdRef.current = isOpenCodeRuntime ? "opencode" : "codex";
+  const activeRuntimeCapabilities = isOpenCodeRuntime
+    ? OpenCodeWorkbenchCapabilities
+    : CodexWorkbenchCapabilities;
+  activeHandoffRuntimeIdRef.current = activeRuntimeCapabilities.runtimeId;
   const activeThreadCwd = isOpenCodeRuntime
     ? null
     : sessionState.lifecycle.sessionSnapshot?.activeThreadCwd;
@@ -652,9 +662,7 @@ export function useSessionWorkbenchController(input: {
           ? (workbenchLifecycleState.stoppedSessionMessage ??
             "TUI is available only when the sandbox is running.")
           : handoff.transitionState !== "stable_chat"
-            ? `Finish the current primary-panel transition before opening ${
-                isOpenCodeRuntime ? "OpenCode" : "Codex"
-              } TUI.`
+            ? `Finish the current primary-panel transition before opening ${activeRuntimeCapabilities.displayName} TUI.`
             : null;
   const attachmentControl = useSessionComposerAttachmentControl({
     attachmentTarget:
@@ -809,8 +817,8 @@ export function useSessionWorkbenchController(input: {
   );
   const codexRuntime = useMemo<SessionWorkbenchRuntimeAdapter>(
     () => ({
-      displayName: "Codex",
-      cliTerminalContentInset: "default",
+      displayName: CodexWorkbenchCapabilities.displayName,
+      cliTerminalContentInset: CodexWorkbenchCapabilities.cliTerminalContentInset,
       conversation: {
         activeConversationId: activeSessionThreadId,
         chatState: chat.chatState,
@@ -822,7 +830,7 @@ export function useSessionWorkbenchController(input: {
         turnControl: {
           activeTurnState: chat.canInterruptTurn || chat.canSteerTurn ? "running" : "idle",
           canInterrupt: chat.canInterruptTurn,
-          canSteer: chat.canSteerTurn,
+          canSteer: CodexWorkbenchCapabilities.supportsSteering && chat.canSteerTurn,
           completedTurnErrorMessage: chat.chatState.completedErrorMessage,
           interruptTurn: chat.interruptTurn,
           isInterrupting: chat.isInterruptingTurn,
@@ -833,11 +841,8 @@ export function useSessionWorkbenchController(input: {
         },
         sessionErrorMessage: sessionMessage.sessionErrorMessage,
         clearSessionErrorMessage: sessionMessage.clearSessionErrorMessage,
-        contextUsage,
-        modelSelection: {
-          required: true,
-          showControls: true,
-        },
+        contextUsage: CodexWorkbenchCapabilities.hasContextUsage ? contextUsage : null,
+        modelSelection: CodexWorkbenchCapabilities.composerModelSelection,
       },
       serverRequestsState: {
         isRespondingToServerRequest: serverRequests.isRespondingToServerRequest,
@@ -869,8 +874,8 @@ export function useSessionWorkbenchController(input: {
   );
   const openCodeRuntime = useMemo<SessionWorkbenchRuntimeAdapter>(
     () => ({
-      displayName: "OpenCode",
-      cliTerminalContentInset: "none",
+      displayName: OpenCodeWorkbenchCapabilities.displayName,
+      cliTerminalContentInset: OpenCodeWorkbenchCapabilities.cliTerminalContentInset,
       conversation: {
         activeConversationId:
           openCodeSessionState.lifecycle.sessionSnapshot?.activeSessionId ?? null,
@@ -882,7 +887,7 @@ export function useSessionWorkbenchController(input: {
         turnControl: {
           activeTurnState: isOpenCodeTurnRunning ? "running" : "idle",
           canInterrupt: openCodeSessionState.chat.canInterruptTurn,
-          canSteer: false,
+          canSteer: OpenCodeWorkbenchCapabilities.supportsSteering,
           completedTurnErrorMessage: openCodeSessionState.chat.chatState.completedErrorMessage,
           interruptTurn: interruptOpenCodeTurn,
           isInterrupting: openCodeSessionState.chat.isInterruptingTurn,
@@ -894,10 +899,7 @@ export function useSessionWorkbenchController(input: {
         sessionErrorMessage: openCodeSessionState.sessionMessage.sessionErrorMessage,
         clearSessionErrorMessage: openCodeSessionState.sessionMessage.clearSessionErrorMessage,
         contextUsage: null,
-        modelSelection: {
-          required: false,
-          showControls: true,
-        },
+        modelSelection: OpenCodeWorkbenchCapabilities.composerModelSelection,
       },
       serverRequestsState: {
         isRespondingToServerRequest: openCodeSessionState.chat.isRespondingToPermission,
