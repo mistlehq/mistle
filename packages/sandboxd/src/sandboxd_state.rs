@@ -683,20 +683,6 @@ impl SandboxdState {
                 ));
             }
         };
-        let runtime_readiness_mode = determine_runtime_readiness_mode(&supervisor_handle);
-        sync_runtime_readiness_from_snapshot(
-            &supervisor_handle,
-            &runtime_readiness_manager,
-            runtime_readiness_mode,
-        );
-        let runtime_readiness_shutdown_requested = Arc::new(AtomicBool::new(false));
-        let runtime_readiness_thread = Some(spawn_runtime_readiness_projection_thread(
-            supervisor_handle.clone(),
-            runtime_readiness_manager.clone(),
-            runtime_readiness_mode,
-            runtime_readiness_shutdown_requested.clone(),
-        ));
-
         let Some(tunnel_session) = startup_tunnel_session.take() else {
             close_egress_proxy_after_failure(
                 &mut egress_proxy,
@@ -733,6 +719,19 @@ impl SandboxdState {
             }
         }
         record_operation_phase_completed(&diagnostics_logger, "attach_runtime_agent_endpoint");
+        let runtime_readiness_mode = determine_runtime_readiness_mode(&supervisor_handle);
+        sync_runtime_readiness_from_snapshot(
+            &supervisor_handle,
+            &runtime_readiness_manager,
+            runtime_readiness_mode,
+        );
+        let runtime_readiness_shutdown_requested = Arc::new(AtomicBool::new(false));
+        let runtime_readiness_thread = Some(spawn_runtime_readiness_projection_thread(
+            supervisor_handle.clone(),
+            runtime_readiness_manager.clone(),
+            runtime_readiness_mode,
+            runtime_readiness_shutdown_requested.clone(),
+        ));
         let tunnel_session = Some(tunnel_session);
         let codex_coordination_shutdown_requested = Arc::new(AtomicBool::new(false));
         let codex_coordination_thread = match (
