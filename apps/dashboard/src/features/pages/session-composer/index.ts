@@ -7,6 +7,7 @@ export {
   type SessionComposerSharedInput,
   type SessionComposerStateInput,
   type SessionComposerUiState,
+  type SessionTurnControl,
 } from "./use-session-composer-state.js";
 export { ComposerStatusBanner } from "./composer-status-banner.js";
 export { SessionComposerActivityRow } from "./session-composer-activity-row.js";

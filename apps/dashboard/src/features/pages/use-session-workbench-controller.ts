@@ -38,6 +38,7 @@ import {
   type SessionComposerRuntimeInput,
   type SessionComposerSharedInput,
   type SessionComposerStateInput,
+  type SessionTurnControl,
 } from "./session-composer/index.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import {
@@ -684,9 +685,7 @@ export function useSessionWorkbenchController(input: {
     ],
   );
   const startCodexTurn = useCallback(
-    async (
-      turnInput: Parameters<SessionComposerStateInput["turnControl"]["startTurn"]>[0],
-    ): Promise<void> => {
+    async (turnInput: Parameters<SessionTurnControl["startTurn"]>[0]): Promise<void> => {
       const sandboxInstanceId = input.sandboxInstanceId;
       const cachedTitle = sandboxStatus?.title;
       const messagePayload = turnInput.transcriptPrompt ?? turnInput.submittedPrompt;
@@ -726,9 +725,7 @@ export function useSessionWorkbenchController(input: {
     ],
   );
   const startOpenCodeTurn = useCallback(
-    async (
-      turnInput: Parameters<SessionComposerStateInput["turnControl"]["startTurn"]>[0],
-    ): Promise<void> => {
+    async (turnInput: Parameters<SessionTurnControl["startTurn"]>[0]): Promise<void> => {
       const sandboxInstanceId = input.sandboxInstanceId;
       const cachedTitle = sandboxStatus?.title;
       const messagePayload = turnInput.transcriptPrompt ?? turnInput.submittedPrompt;
