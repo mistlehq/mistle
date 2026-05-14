@@ -6,6 +6,8 @@ import {
   E2BSandboxRuntimeCredentialSecretTypes,
   E2BSandboxRuntimeCredentialSlotKeys,
   E2BSandboxRuntimeTargetConfigSchema,
+  TensorlakeSandboxRuntimeCredentialSecretTypes,
+  TensorlakeSandboxRuntimeCredentialSlotKeys,
 } from "@mistle/integrations-definitions/sandbox-runtimes";
 import { SandboxProvider, type SandboxProvider as SandboxProviderValue } from "@mistle/sandbox";
 
@@ -35,6 +37,11 @@ type ResolvedSandboxRuntimeCredentials =
       source: "managed" | "connection";
       apiKey: string;
       domain?: string;
+    }
+  | {
+      provider: typeof SandboxProvider.TENSORLAKE;
+      source: "managed" | "connection";
+      apiKey: string;
     };
 
 type SandboxConnection = {
@@ -80,11 +87,40 @@ export async function resolveSandboxRuntimeCredentials(
     });
   }
 
+  if (input.provider === SandboxProvider.TENSORLAKE) {
+    if (input.connectionId === undefined) {
+      return resolveManagedTensorlakeCredentials(ctx);
+    }
+
+    return resolveConnectionTensorlakeCredentials(ctx, {
+      organizationId: input.organizationId,
+      provider: SandboxProvider.TENSORLAKE,
+      connectionId: input.connectionId,
+    });
+  }
+
   return assertUnreachableSandboxProvider(input.provider);
 }
 
 function assertUnreachableSandboxProvider(_provider: never): never {
   throw new BadRequestError("UNSUPPORTED_SANDBOX_PROVIDER", "Sandbox provider is not supported.");
+}
+
+function resolveManagedTensorlakeCredentials(
+  ctx: ResolveSandboxRuntimeCredentialsContext,
+): ResolvedSandboxRuntimeCredentials {
+  if (ctx.sandboxConfig.tensorlake?.enabled !== true) {
+    throw new BadRequestError(
+      "MANAGED_SANDBOX_PROVIDER_UNAVAILABLE",
+      "Managed Tensorlake sandbox runtime is not configured for this deployment.",
+    );
+  }
+
+  return {
+    provider: SandboxProvider.TENSORLAKE,
+    source: "managed",
+    apiKey: ctx.sandboxConfig.tensorlake.apiKey,
+  };
 }
 
 function resolveManagedE2BCredentials(
@@ -102,6 +138,81 @@ function resolveManagedE2BCredentials(
     source: "managed",
     apiKey: ctx.sandboxConfig.e2b.apiKey,
     ...(ctx.sandboxConfig.e2b.domain === undefined ? {} : { domain: ctx.sandboxConfig.e2b.domain }),
+  };
+}
+
+async function resolveConnectionTensorlakeCredentials(
+  ctx: ResolveSandboxRuntimeCredentialsContext,
+  input: ResolveSandboxRuntimeCredentialsInput & {
+    provider: typeof SandboxProvider.TENSORLAKE;
+    connectionId: string;
+  },
+): Promise<ResolvedSandboxRuntimeCredentials> {
+  const connection = await readSandboxConnection(ctx, input);
+  const target = await ctx.db.query.integrationTargets.findFirst({
+    columns: {
+      targetKey: true,
+      familyId: true,
+      variantId: true,
+      enabled: true,
+    },
+    where: (table, { eq }) => eq(table.targetKey, connection.targetKey),
+  });
+
+  if (target === undefined) {
+    throw new NotFoundError(
+      "SANDBOX_CONNECTION_TARGET_NOT_FOUND",
+      `Sandbox connection '${connection.id}' target was not found.`,
+    );
+  }
+
+  if (!target.enabled) {
+    throw new BadRequestError(
+      "SANDBOX_CONNECTION_TARGET_DISABLED",
+      `Sandbox connection '${connection.id}' target is disabled.`,
+    );
+  }
+
+  const definition = ctx.integrationRegistry.getDefinition({
+    familyId: target.familyId,
+    variantId: target.variantId,
+  });
+
+  if (definition?.kind !== IntegrationKinds.SANDBOX || definition.sandboxRuntime === undefined) {
+    throw new BadRequestError(
+      "SANDBOX_CONNECTION_KIND_MISMATCH",
+      `Sandbox connection '${connection.id}' does not reference a sandbox integration target.`,
+    );
+  }
+
+  if (definition.sandboxRuntime.providerId !== SandboxProvider.TENSORLAKE) {
+    throw new BadRequestError(
+      "SANDBOX_CONNECTION_PROVIDER_MISMATCH",
+      `Sandbox connection '${connection.id}' does not match sandbox provider 'tensorlake'.`,
+    );
+  }
+
+  const resolvedCredential = await resolveIntegrationCredential(
+    {
+      db: ctx.db,
+      integrationRegistry: ctx.integrationRegistry,
+      integrationsConfig: ctx.integrationsConfig,
+    },
+    {
+      connectionId: connection.id,
+      secretType: TensorlakeSandboxRuntimeCredentialSecretTypes.API_KEY,
+      slotKey: TensorlakeSandboxRuntimeCredentialSlotKeys.API_KEY,
+    },
+  );
+
+  if (resolvedCredential.kind !== "value") {
+    throw new Error("Tensorlake sandbox runtime API key must resolve to a string credential.");
+  }
+
+  return {
+    provider: SandboxProvider.TENSORLAKE,
+    source: "connection",
+    apiKey: resolvedCredential.value,
   };
 }
 

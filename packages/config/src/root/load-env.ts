@@ -427,6 +427,10 @@ const RootEnvDescriptors = [
     path: ["sandbox", "e2b", "domain"],
   },
   {
+    envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY",
+    path: ["sandbox", "tensorlake", "api_key"],
+  },
+  {
     envVar: "MISTLE_SANDBOX_E2B_CPU_COUNT",
     path: ["sandbox", "e2b", "cpu_count"],
     parse: parseNumberEnv,

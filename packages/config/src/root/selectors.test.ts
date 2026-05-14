@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { Config } from "./schema.js";
-import { selectControlPlaneApiConfig, selectControlPlaneWorkerConfig } from "./selectors.js";
+import {
+  selectControlPlaneApiConfig,
+  selectControlPlaneWorkerConfig,
+  selectDataPlaneApiConfig,
+  selectDataPlaneWorkerConfig,
+} from "./selectors.js";
 
 function createRootConfig(input: {
   allowSignups?: boolean;
@@ -11,6 +16,7 @@ function createRootConfig(input: {
     client_id: string;
     client_secret: string;
   };
+  sandbox?: Partial<Config["sandbox"]>;
 }): Config {
   return {
     global: {
@@ -157,6 +163,11 @@ function createRootConfig(input: {
         cpu_count: 4,
         memory_mb: 8192,
       },
+      tensorlake: {
+        enabled: true,
+        api_key: "tensorlake-api-key",
+      },
+      ...input.sandbox,
     },
   };
 }
@@ -237,6 +248,15 @@ describe("selectControlPlaneApiConfig", () => {
       enabled: true,
     });
   });
+
+  it("projects Tensorlake as an enabled managed sandbox provider", () => {
+    const config = selectControlPlaneApiConfig(createRootConfig({}));
+
+    expect(config.sandbox.tensorlake).toEqual({
+      enabled: true,
+      apiKey: "tensorlake-api-key",
+    });
+  });
 });
 
 describe("selectControlPlaneWorkerConfig", () => {
@@ -269,6 +289,40 @@ describe("selectControlPlaneWorkerConfig", () => {
     expect(config.billing.stripe).toEqual({
       enabled: false,
       secretKey: "sk_test_secret",
+    });
+  });
+});
+
+describe("selectDataPlaneApiConfig", () => {
+  it("projects remote sandbox providers", () => {
+    const config = selectDataPlaneApiConfig(createRootConfig({}));
+
+    expect(config.sandbox.e2b).toEqual({
+      enabled: true,
+      apiKey: "e2b-api-key",
+      domain: "e2b.example.com",
+    });
+    expect(config.sandbox.tensorlake).toEqual({
+      enabled: true,
+      apiKey: "tensorlake-api-key",
+    });
+  });
+});
+
+describe("selectDataPlaneWorkerConfig", () => {
+  it("projects remote sandbox providers", () => {
+    const config = selectDataPlaneWorkerConfig(createRootConfig({}));
+
+    expect(config.sandbox.e2b).toEqual({
+      enabled: true,
+      apiKey: "e2b-api-key",
+      domain: "e2b.example.com",
+      cpuCount: 4,
+      memoryMb: 8192,
+    });
+    expect(config.sandbox.tensorlake).toEqual({
+      enabled: true,
+      apiKey: "tensorlake-api-key",
     });
   });
 });

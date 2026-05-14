@@ -28,6 +28,10 @@ export function resolveResumeStartupMode(input: {
     return SandboxStartupModes.EXISTING;
   }
 
+  if (input.runtimeProvider === SandboxProvider.TENSORLAKE) {
+    return SandboxStartupModes.EXISTING;
+  }
+
   return assertUnreachable(input.runtimeProvider);
 }
 

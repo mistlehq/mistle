@@ -361,6 +361,9 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
         attributes: {
           runtimeProvider: requestedRuntimeProvider,
           snapshotJobId: workflowInput.snapshotJobId,
+          ...(workflowInput.sandboxRuntime.resources === undefined
+            ? {}
+            : { resources: workflowInput.sandboxRuntime.resources }),
         },
         completedMessage: "Snapshot sandbox provider start completed.",
         failedMessage: "Snapshot sandbox provider start failed.",
@@ -382,6 +385,9 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
               sandboxInstanceId: workflowInput.sandboxInstanceId,
               image: workflowInput.image,
               runtimeProvider: requestedRuntimeProvider,
+              ...(workflowInput.sandboxRuntime.resources === undefined
+                ? {}
+                : { resources: workflowInput.sandboxRuntime.resources }),
             },
           );
         });

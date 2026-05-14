@@ -41,6 +41,10 @@ describe("integrations-definitions index", () => {
       familyId: "e2b",
       variantId: "e2b-default",
     });
+    const tensorlakeSandboxRuntimeDefinition = registry.getDefinition({
+      familyId: "tensorlake",
+      variantId: "tensorlake-default",
+    });
     const githubEnterpriseServerDefinition = registry.getDefinition({
       familyId: "github",
       variantId: "github-enterprise-server",
@@ -232,6 +236,47 @@ describe("integrations-definitions index", () => {
               label: "API key",
               inputType: "password",
               slotKey: "e2b.e2b-default.api-key.api-key",
+            },
+          ],
+        },
+      ],
+    });
+    expect(tensorlakeSandboxRuntimeDefinition).toMatchObject({
+      familyId: "tensorlake",
+      variantId: "tensorlake-default",
+      kind: "sandbox",
+      displayName: "Tensorlake",
+      sandboxRuntime: {
+        providerId: "tensorlake",
+        displayName: "Tensorlake",
+        resourceCapabilities: {
+          vcpuCount: {
+            min: 1,
+            max: 8,
+            step: 1,
+            default: 1,
+          },
+          memoryMb: {
+            min: 1024,
+            max: 65536,
+            step: 1024,
+            default: 1024,
+            minPerVcpu: 1024,
+            maxPerVcpu: 8192,
+          },
+        },
+      },
+      connectionMethods: [
+        {
+          id: "api-key",
+          label: "API key",
+          kind: "form",
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "API key",
+              inputType: "password",
+              slotKey: "tensorlake.tensorlake-default.api-key.api-key",
             },
           ],
         },
@@ -523,7 +568,7 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(14);
+    expect(definitions).toHaveLength(15);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -538,6 +583,7 @@ describe("integrations-definitions index", () => {
       "opencode::opencode-go",
       "planetscale::planetscale-mcp",
       "e2b::e2b-default",
+      "tensorlake::tensorlake-default",
       "sentry::sentry-mcp",
       "signoz::signoz-mcp",
       "slack::slack-default",

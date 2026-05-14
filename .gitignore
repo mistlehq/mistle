@@ -24,4 +24,5 @@ config/config.integration.*.toml
 config/config.production.toml
 dev/.generated/
 deploy/compose/local/.generated/
+packages/sandboxd/.generated/
 .local/

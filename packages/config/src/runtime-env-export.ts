@@ -162,6 +162,7 @@ const ControlPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
   { path: ["sandbox", "e2b", "enabled"], envVar: "MISTLE_SANDBOX_E2B_ENABLED" },
   { path: ["sandbox", "e2b", "apiKey"], envVar: "MISTLE_SANDBOX_E2B_API_KEY" },
   { path: ["sandbox", "e2b", "domain"], envVar: "MISTLE_SANDBOX_E2B_DOMAIN" },
+  { path: ["sandbox", "tensorlake", "apiKey"], envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY" },
 ];
 
 const ControlPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
@@ -206,6 +207,10 @@ const DataPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor
   { path: ["sandbox", "docker", "enabled"], envVar: "MISTLE_SANDBOX_DOCKER_ENABLED" },
   { path: ["sandbox", "docker", "socketPath"], envVar: "MISTLE_SANDBOX_DOCKER_SOCKET_PATH" },
   { path: ["sandbox", "e2b", "enabled"], envVar: "MISTLE_SANDBOX_E2B_ENABLED" },
+  { path: ["sandbox", "e2b", "apiKey"], envVar: "MISTLE_SANDBOX_E2B_API_KEY" },
+  { path: ["sandbox", "e2b", "domain"], envVar: "MISTLE_SANDBOX_E2B_DOMAIN" },
+  { path: ["sandbox", "tensorlake", "enabled"], envVar: "MISTLE_SANDBOX_TENSORLAKE_ENABLED" },
+  { path: ["sandbox", "tensorlake", "apiKey"], envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY" },
 ];
 
 const DataPlaneGatewayResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
@@ -280,6 +285,13 @@ const DataPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
   { path: ["sandbox", "docker", "enabled"], envVar: "MISTLE_SANDBOX_DOCKER_ENABLED" },
   { path: ["sandbox", "docker", "socketPath"], envVar: "MISTLE_SANDBOX_DOCKER_SOCKET_PATH" },
   { path: ["sandbox", "docker", "networkName"], envVar: "MISTLE_SANDBOX_DOCKER_NETWORK_NAME" },
+  { path: ["sandbox", "e2b", "enabled"], envVar: "MISTLE_SANDBOX_E2B_ENABLED" },
+  { path: ["sandbox", "e2b", "apiKey"], envVar: "MISTLE_SANDBOX_E2B_API_KEY" },
+  { path: ["sandbox", "e2b", "domain"], envVar: "MISTLE_SANDBOX_E2B_DOMAIN" },
+  { path: ["sandbox", "e2b", "cpuCount"], envVar: "MISTLE_SANDBOX_E2B_CPU_COUNT" },
+  { path: ["sandbox", "e2b", "memoryMb"], envVar: "MISTLE_SANDBOX_E2B_MEMORY_MB" },
+  { path: ["sandbox", "tensorlake", "enabled"], envVar: "MISTLE_SANDBOX_TENSORLAKE_ENABLED" },
+  { path: ["sandbox", "tensorlake", "apiKey"], envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY" },
   {
     path: ["sandboxStorage", "archil", "apiKey"],
     envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY",

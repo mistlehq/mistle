@@ -75,7 +75,8 @@ WORKDIR /app/packages/sandboxd
 
 COPY packages/sandboxd /app/packages/sandboxd
 
-RUN cargo build --locked --release --bin sandboxd
+RUN cargo build --locked --release --bin sandboxd \
+  && strip target/release/sandboxd
 
 FROM rust:1.95-bookworm AS sandboxd-system-tests-build
 

@@ -450,7 +450,7 @@ async function start(): Promise<void> {
         );
       }
       console.log("Building sandbox base image...");
-      await createDockerBaseImageBuilder({ env: sharedDevEnv }).buildBaseImage({
+      await createDockerBaseImageBuilder({ env: sharedDevEnv }).ensureBaseImage({
         source: {
           kind: SandboxBaseImageSourceKinds.DOCKERFILE,
           contextPath: REPO_ROOT,

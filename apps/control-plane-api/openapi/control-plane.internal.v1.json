@@ -4090,7 +4090,7 @@
                   },
                   "provider": {
                     "type": "string",
-                    "enum": ["docker", "e2b"]
+                    "enum": ["docker", "e2b", "tensorlake"]
                   },
                   "connectionId": {
                     "type": "string",
@@ -4141,6 +4141,25 @@
                           "minLength": 1
                         },
                         "domain": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["provider", "source", "apiKey"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "enum": ["tensorlake"]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": ["managed", "connection"]
+                        },
+                        "apiKey": {
                           "type": "string",
                           "minLength": 1
                         }

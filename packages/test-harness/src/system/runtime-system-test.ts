@@ -46,7 +46,7 @@ export type SystemTestServiceSelection =
 
 export type SystemTestExtraInfraId = "mailpit" | "otlp" | "seaweedfs";
 
-export type SystemTestSandboxProvider = "docker" | "e2b";
+export type SystemTestSandboxProvider = "docker" | "e2b" | "tensorlake";
 
 export type SystemTestSandbox = {
   provider: SystemTestSandboxProvider;
@@ -189,6 +189,8 @@ function createInternalInfra(input: CreateSystemTestInput): readonly TestInfraRe
       return createDockerSandboxProviderInfra();
     case "e2b":
       return [];
+    case "tensorlake":
+      return [];
   }
 }
 
@@ -201,6 +203,9 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
       domain?: string;
       cpuCount?: string;
       memoryMb?: string;
+    };
+    tensorlake?: {
+      apiKey: string;
     };
     publicServiceBaseUrls?: ReadonlyMap<ServiceId, string>;
   };
@@ -218,13 +223,32 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
   }
 
   const publicServiceBaseUrls = createPublicServiceBaseUrls(input.publicAccess);
+  if (input.sandbox.provider === "e2b") {
+    return {
+      sandbox: {
+        provider: "e2b",
+        defaultBaseImageRef: await getSystemTestSandboxBaseImageRef(),
+        e2b: readE2BOptions(),
+        publicServiceBaseUrls,
+      },
+    };
+  }
+
   return {
     sandbox: {
-      provider: "e2b",
+      provider: "tensorlake",
       defaultBaseImageRef: await getSystemTestSandboxBaseImageRef(),
-      e2b: readE2BOptions(),
+      tensorlake: readTensorlakeOptions(),
       publicServiceBaseUrls,
     },
+  };
+}
+
+function readTensorlakeOptions(): {
+  apiKey: string;
+} {
+  return {
+    apiKey: readRequiredEnv("TENSORLAKE_API_KEY"),
   };
 }
 

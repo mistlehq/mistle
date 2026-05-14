@@ -15,3 +15,10 @@ export {
   createE2BBaseImageBuilder,
   type E2BBaseImageBuilderOptions,
 } from "./providers/e2b/index.js";
+export {
+  createTensorlakeBaseImageBuilder,
+  createTensorlakeRegisteredImageHandle,
+  createTensorlakeSnapshotImageHandle,
+  parseTensorlakeImageHandle,
+  type TensorlakeBaseImageBuilderOptions,
+} from "./providers/tensorlake/index.js";

@@ -9,10 +9,15 @@ const SandboxRuntimeResourceFieldSchema = z
   })
   .strict();
 
+const SandboxRuntimeMemoryResourceFieldSchema = SandboxRuntimeResourceFieldSchema.extend({
+  minPerVcpu: z.number().int().min(0).optional(),
+  maxPerVcpu: z.number().int().min(0).optional(),
+}).strict();
+
 export const SandboxRuntimeResourceCapabilitiesSchema = z
   .object({
     vcpuCount: SandboxRuntimeResourceFieldSchema,
-    memoryMb: SandboxRuntimeResourceFieldSchema,
+    memoryMb: SandboxRuntimeMemoryResourceFieldSchema,
     storageMb: SandboxRuntimeResourceFieldSchema.optional(),
   })
   .strict();

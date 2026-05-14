@@ -603,6 +603,9 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 sandboxInstanceId: workflowInput.sandboxInstanceId,
                 image: workflowInput.image,
                 runtimeProvider,
+                ...(workflowInput.sandboxRuntime.resources === undefined
+                  ? {}
+                  : { resources: workflowInput.sandboxRuntime.resources }),
                 storagePreparation,
               },
             );

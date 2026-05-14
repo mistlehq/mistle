@@ -57,7 +57,7 @@ const StartWorkflowInputSchema = z
         imageId: z.string().min(1),
         createdAt: z.string().min(1).optional(),
         kind: z.enum(["base", "snapshot"]),
-        provider: z.enum(["docker", "e2b"]).optional(),
+        provider: z.enum(["docker", "e2b", "tensorlake"]).optional(),
       })
       .strict(),
   })

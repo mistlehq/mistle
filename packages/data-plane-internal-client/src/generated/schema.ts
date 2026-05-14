@@ -141,7 +141,7 @@ export interface paths {
               /** @enum {string} */
               kind: "base" | "snapshot";
               /** @enum {string} */
-              provider: "docker" | "e2b";
+              provider: "docker" | "e2b" | "tensorlake";
             };
             organizationId: string;
             /** @enum {string} */
@@ -483,7 +483,7 @@ export interface paths {
             sandboxRuntime: {
               connectionId?: string;
               /** @enum {string} */
-              provider: "docker" | "e2b";
+              provider: "docker" | "e2b" | "tensorlake";
               resources?: {
                 memoryMb: number;
                 storageMb?: number;
@@ -1727,7 +1727,7 @@ export interface paths {
               /** @enum {string} */
               kind: "base";
               /** @enum {string} */
-              provider: "docker" | "e2b";
+              provider: "docker" | "e2b" | "tensorlake";
             };
             organizationId: string;
             sandboxInstanceId: string;
@@ -1736,7 +1736,7 @@ export interface paths {
             sandboxRuntime: {
               connectionId?: string;
               /** @enum {string} */
-              provider: "docker" | "e2b";
+              provider: "docker" | "e2b" | "tensorlake";
               resources?: {
                 memoryMb: number;
                 storageMb?: number;

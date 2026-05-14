@@ -31,6 +31,21 @@ const ControlPlaneApiSandboxE2BConfigSchema = z.discriminatedUnion("enabled", [
     .strict(),
 ]);
 
+const ControlPlaneApiSandboxTensorlakeConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      apiKey: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      apiKey: z.string().min(1).optional(),
+    })
+    .strict(),
+]);
+
 const ControlPlaneApiAuthGoogleConfigSchema = z
   .object({
     clientId: z.string().min(1),
@@ -150,6 +165,7 @@ export const ControlPlaneApiSandboxRuntimeConfigSchema = z
       .optional(),
     docker: ControlPlaneApiSandboxDockerConfigSchema.optional(),
     e2b: ControlPlaneApiSandboxE2BConfigSchema.optional(),
+    tensorlake: ControlPlaneApiSandboxTensorlakeConfigSchema.optional(),
   })
   .strict();
 

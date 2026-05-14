@@ -250,12 +250,18 @@ export function SandboxProfileRuntimeSection(input: {
         return currentRuntime;
       }
 
+      const provider = findProvider({
+        providerId: currentRuntime.sandboxProvider,
+        providers: input.providers,
+      });
       return {
         ...currentRuntime,
-        sandboxResources: {
-          ...currentRuntime.sandboxResources,
-          [field]: value,
-        },
+        sandboxResources: createNextResourcesForFieldChange({
+          field,
+          provider,
+          resources: currentRuntime.sandboxResources,
+          value,
+        }),
       };
     });
     setSaveErrorMessage(null);
@@ -551,6 +557,10 @@ function SandboxProviderResourceFields(input: {
   }
 
   const capabilities = input.provider.resourceCapabilities;
+  const memoryCapability = createMemoryCapabilityForVcpu({
+    capability: capabilities.memoryMb,
+    vcpuCount: input.resources.vcpuCount,
+  });
   return (
     <>
       <ResourceSliderField
@@ -565,7 +575,7 @@ function SandboxProviderResourceFields(input: {
         value={input.resources.vcpuCount}
       />
       <ResourceSliderField
-        capability={capabilities.memoryMb}
+        capability={memoryCapability}
         disabled={input.disabled}
         formatValue={formatMemoryResourceValue}
         id="sandbox-profile-runtime-memory"
@@ -573,7 +583,7 @@ function SandboxProviderResourceFields(input: {
         onChange={(value) => {
           input.onResourceFieldChange("memoryMb", value);
         }}
-        value={input.resources.memoryMb}
+        value={clampResourceValue(input.resources.memoryMb, memoryCapability)}
       />
       {capabilities.storageMb === undefined ? null : (
         <ResourceNumberField
@@ -589,6 +599,70 @@ function SandboxProviderResourceFields(input: {
       )}
     </>
   );
+}
+
+function createNextResourcesForFieldChange(input: {
+  field: keyof NonNullable<SandboxProfileVersion["sandboxResources"]>;
+  provider: SandboxProviderSummary | null;
+  resources: NonNullable<SandboxProfileVersion["sandboxResources"]>;
+  value: number;
+}): NonNullable<SandboxProfileVersion["sandboxResources"]> {
+  const nextResources = {
+    ...input.resources,
+    [input.field]: input.value,
+  };
+
+  if (
+    input.field !== "vcpuCount" ||
+    input.provider === null ||
+    input.provider.resourceCapabilities === null
+  ) {
+    return nextResources;
+  }
+
+  const memoryCapability = createMemoryCapabilityForVcpu({
+    capability: input.provider.resourceCapabilities.memoryMb,
+    vcpuCount: nextResources.vcpuCount,
+  });
+
+  return {
+    ...nextResources,
+    memoryMb: clampResourceValue(nextResources.memoryMb, memoryCapability),
+  };
+}
+
+function createMemoryCapabilityForVcpu(input: {
+  capability: NonNullable<SandboxProviderSummary["resourceCapabilities"]>["memoryMb"];
+  vcpuCount: number;
+}): ResourceCapability {
+  const min = Math.max(
+    input.capability.min,
+    input.capability.minPerVcpu === undefined
+      ? input.capability.min
+      : input.vcpuCount * input.capability.minPerVcpu,
+  );
+  const max = Math.min(
+    input.capability.max,
+    input.capability.maxPerVcpu === undefined
+      ? input.capability.max
+      : input.vcpuCount * input.capability.maxPerVcpu,
+  );
+
+  return {
+    min,
+    max,
+    step: input.capability.step,
+    default: clampResourceValue(input.capability.default, {
+      min,
+      max,
+      step: input.capability.step,
+      default: input.capability.default,
+    }),
+  };
+}
+
+function clampResourceValue(value: number, capability: ResourceCapability): number {
+  return Math.min(Math.max(value, capability.min), capability.max);
 }
 
 function ResourceNumberField(input: {

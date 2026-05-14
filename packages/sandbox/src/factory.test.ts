@@ -79,6 +79,39 @@ describe("createSandboxAdapter", () => {
       }),
     ).toThrow(SandboxConfigurationError);
   });
+
+  it("creates a Tensorlake adapter when Tensorlake config is provided", () => {
+    const adapter = createSandboxAdapter({
+      provider: SandboxProvider.TENSORLAKE,
+      tensorlake: {
+        apiKey: "test-api-key",
+      },
+    });
+
+    expect(typeof adapter.prepareStorageForStart).toBe("function");
+    expect(typeof adapter.start).toBe("function");
+    expect(typeof adapter.inspect).toBe("function");
+    expect(typeof adapter.resume).toBe("function");
+    expect(typeof adapter.captureSnapshot).toBe("function");
+    expect(typeof adapter.attachStorage).toBe("function");
+    expect(typeof adapter.cleanupStorage).toBe("function");
+    expect(typeof adapter.stop).toBe("function");
+    expect(typeof adapter.destroy).toBe("function");
+    expect(adapter.getTransparentProxyConfiguration()).toMatchObject({
+      provider: SandboxProvider.TENSORLAKE,
+      passthroughBypass: {
+        kind: SandboxTransparentProxyBypassKinds.SOCKET_MARK,
+      },
+    });
+  });
+
+  it("throws when Tensorlake config is missing", () => {
+    expect(() =>
+      createSandboxAdapter({
+        provider: SandboxProvider.TENSORLAKE,
+      }),
+    ).toThrow(SandboxConfigurationError);
+  });
 });
 
 describe("provider storage lifecycle no-op hooks", () => {
@@ -146,6 +179,26 @@ describe("provider storage lifecycle no-op hooks", () => {
       }),
     ).resolves.toEqual({});
   });
+
+  it("keeps Tensorlake storage preparation as a no-op", async () => {
+    const adapter = createSandboxAdapter({
+      provider: SandboxProvider.TENSORLAKE,
+      tensorlake: {
+        apiKey: "test-api-key",
+      },
+    });
+
+    await expect(
+      adapter.prepareStorageForStart({
+        sandboxInstanceId: "sbi_12345678901234567890123456",
+        image: {
+          provider: SandboxProvider.TENSORLAKE,
+          imageId: "tensorlake:image:mistle-base",
+          createdAt: "2026-04-17T00:00:00.000Z",
+        },
+      }),
+    ).resolves.toEqual({});
+  });
 });
 
 describe("createSandboxRuntimeControl", () => {
@@ -194,6 +247,27 @@ describe("createSandboxRuntimeControl", () => {
       }),
     ).toThrow(SandboxConfigurationError);
   });
+
+  it("creates a Tensorlake runtime control when Tensorlake config is provided", () => {
+    const runtimeControl = createSandboxRuntimeControl({
+      provider: SandboxProvider.TENSORLAKE,
+      tensorlake: {
+        apiKey: "test-api-key",
+      },
+    });
+
+    expect(typeof runtimeControl.init).toBe("function");
+    expect(typeof runtimeControl.resume).toBe("function");
+    expect(typeof runtimeControl.close).toBe("function");
+  });
+
+  it("throws when Tensorlake runtime control config is missing", () => {
+    expect(() =>
+      createSandboxRuntimeControl({
+        provider: SandboxProvider.TENSORLAKE,
+      }),
+    ).toThrow(SandboxConfigurationError);
+  });
 });
 
 describe("createSandboxBaseImageBuilder", () => {
@@ -202,7 +276,7 @@ describe("createSandboxBaseImageBuilder", () => {
       provider: SandboxProvider.DOCKER,
     });
 
-    expect(typeof builder.buildBaseImage).toBe("function");
+    expect(typeof builder.ensureBaseImage).toBe("function");
   });
 
   it("creates an E2B base image builder when E2B config is provided", () => {
@@ -213,13 +287,32 @@ describe("createSandboxBaseImageBuilder", () => {
       },
     });
 
-    expect(typeof builder.buildBaseImage).toBe("function");
+    expect(typeof builder.ensureBaseImage).toBe("function");
   });
 
   it("throws when E2B base image builder config is missing", () => {
     expect(() =>
       createSandboxBaseImageBuilder({
         provider: SandboxProvider.E2B,
+      }),
+    ).toThrow(SandboxConfigurationError);
+  });
+
+  it("creates a Tensorlake base image builder when Tensorlake config is provided", () => {
+    const builder = createSandboxBaseImageBuilder({
+      provider: SandboxProvider.TENSORLAKE,
+      tensorlake: {
+        apiKey: "test-api-key",
+      },
+    });
+
+    expect(typeof builder.ensureBaseImage).toBe("function");
+  });
+
+  it("throws when Tensorlake base image builder config is missing", () => {
+    expect(() =>
+      createSandboxBaseImageBuilder({
+        provider: SandboxProvider.TENSORLAKE,
       }),
     ).toThrow(SandboxConfigurationError);
   });

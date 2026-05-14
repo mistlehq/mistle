@@ -999,6 +999,9 @@ importers:
       e2b:
         specifier: ^2.19.0
         version: 2.19.0
+      tensorlake:
+        specifier: 0.5.10
+        version: 0.5.10
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -11403,6 +11406,11 @@ packages:
 
   teex@1.0.1:
     resolution: {integrity: sha512-eYE6iEI62Ni1H8oIa7KlDU6uQBtqr4Eajni3wX7rpfXD8ysFx8z0+dri+KWEPWpBsxXfxu58x/0jvTVT1ekOSg==}
+
+  tensorlake@0.5.10:
+    resolution: {integrity: sha512-ZFYEvYrAElvbTDyLZxhkBQTwdVu+AM/Ptz5iUK2pIoYkVSDAYCfLVgGy3xGs/7hCp3kF6NTc3istNCqgQyBUsA==}
+    engines: {node: '>=22.0.0'}
+    hasBin: true
 
   testcontainers@11.14.0:
     resolution: {integrity: sha512-r9pniwv/iwzyHaI7gwAvAm4Y+IvjJg3vBWdjrUCaDMc2AXIr4jKbq7jJO18Mw2ybs73pZy1Aj7p/4RVBGMRWjg==}
@@ -24587,6 +24595,14 @@ snapshots:
     transitivePeerDependencies:
       - bare-abort-controller
       - react-native-b4a
+
+  tensorlake@0.5.10:
+    dependencies:
+      undici: 8.2.0
+      ws: 8.20.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   testcontainers@11.14.0:
     dependencies:

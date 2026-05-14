@@ -15421,6 +15421,14 @@
                                   "default": {
                                     "type": "integer",
                                     "minimum": 0
+                                  },
+                                  "minPerVcpu": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  "maxPerVcpu": {
+                                    "type": "integer",
+                                    "minimum": 0
                                   }
                                 },
                                 "required": ["min", "max", "step", "default"],

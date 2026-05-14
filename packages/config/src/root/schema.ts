@@ -143,6 +143,21 @@ const BillingStripeConfigSchema = z
   )
   .default({ enabled: false });
 
+const SandboxTensorlakeProviderConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      api_key: z.string().trim().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      api_key: z.string().trim().min(1).optional(),
+    })
+    .strict(),
+]);
+
 const ControlPlaneApiAuthSchema = z
   .object({
     secret: z.string().trim().min(1),
@@ -374,6 +389,7 @@ export const ConfigSchema = z
         docker: SandboxDockerProviderConfigSchema.optional(),
         sandboxd_test_faults_enabled: z.boolean().optional(),
         e2b: SandboxE2BProviderConfigSchema.optional(),
+        tensorlake: SandboxTensorlakeProviderConfigSchema.optional(),
       })
       .strict(),
   })

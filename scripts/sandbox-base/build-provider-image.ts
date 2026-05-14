@@ -1,11 +1,13 @@
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
+import { mkdirSync, readdirSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
   SandboxBaseImagePublishModes,
   SandboxBaseImageSourceKinds,
+  SandboxSdkImageSandboxdSourceKinds,
   SandboxProvider,
   createSandboxBaseImageBuilder,
 } from "../../packages/sandbox/src/index.js";
@@ -16,8 +18,22 @@ const REPO_ROOT = resolve(SCRIPT_DIR, "..", "..");
 const DEFAULT_REPOSITORY = "ghcr.io/mistlehq/sandbox-base";
 const DEFAULT_PLATFORM = "linux/amd64";
 const SANDBOX_BASE_DOCKERFILE_PATH = "packages/sandboxd/Dockerfile";
+const TENSORLAKE_SANDBOXD_BINARY_PATH = "packages/sandboxd/.generated/tensorlake/sandboxd";
+const TENSORLAKE_SANDBOXD_ARCHIVE_PATH = `${TENSORLAKE_SANDBOXD_BINARY_PATH}.gz`;
+const TENSORLAKE_SANDBOXD_ARCHIVE_PARTS_PATH =
+  "packages/sandboxd/.generated/tensorlake/sandboxd-parts";
 const SANDBOX_BASE_TARGET = "sandbox-base";
 const SANDBOX_BASE_SYSTEM_TESTS_TARGET = "sandbox-base-system-tests";
+const SANDBOXD_BUILD_ARTIFACT_PATH = "/app/packages/sandboxd/target/release/sandboxd";
+const TENSORLAKE_COPY_PART_SIZE = "512k";
+const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
+
+const TensorlakeSandboxdSources = {
+  LOCAL: "local",
+  RELEASE: "release",
+} as const;
+type TensorlakeSandboxdSource =
+  (typeof TensorlakeSandboxdSources)[keyof typeof TensorlakeSandboxdSources];
 
 type ParsedCliArguments = {
   additionalOutputImageRefs: string[];
@@ -26,13 +42,17 @@ type ParsedCliArguments = {
   labels: Record<string, string>;
   memoryMb?: number;
   outputImageRef?: string;
-  platform: string;
+  platform?: string;
   provider: SandboxProvider;
   publishMode: "load" | "push";
   repository: string;
   sourceImageRef?: string;
+  sandboxdArtifactSha256?: string;
+  sandboxdArtifactUrl?: string;
+  sandboxdArtifactVersion?: string;
+  sandboxdSource?: TensorlakeSandboxdSource;
   tag?: string;
-  target: string;
+  target?: string;
   cpuCount?: number;
 };
 
@@ -58,6 +78,16 @@ E2B options:
   --cpu-count <count>                  E2B template CPU count
   --memory-mb <mb>                     E2B template memory in MB
 
+Tensorlake options:
+  --output-image-ref <name>            Tensorlake registered sandbox image name
+  --api-key <key>                      Tensorlake API key
+  --sandboxd-source <local|release>    sandboxd source for the Tensorlake SDK image
+  --sandboxd-artifact-url <url>        Release sandboxd artifact URL when --sandboxd-source release
+  --sandboxd-artifact-sha256 <sha256>  Release sandboxd artifact SHA256 when --sandboxd-source release
+  --sandboxd-artifact-version <value>  Release sandboxd version when --sandboxd-source release
+  --platform <value>                   Linux platform for the sandboxd build artifact (default: ${DEFAULT_PLATFORM})
+                                          Uses the Tensorlake SDK image builder
+
 General options:
   --help                               Show this message
 `);
@@ -82,11 +112,17 @@ function parsePositiveIntegerArgument(argumentName: string, value: string): numb
 }
 
 function parseProvider(value: string): SandboxProvider {
-  if (value === SandboxProvider.DOCKER || value === SandboxProvider.E2B) {
+  if (
+    value === SandboxProvider.DOCKER ||
+    value === SandboxProvider.E2B ||
+    value === SandboxProvider.TENSORLAKE
+  ) {
     return value;
   }
 
-  throw new Error(`--provider must be ${SandboxProvider.DOCKER} or ${SandboxProvider.E2B}.`);
+  throw new Error(
+    `--provider must be ${SandboxProvider.DOCKER}, ${SandboxProvider.E2B}, or ${SandboxProvider.TENSORLAKE}.`,
+  );
 }
 
 function parsePublishMode(value: string): "load" | "push" {
@@ -95,6 +131,14 @@ function parsePublishMode(value: string): "load" | "push" {
   }
 
   throw new Error("--publish-mode must be load or push.");
+}
+
+function parseTensorlakeSandboxdSource(value: string): TensorlakeSandboxdSource {
+  if (value === TensorlakeSandboxdSources.LOCAL || value === TensorlakeSandboxdSources.RELEASE) {
+    return value;
+  }
+
+  throw new Error("--sandboxd-source must be local or release.");
 }
 
 function parseLabel(value: string): readonly [string, string] {
@@ -120,13 +164,17 @@ function parseCliArguments(argv: readonly string[]): ParsedCliArguments {
   let domain: string | undefined;
   let memoryMb: number | undefined;
   let outputImageRef: string | undefined;
-  let platform = DEFAULT_PLATFORM;
+  let platform: string | undefined;
   let provider: SandboxProvider | undefined;
   let publishMode: "load" | "push" = SandboxBaseImagePublishModes.PUSH;
   let repository = DEFAULT_REPOSITORY;
+  let sandboxdArtifactSha256: string | undefined;
+  let sandboxdArtifactUrl: string | undefined;
+  let sandboxdArtifactVersion: string | undefined;
+  let sandboxdSource: TensorlakeSandboxdSource | undefined;
   let sourceImageRef: string | undefined;
   let tag: string | undefined;
-  let target = SANDBOX_BASE_TARGET;
+  let target: string | undefined;
 
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -220,6 +268,30 @@ function parseCliArguments(argv: readonly string[]): ParsedCliArguments {
       continue;
     }
 
+    if (argument === "--sandboxd-source") {
+      sandboxdSource = parseTensorlakeSandboxdSource(requireFlagValue(argv, index, argument));
+      index += 1;
+      continue;
+    }
+
+    if (argument === "--sandboxd-artifact-url") {
+      sandboxdArtifactUrl = requireFlagValue(argv, index, argument);
+      index += 1;
+      continue;
+    }
+
+    if (argument === "--sandboxd-artifact-sha256") {
+      sandboxdArtifactSha256 = requireFlagValue(argv, index, argument);
+      index += 1;
+      continue;
+    }
+
+    if (argument === "--sandboxd-artifact-version") {
+      sandboxdArtifactVersion = requireFlagValue(argv, index, argument);
+      index += 1;
+      continue;
+    }
+
     if (argument === "--help") {
       printUsage();
       process.exit(0);
@@ -236,11 +308,15 @@ function parseCliArguments(argv: readonly string[]): ParsedCliArguments {
     throw new Error("--repository must not be empty.");
   }
 
-  if (platform.trim().length === 0) {
+  if (platform !== undefined && platform.trim().length === 0) {
     throw new Error("--platform must not be empty.");
   }
 
-  if (target !== SANDBOX_BASE_TARGET && target !== SANDBOX_BASE_SYSTEM_TESTS_TARGET) {
+  if (
+    target !== undefined &&
+    target !== SANDBOX_BASE_TARGET &&
+    target !== SANDBOX_BASE_SYSTEM_TESTS_TARGET
+  ) {
     throw new Error(
       `--target must be ${SANDBOX_BASE_TARGET} or ${SANDBOX_BASE_SYSTEM_TESTS_TARGET}.`,
     );
@@ -253,18 +329,22 @@ function parseCliArguments(argv: readonly string[]): ParsedCliArguments {
   return {
     additionalOutputImageRefs,
     labels,
-    platform,
     provider,
     publishMode,
     repository,
-    target,
     ...(apiKey === undefined ? {} : { apiKey }),
     ...(cpuCount === undefined ? {} : { cpuCount }),
     ...(domain === undefined ? {} : { domain }),
     ...(memoryMb === undefined ? {} : { memoryMb }),
     ...(outputImageRef === undefined ? {} : { outputImageRef }),
+    ...(platform === undefined ? {} : { platform }),
+    ...(sandboxdArtifactSha256 === undefined ? {} : { sandboxdArtifactSha256 }),
+    ...(sandboxdArtifactUrl === undefined ? {} : { sandboxdArtifactUrl }),
+    ...(sandboxdArtifactVersion === undefined ? {} : { sandboxdArtifactVersion }),
+    ...(sandboxdSource === undefined ? {} : { sandboxdSource }),
     ...(sourceImageRef === undefined ? {} : { sourceImageRef }),
     ...(tag === undefined ? {} : { tag }),
+    ...(target === undefined ? {} : { target }),
   };
 }
 
@@ -282,21 +362,188 @@ function createDevTag(gitHeadSha: string): string {
   return `dev-${uniqueHash}`;
 }
 
+function prepareTensorlakeSandboxdBinary(platform: string): void {
+  const imageTag = `mistle-sandboxd-tensorlake-build:${randomUUID()}`;
+  const binaryPath = resolve(REPO_ROOT, TENSORLAKE_SANDBOXD_BINARY_PATH);
+  const archivePath = resolve(REPO_ROOT, TENSORLAKE_SANDBOXD_ARCHIVE_PATH);
+  const archivePartsPath = resolve(REPO_ROOT, TENSORLAKE_SANDBOXD_ARCHIVE_PARTS_PATH);
+  let containerId: string | undefined;
+  let imageBuilt = false;
+  let primaryError: unknown;
+
+  console.log(`Building Linux sandboxd artifact for Tensorlake (${platform}).`);
+  mkdirSync(dirname(binaryPath), { recursive: true });
+  rmSync(binaryPath, { force: true });
+  rmSync(archivePath, { force: true });
+  rmSync(archivePartsPath, { force: true, recursive: true });
+  mkdirSync(archivePartsPath, { recursive: true });
+
+  try {
+    execFileSync(
+      "docker",
+      [
+        "build",
+        "--platform",
+        platform,
+        "--target",
+        "sandboxd-build",
+        "--tag",
+        imageTag,
+        "-f",
+        SANDBOX_BASE_DOCKERFILE_PATH,
+        ".",
+      ],
+      {
+        cwd: REPO_ROOT,
+        stdio: "inherit",
+      },
+    );
+    imageBuilt = true;
+
+    containerId = execFileSync("docker", ["create", "--platform", platform, imageTag], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+    }).trim();
+
+    execFileSync("docker", ["cp", `${containerId}:${SANDBOXD_BUILD_ARTIFACT_PATH}`, binaryPath], {
+      cwd: REPO_ROOT,
+      stdio: "inherit",
+    });
+    execFileSync("gzip", ["-k", "-f", "-9", binaryPath], {
+      cwd: REPO_ROOT,
+      stdio: "inherit",
+    });
+    execFileSync(
+      "split",
+      ["-b", TENSORLAKE_COPY_PART_SIZE, archivePath, resolve(archivePartsPath, "part-")],
+      {
+        cwd: REPO_ROOT,
+        stdio: "inherit",
+      },
+    );
+
+    console.log(
+      `Prepared ${String(readdirSync(archivePartsPath).length)} Tensorlake sandboxd archive parts.`,
+    );
+  } catch (error) {
+    primaryError = error;
+    throw error;
+  } finally {
+    if (containerId !== undefined) {
+      try {
+        execFileSync("docker", ["rm", "-f", containerId], {
+          cwd: REPO_ROOT,
+          stdio: "ignore",
+        });
+      } catch (cleanupError) {
+        if (primaryError === undefined) {
+          throw cleanupError;
+        }
+
+        console.error(`Failed to remove temporary Docker container ${containerId}.`);
+      }
+    }
+
+    if (imageBuilt) {
+      try {
+        execFileSync("docker", ["image", "rm", "-f", imageTag], {
+          cwd: REPO_ROOT,
+          stdio: "ignore",
+        });
+      } catch (cleanupError) {
+        if (primaryError === undefined) {
+          throw cleanupError;
+        }
+
+        console.error(`Failed to remove temporary Docker image ${imageTag}.`);
+      }
+    }
+  }
+}
+
+function requireTensorlakeSandboxdSource(
+  argumentsList: ParsedCliArguments,
+): NonNullable<ParsedCliArguments["sandboxdSource"]> {
+  if (argumentsList.sandboxdSource === undefined) {
+    throw new Error("--sandboxd-source is required when --provider is tensorlake.");
+  }
+
+  return argumentsList.sandboxdSource;
+}
+
+function createTensorlakeSandboxdSource(argumentsList: ParsedCliArguments):
+  | {
+      kind: typeof SandboxSdkImageSandboxdSourceKinds.LOCAL;
+    }
+  | {
+      kind: typeof SandboxSdkImageSandboxdSourceKinds.RELEASE;
+      artifact: {
+        version: string;
+        url: string;
+        sha256: string;
+      };
+    } {
+  const sandboxdSource = requireTensorlakeSandboxdSource(argumentsList);
+  if (sandboxdSource === TensorlakeSandboxdSources.LOCAL) {
+    return {
+      kind: SandboxSdkImageSandboxdSourceKinds.LOCAL,
+    };
+  }
+
+  if (
+    argumentsList.sandboxdArtifactUrl === undefined ||
+    argumentsList.sandboxdArtifactUrl.trim() === ""
+  ) {
+    throw new Error(
+      "--sandboxd-artifact-url is required when --provider is tensorlake and --sandboxd-source is release.",
+    );
+  }
+
+  if (
+    argumentsList.sandboxdArtifactSha256 === undefined ||
+    !SHA256_PATTERN.test(argumentsList.sandboxdArtifactSha256)
+  ) {
+    throw new Error(
+      "--sandboxd-artifact-sha256 must be a lowercase SHA256 hex digest when --provider is tensorlake and --sandboxd-source is release.",
+    );
+  }
+
+  if (
+    argumentsList.sandboxdArtifactVersion === undefined ||
+    argumentsList.sandboxdArtifactVersion.trim() === ""
+  ) {
+    throw new Error(
+      "--sandboxd-artifact-version is required when --provider is tensorlake and --sandboxd-source is release.",
+    );
+  }
+
+  return {
+    kind: SandboxSdkImageSandboxdSourceKinds.RELEASE,
+    artifact: {
+      url: argumentsList.sandboxdArtifactUrl,
+      sha256: argumentsList.sandboxdArtifactSha256,
+      version: argumentsList.sandboxdArtifactVersion,
+    },
+  };
+}
+
 async function buildDockerBaseImage(argumentsList: ParsedCliArguments): Promise<void> {
   const gitHeadSha = readGitHeadSha();
   const tag = argumentsList.tag ?? createDevTag(gitHeadSha);
   const outputImageRef = argumentsList.outputImageRef ?? `${argumentsList.repository}:${tag}`;
+  const platform = argumentsList.platform ?? DEFAULT_PLATFORM;
+  const target = argumentsList.target ?? SANDBOX_BASE_TARGET;
   const builder = createSandboxBaseImageBuilder({
     provider: SandboxProvider.DOCKER,
   });
 
   console.log(`Building ${outputImageRef}`);
   console.log(`Source HEAD: ${gitHeadSha}`);
-  console.log(`Platform: ${argumentsList.platform}`);
-  console.log(`Target: ${argumentsList.target}`);
+  console.log(`Platform: ${platform}`);
+  console.log(`Target: ${target}`);
 
-  await builder.buildBaseImage({
-    platform: argumentsList.platform,
+  await builder.ensureBaseImage({
+    platform,
     source: {
       kind: SandboxBaseImageSourceKinds.DOCKERFILE,
       additionalImageIds: argumentsList.additionalOutputImageRefs,
@@ -305,11 +552,62 @@ async function buildDockerBaseImage(argumentsList: ParsedCliArguments): Promise<
       imageId: outputImageRef,
       labels: argumentsList.labels,
       publishMode: argumentsList.publishMode,
-      target: argumentsList.target,
+      target,
     },
   });
 
   console.log(`Built ${outputImageRef}`);
+}
+
+async function buildTensorlakeBaseImage(argumentsList: ParsedCliArguments): Promise<void> {
+  if (argumentsList.outputImageRef === undefined || argumentsList.outputImageRef.trim() === "") {
+    throw new Error("--output-image-ref is required when --provider is tensorlake.");
+  }
+
+  if (argumentsList.apiKey === undefined || argumentsList.apiKey.trim() === "") {
+    throw new Error("--api-key is required when --provider is tensorlake.");
+  }
+
+  if (argumentsList.target !== undefined) {
+    throw new Error(
+      "--target is not supported when --provider is tensorlake. Tensorlake uses the provider SDK image builder.",
+    );
+  }
+
+  if (argumentsList.publishMode !== SandboxBaseImagePublishModes.PUSH) {
+    throw new Error("--publish-mode must be push when --provider is tensorlake.");
+  }
+
+  if (Object.keys(argumentsList.labels).length > 0) {
+    throw new Error("--label is not supported when --provider is tensorlake.");
+  }
+
+  const sandboxd = createTensorlakeSandboxdSource(argumentsList);
+  if (sandboxd.kind === SandboxSdkImageSandboxdSourceKinds.LOCAL) {
+    const platform = argumentsList.platform ?? DEFAULT_PLATFORM;
+    prepareTensorlakeSandboxdBinary(platform);
+  } else if (argumentsList.platform !== undefined) {
+    throw new Error("--platform is only supported when --sandboxd-source is local.");
+  }
+
+  const builder = createSandboxBaseImageBuilder({
+    provider: SandboxProvider.TENSORLAKE,
+    tensorlake: {
+      apiKey: argumentsList.apiKey,
+    },
+  });
+
+  console.log(`Registering Tensorlake sandbox image ${argumentsList.outputImageRef}.`);
+  const image = await builder.ensureBaseImage({
+    source: {
+      kind: SandboxBaseImageSourceKinds.SDK_IMAGE,
+      contextPath: REPO_ROOT,
+      imageId: argumentsList.outputImageRef,
+      sandboxd,
+    },
+  });
+
+  console.log(`Tensorlake sandbox image is ready: ${image.imageId}.`);
 }
 
 async function buildE2BBaseImage(argumentsList: ParsedCliArguments): Promise<void> {
@@ -332,7 +630,7 @@ async function buildE2BBaseImage(argumentsList: ParsedCliArguments): Promise<voi
   });
 
   console.log(`Ensuring E2B template for ${argumentsList.sourceImageRef}.`);
-  const image = await builder.buildBaseImage({
+  const image = await builder.ensureBaseImage({
     source: {
       kind: SandboxBaseImageSourceKinds.IMAGE,
       imageId: argumentsList.sourceImageRef,
@@ -352,6 +650,11 @@ async function main(): Promise<void> {
 
   if (argumentsList.provider === SandboxProvider.E2B) {
     await buildE2BBaseImage(argumentsList);
+    return;
+  }
+
+  if (argumentsList.provider === SandboxProvider.TENSORLAKE) {
+    await buildTensorlakeBaseImage(argumentsList);
     return;
   }
 

@@ -57,7 +57,7 @@ const DetachedInitCommand = "/opt/mistle/bin/sandboxd init --detach";
 const WaitInitCommand = "/opt/mistle/bin/sandboxd wait-init";
 const ResumeCommand = "/opt/mistle/bin/sandboxd resume";
 const StartDaemonCommand = "/usr/bin/tini -s -- /opt/mistle/bin/sandboxd";
-const DaemonSocketPath = "/run/mistle/sandboxd/control.sock";
+const ReadyCommand = "/opt/mistle/bin/sandboxd ready";
 const DaemonReadinessPollIntervalMs = 100;
 const DaemonReadinessPollAttempts = 100;
 // E2B treats `timeoutMs: 0` as "disable request lifetime timeout".
@@ -823,18 +823,22 @@ export class E2BApiClient implements E2BClient {
   }
 
   async #checkDaemonReady(sandbox: Sandbox): Promise<boolean> {
-    const result = await runE2BOperationWithTransientRetries({
-      operation: E2BClientOperationIds.ENSURE_DAEMON_READY,
-      run: async () =>
-        sandbox.commands.run(
-          `if test -S '${DaemonSocketPath}'; then printf ready; else printf not-ready; fi`,
-          {
+    try {
+      await runE2BOperationWithTransientRetries({
+        operation: E2BClientOperationIds.ENSURE_DAEMON_READY,
+        run: async () =>
+          sandbox.commands.run(ReadyCommand, {
             user: "root",
-          },
-        ),
-    });
+          }),
+      });
+      return true;
+    } catch (error) {
+      if (error instanceof CommandExitError) {
+        return false;
+      }
 
-    return result.stdout.trim() === "ready";
+      throw error;
+    }
   }
 
   async #resolveStartTemplateRef(imageRef: string): Promise<string> {

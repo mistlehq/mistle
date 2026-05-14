@@ -1,6 +1,7 @@
 export const SandboxProvider = {
   DOCKER: "docker",
   E2B: "e2b",
+  TENSORLAKE: "tensorlake",
 } as const;
 export type SandboxProvider = (typeof SandboxProvider)[keyof typeof SandboxProvider];
 export const SandboxRuntimeProvider = SandboxProvider;
@@ -19,6 +20,7 @@ export interface SandboxImageHandle {
 export const SandboxBaseImageSourceKinds = {
   DOCKERFILE: "dockerfile",
   IMAGE: "image",
+  SDK_IMAGE: "sdk_image",
 } as const;
 export type SandboxBaseImageSourceKind =
   (typeof SandboxBaseImageSourceKinds)[keyof typeof SandboxBaseImageSourceKinds];
@@ -46,15 +48,45 @@ export interface SandboxImageBaseImageSource {
   readonly imageId: string;
 }
 
-export type SandboxBaseImageSource = SandboxDockerfileBaseImageSource | SandboxImageBaseImageSource;
+export const SandboxSdkImageSandboxdSourceKinds = {
+  LOCAL: "local",
+  RELEASE: "release",
+} as const;
+export type SandboxSdkImageSandboxdSourceKind =
+  (typeof SandboxSdkImageSandboxdSourceKinds)[keyof typeof SandboxSdkImageSandboxdSourceKinds];
 
-export interface SandboxBuildBaseImageRequest {
+export interface SandboxSdkImageLocalSandboxdSource {
+  readonly kind: typeof SandboxSdkImageSandboxdSourceKinds.LOCAL;
+}
+
+export interface SandboxSdkImageReleaseSandboxdSource {
+  readonly kind: typeof SandboxSdkImageSandboxdSourceKinds.RELEASE;
+  readonly artifact: SandboxdArtifact;
+}
+
+export type SandboxSdkImageSandboxdSource =
+  | SandboxSdkImageLocalSandboxdSource
+  | SandboxSdkImageReleaseSandboxdSource;
+
+export interface SandboxSdkImageBaseImageSource {
+  readonly kind: typeof SandboxBaseImageSourceKinds.SDK_IMAGE;
+  readonly contextPath: string;
+  readonly imageId: string;
+  readonly sandboxd: SandboxSdkImageSandboxdSource;
+}
+
+export type SandboxBaseImageSource =
+  | SandboxDockerfileBaseImageSource
+  | SandboxImageBaseImageSource
+  | SandboxSdkImageBaseImageSource;
+
+export interface SandboxEnsureBaseImageRequest {
   readonly platform?: string;
   readonly source: SandboxBaseImageSource;
 }
 
 export interface SandboxBaseImageBuilder {
-  buildBaseImage(request: SandboxBuildBaseImageRequest): Promise<SandboxImageHandle>;
+  ensureBaseImage(request: SandboxEnsureBaseImageRequest): Promise<SandboxImageHandle>;
 }
 
 export interface SandboxHandle {
@@ -293,9 +325,17 @@ export interface SandboxTransparentProxyConfiguration {
   readonly smokeRequirements: readonly string[];
 }
 
+export interface SandboxStartResources {
+  readonly vcpuCount: number;
+  readonly memoryMb: number;
+  readonly storageMb?: number;
+}
+
 export interface SandboxStartRequest {
+  readonly sandboxInstanceId?: string;
   readonly image: SandboxImageHandle;
   readonly env?: Readonly<Record<string, string>>;
+  readonly resources?: SandboxStartResources;
   readonly storagePreparation?: SandboxStartStoragePreparation;
 }
 

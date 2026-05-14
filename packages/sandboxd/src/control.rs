@@ -221,6 +221,8 @@ impl std::error::Error for ControlError {}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 enum ControlRequest {
+    #[serde(rename = "ready")]
+    Ready,
     #[serde(rename = "init")]
     Init {
         startup_input: StartupInput,
@@ -522,6 +524,11 @@ pub fn submit_init(
     )
 }
 
+/// Performs one no-op round trip against the running daemon control socket.
+pub fn submit_ready(socket_path: &Path) -> Result<(), ControlError> {
+    submit_control_request(socket_path, ControlRequest::Ready).map(|_| ())
+}
+
 /// Submits one resume payload to the running daemon over the local control socket.
 pub fn submit_resume(socket_path: &Path, startup_input: &StartupInput) -> Result<(), ControlError> {
     submit_startup_request(
@@ -580,6 +587,13 @@ pub fn submit_signing(
 }
 
 fn submit_startup_request(socket_path: &Path, request: ControlRequest) -> Result<(), ControlError> {
+    submit_control_request(socket_path, request).map(|_| ())
+}
+
+fn submit_control_request(
+    socket_path: &Path,
+    request: ControlRequest,
+) -> Result<Option<String>, ControlError> {
     let mut stream =
         UnixStream::connect(socket_path).map_err(|error| ControlError::ConnectSocket {
             path: socket_path.to_path_buf(),
@@ -601,13 +615,13 @@ fn submit_startup_request(socket_path: &Path, request: ControlRequest) -> Result
     let response: ControlResponse =
         serde_json::from_slice(&raw_response).map_err(ControlError::InvalidResponse)?;
 
-    if response.ok {
-        return Ok(());
+    if !response.ok {
+        return Err(ControlError::ResponseError(response.error.unwrap_or_else(
+            || "control socket returned ok=false without an error".to_string(),
+        )));
     }
 
-    Err(ControlError::ResponseError(response.error.unwrap_or_else(
-        || "control socket returned ok=false without an error".to_string(),
-    )))
+    Ok(response.signature_base64)
 }
 
 fn run_control_server_loop(
@@ -840,6 +854,7 @@ fn handle_connection(
         serde_json::from_slice(&raw_request).map_err(ControlError::InvalidRequest)?;
 
     match request {
+        ControlRequest::Ready => Ok(None),
         ControlRequest::Init {
             startup_input,
             wait_for_completion,
@@ -1350,7 +1365,8 @@ mod tests {
     use crate::control::{
         ControlSignRequest, DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL, DEFAULT_HEALTH_ENDPOINT_PATH,
         EGRESS_PROXY_FAULT_KILL_PATH, InitPhase, TEST_FAULTS_ENABLED_ENV,
-        start_control_server_with_health_endpoint, submit_init, submit_resume, submit_signing,
+        start_control_server_with_health_endpoint, submit_init, submit_ready, submit_resume,
+        submit_signing,
     };
     use crate::protocol::startup::{
         GitIdentity, GitSigningConfig, StartupExecutionMode, StartupInput, StartupMode,
@@ -1381,6 +1397,20 @@ mod tests {
         gateway
             .close()
             .expect("bootstrap gateway should stop cleanly");
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
+    fn accepts_ready_request_without_initializing_the_daemon() {
+        let test_dir = create_temp_test_dir("control_ready");
+        let socket_path = test_dir.join("control.sock");
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+
+        submit_ready(&socket_path).expect("ready submission should succeed");
+
+        assert_eq!(server.init_phase(), InitPhase::Uninitialized);
+
+        server.close().expect("control server should stop cleanly");
         std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
     }
 

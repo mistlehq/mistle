@@ -591,6 +591,14 @@ const DataPlaneApiEnvDescriptors = [
     path: ["sandbox", "e2b", "enabled"],
     parse: parseStrictBooleanEnv,
   },
+  { envVar: "MISTLE_SANDBOX_E2B_API_KEY", path: ["sandbox", "e2b", "apiKey"] },
+  { envVar: "MISTLE_SANDBOX_E2B_DOMAIN", path: ["sandbox", "e2b", "domain"] },
+  {
+    envVar: "MISTLE_SANDBOX_TENSORLAKE_ENABLED",
+    path: ["sandbox", "tensorlake", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  { envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY", path: ["sandbox", "tensorlake", "apiKey"] },
 ] satisfies readonly EnvDescriptor[];
 
 const DataPlaneGatewayEnvDescriptors = [
@@ -663,6 +671,29 @@ const DataPlaneWorkerEnvDescriptors = [
   },
   { envVar: "MISTLE_SANDBOX_DOCKER_SOCKET_PATH", path: ["sandbox", "docker", "socketPath"] },
   { envVar: "MISTLE_SANDBOX_DOCKER_NETWORK_NAME", path: ["sandbox", "docker", "networkName"] },
+  {
+    envVar: "MISTLE_SANDBOX_E2B_ENABLED",
+    path: ["sandbox", "e2b", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  { envVar: "MISTLE_SANDBOX_E2B_API_KEY", path: ["sandbox", "e2b", "apiKey"] },
+  { envVar: "MISTLE_SANDBOX_E2B_DOMAIN", path: ["sandbox", "e2b", "domain"] },
+  {
+    envVar: "MISTLE_SANDBOX_E2B_CPU_COUNT",
+    path: ["sandbox", "e2b", "cpuCount"],
+    parse: parseNumberEnv,
+  },
+  {
+    envVar: "MISTLE_SANDBOX_E2B_MEMORY_MB",
+    path: ["sandbox", "e2b", "memoryMb"],
+    parse: parseNumberEnv,
+  },
+  {
+    envVar: "MISTLE_SANDBOX_TENSORLAKE_ENABLED",
+    path: ["sandbox", "tensorlake", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  { envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY", path: ["sandbox", "tensorlake", "apiKey"] },
   {
     envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY",
     path: ["sandboxStorage", "archil", "apiKey"],

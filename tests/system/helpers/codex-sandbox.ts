@@ -150,7 +150,7 @@ export type CodexSandboxRequestInit = {
   body?: string;
 };
 
-export type SystemSandboxProvider = "docker" | "e2b";
+export type SystemSandboxProvider = "docker" | "e2b" | "tensorlake";
 
 export type SandboxProfileRuntimeConfigUpdate =
   | {
@@ -161,6 +161,14 @@ export type SandboxProfileRuntimeConfigUpdate =
       sandboxResources: {
         vcpuCount: number;
         memoryMb: number;
+      };
+    }
+  | {
+      sandboxProvider: "tensorlake";
+      sandboxResources: {
+        vcpuCount: number;
+        memoryMb: number;
+        storageMb: number;
       };
     };
 
@@ -192,6 +200,15 @@ export function createSandboxProfileRuntimeConfigUpdate(
         sandboxResources: {
           vcpuCount: 2,
           memoryMb: 4096,
+        },
+      };
+    case "tensorlake":
+      return {
+        sandboxProvider,
+        sandboxResources: {
+          vcpuCount: 2,
+          memoryMb: 4096,
+          storageMb: 20_480,
         },
       };
   }

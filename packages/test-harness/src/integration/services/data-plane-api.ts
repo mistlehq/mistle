@@ -127,17 +127,9 @@ function config(input: {
     runtimeState: {
       gatewayBaseUrl: input.gatewayBaseUrl,
     },
-    sandbox:
-      input.sandbox?.provider === "e2b"
-        ? {
-            e2b: requireE2BOptions(input.sandbox),
-          }
-        : {
-            docker: {
-              enabled: true,
-              socketPath: DockerSocketPath,
-            },
-          },
+    sandbox: {
+      ...createDataPlaneApiSandboxProviderConfig(input.sandbox),
+    },
     controlPlaneApi: {
       baseUrl: input.controlPlaneBaseUrl,
     },
@@ -148,6 +140,40 @@ function config(input: {
       testEnvironmentIdHeader: TestEnvironmentIdHeader,
     },
   };
+}
+
+function createDataPlaneApiSandboxProviderConfig(input: IntegrationSandboxOptions | undefined):
+  | {
+      docker: { enabled: true; socketPath: string };
+    }
+  | {
+      e2b: { enabled: true; apiKey: string; domain: string };
+    }
+  | {
+      tensorlake: { enabled: true; apiKey: string };
+    } {
+  if (input?.provider === "e2b") {
+    return { e2b: requireE2BOptions(input) };
+  }
+
+  if (input?.provider === "tensorlake") {
+    return { tensorlake: requireTensorlakeOptions(input) };
+  }
+
+  return { docker: { enabled: true, socketPath: DockerSocketPath } };
+}
+
+function requireTensorlakeOptions(input: IntegrationSandboxOptions): {
+  enabled: true;
+  apiKey: string;
+} {
+  if (input.tensorlake === undefined) {
+    throw new Error(
+      "data-plane-api requires Tensorlake sandbox options when provider is tensorlake.",
+    );
+  }
+
+  return { enabled: true, apiKey: input.tensorlake.apiKey };
 }
 
 function requireE2BOptions(input: IntegrationSandboxOptions): {

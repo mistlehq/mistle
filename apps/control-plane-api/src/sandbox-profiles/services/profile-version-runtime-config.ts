@@ -75,7 +75,7 @@ function assertSandboxRuntimeProvider(provider: string | null): SandboxProvider 
     );
   }
 
-  if (provider === SandboxProvider.DOCKER || provider === SandboxProvider.E2B) {
+  if (isSandboxProvider(provider)) {
     return provider;
   }
 
@@ -96,6 +96,57 @@ export function createDefaultProfileVersionRuntimeConfig(input: {
     sandboxVcpuCount: null,
     sandboxMemoryMb: null,
     sandboxStorageMb: null,
+  };
+}
+
+function isSandboxProvider(provider: string): provider is SandboxProvider {
+  for (const candidate of Object.values(SandboxProvider)) {
+    if (provider === candidate) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function findSandboxRuntimeResourceCapabilities(input: {
+  integrationRegistry: IntegrationRegistry;
+  providerId: string;
+}): SandboxRuntimeResourceCapabilities {
+  const definition = findSandboxRuntimeDefinition(input);
+
+  if (definition === undefined) {
+    throw new Error(`Sandbox runtime definition for provider '${input.providerId}' was not found.`);
+  }
+
+  return definition.sandboxRuntime.resourceCapabilities;
+}
+
+function findSandboxRuntimeDefinition(input: {
+  integrationRegistry: IntegrationRegistry;
+  providerId: string;
+}):
+  | {
+      sandboxRuntime: {
+        providerId: string;
+        resourceCapabilities: SandboxRuntimeResourceCapabilities;
+      };
+    }
+  | undefined {
+  const definition = input.integrationRegistry
+    .listDefinitions()
+    .find(
+      (candidate) =>
+        candidate.kind === IntegrationKinds.SANDBOX &&
+        candidate.sandboxRuntime?.providerId === input.providerId,
+    );
+
+  if (definition?.sandboxRuntime === undefined) {
+    return undefined;
+  }
+
+  return {
+    sandboxRuntime: definition.sandboxRuntime,
   };
 }
 
@@ -205,47 +256,6 @@ export async function validateSandboxProfileVersionRuntimeConfig(
   ];
 }
 
-export function findSandboxRuntimeResourceCapabilities(input: {
-  integrationRegistry: IntegrationRegistry;
-  providerId: string;
-}): SandboxRuntimeResourceCapabilities {
-  const definition = findSandboxRuntimeDefinition(input);
-
-  if (definition === undefined) {
-    throw new Error(`Sandbox runtime definition for provider '${input.providerId}' was not found.`);
-  }
-
-  return definition.sandboxRuntime.resourceCapabilities;
-}
-
-function findSandboxRuntimeDefinition(input: {
-  integrationRegistry: IntegrationRegistry;
-  providerId: string;
-}):
-  | {
-      sandboxRuntime: {
-        providerId: string;
-        resourceCapabilities: SandboxRuntimeResourceCapabilities;
-      };
-    }
-  | undefined {
-  const definition = input.integrationRegistry
-    .listDefinitions()
-    .find(
-      (candidate) =>
-        candidate.kind === IntegrationKinds.SANDBOX &&
-        candidate.sandboxRuntime?.providerId === input.providerId,
-    );
-
-  if (definition?.sandboxRuntime === undefined) {
-    return undefined;
-  }
-
-  return {
-    sandboxRuntime: definition.sandboxRuntime,
-  };
-}
-
 function validateDockerRuntimeConfig(
   runtimeConfig: SandboxProfileVersionRuntimeConfig,
 ): SandboxRuntimeConfigValidationIssue[] {
@@ -278,6 +288,13 @@ function validateManagedSandboxProviderAvailability(input: {
   }
 
   if (input.providerId === SandboxProvider.E2B && input.sandboxConfig.e2b?.enabled === true) {
+    return [];
+  }
+
+  if (
+    input.providerId === SandboxProvider.TENSORLAKE &&
+    input.sandboxConfig.tensorlake?.enabled === true
+  ) {
     return [];
   }
 
@@ -316,7 +333,12 @@ function validateSandboxResources(input: {
 
   if (
     !isValidCapabilityValue(input.resources.vcpuCount, input.resourceCapabilities.vcpuCount) ||
-    !isValidCapabilityValue(input.resources.memoryMb, input.resourceCapabilities.memoryMb)
+    !isValidCapabilityValue(input.resources.memoryMb, input.resourceCapabilities.memoryMb) ||
+    !isValidMemoryPerVcpuValue({
+      memoryMb: input.resources.memoryMb,
+      vcpuCount: input.resources.vcpuCount,
+      capability: input.resourceCapabilities.memoryMb,
+    })
   ) {
     issues.push({
       code: SandboxProfilePublishabilityIssueCodes.INVALID_SANDBOX_RESOURCES,
@@ -358,6 +380,28 @@ function isValidCapabilityValue(
     value <= capability.max &&
     (value - capability.min) % capability.step === 0
   );
+}
+
+function isValidMemoryPerVcpuValue(input: {
+  memoryMb: number;
+  vcpuCount: number;
+  capability: SandboxRuntimeResourceCapabilities["memoryMb"];
+}): boolean {
+  if (
+    input.capability.minPerVcpu !== undefined &&
+    input.memoryMb < input.vcpuCount * input.capability.minPerVcpu
+  ) {
+    return false;
+  }
+
+  if (
+    input.capability.maxPerVcpu !== undefined &&
+    input.memoryMb > input.vcpuCount * input.capability.maxPerVcpu
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 async function validateSandboxConnection(input: {

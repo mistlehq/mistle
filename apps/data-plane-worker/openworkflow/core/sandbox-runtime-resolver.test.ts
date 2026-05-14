@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createE2BSandboxProviderConfig,
   createResolveSandboxRuntimeInput,
+  createTensorlakeSandboxProviderConfig,
 } from "./sandbox-runtime-resolver.js";
 
 describe("createE2BSandboxProviderConfig", () => {
@@ -46,6 +47,30 @@ describe("createE2BSandboxProviderConfig", () => {
         },
       }),
     ).toThrow("E2B sandbox runtime does not support configurable storage.");
+  });
+});
+
+describe("createTensorlakeSandboxProviderConfig", () => {
+  it("accepts profile-version storage resources", () => {
+    expect(
+      createTensorlakeSandboxProviderConfig({
+        credentials: {
+          provider: "tensorlake",
+          source: "managed",
+          apiKey: "tensorlake-api-key",
+        },
+        resources: {
+          vcpuCount: 4,
+          memoryMb: 16384,
+          storageMb: 20480,
+        },
+      }),
+    ).toEqual({
+      provider: "tensorlake",
+      tensorlake: {
+        apiKey: "tensorlake-api-key",
+      },
+    });
   });
 });
 

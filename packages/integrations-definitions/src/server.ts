@@ -19,7 +19,10 @@ import { OpenAiApiKeyDefinition } from "./openai/index.js";
 import { OpenCodeGoDefinition } from "./opencode/index.js";
 import { PlanetScaleDefinition } from "./planetscale/server.js";
 import { createAgentRuntimeRegistry } from "./registry/agent-runtimes.js";
-import { E2BSandboxRuntimeDefinition } from "./sandbox-runtimes/index.js";
+import {
+  E2BSandboxRuntimeDefinition,
+  TensorlakeSandboxRuntimeDefinition,
+} from "./sandbox-runtimes/index.js";
 import { SentryDefinition } from "./sentry/server.js";
 import { SignozDefinition } from "./signoz/server.js";
 import { SlackDefinition } from "./slack/index.js";
@@ -58,6 +61,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   OpenCodeGoDefinition,
   PlanetScaleDefinition,
   E2BSandboxRuntimeDefinition,
+  TensorlakeSandboxRuntimeDefinition,
   SentryDefinition,
   SignozDefinition,
   SlackDefinition,

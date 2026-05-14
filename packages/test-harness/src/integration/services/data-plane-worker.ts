@@ -256,9 +256,9 @@ function createDataPlaneWorkerEnv(input: {
           MISTLE_SANDBOX_DOCKER_ENABLED: "true",
           MISTLE_SANDBOX_DOCKER_SOCKET_PATH: DockerSocketPath,
         }
-      : {
-          MISTLE_SANDBOX_DOCKER_ENABLED: "false",
-        }),
+      : provider === "e2b"
+        ? { MISTLE_SANDBOX_DOCKER_ENABLED: "false", ...createE2BEnv(input.sandbox) }
+        : { MISTLE_SANDBOX_DOCKER_ENABLED: "false", ...createTensorlakeEnv(input.sandbox) }),
     ...(input.sandboxEndpoints.dockerNetworkName === undefined
       ? {}
       : {
@@ -352,6 +352,39 @@ function readSandboxBaseImageRef(input: {
   return getLocalDevDockerRegistrySandboxBaseImageRef();
 }
 
+function createTensorlakeEnv(input: IntegrationSandboxOptions | undefined): Record<string, string> {
+  if (input?.tensorlake === undefined) {
+    throw new Error(
+      "data-plane-worker requires Tensorlake sandbox options when provider is tensorlake.",
+    );
+  }
+
+  return {
+    MISTLE_SANDBOX_TENSORLAKE_ENABLED: "true",
+    MISTLE_SANDBOX_TENSORLAKE_API_KEY: input.tensorlake.apiKey,
+  };
+}
+
+function createE2BEnv(input: IntegrationSandboxOptions | undefined): Record<string, string> {
+  if (input?.e2b === undefined) {
+    throw new Error("data-plane-worker requires E2B sandbox options when provider is e2b.");
+  }
+
+  return {
+    MISTLE_SANDBOX_E2B_ENABLED: "true",
+    MISTLE_SANDBOX_E2B_API_KEY: input.e2b.apiKey,
+    ...(input.e2b.domain === undefined ? {} : { MISTLE_SANDBOX_E2B_DOMAIN: input.e2b.domain }),
+    ...(input.e2b.cpuCount === undefined
+      ? {}
+      : { MISTLE_SANDBOX_E2B_CPU_COUNT: input.e2b.cpuCount }),
+    ...(input.e2b.memoryMb === undefined
+      ? {}
+      : { MISTLE_SANDBOX_E2B_MEMORY_MB: input.e2b.memoryMb }),
+    ...(input.e2b.templateLockDirectoryPath === undefined
+      ? {}
+      : { MISTLE_SANDBOX_E2B_TEMPLATE_LOCK_DIR: input.e2b.templateLockDirectoryPath }),
+  };
+}
 function createPublicGatewayWsUrl(publicGatewayBaseUrl: string): string {
   const url = new URL("/tunnel/sandbox", publicGatewayBaseUrl);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";

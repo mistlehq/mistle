@@ -26,9 +26,14 @@ export type SandboxRuntimeResourceField = {
   default: number;
 };
 
+export type SandboxRuntimeMemoryResourceField = SandboxRuntimeResourceField & {
+  minPerVcpu?: number;
+  maxPerVcpu?: number;
+};
+
 export type SandboxRuntimeResourceCapabilities = {
   vcpuCount: SandboxRuntimeResourceField;
-  memoryMb: SandboxRuntimeResourceField;
+  memoryMb: SandboxRuntimeMemoryResourceField;
   storageMb?: SandboxRuntimeResourceField;
 };
 

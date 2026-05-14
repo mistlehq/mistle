@@ -19,6 +19,7 @@
     "dev:reset:hard": "tsx ./scripts/dev/down.ts --volumes --rmi-local",
     "dev:sandbox-base:push:docker": "pnpm sandbox-base:build --provider docker --publish-mode push",
     "dev:sandbox-base:push:e2b": "pnpm --filter @mistle/sandbox... build && pnpm sandbox-base:build --provider e2b",
+    "dev:sandbox-base:push:tensorlake": "pnpm --filter @mistle/sandbox... build && pnpm sandbox-base:build --provider tensorlake --output-image-ref ${MISTLE_SANDBOX_TENSORLAKE_BASE_IMAGE:?Set MISTLE_SANDBOX_TENSORLAKE_BASE_IMAGE} --api-key ${TENSORLAKE_API_KEY:?Set TENSORLAKE_API_KEY} --sandboxd-source local",
     "dev:workspace": "turbo watch dev dev:schedules --ui=tui --filter=!@mistle/docs --env-mode=loose",
     "docs:dev": "nix develop .#docs -c pnpm --filter @mistle/docs dev",
     "emails:preview": "pnpm --filter @mistle/emails preview",

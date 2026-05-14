@@ -262,6 +262,16 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
         : config.sandbox.e2b?.enabled === false
           ? { e2b: { enabled: false } }
           : {}),
+      ...(config.sandbox.tensorlake?.enabled === true
+        ? {
+            tensorlake: {
+              enabled: true,
+              apiKey: config.sandbox.tensorlake.api_key,
+            },
+          }
+        : config.sandbox.tensorlake?.enabled === false
+          ? { tensorlake: { enabled: false } }
+          : {}),
     },
     integrations: {
       activeMasterEncryptionKeyVersion:
@@ -360,6 +370,25 @@ export function selectDataPlaneApiConfig(config: Config): DataPlaneApiConfig {
           : config.sandbox.docker?.enabled === false
             ? { enabled: false }
             : undefined,
+      e2b:
+        config.sandbox.e2b?.enabled === true
+          ? {
+              enabled: true,
+              apiKey: config.sandbox.e2b.api_key,
+              domain: config.sandbox.e2b.domain,
+            }
+          : config.sandbox.e2b?.enabled === false
+            ? { enabled: false }
+            : undefined,
+      tensorlake:
+        config.sandbox.tensorlake?.enabled === true
+          ? {
+              enabled: true,
+              apiKey: config.sandbox.tensorlake.api_key,
+            }
+          : config.sandbox.tensorlake?.enabled === false
+            ? { enabled: false }
+            : undefined,
     },
   };
 }
@@ -440,6 +469,27 @@ export function selectDataPlaneWorkerConfig(config: Config): DataPlaneWorkerConf
               networkName: config.sandbox.docker.network_name,
             }
           : config.sandbox.docker?.enabled === false
+            ? { enabled: false }
+            : undefined,
+      e2b:
+        config.sandbox.e2b?.enabled === true
+          ? {
+              enabled: true,
+              apiKey: config.sandbox.e2b.api_key,
+              domain: config.sandbox.e2b.domain,
+              cpuCount: config.sandbox.e2b.cpu_count,
+              memoryMb: config.sandbox.e2b.memory_mb,
+            }
+          : config.sandbox.e2b?.enabled === false
+            ? { enabled: false }
+            : undefined,
+      tensorlake:
+        config.sandbox.tensorlake?.enabled === true
+          ? {
+              enabled: true,
+              apiKey: config.sandbox.tensorlake.api_key,
+            }
+          : config.sandbox.tensorlake?.enabled === false
             ? { enabled: false }
             : undefined,
     },

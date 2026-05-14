@@ -386,9 +386,21 @@ const SandboxRuntimeResourceCapabilitySchema = z
   })
   .strict();
 
+const SandboxRuntimeMemoryResourceCapabilitySchema = SandboxRuntimeResourceCapabilitySchema.extend({
+  maxPerVcpu: z.number().int().min(0).optional(),
+  minPerVcpu: z.number().int().min(0).optional(),
+}).transform((capability) => ({
+  default: capability.default,
+  max: capability.max,
+  ...(capability.maxPerVcpu === undefined ? {} : { maxPerVcpu: capability.maxPerVcpu }),
+  min: capability.min,
+  ...(capability.minPerVcpu === undefined ? {} : { minPerVcpu: capability.minPerVcpu }),
+  step: capability.step,
+}));
+
 const SandboxRuntimeResourceCapabilitiesSchema = z
   .object({
-    memoryMb: SandboxRuntimeResourceCapabilitySchema,
+    memoryMb: SandboxRuntimeMemoryResourceCapabilitySchema,
     storageMb: SandboxRuntimeResourceCapabilitySchema.optional(),
     vcpuCount: SandboxRuntimeResourceCapabilitySchema,
   })

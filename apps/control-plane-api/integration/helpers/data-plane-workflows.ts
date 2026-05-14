@@ -22,12 +22,12 @@ const MaterializeWorkflowRunInputSchema = z.looseObject({
       imageId: z.string().min(1),
       createdAt: z.iso.datetime().optional(),
       kind: z.literal("base"),
-      provider: z.enum(["docker", "e2b"]),
+      provider: z.enum(["docker", "e2b", "tensorlake"]),
     })
     .strict(),
   sandboxRuntime: z
     .object({
-      provider: z.enum(["docker", "e2b"]),
+      provider: z.enum(["docker", "e2b", "tensorlake"]),
       connectionId: z.string().min(1).optional(),
       resources: z
         .object({
@@ -54,7 +54,7 @@ const StartWorkflowRunInputSchema = z.looseObject({
       imageId: z.string().min(1),
       createdAt: z.iso.datetime().optional(),
       kind: z.enum(["base", "snapshot"]),
-      provider: z.enum(["docker", "e2b"]).optional(),
+      provider: z.enum(["docker", "e2b", "tensorlake"]).optional(),
     })
     .strict()
     .optional(),

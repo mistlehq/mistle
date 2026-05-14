@@ -42,6 +42,14 @@ const DockerSandboxRuntimeColumns = {
   sandboxStorageMb: null,
 } as const;
 
+const TensorlakeSandboxRuntimeColumns = {
+  sandboxProvider: "tensorlake",
+  sandboxConnectionId: null,
+  sandboxVcpuCount: 2,
+  sandboxMemoryMb: 4096,
+  sandboxStorageMb: null,
+} as const;
+
 describe.concurrent("sandbox profile version start instance integration", () => {
   it("returns 404 when the selected profile version does not exist", async ({ env }) => {
     const session = await env.auth.createSession({
@@ -692,6 +700,62 @@ describe.concurrent("sandbox profile version start instance integration", () => 
     ).toEqual(["opencode-cli"]);
   });
 
+  it("queues Tensorlake launches for usable published versions from the stored snapshot image", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email:
+        "integration-new-sandbox-profile-start-instance-tensorlake-snapshot-launch@example.com",
+    });
+
+    await createStartableProfile({
+      env,
+      organizationId: session.organizationId,
+      profileId: "sbp_start_instance_tensorlake_snapshot_launch",
+      targetKey: "openai-start-instance-tensorlake-snapshot-launch",
+      connectionId: "icn_start_instance_tensorlake_snapshot_launch",
+      bindingId: "ibd_start_instance_tensorlake_snapshot_launch",
+      versionState: SandboxProfileVersionStates.PUBLISHED,
+      runtimeColumns: TensorlakeSandboxRuntimeColumns,
+      snapshotImageProvider: "tensorlake",
+      snapshotImageId: "tensorlake:image:tensorlake-snapshot-launch-image",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_start_instance_tensorlake_snapshot_launch/versions/1/instances",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(201);
+    const body = StartSandboxProfileInstanceResponseSchema.parse(await response.json());
+    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+      env,
+      sandboxInstanceId: body.sandboxInstanceId,
+    });
+
+    expect(queuedWorkflowInput.image).toEqual({
+      imageId: "tensorlake:image:tensorlake-snapshot-launch-image",
+      kind: "snapshot",
+      provider: "tensorlake",
+    });
+    expect(queuedWorkflowInput.sandboxRuntime).toEqual({
+      provider: "tensorlake",
+      resources: {
+        memoryMb: 4096,
+        vcpuCount: 2,
+      },
+    });
+    expect(queuedWorkflowInput.runtimePlan.image).toEqual({
+      source: "snapshot",
+      imageRef: "tensorlake:image:tensorlake-snapshot-launch-image",
+    });
+  });
+
   it("queues an ephemeral launch when the profile default is persistent but organization persistence is disabled", async ({
     env,
   }) => {
@@ -884,6 +948,8 @@ async function createStartableProfile(input: {
     | typeof SandboxProfileVersionDefaultPersistenceModes.PERSISTENT;
   agentRuntimeId?: "codex" | "opencode";
   snapshotImageId?: string;
+  snapshotImageProvider?: "docker" | "e2b" | "tensorlake";
+  runtimeColumns?: typeof DockerSandboxRuntimeColumns | typeof TensorlakeSandboxRuntimeColumns;
   git?: {
     targetKey: string;
     connectionId: string;
@@ -910,7 +976,7 @@ async function createStartableProfile(input: {
         defaultPersistenceMode:
           input.defaultPersistenceMode ?? SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
         agentRuntimeId: input.agentRuntimeId ?? "codex",
-        ...DockerSandboxRuntimeColumns,
+        ...(input.runtimeColumns ?? DockerSandboxRuntimeColumns),
         publishedAt:
           input.versionState === SandboxProfileVersionStates.PUBLISHED
             ? "2026-04-24T00:00:00.000Z"
@@ -919,7 +985,7 @@ async function createStartableProfile(input: {
       ...(input.snapshotImageId === undefined
         ? {}
         : {
-            snapshotImageProvider: "docker",
+            snapshotImageProvider: input.snapshotImageProvider ?? "docker",
             snapshotImageId: input.snapshotImageId,
           }),
     });

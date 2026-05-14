@@ -48,6 +48,10 @@ describe("integrations-definitions server", () => {
       familyId: "e2b",
       variantId: "e2b-default",
     });
+    const tensorlakeSandboxRuntimeDefinition = registry.getDefinition({
+      familyId: "tensorlake",
+      variantId: "tensorlake-default",
+    });
     const githubEnterpriseServerDefinition = registry.getDefinition({
       familyId: "github",
       variantId: "github-enterprise-server",
@@ -111,6 +115,14 @@ describe("integrations-definitions server", () => {
       kind: "sandbox",
       sandboxRuntime: {
         providerId: "e2b",
+      },
+    });
+    expect(tensorlakeSandboxRuntimeDefinition).toMatchObject({
+      familyId: "tensorlake",
+      variantId: "tensorlake-default",
+      kind: "sandbox",
+      sandboxRuntime: {
+        providerId: "tensorlake",
       },
     });
     expect(awsDefinition?.webhookHandler).toBeUndefined();
@@ -181,7 +193,7 @@ describe("integrations-definitions server", () => {
   it("lists registered server definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(14);
+    expect(definitions).toHaveLength(15);
   });
 
   it("builds the server definitions bundle with an agent runtime registry", () => {
