@@ -138,6 +138,7 @@ const PTY_OUTCOME_CLOSED: &str = "closed";
 const PTY_OUTCOME_EXITED: &str = "exited";
 const PTY_OUTCOME_RESET: &str = "reset";
 const PTY_INPUT_LATENCY_WARNING_THRESHOLD_MS: u64 = 100;
+const FIRST_GATEWAY_EGRESS_STREAM_ID: u64 = 2_147_483_648;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TunnelSigningRequest {
@@ -284,7 +285,7 @@ impl GatewayEgressForwarder {
     pub fn new() -> Self {
         Self {
             request_sender: Arc::new(RwLock::new(None)),
-            next_stream_id: Arc::new(AtomicU64::new(1)),
+            next_stream_id: Arc::new(AtomicU64::new(FIRST_GATEWAY_EGRESS_STREAM_ID)),
         }
     }
 
@@ -6125,15 +6126,16 @@ fn derive_upload_thread_directory_path(
 mod tests {
     use super::{
         AgentStreamState, AgentStreamStats, ConnectedTunnelSessionOutcome, DEFAULT_ATTACHMENT_ROOT,
-        PTY_OUTCOME_CLOSED, PendingEgressHttpRequest, PortAccessTcpStreamState, PtySessionStats,
-        PtySessionTermination, TunnelEgressHttpRequest, TunnelSessionError, TunnelSessionEvent,
-        TunnelSessionLoopContext, TunnelSessionMutableState, TunnelSessionRequest,
-        TunnelSessionRuntime, TunnelSessionRuntimeConnectionState, TunnelWriterMessage,
-        connect_bootstrap_websocket, handle_egress_transport_message,
-        handle_ports_transport_message, handle_tunnel_binary_frame, handle_tunnel_control_message,
-        handle_tunnel_session_event, handle_tunnel_session_request,
-        prioritize_ipv4_socket_addresses, publish_pty_input_latency_warning,
-        publish_pty_session_summary, resolve_bootstrap_tunnel_url, resolve_tunnel_exchange_url,
+        FIRST_GATEWAY_EGRESS_STREAM_ID, GatewayEgressForwarder, PTY_OUTCOME_CLOSED,
+        PendingEgressHttpRequest, PortAccessTcpStreamState, PtySessionStats, PtySessionTermination,
+        TunnelEgressHttpRequest, TunnelSessionError, TunnelSessionEvent, TunnelSessionLoopContext,
+        TunnelSessionMutableState, TunnelSessionRequest, TunnelSessionRuntime,
+        TunnelSessionRuntimeConnectionState, TunnelWriterMessage, connect_bootstrap_websocket,
+        handle_egress_transport_message, handle_ports_transport_message,
+        handle_tunnel_binary_frame, handle_tunnel_control_message, handle_tunnel_session_event,
+        handle_tunnel_session_request, prioritize_ipv4_socket_addresses,
+        publish_pty_input_latency_warning, publish_pty_session_summary,
+        resolve_bootstrap_tunnel_url, resolve_tunnel_exchange_url,
         run_connected_tunnel_session_catching_panics, snapshot_runtime_connection_state,
         startup_transparent_passthrough_socket_mark, sync_pty_scope_keepalive,
     };
@@ -6313,6 +6315,33 @@ mod tests {
             sleeper: Arc::new(ThreadSleeper),
             supervisor_handle: test_tunnel_supervisor_handle("sbi_test", Arc::new(SystemClock)),
         }
+    }
+
+    #[test]
+    fn gateway_egress_forwarder_uses_bootstrap_originated_stream_id_range() {
+        let forwarder = GatewayEgressForwarder::new();
+        let (request_sender, mut request_receiver) = tokio::sync::mpsc::unbounded_channel();
+        forwarder.attach(request_sender);
+
+        let _exchange = forwarder
+            .open_http(TunnelEgressHttpRequest {
+                request_id: "egp_1".to_string(),
+                method: "GET".to_string(),
+                scheme: "https".to_string(),
+                authority: "example.com".to_string(),
+                path: "/".to_string(),
+                query: None,
+                headers: BTreeMap::new(),
+            })
+            .expect("egress request should open");
+
+        let request = request_receiver
+            .blocking_recv()
+            .expect("egress open request should be sent");
+        let TunnelSessionRequest::EgressHttpOpen { stream_id, .. } = request else {
+            panic!("expected egress http open request");
+        };
+        assert_eq!(u64::from(stream_id), FIRST_GATEWAY_EGRESS_STREAM_ID);
     }
 
     #[test]
