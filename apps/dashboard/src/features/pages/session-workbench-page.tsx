@@ -430,7 +430,7 @@ function SessionWorkbenchPageContent(input: {
             autoScrollToBottomOnInitialLoad: true,
             initialBottomScrollResetKey: [
               input.sandboxInstanceId,
-              conversationPane.activeThreadId ?? "no-thread",
+              conversationPane.activeConversationId ?? "no-thread",
             ].join(":"),
             scrollBehavior: "follow-streaming-at-bottom",
             chatEntries: conversationPane.chatState.entries,
