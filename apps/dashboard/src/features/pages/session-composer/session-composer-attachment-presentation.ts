@@ -1,22 +1,14 @@
-import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
+import type { UploadedSandboxFile } from "@mistle/sandbox-session-client";
 
-import type { ChatAttachment } from "../../../chat/chat-types.js";
+import type { ChatAttachment } from "../../chat/chat-types.js";
+import type { SessionComposerSubmittedLocalImageAttachment } from "./session-composer-runtime-contracts.js";
 
-export const AttachedImagesHeader = "Attached images:";
-export const AttachedFilesHeader = "Attached files:";
-
-export type UploadedComposerAttachment = {
-  attachmentId: string;
-  kind: "image" | "file";
-  originalFilename: string;
-  mimeType: string;
-  sizeBytes: number;
-  path: string;
-};
+const AttachedImagesHeader = "Attached images:";
+const AttachedFilesHeader = "Attached files:";
 
 type AttachmentPromptParts = {
-  imageAttachments: readonly Pick<UploadedComposerAttachment, "path">[];
-  fileAttachments: readonly Pick<UploadedComposerAttachment, "originalFilename" | "path">[];
+  imageAttachments: readonly Pick<UploadedSandboxFile, "path">[];
+  fileAttachments: readonly Pick<UploadedSandboxFile, "originalFilename" | "path">[];
 };
 
 export function buildAttachedAttachmentPathsText(input: AttachmentPromptParts): string {
@@ -41,7 +33,7 @@ export function buildAttachedAttachmentPathsText(input: AttachmentPromptParts): 
   return sections.join("\n\n");
 }
 
-export function buildPromptWithAttachedAttachmentPaths(
+function buildPromptWithAttachedAttachmentPaths(
   input: {
     prompt: string;
   } & AttachmentPromptParts,
@@ -64,11 +56,11 @@ export function buildPromptWithAttachedAttachmentPaths(
 }
 
 function splitUploadedAttachments(input: {
-  uploadedAttachments: readonly UploadedComposerAttachment[];
+  uploadedAttachments: readonly UploadedSandboxFile[];
   supportsImageInspection: boolean;
 }): AttachmentPromptParts {
-  const imageAttachments: Pick<UploadedComposerAttachment, "path">[] = [];
-  const fileAttachments: Pick<UploadedComposerAttachment, "originalFilename" | "path">[] = [];
+  const imageAttachments: Pick<UploadedSandboxFile, "path">[] = [];
+  const fileAttachments: Pick<UploadedSandboxFile, "originalFilename" | "path">[] = [];
 
   for (const attachment of input.uploadedAttachments) {
     if (attachment.kind === "file") {
@@ -93,8 +85,8 @@ function splitUploadedAttachments(input: {
 }
 
 function toLocalImageAttachment(
-  attachment: UploadedComposerAttachment,
-): CodexTurnInputLocalImageItem | null {
+  attachment: UploadedSandboxFile,
+): SessionComposerSubmittedLocalImageAttachment | null {
   if (attachment.kind !== "image") {
     return null;
   }
@@ -106,15 +98,15 @@ function toLocalImageAttachment(
 }
 
 function toLocalImageAttachments(
-  attachments: readonly UploadedComposerAttachment[],
-): readonly CodexTurnInputLocalImageItem[] {
+  attachments: readonly UploadedSandboxFile[],
+): readonly SessionComposerSubmittedLocalImageAttachment[] {
   return attachments.flatMap((attachment) => {
     const localImageAttachment = toLocalImageAttachment(attachment);
     return localImageAttachment === null ? [] : [localImageAttachment];
   });
 }
 
-function toDisplayAttachment(attachment: UploadedComposerAttachment): ChatAttachment {
+function toDisplayAttachment(attachment: UploadedSandboxFile): ChatAttachment {
   return {
     kind: attachment.kind,
     path: attachment.path,
@@ -124,7 +116,7 @@ function toDisplayAttachment(attachment: UploadedComposerAttachment): ChatAttach
 
 export function buildMixedAttachmentTurnPrompt(input: {
   prompt: string;
-  uploadedAttachments: readonly UploadedComposerAttachment[];
+  uploadedAttachments: readonly UploadedSandboxFile[];
   supportsImageInspection: boolean;
 }): string {
   return buildPromptWithAttachedAttachmentPaths({
@@ -138,11 +130,11 @@ export function buildMixedAttachmentTurnPrompt(input: {
 
 export function resolveMixedAttachmentTurnRepresentation(input: {
   prompt: string;
-  uploadedAttachments: readonly UploadedComposerAttachment[];
+  uploadedAttachments: readonly UploadedSandboxFile[];
   supportsImageInspection: boolean;
 }): {
   prompt: string;
-  submittedAttachments: readonly CodexTurnInputLocalImageItem[];
+  submittedAttachments: readonly SessionComposerSubmittedLocalImageAttachment[];
   displayAttachments: readonly ChatAttachment[];
 } {
   const imageAttachments = toLocalImageAttachments(input.uploadedAttachments);

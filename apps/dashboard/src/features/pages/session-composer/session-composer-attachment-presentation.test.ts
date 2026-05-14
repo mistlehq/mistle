@@ -1,31 +1,33 @@
+import type { UploadedSandboxFile } from "@mistle/sandbox-session-client";
 import { describe, expect, it } from "vitest";
 
 import {
   buildAttachedAttachmentPathsText,
   buildMixedAttachmentTurnPrompt,
   resolveMixedAttachmentTurnRepresentation,
-  type UploadedComposerAttachment,
-} from "./codex-attachment-presentation.js";
+} from "./session-composer-attachment-presentation.js";
 
-const UploadedImageAttachment: UploadedComposerAttachment = {
+const UploadedImageAttachment: UploadedSandboxFile = {
   attachmentId: "att_image",
   kind: "image",
+  threadId: "thread_123",
   originalFilename: "screenshot.png",
   mimeType: "image/png",
   sizeBytes: 4,
   path: "/root/.local/attachments/thread_123/screenshot.png",
 };
 
-const UploadedFileAttachment: UploadedComposerAttachment = {
+const UploadedFileAttachment: UploadedSandboxFile = {
   attachmentId: "att_file",
   kind: "file",
+  threadId: "thread_123",
   originalFilename: "requirements.pdf",
   mimeType: "application/pdf",
   sizeBytes: 8,
   path: "/root/.local/attachments/thread_123/requirements.pdf",
 };
 
-describe("codex-attachment-presentation", () => {
+describe("session-composer-attachment-presentation", () => {
   it("formats and injects attached image paths for image-only prompt text", () => {
     expect(
       buildAttachedAttachmentPathsText({

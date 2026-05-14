@@ -6,7 +6,7 @@ import {
 import { useCallback, useState } from "react";
 
 import type { ChatAttachment } from "../../chat/chat-types.js";
-import { resolveMixedAttachmentTurnRepresentation } from "../../session-agents/codex/session-state/codex-attachment-presentation.js";
+import { resolveMixedAttachmentTurnRepresentation } from "./session-composer-attachment-presentation.js";
 import type { SessionComposerSubmittedLocalImageAttachment } from "./session-composer-runtime-contracts.js";
 import { resolveUploadErrorMessage } from "./session-composer-upload-errors.js";
 
