@@ -18,8 +18,6 @@ import {
   resolveWorkbenchEntryPhase,
   shouldWaitForAutomationSessionThread,
   buildOpenCodeComposerConfigResetKey,
-  mapOpenCodePermissionsToServerRequests,
-  resolveOpenCodePermissionResponse,
   resolveOpenCodePromptModelOverride,
   shouldGenerateInitialSessionTitle,
   useSessionWorkbenchController,
@@ -142,38 +140,6 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.workbench.primaryPanelState.cliTerminalContentInset).toBe("none");
     expect(result.current.workbench.primaryPanelState.cliTerminalThemeMode).toBe("system");
     expect(result.current.workbench.primaryPanelState.cliRuntimeDisplayName).toBe("OpenCode");
-  });
-
-  it("maps OpenCode permission requests to actionable server requests", () => {
-    expect(
-      mapOpenCodePermissionsToServerRequests([
-        {
-          id: "perm_test",
-          sessionID: "ses_test",
-          permission: "bash",
-          patterns: ["pnpm test"],
-          metadata: {},
-          always: [],
-        },
-      ]),
-    ).toEqual([
-      {
-        requestId: "perm_test",
-        method: "opencode/permission/requestApproval",
-        kind: "opencode-permission",
-        sessionId: "ses_test",
-        permission: "bash",
-        patterns: ["pnpm test"],
-        availableDecisions: ["once", "always", "reject"],
-        status: "pending",
-        responseErrorMessage: null,
-      },
-    ]);
-
-    expect(resolveOpenCodePermissionResponse({ decision: "always" })).toBe("always");
-    expect(() => resolveOpenCodePermissionResponse({ decision: "decline" })).toThrow(
-      "OpenCode permission response has an unsupported decision.",
-    );
   });
 
   it("omits OpenCode prompt model overrides until the user selects a model", () => {

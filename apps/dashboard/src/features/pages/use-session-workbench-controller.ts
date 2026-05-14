@@ -2,10 +2,6 @@ import type {
   CodexJsonRpcClient,
   AgentStreamClient,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
-import type {
-  OpenCodePermissionRequest,
-  OpenCodePermissionResponseInput,
-} from "@mistle/integrations-definitions/agent-runtimes/opencode/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef } from "react";
@@ -15,14 +11,13 @@ import { formatCodexContextUsage } from "../session-agents/codex/session-state/c
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import {
   buildOpenCodeAttachmentParts,
+  mapOpenCodePermissionsToServerRequests,
   parseOpenCodePromptModelSelection,
+  resolveOpenCodePermissionResponse,
   useOpenCodeSessionState,
   type OpenCodeChatState,
 } from "../session-agents/opencode/session-state/index.js";
-import type {
-  OpenCodePermissionApprovalRequestEntry,
-  ServerRequestEntry,
-} from "../session-agents/server-requests/index.js";
+import type { ServerRequestEntry } from "../session-agents/server-requests/index.js";
 import { applyPatchedSessionTitleToCache } from "../sessions/session-header-title-model.js";
 import { generateSessionTitleWithSandboxCodexExec } from "../sessions/session-title-generation.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
@@ -224,43 +219,6 @@ export function shouldGenerateInitialSessionTitle(input: {
   );
 }
 
-function normalizeOpenCodePermissionPatterns(
-  permission: OpenCodePermissionRequest,
-): readonly string[] {
-  return permission.patterns.length === 0 ? [permission.permission] : permission.patterns;
-}
-
-function mapOpenCodePermissionsToServerRequests(
-  pendingPermissions: readonly OpenCodePermissionRequest[],
-): readonly OpenCodePermissionApprovalRequestEntry[] {
-  return pendingPermissions.map((permission) => ({
-    requestId: permission.id,
-    method: "opencode/permission/requestApproval",
-    kind: "opencode-permission",
-    sessionId: permission.sessionID,
-    permission: permission.permission,
-    patterns: normalizeOpenCodePermissionPatterns(permission),
-    availableDecisions: ["once", "always", "reject"],
-    status: "pending",
-    responseErrorMessage: null,
-  }));
-}
-
-function resolveOpenCodePermissionResponse(
-  result: unknown,
-): OpenCodePermissionResponseInput["response"] {
-  if (typeof result !== "object" || result === null || !("decision" in result)) {
-    throw new Error("OpenCode permission response is missing a decision.");
-  }
-
-  const decision = result.decision;
-  if (decision === "always" || decision === "once" || decision === "reject") {
-    return decision;
-  }
-
-  throw new Error("OpenCode permission response has an unsupported decision.");
-}
-
 function buildRefreshingOpenCodeComposerBootstrap(): ReturnType<
   typeof useOpenCodeSessionState
 >["bootstrap"] {
@@ -298,14 +256,12 @@ type UseSessionWorkbenchControllerResult = {
 };
 
 export {
-  mapOpenCodePermissionsToServerRequests,
   sandboxInstanceStatusQueryKey,
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
   hasFreshSandboxStatusReadSinceRecoveryBoundary,
   resolveSandboxStatusReadState,
   resolveAutomationSessionPreparationTimeoutDelayMs,
-  resolveOpenCodePermissionResponse,
   resolveStoppedSessionMessageForWorkbenchEntryPhase,
   resolveWorkbenchEntryPhase,
   shouldWaitForAutomationSessionThread,
@@ -826,7 +782,7 @@ export function useSessionWorkbenchController(input: {
   }, []);
   const respondToOpenCodePermission = useCallback(
     (requestId: string | number, result: unknown): void => {
-      let response: OpenCodePermissionResponseInput["response"];
+      let response: ReturnType<typeof resolveOpenCodePermissionResponse>;
       try {
         response = resolveOpenCodePermissionResponse(result);
       } catch (error) {
