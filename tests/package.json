@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "lint": "oxlint --type-aware --deny-warnings .",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsgo -p tsconfig.json --noEmit",
     "test:system:prepare": "pnpm run test:system:legacy:prepare",
     "test:system:run": "pnpm run test:system:legacy:run",
     "test:system:runtime": "vitest run -c vitest.system-runtime.config.ts",

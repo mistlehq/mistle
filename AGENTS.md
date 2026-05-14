@@ -138,8 +138,8 @@
 
 ## Workflows
 
-- Always run `pnpm validate:changed`, which runs repo-level `format` and `typecheck` plus scoped workspace `lint` and `test` based on the current changed files.
-- Treat `pnpm validate:changed` as the default pre-push validation step.
+- Use `pnpm check:fast` as the default lightweight validation command while working. It runs full `typecheck`, non-type-aware lint, and Turbo affected `test` / `test:component`.
+- The pre-push hook runs `pnpm validate:changed --base origin/main --head HEAD`. Treat that as the heavier pre-push gate, not the default validation command while iterating.
 - Run `pnpm run ci` before pushing only when the change is high risk or touches shared/build/test infrastructure.
 - Do not use `--no-verify` for commits or pushes; fix the underlying hook failure instead.
 - Always commit using Conventional Commits (e.g. `feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`). Do not use any other format.

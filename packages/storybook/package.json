@@ -6,7 +6,7 @@
     "storybook": "storybook dev -p 6006 --ci",
     "build-storybook": "storybook build",
     "lint": "oxlint --type-aware --deny-warnings .",
-    "typecheck": "tsc --noEmit --project ./tsconfig.json",
+    "typecheck": "tsgo --noEmit --project ./tsconfig.json",
     "test": "vitest run --passWithNoTests",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."

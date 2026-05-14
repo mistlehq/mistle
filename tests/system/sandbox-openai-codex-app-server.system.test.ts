@@ -481,7 +481,7 @@ function sendAgentJson(socket: WebSocket, streamId: number, payload: unknown): v
     payloadKind: PayloadKindWebSocketText,
     payload: Buffer.from(JSON.stringify(payload), "utf8"),
   });
-  socket.send(encodedPayload);
+  socket.send(toArrayBufferBackedUint8Array(encodedPayload));
 }
 
 function toUint8Array(data: unknown): Uint8Array | null {
@@ -493,6 +493,10 @@ function toUint8Array(data: unknown): Uint8Array | null {
   }
 
   return null;
+}
+
+function toArrayBufferBackedUint8Array(data: Uint8Array): Uint8Array<ArrayBuffer> {
+  return new Uint8Array(data);
 }
 
 function parseTunnelJsonMessage(data: unknown): Promise<{
@@ -1983,13 +1987,12 @@ async function uploadImageOverTunnel(input: {
       timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
     });
 
-    socket.send(
-      encodeDataFrame({
-        streamId,
-        payloadKind: PayloadKindRawBytes,
-        payload: input.imageBytes,
-      }),
-    );
+    const encodedUploadChunk = encodeDataFrame({
+      streamId,
+      payloadKind: PayloadKindRawBytes,
+      payload: toArrayBufferBackedUint8Array(input.imageBytes),
+    });
+    socket.send(toArrayBufferBackedUint8Array(encodedUploadChunk));
     sendJson(socket, {
       type: "stream.close",
       streamId,
