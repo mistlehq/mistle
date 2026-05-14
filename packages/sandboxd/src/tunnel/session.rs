@@ -782,8 +782,10 @@ impl TunnelSession {
             let runtime = TunnelSessionRuntime {
                 keepalive_manager,
                 runtime_readiness_manager,
-                agent_endpoint_url,
-                runtime_env,
+                connection_state: Arc::new(RwLock::new(TunnelSessionRuntimeConnectionState {
+                    agent_endpoint_url,
+                    runtime_env,
+                })),
                 cgroup_root,
                 attachment_root,
                 sandbox_instance_id,
@@ -1014,8 +1016,7 @@ struct FileUploadState {
 struct TunnelSessionRuntime {
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
-    agent_endpoint_url: Option<String>,
-    runtime_env: BTreeMap<String, String>,
+    connection_state: Arc<RwLock<TunnelSessionRuntimeConnectionState>>,
     cgroup_root: PathBuf,
     attachment_root: PathBuf,
     sandbox_instance_id: String,
@@ -1026,6 +1027,12 @@ struct TunnelSessionRuntime {
     clock: Arc<dyn Clock>,
     sleeper: Arc<dyn Sleeper>,
     supervisor_handle: SandboxdSupervisorHandle,
+}
+
+#[derive(Clone)]
+struct TunnelSessionRuntimeConnectionState {
+    agent_endpoint_url: Option<String>,
+    runtime_env: BTreeMap<String, String>,
 }
 struct TunnelSessionLoopContext<'a> {
     attachment_root: &'a Path,
@@ -1781,6 +1788,51 @@ fn publish_initial_runtime_readiness(
     write_tunnel_text(tunnel_writer_sender, payload)
 }
 
+fn snapshot_runtime_connection_state(
+    runtime: &TunnelSessionRuntime,
+) -> TunnelSessionRuntimeConnectionState {
+    match runtime.connection_state.read() {
+        Ok(connection_state) => connection_state.clone(),
+        Err(poisoned_connection_state) => {
+            eprintln!(
+                "sandboxd bootstrap tunnel observed a poisoned connection state during connect; continuing with the poisoned state"
+            );
+            poisoned_connection_state.into_inner().clone()
+        }
+    }
+}
+
+fn set_runtime_agent_endpoint_url(
+    runtime: &TunnelSessionRuntime,
+    agent_endpoint_url: Option<String>,
+) {
+    match runtime.connection_state.write() {
+        Ok(mut connection_state) => {
+            connection_state.agent_endpoint_url = agent_endpoint_url;
+        }
+        Err(poisoned_connection_state) => {
+            eprintln!(
+                "sandboxd bootstrap tunnel observed a poisoned connection state during agent endpoint update; continuing with the poisoned state"
+            );
+            poisoned_connection_state.into_inner().agent_endpoint_url = agent_endpoint_url;
+        }
+    }
+}
+
+fn set_runtime_environment(runtime: &TunnelSessionRuntime, runtime_env: BTreeMap<String, String>) {
+    match runtime.connection_state.write() {
+        Ok(mut connection_state) => {
+            connection_state.runtime_env = runtime_env;
+        }
+        Err(poisoned_connection_state) => {
+            eprintln!(
+                "sandboxd bootstrap tunnel observed a poisoned connection state during runtime environment update; continuing with the poisoned state"
+            );
+            poisoned_connection_state.into_inner().runtime_env = runtime_env;
+        }
+    }
+}
+
 async fn run_connected_tunnel_session(
     runtime: &TunnelSessionRuntime,
     bootstrap_socket: TunnelWebSocket,
@@ -1800,10 +1852,11 @@ async fn run_connected_tunnel_session(
         runtime.sleeper.clone(),
         event_sender.clone(),
     );
+    let connection_state = snapshot_runtime_connection_state(runtime);
 
     let mut session_state = TunnelSessionMutableState {
-        agent_endpoint_url: runtime.agent_endpoint_url.clone(),
-        runtime_env: runtime.runtime_env.clone(),
+        agent_endpoint_url: connection_state.agent_endpoint_url,
+        runtime_env: connection_state.runtime_env,
         telemetry_relay: TelemetryRelay::default(),
         pending_signing_requests: BTreeMap::new(),
         pending_egress_http_requests: BTreeMap::new(),
@@ -2152,6 +2205,7 @@ async fn run_connected_tunnel_session(
                 request,
                 &tunnel_writer_sender,
                 loop_context.acting_user_id,
+                runtime,
                 &mut session_state,
             ),
         };
@@ -4257,6 +4311,7 @@ fn handle_tunnel_session_request(
     request: TunnelSessionRequest,
     tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     acting_user_id: Option<&str>,
+    runtime: &TunnelSessionRuntime,
     session_state: &mut TunnelSessionMutableState,
 ) -> Result<TunnelSessionControlFlow, TunnelSessionError> {
     match request {
@@ -4264,6 +4319,7 @@ fn handle_tunnel_session_request(
             agent_endpoint_url,
             response_sender,
         } => {
+            set_runtime_agent_endpoint_url(runtime, agent_endpoint_url.clone());
             session_state.agent_endpoint_url = agent_endpoint_url;
             let _ = response_sender.send(Ok(()));
             Ok(TunnelSessionControlFlow::Continue)
@@ -4272,6 +4328,7 @@ fn handle_tunnel_session_request(
             runtime_env,
             response_sender,
         } => {
+            set_runtime_environment(runtime, runtime_env.clone());
             session_state.runtime_env = runtime_env;
             let _ = response_sender.send(Ok(()));
             Ok(TunnelSessionControlFlow::Continue)
@@ -6071,14 +6128,14 @@ mod tests {
         PTY_OUTCOME_CLOSED, PendingEgressHttpRequest, PortAccessTcpStreamState, PtySessionStats,
         PtySessionTermination, TunnelEgressHttpRequest, TunnelSessionError, TunnelSessionEvent,
         TunnelSessionLoopContext, TunnelSessionMutableState, TunnelSessionRequest,
-        TunnelSessionRuntime, TunnelWriterMessage, connect_bootstrap_websocket,
-        handle_egress_transport_message, handle_ports_transport_message,
-        handle_tunnel_binary_frame, handle_tunnel_control_message, handle_tunnel_session_event,
-        handle_tunnel_session_request, prioritize_ipv4_socket_addresses,
-        publish_pty_input_latency_warning, publish_pty_session_summary,
-        resolve_bootstrap_tunnel_url, resolve_tunnel_exchange_url,
-        run_connected_tunnel_session_catching_panics, startup_transparent_passthrough_socket_mark,
-        sync_pty_scope_keepalive,
+        TunnelSessionRuntime, TunnelSessionRuntimeConnectionState, TunnelWriterMessage,
+        connect_bootstrap_websocket, handle_egress_transport_message,
+        handle_ports_transport_message, handle_tunnel_binary_frame, handle_tunnel_control_message,
+        handle_tunnel_session_event, handle_tunnel_session_request,
+        prioritize_ipv4_socket_addresses, publish_pty_input_latency_warning,
+        publish_pty_session_summary, resolve_bootstrap_tunnel_url, resolve_tunnel_exchange_url,
+        run_connected_tunnel_session_catching_panics, snapshot_runtime_connection_state,
+        startup_transparent_passthrough_socket_mark, sync_pty_scope_keepalive,
     };
 
     use std::collections::{BTreeMap, BTreeSet};
@@ -6089,7 +6146,7 @@ mod tests {
     #[cfg(target_os = "linux")]
     use std::process::{Child, Command, Stdio};
     use std::sync::atomic::{AtomicU64, Ordering};
-    use std::sync::{Arc, Mutex, mpsc};
+    use std::sync::{Arc, Mutex, RwLock, mpsc};
     use std::thread;
     use std::time::{Duration, Instant};
 
@@ -6237,11 +6294,33 @@ mod tests {
         }
     }
 
+    fn test_tunnel_session_runtime() -> TunnelSessionRuntime {
+        TunnelSessionRuntime {
+            keepalive_manager: Arc::new(Mutex::new(KeepaliveManager::default())),
+            runtime_readiness_manager: Arc::new(Mutex::new(RuntimeReadinessManager::default())),
+            connection_state: Arc::new(RwLock::new(TunnelSessionRuntimeConnectionState {
+                agent_endpoint_url: None,
+                runtime_env: BTreeMap::new(),
+            })),
+            cgroup_root: PathBuf::from(crate::cgroups::DEFAULT_CGROUP_ROOT),
+            attachment_root: PathBuf::from(DEFAULT_ATTACHMENT_ROOT),
+            sandbox_instance_id: "sbi_test".to_string(),
+            gateway_ws_url: "ws://127.0.0.1:1/v1/bootstrap".to_string(),
+            acting_user_id: None,
+            transparent_passthrough_socket_mark: None,
+            shutdown_requested: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            clock: Arc::new(SystemClock),
+            sleeper: Arc::new(ThreadSleeper),
+            supervisor_handle: test_tunnel_supervisor_handle("sbi_test", Arc::new(SystemClock)),
+        }
+    }
+
     #[test]
     fn set_agent_endpoint_request_updates_the_existing_tunnel_session() {
         let (tunnel_writer_sender, _tunnel_writer_receiver) =
             tokio::sync::mpsc::unbounded_channel();
         let (response_sender, response_receiver) = mpsc::channel();
+        let runtime = test_tunnel_session_runtime();
         let mut session_state = empty_tunnel_session_state();
 
         handle_tunnel_session_request(
@@ -6251,6 +6330,7 @@ mod tests {
             },
             &tunnel_writer_sender,
             None,
+            &runtime,
             &mut session_state,
         )
         .expect("agent endpoint update should be handled");
@@ -6263,6 +6343,11 @@ mod tests {
             session_state.agent_endpoint_url.as_deref(),
             Some("ws://127.0.0.1:12345/agent")
         );
+        let connection_state = snapshot_runtime_connection_state(&runtime);
+        assert_eq!(
+            connection_state.agent_endpoint_url.as_deref(),
+            Some("ws://127.0.0.1:12345/agent")
+        );
     }
 
     #[test]
@@ -6270,6 +6355,7 @@ mod tests {
         let (tunnel_writer_sender, _tunnel_writer_receiver) =
             tokio::sync::mpsc::unbounded_channel();
         let (response_sender, response_receiver) = mpsc::channel();
+        let runtime = test_tunnel_session_runtime();
         let mut session_state = empty_tunnel_session_state();
 
         handle_tunnel_session_request(
@@ -6282,6 +6368,7 @@ mod tests {
             },
             &tunnel_writer_sender,
             None,
+            &runtime,
             &mut session_state,
         )
         .expect("runtime environment update should be handled");
@@ -6294,6 +6381,11 @@ mod tests {
             session_state.runtime_env.get("MISTLE_RUNTIME_ENV"),
             Some(&"ready".to_string())
         );
+        let connection_state = snapshot_runtime_connection_state(&runtime);
+        assert_eq!(
+            connection_state.runtime_env.get("MISTLE_RUNTIME_ENV"),
+            Some(&"ready".to_string())
+        );
     }
 
     #[tokio::test]
@@ -6301,6 +6393,7 @@ mod tests {
         let (tunnel_writer_sender, mut tunnel_writer_receiver) =
             tokio::sync::mpsc::unbounded_channel();
         let (response_sender, _response_receiver) = mpsc::channel();
+        let runtime = test_tunnel_session_runtime();
         let mut session_state = TunnelSessionMutableState {
             agent_endpoint_url: None,
             runtime_env: BTreeMap::new(),
@@ -6334,6 +6427,7 @@ mod tests {
             },
             &tunnel_writer_sender,
             Some("usr_123"),
+            &runtime,
             &mut session_state,
         )
         .expect("egress open request should be written");
@@ -6349,6 +6443,7 @@ mod tests {
             },
             &tunnel_writer_sender,
             None,
+            &runtime,
             &mut session_state,
         )
         .expect("egress request body chunk should be written");
@@ -6373,6 +6468,7 @@ mod tests {
             TunnelSessionRequest::EgressHttpRequestBodyEnd { stream_id: 93 },
             &tunnel_writer_sender,
             None,
+            &runtime,
             &mut session_state,
         )
         .expect("egress request body end should be written");
@@ -6395,6 +6491,7 @@ mod tests {
             },
             &tunnel_writer_sender,
             None,
+            &runtime,
             &mut session_state,
         )
         .expect("egress tcp data should be written");
@@ -6421,6 +6518,7 @@ mod tests {
             TunnelSessionRequest::EgressTcpClose { stream_id: 93 },
             &tunnel_writer_sender,
             None,
+            &runtime,
             &mut session_state,
         )
         .expect("egress tcp close should be written");
@@ -9431,8 +9529,10 @@ mod tests {
         let runtime = TunnelSessionRuntime {
             keepalive_manager,
             runtime_readiness_manager,
-            agent_endpoint_url: None,
-            runtime_env: BTreeMap::new(),
+            connection_state: Arc::new(RwLock::new(TunnelSessionRuntimeConnectionState {
+                agent_endpoint_url: None,
+                runtime_env: BTreeMap::new(),
+            })),
             cgroup_root: PathBuf::from(crate::cgroups::DEFAULT_CGROUP_ROOT),
             attachment_root: PathBuf::from(DEFAULT_ATTACHMENT_ROOT),
             sandbox_instance_id: "sbi_tunnel_session".to_string(),
