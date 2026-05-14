@@ -29,7 +29,7 @@ import {
   resolveWorkbenchEntryPhase,
   shouldWaitForAutomationSessionThread,
 } from "./session-workbench-state.js";
-import { useSessionWorkbenchCodexRecovery } from "./use-session-workbench-codex-recovery.js";
+import { useSessionWorkbenchRecovery } from "./use-session-workbench-recovery.js";
 
 const AutomationSessionStatusRefetchIntervalMs = 2_000;
 const AutomationSessionPreparationTimeoutMessage =
@@ -49,7 +49,7 @@ type SessionSnapshotForWorkbench = {
   sandboxInstanceId?: string;
 };
 
-type SessionLifecycleForWorkbench = {
+export type SessionLifecycleForWorkbench = {
   clearLifecycleErrorMessage: () => void;
   connectSession: (input: InitialSessionConnectInput) => void;
   detachSessionConnection: () => void;
@@ -382,7 +382,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   }, [automationPendingSinceMs, isWaitingForAutomationThread]);
 
   const resolvedLifecycleErrorMessage = lifecycleErrorMessage ?? automationPendingErrorMessage;
-  const codexRecoveryState = useSessionWorkbenchCodexRecovery({
+  const sessionRecoveryState = useSessionWorkbenchRecovery({
     canConnect: connectionReadiness.canConnect,
     connectSession,
     hasLifecycleError: resolvedLifecycleErrorMessage !== null,
@@ -465,7 +465,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   ]);
 
   const sandboxFailureMessage = sandboxStatus?.failureMessage ?? null;
-  const sessionReconnectMessage = codexRecoveryState.sessionReconnectState.message;
+  const sessionReconnectMessage = sessionRecoveryState.sessionReconnectState.message;
   const workbenchStatus = resolveSessionWorkbenchStatus({
     sandboxStatusReadState,
     sandboxLifecycleStatus: displaySandboxLifecycleStatus,

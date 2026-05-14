@@ -77,11 +77,6 @@ import { useSessionPortAccess } from "./use-session-port-access.js";
 import { useSessionPrimaryRepositoryState } from "./use-session-primary-repository-state.js";
 import { useSessionRepositoryStatus } from "./use-session-repository-status.js";
 import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
-import {
-  reduceCodexRecoveryState,
-  resolveCodexRecoveryStateForRender,
-  resolveCodexReconnectMessage,
-} from "./use-session-workbench-codex-recovery.js";
 import { useSessionWorkbenchLifecycleState } from "./use-session-workbench-lifecycle-state.js";
 import { useSessionWorkbenchTransport } from "./use-session-workbench-transport.js";
 
@@ -309,10 +304,7 @@ export {
   hasFreshSandboxStatusRead,
   hasFreshSandboxStatusReadSinceRecoveryBoundary,
   resolveSandboxStatusReadState,
-  reduceCodexRecoveryState,
   resolveAutomationSessionPreparationTimeoutDelayMs,
-  resolveCodexRecoveryStateForRender,
-  resolveCodexReconnectMessage,
   resolveOpenCodePermissionResponse,
   resolveStoppedSessionMessageForWorkbenchEntryPhase,
   resolveWorkbenchEntryPhase,

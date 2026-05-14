@@ -12,10 +12,7 @@ import {
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
   hasFreshSandboxStatusReadSinceRecoveryBoundary,
-  reduceCodexRecoveryState,
   resolveSandboxStatusReadState,
-  resolveCodexRecoveryStateForRender,
-  resolveCodexReconnectMessage,
   resolveAutomationSessionPreparationTimeoutDelayMs,
   resolveStoppedSessionMessageForWorkbenchEntryPhase,
   resolveWorkbenchEntryPhase,
@@ -28,6 +25,11 @@ import {
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
 import { resolveSandboxStatusRefetchInterval } from "./use-session-workbench-lifecycle-state.js";
+import {
+  reduceSessionWorkbenchRecoveryState,
+  resolveSessionWorkbenchRecoveryStateForRender,
+  resolveSessionReconnectMessage,
+} from "./use-session-workbench-recovery.js";
 
 function createControllerQueryClient(input?: {
   gcTime?: number;
@@ -230,8 +232,8 @@ describe("useSessionWorkbenchController", () => {
     ).toBe(false);
   });
 
-  it("starts Codex recovery from a recoverable disconnect and preserves attempts for the same event", () => {
-    const startedRecovery = reduceCodexRecoveryState(
+  it("starts session recovery from a recoverable disconnect and preserves attempts for the same event", () => {
+    const startedRecovery = reduceSessionWorkbenchRecoveryState(
       { kind: "idle" },
       {
         type: "recoverable_disconnect_observed",
@@ -255,7 +257,7 @@ describe("useSessionWorkbenchController", () => {
       recoverableDisconnectId: 1,
     });
 
-    const sameDisconnectReconnect = reduceCodexRecoveryState(startedRecovery, {
+    const sameDisconnectReconnect = reduceSessionWorkbenchRecoveryState(startedRecovery, {
       type: "sync_observed",
       observation: {
         canConnect: true,
@@ -267,7 +269,7 @@ describe("useSessionWorkbenchController", () => {
         sandboxStatus: "running",
       },
     });
-    const reconnectAttemptStarted = reduceCodexRecoveryState(sameDisconnectReconnect, {
+    const reconnectAttemptStarted = reduceSessionWorkbenchRecoveryState(sameDisconnectReconnect, {
       type: "reconnect_attempt_started",
     });
 
@@ -283,7 +285,7 @@ describe("useSessionWorkbenchController", () => {
     });
 
     expect(
-      reduceCodexRecoveryState(reconnectAttemptStarted, {
+      reduceSessionWorkbenchRecoveryState(reconnectAttemptStarted, {
         type: "recoverable_disconnect_observed",
         disconnect: {
           id: 1,
@@ -317,7 +319,7 @@ describe("useSessionWorkbenchController", () => {
     };
 
     expect(
-      reduceCodexRecoveryState(waitingRecovery, {
+      reduceSessionWorkbenchRecoveryState(waitingRecovery, {
         type: "sync_observed",
         observation: {
           canConnect: false,
@@ -332,7 +334,7 @@ describe("useSessionWorkbenchController", () => {
     ).toEqual(waitingRecovery);
 
     expect(
-      reduceCodexRecoveryState(waitingRecovery, {
+      reduceSessionWorkbenchRecoveryState(waitingRecovery, {
         type: "sync_observed",
         observation: {
           canConnect: true,
@@ -350,7 +352,7 @@ describe("useSessionWorkbenchController", () => {
     });
 
     expect(
-      reduceCodexRecoveryState(
+      reduceSessionWorkbenchRecoveryState(
         {
           ...waitingRecovery,
           recoveryStrategy: "reconnect_transport" as const,
@@ -377,7 +379,7 @@ describe("useSessionWorkbenchController", () => {
 
   it("clears stale recovery state before render-time reconnect logic for a new sandbox", () => {
     expect(
-      resolveCodexRecoveryStateForRender({
+      resolveSessionWorkbenchRecoveryStateForRender({
         baseState: {
           kind: "recovering",
           baseMessage: "Sandbox session stream reset.",
@@ -402,7 +404,7 @@ describe("useSessionWorkbenchController", () => {
     });
   });
 
-  it("stops Codex recovery once attempts are exhausted or the sandbox fails", () => {
+  it("stops session recovery once attempts are exhausted or the sandbox fails", () => {
     const exhaustedRecovery = {
       kind: "recovering" as const,
       baseMessage: "Sandbox session stream reset.",
@@ -415,7 +417,7 @@ describe("useSessionWorkbenchController", () => {
     };
 
     expect(
-      reduceCodexRecoveryState(exhaustedRecovery, {
+      reduceSessionWorkbenchRecoveryState(exhaustedRecovery, {
         type: "sync_observed",
         observation: {
           canConnect: true,
@@ -444,7 +446,7 @@ describe("useSessionWorkbenchController", () => {
     };
 
     expect(
-      reduceCodexRecoveryState(failedRecovery, {
+      reduceSessionWorkbenchRecoveryState(failedRecovery, {
         type: "sync_observed",
         observation: {
           canConnect: false,
@@ -465,7 +467,7 @@ describe("useSessionWorkbenchController", () => {
 
   it("formats reconnect messaging across running and stopped recovery phases", () => {
     expect(
-      resolveCodexReconnectMessage({
+      resolveSessionReconnectMessage({
         recoveryBaseMessage: "Sandbox session stream reset.",
         recoveryErrorMessage: null,
         reconnectAttemptCount: 1,
@@ -474,7 +476,7 @@ describe("useSessionWorkbenchController", () => {
     ).toBe("Sandbox session stream reset. Reconnecting session (attempt 1 of 3).");
 
     expect(
-      resolveCodexReconnectMessage({
+      resolveSessionReconnectMessage({
         recoveryBaseMessage: "Sandbox session stream reset.",
         recoveryErrorMessage: null,
         reconnectAttemptCount: 0,
