@@ -2,6 +2,9 @@ export {
   useSessionComposerState,
   type QueuedComposerPromptViewModel,
   type SessionComposerDraftState,
+  type SessionComposerModelSelectionInput,
+  type SessionComposerRuntimeInput,
+  type SessionComposerSharedInput,
   type SessionComposerStateInput,
   type SessionComposerUiState,
 } from "./use-session-composer-state.js";

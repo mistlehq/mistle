@@ -17,10 +17,10 @@ export type ComposerStatusMessage = {
 export function resolveComposerBootstrapMessage(input: {
   activeComposerModel: CodexModelSummary | null;
   bootstrapState: SessionBootstrapPhase;
-  requiresModelSelection?: boolean | undefined;
+  requiresModelSelection: boolean;
   selectedModel: string | null;
 }): string | null {
-  if (input.requiresModelSelection === false) {
+  if (!input.requiresModelSelection) {
     return null;
   }
 
@@ -48,7 +48,7 @@ export function resolveComposerStatusMessage(input: {
   completedTurnErrorMessage: string | null;
   hasPendingImageAttachments: boolean;
   isUploadingAttachments: boolean;
-  requiresModelSelection?: boolean | undefined;
+  requiresModelSelection: boolean;
   sessionErrorMessage: string | null;
   selectedModel: string | null;
 }): ComposerStatusMessage | null {

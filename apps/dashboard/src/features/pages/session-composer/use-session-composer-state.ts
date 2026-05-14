@@ -78,22 +78,31 @@ export type SessionTurnControl = {
   interruptTurn: () => void;
 };
 
-export type SessionComposerStateInput = {
+export type SessionComposerModelSelectionInput = {
+  required: boolean;
+  showControls: boolean;
+};
+
+export type SessionComposerRuntimeInput = {
   bootstrap: SessionBootstrapResult;
   clearSessionErrorMessage: () => void;
   configControl: SessionComposerConfigControl;
+  contextUsage: CodexContextUsageViewModel | null;
+  collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
+  modelSelection: SessionComposerModelSelectionInput;
+  sessionErrorMessage: string | null;
+  turnControl: SessionTurnControl;
+};
+
+export type SessionComposerSharedInput = {
   attachmentControl: SessionComposerAttachmentControl;
   repositoryStatus: {
     branchLabel: string | null;
     pullRequest: SessionPullRequestSummary | null;
   };
-  contextUsage: CodexContextUsageViewModel | null;
-  collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
-  requiresModelSelection?: boolean;
-  showConfigControls?: boolean;
-  sessionErrorMessage: string | null;
-  turnControl: SessionTurnControl;
 };
+
+export type SessionComposerStateInput = SessionComposerRuntimeInput & SessionComposerSharedInput;
 
 export type SessionComposerDraftState = {
   composerText: string;
@@ -115,8 +124,8 @@ export function useSessionComposerState(input: {
 }): SessionComposerUiState {
   const { composerStateInput, draftState } = input;
   const { clearSessionErrorMessage, sessionErrorMessage } = composerStateInput;
-  const requiresModelSelection = composerStateInput.requiresModelSelection !== false;
-  const showConfigControls = composerStateInput.showConfigControls ?? requiresModelSelection;
+  const { required: requiresModelSelection, showControls: showConfigControls } =
+    composerStateInput.modelSelection;
   const composerText = draftState.composerText;
   const [composerErrorMessage, setComposerErrorMessage] = useState<string | null>(null);
   const [pendingComposerAttachments, setPendingComposerAttachments] = useState<

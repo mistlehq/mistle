@@ -147,6 +147,10 @@ function RenderedComposerPaneHarness(input: {
           pullRequest: null,
         },
         contextUsage: null,
+        modelSelection: {
+          required: true,
+          showControls: true,
+        },
         sessionErrorMessage,
         turnControl: {
           activeTurnState: "idle",
@@ -250,6 +254,10 @@ function QueuedPromptComposerHarness(): React.JSX.Element {
             pullRequest: null,
           },
           contextUsage: null,
+          modelSelection: {
+            required: true,
+            showControls: true,
+          },
           sessionErrorMessage: null,
           turnControl: {
             activeTurnState,

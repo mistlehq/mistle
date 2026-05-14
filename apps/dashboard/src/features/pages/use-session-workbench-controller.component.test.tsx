@@ -124,8 +124,10 @@ describe("useSessionWorkbenchController", () => {
       sandboxInstanceId: "sbi_opencode",
     });
 
-    expect(result.current.conversationPane.composerStateInput.requiresModelSelection).toBe(false);
-    expect(result.current.conversationPane.composerStateInput.showConfigControls).toBe(true);
+    expect(result.current.conversationPane.composerStateInput.modelSelection).toEqual({
+      required: false,
+      showControls: true,
+    });
     expect(result.current.conversationPane.composerStateInput.bootstrap.phase).toEqual({
       status: "unavailable",
     });

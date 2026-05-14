@@ -119,6 +119,10 @@ function SessionComposerStateHarness(input: {
         pullRequest: null,
       },
       contextUsage: null,
+      modelSelection: {
+        required: true,
+        showControls: true,
+      },
       ...(input.collaborationDeveloperInstructions === undefined
         ? {}
         : {
