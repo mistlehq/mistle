@@ -16,7 +16,7 @@ use sandboxd::runtime::readiness::RuntimeReadinessManager;
 use sandboxd::time::{Duration, Sleeper, ThreadSleeper};
 
 #[test]
-fn proxy_and_activity_monitor_talk_to_real_opencode_server() {
+fn shell_command_survives_client_disconnect_after_proxy_activity_retention() {
     let raw_port = reserve_available_port();
     let raw_url = format!("http://127.0.0.1:{raw_port}");
     let _server = start_opencode_server(raw_port);
@@ -34,52 +34,51 @@ fn proxy_and_activity_monitor_talk_to_real_opencode_server() {
     wait_for_runtime_readiness(&runtime_readiness_manager, true);
     wait_for_keepalive_activity(&keepalive_manager, false);
 
-    let (mut client, _) =
+    let (mut worker_client, _) =
         connect_to_proxy_with_retry(proxy.listen_url(), &ThreadSleeper, Duration::from_secs(5));
-    client
-        .send(Message::Text(
-            json!({
-                "id": "health",
-                "method": "GET",
-                "path": "/global/health"
-            })
-            .to_string()
-            .into(),
-        ))
-        .expect("health request should send through proxy");
-
-    let health_response = read_json_text_message(&mut client);
-    assert_eq!(health_response["id"], json!("health"));
-    assert_eq!(health_response["type"], json!("response"));
-    assert_eq!(health_response["status"], json!(200));
-    let health_body = health_response["body"]
+    let session_response = call_proxy_json_request(
+        &mut worker_client,
+        json!({
+            "id": "create-session",
+            "method": "POST",
+            "path": "/session",
+            "body": {
+                "title": "persistent shell test"
+            }
+        }),
+    );
+    let session_id = session_response["id"]
         .as_str()
-        .expect("OpenCode health response body should be a string");
-    let health_value: Value =
-        serde_json::from_str(health_body).expect("OpenCode health body should be JSON");
-    assert_eq!(health_value["healthy"], json!(true));
-    assert_eq!(health_value["version"], json!("1.14.50"));
+        .expect("OpenCode session create response should include an id")
+        .to_string();
+    let marker = format!("opencode-persistent-session-{}", std::process::id());
 
-    client
+    worker_client
         .send(Message::Text(
             json!({
-                "id": "status",
-                "method": "GET",
-                "path": "/session/status"
+                "id": "shell-command",
+                "method": "POST",
+                "path": format!("/session/{session_id}/shell"),
+                "body": {
+                    "agent": "build",
+                    "command": format!("sh -lc 'sleep 2; printf {marker}'")
+                }
             })
             .to_string()
             .into(),
         ))
-        .expect("session status request should send through proxy");
-    let status_response = read_json_text_message(&mut client);
-    assert_eq!(status_response["id"], json!("status"));
-    assert_eq!(status_response["type"], json!("response"));
-    assert_eq!(status_response["status"], json!(200));
-    assert_eq!(status_response["body"], json!("{}"));
+        .expect("shell command request should send through proxy");
 
-    client
+    wait_for_raw_session_status(&raw_url, &session_id, "busy");
+
+    worker_client
         .close(None)
-        .expect("proxy client should close cleanly");
+        .expect("worker client should close cleanly");
+
+    wait_for_shell_output(&raw_url, &session_id, &marker);
+    wait_for_raw_session_idle(&raw_url, &session_id);
+    wait_for_keepalive_activity(&keepalive_manager, false);
+
     proxy.close().expect("OpenCode proxy should close cleanly");
 }
 
@@ -183,6 +182,104 @@ fn wait_for_keepalive_activity(
     }
 
     panic!("timed out waiting for keepalive activity {expected_active}");
+}
+
+fn wait_for_raw_session_status(raw_url: &str, session_id: &str, expected_status: &str) {
+    for _ in 0..100 {
+        let statuses = raw_json_request("GET", &format!("{raw_url}/session/status"), None);
+        if statuses[session_id]["type"] == json!(expected_status) {
+            return;
+        }
+
+        ThreadSleeper.sleep(Duration::from_millis(50));
+    }
+
+    panic!("timed out waiting for OpenCode session {session_id} status {expected_status}");
+}
+
+fn wait_for_raw_session_idle(raw_url: &str, session_id: &str) {
+    for _ in 0..100 {
+        let statuses = raw_json_request("GET", &format!("{raw_url}/session/status"), None);
+        if statuses.get(session_id).is_none() || statuses[session_id]["type"] == json!("idle") {
+            return;
+        }
+
+        ThreadSleeper.sleep(Duration::from_millis(50));
+    }
+
+    panic!("timed out waiting for OpenCode session {session_id} to become idle");
+}
+
+fn wait_for_shell_output(raw_url: &str, session_id: &str, expected_output: &str) {
+    for _ in 0..100 {
+        let messages = raw_json_request(
+            "GET",
+            &format!("{raw_url}/session/{session_id}/message"),
+            None,
+        );
+        if opencode_messages_include_tool_output(&messages, expected_output) {
+            return;
+        }
+
+        ThreadSleeper.sleep(Duration::from_millis(50));
+    }
+
+    panic!("timed out waiting for OpenCode shell output {expected_output}");
+}
+
+fn opencode_messages_include_tool_output(messages: &Value, expected_output: &str) -> bool {
+    let Some(messages) = messages.as_array() else {
+        return false;
+    };
+    messages
+        .iter()
+        .filter_map(|message| message["parts"].as_array())
+        .flatten()
+        .any(|part| part["state"]["output"].as_str() == Some(expected_output))
+}
+
+fn call_proxy_json_request<S>(client: &mut WebSocket<S>, request: Value) -> Value
+where
+    S: Read + Write,
+{
+    let request_id = request["id"].clone();
+    client
+        .send(Message::Text(request.to_string().into()))
+        .expect("proxy request should send");
+    let response = read_json_text_message(client);
+    assert_eq!(response["id"], request_id);
+    assert_eq!(response["type"], json!("response"));
+    assert_eq!(response["status"], json!(200));
+    let body = response["body"]
+        .as_str()
+        .expect("proxy response body should be a string");
+    serde_json::from_str(body).expect("proxy response body should be JSON")
+}
+
+fn raw_json_request(method: &str, url: &str, body: Option<Value>) -> Value {
+    let client = reqwest::blocking::Client::new();
+    let request = match method {
+        "GET" => client.get(url),
+        "POST" => client.post(url),
+        other => panic!("unsupported raw OpenCode request method {other}"),
+    };
+    let request = if let Some(body) = body {
+        request.json(&body)
+    } else {
+        request
+    };
+    let response = request
+        .send()
+        .unwrap_or_else(|error| panic!("raw OpenCode request {method} {url} should send: {error}"));
+    let status = response.status();
+    let body_text = response
+        .text()
+        .unwrap_or_else(|error| panic!("raw OpenCode response body should read: {error}"));
+    assert!(
+        status.is_success(),
+        "raw OpenCode request {method} {url} returned {status}: {body_text}"
+    );
+    serde_json::from_str(&body_text).expect("raw OpenCode response body should be JSON")
 }
 
 fn connect_to_proxy_with_retry(
