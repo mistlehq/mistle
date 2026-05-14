@@ -70,6 +70,7 @@ export type CreateSystemTestInput = {
 export type RuntimeSystemTestEnvironment = {
   id: string;
   env: IntegrationTestEnvironment;
+  sandbox?: SystemTestSandbox;
   controlPlaneApi: IntegrationTestEnvironment["controlPlaneApi"];
   controlPlaneWorker: IntegrationTestEnvironment["controlPlaneWorker"];
   dataPlaneApi: IntegrationTestEnvironment["dataPlaneApi"];
@@ -169,7 +170,7 @@ export function createSystemTest(input: CreateSystemTestInput = {}) {
   return base.extend<SystemTestFixture>({
     system: [
       async ({ env }, use) => {
-        await use(createRuntimeSystemEnvironment(env, publicAccessTunnel));
+        await use(createRuntimeSystemEnvironment(env, input.sandbox, publicAccessTunnel));
       },
       {
         scope: "file",
@@ -802,11 +803,13 @@ function readErrorOutput(error: unknown, property: "stderr" | "stdout"): string 
 
 function createRuntimeSystemEnvironment(
   env: IntegrationTestEnvironment,
+  sandbox: SystemTestSandbox | undefined,
   publicAccess: RuntimeSystemPublicAccess | undefined,
 ): RuntimeSystemTestEnvironment {
   return {
     id: env.id,
     env,
+    ...(sandbox === undefined ? {} : { sandbox }),
     ...(publicAccess === undefined ? {} : { publicAccess }),
     get controlPlaneApi() {
       return env.controlPlaneApi;

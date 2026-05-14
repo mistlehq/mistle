@@ -11,7 +11,12 @@ import { systemScheduler, systemSleeper } from "@mistle/time";
 import WebSocket, { type RawData } from "ws";
 import { z } from "zod";
 
-import type { CodexSandboxAuthenticatedSession, CodexSandboxFixture } from "./codex-sandbox.js";
+import {
+  createSandboxProfileRuntimeConfigUpdate,
+  type CodexSandboxAuthenticatedSession,
+  type CodexSandboxFixture,
+  type SystemSandboxProvider,
+} from "./codex-sandbox.js";
 
 const OpenAiTargetKey = "openai-default";
 const OpenAiConnectionMethodId = "api-key";
@@ -308,6 +313,7 @@ export async function createSandboxProfile(input: {
 export async function updateSandboxBindings(input: {
   fixture: Pick<CodexSandboxFixture, "request">;
   session: CodexSandboxAuthenticatedSession;
+  sandboxProvider: SystemSandboxProvider;
   sandboxProfileId: string;
   bindings: unknown[];
 }): Promise<void> {
@@ -324,6 +330,7 @@ export async function updateSandboxBindings(input: {
         cookie: input.session.cookie,
       },
       body: JSON.stringify({
+        ...createSandboxProfileRuntimeConfigUpdate(input.sandboxProvider),
         integrationBindings: {
           bindings: input.bindings,
         },

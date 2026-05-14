@@ -150,7 +150,22 @@ export type CodexSandboxRequestInit = {
   body?: string;
 };
 
+export type SystemSandboxProvider = "docker" | "e2b";
+
+export type SandboxProfileRuntimeConfigUpdate =
+  | {
+      sandboxProvider: "docker";
+    }
+  | {
+      sandboxProvider: "e2b";
+      sandboxResources: {
+        vcpuCount: number;
+        memoryMb: number;
+      };
+    };
+
 export type CodexSandboxFixture = {
+  sandboxProvider: SystemSandboxProvider;
   authSession: (input?: { email?: string }) => Promise<CodexSandboxAuthenticatedSession>;
   request: (path: string, init?: CodexSandboxRequestInit) => Promise<CodexSandboxHttpResponse>;
   dataPlaneApiBaseUrl: string;
@@ -162,6 +177,25 @@ export type CodexSandboxFixture = {
 };
 
 const InternalAuthServiceTokenHeader = "x-mistle-service-token";
+
+export function createSandboxProfileRuntimeConfigUpdate(
+  sandboxProvider: SystemSandboxProvider,
+): SandboxProfileRuntimeConfigUpdate {
+  switch (sandboxProvider) {
+    case "docker":
+      return {
+        sandboxProvider,
+      };
+    case "e2b":
+      return {
+        sandboxProvider,
+        sandboxResources: {
+          vcpuCount: 2,
+          memoryMb: 4096,
+        },
+      };
+  }
+}
 
 export async function prepareCodexSandbox(input: {
   fixture: CodexSandboxFixture;
@@ -659,6 +693,7 @@ async function updateSandboxBindings(input: {
         cookie: input.authenticatedSession.cookie,
       },
       body: JSON.stringify({
+        ...createSandboxProfileRuntimeConfigUpdate(input.fixture.sandboxProvider),
         integrationBindings: {
           bindings: [
             {

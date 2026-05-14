@@ -21,6 +21,10 @@ import { createNodeSandboxSessionRuntime } from "../../../packages/sandbox-sessi
 import type { SandboxSessionRuntime } from "../../../packages/sandbox-session-client/src/runtime.js";
 import { SandboxSessionTransport } from "../../../packages/sandbox-session-client/src/transport.js";
 import {
+  createSandboxProfileRuntimeConfigUpdate,
+  type SystemSandboxProvider,
+} from "./codex-sandbox.js";
+import {
   readGitHubAppWebhookConfig,
   resolveGitHubAppInstallationId,
   updateGitHubAppWebhookConfig,
@@ -175,6 +179,7 @@ export type GitHubWebhookHttpResponse = {
 };
 
 export type GitHubWebhookAutomationFixture = {
+  sandboxProvider: SystemSandboxProvider;
   authSession: (input?: { email?: string }) => Promise<AuthenticatedSession>;
   request: (path: string, init?: GitHubWebhookRequestInit) => Promise<GitHubWebhookHttpResponse>;
   db: ControlPlaneDatabase;
@@ -1382,6 +1387,7 @@ async function putSandboxBindings(input: {
         cookie: input.session.cookie,
       },
       body: JSON.stringify({
+        ...createSandboxProfileRuntimeConfigUpdate(input.fixture.sandboxProvider),
         integrationBindings: {
           bindings: input.bindings,
         },

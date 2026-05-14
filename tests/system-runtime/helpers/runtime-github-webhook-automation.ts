@@ -2,6 +2,7 @@ import { TestEnvironmentIdHeader } from "@mistle/test-harness/integration";
 import type { RuntimeSystemTestEnvironment } from "@mistle/test-harness/system";
 
 import { createNodeSandboxSessionRuntime } from "../../../packages/sandbox-session-client/src/node.js";
+import type { SystemSandboxProvider } from "../../system/helpers/codex-sandbox.js";
 import type {
   AuthenticatedSession,
   GitHubWebhookAutomationFixture,
@@ -12,6 +13,7 @@ export function createRuntimeGitHubWebhookAutomationFixture(
 ): GitHubWebhookAutomationFixture {
   const { publicAccess } = system;
   return {
+    sandboxProvider: readSystemSandboxProvider(system),
     authSession: async (input): Promise<AuthenticatedSession> => {
       const session = await system.env.auth.createSession({
         ...(input?.email === undefined ? {} : { email: input.email }),
@@ -43,6 +45,16 @@ export function createRuntimeGitHubWebhookAutomationFixture(
         },
       }),
   };
+}
+
+function readSystemSandboxProvider(system: RuntimeSystemTestEnvironment): SystemSandboxProvider {
+  if (system.sandbox === undefined) {
+    throw new Error(
+      "Runtime GitHub webhook automation fixture requires a configured sandbox provider.",
+    );
+  }
+
+  return system.sandbox.provider;
 }
 
 function withTestEnvironmentIdQueryParam(input: { url: string; environmentId: string }): string {

@@ -5,6 +5,7 @@ import { createNodeSandboxSessionRuntime } from "../../../packages/sandbox-sessi
 import type {
   CodexSandboxAuthenticatedSession,
   CodexSandboxFixture,
+  SystemSandboxProvider,
 } from "../../system/helpers/codex-sandbox.js";
 
 const InternalAuthServiceToken = "integration-new-internal-service-token";
@@ -15,6 +16,7 @@ export function createRuntimeCodexSandboxFixture(
   system: RuntimeSystemTestEnvironment,
 ): CodexSandboxFixture {
   return {
+    sandboxProvider: readSystemSandboxProvider(system),
     authSession: async (input): Promise<CodexSandboxAuthenticatedSession> => {
       const session = await system.env.auth.createSession({
         ...(input?.email === undefined ? {} : { email: input.email }),
@@ -61,6 +63,14 @@ export function createRuntimeCodexSandboxFixture(
       return SandboxRuntimeStateSnapshotSchema.parse(payload);
     },
   };
+}
+
+function readSystemSandboxProvider(system: RuntimeSystemTestEnvironment): SystemSandboxProvider {
+  if (system.sandbox === undefined) {
+    throw new Error("Runtime Codex sandbox fixture requires a configured sandbox provider.");
+  }
+
+  return system.sandbox.provider;
 }
 
 function withTestEnvironmentIdQueryParam(input: { url: string; environmentId: string }): string {

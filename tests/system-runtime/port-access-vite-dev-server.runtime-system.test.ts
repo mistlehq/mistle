@@ -927,6 +927,7 @@ async function prepareViteSandboxFixture(input: {
   await updateSandboxBindings({
     fixture: input.fixture,
     session,
+    sandboxProvider: input.fixture.sandboxProvider,
     sandboxProfileId,
     bindings: [
       {
