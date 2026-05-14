@@ -33,8 +33,9 @@ import {
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
   useLocalSessionComposerConfigControl,
+  usePersistedSessionComposerConfigControl,
   useSessionComposerAttachmentControl,
-  useSessionComposerConfigControl,
+  type SessionComposerConfigWriter,
   type SessionComposerRuntimeInput,
   type SessionComposerSharedInput,
   type SessionComposerStateInput,
@@ -632,10 +633,39 @@ export function useSessionWorkbenchController(input: {
     openCodeSessionConnectionState,
     selectedRepositoryPath,
   ]);
-  const configControl = useSessionComposerConfigControl({
+  const codexComposerConfigWriter = useMemo<SessionComposerConfigWriter>(
+    () => ({
+      isUpdating: codexConfig.isBatchWritingConfig || codexConfig.isWritingConfigValue,
+      writeModel: (model: string): void => {
+        codexConfig.batchWriteConfig({
+          edits: [
+            {
+              keyPath: "model",
+              value: model,
+              mergeStrategy: "replace",
+            },
+          ],
+        });
+      },
+      writeReasoningEffort: (reasoningEffort: string): void => {
+        codexConfig.writeConfigValue({
+          keyPath: "model_reasoning_effort",
+          value: reasoningEffort,
+          mergeStrategy: "replace",
+        });
+      },
+    }),
+    [
+      codexConfig.batchWriteConfig,
+      codexConfig.isBatchWritingConfig,
+      codexConfig.isWritingConfigValue,
+      codexConfig.writeConfigValue,
+    ],
+  );
+  const configControl = usePersistedSessionComposerConfigControl({
     bootstrap: sessionState.bootstrap,
     clearSessionErrorMessage: sessionMessage.clearSessionErrorMessage,
-    codexConfig,
+    writer: codexComposerConfigWriter,
   });
   const openCodeConfigControl = useLocalSessionComposerConfigControl({
     bootstrap: openCodeComposerBootstrap,

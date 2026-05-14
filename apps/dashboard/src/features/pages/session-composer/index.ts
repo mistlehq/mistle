@@ -22,8 +22,9 @@ export {
 } from "./use-session-composer-attachment-control.js";
 export {
   useLocalSessionComposerConfigControl,
-  useSessionComposerConfigControl,
+  usePersistedSessionComposerConfigControl,
   type SessionComposerConfigControl,
+  type SessionComposerConfigWriter,
 } from "./use-session-composer-config-control.js";
 export {
   buildModelSelectionRequiredMessage,

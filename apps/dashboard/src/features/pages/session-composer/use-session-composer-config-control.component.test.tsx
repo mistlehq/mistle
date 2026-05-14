@@ -4,14 +4,14 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { CodexSessionConfigState } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
 import type {
   SessionComposerBootstrapResult,
   SessionComposerModel,
 } from "./session-composer-runtime-contracts.js";
 import {
   useLocalSessionComposerConfigControl,
-  useSessionComposerConfigControl,
+  usePersistedSessionComposerConfigControl,
+  type SessionComposerConfigWriter,
 } from "./use-session-composer-config-control.js";
 
 const DefaultModel: SessionComposerModel = {
@@ -51,22 +51,21 @@ function SessionComposerConfigControlHarness(input: {
   bootstrap: SessionComposerBootstrapResult;
 }): React.JSX.Element {
   const [lastWrite, setLastWrite] = useState("");
-  const codexConfig: CodexSessionConfigState = {
-    isWritingConfigValue: false,
-    isBatchWritingConfig: false,
-    writeConfigValue: (edit) => {
-      setLastWrite(`${edit.keyPath}:${String(edit.value)}`);
+  const writer: SessionComposerConfigWriter = {
+    isUpdating: false,
+    writeModel: (model) => {
+      setLastWrite(`model:${model}`);
     },
-    batchWriteConfig: (batch) => {
-      setLastWrite(batch.edits.map((edit) => `${edit.keyPath}:${String(edit.value)}`).join(","));
+    writeReasoningEffort: (reasoningEffort) => {
+      setLastWrite(`model_reasoning_effort:${reasoningEffort}`);
     },
   };
-  const configControl = useSessionComposerConfigControl({
+  const configControl = usePersistedSessionComposerConfigControl({
     bootstrap: input.bootstrap,
     clearSessionErrorMessage: () => {
       setLastWrite("");
     },
-    codexConfig,
+    writer,
   });
 
   return (
@@ -79,6 +78,22 @@ function SessionComposerConfigControlHarness(input: {
         {configControl.hasExplicitModelSelection ? "true" : "false"}
       </div>
       <div data-testid="last-write">{lastWrite}</div>
+      <button
+        type="button"
+        onClick={() => {
+          configControl.setModel("gpt-5.3-codex-spark");
+        }}
+      >
+        Select Spark
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          configControl.setReasoningEffort("low");
+        }}
+      >
+        Set Low
+      </button>
     </div>
   );
 }
@@ -119,7 +134,7 @@ function LocalSessionComposerConfigControlHarness(input: {
   );
 }
 
-describe("useSessionComposerConfigControl", () => {
+describe("usePersistedSessionComposerConfigControl", () => {
   afterEach(() => {
     cleanup();
   });
@@ -169,6 +184,40 @@ describe("useSessionComposerConfigControl", () => {
 
     expect(screen.getByTestId("selected-model").textContent).toBe("gpt-5.3-codex-spark");
     expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("low");
+  });
+
+  it("writes selected persisted runtime models through the composer writer", () => {
+    render(
+      <SessionComposerConfigControlHarness
+        bootstrap={createReadyBootstrap({
+          availableModels: [DefaultModel, SparkModel],
+          model: null,
+          modelReasoningEffort: null,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select Spark" }));
+
+    expect(screen.getByTestId("selected-model").textContent).toBe("gpt-5.3-codex-spark");
+    expect(screen.getByTestId("last-write").textContent).toBe("model:gpt-5.3-codex-spark");
+  });
+
+  it("writes selected persisted runtime reasoning effort through the composer writer", () => {
+    render(
+      <SessionComposerConfigControlHarness
+        bootstrap={createReadyBootstrap({
+          availableModels: [DefaultModel, SparkModel],
+          model: "gpt-5.3-codex-spark",
+          modelReasoningEffort: null,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Set Low" }));
+
+    expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("low");
+    expect(screen.getByTestId("last-write").textContent).toBe("model_reasoning_effort:low");
   });
 
   it("uses the local runtime default model when config is unset", () => {

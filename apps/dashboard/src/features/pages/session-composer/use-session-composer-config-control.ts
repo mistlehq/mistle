@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { CodexSessionConfigState } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
 import type { ComposerConfigSnapshot } from "./session-composer-config.js";
 import { resolveActiveComposerModel } from "./session-composer-model-readiness.js";
 import type { SessionComposerBootstrapResult } from "./session-composer-runtime-contracts.js";
@@ -17,6 +16,12 @@ export type SessionComposerConfigControl = {
   isUpdating: boolean;
   setModel: (value: string) => void;
   setReasoningEffort: (value: string) => void;
+};
+
+export type SessionComposerConfigWriter = {
+  isUpdating: boolean;
+  writeModel: (model: string) => void;
+  writeReasoningEffort: (reasoningEffort: string) => void;
 };
 
 function resolveSelectedReasoningEffort(input: {
@@ -53,14 +58,14 @@ function buildModelOptions(
   }));
 }
 
-export function useSessionComposerConfigControl(input: {
+export function usePersistedSessionComposerConfigControl(input: {
   bootstrap: SessionComposerBootstrapResult;
   clearSessionErrorMessage: () => void;
-  codexConfig: CodexSessionConfigState;
+  writer: SessionComposerConfigWriter;
 }): SessionComposerConfigControl {
   const { availableModels, configSnapshot } = input.bootstrap.establishedSnapshot;
-  const { batchWriteConfig, isBatchWritingConfig, isWritingConfigValue, writeConfigValue } =
-    input.codexConfig;
+  const { clearSessionErrorMessage, writer } = input;
+  const { isUpdating, writeModel, writeReasoningEffort } = writer;
   const [composerConfigOverrides, setComposerConfigOverrides] = useState<ComposerConfigSnapshot>({
     model: null,
     modelReasoningEffort: null,
@@ -98,38 +103,26 @@ export function useSessionComposerConfigControl(input: {
 
   const setModel = useCallback(
     (nextModel: string): void => {
-      input.clearSessionErrorMessage();
+      clearSessionErrorMessage();
       setComposerConfigOverrides((currentConfig) => ({
         model: nextModel,
         modelReasoningEffort: currentConfig.modelReasoningEffort,
       }));
-      batchWriteConfig({
-        edits: [
-          {
-            keyPath: "model",
-            value: nextModel,
-            mergeStrategy: "replace",
-          },
-        ],
-      });
+      writeModel(nextModel);
     },
-    [batchWriteConfig, input.clearSessionErrorMessage],
+    [clearSessionErrorMessage, writeModel],
   );
 
   const setReasoningEffort = useCallback(
     (nextReasoningEffort: string): void => {
-      input.clearSessionErrorMessage();
+      clearSessionErrorMessage();
       setComposerConfigOverrides((currentConfig) => ({
         model: currentConfig.model,
         modelReasoningEffort: nextReasoningEffort,
       }));
-      writeConfigValue({
-        keyPath: "model_reasoning_effort",
-        value: nextReasoningEffort,
-        mergeStrategy: "replace",
-      });
+      writeReasoningEffort(nextReasoningEffort);
     },
-    [input.clearSessionErrorMessage, writeConfigValue],
+    [clearSessionErrorMessage, writeReasoningEffort],
   );
 
   return {
@@ -138,7 +131,7 @@ export function useSessionComposerConfigControl(input: {
     hasExplicitModelSelection: selectedModel !== null,
     modelOptions,
     canChangeReasoningEffort: true,
-    isUpdating: isBatchWritingConfig || isWritingConfigValue,
+    isUpdating,
     setModel,
     setReasoningEffort,
   };
