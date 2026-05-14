@@ -14,6 +14,7 @@
     "config:init:integration": "tsx ./scripts/config/init-integration.ts",
     "dev": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--conditions=workspace-src\" tsx ./scripts/dev/start.ts",
     "dev:down": "tsx ./scripts/dev/down.ts",
+    "dev:ios": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--conditions=workspace-src\" tsx ./scripts/dev/start.ts --ios",
     "dev:nix": "nix develop --command pnpm dev",
     "dev:reset": "tsx ./scripts/dev/down.ts --volumes",
     "dev:reset:hard": "tsx ./scripts/dev/down.ts --volumes --rmi-local",
