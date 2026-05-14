@@ -936,6 +936,35 @@ describe("IntegrationConnectionDetailView", () => {
     expect(reauthorizedConnectionId).toBe("icn_planetscale_primary");
   });
 
+  it("renders a reauthorization required notice with the reauthorization action", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_planetscale_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "PlanetScale Production",
+            authMethodId: "oauth2-authorization-code",
+            authMethodLabel: "OAuth",
+            status: "error",
+            resources: [],
+            reauthorization: {
+              actionLabel: "Re-authorize",
+              errorMessage: "This connection needs to be re-authorized.",
+              isPending: false,
+              pendingLabel: "Starting...",
+            },
+          },
+        ]}
+        onEditAuthentication={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("This connection needs to be re-authorized.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Re-authorize" })).toBeTruthy();
+  });
+
   it("disables the reauthorization action while OAuth reauthorization is starting", () => {
     render(
       <IntegrationConnectionDetailView

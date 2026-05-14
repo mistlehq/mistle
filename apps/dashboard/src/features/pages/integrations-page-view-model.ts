@@ -134,6 +134,8 @@ export type ReauthorizationState = {
   isPending: boolean;
 };
 
+const OAuthReauthorizationRequiredMessage = "This connection needs to be re-authorized.";
+
 export function buildIntegrationConnectionDetailItems(input: {
   connections: readonly IntegrationConnection[];
   controlPlaneApiOrigin?: string;
@@ -166,6 +168,9 @@ export function buildIntegrationConnectionDetailItems(input: {
       input.providerAppSetupStateByConnectionId?.get(connection.id) ?? undefined;
     const reauthorizationState =
       input.reauthorizationStateByConnectionId?.get(connection.id) ?? undefined;
+    const reauthorizationErrorMessage =
+      reauthorizationState?.errorMessage ??
+      (connection.status === "error" ? OAuthReauthorizationRequiredMessage : undefined);
     const authFields = resolveAuthFields({
       connection,
       currentMethod,
@@ -202,9 +207,9 @@ export function buildIntegrationConnectionDetailItems(input: {
         : {
             reauthorization: {
               ...currentMethod.ui.reauthorize,
-              ...(reauthorizationState?.errorMessage === undefined
+              ...(reauthorizationErrorMessage === undefined
                 ? {}
-                : { errorMessage: reauthorizationState.errorMessage }),
+                : { errorMessage: reauthorizationErrorMessage }),
               isPending: reauthorizationState?.isPending ?? false,
             },
           }),
