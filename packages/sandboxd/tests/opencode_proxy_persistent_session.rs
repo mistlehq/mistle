@@ -74,9 +74,7 @@ fn shell_command_survives_client_disconnect_after_proxy_activity_retention() {
 
     wait_for_raw_session_status(&raw_url, &session_id, "busy");
 
-    worker_client
-        .close(None)
-        .expect("worker client should close cleanly");
+    drop(worker_client);
 
     wait_for_shell_output(&raw_url, &session_id, &marker);
     wait_for_raw_session_idle(&raw_url, &session_id);
@@ -301,7 +299,10 @@ fn connect_to_proxy_with_retry(
 
     for _ in 0..attempts {
         match connect(proxy_url) {
-            Ok(connection) => return connection,
+            Ok((mut client, response)) => {
+                set_websocket_timeouts(&mut client, StdDuration::from_secs(10));
+                return (client, response);
+            }
             Err(error) => {
                 last_error = Some(error);
                 sleeper.sleep(Duration::from_millis(20));
@@ -313,6 +314,22 @@ fn connect_to_proxy_with_retry(
         "timed out connecting to proxy {proxy_url}: {}",
         last_error.expect("last proxy connection error should exist")
     );
+}
+
+fn set_websocket_timeouts(client: &mut WebSocket<MaybeTlsStream<TcpStream>>, timeout: StdDuration) {
+    match client.get_mut() {
+        MaybeTlsStream::Plain(stream) => {
+            stream
+                .set_read_timeout(Some(timeout))
+                .expect("websocket read timeout should set");
+            stream
+                .set_write_timeout(Some(timeout))
+                .expect("websocket write timeout should set");
+        }
+        _ => {
+            panic!("OpenCode proxy tests should use plain localhost websocket connections");
+        }
+    }
 }
 
 fn read_json_text_message<S>(client: &mut WebSocket<S>) -> Value
