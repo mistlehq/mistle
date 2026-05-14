@@ -10,7 +10,10 @@ import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.j
 import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
 import { NoLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
-import { resolveInitialSessionConnectInput } from "./session-initial-connect-policy.js";
+import {
+  resolveInitialSessionConnectInput,
+  type InitialSessionConnectInput,
+} from "./session-initial-connect-policy.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import type { SessionStartupState } from "./session-startup-status.js";
 import {
@@ -38,8 +41,6 @@ type SessionWorkbenchSandboxStatusSnapshot = {
   status: SandboxInstanceStatusResult["status"] | null;
 };
 
-type SessionConnectInputForWorkbench = ReturnType<typeof resolveInitialSessionConnectInput>;
-
 type SessionSnapshotForWorkbench = {
   activeThreadCwd?: string | null;
   activeThreadId?: string | null;
@@ -50,7 +51,7 @@ type SessionSnapshotForWorkbench = {
 
 type SessionLifecycleForWorkbench = {
   clearLifecycleErrorMessage: () => void;
-  connectSession: (input: SessionConnectInputForWorkbench) => void;
+  connectSession: (input: InitialSessionConnectInput) => void;
   detachSessionConnection: () => void;
   disconnectSession: () => void;
   isStartingSession: boolean;

@@ -41,6 +41,7 @@ import {
   type SessionComposerStateInput,
   type SessionTurnControl,
 } from "./session-composer/index.js";
+import type { InitialSessionConnectInput } from "./session-initial-connect-policy.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import {
   resolveInitialSelectedRepositoryPath,
@@ -427,12 +428,20 @@ export function useSessionWorkbenchController(input: {
   const opencodeLifecycleForWorkbench = useMemo(
     () => ({
       clearLifecycleErrorMessage: openCodeLifecycle.clearLifecycleErrorMessage,
-      connectSession: (connectInput: Parameters<typeof lifecycle.connectSession>[0]): void => {
-        const targetThreadId = connectInput.targetThreadId;
+      connectSession: (connectInput: InitialSessionConnectInput): void => {
+        if (connectInput.targetThreadId === null) {
+          openCodeLifecycle.connectSession({
+            ...(connectInput.initialCwd === undefined
+              ? {}
+              : { initialCwd: connectInput.initialCwd }),
+            sandboxInstanceId: connectInput.sandboxInstanceId,
+          });
+          return;
+        }
+
         openCodeLifecycle.connectSession({
-          ...(connectInput.initialCwd === undefined ? {} : { initialCwd: connectInput.initialCwd }),
           sandboxInstanceId: connectInput.sandboxInstanceId,
-          ...(targetThreadId === null ? {} : { targetThreadId }),
+          targetThreadId: connectInput.targetThreadId,
         });
       },
       detachSessionConnection: openCodeLifecycle.detachSessionConnection,

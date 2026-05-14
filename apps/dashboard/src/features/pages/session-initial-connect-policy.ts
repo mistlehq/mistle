@@ -1,15 +1,28 @@
-import type { ConnectCodexSessionInput } from "../session-agents/codex/session-state/session-connection/use-codex-session-connection.js";
 import type { SandboxInstanceRuntimeContext } from "../sessions/sessions-service.js";
 
 export const MissingConnectableRuntimeContextMessage =
   "Expected a connectable sandbox session to include runtime context.";
+
+export type InitialSessionConnectInput =
+  | {
+      initialCwd?: never;
+      providerThreadId?: string | null;
+      sandboxInstanceId: string;
+      targetThreadId: string;
+    }
+  | {
+      initialCwd?: string | null;
+      providerThreadId?: never;
+      sandboxInstanceId: string;
+      targetThreadId: null;
+    };
 
 export function resolveInitialSessionConnectInput(input: {
   connectable: boolean | null;
   providerThreadId: string | null;
   runtimeContext: SandboxInstanceRuntimeContext | null;
   sandboxInstanceId: string;
-}): ConnectCodexSessionInput {
+}): InitialSessionConnectInput {
   if (input.connectable === true && input.runtimeContext === null) {
     throw new Error(MissingConnectableRuntimeContextMessage);
   }
