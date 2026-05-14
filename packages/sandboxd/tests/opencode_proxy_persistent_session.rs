@@ -128,15 +128,18 @@ fn wait_for_opencode_health(port: u16) {
     for _ in 0..100 {
         if let Ok(mut stream) = TcpStream::connect(format!("127.0.0.1:{port}")) {
             stream
+                .set_read_timeout(Some(StdDuration::from_millis(200)))
+                .expect("OpenCode health stream read timeout should configure");
+            stream
                 .write_all(
                     b"GET /global/health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n",
                 )
                 .expect("OpenCode health request should write");
             let mut response = String::new();
-            stream
-                .read_to_string(&mut response)
-                .expect("OpenCode health response should read");
-            if response.contains("200 OK") && response.contains("\"healthy\":true") {
+            if stream.read_to_string(&mut response).is_ok()
+                && response.contains("200 OK")
+                && response.contains("\"healthy\":true")
+            {
                 return;
             }
         }

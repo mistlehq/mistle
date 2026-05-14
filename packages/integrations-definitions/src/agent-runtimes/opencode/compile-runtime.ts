@@ -23,7 +23,7 @@ import {
 } from "./server.js";
 
 const OpenCodeCliArtifactKey = "opencode-cli";
-const OpenCodeCliVersion = "1.14.50";
+const OpenCodeCliVersion = "1.14.48";
 const OpenCodeCliReleaseTag = `v${OpenCodeCliVersion}`;
 const OpenCodeGitHubRepository = "anomalyco/opencode";
 const OpenCodeConfigPath = "/root/.config/opencode/opencode.json";

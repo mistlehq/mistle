@@ -226,7 +226,7 @@ describe("compileOpenCodeRuntime", () => {
           release: {
             kind: "tag",
             match: "exact",
-            tag: "v1.14.50",
+            tag: "v1.14.48",
           },
           asset: {
             kind: "by_arch",

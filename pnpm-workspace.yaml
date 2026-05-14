@@ -5,8 +5,6 @@ packages:
 
 # 3 days = 4320 minutes.
 minimumReleaseAge: 4320
-minimumReleaseAgeExclude:
-  - "@opencode-ai/sdk"
 
 onlyBuiltDependencies:
   - esbuild
