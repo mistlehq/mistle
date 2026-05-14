@@ -46,10 +46,7 @@ import {
   resolvePrimaryRepositoryTurnStartCwd,
   resolveSessionTerminalCwd,
 } from "./session-primary-repository-policy.js";
-import {
-  SessionRuntimeWorkbenchCapabilities,
-  type SessionRuntimeDisplayName,
-} from "./session-runtime-workbench-capabilities.js";
+import { SessionRuntimeWorkbenchCapabilities } from "./session-runtime-workbench-capabilities.js";
 import type { SessionStartupState } from "./session-startup-status.js";
 import type {
   SessionTerminalContentInset,
@@ -122,7 +119,7 @@ type SessionWorkbenchState = {
     showsChatComposer: boolean;
     cliTerminalContentInset: SessionTerminalContentInset;
     cliTerminalThemeMode: SessionTerminalThemeMode;
-    cliRuntimeDisplayName: SessionRuntimeDisplayName;
+    cliRuntimeDisplayName: string;
     enterCliMode: () => Promise<void>;
     exitCliMode: () => Promise<void>;
   };
@@ -188,7 +185,7 @@ type SessionConversationPaneState = {
 };
 
 type SessionWorkbenchRuntimeAdapter = {
-  displayName: SessionRuntimeDisplayName;
+  displayName: string;
   cliTerminalContentInset: SessionTerminalContentInset;
   conversation: {
     activeConversationId: string | null;

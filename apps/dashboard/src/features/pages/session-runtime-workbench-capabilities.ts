@@ -40,6 +40,3 @@ export const SessionRuntimeWorkbenchCapabilities = {
     hasContextUsage: false,
   },
 } satisfies Record<SessionRuntimeWorkbenchCapabilityKey, SessionRuntimeWorkbenchCapability>;
-
-export type SessionRuntimeDisplayName =
-  (typeof SessionRuntimeWorkbenchCapabilities)[keyof typeof SessionRuntimeWorkbenchCapabilities]["displayName"];
