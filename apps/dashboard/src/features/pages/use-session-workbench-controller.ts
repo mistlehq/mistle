@@ -15,11 +15,13 @@ import {
 import {
   buildOpenCodeAttachmentParts,
   buildOpenCodeCliPtyOpenInput,
+  buildOpenCodeComposerConfigResetKey,
+  buildRefreshingOpenCodeComposerBootstrap,
+  mapOpenCodeChatStateForConversation,
   mapOpenCodePermissionsToServerRequests,
-  parseOpenCodePromptModelSelection,
+  resolveOpenCodePromptModelOverride,
   resolveOpenCodePermissionResponse,
   useOpenCodeSessionState,
-  type OpenCodeChatState,
 } from "../session-agents/opencode/session-state/index.js";
 import type { ServerRequestEntry } from "../session-agents/server-requests/index.js";
 import { applyPatchedSessionTitleToCache } from "../sessions/session-header-title-model.js";
@@ -143,24 +145,6 @@ type SessionWorkbenchState = {
   portAccessState: ReturnType<typeof useSessionPortAccess>;
 };
 
-export function resolveOpenCodePromptModelOverride(
-  hasExplicitModelSelection: boolean,
-  selectedModel: string | null,
-): ReturnType<typeof parseOpenCodePromptModelSelection> | undefined {
-  if (!hasExplicitModelSelection || selectedModel === null) {
-    return undefined;
-  }
-
-  return parseOpenCodePromptModelSelection(selectedModel);
-}
-
-export function buildOpenCodeComposerConfigResetKey(
-  sandboxInstanceId: string | null,
-  sessionId: string | null,
-): string {
-  return `${sandboxInstanceId ?? ""}:${sessionId ?? ""}`;
-}
-
 type SessionConversationChatState = Pick<
   ChatState,
   "activeTurnId" | "entries" | "pendingTurnId" | "status"
@@ -197,20 +181,6 @@ type SessionWorkbenchRuntimeAdapter = {
 const CodexWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
 const OpenCodeWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.OPENCODE;
 
-function mapOpenCodeChatStateForConversation(
-  chatState: OpenCodeChatState,
-): SessionConversationChatState {
-  const activeTurnId =
-    chatState.status === "busy" ? (chatState.sessionId ?? "opencode-active-turn") : null;
-
-  return {
-    activeTurnId,
-    entries: chatState.entries,
-    pendingTurnId: null,
-    status: chatState.status === "busy" ? "inProgress" : chatState.status,
-  };
-}
-
 export function shouldGenerateInitialSessionTitle(input: {
   cachedTitle: string | null | undefined;
   messageCount: number;
@@ -221,21 +191,6 @@ export function shouldGenerateInitialSessionTitle(input: {
     input.messageCount === 0 &&
     !(input.cachedTitle !== undefined && input.cachedTitle !== null)
   );
-}
-
-function buildRefreshingOpenCodeComposerBootstrap(): ReturnType<
-  typeof useOpenCodeSessionState
->["bootstrap"] {
-  return {
-    phase: { status: "bootstrapping" },
-    establishedSnapshot: {
-      availableModels: [],
-      configSnapshot: {
-        model: null,
-        modelReasoningEffort: null,
-      },
-    },
-  };
 }
 
 function applyGeneratedSessionTitlePatch(input: {

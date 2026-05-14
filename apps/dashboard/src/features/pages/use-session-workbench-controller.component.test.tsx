@@ -17,8 +17,6 @@ import {
   resolveStoppedSessionMessageForWorkbenchEntryPhase,
   resolveWorkbenchEntryPhase,
   shouldWaitForAutomationSessionThread,
-  buildOpenCodeComposerConfigResetKey,
-  resolveOpenCodePromptModelOverride,
   shouldGenerateInitialSessionTitle,
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
@@ -140,20 +138,6 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.workbench.primaryPanelState.cliTerminalContentInset).toBe("none");
     expect(result.current.workbench.primaryPanelState.cliTerminalThemeMode).toBe("system");
     expect(result.current.workbench.primaryPanelState.cliRuntimeDisplayName).toBe("OpenCode");
-  });
-
-  it("omits OpenCode prompt model overrides until the user selects a model", () => {
-    expect(resolveOpenCodePromptModelOverride(false, "openai/gpt-5")).toBeUndefined();
-    expect(resolveOpenCodePromptModelOverride(true, null)).toBeUndefined();
-    expect(resolveOpenCodePromptModelOverride(true, "openai/gpt-5")).toEqual({
-      providerID: "openai",
-      modelID: "gpt-5",
-    });
-  });
-
-  it("keys OpenCode composer model overrides by sandbox and session", () => {
-    expect(buildOpenCodeComposerConfigResetKey("sbi_one", "ses_one")).toBe("sbi_one:ses_one");
-    expect(buildOpenCodeComposerConfigResetKey(null, null)).toBe(":");
   });
 
   it("generates an initial session title only for the first message while the title is unset", () => {
