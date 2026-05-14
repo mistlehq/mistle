@@ -417,7 +417,7 @@ export function useSessionWorkbenchController(input: {
       openCodeLifecycle.sessionSnapshot,
     ],
   );
-  const opencodeLifecycleForWorkbench = useMemo(
+  const openCodeLifecycleForWorkbench = useMemo(
     () => ({
       clearLifecycleErrorMessage: openCodeLifecycle.clearLifecycleErrorMessage,
       connectSession: (connectInput: InitialSessionConnectInput): void => {
@@ -457,6 +457,13 @@ export function useSessionWorkbenchController(input: {
       openCodeLifecycle.sessionConnectionState,
       openCodeLifecycle.sessionSnapshot,
     ],
+  );
+  const resolveLifecycleForWorkbench = useCallback(
+    (agentRuntimeId: string | null) =>
+      agentRuntimeId === OpenCodeWorkbenchCapabilities.runtimeId
+        ? openCodeLifecycleForWorkbench
+        : lifecycle,
+    [lifecycle, openCodeLifecycleForWorkbench],
   );
   const contextUsage =
     sessionState.threadTokenUsageSnapshot?.threadId ===
@@ -546,8 +553,7 @@ export function useSessionWorkbenchController(input: {
   const workbenchLifecycleState = useSessionWorkbenchLifecycleState({
     sandboxInstanceId: input.sandboxInstanceId,
     mainPanelTransitionState: handoff.transitionState,
-    lifecycle,
-    opencodeLifecycle: opencodeLifecycleForWorkbench,
+    resolveLifecycle: resolveLifecycleForWorkbench,
     queryClient,
   });
   const sandboxStatus = workbenchLifecycleState.sandboxStatusQuery.data;

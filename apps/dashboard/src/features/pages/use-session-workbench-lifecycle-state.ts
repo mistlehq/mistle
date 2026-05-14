@@ -95,8 +95,7 @@ export function resolveSandboxStatusRefetchInterval(
 export function useSessionWorkbenchLifecycleState(input: {
   sandboxInstanceId: string | null;
   mainPanelTransitionState: MainPanelTransitionState;
-  lifecycle: SessionLifecycleForWorkbench;
-  opencodeLifecycle?: SessionLifecycleForWorkbench;
+  resolveLifecycle: (agentRuntimeId: string | null) => SessionLifecycleForWorkbench;
   queryClient: QueryClient;
 }) {
   const [hasAttemptedAutoConnect, setHasAttemptedAutoConnect] = useState(false);
@@ -146,11 +145,9 @@ export function useSessionWorkbenchLifecycleState(input: {
     },
   });
   const sandboxStatus = sandboxStatusQuery.data;
-  const activeAgentRuntimeId = sandboxStatus?.runtimeContext?.agentRuntimeId ?? "codex";
-  const activeLifecycle =
-    activeAgentRuntimeId === "opencode" && input.opencodeLifecycle !== undefined
-      ? input.opencodeLifecycle
-      : input.lifecycle;
+  const activeLifecycle = input.resolveLifecycle(
+    sandboxStatus?.runtimeContext?.agentRuntimeId ?? null,
+  );
 
   const {
     clearLifecycleErrorMessage,
