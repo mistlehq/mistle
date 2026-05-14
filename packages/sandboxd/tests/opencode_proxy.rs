@@ -3,7 +3,7 @@ use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 use tungstenite::stream::MaybeTlsStream;
@@ -348,7 +348,7 @@ fn activity_monitor_rebuilds_activity_after_event_stream_reconnects() {
 
 enum SimulatedOpenCodeActivityCommand {
     CloseEventStream(mpsc::Sender<()>),
-    Event(Value, mpsc::Sender<()>),
+    Event(Value, mpsc::Sender<bool>),
 }
 
 struct SimulatedOpenCodeActivityServer {
@@ -409,13 +409,26 @@ impl SimulatedOpenCodeActivityServer {
     }
 
     fn send_event(&self, event: Value) {
-        let (ack_sender, ack_receiver) = mpsc::channel();
-        self.command_sender
-            .send(SimulatedOpenCodeActivityCommand::Event(event, ack_sender))
-            .expect("simulated OpenCode activity event should send");
-        ack_receiver
-            .recv_timeout(Duration::from_secs(5))
-            .expect("simulated OpenCode activity event should be delivered");
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            let (ack_sender, ack_receiver) = mpsc::channel();
+            self.command_sender
+                .send(SimulatedOpenCodeActivityCommand::Event(
+                    event.clone(),
+                    ack_sender,
+                ))
+                .expect("simulated OpenCode activity event should send");
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                panic!("simulated OpenCode activity event should be delivered");
+            }
+            if ack_receiver
+                .recv_timeout(remaining)
+                .expect("simulated OpenCode activity event should be acknowledged")
+            {
+                return;
+            }
+        }
     }
 
     fn close_current_event_stream(&self) {
@@ -492,9 +505,10 @@ fn handle_simulated_opencode_activity_request(
                 Ok(SimulatedOpenCodeActivityCommand::Event(event, ack_sender)) => {
                     let frame = format!("event: message\ndata: {}\n\n", event);
                     if stream.write_all(frame.as_bytes()).is_err() {
+                        let _ = ack_sender.send(false);
                         return;
                     }
-                    let _ = ack_sender.send(());
+                    let _ = ack_sender.send(true);
                 }
                 Ok(SimulatedOpenCodeActivityCommand::CloseEventStream(ack_sender)) => {
                     let _ = ack_sender.send(());
