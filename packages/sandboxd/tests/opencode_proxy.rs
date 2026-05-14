@@ -478,7 +478,7 @@ fn handle_simulated_opencode_activity_request(
             .expect("simulated OpenCode statuses lock should not be poisoned")
             .to_string();
         let response = format!(
-            "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{}",
+            "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{}",
             body.len(),
             body
         );
@@ -494,7 +494,9 @@ fn handle_simulated_opencode_activity_request(
         // are grounded in @opencode-ai/sdk's generated EventSessionStatus and
         // EventSessionIdle types.
         stream
-            .write_all(b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\n")
+            .write_all(
+                b"HTTP/1.1 200 OK\r\nconnection: keep-alive\r\ncontent-type: text/event-stream\r\n\r\n",
+            )
             .expect("simulated OpenCode SSE response should write");
         while !shutdown_requested.load(Ordering::Relaxed) {
             let command = command_receiver
@@ -522,7 +524,9 @@ fn handle_simulated_opencode_activity_request(
     }
 
     stream
-        .write_all(b"HTTP/1.1 404 Not Found\r\ncontent-length: 9\r\n\r\nnot found")
+        .write_all(
+            b"HTTP/1.1 404 Not Found\r\nconnection: close\r\ncontent-length: 9\r\n\r\nnot found",
+        )
         .expect("simulated OpenCode activity not-found response should write");
 }
 
