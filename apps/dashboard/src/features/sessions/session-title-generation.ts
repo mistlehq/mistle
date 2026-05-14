@@ -122,7 +122,7 @@ export async function generateSessionTitleWithSandboxCodexExec(input: {
   }
 
   const title = parseSessionTitleGenerationOutput(result.stdout);
-  return await patchSandboxInstanceTitle({
+  return patchSandboxInstanceTitle({
     instanceId: input.sandboxInstanceId,
     onlyIfUnset: true,
     title,

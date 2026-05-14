@@ -26,7 +26,10 @@ import type {
 import { applyPatchedSessionTitleToCache } from "../sessions/session-header-title-model.js";
 import { generateSessionTitleWithSandboxCodexExec } from "../sessions/session-title-generation.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
-import { patchSandboxInstanceTitle } from "../sessions/sessions-service.js";
+import {
+  patchSandboxInstanceTitle,
+  type PatchSandboxInstanceTitleResult,
+} from "../sessions/sessions-service.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
   useLocalSessionComposerConfigControl,
@@ -275,7 +278,7 @@ function buildRefreshingOpenCodeComposerBootstrap(): ReturnType<
 }
 
 function applyGeneratedSessionTitlePatch(input: {
-  patchTitle: () => Promise<Awaited<ReturnType<typeof patchSandboxInstanceTitle>>>;
+  patchTitle: () => Promise<PatchSandboxInstanceTitleResult>;
   queryClient: QueryClient;
 }): void {
   void input
