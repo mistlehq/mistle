@@ -28,6 +28,7 @@ import {
 } from "./scheduled-automation-form-types.js";
 import { ScheduledAutomationTypeSpecificSection } from "./scheduled-automation-form.js";
 import { createScheduledAutomation } from "./scheduled-automations-service.js";
+import { getTriggerTemplateById, type TriggerTemplate } from "./trigger-templates.js";
 import { useAutomationSandboxProfileOptions } from "./use-automation-sandbox-profile-options.js";
 import {
   resolveNoActiveProfileVersionMessage,
@@ -35,6 +36,7 @@ import {
 } from "./use-webhook-automation-editor-state.js";
 import { useWebhookAutomationEventPrerequisites } from "./use-webhook-automation-prerequisites.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
+import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
 import {
   toCreateWebhookAutomationPayload,
   toWebhookAutomationFormValues,
@@ -60,6 +62,7 @@ type NavigateFunction = (to: string) => void | Promise<void>;
 type CreateAutomationEditorProps = {
   navigate: NavigateFunction;
   initialSandboxProfileId?: string | undefined;
+  initialTemplateId?: string | undefined;
   createSuccessPath?: AutomationCreateSuccessPath;
 };
 
@@ -98,11 +101,12 @@ function resolveActiveVersion(versions: readonly SandboxProfileVersion[]): numbe
 
 function createInitialCreateAutomationFormValues(
   initialSandboxProfileId: string | undefined,
+  initialTemplate: TriggerTemplate | null,
 ): CreateAutomationFormValues {
   const webhookValues = toWebhookAutomationFormValues(null);
   const scheduledValues = toScheduledAutomationFormValues(null);
 
-  return {
+  const initialValues: CreateAutomationFormValues = {
     name: "",
     sandboxProfileId: initialSandboxProfileId ?? "",
     primaryRepositoryId: "",
@@ -115,6 +119,28 @@ function createInitialCreateAutomationFormValues(
     cronExpression: scheduledValues.cronExpression,
     timezone: scheduledValues.timezone,
     conversationMode: scheduledValues.conversationMode,
+  };
+
+  if (initialTemplate === null) {
+    return initialValues;
+  }
+
+  if (initialTemplate.kind === "scheduled") {
+    return {
+      ...initialValues,
+      name: initialTemplate.name,
+      inputTemplate: initialTemplate.inputTemplate,
+      cronExpression: initialTemplate.cronExpression,
+      conversationMode: initialTemplate.conversationMode,
+    };
+  }
+
+  return {
+    ...initialValues,
+    name: initialTemplate.name,
+    inputTemplate: initialTemplate.inputTemplate,
+    instructions: initialTemplate.instructions,
+    conversationKeyTemplate: initialTemplate.conversationKeyTemplate,
   };
 }
 
@@ -252,6 +278,31 @@ function applyTriggerIdsChange(input: {
   };
 }
 
+function resolveTemplateTriggerIds(input: {
+  eventTypes: readonly string[];
+  eventOptions: readonly WebhookAutomationEventOption[];
+}): string[] | null {
+  const triggerIds: string[] = [];
+  for (const eventType of input.eventTypes) {
+    const matchingOptions = input.eventOptions.filter(
+      (eventOption) =>
+        eventOption.eventType === eventType &&
+        !isWebhookAutomationEventOptionUnavailable(eventOption),
+    );
+    if (matchingOptions.length !== 1) {
+      return null;
+    }
+
+    const [matchingOption] = matchingOptions;
+    if (matchingOption === undefined) {
+      throw new Error(`Expected matching trigger option for '${eventType}'.`);
+    }
+    triggerIds.push(matchingOption.id);
+  }
+
+  return triggerIds;
+}
+
 function resolveDefaultInputTemplate(kind: AutomationTypeValue): string {
   return kind === "scheduled"
     ? toScheduledAutomationFormValues(null).inputTemplate
@@ -276,9 +327,14 @@ async function invalidateAutomationsQuery(queryClient: QueryClient) {
 
 function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
   const queryClient = useQueryClient();
-  const [kind, setKind] = useState<AutomationTypeValue | null>(null);
+  const initialTemplate =
+    input.initialTemplateId === undefined ? null : getTriggerTemplateById(input.initialTemplateId);
+  const [kind, setKind] = useState<AutomationTypeValue | null>(initialTemplate?.kind ?? null);
   const [formValues, setFormValues] = useState<CreateAutomationFormValues>(() =>
-    createInitialCreateAutomationFormValues(input.initialSandboxProfileId),
+    createInitialCreateAutomationFormValues(input.initialSandboxProfileId, initialTemplate),
+  );
+  const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(
+    initialTemplate?.kind === "scheduled" ? (input.initialTemplateId ?? null) : null,
   );
   const [selectedSandboxProfileVersion, setSelectedSandboxProfileVersion] =
     useState<SelectedSandboxProfileVersion | null>(null);
@@ -422,6 +478,46 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
       selectedProfileTriggerState.selectableConnectionIds,
     ],
   );
+
+  useEffect(() => {
+    if (
+      initialTemplate === null ||
+      initialTemplate.kind !== "trigger" ||
+      input.initialTemplateId === undefined ||
+      appliedTemplateId === input.initialTemplateId ||
+      eventPrerequisites.isPending ||
+      eventPrerequisites.directoryData === undefined ||
+      !hasLoadedSelectedProfileAutomationConfig
+    ) {
+      return;
+    }
+
+    const templateTriggerIds = resolveTemplateTriggerIds({
+      eventTypes: initialTemplate.eventTypes,
+      eventOptions: webhookEventOptions,
+    });
+    if (templateTriggerIds === null) {
+      setAppliedTemplateId(input.initialTemplateId);
+      return;
+    }
+
+    setFormValues((currentValues) =>
+      applyTriggerIdsChange({
+        values: currentValues,
+        triggerIds: templateTriggerIds,
+        eventOptions: webhookEventOptions,
+      }),
+    );
+    setAppliedTemplateId(input.initialTemplateId);
+  }, [
+    appliedTemplateId,
+    eventPrerequisites.directoryData,
+    eventPrerequisites.isPending,
+    hasLoadedSelectedProfileAutomationConfig,
+    initialTemplate,
+    input.initialTemplateId,
+    webhookEventOptions,
+  ]);
 
   useEffect(() => {
     setFormValues((currentValues) => {

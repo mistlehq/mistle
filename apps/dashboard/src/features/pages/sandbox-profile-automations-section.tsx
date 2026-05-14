@@ -9,7 +9,7 @@ import {
 } from "@mistle/ui";
 import { CalendarDotsIcon, PlusIcon, WebhooksLogoIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -23,7 +23,33 @@ import { toAutomationListItemViewModel } from "../automations/automation-list-vi
 import { automationsListQueryKey } from "../automations/automations-query-keys.js";
 import { listAutomations } from "../automations/automations-service.js";
 import { getScheduledAutomation } from "../automations/scheduled-automations-service.js";
+import { TriggerTemplates, type TriggerTemplate } from "../automations/trigger-templates.js";
+import { useWebhookAutomationEventPrerequisites } from "../automations/use-webhook-automation-prerequisites.js";
+import {
+  buildWebhookAutomationEventOptions,
+  resolveEligibleProfileAutomationConnectionIds,
+} from "../automations/webhook-automation-option-builders.js";
+import type { WebhookAutomationEventOption } from "../automations/webhook-automation-trigger-types.js";
 import { getWebhookAutomation } from "../automations/webhook-automations-service.js";
+import { IntegrationLogo } from "../integrations/integration-logo.js";
+import type {
+  IntegrationConnection,
+  IntegrationTarget,
+  IntegrationWebhookSource,
+} from "../integrations/integrations-service.js";
+import {
+  sandboxProfileVersionAutomationConfigQueryKey,
+  sandboxProfileVersionsQueryKey,
+} from "../sandbox-profiles/sandbox-profiles-query-keys.js";
+import {
+  getSandboxProfileVersionAutomationConfig,
+  listSandboxProfileVersions,
+} from "../sandbox-profiles/sandbox-profiles-service.js";
+import type {
+  SandboxProfileVersion,
+  SandboxProfileVersionAutomationConfig,
+} from "../sandbox-profiles/sandbox-profiles-types.js";
+import { ActionTile } from "../shared/action-tile.js";
 import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
 import { TablePagination } from "../shared/table-pagination.js";
 import { EditScheduledAutomationEditor } from "./scheduled-automation-editor-page.js";
@@ -31,12 +57,187 @@ import { EditWebhookAutomationEditor } from "./webhook-automation-editor-page.js
 
 const ProfileAutomationsListLimit = 25;
 
-function createAutomationCreatePath(profileId: string): string {
+type TriggerTemplateAvailability =
+  | {
+      kind: "available";
+      template: TriggerTemplate;
+    }
+  | {
+      kind: "unavailable";
+      reason: string;
+      template: TriggerTemplate;
+    };
+
+function createAutomationCreatePath(profileId: string, templateId?: string): string {
   const searchParams = new URLSearchParams({
     sandboxProfileId: profileId,
   });
+  if (templateId !== undefined) {
+    searchParams.set("template", templateId);
+  }
 
   return `/automations/new?${searchParams.toString()}`;
+}
+
+function TriggerTemplateIcon(input: { template: TriggerTemplate }): React.JSX.Element | null {
+  if (input.template.logoKey === undefined) {
+    return null;
+  }
+
+  return <IntegrationLogo alt={`${input.template.title} logo`} logoKey={input.template.logoKey} />;
+}
+
+function TriggerTemplateList(input: {
+  errorMessage: string | null;
+  isPending: boolean;
+  onCreateFromTemplate: (templateId: string) => void;
+  templates: readonly TriggerTemplateAvailability[];
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-6 py-3">
+      <div>
+        <h2 className="text-2xl font-semibold">Create from template</h2>
+        <p className="mt-2 text-base text-muted-foreground">
+          Choose a starting point for the automation you want to create.
+        </p>
+      </div>
+      {input.errorMessage === null ? null : (
+        <Notice title="Could not load trigger templates" variant="alert">
+          {input.errorMessage}
+        </Notice>
+      )}
+      {input.isPending ? <div className="min-h-48" /> : null}
+      {!input.isPending && input.errorMessage === null ? (
+        <div className="grid gap-4 lg:grid-cols-3">
+          {input.templates.map((item) => (
+            <ActionTile
+              action={
+                item.kind === "available" ? (
+                  <Button
+                    className="w-full"
+                    onClick={() => {
+                      input.onCreateFromTemplate(item.template.id);
+                    }}
+                    type="button"
+                    variant="outline"
+                  >
+                    Select
+                  </Button>
+                ) : (
+                  <p className="text-sm text-muted-foreground">{item.reason}</p>
+                )
+              }
+              actionContainerClassName={
+                item.kind === "available" ? "w-full" : "w-full justify-start"
+              }
+              className={`gap-5 px-4 py-5 sm:flex-col sm:items-stretch sm:justify-between ${
+                item.kind === "available" ? "" : "opacity-75"
+              }`}
+              contentClassName="w-full"
+              description={item.template.description}
+              key={item.template.id}
+              leading={<TriggerTemplateIcon template={item.template} />}
+              title={item.template.title}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function resolveActiveSandboxProfileVersion(
+  versions: readonly SandboxProfileVersion[],
+): number | null {
+  return versions.find((version) => version.isActive)?.version ?? null;
+}
+
+function isTriggerTemplateAvailable(input: {
+  eventOptions: readonly WebhookAutomationEventOption[];
+  template: TriggerTemplate;
+}): boolean {
+  if (input.template.kind === "scheduled") {
+    return true;
+  }
+
+  return input.template.eventTypes.every((eventType) =>
+    input.eventOptions.some((option) => option.eventType === eventType),
+  );
+}
+
+function resolveTriggerTemplateAvailability(input: {
+  automationConfig: SandboxProfileVersionAutomationConfig;
+  connections: readonly IntegrationConnection[];
+  eventOptions: readonly WebhookAutomationEventOption[];
+  selectableConnectionIds: readonly string[];
+  targets: readonly IntegrationTarget[];
+  template: TriggerTemplate;
+  webhookSources: readonly IntegrationWebhookSource[];
+}): TriggerTemplateAvailability {
+  const template = input.template;
+  if (template.kind === "scheduled") {
+    return {
+      kind: "available",
+      template,
+    };
+  }
+
+  if (
+    isTriggerTemplateAvailable({
+      eventOptions: input.eventOptions,
+      template,
+    })
+  ) {
+    return {
+      kind: "available",
+      template,
+    };
+  }
+
+  const matchingTargets = input.targets.filter((target) =>
+    target.supportedWebhookEvents?.some((eventDefinition) =>
+      template.eventTypes.includes(eventDefinition.eventType),
+    ),
+  );
+  const matchingConnections = input.connections.filter((connection) =>
+    matchingTargets.some((target) => target.targetKey === connection.targetKey),
+  );
+  const firstMatchingTarget = matchingTargets[0];
+  const integrationName = firstMatchingTarget?.displayName ?? "the required integration";
+  const matchingConnectionIds = new Set(matchingConnections.map((connection) => connection.id));
+  const hasProfileBinding = input.automationConfig.bindings.some((binding) =>
+    matchingConnectionIds.has(binding.connectionId),
+  );
+  if (!hasProfileBinding) {
+    return {
+      kind: "unavailable",
+      reason: "Slack connection required.",
+      template,
+    };
+  }
+
+  const selectableConnectionIds = new Set(input.selectableConnectionIds);
+  const profileConnections = matchingConnections.filter((connection) =>
+    selectableConnectionIds.has(connection.id),
+  );
+  const hasActiveWebhookSource = input.webhookSources.some(
+    (source) =>
+      source.status === "active" &&
+      profileConnections.some((connection) => connection.id === source.integrationConnectionId),
+  );
+  if (!hasActiveWebhookSource) {
+    return {
+      kind: "unavailable",
+      reason: `The ${integrationName} connection for this sandbox profile does not have an active webhook source.`,
+      template,
+    };
+  }
+
+  return {
+    kind: "unavailable",
+    reason: `The ${integrationName} connection has not synced the required event capability.`,
+    template,
+  };
 }
 
 function SourceSummary(input: { item: AutomationListItemViewModel }): React.JSX.Element {
@@ -295,6 +496,7 @@ export function SandboxProfileAutomationsSection(input: { profileId: string }): 
   const [isMobileAutomationSelectOpen, setIsMobileAutomationSelectOpen] = useState(false);
   const { after, before } = readKeysetPaginationCursors(searchParams);
   const automationId = params["automationId"];
+  const shouldLoadTemplates = automationId === undefined;
   const automationsQuery = useQuery({
     queryKey: automationsListQueryKey({
       limit: ProfileAutomationsListLimit,
@@ -312,6 +514,42 @@ export function SandboxProfileAutomationsSection(input: { profileId: string }): 
       }),
     retry: false,
   });
+  const profileVersionsQuery = useQuery({
+    queryKey: sandboxProfileVersionsQueryKey(input.profileId),
+    queryFn: async ({ signal }) =>
+      listSandboxProfileVersions({
+        profileId: input.profileId,
+        signal,
+      }),
+    enabled: shouldLoadTemplates,
+    retry: false,
+  });
+  const activeSandboxProfileVersion = useMemo(
+    () => resolveActiveSandboxProfileVersion(profileVersionsQuery.data?.versions ?? []),
+    [profileVersionsQuery.data?.versions],
+  );
+  const automationConfigQuery = useQuery({
+    queryKey: sandboxProfileVersionAutomationConfigQueryKey({
+      profileId: input.profileId,
+      version: activeSandboxProfileVersion ?? 0,
+    }),
+    queryFn: async ({ signal }) => {
+      if (activeSandboxProfileVersion === null) {
+        throw new Error("An active sandbox profile version is required.");
+      }
+
+      return getSandboxProfileVersionAutomationConfig({
+        profileId: input.profileId,
+        version: activeSandboxProfileVersion,
+        signal,
+      });
+    },
+    enabled: shouldLoadTemplates && activeSandboxProfileVersion !== null,
+    retry: false,
+  });
+  const eventPrerequisites = useWebhookAutomationEventPrerequisites({
+    enabled: shouldLoadTemplates && activeSandboxProfileVersion !== null,
+  });
 
   const items = automationsQuery.data?.items.map(toAutomationListItemViewModel) ?? [];
   const selectedAutomation =
@@ -322,6 +560,49 @@ export function SandboxProfileAutomationsSection(input: { profileId: string }): 
         fallbackMessage: "Could not load triggers.",
       })
     : null;
+  const triggerTemplateAvailability = useMemo(() => {
+    const automationConfig = automationConfigQuery.data;
+    const directoryData = eventPrerequisites.directoryData;
+    if (automationConfig === undefined || directoryData === undefined) {
+      return [];
+    }
+
+    const selectableConnectionIds = resolveEligibleProfileAutomationConnectionIds({
+      bindings: automationConfig.bindings,
+      connections: directoryData.connections,
+      targets: directoryData.targets,
+    });
+    const eventOptions = buildWebhookAutomationEventOptions({
+      connections: directoryData.connections,
+      targets: directoryData.targets,
+      webhookSources: directoryData.webhookSources,
+      selectableConnectionIds,
+      selectedTriggerIds: [],
+    });
+
+    return TriggerTemplates.map((template) =>
+      resolveTriggerTemplateAvailability({
+        automationConfig,
+        connections: directoryData.connections,
+        eventOptions,
+        selectableConnectionIds,
+        targets: directoryData.targets,
+        template,
+        webhookSources: directoryData.webhookSources,
+      }),
+    );
+  }, [automationConfigQuery.data, eventPrerequisites.directoryData]);
+  const templateErrorMessage =
+    profileVersionsQuery.isError || automationConfigQuery.isError
+      ? resolveApiErrorMessage({
+          error: profileVersionsQuery.error ?? automationConfigQuery.error,
+          fallbackMessage: "Could not load trigger templates.",
+        })
+      : eventPrerequisites.errorMessage;
+  const templatesPending =
+    profileVersionsQuery.isPending ||
+    (activeSandboxProfileVersion !== null &&
+      (automationConfigQuery.isPending || eventPrerequisites.isPending));
 
   function updatePagination(inputValue: {
     nextAfter: string | null;
@@ -344,6 +625,14 @@ export function SandboxProfileAutomationsSection(input: { profileId: string }): 
         automationId: item.id,
         searchParams,
       }),
+    );
+  }
+
+  function createFromTemplate(templateId: string): void {
+    void navigate(
+      templateId.length === 0
+        ? createAutomationCreatePath(input.profileId)
+        : createAutomationCreatePath(input.profileId, templateId),
     );
   }
 
@@ -478,10 +767,13 @@ export function SandboxProfileAutomationsSection(input: { profileId: string }): 
         </nav>
         <div aria-hidden className="hidden bg-border md:block" />
         <div className="min-w-0 md:pl-8">
-          {items.length === 0 && !automationsQuery.isPending && errorMessage === null ? (
-            <div className="py-3 text-sm text-muted-foreground">
-              No triggers use this sandbox profile.
-            </div>
+          {automationId === undefined && !automationsQuery.isPending && errorMessage === null ? (
+            <TriggerTemplateList
+              errorMessage={templateErrorMessage}
+              isPending={templatesPending}
+              onCreateFromTemplate={createFromTemplate}
+              templates={triggerTemplateAvailability}
+            />
           ) : (
             <ProfileAutomationDetail
               profileId={input.profileId}

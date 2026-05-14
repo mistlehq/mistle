@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { EditorView } from "@codemirror/view";
+import { SlackBrowserDefinition } from "@mistle/integrations-definitions/browser";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState, type JSX } from "react";
@@ -18,8 +19,19 @@ import { cleanupTestQueryClients, createTestQueryClient } from "../../test-suppo
 import { automationsListQueryKey } from "../automations/automations-query-keys.js";
 import type { AutomationsListResult } from "../automations/automations-types.js";
 import {
+  WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY,
+  WEBHOOK_AUTOMATION_WEBHOOK_SOURCES_QUERY_KEY_PREFIX,
+} from "../automations/use-webhook-automation-prerequisites.js";
+import { createStoryWebhookTriggerCapabilitiesProviderMetadata } from "../integrations/integration-story-harness.js";
+import type {
+  IntegrationConnection,
+  IntegrationTarget,
+  IntegrationWebhookSource,
+} from "../integrations/integrations-service.js";
+import {
   sandboxProfileDetailQueryKey,
   sandboxProfileIntegrationDirectoryQueryKey,
+  sandboxProfileVersionAutomationConfigQueryKey,
   sandboxProfileVersionIntegrationBindingsQueryKey,
   sandboxProfileVersionSetupScriptQueryKey,
   sandboxProfileVersionsQueryKey,
@@ -118,6 +130,72 @@ type SandboxProfileEditorTestVersionState =
 
 type SandboxProfileEditorTestRouteView = "published" | "draft" | "default";
 type SandboxProfileEditorTestRouteSection = "sandbox-profile" | "automations" | "snapshot" | null;
+
+const SlackAutomationConnectionId = "icn_slack_test";
+const SlackAutomationWebhookSourceId = "iws_slack_test";
+
+function createSlackAutomationConnection(): IntegrationConnection {
+  return {
+    id: SlackAutomationConnectionId,
+    targetKey: "slack-default",
+    displayName: "Slack Engineering",
+    status: "active",
+    createdAt: "2026-04-23T00:00:00.000Z",
+    updatedAt: "2026-04-23T00:00:00.000Z",
+  };
+}
+
+function createSlackAutomationTarget(): IntegrationTarget {
+  return {
+    targetKey: "slack-default",
+    familyId: SlackBrowserDefinition.familyId,
+    variantId: SlackBrowserDefinition.variantId,
+    kind: SlackBrowserDefinition.kind,
+    enabled: true,
+    config: {},
+    displayName: SlackBrowserDefinition.displayName,
+    description: "Slack workspace",
+    ...(SlackBrowserDefinition.logoKey === undefined
+      ? {}
+      : { logoKey: SlackBrowserDefinition.logoKey }),
+    supportedWebhookEvents: [
+      {
+        eventType: "slack:app_mention",
+        providerEventType: "app_mention",
+        displayName: "App mention",
+        requirements: {
+          anyOf: [
+            {
+              event: "app_mention",
+              permissions: [{ permission: "app_mentions:read" }],
+            },
+          ],
+        },
+      },
+    ],
+    targetHealth: {
+      configStatus: "valid",
+    },
+  };
+}
+
+function createSlackAutomationWebhookSource(): IntegrationWebhookSource {
+  return {
+    id: SlackAutomationWebhookSourceId,
+    targetKey: "slack-default",
+    integrationConnectionId: SlackAutomationConnectionId,
+    displayName: "Slack Events API webhook",
+    endpointKey: "ep_slack_test",
+    status: "active",
+    providerMetadata: createStoryWebhookTriggerCapabilitiesProviderMetadata({
+      definition: SlackBrowserDefinition,
+      events: ["app_mention"],
+      permissions: [{ permission: "app_mentions:read" }],
+    }),
+    createdAt: "2026-04-23T00:00:00.000Z",
+    updatedAt: "2026-04-23T00:00:00.000Z",
+  };
+}
 
 function createRunningSnapshotJobFixture(input: {
   id: string;
@@ -367,6 +445,9 @@ function renderSandboxProfileEditor(input?: {
     status: "active" | "error" | "revoked";
     config?: Record<string, unknown>;
   }[];
+  automationConnections?: readonly IntegrationConnection[];
+  automationTargets?: readonly IntegrationTarget[];
+  automationWebhookSources?: readonly IntegrationWebhookSource[];
   setupScript?: string | null;
   setupScriptsByVersion?: Record<number, string | null>;
   targets?: readonly {
@@ -556,6 +637,28 @@ function renderSandboxProfileEditor(input?: {
     connections: input?.connections ?? [],
     targets: input?.targets ?? [],
   });
+  queryClient.setQueryData(
+    sandboxProfileVersionAutomationConfigQueryKey({
+      profileId,
+      version,
+    }),
+    {
+      bindings: input?.bindings ?? [],
+      repositoryOptions: [],
+    },
+  );
+  queryClient.setQueryData(WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY, {
+    connections: input?.automationConnections ?? [],
+    targets: input?.automationTargets ?? [],
+  });
+  for (const connection of input?.automationConnections ?? []) {
+    queryClient.setQueryData(
+      [...WEBHOOK_AUTOMATION_WEBHOOK_SOURCES_QUERY_KEY_PREFIX, connection.id],
+      (input?.automationWebhookSources ?? []).filter(
+        (source) => source.integrationConnectionId === connection.id,
+      ),
+    );
+  }
   for (const versionFixture of versions) {
     const versionSetupScript = input?.setupScriptsByVersion?.[versionFixture.version];
     queryClient.setQueryData(
@@ -1470,6 +1573,17 @@ describe("SandboxProfileEditorPage", () => {
 
   it("opens the triggers tab from the section route segment", () => {
     const { profileId, router } = renderSandboxProfileEditor({
+      automationConnections: [createSlackAutomationConnection()],
+      automationTargets: [createSlackAutomationTarget()],
+      automationWebhookSources: [createSlackAutomationWebhookSource()],
+      bindings: [
+        {
+          id: "binding-slack",
+          connectionId: SlackAutomationConnectionId,
+          kind: "connector",
+          config: {},
+        },
+      ],
       routeSection: "automations",
       versionState: "published",
     });
@@ -1478,7 +1592,23 @@ describe("SandboxProfileEditorPage", () => {
       "true",
     );
     expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/automations`);
-    expect(screen.getByText("No triggers use this sandbox profile.")).toBeDefined();
+    expect(screen.getByRole("heading", { name: "Create from template" })).toBeDefined();
+    expect(screen.getByText("Slack Mention")).toBeDefined();
+  });
+
+  it("shows unavailable trigger templates with a reason when the required connection is missing", () => {
+    renderSandboxProfileEditor({
+      automationTargets: [createSlackAutomationTarget()],
+      routeSection: "automations",
+      versionState: "published",
+    });
+
+    expect(screen.getByRole("heading", { name: "Create from template" })).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "Available" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Unavailable" })).toBeNull();
+    expect(screen.getByText("Slack Mention")).toBeDefined();
+    expect(screen.getByText("Slack connection required.")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Unavailable" })).toBeNull();
   });
 
   it("preserves the profile automation page cursor when selecting an automation", () => {
