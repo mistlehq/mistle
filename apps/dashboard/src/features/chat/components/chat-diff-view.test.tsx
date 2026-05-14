@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { ChatDiffOptions } from "./chat-diff-view.js";
+import { resolveChatDiffOptions } from "./chat-diff-view.js";
 
 describe("ChatDiffView", () => {
-  it("pins diff rendering to the light theme", () => {
-    expect(ChatDiffOptions.themeType).toBe("light");
+  it("uses the resolved Mistle appearance for Pierre diff rendering", () => {
+    expect(resolveChatDiffOptions({ themeType: "dark" }).themeType).toBe("dark");
+    expect(resolveChatDiffOptions({ themeType: "light" }).themeType).toBe("light");
   });
 });

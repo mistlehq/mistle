@@ -128,6 +128,7 @@ export const SlackDisabledButStillLinkedCard = createSlackCard({
 });
 
 export const DefaultProfileSettingsPageViewProps: ProfileSettingsPageViewProps = {
+  appearance: "system",
   displayName: "Mistle Developer",
   email: "developer@mistle.so",
   imageUrl: null,
@@ -146,6 +147,7 @@ export const DefaultProfileSettingsPageViewProps: ProfileSettingsPageViewProps =
   onDeleteLinkedAccountCommitSigningKey: async () => {},
   onDeleteProfileImage: async () => {},
   onLinkLinkedAccount: async () => {},
+  onSaveAppearance: async () => {},
   onSaveChanges: async () => {},
   onUnlinkLinkedAccount: async () => {},
   onUpdateLinkedAccountPreferredEmail: async () => {},
@@ -154,6 +156,7 @@ export const DefaultProfileSettingsPageViewProps: ProfileSettingsPageViewProps =
   profileImageBusy: false,
   profileImageErrorMessage: null,
   saving: false,
+  updatingAppearance: false,
 };
 
 export const DefaultProfileSettingsUserSectionProps: ProfileSettingsUserSectionProps =

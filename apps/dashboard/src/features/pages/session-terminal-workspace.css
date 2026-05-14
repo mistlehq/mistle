@@ -1,14 +1,14 @@
 .session-terminal-dockview {
   --terminal-workspace-bg: var(--background);
   --terminal-workspace-border: var(--border);
-  --terminal-tab-strip-bg: var(--color-stone-100);
-  --terminal-tab-bg: var(--color-stone-200);
-  --terminal-tab-hover-bg: var(--color-stone-200);
+  --terminal-tab-strip-bg: var(--muted);
+  --terminal-tab-bg: color-mix(in srgb, var(--muted) 80%, var(--background));
+  --terminal-tab-hover-bg: color-mix(in srgb, var(--muted) 70%, var(--foreground) 10%);
   --terminal-tab-active-bg: var(--background);
   --terminal-tab-text: var(--muted-foreground);
   --terminal-tab-text-active: var(--foreground);
   --terminal-tab-text-inactive-group: color-mix(in srgb, var(--foreground) 45%, transparent);
-  --terminal-tab-separator: var(--color-stone-300);
+  --terminal-tab-separator: var(--border);
   --terminal-tab-icon-hover-bg: color-mix(in srgb, var(--foreground) 8%, transparent);
   --terminal-scrollbar-color: color-mix(in srgb, var(--foreground) 18%, transparent);
   --terminal-floating-shadow: 0 10px 30px color-mix(in srgb, var(--foreground) 8%, transparent);
@@ -107,7 +107,7 @@
 }
 
 .session-terminal-dockview .dv-tab .dv-default-tab .dv-default-tab-action:hover {
-  background-color: var(--color-stone-100);
+  background-color: var(--terminal-tab-icon-hover-bg);
   border-radius: var(--radius-md);
 }
 

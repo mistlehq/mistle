@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { IntegrationLogo } from "./integration-logo.js";
 
 describe("IntegrationLogo", () => {
-  it("renders the light dashboard logo even when a dark logo asset exists", () => {
+  it("renders light and dark dashboard logos when a dark logo asset exists", () => {
     const { container } = render(
       <IntegrationLogo alt="GitHub logo" className="size-4" logoKey="github" />,
     );
@@ -15,8 +15,14 @@ describe("IntegrationLogo", () => {
     expect(container.querySelector("picture")).toBeNull();
 
     const logo = screen.getByRole("img", { name: "GitHub logo" });
-    expect(logo.getAttribute("class")).toBe("size-4");
-    expect(logo.getAttribute("src")).toBe("/integration-logos/github.svg");
+    expect(logo.tagName).toBe("SPAN");
+
+    const images = container.querySelectorAll("img");
+    expect(images).toHaveLength(2);
+    expect(images[0]?.getAttribute("class")).toBe("size-4 dark:hidden");
+    expect(images[0]?.getAttribute("src")).toBe("/integration-logos/github.svg");
+    expect(images[1]?.getAttribute("class")).toBe("size-4 hidden dark:inline-block");
+    expect(images[1]?.getAttribute("src")).toBe("/integration-logos/github-dark.svg");
   });
 
   it("renders the light dashboard logo for single-asset integrations", () => {
@@ -27,5 +33,13 @@ describe("IntegrationLogo", () => {
     expect(screen.getByRole("img", { name: "Slack logo" }).getAttribute("src")).toBe(
       "/integration-logos/slack.svg",
     );
+  });
+
+  it("keeps decorative variant logos hidden from the accessibility tree", () => {
+    const { container } = render(<IntegrationLogo alt="" logoKey="openai" />);
+
+    expect(container.querySelector('[role="img"]')).toBeNull();
+    expect(container.querySelector("span")?.getAttribute("aria-hidden")).toBe("true");
+    expect(container.querySelectorAll("img")).toHaveLength(2);
   });
 });

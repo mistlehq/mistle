@@ -380,6 +380,7 @@ export function AgentInstructionsEditor(input: AgentInstructionsEditorProps): Re
           onChange={(nextValue) => {
             input.onChange(nextValue);
           }}
+          theme="none"
           value={input.value}
         />
       </div>

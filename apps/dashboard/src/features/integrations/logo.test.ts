@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveIntegrationLogoPath } from "./logo.js";
+import {
+  hasIntegrationLogoDarkVariant,
+  resolveIntegrationLogoPath,
+  resolveIntegrationLogoPaths,
+} from "./logo.js";
 
 describe("resolveIntegrationLogoPath", () => {
   it("returns the dashboard public path for a logo key", () => {
@@ -28,9 +32,37 @@ describe("resolveIntegrationLogoPath", () => {
     );
   });
 
+  it("returns dark variant paths for integrations with light-sensitive marks", () => {
+    expect(resolveIntegrationLogoPath({ logoKey: "github", colorScheme: "dark" })).toBe(
+      "/integration-logos/github-dark.svg",
+    );
+    expect(resolveIntegrationLogoPath({ logoKey: "aws", colorScheme: "dark" })).toBe(
+      "/integration-logos/aws-dark.svg",
+    );
+    expect(resolveIntegrationLogoPath({ logoKey: "slack", colorScheme: "dark" })).toBe(
+      "/integration-logos/slack.svg",
+    );
+  });
+
+  it("returns paired logo paths when a dark variant exists", () => {
+    expect(resolveIntegrationLogoPaths({ logoKey: "openai" })).toEqual({
+      light: "/integration-logos/openai.svg",
+      dark: "/integration-logos/openai-dark.svg",
+    });
+    expect(resolveIntegrationLogoPaths({ logoKey: "linear" })).toEqual({
+      light: "/integration-logos/linear.svg",
+      dark: null,
+    });
+    expect(hasIntegrationLogoDarkVariant({ logoKey: "planetscale" })).toBe(true);
+    expect(hasIntegrationLogoDarkVariant({ logoKey: "jira" })).toBe(false);
+  });
+
   it("trims whitespace from the logo key", () => {
     expect(resolveIntegrationLogoPath({ logoKey: "  github  " })).toBe(
       "/integration-logos/github.svg",
+    );
+    expect(resolveIntegrationLogoPath({ logoKey: "  github  ", colorScheme: "dark" })).toBe(
+      "/integration-logos/github-dark.svg",
     );
   });
 

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { readUserAppearanceFromSession } from "../appearance/appearance.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import {
   clearLinkedAccountCallbackSearchParams,
@@ -23,6 +24,7 @@ import {
 import {
   deleteProfileImage,
   getProfileImage,
+  updateProfileAppearance,
   updateProfileDisplayName,
   uploadProfileImage,
 } from "../settings/profile/profile-service.js";
@@ -74,6 +76,14 @@ export function ProfileSettingsPage(): React.JSX.Element {
 
   const saveMutation = useMutation({
     mutationFn: async (displayName: string) => updateProfileDisplayName({ displayName }),
+    onSuccess: async () => {
+      await queryClient.refetchQueries({
+        queryKey: SESSION_QUERY_KEY,
+      });
+    },
+  });
+  const updateAppearanceMutation = useMutation({
+    mutationFn: updateProfileAppearance,
     onSuccess: async () => {
       await queryClient.refetchQueries({
         queryKey: SESSION_QUERY_KEY,
@@ -236,6 +246,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
   }, [searchParams, setSearchParams]);
 
   const persistedDisplayName = resolveUserDisplayName(session.user);
+  const persistedAppearance = readUserAppearanceFromSession(session);
   const imageUrl = createSingletonImageContentUrl({
     resourceName: "Profile image",
     path: ProfileImageContentPath,
@@ -289,6 +300,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
   return (
     <PageFrame width="form" description={description} title={title}>
       <ProfileSettingsPageView
+        appearance={persistedAppearance}
         displayName={persistedDisplayName}
         email={session.user.email}
         imageUrl={imageUrl}
@@ -304,6 +316,9 @@ export function ProfileSettingsPage(): React.JSX.Element {
         profileImageErrorMessage={profileImageErrorMessage}
         onDeleteProfileImage={async () => {
           await deleteProfileImageMutation.mutateAsync();
+        }}
+        onSaveAppearance={async (appearance) => {
+          await updateAppearanceMutation.mutateAsync({ appearance });
         }}
         onLinkLinkedAccount={async (providerFamily) => {
           await runLinkedAccountAction(providerFamily, async () =>
@@ -343,6 +358,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
         }}
         pendingLinkedAccountProviderFamilies={pendingLinkedAccountProviderFamilies}
         saving={saveMutation.isPending}
+        updatingAppearance={updateAppearanceMutation.isPending}
       />
     </PageFrame>
   );

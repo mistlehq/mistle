@@ -20,7 +20,7 @@ function ResponsiveFieldListStoryPreview(): React.JSX.Element {
   return (
     <div className="w-full max-w-4xl">
       <ResponsiveFieldList
-        className="border-y bg-white"
+        className="border-y bg-card"
         columns={[
           { key: "integration", label: "Integration", desktopWidth: "minmax(0,1.1fr)" },
           { key: "connection", label: "Connection", desktopWidth: "minmax(0,1.6fr)" },

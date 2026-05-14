@@ -1,6 +1,8 @@
 import { Navigate, Outlet, useLocation } from "react-router";
 
 import { AuthenticatedAnalytics } from "../../lib/analytics/authenticated.js";
+import { AuthenticatedAppearanceProvider } from "../appearance/appearance-provider.js";
+import { readUserAppearanceFromSession } from "../appearance/appearance.js";
 import type { SessionData } from "../auth/types.js";
 import {
   MISSING_ACTIVE_ORGANIZATION_ERROR_MESSAGE,
@@ -54,12 +56,12 @@ export function RequireAuth(): React.JSX.Element {
   }
 
   return (
-    <>
+    <AuthenticatedAppearanceProvider appearance={readUserAppearanceFromSession(sessionQuery.data)}>
       <AuthenticatedAnalytics
         organizationId={activeOrganizationId}
         userId={sessionQuery.data.user.id}
       />
       <Outlet />
-    </>
+    </AuthenticatedAppearanceProvider>
   );
 }

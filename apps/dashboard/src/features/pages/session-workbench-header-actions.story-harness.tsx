@@ -27,7 +27,7 @@ type SessionWorkbenchHeaderActionsStoryHarnessProps = {
 };
 
 const StoryActionButtonControl = {
-  className: "bg-transparent text-foreground shadow-none hover:bg-stone-100",
+  className: "bg-transparent text-foreground shadow-none hover:bg-muted/60",
   disabled: false,
   onClick: () => {
     return;
@@ -286,7 +286,7 @@ export function SessionWorkbenchHeaderActionsStoryHarness(
           className="!h-[100dvh] max-h-[100dvh] gap-0 overflow-hidden p-0"
           side="bottom"
         >
-          <SheetHeader className="shrink-0 border-b border-stone-200 px-4 py-3 pr-12 text-left">
+          <SheetHeader className="shrink-0 border-b px-4 py-3 pr-12 text-left">
             <SheetTitle>Changes</SheetTitle>
             <SheetDescription>Review the file changes from this session.</SheetDescription>
           </SheetHeader>

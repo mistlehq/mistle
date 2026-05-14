@@ -20,7 +20,7 @@ export function FormPageSection(input: FormPageSectionProps): React.JSX.Element 
   return (
     <section className={cn("flex flex-col gap-2", input.className)}>
       {input.header === undefined ? null : input.header}
-      <div className="divide-y rounded border bg-white">{input.children}</div>
+      <div className="divide-y rounded border bg-card">{input.children}</div>
     </section>
   );
 }

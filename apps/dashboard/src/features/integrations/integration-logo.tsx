@@ -1,6 +1,7 @@
+import { cn } from "@mistle/ui";
 import type React from "react";
 
-import { resolveIntegrationLogoPath } from "./logo.js";
+import { resolveIntegrationLogoPaths } from "./logo.js";
 
 type IntegrationLogoProps = {
   alt: string;
@@ -9,11 +10,36 @@ type IntegrationLogoProps = {
 };
 
 export function IntegrationLogo(input: IntegrationLogoProps): React.JSX.Element {
+  const logoPaths = resolveIntegrationLogoPaths({ logoKey: input.logoKey });
+
+  if (logoPaths.dark === null) {
+    return <img alt={input.alt} className={input.className} src={logoPaths.light} />;
+  }
+
+  const accessibilityProps =
+    input.alt.length === 0
+      ? {
+          "aria-hidden": true,
+        }
+      : {
+          "aria-label": input.alt,
+          role: "img",
+        };
+
   return (
-    <img
-      alt={input.alt}
-      className={input.className}
-      src={resolveIntegrationLogoPath({ logoKey: input.logoKey })}
-    />
+    <span className="inline-flex items-center" {...accessibilityProps}>
+      <img
+        alt=""
+        aria-hidden="true"
+        className={cn(input.className, "dark:hidden")}
+        src={logoPaths.light}
+      />
+      <img
+        alt=""
+        aria-hidden="true"
+        className={cn(input.className, "hidden dark:inline-block")}
+        src={logoPaths.dark}
+      />
+    </span>
   );
 }

@@ -27,6 +27,7 @@ export function createAuthenticatedSessionFixture(
       createdAt: new Date("2026-03-01T00:00:00.000Z"),
       updatedAt: new Date("2026-03-01T00:00:00.000Z"),
       image: null,
+      appearance: "system",
       ...(overrides.user ?? {}),
     },
     ...overrides,

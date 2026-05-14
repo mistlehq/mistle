@@ -329,7 +329,7 @@ function SavingFieldIndicator(input: { status: SavingFieldStatus }): React.JSX.E
     return (
       <div
         className={cn(
-          "flex items-center justify-end text-emerald-700 transition-opacity duration-700",
+          "flex items-center justify-end text-emerald-600 transition-opacity duration-700 dark:text-emerald-400",
           input.status === "saved" ? "opacity-100" : "opacity-0",
         )}
       >

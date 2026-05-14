@@ -40,6 +40,21 @@ describe("Notice", () => {
     expect(screen.getByText("Check this state before continuing.")).toBeTruthy();
   });
 
+  it("includes dark-mode warning surface classes", () => {
+    render(<Notice variant="warning">Check this state before continuing.</Notice>);
+
+    const notice = screen
+      .getByText("Check this state before continuing.")
+      .closest('[data-slot="notice"]');
+    if (!(notice instanceof HTMLElement)) {
+      throw new Error("Warning notice was not rendered.");
+    }
+
+    expect(notice.className).toContain("dark:border-amber-400/30");
+    expect(notice.className).toContain("dark:bg-amber-400/10");
+    expect(notice.className).toContain("dark:text-amber-100");
+  });
+
   it("does not assign alert semantics to success notices by default", () => {
     render(<Notice variant="success">GitHub linked successfully.</Notice>);
 

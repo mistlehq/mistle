@@ -3,6 +3,36 @@ import { linter } from "@codemirror/lint";
 import { EditorView } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
 
+const ManifestJsonEditorTheme = EditorView.theme({
+  "&": {
+    backgroundColor: "transparent",
+    color: "var(--foreground)",
+  },
+  ".cm-editor": {
+    backgroundColor: "transparent",
+  },
+  ".cm-content": {
+    caretColor: "currentColor",
+  },
+  ".cm-gutters": {
+    backgroundColor: "transparent",
+    borderRightColor: "var(--border)",
+    color: "var(--muted-foreground)",
+  },
+  ".cm-activeLine, .cm-activeLineGutter": {
+    backgroundColor: "color-mix(in oklch, var(--accent) 45%, transparent)",
+  },
+  ".cm-selectionBackground, ::selection": {
+    backgroundColor: "color-mix(in oklch, var(--accent) 45%, transparent)",
+  },
+  ".cm-focused": {
+    outline: "none",
+  },
+  ".cm-diagnostic": {
+    fontFamily: "var(--font-sans)",
+  },
+});
+
 export type ManifestJsonValidation =
   | {
       status: "valid";
@@ -93,9 +123,11 @@ export function ManifestJsonEditor(input: {
             json(),
             linter(jsonParseLinter()),
             createManifestFormatOnBlurExtension(input.onChange),
+            ManifestJsonEditorTheme,
           ]}
           id={input.id}
           onChange={input.onChange}
+          theme="none"
           value={input.value}
         />
       </div>

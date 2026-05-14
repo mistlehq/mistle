@@ -48,7 +48,7 @@ function SourceSummary(input: { item: AutomationListItemViewModel }): React.JSX.
 
     return (
       <>
-        <span className="truncate font-mono text-xs text-foreground">
+        <span className="truncate font-mono text-xs text-muted-foreground">
           {input.item.source.cronExpression}
         </span>
         <span className="truncate text-xs text-muted-foreground">{timing}</span>
@@ -97,30 +97,36 @@ function ProfileAutomationListRow(input: {
 }): React.JSX.Element {
   return (
     <div
-      className={`flex w-full min-w-0 border-l-2 py-3 pl-4 pr-3 transition-colors ${
+      className={`w-full min-w-0 border-l-2 transition-colors ${
         input.selected
           ? "border-foreground text-foreground"
           : "border-transparent text-muted-foreground hover:text-foreground"
       }`}
     >
-      <div className="flex w-full min-w-0 items-start gap-2">
-        <AutomationIssueIndicator enabled={input.item.enabled} issue={input.item.issue} />
+      <div className="grid w-full min-w-0 grid-cols-[1.25rem_minmax(0,1fr)_1.25rem] gap-x-3 px-3 py-3">
+        <span className="flex h-5 items-center justify-center">
+          <AutomationIssueIndicator enabled={input.item.enabled} issue={input.item.issue} />
+        </span>
         <button
           aria-current={input.selected ? "true" : undefined}
           aria-label={`Select automation ${input.item.name}`}
-          className="flex min-w-0 flex-1 flex-col items-start gap-2 text-left"
+          className="flex min-w-0 flex-col items-start text-left"
           onClick={input.onSelect}
           type="button"
         >
-          <span className="flex w-full min-w-0 items-center gap-2">
-            <span className="min-w-0 flex-1 truncate text-sm font-medium">{input.item.name}</span>
-            <AutomationKindIcon kind={input.item.kind} />
+          <span className="block w-full truncate text-sm leading-5 font-semibold text-foreground">
+            {input.item.name}
           </span>
-          <span className="flex min-w-0 flex-col gap-1">
+          <span className="mt-2 flex min-w-0 flex-col gap-1">
             <SourceSummary item={input.item} />
           </span>
-          <span className="text-xs text-muted-foreground">Updated {input.item.updatedAtLabel}</span>
+          <span className="mt-2 text-xs text-muted-foreground">
+            Updated {input.item.updatedAtLabel}
+          </span>
         </button>
+        <span className="flex h-5 items-center justify-center">
+          <AutomationKindIcon kind={input.item.kind} />
+        </span>
       </div>
     </div>
   );

@@ -107,7 +107,7 @@ export function OrganizationIdentityLinkingSettingsPageView(
     <>
       <FormPageStack>
         <ResponsiveFieldList
-          className="border-y bg-white"
+          className="border-y bg-card"
           columns={IdentityLinkingProviderColumns}
           headerClassName="px-4 py-3 font-medium"
         >

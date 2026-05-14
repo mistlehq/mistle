@@ -1,6 +1,7 @@
 import { getDashboardConfig } from "../../../config.js";
 import { authClient } from "../../../lib/auth/client.js";
 import { requestControlPlane } from "../../api/request-control-plane.js";
+import type { UserAppearance } from "../../appearance/appearance.js";
 import {
   assertSingletonImageHasVersion,
   readSingletonImageMetadataResponse,
@@ -88,6 +89,20 @@ export async function updateProfileDisplayName(input: { displayName: string }): 
       throw: true,
       body: {
         name: input.displayName,
+      },
+    });
+  });
+}
+
+export async function updateProfileAppearance(input: {
+  appearance: UserAppearance;
+}): Promise<void> {
+  return executeMembersOperation("updateProfileAppearance", async () => {
+    await authClient.$fetch("/update-user", {
+      method: "POST",
+      throw: true,
+      body: {
+        appearance: input.appearance,
       },
     });
   });

@@ -117,6 +117,7 @@ export function SandboxSetupScriptEditor(input: SandboxSetupScriptEditorProps): 
           onChange={(nextValue) => {
             input.onChange(nextValue);
           }}
+          theme="none"
           value={input.value}
         />
       </div>

@@ -457,7 +457,7 @@ function SetupAssistantPanel(input: {
   state: Exclude<SandboxProfileEditorPageStoryArgs["setupAssistantPanelState"], undefined>;
 }): React.JSX.Element {
   const controlClassName =
-    "bg-transparent text-foreground shadow-none hover:bg-stone-100 aria-pressed:bg-stone-200";
+    "bg-transparent text-foreground shadow-none hover:bg-muted/60 aria-pressed:bg-muted";
 
   return (
     <aside className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden overscroll-contain">
@@ -481,13 +481,13 @@ function SetupAssistantPanel(input: {
             className={[
               "inline-block size-2.5 rounded-full border",
               input.state === "starting"
-                ? "border-stone-300 bg-stone-300"
+                ? "border-muted-foreground/30 bg-muted-foreground/30"
                 : "border-emerald-700 bg-emerald-600",
             ].join(" ")}
             role="status"
             title={input.state === "starting" ? "Starting" : "Connected"}
           />
-          <span aria-hidden className="h-5 w-px bg-stone-200" />
+          <span aria-hidden className="h-5 w-px bg-border" />
           <Button
             aria-label="TUI"
             aria-pressed={false}

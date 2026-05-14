@@ -22,6 +22,7 @@ export function createSettingsFixtureInviteMembersButton(): React.JSX.Element {
 export function createProfileSettingsFixtureContent(): React.JSX.Element {
   return (
     <ProfileSettingsPageView
+      appearance="system"
       displayName="Mistle Developer"
       email="developer@mistle.so"
       imageUrl={null}
@@ -40,6 +41,7 @@ export function createProfileSettingsFixtureContent(): React.JSX.Element {
       onDeleteLinkedAccountCommitSigningKey={async () => {}}
       onDeleteProfileImage={async () => {}}
       onLinkLinkedAccount={async () => {}}
+      onSaveAppearance={async () => {}}
       onSaveChanges={async () => {}}
       onUnlinkLinkedAccount={async () => {}}
       onUpdateLinkedAccountPreferredEmail={async () => {}}
@@ -48,6 +50,7 @@ export function createProfileSettingsFixtureContent(): React.JSX.Element {
       profileImageBusy={false}
       profileImageErrorMessage={null}
       saving={false}
+      updatingAppearance={false}
     />
   );
 }

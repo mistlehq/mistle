@@ -125,8 +125,8 @@ function SessionWorkbenchPageContent(input: {
         cliControl={{
           ariaLabel: cliButtonLabel,
           className: workbench.primaryPanelState.isCliToggleActive
-            ? "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300"
-            : "bg-transparent text-foreground shadow-none hover:bg-stone-100",
+            ? "bg-muted text-foreground shadow-none hover:bg-muted/80"
+            : "bg-transparent text-foreground shadow-none hover:bg-muted/60",
           disabled:
             !workbench.primaryPanelState.canEnterCli &&
             !workbench.primaryPanelState.isCliToggleActive,
@@ -144,8 +144,8 @@ function SessionWorkbenchPageContent(input: {
         diffControl={{
           ariaLabel: diffButtonLabel,
           className: workbench.diffPanelState.isVisible
-            ? "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300"
-            : "bg-transparent text-foreground shadow-none hover:bg-stone-100",
+            ? "bg-muted text-foreground shadow-none hover:bg-muted/80"
+            : "bg-transparent text-foreground shadow-none hover:bg-muted/60",
           disabled: isDiffOpenDisabled,
           onClick: () => {
             workbench.diffPanelState.togglePanel();
@@ -206,8 +206,8 @@ function SessionWorkbenchPageContent(input: {
         terminalControl={{
           ariaLabel: terminalButtonLabel,
           className: workbench.terminalPanelState.isVisible
-            ? "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300"
-            : "bg-transparent text-foreground shadow-none hover:bg-stone-100",
+            ? "bg-muted text-foreground shadow-none hover:bg-muted/80"
+            : "bg-transparent text-foreground shadow-none hover:bg-muted/60",
           disabled: isTerminalOpenDisabled,
           onClick: () => {
             if (workbench.terminalPanelState.isVisible) {

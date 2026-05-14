@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ProfileSettingsPageView } from "./profile-settings-page-view.js";
 
 const baseProps = {
+  appearance: "system",
   displayName: "Mistle Developer",
   email: "developer@mistle.so",
   imageUrl: null,
@@ -26,6 +27,7 @@ const baseProps = {
   onDeleteLinkedAccountCommitSigningKey: async () => {},
   onDeleteProfileImage: async () => {},
   onLinkLinkedAccount: async () => {},
+  onSaveAppearance: async () => {},
   onSaveChanges: async () => {},
   onUnlinkLinkedAccount: async () => {},
   onUpdateLinkedAccountPreferredEmail: async () => {},
@@ -34,6 +36,7 @@ const baseProps = {
   profileImageBusy: false,
   profileImageErrorMessage: null,
   saving: false,
+  updatingAppearance: false,
 } satisfies React.ComponentProps<typeof ProfileSettingsPageView>;
 
 type LinkedAccountCard = NonNullable<
@@ -83,6 +86,30 @@ describe("ProfileSettingsPageView", () => {
     expect(
       screen.getByRole("button", { name: "Remove profile image" }).hasAttribute("disabled"),
     ).toBe(false);
+  });
+
+  it("saves the selected appearance preference", async () => {
+    const savedAppearances: string[] = [];
+
+    render(
+      <ProfileSettingsPageView
+        {...baseProps}
+        onSaveAppearance={async (appearance) => {
+          savedAppearances.push(appearance);
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Appearance" }));
+    const darkOption = screen.getByRole("option", { name: "Dark" });
+    fireEvent.mouseMove(darkOption);
+    fireEvent.mouseDown(darkOption, { button: 0 });
+    fireEvent.mouseUp(darkOption, { button: 0 });
+    fireEvent.click(darkOption, { button: 0 });
+
+    await waitFor(() => {
+      expect(savedAppearances).toEqual(["dark"]);
+    });
   });
 
   it("uploads and removes the profile image through the provided handlers", async () => {
@@ -244,7 +271,7 @@ describe("ProfileSettingsPageView", () => {
 
     expect(screen.queryByText("Commit email")).toBeNull();
     expect(screen.queryByText("None")).toBeNull();
-    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Commit email" })).toBeNull();
   });
 
   it("renders a callback notice when a linked-account result is present", () => {
@@ -488,7 +515,7 @@ describe("ProfileSettingsPageView", () => {
 
     expect(screen.getByText("Commit email")).toBeTruthy();
     expect(screen.getByText("Commit signing")).toBeTruthy();
-    expect(screen.getByRole("combobox")).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Commit email" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Replace private key" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Remove key" })).toBeTruthy();
     expect(screen.getByText("Private key added")).toBeTruthy();

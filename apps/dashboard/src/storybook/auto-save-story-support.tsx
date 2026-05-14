@@ -39,7 +39,7 @@ export function AutoSaveStoryFrame(input: {
   instructions: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 rounded-xl border bg-white p-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 rounded-xl border bg-card p-6">
       {input.children}
       <div className="flex flex-col gap-2 text-sm">
         <FieldDescription>{input.instructions}</FieldDescription>

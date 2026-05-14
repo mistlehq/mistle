@@ -119,7 +119,7 @@ function InlineEditableHeadingStatus(input: {
     <CheckCircleIcon
       aria-hidden
       className={cn(
-        "size-4 shrink-0 text-emerald-700 transition-opacity duration-700",
+        "size-4 shrink-0 text-emerald-600 transition-opacity duration-700 dark:text-emerald-400",
         input.status === "saved" ? "opacity-100" : "opacity-0",
       )}
       weight="fill"

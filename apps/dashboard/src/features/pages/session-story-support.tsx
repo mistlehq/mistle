@@ -39,9 +39,8 @@ const StoryRepositoryOptions = [
   { value: "/root/mistle-docs", label: "mistle-docs" },
 ] satisfies ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
 const StorySelectedRepositoryValue = "/root/mistle";
-const StoryHeaderButtonClassName = "bg-transparent text-foreground shadow-none hover:bg-stone-100";
-const StoryHeaderButtonPressedClassName =
-  "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300";
+const StoryHeaderButtonClassName = "bg-transparent text-foreground shadow-none hover:bg-muted/60";
+const StoryHeaderButtonPressedClassName = "bg-muted text-foreground shadow-none hover:bg-muted/80";
 const StoryPortAccessProcesses = [
   {
     pid: 4321,

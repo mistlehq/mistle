@@ -44,7 +44,7 @@ it("renders the search appearance in the active state", () => {
 
   expect(group).toHaveAttribute("data-active", "true");
   expect(group.className).toContain("border-border");
-  expect(group.className).toContain("bg-white");
+  expect(group.className).toContain("bg-background");
   expect(group.className).toContain("text-sidebar-accent-foreground");
   expect(group.className).toContain("h-9");
   expect(input.className).toContain("h-full");

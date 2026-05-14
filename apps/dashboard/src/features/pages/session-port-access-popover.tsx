@@ -104,8 +104,8 @@ export function SessionPortAccessPopover(input: {
   const isButtonDisabled = input.state.buttonDisabledReason !== null;
   const listenerEntries = createProcessListenerEntries(input.state.processes);
   const buttonClassName = input.state.isPanelOpen
-    ? "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300"
-    : "bg-transparent text-foreground shadow-none hover:bg-stone-100";
+    ? "bg-muted text-foreground shadow-none hover:bg-muted/80"
+    : "bg-transparent text-foreground shadow-none hover:bg-muted/60";
 
   return (
     <Popover onOpenChange={input.state.setPanelOpen} open={input.state.isPanelOpen}>
@@ -129,7 +129,7 @@ export function SessionPortAccessPopover(input: {
         align="end"
         className="max-h-[calc(100dvh-5rem)] w-96 gap-0 overflow-hidden p-0"
       >
-        <PopoverHeader className="border-b border-stone-200 px-4 py-3">
+        <PopoverHeader className="border-b px-4 py-3">
           <PopoverTitle>Processes</PopoverTitle>
           <PopoverDescription>
             Select a process to open its HTTP port in a new tab.
@@ -149,7 +149,7 @@ export function SessionPortAccessSheet(input: {
   return (
     <Sheet onOpenChange={input.state.setPanelOpen} open={input.state.isPanelOpen}>
       <SheetContent className="!h-[100dvh] max-h-[100dvh] gap-0 p-0" side="bottom">
-        <SheetHeader className="shrink-0 border-b border-stone-200 px-4 py-3 pr-12 text-left">
+        <SheetHeader className="shrink-0 border-b px-4 py-3 pr-12 text-left">
           <SheetTitle>Processes</SheetTitle>
           <SheetDescription>Select a process to open its HTTP port in a new tab.</SheetDescription>
         </SheetHeader>
@@ -166,18 +166,20 @@ function ProcessAccessList(input: {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2">
       {input.state.errorMessage !== null ? (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {input.state.errorMessage}
         </p>
       ) : null}
       {input.state.isLoadingProcesses ? (
-        <div className="flex items-center gap-2 px-3 py-3 text-sm text-stone-600">
+        <div className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground">
           <Spinner className="size-4" />
           Loading running processes…
         </div>
       ) : null}
       {!input.state.isLoadingProcesses && input.listenerEntries.length === 0 ? (
-        <p className="px-3 py-3 text-sm text-stone-600">No loopback-listening processes found.</p>
+        <p className="px-3 py-3 text-sm text-muted-foreground">
+          No loopback-listening processes found.
+        </p>
       ) : null}
       {input.listenerEntries.map((entry) => {
         const primaryListener = resolvePrimaryProcessListener(entry.listenerProcess);
@@ -199,10 +201,14 @@ function ProcessAccessList(input: {
             primary={
               <p className="truncate">
                 {entry.bindAddresses.join(", ")}:
-                <span className="font-semibold text-stone-950">{String(primaryListener.port)}</span>
+                <span className="font-semibold text-foreground">
+                  {String(primaryListener.port)}
+                </span>
               </p>
             }
-            secondary={<p className="truncate text-xs text-stone-600">{entry.processLabel}</p>}
+            secondary={
+              <p className="truncate text-xs text-muted-foreground">{entry.processLabel}</p>
+            }
             title={createOpenLabel(entry.listenerProcess)}
           />
         );

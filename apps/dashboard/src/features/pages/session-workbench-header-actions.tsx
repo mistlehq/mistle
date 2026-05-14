@@ -108,7 +108,7 @@ export function SessionWorkbenchHeaderActions(input: {
             "inline-block size-2.5 rounded-full border",
             input.status.kind === "connected"
               ? "border-emerald-700 bg-emerald-600"
-              : "border-stone-300 bg-stone-300",
+              : "border-muted-foreground/30 bg-muted-foreground/30",
           ].join(" ")}
           role="status"
           title={input.status.label}
@@ -116,7 +116,7 @@ export function SessionWorkbenchHeaderActions(input: {
       )}
       {repositoryControl === undefined ? null : (
         <>
-          <span aria-hidden className="hidden h-5 w-px bg-stone-200 sm:block" />
+          <span aria-hidden className="hidden h-5 w-px bg-border sm:block" />
           <Select
             disabled={repositoryControl.disabled}
             onOpenChange={repositoryControl.onOpenChange}
@@ -134,7 +134,7 @@ export function SessionWorkbenchHeaderActions(input: {
           >
             <SelectTrigger
               aria-label={repositoryControl.ariaLabel}
-              className="h-9 w-24 min-w-0 border-stone-200 bg-transparent px-2 text-sm shadow-none hover:bg-stone-100 sm:h-8 sm:w-48 sm:px-2.5"
+              className="h-9 w-24 min-w-0 border-border bg-transparent px-2 text-sm shadow-none hover:bg-muted/60 sm:h-8 sm:w-48 sm:px-2.5"
               indicator={repositoryIndicator}
               title={repositoryControl.title ?? repositoryControl.ariaLabel}
             >
@@ -172,7 +172,7 @@ export function SessionWorkbenchHeaderActions(input: {
           </Select>
         </>
       )}
-      <span aria-hidden className="hidden h-5 w-px bg-stone-200 sm:block" />
+      <span aria-hidden className="hidden h-5 w-px bg-border sm:block" />
       <div className="hidden items-center gap-2 sm:flex">
         <Button
           aria-label={input.cliControl.ariaLabel}

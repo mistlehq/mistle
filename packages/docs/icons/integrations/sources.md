@@ -1,0 +1,24 @@
+Vendored integration logo sources:
+
+- SVGL, https://github.com/pheralb/svgl/tree/main/static/library
+  - anthropic.svg from anthropic_black.svg
+  - anthropic-dark.svg from anthropic_white.svg
+  - atlassian.svg from atlassian.svg
+  - aws.svg from aws_light.svg
+  - aws-dark.svg from aws_dark.svg
+  - datadog.svg from datadog.svg
+  - github.svg from github_light.svg
+  - github-dark.svg from github_dark.svg
+  - google.svg from google.svg
+  - linear.svg from linear.svg
+  - openai.svg from openai.svg
+  - openai-dark.svg from openai_dark.svg
+  - opencode.svg from opencode.svg
+  - opencode-dark.svg from opencode-dark.svg
+  - planetscale.svg from planetscale.svg
+  - planetscale-dark.svg from planetscale_dark.svg
+  - slack.svg from slack.svg
+- Existing non-SVGL vendored assets:
+  - e2b.svg and e2b-dark.svg from the E2B site header logo
+  - jira.svg from the existing Atlassian/Jira mark asset
+  - signoz.svg from the existing SigNoz mark asset

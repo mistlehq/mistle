@@ -1,11 +1,12 @@
 import type { ControlPlaneDatabase, ControlPlaneTables } from "@mistle/db/control-plane";
-import { ControlPlaneDbSchema } from "@mistle/db/control-plane";
+import { ControlPlaneDbSchema, UserAppearances } from "@mistle/db/control-plane";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError } from "better-auth/api";
 import { organization } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
 import type { OpenWorkflow } from "openworkflow";
+import { z } from "zod";
 
 import { AUTH_ROUTE_BASE_PATH } from "./constants.js";
 import { createAuthProviders } from "./providers/index.js";
@@ -98,6 +99,20 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
     }),
     user: {
       modelName: "users",
+      additionalFields: {
+        appearance: {
+          type: "string",
+          fieldName: "appearance",
+          required: false,
+          input: true,
+          returned: true,
+          defaultValue: UserAppearances.SYSTEM,
+          validator: {
+            input: z.enum([UserAppearances.SYSTEM, UserAppearances.LIGHT, UserAppearances.DARK]),
+            output: z.enum([UserAppearances.SYSTEM, UserAppearances.LIGHT, UserAppearances.DARK]),
+          },
+        },
+      },
     },
     session: {
       modelName: "sessions",

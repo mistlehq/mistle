@@ -57,7 +57,7 @@ export function InvitationAccessView(props: InvitationAccessViewProps): React.JS
           {props.isAccepting ? "Accepting..." : "Accept invitation"}
         </ScreenActionButton>
         <ScreenActionButton
-          className="text-zinc-500 hover:text-zinc-700"
+          className="text-muted-foreground hover:text-foreground"
           disabled={isSubmitting}
           onClick={props.onDecline}
           type="button"

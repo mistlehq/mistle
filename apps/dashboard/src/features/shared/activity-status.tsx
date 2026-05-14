@@ -11,12 +11,12 @@ export function ActivityStatus(input: {
       aria-label={input.label}
       aria-live="polite"
       className={cn(
-        "flex min-h-7 items-center justify-center gap-3 text-sm text-stone-500",
+        "flex min-h-7 items-center justify-center gap-3 text-sm text-muted-foreground",
         input.className,
       )}
       role="status"
     >
-      <BrailleSpinner className="text-stone-400" />
+      <BrailleSpinner className="text-muted-foreground" />
       <span className={cn("relative block overflow-hidden", input.labelClassName)}>
         <span
           className="block whitespace-nowrap [animation:activity-status-enter_180ms_ease-out]"

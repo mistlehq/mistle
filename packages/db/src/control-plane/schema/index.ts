@@ -253,5 +253,5 @@ export {
   type UserExternalPrincipal,
   type UserExternalPrincipalStatus,
 } from "./user-external-principals.js";
-export { users } from "./users.js";
+export { users, UserAppearances, type UserAppearance } from "./users.js";
 export { verifications } from "./verifications.js";

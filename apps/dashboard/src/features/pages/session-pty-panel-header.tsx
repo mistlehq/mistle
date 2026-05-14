@@ -11,7 +11,7 @@ export function SessionPtyPanelHeader({
     <>
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <div aria-hidden className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="shrink-0 text-sm font-semibold text-stone-900">{title}</span>
+          <span className="shrink-0 text-sm font-semibold text-foreground">{title}</span>
         </div>
       </div>
       {actions === undefined ? null : (

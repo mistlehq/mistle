@@ -508,7 +508,7 @@ export const SessionTerminalWorkspaceView = forwardRef<
   );
 
   return (
-    <div className="h-full min-h-0 border-t border-stone-300 bg-white">
+    <div className="h-full min-h-0 border-t bg-background">
       <TerminalWorkspaceContext.Provider value={contextValue}>
         <div className="session-terminal-dockview dockview-theme-light h-full min-h-0">
           <DockviewReact

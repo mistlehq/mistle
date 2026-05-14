@@ -176,6 +176,13 @@
       "when": 1778653796886,
       "tag": "0024_remove-redundant-indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1778723871359,
+      "tag": "0025_add-user-appearance",
+      "breakpoints": true
     }
   ]
 }

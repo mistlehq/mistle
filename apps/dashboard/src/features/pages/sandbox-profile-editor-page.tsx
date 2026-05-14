@@ -1810,19 +1810,19 @@ function SetupScriptAssistantPanel(input: {
               "inline-block size-2.5 rounded-full border",
               headerStatusKind === "connected"
                 ? "border-emerald-700 bg-emerald-600"
-                : "border-stone-300 bg-stone-300",
+                : "border-muted-foreground/30 bg-muted-foreground/30",
             ].join(" ")}
             role="status"
             title={headerStatusLabel}
           />
-          <span aria-hidden className="h-5 w-px bg-stone-200" />
+          <span aria-hidden className="h-5 w-px bg-border" />
           <Button
             aria-label="TUI"
             aria-pressed={workbench.primaryPanelState.isCliToggleActive}
             className={
               workbench.primaryPanelState.isCliToggleActive
-                ? "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300"
-                : "bg-transparent text-foreground shadow-none hover:bg-stone-100"
+                ? "bg-muted text-foreground shadow-none hover:bg-muted/80"
+                : "bg-transparent text-foreground shadow-none hover:bg-muted/60"
             }
             disabled={
               !workbench.primaryPanelState.canEnterCli &&
@@ -1848,8 +1848,8 @@ function SetupScriptAssistantPanel(input: {
             aria-pressed={workbench.terminalPanelState.isVisible}
             className={
               workbench.terminalPanelState.isVisible
-                ? "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300"
-                : "bg-transparent text-foreground shadow-none hover:bg-stone-100"
+                ? "bg-muted text-foreground shadow-none hover:bg-muted/80"
+                : "bg-transparent text-foreground shadow-none hover:bg-muted/60"
             }
             disabled={isTerminalOpenDisabled}
             onClick={() => {
@@ -2311,13 +2311,17 @@ function DraftAutomationImpactAutomationList(input: {
   automations: readonly SandboxProfileVersionDraftAutomationImpactAutomation[];
 }): ReactNode {
   return (
-    <ul className="list-disc space-y-1 pl-5">
+    <ul className="list-disc space-y-2 pl-5">
       {input.automations.map((automation) => (
         <li key={automation.id}>
-          <TextLink href={getAutomationDetailPath(automation)} opensInNewWindow>
+          <TextLink
+            className="font-medium text-amber-900 decoration-amber-900/35 hover:text-amber-950 dark:text-amber-100 dark:decoration-amber-100/35 dark:hover:text-amber-50"
+            href={getAutomationDetailPath(automation)}
+            opensInNewWindow
+          >
             {automation.name}
           </TextLink>
-          <div className="mt-0.5 space-y-0.5">
+          <div className="mt-1 space-y-0.5 text-amber-950/80 dark:text-amber-100/75">
             {automation.issues.map((issue) => (
               <div key={`${automation.id}:${issue.code}`}>
                 {formatDraftAutomationImpactIssueMessage(issue)}

@@ -62,7 +62,7 @@ export function OtpStepForm(props: OtpStepFormProps): React.JSX.Element {
       </ScreenActionButton>
       {props.onUseDifferentEmail === undefined ? null : (
         <ScreenActionButton
-          className="text-zinc-500 hover:text-zinc-700"
+          className="text-muted-foreground hover:text-foreground"
           onClick={props.onUseDifferentEmail}
           type="button"
           variant="link"

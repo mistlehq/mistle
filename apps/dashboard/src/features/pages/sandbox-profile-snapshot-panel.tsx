@@ -223,7 +223,7 @@ export function SandboxProfileSnapshotPanelView(input: {
           />
         }
         actionContainerClassName="justify-start sm:min-w-48 sm:justify-end"
-        className="rounded bg-white py-4"
+        className="rounded bg-card py-4"
         contentClassName="flex-1"
         description={resolveSnapshotStatusSummaryDescription(input.state)}
         padding="comfortable"

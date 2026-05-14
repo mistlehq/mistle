@@ -4,6 +4,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
+import { ResolvedAppearanceProvider } from "../appearance/appearance-provider.js";
 import {
   capturePendingSessionDiffCommentAnchor,
   type PendingSessionDiffComment,
@@ -21,6 +22,12 @@ const TestPatch = [
   '+import { Button } from "@mistle/ui";',
 ].join("\n");
 const TestSummaryLabel = "Compared with origin/main";
+
+function renderWithResolvedAppearance(ui: React.ReactElement): ReturnType<typeof render> {
+  return render(
+    <ResolvedAppearanceProvider resolvedAppearance="light">{ui}</ResolvedAppearanceProvider>,
+  );
+}
 
 function createTestPendingComment(body = "Request change"): PendingSessionDiffComment {
   const parsedPatch = parseSessionDiffPatch(TestPatch);
@@ -57,7 +64,7 @@ function createTestPendingComment(body = "Request change"): PendingSessionDiffCo
 
 describe("SessionDiffPanel", () => {
   it("collapses and expands individual file diffs", () => {
-    render(
+    renderWithResolvedAppearance(
       <SessionDiffPanel
         patch={TestPatch}
         summaryLabel={TestSummaryLabel}
@@ -118,7 +125,7 @@ describe("SessionDiffPanel", () => {
       );
     }
 
-    render(<Harness />);
+    renderWithResolvedAppearance(<Harness />);
 
     expect(screen.getByText("Request change")).toBeTruthy();
 
@@ -152,7 +159,7 @@ describe("SessionDiffPanel", () => {
       );
     }
 
-    render(<Harness />);
+    renderWithResolvedAppearance(<Harness />);
 
     fireEvent.click(screen.getByRole("button", { name: "Delete comment on line R2" }));
 
@@ -187,7 +194,7 @@ describe("SessionDiffPanel", () => {
       );
     }
 
-    render(<Harness />);
+    renderWithResolvedAppearance(<Harness />);
 
     const commentField = screen.getByDisplayValue("Request change");
     fireEvent.focus(commentField);

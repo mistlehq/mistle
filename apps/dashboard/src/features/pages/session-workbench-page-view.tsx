@@ -183,7 +183,7 @@ export function SessionWorkbenchPageView({
       <ResizableHandle
         className={
           isBottomPanelVisible
-            ? "relative -my-1 shrink-0 bg-transparent aria-orientation-horizontal:!h-3 aria-orientation-horizontal:cursor-row-resize after:absolute after:inset-x-0 after:top-1/2 after:-translate-y-1/2 after:bg-stone-300/90 hover:after:bg-stone-400/90 aria-orientation-horizontal:after:h-px"
+            ? "relative -my-1 shrink-0 bg-transparent aria-orientation-horizontal:!h-3 aria-orientation-horizontal:cursor-row-resize after:absolute after:inset-x-0 after:top-1/2 after:-translate-y-1/2 after:bg-border hover:after:bg-muted-foreground/50 aria-orientation-horizontal:after:h-px"
             : "hidden"
         }
       />

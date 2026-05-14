@@ -6,6 +6,6 @@ export function SandboxProfileSectionCard(input: {
   className?: string;
 }): React.JSX.Element {
   return (
-    <div className={cn("rounded-md border bg-white p-4", input.className)}>{input.children}</div>
+    <div className={cn("rounded-md border bg-card p-4", input.className)}>{input.children}</div>
   );
 }

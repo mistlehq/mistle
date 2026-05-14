@@ -198,7 +198,7 @@ function EditableTitleFixture(input: { value: string }): React.JSX.Element {
 
 function FormFixture(): React.JSX.Element {
   return (
-    <div className="divide-y rounded border bg-white">
+    <div className="divide-y rounded border bg-card">
       <FixtureRow label="Display name" value="jonathan@mistle.dev" />
       <FixtureRow label="Email" value="jonathan@mistle.dev" muted />
       <FixtureRow label="Role" value="Owner" />
@@ -226,7 +226,7 @@ function DetailFixture(): React.JSX.Element {
 
 function ListFixture(): React.JSX.Element {
   return (
-    <div className="divide-y rounded border bg-white">
+    <div className="divide-y rounded border bg-card">
       {["Fix flaky deploy", "Review billing migration", "Update support docs"].map((item) => (
         <div className="flex items-center justify-between px-4 py-3" key={item}>
           <span className="font-medium">{item}</span>
@@ -256,9 +256,9 @@ function WideFixture(): React.JSX.Element {
     <div className="space-y-4">
       <SectionHeading>Resources & Tools</SectionHeading>
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded border bg-white p-4">Codex</div>
-        <div className="rounded border bg-white p-4">GitHub</div>
-        <div className="rounded border bg-white p-4">Repository access</div>
+        <div className="rounded border bg-card p-4">Codex</div>
+        <div className="rounded border bg-card p-4">GitHub</div>
+        <div className="rounded border bg-card p-4">Repository access</div>
       </div>
     </div>
   );

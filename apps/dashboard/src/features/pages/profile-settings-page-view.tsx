@@ -21,6 +21,7 @@ import { PencilSimpleIcon, TrashIcon } from "@phosphor-icons/react";
 import type { SyntheticEvent } from "react";
 import { useRef, useState } from "react";
 
+import { UserAppearances, type UserAppearance } from "../appearance/appearance.js";
 import { AutoSaveSelectField } from "../forms/auto-save-select-field.js";
 import { AutoSaveTextField } from "../forms/auto-save-text-field.js";
 import { IntegrationLogo } from "../integrations/integration-logo.js";
@@ -36,6 +37,7 @@ import { InlineDividerLabel } from "../shared/inline-divider-label.js";
 import { SettingsImageField } from "../shared/settings-image-field.js";
 
 export type ProfileSettingsPageViewProps = {
+  appearance: UserAppearance;
   displayName: string;
   email: string;
   imageUrl: string | null;
@@ -48,6 +50,7 @@ export type ProfileSettingsPageViewProps = {
   linkedAccountsLoadErrorMessage: string | null;
   onDeleteProfileImage: () => Promise<void>;
   onLinkLinkedAccount: (providerFamily: string) => Promise<void>;
+  onSaveAppearance: (appearance: UserAppearance) => Promise<void>;
   onSaveChanges: (displayName: string) => Promise<void>;
   onCheckLinkedAccountCommitSigningKey: (
     providerFamily: string,
@@ -64,6 +67,7 @@ export type ProfileSettingsPageViewProps = {
   profileImageBusy: boolean;
   profileImageErrorMessage: string | null;
   saving: boolean;
+  updatingAppearance: boolean;
 };
 
 export type ProfileSettingsUserSectionProps = Pick<
@@ -71,13 +75,31 @@ export type ProfileSettingsUserSectionProps = Pick<
   | "displayName"
   | "email"
   | "imageUrl"
+  | "appearance"
   | "onDeleteProfileImage"
+  | "onSaveAppearance"
   | "onSaveChanges"
   | "onUploadProfileImage"
   | "profileImageBusy"
   | "profileImageErrorMessage"
   | "saving"
+  | "updatingAppearance"
 >;
+
+const AppearanceOptions = [
+  {
+    value: UserAppearances.SYSTEM,
+    label: "System",
+  },
+  {
+    value: UserAppearances.LIGHT,
+    label: "Light",
+  },
+  {
+    value: UserAppearances.DARK,
+    label: "Dark",
+  },
+];
 
 export type ProfileSettingsLinkedAccountsSectionProps = Pick<
   ProfileSettingsPageViewProps,
@@ -141,8 +163,30 @@ export function ProfileSettingsUserSection(
             <Input disabled readOnly value={props.email} />
           </FieldContent>
         </Field>
+        <AutoSaveSelectField
+          disabled={props.updatingAppearance}
+          id="appearance"
+          label="Appearance"
+          onSave={async (nextValue) => {
+            if (!isProfileAppearanceOption(nextValue)) {
+              throw new Error(`Unknown appearance option '${nextValue}'.`);
+            }
+
+            await props.onSaveAppearance(nextValue);
+          }}
+          options={AppearanceOptions}
+          value={props.appearance}
+        />
       </div>
     </FormPageSection>
+  );
+}
+
+function isProfileAppearanceOption(value: string): value is UserAppearance {
+  return (
+    value === UserAppearances.SYSTEM ||
+    value === UserAppearances.LIGHT ||
+    value === UserAppearances.DARK
   );
 }
 
@@ -828,10 +872,10 @@ function LinkedAccountStatusBadge(input: {
 }): React.JSX.Element {
   const className =
     input.tone === "active"
-      ? "border-emerald-600/30 bg-emerald-600/10 text-emerald-700"
+      ? "border-emerald-600/30 bg-emerald-600/10 text-emerald-700 dark:text-emerald-300"
       : input.tone === "warning"
-        ? "border-amber-600/30 bg-amber-600/10 text-amber-700"
-        : "border-slate-600/20 bg-slate-600/5 text-slate-700";
+        ? "border-amber-600/30 bg-amber-600/10 text-amber-700 dark:text-amber-300"
+        : "border-muted-foreground/20 bg-muted/50 text-muted-foreground";
 
   return (
     <Badge className={className} variant="outline">

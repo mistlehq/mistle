@@ -13,7 +13,7 @@ type OpenTargetRowProps = {
 export function OpenTargetRow(input: OpenTargetRowProps): React.JSX.Element {
   return (
     <button
-      className="group/open-target-row flex w-full flex-col gap-1 rounded-md px-3 py-2 text-left hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60"
+      className="group/open-target-row flex w-full flex-col gap-1 rounded-md px-3 py-2 text-left hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-60"
       disabled={input.disabled}
       onClick={input.onClick}
       title={input.title}
@@ -35,7 +35,7 @@ export function OpenTargetRow(input: OpenTargetRowProps): React.JSX.Element {
             className="size-4 shrink-0 opacity-0 transition-[opacity,transform] group-hover/open-target-row:translate-x-0.5 group-hover/open-target-row:opacity-100 group-focus-visible/open-target-row:translate-x-0.5 group-focus-visible/open-target-row:opacity-100"
           />
         </div>
-        {input.isLoading ? <Spinner aria-hidden className="size-4 text-stone-500" /> : null}
+        {input.isLoading ? <Spinner aria-hidden className="size-4 text-muted-foreground" /> : null}
       </div>
       {input.secondary ?? null}
     </button>

@@ -13,6 +13,8 @@ import { CaretDownIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { FileDiff, type DiffLineAnnotation, type FileDiffMetadata } from "@pierre/diffs/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { useResolvedAppearance } from "../appearance/appearance-provider.js";
+import type { ResolvedAppearance } from "../appearance/appearance.js";
 import {
   capturePendingSessionDiffCommentAnchor,
   formatPendingSessionDiffCommentLineLabel,
@@ -26,7 +28,6 @@ const SessionDiffPanelOptions = {
   disableFileHeader: true,
   lineDiffType: "none",
   overflow: "scroll",
-  themeType: "light",
 } as const;
 
 type ActiveSessionDiffCommentDraft = {
@@ -156,6 +157,7 @@ export function SessionDiffPanel({
   summaryLabel,
   title = "Diffs",
 }: SessionDiffPanelProps): React.JSX.Element {
+  const resolvedAppearance = useResolvedAppearance();
   const parsedPatch = useMemo(() => parseSessionDiffPatch(patch), [patch]);
   const files = parsedPatch.kind === "parsed" ? parsedPatch.files : [];
   const [openFiles, setOpenFiles] = useState<Record<string, boolean>>({});
@@ -231,6 +233,7 @@ export function SessionDiffPanel({
                   )}
                   repositoryPath={repositoryPath}
                   setActiveCommentDraft={setActiveCommentDraft}
+                  themeType={resolvedAppearance}
                 />
               );
             })}
@@ -253,6 +256,7 @@ type SessionDiffPanelFileSectionProps = {
   pendingComments: readonly PendingSessionDiffComment[];
   repositoryPath: string | null;
   setActiveCommentDraft: React.Dispatch<React.SetStateAction<ActiveSessionDiffCommentDraft | null>>;
+  themeType: ResolvedAppearance;
 };
 
 function SessionDiffPanelFileSection({
@@ -267,6 +271,7 @@ function SessionDiffPanelFileSection({
   pendingComments,
   repositoryPath,
   setActiveCommentDraft,
+  themeType,
 }: SessionDiffPanelFileSectionProps): React.JSX.Element {
   const filePath = resolveFileDiffPath(fileDiff);
   const stats = getFileDiffLineStats(fileDiff);
@@ -469,7 +474,7 @@ function SessionDiffPanelFileSection({
             focusedCommentId !== null ? null : (
               <button
                 aria-label="Add comment"
-                className="absolute z-10 flex size-5 items-center justify-center rounded-md bg-stone-900 text-white shadow-sm ring-1 ring-black/5"
+                className="absolute z-10 flex size-5 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm ring-1 ring-foreground/10"
                 onClick={() => {
                   setActiveCommentDraft({
                     body: "",
@@ -494,10 +499,14 @@ function SessionDiffPanelFileSection({
               fileDiff={fileDiff}
               options={
                 onAddComment === undefined
-                  ? SessionDiffPanelOptions
+                  ? {
+                      ...SessionDiffPanelOptions,
+                      themeType,
+                    }
                   : {
                       ...SessionDiffPanelOptions,
                       lineHoverHighlight: "both" as const,
+                      themeType,
                       onLineEnter: (props) => {
                         handleHoverLine({
                           event: props.event,
@@ -724,8 +733,10 @@ function SessionDiffPanelCommentCard(input: {
 }): React.JSX.Element {
   return (
     <div
-      className={`m-1 max-w-2xl overflow-hidden rounded-md border font-sans shadow-[0_1px_2px_rgba(15,23,42,0.05)] ${
-        input.tone === "warning" ? "border-amber-300 bg-amber-50/40" : "bg-white"
+      className={`m-1 max-w-2xl overflow-hidden rounded-md border font-sans shadow-xs ${
+        input.tone === "warning"
+          ? "border-amber-300 bg-amber-50/40 dark:border-amber-400/30 dark:bg-amber-400/10"
+          : "bg-card"
       }`}
     >
       <div
