@@ -449,8 +449,8 @@ function SessionDiffPanelFileSection({
           </div>
           <div className="ml-3 flex flex-none items-center gap-2">
             <div className="flex items-center gap-1.5 text-sm tabular-nums">
-              <span className="text-emerald-700">+{stats.additions}</span>
-              <span className="text-rose-700">-{stats.deletions}</span>
+              <span className="text-emerald-600 dark:text-emerald-400">+{stats.additions}</span>
+              <span className="text-rose-600 dark:text-rose-400">-{stats.deletions}</span>
             </div>
             <CaretDownIcon
               aria-hidden

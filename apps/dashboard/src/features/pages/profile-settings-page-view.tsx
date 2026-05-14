@@ -21,7 +21,11 @@ import { PencilSimpleIcon, TrashIcon } from "@phosphor-icons/react";
 import type { SyntheticEvent } from "react";
 import { useRef, useState } from "react";
 
-import { UserAppearances, type UserAppearance } from "../appearance/appearance.js";
+import {
+  isUserAppearance,
+  UserAppearances,
+  type UserAppearance,
+} from "../appearance/appearance.js";
 import { AutoSaveSelectField } from "../forms/auto-save-select-field.js";
 import { AutoSaveTextField } from "../forms/auto-save-text-field.js";
 import { IntegrationLogo } from "../integrations/integration-logo.js";
@@ -168,7 +172,7 @@ export function ProfileSettingsUserSection(
           id="appearance"
           label="Appearance"
           onSave={async (nextValue) => {
-            if (!isProfileAppearanceOption(nextValue)) {
+            if (!isUserAppearance(nextValue)) {
               throw new Error(`Unknown appearance option '${nextValue}'.`);
             }
 
@@ -179,14 +183,6 @@ export function ProfileSettingsUserSection(
         />
       </div>
     </FormPageSection>
-  );
-}
-
-function isProfileAppearanceOption(value: string): value is UserAppearance {
-  return (
-    value === UserAppearances.SYSTEM ||
-    value === UserAppearances.LIGHT ||
-    value === UserAppearances.DARK
   );
 }
 

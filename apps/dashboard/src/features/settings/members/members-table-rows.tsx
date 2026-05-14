@@ -48,7 +48,7 @@ function MembersTableActions(input: {
       input.actionFeedback.tone === "destructive"
         ? "text-destructive"
         : input.actionFeedback.tone === "success"
-          ? "text-emerald-700"
+          ? "text-emerald-600 dark:text-emerald-400"
           : "text-muted-foreground";
 
     return (

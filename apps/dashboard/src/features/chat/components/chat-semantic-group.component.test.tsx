@@ -3,6 +3,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { ResolvedAppearanceProvider } from "../../appearance/appearance-provider.js";
 import {
   CodexFixtureExploringGroupEntry,
   CodexFixtureMakingEditsGroupEntry,
@@ -165,12 +166,14 @@ describe("ChatSemanticGroup", () => {
 
   it("renders making-edits output with the diff viewer", () => {
     const { container } = render(
-      <ChatSemanticGroup
-        block={CodexFixtureMakingEditsGroupEntry}
-        isRespondingToServerRequest={false}
-        onRespondToServerRequest={() => {}}
-        pendingServerRequests={[]}
-      />,
+      <ResolvedAppearanceProvider resolvedAppearance="light">
+        <ChatSemanticGroup
+          block={CodexFixtureMakingEditsGroupEntry}
+          isRespondingToServerRequest={false}
+          onRespondToServerRequest={() => {}}
+          pendingServerRequests={[]}
+        />
+      </ResolvedAppearanceProvider>,
     );
     openSemanticGroup();
 

@@ -111,12 +111,12 @@ const meta = {
   args: {
     sandboxInstanceId: StorySandboxInstanceId,
     alert: null,
-    bottomPanel: <div className="h-full w-full border-t bg-white" />,
+    bottomPanel: <div className="h-full w-full border-t bg-card" />,
     isBottomPanelVisible: false,
     isSecondaryPanelVisible: false,
     mainContent: createStorySessionMainContent(),
     primaryBottomPanel: createStorySessionBottomPanel(),
-    secondaryPanel: <div className="h-full w-full border-t bg-white" />,
+    secondaryPanel: <div className="h-full w-full border-t bg-card" />,
     headerStatusUi: {
       label: "Connected",
       variant: "secondary",

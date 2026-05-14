@@ -14,7 +14,7 @@ const noticeVariants = cva(
       variant: {
         default: "",
         success:
-          "[&_[data-slot=notice-description]]:text-emerald-700 [&_[data-slot=notice-icon]]:text-current text-emerald-700",
+          "[&_[data-slot=notice-description]]:text-emerald-700 dark:[&_[data-slot=notice-description]]:text-emerald-100/85 [&_[data-slot=notice-icon]]:text-current text-emerald-700 dark:text-emerald-100",
         warning:
           "[&_[data-slot=notice-description]]:text-amber-950/90 dark:[&_[data-slot=notice-description]]:text-amber-100/85 [&_[data-slot=notice-icon]]:text-current text-amber-950 dark:text-amber-100",
         alert:

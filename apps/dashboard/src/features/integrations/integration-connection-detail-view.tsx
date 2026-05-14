@@ -1255,7 +1255,7 @@ function WebhookTriggerProviderRequirementChip(input: {
       {input.isPresent ? (
         <CheckCircleIcon
           aria-label="Present"
-          className="size-3.5 shrink-0 text-emerald-700"
+          className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400"
           weight="fill"
         />
       ) : (

@@ -384,7 +384,11 @@ export function SandboxProfileSetupScriptTestPanel(
           {isBusy ? (
             <SpinnerGapIcon aria-hidden className="size-4 animate-spin text-muted-foreground" />
           ) : isSuccess ? (
-            <CheckCircleIcon aria-hidden className="size-4 text-emerald-700" weight="fill" />
+            <CheckCircleIcon
+              aria-hidden
+              className="size-4 text-emerald-600 dark:text-emerald-400"
+              weight="fill"
+            />
           ) : (
             <WarningCircleIcon aria-hidden className="size-4 text-destructive" weight="fill" />
           )}
