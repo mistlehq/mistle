@@ -149,7 +149,7 @@ describe("IntegrationConnectionDetailView", () => {
     ).toBeTruthy();
   });
 
-  it("explains disabled delete when a connection has webhook automations", () => {
+  it("explains disabled delete when a connection has webhook triggers", () => {
     render(
       <IntegrationConnectionDetailView
         connections={[
@@ -175,7 +175,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(deleteButton.getAttribute("disabled")).toBe("");
     fireEvent.mouseEnter(deleteButton.parentElement ?? deleteButton);
     expect(
-      screen.getByText("This connection can't be deleted while it has 1 webhook automation."),
+      screen.getByText("This connection can't be deleted while it has 1 webhook trigger."),
     ).toBeTruthy();
   });
 
@@ -1282,9 +1282,9 @@ describe("IntegrationConnectionDetailView", () => {
     expect(
       within(webhookSection).getByText("GitHub returned 404 for the installation."),
     ).toBeTruthy();
-    expect(within(webhookSection).getByText("Available automation triggers")).toBeTruthy();
+    expect(within(webhookSection).getByText("Available trigger events")).toBeTruthy();
     const syncError = within(webhookSection).getByText("Could not sync webhook events");
-    const triggerHeading = within(webhookSection).getByText("Available automation triggers");
+    const triggerHeading = within(webhookSection).getByText("Available trigger events");
     expect(
       syncError.compareDocumentPosition(triggerHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).not.toBe(0);

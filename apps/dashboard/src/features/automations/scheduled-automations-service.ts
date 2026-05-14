@@ -46,7 +46,7 @@ export async function getScheduledAutomation(input: {
       method: "GET",
       pathname: `/v1/automations/schedules/${encodeURIComponent(input.automationId)}`,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
-      fallbackMessage: "Could not load scheduled automation.",
+      fallbackMessage: "Could not load scheduled trigger.",
       errorFactory: createScheduledAutomationsApiError,
     });
 
@@ -54,13 +54,13 @@ export async function getScheduledAutomation(input: {
       response,
       schema: ScheduledAutomationSchema,
       operation: "getScheduledAutomation",
-      invalidMessage: "Scheduled automation response payload is invalid.",
+      invalidMessage: "Scheduled trigger response payload is invalid.",
     });
   } catch (error) {
     throw toScheduledAutomationsApiError({
       operation: "getScheduledAutomation",
       error,
-      fallbackMessage: "Could not load scheduled automation.",
+      fallbackMessage: "Could not load scheduled trigger.",
     });
   }
 }
@@ -76,7 +76,7 @@ export async function createScheduledAutomation(input: {
       pathname: "/v1/automations/schedules",
       body: input.payload,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
-      fallbackMessage: "Could not create scheduled automation.",
+      fallbackMessage: "Could not create scheduled trigger.",
       errorFactory: createScheduledAutomationsApiError,
     });
 
@@ -84,13 +84,13 @@ export async function createScheduledAutomation(input: {
       response,
       schema: ScheduledAutomationSchema,
       operation: "createScheduledAutomation",
-      invalidMessage: "Create scheduled automation response payload is invalid.",
+      invalidMessage: "Create scheduled trigger response payload is invalid.",
     });
   } catch (error) {
     throw toScheduledAutomationsApiError({
       operation: "createScheduledAutomation",
       error,
-      fallbackMessage: "Could not create scheduled automation.",
+      fallbackMessage: "Could not create scheduled trigger.",
     });
   }
 }
@@ -106,7 +106,7 @@ export async function updateScheduledAutomation(input: {
       pathname: `/v1/automations/schedules/${encodeURIComponent(input.payload.automationId)}`,
       body: input.payload.payload,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
-      fallbackMessage: "Could not update scheduled automation.",
+      fallbackMessage: "Could not update scheduled trigger.",
       errorFactory: createScheduledAutomationsApiError,
     });
 
@@ -114,13 +114,13 @@ export async function updateScheduledAutomation(input: {
       response,
       schema: ScheduledAutomationSchema,
       operation: "updateScheduledAutomation",
-      invalidMessage: "Update scheduled automation response payload is invalid.",
+      invalidMessage: "Update scheduled trigger response payload is invalid.",
     });
   } catch (error) {
     throw toScheduledAutomationsApiError({
       operation: "updateScheduledAutomation",
       error,
-      fallbackMessage: "Could not update scheduled automation.",
+      fallbackMessage: "Could not update scheduled trigger.",
     });
   }
 }
@@ -135,7 +135,7 @@ export async function deleteScheduledAutomation(input: {
       method: "DELETE",
       pathname: `/v1/automations/schedules/${encodeURIComponent(input.automationId)}`,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
-      fallbackMessage: "Could not delete scheduled automation.",
+      fallbackMessage: "Could not delete scheduled trigger.",
       errorFactory: createScheduledAutomationsApiError,
     });
 
@@ -143,13 +143,13 @@ export async function deleteScheduledAutomation(input: {
       response,
       schema: DeleteScheduledAutomationResultSchema,
       operation: "deleteScheduledAutomation",
-      invalidMessage: "Delete scheduled automation response payload is invalid.",
+      invalidMessage: "Delete scheduled trigger response payload is invalid.",
     });
   } catch (error) {
     throw toScheduledAutomationsApiError({
       operation: "deleteScheduledAutomation",
       error,
-      fallbackMessage: "Could not delete scheduled automation.",
+      fallbackMessage: "Could not delete scheduled trigger.",
     });
   }
 }

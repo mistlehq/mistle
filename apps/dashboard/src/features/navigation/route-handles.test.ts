@@ -107,10 +107,10 @@ describe("route handles", () => {
     );
     expect(ROUTE_HANDLES.sandboxProfileDraft.appShellInsetOwner).toBe("child");
 
-    expect(ROUTE_HANDLES.automations.title).toBe("Automations");
-    expect(ROUTE_HANDLES.automations.description).toBe("Manage automations.");
+    expect(ROUTE_HANDLES.automations.title).toBe("Triggers");
+    expect(ROUTE_HANDLES.automations.description).toBe("Manage triggers.");
     expect(ROUTE_HANDLES.automations.appShellInsetOwner).toBe("child");
-    expect(ROUTE_HANDLES.automationsNew.title).toBe("Create automation");
+    expect(ROUTE_HANDLES.automationsNew.title).toBe("Create trigger");
     expect(ROUTE_HANDLES.automationsNew.description).toBe("");
     expect(ROUTE_HANDLES.automationsNew.appShellInsetOwner).toBe("child");
     expect(ROUTE_HANDLES.automationsNew.pageBreadcrumbVisible).toBe(true);

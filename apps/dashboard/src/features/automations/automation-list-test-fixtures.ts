@@ -15,7 +15,7 @@ export function createAutomationListIssue(
   return {
     code: "MISSING_TARGET_METADATA",
     message:
-      "This automation references an integration target definition that is no longer available. Event metadata may be incomplete.",
+      "This trigger references an integration target definition that is no longer available. Event metadata may be incomplete.",
     ...overrides,
   };
 }

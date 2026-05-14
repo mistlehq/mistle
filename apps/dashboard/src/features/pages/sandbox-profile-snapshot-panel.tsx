@@ -289,10 +289,10 @@ function formatPublishSnapshotFailureMessage(input: {
 }): string {
   const publishedVersion = `v${String(input.publishedVersion)}`;
   if (input.runnableVersion === null) {
-    return `Version ${publishedVersion} was published, but its snapshot could not be created. New sessions and automations cannot use this profile until the snapshot is retried successfully.`;
+    return `Version ${publishedVersion} was published, but its snapshot could not be created. New sessions and triggers cannot use this profile until the snapshot is retried successfully.`;
   }
 
-  return `Version ${publishedVersion} was published, but its snapshot could not be created. New sessions and automations will continue using v${String(input.runnableVersion)} until the snapshot is retried successfully.`;
+  return `Version ${publishedVersion} was published, but its snapshot could not be created. New sessions and triggers will continue using v${String(input.runnableVersion)} until the snapshot is retried successfully.`;
 }
 
 function resolveSnapshotStatusSummaryDescription(state: SnapshotStatusState): string {
@@ -329,13 +329,13 @@ function resolveSnapshotStatusDescription(input: {
 }): string {
   if (input.fallbackVersion === null) {
     return input.state.kind === "creating"
-      ? "New sessions and automations will be available after snapshot creation succeeds."
-      : "Sessions and automations are blocked until snapshot creation succeeds.";
+      ? "New sessions and triggers will be available after snapshot creation succeeds."
+      : "Sessions and triggers are blocked until snapshot creation succeeds.";
   }
 
   return input.state.kind === "creating"
-    ? `Interim, ${input.fallbackVersion}'s snapshot will be used for new sessions and automations.`
-    : `${input.fallbackVersion}'s snapshot will be used for new sessions and automations.`;
+    ? `Interim, ${input.fallbackVersion}'s snapshot will be used for new sessions and triggers.`
+    : `${input.fallbackVersion}'s snapshot will be used for new sessions and triggers.`;
 }
 
 function SandboxProfileSnapshotRefreshScheduleSection(input: {

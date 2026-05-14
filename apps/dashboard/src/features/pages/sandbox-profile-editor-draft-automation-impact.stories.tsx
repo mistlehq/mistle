@@ -11,7 +11,7 @@ import {
 } from "./sandbox-profile-editor-story-support.js";
 
 const meta = {
-  title: "Dashboard/SandboxProfiles/Editor/Draft Automation Impact",
+  title: "Dashboard/SandboxProfiles/Editor/Draft Trigger Impact",
   component: SandboxProfileEditorPageStory,
   decorators: [withDashboardPageStory],
   parameters: {
@@ -150,7 +150,7 @@ export const PrimaryRepositoryUnavailable: Story = {
   },
 };
 
-export const MultipleAutomationsAffected: Story = {
+export const MultipleTriggersAffected: Story = {
   args: {
     draftAutomationImpactAffectedAutomations: createDraftAutomationImpactAutomations(
       [
@@ -167,6 +167,6 @@ export const MultipleAutomationsAffected: Story = {
 
 export const ImpactCheckFailed: Story = {
   args: {
-    draftAutomationImpactError: "Couldn't check whether this draft affects related automations.",
+    draftAutomationImpactError: "Couldn't check whether this draft affects related triggers.",
   },
 };

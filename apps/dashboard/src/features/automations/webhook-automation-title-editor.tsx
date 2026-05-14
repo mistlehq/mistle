@@ -37,7 +37,7 @@ function WebhookAutomationEditableTitle(input: {
 
   return (
     <InlineEditableHeadingField
-      ariaLabel="Automation name"
+      ariaLabel="Trigger name"
       cancelOnEscape={true}
       disabled={input.disabled}
       draftValue={draftValue}
@@ -47,7 +47,7 @@ function WebhookAutomationEditableTitle(input: {
       onCommit={commitDraft}
       onDraftValueChange={setDraftValue}
       onFocus={() => {}}
-      placeholder="Automation name"
+      placeholder="Trigger name"
     />
   );
 }

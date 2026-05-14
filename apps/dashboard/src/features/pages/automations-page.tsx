@@ -38,7 +38,7 @@ export function AutomationsPage(): React.JSX.Element {
   const errorMessage = automationsQuery.isError
     ? resolveApiErrorMessage({
         error: automationsQuery.error,
-        fallbackMessage: "Could not load automations.",
+        fallbackMessage: "Could not load triggers.",
       })
     : null;
 
@@ -67,7 +67,7 @@ export function AutomationsPage(): React.JSX.Element {
           Create
         </Button>
       }
-      title="Automations"
+      title="Triggers"
     >
       {automationsQuery.isPending ? null : (
         <AutomationListView

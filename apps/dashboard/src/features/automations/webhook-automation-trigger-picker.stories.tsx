@@ -302,7 +302,7 @@ function StoryHarness(input: {
 }
 
 const meta = {
-  title: "Dashboard/Automations/Event/EventPicker",
+  title: "Dashboard/Triggers/Event/EventPicker",
   component: StoryHarness,
   decorators: [withDashboardPageStory],
   parameters: {

@@ -1052,11 +1052,11 @@ describe("SandboxProfileEditorPage", () => {
     });
   });
 
-  it("renders sandbox profile, automations, and snapshots tabs", () => {
+  it("renders sandbox profile, triggers, and snapshots tabs", () => {
     renderSandboxProfileEditor();
 
     expect(screen.getByRole("tab", { name: "Sandbox Profile" })).toBeDefined();
-    expect(screen.getByRole("tab", { name: "Automations" })).toBeDefined();
+    expect(screen.getByRole("tab", { name: "Triggers" })).toBeDefined();
     expect(screen.getByRole("tab", { name: "Snapshots" })).toBeDefined();
     expect(screen.getByLabelText("Profile sections").className).toContain("max-w-5xl");
     expect(screen.getByLabelText("Profile sections").parentElement?.className).toContain("px-4");
@@ -1089,7 +1089,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByText("Sandbox Profile v3's snapshot is being created")).toBeDefined();
     expect(
       screen.getByText(
-        "New sessions and automations will be available after snapshot creation succeeds.",
+        "New sessions and triggers will be available after snapshot creation succeeds.",
       ),
     ).toBeDefined();
     const status = screen.getByRole("status", { name: "Creating snapshot" });
@@ -1106,7 +1106,7 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(screen.getByText("Sandbox Profile v3's snapshot is being created")).toBeDefined();
     expect(
-      screen.getByText("Interim, v2's snapshot will be used for new sessions and automations."),
+      screen.getByText("Interim, v2's snapshot will be used for new sessions and triggers."),
     ).toBeDefined();
   });
 
@@ -1131,13 +1131,13 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByText("Snapshot creation failed")).toBeDefined();
     expect(
       screen.getByText(
-        "Version v3 was published, but its snapshot could not be created. New sessions and automations will continue using v2 until the snapshot is retried successfully.",
+        "Version v3 was published, but its snapshot could not be created. New sessions and triggers will continue using v2 until the snapshot is retried successfully.",
       ),
     ).toBeDefined();
     expect(screen.queryByText("Snapshot materialization failed.")).toBeNull();
     expect(screen.getByText("Sandbox Profile v3's snapshot is unavailable")).toBeDefined();
     expect(
-      screen.getByText("v2's snapshot will be used for new sessions and automations."),
+      screen.getByText("v2's snapshot will be used for new sessions and triggers."),
     ).toBeDefined();
     expect(screen.getByRole("button", { name: "Retry snapshot creation" })).toBeDefined();
   });
@@ -1151,7 +1151,7 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(screen.getByText("Sandbox Profile v3's snapshot is unavailable")).toBeDefined();
     expect(
-      screen.getByText("Sessions and automations are blocked until snapshot creation succeeds."),
+      screen.getByText("Sessions and triggers are blocked until snapshot creation succeeds."),
     ).toBeDefined();
     expect(screen.getByRole("button", { name: "Retry snapshot creation" })).toBeDefined();
     expect(screen.queryByRole("button", { name: "Create snapshot" })).toBeNull();
@@ -1169,7 +1169,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.queryByRole("button", { name: "Create snapshot" })).toBeNull();
   });
 
-  it("shows ready snapshots as the version used for new sessions and automations", () => {
+  it("shows ready snapshots as the version used for new sessions and triggers", () => {
     renderSandboxProfileEditor({
       routeSection: "snapshot",
       versionState: "published",
@@ -1177,7 +1177,7 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(screen.getByText("Sandbox Profile v3's snapshot is ready")).toBeDefined();
     expect(
-      screen.queryByText("This snapshot will be used for new sessions and automations."),
+      screen.queryByText("This snapshot will be used for new sessions and triggers."),
     ).toBeNull();
     expect(screen.getByText("Latest snapshot: N/A")).toBeDefined();
     expect(screen.getByRole("button", { name: "Refresh snapshot" })).toBeDefined();
@@ -1468,17 +1468,17 @@ describe("SandboxProfileEditorPage", () => {
     expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/snapshots`);
   });
 
-  it("opens the automations tab from the section route segment", () => {
+  it("opens the triggers tab from the section route segment", () => {
     const { profileId, router } = renderSandboxProfileEditor({
       routeSection: "automations",
       versionState: "published",
     });
 
-    expect(screen.getByRole("tab", { name: "Automations" }).getAttribute("aria-selected")).toBe(
+    expect(screen.getByRole("tab", { name: "Triggers" }).getAttribute("aria-selected")).toBe(
       "true",
     );
     expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/automations`);
-    expect(screen.getByText("No automations use this sandbox profile.")).toBeDefined();
+    expect(screen.getByText("No triggers use this sandbox profile.")).toBeDefined();
   });
 
   it("preserves the profile automation page cursor when selecting an automation", () => {
@@ -2518,9 +2518,7 @@ describe("SandboxProfileEditorPage", () => {
       ],
     });
 
-    const noticeTitle = screen.getByText(
-      "Publishing this draft will break the following automations",
-    );
+    const noticeTitle = screen.getByText("Publishing this draft will break the following triggers");
     expect(noticeTitle).toBeDefined();
     expect(noticeTitle.closest('[role="tabpanel"]')).not.toBeNull();
     const webhookAutomationLink = screen.getByRole("link", { name: "Repository triage" });
@@ -2537,26 +2535,26 @@ describe("SandboxProfileEditorPage", () => {
     expect(scheduledAutomationLink.getAttribute("target")).toBe("_blank");
     expect(scheduledAutomationLink.getAttribute("rel")).toBe("noreferrer");
     expect(
-      screen.getByText("This automation's webhook source connection is not bound in the draft."),
+      screen.getByText("This trigger's webhook source connection is not bound in the draft."),
     ).toBeDefined();
     expect(
-      screen.getByText("This automation's primary repository is not available in the draft."),
+      screen.getByText("This trigger's primary repository is not available in the draft."),
     ).toBeDefined();
   });
 
   it("shows failed draft automation checks as a dismissible notice", () => {
     renderDraftActionsHarness({
-      draftAutomationImpactError: "Couldn't check whether this draft affects related automations.",
+      draftAutomationImpactError: "Couldn't check whether this draft affects related triggers.",
     });
 
-    expect(screen.getByText("Automation checks failed")).toBeDefined();
+    expect(screen.getByText("Trigger checks failed")).toBeDefined();
     expect(
-      screen.getByText("Couldn't check whether this draft affects related automations."),
+      screen.getByText("Couldn't check whether this draft affects related triggers."),
     ).toBeDefined();
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
 
-    expect(screen.queryByText("Automation checks failed")).toBeNull();
+    expect(screen.queryByText("Trigger checks failed")).toBeNull();
   });
 
   it("shows draft actions for draft profiles with a published version", () => {
@@ -2698,7 +2696,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByRole("heading", { name: "Delete profile?" })).toBeDefined();
     expect(screen.getByText("Repository triage")).toBeDefined();
     expect(screen.getByText("Release notes")).toBeDefined();
-    expect(screen.getByText("These automations use this profile and will break:")).toBeDefined();
+    expect(screen.getByText("These triggers use this profile and will break:")).toBeDefined();
     expect(
       screen.getByText("They will stop working until you delete or retarget them."),
     ).toBeDefined();
@@ -2712,7 +2710,7 @@ describe("SandboxProfileEditorPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "Delete profile" }));
 
-    expect(screen.getByText("Loading automations...")).toBeDefined();
+    expect(screen.getByText("Loading triggers...")).toBeDefined();
     expect(screen.getByRole("button", { name: "Delete profile" }).hasAttribute("disabled")).toBe(
       true,
     );

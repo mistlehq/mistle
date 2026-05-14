@@ -26,7 +26,7 @@ export function AutomationTypeSelectField(input: {
   return (
     <Field orientation="horizontal">
       <FieldHeader>
-        <FieldLabel>Automation type</FieldLabel>
+        <FieldLabel>Trigger source</FieldLabel>
       </FieldHeader>
       <FieldContent>
         <Select
@@ -38,7 +38,7 @@ export function AutomationTypeSelectField(input: {
           value={input.value ?? ""}
         >
           <SelectTrigger aria-invalid={isInvalid ? true : undefined}>
-            <SelectValue placeholder="Select type">
+            <SelectValue placeholder="Select source">
               {input.value === null ? undefined : formatAutomationTypeValue(input.value)}
             </SelectValue>
           </SelectTrigger>
@@ -61,7 +61,7 @@ export function AutomationTypeDisplayField(input: {
   return (
     <Field orientation="horizontal">
       <FieldHeader>
-        <FieldLabel>Automation type</FieldLabel>
+        <FieldLabel>Trigger source</FieldLabel>
       </FieldHeader>
       <FieldContent>
         <div className="flex min-h-9 items-center justify-end text-right text-sm text-foreground">

@@ -104,7 +104,7 @@ export function WebhookAutomationTypeSpecificSection(
       header={
         <div className="flex items-center justify-between gap-3">
           <div className="space-y-1">
-            <h2 className="text-base font-semibold">Events</h2>
+            <h2 className="text-base font-semibold">When this happens</h2>
             {input.formState.triggerHeaderMessage === undefined ? null : (
               <p className="text-destructive text-sm">{input.formState.triggerHeaderMessage}</p>
             )}
@@ -205,11 +205,9 @@ export function WebhookAutomationInstructionsSection(
         <Field>
           <FieldHeader>
             <div className="space-y-1">
-              <FieldLabel id={input.instructionsLabelId}>
-                Agent Instructions for Automation
-              </FieldLabel>
+              <FieldLabel id={input.instructionsLabelId}>Response instructions</FieldLabel>
               <FieldDescription>
-                Appended to the developer message when the automation is triggered.
+                Appended to the developer message when this trigger runs.
               </FieldDescription>
             </div>
           </FieldHeader>
@@ -257,15 +255,15 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
       inputTemplateDescription={
         formState.hasSelectedTrigger ? (
           <>
-            <span className="block">Sent to the agent each time the automation runs.</span>
+            <span className="block">Sent to the agent each time this trigger runs.</span>
             <span className="block">
               Use <InlineCode variant="muted">{"{{ ... }}"}</InlineCode> to insert event fields.
             </span>
           </>
         ) : (
           <>
-            <span className="block">Sent to the agent each time the automation runs.</span>
-            <span className="block">Select a trigger to insert event fields.</span>
+            <span className="block">Sent to the agent each time this trigger runs.</span>
+            <span className="block">Select an event to insert event fields.</span>
           </>
         )
       }

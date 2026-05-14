@@ -96,7 +96,7 @@ function StorySidebarContent(input: {
               render={<NavLink to="/automations" />}
             >
               <AutomationsNavIcon aria-hidden className="size-4 shrink-0" />
-              <span>Automations</span>
+              <span>Triggers</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SessionsNavToggleItem

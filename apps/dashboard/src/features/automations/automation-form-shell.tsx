@@ -165,7 +165,7 @@ export function AutomationFormShell(input: AutomationFormShellProps): React.JSX.
     <div className="p-4">
       <Field orientation="horizontal">
         <FieldHeader>
-          <FieldLabel htmlFor={automationNameId}>Automation name</FieldLabel>
+          <FieldLabel htmlFor={automationNameId}>Trigger name</FieldLabel>
         </FieldHeader>
         <FieldContent>
           <Input
@@ -238,7 +238,7 @@ export function AutomationFormShell(input: AutomationFormShellProps): React.JSX.
 
           {input.onDelete === null ? null : (
             <Button
-              aria-label="Delete automation"
+              aria-label="Delete trigger"
               disabled={disabled}
               onClick={input.onDelete}
               size="icon-sm"
@@ -252,7 +252,7 @@ export function AutomationFormShell(input: AutomationFormShellProps): React.JSX.
       ) : null}
 
       {input.formError === null ? null : (
-        <Notice title="Automation could not be saved" variant="alert">
+        <Notice title="Trigger could not be saved" variant="alert">
           {input.formError}
         </Notice>
       )}
@@ -268,10 +268,10 @@ export function AutomationFormShell(input: AutomationFormShellProps): React.JSX.
           <div className="border-b px-4 py-4">
             <div className="flex min-h-10 items-center justify-between gap-3">
               <div className="space-y-1">
-                <FieldLabel htmlFor={automationEnabledId}>Automation enabled</FieldLabel>
+                <FieldLabel htmlFor={automationEnabledId}>Trigger enabled</FieldLabel>
               </div>
               <Switch
-                aria-label="Automation enabled"
+                aria-label="Trigger enabled"
                 checked={input.enabled}
                 disabled={disabled}
                 id={automationEnabledId}

@@ -280,7 +280,7 @@ export function useLoadedScheduledAutomationEditorState(
       setFormError(
         resolveAutomationMutationErrorMessage({
           error,
-          fallbackMessage: "Could not create automation.",
+          fallbackMessage: "Could not create trigger.",
         }),
       );
     },
@@ -289,7 +289,7 @@ export function useLoadedScheduledAutomationEditorState(
   const updateMutation = useMutation({
     mutationFn: async (values: ScheduledAutomationFormValues) => {
       if (input.automationId === undefined) {
-        throw new Error("Automation id is required.");
+        throw new Error("Trigger id is required.");
       }
 
       return updateScheduledAutomation({
@@ -321,7 +321,7 @@ export function useLoadedScheduledAutomationEditorState(
       setFormError(
         resolveAutomationMutationErrorMessage({
           error,
-          fallbackMessage: "Could not update automation.",
+          fallbackMessage: "Could not update trigger.",
         }),
       );
     },
@@ -330,7 +330,7 @@ export function useLoadedScheduledAutomationEditorState(
   const deleteMutation = useMutation({
     mutationFn: async () => {
       if (input.automationId === undefined) {
-        throw new Error("Automation id is required.");
+        throw new Error("Trigger id is required.");
       }
 
       return deleteScheduledAutomation({
@@ -348,7 +348,7 @@ export function useLoadedScheduledAutomationEditorState(
       setDeleteError(
         resolveAutomationMutationErrorMessage({
           error,
-          fallbackMessage: "Could not delete automation.",
+          fallbackMessage: "Could not delete trigger.",
         }),
       );
     },

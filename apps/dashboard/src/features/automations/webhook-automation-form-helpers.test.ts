@@ -333,7 +333,7 @@ describe("validateWebhookAutomationFormValues", () => {
         GitHubEventOptions,
       ),
     ).toEqual({
-      name: "Automation name is required.",
+      name: "Trigger name is required.",
       triggerIds: "Please add an event",
       sandboxProfileId: "Select a sandbox profile.",
       inputTemplate: "User message is required.",
@@ -370,7 +370,7 @@ describe("validateWebhookAutomationFormValues", () => {
         ],
       ),
     ).toEqual({
-      triggerIds: "All triggers in one automation must come from the same integration connection.",
+      triggerIds: "All events in one trigger must come from the same integration connection.",
     });
   });
 

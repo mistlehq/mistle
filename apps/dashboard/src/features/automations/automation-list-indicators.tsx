@@ -30,7 +30,7 @@ export function AutomationIssueIndicator(input: {
   return (
     <Tooltip delay={0}>
       <TooltipTrigger
-        aria-label="View automation issue details"
+        aria-label="View trigger issue details"
         className="inline-flex shrink-0 items-center justify-center rounded-full text-destructive outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         <WarningCircleIcon aria-hidden className="size-4 fill-current" weight="fill" />

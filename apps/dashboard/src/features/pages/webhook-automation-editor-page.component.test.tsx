@@ -53,14 +53,12 @@ describe("WebhookAutomationEditorPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole("heading", { name: "Create automation" })).toBeDefined();
+    expect(screen.getByRole("heading", { name: "Create trigger" })).toBeDefined();
     expect(container.querySelector('[data-slot="page-header-description"]')).toBeNull();
     const editorText = screen.getByRole("textbox", { name: "User message" }).textContent;
 
     expect(editorText).toContain("Event type: {{webhookEvent.eventType}}");
     expect(editorText).toContain("Payload: {{payload}}");
-    expect(
-      screen.getByRole("textbox", { name: "Agent Instructions for Automation" }),
-    ).toBeDefined();
+    expect(screen.getByRole("textbox", { name: "Response instructions" })).toBeDefined();
   });
 });

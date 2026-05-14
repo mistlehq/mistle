@@ -1204,7 +1204,7 @@ function LoadedSandboxProfileEditorPage(
         automationUsagesQuery.isError
           ? resolveApiErrorMessage({
               error: automationUsagesQuery.error,
-              fallbackMessage: "Could not load automations.",
+              fallbackMessage: "Could not load triggers.",
             })
           : null
       }
@@ -2279,13 +2279,13 @@ const SandboxProfileEditorTabs = [
   },
   {
     id: SandboxProfileEditorSectionIds.AUTOMATIONS,
-    label: "Automations",
+    label: "Triggers",
   },
 ] as const satisfies readonly SandboxProfileEditorSection<SandboxProfileEditorSectionId>[];
 
 const DraftSaveErrorMessage = "Saving draft failed. Please try again later.";
 const DraftAutomationImpactCheckFailedMessage =
-  "Couldn't check whether this draft affects related automations.";
+  "Couldn't check whether this draft affects related triggers.";
 
 function getDraftAutomationImpactAffectedAutomations(
   impact: SandboxProfileVersionDraftAutomationImpact,
@@ -2355,9 +2355,9 @@ function formatDraftAutomationImpactIssueMessage(
     case "TARGET_MISSING":
       return "The draft agent connection references an unavailable integration target.";
     case "WEBHOOK_SOURCE_CONNECTION_NOT_BOUND":
-      return "This automation's webhook source connection is not bound in the draft.";
+      return "This trigger's webhook source connection is not bound in the draft.";
     case "PRIMARY_REPOSITORY_UNAVAILABLE":
-      return "This automation's primary repository is not available in the draft.";
+      return "This trigger's primary repository is not available in the draft.";
   }
 }
 
@@ -2390,11 +2390,11 @@ function DeleteSandboxProfileDialog(input: {
 
         <div className="space-y-4">
           {input.automationUsagesIsPending ? (
-            <p className="text-muted-foreground text-sm">Loading automations...</p>
+            <p className="text-muted-foreground text-sm">Loading triggers...</p>
           ) : null}
 
           {input.automationUsagesError === null ? null : (
-            <Notice title="Could not load automations" variant="alert">
+            <Notice title="Could not load triggers" variant="alert">
               {input.automationUsagesError}
             </Notice>
           )}
@@ -2403,7 +2403,7 @@ function DeleteSandboxProfileDialog(input: {
           input.automationUsagesIsPending ||
           input.automationUsagesError !== null ? null : (
             <div className="space-y-2">
-              <p className="text-sm">These automations use this profile and will break:</p>
+              <p className="text-sm">These triggers use this profile and will break:</p>
               <ul className="list-disc space-y-1 pl-5 text-sm">
                 {input.automationUsages.map((automation) => (
                   <li key={automation.id}>{automation.name}</li>
@@ -2577,7 +2577,7 @@ export function SandboxProfileEditorView(input: {
                 )}
                 {input.draftAutomationImpactAffectedAutomations === null ? null : (
                   <Notice
-                    title="Publishing this draft will break the following automations"
+                    title="Publishing this draft will break the following triggers"
                     variant="warning"
                   >
                     <DraftAutomationImpactAutomationList
@@ -2590,7 +2590,7 @@ export function SandboxProfileEditorView(input: {
                     autoHideAfterMs={NoticeAutoHideDurationsMs.LONG}
                     dismissible
                     onDismiss={input.onDraftAutomationImpactErrorDismiss}
-                    title="Automation checks failed"
+                    title="Trigger checks failed"
                     variant="alert"
                   >
                     {input.draftAutomationImpactError}

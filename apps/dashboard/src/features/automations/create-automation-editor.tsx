@@ -87,7 +87,7 @@ type SelectedSandboxProfileVersion = {
 };
 
 const RequiredFieldSummaryMessage = "Please address the fields highlighted in red.";
-const RequiredAutomationTypeSelectionMessage = "Select an automation type.";
+const RequiredAutomationTypeSelectionMessage = "Select a trigger source.";
 const RequiredTriggerSelectionMessage = "Please add an event";
 const MissingProfileVersionQueryId = 0;
 
@@ -470,7 +470,7 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
       setFormError(
         resolveCreateAutomationMutationErrorMessage({
           error,
-          fallbackMessage: "Could not create automation.",
+          fallbackMessage: "Could not create trigger.",
         }),
       );
     },
@@ -498,7 +498,7 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
       setFormError(
         resolveCreateAutomationMutationErrorMessage({
           error,
-          fallbackMessage: "Could not create automation.",
+          fallbackMessage: "Could not create trigger.",
         }),
       );
     },
@@ -756,13 +756,13 @@ function renderInputTemplateDescription(input: {
   formState: ReturnType<typeof resolveWebhookAutomationFormState>;
 }): ReactNode {
   if (input.kind === "scheduled") {
-    return "Sent to the agent each time the automation runs.";
+    return "Sent to the agent each time the trigger runs.";
   }
 
   if (input.formState.hasSelectedTrigger) {
     return (
       <>
-        <span className="block">Sent to the agent each time the automation runs.</span>
+        <span className="block">Sent to the agent each time the trigger runs.</span>
         <span className="block">
           Use <InlineCode variant="muted">{"{{ ... }}"}</InlineCode> to insert event fields.
         </span>
@@ -772,7 +772,7 @@ function renderInputTemplateDescription(input: {
 
   return (
     <>
-      <span className="block">Sent to the agent each time the automation runs.</span>
+      <span className="block">Sent to the agent each time the trigger runs.</span>
       <span className="block">Select a trigger to insert event fields.</span>
     </>
   );

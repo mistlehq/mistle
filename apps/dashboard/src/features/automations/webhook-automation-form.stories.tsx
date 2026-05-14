@@ -406,7 +406,7 @@ export function WebhookAutomationFormStoryHarness(input: {
   const [validationSummaryError, setValidationSummaryError] = useState<string | null>(
     input.validationSummaryError ?? null,
   );
-  const pageTitle = input.mode === "create" ? "Create automation" : "";
+  const pageTitle = input.mode === "create" ? "Create trigger" : "";
   const automationTypeField =
     input.automationTypeField ??
     (input.mode === "create" ? (
@@ -471,7 +471,7 @@ export function WebhookAutomationFormStoryHarness(input: {
 }
 
 const meta = {
-  title: "Dashboard/Automations/Event/Form",
+  title: "Dashboard/Triggers/Event/Form",
   component: WebhookAutomationFormStoryHarness,
   decorators: [withDashboardPageStory],
   excludeStories: [
@@ -548,7 +548,7 @@ export const NoEventCapableIntegrations: Story = {
     mode: "create",
     triggerPickerDisabledState: {
       reason:
-        "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event automation.",
+        "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event triggers.",
       variant: "default",
     },
     values: {
@@ -564,7 +564,7 @@ export const NoActiveProfileVersion: Story = {
     mode: "create",
     sandboxProfileStatusMessage: {
       message:
-        "The sandbox profile Repo Maintainer has no active version. Publish the profile before creating automations.",
+        "The sandbox profile Repo Maintainer has no active version. Publish the profile before creating triggers.",
       variant: "alert",
     },
     triggerPickerDisabledState: {

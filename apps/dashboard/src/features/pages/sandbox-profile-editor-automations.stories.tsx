@@ -84,7 +84,7 @@ export const ProfileAutomations: AutomationsListResult = {
       issue: {
         code: "MISSING_WEBHOOK_SOURCE",
         message:
-          "This automation references a webhook source that is no longer available. Event metadata may be incomplete.",
+          "This trigger references a webhook source that is no longer available. Event metadata may be incomplete.",
       },
       target: {
         sandboxProfileId: ProfileId,
@@ -119,7 +119,7 @@ function createPaginatedProfileAutomationItem(input: {
     return {
       id: `atm_schedule_page_${String(input.page)}_${String(itemNumber)}`,
       kind: "schedule",
-      name: `Scheduled automation ${String(itemNumber)}`,
+      name: `Scheduled trigger ${String(itemNumber)}`,
       enabled: true,
       target: {
         sandboxProfileId: ProfileId,
@@ -140,7 +140,7 @@ function createPaginatedProfileAutomationItem(input: {
   return {
     id: `atm_webhook_page_${String(input.page)}_${String(itemNumber)}`,
     kind: "webhook",
-    name: `Webhook automation ${String(itemNumber)}`,
+    name: `Webhook trigger ${String(itemNumber)}`,
     enabled: itemNumber % 5 !== 0,
     target: {
       sandboxProfileId: ProfileId,
@@ -338,7 +338,7 @@ export function SandboxProfileAutomationsStory(input: {
 }
 
 const meta = {
-  title: "Dashboard/SandboxProfiles/Editor/Automations",
+  title: "Dashboard/SandboxProfiles/Editor/Triggers",
   component: SandboxProfileAutomationsStory,
   decorators: [withDashboardCenteredStory],
   excludeStories: [
@@ -377,7 +377,7 @@ export const MobilePaginated: Story = {
   },
 };
 
-export const SelectedScheduledAutomation: Story = {
+export const SelectedScheduledTrigger: Story = {
   args: {
     selectedAutomationId: SelectedScheduleAutomationId,
   },

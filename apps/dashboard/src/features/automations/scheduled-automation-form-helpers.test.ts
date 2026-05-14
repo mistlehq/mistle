@@ -54,7 +54,7 @@ const BaseFormValues: ScheduledAutomationFormValues = {
 };
 
 describe("toScheduledAutomationFormValues", () => {
-  it("creates default values for new scheduled automations", () => {
+  it("creates default values for new scheduled triggers", () => {
     expect(toScheduledAutomationFormValues(null)).toEqual({
       name: "",
       sandboxProfileId: "",
@@ -67,7 +67,7 @@ describe("toScheduledAutomationFormValues", () => {
     });
   });
 
-  it("hydrates values from an existing scheduled automation", () => {
+  it("hydrates values from an existing scheduled trigger", () => {
     expect(toScheduledAutomationFormValues(SampleAutomation)).toEqual(BaseFormValues);
   });
 
@@ -83,7 +83,7 @@ describe("toScheduledAutomationFormValues", () => {
     ).toBe("");
   });
 
-  it("hydrates new-conversation scheduled automations", () => {
+  it("hydrates new-conversation scheduled triggers", () => {
     expect(
       toScheduledAutomationFormValues({
         ...SampleAutomation,
@@ -98,7 +98,7 @@ describe("toScheduledAutomationFormValues", () => {
         ...SampleAutomation,
         conversationKeyTemplate: "{{schedule.custom}}",
       }),
-    ).toThrow("Unsupported scheduled automation conversation key template.");
+    ).toThrow("Unsupported scheduled trigger conversation key template.");
   });
 });
 
@@ -107,7 +107,7 @@ describe("validateScheduledAutomationFormValues", () => {
     expect(validateScheduledAutomationFormValues(BaseFormValues)).toEqual({});
   });
 
-  it("requires the persisted scheduled automation fields", () => {
+  it("requires the persisted scheduled trigger fields", () => {
     expect(
       validateScheduledAutomationFormValues({
         name: " ",
@@ -120,7 +120,7 @@ describe("validateScheduledAutomationFormValues", () => {
         inputTemplate: "",
       }),
     ).toEqual({
-      name: "Automation name is required.",
+      name: "Trigger name is required.",
       sandboxProfileId: "Select a sandbox profile.",
       cronExpression: "Cron expression is required.",
       timezone: "Timezone is required.",

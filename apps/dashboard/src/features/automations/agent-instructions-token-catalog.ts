@@ -55,15 +55,15 @@ const SharedAgentInstructionTokens: readonly AgentInstructionsEditorToken[] = [
   }),
   createSharedToken({
     path: "automationRun.id",
-    label: "Automation run id",
+    label: "Trigger run id",
     group: AgentInstructionTokenGroups.AUTOMATION_RUN,
-    description: "The current automation run id.",
+    description: "The current trigger run id.",
   }),
   createSharedToken({
     path: "automationRun.automationTargetId",
-    label: "Automation target id",
+    label: "Trigger target id",
     group: AgentInstructionTokenGroups.AUTOMATION_RUN,
-    description: "The selected automation target id.",
+    description: "The selected trigger target id.",
   }),
   createSharedToken({
     path: "payload",

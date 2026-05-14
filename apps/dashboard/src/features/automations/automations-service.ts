@@ -50,7 +50,7 @@ export async function listAutomations(input: {
           : { sandboxProfileId: input.sandboxProfileId }),
       },
       ...(input.signal === undefined ? {} : { signal: input.signal }),
-      fallbackMessage: "Could not load automations.",
+      fallbackMessage: "Could not load triggers.",
       errorFactory: createAutomationsApiError,
     });
 
@@ -58,13 +58,13 @@ export async function listAutomations(input: {
       response,
       schema: AutomationsListResultSchema,
       operation: "listAutomations",
-      invalidMessage: "Automations list response payload is invalid.",
+      invalidMessage: "Triggers list response payload is invalid.",
     });
   } catch (error) {
     throw toAutomationsApiError({
       operation: "listAutomations",
       error,
-      fallbackMessage: "Could not load automations.",
+      fallbackMessage: "Could not load triggers.",
     });
   }
 }

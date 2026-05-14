@@ -223,14 +223,12 @@ describe("WebhookAutomationForm", () => {
     expect(within(container).queryByText("Group events by")).toBeNull();
   });
 
-  it("shows the message template and automation instructions editors", () => {
+  it("shows the message template and response instructions editors", () => {
     const { container } = renderForm("create");
     const currentForm = within(container);
 
     expect(currentForm.getByRole("textbox", { name: "User message" })).toBeDefined();
-    expect(
-      currentForm.getByRole("textbox", { name: "Agent Instructions for Automation" }),
-    ).toBeDefined();
+    expect(currentForm.getByRole("textbox", { name: "Response instructions" })).toBeDefined();
     const editors = container.querySelectorAll('[data-slot="agent-instructions-editor"]');
     const messageTemplateEditor = editors[0];
 
@@ -242,15 +240,15 @@ describe("WebhookAutomationForm", () => {
     expect(currentForm.queryByRole("heading", { name: "User message" })).toBeNull();
   });
 
-  it("renders events before the automation instructions editor and message template editor", () => {
+  it("renders events before the response instructions editor and message template editor", () => {
     const { container } = renderFormWithOptions({
       mode: "create",
     });
 
     const currentForm = within(container);
-    const [eventsHeading] = currentForm.getAllByRole("heading", { name: "Events" });
+    const [eventsHeading] = currentForm.getAllByRole("heading", { name: "When this happens" });
     const automationInstructionsField = currentForm.getByRole("textbox", {
-      name: "Agent Instructions for Automation",
+      name: "Response instructions",
     });
     const inputTemplateField = currentForm.getByRole("textbox", { name: "User message" });
 
@@ -270,16 +268,15 @@ describe("WebhookAutomationForm", () => {
         Node.DOCUMENT_POSITION_FOLLOWING,
       ),
     ).toBe(true);
-    expect(container.textContent?.indexOf("Events")).toBeLessThan(
-      container.textContent?.indexOf("Agent Instructions for Automation") ??
-        Number.POSITIVE_INFINITY,
+    expect(container.textContent?.indexOf("When this happens")).toBeLessThan(
+      container.textContent?.indexOf("Response instructions") ?? Number.POSITIVE_INFINITY,
     );
-    expect(container.textContent?.indexOf("Agent Instructions for Automation")).toBeLessThan(
+    expect(container.textContent?.indexOf("Response instructions")).toBeLessThan(
       container.textContent?.indexOf("User message") ?? Number.POSITIVE_INFINITY,
     );
   });
 
-  it("renders the automation name field without an inline edit-name control on create", () => {
+  it("renders the trigger name field without an inline edit-name control on create", () => {
     const { container } = renderFormWithOptions({
       mode: "create",
       values: buildFormValues({
@@ -290,12 +287,12 @@ describe("WebhookAutomationForm", () => {
     const automationNameInput = form.getAllByRole("textbox")[0];
 
     if (automationNameInput === undefined) {
-      throw new Error("Expected automation name input to be rendered.");
+      throw new Error("Expected trigger name input to be rendered.");
     }
 
     expect(automationNameInput).toBeDefined();
-    expect(form.queryByDisplayValue("Your automation")).toBeNull();
-    expect(form.queryByRole("button", { name: "Edit automation name" })).toBeNull();
+    expect(form.queryByDisplayValue("Your trigger")).toBeNull();
+    expect(form.queryByRole("button", { name: "Edit trigger name" })).toBeNull();
   });
 
   it("shows the selected-profile trigger binding message when triggers are unavailable", () => {
@@ -303,7 +300,7 @@ describe("WebhookAutomationForm", () => {
       mode: "create",
       triggerPickerDisabledState: {
         reason:
-          "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event automation.",
+          "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event triggers.",
         variant: "default",
       },
       webhookEventOptions: [],
@@ -315,7 +312,7 @@ describe("WebhookAutomationForm", () => {
 
     expect(
       screen.getAllByText(
-        "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event automation.",
+        "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event triggers.",
       ).length,
     ).toBeGreaterThan(0);
   });
@@ -325,7 +322,7 @@ describe("WebhookAutomationForm", () => {
       mode: "create",
       sandboxProfileStatusMessage: {
         message:
-          "The sandbox profile Repo Maintainer has no active version. Publish the profile before creating automations.",
+          "The sandbox profile Repo Maintainer has no active version. Publish the profile before creating triggers.",
         variant: "alert",
       },
       triggerPickerDisabledState: {
@@ -340,7 +337,7 @@ describe("WebhookAutomationForm", () => {
     });
 
     const profileMessage = screen.getByText(
-      "The sandbox profile Repo Maintainer has no active version. Publish the profile before creating automations.",
+      "The sandbox profile Repo Maintainer has no active version. Publish the profile before creating triggers.",
     );
     const sandboxProfileLabel = screen.getByText("Sandbox profile");
     const eventsMessage = screen.getByText(
@@ -361,7 +358,7 @@ describe("WebhookAutomationForm", () => {
         <WebhookAutomationForm
           connectionOptions={ConnectionOptions}
           fieldErrors={{
-            name: "Automation name is required.",
+            name: "Trigger name is required.",
             sandboxProfileId: "Select a sandbox profile.",
             conversationKeyTemplate: "Select a supported conversation grouping.",
             inputTemplate: "User message is required.",
@@ -400,7 +397,7 @@ describe("WebhookAutomationForm", () => {
         <WebhookAutomationForm
           connectionOptions={ConnectionOptions}
           fieldErrors={{
-            name: "Automation name is required.",
+            name: "Trigger name is required.",
             sandboxProfileId: "Select a sandbox profile.",
             triggerIds: "Please add an event",
             inputTemplate: "User message is required.",
@@ -431,7 +428,7 @@ describe("WebhookAutomationForm", () => {
     );
 
     expect(screen.getByText("Please address the fields highlighted in red.")).toBeDefined();
-    expect(screen.queryByText("Automation name is required.")).toBeNull();
+    expect(screen.queryByText("Trigger name is required.")).toBeNull();
     expect(screen.queryByText("Select a sandbox profile.")).toBeNull();
     expect(screen.getAllByText("User message is required.").length).toBeGreaterThan(0);
     expect(screen.getByText("Please add an event")).toBeDefined();
@@ -443,7 +440,7 @@ describe("WebhookAutomationForm", () => {
         <WebhookAutomationForm
           connectionOptions={ConnectionOptions}
           fieldErrors={{}}
-          formError="The selected triggers do not support this automation setup."
+          formError="The selected events do not support this trigger setup."
           validationSummaryError={null}
           isDeleting={false}
           isSaving={false}
@@ -461,9 +458,9 @@ describe("WebhookAutomationForm", () => {
 
     const currentForm = within(container);
 
-    expect(currentForm.getByText("Automation could not be saved")).toBeDefined();
+    expect(currentForm.getByText("Trigger could not be saved")).toBeDefined();
     expect(
-      currentForm.getByText("The selected triggers do not support this automation setup."),
+      currentForm.getByText("The selected events do not support this trigger setup."),
     ).toBeDefined();
   });
 
@@ -476,7 +473,7 @@ describe("WebhookAutomationForm", () => {
       }),
     });
 
-    expect(screen.getAllByText("Select a trigger to insert event fields.").length).toBeGreaterThan(
+    expect(screen.getAllByText("Select an event to insert event fields.").length).toBeGreaterThan(
       0,
     );
   });

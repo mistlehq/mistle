@@ -603,7 +603,7 @@ function resolveDeleteConnectionMessage(
 
   const automationCount = connection.automationCount ?? 0;
   if (automationCount > 0) {
-    return `This connection can't be deleted while it has ${automationCount} webhook ${automationCount === 1 ? "automation" : "automations"}.`;
+    return `This connection can't be deleted while it has ${automationCount} webhook ${automationCount === 1 ? "trigger" : "triggers"}.`;
   }
 
   return "This connection can't be deleted while it is still in use.";
@@ -1075,7 +1075,7 @@ function WebhookTriggerCapabilityEventList(input: {
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-2">
-      <DetailLabel as="p">Available automation triggers</DetailLabel>
+      <DetailLabel as="p">Available trigger events</DetailLabel>
       <div className="divide-border overflow-hidden rounded-md border">
         {input.events.map((event) => (
           <WebhookTriggerCapabilityEventRow

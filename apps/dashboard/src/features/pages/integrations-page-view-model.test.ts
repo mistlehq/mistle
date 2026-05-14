@@ -674,7 +674,7 @@ describe("integrations page view model", () => {
     expect(item?.resources.map((resource) => resource.isRefreshing)).toEqual([true, true]);
   });
 
-  it("disables deletion when a connection is still referenced by webhook automations", () => {
+  it("disables deletion when a connection is still referenced by webhook triggers", () => {
     const [item] = buildIntegrationConnectionDetailItems({
       connections: [
         {

@@ -13,14 +13,14 @@ export const AUTOMATION_LIST_FILTER_OPTIONS: ReadonlyArray<{
 
 export function toAutomationListFilter(value: string | null): AutomationListFilter {
   if (value === null) {
-    throw new Error("Automation filter value must not be null.");
+    throw new Error("Trigger filter value must not be null.");
   }
 
   if (value === "all" || value === "enabled" || value === "disabled") {
     return value;
   }
 
-  throw new Error(`Unexpected automation filter value: "${value}".`);
+  throw new Error(`Unexpected trigger filter value: "${value}".`);
 }
 
 function normalizeSearch(value: string): string {

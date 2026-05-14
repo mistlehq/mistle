@@ -40,7 +40,7 @@ const Screenshots = [
   screen("sandbox-profile-snapshot-ready", "SandboxProfileSnapshotReady", {
     height: 820,
   }),
-  screen("sandbox-profile-automations", "SandboxProfileAutomations", {
+  screen("sandbox-profile-automations", "SandboxProfileTriggers", {
     height: 860,
     width: 1400,
   }),
@@ -57,8 +57,8 @@ const Screenshots = [
     height: 320,
     width: 1280,
   }),
-  screen("event-automation", "EventAutomation"),
-  screen("scheduled-automation", "ScheduledAutomation"),
+  screen("event-automation", "EventTrigger"),
+  screen("scheduled-automation", "ScheduledTrigger"),
   screen("persistent-sandboxes-organization-settings", "PersistentSandboxesOrganizationSettings"),
 ] satisfies readonly ProductScreenshot[];
 

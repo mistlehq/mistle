@@ -152,7 +152,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           automationId: undefined,
           navigate: async () => {},
           initialValues: {
-            name: "Your automation",
+            name: "Your trigger",
             sandboxProfileId: "",
             primaryRepositoryId: "",
             enabled: true,
@@ -178,7 +178,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     );
 
     expect(result.current.values).toEqual({
-      name: "Your automation",
+      name: "Your trigger",
       sandboxProfileId: "",
       primaryRepositoryId: "",
       enabled: true,
@@ -209,7 +209,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       }).disabledState,
     ).toEqual({
       reason:
-        "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event automation.",
+        "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event triggers.",
       variant: "default",
     });
   });
@@ -269,7 +269,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           automationId: undefined,
           navigate: async () => {},
           initialValues: {
-            name: "Linear automation",
+            name: "Linear trigger",
             sandboxProfileId: "sbp_123",
             primaryRepositoryId: "",
             enabled: true,
@@ -301,7 +301,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
 
     expect(result.current.sandboxProfileStatusMessage).toEqual({
       message:
-        "The sandbox profile Repo Maintainer has no active version. Publish the profile before creating automations.",
+        "The sandbox profile Repo Maintainer has no active version. Publish the profile before creating triggers.",
       variant: "alert",
     });
     expect(result.current.triggerPickerDisabledState).toEqual({
@@ -314,7 +314,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     });
 
     expect(result.current.fieldErrors.sandboxProfileId).toBe(
-      "The sandbox profile Repo Maintainer has no active version. Publish the profile before creating automations.",
+      "The sandbox profile Repo Maintainer has no active version. Publish the profile before creating triggers.",
     );
   });
 
@@ -343,7 +343,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           automationId: undefined,
           navigate: async () => {},
           initialValues: {
-            name: "Linear automation",
+            name: "Linear trigger",
             sandboxProfileId: "",
             primaryRepositoryId: "",
             enabled: true,
@@ -408,7 +408,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           automationId: undefined,
           navigate: async () => {},
           initialValues: {
-            name: "Linear automation",
+            name: "Linear trigger",
             sandboxProfileId: "sbp_123",
             primaryRepositoryId: "",
             enabled: true,
@@ -476,7 +476,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           automationId: undefined,
           navigate: async () => {},
           initialValues: {
-            name: "Linear automation",
+            name: "Linear trigger",
             sandboxProfileId: "sbp_123",
             primaryRepositoryId: "mistlehq/platform",
             enabled: true,
@@ -542,7 +542,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           automationId: "atm_123",
           navigate: async () => {},
           initialValues: {
-            name: "Pinned automation",
+            name: "Pinned trigger",
             sandboxProfileId: "sbp_123",
             primaryRepositoryId: "mistlehq/platform",
             enabled: true,
@@ -629,7 +629,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           automationId: "atm_123",
           navigate: async () => {},
           initialValues: {
-            name: "Pinned automation",
+            name: "Pinned trigger",
             sandboxProfileId: "sbp_123",
             primaryRepositoryId: "mistlehq/platform",
             enabled: true,
@@ -695,7 +695,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           automationId: undefined,
           navigate: async () => {},
           initialValues: {
-            name: "Linear automation",
+            name: "Linear trigger",
             sandboxProfileId: "sbp_123",
             primaryRepositoryId: "",
             enabled: true,
@@ -765,7 +765,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           automationId: undefined,
           navigate: async () => {},
           initialValues: {
-            name: "Linear automation",
+            name: "Linear trigger",
             sandboxProfileId: "sbp_123",
             primaryRepositoryId: "",
             enabled: true,
@@ -856,7 +856,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           automationId: "atm_123",
           navigate: async () => {},
           initialValues: {
-            name: "Existing automation",
+            name: "Existing trigger",
             sandboxProfileId: "sbp_123",
             primaryRepositoryId: "",
             enabled: true,
@@ -948,7 +948,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     );
     expect(result.current.formError).toBeNull();
     expect(result.current.fieldErrors).toMatchObject({
-      name: "Automation name is required.",
+      name: "Trigger name is required.",
       sandboxProfileId: "Select a sandbox profile.",
       inputTemplate: "User message is required.",
       triggerIds: "Please add an event",
@@ -1038,7 +1038,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
           automationId: undefined,
           navigate: async () => {},
           initialValues: {
-            name: "Linear automation",
+            name: "Linear trigger",
             sandboxProfileId: "sbp_invalid",
             primaryRepositoryId: "",
             enabled: true,

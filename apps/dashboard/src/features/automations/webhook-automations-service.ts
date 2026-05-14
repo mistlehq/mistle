@@ -46,7 +46,7 @@ export async function getWebhookAutomation(input: {
       method: "GET",
       pathname: `/v1/automations/webhooks/${encodeURIComponent(input.automationId)}`,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
-      fallbackMessage: "Could not load webhook automation.",
+      fallbackMessage: "Could not load webhook trigger.",
       errorFactory: createWebhookAutomationsApiError,
     });
 
@@ -54,13 +54,13 @@ export async function getWebhookAutomation(input: {
       response,
       schema: WebhookAutomationSchema,
       operation: "getWebhookAutomation",
-      invalidMessage: "Webhook automation response payload is invalid.",
+      invalidMessage: "Webhook trigger response payload is invalid.",
     });
   } catch (error) {
     throw toWebhookAutomationsApiError({
       operation: "getWebhookAutomation",
       error,
-      fallbackMessage: "Could not load webhook automation.",
+      fallbackMessage: "Could not load webhook trigger.",
     });
   }
 }
@@ -76,7 +76,7 @@ export async function createWebhookAutomation(input: {
       pathname: "/v1/automations/webhooks",
       body: input.payload,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
-      fallbackMessage: "Could not create webhook automation.",
+      fallbackMessage: "Could not create webhook trigger.",
       errorFactory: createWebhookAutomationsApiError,
     });
 
@@ -84,13 +84,13 @@ export async function createWebhookAutomation(input: {
       response,
       schema: WebhookAutomationSchema,
       operation: "createWebhookAutomation",
-      invalidMessage: "Create webhook automation response payload is invalid.",
+      invalidMessage: "Create webhook trigger response payload is invalid.",
     });
   } catch (error) {
     throw toWebhookAutomationsApiError({
       operation: "createWebhookAutomation",
       error,
-      fallbackMessage: "Could not create webhook automation.",
+      fallbackMessage: "Could not create webhook trigger.",
     });
   }
 }
@@ -106,7 +106,7 @@ export async function updateWebhookAutomation(input: {
       pathname: `/v1/automations/webhooks/${encodeURIComponent(input.payload.automationId)}`,
       body: input.payload.payload,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
-      fallbackMessage: "Could not update webhook automation.",
+      fallbackMessage: "Could not update webhook trigger.",
       errorFactory: createWebhookAutomationsApiError,
     });
 
@@ -114,13 +114,13 @@ export async function updateWebhookAutomation(input: {
       response,
       schema: WebhookAutomationSchema,
       operation: "updateWebhookAutomation",
-      invalidMessage: "Update webhook automation response payload is invalid.",
+      invalidMessage: "Update webhook trigger response payload is invalid.",
     });
   } catch (error) {
     throw toWebhookAutomationsApiError({
       operation: "updateWebhookAutomation",
       error,
-      fallbackMessage: "Could not update webhook automation.",
+      fallbackMessage: "Could not update webhook trigger.",
     });
   }
 }
@@ -135,7 +135,7 @@ export async function deleteWebhookAutomation(input: {
       method: "DELETE",
       pathname: `/v1/automations/webhooks/${encodeURIComponent(input.automationId)}`,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
-      fallbackMessage: "Could not delete webhook automation.",
+      fallbackMessage: "Could not delete webhook trigger.",
       errorFactory: createWebhookAutomationsApiError,
     });
 
@@ -143,13 +143,13 @@ export async function deleteWebhookAutomation(input: {
       response,
       schema: DeleteWebhookAutomationResultSchema,
       operation: "deleteWebhookAutomation",
-      invalidMessage: "Delete webhook automation response payload is invalid.",
+      invalidMessage: "Delete webhook trigger response payload is invalid.",
     });
   } catch (error) {
     throw toWebhookAutomationsApiError({
       operation: "deleteWebhookAutomation",
       error,
-      fallbackMessage: "Could not delete webhook automation.",
+      fallbackMessage: "Could not delete webhook trigger.",
     });
   }
 }

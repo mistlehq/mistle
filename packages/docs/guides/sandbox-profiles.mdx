@@ -58,7 +58,7 @@ The **Runtime** section controls what kind of agent starts and where it runs:
 - **Credentials** controls whether the sandbox runtime uses Mistle-managed credentials or a workspace API key connection, when that provider supports both.
 - **Git Connection** controls which Git provider connection supplies repositories and repository tools.
 
-Model provider connections, Git connection, and connector integrations are saved on the draft profile version. Publishing the profile version makes those choices available to new sessions and automations.
+Model provider connections, Git connection, and connector integrations are saved on the draft profile version. Publishing the profile version makes those choices available to new sessions and triggers.
 
 ## Setup Scripts
 
@@ -135,14 +135,14 @@ Use persistent sandboxes when sessions from a profile should retain selected wor
 
 Read [Persistent Sandboxes](/guides/persistent-sandboxes) for setup steps, limits, and how persistence differs from snapshots.
 
-## Automations On A Profile
+## Triggers On A Profile
 
-Open the **Automations** tab on a sandbox profile to see automations that use that profile. From there you can create a new automation preselected for the profile, or select an existing event or scheduled automation to edit it without leaving the profile.
+Open the **Triggers** tab on a sandbox profile to see triggers that use that profile. From there you can create a new trigger preselected for the profile, or select an existing event or scheduled trigger to edit it without leaving the profile.
 
 <Frame>
   <img
     src="/images/product-screens/sandbox-profile-automations.png"
-    alt="Sandbox profile Automations tab showing profile-scoped automation list and selected automation editor"
+    alt="Sandbox profile Triggers tab showing profile-scoped trigger list and selected trigger editor"
   />
 </Frame>
 

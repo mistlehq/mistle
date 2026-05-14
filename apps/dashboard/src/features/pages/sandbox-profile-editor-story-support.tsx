@@ -135,7 +135,7 @@ const StorySections = [
   },
   {
     id: "automations",
-    label: "Automations",
+    label: "Triggers",
   },
 ] as const satisfies readonly SandboxProfileEditorSection<StorySectionId>[];
 
@@ -824,7 +824,7 @@ function SandboxProfileEditorPageStoryView(
         if (sectionId === "automations") {
           return (
             <div className="flex min-h-64 items-center justify-center rounded-md border bg-background p-6 text-center text-sm text-muted-foreground">
-              No automations use this sandbox profile.
+              No triggers use this sandbox profile.
             </div>
           );
         }

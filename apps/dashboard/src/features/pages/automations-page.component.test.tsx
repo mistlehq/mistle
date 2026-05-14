@@ -32,7 +32,7 @@ function createAutomationListItem(overrides?: Partial<AutomationListItem>): Auto
   return {
     id: "atm_webhook_123",
     kind: "webhook",
-    name: "Review automation",
+    name: "Review trigger",
     enabled: true,
     target: {
       sandboxProfileId: "sbp_repo_maintainer",
@@ -97,7 +97,7 @@ describe("AutomationsPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(markup).toContain("Automations");
+    expect(markup).toContain("Triggers");
     expect(markup).toContain("Create");
     expect(markup).toContain("justify-between");
     expect(markup).toContain('data-slot="table-container" class="relative w-full overflow-x-auto"');
@@ -116,7 +116,7 @@ describe("AutomationsPage", () => {
       queryClient,
       createListResult([
         createAutomationListItem({
-          name: "Single automation",
+          name: "Single trigger",
         }),
       ]),
     );
@@ -129,7 +129,7 @@ describe("AutomationsPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole("button", { name: "Single automation" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Single trigger" })).toBeDefined();
     expect(screen.queryByLabelText("pagination")).toBeNull();
   });
 
@@ -143,7 +143,7 @@ describe("AutomationsPage", () => {
       queryClient,
       createListResult([
         createAutomationListItem({
-          name: "Event automation",
+          name: "Event trigger",
         }),
         createAutomationListItem({
           id: "atm_schedule_123",
@@ -173,7 +173,7 @@ describe("AutomationsPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole("button", { name: "Event automation" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Event trigger" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Daily schedule" })).toBeDefined();
     expect(screen.getByText("0 9 * * 1-5")).toBeDefined();
     expect(screen.getByText("Workspace root")).toBeDefined();
@@ -237,7 +237,7 @@ describe("AutomationsPage", () => {
     automationsListQuery.setState({
       ...automationsListQuery.state,
       data: listResult,
-      error: new Error("Could not load automations."),
+      error: new Error("Could not load triggers."),
       errorUpdateCount: 1,
       errorUpdatedAt: Date.now(),
       fetchStatus: "idle",
@@ -266,7 +266,7 @@ describe("AutomationsPage", () => {
       queryClient,
       createListResult([
         createAutomationListItem({
-          name: "Alpha automation",
+          name: "Alpha trigger",
         }),
         createAutomationListItem({
           id: "atm_456",
@@ -287,18 +287,15 @@ describe("AutomationsPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole("button", { name: "Alpha automation" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Alpha trigger" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Backlog sync" })).toBeDefined();
 
-    fireEvent.change(
-      within(rendered.container).getByRole("textbox", { name: "Search automations" }),
-      {
-        target: { value: "Backlog" },
-      },
-    );
+    fireEvent.change(within(rendered.container).getByRole("textbox", { name: "Search triggers" }), {
+      target: { value: "Backlog" },
+    });
 
     await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Alpha automation" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Alpha trigger" })).toBeNull();
     });
     expect(screen.getByRole("button", { name: "Backlog sync" })).toBeDefined();
   });

@@ -13,14 +13,14 @@ export function AutomationListToolbar(input: {
 }): React.JSX.Element {
   return (
     <ListSearchFilterToolbar
-      filterAriaLabel="Filter automations"
+      filterAriaLabel="Filter triggers"
       filterOptions={AUTOMATION_LIST_FILTER_OPTIONS}
       filterTriggerClassName="w-28"
       filterValue={input.activeFilter}
       onFilterValueChange={(nextValue) => input.onFilterChange(toAutomationListFilter(nextValue))}
       onSearchValueChange={input.onSearchValueChange}
-      searchAriaLabel="Search automations"
-      searchPlaceholder="Search automations, events, schedules, profiles, or repositories"
+      searchAriaLabel="Search triggers"
+      searchPlaceholder="Search triggers, events, schedules, profiles, or repositories"
       searchValue={input.searchValue}
     />
   );

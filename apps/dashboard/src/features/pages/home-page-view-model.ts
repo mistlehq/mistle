@@ -67,12 +67,12 @@ function createBaseSteps(): HomeChecklistStep[] {
     },
     {
       id: "create_automation",
-      title: "Create an automation",
+      title: "Create a trigger",
       description:
-        "Automations are ways to respond to events that happen in other tools, like GitHub, Slack, or Jira.",
+        "Triggers respond to events that happen in other tools, like GitHub, Slack, or Jira.",
       status: "upcoming",
       href: "/automations/new",
-      actionLabel: "Create automation",
+      actionLabel: "Create trigger",
     },
   ];
 }
@@ -148,7 +148,7 @@ export const HomePageStoryModels = {
         create_automation: {
           title: "Add a webhook integration",
           description:
-            "Automations respond to events from tools like GitHub, Slack, or Jira, so you need a webhook-capable integration before you can create one.",
+            "Triggers respond to events from tools like GitHub, Slack, or Jira, so you need a webhook-capable integration before you can create one.",
           href: "/integrations",
           actionLabel: "Add integrations",
         },

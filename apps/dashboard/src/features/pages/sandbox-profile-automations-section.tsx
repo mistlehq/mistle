@@ -77,7 +77,7 @@ function AutomationKindIcon(input: {
     return (
       <>
         <CalendarDotsIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-        <span className="sr-only">Scheduled automation</span>
+        <span className="sr-only">Scheduled trigger</span>
       </>
     );
   }
@@ -85,7 +85,7 @@ function AutomationKindIcon(input: {
   return (
     <>
       <WebhooksLogoIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-      <span className="sr-only">Webhook automation</span>
+      <span className="sr-only">Webhook trigger</span>
     </>
   );
 }
@@ -109,7 +109,7 @@ function ProfileAutomationListRow(input: {
         </span>
         <button
           aria-current={input.selected ? "true" : undefined}
-          aria-label={`Select automation ${input.item.name}`}
+          aria-label={`Select trigger ${input.item.name}`}
           className="flex min-w-0 flex-col items-start text-left"
           onClick={input.onSelect}
           type="button"
@@ -198,7 +198,7 @@ function ProfileAutomationDetail(input: {
     queryKey: ["sandbox-profile-automation-detail-resolution", input.profileId, automationId],
     queryFn: async ({ signal }) => {
       if (automationId === undefined) {
-        throw new Error("Automation id is required.");
+        throw new Error("Trigger id is required.");
       }
 
       return resolveProfileAutomationDetail({
@@ -214,7 +214,7 @@ function ProfileAutomationDetail(input: {
   if (automationId === undefined) {
     return (
       <div className="flex min-h-64 items-center justify-center p-6 text-center text-sm text-muted-foreground">
-        Select an automation to view and edit it.
+        Select a trigger to view and edit it.
       </div>
     );
   }
@@ -229,10 +229,10 @@ function ProfileAutomationDetail(input: {
   if (detailResolutionQuery.isError && input.selectedAutomation === null) {
     return (
       <div className="flex min-h-64 flex-col items-center justify-center gap-4 p-6 text-center">
-        <Notice title="Could not load automation" variant="alert">
+        <Notice title="Could not load trigger" variant="alert">
           {resolveApiErrorMessage({
             error: detailResolutionQuery.error,
-            fallbackMessage: "Could not load automation.",
+            fallbackMessage: "Could not load trigger.",
           })}
         </Notice>
         <Button
@@ -242,7 +242,7 @@ function ProfileAutomationDetail(input: {
           type="button"
           variant="outline"
         >
-          Back to automations
+          Back to triggers
         </Button>
       </div>
     );
@@ -251,8 +251,8 @@ function ProfileAutomationDetail(input: {
   if (selectedAutomationKind === null || selectedAutomationKind === "not-found") {
     return (
       <div className="flex min-h-64 flex-col items-center justify-center gap-4 p-6 text-center">
-        <Notice title="Automation not found for this sandbox profile" variant="alert">
-          The selected automation is not available for this sandbox profile.
+        <Notice title="Trigger not found for this sandbox profile" variant="alert">
+          The selected trigger is not available for this sandbox profile.
         </Notice>
         <Button
           onClick={() => {
@@ -261,7 +261,7 @@ function ProfileAutomationDetail(input: {
           type="button"
           variant="outline"
         >
-          Back to automations
+          Back to triggers
         </Button>
       </div>
     );
@@ -319,7 +319,7 @@ export function SandboxProfileAutomationsSection(input: { profileId: string }): 
   const errorMessage = automationsQuery.isError
     ? resolveApiErrorMessage({
         error: automationsQuery.error,
-        fallbackMessage: "Could not load automations.",
+        fallbackMessage: "Could not load triggers.",
       })
     : null;
 
@@ -400,7 +400,7 @@ export function SandboxProfileAutomationsSection(input: { profileId: string }): 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       {errorMessage === null ? null : (
-        <Notice title="Could not load automations" variant="alert">
+        <Notice title="Could not load triggers" variant="alert">
           {errorMessage}
         </Notice>
       )}
@@ -413,7 +413,7 @@ export function SandboxProfileAutomationsSection(input: { profileId: string }): 
           type="button"
         >
           <PlusIcon />
-          Create Automation
+          Create Trigger
         </Button>
         {automationsQuery.isPending || items.length === 0 ? null : (
           <Select
@@ -429,9 +429,9 @@ export function SandboxProfileAutomationsSection(input: { profileId: string }): 
             }}
             value={selectedAutomation?.id ?? ""}
           >
-            <SelectTrigger aria-label="Select automation" className="w-full">
-              <SelectValue placeholder="Select automation">
-                {selectedAutomation?.name ?? "Select automation"}
+            <SelectTrigger aria-label="Select trigger" className="w-full">
+              <SelectValue placeholder="Select trigger">
+                {selectedAutomation?.name ?? "Select trigger"}
               </SelectValue>
             </SelectTrigger>
             {isMobileAutomationSelectOpen ? (
@@ -449,7 +449,7 @@ export function SandboxProfileAutomationsSection(input: { profileId: string }): 
       </div>
 
       <div className="flex flex-col gap-6 md:grid md:grid-cols-[16rem_1px_minmax(0,1fr)] md:gap-0 lg:grid-cols-[18rem_1px_minmax(0,1fr)]">
-        <nav aria-label="Automations" className="hidden min-h-0 flex-col md:flex">
+        <nav aria-label="Triggers" className="hidden min-h-0 flex-col md:flex">
           <div className="py-3 pl-4 pr-3">
             <Button
               className="w-full justify-start"
@@ -459,7 +459,7 @@ export function SandboxProfileAutomationsSection(input: { profileId: string }): 
               type="button"
             >
               <PlusIcon />
-              Create Automation
+              Create Trigger
             </Button>
           </div>
           {automationsQuery.isPending || items.length === 0
@@ -480,7 +480,7 @@ export function SandboxProfileAutomationsSection(input: { profileId: string }): 
         <div className="min-w-0 md:pl-8">
           {items.length === 0 && !automationsQuery.isPending && errorMessage === null ? (
             <div className="py-3 text-sm text-muted-foreground">
-              No automations use this sandbox profile.
+              No triggers use this sandbox profile.
             </div>
           ) : (
             <ProfileAutomationDetail

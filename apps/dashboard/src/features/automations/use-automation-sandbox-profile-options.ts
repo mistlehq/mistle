@@ -55,7 +55,7 @@ export function useAutomationSandboxProfileOptions(): {
   const errorMessage = sandboxProfilesQuery.isError
     ? resolveApiErrorMessage({
         error: sandboxProfilesQuery.error,
-        fallbackMessage: "Could not load automation prerequisites.",
+        fallbackMessage: "Could not load trigger prerequisites.",
       })
     : null;
 

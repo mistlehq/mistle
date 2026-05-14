@@ -22,7 +22,7 @@ describe("webhook automations api errors", () => {
 
     expect(error).toBeInstanceOf(WebhookAutomationsApiError);
     expect(error.message).toBe(
-      "The selected integration connection does not support webhook automations.",
+      "The selected integration connection does not support webhook triggers.",
     );
   });
 
@@ -49,12 +49,12 @@ describe("webhook automations api errors", () => {
         code: "NOT_FOUND",
         message: "Automation missing.",
       },
-      fallbackMessage: "Could not load webhook automation.",
+      fallbackMessage: "Could not load webhook trigger.",
     });
 
     expect(error).toBeInstanceOf(WebhookAutomationsApiError);
     expect(error.status).toBe(404);
-    expect(error.message).toBe("The webhook automation no longer exists.");
+    expect(error.message).toBe("The webhook trigger no longer exists.");
   });
 
   it("reads mapped messages directly from unknown error values", () => {

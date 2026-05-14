@@ -204,7 +204,7 @@ describe("route breadcrumb metadata", () => {
           handle: {
             appShellInsetOwner: "child",
             appShellViewportMode: "workspace",
-            title: "Create automation",
+            title: "Create trigger",
             description: "",
           },
           params: {},
@@ -214,7 +214,7 @@ describe("route breadcrumb metadata", () => {
     ).toEqual({
       appShellInsetOwner: "child",
       appShellViewportMode: "workspace",
-      title: "Create automation",
+      title: "Create trigger",
       headerIcon: null,
       supportingText: "",
     });

@@ -12,14 +12,11 @@ describe("WebhookAutomationTitleEditor", () => {
         disabled={true}
         errorMessage={undefined}
         onCommit={() => {}}
-        title="Old automation name"
+        title="Old trigger name"
       />,
     );
 
-    expect(screen.getByRole("textbox", { name: "Automation name" })).toHaveProperty(
-      "disabled",
-      true,
-    );
+    expect(screen.getByRole("textbox", { name: "Trigger name" })).toHaveProperty("disabled", true);
   });
 
   it("resets the inline draft from a keyed remount when the title changes", () => {
@@ -28,11 +25,11 @@ describe("WebhookAutomationTitleEditor", () => {
         disabled={false}
         errorMessage={undefined}
         onCommit={() => {}}
-        title="Old automation name"
+        title="Old trigger name"
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("Automation name"), {
+    fireEvent.change(screen.getByLabelText("Trigger name"), {
       target: { value: "Unsaved title" },
     });
 
@@ -41,12 +38,12 @@ describe("WebhookAutomationTitleEditor", () => {
         disabled={false}
         errorMessage={undefined}
         onCommit={() => {}}
-        title="New automation name"
+        title="New trigger name"
       />,
     );
 
     expect(screen.queryByDisplayValue("Unsaved title")).toBeNull();
 
-    expect(screen.getByDisplayValue("New automation name")).toBeDefined();
+    expect(screen.getByDisplayValue("New trigger name")).toBeDefined();
   });
 });

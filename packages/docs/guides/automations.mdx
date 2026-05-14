@@ -1,13 +1,13 @@
 ---
-title: Automations
+title: Triggers
 description: Trigger agent work from external events
 ---
 
 ## Overview
 
-Automations start agent work in response to external events, such as webhook deliveries from connected systems.
+Triggers start agent work in response to external events, such as webhook deliveries from connected systems, or from a saved schedule.
 
-Use automations when a team wants Mistle to react to provider activity without a user manually starting every session.
+Use triggers when a team wants Mistle to react to provider activity or time-based schedules without a user manually starting every session.
 
 Examples include:
 
@@ -17,90 +17,90 @@ Examples include:
 
 ## Requirements
 
-Automations depend on the same building blocks as interactive sessions:
+Triggers depend on the same building blocks as interactive sessions:
 
 - a sandbox profile that defines the agent environment
 - integrations that connect the external systems involved
 - webhook or callback configuration for providers that send events to Mistle
 - account linking when provider activity should be attributed to a specific Mistle user
 
-## Automation Types
+## Trigger Types
 
-Mistle supports two automation shapes:
+Mistle supports two trigger shapes:
 
-- Event-triggered automations respond to provider events, such as Slack app mentions or GitHub webhooks.
-- Scheduled automations run on a saved schedule and start work without waiting for a provider event.
+- Event triggers respond to provider events, such as Slack app mentions or GitHub webhooks.
+- Scheduled triggers run on a saved schedule and start work without waiting for a provider event.
 
 Both shapes use a sandbox profile to define the environment where agent work runs.
 
-## Create An Automation
+## Create A Trigger
 
-To create an automation:
+To create a trigger:
 
-1. Open **Automations**.
-2. Create a new automation.
+1. Open **Triggers**.
+2. Create a new trigger.
 3. Choose the sandbox profile that should run the work.
 4. Choose whether it should be event-triggered or scheduled.
 5. Select the integration event or schedule.
 6. Choose the primary repository when the selected profile provides repository options.
 7. Describe the task or instructions the agent should follow.
-8. Save the automation.
+8. Save the trigger.
 
-### Event-Triggered Automations
+### Event Triggers
 
-Event-triggered automations listen for a provider event, such as a Slack app mention, then start agent work with the selected sandbox profile and repository context.
+Event triggers listen for a provider event, such as a Slack app mention, then start agent work with the selected sandbox profile and repository context.
 
 <Frame>
   <img
     src="/images/product-screens/event-automation.png"
-    alt="Event-triggered automation form with Slack app mention trigger, sandbox profile, repository, and instructions"
+    alt="Event trigger form with Slack app mention source, sandbox profile, repository, and instructions"
   />
 </Frame>
 
-For event-triggered automations, make sure the provider integration has webhook delivery configured and can reach Mistle.
+For event triggers, make sure the provider integration has webhook delivery configured and can reach Mistle.
 
-### Scheduled Automations
+### Scheduled Triggers
 
-Scheduled automations run from a saved schedule. The schedule, timezone, sandbox profile, repository, and instructions define what work Mistle starts each time the schedule fires.
+Scheduled triggers run from a saved schedule. The schedule, timezone, sandbox profile, repository, and instructions define what work Mistle starts each time the schedule fires.
 
 <Frame>
   <img
     src="/images/product-screens/scheduled-automation.png"
-    alt="Scheduled automation form with cron schedule, timezone, sandbox profile, repository, and saved instructions"
+    alt="Scheduled trigger form with cron schedule, timezone, sandbox profile, repository, and saved instructions"
   />
 </Frame>
 
 ## Primary Repository
 
-For automations, the primary repository is saved with the automation target. Each run uses it as the agent's startup working directory, so event-triggered and scheduled work begins in the intended repository without a user choosing it at runtime.
+For triggers, the primary repository is saved with the trigger target. Each run uses it as the agent's startup working directory, so event-triggered and scheduled work begins in the intended repository without a user choosing it at runtime.
 
-Set the primary repository to the repo where the automation should read instructions, discover skills, run commands, and collect code changes. If it is left unset, the automation can still start from the selected sandbox profile, but repository-specific behavior depends on the profile's default workspace rather than an explicit repository choice.
+Set the primary repository to the repo where the trigger should read instructions, discover skills, run commands, and collect code changes. If it is left unset, the trigger can still start from the selected sandbox profile, but repository-specific behavior depends on the profile's default workspace rather than an explicit repository choice.
 
-## Manage Automations From A Profile
+## Manage Triggers From A Profile
 
-Each sandbox profile has an **Automations** tab that lists event-triggered and scheduled automations using that profile. Use it when you want to review profile-specific automation behavior, edit an automation in place, or create a new automation already scoped to that profile.
+Each sandbox profile has a **Triggers** tab that lists event and scheduled triggers using that profile. Use it when you want to review profile-specific trigger behavior, edit a trigger in place, or create a new trigger already scoped to that profile.
 
 <Frame>
   <img
     src="/images/product-screens/sandbox-profile-automations.png"
-    alt="Sandbox profile Automations tab with a list of automations and an inline automation editor"
+    alt="Sandbox profile Triggers tab with a list of triggers and an inline trigger editor"
   />
 </Frame>
 
 ## Event Flow
 
-A typical automation flow is:
+A typical trigger flow is:
 
 1. A provider sends an event to Mistle.
 2. Mistle validates the event and resolves the relevant organization, integration, resource, and requester context.
 3. Mistle starts agent work using the configured sandbox profile.
 4. The agent uses configured integrations to complete the task and report back through the appropriate system.
 
-When automation work writes back to supported external systems, those updates can include a [session link](/guides/sessions#external-activity-links) so teammates can open the Mistle session behind the update.
+When triggered work writes back to supported external systems, those updates can include a [session link](/guides/sessions#external-activity-links) so teammates can open the Mistle session behind the update.
 
 ## Attribution
 
-When an automation is triggered by a provider user, Mistle can use account linking to resolve that provider identity back to a Mistle user.
+When a trigger is started by a provider user, Mistle can use account linking to resolve that provider identity back to a Mistle user.
 
 Read [Account Linking](/guides/account-linking) for identity attribution across providers.
 
@@ -108,5 +108,5 @@ Read [Account Linking](/guides/account-linking) for identity attribution across 
 
 - Read [Integrations](/guides/integrations) for the provider connection model.
 - Read [Account Linking](/guides/account-linking) for requester attribution.
-- Read [Sandbox Profiles](/guides/sandbox-profiles) and [Sessions](/guides/sessions) for the execution environment used by automation runs.
+- Read [Sandbox Profiles](/guides/sandbox-profiles) and [Sessions](/guides/sessions) for the execution environment used by trigger runs.
 - For self-hosted deployments, read [Webhook And Callback URLs](/guides/self-hosted-webhook-callbacks).

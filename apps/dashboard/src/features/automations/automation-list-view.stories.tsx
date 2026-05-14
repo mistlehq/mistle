@@ -140,7 +140,7 @@ const ScheduleWithoutNextRunItem: AutomationListItemViewModel = {
   issue: createAutomationListIssue({
     code: "MISSING_TARGET_METADATA",
     message:
-      "This scheduled automation has no next run. Check whether the schedule is valid and enabled.",
+      "This scheduled trigger has no next run. Check whether the schedule is valid and enabled.",
   }),
   source: {
     kind: "schedule",
@@ -153,7 +153,7 @@ const ScheduleWithoutNextRunItem: AutomationListItemViewModel = {
 };
 
 const meta = {
-  title: "Dashboard/Automations/ListView",
+  title: "Dashboard/Triggers/ListView",
   component: AutomationListView,
   decorators: [withDashboardCenteredStory],
   parameters: {

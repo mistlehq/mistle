@@ -744,7 +744,7 @@ export const SandboxProfileSnapshotReady: Story = {
   render: SandboxProfileSnapshotReadyStory,
 };
 
-export const SandboxProfileAutomations: Story = {
+export const SandboxProfileTriggers: Story = {
   render: SandboxProfileAutomationsStoryForDocs,
 };
 
@@ -764,11 +764,11 @@ export const SessionPortAccess: Story = {
   render: SessionPortAccessStory,
 };
 
-export const EventAutomation: Story = {
+export const EventTrigger: Story = {
   render: EventAutomationStory,
 };
 
-export const ScheduledAutomation: Story = {
+export const ScheduledTrigger: Story = {
   render: ScheduledAutomationStory,
 };
 

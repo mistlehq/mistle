@@ -8,14 +8,14 @@ import { ToolbarSearchInput } from "./toolbar-search-input.js";
 it("uses the default h-9 input size for toolbar search fields", () => {
   const { container } = render(
     <ToolbarSearchInput
-      ariaLabel="Search automations"
+      ariaLabel="Search triggers"
       onValueChange={() => {}}
-      placeholder="Search automations"
+      placeholder="Search triggers"
       value=""
     />,
   );
 
-  const input = screen.getByRole("textbox", { name: "Search automations" });
+  const input = screen.getByRole("textbox", { name: "Search triggers" });
   const group = container.firstElementChild;
 
   if (!(group instanceof HTMLElement)) {
@@ -32,16 +32,16 @@ it("forwards search value changes", () => {
 
   render(
     <ToolbarSearchInput
-      ariaLabel="Search automations"
+      ariaLabel="Search triggers"
       onValueChange={(value) => {
         nextValue = value;
       }}
-      placeholder="Search automations"
+      placeholder="Search triggers"
       value=""
     />,
   );
 
-  fireEvent.change(screen.getByRole("textbox", { name: "Search automations" }), {
+  fireEvent.change(screen.getByRole("textbox", { name: "Search triggers" }), {
     target: { value: "backlog" },
   });
 

@@ -52,17 +52,17 @@ function renderCreatePage(input: {
 }
 
 describe("AutomationCreatePage", () => {
-  it("starts without a selected automation type", () => {
+  it("starts without a selected trigger source", () => {
     renderCreatePage({ initialEntry: "/automations/new" });
 
-    expect(
-      screen.getByRole("region", { name: "Create automation page" }).getAttribute("style"),
-    ).toBe("scrollbar-gutter: stable;");
-    expect(screen.getByRole("heading", { name: "Create automation" })).toBeDefined();
-    expect(screen.getByText("Automation type")).toBeDefined();
-    expect(screen.getByText("Select type")).toBeDefined();
-    expect(screen.queryByRole("heading", { name: "Events" })).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Schedule" })).toBeNull();
+    expect(screen.getByRole("region", { name: "Create trigger page" }).getAttribute("style")).toBe(
+      "scrollbar-gutter: stable;",
+    );
+    expect(screen.getByRole("heading", { name: "Create trigger" })).toBeDefined();
+    expect(screen.getByText("Trigger source")).toBeDefined();
+    expect(screen.getByText("Select source")).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "When this happens" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "When this runs" })).toBeNull();
     expect(screen.queryByRole("textbox", { name: "User message" })).toBeNull();
   });
 
@@ -70,8 +70,8 @@ describe("AutomationCreatePage", () => {
     renderCreatePage({ initialEntry: "/automations/new" });
 
     const sandboxProfileLabel = screen.getByText("Sandbox profile");
-    const automationTypeLabel = screen.getByText("Automation type");
-    const automationNameLabel = screen.getByText("Automation name");
+    const automationTypeLabel = screen.getByText("Trigger source");
+    const automationNameLabel = screen.getByText("Trigger name");
 
     expect(sandboxProfileLabel.compareDocumentPosition(automationTypeLabel)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
@@ -81,25 +81,25 @@ describe("AutomationCreatePage", () => {
     );
   });
 
-  it("ignores type query values when choosing the initial automation type", () => {
+  it("ignores type query values when choosing the initial trigger source", () => {
     renderCreatePage({ initialEntry: "/automations/new?type=event" });
 
-    expect(screen.getByRole("heading", { name: "Create automation" })).toBeDefined();
-    expect(screen.getByText("Automation type")).toBeDefined();
-    expect(screen.getByText("Select type")).toBeDefined();
-    expect(screen.queryByRole("heading", { name: "Events" })).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Schedule" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Create trigger" })).toBeDefined();
+    expect(screen.getByText("Trigger source")).toBeDefined();
+    expect(screen.getByText("Select source")).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "When this happens" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "When this runs" })).toBeNull();
     expect(screen.queryByRole("textbox", { name: "User message" })).toBeNull();
   });
 
-  it("requires the user to select an automation type before creating", () => {
+  it("requires the user to select a trigger source before creating", () => {
     renderCreatePage({ initialEntry: "/automations/new" });
 
     fireEvent.click(screen.getByRole("button", { name: "Create" }));
 
-    expect(screen.getByText("Select an automation type.")).toBeDefined();
+    expect(screen.getByText("Select a trigger source.")).toBeDefined();
     expect(screen.getByText("Please address the fields highlighted in red.")).toBeDefined();
-    expect(screen.queryByRole("heading", { name: "Events" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "When this happens" })).toBeNull();
     expect(screen.queryByRole("textbox", { name: "User message" })).toBeNull();
   });
 });

@@ -86,7 +86,7 @@ export function ScheduledAutomationFormStoryHarness(input: {
   const [validationSummaryError, setValidationSummaryError] = useState<string | null>(
     input.validationSummaryError ?? null,
   );
-  const pageTitle = input.mode === "create" ? "Create automation" : "";
+  const pageTitle = input.mode === "create" ? "Create trigger" : "";
 
   return (
     <PageFrame title={pageTitle} width="form">
@@ -139,7 +139,7 @@ export function ScheduledAutomationFormStoryHarness(input: {
 }
 
 const meta = {
-  title: "Dashboard/Automations/Schedule/Form",
+  title: "Dashboard/Triggers/Schedule/Form",
   component: ScheduledAutomationFormStoryHarness,
   decorators: [withDashboardPageStory],
   excludeStories: ["ExistingScheduledAutomationValues", "ScheduledAutomationFormStoryHarness"],
@@ -206,7 +206,7 @@ export const ValidationErrors: Story = {
     mode: "create",
     validationSummaryError: "Please address the fields highlighted in red.",
     fieldErrors: {
-      name: "Automation name is required.",
+      name: "Trigger name is required.",
       sandboxProfileId: "Select a sandbox profile.",
       cronExpression: "Cron expression is required.",
       timezone: "Timezone is required.",

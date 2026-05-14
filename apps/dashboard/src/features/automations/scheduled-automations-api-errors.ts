@@ -7,13 +7,13 @@ import {
 } from "../api/http-api-error.js";
 
 const ScheduledAutomationErrorMessages = {
-  FORBIDDEN: "Select an active organization to manage scheduled automations.",
+  FORBIDDEN: "Select an active organization to manage scheduled triggers.",
   INVALID_PRIMARY_REPOSITORY: "The selected primary repository is invalid.",
   INVALID_SANDBOX_PROFILE_REFERENCE: "The selected sandbox profile is invalid.",
   INVALID_SANDBOX_PROFILE_VERSION_REFERENCE: "The selected sandbox profile version is invalid.",
   INVALID_SCHEDULE: "The schedule is invalid.",
-  NOT_FOUND: "The scheduled automation no longer exists.",
-  UNAUTHORIZED: "Sign in again to manage scheduled automations.",
+  NOT_FOUND: "The scheduled trigger no longer exists.",
+  UNAUTHORIZED: "Sign in again to manage scheduled triggers.",
 };
 
 type ScheduledAutomationErrorCode = keyof typeof ScheduledAutomationErrorMessages;

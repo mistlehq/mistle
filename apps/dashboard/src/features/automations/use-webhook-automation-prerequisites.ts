@@ -74,7 +74,7 @@ export function useWebhookAutomationEventPrerequisites(input?: {
     integrationDirectoryQuery.isError || webhookSourceError !== undefined
       ? resolveApiErrorMessage({
           error: integrationDirectoryQuery.error ?? webhookSourceError,
-          fallbackMessage: "Could not load automation prerequisites.",
+          fallbackMessage: "Could not load trigger prerequisites.",
         })
       : null;
 

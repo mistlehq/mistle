@@ -32,7 +32,7 @@ export function WebhookAutomationEditorPage(
   const breadcrumbs = useAppPageBreadcrumbs();
   const navigate = useNavigate();
   const params = useParams();
-  const fallbackTitle = input.mode === "create" ? "Create automation" : "Edit automation";
+  const fallbackTitle = input.mode === "create" ? "Create trigger" : "Edit trigger";
   const { title, description } = resolvePageFrameText(pageMeta, fallbackTitle);
   if (input.mode === "create") {
     return (
@@ -44,7 +44,7 @@ export function WebhookAutomationEditorPage(
 
   const automationId = params["automationId"];
   if (automationId === undefined) {
-    throw new Error("Automation id is required.");
+    throw new Error("Trigger id is required.");
   }
 
   return (
@@ -68,7 +68,7 @@ function renderWebhookAutomationEditorError(input: {
           </Notice>
           <div>
             <Button onClick={input.onBack} type="button" variant="outline">
-              Back to automations
+              Back to triggers
             </Button>
           </div>
         </div>
@@ -145,10 +145,10 @@ export function EditWebhookAutomationEditor(input: {
 
   if (prerequisites.errorMessage !== null || automationQuery.isError) {
     return renderWebhookAutomationEditorError({
-      title: "Could not load automation",
+      title: "Could not load trigger",
       description: resolveApiErrorMessage({
         error: automationQuery.error,
-        fallbackMessage: prerequisites.errorMessage ?? "Could not load automation.",
+        fallbackMessage: prerequisites.errorMessage ?? "Could not load trigger.",
       }),
       onBack: () => {
         void input.navigate(input.backPath ?? "/automations");
@@ -173,10 +173,10 @@ export function EditWebhookAutomationEditor(input: {
     });
   } catch (error) {
     return renderWebhookAutomationEditorError({
-      title: "Could not load automation",
+      title: "Could not load trigger",
       description: resolveApiErrorMessage({
         error,
-        fallbackMessage: "Could not load automation.",
+        fallbackMessage: "Could not load trigger.",
       }),
       onBack: () => {
         void input.navigate(input.backPath ?? "/automations");

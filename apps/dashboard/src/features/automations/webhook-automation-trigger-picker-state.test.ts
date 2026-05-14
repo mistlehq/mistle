@@ -61,7 +61,7 @@ describe("webhook automation trigger picker state", () => {
       resolveWebhookAutomationTriggerPickerState({
         disabledState: {
           reason:
-            "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event automation.",
+            "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event triggers.",
           variant: "default",
         },
         eventOptions: WebhookEventOptions,
@@ -73,7 +73,7 @@ describe("webhook automation trigger picker state", () => {
       groupedAvailableEventOptions: [],
       disabled: true,
       helperMessage:
-        "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event automation.",
+        "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event triggers.",
       helperVariant: "default",
       inputPlaceholder: "No events available",
     });

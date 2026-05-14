@@ -29,7 +29,7 @@ export function DeleteWebhookAutomationDialog(
     >
       <DialogContent>
         <DialogHeader variant="sectioned">
-          <DialogTitle>Delete automation</DialogTitle>
+          <DialogTitle>Delete trigger</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -56,7 +56,7 @@ export function DeleteWebhookAutomationDialog(
             Cancel
           </Button>
           <Button disabled={input.isPending} onClick={input.onConfirm} type="button">
-            {input.isPending ? "Deleting..." : "Delete automation"}
+            {input.isPending ? "Deleting..." : "Delete trigger"}
           </Button>
         </DialogFooter>
       </DialogContent>

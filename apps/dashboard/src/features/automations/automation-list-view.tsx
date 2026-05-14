@@ -165,7 +165,7 @@ export function AutomationListView(input: AutomationListViewProps): React.JSX.El
   return (
     <div className="flex flex-col gap-4">
       {input.errorMessage !== null ? (
-        <Notice title="Could not load automations" variant="alert">
+        <Notice title="Could not load triggers" variant="alert">
           {input.errorMessage}
         </Notice>
       ) : (
@@ -189,10 +189,10 @@ export function AutomationListView(input: AutomationListViewProps): React.JSX.El
             <TableHeader className="bg-muted/60">
               <TableRow className="h-9 border-b">
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
-                  Automation
+                  Trigger
                 </TableHead>
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
-                  Trigger
+                  When
                 </TableHead>
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
                   Runs with
@@ -207,8 +207,8 @@ export function AutomationListView(input: AutomationListViewProps): React.JSX.El
                 <TableRow>
                   <TableCell className="text-muted-foreground" colSpan={4}>
                     {hasItems
-                      ? "No automations match the current search or filter."
-                      : "No automations have been created yet."}
+                      ? "No triggers match the current search or filter."
+                      : "No triggers have been created yet."}
                   </TableCell>
                 </TableRow>
               ) : null}

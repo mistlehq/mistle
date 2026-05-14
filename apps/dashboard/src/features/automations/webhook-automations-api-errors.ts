@@ -8,12 +8,12 @@ import {
 
 const WebhookAutomationErrorMessages = {
   CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE:
-    "The selected integration connection does not support webhook automations.",
-  FORBIDDEN: "Select an active organization to manage webhook automations.",
+    "The selected integration connection does not support webhook triggers.",
+  FORBIDDEN: "Select an active organization to manage webhook triggers.",
   INVALID_CONNECTION_REFERENCE: "The selected integration connection is invalid.",
   INVALID_SANDBOX_PROFILE_REFERENCE: "The selected sandbox profile is invalid.",
-  NOT_FOUND: "The webhook automation no longer exists.",
-  UNAUTHORIZED: "Sign in again to manage webhook automations.",
+  NOT_FOUND: "The webhook trigger no longer exists.",
+  UNAUTHORIZED: "Sign in again to manage webhook triggers.",
 } as const;
 
 type WebhookAutomationErrorCode = keyof typeof WebhookAutomationErrorMessages;

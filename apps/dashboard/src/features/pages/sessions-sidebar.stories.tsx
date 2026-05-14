@@ -252,7 +252,7 @@ export const SessionSelected: Story = {
   },
 };
 
-export const ToggleRoundTripFromAutomations: Story = {
+export const ToggleRoundTripFromTriggers: Story = {
   args: {
     initialEntries: ["/automations"],
     showSessionsSidebar: false,

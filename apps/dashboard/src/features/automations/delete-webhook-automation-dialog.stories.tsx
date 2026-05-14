@@ -4,7 +4,7 @@ import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import { DeleteWebhookAutomationDialog } from "./delete-webhook-automation-dialog.js";
 
 const meta = {
-  title: "Dashboard/Automations/Event/DeleteDialog",
+  title: "Dashboard/Triggers/Event/DeleteDialog",
   component: DeleteWebhookAutomationDialog,
   decorators: [withDashboardCenteredStory],
   parameters: {
@@ -34,6 +34,6 @@ export const Pending: Story = {
 
 export const ErrorState: Story = {
   args: {
-    errorMessage: "The webhook automation no longer exists.",
+    errorMessage: "The webhook trigger no longer exists.",
   },
 };

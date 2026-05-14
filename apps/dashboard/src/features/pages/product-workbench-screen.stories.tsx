@@ -273,7 +273,7 @@ const MarketingHeroSessions = [
   }),
   buildSandboxInstanceListItemFixture({
     id: "sbi_release_notes",
-    title: "Draft release notes for webhook automations",
+    title: "Draft release notes for webhook triggers",
     sandboxProfileDisplayName: "Docs Maintainer",
     status: "stopped",
     createdAt: "2026-05-04T12:30:00.000Z",
@@ -353,7 +353,7 @@ const MarketingHeroSessions = [
   }),
   buildSandboxInstanceListItemFixture({
     id: "sbi_release_checklist",
-    title: "Update release checklist automation",
+    title: "Update release checklist trigger",
     sandboxProfileDisplayName: "Docs Maintainer",
     status: "stopped",
     createdAt: "2026-04-30T08:30:00.000Z",

@@ -43,7 +43,7 @@ Choose one of these setup paths:
 
 You can edit the manifest before creating the app. Mistle will use your manifest values for app settings such as the app name, description, and other Slack app configuration that does not need to be managed by Mistle.
 
-To keep the integration working, Mistle always overrides the Slack app webhook and callback settings before submitting the manifest. Mistle sets the Events API request URL to the Mistle callback URL for that connection, adds the required redirect URLs for Slack app installation and Slack identity linking, and adds the required bot scopes and bot events needed for supported Slack automations and resource sync.
+To keep the integration working, Mistle always overrides the Slack app webhook and callback settings before submitting the manifest. Mistle sets the Events API request URL to the Mistle callback URL for that connection, adds the required redirect URLs for Slack app installation and Slack identity linking, and adds the required bot scopes and bot events needed for supported Slack triggers and resource sync.
 
 ### Option 1B: Use An Existing Slack App
 
@@ -53,13 +53,13 @@ If you already created a Slack app, you can connect it directly in Mistle.
 
 Add these bot scopes before installing the app:
 
-| Scope               | Enables                                                      |
-| ------------------- | ------------------------------------------------------------ |
-| `app_mentions:read` | Receive `app_mention` events for Slack-triggered automations |
-| `channels:read`     | Sync public channels as selectable automation resources      |
-| `files:read`        | Read and download files shared with the app                  |
-| `files:write`       | Upload files as the app                                      |
-| `groups:read`       | Sync private channels as selectable automation resources     |
+| Scope               | Enables                                               |
+| ------------------- | ----------------------------------------------------- |
+| `app_mentions:read` | Receive `app_mention` events for Slack triggers       |
+| `channels:read`     | Sync public channels as selectable trigger resources  |
+| `files:read`        | Read and download files shared with the app           |
+| `files:write`       | Upload files as the app                               |
+| `groups:read`       | Sync private channels as selectable trigger resources |
 
 ### Configure Event Subscriptions
 
@@ -67,7 +67,7 @@ Enable the Slack Events API and subscribe the bot to these events:
 
 | Event               | Enables                                       |
 | ------------------- | --------------------------------------------- |
-| `app_mention`       | Slack automation trigger                      |
+| `app_mention`       | Slack trigger source                          |
 | `channel_created`   | Refresh synced public channels when created   |
 | `channel_archive`   | Refresh synced public channels when archived  |
 | `channel_unarchive` | Refresh synced public channels when restored  |
@@ -100,7 +100,7 @@ The linked-user auth fields are required when this connection will be used for I
 
 ### Webhooks
 
-If you use Slack-triggered automations:
+If you use Slack triggers:
 
 1. Open the connection's **Webhooks** section in Mistle.
 2. Copy the displayed callback URL.

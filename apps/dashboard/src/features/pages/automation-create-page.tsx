@@ -27,7 +27,7 @@ export function AutomationCreatePage(): React.JSX.Element {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialSandboxProfileId = parseSandboxProfileId(searchParams.get("sandboxProfileId"));
-  const { title, description } = resolvePageFrameText(pageMeta, "Create automation");
+  const { title, description } = resolvePageFrameText(pageMeta, "Create trigger");
   const createSuccessPath =
     initialSandboxProfileId === undefined
       ? undefined
@@ -39,7 +39,7 @@ export function AutomationCreatePage(): React.JSX.Element {
 
   return (
     <div
-      aria-label="Create automation page"
+      aria-label="Create trigger page"
       className="h-full min-h-0 overflow-y-auto overscroll-contain"
       role="region"
       style={AutomationCreatePageScrollStyle}

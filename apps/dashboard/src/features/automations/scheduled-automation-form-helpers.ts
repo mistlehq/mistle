@@ -55,7 +55,7 @@ function toConversationMode(conversationKeyTemplate: string): ScheduledAutomatio
     return ScheduledAutomationConversationModes.NEW_EACH_RUN;
   }
 
-  throw new Error(`Unsupported scheduled automation conversation key template.`);
+  throw new Error(`Unsupported scheduled trigger conversation key template.`);
 }
 
 function toConversationKeyTemplate(conversationMode: ScheduledAutomationConversationMode): string {
@@ -67,7 +67,7 @@ function toConversationKeyTemplate(conversationMode: ScheduledAutomationConversa
     return ScheduledAutomationNewConversationEachRunKeyTemplate;
   }
 
-  throw new Error(`Unsupported scheduled automation conversation mode.`);
+  throw new Error(`Unsupported scheduled trigger conversation mode.`);
 }
 
 export function toScheduledAutomationFormValues(
@@ -104,7 +104,7 @@ export function validateScheduledAutomationFormValues(
   const errors: Partial<Record<ScheduledAutomationFormValueKey, string>> = {};
 
   if (values.name.trim().length === 0) {
-    errors.name = "Automation name is required.";
+    errors.name = "Trigger name is required.";
   }
 
   if (values.sandboxProfileId.trim().length === 0) {

@@ -5,11 +5,11 @@ import {
 } from "../api/http-api-error.js";
 
 const AutomationsErrorMessages = {
-  FORBIDDEN: "Select an active organization to manage automations.",
-  INVALID_LIST_AUTOMATIONS_INPUT: "The automations request is invalid.",
-  INVALID_PAGINATION_CURSOR: "The automations page cursor is invalid.",
-  UNAUTHORIZED: "Sign in again to manage automations.",
-  VALIDATION_ERROR: "The automations request is invalid.",
+  FORBIDDEN: "Select an active organization to manage triggers.",
+  INVALID_LIST_AUTOMATIONS_INPUT: "The triggers request is invalid.",
+  INVALID_PAGINATION_CURSOR: "The triggers page cursor is invalid.",
+  UNAUTHORIZED: "Sign in again to manage triggers.",
+  VALIDATION_ERROR: "The triggers request is invalid.",
 } as const;
 
 type AutomationsErrorCode = keyof typeof AutomationsErrorMessages;

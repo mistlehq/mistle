@@ -77,7 +77,7 @@ export function resolveNoActiveProfileVersionMessage(input: {
   selectedProfileId: string;
   selectedProfileName?: string | undefined;
 }): string {
-  return `The sandbox profile ${input.selectedProfileName ?? input.selectedProfileId} has no active version. Publish the profile before creating automations.`;
+  return `The sandbox profile ${input.selectedProfileName ?? input.selectedProfileId} has no active version. Publish the profile before creating triggers.`;
 }
 
 function resolveActiveVersion(versions: readonly SandboxProfileVersion[]): number | null {
@@ -157,7 +157,7 @@ export function resolveSelectedProfileTriggerState(input: {
     disabledState:
       selectableConnectionIds.length === 0
         ? {
-            reason: `The sandbox profile ${input.selectedProfileName ?? input.selectedProfileId} has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event automation.`,
+            reason: `The sandbox profile ${input.selectedProfileName ?? input.selectedProfileId} has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event triggers.`,
             variant: "default",
           }
         : null,
@@ -564,7 +564,7 @@ export function useLoadedWebhookAutomationEditorState(
       setFormError(
         resolveAutomationMutationErrorMessage({
           error,
-          fallbackMessage: "Could not create automation.",
+          fallbackMessage: "Could not create trigger.",
         }),
       );
     },
@@ -573,7 +573,7 @@ export function useLoadedWebhookAutomationEditorState(
   const updateMutation = useMutation({
     mutationFn: async (values: WebhookAutomationFormValues) => {
       if (input.automationId === undefined) {
-        throw new Error("Automation id is required.");
+        throw new Error("Trigger id is required.");
       }
 
       return updateWebhookAutomation({
@@ -598,7 +598,7 @@ export function useLoadedWebhookAutomationEditorState(
       setFormError(
         resolveAutomationMutationErrorMessage({
           error,
-          fallbackMessage: "Could not update automation.",
+          fallbackMessage: "Could not update trigger.",
         }),
       );
     },
@@ -607,7 +607,7 @@ export function useLoadedWebhookAutomationEditorState(
   const deleteMutation = useMutation({
     mutationFn: async () => {
       if (input.automationId === undefined) {
-        throw new Error("Automation id is required.");
+        throw new Error("Trigger id is required.");
       }
 
       return deleteWebhookAutomation({
@@ -622,7 +622,7 @@ export function useLoadedWebhookAutomationEditorState(
       setDeleteError(
         resolveAutomationMutationErrorMessage({
           error,
-          fallbackMessage: "Could not delete automation.",
+          fallbackMessage: "Could not delete trigger.",
         }),
       );
     },

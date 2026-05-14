@@ -728,7 +728,7 @@ export async function getSandboxProfileVersionDraftAutomationImpact(input: {
         input.version,
       )}/draft-automation-impact`,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
-      fallbackMessage: "Could not check draft automation impact.",
+      fallbackMessage: "Could not check draft trigger impact.",
     });
 
     const responseBody = await response.json();
@@ -738,7 +738,7 @@ export async function getSandboxProfileVersionDraftAutomationImpact(input: {
         operation: "getSandboxProfileVersionDraftAutomationImpact",
         status: 500,
         body: responseBody,
-        message: "Sandbox profile draft automation impact response payload is invalid.",
+        message: "Sandbox profile draft trigger impact response payload is invalid.",
       });
     }
 
@@ -748,7 +748,7 @@ export async function getSandboxProfileVersionDraftAutomationImpact(input: {
       normalizeHttpApiError({
         operation: "getSandboxProfileVersionDraftAutomationImpact",
         error,
-        fallbackMessage: "Could not check draft automation impact.",
+        fallbackMessage: "Could not check draft trigger impact.",
       }),
     );
   }
@@ -1059,7 +1059,7 @@ export async function getSandboxProfileVersionAutomationConfig(input: {
         input.version,
       )}/automation-config`,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
-      fallbackMessage: "Could not load sandbox profile automation config.",
+      fallbackMessage: "Could not load sandbox profile trigger config.",
     });
 
     const responseBody = await response.json();
@@ -1070,7 +1070,7 @@ export async function getSandboxProfileVersionAutomationConfig(input: {
         operation: "getSandboxProfileVersionAutomationConfig",
         status: 500,
         body: responseBody,
-        message: "Sandbox profile automation config response payload is invalid.",
+        message: "Sandbox profile trigger config response payload is invalid.",
       });
     }
 
@@ -1080,7 +1080,7 @@ export async function getSandboxProfileVersionAutomationConfig(input: {
       normalizeHttpApiError({
         operation: "getSandboxProfileVersionAutomationConfig",
         error,
-        fallbackMessage: "Could not load sandbox profile automation config.",
+        fallbackMessage: "Could not load sandbox profile trigger config.",
       }),
     );
   }

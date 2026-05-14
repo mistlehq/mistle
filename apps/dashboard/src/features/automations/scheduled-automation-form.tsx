@@ -98,7 +98,7 @@ export function ScheduledAutomationTypeSpecificSection(
     <FormPageSection
       header={
         <div className="space-y-1">
-          <h2 className="text-base font-semibold">Schedule</h2>
+          <h2 className="text-base font-semibold">When this runs</h2>
         </div>
       }
     >
@@ -209,7 +209,7 @@ export function ScheduledAutomationForm(input: ScheduledAutomationFormProps): Re
       formError={input.formError}
       inputIdPrefix="scheduled-automation"
       inputTemplate={input.values.inputTemplate}
-      inputTemplateDescription="Sent to the agent each time the automation runs."
+      inputTemplateDescription="Sent to the agent each time this trigger runs."
       inputTemplateLabelId={inputTemplateLabelId}
       inputTemplateTokens={[]}
       isDeleting={input.isDeleting}

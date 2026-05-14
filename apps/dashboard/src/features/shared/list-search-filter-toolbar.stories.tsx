@@ -50,9 +50,9 @@ const meta = {
     layout: "fullscreen",
   },
   args: {
-    searchAriaLabel: "Search automations",
-    searchPlaceholder: "Search automations",
-    filterAriaLabel: "Filter automations",
+    searchAriaLabel: "Search triggers",
+    searchPlaceholder: "Search triggers",
+    filterAriaLabel: "Filter triggers",
     filterOptions: SampleFilterOptions,
     filterTriggerClassName: "w-28",
   },

@@ -434,16 +434,16 @@ describe("app routing breadcrumb integration", () => {
     let markup = renderRoutingMarkup(router);
 
     expectMarkupNotToContainBreadcrumbs(markup);
-    expectMarkupToContainMetaTitle(markup, "Automations");
-    expectMarkupToContainMetaDescription(markup, "Manage automations.");
+    expectMarkupToContainMetaTitle(markup, "Triggers");
+    expectMarkupToContainMetaDescription(markup, "Manage triggers.");
 
     await router.navigate("/automations/new");
     markup = renderRoutingMarkup(router);
 
     expectMarkupToContainHref(markup, "/automations");
     expectMarkupToContainCurrentPageLabel(markup, "Create");
-    expectMarkupToContainMetaTitle(markup, "Create automation");
-    expect(markup).not.toContain("Create a webhook automation.");
+    expectMarkupToContainMetaTitle(markup, "Create trigger");
+    expect(markup).not.toContain("Create a webhook trigger.");
 
     await router.navigate("/automations/aut_123");
     markup = renderRoutingMarkup(router);
@@ -455,14 +455,14 @@ describe("app routing breadcrumb integration", () => {
     expectMarkupToContainEmptyMetaDescription(markup);
   });
 
-  it("does not render supporting description text for create automation", () => {
+  it("does not render supporting description text for create trigger", () => {
     const router = createMemoryRouter(automationRoutes, {
       initialEntries: ["/automations/new"],
     });
     const markup = renderRoutingMarkup(router);
 
-    expectMarkupToContainMetaTitle(markup, "Create automation");
+    expectMarkupToContainMetaTitle(markup, "Create trigger");
     expectMarkupToContainEmptyMetaDescription(markup);
-    expect(markup).not.toContain("Create a webhook automation.");
+    expect(markup).not.toContain("Create a webhook trigger.");
   });
 });

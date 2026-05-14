@@ -44,7 +44,7 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
     <PageFrame
       width="form"
       description="Configure the instructions sent to the agent for each webhook event."
-      title="Automation Editor"
+      title="Trigger Editor"
     >
       <FormPageStack>
         <FormPageSection>
@@ -109,8 +109,8 @@ function PlaygroundHarness(): React.JSX.Element {
   return (
     <PageFrame
       width="form"
-      description="Preview the editor inside the automation form page shell."
-      title="Automation Editor"
+      description="Preview the editor inside the trigger form page shell."
+      title="Trigger Editor"
     >
       <FormPageStack>
         <FormPageSection header={<h2 className="text-base font-semibold">Story Controls</h2>}>
@@ -203,7 +203,7 @@ function PlaygroundHarness(): React.JSX.Element {
 }
 
 const meta = {
-  title: "Dashboard/Automations/AgentInstructionsEditor",
+  title: "Dashboard/Triggers/AgentInstructionsEditor",
   component: StoryHarness,
   decorators: [withDashboardPageStory],
   parameters: {

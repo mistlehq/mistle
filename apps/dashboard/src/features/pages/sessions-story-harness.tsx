@@ -236,7 +236,7 @@ function AutomationsStoryPage(): React.JSX.Element {
           <p className="text-muted-foreground text-sm uppercase tracking-[0.18em]">
             Storybook route
           </p>
-          <h1 className="mt-3 font-semibold text-2xl">Automations preview</h1>
+          <h1 className="mt-3 font-semibold text-2xl">Triggers preview</h1>
           <p className="mt-3 text-muted-foreground text-sm">
             Toggle sessions mode on from this route to verify Storybook follows the same
             sessions-entry and return navigation behavior as the app shell.

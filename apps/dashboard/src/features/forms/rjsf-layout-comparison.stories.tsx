@@ -563,7 +563,7 @@ function RjsfLayoutComparisonStory(input: { caseItem?: ComparisonCase }): React.
           },
           {
             description:
-              "Mixed layout pattern: compact rows remain horizontal while large text areas become stacked. This is the RJSF equivalent of how forms like Create Automation mix orientations.",
+              "Mixed layout pattern: compact rows remain horizontal while large text areas become stacked. This is the RJSF equivalent of how forms like Create Trigger mix orientations.",
             manual: <ManualMixedLayout />,
             rjsf: <RjsfMixedLayout />,
             caseTitle: "Mixed Layout",
@@ -671,7 +671,7 @@ export const MixedLayout: Story = {
       <RjsfLayoutComparisonStory
         caseItem={{
           description:
-            "Mixed layout pattern: compact rows remain horizontal while large text areas become stacked. This is the RJSF equivalent of how forms like Create Automation mix orientations.",
+            "Mixed layout pattern: compact rows remain horizontal while large text areas become stacked. This is the RJSF equivalent of how forms like Create Trigger mix orientations.",
           manual: <ManualMixedLayout />,
           rjsf: <RjsfMixedLayout />,
           caseTitle: "Mixed Layout",

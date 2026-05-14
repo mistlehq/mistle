@@ -133,7 +133,7 @@ export function validateWebhookAutomationFormValues(
   const trimmedInputTemplate = values.inputTemplate.trim();
 
   if (values.name.trim().length === 0) {
-    errors.name = "Automation name is required.";
+    errors.name = "Trigger name is required.";
   }
 
   if (values.triggerIds.length === 0) {
@@ -158,9 +158,9 @@ export function validateWebhookAutomationFormValues(
 
     if (errors.triggerIds === undefined && resolvedTriggers.connectionIds.length > 1) {
       errors.triggerIds =
-        "All triggers in one automation must come from the same integration connection.";
+        "All events in one trigger must come from the same integration connection.";
     } else if (errors.triggerIds === undefined && resolvedTriggers.webhookSourceIds.length > 1) {
-      errors.triggerIds = "All triggers in one automation must come from the same webhook source.";
+      errors.triggerIds = "All events in one trigger must come from the same webhook source.";
     } else if (errors.triggerIds === undefined && resolvedTriggers.webhookSourceId === null) {
       errors.triggerIds = "Select triggers from an available webhook source.";
     }
@@ -234,13 +234,11 @@ function resolveAutomationSubmissionShape(input: {
   });
 
   if (resolvedTriggers.connectionIds.length > 1) {
-    throw new Error(
-      "All triggers in one automation must come from the same integration connection.",
-    );
+    throw new Error("All events in one trigger must come from the same integration connection.");
   }
 
   if (resolvedTriggers.webhookSourceIds.length > 1) {
-    throw new Error("All triggers in one automation must come from the same webhook source.");
+    throw new Error("All events in one trigger must come from the same webhook source.");
   }
 
   if (resolvedTriggers.webhookSourceId === null) {

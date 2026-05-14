@@ -249,9 +249,9 @@ export const ROUTE_HANDLES = {
   sandboxProfileAutomations: {
     appShellInsetOwner: "child",
     sidebarTriggerOwner: "page-frame",
-    breadcrumb: "Automations",
+    breadcrumb: "Triggers",
     title: "Edit profile",
-    description: "Manage sandbox profile automations.",
+    description: "Manage sandbox profile triggers.",
   },
   sandboxProfileSnapshots: {
     appShellInsetOwner: "child",
@@ -263,9 +263,9 @@ export const ROUTE_HANDLES = {
   automations: {
     appShellInsetOwner: "child",
     sidebarTriggerOwner: "page-frame",
-    breadcrumb: "Automations",
-    title: "Automations",
-    description: "Manage automations.",
+    breadcrumb: "Triggers",
+    title: "Triggers",
+    description: "Manage triggers.",
   },
   automationsNew: {
     appShellInsetOwner: "child",
@@ -273,7 +273,7 @@ export const ROUTE_HANDLES = {
     sidebarTriggerOwner: "page-frame",
     breadcrumb: "Create",
     pageBreadcrumbVisible: true,
-    title: "Create automation",
+    title: "Create trigger",
     description: "",
   },
   automationsDetail: {
