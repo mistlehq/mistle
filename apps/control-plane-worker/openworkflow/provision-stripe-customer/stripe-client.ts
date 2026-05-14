@@ -1,11 +1,7 @@
 import Stripe from "stripe";
 
-export type CreateStripeBillingClientInput = {
-  secretKey: string;
-};
-
-export function createStripeBillingClient(input: CreateStripeBillingClientInput): Stripe {
-  return new Stripe(input.secretKey, {
+export function createStripeBillingClient(secretKey: string): Stripe {
+  return new Stripe(secretKey, {
     maxNetworkRetries: 2,
     timeout: 10_000,
   });

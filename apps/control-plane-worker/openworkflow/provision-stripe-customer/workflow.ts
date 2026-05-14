@@ -48,7 +48,7 @@ export const ProvisionStripeCustomerWorkflow = defineTracedControlPlaneWorkflow(
     }
 
     try {
-      const stripe = createStripeBillingClient({ secretKey: billing.stripe.secretKey });
+      const stripe = createStripeBillingClient(billing.stripe.secretKey);
       const stripeCustomer = await step.run({ name: "create-stripe-customer" }, async () =>
         stripe.customers.create(
           {

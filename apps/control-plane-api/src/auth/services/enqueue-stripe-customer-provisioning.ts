@@ -9,13 +9,9 @@ import {
   ProvisionStripeCustomerWorkflowSpec,
 } from "@mistle/workflow-registry/control-plane";
 import { sql } from "drizzle-orm";
+import type { OpenWorkflow } from "openworkflow";
 
-import { type createControlPlaneOpenWorkflow } from "../../openworkflow.js";
-
-type ControlPlaneOpenWorkflow = Pick<
-  ReturnType<typeof createControlPlaneOpenWorkflow>,
-  "runWorkflow"
->;
+type ControlPlaneOpenWorkflow = Pick<OpenWorkflow, "runWorkflow">;
 
 type EnqueueStripeCustomerProvisioningInput = {
   db: ControlPlaneDatabase;
