@@ -45,6 +45,10 @@ type SessionsStoryHarnessProps = {
     } | null;
     failureCode?: string | null;
     failureMessage?: string | null;
+    startupOperation?: {
+      operationId: string;
+      operationKind: "resume" | "start";
+    } | null;
   };
   sandboxInstancesList?: SandboxInstancesListResult;
   sessionsSidebarQueryState?:

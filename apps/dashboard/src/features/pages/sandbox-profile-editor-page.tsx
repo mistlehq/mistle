@@ -1686,6 +1686,9 @@ function ReadySandboxProfileEditorPage(input: {
           setupScriptLoader={setupScriptLoader}
           snapshotPanelState={snapshotPanelState}
           snapshotVersion={snapshotVersion}
+          {...(runtimeDraftState.buildDraftChanges === undefined
+            ? {}
+            : { buildSetupScriptTestRuntimeConfig: runtimeDraftState.buildDraftChanges })}
           selectedAgentRuntimeId={resolveSelectedSandboxProfileAgentRuntimeId({
             currentVersion: input.currentVersion,
             runtimeDraftState,
@@ -2013,6 +2016,7 @@ function SandboxProfileEditorSectionPanels(input: {
   onPersistenceDraftStateChange: (state: SandboxProfilePersistenceDraftState) => void;
   onRuntimeDraftStateChange: (state: SandboxProfileRuntimeSettingsDraftState) => void;
   onIntegrationDraftStateChange: (state: SandboxProfileDraftSectionState) => void;
+  buildSetupScriptTestRuntimeConfig?: () => SandboxProfileRuntimeDraftChanges;
   onPublishSuccessMessageDismiss: () => void;
   onRefreshSnapshot: (version: number) => void;
   onRetryPublishSnapshot: (version: number) => void;
@@ -2092,6 +2096,9 @@ function SandboxProfileEditorSectionPanels(input: {
           )}
           loader={input.setupScriptLoader}
           profileId={input.profileId}
+          {...(input.buildSetupScriptTestRuntimeConfig === undefined
+            ? {}
+            : { buildTestRunRuntimeConfig: input.buildSetupScriptTestRuntimeConfig })}
           onDraftStateChange={input.onSetupScriptDraftStateChange}
           setupAssistantControl={input.setupAssistantControl}
           isDraft={input.mode.kind === "draft"}
@@ -2888,6 +2895,7 @@ function LoadedSandboxProfileSetupScriptSection(input: {
   loader: ReturnType<typeof useSandboxProfileSetupScriptLoader>;
   isDraft: boolean;
   setupAssistantControl: SetupScriptAssistantControl;
+  buildTestRunRuntimeConfig?: () => SandboxProfileRuntimeDraftChanges;
   onDraftStateChange?: (state: SandboxProfileDraftSectionState) => void;
 }): React.JSX.Element | null {
   if (input.loader.setupScriptQuery.isPending) {
@@ -2917,6 +2925,9 @@ function LoadedSandboxProfileSetupScriptSection(input: {
       setupScript={input.loader.setupScript}
       version={input.version}
       setupAssistantControl={input.setupAssistantControl}
+      {...(input.buildTestRunRuntimeConfig === undefined
+        ? {}
+        : { buildTestRunRuntimeConfig: input.buildTestRunRuntimeConfig })}
       {...(input.onDraftStateChange === undefined
         ? {}
         : { onDraftStateChange: input.onDraftStateChange })}
@@ -2932,6 +2943,7 @@ function ReadySandboxProfileSetupScriptSection(input: {
   setupScript: string | null;
   isDraft: boolean;
   setupAssistantControl: SetupScriptAssistantControl;
+  buildTestRunRuntimeConfig?: () => SandboxProfileRuntimeDraftChanges;
   onDraftStateChange?: (state: SandboxProfileDraftSectionState) => void;
 }): React.JSX.Element {
   const setupScriptState = useLoadedSandboxProfileSetupScriptState({
@@ -2945,6 +2957,9 @@ function ReadySandboxProfileSetupScriptSection(input: {
     profileId: input.profileId,
     setupScript: setupScriptState.draftValue,
     version: input.version,
+    ...(input.buildTestRunRuntimeConfig === undefined
+      ? {}
+      : { buildRuntimeConfig: input.buildTestRunRuntimeConfig }),
   });
   const onDraftStateChange = input.onDraftStateChange;
 

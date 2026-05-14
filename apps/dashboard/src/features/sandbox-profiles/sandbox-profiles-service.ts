@@ -20,6 +20,7 @@ import type {
   SandboxProfileVersionAutomationConfig,
   SandboxProfileVersionRefreshSchedule,
   SandboxProfileVersionSetupScript,
+  SandboxProfileSetupScriptTestRuntimeConfig,
   SandboxProvidersResult,
   SandboxProfileSetupAssistant,
   SandboxProfileSetupScriptTestRun,
@@ -422,6 +423,7 @@ const SandboxProfileVersionSchema = z
     latestSnapshotJob: z
       .object({
         id: z.string().min(1),
+        sandboxInstanceId: z.string().min(1).nullable(),
         trigger: z.enum(["publish", "manual_refresh", "scheduled_refresh"]),
         state: z.enum(["queued", "running", "succeeded", "failed"]),
         errorCode: z.string().min(1).nullable(),
@@ -486,6 +488,7 @@ const PublishSandboxProfileVersionResultSchema = z
     snapshotJob: z
       .object({
         id: z.string().min(1),
+        sandboxInstanceId: z.string().min(1).nullable(),
         trigger: z.enum(["publish", "manual_refresh", "scheduled_refresh"]),
         state: z.enum(["queued", "running", "succeeded", "failed"]),
         errorCode: z.string().min(1).nullable(),
@@ -1182,6 +1185,7 @@ export async function startSandboxProfileSetupScriptTestRun(input: {
   profileId: string;
   version: number;
   setupScript: string;
+  runtimeConfig?: SandboxProfileSetupScriptTestRuntimeConfig;
   idempotencyKey?: string;
   signal?: AbortSignal;
 }): Promise<SandboxProfileSetupScriptTestRun> {
@@ -1194,6 +1198,16 @@ export async function startSandboxProfileSetupScriptTestRun(input: {
       )}/setup-script/test-runs`,
       body: {
         setupScript: input.setupScript,
+        ...(input.runtimeConfig === undefined
+          ? {}
+          : {
+              agentRuntimeId: input.runtimeConfig.agentRuntimeId,
+              ...(input.runtimeConfig.sandboxProvider === null
+                ? {}
+                : { sandboxProvider: input.runtimeConfig.sandboxProvider }),
+              sandboxConnectionId: input.runtimeConfig.sandboxConnectionId,
+              sandboxResources: input.runtimeConfig.sandboxResources,
+            }),
         ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
       },
       ...(input.signal === undefined ? {} : { signal: input.signal }),

@@ -114,6 +114,7 @@ describe("useSessionWorkbenchController", () => {
         primaryRepositoryRoot: "/workspace/repo",
       },
       automationConversation: null,
+      startupOperation: null,
     };
     queryClient.setQueryData(sandboxInstanceStatusQueryKey("sbi_opencode"), sandboxStatus);
 
@@ -768,6 +769,7 @@ describe("useSessionWorkbenchController", () => {
       failureMessage: null,
       runtimeContext: null,
       automationConversation: null,
+      startupOperation: null,
     });
 
     const { result } = renderSessionWorkbenchController({
@@ -794,6 +796,7 @@ describe("useSessionWorkbenchController", () => {
         primaryRepositoryRoot: "/workspace/repo",
       },
       automationConversation: null,
+      startupOperation: null,
     };
     const queryClient = createControllerQueryClient({
       staleTime: Number.POSITIVE_INFINITY,

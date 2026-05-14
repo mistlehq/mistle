@@ -203,6 +203,7 @@ function createRunningSnapshotJobFixture(input: {
 }): NonNullable<SandboxProfileVersion["latestSnapshotJob"]> {
   return {
     id: input.id,
+    sandboxInstanceId: `sbi_${input.id}`,
     trigger: input.trigger,
     state: "running",
     errorCode: null,
@@ -216,6 +217,7 @@ function createRunningSnapshotJobFixture(input: {
 function createFailedSnapshotJobFixture(): NonNullable<SandboxProfileVersion["latestSnapshotJob"]> {
   return {
     id: "ssj_failed_initial_materialization",
+    sandboxInstanceId: "sbi_failed_initial_materialization",
     trigger: "publish",
     state: "failed",
     errorCode: "snapshot_materialization_failed",
@@ -231,6 +233,7 @@ function createFailedManualSnapshotJobFixture(): NonNullable<
 > {
   return {
     id: "ssj_failed_manual_materialization",
+    sandboxInstanceId: "sbi_failed_manual_materialization",
     trigger: "manual_refresh",
     state: "failed",
     errorCode: "snapshot_materialization_failed",
@@ -1062,6 +1065,7 @@ describe("SandboxProfileEditorPage", () => {
           usable: false,
           latestSnapshotJob: {
             id: "ssj_pending_initial_materialization",
+            sandboxInstanceId: "sbi_pending_initial_materialization",
             trigger: "publish",
             state: "running",
             errorCode: null,
@@ -1817,6 +1821,7 @@ describe("SandboxProfileEditorPage", () => {
             usable: false,
             latestSnapshotJob: {
               id: "ssj_pending_initial_materialization",
+              sandboxInstanceId: "sbi_pending_initial_materialization",
               trigger: "publish",
               state: "queued",
               errorCode: null,
@@ -1847,6 +1852,7 @@ describe("SandboxProfileEditorPage", () => {
           activeVersion: null,
           snapshotJob: {
             id: "ssj_pending_initial_materialization",
+            sandboxInstanceId: "sbi_pending_initial_materialization",
             trigger: "publish",
             state: "queued",
             errorCode: null,
@@ -1863,6 +1869,7 @@ describe("SandboxProfileEditorPage", () => {
             usable: false,
             latestSnapshotJob: {
               id: "ssj_pending_initial_materialization",
+              sandboxInstanceId: "sbi_pending_initial_materialization",
               trigger: "publish",
               state: "queued",
               errorCode: null,
@@ -1894,6 +1901,7 @@ describe("SandboxProfileEditorPage", () => {
       usable: false,
       latestSnapshotJob: {
         id: "ssj_pending_initial_materialization",
+        sandboxInstanceId: "sbi_pending_initial_materialization",
         trigger: "publish",
         state: "queued",
         errorCode: null,
@@ -1924,6 +1932,7 @@ describe("SandboxProfileEditorPage", () => {
           activeVersion: null,
           snapshotJob: {
             id: "ssj_pending_initial_materialization",
+            sandboxInstanceId: "sbi_pending_initial_materialization",
             trigger: "publish",
             state: "queued",
             errorCode: null,
@@ -2294,17 +2303,9 @@ describe("SandboxProfileEditorPage", () => {
     const setupAssistantButton = screen.getByRole("button", {
       name: "Setup Assistant",
     });
-    const failOnFirstErrorSwitch = screen.getByRole("switch", {
-      name: "Fail on error",
-    });
-
     expect(testButton.hasAttribute("disabled")).toBe(false);
     expect(testButton.getAttribute("title")).toBe("Test setup script");
     expect(setupAssistantButton.hasAttribute("disabled")).toBe(false);
-    expect(failOnFirstErrorSwitch.getAttribute("aria-checked")).toBe("true");
-
-    fireEvent.click(failOnFirstErrorSwitch);
-    expect(failOnFirstErrorSwitch.getAttribute("aria-checked")).toBe("false");
   });
 
   it("toggles the Setup Assistant panel from the setup script action", async () => {

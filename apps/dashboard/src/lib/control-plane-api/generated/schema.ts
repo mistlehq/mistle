@@ -6956,6 +6956,11 @@ export interface paths {
                 launchCwd: string | null;
                 primaryRepositoryRoot: string | null;
               } | null;
+              startupOperation: {
+                operationId: string;
+                /** @enum {string} */
+                operationKind: "start" | "resume";
+              } | null;
               /** @enum {string} */
               status: "pending" | "starting" | "running" | "stopped" | "failed";
               title: string | null;
@@ -7154,6 +7159,152 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/sandbox/instances/{instanceId}/operation-events": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query: {
+          afterSequence?: number | null;
+          limit?: number;
+          operationId: string;
+        };
+        header?: never;
+        path: {
+          instanceId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description List sandbox operation events. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              events: {
+                attributes: {
+                  [key: string]: unknown;
+                };
+                createdAt: string;
+                id: string;
+                message: string;
+                observedAt: string;
+                operationId: string;
+                /** @enum {string} */
+                operationKind: "start" | "resume" | "setup_check" | "snapshot" | "stop";
+                payloadBase64: string | null;
+                /** @enum {string|null} */
+                phase:
+                  | "provider"
+                  | "storage_provision"
+                  | "storage_attach"
+                  | "sandboxd"
+                  | "operation_stream"
+                  | "git_identity"
+                  | "egress"
+                  | "runtime_plan"
+                  | "setup_script"
+                  | "runtime_processes"
+                  | "runtime_adapters"
+                  | "agent_endpoint"
+                  | "ready"
+                  | "running"
+                  | "snapshot"
+                  | "stop"
+                  | "teardown"
+                  | null;
+                /** @enum {string} */
+                recordKind: "lifecycle" | "transcript";
+                sandboxInstanceId: string;
+                sequence: number;
+                /** @enum {string} */
+                source: "worker" | "gateway" | "sandboxd";
+                /** @enum {string|null} */
+                status: "started" | "completed" | "failed" | "warning" | null;
+                /** @enum {string|null} */
+                stream: "stdout" | "stderr" | "system" | null;
+              }[];
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox instance was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "INSTANCE_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/sandbox/instances/{instanceId}/ports/{port}/access": {
     parameters: {
       query?: never;
@@ -7308,6 +7459,11 @@ export interface paths {
                 agentRuntimeId: "codex" | "opencode" | null;
                 launchCwd: string | null;
                 primaryRepositoryRoot: string | null;
+              } | null;
+              startupOperation: {
+                operationId: string;
+                /** @enum {string} */
+                operationKind: "start" | "resume";
               } | null;
               /** @enum {string} */
               status: "pending" | "starting" | "running" | "stopped" | "failed";
@@ -8247,6 +8403,7 @@ export interface paths {
                   errorMessage: string | null;
                   finishedAt: string | null;
                   id: string;
+                  sandboxInstanceId: string | null;
                   startedAt: string | null;
                   /** @enum {string} */
                   state: "queued" | "running" | "succeeded" | "failed";
@@ -8370,6 +8527,7 @@ export interface paths {
                 errorMessage: string | null;
                 finishedAt: string | null;
                 id: string;
+                sandboxInstanceId: string | null;
                 startedAt: string | null;
                 /** @enum {string} */
                 state: "queued" | "running" | "succeeded" | "failed";
@@ -9085,13 +9243,15 @@ export interface paths {
             "application/json":
               | {
                   /** @enum {string} */
-                  code: "INVALID_PRIMARY_REPOSITORY";
+                  code: "INVALID_PRIMARY_REPOSITORY" | "INVALID_SANDBOX_RUNTIME_CONFIG";
                   message: string;
                 }
               | {
                   /** @enum {string} */
                   code:
                     | "AGENT_RUNTIME_REQUIRED"
+                    | "SANDBOX_PROVIDER_REQUIRED"
+                    | "INVALID_SANDBOX_PROVIDER"
                     | "INVALID_BINDING_CONNECTION_REFERENCE"
                     | "INVALID_CONNECTION_TARGET_REFERENCE"
                     | "CONNECTION_MISMATCH"
@@ -9331,6 +9491,7 @@ export interface paths {
                 errorMessage: string | null;
                 finishedAt: string | null;
                 id: string;
+                sandboxInstanceId: string | null;
                 startedAt: string | null;
                 /** @enum {string} */
                 state: "queued" | "running" | "succeeded" | "failed";
@@ -9349,6 +9510,7 @@ export interface paths {
                   errorMessage: string | null;
                   finishedAt: string | null;
                   id: string;
+                  sandboxInstanceId: string | null;
                   startedAt: string | null;
                   /** @enum {string} */
                   state: "queued" | "running" | "succeeded" | "failed";
@@ -9618,6 +9780,7 @@ export interface paths {
                 errorMessage: string | null;
                 finishedAt: string | null;
                 id: string;
+                sandboxInstanceId: string | null;
                 startedAt: string | null;
                 /** @enum {string} */
                 state: "queued" | "running" | "succeeded" | "failed";
@@ -9636,6 +9799,7 @@ export interface paths {
                   errorMessage: string | null;
                   finishedAt: string | null;
                   id: string;
+                  sandboxInstanceId: string | null;
                   startedAt: string | null;
                   /** @enum {string} */
                   state: "queued" | "running" | "succeeded" | "failed";
@@ -9992,6 +10156,7 @@ export interface paths {
                 errorMessage: string | null;
                 finishedAt: string | null;
                 id: string;
+                sandboxInstanceId: string | null;
                 startedAt: string | null;
                 /** @enum {string} */
                 state: "queued" | "running" | "succeeded" | "failed";
@@ -10010,6 +10175,7 @@ export interface paths {
                   errorMessage: string | null;
                   finishedAt: string | null;
                   id: string;
+                  sandboxInstanceId: string | null;
                   startedAt: string | null;
                   /** @enum {string} */
                   state: "queued" | "running" | "succeeded" | "failed";
@@ -10275,13 +10441,15 @@ export interface paths {
             "application/json":
               | {
                   /** @enum {string} */
-                  code: "INVALID_PRIMARY_REPOSITORY";
+                  code: "INVALID_PRIMARY_REPOSITORY" | "INVALID_SANDBOX_RUNTIME_CONFIG";
                   message: string;
                 }
               | {
                   /** @enum {string} */
                   code:
                     | "AGENT_RUNTIME_REQUIRED"
+                    | "SANDBOX_PROVIDER_REQUIRED"
+                    | "INVALID_SANDBOX_PROVIDER"
                     | "INVALID_BINDING_CONNECTION_REFERENCE"
                     | "INVALID_CONNECTION_TARGET_REFERENCE"
                     | "CONNECTION_MISMATCH"
@@ -10382,7 +10550,16 @@ export interface paths {
       requestBody: {
         content: {
           "application/json": {
+            /** @enum {string} */
+            agentRuntimeId?: "codex" | "opencode";
             idempotencyKey?: string;
+            sandboxConnectionId?: string | null;
+            sandboxProvider?: string;
+            sandboxResources?: {
+              memoryMb: number;
+              storageMb?: number;
+              vcpuCount: number;
+            } | null;
             setupScript: string;
           };
         };
@@ -10411,13 +10588,15 @@ export interface paths {
             "application/json":
               | {
                   /** @enum {string} */
-                  code: "INVALID_PRIMARY_REPOSITORY";
+                  code: "INVALID_PRIMARY_REPOSITORY" | "INVALID_SANDBOX_RUNTIME_CONFIG";
                   message: string;
                 }
               | {
                   /** @enum {string} */
                   code:
                     | "AGENT_RUNTIME_REQUIRED"
+                    | "SANDBOX_PROVIDER_REQUIRED"
+                    | "INVALID_SANDBOX_PROVIDER"
                     | "INVALID_BINDING_CONNECTION_REFERENCE"
                     | "INVALID_CONNECTION_TARGET_REFERENCE"
                     | "CONNECTION_MISMATCH"
