@@ -1,6 +1,3 @@
-import { resolveAgentPtyLaunchTemplate } from "@mistle/integrations-core";
-import { CodexAppServerListenUrl } from "@mistle/integrations-definitions/agent-runtimes/codex/app-server";
-import { OpenCodePtyLaunchSpec } from "@mistle/integrations-definitions/agent-runtimes/opencode/pty-launch";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 import { useCallback, useEffect, useReducer, useRef, type RefObject } from "react";
 
@@ -11,6 +8,7 @@ import {
   reduceSessionMainPanelHandoffState,
   type MainPanelTransitionState,
 } from "./session-main-panel-handoff-state.js";
+import { buildCliPtyOpenInput, type SessionCliLaunchTarget } from "./session-runtime-cli-launch.js";
 
 type SessionMainPanelRuntimeId = "codex" | "opencode";
 type ChatRestoreConnectionInput =
@@ -27,16 +25,6 @@ type ChatRestoreConnectionInput =
       sandboxInstanceId: string;
       selectionPolicy?: "most_recently_updated";
       targetThreadId: null;
-    };
-
-type SessionCliLaunchTarget =
-  | {
-      type: "resume";
-      threadId: string;
-    }
-  | {
-      type: "start_new";
-      shouldClearActiveThreadId: boolean;
     };
 
 type SessionMainPanelHandoffLifecycleSnapshot = {
@@ -92,54 +80,6 @@ async function closeAndDisconnectCliPty(
   const disconnectPromise = cliPtyState.actions.disconnectPty().catch(() => {});
 
   await Promise.all([closePromise, disconnectPromise]);
-}
-
-export function buildCliPtyOpenInput(input: {
-  launchTarget: SessionCliLaunchTarget;
-  runtimeId: SessionMainPanelRuntimeId;
-  sandboxInstanceId: string;
-  selectedRepositoryPath: string | null;
-}): {
-  sandboxInstanceId: string;
-  ptySessionId: "cli";
-  cols: number;
-  rows: number;
-  command: "codex" | "opencode";
-  args: string[];
-  cwd?: string;
-} {
-  if (input.runtimeId === "opencode") {
-    const launch = resolveAgentPtyLaunchTemplate({
-      launch: OpenCodePtyLaunchSpec,
-      threadId: input.launchTarget.type === "resume" ? input.launchTarget.threadId : null,
-    });
-
-    return {
-      sandboxInstanceId: input.sandboxInstanceId,
-      ptySessionId: "cli",
-      cols: launch.cols,
-      rows: launch.rows,
-      command: "opencode",
-      args:
-        input.selectedRepositoryPath === null
-          ? launch.args
-          : [...launch.args, "--dir", input.selectedRepositoryPath],
-      ...(input.selectedRepositoryPath === null ? {} : { cwd: input.selectedRepositoryPath }),
-    };
-  }
-
-  return {
-    sandboxInstanceId: input.sandboxInstanceId,
-    ptySessionId: "cli",
-    cols: 120,
-    rows: 32,
-    command: "codex",
-    args:
-      input.launchTarget.type === "resume"
-        ? ["resume", "--remote", CodexAppServerListenUrl, input.launchTarget.threadId]
-        : ["--remote", CodexAppServerListenUrl],
-    ...(input.selectedRepositoryPath === null ? {} : { cwd: input.selectedRepositoryPath }),
-  };
 }
 
 export function resolveChatRestoreConnectionInput(input: {
@@ -339,14 +279,14 @@ export function useSessionMainPanelHandoff(
       activeRuntime.lifecycle.detachSessionConnection();
       activeRuntime.resetServerRequests();
 
-      await input.cliPtyState.actions.openPty({
-        ...buildCliPtyOpenInput({
+      await input.cliPtyState.actions.openPty(
+        buildCliPtyOpenInput({
           launchTarget,
           runtimeId: activeRuntimeId,
           sandboxInstanceId: input.sandboxInstanceId,
           selectedRepositoryPath,
         }),
-      });
+      );
 
       if (!isCurrentGeneration(generation)) {
         await closeAndDisconnectCliPty(input.cliPtyState);
