@@ -3,6 +3,7 @@ import type {
   SessionComposerRuntimeInput,
   SessionTurnControl,
 } from "../pages/session-composer/index.js";
+import type { SessionTerminalContentInset } from "../pages/session-terminal-surface.js";
 import type { UseCodexSessionStateResult } from "./codex/session-state/index.js";
 import {
   mapOpenCodeChatStateForConversation,
@@ -26,7 +27,7 @@ type SessionWorkbenchServerRequestsState = {
 
 export type SessionWorkbenchRuntimeAdapter = {
   displayName: string;
-  cliTerminalContentInset: "default" | "none";
+  cliTerminalContentInset: SessionTerminalContentInset;
   conversation: {
     activeConversationId: string | null;
     chatState: SessionConversationChatState;
