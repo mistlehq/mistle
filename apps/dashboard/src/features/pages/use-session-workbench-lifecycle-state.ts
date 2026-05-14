@@ -196,10 +196,6 @@ export function useSessionWorkbenchLifecycleState(input: {
     requestRecoveryStatusRefresh();
   }, [requestRecoveryStatusRefresh]);
 
-  if (initialSandboxStatusDataUpdatedAtRef.current === null) {
-    initialSandboxStatusDataUpdatedAtRef.current = sandboxStatusQuery.dataUpdatedAt;
-  }
-
   const hasFreshSandboxStatusSinceMount = hasFreshSandboxStatusRead({
     initialDataUpdatedAtMs: initialSandboxStatusDataUpdatedAtRef.current,
     currentDataUpdatedAtMs: sandboxStatusQuery.dataUpdatedAt,
@@ -262,13 +258,23 @@ export function useSessionWorkbenchLifecycleState(input: {
     setAutoResumeErrorMessage(null);
     setAutomationPendingSinceMs(null);
     setAutomationPendingErrorMessage(null);
-    initialSandboxStatusDataUpdatedAtRef.current = null;
+    if (input.sandboxInstanceId === null) {
+      initialSandboxStatusDataUpdatedAtRef.current = null;
+    } else {
+      const queryKey = sandboxInstanceStatusQueryKey(input.sandboxInstanceId);
+      initialSandboxStatusDataUpdatedAtRef.current =
+        input.queryClient.getQueryState(queryKey)?.dataUpdatedAt ?? 0;
+      void input.queryClient.refetchQueries({
+        queryKey,
+        type: "active",
+      });
+    }
     recoveryRefreshStateRef.current = {
       boundaryEpoch: 0,
       latestCompletedEpoch: 0,
       inFlight: false,
     };
-  }, [input.sandboxInstanceId]);
+  }, [input.queryClient, input.sandboxInstanceId]);
 
   useEffect(() => {
     if (input.mainPanelTransitionState === "stable_chat") {
