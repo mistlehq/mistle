@@ -3,16 +3,14 @@ import type {
   AgentStreamClient,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
-import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { formatCodexContextUsage } from "../session-agents/codex/session-state/codex-context-usage.js";
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import {
-  buildOpenCodeAttachmentParts,
   buildOpenCodeComposerConfigResetKey,
   buildRefreshingOpenCodeComposerBootstrap,
-  resolveOpenCodePromptModelOverride,
   useOpenCodeSessionState,
 } from "../session-agents/opencode/session-state/index.js";
 import { SessionRuntimeWorkbenchCapabilities } from "../session-agents/session-runtime-workbench-capabilities.js";
@@ -29,13 +27,11 @@ import {
   buildOpenCodeLifecycleForWorkbench,
   resolveSessionLifecycleForWorkbench,
 } from "../session-agents/session-workbench-handoff-runtimes.js";
-import { applyPatchedSessionTitleToCache } from "../sessions/session-header-title-model.js";
-import { generateSessionTitleWithSandboxCodexExec } from "../sessions/session-title-generation.js";
-import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import {
-  patchSandboxInstanceTitle,
-  type PatchSandboxInstanceTitleResult,
-} from "../sessions/sessions-service.js";
+  buildCodexTurnStarter,
+  buildOpenCodeTurnStarter,
+} from "../session-agents/session-workbench-turn-starters.js";
+import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
   useLocalSessionComposerConfigControl,
@@ -49,7 +45,6 @@ import {
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import {
   resolveInitialSelectedRepositoryPath,
-  resolvePrimaryRepositoryTurnStartCwd,
   resolveSessionTerminalCwd,
 } from "./session-primary-repository-policy.js";
 import type { SessionStartupState } from "./session-startup-status.js";
@@ -152,34 +147,6 @@ type SessionConversationPaneState = SessionWorkbenchRuntimeAdapter["conversation
 
 const CodexWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
 const OpenCodeWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.OPENCODE;
-
-export function shouldGenerateInitialSessionTitle(input: {
-  cachedTitle: string | null | undefined;
-  messageCount: number;
-  sandboxInstanceId: string | null;
-}): boolean {
-  return (
-    input.sandboxInstanceId !== null &&
-    input.messageCount === 0 &&
-    !(input.cachedTitle !== undefined && input.cachedTitle !== null)
-  );
-}
-
-function applyGeneratedSessionTitlePatch(input: {
-  patchTitle: () => Promise<PatchSandboxInstanceTitleResult>;
-  queryClient: QueryClient;
-}): void {
-  void input
-    .patchTitle()
-    .then((patchedTitle) => {
-      applyPatchedSessionTitleToCache(input.queryClient, patchedTitle);
-    })
-    .catch((error: unknown) => {
-      console.warn(
-        error instanceof Error ? error.message : "Could not generate sandbox session title.",
-      );
-    });
-}
 
 type UseSessionWorkbenchControllerResult = {
   workbench: SessionWorkbenchState;
@@ -517,37 +484,16 @@ export function useSessionWorkbenchController(input: {
       sessionState.threads.ensureCanSwitchPrimaryRepository,
     ],
   );
-  const startCodexTurn = useCallback(
-    async (turnInput: Parameters<SessionTurnControl["startTurn"]>[0]): Promise<void> => {
-      const sandboxInstanceId = input.sandboxInstanceId;
-      const cachedTitle = sandboxStatus?.title;
-      const messagePayload = turnInput.transcriptPrompt ?? turnInput.submittedPrompt;
-      const shouldGenerateSessionTitle = shouldGenerateInitialSessionTitle({
-        sandboxInstanceId,
-        cachedTitle,
-        messageCount: chat.chatState.turnOrder.length,
-      });
-
-      await chat.startTurn({
-        ...turnInput,
-        cwd: resolvePrimaryRepositoryTurnStartCwd(selectedRepositoryPath),
-      });
-
-      if (!shouldGenerateSessionTitle || sandboxInstanceId === null) {
-        return;
-      }
-
-      applyGeneratedSessionTitlePatch({
-        patchTitle: () =>
-          generateSessionTitleWithSandboxCodexExec({
-            cwd: selectedRepositoryPath,
-            ensureTransportConnected: transportManager.ensureTransportConnected,
-            messagePayload,
-            sandboxInstanceId,
-          }),
+  const startCodexTurn = useMemo<SessionTurnControl["startTurn"]>(
+    () =>
+      buildCodexTurnStarter({
+        cachedTitle: sandboxStatus?.title,
+        chat,
+        ensureTransportConnected: transportManager.ensureTransportConnected,
         queryClient,
-      });
-    },
+        sandboxInstanceId: input.sandboxInstanceId,
+        selectedRepositoryPath,
+      }),
     [
       chat,
       input.sandboxInstanceId,
@@ -557,43 +503,19 @@ export function useSessionWorkbenchController(input: {
       transportManager.ensureTransportConnected,
     ],
   );
-  const startOpenCodeTurn = useCallback(
-    async (turnInput: Parameters<SessionTurnControl["startTurn"]>[0]): Promise<void> => {
-      const sandboxInstanceId = input.sandboxInstanceId;
-      const cachedTitle = sandboxStatus?.title;
-      const messagePayload = turnInput.transcriptPrompt ?? turnInput.submittedPrompt;
-      const shouldGenerateSessionTitle = shouldGenerateInitialSessionTitle({
-        sandboxInstanceId,
-        cachedTitle,
-        messageCount: openCodeSessionState.chat.chatState.messageOrder.length,
-      });
-      const selectedOpenCodeModel = resolveOpenCodePromptModelOverride(
-        openCodeConfigControl.hasExplicitModelSelection,
-        openCodeConfigControl.selectedModel,
-      );
-      const attachmentParts = buildOpenCodeAttachmentParts(turnInput.uploadedAttachments ?? []);
-      await openCodeSessionState.chat.sendPrompt({
-        ...(selectedRepositoryPath === null ? {} : { directory: selectedRepositoryPath }),
-        ...(selectedOpenCodeModel === undefined ? {} : { model: selectedOpenCodeModel }),
-        submittedAttachments: attachmentParts,
-        submittedPrompt: messagePayload,
-      });
-      if (!shouldGenerateSessionTitle || sandboxInstanceId === null) {
-        return;
-      }
-
-      applyGeneratedSessionTitlePatch({
-        patchTitle: async () => {
-          const title = await openCodeSessionState.chat.waitForGeneratedSessionTitle();
-          return patchSandboxInstanceTitle({
-            instanceId: sandboxInstanceId,
-            onlyIfUnset: true,
-            title,
-          });
+  const startOpenCodeTurn = useMemo<SessionTurnControl["startTurn"]>(
+    () =>
+      buildOpenCodeTurnStarter({
+        cachedTitle: sandboxStatus?.title,
+        chat: openCodeSessionState.chat,
+        modelSelection: {
+          hasExplicitModelSelection: openCodeConfigControl.hasExplicitModelSelection,
+          selectedModel: openCodeConfigControl.selectedModel,
         },
         queryClient,
-      });
-    },
+        sandboxInstanceId: input.sandboxInstanceId,
+        selectedRepositoryPath,
+      }),
     [
       input.sandboxInstanceId,
       openCodeConfigControl.hasExplicitModelSelection,

@@ -5,6 +5,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient, flushScheduledReactWork } from "../../test-support/query-client.js";
+import { shouldGenerateInitialSessionTitle } from "../session-agents/session-workbench-turn-starters.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
 import { resolveInitialSessionConnectInput } from "./session-initial-connect-policy.js";
@@ -17,7 +18,6 @@ import {
   resolveStoppedSessionMessageForWorkbenchEntryPhase,
   resolveWorkbenchEntryPhase,
   shouldWaitForAutomationSessionThread,
-  shouldGenerateInitialSessionTitle,
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
 import { resolveSandboxStatusRefetchInterval } from "./use-session-workbench-lifecycle-state.js";
