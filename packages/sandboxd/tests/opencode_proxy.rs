@@ -347,8 +347,8 @@ fn activity_monitor_rebuilds_activity_after_event_stream_reconnects() {
 }
 
 enum SimulatedOpenCodeActivityCommand {
-    CloseEventStream,
-    Event(Value),
+    CloseEventStream(mpsc::Sender<()>),
+    Event(Value, mpsc::Sender<()>),
 }
 
 struct SimulatedOpenCodeActivityServer {
@@ -409,15 +409,25 @@ impl SimulatedOpenCodeActivityServer {
     }
 
     fn send_event(&self, event: Value) {
+        let (ack_sender, ack_receiver) = mpsc::channel();
         self.command_sender
-            .send(SimulatedOpenCodeActivityCommand::Event(event))
+            .send(SimulatedOpenCodeActivityCommand::Event(event, ack_sender))
             .expect("simulated OpenCode activity event should send");
+        ack_receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("simulated OpenCode activity event should be delivered");
     }
 
     fn close_current_event_stream(&self) {
+        let (ack_sender, ack_receiver) = mpsc::channel();
         self.command_sender
-            .send(SimulatedOpenCodeActivityCommand::CloseEventStream)
+            .send(SimulatedOpenCodeActivityCommand::CloseEventStream(
+                ack_sender,
+            ))
             .expect("simulated OpenCode activity stream close should send");
+        ack_receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("simulated OpenCode activity stream should close");
     }
 
     fn set_statuses(&self, statuses: Value) {
@@ -479,13 +489,17 @@ fn handle_simulated_opencode_activity_request(
                 .expect("simulated OpenCode command receiver lock should not be poisoned")
                 .recv_timeout(Duration::from_millis(25));
             match command {
-                Ok(SimulatedOpenCodeActivityCommand::Event(event)) => {
+                Ok(SimulatedOpenCodeActivityCommand::Event(event, ack_sender)) => {
                     let frame = format!("event: message\ndata: {}\n\n", event);
                     if stream.write_all(frame.as_bytes()).is_err() {
                         return;
                     }
+                    let _ = ack_sender.send(());
                 }
-                Ok(SimulatedOpenCodeActivityCommand::CloseEventStream) => return,
+                Ok(SimulatedOpenCodeActivityCommand::CloseEventStream(ack_sender)) => {
+                    let _ = ack_sender.send(());
+                    return;
+                }
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
                 Err(mpsc::RecvTimeoutError::Disconnected) => return,
             }

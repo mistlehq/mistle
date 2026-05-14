@@ -3,7 +3,9 @@ import {
   createOpenCodeSessionClient,
   type OpenCodeEvent,
   type OpenCodeEventSubscription,
+  type OpenCodeMessageWithParts,
   type OpenCodeProviderSummary,
+  type OpenCodePermissionRequest,
   type OpenCodePermissionResponseInput,
   type OpenCodePromptPartInput,
   type OpenCodeSessionClient,
@@ -189,12 +191,18 @@ async function hydrateConnectedOpenCodeChat(input: {
   dispatchChatAction: Dispatch<OpenCodeChatAction>;
   sessionId: string;
 }): Promise<void> {
-  const messages = await input.client.listMessages({
-    sessionId: input.sessionId,
-  });
-  const pendingPermissions = await input.client.listPermissions({
-    ...(input.directory === undefined ? {} : { directory: input.directory }),
-  });
+  let messages: readonly OpenCodeMessageWithParts[];
+  let pendingPermissions: readonly OpenCodePermissionRequest[];
+  try {
+    messages = await input.client.listMessages({
+      sessionId: input.sessionId,
+    });
+    pendingPermissions = await input.client.listPermissions({
+      ...(input.directory === undefined ? {} : { directory: input.directory }),
+    });
+  } catch (error) {
+    throw new Error("Could not hydrate OpenCode messages.", { cause: error });
+  }
   input.dispatchChatAction({
     type: "hydrate_messages",
     sessionId: input.sessionId,
