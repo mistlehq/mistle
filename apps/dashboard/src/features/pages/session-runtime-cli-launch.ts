@@ -1,6 +1,7 @@
 import { resolveAgentPtyLaunchTemplate } from "@mistle/integrations-core";
 import { CodexAppServerListenUrl } from "@mistle/integrations-definitions/agent-runtimes/codex/app-server";
 import { OpenCodePtyLaunchSpec } from "@mistle/integrations-definitions/agent-runtimes/opencode/pty-launch";
+import type { SandboxPtyOpenOptions } from "@mistle/sandbox-session-client";
 
 export type SessionCliLaunchTarget =
   | {
@@ -14,20 +15,16 @@ export type SessionCliLaunchTarget =
 
 export type SessionRuntimeCliLaunchRuntimeId = "codex" | "opencode";
 
+type SessionRuntimeCliPtyOpenInput = {
+  sandboxInstanceId: string;
+} & SandboxPtyOpenOptions;
+
 export function buildCliPtyOpenInput(input: {
   launchTarget: SessionCliLaunchTarget;
   runtimeId: SessionRuntimeCliLaunchRuntimeId;
   sandboxInstanceId: string;
   selectedRepositoryPath: string | null;
-}): {
-  sandboxInstanceId: string;
-  ptySessionId: "cli";
-  cols: number;
-  rows: number;
-  command: "codex" | "opencode";
-  args: string[];
-  cwd?: string;
-} {
+}): SessionRuntimeCliPtyOpenInput {
   if (input.runtimeId === "opencode") {
     const launch = resolveAgentPtyLaunchTemplate({
       launch: OpenCodePtyLaunchSpec,
