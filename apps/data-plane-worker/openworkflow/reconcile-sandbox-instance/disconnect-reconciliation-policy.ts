@@ -21,6 +21,11 @@ export type DisconnectReconciliationAction =
  * This is intentionally provider-agnostic. Provider-specific interpretation
  * belongs in `@mistle/sandbox`, which reduces raw provider payloads into the
  * shared `SandboxInspectDisposition`.
+ *
+ * This policy reports the reconciliation condition. When startup diagnostics
+ * already recorded a more specific failure, the reconciliation workflow enriches
+ * the persisted failure message from sandbox operation events before marking
+ * the instance failed.
  */
 export function determineDisconnectReconciliationAction(input: {
   persistenceMode: string;

@@ -27,6 +27,11 @@ import { stopSandbox } from "../shared/stop-sandbox.js";
 import { determineDisconnectReconciliationAction } from "./disconnect-reconciliation-policy.js";
 import { markSandboxInstanceFailed } from "./mark-sandbox-instance-failed.js";
 import { markSandboxInstanceStopped } from "./mark-sandbox-instance-stopped.js";
+import {
+  formatStartupDisconnectFailureMessage,
+  resolveStartupFailureEvidence,
+  shouldEnrichStartupDisconnectFailure,
+} from "./startup-failure-evidence.js";
 
 type ActiveSandboxInstance = {
   id: string;
@@ -414,13 +419,19 @@ export async function reconcileSandboxInstance(
 
   switch (action.kind) {
     case "fail": {
+      const failureMessage = await resolveReconciliationFailureMessage({
+        db: ctx.db,
+        failureCode: action.failureCode,
+        failureMessage: action.failureMessage,
+        sandboxInstanceId: sandboxInstance.id,
+      });
       const markOutcome = await markSandboxInstanceFailed({
         db: ctx.db,
         tables: ctx.tables,
         sandboxInstanceId: sandboxInstance.id,
         currentStatus: sandboxInstance.status,
         failureCode: action.failureCode,
-        failureMessage: action.failureMessage,
+        failureMessage,
         stillPermitted: async () =>
           isDisconnectReconciliationStillPermitted({
             runtimeStateReader: ctx.runtimeStateReader,
@@ -509,4 +520,25 @@ export async function reconcileSandboxInstance(
         sandboxInstance,
       });
   }
+}
+
+async function resolveReconciliationFailureMessage(input: {
+  db: DataPlaneDatabase;
+  failureCode: string;
+  failureMessage: string;
+  sandboxInstanceId: string;
+}): Promise<string> {
+  if (!shouldEnrichStartupDisconnectFailure({ failureCode: input.failureCode })) {
+    return input.failureMessage;
+  }
+
+  const evidence = await resolveStartupFailureEvidence({
+    db: input.db,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
+
+  return formatStartupDisconnectFailureMessage({
+    baseFailureMessage: input.failureMessage,
+    evidence,
+  });
 }
