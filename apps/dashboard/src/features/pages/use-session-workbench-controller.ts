@@ -11,12 +11,11 @@ import { useOpenCodeSessionState } from "../session-agents/opencode/session-stat
 import { SessionRuntimeWorkbenchCapabilities } from "../session-agents/session-runtime-workbench-capabilities.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
-import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import type { SessionStartupState } from "./session-startup-status.js";
-import type {
-  SessionTerminalContentInset,
-  SessionTerminalThemeMode,
-} from "./session-terminal-surface.js";
+import {
+  resolveSessionWorkbenchPrimaryPanelState,
+  type SessionWorkbenchPrimaryPanelState,
+} from "./session-workbench-primary-panel-state.js";
 import {
   hasAutomationSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
@@ -28,10 +27,7 @@ import {
   shouldWaitForAutomationSessionThread,
 } from "./session-workbench-state.js";
 import type { SessionWorkbenchStatus } from "./session-workbench-state.js";
-import {
-  useSessionMainPanelHandoff,
-  type SessionMainPanelRuntimeId,
-} from "./use-session-main-panel-handoff.js";
+import { type SessionMainPanelRuntimeId } from "./use-session-main-panel-handoff.js";
 import type { SessionPrimaryRepositoryState } from "./use-session-primary-repository-state.js";
 import {
   useSessionWorkbenchChromeState,
@@ -73,19 +69,7 @@ type SessionWorkbenchState = {
   initialEntryStartupState: SessionStartupState | null;
   sandboxStatusQuery: ReturnType<typeof useSessionWorkbenchLifecycleState>["sandboxStatusQuery"];
   cliPtyState: ReturnType<typeof useSandboxPtyState>;
-  primaryPanelState: {
-    transitionState: MainPanelTransitionState;
-    canEnterCli: boolean;
-    disabledReason: string | null;
-    error: ReturnType<typeof useSessionMainPanelHandoff>["error"];
-    isCliToggleActive: boolean;
-    showsChatComposer: boolean;
-    cliTerminalContentInset: SessionTerminalContentInset;
-    cliTerminalThemeMode: SessionTerminalThemeMode;
-    cliRuntimeDisplayName: string;
-    enterCliMode: () => Promise<void>;
-    exitCliMode: () => Promise<void>;
-  };
+  primaryPanelState: SessionWorkbenchPrimaryPanelState;
   terminalPanelState: SessionWorkbenchChromeState["terminalPanelState"];
   diffPanelState: SessionWorkbenchChromeState["diffPanelState"];
   primaryRepositoryState: SessionPrimaryRepositoryState;
@@ -194,17 +178,15 @@ export function useSessionWorkbenchController(input: {
     sessionSnapshot,
     sessionState,
   });
-  const enterCliDisabledReason =
-    input.sandboxInstanceId === null
-      ? "Session id is required."
-      : sessionSnapshot === null
-        ? "TUI is available after the session is connected."
-        : !workbenchLifecycleState.connectionReadiness.canConnect
-          ? (workbenchLifecycleState.stoppedSessionMessage ??
-            "TUI is available only when the sandbox is running.")
-          : handoff.transitionState !== "stable_chat"
-            ? `Finish the current primary-panel transition before opening ${conversationRuntime.cliRuntimeDisplayName} TUI.`
-            : null;
+  const primaryPanelState = resolveSessionWorkbenchPrimaryPanelState({
+    canConnect: workbenchLifecycleState.connectionReadiness.canConnect,
+    cliRuntimeDisplayName: conversationRuntime.cliRuntimeDisplayName,
+    cliTerminalContentInset: conversationRuntime.cliTerminalContentInset,
+    handoff,
+    hasSessionSnapshot: sessionSnapshot !== null,
+    sandboxInstanceId: input.sandboxInstanceId,
+    stoppedSessionMessage: workbenchLifecycleState.stoppedSessionMessage,
+  });
 
   return {
     workbench: {
@@ -218,19 +200,7 @@ export function useSessionWorkbenchController(input: {
       sandboxLifecycleStatus: workbenchLifecycleState.sandboxLifecycleStatus,
       initialEntryStartupState: workbenchLifecycleState.initialEntryStartupState,
       sandboxStatusQuery: workbenchLifecycleState.sandboxStatusQuery,
-      primaryPanelState: {
-        transitionState: handoff.transitionState,
-        canEnterCli: enterCliDisabledReason === null,
-        disabledReason: enterCliDisabledReason,
-        error: handoff.error,
-        isCliToggleActive: handoff.isCliToggleActive,
-        showsChatComposer: handoff.transitionState === "stable_chat",
-        cliTerminalContentInset: conversationRuntime.cliTerminalContentInset,
-        cliTerminalThemeMode: "system",
-        cliRuntimeDisplayName: conversationRuntime.cliRuntimeDisplayName,
-        enterCliMode: handoff.handoffToCli,
-        exitCliMode: handoff.handoffToChat,
-      },
+      primaryPanelState,
       terminalPanelState: chromeState.terminalPanelState,
       diffPanelState: chromeState.diffPanelState,
       primaryRepositoryState: repositoryControl.primaryRepositoryState,
