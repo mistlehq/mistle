@@ -28,16 +28,15 @@ import {
   shouldWaitForAutomationSessionThread,
 } from "./session-workbench-state.js";
 import type { SessionWorkbenchStatus } from "./session-workbench-state.js";
-import { useSessionBranchDiff } from "./use-session-branch-diff.js";
-import { useSessionDiffWorkbenchState } from "./use-session-diff-workbench-state.js";
 import {
   useSessionMainPanelHandoff,
   type SessionMainPanelRuntimeId,
 } from "./use-session-main-panel-handoff.js";
-import { useSessionPortAccess } from "./use-session-port-access.js";
 import type { SessionPrimaryRepositoryState } from "./use-session-primary-repository-state.js";
-import { useSessionRepositoryStatus } from "./use-session-repository-status.js";
-import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
+import {
+  useSessionWorkbenchChromeState,
+  type SessionWorkbenchChromeState,
+} from "./use-session-workbench-chrome-state.js";
 import {
   useSessionWorkbenchConversationRuntime,
   type SessionConversationPaneState,
@@ -87,28 +86,14 @@ type SessionWorkbenchState = {
     enterCliMode: () => Promise<void>;
     exitCliMode: () => Promise<void>;
   };
-  terminalPanelState: {
-    closePanel: () => void;
-    isVisible: boolean;
-    openPanel: () => void;
-    togglePanel: () => void;
-  };
-  diffPanelState: {
-    closePanel: () => void;
-    compareLabel: string;
-    errorNotice: ReturnType<typeof useSessionBranchDiff>["errorNotice"];
-    isLoading: boolean;
-    isVisible: boolean;
-    openPanel: () => void;
-    patch: string;
-    togglePanel: () => void;
-  };
+  terminalPanelState: SessionWorkbenchChromeState["terminalPanelState"];
+  diffPanelState: SessionWorkbenchChromeState["diffPanelState"];
   primaryRepositoryState: SessionPrimaryRepositoryState;
   primaryRepositoryControlState: {
     disabledReason: string | null;
     switchPrimaryRepository: (nextSelectedRepositoryPath: string | null) => Promise<void>;
   };
-  portAccessState: ReturnType<typeof useSessionPortAccess>;
+  portAccessState: SessionWorkbenchChromeState["portAccessState"];
 };
 
 const CodexWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
@@ -166,12 +151,6 @@ export function useSessionWorkbenchController(input: {
     selectedRepositoryPathRef,
     sessionState,
   });
-  const terminalPanelState = useSessionTerminalWorkbenchState({
-    sandboxInstanceId: input.sandboxInstanceId,
-  });
-  const diffPanelState = useSessionDiffWorkbenchState({
-    sandboxInstanceId: input.sandboxInstanceId,
-  });
   const workbenchLifecycleState = useSessionWorkbenchLifecycleState({
     sandboxInstanceId: input.sandboxInstanceId,
     mainPanelTransitionState: handoff.transitionState,
@@ -193,24 +172,13 @@ export function useSessionWorkbenchController(input: {
   });
   const isOpenCodeRuntime = repositoryControl.isOpenCodeRuntime;
   const selectedRepositoryPath = repositoryControl.selectedRepositoryPath;
-  const branchDiffState = useSessionBranchDiff({
-    cwd: selectedRepositoryPath,
-    enabled: diffPanelState.isVisible && workbenchLifecycleState.connectionReadiness.canConnect,
-    ensureTransportConnected: transportManager.ensureTransportConnected,
-    sandboxInstanceId: input.sandboxInstanceId,
-  });
-  const repositoryStatus = useSessionRepositoryStatus({
-    connectedAtIso: workbenchLifecycleState.sessionSnapshot?.connectedAtIso ?? null,
-    cwd: selectedRepositoryPath,
-    enabled: workbenchLifecycleState.connectionReadiness.canConnect,
-    ensureTransportConnected: transportManager.ensureTransportConnected,
-    refreshEpoch: sessionState.repositoryStatusRefreshEpoch,
-    sandboxInstanceId: input.sandboxInstanceId,
-  });
-  const portAccessState = useSessionPortAccess({
+  const chromeState = useSessionWorkbenchChromeState({
     canConnect: workbenchLifecycleState.connectionReadiness.canConnect,
+    connectedAtIso: workbenchLifecycleState.sessionSnapshot?.connectedAtIso ?? null,
     ensureTransportConnected: transportManager.ensureTransportConnected,
+    repositoryStatusRefreshEpoch: sessionState.repositoryStatusRefreshEpoch,
     sandboxInstanceId: input.sandboxInstanceId,
+    selectedRepositoryPath,
     stoppedSessionMessage: workbenchLifecycleState.stoppedSessionMessage,
   });
   const sessionSnapshot = workbenchLifecycleState.sessionSnapshot;
@@ -219,7 +187,7 @@ export function useSessionWorkbenchController(input: {
     isOpenCodeRuntime,
     openCodeSessionState,
     queryClient,
-    repositoryStatus,
+    repositoryStatus: chromeState.repositoryStatus,
     sandboxInstanceId: input.sandboxInstanceId,
     sandboxStatus,
     selectedRepositoryPath,
@@ -263,19 +231,10 @@ export function useSessionWorkbenchController(input: {
         enterCliMode: handoff.handoffToCli,
         exitCliMode: handoff.handoffToChat,
       },
-      terminalPanelState,
-      diffPanelState: {
-        closePanel: diffPanelState.closePanel,
-        compareLabel: branchDiffState.compareLabel,
-        errorNotice: branchDiffState.errorNotice,
-        isLoading: branchDiffState.isLoading,
-        isVisible: diffPanelState.isVisible,
-        openPanel: diffPanelState.openPanel,
-        patch: branchDiffState.patch,
-        togglePanel: diffPanelState.togglePanel,
-      },
+      terminalPanelState: chromeState.terminalPanelState,
+      diffPanelState: chromeState.diffPanelState,
       primaryRepositoryState: repositoryControl.primaryRepositoryState,
-      portAccessState,
+      portAccessState: chromeState.portAccessState,
       primaryRepositoryControlState: repositoryControl.primaryRepositoryControlState,
     },
     conversationPane: conversationRuntime.conversationPane,
