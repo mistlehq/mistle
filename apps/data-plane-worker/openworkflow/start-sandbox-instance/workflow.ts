@@ -1078,6 +1078,18 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       }
     }
 
+    if (workflowInput.purpose === SandboxInstancePurposes.SETUP_CHECK) {
+      await operationEvents.record({
+        attributes: {
+          providerSandboxId: startedSandbox.providerSandboxId,
+          runtimeProvider: startedSandbox.runtimeProvider,
+        },
+        message: "Setup-check sandbox runtime adapters initialized.",
+        phase: "runtime_adapters",
+        status: "completed",
+      });
+    }
+
     let didSandboxBecomeReady: boolean;
     try {
       const readinessAttributes = {

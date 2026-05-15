@@ -451,13 +451,29 @@ function createLifecycleTimelineItems(
       throw new Error("Lifecycle timeline phase index was missing.");
     }
 
+    const nextEvent = resolveLifecycleTimelineEvent(existingItem.event, event);
     items[existingIndex] = {
-      event,
+      event: nextEvent,
       startedAt: existingItem.startedAt ?? (event.status === "started" ? event.observedAt : null),
     };
   }
 
   return items;
+}
+
+function resolveLifecycleTimelineEvent(
+  currentEvent: SandboxOperationEvent,
+  nextEvent: SandboxOperationEvent,
+): SandboxOperationEvent {
+  if (
+    currentEvent.status !== "started" &&
+    currentEvent.status !== null &&
+    nextEvent.status === "started"
+  ) {
+    return currentEvent;
+  }
+
+  return nextEvent;
 }
 
 function renderStatusIcon(status: SandboxOperationEvent["status"]): React.JSX.Element {
