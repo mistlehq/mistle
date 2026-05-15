@@ -102,8 +102,7 @@ describe("SandboxOperationProgressView", () => {
     expect(within(timeline).queryByText("Snapshot sandbox provider start started.")).toBeNull();
     expect(within(timeline).queryByText("Snapshot sandbox provider start completed.")).toBeNull();
     expect(within(timeline).getAllByText("Sandbox")).toHaveLength(1);
-    const completedStatus = within(timeline).getByText("completed");
-    expect(completedStatus.classList.contains("sr-only")).toBe(true);
+    expectScreenReaderOnlyText(timeline, "Status: completed");
   });
 
   it("keeps one lifecycle row when worker and sandboxd report the same phase", () => {
@@ -139,8 +138,7 @@ describe("SandboxOperationProgressView", () => {
     expect(within(timeline).queryByText("Snapshot sandboxd initialization started.")).toBeNull();
     expect(within(timeline).queryByText("sandboxd started")).toBeNull();
     expect(within(timeline).getAllByText("Sandbox daemon")).toHaveLength(1);
-    const startedStatus = within(timeline).getByText("started");
-    expect(startedStatus.classList.contains("sr-only")).toBe(true);
+    expectScreenReaderOnlyText(timeline, "Status: started");
   });
 
   it("keeps collapsed lifecycle rows in first-seen phase order", () => {
@@ -182,7 +180,7 @@ describe("SandboxOperationProgressView", () => {
     expect(timelineText.indexOf("Sandbox daemon")).toBeLessThan(timelineText.indexOf("Tunnel"));
     expect(within(timeline).queryByText("Snapshot sandboxd initialization started.")).toBeNull();
     expect(within(timeline).queryByText("Snapshot sandboxd initialization completed.")).toBeNull();
-    for (const completedStatus of within(timeline).getAllByText("completed")) {
+    for (const completedStatus of within(timeline).getAllByText("Status: completed")) {
       expect(completedStatus.classList.contains("sr-only")).toBe(true);
     }
   });
@@ -216,8 +214,8 @@ describe("SandboxOperationProgressView", () => {
       throw new Error("Expected sandbox operation timeline to render.");
     }
 
-    expect(within(timeline).getByText("warning").classList.contains("sr-only")).toBe(true);
-    expect(within(timeline).getByText("failed").classList.contains("sr-only")).toBe(true);
+    expectScreenReaderOnlyText(timeline, "Status: warning");
+    expectScreenReaderOnlyText(timeline, "Status: failed");
   });
 
   it("expands warning and failure details from lifecycle messages", () => {
@@ -444,6 +442,11 @@ function createLifecycleEvent(input: {
     status: input.status,
     stream: null,
   };
+}
+
+function expectScreenReaderOnlyText(container: HTMLElement, text: string): void {
+  const element = within(container).getByText(text);
+  expect(element.classList.contains("sr-only")).toBe(true);
 }
 
 function createTranscriptEvent(input: {

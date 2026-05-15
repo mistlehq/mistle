@@ -255,7 +255,7 @@ function SandboxOperationTimeline(input: {
             <div className="min-w-0">
               <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="text-sm font-medium">{phaseLabel}</span>
-                <span className="sr-only">{formatLifecycleStatus(event.status)}</span>
+                <span className="sr-only">Status: {formatLifecycleStatus(event.status)}</span>
                 <time className="text-xs text-muted-foreground" dateTime={event.observedAt}>
                   {formatLifecycleItemTime({ event, startedAt })}
                 </time>
