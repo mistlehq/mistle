@@ -18,7 +18,7 @@ export function AppSidebarHeader(input: AppSidebarHeaderProps): React.JSX.Elemen
       {showCollapseControl ? (
         <Button
           aria-label="Collapse sidebar"
-          className="shrink-0"
+          className="size-10 shrink-0 md:size-8"
           onClick={toggleSidebar}
           size="icon-sm"
           type="button"

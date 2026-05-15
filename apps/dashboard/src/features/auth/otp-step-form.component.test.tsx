@@ -63,6 +63,22 @@ describe("OtpStepForm", () => {
     expect(markup).not.toContain('data-slot="input-otp" class="sr-only');
   });
 
+  it("seeds the OTP input height before autofocus so iOS does not zoom", () => {
+    const markup = renderToStaticMarkup(
+      <OtpStepForm
+        email="user@example.com"
+        isVerifyingOtp={false}
+        onOtpChange={() => {}}
+        onSubmit={async () => {}}
+        onUseDifferentEmail={() => {}}
+        otp=""
+      />,
+    );
+
+    expect(markup).toContain("cn-input-otp");
+    expect(markup).toContain("[--root-height:3rem]");
+  });
+
   it("autofocuses the OTP input", () => {
     const markup = renderToStaticMarkup(
       <OtpStepForm

@@ -36,6 +36,55 @@ describe("OrganizationMenuTrigger", () => {
     expect(screen.getByText("Mistle Labs")).toBeTruthy();
   });
 
+  it("keeps the mobile organization trigger comfortable to tap", () => {
+    renderOrganizationMenuTrigger({});
+
+    const trigger = screen.getByRole("button", { name: "Organization menu" });
+    const organizationName = screen.getByText("Mistle Labs");
+    const avatar = screen.getByText("ML").closest('[data-slot="avatar"]');
+
+    expect(trigger.className).toContain("px-3");
+    expect(trigger.className).toContain("py-3");
+    expect(trigger.className).toContain("md:px-2");
+    expect(trigger.className).toContain("md:py-2");
+    expect(organizationName.className).toContain("text-base");
+    expect(organizationName.className).toContain("md:text-sm");
+    expect(avatar?.className).toContain("h-10");
+    expect(avatar?.className).toContain("md:h-8");
+  });
+
+  it("keeps organization menu rows comfortable in the mobile sidebar", () => {
+    renderOrganizationMenuTrigger({
+      activeOrganizationId: "org_2",
+      organizations: [{ id: "org_2", name: "Mistle Labs" }],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Organization menu" }));
+    const settingsItem = screen.getByText("Settings");
+    const switchOrganizationItem = screen.getByText("Switch organization");
+
+    expect(settingsItem.className).toContain("min-h-11");
+    expect(settingsItem.className).toContain("text-base");
+    expect(settingsItem.className).toContain("md:text-sm");
+    expect(switchOrganizationItem.className).toContain("min-h-11");
+    expect(switchOrganizationItem.className).toContain("text-base");
+  });
+
+  it("keeps organization submenu choices readable in the mobile sidebar", () => {
+    renderOrganizationMenuTrigger({
+      activeOrganizationId: "org_2",
+      isSwitchOrganizationSubmenuOpen: true,
+      organizations: [{ id: "org_2", name: "Mistle Labs" }],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Organization menu" }));
+    const organizationItem = screen.getByRole("menuitemradio", { name: "Mistle Labs" });
+
+    expect(organizationItem.className).toContain("min-h-11");
+    expect(organizationItem.className).toContain("text-base");
+    expect(organizationItem.className).toContain("md:text-sm");
+  });
+
   it("falls back to organization initials when no uploaded logo is available", () => {
     renderOrganizationMenuTrigger({});
 

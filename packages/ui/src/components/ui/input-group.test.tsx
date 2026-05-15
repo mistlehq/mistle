@@ -36,6 +36,8 @@ it("renders the search appearance in the inactive state", () => {
   expect(group.className).toContain("h-9");
   expect(input.className).toContain("h-full");
   expect(input.className).toContain("border-0");
+  expect(input.className).toContain("text-base");
+  expect(input.className).toContain("md:text-sm");
 });
 
 it("renders the search appearance in the active state", () => {
@@ -49,6 +51,8 @@ it("renders the search appearance in the active state", () => {
   expect(group.className).toContain("h-9");
   expect(input.className).toContain("h-full");
   expect(input.className).toContain("border-0");
+  expect(input.className).toContain("text-base");
+  expect(input.className).toContain("md:text-sm");
 });
 
 it("keeps the default input variant stripped inside the group chrome", () => {
@@ -66,6 +70,8 @@ it("keeps the default input variant stripped inside the group chrome", () => {
   expect(input.className).toContain("rounded-none");
   expect(input.className).toContain("px-0");
   expect(input.className).toContain("shadow-none");
+  expect(input.className).toContain("text-base");
+  expect(input.className).toContain("md:text-sm");
 });
 
 it("lets the default group wrapper expand for textareas", () => {

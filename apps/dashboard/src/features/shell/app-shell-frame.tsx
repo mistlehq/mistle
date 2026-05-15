@@ -151,7 +151,7 @@ function MainSidebarContent(input: {
               isActive={input.locationPathname === "/"}
               render={<NavLink to="/" />}
             >
-              <HomeNavIcon aria-hidden className="size-4 shrink-0" />
+              <HomeNavIcon aria-hidden className="size-5 shrink-0 md:size-4" />
               <span>Home</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -163,7 +163,7 @@ function MainSidebarContent(input: {
               }
               render={<NavLink to="/integrations" />}
             >
-              <IntegrationsNavIcon aria-hidden className="size-4 shrink-0" />
+              <IntegrationsNavIcon aria-hidden className="size-5 shrink-0 md:size-4" />
               <span>Integrations</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -175,7 +175,7 @@ function MainSidebarContent(input: {
               }
               render={<NavLink to="/sandbox-profiles" />}
             >
-              <SandboxProfilesNavIcon aria-hidden className="size-4 shrink-0" />
+              <SandboxProfilesNavIcon aria-hidden className="size-5 shrink-0 md:size-4" />
               <span>Sandbox Profiles</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -187,7 +187,7 @@ function MainSidebarContent(input: {
               }
               render={<NavLink to="/automations" />}
             >
-              <AutomationsNavIcon aria-hidden className="size-4 shrink-0" />
+              <AutomationsNavIcon aria-hidden className="size-5 shrink-0 md:size-4" />
               <span>Triggers</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
