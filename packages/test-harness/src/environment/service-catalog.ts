@@ -38,7 +38,7 @@ import {
 } from "../services/shared-postgres.js";
 import { acquireSharedSeaweedfsInfra } from "../services/shared-seaweedfs.js";
 import { acquireSharedValkeyInfra, type SharedValkeyLease } from "../services/shared-valkey.js";
-import { DockerIntegrationConfigPathInContainer } from "../system/integration-config-paths.js";
+import { IntegrationConfigPathInContainer } from "../system/integration-config-paths.js";
 import {
   DefaultSandboxBaseImageBuild,
   readPreparedTestHarnessRuntime,
@@ -340,7 +340,7 @@ function createRegistryContext(input: {
 }): MistleRegistryContext {
   return {
     buildContextHostPath: input.buildContextHostPath ?? DefaultBuildContextHostPath,
-    configPathInContainer: input.configPathInContainer ?? DockerIntegrationConfigPathInContainer,
+    configPathInContainer: input.configPathInContainer ?? IntegrationConfigPathInContainer,
     startupTimeoutMs: input.startupTimeoutMs ?? DefaultStartupTimeoutMs,
   };
 }

@@ -10,8 +10,7 @@ export type IntegrationSandboxProvider =
   (typeof IntegrationSandboxProvider)[keyof typeof IntegrationSandboxProvider];
 
 export const IntegrationConfigFileNames = {
-  DOCKER: "config.integration.docker.toml",
-  E2B: "config.integration.e2b.toml",
+  DEFAULT: "config.integration.toml",
 } as const;
 
 type RequiredConfigValue = {
@@ -48,13 +47,11 @@ const ArchilIntegrationRequiredConfigValues = [
 
 export type IntegrationProviderPreset = {
   requiredConfigValues: readonly RequiredConfigValue[];
-  outputFileName: (typeof IntegrationConfigFileNames)[keyof typeof IntegrationConfigFileNames];
   e2bSandboxBaseImage?: string;
 };
 
 const DOCKER_PRESET: IntegrationProviderPreset = {
   requiredConfigValues: [],
-  outputFileName: IntegrationConfigFileNames.DOCKER,
 };
 
 const E2B_REQUIRED_CONFIG_VALUES = [
@@ -69,17 +66,17 @@ async function createE2BPreset(): Promise<IntegrationProviderPreset> {
 
   return {
     requiredConfigValues: E2B_REQUIRED_CONFIG_VALUES,
-    outputFileName: IntegrationConfigFileNames.E2B,
     e2bSandboxBaseImage: e2bIntegrationSandboxBaseImage,
   };
 }
 
 export function getRequiredIntegrationConfigValues(input: {
-  provider: IntegrationSandboxProvider;
+  providers: readonly IntegrationSandboxProvider[];
   configRoot: Record<string, unknown>;
 }): readonly RequiredConfigValue[] {
-  const presetRequiredConfigValues =
-    input.provider === IntegrationSandboxProvider.E2B ? E2B_REQUIRED_CONFIG_VALUES : [];
+  const presetRequiredConfigValues = input.providers.includes(IntegrationSandboxProvider.E2B)
+    ? E2B_REQUIRED_CONFIG_VALUES
+    : [];
   const storageBackend = getValueAtPath(input.configRoot, ["sandbox", "storage", "backend"]);
 
   if (storageBackend === "archil") {

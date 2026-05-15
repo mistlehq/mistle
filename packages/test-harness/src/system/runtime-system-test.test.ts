@@ -3,10 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { ServiceIds } from "../integration/services/service-ids.js";
 import { createDockerSandboxReachableHostUrl } from "./docker-sandbox-networking.js";
-import {
-  DockerIntegrationConfigPathInContainer,
-  E2BIntegrationConfigPathInContainer,
-} from "./integration-config-paths.js";
+import { IntegrationConfigPathInContainer } from "./integration-config-paths.js";
 import {
   createRuntimeSystemServiceOptions,
   resolveRuntimeSystemIntegrationConfigPathInContainer,
@@ -15,30 +12,30 @@ import {
 } from "./runtime-system-test.js";
 
 describe("resolveRuntimeSystemIntegrationConfigPathInContainer", () => {
-  it("uses the Docker integration config for non-sandbox runtime system tests", () => {
+  it("uses the shared integration config for non-sandbox runtime system tests", () => {
     expect(resolveRuntimeSystemIntegrationConfigPathInContainer({})).toBe(
-      DockerIntegrationConfigPathInContainer,
+      IntegrationConfigPathInContainer,
     );
   });
 
-  it("uses the Docker integration config for Docker sandbox runtime system tests", () => {
+  it("uses the shared integration config for Docker sandbox runtime system tests", () => {
     expect(
       resolveRuntimeSystemIntegrationConfigPathInContainer({
         sandbox: {
           provider: "docker",
         },
       }),
-    ).toBe(DockerIntegrationConfigPathInContainer);
+    ).toBe(IntegrationConfigPathInContainer);
   });
 
-  it("uses the E2B integration config for E2B sandbox runtime system tests", () => {
+  it("uses the shared integration config for E2B sandbox runtime system tests", () => {
     expect(
       resolveRuntimeSystemIntegrationConfigPathInContainer({
         sandbox: {
           provider: "e2b",
         },
       }),
-    ).toBe(E2BIntegrationConfigPathInContainer);
+    ).toBe(IntegrationConfigPathInContainer);
   });
 });
 

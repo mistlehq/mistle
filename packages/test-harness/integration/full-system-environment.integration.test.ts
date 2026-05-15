@@ -6,7 +6,7 @@ import { describe, expect, test } from "vitest";
 
 import {
   DEFAULT_SHARED_SYSTEM_INFRA_KEY,
-  DockerIntegrationConfigPathInContainer,
+  IntegrationConfigPathInContainer,
   startFullSystemEnvironment,
 } from "../src/index.js";
 
@@ -24,7 +24,7 @@ describe("full system environment integration", () => {
     async () => {
       const environment = await startFullSystemEnvironment({
         buildContextHostPath: PROJECT_ROOT_HOST_PATH,
-        configPathInContainer: DockerIntegrationConfigPathInContainer,
+        configPathInContainer: IntegrationConfigPathInContainer,
         sandboxProvider: "docker",
         startupTimeoutMs: 120_000,
         sharedInfraKey: DEFAULT_SHARED_SYSTEM_INFRA_KEY,

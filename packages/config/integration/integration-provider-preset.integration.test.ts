@@ -11,7 +11,7 @@ import { getValueAtPath } from "../src/core/record.js";
 describe("integration provider presets", () => {
   it("defaults docker integration config generation to managed Docker volume storage", async () => {
     const configRoot = buildIntegrationTomlConfig({
-      provider: IntegrationSandboxProvider.DOCKER,
+      providers: [IntegrationSandboxProvider.DOCKER],
       environment: {},
     });
 
@@ -33,7 +33,7 @@ describe("integration provider presets", () => {
 
   it("does not require Archil config values for docker_volume storage", () => {
     const requiredValues = getRequiredIntegrationConfigValues({
-      provider: IntegrationSandboxProvider.DOCKER,
+      providers: [IntegrationSandboxProvider.DOCKER],
       configRoot: {
         sandbox: {
           storage: {
@@ -54,7 +54,7 @@ describe("integration provider presets", () => {
     }
 
     const configRoot = buildIntegrationTomlConfig({
-      provider: IntegrationSandboxProvider.E2B,
+      providers: [IntegrationSandboxProvider.E2B],
       environment: {
         MISTLE_SANDBOX_E2B_API_KEY: "e2b-test-key",
         MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY: "archil-test-key",
@@ -97,7 +97,7 @@ describe("integration provider presets", () => {
 
   it("requires a complete managed Archil profile when integration storage backend is archil", () => {
     const requiredValues = getRequiredIntegrationConfigValues({
-      provider: IntegrationSandboxProvider.DOCKER,
+      providers: [IntegrationSandboxProvider.DOCKER],
       configRoot: {
         sandbox: {
           storage: {

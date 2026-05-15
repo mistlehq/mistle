@@ -352,7 +352,7 @@ jobs:
         run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
 
       - name: Build TS workspace in Nix shell
-        run: nix develop --command bash -c "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm build:ts"
+        run: nix develop --command bash -c "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.toml pnpm build:ts"
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.build-ts-turbo-cache.outputs.cache-hit != 'true' }}
@@ -448,7 +448,7 @@ jobs:
 
       - name: Build workspace in Nix shell
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: nix develop --command bash -c "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm turbo run build --filter=@mistle/sandboxd"
+        run: nix develop --command bash -c "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.toml pnpm turbo run build --filter=@mistle/sandboxd"
 
       - name: Run Rust static checks in Nix shell
         run: >-
@@ -843,7 +843,7 @@ jobs:
 
       - name: Run control-plane migrations
         env:
-          MISTLE_CONFIG_PATH: ${{ github.workspace }}/config/config.integration.docker.toml
+          MISTLE_CONFIG_PATH: ${{ github.workspace }}/config/config.integration.toml
           MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: postgresql://mistle:mistle@127.0.0.1:5432/mistle
           MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL: postgresql://mistle:mistle@127.0.0.1:5432/mistle
         run: nix develop --command pnpm --filter @mistle/control-plane-api db:migrate
@@ -916,7 +916,7 @@ jobs:
 
       - name: Run data-plane migrations
         env:
-          MISTLE_CONFIG_PATH: ${{ github.workspace }}/config/config.integration.docker.toml
+          MISTLE_CONFIG_PATH: ${{ github.workspace }}/config/config.integration.toml
           MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL: postgresql://mistle:mistle@127.0.0.1:5432/mistle
           MISTLE_POSTGRES_DATA_PLANE_POOLED_URL: postgresql://mistle:mistle@127.0.0.1:5432/mistle
         run: nix develop --command pnpm --filter @mistle/data-plane-api db:migrate

@@ -21,6 +21,8 @@ function buildCommonEnv(): NodeJS.ProcessEnv {
     MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: "https://api.example.test",
     MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL:
       "wss://gateway.example.test/tunnel/sandbox",
+    MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL:
+      "wss://gateway.example.test/tunnel/sandbox",
     MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: "postgresql://user:pass@postgres:5432/control",
     MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL: "postgresql://user:pass@pgbouncer:6432/control",
     MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL: "postgresql://user:pass@postgres:5432/data",
@@ -43,17 +45,25 @@ function buildCommonEnv(): NodeJS.ProcessEnv {
 function buildDockerSandboxEnv(): NodeJS.ProcessEnv {
   return {
     ...buildCommonEnv(),
-    MISTLE_PROFILE: "docker-sandbox",
+    MISTLE_SANDBOX_STORAGE_BACKEND: "docker_volume",
+    MISTLE_SANDBOX_DOCKER_ENABLED: "true",
+    MISTLE_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
+    MISTLE_SANDBOX_DOCKER_NETWORK_NAME: "mistle-single-container-network",
+    MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL:
+      "ws://mistle-single-container:5202/tunnel/sandbox",
+    MISTLE_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX: "mistle-",
   };
 }
 
 function buildRemoteSandboxEnv(): NodeJS.ProcessEnv {
   return {
     ...buildCommonEnv(),
-    MISTLE_PROFILE: "remote-sandbox",
+    MISTLE_SANDBOX_STORAGE_BACKEND: "archil",
+    MISTLE_SANDBOX_E2B_ENABLED: "true",
     MISTLE_SANDBOX_E2B_API_KEY: "e2b-key",
     MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY: "archil-key",
     MISTLE_SANDBOX_STORAGE_ARCHIL_REGION: "gcp-us-central1",
+    MISTLE_SANDBOX_STORAGE_ARCHIL_MOUNT_OBJECT_STORE: "sandbox_storage",
     MISTLE_OBJECT_STORE_SANDBOX_STORAGE_BUCKET_NAME: "sandbox-storage",
     MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ENDPOINT: "https://sandbox-storage.example.test",
     MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ACCESS_KEY_ID: "sandbox-access-key",
@@ -62,7 +72,7 @@ function buildRemoteSandboxEnv(): NodeJS.ProcessEnv {
 }
 
 describe("generateContainerRuntimeConfig", () => {
-  it("generates a docker-sandbox config with managed local networking defaults", () => {
+  it("generates a single-container config with Docker runtime settings", () => {
     const tempDir = createTempDir();
 
     try {
@@ -87,7 +97,7 @@ describe("generateContainerRuntimeConfig", () => {
     }
   });
 
-  it("generates a remote-sandbox config with remote gateway and egress defaults", () => {
+  it("generates a single-container config with E2B runtime settings", () => {
     const tempDir = createTempDir();
 
     try {
