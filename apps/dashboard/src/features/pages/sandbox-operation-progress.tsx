@@ -1,6 +1,7 @@
 import { Notice } from "@mistle/ui";
 import {
   CheckCircleIcon,
+  CaretDownIcon,
   CircleIcon,
   SpinnerGapIcon,
   WarningCircleIcon,
@@ -219,6 +220,7 @@ function SandboxOperationTimeline(input: {
   items: readonly SandboxLifecycleTimelineItem[];
 }): React.JSX.Element {
   const scrollContainerRef = useRef<HTMLOListElement | null>(null);
+  const [expandedEventIds, setExpandedEventIds] = useState<ReadonlySet<string>>(() => new Set());
 
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
@@ -239,25 +241,56 @@ function SandboxOperationTimeline(input: {
 
   return (
     <ol
-      className={`${resolveTimelineContainerClassName(input.isSplit)} space-y-3`}
+      className={`${resolveTimelineContainerClassName(input.isSplit)} space-y-2`}
       ref={scrollContainerRef}
     >
-      {input.items.map(({ event, startedAt }) => (
-        <li className="grid grid-cols-[1rem_minmax(0,1fr)] gap-2" key={event.id}>
-          <span className="pt-0.5">{renderStatusIcon(event.status)}</span>
-          <span className="min-w-0">
-            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="text-sm font-medium">{formatLifecyclePhase(event.phase)}</span>
-              <span className={resolveStatusClassName(event.status)}>
-                {formatLifecycleStatus(event.status)}
+      {input.items.map(({ event, startedAt }) => {
+        const diagnosticMessage = resolveLifecycleDiagnosticMessage(event);
+        const isExpanded = expandedEventIds.has(event.id);
+
+        return (
+          <li className="grid grid-cols-[1rem_minmax(0,1fr)] items-start gap-2" key={event.id}>
+            <span className="pt-0.5">{renderStatusIcon(event.status)}</span>
+            <span className="min-w-0">
+              <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="text-sm font-medium">{formatLifecyclePhase(event.phase)}</span>
+                <time className="text-xs text-muted-foreground" dateTime={event.observedAt}>
+                  {formatLifecycleItemTime({ event, startedAt })}
+                </time>
+                {diagnosticMessage === null ? null : (
+                  <button
+                    aria-expanded={isExpanded}
+                    aria-label={`${isExpanded ? "Hide" : "Show"} ${formatLifecyclePhase(event.phase)} details`}
+                    className="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                    onClick={() => {
+                      setExpandedEventIds((currentIds) => {
+                        const nextIds = new Set(currentIds);
+                        if (nextIds.has(event.id)) {
+                          nextIds.delete(event.id);
+                        } else {
+                          nextIds.add(event.id);
+                        }
+                        return nextIds;
+                      });
+                    }}
+                    type="button"
+                  >
+                    <CaretDownIcon
+                      aria-hidden
+                      className={`size-3.5 transition-transform ${isExpanded ? "" : "-rotate-90"}`}
+                    />
+                  </button>
+                )}
               </span>
+              {diagnosticMessage === null || !isExpanded ? null : (
+                <p className="mt-1 whitespace-pre-wrap break-words rounded border border-border bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">
+                  {diagnosticMessage}
+                </p>
+              )}
             </span>
-            <time className="mt-1 block text-xs text-muted-foreground" dateTime={event.observedAt}>
-              {formatLifecycleItemTime({ event, startedAt })}
-            </time>
-          </span>
-        </li>
-      ))}
+          </li>
+        );
+      })}
     </ol>
   );
 }
@@ -452,23 +485,6 @@ function renderStatusIcon(status: SandboxOperationEvent["status"]): React.JSX.El
   return <CircleIcon aria-hidden className="size-4 text-muted-foreground" />;
 }
 
-function resolveStatusClassName(status: SandboxOperationEvent["status"]): string {
-  const baseClassName = "rounded border px-1.5 py-0.5 text-[11px] leading-none";
-  if (status === "completed") {
-    return `${baseClassName} border-emerald-200 bg-emerald-50 text-emerald-800`;
-  }
-
-  if (status === "failed") {
-    return `${baseClassName} border-destructive/20 bg-destructive/10 text-destructive`;
-  }
-
-  if (status === "warning") {
-    return `${baseClassName} border-amber-200 bg-amber-50 text-amber-800`;
-  }
-
-  return `${baseClassName} border-border bg-muted text-muted-foreground`;
-}
-
 function formatLifecyclePhase(phase: SandboxOperationEvent["phase"]): string {
   if (phase === null) {
     return "Operation";
@@ -512,12 +528,28 @@ function formatLifecyclePhase(phase: SandboxOperationEvent["phase"]): string {
   }
 }
 
-function formatLifecycleStatus(status: SandboxOperationEvent["status"]): string {
-  if (status === null) {
-    return "event";
+function resolveLifecycleDiagnosticMessage(event: SandboxOperationEvent): string | null {
+  if (event.status !== "failed" && event.status !== "warning") {
+    return null;
   }
 
-  return status.replaceAll("_", " ");
+  const message = event.message.trim();
+  const error = readStringAttribute(event.attributes, "error")?.trim() ?? "";
+
+  if (message.length === 0) {
+    return error.length === 0 ? null : error;
+  }
+
+  if (error.length === 0 || error === message) {
+    return message;
+  }
+
+  return `${message}\n${error}`;
+}
+
+function readStringAttribute(attributes: Record<string, unknown>, key: string): string | undefined {
+  const value = attributes[key];
+  return typeof value === "string" ? value : undefined;
 }
 
 function formatEventTime(value: string): string {

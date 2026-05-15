@@ -10,12 +10,51 @@ const meta = {
   parameters: {
     layout: "fullscreen",
   },
-  title: "Pages/Sandbox Operation Progress",
+  title: "Dashboard/SandboxOperations/Progress",
 } satisfies Meta<typeof SandboxOperationProgressView>;
 
 export default meta;
 
 type Story = StoryObj<typeof meta>;
+
+const LifecycleStatusStateEvents = [
+  lifecycleEvent({
+    id: "soe_story_status_completed",
+    message: "Sandbox finished.",
+    phase: "provider",
+    sequence: 1,
+    source: "worker",
+    status: "completed",
+  }),
+  lifecycleEvent({
+    id: "soe_story_status_started",
+    message: "Snapshot capture started.",
+    phase: "snapshot",
+    sequence: 2,
+    source: "worker",
+    status: "started",
+  }),
+  lifecycleEvent({
+    id: "soe_story_status_warning",
+    message: "Setup script completed with warnings.",
+    phase: "setup_script",
+    sequence: 3,
+    source: "sandboxd",
+    status: "warning",
+  }),
+  lifecycleEvent({
+    attributes: {
+      error:
+        "runtime plan artifacts[0] lifecycle.install[0] failed: GitHub release lookup returned 403.",
+    },
+    id: "soe_story_status_failed",
+    message: "Runtime plan failed.",
+    phase: "runtime_plan",
+    sequence: 4,
+    source: "sandboxd",
+    status: "failed",
+  }),
+] satisfies readonly SandboxOperationEvent[];
 
 export const SnapshotCreating: Story = {
   args: {
@@ -71,6 +110,14 @@ export const SnapshotCreating: Story = {
   },
 };
 
+export const TimelineStatusStates: Story = {
+  args: {
+    displayMode: "timeline",
+    events: LifecycleStatusStateEvents,
+    title: "Sandbox operation status states",
+  },
+};
+
 export const WaitingForEvents: Story = {
   args: {
     emptyMessage: "Waiting for setup-check sandbox startup events.",
@@ -114,6 +161,7 @@ export const ProgressUnavailable: Story = {
 };
 
 function lifecycleEvent(input: {
+  attributes?: Record<string, unknown>;
   id: string;
   message: string;
   phase: NonNullable<SandboxOperationEvent["phase"]>;
@@ -122,7 +170,7 @@ function lifecycleEvent(input: {
   status: NonNullable<SandboxOperationEvent["status"]>;
 }): SandboxOperationEvent {
   return {
-    attributes: {},
+    attributes: input.attributes ?? {},
     createdAt: "2026-05-13T10:00:00.000Z",
     id: input.id,
     message: input.message,

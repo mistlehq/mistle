@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { SandboxOperationEvent } from "../sessions/sessions-types.js";
@@ -102,7 +102,7 @@ describe("SandboxOperationProgressView", () => {
     expect(within(timeline).queryByText("Snapshot sandbox provider start started.")).toBeNull();
     expect(within(timeline).queryByText("Snapshot sandbox provider start completed.")).toBeNull();
     expect(within(timeline).getAllByText("Sandbox")).toHaveLength(1);
-    expect(within(timeline).getByText("completed")).toBeDefined();
+    expect(within(timeline).queryByText("completed")).toBeNull();
   });
 
   it("keeps one lifecycle row when worker and sandboxd report the same phase", () => {
@@ -138,7 +138,7 @@ describe("SandboxOperationProgressView", () => {
     expect(within(timeline).queryByText("Snapshot sandboxd initialization started.")).toBeNull();
     expect(within(timeline).queryByText("sandboxd started")).toBeNull();
     expect(within(timeline).getAllByText("Sandbox daemon")).toHaveLength(1);
-    expect(within(timeline).getByText("started")).toBeDefined();
+    expect(within(timeline).queryByText("started")).toBeNull();
   });
 
   it("keeps collapsed lifecycle rows in first-seen phase order", () => {
@@ -180,7 +180,81 @@ describe("SandboxOperationProgressView", () => {
     expect(timelineText.indexOf("Sandbox daemon")).toBeLessThan(timelineText.indexOf("Tunnel"));
     expect(within(timeline).queryByText("Snapshot sandboxd initialization started.")).toBeNull();
     expect(within(timeline).queryByText("Snapshot sandboxd initialization completed.")).toBeNull();
-    expect(within(timeline).getAllByText("completed")).toHaveLength(2);
+    expect(within(timeline).queryByText("completed")).toBeNull();
+  });
+
+  it("does not render text badges for warning and failed lifecycle rows", () => {
+    render(
+      <SandboxOperationProgressView
+        displayMode="timeline"
+        events={[
+          createLifecycleEvent({
+            id: "soe_runtime_plan_warning",
+            message: "Runtime plan warning.",
+            phase: "runtime_plan",
+            sequence: 1,
+            status: "warning",
+          }),
+          createLifecycleEvent({
+            id: "soe_snapshot_failed",
+            message: "Snapshot capture failed.",
+            phase: "snapshot",
+            sequence: 2,
+            status: "failed",
+          }),
+        ]}
+        title="Snapshot creation progress"
+      />,
+    );
+
+    const timeline = screen.getByText("Runtime plan").closest("ol");
+    if (timeline === null) {
+      throw new Error("Expected sandbox operation timeline to render.");
+    }
+
+    expect(within(timeline).queryByText("warning")).toBeNull();
+    expect(within(timeline).queryByText("failed")).toBeNull();
+  });
+
+  it("expands warning and failure details from lifecycle messages", () => {
+    render(
+      <SandboxOperationProgressView
+        displayMode="timeline"
+        events={[
+          createLifecycleEvent({
+            id: "soe_setup_script_warning",
+            message: "Setup script emitted a warning.",
+            phase: "setup_script",
+            sequence: 1,
+            status: "warning",
+          }),
+          createLifecycleEvent({
+            attributes: {
+              error: "runtime plan artifacts[0] lifecycle.install[0] failed.",
+            },
+            id: "soe_runtime_plan_failed",
+            message: "Runtime plan failed.",
+            phase: "runtime_plan",
+            sequence: 2,
+            status: "failed",
+          }),
+        ]}
+        title="Snapshot creation progress"
+      />,
+    );
+
+    expect(screen.queryByText("Setup script emitted a warning.")).toBeNull();
+    expect(screen.queryByText(/Runtime plan failed/u)).toBeNull();
+
+    fireEvent.click(screen.getByLabelText("Show Setup script details"));
+    expect(screen.getByText("Setup script emitted a warning.")).toBeDefined();
+
+    fireEvent.click(screen.getByLabelText("Show Runtime plan details"));
+    expect(screen.getByText(/Runtime plan failed/u)).toBeDefined();
+    expect(screen.getByText(/runtime plan artifacts\[0\]/u)).toBeDefined();
+
+    fireEvent.click(screen.getByLabelText("Hide Runtime plan details"));
+    expect(screen.queryByText(/Runtime plan failed/u)).toBeNull();
   });
 
   it("does not infer lifecycle phases when no events have been returned", () => {
@@ -341,6 +415,7 @@ describe("SandboxOperationProgressView", () => {
 });
 
 function createLifecycleEvent(input: {
+  attributes?: Record<string, unknown>;
   id: string;
   message: string;
   phase: NonNullable<SandboxOperationEvent["phase"]>;
@@ -349,7 +424,7 @@ function createLifecycleEvent(input: {
   status: NonNullable<SandboxOperationEvent["status"]>;
 }): SandboxOperationEvent {
   return {
-    attributes: {},
+    attributes: input.attributes ?? {},
     createdAt: "2026-05-13T10:00:00.000Z",
     id: input.id,
     message: input.message,
