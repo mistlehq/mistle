@@ -13,12 +13,21 @@ import {
 } from "tensorlake";
 
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
-import { SandboxInspectDispositions, SandboxInspectStates, SandboxProvider } from "../../types.js";
+import {
+  SandboxBaseImageSourceKinds,
+  SandboxInspectDispositions,
+  SandboxInspectStates,
+  SandboxProvider,
+} from "../../types.js";
+import { createTensorlakeSdkImageBuildContext } from "./base-image-builder.js";
 import {
   TensorlakeClientOperationIds,
+  TensorlakeClientError,
+  TensorlakeClientErrorCodes,
   TensorlakeCommandExitError,
   mapTensorlakeClientError,
 } from "./client-errors.js";
+import { registerTensorlakeSandboxBaseImage } from "./image-registration.js";
 import {
   TensorlakeRuntimeControlRequestSchema,
   TensorlakeSandboxIdRequestSchema,
@@ -46,6 +55,7 @@ const DaemonReadinessPollIntervalMs = 100;
 const DaemonReadinessPollAttempts = 100;
 const StartupCommandPollIntervalMs = 250;
 const StartupCommandPollAttempts = 1200;
+const TensorlakeImageNotRegisteredMessagePattern = /Image '.*' is not registered in the server/u;
 
 export type TensorlakeStartSandboxResponse = { sandboxId: string };
 export type TensorlakeCaptureSandboxSnapshotResponse = { snapshotId: string };
@@ -138,6 +148,18 @@ function createSandboxOptions(request: TensorlakeStartSandboxRequest): CreateAnd
   };
 }
 
+function isMissingRegisteredBaseImageError(
+  error: TensorlakeClientError,
+  image: TensorlakeStartSandboxRequest["image"],
+): boolean {
+  return (
+    image.kind === TensorlakeStartImageKinds.IMAGE &&
+    image.sourceBaseImageRef !== undefined &&
+    error.code === TensorlakeClientErrorCodes.INVALID_ARGUMENT &&
+    TensorlakeImageNotRegisteredMessagePattern.test(error.message)
+  );
+}
+
 const TensorlakeSandboxNameRegex = /^[a-z][a-z0-9-]{0,62}$/;
 
 export function createTensorlakeSandboxName(sandboxInstanceId: string): string {
@@ -205,8 +227,11 @@ function joinOutputLines(lines: readonly string[]): string {
 export class TensorlakeApiClient implements TensorlakeClient {
   readonly #client: SandboxClient;
   readonly #clientOptions: SandboxClientOptions;
+  readonly #baseImageRegistrationPromises = new Map<string, Promise<void>>();
+  readonly #config: ValidatedTensorlakeSandboxConfig;
 
   constructor(input: { config: ValidatedTensorlakeSandboxConfig }) {
+    this.#config = input.config;
     this.#clientOptions = createTensorlakeClientOptions(input.config);
     this.#client = new SandboxClient(this.#clientOptions, true);
   }
@@ -217,13 +242,105 @@ export class TensorlakeApiClient implements TensorlakeClient {
     const parsedRequest = TensorlakeStartSandboxRequestSchema.parse(request);
 
     try {
-      const sandbox = await Sandbox.create({
-        ...this.#clientOptions,
-        ...createSandboxOptions(parsedRequest),
-      });
-      return { sandboxId: sandbox.sandboxId };
+      return await this.#createSandbox(parsedRequest);
     } catch (error) {
-      throw mapTensorlakeClientError(TensorlakeClientOperationIds.CREATE_SANDBOX, error);
+      const mappedError = mapTensorlakeClientError(
+        TensorlakeClientOperationIds.CREATE_SANDBOX,
+        error,
+      );
+
+      if (!isMissingRegisteredBaseImageError(mappedError, parsedRequest.image)) {
+        throw mappedError;
+      }
+
+      await this.#ensureBaseImageRegistered(parsedRequest.image);
+
+      try {
+        return await this.#createSandbox(parsedRequest);
+      } catch (retryError) {
+        throw mapTensorlakeClientError(TensorlakeClientOperationIds.CREATE_SANDBOX, retryError);
+      }
+    }
+  }
+
+  async #createSandbox(
+    request: TensorlakeStartSandboxRequest,
+  ): Promise<TensorlakeStartSandboxResponse> {
+    const sandbox = await Sandbox.create({
+      ...this.#clientOptions,
+      ...createSandboxOptions(request),
+    });
+    return { sandboxId: sandbox.sandboxId };
+  }
+
+  async #ensureBaseImageRegistered(image: TensorlakeStartSandboxRequest["image"]): Promise<void> {
+    if (image.sourceBaseImageRef === undefined) {
+      throw new Error("Tensorlake missing-image registration requires a source base image ref.");
+    }
+
+    const existingPromise = this.#baseImageRegistrationPromises.get(image.id);
+    if (existingPromise !== undefined) {
+      return existingPromise;
+    }
+
+    const registrationPromise = this.#registerBaseImage(image);
+    this.#baseImageRegistrationPromises.set(image.id, registrationPromise);
+
+    try {
+      await registrationPromise;
+    } catch (error) {
+      this.#baseImageRegistrationPromises.delete(image.id);
+      throw error;
+    }
+  }
+
+  async #registerBaseImage(image: TensorlakeStartSandboxRequest["image"]): Promise<void> {
+    if (image.sourceBaseImageRef === undefined) {
+      throw new Error("Tensorlake base image registration requires a source base image ref.");
+    }
+
+    const buildContext = await createTensorlakeSdkImageBuildContext({
+      kind: SandboxBaseImageSourceKinds.SDK_IMAGE,
+      baseImageRef: image.sourceBaseImageRef,
+      contextPath: process.cwd(),
+      imageId: image.id,
+    });
+    let registrationError: unknown;
+
+    try {
+      // E2B exposes first-class template existence checks in its SDK, so it can
+      // ensure the template before launch. Tensorlake's TypeScript SDK currently
+      // exposes image creation but not image lookup; the CLI has list/describe
+      // commands backed by unexposed platform endpoints. Prefer a check-based
+      // path here once the SDK exposes one, instead of depending on those raw
+      // endpoints from application code.
+      await registerTensorlakeSandboxBaseImage({
+        apiKey: this.#config.apiKey,
+        contextPath: buildContext.path,
+        source: {
+          baseImageRef: image.sourceBaseImageRef,
+          imageId: image.id,
+        },
+      });
+    } catch (error) {
+      registrationError = mapTensorlakeClientError(
+        TensorlakeClientOperationIds.BUILD_BASE_IMAGE,
+        error,
+      );
+    }
+
+    try {
+      await buildContext.cleanup();
+    } catch (cleanupError) {
+      if (registrationError === undefined) {
+        throw cleanupError;
+      }
+
+      console.error(`Failed to remove Tensorlake image build context ${buildContext.path}.`);
+    }
+
+    if (registrationError !== undefined) {
+      throw registrationError;
     }
   }
 

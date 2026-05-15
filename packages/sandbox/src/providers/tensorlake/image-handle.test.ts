@@ -49,6 +49,7 @@ describe("Tensorlake image handles", () => {
     ).toEqual({
       kind: "image",
       id: "mistle-2007239adae78582586d0995",
+      sourceBaseImageRef: imageId,
     });
   });
 
@@ -68,6 +69,7 @@ describe("Tensorlake image handles", () => {
     ).toEqual({
       kind: "image",
       id: "mistle-111111111111111111111111",
+      sourceBaseImageRef: imageId,
     });
   });
 

@@ -2,8 +2,6 @@ import { mkdir, mkdtemp, rm, cp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { createSandboxImage } from "tensorlake";
-
 import { SandboxConfigurationError } from "../../errors.js";
 import {
   SandboxBaseImageSourceKinds,
@@ -13,12 +11,11 @@ import {
   type SandboxSdkImageBaseImageSource,
   type SandboxImageHandle,
 } from "../../types.js";
-import { createTensorlakeSandboxBaseImage } from "./base-image-definition.js";
 import { TensorlakeClientOperationIds, mapTensorlakeClientError } from "./client-errors.js";
 import { validateTensorlakeSandboxConfig, type TensorlakeSandboxConfig } from "./config.js";
 import { createTensorlakeRegisteredImageHandle } from "./image-handle.js";
+import { registerTensorlakeSandboxBaseImage } from "./image-registration.js";
 
-const TensorlakeApiKeyEnv = "TENSORLAKE_API_KEY";
 const TensorlakeLocalSandboxdPartsRelativePath =
   "packages/sandboxd/.generated/tensorlake/sandboxd-parts";
 const TensorlakeBuildContextPlaceholderFile = ".mistle-tensorlake-context";
@@ -62,19 +59,14 @@ export class TensorlakeBaseImageBuilder implements SandboxBaseImageBuilder {
     let buildError: unknown;
 
     try {
-      await withTensorlakeApiKey(config.apiKey, async () => {
-        await createSandboxImage(
-          createTensorlakeSandboxBaseImage({
-            baseImageRef: source.baseImageRef,
-            name: source.imageId,
-            ...(source.sandboxd === undefined ? {} : { sandboxd: source.sandboxd }),
-          }),
-          {
-            registeredName: source.imageId,
-            contextDir: buildContext.path,
-            verbose: true,
-          },
-        );
+      await registerTensorlakeSandboxBaseImage({
+        apiKey: config.apiKey,
+        contextPath: buildContext.path,
+        source: {
+          baseImageRef: source.baseImageRef,
+          imageId: source.imageId,
+          ...(source.sandboxd === undefined ? {} : { sandboxd: source.sandboxd }),
+        },
       });
     } catch (error) {
       buildError = mapTensorlakeClientError(TensorlakeClientOperationIds.BUILD_BASE_IMAGE, error);
@@ -151,23 +143,5 @@ function validateSdkImageSource(request: {
     throw new SandboxConfigurationError(
       "Tensorlake base image builder requires a non-empty source image ref.",
     );
-  }
-}
-
-async function withTensorlakeApiKey<Result>(
-  apiKey: string,
-  operation: () => Promise<Result>,
-): Promise<Result> {
-  const previousApiKey = process.env[TensorlakeApiKeyEnv];
-  process.env[TensorlakeApiKeyEnv] = apiKey;
-
-  try {
-    return await operation();
-  } finally {
-    if (previousApiKey === undefined) {
-      delete process.env[TensorlakeApiKeyEnv];
-    } else {
-      process.env[TensorlakeApiKeyEnv] = previousApiKey;
-    }
   }
 }

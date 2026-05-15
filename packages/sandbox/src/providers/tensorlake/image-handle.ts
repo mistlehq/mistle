@@ -12,6 +12,7 @@ const TensorlakeBaseImageDigestLength = 24;
 export type TensorlakeStartImage = {
   readonly kind: TensorlakeStartImageKind;
   readonly id: string;
+  readonly sourceBaseImageRef?: string;
 };
 
 export function createTensorlakeRegisteredImageHandle(imageName: string): SandboxImageHandle {
@@ -66,6 +67,7 @@ export function resolveTensorlakeStartImage(handle: SandboxImageHandle): Tensorl
     return {
       kind: TensorlakeStartImageKinds.IMAGE,
       id: createTensorlakeRegisteredBaseImageName(handle.imageId),
+      sourceBaseImageRef: handle.imageId,
     };
   }
 

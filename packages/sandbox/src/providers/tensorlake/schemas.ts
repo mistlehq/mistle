@@ -28,6 +28,13 @@ export const TensorlakeStartSandboxRequestSchema = z
       id: z.string().trim().min(1, {
         message: "Tensorlake request field `image.id` is required.",
       }),
+      sourceBaseImageRef: z
+        .string()
+        .trim()
+        .min(1, {
+          message: "Tensorlake request field `image.sourceBaseImageRef` must be non-empty.",
+        })
+        .optional(),
     }),
     env: z.record(z.string().trim().min(1), z.string()).optional(),
     resources: z
