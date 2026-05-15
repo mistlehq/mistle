@@ -96,6 +96,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
         ...DockerSandboxRuntimeConfig,
         isActive: true,
         usable: true,
+        maintenanceScript: null,
         refreshSchedule: null,
         latestSnapshotJob: {
           id: expect.any(String),
@@ -156,7 +157,125 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
       image: {
         kind: "base",
       },
+      snapshotPreparationScriptKind: "setup",
     });
+  });
+
+  it("queues manual maintenance refresh from the current snapshot image", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-maintenance-refresh@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_version_maintenance_refresh_001",
+        organizationId: session.organizationId,
+        displayName: "Maintenance Refresh Profile",
+        activeVersion: 1,
+        createdAt: "2026-05-15T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values({
+      ...sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_version_maintenance_refresh_001",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        publishedAt: "2026-05-15T00:01:00.000Z",
+        maintenanceScript: "echo maintain",
+        ...DockerSandboxRuntimeColumns,
+      }),
+      snapshotImageProvider: "docker",
+      snapshotImageId: "sha256:maintenance-refresh-existing",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_version_maintenance_refresh_001/versions/1/refresh",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          refreshKind: "maintenance",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    expect(responseBody.version).toMatchObject({
+      sandboxProfileId: "sbp_version_maintenance_refresh_001",
+      version: 1,
+      maintenanceScript: "echo maintain",
+      latestSnapshotJob: {
+        trigger: SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH,
+        state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+      },
+    });
+
+    const queuedWorkflowInput = await waitForQueuedMaterializeWorkflowInput({
+      env,
+      snapshotJobId: responseBody.snapshotJob.id,
+    });
+    expect(queuedWorkflowInput).toMatchObject({
+      snapshotJobId: responseBody.snapshotJob.id,
+      sandboxProfileId: "sbp_version_maintenance_refresh_001",
+      sandboxProfileVersion: 1,
+      image: {
+        kind: "snapshot",
+        imageId: "sha256:maintenance-refresh-existing",
+      },
+      snapshotPreparationScriptKind: "maintenance",
+    });
+  });
+
+  it("rejects manual maintenance refresh when no maintenance script is saved", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email:
+        "integration-new-sandbox-profile-version-maintenance-refresh-missing-script@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_version_maintenance_refresh_missing_script",
+        organizationId: session.organizationId,
+        displayName: "Maintenance Refresh Missing Script Profile",
+        activeVersion: 1,
+        createdAt: "2026-05-15T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values({
+      ...sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_version_maintenance_refresh_missing_script",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        publishedAt: "2026-05-15T00:01:00.000Z",
+        ...DockerSandboxRuntimeColumns,
+      }),
+      snapshotImageProvider: "docker",
+      snapshotImageId: "sha256:maintenance-refresh-missing-script",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_version_maintenance_refresh_missing_script/versions/1/refresh",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          refreshKind: "maintenance",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(409);
+    const responseBody = RefreshSandboxProfileVersionConflictResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody.code).toBe("PROFILE_VERSION_NOT_USABLE");
   });
 
   it("queues publish snapshot retry when the published version does not have a snapshot yet", async ({
@@ -206,6 +325,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
         ...DockerSandboxRuntimeConfig,
         isActive: false,
         usable: false,
+        maintenanceScript: null,
         refreshSchedule: null,
         latestSnapshotJob: {
           id: expect.any(String),
@@ -245,6 +365,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
       image: {
         kind: "base",
       },
+      snapshotPreparationScriptKind: "setup",
     });
   });
 
@@ -411,6 +532,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
       image: {
         kind: "base",
       },
+      snapshotPreparationScriptKind: "setup",
     });
   });
 
@@ -509,6 +631,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
       image: {
         kind: "base",
       },
+      snapshotPreparationScriptKind: "setup",
     });
   });
 

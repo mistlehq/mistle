@@ -400,6 +400,7 @@ function createRuntimeStoryVersion(input: {
     defaultPersistenceMode: "ephemeral",
     sandboxProvider: runtimeState === "docker" ? "docker" : "e2b",
     sandboxConnectionId: runtimeState === "e2b-connection" ? StoryE2BSandboxConnection.id : null,
+    maintenanceScript: null,
     sandboxResources:
       runtimeState === "docker"
         ? null
@@ -792,7 +793,10 @@ function SandboxProfileEditorPageStoryView(
         if (sectionId === "snapshot") {
           return (
             <SandboxProfileSnapshotPanelView
+              canRunMaintenanceRefresh={false}
               isActionPending={false}
+              maintenanceScriptSection={null}
+              onMaintenanceRefreshSnapshot={() => {}}
               onPublishSuccessMessageDismiss={() => {}}
               onRefreshSnapshot={() => {}}
               onRetryPublishSnapshot={() => {}}

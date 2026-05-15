@@ -5,35 +5,34 @@ import {
   ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
 
+import { notFoundResponseSchema } from "../get-sandbox-profile-version-integration-bindings/schema.js";
 import {
-  publishSandboxProfileVersionResponseSchema,
-  refreshSandboxProfileVersionBodySchema,
+  putSandboxProfileVersionMaintenanceScriptBodySchema,
+  putSandboxProfileVersionMaintenanceScriptResponseSchema,
   sandboxProfileVersionParamsSchema,
 } from "../schemas.js";
-import { conflictResponseSchema, notFoundResponseSchema } from "./schema.js";
 
 export const route = createRoute({
-  method: "post",
-  path: "/{profileId}/versions/{version}/refresh",
+  method: "put",
+  path: "/{profileId}/versions/{version}/maintenance-script",
   tags: ["Sandbox Profiles"],
   request: {
     params: sandboxProfileVersionParamsSchema,
     body: {
-      required: false,
       content: {
         "application/json": {
-          schema: refreshSandboxProfileVersionBodySchema,
+          schema: putSandboxProfileVersionMaintenanceScriptBodySchema,
         },
       },
+      required: true,
     },
   },
   responses: {
     200: {
-      description:
-        "Queue manual snapshot materialization or refresh for the specified published sandbox profile version.",
+      description: "Update the maintenance script for the specified sandbox profile version.",
       content: {
         "application/json": {
-          schema: publishSandboxProfileVersionResponseSchema,
+          schema: putSandboxProfileVersionMaintenanceScriptResponseSchema,
         },
       },
     },
@@ -46,18 +45,10 @@ export const route = createRoute({
       },
     },
     404: {
-      description: "Sandbox profile or version was not found.",
+      description: "Sandbox profile or profile version was not found.",
       content: {
         "application/json": {
           schema: notFoundResponseSchema,
-        },
-      },
-    },
-    409: {
-      description: "Sandbox profile version cannot be refreshed.",
-      content: {
-        "application/json": {
-          schema: conflictResponseSchema,
         },
       },
     },

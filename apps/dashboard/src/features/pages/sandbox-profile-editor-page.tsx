@@ -995,10 +995,11 @@ function LoadedSandboxProfileEditorPage(
     },
   });
   const refreshSnapshotMutation = useMutation({
-    mutationFn: async (version: number) =>
+    mutationFn: async (request: { version: number; refreshKind: "setup" | "maintenance" }) =>
       refreshSandboxProfileVersion({
         profileId: input.profileId,
-        version,
+        version: request.version,
+        refreshKind: request.refreshKind,
       }),
     onSuccess: async (result) => {
       setVersionActionError(null);
@@ -1172,8 +1173,8 @@ function LoadedSandboxProfileEditorPage(
       onPublish={async (version) => {
         await publishMutation.mutateAsync(version);
       }}
-      onRefreshSnapshot={(version) => {
-        refreshSnapshotMutation.mutate(version);
+      onRefreshSnapshot={(request) => {
+        refreshSnapshotMutation.mutate(request);
       }}
       onRetryPublishSnapshot={(version) => {
         retryPublishSnapshotMutation.mutate(version);
@@ -1273,7 +1274,7 @@ function ReadySandboxProfileEditorPage(input: {
   deleteProfileIsPending: boolean;
   isDeleteProfileDialogOpen: boolean;
   onPublish: (version: number) => Promise<void>;
-  onRefreshSnapshot: (version: number) => void;
+  onRefreshSnapshot: (input: { version: number; refreshKind: "setup" | "maintenance" }) => void;
   onRetryPublishSnapshot: (version: number) => void;
   onDiscardChangesAndLeaveDraft: (input: { draftVersion: number }) => void;
   onConfirmDeleteProfile: () => void;
@@ -2153,7 +2154,7 @@ function SandboxProfileEditorSectionPanels(input: {
   onIntegrationDraftStateChange: (state: SandboxProfileDraftSectionState) => void;
   buildSetupScriptTestRuntimeConfig?: () => SandboxProfileRuntimeDraftChanges;
   onPublishSuccessMessageDismiss: () => void;
-  onRefreshSnapshot: (version: number) => void;
+  onRefreshSnapshot: (input: { version: number; refreshKind: "setup" | "maintenance" }) => void;
   onRetryPublishSnapshot: (version: number) => void;
   onSetupScriptDraftStateChange: (state: SandboxProfileDraftSectionState) => void;
   setupAssistantControl: SetupScriptAssistantControl;
@@ -2173,11 +2174,28 @@ function SandboxProfileEditorSectionPanels(input: {
   if (input.activeSectionId === SandboxProfileEditorSectionIds.SNAPSHOT) {
     return (
       <SandboxProfileSnapshotPanel
+        canRunMaintenanceRefresh={
+          input.snapshotVersion?.usable === true &&
+          (input.snapshotVersion.maintenanceScript?.trim().length ?? 0) > 0
+        }
+        canRunMaintenanceScript={input.snapshotVersion?.usable === true}
         isActionPending={input.versionActionIsPending}
         invalidateProfileVersions={input.invalidateProfileVersions}
+        maintenanceScript={input.snapshotVersion?.maintenanceScript ?? null}
         onRefreshSnapshot={() => {
           if (input.snapshotVersion !== null) {
-            input.onRefreshSnapshot(input.snapshotVersion.version);
+            input.onRefreshSnapshot({
+              version: input.snapshotVersion.version,
+              refreshKind: "setup",
+            });
+          }
+        }}
+        onMaintenanceRefreshSnapshot={() => {
+          if (input.snapshotVersion !== null) {
+            input.onRefreshSnapshot({
+              version: input.snapshotVersion.version,
+              refreshKind: "maintenance",
+            });
           }
         }}
         onRetryPublishSnapshot={() => {

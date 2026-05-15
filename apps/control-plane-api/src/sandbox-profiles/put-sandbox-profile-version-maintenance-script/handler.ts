@@ -3,7 +3,7 @@ import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
-import { refreshProfileVersionSnapshot } from "../services/refresh-profile-version-snapshot.js";
+import { putProfileVersionMaintenanceScript } from "../services/put-profile-version-maintenance-script.js";
 import { route } from "./route.js";
 
 const routeHandler = async (
@@ -11,22 +11,18 @@ const routeHandler = async (
   { session }: AppSession,
 ) => {
   const db = ctx.get("db");
-  const dataPlaneClient = ctx.get("dataPlaneClient");
-  const sandboxConfig = ctx.get("sandboxConfig");
   const { profileId, version } = ctx.req.valid("param");
   const body = ctx.req.valid("json");
 
-  const response = await refreshProfileVersionSnapshot(
+  const response = await putProfileVersionMaintenanceScript(
     {
       db,
-      dataPlaneClient,
-      defaultBaseImage: sandboxConfig.defaultBaseImage,
     },
     {
       organizationId: session.activeOrganizationId,
       profileId,
       profileVersion: version,
-      ...(body?.refreshKind === undefined ? {} : { refreshKind: body.refreshKind }),
+      maintenanceScript: body.maintenanceScript,
     },
   );
 

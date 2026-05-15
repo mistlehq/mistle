@@ -47,6 +47,7 @@ export async function requestSandboxProfileVersionSnapshotMaterialization(
     MaterializeSandboxProfileVersionSnapshotWorkflowSpec,
     {
       ...input,
+      snapshotPreparationScriptKind: input.snapshotPreparationScriptKind ?? "setup",
       sandboxRuntime: createWorkflowSandboxRuntime(input.sandboxRuntime),
     },
     {

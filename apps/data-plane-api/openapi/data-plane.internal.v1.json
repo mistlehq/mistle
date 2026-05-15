@@ -39,6 +39,10 @@
                     "type": "integer",
                     "minimum": 1
                   },
+                  "snapshotPreparationScriptKind": {
+                    "type": "string",
+                    "enum": ["setup", "maintenance"]
+                  },
                   "image": {
                     "type": "object",
                     "properties": {
@@ -52,7 +56,7 @@
                       },
                       "kind": {
                         "type": "string",
-                        "enum": ["base"]
+                        "enum": ["base", "snapshot"]
                       },
                       "provider": {
                         "type": "string",

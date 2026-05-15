@@ -1725,7 +1725,7 @@ export interface paths {
               createdAt: string;
               imageId: string;
               /** @enum {string} */
-              kind: "base";
+              kind: "base" | "snapshot";
               /** @enum {string} */
               provider: "docker" | "e2b" | "tensorlake";
             };
@@ -1744,6 +1744,8 @@ export interface paths {
               };
             };
             snapshotJobId: string;
+            /** @enum {string} */
+            snapshotPreparationScriptKind?: "setup" | "maintenance";
           };
         };
       };

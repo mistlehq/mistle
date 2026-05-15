@@ -22,6 +22,7 @@ type CompileProfileVersionRuntimePlanInput = {
   profileId: string;
   profileVersion: number;
   agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
+  snapshotPreparationScriptKind?: "setup" | "maintenance";
   image: ResolvedSandboxImage;
 };
 
@@ -104,6 +105,9 @@ export async function compileProfileVersionRuntimePlan(
       profileId: input.profileId,
       profileVersion: input.profileVersion,
       ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
+      ...(input.snapshotPreparationScriptKind === undefined
+        ? {}
+        : { snapshotPreparationScriptKind: input.snapshotPreparationScriptKind }),
       image: input.image,
     });
   } catch (error) {

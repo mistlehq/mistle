@@ -101,6 +101,7 @@ describe.concurrent("data-plane worker snapshot materialization", () => {
         organizationId,
         sandboxProfileId,
         sandboxProfileVersion: 1,
+        snapshotPreparationScriptKind: "setup",
         image: {
           imageId: "integration-new-snapshot-claim-loss-image",
           createdAt: new Date().toISOString(),
@@ -206,6 +207,7 @@ describe.concurrent("data-plane worker snapshot materialization", () => {
           organizationId,
           sandboxProfileId,
           sandboxProfileVersion: 1,
+          snapshotPreparationScriptKind: "setup",
           image: {
             imageId: "integration-snapshot-resolve-failure-image",
             createdAt: "2026-01-01T00:00:00.000Z",

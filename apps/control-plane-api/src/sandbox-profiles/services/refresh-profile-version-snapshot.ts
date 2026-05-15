@@ -33,16 +33,26 @@ type RefreshProfileVersionSnapshotInput = {
   organizationId: string;
   profileId: string;
   profileVersion: number;
+  refreshKind?: "setup" | "maintenance";
+};
+
+type SnapshotMaterializationImage = {
+  imageId: string;
+  createdAt: string;
+  kind: "base" | "snapshot";
+  provider: "docker" | "e2b" | "tensorlake";
 };
 
 type SnapshotRefreshIntent =
   | {
       trigger: typeof SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH;
       requireMissingSnapshot: false;
+      refreshKind: "setup" | "maintenance";
     }
   | {
       trigger: typeof SandboxProfileVersionSnapshotJobTriggers.PUBLISH;
       requireMissingSnapshot: true;
+      refreshKind: "setup";
     };
 
 type RefreshProfileVersionSnapshotOutput = {
@@ -54,6 +64,7 @@ type RefreshProfileVersionSnapshotOutput = {
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
     sandboxProvider: string | null;
     sandboxConnectionId: string | null;
+    maintenanceScript: string | null;
     sandboxResources: SandboxProfileVersionResources | null;
     isActive: boolean;
     usable: boolean;
@@ -104,6 +115,7 @@ export async function refreshProfileVersionSnapshot(
     {
       trigger: SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH,
       requireMissingSnapshot: false,
+      refreshKind: input.refreshKind ?? "setup",
     },
   );
 }
@@ -128,8 +140,13 @@ export async function retryPublishProfileVersionSnapshot(
     {
       trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
       requireMissingSnapshot: true,
+      refreshKind: "setup",
     },
   );
+}
+
+function hasNonBlankScript(script: string | null): boolean {
+  return script !== null && script.trim().length > 0;
 }
 
 async function queueProfileVersionSnapshot(
@@ -160,6 +177,7 @@ async function queueProfileVersionSnapshot(
           agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
           snapshotImageProvider: tables.sandboxProfileVersions.snapshotImageProvider,
           snapshotImageId: tables.sandboxProfileVersions.snapshotImageId,
+          maintenanceScript: tables.sandboxProfileVersions.maintenanceScript,
           sandboxProvider: tables.sandboxProfileVersions.sandboxProvider,
           sandboxConnectionId: tables.sandboxProfileVersions.sandboxConnectionId,
           sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
@@ -239,6 +257,16 @@ async function queueProfileVersionSnapshot(
         );
       }
 
+      if (
+        intent.refreshKind === "maintenance" &&
+        !hasNonBlankScript(sandboxProfileVersion.maintenanceScript)
+      ) {
+        throw new SandboxProfilesConflictError(
+          SandboxProfilesConflictCodes.PROFILE_VERSION_NOT_USABLE,
+          `Sandbox profile version '${String(input.profileVersion)}' does not have a maintenance script.`,
+        );
+      }
+
       const refreshSchedulesByVersion = await loadActiveRefreshSchedulesByVersion({
         db: tx,
         profileId: input.profileId,
@@ -277,6 +305,7 @@ async function queueProfileVersionSnapshot(
           state: sandboxProfileVersion.state,
           defaultPersistenceMode: resolvedDefaultPersistenceMode,
           agentRuntimeId: resolvedAgentRuntimeId,
+          maintenanceScript: sandboxProfileVersion.maintenanceScript,
           ...mapProfileVersionRuntimeConfig({
             sandboxProvider: resolvedSandboxProvider,
             sandboxConnectionId: resolvedSandboxConnectionId,
@@ -291,14 +320,40 @@ async function queueProfileVersionSnapshot(
         },
         activeVersion: sandboxProfileVersion.activeVersion,
         snapshotJob,
+        snapshotImage: {
+          provider: sandboxProfileVersion.snapshotImageProvider,
+          imageId: sandboxProfileVersion.snapshotImageId,
+        },
       };
     });
+
+    const sandboxRuntime = createWorkflowSandboxRuntime(refreshResult.version);
+    let materializationImage: SnapshotMaterializationImage;
+    if (intent.refreshKind === "setup") {
+      materializationImage = {
+        imageId: defaultBaseImage,
+        createdAt: new Date().toISOString(),
+        kind: "base",
+        provider: sandboxRuntime.provider,
+      };
+    } else {
+      const snapshotImageId = refreshResult.snapshotImage.imageId;
+      if (snapshotImageId === null) {
+        throw new Error("Expected maintenance refresh to have a usable snapshot image.");
+      }
+
+      materializationImage = {
+        imageId: snapshotImageId,
+        createdAt: new Date().toISOString(),
+        kind: "snapshot",
+        provider: sandboxRuntime.provider,
+      };
+    }
 
     await enqueueSnapshotMaterializationJob(
       {
         db,
         dataPlaneClient,
-        defaultBaseImage,
       },
       {
         snapshotJobId: refreshResult.snapshotJob.id,
@@ -306,11 +361,17 @@ async function queueProfileVersionSnapshot(
         organizationId: input.organizationId,
         profileId: input.profileId,
         profileVersion: input.profileVersion,
-        sandboxRuntime: createWorkflowSandboxRuntime(refreshResult.version),
+        snapshotPreparationScriptKind: intent.refreshKind,
+        image: materializationImage,
+        sandboxRuntime,
       },
     );
 
-    return refreshResult;
+    return {
+      version: refreshResult.version,
+      activeVersion: refreshResult.activeVersion,
+      snapshotJob: refreshResult.snapshotJob,
+    };
   } catch (error) {
     if (
       isControlPlaneUniqueViolation(

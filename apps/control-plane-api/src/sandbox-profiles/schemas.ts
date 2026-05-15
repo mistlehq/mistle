@@ -145,8 +145,10 @@ export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVers
     agentRuntimeId: true,
     sandboxProvider: true,
     sandboxConnectionId: true,
+    maintenanceScript: true,
   })
   .extend({
+    maintenanceScript: z.string().nullable(),
     sandboxResources: sandboxProfileVersionResourcesSchema.nullable(),
     isActive: z.boolean(),
     usable: z.boolean(),
@@ -269,6 +271,12 @@ export const publishSandboxProfileVersionResponseSchema = z
   })
   .strict();
 
+export const refreshSandboxProfileVersionBodySchema = z
+  .object({
+    refreshKind: z.enum(["setup", "maintenance"]).optional(),
+  })
+  .strict();
+
 export const discardSandboxProfileVersionDraftResponseSchema = z
   .object({
     discardedVersion: z.number().int().min(1),
@@ -347,6 +355,20 @@ export const putSandboxProfileVersionDraftResponseSchema = z
     sandboxConnectionId: z.string().min(1).nullable(),
     sandboxResources: sandboxProfileVersionResourcesSchema.nullable(),
     integrationBindings: sandboxProfileVersionIntegrationBindingsResponseSchema,
+  })
+  .strict();
+
+export const putSandboxProfileVersionMaintenanceScriptBodySchema = z
+  .object({
+    maintenanceScript: z.string().nullable(),
+  })
+  .strict();
+
+export const putSandboxProfileVersionMaintenanceScriptResponseSchema = z
+  .object({
+    sandboxProfileId: z.string().min(1),
+    version: z.number().int().min(1),
+    maintenanceScript: z.string().nullable(),
   })
   .strict();
 
@@ -431,6 +453,30 @@ export const startSandboxProfileSetupScriptTestRunBodySchema = z
       .min(1)
       .refine((value) => value.trim().length > 0, {
         message: "Setup script must not be blank.",
+      }),
+    idempotencyKey: z.string().min(1).max(255).optional(),
+    agentRuntimeId: sandboxProfileVersionAgentRuntimeIdSchema.optional(),
+    sandboxProvider: z.string().min(1).optional(),
+    sandboxConnectionId: z.string().min(1).nullable().optional(),
+    sandboxResources: sandboxProfileVersionResourcesSchema.nullable().optional(),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      (value.sandboxConnectionId === undefined && value.sandboxResources === undefined) ||
+      value.sandboxProvider !== undefined,
+    {
+      message: "Sandbox provider is required when sandbox runtime override fields are provided.",
+    },
+  );
+
+export const startSandboxProfileMaintenanceScriptTestRunBodySchema = z
+  .object({
+    maintenanceScript: z
+      .string()
+      .min(1)
+      .refine((value) => value.trim().length > 0, {
+        message: "Maintenance script must not be blank.",
       }),
     idempotencyKey: z.string().min(1).max(255).optional(),
     agentRuntimeId: sandboxProfileVersionAgentRuntimeIdSchema.optional(),

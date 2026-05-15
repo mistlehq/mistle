@@ -7,6 +7,13 @@ import { and, eq, sql } from "drizzle-orm";
 
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
+type SnapshotMaterializationImageInput = {
+  imageId: string;
+  createdAt: string;
+  kind: "base" | "snapshot";
+  provider: SandboxRuntimeProviderInput["provider"];
+};
+
 async function markQueuedSnapshotJobFailedToEnqueue(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
   input: {
@@ -37,19 +44,15 @@ async function markQueuedSnapshotJobFailedToEnqueue(
 }
 
 export async function enqueueSnapshotMaterializationJob(
-  {
-    db,
-    dataPlaneClient,
-    defaultBaseImage,
-  }: Pick<CreateSandboxProfilesServiceInput, "db" | "dataPlaneClient"> & {
-    defaultBaseImage: string;
-  },
+  { db, dataPlaneClient }: Pick<CreateSandboxProfilesServiceInput, "db" | "dataPlaneClient">,
   input: {
     snapshotJobId: string;
     sandboxInstanceId: string;
     organizationId: string;
     profileId: string;
     profileVersion: number;
+    snapshotPreparationScriptKind: "setup" | "maintenance";
+    image: SnapshotMaterializationImageInput;
     sandboxRuntime: SandboxRuntimeProviderInput;
   },
 ): Promise<void> {
@@ -60,12 +63,8 @@ export async function enqueueSnapshotMaterializationJob(
       organizationId: input.organizationId,
       sandboxProfileId: input.profileId,
       sandboxProfileVersion: input.profileVersion,
-      image: {
-        imageId: defaultBaseImage,
-        createdAt: new Date().toISOString(),
-        kind: "base",
-        provider: input.sandboxRuntime.provider,
-      },
+      snapshotPreparationScriptKind: input.snapshotPreparationScriptKind,
+      image: input.image,
       sandboxRuntime: input.sandboxRuntime,
     });
   } catch (error) {

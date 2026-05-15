@@ -19,6 +19,9 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
       organizationId: body.organizationId,
       profileId: body.profileId,
       profileVersion: body.profileVersion,
+      ...(body.snapshotPreparationScriptKind === undefined
+        ? {}
+        : { snapshotPreparationScriptKind: body.snapshotPreparationScriptKind }),
       image: {
         source: body.image.kind,
         imageRef: body.image.imageId,

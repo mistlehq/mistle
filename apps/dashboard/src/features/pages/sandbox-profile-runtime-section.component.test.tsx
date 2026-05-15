@@ -139,6 +139,7 @@ function createVersion(
     defaultPersistenceMode: "ephemeral",
     sandboxProvider: input.sandboxProvider,
     sandboxConnectionId: input.sandboxConnectionId,
+    maintenanceScript: null,
     sandboxResources: input.sandboxResources,
     isActive: false,
     usable: false,

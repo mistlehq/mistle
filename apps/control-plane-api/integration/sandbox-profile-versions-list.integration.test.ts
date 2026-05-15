@@ -114,6 +114,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
         ...EmptySandboxRuntimeConfig,
         isActive: false,
         usable: false,
+        maintenanceScript: null,
         refreshSchedule: null,
         latestSnapshotJob: null,
       },
@@ -125,6 +126,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
         ...EmptySandboxRuntimeConfig,
         isActive: true,
         usable: true,
+        maintenanceScript: null,
         refreshSchedule: null,
         latestSnapshotJob: {
           id: "ssj_versions_list_v2_refresh_failed",
@@ -146,6 +148,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
         ...EmptySandboxRuntimeConfig,
         isActive: false,
         usable: false,
+        maintenanceScript: null,
         refreshSchedule: null,
         latestSnapshotJob: {
           id: "ssj_versions_list_v1_publish",
@@ -204,6 +207,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
         ...EmptySandboxRuntimeConfig,
         isActive: false,
         usable: false,
+        maintenanceScript: null,
         refreshSchedule: null,
         latestSnapshotJob: null,
       },
@@ -269,6 +273,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
         ...EmptySandboxRuntimeConfig,
         isActive: false,
         usable: false,
+        maintenanceScript: null,
         refreshSchedule: null,
         latestSnapshotJob: {
           id: "ssj_versions_list_failed_materialization_publish",

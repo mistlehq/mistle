@@ -11,6 +11,8 @@ import type {
   LaunchableSandboxProfilesResult,
   PutSandboxProfileVersionDraftInput,
   PutSandboxProfileVersionDraftResult,
+  PutSandboxProfileVersionMaintenanceScriptInput,
+  PutSandboxProfileVersionMaintenanceScriptResult,
   PutSandboxProfileVersionRefreshScheduleInput,
   SandboxProfile,
   SandboxProfileVersion,
@@ -23,6 +25,7 @@ import type {
   SandboxProfileSetupScriptTestRuntimeConfig,
   SandboxProvidersResult,
   SandboxProfileSetupAssistant,
+  SandboxProfileMaintenanceScriptTestRun,
   SandboxProfileSetupScriptTestRun,
   SandboxProfilesListResult,
   PublishSandboxProfileVersionResult,
@@ -447,6 +450,7 @@ const SandboxProfileVersionSchema = z
       .strict()
       .nullable(),
     refreshSchedule: SandboxProfileVersionRefreshScheduleSummarySchema.nullable(),
+    maintenanceScript: z.string().nullable(),
     sandboxConnectionId: z.string().min(1).nullable(),
     sandboxProfileId: z.string().min(1),
     sandboxProvider: z.string().min(1).nullable(),
@@ -619,6 +623,8 @@ const SandboxProfileAcceptedStartResponseSchema = z
   .strict();
 
 const SandboxProfileSetupScriptTestRunResponseSchema = SandboxProfileAcceptedStartResponseSchema;
+const SandboxProfileMaintenanceScriptTestRunResponseSchema =
+  SandboxProfileAcceptedStartResponseSchema;
 const SandboxProfileSetupAssistantResponseSchema = SandboxProfileAcceptedStartResponseSchema;
 
 export async function listSandboxProfileVersions(input: {
@@ -833,6 +839,7 @@ export async function publishSandboxProfileVersion(input: {
 export async function refreshSandboxProfileVersion(input: {
   profileId: string;
   version: number;
+  refreshKind?: "setup" | "maintenance";
 }): Promise<PublishSandboxProfileVersionResult> {
   try {
     const response = await requestControlPlane({
@@ -841,6 +848,9 @@ export async function refreshSandboxProfileVersion(input: {
       pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
         input.version,
       )}/refresh`,
+      body: {
+        ...(input.refreshKind === undefined ? {} : { refreshKind: input.refreshKind }),
+      },
       fallbackMessage: "Could not refresh sandbox profile snapshot.",
     });
 
@@ -862,6 +872,52 @@ export async function refreshSandboxProfileVersion(input: {
         operation: "refreshSandboxProfileVersion",
         error,
         fallbackMessage: "Could not refresh sandbox profile snapshot.",
+      }),
+    );
+  }
+}
+
+export async function putSandboxProfileVersionMaintenanceScript(
+  input: PutSandboxProfileVersionMaintenanceScriptInput,
+): Promise<PutSandboxProfileVersionMaintenanceScriptResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "putSandboxProfileVersionMaintenanceScript",
+      method: "PUT",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/maintenance-script`,
+      body: {
+        maintenanceScript: input.maintenanceScript,
+      },
+      fallbackMessage: "Could not save sandbox profile maintenance script.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = z
+      .object({
+        sandboxProfileId: z.string().min(1),
+        version: z.number().int().min(1),
+        maintenanceScript: z.string().nullable(),
+      })
+      .strict()
+      .safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "putSandboxProfileVersionMaintenanceScript",
+        status: 500,
+        body: responseBody,
+        message: "Sandbox profile maintenance script response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "putSandboxProfileVersionMaintenanceScript",
+        error,
+        fallbackMessage: "Could not save sandbox profile maintenance script.",
       }),
     );
   }
@@ -1244,6 +1300,63 @@ export async function startSandboxProfileSetupScriptTestRun(input: {
         operation: "startSandboxProfileSetupScriptTestRun",
         error,
         fallbackMessage: "Could not start setup script test run.",
+      }),
+    );
+  }
+}
+
+export async function startSandboxProfileMaintenanceScriptTestRun(input: {
+  profileId: string;
+  version: number;
+  maintenanceScript: string;
+  runtimeConfig?: SandboxProfileSetupScriptTestRuntimeConfig;
+  idempotencyKey?: string;
+  signal?: AbortSignal;
+}): Promise<SandboxProfileMaintenanceScriptTestRun> {
+  try {
+    const response = await requestControlPlane({
+      operation: "startSandboxProfileMaintenanceScriptTestRun",
+      method: "POST",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/maintenance-script/test-runs`,
+      body: {
+        maintenanceScript: input.maintenanceScript,
+        ...(input.runtimeConfig === undefined
+          ? {}
+          : {
+              agentRuntimeId: input.runtimeConfig.agentRuntimeId,
+              ...(input.runtimeConfig.sandboxProvider === null
+                ? {}
+                : { sandboxProvider: input.runtimeConfig.sandboxProvider }),
+              sandboxConnectionId: input.runtimeConfig.sandboxConnectionId,
+              sandboxResources: input.runtimeConfig.sandboxResources,
+            }),
+        ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
+      },
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not start maintenance script test run.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse =
+      SandboxProfileMaintenanceScriptTestRunResponseSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "startSandboxProfileMaintenanceScriptTestRun",
+        status: 500,
+        body: responseBody,
+        message: "Maintenance script test run response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "startSandboxProfileMaintenanceScriptTestRun",
+        error,
+        fallbackMessage: "Could not start maintenance script test run.",
       }),
     );
   }

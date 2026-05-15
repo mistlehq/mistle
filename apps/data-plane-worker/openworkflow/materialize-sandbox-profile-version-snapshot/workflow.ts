@@ -319,6 +319,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
             organizationId: workflowInput.organizationId,
             profileId: workflowInput.sandboxProfileId,
             profileVersion: workflowInput.sandboxProfileVersion,
+            snapshotPreparationScriptKind: workflowInput.snapshotPreparationScriptKind,
             image: {
               imageId: workflowInput.image.imageId,
               kind: workflowInput.image.kind,

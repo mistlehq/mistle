@@ -37,6 +37,11 @@ type StartProfileSetupSandboxInput = {
     | typeof SandboxInstancePurposes.SETUP_CHECK;
   agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
   setupScript?: string;
+  snapshotPreparationScriptKind?: "setup" | "maintenance";
+  image?: {
+    kind: "base" | "snapshot";
+    imageId: string;
+  };
   sandboxRuntimeConfig?: {
     sandboxProvider: string;
     sandboxConnectionId: string | null;
@@ -169,9 +174,12 @@ export async function startProfileSetupSandbox(
       profileId: input.profileId,
       profileVersion: input.profileVersion,
       ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
+      ...(input.snapshotPreparationScriptKind === undefined
+        ? {}
+        : { snapshotPreparationScriptKind: input.snapshotPreparationScriptKind }),
       image: {
-        source: "base",
-        imageRef: defaultBaseImage,
+        source: input.image?.kind ?? "base",
+        imageRef: input.image?.imageId ?? defaultBaseImage,
       },
     },
   );
@@ -202,9 +210,9 @@ export async function startProfileSetupSandbox(
     startedBy: input.startedBy,
     source: input.source,
     image: {
-      imageId: defaultBaseImage,
+      imageId: input.image?.imageId ?? defaultBaseImage,
       createdAt: new Date().toISOString(),
-      kind: "base",
+      kind: input.image?.kind ?? "base",
       provider: sandboxRuntime.provider,
     },
     sandboxRuntime,

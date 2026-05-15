@@ -8528,6 +8528,7 @@ export interface paths {
                   /** @enum {string} */
                   trigger: "publish" | "manual_refresh" | "scheduled_refresh";
                 } | null;
+                maintenanceScript: string | null;
                 refreshSchedule: {
                   cronExpression: string;
                   enabled: boolean;
@@ -8652,6 +8653,7 @@ export interface paths {
                 /** @enum {string} */
                 trigger: "publish" | "manual_refresh" | "scheduled_refresh";
               } | null;
+              maintenanceScript: string | null;
               refreshSchedule: {
                 cronExpression: string;
                 enabled: boolean;
@@ -9574,6 +9576,275 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/sandbox/profiles/{profileId}/versions/{version}/maintenance-script": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          profileId: string;
+          version: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            maintenanceScript: string | null;
+          };
+        };
+      };
+      responses: {
+        /** @description Update the maintenance script for the specified sandbox profile version. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              maintenanceScript: string | null;
+              sandboxProfileId: string;
+              version: number;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile or profile version was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_NOT_FOUND" | "PROFILE_VERSION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/sandbox/profiles/{profileId}/versions/{version}/maintenance-script/test-runs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          profileId: string;
+          version: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            agentRuntimeId?: "codex" | "opencode";
+            idempotencyKey?: string;
+            maintenanceScript: string;
+            sandboxConnectionId?: string | null;
+            sandboxProvider?: string;
+            sandboxResources?: {
+              memoryMb: number;
+              storageMb?: number;
+              vcpuCount: number;
+            } | null;
+          };
+        };
+      };
+      responses: {
+        /** @description Start a maintenance script test run for the specified profile version. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              sandboxInstanceId: string;
+              /** @enum {string} */
+              status: "accepted";
+              workflowRunId: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_PRIMARY_REPOSITORY" | "INVALID_SANDBOX_RUNTIME_CONFIG";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "AGENT_RUNTIME_REQUIRED"
+                    | "SANDBOX_PROVIDER_REQUIRED"
+                    | "INVALID_SANDBOX_PROVIDER"
+                    | "INVALID_BINDING_CONNECTION_REFERENCE"
+                    | "INVALID_CONNECTION_TARGET_REFERENCE"
+                    | "CONNECTION_MISMATCH"
+                    | "TARGET_DISABLED"
+                    | "CONNECTION_NOT_ACTIVE"
+                    | "KIND_MISMATCH"
+                    | "INVALID_TARGET_CONFIG"
+                    | "INVALID_TARGET_SECRETS"
+                    | "INVALID_BINDING_CONFIG"
+                    | "ROUTE_CONFLICT"
+                    | "ARTIFACT_CONFLICT"
+                    | "RUNTIME_CLIENT_SETUP_CONFLICT"
+                    | "RUNTIME_CLIENT_SETUP_INVALID_REF";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile or profile version was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_NOT_FOUND" | "PROFILE_VERSION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile version cannot run maintenance script tests. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_VERSION_NOT_USABLE";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/sandbox/profiles/{profileId}/versions/{version}/publish": {
     parameters: {
       query?: never;
@@ -9635,6 +9906,7 @@ export interface paths {
                   /** @enum {string} */
                   trigger: "publish" | "manual_refresh" | "scheduled_refresh";
                 } | null;
+                maintenanceScript: string | null;
                 refreshSchedule: {
                   cronExpression: string;
                   enabled: boolean;
@@ -9882,7 +10154,14 @@ export interface paths {
         };
         cookie?: never;
       };
-      requestBody?: never;
+      requestBody?: {
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            refreshKind?: "setup" | "maintenance";
+          };
+        };
+      };
       responses: {
         /** @description Queue manual snapshot materialization or refresh for the specified published sandbox profile version. */
         200: {
@@ -9924,6 +10203,7 @@ export interface paths {
                   /** @enum {string} */
                   trigger: "publish" | "manual_refresh" | "scheduled_refresh";
                 } | null;
+                maintenanceScript: string | null;
                 refreshSchedule: {
                   cronExpression: string;
                   enabled: boolean;
@@ -10300,6 +10580,7 @@ export interface paths {
                   /** @enum {string} */
                   trigger: "publish" | "manual_refresh" | "scheduled_refresh";
                 } | null;
+                maintenanceScript: string | null;
                 refreshSchedule: {
                   cronExpression: string;
                   enabled: boolean;

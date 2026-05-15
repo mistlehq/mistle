@@ -6,6 +6,7 @@ export const InternalSandboxRuntimeCompileProfileVersionRuntimePlanRequestSchema
     organizationId: z.string().min(1),
     profileId: z.string().min(1),
     profileVersion: z.number().int().min(1),
+    snapshotPreparationScriptKind: z.enum(["setup", "maintenance"]).optional(),
     image: z
       .object({
         imageId: z.string().min(1),

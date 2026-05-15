@@ -97,6 +97,7 @@ function createSandboxProfileVersionFixture(input: {
   state: SandboxProfileVersion["state"];
   agentRuntimeId?: SandboxProfileVersion["agentRuntimeId"];
   defaultPersistenceMode?: SandboxProfileVersion["defaultPersistenceMode"];
+  maintenanceScript?: string | null;
   isActive: boolean;
   usable?: boolean;
   latestSnapshotJob?: SandboxProfileVersion["latestSnapshotJob"];
@@ -111,6 +112,7 @@ function createSandboxProfileVersionFixture(input: {
     sandboxConnectionId: null,
     sandboxProvider: "docker",
     sandboxResources: null,
+    maintenanceScript: input.maintenanceScript ?? null,
     isActive: input.isActive,
     usable: input.usable ?? input.state === "published",
     latestSnapshotJob: input.latestSnapshotJob ?? null,
@@ -339,6 +341,7 @@ function createFailedManualSnapshotJobFixture(): NonNullable<
 function createSandboxProfileVersionsForTest(input: {
   profileId: string;
   defaultPersistenceMode?: SandboxProfileVersion["defaultPersistenceMode"];
+  maintenanceScript?: string | null;
   refreshSchedule?: SandboxProfileVersion["refreshSchedule"];
   version: number;
   versionState: SandboxProfileEditorTestVersionState;
@@ -354,6 +357,7 @@ function createSandboxProfileVersionsForTest(input: {
       sandboxProfileId: input.profileId,
       version: versionInput.version ?? input.version,
       state: versionInput.state,
+      maintenanceScript: input.maintenanceScript ?? null,
       ...(input.defaultPersistenceMode === undefined
         ? {}
         : { defaultPersistenceMode: input.defaultPersistenceMode }),
@@ -560,6 +564,7 @@ function renderSandboxProfileEditor(input?: {
   sandboxProvidersLoading?: boolean;
   defaultPersistenceMode?: SandboxProfileVersion["defaultPersistenceMode"];
   persistentSandboxesEnabled?: boolean;
+  maintenanceScript?: string | null;
   profileAutomationsListResult?: AutomationsListResult;
   routeSearch?: string;
   routeState?: unknown;
@@ -595,6 +600,9 @@ function renderSandboxProfileEditor(input?: {
       ? {}
       : { defaultPersistenceMode: input.defaultPersistenceMode }),
     ...(input?.refreshSchedule === undefined ? {} : { refreshSchedule: input.refreshSchedule }),
+    ...(input?.maintenanceScript === undefined
+      ? {}
+      : { maintenanceScript: input.maintenanceScript }),
     version,
     versionState: resolvedVersionState,
   });
@@ -1379,7 +1387,27 @@ describe("SandboxProfileEditorPage", () => {
       screen.queryByText("This snapshot will be used for new sessions and triggers."),
     ).toBeNull();
     expect(screen.getByText("Latest snapshot: N/A")).toBeDefined();
-    expect(screen.getByRole("button", { name: "Refresh snapshot" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Refresh from setup script" })).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "Run maintenance refresh" }).getAttribute("disabled"),
+    ).not.toBeNull();
+  });
+
+  it("enables maintenance refresh when a usable published version has a maintenance script", () => {
+    renderSandboxProfileEditor({
+      maintenanceScript: "echo maintain",
+      routeSection: "snapshot",
+      versionState: "published",
+    });
+
+    expect(screen.getByRole("button", { name: "Refresh from setup script" })).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "Run maintenance refresh" }).getAttribute("disabled"),
+    ).toBeNull();
+    expect(screen.getByText("Maintenance script")).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "Test maintenance script" }).getAttribute("disabled"),
+    ).toBeNull();
   });
 
   it("shows automatic snapshot refresh as disabled when it is not configured", () => {

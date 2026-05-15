@@ -103,6 +103,7 @@ export type MaterializeSandboxProfileVersionSnapshotWorkflowInput = {
   organizationId: string;
   sandboxProfileId: string;
   sandboxProfileVersion: number;
+  snapshotPreparationScriptKind: "setup" | "maintenance";
   image: StartSandboxInstanceWorkflowImageInput;
   sandboxRuntime: SandboxRuntimeProviderInput;
 };

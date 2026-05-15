@@ -29,6 +29,45 @@ const it = createIntegrationTest({
 });
 
 describe.concurrent("sandbox profile internal runtime plan compiler integration", () => {
+  it("uses the maintenance script when compiling a maintenance snapshot plan", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-compile-maintenance-script@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_compile_internal_maintenance_script",
+        organizationId: session.organizationId,
+        displayName: "Maintenance Script Compile Profile",
+        createdAt: "2026-05-15T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_compile_internal_maintenance_script",
+        version: 1,
+        setupScript: "echo setup",
+        maintenanceScript: "echo maintain",
+      }),
+    );
+
+    const result = await compileSandboxRuntimePlan({
+      db: env.controlPlaneDb,
+      integrationDefinitions: Definitions,
+      resolveTargetSecrets: async () => [],
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_internal_maintenance_script",
+      profileVersion: 1,
+      snapshotPreparationScriptKind: "maintenance",
+      image: {
+        source: "snapshot",
+        imageRef: "sha256:compile-maintenance-existing-snapshot",
+      },
+    });
+
+    expect(result.setupScript).toBe("echo maintain");
+  });
+
   it("fails when resolved target secrets omit an existing target entry", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-compile-internal-missing-target-secrets@example.com",

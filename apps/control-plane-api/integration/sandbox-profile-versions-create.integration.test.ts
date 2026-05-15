@@ -149,6 +149,7 @@ describe.concurrent("sandbox profile versions create integration", () => {
       ...EmptySandboxRuntimeConfig,
       isActive: false,
       usable: false,
+      maintenanceScript: null,
       refreshSchedule: null,
       latestSnapshotJob: null,
     });

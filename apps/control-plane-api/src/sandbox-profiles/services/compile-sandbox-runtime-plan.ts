@@ -80,15 +80,16 @@ export type CompileSandboxRuntimePlanInput = {
   profileId: string;
   profileVersion: number;
   agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
+  snapshotPreparationScriptKind?: "setup" | "maintenance";
   image: ResolvedSandboxImage;
 };
 
-function normalizeSetupScript(setupScript: string | null): string | undefined {
-  if (setupScript === null || setupScript.trim().length === 0) {
+function normalizeSnapshotPreparationScript(script: string | null): string | undefined {
+  if (script === null || script.trim().length === 0) {
     return undefined;
   }
 
-  return setupScript;
+  return script;
 }
 
 function mapCompilerErrorCodeToSandboxRuntimePlanCompilerErrorCode(
@@ -291,6 +292,7 @@ export async function compileSandboxRuntimePlan(
       sandboxProfileId: true,
       agentRuntimeId: true,
       setupScript: true,
+      maintenanceScript: true,
     },
     where: (table, { and, eq }) =>
       and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),
@@ -322,11 +324,18 @@ export async function compileSandboxRuntimePlan(
       definitions: input.integrationDefinitions,
     });
 
-    const setupScript = normalizeSetupScript(sandboxProfileVersion.setupScript);
+    const snapshotPreparationScriptKind = input.snapshotPreparationScriptKind ?? "setup";
+    const snapshotPreparationScript = normalizeSnapshotPreparationScript(
+      snapshotPreparationScriptKind === "setup"
+        ? sandboxProfileVersion.setupScript
+        : sandboxProfileVersion.maintenanceScript,
+    );
 
     return {
       ...runtimePlan,
-      ...(setupScript === undefined ? {} : { setupScript }),
+      ...(snapshotPreparationScript === undefined
+        ? {}
+        : { setupScript: snapshotPreparationScript }),
     };
   } catch (error) {
     if (error instanceof IntegrationCompilerError) {

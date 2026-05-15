@@ -20,12 +20,15 @@ export {
   getSandboxProfileVersionSetupScriptResponseSchema as GetSandboxProfileVersionSetupScriptResponseSchema,
   putSandboxProfileVersionDraftBodySchema as PutSandboxProfileVersionDraftBodySchema,
   putSandboxProfileVersionDraftResponseSchema as PutSandboxProfileVersionDraftResponseSchema,
+  putSandboxProfileVersionMaintenanceScriptBodySchema as PutSandboxProfileVersionMaintenanceScriptBodySchema,
+  putSandboxProfileVersionMaintenanceScriptResponseSchema as PutSandboxProfileVersionMaintenanceScriptResponseSchema,
   createSandboxProfileBodySchema as CreateSandboxProfileBodySchema,
   updateSandboxProfileBodySchema as UpdateSandboxProfileBodySchema,
   sandboxProfileIdParamsSchema as SandboxProfileIdParamsSchema,
   sandboxProfileVersionParamsSchema as SandboxProfileVersionParamsSchema,
   startSandboxProfileInstanceBodySchema as StartSandboxProfileInstanceBodySchema,
   startSandboxProfileSetupScriptTestRunBodySchema as StartSandboxProfileSetupScriptTestRunBodySchema,
+  startSandboxProfileMaintenanceScriptTestRunBodySchema as StartSandboxProfileMaintenanceScriptTestRunBodySchema,
   startSandboxProfileSetupAssistantBodySchema as StartSandboxProfileSetupAssistantBodySchema,
   sandboxProfileDeletionAcceptedResponseSchema as SandboxProfileDeletionAcceptedResponseSchema,
   startSandboxProfileInstanceResponseSchema as StartSandboxProfileInstanceResponseSchema,
@@ -55,9 +58,11 @@ export { route as putSandboxProfileVersionRefreshScheduleRoute } from "./put-san
 export { route as deleteSandboxProfileVersionRefreshScheduleRoute } from "./delete-sandbox-profile-version-refresh-schedule/route.js";
 export { route as discardSandboxProfileVersionDraftRoute } from "./discard-sandbox-profile-version-draft/route.js";
 export { route as putSandboxProfileVersionDraftRoute } from "./put-sandbox-profile-version-draft/route.js";
+export { route as putSandboxProfileVersionMaintenanceScriptRoute } from "./put-sandbox-profile-version-maintenance-script/route.js";
 export { route as startSandboxProfileInstanceRoute } from "./start-sandbox-profile-instance/route.js";
 export { route as startSandboxProfileSetupAssistantRoute } from "./start-sandbox-profile-setup-assistant/route.js";
 export { route as startSandboxProfileSetupScriptTestRunRoute } from "./start-sandbox-profile-setup-script-test-run/route.js";
+export { route as startSandboxProfileMaintenanceScriptTestRunRoute } from "./start-sandbox-profile-maintenance-script-test-run/route.js";
 export { badRequestResponseSchema as ListSandboxProfilesBadRequestResponseSchema } from "./list-sandbox-profiles/schema.js";
 export { notFoundResponseSchema as NotFoundResponseSchema } from "./get-sandbox-profile/schema.js";
 export { notFoundResponseSchema as SandboxProfileVersionNotFoundResponseSchema } from "./get-sandbox-profile-version-integration-bindings/schema.js";

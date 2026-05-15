@@ -32,6 +32,7 @@ type ListProfileVersionsOutput = {
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
     sandboxProvider: string | null;
     sandboxConnectionId: string | null;
+    maintenanceScript: string | null;
     sandboxResources: SandboxProfileVersionResources | null;
     isActive: boolean;
     usable: boolean;
@@ -79,6 +80,7 @@ export async function listProfileVersions(
       agentRuntimeId: true,
       snapshotImageProvider: true,
       snapshotImageId: true,
+      maintenanceScript: true,
       sandboxProvider: true,
       sandboxConnectionId: true,
       sandboxVcpuCount: true,
@@ -130,6 +132,7 @@ export async function listProfileVersions(
         state: version.state,
         defaultPersistenceMode: version.defaultPersistenceMode,
         agentRuntimeId: version.agentRuntimeId,
+        maintenanceScript: version.maintenanceScript,
         ...mapProfileVersionRuntimeConfig(version),
         isActive: version.version === sandboxProfile.activeVersion,
         usable:

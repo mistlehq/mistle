@@ -38,6 +38,18 @@ type SnapshotRefreshJobResolution = Readonly<{
   kind: "active_existing" | "created" | "source_existing";
 }>;
 
+function assertScheduledSnapshotSandboxProvider(
+  provider: string | null,
+): SandboxRuntimeProviderInput["provider"] {
+  if (provider === "docker" || provider === "e2b") {
+    return provider;
+  }
+
+  throw new Error(
+    `Unsupported sandbox provider '${String(provider)}' for scheduled snapshot refresh.`,
+  );
+}
+
 export async function dispatchSnapshotRefreshScheduledAction(
   ctx: {
     db: ControlPlaneDatabase;
@@ -79,7 +91,7 @@ export async function dispatchSnapshotRefreshScheduledAction(
   }
 
   try {
-    const sandboxRuntime = await loadSnapshotRefreshSandboxRuntime(ctx, {
+    const materializationTarget = await loadSnapshotRefreshMaterializationTarget(ctx, {
       organizationId: input.organizationId,
       sandboxProfileId: queuedSnapshotJob.sandboxProfileId,
       sandboxProfileVersion: queuedSnapshotJob.sandboxProfileVersion,
@@ -91,13 +103,9 @@ export async function dispatchSnapshotRefreshScheduledAction(
       organizationId: input.organizationId,
       sandboxProfileId: queuedSnapshotJob.sandboxProfileId,
       sandboxProfileVersion: queuedSnapshotJob.sandboxProfileVersion,
-      image: {
-        imageId: ctx.defaultBaseImage,
-        createdAt: new Date().toISOString(),
-        kind: "base",
-        provider: sandboxRuntime.provider,
-      },
-      sandboxRuntime,
+      snapshotPreparationScriptKind: materializationTarget.snapshotPreparationScriptKind,
+      image: materializationTarget.image,
+      sandboxRuntime: materializationTarget.sandboxRuntime,
     });
 
     return {
@@ -112,21 +120,37 @@ export async function dispatchSnapshotRefreshScheduledAction(
   }
 }
 
-async function loadSnapshotRefreshSandboxRuntime(
+function hasNonBlankScript(script: string | null): boolean {
+  return script !== null && script.trim().length > 0;
+}
+
+async function loadSnapshotRefreshMaterializationTarget(
   ctx: {
     db: ControlPlaneDatabase;
+    defaultBaseImage: string;
   },
   input: {
     organizationId: string;
     sandboxProfileId: string;
     sandboxProfileVersion: number;
   },
-): Promise<SandboxRuntimeProviderInput> {
+): Promise<{
+  sandboxRuntime: SandboxRuntimeProviderInput;
+  snapshotPreparationScriptKind: "setup" | "maintenance";
+  image: {
+    imageId: string;
+    createdAt: string;
+    kind: "base" | "snapshot";
+    provider: SandboxRuntimeProviderInput["provider"];
+  };
+}> {
   const tables = getControlPlaneDatabaseSchema(ctx.db);
   const [sandboxProfileVersion] = await ctx.db
     .select({
       sandboxProvider: tables.sandboxProfileVersions.sandboxProvider,
       sandboxConnectionId: tables.sandboxProfileVersions.sandboxConnectionId,
+      snapshotImageId: tables.sandboxProfileVersions.snapshotImageId,
+      maintenanceScript: tables.sandboxProfileVersions.maintenanceScript,
       sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
       sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
       sandboxStorageMb: tables.sandboxProfileVersions.sandboxStorageMb,
@@ -152,12 +176,7 @@ async function loadSnapshotRefreshSandboxRuntime(
     );
   }
 
-  const provider = sandboxProfileVersion.sandboxProvider;
-  if (provider !== "docker" && provider !== "e2b") {
-    throw new Error(
-      `Unsupported sandbox provider '${String(provider)}' for scheduled snapshot refresh.`,
-    );
-  }
+  const provider = assertScheduledSnapshotSandboxProvider(sandboxProfileVersion.sandboxProvider);
 
   if (
     provider !== "docker" &&
@@ -169,7 +188,7 @@ async function loadSnapshotRefreshSandboxRuntime(
     );
   }
 
-  return {
+  const sandboxRuntime: SandboxRuntimeProviderInput = {
     provider,
     ...(sandboxProfileVersion.sandboxConnectionId === null
       ? {}
@@ -186,6 +205,48 @@ async function loadSnapshotRefreshSandboxRuntime(
               : { storageMb: sandboxProfileVersion.sandboxStorageMb }),
           },
         }),
+  };
+  const snapshotPreparationScriptKind = hasNonBlankScript(sandboxProfileVersion.maintenanceScript)
+    ? "maintenance"
+    : "setup";
+  if (
+    snapshotPreparationScriptKind === "maintenance" &&
+    sandboxProfileVersion.snapshotImageId === null
+  ) {
+    throw new Error(
+      `Sandbox profile '${input.sandboxProfileId}' version '${String(input.sandboxProfileVersion)}' has a maintenance script but no usable snapshot for scheduled refresh.`,
+    );
+  }
+
+  if (snapshotPreparationScriptKind === "setup") {
+    return {
+      sandboxRuntime,
+      snapshotPreparationScriptKind,
+      image: {
+        imageId: ctx.defaultBaseImage,
+        createdAt: new Date().toISOString(),
+        kind: "base",
+        provider: sandboxRuntime.provider,
+      },
+    };
+  }
+
+  const snapshotImageId = sandboxProfileVersion.snapshotImageId;
+  if (snapshotImageId === null) {
+    throw new Error(
+      `Sandbox profile '${input.sandboxProfileId}' version '${String(input.sandboxProfileVersion)}' has a maintenance script but no usable snapshot for scheduled refresh.`,
+    );
+  }
+
+  return {
+    sandboxRuntime,
+    snapshotPreparationScriptKind,
+    image: {
+      imageId: snapshotImageId,
+      createdAt: new Date().toISOString(),
+      kind: "snapshot",
+      provider: sandboxRuntime.provider,
+    },
   };
 }
 

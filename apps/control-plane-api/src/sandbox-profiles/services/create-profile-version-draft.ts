@@ -33,6 +33,7 @@ type CreateProfileVersionDraftOutput = {
   agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
   sandboxProvider: string | null;
   sandboxConnectionId: string | null;
+  maintenanceScript: string | null;
   sandboxResources: SandboxProfileVersionResources | null;
   isActive: boolean;
   usable: boolean;
@@ -85,6 +86,7 @@ export async function createProfileVersionDraft(
         columns: {
           version: true,
           setupScript: true,
+          maintenanceScript: true,
           defaultPersistenceMode: true,
           agentRuntimeId: true,
           sandboxProvider: true,
@@ -126,6 +128,7 @@ export async function createProfileVersionDraft(
           version: nextVersionNumber,
           state: SandboxProfileVersionStates.DRAFT,
           setupScript: latestVersion.setupScript,
+          maintenanceScript: latestVersion.maintenanceScript,
           defaultPersistenceMode: latestVersion.defaultPersistenceMode,
           agentRuntimeId: latestVersion.agentRuntimeId,
           sandboxProvider: latestVersion.sandboxProvider,
@@ -172,6 +175,7 @@ export async function createProfileVersionDraft(
         defaultPersistenceMode: createdDraftVersion.defaultPersistenceMode,
         agentRuntimeId: createdDraftVersion.agentRuntimeId,
         ...mapProfileVersionRuntimeConfig(createdDraftVersion),
+        maintenanceScript: latestVersion.maintenanceScript,
         isActive: false,
         usable: false,
         refreshSchedule: null,

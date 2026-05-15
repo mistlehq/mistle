@@ -539,6 +539,8 @@ export interface paths {
             organizationId: string;
             profileId: string;
             profileVersion: number;
+            /** @enum {string} */
+            snapshotPreparationScriptKind?: "setup" | "maintenance";
           };
         };
       };

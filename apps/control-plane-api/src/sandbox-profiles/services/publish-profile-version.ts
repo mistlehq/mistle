@@ -1,11 +1,14 @@
 import {
   getControlPlaneDatabaseSchema,
+  type ControlPlaneTransaction,
+  ScheduleTargetTypes,
   type SandboxProfileVersionAgentRuntimeId,
   type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
+import { findNextScheduleOccurrence } from "@mistle/time";
 import { and, eq, sql } from "drizzle-orm";
 import { typeid } from "typeid-js";
 
@@ -43,6 +46,7 @@ type PublishProfileVersionOutput = {
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
     sandboxProvider: string | null;
     sandboxConnectionId: string | null;
+    maintenanceScript: string | null;
     sandboxResources: SandboxProfileVersionResources | null;
     isActive: boolean;
     usable: boolean;
@@ -72,6 +76,105 @@ type PublishProfileVersionOutput = {
     finishedAt: string | null;
   };
 };
+
+async function copyRefreshScheduleToPublishedVersion(
+  tx: ControlPlaneTransaction,
+  input: {
+    organizationId: string;
+    profileId: string;
+    fromVersion: number;
+    toVersion: number;
+    now: Date;
+  },
+): Promise<ProfileVersionRefreshScheduleSummary | null> {
+  const tables = getControlPlaneDatabaseSchema(tx);
+  const [sourceTarget] = await tx
+    .select({
+      scheduleId: tables.sandboxProfileSnapshotRefreshScheduleTargets.scheduleId,
+    })
+    .from(tables.sandboxProfileSnapshotRefreshScheduleTargets)
+    .where(
+      and(
+        eq(tables.sandboxProfileSnapshotRefreshScheduleTargets.sandboxProfileId, input.profileId),
+        eq(
+          tables.sandboxProfileSnapshotRefreshScheduleTargets.sandboxProfileVersion,
+          input.fromVersion,
+        ),
+      ),
+    )
+    .limit(1);
+
+  if (sourceTarget === undefined) {
+    return null;
+  }
+
+  const sourceSchedule = await tx.query.schedules.findFirst({
+    columns: {
+      name: true,
+      cronExpression: true,
+      timezone: true,
+      enabled: true,
+    },
+    where: (table, { and: whereAnd, eq: whereEq, isNull }) =>
+      whereAnd(
+        whereEq(table.id, sourceTarget.scheduleId),
+        whereEq(table.enabled, true),
+        isNull(table.deletedAt),
+      ),
+  });
+
+  if (sourceSchedule === undefined) {
+    return null;
+  }
+
+  const nextOccurrence = findNextScheduleOccurrence({
+    after: input.now,
+    cronExpression: sourceSchedule.cronExpression,
+    timezone: sourceSchedule.timezone,
+  });
+  if (nextOccurrence === null) {
+    throw new Error("Copied snapshot refresh schedule has no next occurrence.");
+  }
+
+  const [createdSchedule] = await tx
+    .insert(tables.schedules)
+    .values({
+      organizationId: input.organizationId,
+      targetType: ScheduleTargetTypes.SNAPSHOT_REFRESH,
+      name: sourceSchedule.name,
+      cronExpression: sourceSchedule.cronExpression,
+      timezone: sourceSchedule.timezone,
+      enabled: sourceSchedule.enabled,
+      nextScheduledAt: nextOccurrence.scheduledAt.toISOString(),
+    })
+    .returning({
+      id: tables.schedules.id,
+      name: tables.schedules.name,
+      cronExpression: tables.schedules.cronExpression,
+      timezone: tables.schedules.timezone,
+      enabled: tables.schedules.enabled,
+      nextScheduledAt: tables.schedules.nextScheduledAt,
+    });
+
+  if (createdSchedule === undefined) {
+    throw new Error("Expected copied snapshot refresh schedule to be created.");
+  }
+
+  await tx.insert(tables.sandboxProfileSnapshotRefreshScheduleTargets).values({
+    scheduleId: createdSchedule.id,
+    sandboxProfileId: input.profileId,
+    sandboxProfileVersion: input.toVersion,
+  });
+
+  return {
+    scheduleId: createdSchedule.id,
+    name: createdSchedule.name,
+    cronExpression: createdSchedule.cronExpression,
+    timezone: createdSchedule.timezone,
+    enabled: createdSchedule.enabled,
+    nextScheduledAt: createdSchedule.nextScheduledAt,
+  };
+}
 
 export async function publishProfileVersion(
   {
@@ -114,6 +217,7 @@ export async function publishProfileVersion(
         sandboxProfileId: true,
         version: true,
         state: true,
+        maintenanceScript: true,
       },
       where: (table, { and, eq }) =>
         and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),
@@ -149,11 +253,32 @@ export async function publishProfileVersion(
       );
     }
 
+    const previousActiveVersionNumber = sandboxProfile.activeVersion;
+    let previousActiveVersion: { maintenanceScript: string | null } | null = null;
+    if (previousActiveVersionNumber !== null) {
+      const activeVersion = previousActiveVersionNumber;
+      previousActiveVersion =
+        (await tx.query.sandboxProfileVersions.findFirst({
+          columns: {
+            maintenanceScript: true,
+          },
+          where: (table, { and: whereAnd, eq: whereEq }) =>
+            whereAnd(
+              whereEq(table.sandboxProfileId, input.profileId),
+              whereEq(table.version, activeVersion),
+            ),
+        })) ?? null;
+    }
+
     const [publishedVersion] = await tx
       .update(tables.sandboxProfileVersions)
       .set({
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: sql`now()`,
+        maintenanceScript:
+          previousActiveVersion === null
+            ? sandboxProfileVersion.maintenanceScript
+            : previousActiveVersion.maintenanceScript,
       })
       .where(
         and(
@@ -173,6 +298,7 @@ export async function publishProfileVersion(
         sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
         sandboxMemoryMb: tables.sandboxProfileVersions.sandboxMemoryMb,
         sandboxStorageMb: tables.sandboxProfileVersions.sandboxStorageMb,
+        maintenanceScript: tables.sandboxProfileVersions.maintenanceScript,
       });
 
     if (publishedVersion === undefined) {
@@ -213,6 +339,16 @@ export async function publishProfileVersion(
       db: tx,
       profileId: input.profileId,
     });
+    const copiedRefreshSchedule =
+      previousActiveVersionNumber === null
+        ? null
+        : await copyRefreshScheduleToPublishedVersion(tx, {
+            organizationId: input.organizationId,
+            profileId: input.profileId,
+            fromVersion: previousActiveVersionNumber,
+            toVersion: input.profileVersion,
+            now: new Date(),
+          });
 
     return {
       version: {
@@ -221,10 +357,12 @@ export async function publishProfileVersion(
         state: publishedVersion.state,
         defaultPersistenceMode: publishedVersion.defaultPersistenceMode,
         agentRuntimeId: publishedVersion.agentRuntimeId,
+        maintenanceScript: publishedVersion.maintenanceScript,
         ...mapProfileVersionRuntimeConfig(publishedVersion),
         isActive: false,
         usable: false,
-        refreshSchedule: refreshSchedulesByVersion.get(input.profileVersion) ?? null,
+        refreshSchedule:
+          copiedRefreshSchedule ?? refreshSchedulesByVersion.get(input.profileVersion) ?? null,
         latestSnapshotJob: snapshotJob,
       },
       activeVersion: sandboxProfile.activeVersion,
@@ -232,11 +370,11 @@ export async function publishProfileVersion(
     };
   });
 
+  const sandboxRuntime = createWorkflowSandboxRuntime(publishedResult.version);
   await enqueueSnapshotMaterializationJob(
     {
       db,
       dataPlaneClient,
-      defaultBaseImage,
     },
     {
       snapshotJobId: publishedResult.snapshotJob.id,
@@ -244,7 +382,14 @@ export async function publishProfileVersion(
       organizationId: input.organizationId,
       profileId: input.profileId,
       profileVersion: input.profileVersion,
-      sandboxRuntime: createWorkflowSandboxRuntime(publishedResult.version),
+      snapshotPreparationScriptKind: "setup",
+      image: {
+        imageId: defaultBaseImage,
+        createdAt: new Date().toISOString(),
+        kind: "base",
+        provider: sandboxRuntime.provider,
+      },
+      sandboxRuntime,
     },
   );
 

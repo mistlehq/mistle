@@ -21,7 +21,7 @@ const MaterializeWorkflowRunInputSchema = z.looseObject({
     .object({
       imageId: z.string().min(1),
       createdAt: z.iso.datetime().optional(),
-      kind: z.literal("base"),
+      kind: z.enum(["base", "snapshot"]),
       provider: z.enum(["docker", "e2b", "tensorlake"]),
     })
     .strict(),

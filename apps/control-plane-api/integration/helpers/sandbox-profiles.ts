@@ -33,6 +33,7 @@ export function sandboxProfileVersionRow(input: {
   state?: "draft" | "published";
   publishedAt?: string | null;
   setupScript?: string | null;
+  maintenanceScript?: string | null;
   agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
   defaultPersistenceMode?: SandboxProfileVersionDefaultPersistenceMode;
   sandboxProvider?: string | null;
@@ -52,6 +53,9 @@ export function sandboxProfileVersionRow(input: {
           : "2026-01-01T00:00:00.000Z"
         : input.publishedAt,
     ...(input.setupScript === undefined ? {} : { setupScript: input.setupScript }),
+    ...(input.maintenanceScript === undefined
+      ? {}
+      : { maintenanceScript: input.maintenanceScript }),
     ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
     defaultPersistenceMode:
       input.defaultPersistenceMode ?? SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,

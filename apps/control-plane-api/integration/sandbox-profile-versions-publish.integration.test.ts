@@ -135,6 +135,7 @@ describe.concurrent("sandbox profile versions publish integration", () => {
         ...EmptySandboxRuntimeConfig,
         isActive: false,
         usable: false,
+        maintenanceScript: null,
         refreshSchedule: {
           scheduleId: expect.any(String),
           name: "Draft refresh",
@@ -213,6 +214,123 @@ describe.concurrent("sandbox profile versions publish integration", () => {
       image: {
         kind: "base",
       },
+      snapshotPreparationScriptKind: "setup",
+    });
+  });
+
+  it("copies the previous active version maintenance script and refresh schedule when publishing", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publish-copy-maintenance@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_version_publish_copy_maintenance",
+        organizationId: session.organizationId,
+        displayName: "Publish Copy Maintenance Profile",
+        activeVersion: 1,
+        createdAt: "2026-05-15T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+      {
+        ...sandboxProfileVersionRow({
+          sandboxProfileId: "sbp_version_publish_copy_maintenance",
+          version: 1,
+          state: SandboxProfileVersionStates.PUBLISHED,
+          publishedAt: "2026-05-15T00:01:00.000Z",
+          maintenanceScript: "echo maintain previous",
+        }),
+        snapshotImageProvider: "docker",
+        snapshotImageId: "sha256:publish-copy-maintenance-v1",
+      },
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_version_publish_copy_maintenance",
+        version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
+        maintenanceScript: "echo draft should not replace previous",
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    ]);
+
+    const scheduleResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_version_publish_copy_maintenance/versions/1/refresh-schedule",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          name: "Existing active refresh",
+          cronExpression: "15 7 * * *",
+          timezone: "Asia/Singapore",
+        }),
+      },
+    );
+    expect(scheduleResponse.status).toBe(200);
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_version_publish_copy_maintenance/versions/2/publish",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    expect(responseBody.version).toMatchObject({
+      sandboxProfileId: "sbp_version_publish_copy_maintenance",
+      version: 2,
+      maintenanceScript: "echo maintain previous",
+      refreshSchedule: {
+        name: "Existing active refresh",
+        cronExpression: "15 7 * * *",
+        timezone: "Asia/Singapore",
+        enabled: true,
+        nextScheduledAt: expect.any(String),
+      },
+    });
+
+    const persistedPublishedVersion =
+      await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+        columns: {
+          maintenanceScript: true,
+        },
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.sandboxProfileId, "sbp_version_publish_copy_maintenance"),
+            eq(table.version, 2),
+          ),
+      });
+    expect(persistedPublishedVersion?.maintenanceScript).toBe("echo maintain previous");
+
+    const copiedTarget =
+      await env.controlPlaneDb.query.sandboxProfileSnapshotRefreshScheduleTargets.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.sandboxProfileId, "sbp_version_publish_copy_maintenance"),
+            eq(table.sandboxProfileVersion, 2),
+          ),
+      });
+    if (copiedTarget === undefined) {
+      throw new Error("Expected copied refresh schedule target for published version.");
+    }
+
+    const queuedWorkflowInput = await waitForQueuedMaterializeWorkflowInput({
+      env,
+      snapshotJobId: responseBody.snapshotJob.id,
+    });
+    expect(queuedWorkflowInput).toMatchObject({
+      image: {
+        kind: "base",
+      },
+      snapshotPreparationScriptKind: "setup",
     });
   });
 

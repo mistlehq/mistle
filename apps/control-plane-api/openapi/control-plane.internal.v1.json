@@ -1999,6 +1999,10 @@
                     "type": "integer",
                     "minimum": 1
                   },
+                  "snapshotPreparationScriptKind": {
+                    "type": "string",
+                    "enum": ["setup", "maintenance"]
+                  },
                   "image": {
                     "type": "object",
                     "properties": {

@@ -1,39 +1,38 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import {
-  ForbiddenResponseSchema,
-  UnauthorizedResponseSchema,
-  ValidationErrorResponseSchema,
-} from "@mistle/http/errors.js";
+import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
 import {
-  publishSandboxProfileVersionResponseSchema,
-  refreshSandboxProfileVersionBodySchema,
   sandboxProfileVersionParamsSchema,
+  startSandboxProfileMaintenanceScriptTestRunBodySchema,
+  startSandboxProfileSetupScriptTestRunResponseSchema,
 } from "../schemas.js";
-import { conflictResponseSchema, notFoundResponseSchema } from "./schema.js";
+import {
+  badRequestResponseSchema,
+  conflictResponseSchema,
+  notFoundResponseSchema,
+} from "../start-sandbox-profile-instance/schema.js";
 
 export const route = createRoute({
   method: "post",
-  path: "/{profileId}/versions/{version}/refresh",
+  path: "/{profileId}/versions/{version}/maintenance-script/test-runs",
   tags: ["Sandbox Profiles"],
   request: {
     params: sandboxProfileVersionParamsSchema,
     body: {
-      required: false,
+      required: true,
       content: {
         "application/json": {
-          schema: refreshSandboxProfileVersionBodySchema,
+          schema: startSandboxProfileMaintenanceScriptTestRunBodySchema,
         },
       },
     },
   },
   responses: {
-    200: {
-      description:
-        "Queue manual snapshot materialization or refresh for the specified published sandbox profile version.",
+    201: {
+      description: "Start a maintenance script test run for the specified profile version.",
       content: {
         "application/json": {
-          schema: publishSandboxProfileVersionResponseSchema,
+          schema: startSandboxProfileSetupScriptTestRunResponseSchema,
         },
       },
     },
@@ -41,12 +40,12 @@ export const route = createRoute({
       description: "Invalid request.",
       content: {
         "application/json": {
-          schema: ValidationErrorResponseSchema,
+          schema: badRequestResponseSchema,
         },
       },
     },
     404: {
-      description: "Sandbox profile or version was not found.",
+      description: "Sandbox profile or profile version was not found.",
       content: {
         "application/json": {
           schema: notFoundResponseSchema,
@@ -54,7 +53,7 @@ export const route = createRoute({
       },
     },
     409: {
-      description: "Sandbox profile version cannot be refreshed.",
+      description: "Sandbox profile version cannot run maintenance script tests.",
       content: {
         "application/json": {
           schema: conflictResponseSchema,

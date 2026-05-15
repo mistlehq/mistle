@@ -54,6 +54,7 @@ export function defineSandboxProfileVersions(schema: PgSchema) {
       snapshotImageProvider: text("snapshot_image_provider"),
       snapshotImageId: text("snapshot_image_id"),
       setupScript: text("setup_script"),
+      maintenanceScript: text("maintenance_script"),
       defaultPersistenceMode: text("default_persistence_mode")
         .notNull()
         .$type<SandboxProfileVersionDefaultPersistenceMode>()
