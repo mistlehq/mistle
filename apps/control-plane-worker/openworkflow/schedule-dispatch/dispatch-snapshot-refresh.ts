@@ -206,17 +206,11 @@ async function loadSnapshotRefreshMaterializationTarget(
           },
         }),
   };
-  const snapshotPreparationScriptKind = hasNonBlankScript(sandboxProfileVersion.maintenanceScript)
-    ? "maintenance"
-    : "setup";
-  if (
-    snapshotPreparationScriptKind === "maintenance" &&
-    sandboxProfileVersion.snapshotImageId === null
-  ) {
-    throw new Error(
-      `Sandbox profile '${input.sandboxProfileId}' version '${String(input.sandboxProfileVersion)}' has a maintenance script but no usable snapshot for scheduled refresh.`,
-    );
-  }
+  const snapshotPreparationScriptKind =
+    hasNonBlankScript(sandboxProfileVersion.maintenanceScript) &&
+    sandboxProfileVersion.snapshotImageId !== null
+      ? "maintenance"
+      : "setup";
 
   if (snapshotPreparationScriptKind === "setup") {
     return {
@@ -234,7 +228,7 @@ async function loadSnapshotRefreshMaterializationTarget(
   const snapshotImageId = sandboxProfileVersion.snapshotImageId;
   if (snapshotImageId === null) {
     throw new Error(
-      `Sandbox profile '${input.sandboxProfileId}' version '${String(input.sandboxProfileVersion)}' has a maintenance script but no usable snapshot for scheduled refresh.`,
+      `Sandbox profile '${input.sandboxProfileId}' version '${String(input.sandboxProfileVersion)}' selected maintenance refresh without a usable snapshot.`,
     );
   }
 

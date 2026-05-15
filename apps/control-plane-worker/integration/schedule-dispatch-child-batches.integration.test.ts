@@ -11,7 +11,10 @@ import {
   ScheduledActionStatuses,
   ScheduleTargetTypes,
 } from "@mistle/db/control-plane";
-import { createControlPlaneWorkflowNamespaceId } from "@mistle/db/test-environment";
+import {
+  createControlPlaneWorkflowNamespaceId,
+  createDataPlaneWorkflowNamespaceId,
+} from "@mistle/db/test-environment";
 import {
   createIntegrationTest,
   TestEnvironmentIdHeader,
@@ -21,6 +24,7 @@ import {
   HandleAutomationRunWorkflowSpec,
   ScheduleDispatchBatchWorkflowSpec,
 } from "@mistle/workflow-registry/control-plane";
+import { MaterializeSandboxProfileVersionSnapshotWorkflowSpec } from "@mistle/workflow-registry/data-plane";
 import { eq, sql } from "drizzle-orm";
 import { describe, expect } from "vitest";
 import { z } from "zod";
@@ -564,6 +568,65 @@ describe.concurrent("control-plane worker schedule dispatch child batches", () =
     expect(persistedAction?.dispatchedAt).not.toBeNull();
   });
 
+  it("uses setup refresh when scheduled maintenance fires before the first snapshot exists", async ({
+    env,
+  }) => {
+    await seedSnapshotRefreshScheduledAction({
+      env,
+      organizationId: "org_integration_new_schedule_batch_snapshot_initial_setup",
+      profileId: "sbp_integration_new_schedule_batch_snapshot_initial_setup",
+      profileVersion: 1,
+      scheduleId: "sch_integration_new_schedule_batch_snapshot_initial_setup",
+      scheduledActionId: "sca_integration_new_schedule_batch_snapshot_initial_setup",
+      maintenanceScript: "echo maintain",
+      snapshotImageId: null,
+    });
+
+    const result = await dispatchScheduledAction(createDispatchContext(env), {
+      scheduledActionId: "sca_integration_new_schedule_batch_snapshot_initial_setup",
+      dispatchClaimKey: "schedule-dispatch-batch:integration-new-snapshot-initial-setup",
+      staleDispatchingBefore: new Date("2026-04-28T01:00:00.000Z"),
+    });
+
+    expect(result).toEqual({
+      scheduledActionId: "sca_integration_new_schedule_batch_snapshot_initial_setup",
+      status: "dispatched",
+    });
+
+    const [snapshotJob] = await env.controlPlaneDb.query.sandboxProfileVersionSnapshotJobs.findMany(
+      {
+        where: (table, { eq }) =>
+          eq(
+            table.sourceScheduledActionId,
+            "sca_integration_new_schedule_batch_snapshot_initial_setup",
+          ),
+      },
+    );
+    if (snapshotJob === undefined) {
+      throw new Error("Expected scheduled snapshot refresh job to be created.");
+    }
+
+    const snapshotWorkflowRun = await readDataPlaneWorkflowRunByIdempotencyKey(env, {
+      workflowName: MaterializeSandboxProfileVersionSnapshotWorkflowSpec.name,
+      idempotencyKey: JSON.stringify({
+        version: 1,
+        snapshotJobId: snapshotJob.id,
+      }),
+    });
+    expect(snapshotWorkflowRun).toEqual(
+      expect.objectContaining({
+        workflow_name: MaterializeSandboxProfileVersionSnapshotWorkflowSpec.name,
+        input: expect.objectContaining({
+          snapshotPreparationScriptKind: "setup",
+          image: expect.objectContaining({
+            imageId: "registry:3",
+            kind: "base",
+          }),
+        }),
+      }),
+    );
+  });
+
   it("assigns a sandbox instance id when dispatching a queued scheduled snapshot job created before the column existed", async ({
     env,
   }) => {
@@ -717,6 +780,8 @@ async function seedSnapshotRefreshScheduledAction(input: {
   profileVersion: number;
   scheduleId: string;
   scheduledActionId: string;
+  maintenanceScript?: string | null;
+  snapshotImageId?: string | null;
 }): Promise<void> {
   await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.organizations).values({
     id: input.organizationId,
@@ -739,6 +804,10 @@ async function seedSnapshotRefreshScheduledAction(input: {
       sandboxVcpuCount: null,
       sandboxMemoryMb: null,
       sandboxStorageMb: null,
+      ...(input.maintenanceScript === undefined
+        ? {}
+        : { maintenanceScript: input.maintenanceScript }),
+      ...(input.snapshotImageId === undefined ? {} : { snapshotImageId: input.snapshotImageId }),
     });
   await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.schedules).values({
     id: input.scheduleId,
@@ -810,6 +879,27 @@ async function readControlPlaneWorkflowRunByIdempotencyKey(
     from control_plane_openworkflow.workflow_runs
     where
       namespace_id = ${createControlPlaneWorkflowNamespaceId(env.id)}
+      and workflow_name = ${input.workflowName}
+      and idempotency_key = ${input.idempotencyKey}
+    order by created_at asc
+  `);
+
+  const row = result.rows[0];
+  return row === undefined ? undefined : WorkflowRunRowSchema.parse(row);
+}
+
+async function readDataPlaneWorkflowRunByIdempotencyKey(
+  env: IntegrationTestEnvironment,
+  input: {
+    workflowName: string;
+    idempotencyKey: string;
+  },
+): Promise<WorkflowRunRow | undefined> {
+  const result = await env.controlPlaneDb.execute(sql<WorkflowRunRow>`
+    select id, workflow_name, status, input, idempotency_key
+    from data_plane_openworkflow.workflow_runs
+    where
+      namespace_id = ${createDataPlaneWorkflowNamespaceId(env.id)}
       and workflow_name = ${input.workflowName}
       and idempotency_key = ${input.idempotencyKey}
     order by created_at asc

@@ -225,6 +225,48 @@ describe("SandboxOperationProgressView", () => {
     expectScreenReaderOnlyText(timeline, "Status: completed");
   });
 
+  it("shows retry progress when a failed phase starts again", () => {
+    render(
+      <SandboxOperationProgressView
+        events={[
+          createLifecycleEvent({
+            id: "soe_runtime_adapters_started",
+            message: "runtime_adapters started",
+            phase: "runtime_adapters",
+            sequence: 1,
+            source: "sandboxd",
+            status: "started",
+          }),
+          createLifecycleEvent({
+            id: "soe_runtime_adapters_failed",
+            message: "runtime_adapters failed",
+            phase: "runtime_adapters",
+            sequence: 2,
+            source: "sandboxd",
+            status: "failed",
+          }),
+          createLifecycleEvent({
+            id: "soe_runtime_adapters_retry_started",
+            message: "runtime_adapters retry started",
+            phase: "runtime_adapters",
+            sequence: 3,
+            source: "sandboxd",
+            status: "started",
+          }),
+        ]}
+        title="Maintenance script test progress"
+      />,
+    );
+
+    const timeline = screen.getByText("Runtime adapters").closest("ol");
+    if (timeline === null) {
+      throw new Error("Expected sandbox operation timeline to render.");
+    }
+
+    expect(within(timeline).getAllByText("Runtime adapters")).toHaveLength(1);
+    expectScreenReaderOnlyText(timeline, "Status: started");
+  });
+
   it("keeps warning and failed status text screen-reader-only", () => {
     render(
       <SandboxOperationProgressView

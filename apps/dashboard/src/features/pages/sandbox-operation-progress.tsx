@@ -465,11 +465,7 @@ function resolveLifecycleTimelineEvent(
   currentEvent: SandboxOperationEvent,
   nextEvent: SandboxOperationEvent,
 ): SandboxOperationEvent {
-  if (
-    currentEvent.status !== "started" &&
-    currentEvent.status !== null &&
-    nextEvent.status === "started"
-  ) {
+  if (currentEvent.status === "completed" && nextEvent.status === "started") {
     return currentEvent;
   }
 
