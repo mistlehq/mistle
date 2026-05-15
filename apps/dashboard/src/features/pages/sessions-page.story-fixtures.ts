@@ -94,6 +94,10 @@ export function createSessionsPageStoryQueryClient(input?: {
     } | null;
     failureCode?: string | null;
     failureMessage?: string | null;
+    startupOperation?: {
+      operationId: string;
+      operationKind: "start" | "resume";
+    } | null;
   };
   sessionsSidebarQueryState?: SessionsSidebarQueryState;
 }): QueryClient {
@@ -172,6 +176,7 @@ export function createSessionsPageStoryQueryClient(input?: {
       failureMessage: input.sandboxInstanceStatus.failureMessage ?? null,
       runtimeContext: input.sandboxInstanceStatus.runtimeContext ?? null,
       automationConversation: null,
+      startupOperation: input.sandboxInstanceStatus.startupOperation ?? null,
     });
   }
 

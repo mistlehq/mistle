@@ -4,6 +4,7 @@ import { defineSandboxInstanceDeadlines } from "./sandbox-instance-deadlines.js"
 import { defineSandboxInstanceRuntimePlans } from "./sandbox-instance-runtime-plans.js";
 import { defineSandboxInstanceStorages } from "./sandbox-instance-storages.js";
 import { defineSandboxInstances } from "./sandbox-instances.js";
+import { defineSandboxOperationEvents } from "./sandbox-operation-events.js";
 import { defineSandboxTunnelTokenRedemptions } from "./sandbox-tunnel-token-redemptions.js";
 
 /**
@@ -31,6 +32,10 @@ export function createDataPlaneDbSchema(schemaName: string) {
       sandboxInstances,
     }),
     sandboxInstances,
+    sandboxOperationEvents: defineSandboxOperationEvents({
+      schema,
+      sandboxInstances,
+    }),
     sandboxTunnelTokenRedemptions: defineSandboxTunnelTokenRedemptions(schema),
   };
 }

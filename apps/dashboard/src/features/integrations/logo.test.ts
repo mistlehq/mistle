@@ -31,6 +31,9 @@ describe("resolveIntegrationLogoPath", () => {
     expect(resolveIntegrationLogoPath({ logoKey: "opencode" })).toBe(
       "/integration-logos/opencode.svg",
     );
+    expect(resolveIntegrationLogoPath({ logoKey: "tensorlake" })).toBe(
+      "/integration-logos/tensorlake.svg",
+    );
   });
 
   it("returns dark variant paths for integrations with light-sensitive marks", () => {

@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -42,4 +43,23 @@ export function updateSandboxdCargoTomlVersionFile(
     updateSandboxdCargoTomlVersion(cargoTomlContent, version),
     "utf8",
   );
+}
+
+export function sandboxdCargoLockUpdateArgs(repositoryRootPath: string, version: string): string[] {
+  return [
+    "update",
+    "--manifest-path",
+    join(repositoryRootPath, "packages", "sandboxd", "Cargo.toml"),
+    "--package",
+    "sandboxd",
+    "--precise",
+    version,
+  ];
+}
+
+export function updateSandboxdCargoLockFile(repositoryRootPath: string, version: string): void {
+  execFileSync("cargo", sandboxdCargoLockUpdateArgs(repositoryRootPath, version), {
+    cwd: repositoryRootPath,
+    stdio: "inherit",
+  });
 }

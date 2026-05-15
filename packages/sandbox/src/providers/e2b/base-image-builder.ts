@@ -3,7 +3,7 @@ import {
   SandboxBaseImageSourceKinds,
   SandboxProvider,
   type SandboxBaseImageBuilder,
-  type SandboxBuildBaseImageRequest,
+  type SandboxEnsureBaseImageRequest,
   type SandboxImageHandle,
 } from "../../types.js";
 import { validateE2BSandboxConfig, type E2BSandboxConfig } from "./config.js";
@@ -21,7 +21,7 @@ export class E2BBaseImageBuilder implements SandboxBaseImageBuilder {
     this.#options = options;
   }
 
-  async buildBaseImage(request: SandboxBuildBaseImageRequest): Promise<SandboxImageHandle> {
+  async ensureBaseImage(request: SandboxEnsureBaseImageRequest): Promise<SandboxImageHandle> {
     if (request.source.kind !== SandboxBaseImageSourceKinds.IMAGE) {
       throw new SandboxConfigurationError("E2B base image builder requires an image source.");
     }

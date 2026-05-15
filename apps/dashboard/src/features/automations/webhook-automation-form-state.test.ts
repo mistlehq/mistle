@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { GitHubPullRequestConversationKeyTemplate } from "./webhook-automation-conversation-key-options.js";
 import {
   resolveWebhookAutomationFormPresentation,
   resolveWebhookAutomationFormState,
@@ -28,7 +29,6 @@ const PrimaryRepositoryOptions: readonly WebhookAutomationFormOption[] = [
     path: "/root/mistlehq/platform",
   },
 ];
-
 describe("resolveWebhookAutomationFormPresentation", () => {
   it("shows create-only and edit-only controls based on mode", () => {
     expect(
@@ -187,6 +187,37 @@ describe("resolveWebhookAutomationFormState", () => {
     });
 
     expect(state.selectedConversationGroupingLabel).toBe("Issue");
+  });
+
+  it("derives pull request grouping for pull request events and pull request comments", () => {
+    const pullRequestTriggerId = createWebhookAutomationTriggerId({
+      webhookSourceId: GitHubWebhookSourceId,
+      eventType: "github.pull_request.opened",
+    });
+    const issueCommentTriggerId = createWebhookAutomationTriggerId({
+      webhookSourceId: GitHubWebhookSourceId,
+      eventType: "github.issue_comment.created",
+    });
+
+    const state = resolveWebhookAutomationFormState({
+      webhookEventOptions: [
+        createGithubPullRequestOpenedEventOption(),
+        createGithubIssueCommentCreatedEventOption(),
+      ],
+      selectedTriggerIds: [pullRequestTriggerId, issueCommentTriggerId],
+      conversationKeyTemplate: GitHubPullRequestConversationKeyTemplate,
+      triggerParameterValues: {
+        [issueCommentTriggerId]: {
+          target: "exists",
+        },
+      },
+      triggerIdsError: undefined,
+    });
+
+    expect(state.conversationKeySelectionState.selectedTemplate).toBe(
+      GitHubPullRequestConversationKeyTemplate,
+    );
+    expect(state.selectedConversationGroupingLabel).toBe("Pull request");
   });
 
   it("builds agent instruction tokens from the selected trigger payload references", () => {

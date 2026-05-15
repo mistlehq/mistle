@@ -79,6 +79,13 @@ function createRemoteSandboxProviderConfig(input: {
     });
   }
 
+  if (input.credentials.provider === SandboxProvider.TENSORLAKE) {
+    return createTensorlakeSandboxProviderConfig({
+      credentials: input.credentials,
+      resources: input.resources,
+    });
+  }
+
   return assertUnreachableResolvedSandboxRuntimeCredentials(input.credentials);
 }
 
@@ -101,6 +108,18 @@ function createE2BSandboxProviderConfig(input: {
             cpuCount: input.resources.vcpuCount,
             memoryMb: input.resources.memoryMb,
           }),
+    },
+  };
+}
+
+function createTensorlakeSandboxProviderConfig(input: {
+  credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "tensorlake" }>;
+  resources?: ResolveSandboxRuntimeAdapterInput["resources"];
+}): CreateSandboxAdapterInput {
+  return {
+    provider: SandboxProvider.TENSORLAKE,
+    tensorlake: {
+      apiKey: input.credentials.apiKey,
     },
   };
 }

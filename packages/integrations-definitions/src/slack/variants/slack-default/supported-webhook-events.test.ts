@@ -9,6 +9,10 @@ describe("SlackSupportedWebhookEvents", () => {
       (eventDefinition) => eventDefinition.eventType === "slack:app_mention",
     );
 
+    expect(appMentionEvent?.payloadReferences).toContainEqual({
+      path: ["event"],
+      description: "Slack event payload object.",
+    });
     expect(appMentionEvent?.parameters).toEqual([
       {
         id: "invocationToken",
@@ -48,6 +52,10 @@ describe("SlackSupportedWebhookEvents", () => {
         ],
       },
       payloadReferences: [
+        {
+          path: ["event"],
+          description: "Slack event payload object.",
+        },
         {
           path: ["event", "channel"],
           description: "Normalized Slack channel ID for the reacted message event.",

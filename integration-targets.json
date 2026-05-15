@@ -29,6 +29,11 @@
       "config": {}
     },
     {
+      "targetKey": "tensorlake-default",
+      "enabled": true,
+      "config": {}
+    },
+    {
       "targetKey": "jira-default",
       "enabled": true,
       "config": {}

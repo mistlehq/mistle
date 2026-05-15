@@ -8,7 +8,7 @@ import {
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import type { SandboxRuntimeProviderInput } from "@mistle/workflow-registry/data-plane";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { typeid } from "typeid-js";
 import { z } from "zod";
 
@@ -26,6 +26,7 @@ const SnapshotRefreshTargetPayloadSchema = z
 
 type SnapshotRefreshJob = Readonly<{
   id: string;
+  sandboxInstanceId: string | null;
   sandboxProfileId: string;
   sandboxProfileVersion: number;
   workflowRunId: string | null;
@@ -65,19 +66,31 @@ export async function dispatchSnapshotRefreshScheduledAction(
     };
   }
 
+  let queuedSnapshotJob: SnapshotRefreshJob & { sandboxInstanceId: string };
+  if (snapshotJob.sandboxInstanceId === null) {
+    queuedSnapshotJob = await assignSandboxInstanceIdToQueuedSnapshotJob(ctx, {
+      snapshotJobId: snapshotJob.id,
+    });
+  } else {
+    queuedSnapshotJob = {
+      ...snapshotJob,
+      sandboxInstanceId: snapshotJob.sandboxInstanceId,
+    };
+  }
+
   try {
     const sandboxRuntime = await loadSnapshotRefreshSandboxRuntime(ctx, {
       organizationId: input.organizationId,
-      sandboxProfileId: snapshotJob.sandboxProfileId,
-      sandboxProfileVersion: snapshotJob.sandboxProfileVersion,
+      sandboxProfileId: queuedSnapshotJob.sandboxProfileId,
+      sandboxProfileVersion: queuedSnapshotJob.sandboxProfileVersion,
     });
 
     const materialization = await ctx.dataPlaneClient.materializeSandboxProfileVersionSnapshotJob({
-      snapshotJobId: snapshotJob.id,
-      sandboxInstanceId: typeid("sbi").toString(),
+      snapshotJobId: queuedSnapshotJob.id,
+      sandboxInstanceId: queuedSnapshotJob.sandboxInstanceId,
       organizationId: input.organizationId,
-      sandboxProfileId: snapshotJob.sandboxProfileId,
-      sandboxProfileVersion: snapshotJob.sandboxProfileVersion,
+      sandboxProfileId: queuedSnapshotJob.sandboxProfileId,
+      sandboxProfileVersion: queuedSnapshotJob.sandboxProfileVersion,
       image: {
         imageId: ctx.defaultBaseImage,
         createdAt: new Date().toISOString(),
@@ -92,8 +105,8 @@ export async function dispatchSnapshotRefreshScheduledAction(
     };
   } catch (error) {
     await markQueuedSnapshotJobFailedToEnqueue(ctx, {
-      snapshotJobId: snapshotJob.id,
-      message: `Failed to enqueue scheduled snapshot refresh for sandbox profile '${snapshotJob.sandboxProfileId}' version '${String(snapshotJob.sandboxProfileVersion)}'.`,
+      snapshotJobId: queuedSnapshotJob.id,
+      message: `Failed to enqueue scheduled snapshot refresh for sandbox profile '${queuedSnapshotJob.sandboxProfileId}' version '${String(queuedSnapshotJob.sandboxProfileVersion)}'.`,
     });
     throw error;
   }
@@ -187,6 +200,7 @@ async function createOrResolveSnapshotRefreshJob(
   },
 ): Promise<SnapshotRefreshJobResolution> {
   const tables = getControlPlaneDatabaseSchema(ctx.db);
+  const sandboxInstanceId = typeid("sbi").toString();
 
   try {
     const [snapshotJob] = await ctx.db
@@ -194,12 +208,14 @@ async function createOrResolveSnapshotRefreshJob(
       .values({
         sandboxProfileId: input.sandboxProfileId,
         sandboxProfileVersion: input.sandboxProfileVersion,
+        sandboxInstanceId,
         trigger: SandboxProfileVersionSnapshotJobTriggers.SCHEDULED_REFRESH,
         state: SandboxProfileVersionSnapshotJobStates.QUEUED,
         sourceScheduledActionId: input.scheduledActionId,
       })
       .returning({
         id: tables.sandboxProfileVersionSnapshotJobs.id,
+        sandboxInstanceId: tables.sandboxProfileVersionSnapshotJobs.sandboxInstanceId,
         sandboxProfileId: tables.sandboxProfileVersionSnapshotJobs.sandboxProfileId,
         sandboxProfileVersion: tables.sandboxProfileVersionSnapshotJobs.sandboxProfileVersion,
         workflowRunId: tables.sandboxProfileVersionSnapshotJobs.workflowRunId,
@@ -250,6 +266,53 @@ async function createOrResolveSnapshotRefreshJob(
   }
 }
 
+async function assignSandboxInstanceIdToQueuedSnapshotJob(
+  ctx: {
+    db: ControlPlaneDatabase;
+  },
+  input: {
+    snapshotJobId: string;
+  },
+): Promise<SnapshotRefreshJob & { sandboxInstanceId: string }> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+  const sandboxInstanceId = typeid("sbi").toString();
+  const [snapshotJob] = await ctx.db
+    .update(tables.sandboxProfileVersionSnapshotJobs)
+    .set({
+      sandboxInstanceId,
+      updatedAt: sql`now()`,
+    })
+    .where(
+      and(
+        eq(tables.sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId),
+        eq(
+          tables.sandboxProfileVersionSnapshotJobs.state,
+          SandboxProfileVersionSnapshotJobStates.QUEUED,
+        ),
+        isNull(tables.sandboxProfileVersionSnapshotJobs.sandboxInstanceId),
+      ),
+    )
+    .returning({
+      id: tables.sandboxProfileVersionSnapshotJobs.id,
+      sandboxInstanceId: tables.sandboxProfileVersionSnapshotJobs.sandboxInstanceId,
+      sandboxProfileId: tables.sandboxProfileVersionSnapshotJobs.sandboxProfileId,
+      sandboxProfileVersion: tables.sandboxProfileVersionSnapshotJobs.sandboxProfileVersion,
+      workflowRunId: tables.sandboxProfileVersionSnapshotJobs.workflowRunId,
+      state: tables.sandboxProfileVersionSnapshotJobs.state,
+    });
+
+  if (snapshotJob?.sandboxInstanceId === undefined || snapshotJob.sandboxInstanceId === null) {
+    throw new Error(
+      `Queued snapshot job '${input.snapshotJobId}' could not be assigned a sandbox instance id.`,
+    );
+  }
+
+  return {
+    ...snapshotJob,
+    sandboxInstanceId: snapshotJob.sandboxInstanceId,
+  };
+}
+
 async function loadSnapshotJobForScheduledAction(
   ctx: {
     db: ControlPlaneDatabase;
@@ -262,6 +325,7 @@ async function loadSnapshotJobForScheduledAction(
     columns: {
       id: true,
       sandboxProfileId: true,
+      sandboxInstanceId: true,
       sandboxProfileVersion: true,
       workflowRunId: true,
       state: true,
@@ -291,6 +355,7 @@ async function loadActiveSnapshotJobForProfileVersion(
     columns: {
       id: true,
       sandboxProfileId: true,
+      sandboxInstanceId: true,
       sandboxProfileVersion: true,
       workflowRunId: true,
       state: true,

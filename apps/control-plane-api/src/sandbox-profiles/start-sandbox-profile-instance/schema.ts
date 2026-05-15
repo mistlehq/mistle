@@ -12,10 +12,17 @@ import {
 } from "../errors.js";
 
 export const badRequestResponseSchema = z.union([
-  createCodeMessageErrorSchema(z.enum([SandboxProfilesBadRequestCodes.INVALID_PRIMARY_REPOSITORY])),
+  createCodeMessageErrorSchema(
+    z.enum([
+      SandboxProfilesBadRequestCodes.INVALID_PRIMARY_REPOSITORY,
+      SandboxProfilesBadRequestCodes.INVALID_SANDBOX_RUNTIME_CONFIG,
+    ]),
+  ),
   createCodeMessageErrorSchema(
     z.enum([
       SandboxProfilesCompileErrorCodes.AGENT_RUNTIME_REQUIRED,
+      SandboxProfilesCompileErrorCodes.SANDBOX_PROVIDER_REQUIRED,
+      SandboxProfilesCompileErrorCodes.INVALID_SANDBOX_PROVIDER,
       SandboxProfilesCompileErrorCodes.INVALID_BINDING_CONNECTION_REFERENCE,
       SandboxProfilesCompileErrorCodes.INVALID_CONNECTION_TARGET_REFERENCE,
       SandboxProfilesCompileErrorCodes.CONNECTION_MISMATCH,

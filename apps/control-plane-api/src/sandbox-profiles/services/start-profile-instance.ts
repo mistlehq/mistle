@@ -79,7 +79,11 @@ const LaunchImageKinds = {
 function assertSnapshotImageProvider(
   provider: string,
 ): NonNullable<StartSandboxInstanceWorkflowImageInput["provider"]> {
-  if (provider === SandboxProvider.DOCKER || provider === SandboxProvider.E2B) {
+  if (
+    provider === SandboxProvider.DOCKER ||
+    provider === SandboxProvider.E2B ||
+    provider === SandboxProvider.TENSORLAKE
+  ) {
     return provider;
   }
 

@@ -2,9 +2,13 @@ use std::collections::BTreeMap;
 use std::fs::DirBuilder;
 use std::os::unix::fs::DirBuilderExt;
 use std::path::Path;
+use std::sync::Arc;
 
 use super::plan::{CompiledWorkspaceSource, RuntimeExecCommand, WorkspaceSourceResourceKind};
-use crate::command::{CommandSpec, DEFAULT_COMMAND_POLL_INTERVAL, run_command};
+use crate::command::{
+    CommandOutputSink, CommandSpec, DEFAULT_COMMAND_POLL_INTERVAL,
+    run_command_with_details_and_output_sink,
+};
 use crate::time::{SystemClock, ThreadSleeper};
 
 const EGRESS_GRANT_HEADER_NAME: &str = "X-Mistle-Egress-Grant";
@@ -12,6 +16,7 @@ const EGRESS_GRANT_HEADER_NAME: &str = "X-Mistle-Egress-Grant";
 pub fn apply_workspace_source(
     workspace_source: &CompiledWorkspaceSource,
     managed_env: Option<&BTreeMap<String, String>>,
+    output_sink: Option<Arc<dyn CommandOutputSink>>,
 ) -> Result<(), String> {
     match workspace_source {
         CompiledWorkspaceSource::GitClone {
@@ -26,6 +31,7 @@ pub fn apply_workspace_source(
             clone_url.as_deref(),
             egress_grant_token.as_deref(),
             managed_env,
+            output_sink,
         ),
     }
 }
@@ -36,6 +42,7 @@ fn apply_git_clone_workspace_source(
     clone_url: Option<&str>,
     egress_grant_token: Option<&str>,
     managed_env: Option<&BTreeMap<String, String>>,
+    output_sink: Option<Arc<dyn CommandOutputSink>>,
 ) -> Result<(), String> {
     if Path::new(path).exists() {
         return Ok(());
@@ -78,7 +85,7 @@ fn apply_git_clone_workspace_source(
         timeout_ms: None,
     };
 
-    run_command(
+    run_command_with_details_and_output_sink(
         CommandSpec {
             args: &command.args,
             env: command.env.as_ref(),
@@ -88,7 +95,9 @@ fn apply_git_clone_workspace_source(
         &SystemClock,
         &ThreadSleeper,
         DEFAULT_COMMAND_POLL_INTERVAL,
+        output_sink.clone(),
     )
+    .map_err(|error| error.message)
     .map_err(|error| format!("failed to clone repository: {error}"))?;
 
     if clone_url.is_some_and(|clone_url| clone_url != origin_url) {
@@ -107,7 +116,7 @@ fn apply_git_clone_workspace_source(
             timeout_ms: None,
         };
 
-        run_command(
+        run_command_with_details_and_output_sink(
             CommandSpec {
                 args: &update_origin_command.args,
                 env: update_origin_command.env.as_ref(),
@@ -117,7 +126,9 @@ fn apply_git_clone_workspace_source(
             &SystemClock,
             &ThreadSleeper,
             DEFAULT_COMMAND_POLL_INTERVAL,
+            output_sink,
         )
+        .map_err(|error| error.message)
         .map_err(|error| format!("failed to restore repository origin url: {error}"))?;
     }
 

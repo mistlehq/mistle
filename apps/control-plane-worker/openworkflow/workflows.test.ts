@@ -2,6 +2,7 @@ import {
   HandleAutomationConversationDeliveryWorkflowSpec,
   HandleAutomationRunWorkflowSpec,
   HandleIntegrationWebhookEventWorkflowSpec,
+  ProvisionStripeCustomerWorkflowSpec,
   RequestDeleteSandboxProfileWorkflowSpec,
   ScheduleDispatchBatchWorkflowSpec,
   ScheduleDispatchWorkflowSpec,
@@ -40,6 +41,12 @@ describe("control-plane worker openworkflow entrypoints", () => {
   it("preserves the request delete sandbox profile workflow identity", () => {
     expect(readWorkflowSpec(RequestDeleteSandboxProfileWorkflowSpec.name)).toMatchObject(
       RequestDeleteSandboxProfileWorkflowSpec,
+    );
+  });
+
+  it("preserves the provision Stripe customer workflow identity", () => {
+    expect(readWorkflowSpec(ProvisionStripeCustomerWorkflowSpec.name)).toMatchObject(
+      ProvisionStripeCustomerWorkflowSpec,
     );
   });
 

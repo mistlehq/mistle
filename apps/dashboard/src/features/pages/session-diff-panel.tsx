@@ -717,7 +717,7 @@ function SessionDiffCommentTextarea(
   return (
     <Textarea
       {...props}
-      className={`min-h-28 resize-none rounded-none border-0 bg-transparent p-0 text-sm shadow-none focus-visible:ring-0 ${
+      className={`min-h-28 resize-none rounded-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 ${
         props.className ?? ""
       }`}
     />

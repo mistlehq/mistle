@@ -652,6 +652,8 @@ export async function startFullSystemEnvironment(
           ...(isDockerSandboxProvider
             ? {
                 MISTLE_SANDBOX_DEFAULT_BASE_IMAGE: sandboxBaseImageReference,
+                MISTLE_SANDBOX_STORAGE_BACKEND: "docker_volume",
+                MISTLE_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX: "it-system-",
               }
             : {}),
           MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL: gatewayWsUrl,
@@ -718,6 +720,8 @@ export async function startFullSystemEnvironment(
           MISTLE_SERVICES_DATA_PLANE_GATEWAY_INTERNAL_URL: DATA_PLANE_GATEWAY_CONTAINER_BASE_URL,
           ...(isDockerSandboxProvider
             ? {
+                MISTLE_SANDBOX_STORAGE_BACKEND: "docker_volume",
+                MISTLE_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX: "it-system-",
                 MISTLE_SANDBOX_DOCKER_ENABLED: "true",
                 MISTLE_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
                 MISTLE_SANDBOX_DOCKER_NETWORK_NAME: activeNetwork.getName(),

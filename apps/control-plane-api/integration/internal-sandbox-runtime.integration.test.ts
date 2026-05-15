@@ -15,6 +15,9 @@ import {
   E2BSandboxRuntimeCredentialSlotKeys,
   E2BSandboxRuntimeFamilyId,
   E2BSandboxRuntimeVariantId,
+  TensorlakeSandboxRuntimeCredentialSlotKeys,
+  TensorlakeSandboxRuntimeFamilyId,
+  TensorlakeSandboxRuntimeVariantId,
 } from "@mistle/integrations-definitions/sandbox-runtimes";
 import {
   createIntegrationTest,
@@ -238,6 +241,66 @@ describe.concurrent("internal sandbox runtime integration", () => {
       source: "connection",
       apiKey: "e2b-connection-api-key",
       domain: "e2b.internal.example.com",
+    });
+  });
+
+  it("resolves Tensorlake sandbox runtime credentials from a sandbox connection", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-internal-sandbox-runtime-tensorlake-credentials@example.com",
+    });
+    await seedIntegrationTarget(env, {
+      targetKey: "tensorlake-internal-runtime-credentials",
+      familyId: TensorlakeSandboxRuntimeFamilyId,
+      variantId: TensorlakeSandboxRuntimeVariantId,
+      config: {},
+    });
+
+    const createResponse = await createFormConnection({
+      env,
+      targetKey: "tensorlake-internal-runtime-credentials",
+      cookie: session.cookie,
+      body: {
+        displayName: "Tensorlake runtime credentials",
+        methodId: IntegrationConnectionMethodIds.API_KEY,
+        config: {},
+        secrets: {
+          apiKey: "tensorlake-connection-api-key",
+        },
+      },
+    });
+
+    expect(createResponse.status).toBe(201);
+    const connection = CreatedFormIntegrationConnectionSchema.parse(await createResponse.json());
+    await expectCredentialSlots({
+      env,
+      connectionId: connection.id,
+      organizationId: session.organizationId,
+      expected: [
+        {
+          slotKey: TensorlakeSandboxRuntimeCredentialSlotKeys.API_KEY,
+          secretKind: IntegrationCredentialSecretKinds.API_KEY,
+          intendedFamilyId: TensorlakeSandboxRuntimeFamilyId,
+          plaintext: "tensorlake-connection-api-key",
+        },
+      ],
+    });
+
+    const response = await internalSandboxRuntimeRequest(env, {
+      path: "/resolve-credentials",
+      body: {
+        organizationId: session.organizationId,
+        provider: "tensorlake",
+        connectionId: connection.id,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      provider: "tensorlake",
+      source: "connection",
+      apiKey: "tensorlake-connection-api-key",
     });
   });
 

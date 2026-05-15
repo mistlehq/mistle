@@ -1,5 +1,17 @@
 export { accounts } from "./accounts.js";
 export {
+  apiKeyPermissions,
+  type ApiKeyPermission,
+  type InsertApiKeyPermission,
+} from "./api-key-permissions.js";
+export {
+  apiKeys,
+  ApiKeyActorKinds,
+  type ApiKey,
+  type ApiKeyActorKind,
+  type InsertApiKey,
+} from "./api-keys.js";
+export {
   automations,
   AutomationKinds,
   type InsertAutomation,
@@ -126,8 +138,10 @@ export type {
 } from "./organization-identity-link-provider-configs.js";
 export {
   integrationConnectionRedirectSessions,
+  IntegrationConnectionRedirectSessionIntents,
   type InsertIntegrationConnectionRedirectSession,
   type IntegrationConnectionRedirectSession,
+  type IntegrationConnectionRedirectSessionIntent,
 } from "./integration-connection-redirect-sessions.js";
 export {
   integrationConnectionDeviceAuthorizationAttempts,
@@ -166,6 +180,15 @@ export type { MemberRole } from "./members.js";
 export { CONTROL_PLANE_SCHEMA_NAME } from "./namespace.js";
 export { createControlPlaneDbSchema } from "./factory.js";
 export type { ControlPlaneDbSchema } from "./factory.js";
+export {
+  BillingCustomerProviders,
+  organizationBillingCustomers,
+  OrganizationBillingCustomerStatuses,
+  type BillingCustomerProvider,
+  type InsertOrganizationBillingCustomer,
+  type OrganizationBillingCustomer,
+  type OrganizationBillingCustomerStatus,
+} from "./organization-billing-customers.js";
 export {
   organizationCredentialKeys,
   type InsertOrganizationCredentialKey,

@@ -255,6 +255,7 @@ describe.concurrent("sandbox instances get integration", () => {
       failureCode: null,
       failureMessage: null,
       runtimeContext: null,
+      startupOperation: null,
       automationConversation: null,
     });
   });

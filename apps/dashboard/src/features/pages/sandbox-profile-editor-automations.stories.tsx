@@ -1,3 +1,4 @@
+import { SlackBrowserDefinition } from "@mistle/integrations-definitions/browser";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
@@ -10,6 +11,11 @@ import type { AutomationsListResult } from "../automations/automations-types.js"
 import type { ScheduledAutomation } from "../automations/scheduled-automations-types.js";
 import { AUTOMATION_SANDBOX_PROFILES_QUERY_KEY } from "../automations/use-automation-sandbox-profile-options.js";
 import {
+  WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY,
+  WEBHOOK_AUTOMATION_WEBHOOK_SOURCES_QUERY_KEY_PREFIX,
+} from "../automations/use-webhook-automation-prerequisites.js";
+import { createStoryWebhookTriggerCapabilitiesProviderMetadata } from "../integrations/integration-story-harness.js";
+import {
   sandboxProfileVersionAutomationConfigQueryKey,
   sandboxProfileVersionsQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
@@ -17,6 +23,8 @@ import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.
 import { SandboxProfileAutomationsSection } from "./sandbox-profile-automations-section.js";
 
 const ProfileId = "sbp_repo_maintainer";
+const SlackConnectionId = "icn_slack_story";
+const SlackWebhookSourceId = "iws_slack_story";
 export const SelectedScheduleAutomationId = "atm_schedule_daily_triage";
 
 const Profile: SandboxProfile = {
@@ -221,6 +229,7 @@ type StoryAutomationPage = {
 function createStoryQueryClient(input: {
   additionalPages?: readonly StoryAutomationPage[];
   automations: AutomationsListResult;
+  slackConnectionAvailable?: boolean;
 }): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -285,13 +294,83 @@ function createStoryQueryClient(input: {
       repositoryOptions: [
         {
           id: "mistlehq/platform",
-          name: "mistlehq/platform",
+          label: "mistlehq/platform",
           path: "/workspaces/mistlehq/platform",
         },
       ],
-      bindings: [],
+      bindings:
+        input.slackConnectionAvailable === false
+          ? []
+          : [
+              {
+                id: "bnd_slack_story",
+                sandboxProfileId: ProfileId,
+                sandboxProfileVersion: 3,
+                connectionId: SlackConnectionId,
+                kind: "connector",
+                config: {},
+                createdAt: "2026-05-01T00:00:00.000Z",
+                updatedAt: "2026-05-08T00:00:00.000Z",
+              },
+            ],
     },
   );
+  queryClient.setQueryData(WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY, {
+    connections:
+      input.slackConnectionAvailable === false
+        ? []
+        : [
+            {
+              id: SlackConnectionId,
+              targetKey: "slack-default",
+              displayName: "Slack Engineering",
+              status: "active",
+              createdAt: "2026-05-01T00:00:00.000Z",
+              updatedAt: "2026-05-08T00:00:00.000Z",
+            },
+          ],
+    targets: [
+      {
+        targetKey: "slack-default",
+        familyId: SlackBrowserDefinition.familyId,
+        variantId: SlackBrowserDefinition.variantId,
+        kind: SlackBrowserDefinition.kind,
+        enabled: true,
+        config: {},
+        displayName: SlackBrowserDefinition.displayName,
+        description: "Slack workspace",
+        ...(SlackBrowserDefinition.logoKey === undefined
+          ? {}
+          : { logoKey: SlackBrowserDefinition.logoKey }),
+        supportedWebhookEvents: SlackBrowserDefinition.supportedWebhookEvents,
+        targetHealth: {
+          configStatus: "valid",
+        },
+      },
+    ],
+  });
+  if (input.slackConnectionAvailable !== false) {
+    queryClient.setQueryData(
+      [...WEBHOOK_AUTOMATION_WEBHOOK_SOURCES_QUERY_KEY_PREFIX, SlackConnectionId],
+      [
+        {
+          id: SlackWebhookSourceId,
+          targetKey: "slack-default",
+          integrationConnectionId: SlackConnectionId,
+          displayName: "Slack Events API webhook",
+          endpointKey: "ep_slack_story",
+          status: "active",
+          providerMetadata: createStoryWebhookTriggerCapabilitiesProviderMetadata({
+            definition: SlackBrowserDefinition,
+            events: ["app_mention"],
+            permissions: [{ permission: "app_mentions:read" }],
+          }),
+          createdAt: "2026-05-01T00:00:00.000Z",
+          updatedAt: "2026-05-08T00:00:00.000Z",
+        },
+      ],
+    );
+  }
 
   return queryClient;
 }
@@ -300,11 +379,15 @@ export function SandboxProfileAutomationsStory(input: {
   additionalPages?: readonly StoryAutomationPage[];
   automations: AutomationsListResult;
   selectedAutomationId?: string;
+  slackConnectionAvailable?: boolean;
 }): React.JSX.Element {
   const [queryClient] = useState(() =>
     createStoryQueryClient({
       automations: input.automations,
       ...(input.additionalPages === undefined ? {} : { additionalPages: input.additionalPages }),
+      ...(input.slackConnectionAvailable === undefined
+        ? {}
+        : { slackConnectionAvailable: input.slackConnectionAvailable }),
     }),
   );
   const initialPath =
@@ -356,6 +439,31 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Populated: Story = {};
+
+export const TemplatePickerWithExistingTriggers: Story = {};
+
+export const TemplatePickerEmpty: Story = {
+  args: {
+    automations: {
+      items: [],
+      nextPage: null,
+      previousPage: null,
+      totalResults: 0,
+    },
+  },
+};
+
+export const TemplatePickerUnavailable: Story = {
+  args: {
+    automations: {
+      items: [],
+      nextPage: null,
+      previousPage: null,
+      totalResults: 0,
+    },
+    slackConnectionAvailable: false,
+  },
+};
 
 export const MobilePaginated: Story = {
   args: {

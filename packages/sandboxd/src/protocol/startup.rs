@@ -15,6 +15,26 @@ pub enum StartupExecutionMode {
     Snapshot,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StartupOperationKind {
+    Start,
+    Resume,
+    SetupCheck,
+    Snapshot,
+}
+
+impl StartupOperationKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Start => "start",
+            Self::Resume => "resume",
+            Self::SetupCheck => "setup_check",
+            Self::Snapshot => "snapshot",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GitSigningConfig {
@@ -76,6 +96,7 @@ pub struct StartupInput {
     pub startup_mode: StartupMode,
     #[serde(default)]
     pub execution_mode: StartupExecutionMode,
+    pub operation_kind: StartupOperationKind,
     pub bootstrap_token: String,
     pub tunnel_exchange_token: String,
     pub tunnel_gateway_ws_url: String,
@@ -114,12 +135,13 @@ pub enum StartupInitResponse {
 
 #[cfg(test)]
 mod tests {
-    use super::{StartupExecutionMode, StartupInput, StartupMode};
+    use super::{StartupExecutionMode, StartupInput, StartupMode, StartupOperationKind};
 
     #[test]
     fn defaults_execution_mode_to_session_when_missing() {
         let startup_input: StartupInput = serde_json::from_value(serde_json::json!({
             "startupMode": "new",
+            "operationKind": "start",
             "bootstrapToken": "bootstrap-token",
             "tunnelExchangeToken": "exchange-token",
             "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox/sbi_123",
@@ -141,6 +163,7 @@ mod tests {
 
         assert_eq!(startup_input.startup_mode, StartupMode::New);
         assert_eq!(startup_input.execution_mode, StartupExecutionMode::Session);
+        assert_eq!(startup_input.operation_kind, StartupOperationKind::Start);
         assert!(!startup_input.is_snapshot());
     }
 
@@ -149,6 +172,7 @@ mod tests {
         let startup_input: StartupInput = serde_json::from_value(serde_json::json!({
             "startupMode": "new",
             "executionMode": "snapshot",
+            "operationKind": "snapshot",
             "bootstrapToken": "bootstrap-token",
             "tunnelExchangeToken": "exchange-token",
             "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox/sbi_123",
@@ -169,6 +193,7 @@ mod tests {
         .expect("startup input should deserialize");
 
         assert_eq!(startup_input.execution_mode, StartupExecutionMode::Snapshot);
+        assert_eq!(startup_input.operation_kind, StartupOperationKind::Snapshot);
         assert!(startup_input.is_snapshot());
     }
 }

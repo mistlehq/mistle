@@ -26,6 +26,22 @@ export const SandboxdExecutionModeSchema = z.enum([
 
 export type SandboxdExecutionMode = z.infer<typeof SandboxdExecutionModeSchema>;
 
+export const SandboxdOperationKinds = {
+  START: "start",
+  RESUME: "resume",
+  SETUP_CHECK: "setup_check",
+  SNAPSHOT: "snapshot",
+} as const;
+
+export const SandboxdOperationKindSchema = z.enum([
+  SandboxdOperationKinds.START,
+  SandboxdOperationKinds.RESUME,
+  SandboxdOperationKinds.SETUP_CHECK,
+  SandboxdOperationKinds.SNAPSHOT,
+]);
+
+export type SandboxdOperationKind = z.infer<typeof SandboxdOperationKindSchema>;
+
 export const SandboxdGitIdentitySchema = z
   .object({
     name: z.string().min(1),
@@ -95,6 +111,7 @@ export const SandboxdStartupInputSchema = z
   .object({
     startupMode: SandboxdStartupModeSchema,
     executionMode: SandboxdExecutionModeSchema.optional(),
+    operationKind: SandboxdOperationKindSchema,
     bootstrapToken: z.string().min(1),
     tunnelExchangeToken: z.string().min(1),
     tunnelGatewayWsUrl: z.string().min(1),

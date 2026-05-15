@@ -18,24 +18,22 @@ Maintainer docs for local config initialization scripts.
 
 - Command: `pnpm config:init:integration`
 - Script: `scripts/config/init-integration.ts`
-- Output:
-  - `config/config.integration.docker.toml`
-  - `config/config.integration.e2b.toml`
+- Output: `config/config.integration.toml`
 - Behavior:
   - Generates the resource-oriented TOML shape.
   - Uses the development config as the integration baseline.
-  - Shapes the config per requested sandbox provider from `MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS`.
+  - Enables requested sandbox provider config from `MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS`.
   - Applies the existing env override names that are still needed while the env surface remains stable.
   - Preserves generated section comments for operator-facing guidance.
-  - Writes one provider-specific integration config file per requested provider.
-  - Validates each result through `@mistle/config`.
+  - Writes one shared integration config file.
+  - Validates the result through `@mistle/config`.
 
 ## Notes
 
 - Generated development and integration TOML files use the resource-oriented shape.
 - `config:init:integration` expects `MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS` to be set.
-- Docker integration configs use `sandbox.storage.backend = "docker_volume"`.
-- E2B integration configs use Archil-backed storage and require a fully
+- Docker-only integration configs use `sandbox.storage.backend = "docker_volume"`.
+- Integration configs with E2B enabled use Archil-backed storage and require a fully
   populated managed Archil profile via env, including `api_key`, `region`, and
   one S3-compatible mount.
 - Archil-backed development and test configs should point at a real remote

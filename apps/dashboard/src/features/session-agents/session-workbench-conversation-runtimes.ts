@@ -1,0 +1,161 @@
+import type { ChatState } from "../chat/chat-state.js";
+import type {
+  SessionComposerRuntimeInput,
+  SessionTurnControl,
+} from "../pages/session-composer/index.js";
+import type { SessionTerminalContentInset } from "../pages/session-terminal-surface.js";
+import type { UseCodexSessionStateResult } from "./codex/session-state/index.js";
+import {
+  mapOpenCodeChatStateForConversation,
+  mapOpenCodePermissionsToServerRequests,
+  resolveOpenCodePermissionResponse,
+  type UseOpenCodeSessionStateResult,
+} from "./opencode/session-state/index.js";
+import type { ServerRequestEntry } from "./server-requests/index.js";
+import { SessionRuntimeWorkbenchCapabilities } from "./session-runtime-workbench-capabilities.js";
+
+type SessionConversationChatState = Pick<
+  ChatState,
+  "activeTurnId" | "entries" | "pendingTurnId" | "status"
+>;
+
+type SessionWorkbenchServerRequestsState = {
+  isRespondingToServerRequest: boolean;
+  pendingServerRequests: readonly ServerRequestEntry[];
+  respondToServerRequest: (requestId: string | number, result: unknown) => void;
+};
+
+export type SessionWorkbenchRuntimeAdapter = {
+  displayName: string;
+  cliTerminalContentInset: SessionTerminalContentInset;
+  conversation: {
+    activeConversationId: string | null;
+    chatState: SessionConversationChatState;
+    dismissUserMessageAction?: UseCodexSessionStateResult["chat"]["dismissUserMessageAction"];
+  };
+  composerRuntimeInput: SessionComposerRuntimeInput;
+  serverRequestsState: SessionWorkbenchServerRequestsState;
+};
+
+export function buildCodexConversationRuntime(input: {
+  activeConversationId: string | null;
+  bootstrap: UseCodexSessionStateResult["bootstrap"];
+  chat: UseCodexSessionStateResult["chat"];
+  configControl: SessionComposerRuntimeInput["configControl"];
+  contextUsage: SessionComposerRuntimeInput["contextUsage"];
+  serverRequests: UseCodexSessionStateResult["serverRequests"];
+  sessionMessage: UseCodexSessionStateResult["sessionMessage"];
+  startTurn: SessionTurnControl["startTurn"];
+}): SessionWorkbenchRuntimeAdapter {
+  const capabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
+
+  return {
+    displayName: capabilities.displayName,
+    cliTerminalContentInset: capabilities.cliTerminalContentInset,
+    conversation: {
+      activeConversationId: input.activeConversationId,
+      chatState: input.chat.chatState,
+      dismissUserMessageAction: input.chat.dismissUserMessageAction,
+    },
+    composerRuntimeInput: {
+      bootstrap: input.bootstrap,
+      configControl: input.configControl,
+      turnControl: {
+        activeTurnState:
+          input.chat.canInterruptTurn || input.chat.canSteerTurn ? "running" : "idle",
+        canInterrupt: input.chat.canInterruptTurn,
+        canSteer: capabilities.supportsSteering && input.chat.canSteerTurn,
+        completedTurnErrorMessage: input.chat.chatState.completedErrorMessage,
+        interruptTurn: input.chat.interruptTurn,
+        isInterrupting: input.chat.isInterruptingTurn,
+        isStarting: input.chat.isStartingTurn,
+        isSteering: input.chat.isSteeringTurn,
+        startTurn: input.startTurn,
+        steerTurn: input.chat.steerTurn,
+      },
+      sessionErrorMessage: input.sessionMessage.sessionErrorMessage,
+      clearSessionErrorMessage: input.sessionMessage.clearSessionErrorMessage,
+      contextUsage: capabilities.hasContextUsage ? input.contextUsage : null,
+      modelSelection: capabilities.composerModelSelection,
+    },
+    serverRequestsState: {
+      isRespondingToServerRequest: input.serverRequests.isRespondingToServerRequest,
+      pendingServerRequests: input.serverRequests.pendingServerRequests,
+      respondToServerRequest: input.serverRequests.respondToServerRequest,
+    },
+  };
+}
+
+export function buildOpenCodeConversationRuntime(input: {
+  bootstrap: SessionComposerRuntimeInput["bootstrap"];
+  chat: UseOpenCodeSessionStateResult["chat"];
+  configControl: SessionComposerRuntimeInput["configControl"];
+  sessionMessage: UseOpenCodeSessionStateResult["sessionMessage"];
+  sessionSnapshot: UseOpenCodeSessionStateResult["lifecycle"]["sessionSnapshot"];
+  startTurn: SessionTurnControl["startTurn"];
+}): SessionWorkbenchRuntimeAdapter {
+  const capabilities = SessionRuntimeWorkbenchCapabilities.OPENCODE;
+  const isTurnRunning = input.chat.chatState.status === "busy";
+  const respondToServerRequest = (requestId: string | number, result: unknown): void => {
+    let response: ReturnType<typeof resolveOpenCodePermissionResponse>;
+    try {
+      response = resolveOpenCodePermissionResponse(result);
+    } catch (error) {
+      input.sessionMessage.reportSessionErrorMessage(
+        error instanceof Error ? error.message : "Could not respond to OpenCode permission.",
+      );
+      return;
+    }
+
+    void input.chat
+      .respondToPermission({
+        requestId: String(requestId),
+        response,
+      })
+      .catch((error: unknown) => {
+        input.sessionMessage.reportSessionErrorMessage(
+          error instanceof Error ? error.message : "Could not respond to OpenCode permission.",
+        );
+      });
+  };
+
+  return {
+    displayName: capabilities.displayName,
+    cliTerminalContentInset: capabilities.cliTerminalContentInset,
+    conversation: {
+      activeConversationId: input.sessionSnapshot?.activeSessionId ?? null,
+      chatState: mapOpenCodeChatStateForConversation(input.chat.chatState),
+    },
+    composerRuntimeInput: {
+      bootstrap: input.bootstrap,
+      configControl: input.configControl,
+      turnControl: {
+        activeTurnState: isTurnRunning ? "running" : "idle",
+        canInterrupt: input.chat.canInterruptTurn,
+        canSteer: capabilities.supportsSteering,
+        completedTurnErrorMessage: input.chat.chatState.completedErrorMessage,
+        interruptTurn: (): void => {
+          void input.chat.abortSession();
+        },
+        isInterrupting: input.chat.isInterruptingTurn,
+        isStarting: input.chat.isStartingTurn,
+        isSteering: false,
+        startTurn: input.startTurn,
+        steerTurn: async (): Promise<void> => {
+          throw new Error("OpenCode does not support steering an active turn.");
+        },
+      },
+      sessionErrorMessage: input.sessionMessage.sessionErrorMessage,
+      clearSessionErrorMessage: input.sessionMessage.clearSessionErrorMessage,
+      contextUsage: null,
+      modelSelection: capabilities.composerModelSelection,
+    },
+    serverRequestsState: {
+      isRespondingToServerRequest: input.chat.isRespondingToPermission,
+      pendingServerRequests: mapOpenCodePermissionsToServerRequests(
+        input.chat.chatState.pendingPermissions,
+      ),
+      respondToServerRequest,
+    },
+  };
+}

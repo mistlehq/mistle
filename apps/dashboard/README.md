@@ -21,7 +21,7 @@ Minimal dashboard scaffold using Vite + React.
     1. `config/config.development.toml`
     2. `config/config.production.toml`
   - this applies for `dev`, `build`, and `preview`
-- CI should pass `MISTLE_CONFIG_PATH` (for example `config/config.integration.docker.toml`) instead of relying on production defaults.
+- CI should pass `MISTLE_CONFIG_PATH` (for example `config/config.integration.toml`) instead of relying on production defaults.
 - Docker image builds can set `MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN` directly when no config file is present, or override the dashboard config file with `MISTLE_CONFIG_PATH`.
 - Override config file path by setting:
   - `MISTLE_CONFIG_PATH`

@@ -209,26 +209,18 @@ jobs:
           path: dist/release-manifest/sandbox-base.json
 
   publish-single-container:
-    name: Publish single-container (${{ matrix.profile }})
+    name: Publish single-container
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
       contents: read
       packages: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - profile: docker
-            target: docker-sandbox
-          - profile: remote
-            target: remote-sandbox
     env:
       IMAGE_REPOSITORY: ghcr.io/mistlehq/mistle
-      IMAGE_SHA_TAG: ${{ matrix.profile }}-${{ github.sha }}
+      IMAGE_SHA_TAG: ${{ github.sha }}
       IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
-      IMAGE_TARGET: ${{ matrix.target }}
+      IMAGE_TARGET: single-container
 
     steps:
       - name: Checkout
@@ -270,15 +262,15 @@ jobs:
       - name: Write release manifest fragment
         run: |
           mkdir -p dist/release-manifest
-          cat <<EOF > "dist/release-manifest/mistle-${{ matrix.profile }}.json"
-          {"component":"mistle-${{ matrix.profile }}","image_ref":"${{ steps.publish.outputs.image_ref }}"}
+          cat <<EOF > "dist/release-manifest/mistle.json"
+          {"component":"mistle","image_ref":"${{ steps.publish.outputs.image_ref }}"}
           EOF
 
       - name: Upload release manifest fragment
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: release-image-mistle-${{ matrix.profile }}
-          path: dist/release-manifest/mistle-${{ matrix.profile }}.json
+          name: release-image-mistle
+          path: dist/release-manifest/mistle.json
 
   publish-sandboxd-artifact:
     name: Publish sandboxd artifact
@@ -413,11 +405,10 @@ jobs:
                   repository = "ghcr.io/mistlehq/sandbox-base"
                   release_tag = f"v{version}"
                   latest_tag = "latest"
-              elif component.startswith("mistle-"):
-                  profile = component.removeprefix("mistle-")
+              elif component == "mistle":
                   repository = "ghcr.io/mistlehq/mistle"
-                  release_tag = f"{profile}-v{version}"
-                  latest_tag = f"{profile}-latest"
+                  release_tag = f"v{version}"
+                  latest_tag = "latest"
               else:
                   raise ValueError(f"Unknown release image component: {component}")
 

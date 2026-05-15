@@ -30,7 +30,7 @@ const it = createIntegrationTest({
 });
 
 describe.concurrent("sandbox profile Setup Assistant integration", () => {
-  it("starts a separate setup-check sandbox without passing the setup script", async ({ env }) => {
+  it("starts a setup-assistant sandbox without passing the setup script", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-setup-assistant@example.com",
     });
@@ -63,7 +63,7 @@ describe.concurrent("sandbox profile Setup Assistant integration", () => {
     const sandboxInstance = await env.dataPlaneDb.query.sandboxInstances.findFirst({
       where: (table, { eq }) => eq(table.id, body.sandboxInstanceId),
     });
-    expect(sandboxInstance?.purpose).toBe(SandboxInstancePurposes.SETUP_CHECK);
+    expect(sandboxInstance?.purpose).toBe(SandboxInstancePurposes.SETUP_ASSISTANT);
     expect(sandboxInstance?.sandboxProfileId).toBe("sbp_setup_assistant_001");
     expect(sandboxInstance?.sandboxProfileVersion).toBe(1);
 
@@ -72,6 +72,7 @@ describe.concurrent("sandbox profile Setup Assistant integration", () => {
       sandboxInstanceId: body.sandboxInstanceId,
     });
     expect(queuedWorkflowInput.runtimePlan.setupScript).toBeUndefined();
+    expect(queuedWorkflowInput.purpose).toBe("setup_assistant");
     expect(queuedWorkflowInput.image).toMatchObject({
       kind: "base",
     });

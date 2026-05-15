@@ -105,11 +105,34 @@ const PartialDataPlaneApiSandboxE2BConfigSchema = z
   })
   .strict();
 
+export const DataPlaneApiSandboxTensorlakeConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      apiKey: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      apiKey: z.string().min(1).optional(),
+    })
+    .strict(),
+]);
+
+const PartialDataPlaneApiSandboxTensorlakeConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    apiKey: z.string().min(1).optional(),
+  })
+  .strict();
+
 export const DataPlaneApiSandboxConfigSchema = z
   .object({
     storage: GlobalSandboxStorageConfigSchema.optional(),
     docker: DataPlaneApiSandboxDockerConfigSchema.optional(),
     e2b: DataPlaneApiSandboxE2BConfigSchema.optional(),
+    tensorlake: DataPlaneApiSandboxTensorlakeConfigSchema.optional(),
   })
   .strict();
 
@@ -118,6 +141,7 @@ export const PartialDataPlaneApiSandboxConfigSchema = z
     storage: GlobalSandboxStorageConfigSchema.partial().optional(),
     docker: PartialDataPlaneApiSandboxDockerConfigSchema.optional(),
     e2b: PartialDataPlaneApiSandboxE2BConfigSchema.optional(),
+    tensorlake: PartialDataPlaneApiSandboxTensorlakeConfigSchema.optional(),
   })
   .strict();
 
@@ -152,7 +176,7 @@ export const PartialDataPlaneApiConfigSchema = z
   .strict();
 
 export function getDataPlaneApiSandboxProviderValidationIssue(input: {
-  appSandbox: Pick<DataPlaneApiConfig["sandbox"], "docker" | "e2b">;
+  appSandbox: Pick<DataPlaneApiConfig["sandbox"], "docker" | "e2b" | "tensorlake">;
 }): {
   path: readonly ["sandbox", "docker"];
   message: string;

@@ -1,0 +1,1 @@
+ALTER TABLE "control_plane"."sandbox_profile_version_snapshot_jobs" ADD COLUMN "sandbox_instance_id" text;

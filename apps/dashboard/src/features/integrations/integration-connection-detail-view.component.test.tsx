@@ -902,6 +902,99 @@ describe("IntegrationConnectionDetailView", () => {
     expect(editedConnectionId).toBe("icn_jira_primary");
   });
 
+  it("renders reauthorization state for OAuth connections", () => {
+    let reauthorizedConnectionId: string | null = null;
+
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_planetscale_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "PlanetScale Production",
+            authMethodId: "oauth2-authorization-code",
+            authMethodLabel: "OAuth",
+            status: "active",
+            resources: [],
+            reauthorization: {
+              actionLabel: "Re-authorize",
+              errorMessage: "Could not start reauthorization.",
+              isPending: false,
+              pendingLabel: "Starting...",
+            },
+          },
+        ]}
+        onEditAuthentication={(connectionId) => {
+          reauthorizedConnectionId = connectionId;
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Could not start reauthorization.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Re-authorize" }));
+    expect(reauthorizedConnectionId).toBe("icn_planetscale_primary");
+  });
+
+  it("renders a reauthorization required notice with the reauthorization action", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_planetscale_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "PlanetScale Production",
+            authMethodId: "oauth2-authorization-code",
+            authMethodLabel: "OAuth",
+            status: "error",
+            resources: [],
+            reauthorization: {
+              actionLabel: "Re-authorize",
+              errorMessage: "This connection needs to be re-authorized.",
+              isPending: false,
+              pendingLabel: "Starting...",
+            },
+          },
+        ]}
+        onEditAuthentication={() => {}}
+      />,
+    );
+
+    expect(screen.getByText("This connection needs to be re-authorized.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Re-authorize" })).toBeTruthy();
+  });
+
+  it("disables the reauthorization action while OAuth reauthorization is starting", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_planetscale_primary",
+            bindingCount: 0,
+            canDelete: true,
+            displayName: "PlanetScale Production",
+            authMethodId: "oauth2-authorization-code",
+            authMethodLabel: "OAuth",
+            status: "active",
+            resources: [],
+            reauthorization: {
+              actionLabel: "Re-authorize",
+              isPending: true,
+              pendingLabel: "Starting...",
+            },
+          },
+        ]}
+        onEditAuthentication={() => {}}
+      />,
+    );
+
+    const reauthorizeButton = screen.getByRole("button", { name: "Re-authorize" });
+
+    expect(reauthorizeButton).toHaveProperty("disabled", true);
+    expect(reauthorizeButton.textContent).toBe("Starting...");
+  });
+
   it("keeps Manage installation visible alongside Edit for installed GitHub App connections", () => {
     let editedConnectionId: string | null = null;
     let startedProviderAppSetupConnectionId: string | null = null;

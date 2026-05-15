@@ -10,6 +10,7 @@ import {
   SentryBrowserDefinition,
   SignozBrowserDefinition,
   SlackBrowserDefinition,
+  TensorlakeSandboxRuntimeBrowserDefinition,
 } from "./browser.js";
 
 describe("browser definitions", () => {
@@ -74,6 +75,22 @@ describe("browser definitions", () => {
 
   it("keeps sentry browser definitions free of server-only OAuth handlers", () => {
     expect(SentryBrowserDefinition.oauth2AuthorizationCode).toBeUndefined();
+  });
+
+  it("registers Tensorlake sandbox runtime in the browser-safe definitions bundle", () => {
+    const definition = createBrowserDefinitionsBundle().integrationRegistry.getDefinition({
+      familyId: TensorlakeSandboxRuntimeBrowserDefinition.familyId,
+      variantId: TensorlakeSandboxRuntimeBrowserDefinition.variantId,
+    });
+
+    expect(definition).toMatchObject({
+      familyId: "tensorlake",
+      variantId: "tensorlake-default",
+      kind: "sandbox",
+      sandboxRuntime: {
+        providerId: "tensorlake",
+      },
+    });
   });
 
   it("registers E2B sandbox runtime in the browser-safe definitions bundle", () => {

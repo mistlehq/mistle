@@ -16,6 +16,7 @@ import {
 } from "@mistle/integrations-definitions/server";
 import { releaseReservedPort, reserveAvailablePort } from "@mistle/test-harness";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
+import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import { CompleteOAuth2AuthorizationCodeConnectionBadRequestResponseSchema } from "../src/integration-connections/complete-oauth2-authorization-code-connection/schema.js";
@@ -23,7 +24,11 @@ import { IntegrationConnectionSchema } from "../src/integration-connections/sche
 import { StartOAuth2AuthorizationCodeConnectionBadRequestResponseSchema } from "../src/integration-connections/start-oauth2-authorization-code-connection/schema.js";
 import { StartOAuth2AuthorizationCodeConnectionResponseSchema } from "../src/integration-connections/start-oauth2-authorization-code-connection/schema.js";
 import { UpdateIntegrationConnectionBodySchema } from "../src/integration-connections/update-integration-connection/schema.js";
-import { expectCredentialSlots, seedIntegrationTarget } from "./helpers/integration-connections.js";
+import {
+  expectCredentialSlots,
+  readCredentialIds,
+  seedIntegrationTarget,
+} from "./helpers/integration-connections.js";
 
 const SimulatedProviderHost = "0.0.0.0";
 const SimulatedProviderRequestHost = "127.0.0.1";
@@ -264,6 +269,147 @@ describe.concurrent("integration connections OAuth 2.0 authorization-code integr
     });
   });
 
+  it("reauthorizes an existing OAuth connection and replaces linked credentials", async ({
+    env,
+  }) => {
+    const simulatedSignoz = await startSimulatedSignozOAuthProvider();
+    const targetKey = "signoz-oauth-reauthorize";
+
+    try {
+      await seedSignozTarget({
+        env,
+        targetKey,
+        issuerBaseUrl: simulatedSignoz.baseUrl,
+      });
+      const session = await env.auth.createSession({
+        email: "integration-new-oauth2-reauthorize@example.com",
+      });
+
+      const startResponse = await startOAuth2AuthorizationCodeConnection({
+        env,
+        targetKey,
+        cookie: session.cookie,
+        body: {
+          displayName: "SigNoz reauthorize MCP",
+          config: {
+            region: TestRegion,
+          },
+        },
+      });
+      expect(startResponse.status).toBe(200);
+      const started = StartOAuth2AuthorizationCodeConnectionResponseSchema.parse(
+        await startResponse.json(),
+      );
+      const state = new URL(started.authorizationUrl).searchParams.get("state");
+      if (state === null || state.length === 0) {
+        throw new Error("Expected authorization URL to include redirect state.");
+      }
+
+      const completeResponse = await env.controlPlaneApi.http.fetch(
+        `/p/integration/callbacks/${encodeURIComponent(targetKey)}/oauth2-authorization-code?state=${encodeURIComponent(state)}&code=signoz_code_123`,
+        {
+          method: "GET",
+          redirect: "manual",
+        },
+      );
+      expect(completeResponse.status).toBe(302);
+
+      const connection = await env.controlPlaneDb.query.integrationConnections.findFirst({
+        where: (table, { and, eq }) =>
+          and(eq(table.organizationId, session.organizationId), eq(table.targetKey, targetKey)),
+      });
+      if (connection === undefined) {
+        throw new Error("Expected completed OAuth connection.");
+      }
+
+      const previousCredentialIds = await readCredentialIds({
+        env,
+        connectionId: connection.id,
+      });
+      await env.controlPlaneDb
+        .update(env.controlPlaneTables.integrationConnections)
+        .set({
+          status: IntegrationConnectionStatuses.ERROR,
+        })
+        .where(eq(env.controlPlaneTables.integrationConnections.id, connection.id));
+
+      const reauthorizeStartResponse = await startOAuth2AuthorizationCodeReauthorization({
+        env,
+        connectionId: connection.id,
+        cookie: session.cookie,
+      });
+      expect(reauthorizeStartResponse.status).toBe(200);
+      const startedReauthorization = StartOAuth2AuthorizationCodeConnectionResponseSchema.parse(
+        await reauthorizeStartResponse.json(),
+      );
+      const reauthorizeState = new URL(startedReauthorization.authorizationUrl).searchParams.get(
+        "state",
+      );
+      if (reauthorizeState === null || reauthorizeState.length === 0) {
+        throw new Error("Expected reauthorization URL to include redirect state.");
+      }
+
+      const redirectSession =
+        await env.controlPlaneDb.query.integrationConnectionRedirectSessions.findFirst({
+          where: (table, { eq }) => eq(table.state, reauthorizeState),
+        });
+      expect(redirectSession?.intent).toBe("reauthorize");
+      expect(redirectSession?.connectionId).toBe(connection.id);
+
+      const reauthorizeCompleteResponse = await env.controlPlaneApi.http.fetch(
+        `/p/integration/callbacks/${encodeURIComponent(targetKey)}/oauth2-authorization-code?state=${encodeURIComponent(reauthorizeState)}&code=signoz_code_reauth`,
+        {
+          method: "GET",
+          redirect: "manual",
+        },
+      );
+      expect(reauthorizeCompleteResponse.status).toBe(302);
+      expect(reauthorizeCompleteResponse.headers.get("location")).toBe(
+        `http://localhost:5173/integrations/${encodeURIComponent(targetKey)}?connectionId=${encodeURIComponent(connection.id)}&connectionNotice=reauthorized`,
+      );
+
+      const connections = await env.controlPlaneDb.query.integrationConnections.findMany({
+        where: (table, { and, eq }) =>
+          and(eq(table.organizationId, session.organizationId), eq(table.targetKey, targetKey)),
+      });
+      expect(connections).toHaveLength(1);
+      expect(connections[0]?.id).toBe(connection.id);
+      expect(connections[0]?.displayName).toBe("SigNoz reauthorize MCP");
+      expect(connections[0]?.status).toBe(IntegrationConnectionStatuses.ACTIVE);
+
+      await expectCredentialSlots({
+        env,
+        connectionId: connection.id,
+        organizationId: session.organizationId,
+        previousCredentialIds,
+        expected: [
+          {
+            slotKey: SignozCredentialSlotKeys.accessToken,
+            secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+            intendedFamilyId: SignozFamilyId,
+            plaintext: "sig_access_token_reauth",
+          },
+          {
+            slotKey: SignozCredentialSlotKeys.refreshToken,
+            secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
+            intendedFamilyId: SignozFamilyId,
+            plaintext: "sig_refresh_token_reauth",
+          },
+        ],
+      });
+
+      const previousCredentials = await env.controlPlaneDb.query.integrationCredentials.findMany({
+        where: (table, { inArray }) => inArray(table.id, previousCredentialIds),
+      });
+      expect(previousCredentials.map((credential) => credential.revokedAt === null)).toEqual([
+        false,
+        false,
+      ]);
+    } finally {
+      await simulatedSignoz.stop();
+    }
+  });
+
   it("returns route errors for unsupported or invalid OAuth start and complete requests", async ({
     env,
   }) => {
@@ -378,12 +524,15 @@ async function startSimulatedSignozOAuthProvider(): Promise<SimulatedSignozOAuth
     }
 
     if (requestUrl.pathname === "/oauth/token") {
+      const tokenRequestBody = new URLSearchParams(body);
+      const tokenSuffix = tokenRequestBody.get("code") === "signoz_code_reauth" ? "reauth" : "123";
+
       response.end(
         JSON.stringify({
-          access_token: "sig_access_token_123",
+          access_token: `sig_access_token_${tokenSuffix}`,
           token_type: "Bearer",
           expires_in: 3600,
-          refresh_token: "sig_refresh_token_123",
+          refresh_token: `sig_refresh_token_${tokenSuffix}`,
         }),
       );
       return;
@@ -409,6 +558,24 @@ async function startSimulatedSignozOAuthProvider(): Promise<SimulatedSignozOAuth
       });
     },
   };
+}
+
+async function startOAuth2AuthorizationCodeReauthorization(input: {
+  env: Parameters<typeof seedIntegrationTarget>[0];
+  connectionId: string;
+  cookie: string;
+}) {
+  return input.env.controlPlaneApi.http.fetch(
+    `/v1/integration/connections/${encodeURIComponent(
+      input.connectionId,
+    )}/oauth2-authorization-code/reauthorize/start`,
+    {
+      method: "POST",
+      headers: {
+        cookie: input.cookie,
+      },
+    },
+  );
 }
 
 async function seedSignozTarget(input: {

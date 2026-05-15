@@ -17,6 +17,7 @@ export async function createDataPlaneApiRuntime(
   try {
     app = createApp({
       config: runtimeConfig.app,
+      environment: runtimeConfig.global.env,
       internalAuthServiceToken: runtimeConfig.app.internalAuth.serviceToken,
       resources,
       sandboxStorageBackend: runtimeConfig.app.sandbox.storage?.backend,

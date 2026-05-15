@@ -141,13 +141,13 @@ export interface paths {
               /** @enum {string} */
               kind: "base" | "snapshot";
               /** @enum {string} */
-              provider: "docker" | "e2b";
+              provider: "docker" | "e2b" | "tensorlake";
             };
             organizationId: string;
             /** @enum {string} */
             persistenceMode: "ephemeral" | "persistent";
             /** @enum {string} */
-            purpose: "session" | "snapshot" | "setup_check";
+            purpose: "session" | "snapshot" | "setup_assistant" | "setup_check";
             runtimePlan: {
               agentRuntimes: {
                 clientId: string;
@@ -483,7 +483,7 @@ export interface paths {
             sandboxRuntime: {
               connectionId?: string;
               /** @enum {string} */
-              provider: "docker" | "e2b";
+              provider: "docker" | "e2b" | "tensorlake";
               resources?: {
                 memoryMb: number;
                 storageMb?: number;
@@ -919,6 +919,11 @@ export interface paths {
                   sourceKind: "git-clone";
                 }[];
               } | null;
+              startupOperation: {
+                operationId: string;
+                /** @enum {string} */
+                operationKind: "start" | "resume";
+              } | null;
               /** @enum {string} */
               status: "pending" | "starting" | "running" | "stopped" | "failed";
               title: string | null;
@@ -1203,6 +1208,127 @@ export interface paths {
         };
       };
     };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/internal/sandbox/instances/:id/operation-events": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query: {
+          afterSequence?: number;
+          limit?: number;
+          operationId: string;
+          organizationId: string;
+        };
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description List persisted sandbox operation events for internal callers. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              events: {
+                attributes: {
+                  [key: string]: unknown;
+                };
+                createdAt: string;
+                id: string;
+                message: string;
+                observedAt: string;
+                operationId: string;
+                /** @enum {string} */
+                operationKind: "start" | "resume" | "setup_check" | "snapshot" | "stop";
+                payloadBase64: string | null;
+                /** @enum {string|null} */
+                phase:
+                  | "provider"
+                  | "storage_provision"
+                  | "storage_attach"
+                  | "sandboxd"
+                  | "operation_stream"
+                  | "git_identity"
+                  | "egress"
+                  | "runtime_plan"
+                  | "setup_script"
+                  | "runtime_processes"
+                  | "runtime_adapters"
+                  | "agent_endpoint"
+                  | "ready"
+                  | "running"
+                  | "snapshot"
+                  | "stop"
+                  | "teardown"
+                  | null;
+                /** @enum {string} */
+                recordKind: "lifecycle" | "transcript";
+                sandboxInstanceId: string;
+                sequence: number;
+                /** @enum {string} */
+                source: "worker" | "gateway" | "sandboxd";
+                /** @enum {string|null} */
+                status: "started" | "completed" | "failed" | "warning" | null;
+                /** @enum {string|null} */
+                stream: "stdout" | "stderr" | "system" | null;
+              }[];
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal service authentication failed. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -1601,7 +1727,7 @@ export interface paths {
               /** @enum {string} */
               kind: "base";
               /** @enum {string} */
-              provider: "docker" | "e2b";
+              provider: "docker" | "e2b" | "tensorlake";
             };
             organizationId: string;
             sandboxInstanceId: string;
@@ -1610,7 +1736,7 @@ export interface paths {
             sandboxRuntime: {
               connectionId?: string;
               /** @enum {string} */
-              provider: "docker" | "e2b";
+              provider: "docker" | "e2b" | "tensorlake";
               resources?: {
                 memoryMb: number;
                 storageMb?: number;

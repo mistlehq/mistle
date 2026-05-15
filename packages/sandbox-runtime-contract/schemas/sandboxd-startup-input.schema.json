@@ -10,6 +10,10 @@
       "type": "string",
       "enum": ["session", "snapshot"]
     },
+    "operationKind": {
+      "type": "string",
+      "enum": ["start", "resume", "setup_check", "snapshot"]
+    },
     "bootstrapToken": {
       "type": "string",
       "minLength": 1
@@ -1326,6 +1330,7 @@
   },
   "required": [
     "startupMode",
+    "operationKind",
     "bootstrapToken",
     "tunnelExchangeToken",
     "tunnelGatewayWsUrl",

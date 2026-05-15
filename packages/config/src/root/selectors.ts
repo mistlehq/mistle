@@ -12,6 +12,28 @@ import type {
 import type { GlobalConfig, GlobalTelemetryConfig } from "../global/schema.js";
 import { type Config } from "./schema.js";
 
+function selectControlPlaneWorkerStripeBillingConfig(
+  config: Config,
+): ControlPlaneWorkerConfig["billing"]["stripe"] {
+  if (config.billing.stripe.enabled === true) {
+    return {
+      enabled: true,
+      secretKey: config.billing.stripe.secret_key,
+    };
+  }
+
+  if (config.billing.stripe.secret_key === undefined) {
+    return {
+      enabled: false,
+    };
+  }
+
+  return {
+    enabled: false,
+    secretKey: config.billing.stripe.secret_key,
+  };
+}
+
 function buildArchilMount(config: Config): DataPlaneWorkerSandboxStorageConfig {
   const archilConfig = config.sandbox.storage?.archil;
 
@@ -187,6 +209,11 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
     dashboard: {
       baseUrl: config.services.dashboard.public_url,
     },
+    billing: {
+      stripe: {
+        enabled: config.billing.stripe.enabled,
+      },
+    },
     workflow: {
       databaseUrl: config.postgres.control_plane.direct_url,
       migrationUrl: config.postgres.control_plane.direct_url,
@@ -234,6 +261,16 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
           }
         : config.sandbox.e2b?.enabled === false
           ? { e2b: { enabled: false } }
+          : {}),
+      ...(config.sandbox.tensorlake?.enabled === true
+        ? {
+            tensorlake: {
+              enabled: true,
+              apiKey: config.sandbox.tensorlake.api_key,
+            },
+          }
+        : config.sandbox.tensorlake?.enabled === false
+          ? { tensorlake: { enabled: false } }
           : {}),
     },
     integrations: {
@@ -287,6 +324,9 @@ export function selectControlPlaneWorkerConfig(config: Config): ControlPlaneWork
     sandbox: {
       defaultBaseImage: config.sandbox.default_base_image,
     },
+    billing: {
+      stripe: selectControlPlaneWorkerStripeBillingConfig(config),
+    },
   };
 }
 
@@ -328,6 +368,25 @@ export function selectDataPlaneApiConfig(config: Config): DataPlaneApiConfig {
               socketPath: config.sandbox.docker.socket_path,
             }
           : config.sandbox.docker?.enabled === false
+            ? { enabled: false }
+            : undefined,
+      e2b:
+        config.sandbox.e2b?.enabled === true
+          ? {
+              enabled: true,
+              apiKey: config.sandbox.e2b.api_key,
+              domain: config.sandbox.e2b.domain,
+            }
+          : config.sandbox.e2b?.enabled === false
+            ? { enabled: false }
+            : undefined,
+      tensorlake:
+        config.sandbox.tensorlake?.enabled === true
+          ? {
+              enabled: true,
+              apiKey: config.sandbox.tensorlake.api_key,
+            }
+          : config.sandbox.tensorlake?.enabled === false
             ? { enabled: false }
             : undefined,
     },
@@ -410,6 +469,27 @@ export function selectDataPlaneWorkerConfig(config: Config): DataPlaneWorkerConf
               networkName: config.sandbox.docker.network_name,
             }
           : config.sandbox.docker?.enabled === false
+            ? { enabled: false }
+            : undefined,
+      e2b:
+        config.sandbox.e2b?.enabled === true
+          ? {
+              enabled: true,
+              apiKey: config.sandbox.e2b.api_key,
+              domain: config.sandbox.e2b.domain,
+              cpuCount: config.sandbox.e2b.cpu_count,
+              memoryMb: config.sandbox.e2b.memory_mb,
+            }
+          : config.sandbox.e2b?.enabled === false
+            ? { enabled: false }
+            : undefined,
+      tensorlake:
+        config.sandbox.tensorlake?.enabled === true
+          ? {
+              enabled: true,
+              apiKey: config.sandbox.tensorlake.api_key,
+            }
+          : config.sandbox.tensorlake?.enabled === false
             ? { enabled: false }
             : undefined,
     },

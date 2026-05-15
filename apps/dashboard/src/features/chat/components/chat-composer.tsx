@@ -246,7 +246,7 @@ export function ChatComposer({
           </div>
         )}
         <Textarea
-          className="max-h-48 min-h-12 resize-none overflow-y-auto border-0 bg-transparent p-1.5 text-sm shadow-none placeholder:text-muted-foreground/60 focus-visible:border-transparent focus-visible:ring-0"
+          className="max-h-48 min-h-12 resize-none overflow-y-auto border-0 bg-transparent p-1.5 shadow-none placeholder:text-muted-foreground/60 focus-visible:border-transparent focus-visible:ring-0"
           id="session-composer"
           onChange={(event) => {
             onComposerTextChange(event.target.value);

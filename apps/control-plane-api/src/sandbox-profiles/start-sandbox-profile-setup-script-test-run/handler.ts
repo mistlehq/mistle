@@ -12,6 +12,7 @@ const routeHandler = async (
 ) => {
   const db = ctx.get("db");
   const dataPlaneClient = ctx.get("dataPlaneClient");
+  const integrationRegistry = ctx.get("integrationRegistry");
   const integrationsConfig = ctx.get("config").integrations;
   const sandboxConfig = ctx.get("sandboxConfig");
   const { profileId, version } = ctx.req.valid("param");
@@ -20,7 +21,9 @@ const routeHandler = async (
   const startedSandboxInstance = await startProfileSetupScriptTestRun(
     {
       db,
+      integrationRegistry,
       integrationsConfig,
+      sandboxConfig,
       dataPlaneClient,
       defaultBaseImage: sandboxConfig.defaultBaseImage,
     },
@@ -28,6 +31,17 @@ const routeHandler = async (
       organizationId: session.activeOrganizationId,
       profileId,
       profileVersion: version,
+      setupScript: body.setupScript,
+      ...(body.agentRuntimeId === undefined ? {} : { agentRuntimeId: body.agentRuntimeId }),
+      ...(body.sandboxProvider === undefined
+        ? {}
+        : {
+            sandboxRuntimeConfig: {
+              sandboxProvider: body.sandboxProvider,
+              sandboxConnectionId: body.sandboxConnectionId ?? null,
+              sandboxResources: body.sandboxResources ?? null,
+            },
+          }),
       startedBy: {
         kind: "user",
         id: user.id,

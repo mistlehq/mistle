@@ -125,5 +125,6 @@ export async function getInstance(
       runtimePlan: sandboxInstance.runtimePlan,
     }),
     automationConversation,
+    startupOperation: sandboxInstance.startupOperation,
   };
 }

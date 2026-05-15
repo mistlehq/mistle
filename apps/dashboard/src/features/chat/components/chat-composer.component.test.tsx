@@ -42,6 +42,15 @@ describe("ChatComposer", () => {
     expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
   });
 
+  it("keeps the composer textarea at an iOS-safe mobile font size", () => {
+    render(<ChatComposer {...createBaseComposerProps()} />);
+
+    const composer = screen.getByPlaceholderText("Ask anything");
+
+    expect(composer.className).toContain("text-base");
+    expect(composer.className).toContain("md:text-sm");
+  });
+
   it("renders a spinner icon while a start-turn request is pending", () => {
     const { container } = render(
       <ChatComposer

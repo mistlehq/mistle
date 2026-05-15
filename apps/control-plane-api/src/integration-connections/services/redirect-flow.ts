@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 
 import {
   type ControlPlaneDatabase,
+  IntegrationConnectionRedirectSessionIntents,
+  type IntegrationConnectionRedirectSessionIntent,
   type IntegrationConnectionRedirectSession,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
@@ -34,6 +36,8 @@ export async function persistRedirectSessionOrThrow(input: {
   db: ControlPlaneDatabase;
   organizationId: string;
   targetKey: string;
+  intent?: IntegrationConnectionRedirectSessionIntent;
+  connectionId?: string;
   state: string;
   expiresAt: string;
   failureMessage: string;
@@ -47,6 +51,8 @@ export async function persistRedirectSessionOrThrow(input: {
     .values({
       organizationId: input.organizationId,
       targetKey: input.targetKey,
+      intent: input.intent ?? IntegrationConnectionRedirectSessionIntents.CREATE,
+      ...(input.connectionId === undefined ? {} : { connectionId: input.connectionId }),
       state: input.state,
       expiresAt: input.expiresAt,
       ...(input.pkceVerifierEncrypted === undefined

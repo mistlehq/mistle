@@ -6,6 +6,7 @@ import { dataPlaneSchema } from "./namespace.js";
 export const SandboxInstanceProviders = {
   DOCKER: "docker",
   E2B: "e2b",
+  TENSORLAKE: "tensorlake",
 } as const;
 
 export type SandboxInstanceProvider =
@@ -43,6 +44,7 @@ export type SandboxInstanceSource =
 export const SandboxInstancePurposes = {
   SESSION: "session",
   SNAPSHOT: "snapshot",
+  SETUP_ASSISTANT: "setup_assistant",
   SETUP_CHECK: "setup_check",
 } as const;
 

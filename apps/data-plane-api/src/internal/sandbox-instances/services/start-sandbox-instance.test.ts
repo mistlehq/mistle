@@ -65,4 +65,16 @@ describe("resolveSandboxInstancePersistenceMode", () => {
       }),
     ).toBe(SandboxInstancePersistenceModes.EPHEMERAL);
   });
+
+  it("returns ephemeral for setup-assistant sandboxes even when persistent sandboxes are enabled", () => {
+    expect(
+      resolveSandboxInstancePersistenceMode({
+        organizationId: "org_test",
+        purpose: SandboxInstancePurposes.SETUP_ASSISTANT,
+        effectivePersistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+        sandboxProvider: "e2b",
+        configuredStorageBackend: "archil",
+      }),
+    ).toBe(SandboxInstancePersistenceModes.EPHEMERAL);
+  });
 });

@@ -107,6 +107,13 @@ describe("sync-integration-targets", () => {
         enabled: false,
         config: {},
       },
+      {
+        targetKey: "tensorlake-default",
+        familyId: "tensorlake",
+        variantId: "tensorlake-default",
+        enabled: false,
+        config: {},
+      },
     ]);
   });
 });

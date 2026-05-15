@@ -20,6 +20,7 @@ import type { AsyncTaskTracker } from "../runtime/async-task-tracker.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import { SandboxTunnelWebSocketAdmission } from "./admission/sandbox-tunnel-websocket-admission.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
+import type { SandboxOperationIngressService } from "./operation-ingress/index.js";
 import type { SandboxOwnerResolver } from "./ownership/sandbox-owner-resolver.js";
 import { TunnelProtocolTranslator } from "./protocol/tunnel-protocol-translator.js";
 import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
@@ -63,6 +64,7 @@ type RegisterSandboxTunnelRouteInput = {
   activeBootstrapSessionStore: ActiveBootstrapSessionStore;
   sandboxInstanceDeadlineService: SandboxInstanceDeadlineService;
   sandboxDeadlineLifecycleCoordinator: SandboxDeadlineLifecycleCoordinator;
+  operationIngressService: SandboxOperationIngressService;
   telemetryIngressService: SandboxTelemetryIngressService;
   sandboxTunnelTaskTracker: AsyncTaskTracker;
   gatewayEgressTransportService: GatewayEgressTransportService;
@@ -338,6 +340,18 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                   },
                   sandboxKeepaliveRepository,
                   sandboxRuntimeReadinessRepository,
+                  handleOperationDelivery: async (delivery) => {
+                    await input.operationIngressService.handleDelivery({
+                      db: ctx.get("db"),
+                      delivery,
+                      relaySessionId,
+                      sandboxInstanceId,
+                      sendControlMessage: (message) => {
+                        ws.send(JSON.stringify(message));
+                      },
+                      tables: ctx.get("tables"),
+                    });
+                  },
                   handleTelemetryDelivery: async (delivery) => {
                     await input.telemetryIngressService.handleDelivery({
                       delivery,
@@ -433,6 +447,14 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                       }),
                   );
                 }
+                closeTasks.push(
+                  Promise.resolve().then(() => {
+                    input.operationIngressService.detachBootstrapSession({
+                      relaySessionId,
+                      sandboxInstanceId,
+                    });
+                  }),
+                );
                 closeTasks.push(
                   input.telemetryIngressService
                     .detachBootstrapSession({

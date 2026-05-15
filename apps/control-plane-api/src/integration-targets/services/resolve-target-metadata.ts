@@ -136,6 +136,10 @@ export type ResolvedIntegrationTargetMetadata = {
             submitLabel: string;
             helperText: string;
           };
+          reauthorize?: {
+            actionLabel: string;
+            pendingLabel: string;
+          };
         };
       }
     | {
@@ -247,7 +251,14 @@ function resolveConnectionMethod(
     ...(method.connectionDetail === undefined
       ? {}
       : { connectionDetail: cloneConnectionMethodDetailMetadata(method.connectionDetail) }),
-    ui: method.ui,
+    ui: {
+      create: method.ui.create,
+      ...(method.ui.reauthorize === undefined
+        ? {}
+        : {
+            reauthorize: method.ui.reauthorize,
+          }),
+    },
   };
 }
 

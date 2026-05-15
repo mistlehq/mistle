@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { createTestRegistry, startTestEnvironment } from "../src/index.js";
+import {
+  createTestRegistry,
+  IntegrationConfigPathInContainer,
+  startTestEnvironment,
+} from "../src/index.js";
 
-const DockerSampleConfigPathInContainer = "/app/config/config.docker.sample.toml";
 const startedEnvironments: Awaited<ReturnType<typeof startTestEnvironment>>[] = [];
 const HttpServiceIds = ["control-plane-api", "data-plane-api", "data-plane-gateway"] as const;
 
@@ -14,7 +17,7 @@ describe("Mistle test registry", () => {
 
   it("starts data-plane-api without starting control-plane-api", async () => {
     const registry = createTestRegistry({
-      configPathInContainer: DockerSampleConfigPathInContainer,
+      configPathInContainer: IntegrationConfigPathInContainer,
       __dangerouslyIsolatedServices: {
         reason:
           "This smoke proves optional service references do not force subset integration tests to start unrelated Mistle services.",
@@ -38,7 +41,7 @@ describe("Mistle test registry", () => {
 
   it("starts the full concrete Mistle service graph through the registry", async () => {
     const registry = createTestRegistry({
-      configPathInContainer: DockerSampleConfigPathInContainer,
+      configPathInContainer: IntegrationConfigPathInContainer,
       __dangerouslyIsolatedServices: {
         reason:
           "This smoke starts the entire graph and should not reuse partially-started services from smaller registry smoke tests.",

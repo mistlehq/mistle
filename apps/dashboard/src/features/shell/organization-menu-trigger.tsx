@@ -54,14 +54,14 @@ export function OrganizationMenuTrigger(input: {
         render={
           <Button
             aria-label="Organization menu"
-            className="h-auto w-full justify-start px-2 py-2 text-left"
+            className="h-auto w-full justify-start px-3 py-3 text-left md:px-2 md:py-2"
             type="button"
             variant="ghost"
           />
         }
       >
-        <div className="flex w-full items-center gap-2">
-          <Avatar className="h-8 w-8 shrink-0">
+        <div className="flex w-full items-center gap-3 md:gap-2">
+          <Avatar className="h-10 w-10 shrink-0 md:h-8 md:w-8">
             {input.organizationImageUrl === undefined ||
             input.organizationImageUrl === null ? null : (
               <AvatarImage alt={`${organizationName} logo`} src={input.organizationImageUrl} />
@@ -72,16 +72,24 @@ export function OrganizationMenuTrigger(input: {
           </Avatar>
           <div className="min-w-0 flex-1">
             <p
-              className="text-sidebar-foreground truncate text-sm font-medium"
+              className="text-sidebar-foreground truncate text-base font-medium md:text-sm"
               title={organizationName}
             >
               {organizationName}
             </p>
           </div>
-          <CaretDownIcon aria-hidden className="text-sidebar-foreground/70 h-4 w-4 shrink-0" />
+          <CaretDownIcon
+            aria-hidden
+            className="text-sidebar-foreground/70 h-5 w-5 shrink-0 md:h-4 md:w-4"
+          />
         </div>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-64" side="bottom" sideOffset={8}>
+      <DropdownMenuContent
+        align="start"
+        className="w-[min(calc(100vw-2rem),20rem)] md:w-64"
+        side="bottom"
+        sideOffset={8}
+      >
         {input.organizationSummaryErrorMessage !== null ? (
           <>
             <DropdownMenuGroup>
@@ -103,7 +111,7 @@ export function OrganizationMenuTrigger(input: {
               <DropdownMenuSubTrigger disabled={input.isSwitchingOrganization}>
                 Switch organization
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
+              <DropdownMenuSubContent className="min-w-48">
                 {organizations.length > 0 ? (
                   <DropdownMenuRadioGroup
                     onValueChange={(organizationId) => {

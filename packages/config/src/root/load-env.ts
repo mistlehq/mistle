@@ -96,6 +96,15 @@ const RootEnvDescriptors = [
     path: ["internal_auth", "shared_token", "token"],
   },
   {
+    envVar: "MISTLE_BILLING_STRIPE_ENABLED",
+    path: ["billing", "stripe", "enabled"],
+    parse: parseBooleanEnv,
+  },
+  {
+    envVar: "MISTLE_BILLING_STRIPE_SECRET_KEY",
+    path: ["billing", "stripe", "secret_key"],
+  },
+  {
     envVar: "MISTLE_TELEMETRY_ENABLED",
     path: ["telemetry", "enabled"],
     parse: parseBooleanEnv,
@@ -416,6 +425,15 @@ const RootEnvDescriptors = [
   {
     envVar: "MISTLE_SANDBOX_E2B_DOMAIN",
     path: ["sandbox", "e2b", "domain"],
+  },
+  {
+    envVar: "MISTLE_SANDBOX_TENSORLAKE_ENABLED",
+    path: ["sandbox", "tensorlake", "enabled"],
+    parse: parseBooleanEnv,
+  },
+  {
+    envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY",
+    path: ["sandbox", "tensorlake", "api_key"],
   },
   {
     envVar: "MISTLE_SANDBOX_E2B_CPU_COUNT",

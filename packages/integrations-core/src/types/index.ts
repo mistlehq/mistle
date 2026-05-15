@@ -26,9 +26,14 @@ export type SandboxRuntimeResourceField = {
   default: number;
 };
 
+export type SandboxRuntimeMemoryResourceField = SandboxRuntimeResourceField & {
+  minPerVcpu?: number;
+  maxPerVcpu?: number;
+};
+
 export type SandboxRuntimeResourceCapabilities = {
   vcpuCount: SandboxRuntimeResourceField;
-  memoryMb: SandboxRuntimeResourceField;
+  memoryMb: SandboxRuntimeMemoryResourceField;
   storageMb?: SandboxRuntimeResourceField;
 };
 
@@ -491,6 +496,11 @@ export type IntegrationConnectionMethodCreateUi = {
   helperText: string;
 };
 
+export type IntegrationConnectionMethodReauthorizeUi = {
+  actionLabel: string;
+  pendingLabel: string;
+};
+
 export type IntegrationDeviceAuthorizationConnectionMethodCreateUi = {
   submitLabel: string;
 };
@@ -889,6 +899,7 @@ export type IntegrationRedirectConnectionMethodDefinition<
   >;
   ui: {
     create: IntegrationConnectionMethodCreateUi;
+    reauthorize?: IntegrationConnectionMethodReauthorizeUi;
   };
 };
 

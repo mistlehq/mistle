@@ -22,12 +22,12 @@ const MaterializeWorkflowRunInputSchema = z.looseObject({
       imageId: z.string().min(1),
       createdAt: z.iso.datetime().optional(),
       kind: z.literal("base"),
-      provider: z.enum(["docker", "e2b"]),
+      provider: z.enum(["docker", "e2b", "tensorlake"]),
     })
     .strict(),
   sandboxRuntime: z
     .object({
-      provider: z.enum(["docker", "e2b"]),
+      provider: z.enum(["docker", "e2b", "tensorlake"]),
       connectionId: z.string().min(1).optional(),
       resources: z
         .object({
@@ -44,7 +44,7 @@ const MaterializeWorkflowRunInputSchema = z.looseObject({
 const StartWorkflowRunInputSchema = z.looseObject({
   sandboxInstanceId: z.string().min(1),
   actingUserId: z.string().min(1).optional(),
-  purpose: z.enum(["session", "snapshot", "setup_check"]).optional(),
+  purpose: z.enum(["session", "snapshot", "setup_assistant", "setup_check"]).optional(),
   persistenceMode: z.enum([
     SandboxInstancePersistenceModes.EPHEMERAL,
     SandboxInstancePersistenceModes.PERSISTENT,
@@ -54,7 +54,7 @@ const StartWorkflowRunInputSchema = z.looseObject({
       imageId: z.string().min(1),
       createdAt: z.iso.datetime().optional(),
       kind: z.enum(["base", "snapshot"]),
-      provider: z.enum(["docker", "e2b"]).optional(),
+      provider: z.enum(["docker", "e2b", "tensorlake"]).optional(),
     })
     .strict()
     .optional(),

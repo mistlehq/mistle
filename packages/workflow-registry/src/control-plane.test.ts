@@ -4,6 +4,7 @@ import {
   HandleAutomationConversationDeliveryWorkflowSpec,
   HandleAutomationRunWorkflowSpec,
   HandleIntegrationWebhookEventWorkflowSpec,
+  ProvisionStripeCustomerWorkflowSpec,
   RequestDeleteSandboxProfileWorkflowSpec,
   ScheduleDispatchBatchWorkflowSpec,
   ScheduleDispatchWorkflowSpec,
@@ -11,6 +12,7 @@ import {
   SendVerificationOTPWorkflowSpec,
   StartSandboxProfileInstanceWorkflowSpec,
   SyncIntegrationConnectionResourcesWorkflowSpec,
+  createStripeCustomerProvisioningIdempotencyKey,
 } from "./control-plane.js";
 
 describe("control-plane workflow registry", () => {
@@ -18,6 +20,7 @@ describe("control-plane workflow registry", () => {
     expect([
       SendVerificationOTPWorkflowSpec,
       SendOrganizationInvitationWorkflowSpec,
+      ProvisionStripeCustomerWorkflowSpec,
       RequestDeleteSandboxProfileWorkflowSpec,
       StartSandboxProfileInstanceWorkflowSpec,
       HandleIntegrationWebhookEventWorkflowSpec,
@@ -29,6 +32,7 @@ describe("control-plane workflow registry", () => {
     ]).toEqual([
       { name: "control-plane.auth.send-verification-otp", version: "1" },
       { name: "control-plane.auth.send-organization-invitation", version: "1" },
+      { name: "control-plane.billing.provision-stripe-customer", version: "1" },
       { name: "control-plane.sandbox-profiles.request-delete-profile", version: "1" },
       { name: "control-plane.sandbox-instances.start-profile-instance", version: "1" },
       { name: "control-plane.integration-webhooks.handle-event", version: "1" },
@@ -38,5 +42,11 @@ describe("control-plane workflow registry", () => {
       { name: "control-plane.schedules.dispatch", version: "1" },
       { name: "control-plane.schedules.dispatch-batch", version: "1" },
     ]);
+  });
+
+  test("builds a stable Stripe customer provisioning idempotency key", () => {
+    expect(createStripeCustomerProvisioningIdempotencyKey("org_123")).toBe(
+      "organization:org_123:stripe-customer",
+    );
   });
 });

@@ -125,9 +125,10 @@ const SandboxProfileIntegrationConnectionColumns = [
   },
 ] satisfies readonly ResponsiveFieldListColumn[];
 
-const SandboxProfileIntegrationCellContentClassName = "flex items-center md:min-h-9";
+const SandboxProfileIntegrationCellContentClassName =
+  "flex items-center @3xl/responsive-field-list:min-h-9";
 const SandboxProfileIntegrationActionCellClassName =
-  "absolute right-0 top-0 md:static md:flex md:min-h-9 md:items-center md:justify-end";
+  "absolute right-0 top-0 @3xl/responsive-field-list:static @3xl/responsive-field-list:flex @3xl/responsive-field-list:min-h-9 @3xl/responsive-field-list:items-center @3xl/responsive-field-list:justify-end";
 
 function IntegrationNameCell(input: {
   logoKey: string | undefined;
@@ -857,7 +858,7 @@ export function SandboxProfileIntegrationsSetupSection(
                     <ResponsiveFieldListRow
                       className="py-4"
                       gapClassName="gap-6"
-                      gridClassName="md:items-start"
+                      gridClassName="@3xl/responsive-field-list:items-start"
                       isLastRow={connectorRows.length === 0}
                     >
                       <ResponsiveFieldListCell columnKey="integration">
@@ -894,9 +895,11 @@ export function SandboxProfileIntegrationsSetupSection(
 
                     return (
                       <ResponsiveFieldListRow
-                        className={isReadOnly ? "py-4" : "py-4 pr-10 md:pr-0"}
+                        className={
+                          isReadOnly ? "py-4" : "py-4 pr-10 @3xl/responsive-field-list:pr-0"
+                        }
                         gapClassName="gap-6"
-                        gridClassName="md:items-start"
+                        gridClassName="@3xl/responsive-field-list:items-start"
                         key={row.clientId}
                       >
                         <ResponsiveFieldListCell columnKey="integration">
@@ -950,7 +953,7 @@ export function SandboxProfileIntegrationsSetupSection(
                       <ResponsiveFieldListRow
                         className="py-4"
                         gapClassName="gap-6"
-                        gridClassName="md:items-start"
+                        gridClassName="@3xl/responsive-field-list:items-start"
                         isLastRow={
                           choiceIndex === agentChoices.length - 1 && connectorRows.length === 0
                         }
@@ -1013,9 +1016,11 @@ export function SandboxProfileIntegrationsSetupSection(
 
                     return (
                       <ResponsiveFieldListRow
-                        className={isReadOnly ? "py-4" : "py-4 pr-10 md:pr-0"}
+                        className={
+                          isReadOnly ? "py-4" : "py-4 pr-10 @3xl/responsive-field-list:pr-0"
+                        }
                         gapClassName="gap-6"
-                        gridClassName="md:items-start"
+                        gridClassName="@3xl/responsive-field-list:items-start"
                         isLastRow={rowIndex === connectorRows.length - 1}
                         key={row.clientId}
                       >

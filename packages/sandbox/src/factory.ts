@@ -12,6 +12,12 @@ import {
   type E2BSandboxConfig,
 } from "./providers/e2b/index.js";
 import {
+  createTensorlakeAdapter,
+  createTensorlakeBaseImageBuilder,
+  createTensorlakeRuntimeControl,
+  type TensorlakeSandboxConfig,
+} from "./providers/tensorlake/index.js";
+import {
   SandboxProvider,
   type SandboxAdapter,
   type SandboxBaseImageBuilder,
@@ -23,6 +29,7 @@ export type CreateSandboxAdapterInput = {
   provider: SandboxProviderType;
   docker?: DockerSandboxConfig;
   e2b?: E2BSandboxConfig;
+  tensorlake?: TensorlakeSandboxConfig;
 };
 
 export type CreateSandboxBaseImageBuilderInput = CreateSandboxAdapterInput & {
@@ -50,6 +57,16 @@ export function createSandboxAdapter(input: CreateSandboxAdapterInput): SandboxA
     return createE2BAdapter(input.e2b);
   }
 
+  if (input.provider === SandboxProvider.TENSORLAKE) {
+    if (input.tensorlake === undefined) {
+      throw new SandboxConfigurationError(
+        "Tensorlake config is required when provider is tensorlake.",
+      );
+    }
+
+    return createTensorlakeAdapter(input.tensorlake);
+  }
+
   return assertUnreachable(input.provider);
 }
 
@@ -73,6 +90,18 @@ export function createSandboxBaseImageBuilder(
     });
   }
 
+  if (input.provider === SandboxProvider.TENSORLAKE) {
+    if (input.tensorlake === undefined) {
+      throw new SandboxConfigurationError(
+        "Tensorlake config is required when provider is tensorlake.",
+      );
+    }
+
+    return createTensorlakeBaseImageBuilder({
+      config: input.tensorlake,
+    });
+  }
+
   return assertUnreachable(input.provider);
 }
 
@@ -93,6 +122,16 @@ export function createSandboxRuntimeControl(
     }
 
     return createE2BRuntimeControl(input.e2b);
+  }
+
+  if (input.provider === SandboxProvider.TENSORLAKE) {
+    if (input.tensorlake === undefined) {
+      throw new SandboxConfigurationError(
+        "Tensorlake config is required when provider is tensorlake.",
+      );
+    }
+
+    return createTensorlakeRuntimeControl(input.tensorlake);
   }
 
   return assertUnreachable(input.provider);

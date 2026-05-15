@@ -6,6 +6,7 @@ export {
   sandboxInstancePortAccessSchema as SandboxInstancePortAccessSchema,
   listSandboxInstancesQuerySchema as ListSandboxInstancesQuerySchema,
   listSandboxInstancesResponseSchema as ListSandboxInstancesResponseSchema,
+  sandboxOperationEventsResponseSchema as SandboxOperationEventsResponseSchema,
   sandboxInstancesNotFoundResponseSchema as SandboxInstancesNotFoundResponseSchema,
   sandboxInstanceStatusResponseSchema as SandboxInstanceStatusResponseSchema,
 } from "./schemas.js";
@@ -13,6 +14,7 @@ export { route as createSandboxInstanceConnectionTokenRoute } from "./create-san
 export { route as createSandboxInstancePortAccessRoute } from "./create-sandbox-instance-port-access/route.js";
 export { route as listSandboxInstancesRoute } from "./list-sandbox-instances/route.js";
 export { route as getSandboxInstanceRoute } from "./get-sandbox-instance/route.js";
+export { route as listOperationEventsRoute } from "./list-operation-events/route.js";
 export { route as getSandboxInstanceSessionLinkRoute } from "./get-sandbox-instance-session-link/route.js";
 export { route as patchSandboxInstanceTitleRoute } from "./patch-sandbox-instance-title/route.js";
 export { route as resumeSandboxInstanceRoute } from "./resume-sandbox-instance/route.js";
