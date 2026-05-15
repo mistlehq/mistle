@@ -1,5 +1,17 @@
 export { accounts } from "./accounts.js";
 export {
+  apiKeyPermissions,
+  type ApiKeyPermission,
+  type InsertApiKeyPermission,
+} from "./api-key-permissions.js";
+export {
+  apiKeys,
+  ApiKeyActorKinds,
+  type ApiKey,
+  type ApiKeyActorKind,
+  type InsertApiKey,
+} from "./api-keys.js";
+export {
   automations,
   AutomationKinds,
   type InsertAutomation,
