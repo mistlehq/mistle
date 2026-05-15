@@ -17,8 +17,10 @@ export {
 } from "./providers/e2b/index.js";
 export {
   createTensorlakeBaseImageBuilder,
+  createTensorlakeRegisteredBaseImageName,
   createTensorlakeRegisteredImageHandle,
   createTensorlakeSnapshotImageHandle,
   parseTensorlakeImageHandle,
+  resolveTensorlakeStartImage,
   type TensorlakeBaseImageBuilderOptions,
 } from "./providers/tensorlake/index.js";

@@ -13,9 +13,11 @@ export {
   type TensorlakeBaseImageBuilderOptions,
 } from "./base-image-builder.js";
 export {
+  createTensorlakeRegisteredBaseImageName,
   createTensorlakeRegisteredImageHandle,
   createTensorlakeSnapshotImageHandle,
   parseTensorlakeImageHandle,
+  resolveTensorlakeStartImage,
 } from "./image-handle.js";
 
 export function createTensorlakeAdapter(config: TensorlakeSandboxConfig): TensorlakeSandboxAdapter {

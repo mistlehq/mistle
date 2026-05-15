@@ -19,12 +19,7 @@ export function createTensorlakeSandboxBaseImage(input: {
   }).run(
     [
       "apt-get update",
-      "apt-get install -y --no-install-recommends linux-modules-$(uname -r)",
-      "modprobe nf_tables",
-      "(nft delete table ip mistle_tensorlake_probe 2>/dev/null || true)",
-      "nft add table ip mistle_tensorlake_probe",
-      "nft add chain ip mistle_tensorlake_probe output '{ type nat hook output priority -100; policy accept; }'",
-      "nft delete table ip mistle_tensorlake_probe",
+      "apt-get install -y --no-install-recommends kmod linux-modules-$(uname -r)",
       "rm -rf /var/lib/apt/lists/*",
     ].join(" && "),
   );

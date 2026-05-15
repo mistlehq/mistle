@@ -204,11 +204,35 @@ export async function initializeSandboxRuntime(
     payload: encodeSandboxStartupInput(startupInput),
     env: runtimeEnv,
   };
-  if (input.waitForCompletion === false) {
+  try {
     await ctx.sandboxRuntimeControl.beginInit(initRequest);
-  } else {
-    await ctx.sandboxRuntimeControl.init(initRequest);
+  } catch (error) {
+    if (!isSandboxdAlreadyInitializedError(error)) {
+      throw error;
+    }
+
+    ctx.logger.info(
+      {
+        providerSandboxId: input.providerSandboxId,
+        sandboxInstanceId: input.sandboxInstanceId,
+      },
+      "Sandboxd initialization was already submitted before retry.",
+    );
   }
+
+  if (input.waitForCompletion !== false) {
+    await ctx.sandboxRuntimeControl.waitInit({
+      id: input.providerSandboxId,
+      env: runtimeEnv,
+    });
+  }
+}
+
+function isSandboxdAlreadyInitializedError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message.includes("sandboxd has already completed initialization")
+  );
 }
 
 function createTransparentProxyStartupConfiguration(input: {

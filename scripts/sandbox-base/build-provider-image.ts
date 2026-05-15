@@ -10,6 +10,7 @@ import {
   SandboxSdkImageSandboxdSourceKinds,
   SandboxProvider,
   createSandboxBaseImageBuilder,
+  createTensorlakeRegisteredBaseImageName,
 } from "../../packages/sandbox/src/index.js";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -32,7 +33,6 @@ const E2BApiKeyEnv = "E2B_API_KEY";
 const E2BConfigApiKeyEnv = "MISTLE_SANDBOX_E2B_API_KEY";
 const TensorlakeApiKeyEnv = "TENSORLAKE_API_KEY";
 const TensorlakeConfigApiKeyEnv = "MISTLE_SANDBOX_TENSORLAKE_API_KEY";
-const TensorlakeBaseImageEnv = "MISTLE_SANDBOX_TENSORLAKE_BASE_IMAGE";
 
 const TensorlakeSandboxdSources = {
   LOCAL: "local",
@@ -86,6 +86,7 @@ E2B options:
 
 Tensorlake options:
   --output-image-ref <name>            Tensorlake registered sandbox image name
+                                          Defaults to the deterministic name for --source-image-ref
   --source-image-ref <ref>             OCI image ref to import into Tensorlake
   --api-key <key>                      Tensorlake API key
   --sandboxd-source <local|release>    optional sandboxd override for the Tensorlake SDK image
@@ -581,17 +582,10 @@ async function buildDockerBaseImage(argumentsList: ParsedCliArguments): Promise<
 }
 
 async function buildTensorlakeBaseImage(argumentsList: ParsedCliArguments): Promise<void> {
-  const outputImageRef = argumentsList.outputImageRef ?? readOptionalEnv(TensorlakeBaseImageEnv);
   const apiKey =
     argumentsList.apiKey ??
     readOptionalEnv(TensorlakeApiKeyEnv) ??
     readOptionalEnv(TensorlakeConfigApiKeyEnv);
-
-  if (outputImageRef === undefined || outputImageRef.trim() === "") {
-    throw new Error(
-      `--output-image-ref or ${TensorlakeBaseImageEnv} is required when --provider is tensorlake.`,
-    );
-  }
 
   if (apiKey === undefined || apiKey.trim() === "") {
     throw new Error(
@@ -614,6 +608,8 @@ async function buildTensorlakeBaseImage(argumentsList: ParsedCliArguments): Prom
   }
 
   const sourceImageRef = requireTensorlakeSourceImageRef(argumentsList);
+  const outputImageRef =
+    argumentsList.outputImageRef ?? createTensorlakeRegisteredBaseImageName(sourceImageRef);
   const sandboxd = createTensorlakeSandboxdSource(argumentsList);
   if (sandboxd?.kind === SandboxSdkImageSandboxdSourceKinds.LOCAL) {
     const platform = argumentsList.platform ?? DEFAULT_PLATFORM;

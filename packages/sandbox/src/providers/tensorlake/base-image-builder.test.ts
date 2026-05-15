@@ -1,3 +1,7 @@
+import { access, mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { dockerfileContent } from "tensorlake";
 import { describe, expect, it } from "vitest";
 
@@ -7,7 +11,10 @@ import {
   SandboxProvider,
   SandboxSdkImageSandboxdSourceKinds,
 } from "../../types.js";
-import { TensorlakeBaseImageBuilder } from "./base-image-builder.js";
+import {
+  TensorlakeBaseImageBuilder,
+  createTensorlakeSdkImageBuildContext,
+} from "./base-image-builder.js";
 import { createTensorlakeSandboxBaseImage } from "./base-image-definition.js";
 import { parseTensorlakeImageHandle } from "./image-handle.js";
 
@@ -39,8 +46,9 @@ describe("TensorlakeBaseImageBuilder", () => {
 
     expect(dockerfileText).toContain("FROM ghcr.io/mistlehq/sandbox-base:v1.2.3");
     expect(dockerfileText).toContain("apt-get install -y --no-install-recommends");
-    expect(dockerfileText).toContain("linux-modules-$(uname -r)");
-    expect(dockerfileText).toContain("modprobe nf_tables");
+    expect(dockerfileText).toContain("kmod linux-modules-$(uname -r)");
+    expect(dockerfileText).not.toContain("modprobe nf_tables");
+    expect(dockerfileText).not.toContain("nft add table");
     expect(dockerfileText).not.toContain("DEBIAN_FRONTEND");
     expect(dockerfileText).not.toContain("WORKDIR /root");
     expect(dockerfileText).not.toContain("test -x /opt/mistle/bin/sandboxd");
@@ -111,5 +119,81 @@ describe("TensorlakeBaseImageBuilder", () => {
         },
       }),
     ).rejects.toBeInstanceOf(SandboxConfigurationError);
+  });
+});
+
+describe("createTensorlakeSdkImageBuildContext", () => {
+  it("creates an empty Tensorlake build context when the image does not copy local files", async () => {
+    const repoPath = await mkdtemp(join(tmpdir(), "mistle-tensorlake-source-"));
+
+    try {
+      await mkdir(join(repoPath, "node_modules", ".pnpm", "dependency"), { recursive: true });
+      await writeFile(join(repoPath, "node_modules", ".pnpm", "dependency", "index.js"), "");
+
+      const buildContext = await createTensorlakeSdkImageBuildContext({
+        kind: SandboxBaseImageSourceKinds.SDK_IMAGE,
+        baseImageRef: "ghcr.io/mistlehq/sandbox-base:v1.2.3",
+        contextPath: repoPath,
+        imageId: "mistle-base",
+      });
+
+      try {
+        await expect(readdir(buildContext.path)).resolves.toEqual([".mistle-tensorlake-context"]);
+      } finally {
+        await buildContext.cleanup();
+      }
+    } finally {
+      await rm(repoPath, { force: true, recursive: true });
+    }
+  });
+
+  it("copies only generated sandboxd parts when using a local sandboxd artifact", async () => {
+    const repoPath = await mkdtemp(join(tmpdir(), "mistle-tensorlake-source-"));
+
+    try {
+      const partsPath = join(
+        repoPath,
+        "packages",
+        "sandboxd",
+        ".generated",
+        "tensorlake",
+        "sandboxd-parts",
+      );
+      await mkdir(partsPath, { recursive: true });
+      await writeFile(join(partsPath, "part-aa"), "sandboxd");
+      await mkdir(join(repoPath, "node_modules", ".pnpm", "dependency"), { recursive: true });
+      await writeFile(join(repoPath, "node_modules", ".pnpm", "dependency", "index.js"), "");
+
+      const buildContext = await createTensorlakeSdkImageBuildContext({
+        kind: SandboxBaseImageSourceKinds.SDK_IMAGE,
+        baseImageRef: "ghcr.io/mistlehq/sandbox-base:v1.2.3",
+        contextPath: repoPath,
+        imageId: "mistle-base",
+        sandboxd: {
+          kind: SandboxSdkImageSandboxdSourceKinds.LOCAL,
+        },
+      });
+
+      try {
+        await expect(
+          access(
+            join(
+              buildContext.path,
+              "packages",
+              "sandboxd",
+              ".generated",
+              "tensorlake",
+              "sandboxd-parts",
+              "part-aa",
+            ),
+          ),
+        ).resolves.toBeUndefined();
+        await expect(access(join(buildContext.path, "node_modules"))).rejects.toThrow("ENOENT");
+      } finally {
+        await buildContext.cleanup();
+      }
+    } finally {
+      await rm(repoPath, { force: true, recursive: true });
+    }
   });
 });

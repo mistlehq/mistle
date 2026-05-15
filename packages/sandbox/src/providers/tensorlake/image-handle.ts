@@ -1,8 +1,13 @@
+import { createHash } from "node:crypto";
+
 import { SandboxConfigurationError } from "../../errors.js";
 import { SandboxProvider, type SandboxImageHandle } from "../../types.js";
 import { TensorlakeStartImageKinds, type TensorlakeStartImageKind } from "./schemas.js";
 
 const TensorlakeImageHandlePrefix = "tensorlake:";
+const TensorlakeSandboxBaseImageNamePrefix = "mistle";
+const TensorlakeSha256DigestPrefix = "@sha256:";
+const TensorlakeBaseImageDigestLength = 24;
 
 export type TensorlakeStartImage = {
   readonly kind: TensorlakeStartImageKind;
@@ -46,17 +51,66 @@ export function parseTensorlakeImageHandle(handle: SandboxImageHandle): Tensorla
   throw new SandboxConfigurationError(`Unsupported Tensorlake image handle kind "${kind}".`);
 }
 
+export function resolveTensorlakeStartImage(handle: SandboxImageHandle): TensorlakeStartImage {
+  if (handle.provider !== SandboxProvider.TENSORLAKE) {
+    throw new SandboxConfigurationError(
+      "Tensorlake adapter received a non-Tensorlake image handle.",
+    );
+  }
+
+  if (handle.imageId.startsWith(TensorlakeImageHandlePrefix)) {
+    return parseTensorlakeImageHandle(handle);
+  }
+
+  if (isGhcrImageRef(handle.imageId)) {
+    return {
+      kind: TensorlakeStartImageKinds.IMAGE,
+      id: createTensorlakeRegisteredBaseImageName(handle.imageId),
+    };
+  }
+
+  return {
+    kind: TensorlakeStartImageKinds.IMAGE,
+    id: requireNonEmptyTensorlakeImageId(handle.imageId),
+  };
+}
+
+export function createTensorlakeRegisteredBaseImageName(baseImageRef: string): string {
+  return `${TensorlakeSandboxBaseImageNamePrefix}-${createTensorlakeBaseImageNameDigest(baseImageRef)}`;
+}
+
 function createTensorlakeImageHandle(
   kind: TensorlakeStartImageKind,
   id: string,
 ): SandboxImageHandle {
-  if (id.trim().length === 0) {
-    throw new SandboxConfigurationError("Tensorlake image handle id is required.");
-  }
-
   return {
     provider: SandboxProvider.TENSORLAKE,
-    imageId: `${TensorlakeImageHandlePrefix}${kind}:${id}`,
+    imageId: `${TensorlakeImageHandlePrefix}${kind}:${requireNonEmptyTensorlakeImageId(id)}`,
     createdAt: new Date().toISOString(),
   };
+}
+
+function isGhcrImageRef(imageId: string): boolean {
+  return imageId.trim().startsWith("ghcr.io/");
+}
+
+function requireNonEmptyTensorlakeImageId(imageId: string): string {
+  const normalizedImageId = imageId.trim();
+  if (normalizedImageId.length === 0) {
+    throw new SandboxConfigurationError("Tensorlake image handle id is required.");
+  }
+  return normalizedImageId;
+}
+
+function createTensorlakeBaseImageNameDigest(baseImageRef: string): string {
+  const normalizedBaseImageRef = requireNonEmptyTensorlakeImageId(baseImageRef);
+  const digestIndex = normalizedBaseImageRef.indexOf(TensorlakeSha256DigestPrefix);
+  if (digestIndex >= 0) {
+    const digest = normalizedBaseImageRef.slice(digestIndex + TensorlakeSha256DigestPrefix.length);
+    if (/^[a-f0-9]{64}$/u.test(digest)) {
+      return digest.slice(0, TensorlakeBaseImageDigestLength);
+    }
+  }
+
+  return createHash("sha256").update(normalizedBaseImageRef).digest("hex").slice(0, 24);
 }

@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import { SandboxConfigurationError } from "../../errors.js";
 import { SandboxProvider } from "../../types.js";
 import {
+  createTensorlakeRegisteredBaseImageName,
   createTensorlakeRegisteredImageHandle,
   createTensorlakeSnapshotImageHandle,
   parseTensorlakeImageHandle,
+  resolveTensorlakeStartImage,
 } from "./image-handle.js";
 
 describe("Tensorlake image handles", () => {
@@ -30,5 +32,55 @@ describe("Tensorlake image handles", () => {
         createdAt: "2026-05-11T00:00:00.000Z",
       }),
     ).toThrow(SandboxConfigurationError);
+  });
+
+  it("resolves GHCR base image refs to deterministic registered image names", () => {
+    const imageId = "ghcr.io/mistlehq/sandbox-base:v1.2.3";
+
+    expect(createTensorlakeRegisteredBaseImageName(imageId)).toBe(
+      "mistle-2007239adae78582586d0995",
+    );
+    expect(
+      resolveTensorlakeStartImage({
+        provider: SandboxProvider.TENSORLAKE,
+        imageId,
+        createdAt: "2026-05-11T00:00:00.000Z",
+      }),
+    ).toEqual({
+      kind: "image",
+      id: "mistle-2007239adae78582586d0995",
+    });
+  });
+
+  it("uses GHCR digest refs directly for deterministic registered image names", () => {
+    const imageId =
+      "ghcr.io/mistlehq/sandbox-base@sha256:1111111111111111111111112222222222222222222222223333333333333333";
+
+    expect(createTensorlakeRegisteredBaseImageName(imageId)).toBe(
+      "mistle-111111111111111111111111",
+    );
+    expect(
+      resolveTensorlakeStartImage({
+        provider: SandboxProvider.TENSORLAKE,
+        imageId,
+        createdAt: "2026-05-11T00:00:00.000Z",
+      }),
+    ).toEqual({
+      kind: "image",
+      id: "mistle-111111111111111111111111",
+    });
+  });
+
+  it("preserves explicit Tensorlake registered image ids", () => {
+    expect(
+      resolveTensorlakeStartImage({
+        provider: SandboxProvider.TENSORLAKE,
+        imageId: "mistle:production:abcdef",
+        createdAt: "2026-05-11T00:00:00.000Z",
+      }),
+    ).toEqual({
+      kind: "image",
+      id: "mistle:production:abcdef",
+    });
   });
 });

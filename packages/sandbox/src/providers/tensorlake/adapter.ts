@@ -29,7 +29,10 @@ import {
   TensorlakeClientOperationIds,
 } from "./client-errors.js";
 import type { TensorlakeClient } from "./client.js";
-import { createTensorlakeSnapshotImageHandle, parseTensorlakeImageHandle } from "./image-handle.js";
+import {
+  createTensorlakeSnapshotImageHandle,
+  resolveTensorlakeStartImage,
+} from "./image-handle.js";
 import { createTensorlakeTransparentProxyConfiguration } from "./transparent-proxy.js";
 import type { TensorlakeSandboxInspectResult } from "./types.js";
 
@@ -100,7 +103,7 @@ export class TensorlakeSandboxAdapter implements SandboxAdapter {
         "Tensorlake adapter requires a sandbox instance id to create a named sandbox.",
       );
     }
-    const image = parseTensorlakeImageHandle(request.image);
+    const image = resolveTensorlakeStartImage(request.image);
     const response = await this.#client.startSandbox({
       sandboxInstanceId: request.sandboxInstanceId,
       image,

@@ -752,7 +752,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               providerSandboxId: startedSandbox.providerSandboxId,
               startupMode: SandboxStartupModes.NEW,
               executionMode: SandboxExecutionModes.SESSION,
-              waitForCompletion: !waitForPostStartStorageAttach,
+              waitForCompletion: false,
               waitForStorageAttach: waitForPostStartStorageAttach,
               runtimePlan: workflowInput.runtimePlan,
               ...(workflowInput.actingUserId === undefined
@@ -778,6 +778,38 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           status: retryable ? "warning" : "failed",
         });
         throw error;
+      }
+
+      if (!waitForPostStartStorageAttach) {
+        try {
+          await step.run({ name: "wait-for-sandbox-runtime-initialization" }, async () => {
+            logger.info("Waiting for sandbox runtime initialization.");
+            const resolvedRuntime =
+              await ctx.sandboxRuntimeProviderResolver.resolve(sandboxRuntimeInput);
+            await resolvedRuntime.sandboxRuntimeControl.waitInit({
+              id: startedSandbox.providerSandboxId,
+              env: createSandboxRuntimeEnv({
+                config: ctx.config,
+                sandboxInstanceId: workflowInput.sandboxInstanceId,
+                waitForStorageAttach: waitForPostStartStorageAttach,
+              }),
+            });
+          });
+        } catch (error) {
+          const retryable = shouldRethrowDurableStepErrorForRetry(error);
+          await operationEvents.record({
+            attributes: {
+              ...sandboxdLifecycleAttributes,
+              error: formatLifecycleEventError(error),
+            },
+            message: retryable
+              ? "Sandboxd initialization wait attempt failed and will retry."
+              : "Sandboxd initialization wait failed.",
+            phase: "sandboxd",
+            status: retryable ? "warning" : "failed",
+          });
+          throw error;
+        }
       }
 
       await operationEvents.record({
