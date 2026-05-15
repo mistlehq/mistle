@@ -6,6 +6,7 @@ import { route } from "./route.js";
 
 export const handler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
   const config = ctx.get("config");
+  const environment = ctx.get("environment");
   const db = ctx.get("resources").db;
   const tables = ctx.get("resources").tables;
   const controlPlaneInternalClient = ctx.get("resources").controlPlaneInternalClient;
@@ -15,7 +16,12 @@ export const handler: RouteHandler<typeof route, AppContextBindings> = async (ct
 
   const response = await getSandboxInstance(
     {
-      config: { app: config },
+      config: {
+        app: config,
+        global: {
+          env: environment,
+        },
+      },
       controlPlaneInternalClient,
       db,
       tables,

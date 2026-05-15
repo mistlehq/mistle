@@ -68,6 +68,9 @@ function start(input: {
     const endpoint = httpEndpoint(startInput, ServiceIds.DATA_PLANE_API);
     const peer = peers(startInput.services, startInput.plannedEndpoints);
     const runtime = await createDataPlaneApiRuntime({
+      global: {
+        env: "development",
+      },
       app: config({
         port: endpoint.port,
         postgres,

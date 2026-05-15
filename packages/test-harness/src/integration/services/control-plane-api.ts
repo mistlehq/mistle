@@ -120,6 +120,9 @@ function start(input: {
     const endpoint = httpEndpoint(startInput, ServiceIds.CONTROL_PLANE_API);
     const peer = peers(startInput.services, startInput.plannedEndpoints);
     const runtime = await createControlPlaneApiRuntime({
+      global: {
+        env: "development",
+      },
       app: config(
         input.googleAuth === undefined
           ? {

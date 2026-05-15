@@ -29,6 +29,7 @@ export async function createControlPlaneApiRuntime(
 
     app = createApp({
       config,
+      environment: runtimeConfig.global.env,
       sandboxConfig: config.sandbox,
       internalAuthServiceToken: config.internalAuth.serviceToken,
       db: appContext.db,

@@ -27,6 +27,7 @@ export type ControlPlaneApiPortAccessConfig = ControlPlaneApiConfig["portAccess"
 export type ControlPlaneApiSandboxRuntimeConfig = ControlPlaneApiConfig["sandbox"];
 export type ControlPlaneApiRuntimeConfig = {
   app: ControlPlaneApiConfig;
+  global: Pick<ControlPlaneApiGlobalConfig, "env">;
 };
 
 export type AppContextBindings = {
