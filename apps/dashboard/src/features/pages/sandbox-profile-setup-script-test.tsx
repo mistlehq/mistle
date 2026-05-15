@@ -12,8 +12,15 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { startSandboxProfileSetupScriptTestRun } from "../sandbox-profiles/sandbox-profiles-service.js";
-import type { SandboxProfileSetupScriptTestRuntimeConfig } from "../sandbox-profiles/sandbox-profiles-types.js";
+import {
+  startSandboxProfileMaintenanceScriptTestRun,
+  startSandboxProfileSetupScriptTestRun,
+} from "../sandbox-profiles/sandbox-profiles-service.js";
+import type {
+  SandboxProfileMaintenanceScriptTestRun,
+  SandboxProfileSetupScriptTestRuntimeConfig,
+  SandboxProfileSetupScriptTestRun,
+} from "../sandbox-profiles/sandbox-profiles-types.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import {
   getSandboxInstanceStatus,
@@ -26,8 +33,10 @@ import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
 type SetupScriptTestStatus = "blank" | "failed" | "idle" | "running" | "starting" | "success";
 
 type SetupScriptTestViewProps = {
+  canRun?: boolean;
   disabled?: boolean;
   isDraft: boolean;
+  labels?: ScriptTestLabels;
   onClose?: () => void;
   onRun?: () => void;
   onStop?: () => void;
@@ -51,6 +60,34 @@ type SetupScriptTestRunnerProps = {
   version: number;
 };
 
+type MaintenanceScriptTestRunnerProps = {
+  canRun: boolean;
+  disabled?: boolean;
+  maintenanceScript: string;
+  profileId: string;
+  version: number;
+};
+
+type ScriptTestLabels = {
+  addScriptTitle: string;
+  closeOutputLabel: string;
+  completedLabel: string;
+  disabledTitle: string;
+  failedLabel: string;
+  failureFallbackMessage: string;
+  runningLabel: string;
+  runningTitle: string;
+  startErrorFallbackMessage: string;
+  startingTitle: string;
+  statusErrorFallbackMessage: string;
+  stopIdempotencyPrefix: string;
+  stopTitle: string;
+  testButtonLabel: string;
+  testTitle: string;
+  unavailableTitle: string;
+  waitingMessage: string;
+};
+
 type SetupScriptTestRunState = {
   panelProps: SetupScriptTestViewProps;
   buttonProps: SetupScriptTestViewProps;
@@ -64,15 +101,54 @@ type StartedSetupScriptTestRun = {
 
 type SetupScriptTestRunRequest = {
   runtimeConfig?: SandboxProfileSetupScriptTestRuntimeConfig;
-  setupScript: string;
+  script: string;
 };
 
 type SetupScriptTestTerminalResult = "success" | null;
 
 const SetupScriptTestSandboxStatusRefetchIntervalMs = 1_000;
+const SetupScriptTestLabels: ScriptTestLabels = {
+  addScriptTitle: "Add a setup script before testing.",
+  closeOutputLabel: "Close setup script test output",
+  completedLabel: "Setup script completed",
+  disabledTitle: "Setup script test is unavailable.",
+  failedLabel: "Setup script failed",
+  failureFallbackMessage: "Setup script test sandbox failed.",
+  runningLabel: "Running setup script",
+  runningTitle: "Setup script test is running.",
+  startErrorFallbackMessage: "Could not start setup script test run.",
+  startingTitle: "Setup script test is starting.",
+  statusErrorFallbackMessage: "Could not check setup script test sandbox status.",
+  stopIdempotencyPrefix: "setup-script-test-stop",
+  stopTitle: "Stop setup script test.",
+  testButtonLabel: "Test",
+  testTitle: "Test setup script",
+  unavailableTitle: "Setup script testing is only available while editing a draft.",
+  waitingMessage: "Waiting for setup-check sandbox startup events.",
+};
+const MaintenanceScriptTestLabels: ScriptTestLabels = {
+  addScriptTitle: "Add a maintenance script before testing.",
+  closeOutputLabel: "Close maintenance script test output",
+  completedLabel: "Maintenance script completed",
+  disabledTitle: "Maintenance script test is unavailable.",
+  failedLabel: "Maintenance script failed",
+  failureFallbackMessage: "Maintenance script test sandbox failed.",
+  runningLabel: "Running maintenance script",
+  runningTitle: "Maintenance script test is running.",
+  startErrorFallbackMessage: "Could not start maintenance script test run.",
+  startingTitle: "Maintenance script test is starting.",
+  statusErrorFallbackMessage: "Could not check maintenance script test sandbox status.",
+  stopIdempotencyPrefix: "maintenance-script-test-stop",
+  stopTitle: "Stop maintenance script test.",
+  testButtonLabel: "Test maintenance script",
+  testTitle: "Test maintenance script",
+  unavailableTitle: "Maintenance script testing requires a usable snapshot.",
+  waitingMessage: "Waiting for maintenance-check sandbox startup events.",
+};
 
 function resolveSetupScriptTestButtonLabel(input: {
   canStop: boolean;
+  labels: ScriptTestLabels;
   status: SetupScriptTestStatus;
 }): string {
   if (input.canStop) {
@@ -87,7 +163,7 @@ function resolveSetupScriptTestButtonLabel(input: {
     return "Running...";
   }
 
-  return "Test";
+  return input.labels.testButtonLabel;
 }
 
 function resolveSetupScriptTestButtonIcon(input: {
@@ -107,35 +183,36 @@ function resolveSetupScriptTestButtonIcon(input: {
 
 function resolveSetupScriptTestButtonTitle(input: {
   canStop: boolean;
+  canRun: boolean;
   disabled: boolean;
-  isDraft: boolean;
+  labels: ScriptTestLabels;
   status: SetupScriptTestStatus;
 }): string {
-  if (!input.isDraft) {
-    return "Setup script testing is only available while editing a draft.";
+  if (!input.canRun) {
+    return input.labels.unavailableTitle;
   }
 
   if (input.status === "blank") {
-    return "Add a setup script before testing.";
+    return input.labels.addScriptTitle;
   }
 
   if (input.canStop) {
-    return "Stop setup script test.";
+    return input.labels.stopTitle;
   }
 
   if (input.status === "starting") {
-    return "Setup script test is starting.";
+    return input.labels.startingTitle;
   }
 
   if (input.status === "running") {
-    return "Setup script test is running.";
+    return input.labels.runningTitle;
   }
 
   if (input.disabled) {
-    return "Setup script test is unavailable.";
+    return input.labels.disabledTitle;
   }
 
-  return "Test setup script";
+  return input.labels.testTitle;
 }
 
 export function resolveSetupScriptTestStatus(input: {
@@ -195,22 +272,25 @@ export function resolveSetupScriptTestStatusMessage(input: {
 
 function resolveSandboxFailureMessage(input: {
   failureMessage: string | null | undefined;
+  fallbackMessage: string;
   status: string | undefined;
 }): string | null {
   if (input.status !== "failed") {
     return null;
   }
 
-  return input.failureMessage ?? "Setup script test sandbox failed.";
+  return input.failureMessage ?? input.fallbackMessage;
 }
 
 export function SandboxProfileSetupScriptTestButton(
   input: SetupScriptTestViewProps,
 ): React.JSX.Element {
+  const labels = input.labels ?? SetupScriptTestLabels;
+  const canRun = input.canRun ?? input.isDraft;
   const isBusy = input.status === "starting" || input.status === "running";
   const canStop = isBusy && input.onStop !== undefined;
   const isButtonDisabled =
-    input.disabled === true || !input.isDraft || input.status === "blank" || (isBusy && !canStop);
+    input.disabled === true || !canRun || input.status === "blank" || (isBusy && !canStop);
   const onButtonClick = canStop ? input.onStop : input.onRun;
 
   const setupAssistantButton =
@@ -243,15 +323,16 @@ export function SandboxProfileSetupScriptTestButton(
           size="sm"
           title={resolveSetupScriptTestButtonTitle({
             canStop,
+            canRun,
             disabled: input.disabled === true,
-            isDraft: input.isDraft,
+            labels,
             status: input.status,
           })}
           type="button"
           variant="outline"
         >
           {resolveSetupScriptTestButtonIcon({ canStop, status: input.status })}
-          {resolveSetupScriptTestButtonLabel({ canStop, status: input.status })}
+          {resolveSetupScriptTestButtonLabel({ canStop, labels, status: input.status })}
         </Button>
         {input.setupAssistant === undefined ? null : input.setupAssistant.disabled ? (
           <Tooltip>
@@ -277,6 +358,7 @@ export function SandboxProfileSetupScriptTestPanel(
     return null;
   }
 
+  const labels = input.labels ?? SetupScriptTestLabels;
   const isBusy = input.status === "starting" || input.status === "running";
   const isSuccess = input.status === "success";
   const isFailed = input.status === "failed";
@@ -301,16 +383,16 @@ export function SandboxProfileSetupScriptTestPanel(
             {input.status === "starting"
               ? "Starting test sandbox"
               : input.status === "running"
-                ? "Running setup script"
+                ? labels.runningLabel
                 : input.status === "success"
-                  ? "Setup script completed"
-                  : "Setup script failed"}
+                  ? labels.completedLabel
+                  : labels.failedLabel}
           </span>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           {input.onClose === undefined ? null : (
             <Button
-              aria-label="Close setup script test output"
+              aria-label={labels.closeOutputLabel}
               onClick={input.onClose}
               size="icon-xs"
               type="button"
@@ -333,60 +415,78 @@ export function SandboxProfileSetupScriptTestPanel(
       {renderOperationProgress ? (
         <div className="border-b border-border">{input.operationProgress}</div>
       ) : (
-        <div className="p-3 text-sm text-muted-foreground">
-          Waiting for setup-check sandbox startup events.
-        </div>
+        <div className="p-3 text-sm text-muted-foreground">{labels.waitingMessage}</div>
       )}
     </section>
   );
 }
 
-export function useSandboxProfileSetupScriptTestRun(
-  input: SetupScriptTestRunnerProps,
-): SetupScriptTestRunState {
-  const { buildRuntimeConfig, disabled, isDraft, profileId, setupScript, version } = input;
+function useSandboxProfileScriptTestRun(input: {
+  canRun: boolean;
+  disabled?: boolean;
+  isDraft: boolean;
+  labels: ScriptTestLabels;
+  profileId: string;
+  script: string;
+  startTestRun: (
+    request: SetupScriptTestRunRequest & { idempotencyKey: string },
+  ) => Promise<SandboxProfileSetupScriptTestRun | SandboxProfileMaintenanceScriptTestRun>;
+  version: number;
+  buildRuntimeConfig?: () => SandboxProfileSetupScriptTestRuntimeConfig;
+}): SetupScriptTestRunState {
+  const {
+    buildRuntimeConfig,
+    canRun,
+    disabled,
+    isDraft,
+    labels,
+    profileId,
+    script,
+    startTestRun,
+    version,
+  } = input;
   const [startedRun, setStartedRun] = useState<StartedSetupScriptTestRun | null>(null);
   const [runErrorMessage, setRunErrorMessage] = useState<string | null>(null);
   const [terminalResult, setTerminalResult] = useState<SetupScriptTestTerminalResult>(null);
   const stopRequestedSandboxInstanceIdsRef = useRef<ReadonlySet<string>>(new Set());
-  const scriptIsBlank = setupScript.trim().length === 0;
+  const scriptIsBlank = script.trim().length === 0;
   const startedRunRef = useRef<StartedSetupScriptTestRun | null>(null);
   const clearStartedRun = useCallback((): void => {
     setStartedRun(null);
     startedRunRef.current = null;
     setTerminalResult(null);
   }, []);
-  const stopTestSandboxBestEffort = useCallback((run: StartedSetupScriptTestRun): void => {
-    if (stopRequestedSandboxInstanceIdsRef.current.has(run.sandboxInstanceId)) {
-      return;
-    }
+  const stopTestSandboxBestEffort = useCallback(
+    (run: StartedSetupScriptTestRun): void => {
+      if (stopRequestedSandboxInstanceIdsRef.current.has(run.sandboxInstanceId)) {
+        return;
+      }
 
-    stopRequestedSandboxInstanceIdsRef.current = new Set([
-      ...stopRequestedSandboxInstanceIdsRef.current,
-      run.sandboxInstanceId,
-    ]);
+      stopRequestedSandboxInstanceIdsRef.current = new Set([
+        ...stopRequestedSandboxInstanceIdsRef.current,
+        run.sandboxInstanceId,
+      ]);
 
-    void stopSandboxInstance({
-      instanceId: run.sandboxInstanceId,
-      idempotencyKey: `setup-script-test-stop:${run.workflowRunId}`,
-    }).catch(() => undefined);
-  }, []);
+      void stopSandboxInstance({
+        instanceId: run.sandboxInstanceId,
+        idempotencyKey: `${labels.stopIdempotencyPrefix}:${run.workflowRunId}`,
+      }).catch(() => undefined);
+    },
+    [labels.stopIdempotencyPrefix],
+  );
   const startMutation = useMutation({
     meta: NoLoadingIndicatorMeta,
     mutationFn: async (request: SetupScriptTestRunRequest) =>
-      startSandboxProfileSetupScriptTestRun({
+      startTestRun({
         idempotencyKey: crypto.randomUUID(),
-        profileId,
-        ...(request.runtimeConfig === undefined ? {} : { runtimeConfig: request.runtimeConfig }),
-        setupScript: request.setupScript,
-        version,
+        ...request,
       }),
     onSuccess: (result, request) => {
       setRunErrorMessage(null);
       setTerminalResult(null);
       const nextStartedRun = {
         sandboxInstanceId: result.sandboxInstanceId,
-        setupScript: request.setupScript,
+        setupScript: request.script,
         workflowRunId: result.workflowRunId,
       };
       startedRunRef.current = nextStartedRun;
@@ -396,7 +496,7 @@ export function useSandboxProfileSetupScriptTestRun(
       setRunErrorMessage(
         resolveApiErrorMessage({
           error,
-          fallbackMessage: "Could not start setup script test run.",
+          fallbackMessage: labels.startErrorFallbackMessage,
         }),
       );
     },
@@ -404,12 +504,12 @@ export function useSandboxProfileSetupScriptTestRun(
   const sandboxStatusQuery = useQuery({
     queryKey:
       startedRun === null
-        ? ["sandbox-instance-status", "setup-script-test", null]
+        ? ["sandbox-instance-status", labels.stopIdempotencyPrefix, null]
         : sandboxInstanceStatusQueryKey(startedRun.sandboxInstanceId),
     meta: NoLoadingIndicatorMeta,
     queryFn: async ({ signal }) => {
       if (startedRun === null) {
-        throw new Error("Setup script test sandbox instance id is required.");
+        throw new Error("Script test sandbox instance id is required.");
       }
 
       return getSandboxInstanceStatus({
@@ -429,12 +529,13 @@ export function useSandboxProfileSetupScriptTestRun(
   });
   const sandboxFailureMessage = resolveSandboxFailureMessage({
     failureMessage: sandboxStatusQuery.data?.failureMessage,
+    fallbackMessage: labels.failureFallbackMessage,
     status: sandboxStatusQuery.data?.status,
   });
   const sandboxStatusErrorMessage = sandboxStatusQuery.isError
     ? resolveApiErrorMessage({
         error: sandboxStatusQuery.error,
-        fallbackMessage: "Could not check setup script test sandbox status.",
+        fallbackMessage: labels.statusErrorFallbackMessage,
       })
     : null;
   const testRunErrorMessage = sandboxFailureMessage ?? sandboxStatusErrorMessage ?? runErrorMessage;
@@ -475,14 +576,15 @@ export function useSandboxProfileSetupScriptTestRun(
 
     clearStartedRun();
     startMutation.mutate({
-      setupScript,
+      script,
       ...(runtimeConfig === undefined ? {} : { runtimeConfig }),
     });
-  }, [buildRuntimeConfig, clearStartedRun, setupScript, startMutation]);
+  }, [buildRuntimeConfig, clearStartedRun, script, startMutation]);
 
   const handleRun = useCallback((): void => {
     if (
       !isDraft ||
+      !canRun ||
       disabled === true ||
       scriptIsBlank ||
       status === "starting" ||
@@ -492,7 +594,7 @@ export function useSandboxProfileSetupScriptTestRun(
     }
 
     startSetupScriptTest();
-  }, [disabled, isDraft, scriptIsBlank, startSetupScriptTest, status]);
+  }, [canRun, disabled, isDraft, scriptIsBlank, startSetupScriptTest, status]);
 
   const handleStop = useCallback((): void => {
     const currentRun = startedRunRef.current;
@@ -513,6 +615,8 @@ export function useSandboxProfileSetupScriptTestRun(
   return {
     buttonProps: {
       isDraft,
+      canRun,
+      labels,
       onRun: handleRun,
       ...(startedRun === null ? {} : { onStop: handleStop }),
       status,
@@ -520,11 +624,13 @@ export function useSandboxProfileSetupScriptTestRun(
     },
     panelProps: {
       isDraft,
+      canRun,
+      labels,
       onClose: handleClose,
       operationProgress:
         startedRun === null ? undefined : (
           <SandboxOperationProgress
-            emptyMessage="Waiting for setup-check sandbox startup events."
+            emptyMessage={labels.waitingMessage}
             operationId={startedRun.workflowRunId}
             sandboxInstanceId={startedRun.sandboxInstanceId}
           />
@@ -533,6 +639,52 @@ export function useSandboxProfileSetupScriptTestRun(
       statusMessage,
     },
   };
+}
+
+export function useSandboxProfileSetupScriptTestRun(
+  input: SetupScriptTestRunnerProps,
+): SetupScriptTestRunState {
+  const { buildRuntimeConfig, disabled, isDraft, profileId, setupScript, version } = input;
+  return useSandboxProfileScriptTestRun({
+    canRun: isDraft,
+    isDraft,
+    labels: SetupScriptTestLabels,
+    profileId,
+    script: setupScript,
+    startTestRun: async (request) =>
+      startSandboxProfileSetupScriptTestRun({
+        idempotencyKey: request.idempotencyKey,
+        profileId,
+        ...(request.runtimeConfig === undefined ? {} : { runtimeConfig: request.runtimeConfig }),
+        setupScript: request.script,
+        version,
+      }),
+    version,
+    ...(buildRuntimeConfig === undefined ? {} : { buildRuntimeConfig }),
+    ...(disabled === undefined ? {} : { disabled }),
+  });
+}
+
+export function useSandboxProfileMaintenanceScriptTestRun(
+  input: MaintenanceScriptTestRunnerProps,
+): SetupScriptTestRunState {
+  const { canRun, disabled, maintenanceScript, profileId, version } = input;
+  return useSandboxProfileScriptTestRun({
+    canRun,
+    isDraft: true,
+    labels: MaintenanceScriptTestLabels,
+    profileId,
+    script: maintenanceScript,
+    startTestRun: async (request) =>
+      startSandboxProfileMaintenanceScriptTestRun({
+        idempotencyKey: request.idempotencyKey,
+        maintenanceScript: request.script,
+        profileId,
+        version,
+      }),
+    version,
+    ...(disabled === undefined ? {} : { disabled }),
+  });
 }
 
 export type { SetupScriptTestStatus };

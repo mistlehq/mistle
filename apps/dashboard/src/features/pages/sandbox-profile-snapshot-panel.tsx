@@ -28,7 +28,6 @@ import {
   deleteSandboxProfileVersionRefreshSchedule,
   putSandboxProfileVersionMaintenanceScript,
   putSandboxProfileVersionRefreshSchedule,
-  startSandboxProfileMaintenanceScriptTestRun,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { ActionTile } from "../shared/action-tile.js";
@@ -44,6 +43,11 @@ import {
   type CronExpressionBreakdown,
 } from "./sandbox-profile-editor-page-model.js";
 import { SandboxProfileEditorHorizontalTabContent } from "./sandbox-profile-editor-sections.js";
+import {
+  SandboxProfileSetupScriptTestButton,
+  SandboxProfileSetupScriptTestPanel,
+  useSandboxProfileMaintenanceScriptTestRun,
+} from "./sandbox-profile-setup-script-test.js";
 import { SandboxSetupScriptEditor } from "./sandbox-setup-script-editor.js";
 
 export type SnapshotPanelState =
@@ -556,7 +560,6 @@ function SandboxProfileMaintenanceScriptSection(input: {
   const [draftValue, setDraftValue] = useState(input.maintenanceScript ?? "");
   const [persistedValue, setPersistedValue] = useState(input.maintenanceScript ?? "");
   const [mutationError, setMutationError] = useState<string | null>(null);
-  const [testRunSandboxInstanceId, setTestRunSandboxInstanceId] = useState<string | null>(null);
   const saveMutation = useMutation({
     mutationFn: async (maintenanceScript: string) =>
       putSandboxProfileVersionMaintenanceScript({
@@ -580,36 +583,21 @@ function SandboxProfileMaintenanceScriptSection(input: {
       );
     },
   });
-  const testMutation = useMutation({
-    mutationFn: async (maintenanceScript: string) =>
-      startSandboxProfileMaintenanceScriptTestRun({
-        profileId: input.profileId,
-        version: input.version,
-        maintenanceScript,
-      }),
-    onSuccess: (result) => {
-      setMutationError(null);
-      setTestRunSandboxInstanceId(result.sandboxInstanceId);
-    },
-    onError: (error: unknown) => {
-      setMutationError(
-        resolveApiErrorMessage({
-          error,
-          fallbackMessage: "Could not start maintenance script test run.",
-        }),
-      );
-    },
-  });
-  const isMutating = saveMutation.isPending || testMutation.isPending;
+  const isMutating = saveMutation.isPending;
   const hasChanges = draftValue !== persistedValue;
-  const scriptIsBlank = draftValue.trim().length === 0;
+  const maintenanceScriptTest = useSandboxProfileMaintenanceScriptTestRun({
+    canRun: input.canRunMaintenanceScript,
+    disabled: input.disabled || isMutating,
+    maintenanceScript: draftValue,
+    profileId: input.profileId,
+    version: input.version,
+  });
 
   useEffect(() => {
     const nextValue = input.maintenanceScript ?? "";
     setDraftValue(nextValue);
     setPersistedValue(nextValue);
     setMutationError(null);
-    setTestRunSandboxInstanceId(null);
   }, [input.maintenanceScript]);
 
   function handleSubmit(event: SyntheticEvent<HTMLFormElement>): void {
@@ -644,29 +632,14 @@ function SandboxProfileMaintenanceScriptSection(input: {
             </Notice>
           )}
 
-          {testRunSandboxInstanceId === null ? null : (
-            <Notice title="Maintenance script test started" variant="success">
-              Sandbox instance: {testRunSandboxInstanceId}
-            </Notice>
-          )}
+          <SandboxProfileSetupScriptTestPanel {...maintenanceScriptTest.panelProps} />
 
-          <ButtonGroup>
+          <div className="flex flex-wrap items-center gap-3">
             <Button disabled={input.disabled || isMutating || !hasChanges} type="submit">
               Save maintenance script
             </Button>
-            <Button
-              disabled={
-                input.disabled || isMutating || scriptIsBlank || !input.canRunMaintenanceScript
-              }
-              onClick={() => {
-                testMutation.mutate(draftValue);
-              }}
-              type="button"
-              variant="secondary"
-            >
-              Test maintenance script
-            </Button>
-          </ButtonGroup>
+            <SandboxProfileSetupScriptTestButton {...maintenanceScriptTest.buttonProps} />
+          </div>
         </div>
       </form>
     </FormPageSection>
