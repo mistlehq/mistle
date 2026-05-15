@@ -206,16 +206,13 @@ async function loadSnapshotRefreshMaterializationTarget(
           },
         }),
   };
-  const snapshotPreparationScriptKind =
-    hasNonBlankScript(sandboxProfileVersion.maintenanceScript) &&
-    sandboxProfileVersion.snapshotImageId !== null
-      ? "maintenance"
-      : "setup";
-
-  if (snapshotPreparationScriptKind === "setup") {
+  if (
+    !hasNonBlankScript(sandboxProfileVersion.maintenanceScript) ||
+    sandboxProfileVersion.snapshotImageId === null
+  ) {
     return {
       sandboxRuntime,
-      snapshotPreparationScriptKind,
+      snapshotPreparationScriptKind: "setup",
       image: {
         imageId: ctx.defaultBaseImage,
         createdAt: new Date().toISOString(),
@@ -226,15 +223,9 @@ async function loadSnapshotRefreshMaterializationTarget(
   }
 
   const snapshotImageId = sandboxProfileVersion.snapshotImageId;
-  if (snapshotImageId === null) {
-    throw new Error(
-      `Sandbox profile '${input.sandboxProfileId}' version '${String(input.sandboxProfileVersion)}' selected maintenance refresh without a usable snapshot.`,
-    );
-  }
-
   return {
     sandboxRuntime,
-    snapshotPreparationScriptKind,
+    snapshotPreparationScriptKind: "maintenance",
     image: {
       imageId: snapshotImageId,
       createdAt: new Date().toISOString(),

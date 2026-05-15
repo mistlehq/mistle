@@ -19,7 +19,7 @@ afterEach(() => {
 
 describe("SandboxProfileSetupScriptTestButton", () => {
   it("keeps the setup script test action disabled while the start request is pending", () => {
-    render(<SandboxProfileSetupScriptTestButton isDraft={true} status="starting" />);
+    render(<SandboxProfileSetupScriptTestButton canRun={true} status="starting" />);
 
     const pendingStartButton = screen.getByRole("button", {
       name: "Starting...",
@@ -35,7 +35,7 @@ describe("SandboxProfileSetupScriptTestButton", () => {
 
       return (
         <SandboxProfileSetupScriptTestButton
-          isDraft={true}
+          canRun={true}
           onStop={() => {
             setStatus("idle");
           }}

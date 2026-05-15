@@ -880,9 +880,9 @@ fn command_output_sink(
     })
 }
 
-fn is_snapshot_preparation_operation(startup_input: &StartupInput) -> bool {
+fn is_snapshot_preparation_operation(operation_kind: StartupOperationKind) -> bool {
     matches!(
-        startup_input.operation_kind,
+        operation_kind,
         StartupOperationKind::SetupCheck | StartupOperationKind::Snapshot
     )
 }
@@ -891,7 +891,8 @@ fn should_run_setup_script_for_startup(
     uses_pre_materialized_snapshot: bool,
     startup_input: &StartupInput,
 ) -> bool {
-    !uses_pre_materialized_snapshot || is_snapshot_preparation_operation(startup_input)
+    !uses_pre_materialized_snapshot
+        || is_snapshot_preparation_operation(startup_input.operation_kind)
 }
 
 fn record_operation_phase_failure(

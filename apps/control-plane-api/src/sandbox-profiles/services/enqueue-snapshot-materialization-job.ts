@@ -7,7 +7,7 @@ import { and, eq, sql } from "drizzle-orm";
 
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
-type SnapshotMaterializationImageInput = {
+export type SnapshotMaterializationImageInput = {
   imageId: string;
   createdAt: string;
   kind: "base" | "snapshot";

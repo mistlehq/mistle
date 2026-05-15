@@ -839,7 +839,7 @@ export async function publishSandboxProfileVersion(input: {
 export async function refreshSandboxProfileVersion(input: {
   profileId: string;
   version: number;
-  refreshKind?: "setup" | "maintenance";
+  refreshKind: "setup" | "maintenance";
 }): Promise<PublishSandboxProfileVersionResult> {
   try {
     const response = await requestControlPlane({
@@ -849,7 +849,7 @@ export async function refreshSandboxProfileVersion(input: {
         input.version,
       )}/refresh`,
       body: {
-        ...(input.refreshKind === undefined ? {} : { refreshKind: input.refreshKind }),
+        refreshKind: input.refreshKind,
       },
       fallbackMessage: "Could not refresh sandbox profile snapshot.",
     });

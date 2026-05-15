@@ -32,23 +32,27 @@ import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
 
 type SetupScriptTestStatus = "blank" | "failed" | "idle" | "running" | "starting" | "success";
 
-type SetupScriptTestViewProps = {
-  canRun?: boolean;
+type SetupScriptTestButtonProps = {
+  canRun: boolean;
   disabled?: boolean;
-  isDraft: boolean;
   labels?: ScriptTestLabels;
-  onClose?: () => void;
   onRun?: () => void;
   onStop?: () => void;
-  operationProgress?: ReactNode;
   status: SetupScriptTestStatus;
-  statusMessage?: string | null;
   setupAssistant?: {
     disabled: boolean;
     isStarting: boolean;
     onClick: () => void;
     title: string;
   };
+};
+
+type SetupScriptTestPanelProps = {
+  labels?: ScriptTestLabels;
+  onClose?: () => void;
+  operationProgress?: ReactNode;
+  status: SetupScriptTestStatus;
+  statusMessage?: string | null;
 };
 
 type SetupScriptTestRunnerProps = {
@@ -89,8 +93,8 @@ type ScriptTestLabels = {
 };
 
 type SetupScriptTestRunState = {
-  panelProps: SetupScriptTestViewProps;
-  buttonProps: SetupScriptTestViewProps;
+  panelProps: SetupScriptTestPanelProps;
+  buttonProps: SetupScriptTestButtonProps;
 };
 
 type StartedSetupScriptTestRun = {
@@ -283,10 +287,10 @@ function resolveSandboxFailureMessage(input: {
 }
 
 export function SandboxProfileSetupScriptTestButton(
-  input: SetupScriptTestViewProps,
+  input: SetupScriptTestButtonProps,
 ): React.JSX.Element {
   const labels = input.labels ?? SetupScriptTestLabels;
-  const canRun = input.canRun ?? input.isDraft;
+  const canRun = input.canRun;
   const isBusy = input.status === "starting" || input.status === "running";
   const canStop = isBusy && input.onStop !== undefined;
   const isButtonDisabled =
@@ -352,7 +356,7 @@ export function SandboxProfileSetupScriptTestButton(
 }
 
 export function SandboxProfileSetupScriptTestPanel(
-  input: SetupScriptTestViewProps,
+  input: SetupScriptTestPanelProps,
 ): React.JSX.Element | null {
   if (input.status === "idle" || input.status === "blank") {
     return null;
@@ -424,27 +428,14 @@ export function SandboxProfileSetupScriptTestPanel(
 function useSandboxProfileScriptTestRun(input: {
   canRun: boolean;
   disabled?: boolean;
-  isDraft: boolean;
   labels: ScriptTestLabels;
-  profileId: string;
   script: string;
   startTestRun: (
     request: SetupScriptTestRunRequest & { idempotencyKey: string },
   ) => Promise<SandboxProfileSetupScriptTestRun | SandboxProfileMaintenanceScriptTestRun>;
-  version: number;
   buildRuntimeConfig?: () => SandboxProfileSetupScriptTestRuntimeConfig;
 }): SetupScriptTestRunState {
-  const {
-    buildRuntimeConfig,
-    canRun,
-    disabled,
-    isDraft,
-    labels,
-    profileId,
-    script,
-    startTestRun,
-    version,
-  } = input;
+  const { buildRuntimeConfig, canRun, disabled, labels, script, startTestRun } = input;
   const [startedRun, setStartedRun] = useState<StartedSetupScriptTestRun | null>(null);
   const [runErrorMessage, setRunErrorMessage] = useState<string | null>(null);
   const [terminalResult, setTerminalResult] = useState<SetupScriptTestTerminalResult>(null);
@@ -583,7 +574,6 @@ function useSandboxProfileScriptTestRun(input: {
 
   const handleRun = useCallback((): void => {
     if (
-      !isDraft ||
       !canRun ||
       disabled === true ||
       scriptIsBlank ||
@@ -594,7 +584,7 @@ function useSandboxProfileScriptTestRun(input: {
     }
 
     startSetupScriptTest();
-  }, [canRun, disabled, isDraft, scriptIsBlank, startSetupScriptTest, status]);
+  }, [canRun, disabled, scriptIsBlank, startSetupScriptTest, status]);
 
   const handleStop = useCallback((): void => {
     const currentRun = startedRunRef.current;
@@ -614,7 +604,6 @@ function useSandboxProfileScriptTestRun(input: {
 
   return {
     buttonProps: {
-      isDraft,
       canRun,
       labels,
       onRun: handleRun,
@@ -623,8 +612,6 @@ function useSandboxProfileScriptTestRun(input: {
       ...(disabled === undefined ? {} : { disabled }),
     },
     panelProps: {
-      isDraft,
-      canRun,
       labels,
       onClose: handleClose,
       operationProgress:
@@ -647,9 +634,7 @@ export function useSandboxProfileSetupScriptTestRun(
   const { buildRuntimeConfig, disabled, isDraft, profileId, setupScript, version } = input;
   return useSandboxProfileScriptTestRun({
     canRun: isDraft,
-    isDraft,
     labels: SetupScriptTestLabels,
-    profileId,
     script: setupScript,
     startTestRun: async (request) =>
       startSandboxProfileSetupScriptTestRun({
@@ -659,7 +644,6 @@ export function useSandboxProfileSetupScriptTestRun(
         setupScript: request.script,
         version,
       }),
-    version,
     ...(buildRuntimeConfig === undefined ? {} : { buildRuntimeConfig }),
     ...(disabled === undefined ? {} : { disabled }),
   });
@@ -671,9 +655,7 @@ export function useSandboxProfileMaintenanceScriptTestRun(
   const { canRun, disabled, maintenanceScript, profileId, version } = input;
   return useSandboxProfileScriptTestRun({
     canRun,
-    isDraft: true,
     labels: MaintenanceScriptTestLabels,
-    profileId,
     script: maintenanceScript,
     startTestRun: async (request) =>
       startSandboxProfileMaintenanceScriptTestRun({
@@ -682,7 +664,6 @@ export function useSandboxProfileMaintenanceScriptTestRun(
         profileId,
         version,
       }),
-    version,
     ...(disabled === undefined ? {} : { disabled }),
   });
 }

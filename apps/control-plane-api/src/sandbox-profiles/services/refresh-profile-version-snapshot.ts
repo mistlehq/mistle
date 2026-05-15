@@ -17,7 +17,10 @@ import {
   SandboxProfilesNotFoundCodes,
   SandboxProfilesNotFoundError,
 } from "../errors.js";
-import { enqueueSnapshotMaterializationJob } from "./enqueue-snapshot-materialization-job.js";
+import {
+  enqueueSnapshotMaterializationJob,
+  type SnapshotMaterializationImageInput,
+} from "./enqueue-snapshot-materialization-job.js";
 import {
   loadActiveRefreshSchedulesByVersion,
   type ProfileVersionRefreshScheduleSummary,
@@ -34,13 +37,6 @@ type RefreshProfileVersionSnapshotInput = {
   profileId: string;
   profileVersion: number;
   refreshKind?: "setup" | "maintenance";
-};
-
-type SnapshotMaterializationImage = {
-  imageId: string;
-  createdAt: string;
-  kind: "base" | "snapshot";
-  provider: "docker" | "e2b" | "tensorlake";
 };
 
 type SnapshotRefreshIntent =
@@ -328,7 +324,7 @@ async function queueProfileVersionSnapshot(
     });
 
     const sandboxRuntime = createWorkflowSandboxRuntime(refreshResult.version);
-    let materializationImage: SnapshotMaterializationImage;
+    let materializationImage: SnapshotMaterializationImageInput;
     if (intent.refreshKind === "setup") {
       materializationImage = {
         imageId: defaultBaseImage,

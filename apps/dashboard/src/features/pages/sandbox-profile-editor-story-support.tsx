@@ -440,7 +440,7 @@ function SetupScriptStoryControls(input: {
 
   return (
     <SandboxProfileSetupScriptTestButton
-      isDraft={input.isDraft}
+      canRun={input.isDraft}
       status={input.testStatus}
       {...(input.testStatus === "running" ? { onStop: noopStoryAction } : {})}
       {...(showSetupAssistantAction
@@ -777,10 +777,7 @@ function SandboxProfileEditorPageStoryView(
                       />
                     }
                     testPanel={
-                      <SandboxProfileSetupScriptTestPanel
-                        isDraft={mode.kind === "draft"}
-                        status={setupScriptTestStatus}
-                      />
+                      <SandboxProfileSetupScriptTestPanel status={setupScriptTestStatus} />
                     }
                     value={setupScriptDraft}
                   />
