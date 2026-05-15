@@ -47,13 +47,26 @@ describe("trigger templates", () => {
     expect(template.inputTemplate).not.toContain("{{payload.pull_request.html_url}}");
     expect(template.inputTemplate).not.toContain("{{payload.pull_request.title}}");
     expect(template.inputTemplate).not.toContain("{{payload.action}}");
-    expect(template.instructions).toContain("`gh` CLI");
+    expect(template.instructions).toContain("# GitHub PR Review");
+    expect(template.instructions).toContain("Use live PR state.");
     expect(template.instructions).toContain("routing data only");
     expect(template.instructions).toContain("`gh pr view`");
     expect(template.instructions).toContain("`gh pr diff`");
+    expect(template.instructions).toContain("Read repo-local review, test, contribution");
+    expect(template.instructions).toContain("reconstruct the review scope");
+    expect(template.instructions).toContain("Trace each changed behavior");
+    expect(template.instructions).toContain("entrypoint -> validation/parsing -> dispatch");
+    expect(template.instructions).toContain("Use source, executable checks, current docs");
+    expect(template.instructions).toContain("Lead with findings.");
+    expect(template.instructions).toContain("no blocking correctness issues were found");
+    expect(template.instructions).toContain("If verification fails");
+    expect(template.instructions).toContain(
+      "whether it appears caused by the PR or by the environment",
+    );
+    expect(template.instructions).toContain("proof gaps or residual risk");
     expect(template.instructions).toContain("`gh pr comment`");
-    expect(template.instructions).toContain("`gh pr review`");
     expect(template.instructions).toContain("`gh api`");
+    expect(template.instructions).not.toContain("Review the pull request for correctness");
     expect(template.conversationKeyTemplate).toBe(
       "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}",
     );
