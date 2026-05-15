@@ -28,10 +28,13 @@ import {
 } from "./profile-version-runtime-config.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
-type StartProfileSetupCheckSandboxInput = {
+type StartProfileSetupSandboxInput = {
   organizationId: string;
   profileId: string;
   profileVersion: number;
+  purpose:
+    | typeof SandboxInstancePurposes.SETUP_ASSISTANT
+    | typeof SandboxInstancePurposes.SETUP_CHECK;
   agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
   setupScript?: string;
   sandboxRuntimeConfig?: {
@@ -47,13 +50,13 @@ type StartProfileSetupCheckSandboxInput = {
   source: SandboxInstanceSource;
 };
 
-type StartProfileSetupCheckSandboxOutput = {
+type StartProfileSetupSandboxOutput = {
   status: "accepted";
   workflowRunId: string;
   sandboxInstanceId: string;
 };
 
-async function resolveSetupCheckSandboxRuntimeConfig(
+async function resolveSetupSandboxRuntimeConfig(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
   input: {
     organizationId: string;
@@ -104,7 +107,7 @@ async function resolveSetupCheckSandboxRuntimeConfig(
   return mapProfileVersionRuntimeConfig(sandboxProfileVersion);
 }
 
-export async function startProfileSetupCheckSandbox(
+export async function startProfileSetupSandbox(
   {
     db,
     integrationRegistry,
@@ -117,10 +120,10 @@ export async function startProfileSetupCheckSandbox(
     sandboxConfig: CreateSandboxProfilesServiceInput["sandboxConfig"];
     defaultBaseImage: string;
   },
-  input: StartProfileSetupCheckSandboxInput,
-): Promise<StartProfileSetupCheckSandboxOutput> {
+  input: StartProfileSetupSandboxInput,
+): Promise<StartProfileSetupSandboxOutput> {
   const idempotencyKey = input.idempotencyKey ?? randomUUID();
-  const persistedSandboxRuntimeConfig = await resolveSetupCheckSandboxRuntimeConfig(
+  const persistedSandboxRuntimeConfig = await resolveSetupSandboxRuntimeConfig(
     {
       db,
     },
@@ -175,7 +178,7 @@ export async function startProfileSetupCheckSandbox(
   if (compiledRuntimePlan.agentRuntimes.length === 0) {
     throw new SandboxProfilesCompileError(
       SandboxProfilesCompileErrorCodes.AGENT_RUNTIME_REQUIRED,
-      `Sandbox profile '${input.profileId}' version ${String(input.profileVersion)} does not declare an agent runtime. Add an agent integration binding before starting the Setup Assistant.`,
+      `Sandbox profile '${input.profileId}' version ${String(input.profileVersion)} does not declare an agent runtime. Add an agent integration binding before starting this setup sandbox.`,
     );
   }
   const { setupScript: _compiledSetupScript, ...runtimePlanWithoutSetupScript } =
@@ -193,7 +196,7 @@ export async function startProfileSetupCheckSandbox(
     sandboxProfileId: input.profileId,
     sandboxProfileVersion: input.profileVersion,
     persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
-    purpose: SandboxInstancePurposes.SETUP_CHECK,
+    purpose: input.purpose,
     idempotencyKey,
     runtimePlan,
     startedBy: input.startedBy,

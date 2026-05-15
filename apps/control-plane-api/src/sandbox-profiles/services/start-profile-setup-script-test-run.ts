@@ -1,8 +1,12 @@
 import type { SandboxProfileVersionAgentRuntimeId } from "@mistle/db/control-plane";
-import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
+import {
+  SandboxInstancePurposes,
+  type SandboxInstanceSource,
+  type SandboxInstanceStarterKind,
+} from "@mistle/db/data-plane";
 
 import type { SandboxProfileVersionResources } from "./profile-version-runtime-config.js";
-import { startProfileSetupCheckSandbox } from "./start-profile-setup-check-sandbox.js";
+import { startProfileSetupSandbox } from "./start-profile-setup-sandbox.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type StartProfileSetupScriptTestRunInput = {
@@ -45,7 +49,7 @@ export async function startProfileSetupScriptTestRun(
   },
   input: StartProfileSetupScriptTestRunInput,
 ): Promise<StartProfileSetupScriptTestRunOutput> {
-  return await startProfileSetupCheckSandbox(
+  return await startProfileSetupSandbox(
     {
       db,
       integrationRegistry,
@@ -58,6 +62,7 @@ export async function startProfileSetupScriptTestRun(
       organizationId: input.organizationId,
       profileId: input.profileId,
       profileVersion: input.profileVersion,
+      purpose: SandboxInstancePurposes.SETUP_CHECK,
       setupScript: input.setupScript,
       ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
       ...(input.sandboxRuntimeConfig === undefined
