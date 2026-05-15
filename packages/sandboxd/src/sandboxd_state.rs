@@ -24,7 +24,9 @@ use crate::egress_proxy::EgressProxy;
 use crate::keepalive::KeepaliveManager;
 use crate::process;
 use crate::process::{CodexAppServerControlHandle, CodexAppServerObservationHandle};
-use crate::protocol::startup::{StartupExecutionMode, StartupInput, StartupMode};
+use crate::protocol::startup::{
+    StartupExecutionMode, StartupInput, StartupMode, StartupOperationKind,
+};
 use crate::pty::{DEFAULT_PTY_SHELL, DEFAULT_PTY_TERM};
 use crate::runtime;
 use crate::runtime::CompiledRuntimePlanImageSource;
@@ -160,6 +162,8 @@ impl SandboxdState {
         let uses_pre_materialized_snapshot = startup_input.startup_mode == StartupMode::New
             && startup_input.execution_mode == StartupExecutionMode::Session
             && runtime_plan.image.source == CompiledRuntimePlanImageSource::Snapshot;
+        let should_run_setup_script =
+            should_run_setup_script_for_startup(uses_pre_materialized_snapshot, startup_input);
         let sandbox_instance_id = derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)
             .map_err(|error| SandboxdStateError::StartTunnelSession(error.to_string()))?;
         let supervisor_handle = SandboxdSupervisorHandle::new(
@@ -339,7 +343,7 @@ impl SandboxdState {
                 }
             }
         }
-        if !uses_pre_materialized_snapshot {
+        if should_run_setup_script {
             record_operation_phase_started(&diagnostics_logger, "run_setup_script");
             match run_setup_script_with_output_sink(
                 &runtime_plan,
@@ -874,6 +878,20 @@ fn command_output_sink(
     diagnostics_logger.clone().map(|logger| {
         Arc::new(StartupCommandOutputSink { logger, phase }) as Arc<dyn CommandOutputSink>
     })
+}
+
+fn is_snapshot_preparation_operation(startup_input: &StartupInput) -> bool {
+    matches!(
+        startup_input.operation_kind,
+        StartupOperationKind::SetupCheck | StartupOperationKind::Snapshot
+    )
+}
+
+fn should_run_setup_script_for_startup(
+    uses_pre_materialized_snapshot: bool,
+    startup_input: &StartupInput,
+) -> bool {
+    !uses_pre_materialized_snapshot || is_snapshot_preparation_operation(startup_input)
 }
 
 fn record_operation_phase_failure(
@@ -2573,6 +2591,110 @@ mod tests {
     }
 
     #[test]
+    fn session_start_from_snapshot_skips_setup_script() {
+        let output_path = std::env::temp_dir().join(format!(
+            "mistle-session-start-from-snapshot-setup-output-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after unix epoch")
+                .as_nanos()
+        ));
+        let _ = fs::remove_file(&output_path);
+        let (bootstrap_url, gateway_thread) = start_snapshot_bootstrap_gateway();
+        let git_config_path = std::env::temp_dir().join(format!(
+            "mistle-session-start-from-snapshot-git-config-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after unix epoch")
+                .as_nanos()
+        ));
+
+        let state = SandboxdState::initialize(
+            &build_startup_input(
+                StartupMode::New,
+                StartupExecutionMode::Session,
+                &bootstrap_url,
+                serde_json::json!({
+                    "image": {
+                        "source": "snapshot",
+                        "imageRef": "registry.example.test/snapshot:latest"
+                    },
+                    "setupScript": format!("printf unexpected > {}", output_path.display()),
+                    "egressRoutes": [],
+                    "artifacts": [],
+                    "workspaceSources": [],
+                    "runtimeClients": [],
+                    "agentRuntimes": []
+                }),
+                None,
+            ),
+            git_config_path.as_path(),
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+            None,
+            false,
+        )
+        .expect("session start from snapshot should initialize");
+
+        assert!(
+            !output_path.exists(),
+            "normal session starts from snapshots must not rerun setup scripts"
+        );
+
+        state
+            .close()
+            .expect("session start from snapshot state should close cleanly");
+        gateway_thread
+            .join()
+            .expect("session gateway thread should exit after tunnel shutdown");
+        let _ = fs::remove_file(git_config_path);
+    }
+
+    #[test]
+    fn snapshot_preparation_operations_run_setup_script_from_snapshot() {
+        let start_input = build_startup_input(
+            StartupMode::New,
+            StartupExecutionMode::Session,
+            "ws://127.0.0.1:1/tunnel/sandbox/sbi_test",
+            minimal_runtime_plan_json(),
+            None,
+        );
+        let setup_check_input = build_startup_input_with_operation_kind(
+            StartupMode::New,
+            StartupExecutionMode::Session,
+            crate::protocol::startup::StartupOperationKind::SetupCheck,
+            "ws://127.0.0.1:1/tunnel/sandbox/sbi_test",
+            minimal_runtime_plan_json(),
+            None,
+        );
+        let snapshot_input = build_startup_input_with_operation_kind(
+            StartupMode::New,
+            StartupExecutionMode::Session,
+            crate::protocol::startup::StartupOperationKind::Snapshot,
+            "ws://127.0.0.1:1/tunnel/sandbox/sbi_test",
+            minimal_runtime_plan_json(),
+            None,
+        );
+
+        assert!(!super::should_run_setup_script_for_startup(
+            true,
+            &start_input
+        ));
+        assert!(super::should_run_setup_script_for_startup(
+            true,
+            &setup_check_input
+        ));
+        assert!(super::should_run_setup_script_for_startup(
+            true,
+            &snapshot_input
+        ));
+        assert!(super::should_run_setup_script_for_startup(
+            false,
+            &start_input
+        ));
+    }
+
+    #[test]
     fn session_initialization_uses_common_minimal_bootstrap_tunnel_phase() {
         let log_dir = std::env::temp_dir().join(format!(
             "mistle-session-initialization-gateway-log-{}",
@@ -2919,9 +3041,27 @@ mod tests {
         runtime_plan: serde_json::Value,
         git_identity: Option<GitIdentity>,
     ) -> StartupInput {
+        build_startup_input_with_operation_kind(
+            startup_mode,
+            execution_mode,
+            crate::protocol::startup::StartupOperationKind::Start,
+            tunnel_gateway_ws_url,
+            runtime_plan,
+            git_identity,
+        )
+    }
+
+    fn build_startup_input_with_operation_kind(
+        startup_mode: StartupMode,
+        execution_mode: StartupExecutionMode,
+        operation_kind: crate::protocol::startup::StartupOperationKind,
+        tunnel_gateway_ws_url: &str,
+        runtime_plan: serde_json::Value,
+        git_identity: Option<GitIdentity>,
+    ) -> StartupInput {
         StartupInput {
             startup_mode,
-            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+            operation_kind,
             execution_mode,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
