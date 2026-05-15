@@ -50,6 +50,7 @@ type SandboxLifecycleTimelineItem = {
 
 const SandboxOperationEventsLimit = 100;
 const SandboxOperationEventsRefetchIntervalMs = 1_000;
+const TranscriptContainerClassName = "flex max-h-72 min-h-48 flex-col overflow-hidden bg-[#111817]";
 const TerminalFontFamily =
   '"JetBrains Mono Variable", "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
 const OperationTerminalTheme: ITheme = {
@@ -207,9 +208,7 @@ export function SandboxOperationProgressView(
         {shouldShowTimeline ? (
           <SandboxOperationTimeline isSplit={displayMode === "both"} items={lifecycleItems} />
         ) : null}
-        {shouldShowTranscript ? (
-          <SandboxOperationTranscript isSplit={displayMode === "both"} events={transcriptEvents} />
-        ) : null}
+        {shouldShowTranscript ? <SandboxOperationTranscript events={transcriptEvents} /> : null}
       </div>
     </section>
   );
@@ -305,7 +304,6 @@ function toggleExpandedTimelineEventId(
 }
 
 function SandboxOperationTranscript(input: {
-  isSplit: boolean;
   events: readonly SandboxOperationEvent[];
 }): React.JSX.Element {
   const outputChunks = useMemo(
@@ -315,7 +313,7 @@ function SandboxOperationTranscript(input: {
 
   if (outputChunks.length === 0) {
     return (
-      <div className={resolveTranscriptContainerClassName(input.isSplit)}>
+      <div className={TranscriptContainerClassName}>
         <SandboxOperationTranscriptHeader />
         <div className="min-h-0 flex-1 overflow-auto p-3">
           <p className="font-mono text-xs text-[#8fa09c]">No output yet.</p>
@@ -325,7 +323,7 @@ function SandboxOperationTranscript(input: {
   }
 
   return (
-    <div className={resolveTranscriptContainerClassName(input.isSplit)}>
+    <div className={TranscriptContainerClassName}>
       <SandboxOperationTranscriptHeader />
       <SandboxOperationTranscriptTerminal outputChunks={outputChunks} />
     </div>
@@ -428,12 +426,6 @@ function resolveTimelineContainerClassName(isSplit: boolean): string {
   return isSplit
     ? "max-h-72 min-h-48 overflow-auto border-b border-border p-3 lg:border-r lg:border-b-0"
     : "max-h-72 min-h-48 overflow-auto p-3";
-}
-
-function resolveTranscriptContainerClassName(isSplit: boolean): string {
-  return isSplit
-    ? "flex max-h-72 min-h-48 flex-col overflow-hidden bg-[#111817]"
-    : "flex max-h-72 min-h-48 flex-col overflow-hidden bg-[#111817]";
 }
 
 function createLifecycleTimelineItems(
