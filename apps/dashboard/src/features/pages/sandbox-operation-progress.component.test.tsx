@@ -180,9 +180,7 @@ describe("SandboxOperationProgressView", () => {
     expect(timelineText.indexOf("Sandbox daemon")).toBeLessThan(timelineText.indexOf("Tunnel"));
     expect(within(timeline).queryByText("Snapshot sandboxd initialization started.")).toBeNull();
     expect(within(timeline).queryByText("Snapshot sandboxd initialization completed.")).toBeNull();
-    for (const completedStatus of within(timeline).getAllByText("Status: completed")) {
-      expect(completedStatus.classList.contains("sr-only")).toBe(true);
-    }
+    expectScreenReaderOnlyText(timeline, "Status: completed");
   });
 
   it("keeps warning and failed status text screen-reader-only", () => {
@@ -445,8 +443,10 @@ function createLifecycleEvent(input: {
 }
 
 function expectScreenReaderOnlyText(container: HTMLElement, text: string): void {
-  const element = within(container).getByText(text);
-  expect(element.classList.contains("sr-only")).toBe(true);
+  const elements = within(container).getAllByText(text);
+  for (const element of elements) {
+    expect(element.classList.contains("sr-only")).toBe(true);
+  }
 }
 
 function createTranscriptEvent(input: {
