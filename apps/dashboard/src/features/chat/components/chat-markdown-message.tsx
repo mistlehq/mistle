@@ -18,14 +18,6 @@ type MarkdownTreeNode = {
   value?: string;
 };
 
-function createSoftBreakNode(): MarkdownTreeNode {
-  return { type: "break" };
-}
-
-function createTextNode(value: string): MarkdownTreeNode {
-  return { type: "text", value };
-}
-
 function preserveSoftBreaksRemarkPlugin(): (tree: MarkdownTreeNode) => void {
   return function preserveSoftBreaks(tree: MarkdownTreeNode): void {
     rewriteSoftBreaks(tree);
@@ -49,10 +41,10 @@ function rewriteSoftBreaks(node: MarkdownTreeNode): void {
 
     for (const [index, segment] of segments.entries()) {
       if (index > 0) {
-        rewrittenNodes.push(createSoftBreakNode());
+        rewrittenNodes.push({ type: "break" });
       }
       if (segment.length > 0) {
-        rewrittenNodes.push(createTextNode(segment));
+        rewrittenNodes.push({ type: "text", value: segment });
       }
     }
 

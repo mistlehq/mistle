@@ -21,6 +21,7 @@ import {
   RepoMaintainerSandboxProfileId,
 } from "./webhook-automation-test-fixtures.js";
 import type { WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker-state.js";
+import type { WebhookAutomationTriggerParameterValueMap } from "./webhook-automation-trigger-types.js";
 
 const ConnectionOptions: readonly WebhookAutomationFormOption[] = [
   {
@@ -133,7 +134,7 @@ describe("WebhookAutomationForm", () => {
         | string
         | boolean
         | string[]
-        | Record<string, Record<string, string>>
+        | WebhookAutomationTriggerParameterValueMap
         | Record<string, Record<string, boolean>>,
     ) => void;
   }): ReturnType<typeof render> {

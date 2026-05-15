@@ -17,7 +17,10 @@ import {
 } from "./webhook-automation-test-fixtures.js";
 import type { WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker-state.js";
 import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
-import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
+import type {
+  WebhookAutomationEventOption,
+  WebhookAutomationTriggerParameterValueMap,
+} from "./webhook-automation-trigger-types.js";
 
 const SlackConnectionId = "icn_slack";
 const SlackWebhookSourceId = "iws_slack";
@@ -66,7 +69,7 @@ function renderTriggerPicker(input: {
   hasConnectedIntegrations: boolean;
   selectedConnectionId: string;
   selectedTriggerIds: readonly string[];
-  triggerParameterValues: Record<string, Record<string, string>>;
+  triggerParameterValues: WebhookAutomationTriggerParameterValueMap;
   disabledState?: WebhookAutomationTriggerPickerDisabledState | null;
   eventOptions?: readonly WebhookAutomationEventOption[];
   useStatefulSelection?: boolean;
@@ -682,13 +685,12 @@ describe("WebhookAutomationTriggerPicker", () => {
         webhookSourceId: GitHubWebhookSourceId,
         eventType: "github.pull_request.opened",
       });
-      const [triggerParameterValues, setTriggerParameterValues] = useState<
-        Record<string, Record<string, string>>
-      >({
-        [triggerId]: {
-          author: "octocat",
-        },
-      });
+      const [triggerParameterValues, setTriggerParameterValues] =
+        useState<WebhookAutomationTriggerParameterValueMap>({
+          [triggerId]: {
+            author: "octocat",
+          },
+        });
 
       return (
         <>

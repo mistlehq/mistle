@@ -39,7 +39,6 @@ import {
   resolveSelectedProfileTriggerState,
 } from "./use-webhook-automation-editor-state.js";
 import { useWebhookAutomationEventPrerequisites } from "./use-webhook-automation-prerequisites.js";
-import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import {
   toCreateWebhookAutomationPayload,
   toWebhookAutomationFormValues,
@@ -237,11 +236,7 @@ function resolveNormalizedConversationKeyTemplate(input: {
     triggerParameterValues: input.values.triggerParameterValues,
     triggerIdsError: undefined,
   });
-  const conversationKeyFieldOptions = resolveConversationKeyFieldOptions({
-    selectedEventOptions: formState.selectedTriggerOptions,
-    currentTemplate: input.values.conversationKeyTemplate,
-    triggerParameterValues: input.values.triggerParameterValues,
-  });
+  const conversationKeyFieldOptions = formState.conversationKeySelectionState;
 
   if (conversationKeyFieldOptions.options.length === 0) {
     return input.values.conversationKeyTemplate;
@@ -265,7 +260,7 @@ function applyTriggerIdsChange(input: {
   values: CreateAutomationFormValues;
   triggerIds: string[];
   eventOptions: readonly WebhookAutomationEventOption[];
-  triggerParameterValuesByEventType?: Record<string, Record<string, string>>;
+  triggerParameterValuesByEventType?: WebhookAutomationFormValues["triggerParameterValues"];
 }): CreateAutomationFormValues {
   const nextValues: CreateAutomationFormValues = {
     ...input.values,

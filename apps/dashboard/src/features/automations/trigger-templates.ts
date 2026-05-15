@@ -1,7 +1,10 @@
 import { ScheduledAutomationConversationModes } from "./scheduled-automation-form-types.js";
 import { GitHubPullRequestConversationKeyTemplate } from "./webhook-automation-conversation-key-options.js";
 import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
-import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
+import type {
+  WebhookAutomationEventOption,
+  WebhookAutomationTriggerParameterValueMap,
+} from "./webhook-automation-trigger-types.js";
 
 type WebhookTriggerTemplate = {
   id: string;
@@ -14,7 +17,7 @@ type WebhookTriggerTemplate = {
   inputTemplate: string;
   instructions: string;
   conversationKeyTemplate: string;
-  triggerParameterValuesByEventType?: Record<string, Record<string, string>>;
+  triggerParameterValuesByEventType?: WebhookAutomationTriggerParameterValueMap;
 };
 
 type ScheduledTriggerTemplate = {
