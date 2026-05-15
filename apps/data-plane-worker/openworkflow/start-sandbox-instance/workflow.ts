@@ -1401,7 +1401,10 @@ function shouldWaitForPostStartStorageAttach(input: {
 function resolveStartSandboxOperationKind(
   purpose: StartSandboxInstanceWorkflowInput["purpose"],
 ): SandboxdOperationKind {
-  if (purpose === SandboxInstancePurposes.SESSION) {
+  if (
+    purpose === SandboxInstancePurposes.SESSION ||
+    purpose === SandboxInstancePurposes.SETUP_ASSISTANT
+  ) {
     return SandboxOperationKinds.START;
   }
 

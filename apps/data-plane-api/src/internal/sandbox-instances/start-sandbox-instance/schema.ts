@@ -22,7 +22,7 @@ export const StartSandboxInstanceInputSchema = z
     sandboxProfileId: z.string().min(1),
     sandboxProfileVersion: z.number().int().min(1),
     persistenceMode: z.enum(["ephemeral", "persistent"]),
-    purpose: z.enum(["session", "snapshot", "setup_check"]),
+    purpose: z.enum(["session", "snapshot", "setup_assistant", "setup_check"]),
     idempotencyKey: z.string().min(1).max(255).optional(),
     runtimePlan: CompiledRuntimePlanSchema,
     startedBy: z

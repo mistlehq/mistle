@@ -50,6 +50,7 @@ const StartWorkflowInputSchema = z
     purpose: z.enum([
       SandboxInstancePurposes.SESSION,
       SandboxInstancePurposes.SNAPSHOT,
+      SandboxInstancePurposes.SETUP_ASSISTANT,
       SandboxInstancePurposes.SETUP_CHECK,
     ]),
     image: z
@@ -230,6 +231,37 @@ describe.concurrent("internal sandbox instance start and resume integration", ()
     );
   });
 
+  it("queues setup-assistant launches as ephemeral startable sandboxes", async ({ env }) => {
+    const workflowInput = startInput({
+      organizationId: "org_dp_api_start_setup_assistant",
+      sandboxProfileId: "sbp_dp_api_start_setup_assistant",
+      sandboxProfileVersion: 4,
+      purpose: SandboxInstancePurposes.SETUP_ASSISTANT,
+      imageId: "im_dp_api_start_setup_assistant",
+      persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+    });
+
+    const startedSandbox = await clientFor(env).startSandboxInstance(workflowInput);
+    const workflowRuns = await waitForQueuedWorkflowRuns({
+      env,
+      workflowName: StartSandboxInstanceWorkflowName,
+      inputEquals: {
+        organizationId: workflowInput.organizationId,
+        sandboxProfileId: workflowInput.sandboxProfileId,
+      },
+    });
+
+    const parsedInput = StartWorkflowInputSchema.parse(workflowRuns[0]?.input);
+    expect(parsedInput).toMatchObject({
+      sandboxInstanceId: startedSandbox.sandboxInstanceId,
+      purpose: SandboxInstancePurposes.SETUP_ASSISTANT,
+      persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
+    });
+    await expect(readSandboxInstancePurpose(env, startedSandbox.sandboxInstanceId)).resolves.toBe(
+      SandboxInstancePurposes.SETUP_ASSISTANT,
+    );
+  });
+
   it("queues snapshot launches with the snapshot image provider", async ({ env }) => {
     const workflowInput = startInput({
       organizationId: "org_dp_api_start_snapshot",
@@ -352,6 +384,7 @@ function startInput(input: {
   purpose:
     | typeof SandboxInstancePurposes.SESSION
     | typeof SandboxInstancePurposes.SNAPSHOT
+    | typeof SandboxInstancePurposes.SETUP_ASSISTANT
     | typeof SandboxInstancePurposes.SETUP_CHECK;
   imageId: string;
   imageKind?: "base" | "snapshot";

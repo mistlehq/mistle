@@ -217,7 +217,7 @@
                   },
                   "purpose": {
                     "type": "string",
-                    "enum": ["session", "snapshot", "setup_check"]
+                    "enum": ["session", "snapshot", "setup_assistant", "setup_check"]
                   },
                   "idempotencyKey": {
                     "type": "string",

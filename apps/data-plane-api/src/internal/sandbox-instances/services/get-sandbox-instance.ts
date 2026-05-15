@@ -784,6 +784,7 @@ export async function getSandboxInstance(
         whereEq(table.organizationId, input.organizationId),
         or(
           whereEq(table.purpose, SandboxInstancePurposes.SESSION),
+          whereEq(table.purpose, SandboxInstancePurposes.SETUP_ASSISTANT),
           whereEq(table.purpose, SandboxInstancePurposes.SETUP_CHECK),
         ),
       ),

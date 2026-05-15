@@ -49,4 +49,12 @@ describe("StartSandboxInstanceWorkflow operation kind", () => {
       ),
     ).toBe("start");
   });
+
+  it("uses start operation streams for setup-assistant sandboxes", () => {
+    expect(
+      startSandboxWorkflowTestInternals.resolveStartSandboxOperationKind(
+        SandboxInstancePurposes.SETUP_ASSISTANT,
+      ),
+    ).toBe("start");
+  });
 });
