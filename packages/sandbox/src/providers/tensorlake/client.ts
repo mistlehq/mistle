@@ -459,14 +459,15 @@ export class TensorlakeApiClient implements TensorlakeClient {
         operation: TensorlakeClientOperationIds.INIT,
         sandbox,
       });
-      const result = await sandbox.run(InitCommand, {
-        args: WaitInitCommandArgs,
-        ...(parsedRequest.env === undefined ? {} : { env: parsedRequest.env }),
-      });
-      ensureCommandSucceeded({
+      // Tensorlake's foreground run stream can close before sandboxd init
+      // finishes. Track wait-init as a background process and poll status
+      // instead, matching the init/resume startup command path.
+      await this.#runProcessToCompletion(sandbox, {
         operation: TensorlakeClientOperationIds.INIT,
         commandDescription: "Tensorlake sandbox wait-init command",
-        result,
+        command: InitCommand,
+        args: WaitInitCommandArgs,
+        ...(parsedRequest.env === undefined ? {} : { env: parsedRequest.env }),
       });
     } catch (error) {
       throw mapTensorlakeClientError(TensorlakeClientOperationIds.INIT, error);
@@ -612,25 +613,50 @@ export class TensorlakeApiClient implements TensorlakeClient {
       payload: Uint8Array<ArrayBufferLike>;
     },
   ): Promise<void> {
+    await this.#runProcessToCompletion(sandbox, {
+      operation: input.operation,
+      commandDescription: `Tensorlake sandbox ${input.operation} command`,
+      command: input.command,
+      args: input.args,
+      stdin: input.payload,
+    });
+  }
+
+  async #runProcessToCompletion(
+    sandbox: Sandbox,
+    input: {
+      operation:
+        | typeof TensorlakeClientOperationIds.INIT
+        | typeof TensorlakeClientOperationIds.RESUME;
+      commandDescription: string;
+      command: string;
+      args: readonly string[];
+      env?: Readonly<Record<string, string>>;
+      stdin?: Uint8Array<ArrayBufferLike>;
+    },
+  ): Promise<void> {
     const process = await sandbox.startProcess(input.command, {
       args: [...input.args],
-      stdinMode: StdinMode.PIPE,
+      ...(input.env === undefined ? {} : { env: input.env }),
+      ...(input.stdin === undefined ? {} : { stdinMode: StdinMode.PIPE }),
     });
-    await sandbox.writeStdin(process.pid, input.payload);
-    await sandbox.closeStdin(process.pid);
+
+    if (input.stdin !== undefined) {
+      await sandbox.writeStdin(process.pid, input.stdin);
+      await sandbox.closeStdin(process.pid);
+    }
 
     for (let attempt = 1; attempt <= StartupCommandPollAttempts; attempt += 1) {
       const processInfo = await sandbox.getProcess(process.pid);
       if (processInfo.status !== "running") {
-        const stdout = await sandbox.getStdout(process.pid);
-        const stderr = await sandbox.getStderr(process.pid);
+        const output = await this.#readProcessOutput(sandbox, processInfo);
         ensureCommandSucceeded({
           operation: input.operation,
-          commandDescription: `Tensorlake sandbox ${input.operation} command`,
+          commandDescription: input.commandDescription,
           result: {
             exitCode: processInfo.exitCode ?? 1,
-            stdout: stdout.lines.join("\n"),
-            stderr: stderr.lines.join("\n"),
+            stdout: output.stdout,
+            stderr: output.stderr,
           },
         });
         return;
