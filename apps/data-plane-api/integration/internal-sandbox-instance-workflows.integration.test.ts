@@ -193,7 +193,7 @@ describe.concurrent("internal sandbox instance workflow queue integration", () =
     );
   });
 
-  it("queues a user stop workflow for running setup-check sandbox instances", async ({ env }) => {
+  it("queues a user stop workflow for running setup sandboxes", async ({ env }) => {
     const workflowInput: StopUserRequestedSandboxInstanceInput = {
       organizationId: "org_dp_api_workflow_user_stop",
       sandboxInstanceId: "sbi_dp_api_workflow_user_stop",
@@ -206,9 +206,20 @@ describe.concurrent("internal sandbox instance workflow queue integration", () =
       sandboxProfileId: "sbp_dp_api_workflow_user_stop",
       purpose: SandboxInstancePurposes.SETUP_CHECK,
     });
+    await insertRunningSandboxInstance(env, {
+      sandboxInstanceId: "sbi_dp_api_workflow_user_stop_assistant",
+      organizationId: workflowInput.organizationId,
+      sandboxProfileId: "sbp_dp_api_workflow_user_stop_assistant",
+      purpose: SandboxInstancePurposes.SETUP_ASSISTANT,
+    });
 
     const firstResponse = await clientFor(env).stopUserRequestedSandboxInstance(workflowInput);
     const secondResponse = await clientFor(env).stopUserRequestedSandboxInstance(workflowInput);
+    const setupAssistantResponse = await clientFor(env).stopUserRequestedSandboxInstance({
+      organizationId: workflowInput.organizationId,
+      sandboxInstanceId: "sbi_dp_api_workflow_user_stop_assistant",
+      idempotencyKey: "dashboard-user-stop-assistant-integration-new",
+    });
 
     expect(firstResponse).toEqual({
       status: "accepted",
@@ -253,6 +264,18 @@ describe.concurrent("internal sandbox instance workflow queue integration", () =
       organizationId: workflowInput.organizationId,
       idempotencyKey: workflowInput.idempotencyKey,
     });
+
+    const setupAssistantWorkflowRuns = await waitForQueuedWorkflowRuns({
+      env,
+      sandboxInstanceId: "sbi_dp_api_workflow_user_stop_assistant",
+      workflowName: StopSandboxInstanceWorkflowName,
+    });
+    expect(setupAssistantWorkflowRuns).toHaveLength(1);
+    expect(UserStopWorkflowInputSchema.parse(setupAssistantWorkflowRuns[0]?.input)).toEqual({
+      sandboxInstanceId: "sbi_dp_api_workflow_user_stop_assistant",
+      stopReason: "user",
+    });
+    expect(setupAssistantWorkflowRuns[0]?.id).toBe(setupAssistantResponse.workflowRunId);
   });
 
   it("rejects user stop workflows for session sandbox instances", async ({ env }) => {
@@ -345,7 +368,10 @@ async function insertRunningSandboxInstance(
     sandboxInstanceId: string;
     organizationId: string;
     sandboxProfileId: string;
-    purpose?: typeof SandboxInstancePurposes.SESSION | typeof SandboxInstancePurposes.SETUP_CHECK;
+    purpose?:
+      | typeof SandboxInstancePurposes.SESSION
+      | typeof SandboxInstancePurposes.SETUP_ASSISTANT
+      | typeof SandboxInstancePurposes.SETUP_CHECK;
   },
 ): Promise<void> {
   await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values(
@@ -367,7 +393,10 @@ function sandboxInstanceRow(input: {
     | typeof SandboxInstanceStatuses.RUNNING
     | typeof SandboxInstanceStatuses.STOPPED
     | typeof SandboxInstanceStatuses.FAILED;
-  purpose?: typeof SandboxInstancePurposes.SESSION | typeof SandboxInstancePurposes.SETUP_CHECK;
+  purpose?:
+    | typeof SandboxInstancePurposes.SESSION
+    | typeof SandboxInstancePurposes.SETUP_ASSISTANT
+    | typeof SandboxInstancePurposes.SETUP_CHECK;
 }): DataPlaneTables["sandboxInstances"]["$inferInsert"] {
   return {
     id: input.id,

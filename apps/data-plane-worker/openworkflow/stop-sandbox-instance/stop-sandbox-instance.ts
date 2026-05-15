@@ -153,7 +153,14 @@ async function isSandboxStopStillPermitted(ctx: {
   });
 }
 
-function assertUserStopIsScopedToSetupCheck(input: {
+export function isUserStopSupportedPurpose(purpose: SandboxInstancePurpose): boolean {
+  return (
+    purpose === SandboxInstancePurposes.SETUP_ASSISTANT ||
+    purpose === SandboxInstancePurposes.SETUP_CHECK
+  );
+}
+
+function assertUserStopIsScopedToUserStoppablePurpose(input: {
   sandboxInstanceId: string;
   stopReason: SandboxStopReason;
   purpose: SandboxInstancePurpose;
@@ -162,9 +169,9 @@ function assertUserStopIsScopedToSetupCheck(input: {
     return;
   }
 
-  if (input.purpose !== SandboxInstancePurposes.SETUP_CHECK) {
+  if (!isUserStopSupportedPurpose(input.purpose)) {
     throw new Error(
-      `User-requested stop is only supported for setup-check sandbox instances; sandbox instance '${input.sandboxInstanceId}' has purpose '${input.purpose}'.`,
+      `User-requested stop is only supported for setup-check and setup-assistant sandbox instances; sandbox instance '${input.sandboxInstanceId}' has purpose '${input.purpose}'.`,
     );
   }
 }
@@ -212,7 +219,7 @@ export async function stopSandboxInstance(
     };
   }
 
-  assertUserStopIsScopedToSetupCheck({
+  assertUserStopIsScopedToUserStoppablePurpose({
     sandboxInstanceId: input.sandboxInstanceId,
     stopReason: input.stopReason,
     purpose: sandboxInstanceState.purpose,
