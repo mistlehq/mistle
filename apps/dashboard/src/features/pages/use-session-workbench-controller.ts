@@ -40,10 +40,6 @@ import {
   type SessionTurnControl,
 } from "./session-composer/index.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
-import {
-  resolveInitialSelectedRepositoryPath,
-  resolveSessionTerminalCwd,
-} from "./session-primary-repository-policy.js";
 import type { SessionStartupState } from "./session-startup-status.js";
 import type {
   SessionTerminalContentInset,
@@ -67,10 +63,11 @@ import {
   type SessionMainPanelRuntimeId,
 } from "./use-session-main-panel-handoff.js";
 import { useSessionPortAccess } from "./use-session-port-access.js";
-import { useSessionPrimaryRepositoryState } from "./use-session-primary-repository-state.js";
+import type { SessionPrimaryRepositoryState } from "./use-session-primary-repository-state.js";
 import { useSessionRepositoryStatus } from "./use-session-repository-status.js";
 import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
 import { useSessionWorkbenchLifecycleState } from "./use-session-workbench-lifecycle-state.js";
+import { useSessionWorkbenchRepositoryControl } from "./use-session-workbench-repository-control.js";
 import { useSessionWorkbenchTransport } from "./use-session-workbench-transport.js";
 
 type SessionWorkbenchState = {
@@ -129,7 +126,7 @@ type SessionWorkbenchState = {
     patch: string;
     togglePanel: () => void;
   };
-  primaryRepositoryState: ReturnType<typeof useSessionPrimaryRepositoryState>;
+  primaryRepositoryState: SessionPrimaryRepositoryState;
   primaryRepositoryControlState: {
     disabledReason: string | null;
     switchPrimaryRepository: (nextSelectedRepositoryPath: string | null) => Promise<void>;
@@ -307,33 +304,21 @@ export function useSessionWorkbenchController(input: {
     queryClient,
   });
   const sandboxStatus = workbenchLifecycleState.sandboxStatusQuery.data;
-  const isOpenCodeRuntime =
-    sandboxStatus?.runtimeContext?.agentRuntimeId === OpenCodeWorkbenchCapabilities.runtimeId;
-  const activeRuntimeCapabilities = isOpenCodeRuntime
-    ? OpenCodeWorkbenchCapabilities
-    : CodexWorkbenchCapabilities;
-  activeHandoffRuntimeIdRef.current = activeRuntimeCapabilities.runtimeId;
-  const activeThreadCwd = isOpenCodeRuntime
-    ? null
-    : sessionState.lifecycle.sessionSnapshot?.activeThreadCwd;
-  const initialSelectedRepositoryPath = resolveInitialSelectedRepositoryPath({
-    activeThreadCwd: activeThreadCwd ?? undefined,
-    runtimePrimaryRepositoryRoot: sandboxStatus?.runtimeContext?.primaryRepositoryRoot,
-  });
-  const primaryRepositoryState = useSessionPrimaryRepositoryState({
-    enabled: workbenchLifecycleState.connectionReadiness.canConnect,
+  const repositoryControl = useSessionWorkbenchRepositoryControl({
+    activeHandoffRuntimeIdRef,
+    canConnect: workbenchLifecycleState.connectionReadiness.canConnect,
+    codexActiveThreadCwd: sessionState.lifecycle.sessionSnapshot?.activeThreadCwd,
+    ensureCanSwitchPrimaryRepository: sessionState.threads.ensureCanSwitchPrimaryRepository,
     ensureTransportConnected: transportManager.ensureTransportConnected,
-    initialSelectedRepositoryPath,
-    runtimeDisplayName: activeRuntimeCapabilities.displayName,
+    isCliToggleActive: handoff.isCliToggleActive,
+    runtimeAgentRuntimeId: sandboxStatus?.runtimeContext?.agentRuntimeId,
+    runtimePrimaryRepositoryRoot: sandboxStatus?.runtimeContext?.primaryRepositoryRoot,
     sandboxInstanceId: input.sandboxInstanceId,
+    selectedRepositoryPathRef,
   });
-  const selectedRepositoryPath = primaryRepositoryState.selectedRepositoryPath;
-  selectedRepositoryPathRef.current = selectedRepositoryPath;
-  const terminalCwd = resolveSessionTerminalCwd({
-    activeThreadCwd,
-    selectedRepositoryPath,
-  });
-  const isPrimaryRepositorySwitchBlockedByCli = handoff.isCliToggleActive;
+  const isOpenCodeRuntime = repositoryControl.isOpenCodeRuntime;
+  const activeRuntimeCapabilities = repositoryControl.activeRuntimeCapabilities;
+  const selectedRepositoryPath = repositoryControl.selectedRepositoryPath;
   const branchDiffState = useSessionBranchDiff({
     cwd: selectedRepositoryPath,
     enabled: diffPanelState.isVisible && workbenchLifecycleState.connectionReadiness.canConnect,
@@ -392,24 +377,6 @@ export function useSessionWorkbenchController(input: {
         : null,
     ensureTransportConnected: transportManager.ensureTransportConnected,
   });
-  const switchPrimaryRepository = useCallback(
-    async (nextSelectedRepositoryPath: string | null): Promise<void> => {
-      if (nextSelectedRepositoryPath === selectedRepositoryPath) {
-        return;
-      }
-
-      if (!isOpenCodeRuntime) {
-        await sessionState.threads.ensureCanSwitchPrimaryRepository();
-      }
-      primaryRepositoryState.setSelectedRepositoryPath(nextSelectedRepositoryPath);
-    },
-    [
-      isOpenCodeRuntime,
-      primaryRepositoryState.setSelectedRepositoryPath,
-      selectedRepositoryPath,
-      sessionState.threads.ensureCanSwitchPrimaryRepository,
-    ],
-  );
   const startCodexTurn = useMemo<SessionTurnControl["startTurn"]>(
     () =>
       buildCodexTurnStarter({
@@ -522,7 +489,7 @@ export function useSessionWorkbenchController(input: {
 
   return {
     workbench: {
-      terminalCwd,
+      terminalCwd: repositoryControl.terminalCwd,
       ensureTransportConnected: transportManager.ensureTransportConnected,
       connectionReadiness: workbenchLifecycleState.connectionReadiness,
       handleTerminalWorkspaceReset: workbenchLifecycleState.handleTerminalWorkspaceReset,
@@ -556,15 +523,9 @@ export function useSessionWorkbenchController(input: {
         patch: branchDiffState.patch,
         togglePanel: diffPanelState.togglePanel,
       },
-      primaryRepositoryState,
+      primaryRepositoryState: repositoryControl.primaryRepositoryState,
       portAccessState,
-      primaryRepositoryControlState: {
-        disabledReason:
-          !isOpenCodeRuntime && isPrimaryRepositorySwitchBlockedByCli
-            ? "Exit Codex TUI before switching the primary repository."
-            : null,
-        switchPrimaryRepository,
-      },
+      primaryRepositoryControlState: repositoryControl.primaryRepositoryControlState,
     },
     conversationPane: {
       activeConversationId: activeRuntime.conversation.activeConversationId,
