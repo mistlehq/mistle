@@ -26,7 +26,7 @@ import { AutomationCreatePage } from "./automation-create-page.js";
 
 const SlackConnectionId = "icn_slack_test";
 const GitHubConnectionId = "icn_github_test";
-const SandboxProfileId = "sbp_slack_test";
+const AutomationSandboxProfileId = "sbp_automation_test";
 const GitHubPrReviewTemplateEventTypes = getGitHubPrReviewTemplateEventTypes();
 const GitHubPrReviewTemplateSupportedEvents =
   GitHubCloudBrowserDefinition.supportedWebhookEvents?.filter((eventDefinition) =>
@@ -184,7 +184,7 @@ function renderCreatePage(input: {
     input.seedSlackProfile === true || input.seedGitHubProfile === true
       ? [
           {
-            value: SandboxProfileId,
+            value: AutomationSandboxProfileId,
             label: "Automation profile",
           },
         ]
@@ -196,7 +196,7 @@ function renderCreatePage(input: {
         ? [
             {
               id: "bnd_slack_test",
-              sandboxProfileId: SandboxProfileId,
+              sandboxProfileId: AutomationSandboxProfileId,
               sandboxProfileVersion: 1,
               connectionId: SlackConnectionId,
               kind: "connector",
@@ -210,7 +210,7 @@ function renderCreatePage(input: {
         ? [
             {
               id: "bnd_github_test",
-              sandboxProfileId: SandboxProfileId,
+              sandboxProfileId: AutomationSandboxProfileId,
               sandboxProfileVersion: 1,
               connectionId: GitHubConnectionId,
               kind: "git",
@@ -222,10 +222,10 @@ function renderCreatePage(input: {
         : []),
     ];
 
-    queryClient.setQueryData(sandboxProfileVersionsQueryKey(SandboxProfileId), {
+    queryClient.setQueryData(sandboxProfileVersionsQueryKey(AutomationSandboxProfileId), {
       versions: [
         {
-          sandboxProfileId: SandboxProfileId,
+          sandboxProfileId: AutomationSandboxProfileId,
           version: 1,
           state: "published",
           isActive: true,
@@ -245,7 +245,7 @@ function renderCreatePage(input: {
     });
     queryClient.setQueryData(
       sandboxProfileVersionAutomationConfigQueryKey({
-        profileId: SandboxProfileId,
+        profileId: AutomationSandboxProfileId,
         version: 1,
       }),
       {
@@ -327,7 +327,7 @@ describe("AutomationCreatePage", () => {
     expect(screen.queryByRole("textbox", { name: "User message" })).toBeNull();
   });
 
-  it("prefills the create form from a hardcoded trigger template", () => {
+  it("prefills the create form from the Slack mention template", () => {
     renderCreatePage({ initialEntry: "/automations/new?template=slack-app-mention" });
 
     expect(screen.getByText("Event")).toBeDefined();
@@ -354,9 +354,9 @@ describe("AutomationCreatePage", () => {
     );
   });
 
-  it("selects the template event after profile bindings are available", async () => {
+  it("selects the Slack mention template event after profile bindings are available", async () => {
     renderCreatePage({
-      initialEntry: `/automations/new?sandboxProfileId=${SandboxProfileId}&template=slack-app-mention`,
+      initialEntry: `/automations/new?sandboxProfileId=${AutomationSandboxProfileId}&template=slack-app-mention`,
       seedSlackProfile: true,
     });
 
@@ -367,7 +367,7 @@ describe("AutomationCreatePage", () => {
 
   it("selects the GitHub PR review template events and comment filters after profile bindings are available", async () => {
     renderCreatePage({
-      initialEntry: `/automations/new?sandboxProfileId=${SandboxProfileId}&template=github-pr-review`,
+      initialEntry: `/automations/new?sandboxProfileId=${AutomationSandboxProfileId}&template=github-pr-review`,
       seedGitHubProfile: true,
     });
 
