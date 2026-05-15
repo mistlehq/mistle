@@ -2,13 +2,65 @@ import { useEffect, useMemo } from "react";
 
 import {
   useLocalSessionComposerConfigControl,
+  usePersistedSessionComposerConfigControl,
   type SessionComposerConfigControl,
+  type SessionComposerConfigWriter,
 } from "../pages/session-composer/index.js";
+import type { UseCodexSessionStateResult } from "./codex/session-state/index.js";
 import {
   buildOpenCodeComposerConfigResetKey,
   buildRefreshingOpenCodeComposerBootstrap,
   type UseOpenCodeSessionStateResult,
 } from "./opencode/session-state/index.js";
+
+export function useCodexWorkbenchComposerState(input: {
+  sessionState: UseCodexSessionStateResult;
+}): {
+  configControl: SessionComposerConfigControl;
+} {
+  const codexConfig = input.sessionState.codexConfig;
+  const sessionMessage = input.sessionState.sessionMessage;
+
+  const configWriter = useMemo<SessionComposerConfigWriter>(
+    () => ({
+      isUpdating: codexConfig.isBatchWritingConfig || codexConfig.isWritingConfigValue,
+      writeModel: (model: string): void => {
+        codexConfig.batchWriteConfig({
+          edits: [
+            {
+              keyPath: "model",
+              value: model,
+              mergeStrategy: "replace",
+            },
+          ],
+        });
+      },
+      writeReasoningEffort: (reasoningEffort: string): void => {
+        codexConfig.writeConfigValue({
+          keyPath: "model_reasoning_effort",
+          value: reasoningEffort,
+          mergeStrategy: "replace",
+        });
+      },
+    }),
+    [
+      codexConfig.batchWriteConfig,
+      codexConfig.isBatchWritingConfig,
+      codexConfig.isWritingConfigValue,
+      codexConfig.writeConfigValue,
+    ],
+  );
+
+  const configControl = usePersistedSessionComposerConfigControl({
+    bootstrap: input.sessionState.bootstrap,
+    clearSessionErrorMessage: sessionMessage.clearSessionErrorMessage,
+    writer: configWriter,
+  });
+
+  return {
+    configControl,
+  };
+}
 
 export function useOpenCodeWorkbenchComposerState(input: {
   enabled: boolean;

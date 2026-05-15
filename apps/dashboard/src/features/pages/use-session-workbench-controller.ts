@@ -10,7 +10,10 @@ import { formatCodexContextUsage } from "../session-agents/codex/session-state/c
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import { useOpenCodeSessionState } from "../session-agents/opencode/session-state/index.js";
 import { SessionRuntimeWorkbenchCapabilities } from "../session-agents/session-runtime-workbench-capabilities.js";
-import { useOpenCodeWorkbenchComposerState } from "../session-agents/session-workbench-composer-bootstrap.js";
+import {
+  useCodexWorkbenchComposerState,
+  useOpenCodeWorkbenchComposerState,
+} from "../session-agents/session-workbench-composer-bootstrap.js";
 import {
   buildCodexConversationRuntime,
   buildOpenCodeConversationRuntime,
@@ -31,9 +34,7 @@ import {
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
-  usePersistedSessionComposerConfigControl,
   useSessionComposerAttachmentControl,
-  type SessionComposerConfigWriter,
   type SessionComposerSharedInput,
   type SessionComposerStateInput,
   type SessionTurnControl,
@@ -252,7 +253,6 @@ export function useSessionWorkbenchController(input: {
     sandboxInstanceId: input.sandboxInstanceId,
   });
   const chat = sessionState.chat;
-  const codexConfig = sessionState.codexConfig;
   const serverRequests = sessionState.serverRequests;
   const sessionMessage = sessionState.sessionMessage;
   const codexHandoffRuntime = useMemo(
@@ -361,39 +361,8 @@ export function useSessionWorkbenchController(input: {
       selectedRepositoryPath,
       sessionState: openCodeSessionState,
     });
-  const codexComposerConfigWriter = useMemo<SessionComposerConfigWriter>(
-    () => ({
-      isUpdating: codexConfig.isBatchWritingConfig || codexConfig.isWritingConfigValue,
-      writeModel: (model: string): void => {
-        codexConfig.batchWriteConfig({
-          edits: [
-            {
-              keyPath: "model",
-              value: model,
-              mergeStrategy: "replace",
-            },
-          ],
-        });
-      },
-      writeReasoningEffort: (reasoningEffort: string): void => {
-        codexConfig.writeConfigValue({
-          keyPath: "model_reasoning_effort",
-          value: reasoningEffort,
-          mergeStrategy: "replace",
-        });
-      },
-    }),
-    [
-      codexConfig.batchWriteConfig,
-      codexConfig.isBatchWritingConfig,
-      codexConfig.isWritingConfigValue,
-      codexConfig.writeConfigValue,
-    ],
-  );
-  const configControl = usePersistedSessionComposerConfigControl({
-    bootstrap: sessionState.bootstrap,
-    clearSessionErrorMessage: sessionMessage.clearSessionErrorMessage,
-    writer: codexComposerConfigWriter,
+  const { configControl } = useCodexWorkbenchComposerState({
+    sessionState,
   });
   const sessionSnapshot = workbenchLifecycleState.sessionSnapshot;
   const activeSessionThreadId = isOpenCodeRuntime
