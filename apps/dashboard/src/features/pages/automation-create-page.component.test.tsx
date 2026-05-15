@@ -10,6 +10,7 @@ import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } f
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
+import { getTriggerTemplateById } from "../automations/trigger-templates.js";
 import { AUTOMATION_SANDBOX_PROFILES_QUERY_KEY } from "../automations/use-automation-sandbox-profile-options.js";
 import {
   WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY,
@@ -26,14 +27,20 @@ import { AutomationCreatePage } from "./automation-create-page.js";
 const SlackConnectionId = "icn_slack_test";
 const GitHubConnectionId = "icn_github_test";
 const SandboxProfileId = "sbp_slack_test";
-const GitHubPrReviewTemplateEventTypes = [
-  "github.pull_request.opened",
-  "github.issue_comment.created",
-];
+const GitHubPrReviewTemplateEventTypes = getGitHubPrReviewTemplateEventTypes();
 const GitHubPrReviewTemplateSupportedEvents =
   GitHubCloudBrowserDefinition.supportedWebhookEvents?.filter((eventDefinition) =>
     GitHubPrReviewTemplateEventTypes.some((eventType) => eventType === eventDefinition.eventType),
   ) ?? [];
+
+function getGitHubPrReviewTemplateEventTypes(): readonly string[] {
+  const template = getTriggerTemplateById("github-pr-review");
+  if (template.kind !== "trigger") {
+    throw new Error("Expected GitHub PR review template to be a webhook trigger template.");
+  }
+
+  return template.eventTypes;
+}
 
 function renderCreatePage(input: {
   initialEntry: string;
