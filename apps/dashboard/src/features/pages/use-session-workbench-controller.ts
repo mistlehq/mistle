@@ -4,19 +4,11 @@ import type {
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useRef } from "react";
+import { useRef } from "react";
 
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import { useOpenCodeSessionState } from "../session-agents/opencode/session-state/index.js";
 import { SessionRuntimeWorkbenchCapabilities } from "../session-agents/session-runtime-workbench-capabilities.js";
-import {
-  buildCodexHandoffRuntime,
-  buildCodexLifecycleForHandoff,
-  buildOpenCodeHandoffRuntime,
-  buildOpenCodeLifecycleForHandoff,
-  buildOpenCodeLifecycleForWorkbench,
-  resolveSessionLifecycleForWorkbench,
-} from "../session-agents/session-workbench-handoff-runtimes.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
@@ -50,6 +42,7 @@ import {
   useSessionWorkbenchConversationRuntime,
   type SessionConversationPaneState,
 } from "./use-session-workbench-conversation-runtime.js";
+import { useSessionWorkbenchHandoffControl } from "./use-session-workbench-handoff-control.js";
 import { useSessionWorkbenchLifecycleState } from "./use-session-workbench-lifecycle-state.js";
 import { useSessionWorkbenchRepositoryControl } from "./use-session-workbench-repository-control.js";
 import { useSessionWorkbenchTransport } from "./use-session-workbench-transport.js";
@@ -119,7 +112,6 @@ type SessionWorkbenchState = {
 };
 
 const CodexWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
-const OpenCodeWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.OPENCODE;
 
 type UseSessionWorkbenchControllerResult = {
   workbench: SessionWorkbenchState;
@@ -163,109 +155,21 @@ export function useSessionWorkbenchController(input: {
     rpcClientRef,
     sessionEventUnsubscribersRef,
   });
-  const lifecycle = sessionState.lifecycle;
   const openCodeSessionState = useOpenCodeSessionState({
     ensureTransportConnected: transportManager.ensureTransportConnected,
   });
-  const openCodeLifecycle = openCodeSessionState.lifecycle;
-  const codexLifecycleForHandoff = useMemo(
-    () => buildCodexLifecycleForHandoff(lifecycle),
-    [
-      lifecycle.clearLifecycleErrorMessage,
-      lifecycle.connectSession,
-      lifecycle.detachSessionConnection,
-      lifecycle.lifecycleErrorMessage,
-      lifecycle.sessionConnectionState,
-      lifecycle.sessionSnapshot,
-    ],
-  );
-  const openCodeLifecycleForHandoff = useMemo(
-    () => buildOpenCodeLifecycleForHandoff(openCodeLifecycle),
-    [
-      openCodeLifecycle.clearLifecycleErrorMessage,
-      openCodeLifecycle.connectSession,
-      openCodeLifecycle.detachSessionConnection,
-      openCodeLifecycle.lifecycleErrorMessage,
-      openCodeLifecycle.sessionConnectionState,
-      openCodeLifecycle.sessionSnapshot,
-    ],
-  );
-  const openCodeLifecycleForWorkbench = useMemo(
-    () => buildOpenCodeLifecycleForWorkbench(openCodeLifecycle),
-    [
-      openCodeLifecycle.clearLifecycleErrorMessage,
-      openCodeLifecycle.connectSession,
-      openCodeLifecycle.detachSessionConnection,
-      openCodeLifecycle.disconnectSession,
-      openCodeLifecycle.isStartingSession,
-      openCodeLifecycle.lifecycleErrorMessage,
-      openCodeLifecycle.recoverSession,
-      openCodeLifecycle.recoverableDisconnect,
-      openCodeLifecycle.sessionConnectionState,
-      openCodeLifecycle.sessionSnapshot,
-    ],
-  );
-  const resolveLifecycleForWorkbench = useCallback(
-    (agentRuntimeId: string | null) =>
-      resolveSessionLifecycleForWorkbench({
-        agentRuntimeId,
-        codexLifecycle: lifecycle,
-        openCodeLifecycle: openCodeLifecycleForWorkbench,
-      }),
-    [lifecycle, openCodeLifecycleForWorkbench],
-  );
-  const cliPtyState = useSandboxPtyState({
+  const { cliPtyState, handoff, resolveLifecycleForWorkbench } = useSessionWorkbenchHandoffControl({
+    activeHandoffRuntimeIdRef,
     ensureTransportConnected: transportManager.ensureTransportConnected,
+    openCodeSessionState,
+    sandboxInstanceId: input.sandboxInstanceId,
+    selectedRepositoryPathRef,
+    sessionState,
   });
   const terminalPanelState = useSessionTerminalWorkbenchState({
     sandboxInstanceId: input.sandboxInstanceId,
   });
   const diffPanelState = useSessionDiffWorkbenchState({
-    sandboxInstanceId: input.sandboxInstanceId,
-  });
-  const codexHandoffRuntime = useMemo(
-    () =>
-      buildCodexHandoffRuntime({
-        chat: sessionState.chat,
-        lifecycle: codexLifecycleForHandoff,
-        serverRequests: sessionState.serverRequests,
-        threadAuthority: sessionState.threadAuthority,
-      }),
-    [
-      sessionState.chat.hydrateChatFromThread,
-      codexLifecycleForHandoff,
-      sessionState.serverRequests.resetServerRequests,
-      sessionState.threadAuthority.clearActiveThreadIdAfterCliLaunch,
-      sessionState.threadAuthority.providerThreadId,
-      sessionState.threadAuthority.resolveCliLaunchTarget,
-    ],
-  );
-  const openCodeHandoffRuntime = useMemo(
-    () =>
-      buildOpenCodeHandoffRuntime({
-        chat: openCodeSessionState.chat,
-        lifecycle: openCodeLifecycleForHandoff,
-        sessionSnapshot: openCodeSessionState.lifecycle.sessionSnapshot,
-      }),
-    [
-      openCodeLifecycleForHandoff,
-      openCodeSessionState.chat.hydrateChatFromSessionOrThrow,
-      openCodeSessionState.lifecycle.sessionSnapshot,
-    ],
-  );
-  const handoffRuntimes = useMemo(
-    () => ({
-      [CodexWorkbenchCapabilities.runtimeId]: codexHandoffRuntime,
-      [OpenCodeWorkbenchCapabilities.runtimeId]: openCodeHandoffRuntime,
-    }),
-    [codexHandoffRuntime, openCodeHandoffRuntime],
-  );
-
-  const handoff = useSessionMainPanelHandoff({
-    activeRuntimeIdRef: activeHandoffRuntimeIdRef,
-    cliPtyState,
-    runtimes: handoffRuntimes,
-    selectedRepositoryPathRef,
     sandboxInstanceId: input.sandboxInstanceId,
   });
   const workbenchLifecycleState = useSessionWorkbenchLifecycleState({
