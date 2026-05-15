@@ -19,14 +19,6 @@ import { CaretDownIcon } from "@phosphor-icons/react";
 
 import { deriveInitials } from "../shared/derive-initials.js";
 
-const OrganizationMenuContentClassName = "w-[min(calc(100vw-2rem),20rem)] p-1.5 md:w-64 md:p-1";
-const OrganizationMenuItemClassName =
-  "min-h-11 rounded-md px-4 py-3 text-base md:min-h-0 md:rounded-sm md:px-2 md:py-1.5 md:text-sm";
-const OrganizationMenuSubTriggerClassName = `${OrganizationMenuItemClassName} [&_svg:not([class*='size-'])]:size-5 md:[&_svg:not([class*='size-'])]:size-4`;
-const OrganizationMenuSubContentClassName = "min-w-48 p-1.5 md:min-w-[96px] md:p-1";
-const OrganizationMenuRadioItemClassName =
-  "min-h-11 rounded-md py-3 pr-10 pl-4 text-base md:min-h-0 md:rounded-sm md:py-1.5 md:pr-8 md:pl-2 md:text-sm";
-
 export type OrganizationMenuOrganizationOption = {
   id: string;
   name: string;
@@ -94,27 +86,20 @@ export function OrganizationMenuTrigger(input: {
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
-        className={OrganizationMenuContentClassName}
+        className="w-[min(calc(100vw-2rem),20rem)] md:w-64"
         side="bottom"
         sideOffset={8}
       >
         {input.organizationSummaryErrorMessage !== null ? (
           <>
             <DropdownMenuGroup>
-              <DropdownMenuItem className={OrganizationMenuItemClassName} disabled>
-                {input.organizationSummaryErrorMessage}
-              </DropdownMenuItem>
+              <DropdownMenuItem disabled>{input.organizationSummaryErrorMessage}</DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
           </>
         ) : null}
         <DropdownMenuGroup>
-          <DropdownMenuItem
-            className={OrganizationMenuItemClassName}
-            onClick={input.onNavigateToSettings}
-          >
-            Settings
-          </DropdownMenuItem>
+          <DropdownMenuItem onClick={input.onNavigateToSettings}>Settings</DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
@@ -123,13 +108,10 @@ export function OrganizationMenuTrigger(input: {
               onOpenChange={input.onSwitchOrganizationSubmenuOpenChange}
               open={input.isSwitchOrganizationSubmenuOpen}
             >
-              <DropdownMenuSubTrigger
-                className={OrganizationMenuSubTriggerClassName}
-                disabled={input.isSwitchingOrganization}
-              >
+              <DropdownMenuSubTrigger disabled={input.isSwitchingOrganization}>
                 Switch organization
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className={OrganizationMenuSubContentClassName}>
+              <DropdownMenuSubContent className="min-w-48">
                 {organizations.length > 0 ? (
                   <DropdownMenuRadioGroup
                     onValueChange={(organizationId) => {
@@ -139,7 +121,6 @@ export function OrganizationMenuTrigger(input: {
                   >
                     {organizations.map((organization) => (
                       <DropdownMenuRadioItem
-                        className={OrganizationMenuRadioItemClassName}
                         disabled={input.isSwitchingOrganization}
                         key={organization.id}
                         value={organization.id}
@@ -152,7 +133,7 @@ export function OrganizationMenuTrigger(input: {
                 {showOrganizationSwitcherError ? (
                   <>
                     {organizations.length > 0 ? <DropdownMenuSeparator /> : null}
-                    <DropdownMenuItem className={OrganizationMenuItemClassName} disabled>
+                    <DropdownMenuItem disabled>
                       {input.organizationSwitcherErrorMessage}
                     </DropdownMenuItem>
                   </>
@@ -161,7 +142,6 @@ export function OrganizationMenuTrigger(input: {
             </DropdownMenuSub>
           ) : null}
           <DropdownMenuItem
-            className={OrganizationMenuItemClassName}
             disabled={input.isSigningOut}
             onClick={input.onSignOut}
             variant="destructive"
