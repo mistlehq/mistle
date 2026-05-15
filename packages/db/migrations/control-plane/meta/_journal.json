@@ -211,6 +211,13 @@
       "when": 1778831664534,
       "tag": "0029_add-api-keys",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1778860726763,
+      "tag": "0030_add-maintenance-script",
+      "breakpoints": true
     }
   ]
 }
