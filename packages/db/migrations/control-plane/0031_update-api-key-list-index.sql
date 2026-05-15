@@ -1,0 +1,2 @@
+DROP INDEX "control_plane"."api_keys_organization_id_revoked_at_idx";--> statement-breakpoint
+CREATE INDEX "api_keys_active_list_idx" ON "control_plane"."api_keys" USING btree ("organization_id","revoked_at","created_at","id");

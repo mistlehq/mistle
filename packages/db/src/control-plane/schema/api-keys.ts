@@ -41,7 +41,12 @@ export function defineApiKeys(schema: PgSchema) {
     },
     (table) => [
       uniqueIndex("api_keys_secret_prefix_uidx").on(table.secretPrefix),
-      index("api_keys_organization_id_revoked_at_idx").on(table.organizationId, table.revokedAt),
+      index("api_keys_active_list_idx").on(
+        table.organizationId,
+        table.revokedAt,
+        table.createdAt,
+        table.id,
+      ),
     ],
   );
 }

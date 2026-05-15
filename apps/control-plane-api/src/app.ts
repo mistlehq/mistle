@@ -6,6 +6,7 @@ import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { Scalar } from "@scalar/hono-api-reference";
 import type { OpenWorkflow } from "openworkflow";
 
+import { createApiKeysRoutes } from "./api-keys/index.js";
 import type { ControlPlaneAuth } from "./auth/index.js";
 import { createAuthRoutes } from "./auth/routes.js";
 import { createAutomationSchedulesRoutes } from "./automation-schedules/index.js";
@@ -151,6 +152,7 @@ export function registerApiRouteModules(app: ControlPlaneApp): void {
 
 export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const authRoutes = createAuthRoutes();
+  const apiKeysRoutes = withActiveOrganizationAccess(createApiKeysRoutes());
   const automationsRoutes = withActiveOrganizationAccess(createAutomationsRoutes());
   const automationSchedulesRoutes = withActiveOrganizationAccess(createAutomationSchedulesRoutes());
   const automationWebhooksRoutes = withActiveOrganizationAccess(createAutomationWebhooksRoutes());
@@ -170,6 +172,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const sandboxProfilesRoutes = withActiveOrganizationAccess(createSandboxProfilesRoutes());
 
   app.route(authRoutes.basePath, authRoutes.routes);
+  app.route(apiKeysRoutes.basePath, apiKeysRoutes.routes);
   app.route(automationsRoutes.basePath, automationsRoutes.routes);
   app.route(automationSchedulesRoutes.basePath, automationSchedulesRoutes.routes);
   app.route(automationWebhooksRoutes.basePath, automationWebhooksRoutes.routes);

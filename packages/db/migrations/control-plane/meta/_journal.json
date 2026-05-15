@@ -218,6 +218,13 @@
       "when": 1778860726763,
       "tag": "0030_add-maintenance-script",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1778861309094,
+      "tag": "0031_update-api-key-list-index",
+      "breakpoints": true
     }
   ]
 }

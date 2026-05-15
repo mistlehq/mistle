@@ -33,6 +33,8 @@ export const OrganizationPermissions = {
   AUTOMATION_WEBHOOK_CREATE: "automationWebhook:create",
   AUTOMATION_WEBHOOK_UPDATE: "automationWebhook:update",
   AUTOMATION_WEBHOOK_DELETE: "automationWebhook:delete",
+  API_KEY_READ: "apiKey:read",
+  API_KEY_MANAGE: "apiKey:manage",
 } as const;
 
 export type OrganizationPermission =
@@ -69,6 +71,8 @@ const OWNER_PERMISSIONS: readonly OrganizationPermission[] = [
   OrganizationPermissions.AUTOMATION_WEBHOOK_CREATE,
   OrganizationPermissions.AUTOMATION_WEBHOOK_UPDATE,
   OrganizationPermissions.AUTOMATION_WEBHOOK_DELETE,
+  OrganizationPermissions.API_KEY_READ,
+  OrganizationPermissions.API_KEY_MANAGE,
 ];
 
 const ADMIN_PERMISSIONS: readonly OrganizationPermission[] = OWNER_PERMISSIONS;
@@ -99,6 +103,12 @@ const MEMBER_PERMISSIONS: readonly OrganizationPermission[] = [
   OrganizationPermissions.AUTOMATION_WEBHOOK_UPDATE,
   OrganizationPermissions.AUTOMATION_WEBHOOK_DELETE,
 ];
+
+const ORGANIZATION_PERMISSION_VALUES = new Set<string>(Object.values(OrganizationPermissions));
+
+export function isOrganizationPermission(value: string): value is OrganizationPermission {
+  return ORGANIZATION_PERMISSION_VALUES.has(value);
+}
 
 function normalizeRole(value: string): OrganizationRole | null {
   if (value === "owner" || value === "admin" || value === "member") {
