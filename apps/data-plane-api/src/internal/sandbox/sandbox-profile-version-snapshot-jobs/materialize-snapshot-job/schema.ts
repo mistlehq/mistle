@@ -9,7 +9,7 @@ export const MaterializeSandboxProfileVersionSnapshotJobRequestSchema = z
     organizationId: z.string().min(1),
     sandboxProfileId: z.string().min(1),
     sandboxProfileVersion: z.number().int().min(1),
-    snapshotPreparationScriptKind: z.enum(["setup", "maintenance"]).optional(),
+    snapshotPreparationScriptKind: z.enum(["setup", "maintenance"]),
     image: z
       .object({
         imageId: z.string().min(1),

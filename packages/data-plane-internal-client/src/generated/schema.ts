@@ -1745,7 +1745,7 @@ export interface paths {
             };
             snapshotJobId: string;
             /** @enum {string} */
-            snapshotPreparationScriptKind?: "setup" | "maintenance";
+            snapshotPreparationScriptKind: "setup" | "maintenance";
           };
         };
       };

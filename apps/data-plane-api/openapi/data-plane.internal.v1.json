@@ -107,6 +107,7 @@
                   "organizationId",
                   "sandboxProfileId",
                   "sandboxProfileVersion",
+                  "snapshotPreparationScriptKind",
                   "image",
                   "sandboxRuntime"
                 ],
