@@ -223,12 +223,14 @@ describe("WebhookAutomationForm", () => {
     expect(within(container).queryByText("Group events by")).toBeNull();
   });
 
-  it("shows the message template and response instructions editors", () => {
+  it("shows the message template and agent instructions editors", () => {
     const { container } = renderForm("create");
     const currentForm = within(container);
 
     expect(currentForm.getByRole("textbox", { name: "User message" })).toBeDefined();
-    expect(currentForm.getByRole("textbox", { name: "Response instructions" })).toBeDefined();
+    expect(
+      currentForm.getByRole("textbox", { name: "Agent Instructions for Trigger" }),
+    ).toBeDefined();
     const editors = container.querySelectorAll('[data-slot="agent-instructions-editor"]');
     const messageTemplateEditor = editors[0];
 
@@ -240,7 +242,7 @@ describe("WebhookAutomationForm", () => {
     expect(currentForm.queryByRole("heading", { name: "User message" })).toBeNull();
   });
 
-  it("renders events before the response instructions editor and message template editor", () => {
+  it("renders events before the agent instructions editor and message template editor", () => {
     const { container } = renderFormWithOptions({
       mode: "create",
     });
@@ -248,7 +250,7 @@ describe("WebhookAutomationForm", () => {
     const currentForm = within(container);
     const [eventsHeading] = currentForm.getAllByRole("heading", { name: "When this happens" });
     const automationInstructionsField = currentForm.getByRole("textbox", {
-      name: "Response instructions",
+      name: "Agent Instructions for Trigger",
     });
     const inputTemplateField = currentForm.getByRole("textbox", { name: "User message" });
 
@@ -269,9 +271,9 @@ describe("WebhookAutomationForm", () => {
       ),
     ).toBe(true);
     expect(container.textContent?.indexOf("When this happens")).toBeLessThan(
-      container.textContent?.indexOf("Response instructions") ?? Number.POSITIVE_INFINITY,
+      container.textContent?.indexOf("Agent Instructions for Trigger") ?? Number.POSITIVE_INFINITY,
     );
-    expect(container.textContent?.indexOf("Response instructions")).toBeLessThan(
+    expect(container.textContent?.indexOf("Agent Instructions for Trigger")).toBeLessThan(
       container.textContent?.indexOf("User message") ?? Number.POSITIVE_INFINITY,
     );
   });

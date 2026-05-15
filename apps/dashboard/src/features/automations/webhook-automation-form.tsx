@@ -205,7 +205,7 @@ export function WebhookAutomationInstructionsSection(
         <Field>
           <FieldHeader>
             <div className="space-y-1">
-              <FieldLabel id={input.instructionsLabelId}>Response instructions</FieldLabel>
+              <FieldLabel id={input.instructionsLabelId}>Agent Instructions for Trigger</FieldLabel>
               <FieldDescription>
                 Appended to the developer message when this trigger runs.
               </FieldDescription>
