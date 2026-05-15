@@ -180,3 +180,4 @@ export function useSessionTerminalWorkbenchState(input: {
 }
 
 export { MIN_TERMINAL_PANEL_SIZE };
+export type { SessionTerminalWorkbenchState };

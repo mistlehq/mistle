@@ -87,7 +87,10 @@ export function resolveSandboxInstancePersistenceMode(input: {
   sandboxProvider: SandboxProvider;
   configuredStorageBackend: DataPlaneApiSandboxStorageBackend;
 }): SandboxInstancePersistenceMode {
-  if (input.purpose === SandboxInstancePurposes.SETUP_CHECK) {
+  if (
+    input.purpose === SandboxInstancePurposes.SETUP_ASSISTANT ||
+    input.purpose === SandboxInstancePurposes.SETUP_CHECK
+  ) {
     return SandboxInstancePersistenceModes.EPHEMERAL;
   }
 

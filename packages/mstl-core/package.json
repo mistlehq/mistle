@@ -1,0 +1,12 @@
+{
+  "name": "@mistle/mstl-core",
+  "private": true,
+  "scripts": {
+    "build": "cargo build --locked",
+    "lint": "cargo clippy --locked --all-targets -- -D warnings",
+    "typecheck": "cargo check --locked --all-targets",
+    "test": "cargo test --locked",
+    "format": "cargo fmt",
+    "format:check": "cargo fmt --check"
+  }
+}

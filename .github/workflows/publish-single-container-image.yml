@@ -23,17 +23,8 @@ on:
       - "tsconfig.base.json"
   workflow_dispatch:
     inputs:
-      profile:
-        description: Single-container profile image to publish
-        required: true
-        default: all
-        type: choice
-        options:
-          - all
-          - docker
-          - remote
       publish_latest:
-        description: Also publish profile-qualified latest tags
+        description: Also publish latest tag
         required: true
         default: false
         type: boolean
@@ -42,80 +33,23 @@ permissions:
   contents: read
 
 concurrency:
-  group: publish-single-container-image-${{ github.ref }}-${{ inputs.profile }}
+  group: publish-single-container-image-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  prepare:
-    name: Prepare publish matrix
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.matrix.outputs.matrix }}
-      publish_latest: ${{ steps.flags.outputs.publish_latest }}
-      selected_profile: ${{ steps.flags.outputs.selected_profile }}
-
-    steps:
-      - name: Resolve publish flags
-        id: flags
-        run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            echo "publish_latest=true" >> "${GITHUB_OUTPUT}"
-            echo "selected_profile=all" >> "${GITHUB_OUTPUT}"
-          else
-            echo "publish_latest=${{ inputs.publish_latest }}" >> "${GITHUB_OUTPUT}"
-            echo "selected_profile=${{ inputs.profile }}" >> "${GITHUB_OUTPUT}"
-          fi
-
-      - name: Resolve matrix
-        id: matrix
-        env:
-          SELECTED_PROFILE: ${{ steps.flags.outputs.selected_profile }}
-        run: |
-          python3 <<'PY'
-          import json
-          import os
-
-          all_profiles = [
-              {"profile": "docker", "target": "docker-sandbox"},
-              {"profile": "remote", "target": "remote-sandbox"},
-          ]
-          selected_profile = os.environ["SELECTED_PROFILE"]
-
-          if selected_profile == "all":
-              selected = all_profiles
-          else:
-              selected = [
-                  profile
-                  for profile in all_profiles
-                  if profile["profile"] == selected_profile
-              ]
-
-          if not selected:
-              raise RuntimeError(f"Unsupported profile selection: {selected_profile}")
-
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
-              fh.write(f"matrix={json.dumps(selected)}\n")
-          PY
-
   publish:
-    name: Publish ${{ matrix.profile }}
-    needs:
-      - prepare
+    name: Publish single-container
     runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
       contents: read
       packages: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJson(needs.prepare.outputs.matrix) }}
     env:
       IMAGE_REPOSITORY: ghcr.io/mistlehq/mistle
-      IMAGE_TAG: ${{ matrix.profile }}-${{ github.sha }}
-      IMAGE_LATEST_TAG: ${{ matrix.profile }}-latest
+      IMAGE_TAG: ${{ github.sha }}
+      IMAGE_LATEST_TAG: latest
       IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
-      IMAGE_TARGET: ${{ matrix.target }}
+      IMAGE_TARGET: single-container
 
     steps:
       - name: Checkout
@@ -133,7 +67,8 @@ jobs:
         run: |
           tags=(--tag "${IMAGE_REPOSITORY}:${IMAGE_TAG}")
 
-          if [ "${{ needs.prepare.outputs.publish_latest }}" = "true" ]; then
+          publish_latest="${{ github.event_name == 'push' || inputs.publish_latest }}"
+          if [ "${publish_latest}" = "true" ]; then
             tags+=(--tag "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}")
           fi
 
@@ -154,7 +89,8 @@ jobs:
         run: |
           docker push "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
 
-          if [ "${{ needs.prepare.outputs.publish_latest }}" = "true" ]; then
+          publish_latest="${{ github.event_name == 'push' || inputs.publish_latest }}"
+          if [ "${publish_latest}" = "true" ]; then
             docker push "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}"
           fi
 
@@ -169,9 +105,9 @@ jobs:
           {
             echo "## Published image"
             echo
-            echo "- Profile: \`${{ matrix.profile }}\`"
             echo "- Tag: \`${IMAGE_REPOSITORY}:${IMAGE_TAG}\`"
-            if [ "${{ needs.prepare.outputs.publish_latest }}" = "true" ]; then
+            publish_latest="${{ github.event_name == 'push' || inputs.publish_latest }}"
+            if [ "${publish_latest}" = "true" ]; then
               echo "- Alias: \`${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}\`"
             fi
             echo "- Digest: \`${{ steps.publish.outputs.image_ref }}\`"
@@ -181,7 +117,6 @@ jobs:
     name: Notify Slack
     runs-on: ubuntu-latest
     needs:
-      - prepare
       - publish
     if: always()
     permissions:
@@ -191,7 +126,6 @@ jobs:
       PUBLISH_RESULT: ${{ needs.publish.result }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       WORKFLOW_NAME: ${{ github.workflow }}
-      SELECTED_PROFILE: ${{ needs.prepare.outputs.selected_profile }}
 
     steps:
       - name: Fetch Infisical secrets
@@ -223,7 +157,6 @@ jobs:
           }
           color = color_by_result.get(publish_result, "#808080")
           emoji = emoji_by_result.get(publish_result, ":grey_question:")
-          profile = os.environ["SELECTED_PROFILE"]
           payload = {
               "attachments": [
                   {
@@ -240,11 +173,6 @@ jobs:
                           {
                               "title": "Branch",
                               "value": os.environ["GITHUB_REF_NAME"],
-                              "short": True,
-                          },
-                          {
-                              "title": "Profile",
-                              "value": profile,
                               "short": True,
                           },
                           {

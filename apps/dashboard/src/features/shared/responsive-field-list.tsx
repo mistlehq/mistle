@@ -48,11 +48,11 @@ function resolveColumn(
 
 function resolveAlignmentClassName(align: ResponsiveFieldListColumn["align"]): string | null {
   if (align === "center") {
-    return "md:flex md:justify-center";
+    return "@3xl/responsive-field-list:flex @3xl/responsive-field-list:justify-center";
   }
 
   if (align === "end") {
-    return "md:flex md:justify-end";
+    return "@3xl/responsive-field-list:flex @3xl/responsive-field-list:justify-end";
   }
 
   return null;
@@ -73,10 +73,13 @@ export function ResponsiveFieldList(input: {
 
   return (
     <ResponsiveFieldListContext.Provider value={{ columns: input.columns }}>
-      <div className={cn("flex flex-col", input.className)} data-slot="responsive-field-list">
+      <div
+        className={cn("@container/responsive-field-list flex flex-col", input.className)}
+        data-slot="responsive-field-list"
+      >
         <div
           className={cn(
-            "hidden border-b md:grid md:grid-cols-[var(--responsive-field-list-grid-template)]",
+            "hidden border-b @3xl/responsive-field-list:grid @3xl/responsive-field-list:grid-cols-[var(--responsive-field-list-grid-template)]",
             input.gapClassName ?? "gap-4",
             input.headerClassName ?? "py-2",
           )}
@@ -125,7 +128,7 @@ export function ResponsiveFieldListRow(input: {
     >
       <div
         className={cn(
-          "relative grid md:items-center md:grid-cols-[var(--responsive-field-list-grid-template)]",
+          "relative grid @3xl/responsive-field-list:items-center @3xl/responsive-field-list:grid-cols-[var(--responsive-field-list-grid-template)]",
           input.gapClassName ?? "gap-4",
           input.gridClassName,
         )}
@@ -158,7 +161,7 @@ export function ResponsiveFieldListCell(input: {
     <div
       className={cn(
         "min-w-0",
-        input.hideOnMobile === true ? "hidden md:block" : null,
+        input.hideOnMobile === true ? "hidden @3xl/responsive-field-list:block" : null,
         resolveAlignmentClassName(column.align),
         column.cellClassName,
         input.className,
@@ -169,7 +172,11 @@ export function ResponsiveFieldListCell(input: {
       {column.hideMobileLabel === true ? null : (
         <DetailLabel
           as="div"
-          className={cn("mb-1 md:hidden", column.mobileLabelClassName, input.mobileLabelClassName)}
+          className={cn(
+            "mb-1 @3xl/responsive-field-list:hidden",
+            column.mobileLabelClassName,
+            input.mobileLabelClassName,
+          )}
           data-slot="responsive-field-list-mobile-label"
         >
           {column.label}

@@ -361,6 +361,7 @@ describe("app routing breadcrumb integration", () => {
       failureMessage: null,
       runtimeContext: null,
       automationConversation: null,
+      startupOperation: null,
     });
     const router = createMemoryRouter(dashboardRoutes, {
       initialEntries: ["/sessions/sbi_123"],
@@ -390,6 +391,7 @@ describe("app routing breadcrumb integration", () => {
       failureMessage: null,
       runtimeContext: null,
       automationConversation: null,
+      startupOperation: null,
     });
     const router = createMemoryRouter(dashboardRoutes, {
       initialEntries: ["/sessions/sbi_123"],

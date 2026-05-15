@@ -45,6 +45,7 @@ import { createInMemoryTunnelRelayCoordinator } from "../tunnel/create-in-memory
 import { LocalGatewayForwardingClientAdapter } from "../tunnel/gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
 import { LocalGatewayForwardingServerAdapter } from "../tunnel/gateway-forwarding/adapters/local-gateway-forwarding-server-adapter.js";
 import { InteractiveStreamRouter } from "../tunnel/gateway-forwarding/index.js";
+import { SandboxOperationIngressService } from "../tunnel/operation-ingress/index.js";
 import { AttachmentBackedSandboxOwnerResolver } from "../tunnel/ownership/attachment-backed-sandbox-owner-resolver.js";
 import { registerSandboxTunnelRoute } from "../tunnel/register-sandbox-tunnel-route.js";
 import { registerSandboxTunnelTokenExchangeRoute } from "../tunnel/register-sandbox-tunnel-token-exchange-route.js";
@@ -273,6 +274,7 @@ export function createDataPlaneGatewayRuntime(
     telemetry: config.app.telemetry,
   });
   const telemetryIngressService = new SandboxTelemetryIngressService(telemetryIngressSink);
+  const operationIngressService = new SandboxOperationIngressService();
   const dataPlaneClient = createDataPlaneSandboxInstancesClient({
     baseUrl: config.app.dataPlaneApi.baseUrl,
     serviceToken: config.app.internalAuth.serviceToken,
@@ -328,6 +330,7 @@ export function createDataPlaneGatewayRuntime(
     activeBootstrapSessionStore,
     sandboxInstanceDeadlineService,
     sandboxDeadlineLifecycleCoordinator,
+    operationIngressService,
     telemetryIngressService,
     sandboxTunnelTaskTracker,
     gatewayEgressTransportService,
@@ -372,6 +375,7 @@ export function createDataPlaneGatewayRuntime(
   async function stopRuntimeResources(): Promise<void> {
     await closeWebSocketServer(nodeWebSocket.wss);
     await sandboxTunnelTaskTracker.drain();
+    operationIngressService.shutdown();
     await telemetryIngressService.shutdown();
 
     if (startedServer !== undefined) {

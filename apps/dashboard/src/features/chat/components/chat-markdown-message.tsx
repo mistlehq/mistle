@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import { Streamdown } from "streamdown";
+import { defaultRemarkPlugins, Streamdown } from "streamdown";
 
 import { ChatExternalLinkDialog } from "./chat-external-link-dialog.js";
 import { StreamdownPlugins } from "./streamdown-plugins.js";
@@ -8,8 +8,54 @@ type ChatMarkdownMessageProps = {
   className?: string;
   contentClassName?: string;
   isStreaming: boolean;
+  preserveSoftLineBreaks?: boolean;
   text: string;
 };
+
+type MarkdownTreeNode = {
+  children?: MarkdownTreeNode[];
+  type: string;
+  value?: string;
+};
+
+function preserveSoftBreaksRemarkPlugin(): (tree: MarkdownTreeNode) => void {
+  return function preserveSoftBreaks(tree: MarkdownTreeNode): void {
+    rewriteSoftBreaks(tree);
+  };
+}
+
+function rewriteSoftBreaks(node: MarkdownTreeNode): void {
+  const children = node.children;
+  if (children === undefined) {
+    return;
+  }
+
+  node.children = children.flatMap((child) => {
+    if (child.type !== "text" || child.value === undefined || !child.value.includes("\n")) {
+      rewriteSoftBreaks(child);
+      return [child];
+    }
+
+    const segments = child.value.split("\n");
+    const rewrittenNodes: MarkdownTreeNode[] = [];
+
+    for (const [index, segment] of segments.entries()) {
+      if (index > 0) {
+        rewrittenNodes.push({ type: "break" });
+      }
+      if (segment.length > 0) {
+        rewrittenNodes.push({ type: "text", value: segment });
+      }
+    }
+
+    return rewrittenNodes;
+  });
+}
+
+const RemarkPluginsPreservingSoftBreaks = [
+  ...Object.values(defaultRemarkPlugins),
+  preserveSoftBreaksRemarkPlugin,
+];
 
 export function ChatMarkdownMessage(props: ChatMarkdownMessageProps): JSX.Element {
   return (
@@ -36,6 +82,9 @@ export function ChatMarkdownMessage(props: ChatMarkdownMessageProps): JSX.Elemen
         }}
         mode={props.isStreaming ? "streaming" : "static"}
         plugins={StreamdownPlugins}
+        {...(props.preserveSoftLineBreaks === true
+          ? { remarkPlugins: RemarkPluginsPreservingSoftBreaks }
+          : {})}
       >
         {props.text}
       </Streamdown>

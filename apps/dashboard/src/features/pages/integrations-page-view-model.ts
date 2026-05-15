@@ -129,10 +129,18 @@ export type ProviderAppSetupState = Required<
 > &
   Pick<NonNullable<IntegrationConnectionDetailItem["installation"]>, "errorMessage">;
 
+export type ReauthorizationState = {
+  errorMessage?: string;
+  isPending: boolean;
+};
+
+const OAuthReauthorizationRequiredMessage = "This connection needs to be re-authorized.";
+
 export function buildIntegrationConnectionDetailItems(input: {
   connections: readonly IntegrationConnection[];
   controlPlaneApiOrigin?: string;
   providerAppSetupStateByConnectionId?: ReadonlyMap<string, ProviderAppSetupState>;
+  reauthorizationStateByConnectionId?: ReadonlyMap<string, ReauthorizationState>;
   refreshingConnectionIds?: ReadonlySet<string>;
   refreshingResourceKeys: ReadonlySet<string>;
   targetConfig?: Record<string, unknown>;
@@ -158,6 +166,11 @@ export function buildIntegrationConnectionDetailItems(input: {
     });
     const providerAppSetupState =
       input.providerAppSetupStateByConnectionId?.get(connection.id) ?? undefined;
+    const reauthorizationState =
+      input.reauthorizationStateByConnectionId?.get(connection.id) ?? undefined;
+    const reauthorizationErrorMessage =
+      reauthorizationState?.errorMessage ??
+      (connection.status === "error" ? OAuthReauthorizationRequiredMessage : undefined);
     const authFields = resolveAuthFields({
       connection,
       currentMethod,
@@ -189,6 +202,17 @@ export function buildIntegrationConnectionDetailItems(input: {
         : { authMethodLabel: connection.connectionMethodLabel }),
       ...(authFields.length === 0 ? {} : { authFields }),
       ...(authSecretLabels.length === 0 ? {} : { authSecretLabels }),
+      ...(currentMethod?.kind !== "redirect" || currentMethod.ui.reauthorize === undefined
+        ? {}
+        : {
+            reauthorization: {
+              ...currentMethod.ui.reauthorize,
+              ...(reauthorizationErrorMessage === undefined
+                ? {}
+                : { errorMessage: reauthorizationErrorMessage }),
+              isPending: reauthorizationState?.isPending ?? false,
+            },
+          }),
       ...(connectionDetailContext === undefined
         ? {}
         : {

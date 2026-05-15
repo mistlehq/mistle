@@ -5,29 +5,15 @@ import { fileURLToPath } from "node:url";
 import { parse } from "smol-toml";
 import { z } from "zod";
 
+import { defaultMissingEnabledToFalse } from "../../core/discriminated-union.js";
 import { parseBooleanEnv } from "../../core/load-env.js";
 
 export type DashboardBuildEnvironment = "development" | "production";
 
 type UnknownRecord = Record<string, unknown>;
 
-function withDisabledPostHogDefault(value: unknown): unknown {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return value;
-  }
-
-  if ("enabled" in value) {
-    return value;
-  }
-
-  return {
-    ...value,
-    enabled: false,
-  };
-}
-
 const DashboardPostHogBuildConfigSchema = z.preprocess(
-  withDisabledPostHogDefault,
+  defaultMissingEnabledToFalse,
   z.discriminatedUnion("enabled", [
     z
       .object({

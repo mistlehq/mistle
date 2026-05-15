@@ -1,9 +1,18 @@
 import { index, text, timestamp, uniqueIndex, type PgSchema } from "drizzle-orm/pg-core";
 import { typeid } from "typeid-js";
 
+import { integrationConnections } from "./integration-connections.js";
 import { integrationTargets } from "./integration-targets.js";
 import { controlPlaneSchema } from "./namespace.js";
 import { organizations } from "./organizations.js";
+
+export const IntegrationConnectionRedirectSessionIntents = {
+  CREATE: "create",
+  REAUTHORIZE: "reauthorize",
+} as const;
+
+export type IntegrationConnectionRedirectSessionIntent =
+  (typeof IntegrationConnectionRedirectSessionIntents)[keyof typeof IntegrationConnectionRedirectSessionIntents];
 
 export function defineIntegrationConnectionRedirectSessions(schema: PgSchema) {
   return schema.table(
@@ -18,6 +27,13 @@ export function defineIntegrationConnectionRedirectSessions(schema: PgSchema) {
       targetKey: text("target_key")
         .notNull()
         .references(() => integrationTargets.targetKey, { onDelete: "restrict" }),
+      intent: text("intent")
+        .$type<IntegrationConnectionRedirectSessionIntent>()
+        .notNull()
+        .default(IntegrationConnectionRedirectSessionIntents.CREATE),
+      connectionId: text("connection_id").references(() => integrationConnections.id, {
+        onDelete: "cascade",
+      }),
       state: text("state").notNull(),
       pkceVerifierEncrypted: text("pkce_verifier_encrypted"),
       providerStateEncrypted: text("provider_state_encrypted"),

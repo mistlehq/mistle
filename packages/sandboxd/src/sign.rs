@@ -443,6 +443,7 @@ mod tests {
     fn valid_startup_input(tunnel_gateway_ws_url: &str, include_signing: bool) -> StartupInput {
         StartupInput {
             startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),

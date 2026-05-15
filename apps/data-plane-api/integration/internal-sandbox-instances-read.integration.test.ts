@@ -11,6 +11,11 @@ import {
   SandboxInstancePurposes,
   SandboxStopReasons,
   SandboxInstanceStatuses,
+  SandboxLifecyclePhases,
+  SandboxLifecycleStatuses,
+  SandboxOperationEventRecordKinds,
+  SandboxOperationEventSources,
+  SandboxOperationKinds,
   type DataPlaneTables,
 } from "@mistle/db/data-plane";
 import {
@@ -70,6 +75,59 @@ it("returns pending sandbox instances before provider provisioning begins", asyn
     failureCode: null,
     failureMessage: null,
     runtimePlan: null,
+    startupOperation: null,
+  });
+});
+
+it("returns the latest start or resume operation for session startup progress", async ({ env }) => {
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values(
+    sandboxInstanceRow({
+      id: "sbi_integration_new_get_startup_operation",
+      organizationId: "org_integration_new_get_startup_operation",
+      sandboxProfileId: "sbp_integration_new_startup_operation",
+      status: SandboxInstanceStatuses.PENDING,
+      providerSandboxId: null,
+      title: null,
+    }),
+  );
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxOperationEvents).values([
+    sandboxOperationEventRow({
+      id: "soe_integration_new_get_startup_operation_start",
+      sandboxInstanceId: "sbi_integration_new_get_startup_operation",
+      operationId: "owfr_integration_new_start",
+      operationKind: SandboxOperationKinds.START,
+      sequence: 1,
+      createdAt: "2026-05-13T00:00:00.000Z",
+    }),
+    sandboxOperationEventRow({
+      id: "soe_integration_new_get_startup_operation_resume",
+      sandboxInstanceId: "sbi_integration_new_get_startup_operation",
+      operationId: "owfr_integration_new_resume",
+      operationKind: SandboxOperationKinds.RESUME,
+      sequence: 1,
+      createdAt: "2026-05-13T00:01:00.000Z",
+    }),
+    sandboxOperationEventRow({
+      id: "soe_integration_new_get_startup_operation_stop",
+      sandboxInstanceId: "sbi_integration_new_get_startup_operation",
+      operationId: "owfr_integration_new_stop",
+      operationKind: SandboxOperationKinds.STOP,
+      sequence: 1,
+      createdAt: "2026-05-13T00:02:00.000Z",
+    }),
+  ]);
+
+  await expect(
+    clientFor(env).getSandboxInstance({
+      organizationId: "org_integration_new_get_startup_operation",
+      instanceId: "sbi_integration_new_get_startup_operation",
+    }),
+  ).resolves.toMatchObject({
+    id: "sbi_integration_new_get_startup_operation",
+    startupOperation: {
+      operationId: "owfr_integration_new_resume",
+      operationKind: "resume",
+    },
   });
 });
 
@@ -99,6 +157,7 @@ it("returns setup-check-purpose sandbox instances by id", async ({ env }) => {
     failureCode: null,
     failureMessage: null,
     runtimePlan: null,
+    startupOperation: null,
   });
 });
 
@@ -482,6 +541,7 @@ function clientFor(env: IntegrationTestEnvironment): DataPlaneSandboxInstancesCl
 }
 
 type SandboxInstanceRow = DataPlaneTables["sandboxInstances"]["$inferInsert"];
+type SandboxOperationEventRow = DataPlaneTables["sandboxOperationEvents"]["$inferInsert"];
 
 function sandboxInstanceRow(
   input: Partial<SandboxInstanceRow> & {
@@ -498,6 +558,28 @@ function sandboxInstanceRow(
     startedByKind: "user",
     startedById: "usr_integration_new_read",
     source: "dashboard",
+    ...input,
+  };
+}
+
+function sandboxOperationEventRow(
+  input: Partial<SandboxOperationEventRow> & {
+    id: string;
+    operationId: string;
+    sandboxInstanceId: string;
+  },
+): SandboxOperationEventRow {
+  return {
+    operationKind: SandboxOperationKinds.START,
+    sequence: 1,
+    recordKind: SandboxOperationEventRecordKinds.LIFECYCLE,
+    observedAt: "2026-05-13T00:00:00.000Z",
+    source: SandboxOperationEventSources.WORKER,
+    phase: SandboxLifecyclePhases.PROVIDER,
+    status: SandboxLifecycleStatuses.STARTED,
+    stream: null,
+    message: "Sandbox operation started.",
+    attributes: {},
     ...input,
   };
 }

@@ -19,14 +19,14 @@ export function SessionsNavToggleItem(input: {
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
-        className="pr-12"
+        className="pr-14 md:pr-12"
         isActive={isActive}
         render={<NavLink to={sessionsHref} />}
       >
-        <TerminalIcon aria-hidden className="size-4 shrink-0" />
+        <TerminalIcon aria-hidden className="size-5 shrink-0 md:size-4" />
         <span>Sessions</span>
       </SidebarMenuButton>
-      <div className="absolute top-1/2 right-2 -translate-y-1/2">
+      <div className="absolute top-1/2 right-3 -translate-y-1/2 md:right-2">
         <SessionsSidebarModeSwitch
           checked={input.checked}
           onCheckedChange={input.onCheckedChange}

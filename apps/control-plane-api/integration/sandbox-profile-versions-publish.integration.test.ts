@@ -145,6 +145,7 @@ describe.concurrent("sandbox profile versions publish integration", () => {
         },
         latestSnapshotJob: {
           id: expect.any(String),
+          sandboxInstanceId: expect.any(String),
           trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
           state: SandboxProfileVersionSnapshotJobStates.QUEUED,
           errorCode: null,
@@ -157,6 +158,7 @@ describe.concurrent("sandbox profile versions publish integration", () => {
       activeVersion: 1,
       snapshotJob: {
         id: expect.any(String),
+        sandboxInstanceId: expect.any(String),
         trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
         state: SandboxProfileVersionSnapshotJobStates.QUEUED,
         errorCode: null,
@@ -192,6 +194,7 @@ describe.concurrent("sandbox profile versions publish integration", () => {
       });
     expect(persistedSnapshotJob).toMatchObject({
       id: responseBody.snapshotJob.id,
+      sandboxInstanceId: responseBody.snapshotJob.sandboxInstanceId,
       sandboxProfileId: "sbp_version_publish_001",
       sandboxProfileVersion: 2,
       trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
@@ -204,6 +207,7 @@ describe.concurrent("sandbox profile versions publish integration", () => {
     });
     expect(queuedWorkflowInput).toMatchObject({
       snapshotJobId: responseBody.snapshotJob.id,
+      sandboxInstanceId: responseBody.snapshotJob.sandboxInstanceId,
       sandboxProfileId: "sbp_version_publish_001",
       sandboxProfileVersion: 2,
       image: {

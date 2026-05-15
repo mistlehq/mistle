@@ -224,6 +224,104 @@ export function findSandboxBaseInventorySpecDrift(dockerfileText: string): reado
   return failures;
 }
 
+export function findSandboxBaseDockerfileDependencyDrift(input: {
+  candidateDockerfileText: string;
+  candidateStageNames?: Readonly<Record<string, string>>;
+  compareBaseImages?: boolean;
+  compareExtraPackages?: boolean;
+  referenceDockerfileText: string;
+  stageNames: readonly string[];
+}): readonly string[] {
+  const candidateFacts = parseDockerfileFacts(input.candidateDockerfileText);
+  const referenceFacts = parseDockerfileFacts(input.referenceDockerfileText);
+  const failures: string[] = [];
+
+  for (const stageName of input.stageNames) {
+    const candidateStageName = input.candidateStageNames?.[stageName] ?? stageName;
+    const candidateStage = findStage(candidateFacts, candidateStageName);
+    const referenceStage = findStage(referenceFacts, stageName);
+
+    if (referenceStage === null) {
+      failures.push(`reference stage '${stageName}' does not exist`);
+      continue;
+    }
+
+    if (candidateStage === null) {
+      failures.push(`candidate stage '${candidateStageName}' does not exist`);
+      continue;
+    }
+
+    if (
+      input.compareBaseImages !== false &&
+      candidateStage.baseImage !== referenceStage.baseImage
+    ) {
+      failures.push(
+        `stage '${candidateStageName}' base image is '${candidateStage.baseImage}', expected '${referenceStage.baseImage}'`,
+      );
+    }
+
+    const candidatePackages = new Set(listAptPackages(candidateStage));
+    const referencePackages = new Set(listAptPackages(referenceStage));
+
+    for (const packageName of referencePackages) {
+      if (!candidatePackages.has(packageName)) {
+        failures.push(`stage '${stageName}' is missing apt package '${packageName}'`);
+      }
+    }
+
+    if (input.compareExtraPackages !== false) {
+      for (const packageName of candidatePackages) {
+        if (!referencePackages.has(packageName)) {
+          failures.push(`stage '${stageName}' has extra apt package '${packageName}'`);
+        }
+      }
+    }
+  }
+
+  return failures;
+}
+
+function listAptPackages(stage: ParsedDockerfileStage): readonly string[] {
+  const packages = new Set<string>();
+
+  for (const instruction of stage.instructions) {
+    if (instruction.kind !== "RUN") {
+      continue;
+    }
+
+    for (const packageName of listAptPackagesFromRunInstruction(instruction.value)) {
+      packages.add(packageName);
+    }
+  }
+
+  return [...packages].sort();
+}
+
+function listAptPackagesFromRunInstruction(instructionValue: string): readonly string[] {
+  const packages: string[] = [];
+  const aptInstallExpressions = instructionValue.matchAll(
+    /apt-get\s+install\s+([\s\S]*?)(?:&&|$)/gu,
+  );
+
+  for (const aptInstallExpression of aptInstallExpressions) {
+    const packageListExpression = aptInstallExpression[1];
+    if (packageListExpression === undefined) {
+      continue;
+    }
+
+    for (const token of splitShellTokens(packageListExpression)) {
+      const normalizedToken = token.replace(/\\$/u, "");
+      if (normalizedToken.length === 0 || normalizedToken.startsWith("-")) {
+        continue;
+      }
+
+      packages.push(normalizedToken);
+    }
+  }
+
+  return packages;
+}
+
 function checkInventorySpec(): void {
   const dockerfileUrl = new URL(
     `../../${SandboxBaseInventorySpec.dockerfilePath}`,

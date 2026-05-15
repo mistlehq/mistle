@@ -26,6 +26,13 @@ export type TelemetryDelivery = Extract<
   }
 >;
 
+export type OperationDelivery = Extract<
+  TunnelProtocolDelivery,
+  {
+    kind: "operationOpen" | "operationClose" | "operationData" | "operationInvalidData";
+  }
+>;
+
 export type SigningDelivery = Extract<
   TunnelProtocolDelivery,
   {
@@ -69,6 +76,7 @@ export async function handleTunnelWebSocketMessage(input: {
   db: DataPlaneDatabase;
   gatewayEgressTransportService: GatewayEgressTransportService;
   handleSigningDelivery?: ((delivery: SigningDelivery) => Promise<void>) | undefined;
+  handleOperationDelivery?: ((delivery: OperationDelivery) => Promise<void>) | undefined;
   sandboxKeepaliveRepository: SandboxKeepaliveRepository;
   sandboxRuntimeReadinessRepository: SandboxRuntimeReadinessRepository;
   handleTelemetryDelivery?: ((delivery: TelemetryDelivery) => Promise<void>) | undefined;
@@ -134,6 +142,17 @@ export async function handleTunnelWebSocketMessage(input: {
     }
 
     await input.handleTelemetryDelivery(translation.delivery);
+  } else if (
+    translation.delivery.kind === "operationOpen" ||
+    translation.delivery.kind === "operationClose" ||
+    translation.delivery.kind === "operationData" ||
+    translation.delivery.kind === "operationInvalidData"
+  ) {
+    if (input.handleOperationDelivery === undefined) {
+      throw new Error("Operation delivery requires an operation handler.");
+    }
+
+    await input.handleOperationDelivery(translation.delivery);
   } else if (translation.delivery.kind === "signingRequest") {
     if (input.handleSigningDelivery === undefined) {
       throw new Error("Signing delivery requires a signing handler.");

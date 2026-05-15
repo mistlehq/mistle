@@ -60,6 +60,7 @@ type RefreshProfileVersionSnapshotOutput = {
     refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
     latestSnapshotJob: {
       id: string;
+      sandboxInstanceId: string | null;
       trigger: (typeof SandboxProfileVersionSnapshotJobTriggers)[keyof typeof SandboxProfileVersionSnapshotJobTriggers];
       state: (typeof SandboxProfileVersionSnapshotJobStates)[keyof typeof SandboxProfileVersionSnapshotJobStates];
       errorCode: string | null;
@@ -72,6 +73,7 @@ type RefreshProfileVersionSnapshotOutput = {
   activeVersion: number | null;
   snapshotJob: {
     id: string;
+    sandboxInstanceId: string | null;
     trigger: (typeof SandboxProfileVersionSnapshotJobTriggers)[keyof typeof SandboxProfileVersionSnapshotJobTriggers];
     state: (typeof SandboxProfileVersionSnapshotJobStates)[keyof typeof SandboxProfileVersionSnapshotJobStates];
     errorCode: string | null;
@@ -246,11 +248,13 @@ async function queueProfileVersionSnapshot(
         .values({
           sandboxProfileId: input.profileId,
           sandboxProfileVersion: input.profileVersion,
+          sandboxInstanceId,
           trigger: intent.trigger,
           state: SandboxProfileVersionSnapshotJobStates.QUEUED,
         })
         .returning({
           id: tables.sandboxProfileVersionSnapshotJobs.id,
+          sandboxInstanceId: tables.sandboxProfileVersionSnapshotJobs.sandboxInstanceId,
           trigger: tables.sandboxProfileVersionSnapshotJobs.trigger,
           state: tables.sandboxProfileVersionSnapshotJobs.state,
           errorCode: tables.sandboxProfileVersionSnapshotJobs.errorCode,

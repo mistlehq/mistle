@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { GitHubPullRequestConversationKeyTemplate } from "./webhook-automation-conversation-key-options.js";
 import {
   toCreateWebhookAutomationPayload,
   toUpdateWebhookAutomationPayload,
@@ -66,9 +67,9 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
     conversationKeyOptions: [
       {
         id: "pull-request",
-        label: "Per pull request",
-        description: "All matching events for the same pull request go to one conversation.",
-        template: "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
+        label: "Pull request",
+        description: "Events from the same pull request go to the same conversation.",
+        template: GitHubPullRequestConversationKeyTemplate,
       },
       {
         id: "repository",
@@ -418,8 +419,26 @@ describe("validateWebhookAutomationFormValues", () => {
         {
           ...BaseFormValues,
           inputTemplate: DefaultWebhookAutomationMessageTemplate,
-          conversationKeyTemplate:
-            "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
+          conversationKeyTemplate: GitHubPullRequestConversationKeyTemplate,
+        },
+        GitHubEventOptions,
+      ),
+    ).toEqual({});
+  });
+
+  it("accepts pull request grouping for pull request events and filtered pull request comments", () => {
+    expect(
+      validateWebhookAutomationFormValues(
+        {
+          ...BaseFormValues,
+          conversationKeyTemplate: GitHubPullRequestConversationKeyTemplate,
+          triggerIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
+          triggerParameterValues: {
+            [IssueCommentCreatedTriggerId]: {
+              invocationToken: "pr-review",
+              target: "exists",
+            },
+          },
         },
         GitHubEventOptions,
       ),

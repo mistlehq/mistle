@@ -38,6 +38,7 @@ type ListProfileVersionsOutput = {
     refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
     latestSnapshotJob: {
       id: string;
+      sandboxInstanceId: string | null;
       trigger: SandboxProfileVersionSnapshotJobTrigger;
       state: SandboxProfileVersionSnapshotJobState;
       errorCode: string | null;
@@ -91,6 +92,7 @@ export async function listProfileVersions(
   const latestJobs = await db.query.sandboxProfileVersionSnapshotJobs.findMany({
     columns: {
       id: true,
+      sandboxInstanceId: true,
       sandboxProfileVersion: true,
       trigger: true,
       state: true,
@@ -140,6 +142,7 @@ export async function listProfileVersions(
             ? null
             : {
                 id: latestJob.id,
+                sandboxInstanceId: latestJob.sandboxInstanceId,
                 trigger: latestJob.trigger,
                 state: latestJob.state,
                 errorCode: latestJob.errorCode,

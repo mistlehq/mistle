@@ -89,6 +89,25 @@ const PlainConnectionMethod: IntegrationConnectionMethod = {
 };
 
 describe("resolveInstalledIntegrationConnectionNotice", () => {
+  it("resolves the reauthorized notice for the selected connection", () => {
+    expect(
+      resolveInstalledIntegrationConnectionNotice({
+        connectionMethods: [PlainConnectionMethod],
+        detailConnectionId: "connection_1",
+        searchParams: new URLSearchParams("connectionNotice=reauthorized"),
+        selectedConnection: {
+          connectionMethodId: "plain-form",
+          id: "connection_1",
+        },
+      }),
+    ).toEqual({
+      connectionId: "connection_1",
+      resetKey: "reauthorized:connection_1",
+      title: "Re-authorized",
+      variant: "success",
+    });
+  });
+
   it("resolves the installed notice from provider app setup metadata", () => {
     expect(
       resolveInstalledIntegrationConnectionNotice({

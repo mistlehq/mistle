@@ -1,3 +1,4 @@
+import type { SandboxProfileVersionAgentRuntimeId } from "@mistle/db/control-plane";
 import type { CompiledRuntimePlan, ResolvedSandboxImage } from "@mistle/integrations-core";
 import { createDefinitionsBundle } from "@mistle/integrations-definitions/server";
 
@@ -20,6 +21,7 @@ type CompileProfileVersionRuntimePlanInput = {
   organizationId: string;
   profileId: string;
   profileVersion: number;
+  agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
   image: ResolvedSandboxImage;
 };
 
@@ -101,6 +103,7 @@ export async function compileProfileVersionRuntimePlan(
       organizationId: input.organizationId,
       profileId: input.profileId,
       profileVersion: input.profileVersion,
+      ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
       image: input.image,
     });
   } catch (error) {

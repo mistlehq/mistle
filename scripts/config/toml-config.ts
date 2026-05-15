@@ -362,11 +362,13 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
 }
 
 export function buildIntegrationTomlConfig(input: {
-  provider: "docker" | "e2b";
+  providers: readonly ("docker" | "e2b")[];
   environment: NodeJS.ProcessEnv;
   e2bSandboxBaseImage?: string;
 }): ConfigRecord {
   let configRoot = buildDevelopmentTomlConfig();
+  const dockerEnabled = input.providers.includes("docker");
+  const e2bEnabled = input.providers.includes("e2b");
 
   configRoot = setValueAtPath(
     configRoot,
@@ -388,8 +390,13 @@ export function buildIntegrationTomlConfig(input: {
     ["services", "data_plane_gateway", "sandbox_ws_internal_url"],
     "ws://data-plane-gateway:5202/tunnel/sandbox",
   );
-  if (input.provider === "docker") {
+  if (dockerEnabled) {
     configRoot = setValueAtPath(configRoot, ["sandbox", "docker", "enabled"], true);
+  } else {
+    configRoot = deleteValueAtPath(configRoot, ["sandbox", "docker"]);
+  }
+
+  if (!e2bEnabled) {
     configRoot = setValueAtPath(configRoot, ["sandbox", "storage"], {
       backend: "docker_volume",
       docker_volume: {
@@ -442,7 +449,6 @@ export function buildIntegrationTomlConfig(input: {
     ["services", "data_plane_gateway", "sandbox_ws_internal_url"],
     "wss://gateway.mistle.example/tunnel/sandbox",
   );
-  configRoot = deleteValueAtPath(configRoot, ["sandbox", "docker"]);
 
   return configRoot;
 }

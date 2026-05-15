@@ -2,6 +2,7 @@ import {
   SandboxInstancePurposes,
   SandboxInstanceStatuses,
   type DataPlaneDatabase,
+  type SandboxInstancePurpose,
 } from "@mistle/db/data-plane";
 import { ConflictError, NotFoundError } from "@mistle/http/errors.js";
 import { StopSandboxInstanceWorkflowSpec } from "@mistle/workflow-registry/data-plane";
@@ -32,6 +33,13 @@ function createUserRequestedSandboxStopIdempotencyKey(
   });
 }
 
+function supportsUserRequestedStop(purpose: SandboxInstancePurpose): boolean {
+  return (
+    purpose === SandboxInstancePurposes.SETUP_ASSISTANT ||
+    purpose === SandboxInstancePurposes.SETUP_CHECK
+  );
+}
+
 export async function stopUserRequestedSandboxInstance(
   ctx: StopUserRequestedSandboxInstanceContext,
   input: StopUserRequestedSandboxInstanceInput,
@@ -56,10 +64,10 @@ export async function stopUserRequestedSandboxInstance(
     );
   }
 
-  if (sandboxInstance.purpose !== SandboxInstancePurposes.SETUP_CHECK) {
+  if (!supportsUserRequestedStop(sandboxInstance.purpose)) {
     throw new ConflictError(
       SandboxInstanceUserStopNotSupportedErrorCode,
-      `User-requested stop is only supported for setup-check sandbox instances; sandbox instance '${input.sandboxInstanceId}' has purpose '${sandboxInstance.purpose}'.`,
+      `User-requested stop is only supported for setup-check and setup-assistant sandbox instances; sandbox instance '${input.sandboxInstanceId}' has purpose '${sandboxInstance.purpose}'.`,
     );
   }
 
@@ -82,7 +90,7 @@ export async function stopUserRequestedSandboxInstance(
   if (sandboxInstance.status !== SandboxInstanceStatuses.RUNNING) {
     throw new ConflictError(
       SandboxInstanceUserStopNotSupportedErrorCode,
-      `Setup-check sandbox instance '${input.sandboxInstanceId}' is '${sandboxInstance.status}' and cannot be stopped yet.`,
+      `Sandbox instance '${input.sandboxInstanceId}' is '${sandboxInstance.status}' and cannot be stopped yet.`,
     );
   }
 

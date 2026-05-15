@@ -413,3 +413,4 @@ export {
   normalizeBranchDiffError,
   resolveBranchDiffErrorNotice,
 };
+export type { SessionBranchDiffState };

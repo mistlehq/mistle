@@ -4,7 +4,7 @@ import { getControlPlaneApiClient } from "../../lib/control-plane-api/client.js"
 import { normalizeHttpApiError } from "../api/http-api-error.js";
 import { requestControlPlane } from "../api/request-control-plane.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
-import type { SandboxInstancesListResult } from "./sessions-types.js";
+import type { SandboxInstancesListResult, SandboxOperationEventsResult } from "./sessions-types.js";
 
 const StartSandboxProfileInstanceResponseSchema = z
   .object({
@@ -36,6 +36,13 @@ const SandboxInstanceStatusResponseSchema = z
         routeId: z.string().min(1).nullable(),
         providerConversationId: z.string().min(1).nullable(),
       })
+      .nullable(),
+    startupOperation: z
+      .object({
+        operationId: z.string().min(1),
+        operationKind: z.enum(["start", "resume"]),
+      })
+      .strict()
       .nullable(),
   })
   .strict();
@@ -227,6 +234,52 @@ export async function getSandboxInstanceStatus(input: {
         operation: "getSandboxInstanceStatus",
         error,
         fallbackMessage: "Could not check sandbox session status.",
+      }),
+    );
+  }
+}
+
+export async function listSandboxOperationEvents(input: {
+  afterSequence?: number;
+  instanceId: string;
+  limit?: number;
+  operationId: string;
+  signal?: AbortSignal;
+}): Promise<SandboxOperationEventsResult> {
+  try {
+    const client = getControlPlaneApiClient();
+    const { data } = await client.GET("/v1/sandbox/instances/{instanceId}/operation-events", {
+      credentials: "include",
+      params: {
+        path: {
+          instanceId: input.instanceId,
+        },
+        query: {
+          operationId: input.operationId,
+          ...(input.afterSequence === undefined ? {} : { afterSequence: input.afterSequence }),
+          ...(input.limit === undefined ? {} : { limit: input.limit }),
+        },
+      },
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+    });
+
+    if (data === undefined) {
+      throw new SandboxProfilesApiError({
+        operation: "listSandboxOperationEvents",
+        status: 500,
+        body: null,
+        message: "Sandbox operation events response was empty.",
+        code: null,
+      });
+    }
+
+    return data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "listSandboxOperationEvents",
+        error,
+        fallbackMessage: "Could not load sandbox operation progress.",
       }),
     );
   }

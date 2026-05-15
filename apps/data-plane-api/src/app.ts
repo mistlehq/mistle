@@ -1,16 +1,19 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { readRepositoryVersion } from "@mistle/config";
+import { Scalar } from "@scalar/hono-api-reference";
 
 import { createInternalSandboxRoutes } from "./internal/index.js";
 import type { AppRuntimeResources } from "./resources.js";
 import type {
   AppContextBindings,
   DataPlaneApiConfig,
+  DataPlaneApiGlobalConfig,
   DataPlaneApiSandboxStorageBackend,
   DataPlaneApp,
 } from "./types.js";
 
 const DataPlaneOpenApiPath = "/openapi.json";
+const DataPlaneApiReferencePath = "/openapi";
 const DataPlaneReleaseVersion = readRepositoryVersion(import.meta.url);
 
 const DataPlaneInternalOpenApiInfo = {
@@ -20,6 +23,7 @@ const DataPlaneInternalOpenApiInfo = {
 
 export type CreateAppInput = {
   config: DataPlaneApiConfig;
+  environment: DataPlaneApiGlobalConfig["env"];
   internalAuthServiceToken: string;
   resources: AppRuntimeResources;
   sandboxStorageBackend: DataPlaneApiSandboxStorageBackend;
@@ -31,6 +35,7 @@ export function createApp(input: CreateAppInput): DataPlaneApp {
   configureApp({
     app,
     config: input.config,
+    environment: input.environment,
     internalAuthServiceToken: input.internalAuthServiceToken,
     resources: input.resources,
     sandboxStorageBackend: input.sandboxStorageBackend,
@@ -40,7 +45,8 @@ export function createApp(input: CreateAppInput): DataPlaneApp {
 }
 
 export function configureApp(input: CreateAppInput & { app: DataPlaneApp }): void {
-  const { app, config, internalAuthServiceToken, resources, sandboxStorageBackend } = input;
+  const { app, config, environment, internalAuthServiceToken, resources, sandboxStorageBackend } =
+    input;
 
   app.get("/__healthz", (ctx) => {
     return ctx.json({ ok: true });
@@ -58,6 +64,7 @@ export function configureApp(input: CreateAppInput & { app: DataPlaneApp }): voi
     });
 
     ctx.set("config", requestContext.config);
+    ctx.set("environment", environment);
     ctx.set("internalAuthServiceToken", internalAuthServiceToken);
     ctx.set("resources", requestContext.resources);
     ctx.set("controlPlaneInternalClient", requestContext.resources.controlPlaneInternalClient);
@@ -69,6 +76,15 @@ export function configureApp(input: CreateAppInput & { app: DataPlaneApp }): voi
     openapi: "3.1.0",
     info: DataPlaneInternalOpenApiInfo,
   });
+  if (environment === "development") {
+    app.get(
+      DataPlaneApiReferencePath,
+      Scalar({
+        pageTitle: "Mistle Data Plane Internal API Reference",
+        url: DataPlaneOpenApiPath,
+      }),
+    );
+  }
 
   registerApiRouteModules(app);
 }

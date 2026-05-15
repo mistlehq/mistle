@@ -35,6 +35,10 @@ type StoryResolvedAuthMethod = {
   authMethodLabel: string;
   definition: AnyIntegrationDefinition;
   normalizedMethod: IntegrationConnectionMethod;
+  reauthorizeUi?: {
+    actionLabel: string;
+    pendingLabel: string;
+  };
   secretLabels: readonly string[];
 };
 
@@ -153,6 +157,9 @@ function resolveAuthMethodOrThrow(input: StoryAuthMethodSpec): StoryResolvedAuth
     authMethodLabel: method.label,
     definition,
     normalizedMethod: normalizeStoryConnectionMethod(method),
+    ...(method.kind === "redirect" && method.ui.reauthorize !== undefined
+      ? { reauthorizeUi: method.ui.reauthorize }
+      : {}),
     secretLabels:
       method.kind === "form"
         ? method.secretFields.filter((field) => field.optional !== true).map((field) => field.label)
@@ -235,6 +242,10 @@ function normalizeStoryConnectionMethod(input: {
     pending?: {
       description?: string;
       title?: string;
+    };
+    reauthorize?: {
+      actionLabel: string;
+      pendingLabel: string;
     };
   };
 }): IntegrationConnectionMethod {
@@ -761,6 +772,12 @@ type ScenarioDetailStorySpec = {
         postInstallationSetupUrl?: string;
       }
     | undefined;
+  reauthorization?:
+    | {
+        errorMessage?: string;
+        isPending?: boolean;
+      }
+    | false;
   resources?: readonly {
     count: number;
     items: readonly string[];
@@ -838,6 +855,33 @@ function createWebhookPolicy(input: ScenarioDetailStorySpec) {
   });
 }
 
+function resolveStoryReauthorization(input: ScenarioDetailStorySpec):
+  | {
+      actionLabel: string;
+      errorMessage?: string;
+      isPending: boolean;
+      pendingLabel: string;
+    }
+  | undefined {
+  if (input.authMethod === undefined || input.reauthorization === false) {
+    return undefined;
+  }
+
+  const reauthorizeUi = resolveAuthMethodOrThrow(input.authMethod).reauthorizeUi;
+  if (reauthorizeUi === undefined) {
+    return undefined;
+  }
+
+  return {
+    actionLabel: reauthorizeUi.actionLabel,
+    ...(input.reauthorization?.errorMessage === undefined
+      ? {}
+      : { errorMessage: input.reauthorization.errorMessage }),
+    isPending: input.reauthorization?.isPending ?? false,
+    pendingLabel: reauthorizeUi.pendingLabel,
+  };
+}
+
 function createScenarioDetailViewStoryProps(
   input: ScenarioDetailStorySpec,
 ): IntegrationConnectionDetailViewProps {
@@ -854,6 +898,7 @@ function createScenarioDetailViewStoryProps(
   const resourceItemsByKey = createResourceItems(input);
   const webhookPolicy = createWebhookPolicy(input);
   const webhookSourceStateByConnectionId = createWebhookSourceSectionState(input);
+  const reauthorization = resolveStoryReauthorization(input);
   const automationCount = input.automationCount ?? 0;
   const bindingCount = input.bindingCount ?? 0;
   const supportedWebhookEvents =
@@ -875,6 +920,7 @@ function createScenarioDetailViewStoryProps(
         displayName: input.displayName,
         id: input.connectionId,
         ...(input.installation === undefined ? {} : { installation: input.installation }),
+        ...(reauthorization === undefined ? {} : { reauthorization }),
         resources: (input.resources ?? []).map((resource) => ({
           count: resource.count,
           isRefreshing: false,

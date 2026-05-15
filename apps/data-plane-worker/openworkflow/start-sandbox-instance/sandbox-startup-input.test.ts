@@ -245,6 +245,7 @@ const RuntimePlanSchema = z.object({
 const SandboxStartupInputSchema = z.object({
   startupMode: z.enum([SandboxStartupModes.NEW, SandboxStartupModes.EXISTING]),
   executionMode: z.enum([SandboxExecutionModes.SESSION, SandboxExecutionModes.SNAPSHOT]).optional(),
+  operationKind: z.enum(["start", "resume", "setup_check", "snapshot"]),
   bootstrapToken: z.string().min(1),
   tunnelExchangeToken: z.string().min(1),
   tunnelGatewayWsUrl: z.string().min(1),
@@ -350,9 +351,22 @@ describe("encodeSandboxStartupInput", () => {
     expect(url).toBe("ws://127.0.0.1:5003/tunnel/sandbox/sbi_example_001");
   });
 
+  it("adds the operation id as a tunnel gateway query parameter when present", () => {
+    const url = createSandboxTunnelGatewayWsUrl({
+      gatewayWebsocketUrl: "ws://127.0.0.1:5003/tunnel/sandbox?x-mistle-test-environment-id=test",
+      operationId: "op_start_001",
+      sandboxInstanceId: "sbi_example_001",
+    });
+
+    expect(url).toBe(
+      "ws://127.0.0.1:5003/tunnel/sandbox/sbi_example_001?x-mistle-test-environment-id=test&operation_id=op_start_001",
+    );
+  });
+
   it("encodes the startup input as newline-delimited json", () => {
     const encoded = encodeSandboxStartupInput({
       startupMode: SandboxStartupModes.NEW,
+      operationKind: "start",
       bootstrapToken: "bootstrap-token-value",
       tunnelExchangeToken: "tunnel-exchange-token-value",
       tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -365,6 +379,7 @@ describe("encodeSandboxStartupInput", () => {
     const decoded = SandboxStartupInputSchema.parse(JSON.parse(encodedText.trimEnd()));
     expect(decoded).toEqual({
       startupMode: SandboxStartupModes.NEW,
+      operationKind: "start",
       bootstrapToken: "bootstrap-token-value",
       tunnelExchangeToken: "tunnel-exchange-token-value",
       tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -375,6 +390,7 @@ describe("encodeSandboxStartupInput", () => {
   it("encodes optional git identity when present", () => {
     const encoded = encodeSandboxStartupInput({
       startupMode: SandboxStartupModes.NEW,
+      operationKind: "start",
       bootstrapToken: "bootstrap-token-value",
       tunnelExchangeToken: "tunnel-exchange-token-value",
       tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -396,6 +412,7 @@ describe("encodeSandboxStartupInput", () => {
     const encoded = encodeSandboxStartupInput({
       startupMode: SandboxStartupModes.NEW,
       executionMode: SandboxExecutionModes.SNAPSHOT,
+      operationKind: "snapshot",
       bootstrapToken: "bootstrap-token-value",
       tunnelExchangeToken: "tunnel-exchange-token-value",
       tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -409,6 +426,7 @@ describe("encodeSandboxStartupInput", () => {
   it("encodes optional git signing config when present", () => {
     const encoded = encodeSandboxStartupInput({
       startupMode: SandboxStartupModes.NEW,
+      operationKind: "start",
       bootstrapToken: "bootstrap-token-value",
       tunnelExchangeToken: "tunnel-exchange-token-value",
       tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -447,6 +465,7 @@ describe("encodeSandboxStartupInput", () => {
   it("encodes optional transparent proxy configuration when present", () => {
     const encoded = encodeSandboxStartupInput({
       startupMode: SandboxStartupModes.NEW,
+      operationKind: "start",
       bootstrapToken: "bootstrap-token-value",
       tunnelExchangeToken: "tunnel-exchange-token-value",
       tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -495,6 +514,7 @@ describe("encodeSandboxStartupInput", () => {
   it("preserves an optional setup script in the encoded runtime plan", () => {
     const encoded = encodeSandboxStartupInput({
       startupMode: SandboxStartupModes.NEW,
+      operationKind: "start",
       bootstrapToken: "bootstrap-token-value",
       tunnelExchangeToken: "tunnel-exchange-token-value",
       tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -511,6 +531,7 @@ describe("encodeSandboxStartupInput", () => {
   it("preserves linked-principal credential resolvers in the encoded runtime plan", () => {
     const encoded = encodeSandboxStartupInput({
       startupMode: SandboxStartupModes.NEW,
+      operationKind: "start",
       bootstrapToken: "bootstrap-token-value",
       tunnelExchangeToken: "tunnel-exchange-token-value",
       tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",

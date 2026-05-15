@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 
 import { EditorView } from "@codemirror/view";
+import {
+  GitHubCloudBrowserDefinition,
+  SlackBrowserDefinition,
+} from "@mistle/integrations-definitions/browser";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState, type JSX } from "react";
@@ -18,8 +22,19 @@ import { cleanupTestQueryClients, createTestQueryClient } from "../../test-suppo
 import { automationsListQueryKey } from "../automations/automations-query-keys.js";
 import type { AutomationsListResult } from "../automations/automations-types.js";
 import {
+  WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY,
+  WEBHOOK_AUTOMATION_WEBHOOK_SOURCES_QUERY_KEY_PREFIX,
+} from "../automations/use-webhook-automation-prerequisites.js";
+import { createStoryWebhookTriggerCapabilitiesProviderMetadata } from "../integrations/integration-story-harness.js";
+import type {
+  IntegrationConnection,
+  IntegrationTarget,
+  IntegrationWebhookSource,
+} from "../integrations/integrations-service.js";
+import {
   sandboxProfileDetailQueryKey,
   sandboxProfileIntegrationDirectoryQueryKey,
+  sandboxProfileVersionAutomationConfigQueryKey,
   sandboxProfileVersionIntegrationBindingsQueryKey,
   sandboxProfileVersionSetupScriptQueryKey,
   sandboxProfileVersionsQueryKey,
@@ -47,6 +62,7 @@ import {
 } from "./sandbox-profile-editor-page-model.js";
 import {
   SandboxProfileDefaultRedirect,
+  SetupAssistantCloseDialog,
   SandboxProfileEditorPage,
   SandboxProfileEditorShell,
   SandboxProfileEditorView,
@@ -119,12 +135,167 @@ type SandboxProfileEditorTestVersionState =
 type SandboxProfileEditorTestRouteView = "published" | "draft" | "default";
 type SandboxProfileEditorTestRouteSection = "sandbox-profile" | "automations" | "snapshot" | null;
 
+const SlackAutomationConnectionId = "icn_slack_test";
+const SlackAutomationWebhookSourceId = "iws_slack_test";
+const GitHubAutomationConnectionId = "icn_github_test";
+const GitHubAutomationWebhookSourceId = "iws_github_test";
+
+function createSlackAutomationConnection(input: { id?: string } = {}): IntegrationConnection {
+  return {
+    id: input.id ?? SlackAutomationConnectionId,
+    targetKey: "slack-default",
+    displayName: "Slack Engineering",
+    status: "active",
+    createdAt: "2026-04-23T00:00:00.000Z",
+    updatedAt: "2026-04-23T00:00:00.000Z",
+  };
+}
+
+function createSlackAutomationTarget(): IntegrationTarget {
+  return {
+    targetKey: "slack-default",
+    familyId: SlackBrowserDefinition.familyId,
+    variantId: SlackBrowserDefinition.variantId,
+    kind: SlackBrowserDefinition.kind,
+    enabled: true,
+    config: {},
+    displayName: SlackBrowserDefinition.displayName,
+    description: "Slack workspace",
+    ...(SlackBrowserDefinition.logoKey === undefined
+      ? {}
+      : { logoKey: SlackBrowserDefinition.logoKey }),
+    supportedWebhookEvents: [
+      {
+        eventType: "slack:app_mention",
+        providerEventType: "app_mention",
+        displayName: "App mention",
+        requirements: {
+          anyOf: [
+            {
+              event: "app_mention",
+              permissions: [{ permission: "app_mentions:read" }],
+            },
+          ],
+        },
+      },
+    ],
+    targetHealth: {
+      configStatus: "valid",
+    },
+  };
+}
+
+function createSlackAutomationWebhookSource(): IntegrationWebhookSource {
+  return {
+    id: SlackAutomationWebhookSourceId,
+    targetKey: "slack-default",
+    integrationConnectionId: SlackAutomationConnectionId,
+    displayName: "Slack Events API webhook",
+    endpointKey: "ep_slack_test",
+    status: "active",
+    providerMetadata: createStoryWebhookTriggerCapabilitiesProviderMetadata({
+      definition: SlackBrowserDefinition,
+      events: ["app_mention"],
+      permissions: [{ permission: "app_mentions:read" }],
+    }),
+    createdAt: "2026-04-23T00:00:00.000Z",
+    updatedAt: "2026-04-23T00:00:00.000Z",
+  };
+}
+
+function createGitHubAutomationConnection(input: { id?: string } = {}): IntegrationConnection {
+  return {
+    id: input.id ?? GitHubAutomationConnectionId,
+    targetKey: "github-cloud",
+    displayName: "GitHub",
+    status: "active",
+    createdAt: "2026-04-23T00:00:00.000Z",
+    updatedAt: "2026-04-23T00:00:00.000Z",
+  };
+}
+
+function createGitHubAutomationTarget(): IntegrationTarget {
+  return {
+    targetKey: "github-cloud",
+    familyId: GitHubCloudBrowserDefinition.familyId,
+    variantId: GitHubCloudBrowserDefinition.variantId,
+    kind: GitHubCloudBrowserDefinition.kind,
+    enabled: true,
+    config: {},
+    displayName: GitHubCloudBrowserDefinition.displayName,
+    description: "GitHub repositories",
+    ...(GitHubCloudBrowserDefinition.logoKey === undefined
+      ? {}
+      : { logoKey: GitHubCloudBrowserDefinition.logoKey }),
+    supportedWebhookEvents: [
+      {
+        eventType: "github.pull_request.opened",
+        providerEventType: "pull_request",
+        displayName: "Pull request opened",
+        requirements: {
+          anyOf: [
+            {
+              event: "pull_request",
+              permissions: [{ permission: "pull_requests", access: "read" }],
+            },
+          ],
+        },
+      },
+      {
+        eventType: "github.issue_comment.created",
+        providerEventType: "issue_comment",
+        displayName: "Issue comment created",
+        requirements: {
+          anyOf: [
+            {
+              event: "issue_comment",
+              permissions: [{ permission: "issues", access: "read" }],
+            },
+          ],
+        },
+      },
+    ],
+    targetHealth: {
+      configStatus: "valid",
+    },
+  };
+}
+
+function createGitHubAutomationWebhookSource(
+  input: {
+    id?: string;
+    connectionId?: string;
+    events?: readonly ("pull_request" | "issue_comment")[];
+    permissions?: readonly { permission: string; access: string }[];
+  } = {},
+): IntegrationWebhookSource {
+  return {
+    id: input.id ?? GitHubAutomationWebhookSourceId,
+    targetKey: "github-cloud",
+    integrationConnectionId: input.connectionId ?? GitHubAutomationConnectionId,
+    displayName: "GitHub webhook",
+    endpointKey: "ep_github_test",
+    status: "active",
+    providerMetadata: createStoryWebhookTriggerCapabilitiesProviderMetadata({
+      definition: GitHubCloudBrowserDefinition,
+      events: input.events ?? ["pull_request", "issue_comment"],
+      permissions: input.permissions ?? [
+        { permission: "pull_requests", access: "read" },
+        { permission: "issues", access: "read" },
+      ],
+    }),
+    createdAt: "2026-04-23T00:00:00.000Z",
+    updatedAt: "2026-04-23T00:00:00.000Z",
+  };
+}
+
 function createRunningSnapshotJobFixture(input: {
   id: string;
   trigger: "publish" | "manual_refresh";
 }): NonNullable<SandboxProfileVersion["latestSnapshotJob"]> {
   return {
     id: input.id,
+    sandboxInstanceId: `sbi_${input.id}`,
     trigger: input.trigger,
     state: "running",
     errorCode: null,
@@ -138,6 +309,7 @@ function createRunningSnapshotJobFixture(input: {
 function createFailedSnapshotJobFixture(): NonNullable<SandboxProfileVersion["latestSnapshotJob"]> {
   return {
     id: "ssj_failed_initial_materialization",
+    sandboxInstanceId: "sbi_failed_initial_materialization",
     trigger: "publish",
     state: "failed",
     errorCode: "snapshot_materialization_failed",
@@ -153,6 +325,7 @@ function createFailedManualSnapshotJobFixture(): NonNullable<
 > {
   return {
     id: "ssj_failed_manual_materialization",
+    sandboxInstanceId: "sbi_failed_manual_materialization",
     trigger: "manual_refresh",
     state: "failed",
     errorCode: "snapshot_materialization_failed",
@@ -367,6 +540,9 @@ function renderSandboxProfileEditor(input?: {
     status: "active" | "error" | "revoked";
     config?: Record<string, unknown>;
   }[];
+  automationConnections?: readonly IntegrationConnection[];
+  automationTargets?: readonly IntegrationTarget[];
+  automationWebhookSources?: readonly IntegrationWebhookSource[];
   setupScript?: string | null;
   setupScriptsByVersion?: Record<number, string | null>;
   targets?: readonly {
@@ -556,6 +732,28 @@ function renderSandboxProfileEditor(input?: {
     connections: input?.connections ?? [],
     targets: input?.targets ?? [],
   });
+  queryClient.setQueryData(
+    sandboxProfileVersionAutomationConfigQueryKey({
+      profileId,
+      version,
+    }),
+    {
+      bindings: input?.bindings ?? [],
+      repositoryOptions: [],
+    },
+  );
+  queryClient.setQueryData(WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY, {
+    connections: input?.automationConnections ?? [],
+    targets: input?.automationTargets ?? [],
+  });
+  for (const connection of input?.automationConnections ?? []) {
+    queryClient.setQueryData(
+      [...WEBHOOK_AUTOMATION_WEBHOOK_SOURCES_QUERY_KEY_PREFIX, connection.id],
+      (input?.automationWebhookSources ?? []).filter(
+        (source) => source.integrationConnectionId === connection.id,
+      ),
+    );
+  }
   for (const versionFixture of versions) {
     const versionSetupScript = input?.setupScriptsByVersion?.[versionFixture.version];
     queryClient.setQueryData(
@@ -959,6 +1157,7 @@ describe("SandboxProfileEditorPage", () => {
           usable: false,
           latestSnapshotJob: {
             id: "ssj_pending_initial_materialization",
+            sandboxInstanceId: "sbi_pending_initial_materialization",
             trigger: "publish",
             state: "running",
             errorCode: null,
@@ -1470,6 +1669,17 @@ describe("SandboxProfileEditorPage", () => {
 
   it("opens the triggers tab from the section route segment", () => {
     const { profileId, router } = renderSandboxProfileEditor({
+      automationConnections: [createSlackAutomationConnection()],
+      automationTargets: [createSlackAutomationTarget()],
+      automationWebhookSources: [createSlackAutomationWebhookSource()],
+      bindings: [
+        {
+          id: "binding-slack",
+          connectionId: SlackAutomationConnectionId,
+          kind: "connector",
+          config: {},
+        },
+      ],
       routeSection: "automations",
       versionState: "published",
     });
@@ -1478,7 +1688,99 @@ describe("SandboxProfileEditorPage", () => {
       "true",
     );
     expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/automations`);
-    expect(screen.getByText("No triggers use this sandbox profile.")).toBeDefined();
+    expect(screen.getByRole("heading", { name: "Create from template" })).toBeDefined();
+    expect(screen.getByText("Slack Mention")).toBeDefined();
+  });
+
+  it("shows unavailable trigger templates with a reason when the required connection is missing", () => {
+    renderSandboxProfileEditor({
+      automationTargets: [createSlackAutomationTarget()],
+      routeSection: "automations",
+      versionState: "published",
+    });
+
+    expect(screen.getByRole("heading", { name: "Create from template" })).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "Available" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Unavailable" })).toBeNull();
+    expect(screen.getByText("Slack Mention")).toBeDefined();
+    expect(screen.getByText("Slack connection required.")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Unavailable" })).toBeNull();
+  });
+
+  it("shows the GitHub PR review template when the profile can receive pull request events", () => {
+    renderSandboxProfileEditor({
+      automationConnections: [createGitHubAutomationConnection()],
+      automationTargets: [createGitHubAutomationTarget()],
+      automationWebhookSources: [createGitHubAutomationWebhookSource()],
+      bindings: [
+        {
+          id: "binding-github",
+          connectionId: GitHubAutomationConnectionId,
+          kind: "git",
+          config: {},
+        },
+      ],
+      routeSection: "automations",
+      versionState: "published",
+    });
+
+    expect(screen.getByRole("heading", { name: "Create from template" })).toBeDefined();
+    expect(screen.getByText("GitHub PR Review")).toBeDefined();
+    expect(
+      screen.getByText("Review a pull request when it is opened or requested with pr-review."),
+    ).toBeDefined();
+    expect(screen.queryByText("GitHub connection required.")).toBeNull();
+    expect(screen.getAllByRole("button", { name: "Select" }).length).toBeGreaterThan(0);
+  });
+
+  it("does not make the GitHub PR review template selectable when required events are split across webhook sources", () => {
+    const pullRequestConnectionId = "icn_github_pull_request_test";
+    const issueCommentConnectionId = "icn_github_issue_comment_test";
+
+    renderSandboxProfileEditor({
+      automationConnections: [
+        createGitHubAutomationConnection({ id: pullRequestConnectionId }),
+        createGitHubAutomationConnection({ id: issueCommentConnectionId }),
+      ],
+      automationTargets: [createGitHubAutomationTarget()],
+      automationWebhookSources: [
+        createGitHubAutomationWebhookSource({
+          id: "iws_github_pull_request_test",
+          connectionId: pullRequestConnectionId,
+          events: ["pull_request"],
+          permissions: [{ permission: "pull_requests", access: "read" }],
+        }),
+        createGitHubAutomationWebhookSource({
+          id: "iws_github_issue_comment_test",
+          connectionId: issueCommentConnectionId,
+          events: ["issue_comment"],
+          permissions: [{ permission: "issues", access: "read" }],
+        }),
+      ],
+      bindings: [
+        {
+          id: "binding-github-pull-request",
+          connectionId: pullRequestConnectionId,
+          kind: "git",
+          config: {},
+        },
+        {
+          id: "binding-github-issue-comment",
+          connectionId: issueCommentConnectionId,
+          kind: "git",
+          config: {},
+        },
+      ],
+      routeSection: "automations",
+      versionState: "published",
+    });
+
+    expect(screen.getByRole("heading", { name: "Create from template" })).toBeDefined();
+    expect(screen.getByText("GitHub PR Review")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Select" })).toBeNull();
+    expect(
+      screen.getByText("The GitHub connection has not synced the required event capability."),
+    ).toBeDefined();
   });
 
   it("preserves the profile automation page cursor when selecting an automation", () => {
@@ -1687,6 +1989,7 @@ describe("SandboxProfileEditorPage", () => {
             usable: false,
             latestSnapshotJob: {
               id: "ssj_pending_initial_materialization",
+              sandboxInstanceId: "sbi_pending_initial_materialization",
               trigger: "publish",
               state: "queued",
               errorCode: null,
@@ -1717,6 +2020,7 @@ describe("SandboxProfileEditorPage", () => {
           activeVersion: null,
           snapshotJob: {
             id: "ssj_pending_initial_materialization",
+            sandboxInstanceId: "sbi_pending_initial_materialization",
             trigger: "publish",
             state: "queued",
             errorCode: null,
@@ -1733,6 +2037,7 @@ describe("SandboxProfileEditorPage", () => {
             usable: false,
             latestSnapshotJob: {
               id: "ssj_pending_initial_materialization",
+              sandboxInstanceId: "sbi_pending_initial_materialization",
               trigger: "publish",
               state: "queued",
               errorCode: null,
@@ -1764,6 +2069,7 @@ describe("SandboxProfileEditorPage", () => {
       usable: false,
       latestSnapshotJob: {
         id: "ssj_pending_initial_materialization",
+        sandboxInstanceId: "sbi_pending_initial_materialization",
         trigger: "publish",
         state: "queued",
         errorCode: null,
@@ -1794,6 +2100,7 @@ describe("SandboxProfileEditorPage", () => {
           activeVersion: null,
           snapshotJob: {
             id: "ssj_pending_initial_materialization",
+            sandboxInstanceId: "sbi_pending_initial_materialization",
             trigger: "publish",
             state: "queued",
             errorCode: null,
@@ -2164,20 +2471,12 @@ describe("SandboxProfileEditorPage", () => {
     const setupAssistantButton = screen.getByRole("button", {
       name: "Setup Assistant",
     });
-    const failOnFirstErrorSwitch = screen.getByRole("switch", {
-      name: "Fail on error",
-    });
-
     expect(testButton.hasAttribute("disabled")).toBe(false);
     expect(testButton.getAttribute("title")).toBe("Test setup script");
     expect(setupAssistantButton.hasAttribute("disabled")).toBe(false);
-    expect(failOnFirstErrorSwitch.getAttribute("aria-checked")).toBe("true");
-
-    fireEvent.click(failOnFirstErrorSwitch);
-    expect(failOnFirstErrorSwitch.getAttribute("aria-checked")).toBe("false");
   });
 
-  it("toggles the Setup Assistant panel from the setup script action", async () => {
+  it("opens the Setup Assistant panel from the setup script action", async () => {
     renderSandboxProfileEditor({
       bindings: [
         {
@@ -2203,20 +2502,72 @@ describe("SandboxProfileEditorPage", () => {
         name: "Close Setup Assistant panel",
       }),
     ).toBeTruthy();
+  });
 
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Setup Assistant",
-      }),
+  it("confirms before closing an active Setup Assistant sandbox", () => {
+    let confirmed = false;
+    let canceled = false;
+
+    render(
+      <SetupAssistantCloseDialog
+        errorMessage={null}
+        isOpen
+        isPending={false}
+        onCancel={() => {
+          canceled = true;
+        }}
+        onConfirm={() => {
+          confirmed = true;
+        }}
+      />,
     );
 
-    await waitFor(() => {
-      expect(
-        screen.queryByRole("button", {
-          name: "Close Setup Assistant panel",
-        }),
-      ).toBeNull();
-    });
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getByText("Stop Setup Assistant?")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Closing the Setup Assistant stops its temporary sandbox. The setup script draft stays in the editor.",
+      ),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(canceled).toBe(true);
+    expect(confirmed).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Stop and close" }));
+    expect(confirmed).toBe(true);
+  });
+
+  it("blocks duplicate Setup Assistant stop confirmations while stopping", () => {
+    let canceled = false;
+    let confirmed = false;
+
+    render(
+      <SetupAssistantCloseDialog
+        errorMessage="Stop request timed out."
+        isOpen
+        isPending
+        onCancel={() => {
+          canceled = true;
+        }}
+        onConfirm={() => {
+          confirmed = true;
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Stop request timed out.")).toBeTruthy();
+
+    const cancelButton = screen.getByRole("button", { name: "Cancel" });
+    const confirmButton = screen.getByRole("button", { name: "Stopping..." });
+    expect(cancelButton.hasAttribute("disabled")).toBe(true);
+    expect(confirmButton.hasAttribute("disabled")).toBe(true);
+
+    fireEvent.click(cancelButton);
+    fireEvent.click(confirmButton);
+
+    expect(canceled).toBe(false);
+    expect(confirmed).toBe(false);
   });
 
   it("disables setup script testing for empty and published scripts", () => {

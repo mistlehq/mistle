@@ -74,6 +74,54 @@ describe.concurrent("sandbox instances stop integration", () => {
     });
   });
 
+  it("queues a user stop workflow for setup-assistant sandboxes through the public route", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-instances-stop-setup-assistant@example.com",
+    });
+
+    await insertSandboxInstance(env, {
+      sandboxInstanceId: "sbi_cp_stop_setup_assistant",
+      organizationId: session.organizationId,
+      sandboxProfileId: "sbp_cp_stop_setup_assistant",
+      purpose: SandboxInstancePurposes.SETUP_ASSISTANT,
+      status: SandboxInstanceStatuses.RUNNING,
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/instances/sbi_cp_stop_setup_assistant/stop",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          idempotencyKey: "dashboard-setup-assistant-stop-001",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const body = stopSandboxInstanceResponseSchema.parse(await response.json());
+    expect(body).toEqual({
+      status: "accepted",
+      sandboxInstanceId: "sbi_cp_stop_setup_assistant",
+      workflowRunId: expect.any(String),
+    });
+
+    const workflowRun = await waitForQueuedUserStopWorkflowRun({
+      env,
+      sandboxInstanceId: "sbi_cp_stop_setup_assistant",
+    });
+    expect(workflowRun.id).toBe(body.workflowRunId);
+    expect(workflowRun.input).toEqual({
+      sandboxInstanceId: "sbi_cp_stop_setup_assistant",
+      stopReason: "user",
+    });
+  });
+
   it("returns 409 when the public stop route targets a session sandbox", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-instances-stop-session@example.com",
@@ -150,7 +198,10 @@ async function insertSandboxInstance(
     sandboxInstanceId: string;
     organizationId: string;
     sandboxProfileId: string;
-    purpose: typeof SandboxInstancePurposes.SESSION | typeof SandboxInstancePurposes.SETUP_CHECK;
+    purpose:
+      | typeof SandboxInstancePurposes.SESSION
+      | typeof SandboxInstancePurposes.SETUP_ASSISTANT
+      | typeof SandboxInstancePurposes.SETUP_CHECK;
     status: typeof SandboxInstanceStatuses.RUNNING;
   },
 ): Promise<void> {

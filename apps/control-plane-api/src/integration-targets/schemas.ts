@@ -24,6 +24,13 @@ const IntegrationConnectionMethodCreateUiSchema = z
   })
   .strict();
 
+const IntegrationConnectionMethodReauthorizeUiSchema = z
+  .object({
+    actionLabel: z.string().min(1),
+    pendingLabel: z.string().min(1),
+  })
+  .strict();
+
 const IntegrationDeviceAuthorizationConnectionMethodCreateUiSchema = z
   .object({
     submitLabel: z.string().min(1),
@@ -59,6 +66,7 @@ const IntegrationConnectionMethodSchema = z.discriminatedUnion("kind", [
       ui: z
         .object({
           create: IntegrationConnectionMethodCreateUiSchema,
+          reauthorize: IntegrationConnectionMethodReauthorizeUiSchema.optional(),
         })
         .strict(),
     })

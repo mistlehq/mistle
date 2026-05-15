@@ -38,7 +38,7 @@ export function ChatUserMessage(props: ChatUserMessageProps): React.JSX.Element 
         }}
       >
         {props.text.length === 0 ? null : (
-          <ChatMarkdownMessage isStreaming={false} text={props.text} />
+          <ChatMarkdownMessage isStreaming={false} preserveSoftLineBreaks text={props.text} />
         )}
         {attachments.length === 0 ? null : (
           <div className="flex flex-wrap gap-2">

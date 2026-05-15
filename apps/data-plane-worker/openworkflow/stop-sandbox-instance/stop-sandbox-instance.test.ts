@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { shouldExecuteSandboxStop } from "./stop-sandbox-instance.js";
+import { isUserStopSupportedPurpose, shouldExecuteSandboxStop } from "./stop-sandbox-instance.js";
 
 describe("shouldExecuteSandboxStop", () => {
   it("allows an idle stop only when owner and attachment still match the expected lease", () => {
@@ -72,5 +72,14 @@ describe("shouldExecuteSandboxStop", () => {
         },
       }),
     ).toBe(true);
+  });
+});
+
+describe("isUserStopSupportedPurpose", () => {
+  it("allows user stops for setup sandboxes only", () => {
+    expect(isUserStopSupportedPurpose("setup_check")).toBe(true);
+    expect(isUserStopSupportedPurpose("setup_assistant")).toBe(true);
+    expect(isUserStopSupportedPurpose("session")).toBe(false);
+    expect(isUserStopSupportedPurpose("snapshot")).toBe(false);
   });
 });

@@ -1,14 +1,22 @@
 import { createHash } from "node:crypto";
 
-import { type ControlPlaneDatabase } from "@mistle/db/control-plane";
-import { BadRequestError } from "@mistle/http/errors.js";
-import type { IntegrationRegistry } from "@mistle/integrations-core";
+import {
+  IntegrationConnectionRedirectSessionIntents,
+  type ControlPlaneDatabase,
+} from "@mistle/db/control-plane";
+import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
+import {
+  IntegrationConnectionMethodIds,
+  type IntegrationRegistry,
+} from "@mistle/integrations-core";
 
 import {
   encryptRedirectSessionSecretUtf8,
   resolveMasterEncryptionKeyMaterial,
 } from "../../lib/crypto.js";
 import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
+import { IntegrationConnectionsNotFoundCodes } from "../constants.js";
+import { assertIdentityLinkingAuthEditableOrThrow } from "./assert-identity-linking-auth-editable.js";
 import {
   createRedirectSessionExpiryTimestamp,
   createRedirectState,
@@ -24,6 +32,12 @@ export type StartOAuth2AuthorizationCodeConnectionInput = {
   targetKey: string;
   displayName?: string;
   connectionConfig?: Record<string, unknown>;
+  controlPlaneBaseUrl: string;
+};
+
+export type StartOAuth2AuthorizationCodeConnectionReauthorizationInput = {
+  organizationId: string;
+  connectionId: string;
   controlPlaneBaseUrl: string;
 };
 
@@ -92,11 +106,28 @@ function buildOAuth2AuthorizationCodeCompleteUrl(input: {
   ).toString();
 }
 
+function removeFrameworkConnectionConfigFields(
+  config: Record<string, unknown> | null,
+): Record<string, unknown> {
+  if (config === null) {
+    return {};
+  }
+
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(config)) {
+    if (key !== "connection_method" && key !== "client_id") {
+      result[key] = value;
+    }
+  }
+
+  return result;
+}
+
 function createPkceChallenge(verifier: string): string {
   return createHash("sha256").update(verifier, "utf8").digest("base64url");
 }
 
-export async function startOAuth2AuthorizationCodeConnection(
+async function startOAuth2AuthorizationCodeRedirect(
   ctx: {
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
@@ -105,7 +136,15 @@ export async function startOAuth2AuthorizationCodeConnection(
       masterEncryptionKeys: Record<string, string>;
     };
   },
-  input: StartOAuth2AuthorizationCodeConnectionInput,
+  input: {
+    organizationId: string;
+    targetKey: string;
+    connectionConfig: Record<string, unknown>;
+    controlPlaneBaseUrl: string;
+    state: string;
+    intent?: "create" | "reauthorize";
+    connectionId?: string;
+  },
 ): Promise<StartedOAuth2AuthorizationCodeConnection> {
   const { db, integrationRegistry, integrationsConfig } = ctx;
 
@@ -124,11 +163,6 @@ export async function startOAuth2AuthorizationCodeConnection(
     targetKey: input.targetKey,
     rawConnectionConfig: input.connectionConfig,
     configSchema: resolved.connectionMethodStartConfigSchema,
-  });
-
-  const state = encodeRedirectStateMetadata({
-    state: createRedirectState(),
-    ...(input.displayName === undefined ? {} : { displayName: input.displayName }),
   });
   const pkceVerifier = createRedirectState();
   const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
@@ -151,7 +185,7 @@ export async function startOAuth2AuthorizationCodeConnection(
       targetKey: input.targetKey,
       target: resolved.target,
       connectionConfig,
-      state,
+      state: input.state,
       redirectUrl,
       pkce: {
         challenge: createPkceChallenge(pkceVerifier),
@@ -171,7 +205,12 @@ export async function startOAuth2AuthorizationCodeConnection(
     db,
     organizationId: input.organizationId,
     targetKey: input.targetKey,
-    state,
+    intent:
+      input.intent === "reauthorize"
+        ? IntegrationConnectionRedirectSessionIntents.REAUTHORIZE
+        : IntegrationConnectionRedirectSessionIntents.CREATE,
+    ...(input.connectionId === undefined ? {} : { connectionId: input.connectionId }),
+    state: input.state,
     pkceVerifierEncrypted,
     ...(providerStateEncrypted === undefined ? {} : { providerStateEncrypted }),
     expiresAt: createRedirectSessionExpiryTimestamp(),
@@ -181,4 +220,98 @@ export async function startOAuth2AuthorizationCodeConnection(
   return {
     authorizationUrl: startedOAuth2AuthorizationCodeConnection.authorizationUrl,
   };
+}
+
+export async function startOAuth2AuthorizationCodeConnection(
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+    integrationsConfig: {
+      activeMasterEncryptionKeyVersion: number;
+      masterEncryptionKeys: Record<string, string>;
+    };
+  },
+  input: StartOAuth2AuthorizationCodeConnectionInput,
+): Promise<StartedOAuth2AuthorizationCodeConnection> {
+  const state = encodeRedirectStateMetadata({
+    state: createRedirectState(),
+    ...(input.displayName === undefined ? {} : { displayName: input.displayName }),
+  });
+
+  return startOAuth2AuthorizationCodeRedirect(ctx, {
+    organizationId: input.organizationId,
+    targetKey: input.targetKey,
+    connectionConfig: input.connectionConfig ?? {},
+    controlPlaneBaseUrl: input.controlPlaneBaseUrl,
+    state,
+  });
+}
+
+export async function startOAuth2AuthorizationCodeConnectionReauthorization(
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+    integrationsConfig: {
+      activeMasterEncryptionKeyVersion: number;
+      masterEncryptionKeys: Record<string, string>;
+    };
+  },
+  input: StartOAuth2AuthorizationCodeConnectionReauthorizationInput,
+): Promise<StartedOAuth2AuthorizationCodeConnection> {
+  const existingConnection = await ctx.db.query.integrationConnections.findFirst({
+    where: (table, { and, eq }) =>
+      and(eq(table.id, input.connectionId), eq(table.organizationId, input.organizationId)),
+  });
+
+  if (existingConnection === undefined) {
+    throw new NotFoundError(
+      IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND,
+      `Integration connection '${input.connectionId}' was not found.`,
+    );
+  }
+
+  await assertIdentityLinkingAuthEditableOrThrow({
+    db: ctx.db,
+    organizationId: input.organizationId,
+    connectionId: existingConnection.id,
+  });
+
+  if (
+    existingConnection.config?.["connection_method"] !==
+    IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE
+  ) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_START_INPUT,
+      `Integration connection '${input.connectionId}' is not an OAuth 2.0 (Authorization Code) connection.`,
+    );
+  }
+
+  const resolved = await resolveOAuth2AuthorizationCodeCapabilityTargetOrThrow(
+    {
+      db: ctx.db,
+      integrationRegistry: ctx.integrationRegistry,
+      integrationsConfig: ctx.integrationsConfig,
+    },
+    {
+      targetKey: existingConnection.targetKey,
+      invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_START_INPUT,
+    },
+  );
+
+  if (resolved.connectionMethod.ui.reauthorize === undefined) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.OAUTH2_NOT_SUPPORTED,
+      `Integration target '${existingConnection.targetKey}' does not support OAuth 2.0 (Authorization Code) reauthorization.`,
+    );
+  }
+
+  return startOAuth2AuthorizationCodeRedirect(ctx, {
+    organizationId: input.organizationId,
+    targetKey: existingConnection.targetKey,
+    connectionConfig: removeFrameworkConnectionConfigFields(existingConnection.config),
+    controlPlaneBaseUrl: input.controlPlaneBaseUrl,
+    state: createRedirectState(),
+    intent: "reauthorize",
+    connectionId: existingConnection.id,
+  });
 }

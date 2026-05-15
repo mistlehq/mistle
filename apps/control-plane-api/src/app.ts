@@ -3,6 +3,7 @@ import { readRepositoryVersion } from "@mistle/config";
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
+import { Scalar } from "@scalar/hono-api-reference";
 import type { OpenWorkflow } from "openworkflow";
 
 import type { ControlPlaneAuth } from "./auth/index.js";
@@ -37,11 +38,13 @@ import type {
   AppContextBindings,
   AppContextVariables,
   ControlPlaneApiConfig,
+  ControlPlaneApiGlobalConfig,
   ControlPlaneApiSandboxRuntimeConfig,
   ControlPlaneApp,
 } from "./types.js";
 
 const ControlPlaneOpenApiPath = "/openapi.json";
+const ControlPlaneApiReferencePath = "/openapi";
 const ControlPlaneReleaseVersion = readRepositoryVersion(import.meta.url);
 
 const ControlPlaneOpenApiInfo = {
@@ -51,6 +54,7 @@ const ControlPlaneOpenApiInfo = {
 
 export type CreateAppInput = {
   config: ControlPlaneApiConfig;
+  environment: ControlPlaneApiGlobalConfig["env"];
   sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
   internalAuthServiceToken: string;
   db: ControlPlaneDatabase;
@@ -75,6 +79,7 @@ export function createApp(input: CreateAppInput): ControlPlaneApp {
   configureApp({
     app,
     config: input.config,
+    environment: input.environment,
     sandboxConfig: input.sandboxConfig,
     internalAuthServiceToken: input.internalAuthServiceToken,
     db: input.db,
@@ -96,7 +101,7 @@ export function createApp(input: CreateAppInput): ControlPlaneApp {
 }
 
 export function configureApp(input: CreateAppInput & { app: ControlPlaneApp }): void {
-  const { app, config, db, auth } = input;
+  const { app, config, db, auth, environment } = input;
 
   app.use("*", createCorsMiddleware({ trustedOrigins: config.auth.trustedOrigins }));
   app.get("/__healthz", (ctx) => {
@@ -127,6 +132,15 @@ export function configureApp(input: CreateAppInput & { app: ControlPlaneApp }): 
     openapi: "3.1.0",
     info: ControlPlaneOpenApiInfo,
   });
+  if (environment === "development") {
+    app.get(
+      ControlPlaneApiReferencePath,
+      Scalar({
+        pageTitle: "Mistle Control Plane API Reference",
+        url: ControlPlaneOpenApiPath,
+      }),
+    );
+  }
   registerApiRouteModules(app);
 }
 

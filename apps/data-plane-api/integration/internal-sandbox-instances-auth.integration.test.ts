@@ -55,6 +55,7 @@ describe.concurrent("internal sandbox instances auth integration", () => {
       failureMessage: null,
       id: sandboxInstanceId,
       runtimePlan: null,
+      startupOperation: null,
       status: "pending",
       title: null,
     });

@@ -35,6 +35,25 @@ export type {
   SandboxStorageProvider,
   SandboxStorageStatus,
 } from "./sandbox-instance-storages.js";
+export {
+  sandboxOperationEvents,
+  SandboxLifecyclePhases,
+  SandboxLifecycleStatuses,
+  SandboxOperationEventRecordKinds,
+  SandboxOperationEventSources,
+  SandboxOperationKinds,
+  SandboxOperationTranscriptStreams,
+} from "./sandbox-operation-events.js";
+export type {
+  InsertSandboxOperationEvent,
+  SandboxLifecyclePhase,
+  SandboxLifecycleStatus,
+  SandboxOperationEvent,
+  SandboxOperationEventRecordKind,
+  SandboxOperationEventSource,
+  SandboxOperationKind,
+  SandboxOperationTranscriptStream,
+} from "./sandbox-operation-events.js";
 export { sandboxInstanceRuntimePlans } from "./sandbox-instance-runtime-plans.js";
 export type {
   InsertSandboxInstanceRuntimePlan,

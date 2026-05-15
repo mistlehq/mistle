@@ -32,6 +32,7 @@ import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles
 import { ActionTile } from "../shared/action-tile.js";
 import { ActivityStatus } from "../shared/activity-status.js";
 import { FormPageSection } from "../shared/form-page.js";
+import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
 import {
   createTimezoneOptions,
   formatCronExpressionBreakdownDiagram,
@@ -47,12 +48,16 @@ export type SnapshotPanelState =
     }
   | {
       kind: "creating";
+      operationId: string;
       publishedVersion: number;
       runnableVersion: number | null;
+      sandboxInstanceId: string | null;
     }
   | {
       kind: "ready";
       latestSnapshotCreatedAt: string | null;
+      operationId: string | null;
+      sandboxInstanceId: string | null;
     }
   | {
       kind: "publish-snapshot-error";
@@ -69,6 +74,11 @@ type SnapshotStatusState = Extract<
   SnapshotPanelState,
   { kind: "creating" | "publish-snapshot-error" | "ready" | "refresh-error" }
 >;
+
+type SnapshotOperationProgressState = {
+  operationId: string;
+  sandboxInstanceId: string | null;
+};
 
 export type SnapshotRefreshSchedule = SandboxProfileVersion["refreshSchedule"];
 export type SnapshotRefreshScheduleInput = {
@@ -90,8 +100,10 @@ export function resolveSnapshotPanelState(
   if (latestSnapshotJob?.state === "queued" || latestSnapshotJob?.state === "running") {
     return {
       kind: "creating",
+      operationId: latestSnapshotJob.id,
       publishedVersion: version.version,
       runnableVersion: activeVersion,
+      sandboxInstanceId: latestSnapshotJob.sandboxInstanceId,
     };
   }
 
@@ -124,6 +136,9 @@ export function resolveSnapshotPanelState(
     kind: "ready",
     latestSnapshotCreatedAt:
       latestSnapshotJob?.state === "succeeded" ? latestSnapshotJob.finishedAt : null,
+    operationId: latestSnapshotJob?.state === "succeeded" ? latestSnapshotJob.id : null,
+    sandboxInstanceId:
+      latestSnapshotJob?.state === "succeeded" ? latestSnapshotJob.sandboxInstanceId : null,
   };
 }
 
@@ -176,6 +191,8 @@ export function SandboxProfileSnapshotPanelView(input: {
   state: SnapshotPanelState;
   version: number | null;
 }): React.JSX.Element {
+  const retainedCreatingState = useRetainedCreatingSnapshotState(input.state);
+
   if (input.state.kind === "draft-unavailable" || input.version === null) {
     return (
       <SandboxProfileEditorHorizontalTabContent>
@@ -233,9 +250,62 @@ export function SandboxProfileSnapshotPanelView(input: {
         })}
       />
 
+      {retainedCreatingState === null ? null : (
+        <SandboxOperationProgress
+          emptyMessage="Waiting for snapshot materialization events."
+          operationId={retainedCreatingState.operationId}
+          sandboxInstanceId={retainedCreatingState.sandboxInstanceId}
+          showLoadError={false}
+          title="Snapshot creation progress"
+        />
+      )}
+
       {input.refreshScheduleSection}
     </SandboxProfileEditorHorizontalTabContent>
   );
+}
+
+function useRetainedCreatingSnapshotState(
+  state: SnapshotPanelState,
+): SnapshotOperationProgressState | null {
+  const [retainedState, setRetainedState] = useState<SnapshotOperationProgressState | null>(
+    resolveRetainedSnapshotOperationState({
+      retainedState: null,
+      state,
+    }),
+  );
+
+  useEffect(() => {
+    setRetainedState((currentRetainedState) =>
+      resolveRetainedSnapshotOperationState({
+        retainedState: currentRetainedState,
+        state,
+      }),
+    );
+  }, [state]);
+
+  return retainedState;
+}
+
+export function resolveRetainedSnapshotOperationState(input: {
+  retainedState: SnapshotOperationProgressState | null;
+  state: SnapshotPanelState;
+}): SnapshotOperationProgressState | null {
+  if (input.state.kind === "creating") {
+    return {
+      operationId: input.state.operationId,
+      sandboxInstanceId: input.state.sandboxInstanceId,
+    };
+  }
+
+  if (input.state.kind === "ready" && input.state.operationId !== null) {
+    return {
+      operationId: input.state.operationId,
+      sandboxInstanceId: input.state.sandboxInstanceId,
+    };
+  }
+
+  return input.retainedState;
 }
 
 function SnapshotStatusAction(input: {

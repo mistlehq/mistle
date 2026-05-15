@@ -544,6 +544,7 @@ describe.concurrent("control-plane worker schedule dispatch child batches", () =
       expect.objectContaining({
         sandboxProfileId: "sbp_integration_new_schedule_batch_snapshot_create",
         sandboxProfileVersion: 1,
+        sandboxInstanceId: expect.any(String),
         trigger: SandboxProfileVersionSnapshotJobTriggers.SCHEDULED_REFRESH,
         state: SandboxProfileVersionSnapshotJobStates.QUEUED,
         sourceScheduledActionId: "sca_integration_new_schedule_batch_snapshot_create",
@@ -561,6 +562,62 @@ describe.concurrent("control-plane worker schedule dispatch child batches", () =
       }),
     );
     expect(persistedAction?.dispatchedAt).not.toBeNull();
+  });
+
+  it("assigns a sandbox instance id when dispatching a queued scheduled snapshot job created before the column existed", async ({
+    env,
+  }) => {
+    await seedSnapshotRefreshScheduledAction({
+      env,
+      organizationId: "org_integration_new_schedule_batch_snapshot_legacy",
+      profileId: "sbp_integration_new_schedule_batch_snapshot_legacy",
+      profileVersion: 1,
+      scheduleId: "sch_integration_new_schedule_batch_snapshot_legacy",
+      scheduledActionId: "sca_integration_new_schedule_batch_snapshot_legacy",
+    });
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionSnapshotJobs)
+      .values({
+        id: "ssj_integration_new_schedule_batch_snapshot_legacy",
+        sandboxProfileId: "sbp_integration_new_schedule_batch_snapshot_legacy",
+        sandboxProfileVersion: 1,
+        sandboxInstanceId: null,
+        trigger: SandboxProfileVersionSnapshotJobTriggers.SCHEDULED_REFRESH,
+        state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+        sourceScheduledActionId: "sca_integration_new_schedule_batch_snapshot_legacy",
+        workflowRunId: null,
+      });
+
+    const result = await dispatchScheduledAction(createDispatchContext(env), {
+      scheduledActionId: "sca_integration_new_schedule_batch_snapshot_legacy",
+      dispatchClaimKey: "schedule-dispatch-batch:integration-new-snapshot-legacy",
+      staleDispatchingBefore: new Date("2026-04-28T01:00:00.000Z"),
+    });
+
+    expect(result).toEqual({
+      scheduledActionId: "sca_integration_new_schedule_batch_snapshot_legacy",
+      status: "dispatched",
+    });
+
+    const snapshotJob = await env.controlPlaneDb.query.sandboxProfileVersionSnapshotJobs.findFirst({
+      where: (table, { eq }) => eq(table.id, "ssj_integration_new_schedule_batch_snapshot_legacy"),
+    });
+    expect(snapshotJob).toEqual(
+      expect.objectContaining({
+        sandboxInstanceId: expect.any(String),
+        workflowRunId: null,
+      }),
+    );
+
+    const persistedAction = await env.controlPlaneDb.query.scheduledActions.findFirst({
+      where: (table, { eq }) => eq(table.id, "sca_integration_new_schedule_batch_snapshot_legacy"),
+    });
+    expect(persistedAction).toEqual(
+      expect.objectContaining({
+        status: ScheduledActionStatuses.DISPATCHED,
+        targetWorkflowId: expect.any(String),
+      }),
+    );
   });
 });
 

@@ -42,6 +42,10 @@ export const SentryMcpBaseDefinition: SentryMcpBaseIntegrationDefinition = {
           submitLabel: "Connect Sentry",
           helperText: "Authorize Sentry hosted MCP access.",
         },
+        reauthorize: {
+          actionLabel: "Re-authorize",
+          pendingLabel: "Starting...",
+        },
       },
     },
   ],

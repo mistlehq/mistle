@@ -67,6 +67,10 @@ export const SignozMcpBaseDefinition: SignozMcpBaseIntegrationDefinition = {
           submitLabel: "Connect SigNoz",
           helperText: "Authorize SigNoz hosted MCP access.",
         },
+        reauthorize: {
+          actionLabel: "Re-authorize",
+          pendingLabel: "Starting...",
+        },
       },
     },
   ],

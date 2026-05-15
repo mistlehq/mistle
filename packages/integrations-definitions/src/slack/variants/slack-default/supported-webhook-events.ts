@@ -9,7 +9,13 @@ import type {
 import { createInvocationTokenParameter } from "../../../shared/invocation-token-parameter.js";
 import { SlackThreadRootTimestampField } from "./normalized-event-fields.js";
 
+const SlackEventPayloadReference: IntegrationWebhookPayloadReference = {
+  path: ["event"],
+  description: "Slack event payload object.",
+};
+
 const SlackMessagePayloadReferences: readonly IntegrationWebhookPayloadReference[] = [
+  SlackEventPayloadReference,
   {
     path: ["event", "channel"],
     description: "Slack channel ID for the message event.",
@@ -38,6 +44,7 @@ const SlackMessagePayloadReferences: readonly IntegrationWebhookPayloadReference
 ];
 
 const SlackReactionPayloadReferences: readonly IntegrationWebhookPayloadReference[] = [
+  SlackEventPayloadReference,
   {
     path: ["event", "channel"],
     description: "Normalized Slack channel ID for the reacted message event.",

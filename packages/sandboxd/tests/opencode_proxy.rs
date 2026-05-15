@@ -505,7 +505,7 @@ fn handle_simulated_opencode_activity_request(
                 .recv_timeout(Duration::from_millis(25));
             match command {
                 Ok(SimulatedOpenCodeActivityCommand::Event(event, ack_sender)) => {
-                    let frame = format!("event: message\ndata: {}\n\n", event);
+                    let frame = format!("event: message\ndata: {event}\n\n");
                     if stream.write_all(frame.as_bytes()).is_err() {
                         let _ = ack_sender.send(false);
                         return;

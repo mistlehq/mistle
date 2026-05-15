@@ -9,6 +9,7 @@ import {
   parseSigningControlMessage,
   parseStreamControlMessage,
   parseTelemetryControlMessage,
+  parseOperationControlMessage,
   type BootstrapControlMessage,
   type KeepaliveControlMessage,
   type RuntimeReadyControlMessage,
@@ -17,6 +18,8 @@ import {
   type StreamControlMessage,
   type TelemetryClose,
   type TelemetryOpen,
+  type OperationClose,
+  type OperationOpen,
 } from "@mistle/sandbox-session-protocol";
 
 import { PortAccessTransportService } from "../../publishing/port-access-transport.js";
@@ -29,6 +32,8 @@ import {
 } from "../tunnel-session/index.js";
 import type { RelayPayload, RelayPeerSide } from "../types.js";
 import { FrameCodec } from "./frame-codec.js";
+
+const ReservedOperationStreamId = 0xffff_fffd;
 
 export type ReleaseInteractiveStream = {
   clientSessionId: string;
@@ -64,6 +69,24 @@ export type TunnelProtocolDelivery =
     }
   | {
       kind: "telemetryInvalidData";
+      payloadKind: number;
+      streamId: number;
+    }
+  | {
+      kind: "operationOpen";
+      message: OperationOpen;
+    }
+  | {
+      kind: "operationClose";
+      message: OperationClose;
+    }
+  | {
+      kind: "operationData";
+      payload: ArrayBuffer;
+      streamId: number;
+    }
+  | {
+      kind: "operationInvalidData";
       payloadKind: number;
       streamId: number;
     }
@@ -359,6 +382,12 @@ function isBootstrapTelemetryControlMessageAllowed(
   return message.type === "telemetry.open" || message.type === "telemetry.close";
 }
 
+function isBootstrapOperationControlMessageAllowed(
+  message: BootstrapControlMessage,
+): message is OperationOpen | OperationClose {
+  return message.type === "operation.open" || message.type === "operation.close";
+}
+
 function assertConnectionControlMessageAllowed(message: StreamControlMessage): void {
   if (isConnectionControlMessageAllowed(message)) {
     return;
@@ -385,6 +414,10 @@ function assertBootstrapControlMessageAllowed(message: BootstrapControlMessage):
   }
 
   if (isBootstrapTelemetryControlMessageAllowed(message)) {
+    return;
+  }
+
+  if (isBootstrapOperationControlMessageAllowed(message)) {
     return;
   }
 
@@ -614,6 +647,13 @@ export class TunnelProtocolTranslator {
       throw createUnsupportedConnectionTelemetryMessageError(telemetryControlMessage.type);
     }
 
+    const operationControlMessage = parseOperationControlMessage(input.payload);
+    if (operationControlMessage !== undefined) {
+      throw new TunnelProtocolViolationError(
+        `Connection websocket cannot send operation control message type '${operationControlMessage.type}'.`,
+      );
+    }
+
     const signingControlMessage = parseSigningControlMessage(input.payload);
     if (signingControlMessage !== undefined) {
       throw createUnsupportedConnectionSigningMessageError(signingControlMessage.type);
@@ -839,6 +879,24 @@ export class TunnelProtocolTranslator {
       });
     }
 
+    if (controlMessage.type === "operation.open") {
+      return createTranslation({
+        delivery: {
+          kind: "operationOpen",
+          message: controlMessage,
+        },
+      });
+    }
+
+    if (controlMessage.type === "operation.close") {
+      return createTranslation({
+        delivery: {
+          kind: "operationClose",
+          message: controlMessage,
+        },
+      });
+    }
+
     if (
       controlMessage.type === "stream.window" &&
       this.portAccessTransportService.handleBootstrapStreamWindow({
@@ -984,7 +1042,10 @@ export class TunnelProtocolTranslator {
       if (dataFrameHeader.payloadKind !== PayloadKindRawBytes) {
         return createTranslation({
           delivery: {
-            kind: "telemetryInvalidData",
+            kind:
+              dataFrameHeader.streamId === ReservedOperationStreamId
+                ? "operationInvalidData"
+                : "telemetryInvalidData",
             streamId: dataFrameHeader.streamId,
             payloadKind: dataFrameHeader.payloadKind,
           },
@@ -993,7 +1054,10 @@ export class TunnelProtocolTranslator {
 
       return createTranslation({
         delivery: {
-          kind: "telemetryData",
+          kind:
+            dataFrameHeader.streamId === ReservedOperationStreamId
+              ? "operationData"
+              : "telemetryData",
           payload: input.payload,
           streamId: dataFrameHeader.streamId,
         },

@@ -29,6 +29,7 @@ export async function createControlPlaneApiRuntime(
 
     app = createApp({
       config,
+      environment: runtimeConfig.global.env,
       sandboxConfig: config.sandbox,
       internalAuthServiceToken: config.internalAuth.serviceToken,
       db: appContext.db,
@@ -144,5 +145,6 @@ function createAuthConfig(config: ControlPlaneApiRuntimeConfig["app"]): ControlP
         }),
     activeMasterEncryptionKeyVersion: config.integrations.activeMasterEncryptionKeyVersion,
     masterEncryptionKeys: config.integrations.masterEncryptionKeys,
+    billing: config.billing,
   };
 }

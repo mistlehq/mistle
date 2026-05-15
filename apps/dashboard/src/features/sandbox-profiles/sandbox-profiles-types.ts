@@ -85,6 +85,7 @@ export type PublishSandboxProfileVersionResult = {
   activeVersion: number | null;
   snapshotJob: {
     id: string;
+    sandboxInstanceId: string | null;
     trigger: "publish" | "manual_refresh" | "scheduled_refresh";
     state: "queued" | "running" | "succeeded" | "failed";
     errorCode: string | null;
@@ -102,6 +103,10 @@ export type SandboxProfileVersionSetupScript =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/setup-script"]["get"]["responses"][200]["content"]["application/json"];
 export type SandboxProfileSetupScriptTestRun =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/setup-script/test-runs"]["post"]["responses"][201]["content"]["application/json"];
+export type SandboxProfileSetupScriptTestRuntimeConfig = Pick<
+  SandboxProfileVersion,
+  "agentRuntimeId" | "sandboxConnectionId" | "sandboxProvider" | "sandboxResources"
+>;
 export type SandboxProfileSetupAssistant =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/setup-script/assistant"]["post"]["responses"][201]["content"]["application/json"];
 export type SandboxProfileVersionAutomationConfig =

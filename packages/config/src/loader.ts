@@ -426,6 +426,11 @@ const ControlPlaneApiEnvDescriptors = [
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET",
     path: ["auth", "google", "clientSecret"],
   },
+  {
+    envVar: "MISTLE_BILLING_STRIPE_ENABLED",
+    path: ["billing", "stripe", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
   { envVar: "MISTLE_SERVICES_DASHBOARD_PUBLIC_URL", path: ["dashboard", "baseUrl"] },
   {
     envVar: "MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL",
@@ -501,6 +506,12 @@ const ControlPlaneApiEnvDescriptors = [
   { envVar: "MISTLE_SANDBOX_E2B_API_KEY", path: ["sandbox", "e2b", "apiKey"] },
   { envVar: "MISTLE_SANDBOX_E2B_DOMAIN", path: ["sandbox", "e2b", "domain"] },
   {
+    envVar: "MISTLE_SANDBOX_TENSORLAKE_ENABLED",
+    path: ["sandbox", "tensorlake", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  { envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY", path: ["sandbox", "tensorlake", "apiKey"] },
+  {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION",
     path: ["integrations", "activeMasterEncryptionKeyVersion"],
     parse: parseNumberEnv,
@@ -542,6 +553,12 @@ const ControlPlaneWorkerEnvDescriptors = [
   },
   { envVar: "MISTLE_INTERNAL_AUTH_SHARED_TOKEN", path: ["internalAuth", "serviceToken"] },
   { envVar: "MISTLE_SANDBOX_DEFAULT_BASE_IMAGE", path: ["sandbox", "defaultBaseImage"] },
+  {
+    envVar: "MISTLE_BILLING_STRIPE_ENABLED",
+    path: ["billing", "stripe", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  { envVar: "MISTLE_BILLING_STRIPE_SECRET_KEY", path: ["billing", "stripe", "secretKey"] },
 ] satisfies readonly EnvDescriptor[];
 
 const DataPlaneApiEnvDescriptors = [
@@ -580,6 +597,14 @@ const DataPlaneApiEnvDescriptors = [
     path: ["sandbox", "e2b", "enabled"],
     parse: parseStrictBooleanEnv,
   },
+  { envVar: "MISTLE_SANDBOX_E2B_API_KEY", path: ["sandbox", "e2b", "apiKey"] },
+  { envVar: "MISTLE_SANDBOX_E2B_DOMAIN", path: ["sandbox", "e2b", "domain"] },
+  {
+    envVar: "MISTLE_SANDBOX_TENSORLAKE_ENABLED",
+    path: ["sandbox", "tensorlake", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  { envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY", path: ["sandbox", "tensorlake", "apiKey"] },
 ] satisfies readonly EnvDescriptor[];
 
 const DataPlaneGatewayEnvDescriptors = [
@@ -652,6 +677,29 @@ const DataPlaneWorkerEnvDescriptors = [
   },
   { envVar: "MISTLE_SANDBOX_DOCKER_SOCKET_PATH", path: ["sandbox", "docker", "socketPath"] },
   { envVar: "MISTLE_SANDBOX_DOCKER_NETWORK_NAME", path: ["sandbox", "docker", "networkName"] },
+  {
+    envVar: "MISTLE_SANDBOX_E2B_ENABLED",
+    path: ["sandbox", "e2b", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  { envVar: "MISTLE_SANDBOX_E2B_API_KEY", path: ["sandbox", "e2b", "apiKey"] },
+  { envVar: "MISTLE_SANDBOX_E2B_DOMAIN", path: ["sandbox", "e2b", "domain"] },
+  {
+    envVar: "MISTLE_SANDBOX_E2B_CPU_COUNT",
+    path: ["sandbox", "e2b", "cpuCount"],
+    parse: parseNumberEnv,
+  },
+  {
+    envVar: "MISTLE_SANDBOX_E2B_MEMORY_MB",
+    path: ["sandbox", "e2b", "memoryMb"],
+    parse: parseNumberEnv,
+  },
+  {
+    envVar: "MISTLE_SANDBOX_TENSORLAKE_ENABLED",
+    path: ["sandbox", "tensorlake", "enabled"],
+    parse: parseStrictBooleanEnv,
+  },
+  { envVar: "MISTLE_SANDBOX_TENSORLAKE_API_KEY", path: ["sandbox", "tensorlake", "apiKey"] },
   {
     envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY",
     path: ["sandboxStorage", "archil", "apiKey"],

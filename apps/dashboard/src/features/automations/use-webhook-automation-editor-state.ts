@@ -213,6 +213,9 @@ function applyWebhookAutomationValueChange(input: {
         nextValues.triggerParameterValues[triggerId] ?? {},
       ]),
     );
+  }
+
+  if (input.key === "triggerIds" || input.key === "triggerParameterValues") {
     nextValues.conversationKeyTemplate = resolveNormalizedConversationKeyTemplate({
       values: nextValues,
       eventOptions: input.eventOptions,
@@ -298,6 +301,7 @@ function resolveNormalizedConversationKeyTemplate(input: {
   const conversationKeyFieldOptions = resolveConversationKeyFieldOptions({
     selectedEventOptions: selectedTriggerOptions,
     currentTemplate: input.values.conversationKeyTemplate,
+    triggerParameterValues: input.values.triggerParameterValues,
   });
 
   if (conversationKeyFieldOptions.options.length === 0) {

@@ -245,6 +245,31 @@ export async function startRedirectIntegrationConnection(input: {
   }
 }
 
+export async function startRedirectIntegrationConnectionReauthorization(input: {
+  connectionId: string;
+}): Promise<StartedRedirectConnection> {
+  try {
+    const response = await requestControlPlane({
+      operation: "startRedirectIntegrationConnectionReauthorization",
+      method: "POST",
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/oauth2-authorization-code/reauthorize/start`,
+      fallbackMessage: "Could not start integration connection reauthorization.",
+    });
+
+    return readJsonWithSchema({
+      response,
+      schema: StartedRedirectConnectionSchema,
+      operation: "startRedirectIntegrationConnectionReauthorization",
+    });
+  } catch (error) {
+    throw wrapIntegrationsApiError({
+      operation: "startRedirectIntegrationConnectionReauthorization",
+      error,
+      fallbackMessage: "Could not start integration connection reauthorization.",
+    });
+  }
+}
+
 export async function startDeviceAuthorizationIntegrationConnection(input: {
   targetKey: string;
   methodId: IntegrationConnectionMethod["id"];

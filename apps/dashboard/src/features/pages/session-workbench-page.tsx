@@ -6,6 +6,7 @@ import type { ChatComposerViewModel } from "../chat/components/chat-composer.js"
 import { SessionHeaderTitle } from "../sessions/session-header-title.js";
 import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
 import { shouldRenderSidebarTrigger } from "../shared/sidebar-trigger-visibility.js";
+import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
 import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import {
@@ -450,6 +451,8 @@ function SessionWorkbenchPageContent(input: {
             terminalThemeMode: workbench.primaryPanelState.cliTerminalThemeMode,
           },
           initialEntryStartupState,
+          sandboxInstanceId: input.sandboxInstanceId,
+          startupOperation: workbench.sandboxStatusQuery.data?.startupOperation ?? null,
           transitionState: workbench.primaryPanelState.transitionState,
         })}
         mainContentScrollContainerRef={conversationScrollContainerRef}
@@ -528,14 +531,28 @@ function renderPrimaryPanelMainContent(input: {
   initialEntryStartupState: ReturnType<
     typeof useSessionWorkbenchController
   >["workbench"]["initialEntryStartupState"];
+  sandboxInstanceId: string | null;
+  startupOperation:
+    | NonNullable<
+        ReturnType<typeof useSessionWorkbenchController>["workbench"]["sandboxStatusQuery"]["data"]
+      >["startupOperation"]
+    | null;
   transitionState: ReturnType<
     typeof useSessionWorkbenchController
   >["workbench"]["primaryPanelState"]["transitionState"];
 }): React.JSX.Element {
   if (input.initialEntryStartupState !== null) {
     return (
-      <div className="mx-auto flex h-full w-full max-w-5xl items-center justify-center px-4 py-6">
+      <div className="mx-auto flex h-full w-full max-w-3xl flex-col justify-center gap-4 px-4 py-6">
         <SessionStartupStatus state={input.initialEntryStartupState} />
+        <SandboxOperationProgress
+          displayMode="timeline"
+          emptyMessage="Waiting for session startup events."
+          operationId={input.startupOperation?.operationId ?? null}
+          sandboxInstanceId={input.sandboxInstanceId}
+          showBorder
+          showLoadError={false}
+        />
       </div>
     );
   }

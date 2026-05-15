@@ -1,0 +1,12 @@
+{
+  "name": "@mistle/mstl-cli",
+  "private": true,
+  "scripts": {
+    "build": "rm -rf dist && cargo build --locked --bin mstl && mkdir -p dist && cp target/debug/mstl dist/mstl",
+    "lint": "cargo clippy --locked --all-targets -- -D warnings",
+    "typecheck": "cargo check --locked --all-targets",
+    "test": "cargo test --locked",
+    "format": "cargo fmt",
+    "format:check": "cargo fmt --check"
+  }
+}

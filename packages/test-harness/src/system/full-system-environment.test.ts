@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DockerIntegrationConfigPathInContainer } from "./integration-config-paths.js";
+import { IntegrationConfigPathInContainer } from "./integration-config-paths.js";
 import {
   createControlPlaneDatabaseMigrationCommandInput,
   createControlPlaneIntegrationTargetsSyncCommandInput,
@@ -12,14 +12,14 @@ import {
 
 const BuildContextHostPath = "/workspace/repo";
 const HostDatabaseUrl = "postgresql://mistle:mistle@127.0.0.1:5433/mistle_system";
-const HostConfigPath = "/workspace/repo/config/config.integration.docker.toml";
+const HostConfigPath = "/workspace/repo/config/config.integration.toml";
 
 describe("resolveHostPathFromContainerPath", () => {
   it("maps a container path under /app to the host build context", () => {
     expect(
       resolveHostPathFromContainerPath({
         buildContextHostPath: "/workspace/repo",
-        containerPath: DockerIntegrationConfigPathInContainer,
+        containerPath: IntegrationConfigPathInContainer,
       }),
     ).toBe(HostConfigPath);
   });
@@ -39,7 +39,7 @@ describe("createControlPlaneIntegrationTargetsSyncCommandInput", () => {
     expect(
       createControlPlaneIntegrationTargetsSyncCommandInput({
         buildContextHostPath: BuildContextHostPath,
-        configPathInContainer: DockerIntegrationConfigPathInContainer,
+        configPathInContainer: IntegrationConfigPathInContainer,
         hostDatabaseUrl: HostDatabaseUrl,
       }),
     ).toEqual({
@@ -59,7 +59,7 @@ describe("system migration command inputs", () => {
     expect(
       createControlPlaneDatabaseMigrationCommandInput({
         buildContextHostPath: BuildContextHostPath,
-        configPathInContainer: DockerIntegrationConfigPathInContainer,
+        configPathInContainer: IntegrationConfigPathInContainer,
         hostDatabaseUrl: HostDatabaseUrl,
       }),
     ).toEqual({
@@ -77,7 +77,7 @@ describe("system migration command inputs", () => {
     expect(
       createControlPlaneWorkflowMigrationCommandInput({
         buildContextHostPath: BuildContextHostPath,
-        configPathInContainer: DockerIntegrationConfigPathInContainer,
+        configPathInContainer: IntegrationConfigPathInContainer,
         hostDatabaseUrl: HostDatabaseUrl,
       }),
     ).toEqual({
@@ -102,7 +102,7 @@ describe("system migration command inputs", () => {
     expect(
       createDataPlaneDatabaseMigrationCommandInput({
         buildContextHostPath: BuildContextHostPath,
-        configPathInContainer: DockerIntegrationConfigPathInContainer,
+        configPathInContainer: IntegrationConfigPathInContainer,
         hostDatabaseUrl: HostDatabaseUrl,
       }),
     ).toEqual({
@@ -120,7 +120,7 @@ describe("system migration command inputs", () => {
     expect(
       createDataPlaneWorkflowMigrationCommandInput({
         buildContextHostPath: BuildContextHostPath,
-        configPathInContainer: DockerIntegrationConfigPathInContainer,
+        configPathInContainer: IntegrationConfigPathInContainer,
         hostDatabaseUrl: HostDatabaseUrl,
       }),
     ).toEqual({

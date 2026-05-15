@@ -432,6 +432,105 @@ describe("integrations page view model", () => {
     expect(item?.authSecretLabels).toEqual(["Bot token", "Signing secret"]);
   });
 
+  it("builds reauthorization detail metadata from redirect connection method capabilities", () => {
+    const [item] = buildIntegrationConnectionDetailItems({
+      connections: [
+        {
+          id: "icn_planetscale_123",
+          targetKey: "planetscale-mcp",
+          displayName: "PlanetScale",
+          status: "active",
+          config: {
+            connection_method: "oauth2-authorization-code",
+          },
+          connectionMethodId: "oauth2-authorization-code",
+          connectionMethodLabel: "OAuth",
+          createdAt: "2026-03-03T00:00:00.000Z",
+          updatedAt: "2026-03-11T04:30:00.000Z",
+        } satisfies IntegrationConnection,
+      ],
+      reauthorizationStateByConnectionId: new Map([
+        [
+          "icn_planetscale_123",
+          {
+            errorMessage: "Could not start reauthorization.",
+            isPending: true,
+          },
+        ],
+      ]),
+      targetConnectionMethods: [
+        {
+          id: "oauth2-authorization-code",
+          label: "OAuth",
+          kind: "redirect",
+          ui: {
+            create: {
+              helperText: "Connect PlanetScale with OAuth.",
+              submitLabel: "Connect PlanetScale",
+            },
+            reauthorize: {
+              actionLabel: "Re-authorize",
+              pendingLabel: "Starting...",
+            },
+          },
+        },
+      ],
+      refreshingResourceKeys: new Set<string>(),
+    });
+
+    expect(item?.reauthorization).toEqual({
+      actionLabel: "Re-authorize",
+      errorMessage: "Could not start reauthorization.",
+      isPending: true,
+      pendingLabel: "Starting...",
+    });
+  });
+
+  it("builds a reauthorization required notice for errored redirect connections", () => {
+    const [item] = buildIntegrationConnectionDetailItems({
+      connections: [
+        {
+          id: "icn_planetscale_123",
+          targetKey: "planetscale-mcp",
+          displayName: "PlanetScale",
+          status: "error",
+          config: {
+            connection_method: "oauth2-authorization-code",
+          },
+          connectionMethodId: "oauth2-authorization-code",
+          connectionMethodLabel: "OAuth",
+          createdAt: "2026-03-03T00:00:00.000Z",
+          updatedAt: "2026-03-11T04:30:00.000Z",
+        } satisfies IntegrationConnection,
+      ],
+      targetConnectionMethods: [
+        {
+          id: "oauth2-authorization-code",
+          label: "OAuth",
+          kind: "redirect",
+          ui: {
+            create: {
+              helperText: "Connect PlanetScale with OAuth.",
+              submitLabel: "Connect PlanetScale",
+            },
+            reauthorize: {
+              actionLabel: "Re-authorize",
+              pendingLabel: "Starting...",
+            },
+          },
+        },
+      ],
+      refreshingResourceKeys: new Set<string>(),
+    });
+
+    expect(item?.reauthorization).toEqual({
+      actionLabel: "Re-authorize",
+      errorMessage: "This connection needs to be re-authorized.",
+      isPending: false,
+      pendingLabel: "Starting...",
+    });
+  });
+
   it("builds detail items for AWS assume-role connections", () => {
     const [item] = buildIntegrationConnectionDetailItems({
       connections: [
