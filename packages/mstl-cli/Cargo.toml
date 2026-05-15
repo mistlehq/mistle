@@ -1,0 +1,11 @@
+[package]
+name = "mstl-cli"
+version = "0.0.0"
+edition = "2024"
+
+[[bin]]
+name = "mstl"
+path = "src/main.rs"
+
+[dependencies]
+mstl-core = { path = "../mstl-core" }
