@@ -37,11 +37,12 @@ describe.concurrent("api keys integration", () => {
     expect(body.token).toMatch(/^mstl_apk_[A-Za-z0-9_-]+_[A-Za-z0-9_-]+$/u);
     expect(body.apiKey).toMatchObject({
       name: "CLI key",
-      secretPrefix: body.token.split("_")[2],
+      secretPrefix: expect.stringMatching(/^[A-Za-z0-9_-]{22}$/u),
       permissions: [OrganizationPermissions.SANDBOX_SESSION_CREATE],
       expiresAt: null,
       lastUsedAt: null,
     });
+    expect(body.token.startsWith(`mstl_apk_${body.apiKey.secretPrefix}_`)).toBe(true);
 
     const persistedApiKey = await env.controlPlaneDb.query.apiKeys.findFirst({
       where: (table, { eq }) => eq(table.id, body.apiKey.id),
