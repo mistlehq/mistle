@@ -207,7 +207,7 @@ function resolveTriggerTemplateAvailability(input: {
   if (!hasProfileBinding) {
     return {
       kind: "unavailable",
-      reason: "Slack connection required.",
+      reason: `${integrationName} connection required.`,
       template,
     };
   }

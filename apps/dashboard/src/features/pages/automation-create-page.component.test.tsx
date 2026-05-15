@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 
-import { SlackBrowserDefinition } from "@mistle/integrations-definitions/browser";
+import {
+  GitHubCloudBrowserDefinition,
+  SlackBrowserDefinition,
+} from "@mistle/integrations-definitions/browser";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } from "react-router";
@@ -21,10 +24,12 @@ import {
 import { AutomationCreatePage } from "./automation-create-page.js";
 
 const SlackConnectionId = "icn_slack_test";
+const GitHubConnectionId = "icn_github_test";
 const SandboxProfileId = "sbp_slack_test";
 
 function renderCreatePage(input: {
   initialEntry: string;
+  seedGitHubProfile?: boolean;
   seedSlackProfile?: boolean;
   shouldSeedIntegrationDirectory?: boolean;
 }): ReturnType<typeof createMemoryRouter> {
@@ -34,9 +39,12 @@ function renderCreatePage(input: {
   });
 
   if (input.shouldSeedIntegrationDirectory ?? true) {
+    const hasGitHubProfile = input.seedGitHubProfile === true;
+    const hasSlackProfile = input.seedSlackProfile === true;
+
     queryClient.setQueryData(WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY, {
-      connections:
-        input.seedSlackProfile === true
+      connections: [
+        ...(hasSlackProfile
           ? [
               {
                 id: SlackConnectionId,
@@ -47,9 +55,22 @@ function renderCreatePage(input: {
                 updatedAt: "2026-05-08T00:00:00.000Z",
               },
             ]
-          : [],
-      targets:
-        input.seedSlackProfile === true
+          : []),
+        ...(hasGitHubProfile
+          ? [
+              {
+                id: GitHubConnectionId,
+                targetKey: "github-cloud",
+                displayName: "GitHub",
+                status: "active",
+                createdAt: "2026-05-01T00:00:00.000Z",
+                updatedAt: "2026-05-08T00:00:00.000Z",
+              },
+            ]
+          : []),
+      ],
+      targets: [
+        ...(hasSlackProfile
           ? [
               {
                 targetKey: "slack-default",
@@ -69,10 +90,72 @@ function renderCreatePage(input: {
                 },
               },
             ]
-          : [],
+          : []),
+        ...(hasGitHubProfile
+          ? [
+              {
+                targetKey: "github-cloud",
+                familyId: GitHubCloudBrowserDefinition.familyId,
+                variantId: GitHubCloudBrowserDefinition.variantId,
+                kind: GitHubCloudBrowserDefinition.kind,
+                enabled: true,
+                config: {},
+                displayName: GitHubCloudBrowserDefinition.displayName,
+                description: "GitHub repositories",
+                ...(GitHubCloudBrowserDefinition.logoKey === undefined
+                  ? {}
+                  : { logoKey: GitHubCloudBrowserDefinition.logoKey }),
+                supportedWebhookEvents: [
+                  {
+                    eventType: "github.pull_request.opened",
+                    providerEventType: "pull_request",
+                    displayName: "Pull request opened",
+                    requirements: {
+                      anyOf: [
+                        {
+                          event: "pull_request",
+                          permissions: [{ permission: "pull_requests", access: "read" }],
+                        },
+                      ],
+                    },
+                  },
+                  {
+                    eventType: "github.pull_request.reopened",
+                    providerEventType: "pull_request",
+                    displayName: "Pull request reopened",
+                    requirements: {
+                      anyOf: [
+                        {
+                          event: "pull_request",
+                          permissions: [{ permission: "pull_requests", access: "read" }],
+                        },
+                      ],
+                    },
+                  },
+                  {
+                    eventType: "github.pull_request.synchronize",
+                    providerEventType: "pull_request",
+                    displayName: "Pull request updated",
+                    requirements: {
+                      anyOf: [
+                        {
+                          event: "pull_request",
+                          permissions: [{ permission: "pull_requests", access: "read" }],
+                        },
+                      ],
+                    },
+                  },
+                ],
+                targetHealth: {
+                  configStatus: "valid",
+                },
+              },
+            ]
+          : []),
+      ],
     });
 
-    if (input.seedSlackProfile === true) {
+    if (hasSlackProfile) {
       queryClient.setQueryData(
         [...WEBHOOK_AUTOMATION_WEBHOOK_SOURCES_QUERY_KEY_PREFIX, SlackConnectionId],
         [
@@ -94,20 +177,73 @@ function renderCreatePage(input: {
         ],
       );
     }
+    if (hasGitHubProfile) {
+      queryClient.setQueryData(
+        [...WEBHOOK_AUTOMATION_WEBHOOK_SOURCES_QUERY_KEY_PREFIX, GitHubConnectionId],
+        [
+          {
+            id: "iws_github_test",
+            targetKey: "github-cloud",
+            integrationConnectionId: GitHubConnectionId,
+            displayName: "GitHub webhook",
+            endpointKey: "ep_github_test",
+            status: "active",
+            providerMetadata: createStoryWebhookTriggerCapabilitiesProviderMetadata({
+              definition: GitHubCloudBrowserDefinition,
+              events: ["pull_request"],
+              permissions: [{ permission: "pull_requests", access: "read" }],
+            }),
+            createdAt: "2026-05-01T00:00:00.000Z",
+            updatedAt: "2026-05-08T00:00:00.000Z",
+          },
+        ],
+      );
+    }
   }
 
   queryClient.setQueryData(
     AUTOMATION_SANDBOX_PROFILES_QUERY_KEY,
-    input.seedSlackProfile === true
+    input.seedSlackProfile === true || input.seedGitHubProfile === true
       ? [
           {
             value: SandboxProfileId,
-            label: "Slack profile",
+            label: "Automation profile",
           },
         ]
       : [],
   );
-  if (input.seedSlackProfile === true) {
+  if (input.seedSlackProfile === true || input.seedGitHubProfile === true) {
+    const bindings = [
+      ...(input.seedSlackProfile === true
+        ? [
+            {
+              id: "bnd_slack_test",
+              sandboxProfileId: SandboxProfileId,
+              sandboxProfileVersion: 1,
+              connectionId: SlackConnectionId,
+              kind: "connector",
+              config: {},
+              createdAt: "2026-05-01T00:00:00.000Z",
+              updatedAt: "2026-05-08T00:00:00.000Z",
+            },
+          ]
+        : []),
+      ...(input.seedGitHubProfile === true
+        ? [
+            {
+              id: "bnd_github_test",
+              sandboxProfileId: SandboxProfileId,
+              sandboxProfileVersion: 1,
+              connectionId: GitHubConnectionId,
+              kind: "git",
+              config: {},
+              createdAt: "2026-05-01T00:00:00.000Z",
+              updatedAt: "2026-05-08T00:00:00.000Z",
+            },
+          ]
+        : []),
+    ];
+
     queryClient.setQueryData(sandboxProfileVersionsQueryKey(SandboxProfileId), {
       versions: [
         {
@@ -136,18 +272,7 @@ function renderCreatePage(input: {
       }),
       {
         repositoryOptions: [],
-        bindings: [
-          {
-            id: "bnd_slack_test",
-            sandboxProfileId: SandboxProfileId,
-            sandboxProfileVersion: 1,
-            connectionId: SlackConnectionId,
-            kind: "connector",
-            config: {},
-            createdAt: "2026-05-01T00:00:00.000Z",
-            updatedAt: "2026-05-08T00:00:00.000Z",
-          },
-        ],
+        bindings,
       },
     );
   }
@@ -235,6 +360,18 @@ describe("AutomationCreatePage", () => {
     );
   });
 
+  it("prefills the create form from the GitHub PR review template", () => {
+    renderCreatePage({ initialEntry: "/automations/new?template=github-pr-review" });
+
+    expect(screen.getByText("Event")).toBeDefined();
+    expect(getFormControlValue(screen.getByRole("textbox", { name: "Trigger name" }))).toBe(
+      "GitHub PR Review",
+    );
+    expect(screen.getByRole("textbox", { name: "User message" }).textContent).toContain(
+      "{{payload.repository.full_name}}",
+    );
+  });
+
   it("selects the template event after profile bindings are available", async () => {
     renderCreatePage({
       initialEntry: `/automations/new?sandboxProfileId=${SandboxProfileId}&template=slack-app-mention`,
@@ -243,6 +380,19 @@ describe("AutomationCreatePage", () => {
 
     await waitFor(() => {
       expect(screen.getByText("App mention")).toBeDefined();
+    });
+  });
+
+  it("selects all GitHub PR review template events after profile bindings are available", async () => {
+    renderCreatePage({
+      initialEntry: `/automations/new?sandboxProfileId=${SandboxProfileId}&template=github-pr-review`,
+      seedGitHubProfile: true,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Pull request opened")).toBeDefined();
+      expect(screen.getByText("Pull request reopened")).toBeDefined();
+      expect(screen.getByText("Pull request updated")).toBeDefined();
     });
   });
 

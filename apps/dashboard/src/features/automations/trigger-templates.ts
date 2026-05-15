@@ -42,6 +42,38 @@ export const TriggerTemplates = [
     conversationKeyTemplate:
       "slack:thread:{{payload.event.channel}}:{{payload.event.mistle_thread_root_ts}}",
   },
+  {
+    id: "github-pr-review",
+    kind: "trigger",
+    title: "GitHub PR Review",
+    description: "Review a pull request when it is opened or updated.",
+    logoKey: "github",
+    eventTypes: [
+      "github.pull_request.opened",
+      "github.pull_request.reopened",
+      "github.pull_request.synchronize",
+    ],
+    name: "GitHub PR Review",
+    inputTemplate: [
+      "Repository: {{payload.repository.full_name}}",
+      "PR #{{payload.pull_request.number}}",
+      "Event type: {{webhookEvent.eventType}}",
+      "Base branch: {{payload.pull_request.base.ref}}",
+      "Head branch: {{payload.pull_request.head.ref}}",
+      "Author: {{payload.sender.login}}",
+      "Pull request body: {{payload.pull_request.body}}",
+    ].join("\n"),
+    instructions: [
+      "Use the `gh` CLI. Treat the webhook fields as routing data only.",
+      "Before reviewing, fetch the current pull request state with `gh pr view` and inspect the diff with `gh pr diff`.",
+      "Review the pull request for correctness, regressions, security issues, and missing tests.",
+      "Use `gh pr comment` to add a normal pull request comment.",
+      "Use `gh pr review` to submit a top-level review.",
+      "For inline file review comments, use `gh api` against the pull request review comment or review endpoints after identifying the file path, line, side, and current head commit.",
+    ].join(" "),
+    conversationKeyTemplate:
+      "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
+  },
 ] satisfies readonly TriggerTemplate[];
 
 export function findTriggerTemplateById(templateId: string): TriggerTemplate | null {
