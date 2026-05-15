@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { GitHubPullRequestConversationKeyTemplate } from "./webhook-automation-conversation-key-options.js";
 import {
   toCreateWebhookAutomationPayload,
   toUpdateWebhookAutomationPayload,
@@ -68,8 +69,7 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
         id: "pull-request",
         label: "Pull request",
         description: "Events from the same pull request go to the same conversation.",
-        template:
-          "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}",
+        template: GitHubPullRequestConversationKeyTemplate,
       },
       {
         id: "repository",
@@ -419,8 +419,7 @@ describe("validateWebhookAutomationFormValues", () => {
         {
           ...BaseFormValues,
           inputTemplate: DefaultWebhookAutomationMessageTemplate,
-          conversationKeyTemplate:
-            "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}",
+          conversationKeyTemplate: GitHubPullRequestConversationKeyTemplate,
         },
         GitHubEventOptions,
       ),
@@ -432,8 +431,7 @@ describe("validateWebhookAutomationFormValues", () => {
       validateWebhookAutomationFormValues(
         {
           ...BaseFormValues,
-          conversationKeyTemplate:
-            "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}",
+          conversationKeyTemplate: GitHubPullRequestConversationKeyTemplate,
           triggerIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
           triggerParameterValues: {
             [IssueCommentCreatedTriggerId]: {

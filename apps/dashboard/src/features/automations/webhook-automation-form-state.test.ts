@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { GitHubPullRequestConversationKeyTemplate } from "./webhook-automation-conversation-key-options.js";
 import {
   resolveWebhookAutomationFormPresentation,
   resolveWebhookAutomationFormState,
@@ -28,9 +29,6 @@ const PrimaryRepositoryOptions: readonly WebhookAutomationFormOption[] = [
     path: "/root/mistlehq/platform",
   },
 ];
-const GitHubPullRequestConversationKeyTemplate =
-  "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}";
-
 describe("resolveWebhookAutomationFormPresentation", () => {
   it("shows create-only and edit-only controls based on mode", () => {
     expect(

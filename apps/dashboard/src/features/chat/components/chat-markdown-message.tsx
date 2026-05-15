@@ -8,6 +8,7 @@ type ChatMarkdownMessageProps = {
   className?: string;
   contentClassName?: string;
   isStreaming: boolean;
+  preserveSoftLineBreaks?: boolean;
   text: string;
 };
 
@@ -59,7 +60,10 @@ function rewriteSoftBreaks(node: MarkdownTreeNode): void {
   });
 }
 
-const RemarkPlugins = [...Object.values(defaultRemarkPlugins), preserveSoftBreaksRemarkPlugin];
+const RemarkPluginsPreservingSoftBreaks = [
+  ...Object.values(defaultRemarkPlugins),
+  preserveSoftBreaksRemarkPlugin,
+];
 
 export function ChatMarkdownMessage(props: ChatMarkdownMessageProps): JSX.Element {
   return (
@@ -86,7 +90,9 @@ export function ChatMarkdownMessage(props: ChatMarkdownMessageProps): JSX.Elemen
         }}
         mode={props.isStreaming ? "streaming" : "static"}
         plugins={StreamdownPlugins}
-        remarkPlugins={RemarkPlugins}
+        {...(props.preserveSoftLineBreaks === true
+          ? { remarkPlugins: RemarkPluginsPreservingSoftBreaks }
+          : {})}
       >
         {props.text}
       </Streamdown>

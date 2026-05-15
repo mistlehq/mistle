@@ -4,6 +4,7 @@ import {
   getTriggerTemplateById,
   resolveTriggerTemplateEventOptionIds,
 } from "./trigger-templates.js";
+import { GitHubPullRequestConversationKeyTemplate } from "./webhook-automation-conversation-key-options.js";
 import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
 import {
   createGithubIssueCommentCreatedEventOption,
@@ -67,9 +68,7 @@ describe("trigger templates", () => {
     expect(template.instructions).toContain("`gh pr comment`");
     expect(template.instructions).toContain("`gh api`");
     expect(template.instructions).not.toContain("Review the pull request for correctness");
-    expect(template.conversationKeyTemplate).toBe(
-      "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}",
-    );
+    expect(template.conversationKeyTemplate).toBe(GitHubPullRequestConversationKeyTemplate);
   });
 
   it("resolves template trigger ids only when every event is available from one webhook source", () => {

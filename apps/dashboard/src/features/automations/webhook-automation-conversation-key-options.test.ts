@@ -1,7 +1,10 @@
 import { SlackBrowserDefinition } from "@mistle/integrations-definitions/browser";
 import { describe, expect, it } from "vitest";
 
-import { resolveCommonWebhookAutomationConversationKeyOptions } from "./webhook-automation-conversation-key-options.js";
+import {
+  GitHubPullRequestConversationKeyTemplate,
+  resolveCommonWebhookAutomationConversationKeyOptions,
+} from "./webhook-automation-conversation-key-options.js";
 import {
   createWebhookAutomationEventOption,
   createWebhookAutomationTriggerId,
@@ -22,8 +25,6 @@ const GitHubPullRequestOpenedTriggerId = createWebhookAutomationTriggerId({
   webhookSourceId: GitHubWebhookSourceId,
   eventType: "github.pull_request.opened",
 });
-const GitHubPullRequestConversationKeyTemplate =
-  "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}";
 
 function createSlackEventOption(eventType: string) {
   const eventDefinition = SlackBrowserDefinition.supportedWebhookEvents?.find(

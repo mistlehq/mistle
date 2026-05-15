@@ -1,4 +1,5 @@
 import { ScheduledAutomationConversationModes } from "./scheduled-automation-form-types.js";
+import { GitHubPullRequestConversationKeyTemplate } from "./webhook-automation-conversation-key-options.js";
 import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
 import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 
@@ -130,8 +131,7 @@ export const TriggerTemplates = [
       "",
       "Publish by default unless the request explicitly asks for a dry run, preview, or local-only review. Post exact changed-line findings as inline review comments with `gh api`. Put architectural, cross-file, non-diff, or unanchorable findings in the PR-level comment with file or symbol references. Post the overall result, proof checked, residual risk, judgment, and broad questions with `gh pr comment`. Post inline comments first, then the PR-level summary.",
     ].join("\n"),
-    conversationKeyTemplate:
-      "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}",
+    conversationKeyTemplate: GitHubPullRequestConversationKeyTemplate,
     triggerParameterValuesByEventType: {
       "github.issue_comment.created": {
         invocationToken: "pr-review",

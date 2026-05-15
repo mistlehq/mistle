@@ -8,13 +8,14 @@ import type {
 const GitHubIssueCommentCreatedEventType = "github.issue_comment.created";
 const GitHubIssueCommentTargetParameterId = "target";
 const GitHubIssueCommentPullRequestTargetValue = "exists";
+export const GitHubPullRequestConversationKeyTemplate =
+  "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}";
 
 const GitHubPullRequestConversationKeyOption = {
   id: "pull-request",
   label: "Pull request",
   description: "Events from the same pull request go to the same conversation.",
-  template:
-    "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}",
+  template: GitHubPullRequestConversationKeyTemplate,
 } satisfies WebhookAutomationConversationKeyOption;
 
 function shouldAddGitHubPullRequestGrouping(input: {
