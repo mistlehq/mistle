@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { defaultMissingEnabledToFalse } from "../../core/discriminated-union.js";
+
 export const ControlPlaneWorkerDatabaseConfigSchema = z
   .object({
     url: z.string().min(1),
@@ -51,6 +53,33 @@ export const ControlPlaneWorkerSandboxConfigSchema = z
   })
   .strict();
 
+const ControlPlaneWorkerStripeBillingConfigSchema = z.preprocess(
+  defaultMissingEnabledToFalse,
+  z.discriminatedUnion("enabled", [
+    z
+      .object({
+        enabled: z.literal(true),
+        secretKey: z.string().min(1),
+      })
+      .strict(),
+    z
+      .object({
+        enabled: z.literal(false),
+        secretKey: z.string().min(1).optional(),
+      })
+      .strict(),
+  ]),
+);
+
+const ControlPlaneWorkerBillingConfigObjectSchema = z
+  .object({
+    stripe: ControlPlaneWorkerStripeBillingConfigSchema,
+  })
+  .strict();
+
+export const ControlPlaneWorkerBillingConfigSchema =
+  ControlPlaneWorkerBillingConfigObjectSchema.default({ stripe: { enabled: false } });
+
 export const ControlPlaneWorkerConfigSchema = z
   .object({
     database: ControlPlaneWorkerDatabaseConfigSchema,
@@ -60,6 +89,7 @@ export const ControlPlaneWorkerConfigSchema = z
     controlPlaneApi: ControlPlaneWorkerControlPlaneApiConfigSchema,
     internalAuth: ControlPlaneWorkerInternalAuthConfigSchema,
     sandbox: ControlPlaneWorkerSandboxConfigSchema,
+    billing: ControlPlaneWorkerBillingConfigSchema,
   })
   .strict();
 
@@ -72,6 +102,7 @@ export const PartialControlPlaneWorkerConfigSchema = z
     controlPlaneApi: ControlPlaneWorkerControlPlaneApiConfigSchema.partial().optional(),
     internalAuth: ControlPlaneWorkerInternalAuthConfigSchema.partial().optional(),
     sandbox: ControlPlaneWorkerSandboxConfigSchema.partial().optional(),
+    billing: ControlPlaneWorkerBillingConfigObjectSchema.partial().optional(),
   })
   .strict();
 

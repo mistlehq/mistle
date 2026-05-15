@@ -1185,7 +1185,7 @@ export interface paths {
             connectionId?: string;
             organizationId: string;
             /** @enum {string} */
-            provider: "docker" | "e2b";
+            provider: "docker" | "e2b" | "tensorlake";
           };
         };
       };
@@ -1208,6 +1208,13 @@ export interface paths {
                   domain?: string;
                   /** @enum {string} */
                   provider: "e2b";
+                  /** @enum {string} */
+                  source: "managed" | "connection";
+                }
+              | {
+                  apiKey: string;
+                  /** @enum {string} */
+                  provider: "tensorlake";
                   /** @enum {string} */
                   source: "managed" | "connection";
                 };

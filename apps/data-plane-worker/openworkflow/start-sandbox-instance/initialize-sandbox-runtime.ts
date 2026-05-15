@@ -27,6 +27,8 @@ import { createSandboxRuntimeEnv } from "./start-sandbox.js";
 export async function createSandboxStartupInput(input: {
   config: DataPlaneWorkerRuntimeConfig;
   organizationId: string;
+  operationId: string;
+  operationKind: SandboxStartupInput["operationKind"];
   sandboxInstanceId: string;
   startupMode: SandboxStartupInput["startupMode"];
   executionMode?: SandboxStartupInput["executionMode"];
@@ -40,6 +42,7 @@ export async function createSandboxStartupInput(input: {
   const tunnelExchangeTokenJti = randomUUID();
   const tunnelGatewayWsUrl = createSandboxTunnelGatewayWsUrl({
     gatewayWebsocketUrl: input.config.sandbox.internalGatewayWsUrl,
+    operationId: input.operationId,
     sandboxInstanceId: input.sandboxInstanceId,
   });
 
@@ -109,6 +112,7 @@ export async function createSandboxStartupInput(input: {
   return {
     startupMode: input.startupMode,
     ...(input.executionMode === undefined ? {} : { executionMode: input.executionMode }),
+    operationKind: input.operationKind,
     bootstrapToken,
     tunnelExchangeToken,
     tunnelGatewayWsUrl,
@@ -130,6 +134,8 @@ export async function initializeSandboxRuntime(
   },
   input: {
     organizationId: string;
+    operationId: string;
+    operationKind: SandboxStartupInput["operationKind"];
     sandboxInstanceId: string;
     providerSandboxId: string;
     startupMode: SandboxStartupInput["startupMode"];
@@ -181,6 +187,8 @@ export async function initializeSandboxRuntime(
   const startupInput = await createSandboxStartupInput({
     config: ctx.config,
     organizationId: input.organizationId,
+    operationId: input.operationId,
+    operationKind: input.operationKind,
     sandboxInstanceId: input.sandboxInstanceId,
     startupMode: input.startupMode,
     ...(input.executionMode === undefined ? {} : { executionMode: input.executionMode }),
@@ -196,11 +204,35 @@ export async function initializeSandboxRuntime(
     payload: encodeSandboxStartupInput(startupInput),
     env: runtimeEnv,
   };
-  if (input.waitForCompletion === false) {
+  try {
     await ctx.sandboxRuntimeControl.beginInit(initRequest);
-  } else {
-    await ctx.sandboxRuntimeControl.init(initRequest);
+  } catch (error) {
+    if (!isSandboxdAlreadyInitializedError(error)) {
+      throw error;
+    }
+
+    ctx.logger.info(
+      {
+        providerSandboxId: input.providerSandboxId,
+        sandboxInstanceId: input.sandboxInstanceId,
+      },
+      "Sandboxd initialization was already submitted before retry.",
+    );
   }
+
+  if (input.waitForCompletion !== false) {
+    await ctx.sandboxRuntimeControl.waitInit({
+      id: input.providerSandboxId,
+      env: runtimeEnv,
+    });
+  }
+}
+
+function isSandboxdAlreadyInitializedError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message.includes("sandboxd has already completed initialization")
+  );
 }
 
 function createTransparentProxyStartupConfiguration(input: {

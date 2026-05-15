@@ -109,6 +109,28 @@ export function createSandboxRuntimeProviderResolver(input: {
         });
       }
 
+      if (runtimeInput.provider === SandboxProvider.TENSORLAKE) {
+        const credentials = await input.controlPlaneInternalClient.resolveSandboxRuntimeCredentials(
+          {
+            organizationId: runtimeInput.organizationId,
+            provider: SandboxProvider.TENSORLAKE,
+            ...(runtimeInput.connectionId === undefined
+              ? {}
+              : { connectionId: runtimeInput.connectionId }),
+          },
+        );
+        if (credentials.provider !== SandboxProvider.TENSORLAKE) {
+          throw new Error(
+            "Control-plane returned non-Tensorlake credentials for Tensorlake runtime.",
+          );
+        }
+
+        return createTensorlakeSandboxRuntime({
+          credentials,
+          resources: runtimeInput.resources,
+        });
+      }
+
       return assertUnreachableSandboxProvider(runtimeInput.provider);
     },
   };
@@ -174,6 +196,31 @@ export function createE2BSandboxProviderConfig(input: {
             cpuCount: input.resources.vcpuCount,
             memoryMb: input.resources.memoryMb,
           }),
+    },
+  };
+}
+
+function createTensorlakeSandboxRuntime(input: {
+  credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "tensorlake" }>;
+  resources?: ResolveSandboxRuntimeInput["resources"];
+}): ResolvedSandboxRuntime {
+  const providerConfig = createTensorlakeSandboxProviderConfig(input);
+
+  return {
+    provider: SandboxProvider.TENSORLAKE,
+    sandboxAdapter: createSandboxAdapter(providerConfig),
+    sandboxRuntimeControl: createSandboxRuntimeControl(providerConfig),
+  };
+}
+
+export function createTensorlakeSandboxProviderConfig(input: {
+  credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "tensorlake" }>;
+  resources?: ResolveSandboxRuntimeInput["resources"];
+}): CreateSandboxAdapterInput {
+  return {
+    provider: SandboxProvider.TENSORLAKE,
+    tensorlake: {
+      apiKey: input.credentials.apiKey,
     },
   };
 }

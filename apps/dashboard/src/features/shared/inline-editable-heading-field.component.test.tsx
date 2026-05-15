@@ -61,8 +61,10 @@ describe("InlineEditableHeadingField", () => {
 
     const input = screen.getByRole("textbox", { name: "Heading" });
 
-    expect(input.className).toContain("h-7");
-    expect(input.className).toContain("text-sm");
+    expect(input.className).toContain("h-8");
+    expect(input.className).toContain("text-base");
+    expect(input.className).toContain("md:h-7");
+    expect(input.className).toContain("md:text-sm");
     expect(input.className).toContain("leading-tight");
     expect(input.className).toContain("font-medium");
   });

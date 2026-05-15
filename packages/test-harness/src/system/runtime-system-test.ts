@@ -26,10 +26,7 @@ import { createDockerSandboxProviderInfra } from "../environment/service-catalog
 import type { TestEnvironment, TestInfraRequirement } from "../environment/types.js";
 import { createIntegrationTest, type IntegrationTestEnvironment } from "../integration/index.js";
 import { ServiceIds, type ServiceId } from "../integration/services/service-ids.js";
-import {
-  DockerIntegrationConfigPathInContainer,
-  E2BIntegrationConfigPathInContainer,
-} from "./integration-config-paths.js";
+import { IntegrationConfigPathInContainer } from "./integration-config-paths.js";
 import { resolveHostPathFromContainerPath } from "./provision-system-integration-targets.js";
 import type { RuntimePublicAccessTunnel } from "./runtime-public-access.js";
 import { startRuntimeCloudflaredTunnel } from "./runtime-public-access.js";
@@ -46,7 +43,7 @@ export type SystemTestServiceSelection =
 
 export type SystemTestExtraInfraId = "mailpit" | "otlp" | "seaweedfs";
 
-export type SystemTestSandboxProvider = "docker" | "e2b";
+export type SystemTestSandboxProvider = "docker" | "e2b" | "tensorlake";
 
 export type SystemTestSandbox = {
   provider: SystemTestSandboxProvider;
@@ -189,6 +186,8 @@ function createInternalInfra(input: CreateSystemTestInput): readonly TestInfraRe
       return createDockerSandboxProviderInfra();
     case "e2b":
       return [];
+    case "tensorlake":
+      return [];
   }
 }
 
@@ -201,6 +200,9 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
       domain?: string;
       cpuCount?: string;
       memoryMb?: string;
+    };
+    tensorlake?: {
+      apiKey: string;
     };
     publicServiceBaseUrls?: ReadonlyMap<ServiceId, string>;
   };
@@ -218,13 +220,32 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
   }
 
   const publicServiceBaseUrls = createPublicServiceBaseUrls(input.publicAccess);
+  if (input.sandbox.provider === "e2b") {
+    return {
+      sandbox: {
+        provider: "e2b",
+        defaultBaseImageRef: await getSystemTestSandboxBaseImageRef(),
+        e2b: readE2BOptions(),
+        publicServiceBaseUrls,
+      },
+    };
+  }
+
   return {
     sandbox: {
-      provider: "e2b",
+      provider: "tensorlake",
       defaultBaseImageRef: await getSystemTestSandboxBaseImageRef(),
-      e2b: readE2BOptions(),
+      tensorlake: readTensorlakeOptions(),
       publicServiceBaseUrls,
     },
+  };
+}
+
+function readTensorlakeOptions(): {
+  apiKey: string;
+} {
+  return {
+    apiKey: readRequiredEnv("TENSORLAKE_API_KEY"),
   };
 }
 
@@ -719,11 +740,8 @@ async function syncControlPlaneIntegrationTargets(input: {
 export function resolveRuntimeSystemIntegrationConfigPathInContainer(
   input: CreateSystemTestInput,
 ): string {
-  if (input.sandbox?.provider === "e2b") {
-    return E2BIntegrationConfigPathInContainer;
-  }
-
-  return DockerIntegrationConfigPathInContainer;
+  void input;
+  return IntegrationConfigPathInContainer;
 }
 
 async function runCommand(input: {

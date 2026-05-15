@@ -77,6 +77,16 @@ export type ResolvedOAuth2AuthorizationCodeCapabilityTarget = {
     Record<string, string>,
     Record<string, unknown>
   >;
+  connectionMethod: {
+    id: string;
+    kind: "redirect";
+    ui: {
+      reauthorize?: {
+        actionLabel: string;
+        pendingLabel: string;
+      };
+    };
+  };
   connectionMethodStartConfigSchema?: IntegrationConfigSchema<Record<string, unknown>>;
 };
 
@@ -118,6 +128,12 @@ export async function resolveOAuth2AuthorizationCodeCapabilityTargetOrThrow(
     throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.OAUTH2_NOT_SUPPORTED,
       `Integration target '${input.targetKey}' does not support OAuth 2.0 (Authorization Code).`,
+    );
+  }
+  if (oauth2ConnectionMethod.kind !== "redirect") {
+    throw new BadRequestError(
+      input.invalidInputCode,
+      `Integration target '${input.targetKey}' OAuth 2.0 (Authorization Code) method must be a redirect method.`,
     );
   }
 
@@ -185,8 +201,15 @@ export async function resolveOAuth2AuthorizationCodeCapabilityTargetOrThrow(
       secrets: parsedSecrets,
     },
     oauth2AuthorizationCode,
-    ...(oauth2ConnectionMethod.kind !== "redirect" ||
-    oauth2ConnectionMethod.startConfigSchema === undefined
+    connectionMethod: {
+      id: oauth2ConnectionMethod.id,
+      kind: oauth2ConnectionMethod.kind,
+      ui:
+        oauth2ConnectionMethod.ui.reauthorize === undefined
+          ? {}
+          : { reauthorize: oauth2ConnectionMethod.ui.reauthorize },
+    },
+    ...(oauth2ConnectionMethod.startConfigSchema === undefined
       ? {}
       : { connectionMethodStartConfigSchema: oauth2ConnectionMethod.startConfigSchema }),
   };

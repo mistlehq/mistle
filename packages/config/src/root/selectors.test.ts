@@ -1,15 +1,22 @@
 import { describe, expect, it } from "vitest";
 
 import type { Config } from "./schema.js";
-import { selectControlPlaneApiConfig } from "./selectors.js";
+import {
+  selectControlPlaneApiConfig,
+  selectControlPlaneWorkerConfig,
+  selectDataPlaneApiConfig,
+  selectDataPlaneWorkerConfig,
+} from "./selectors.js";
 
 function createRootConfig(input: {
   allowSignups?: boolean;
+  billingStripe?: { enabled: false; secret_key?: string } | { enabled: true; secret_key: string };
   enabledMethods?: Array<"otp" | "google">;
   google?: {
     client_id: string;
     client_secret: string;
   };
+  sandbox?: Partial<Config["sandbox"]>;
 }): Config {
   return {
     global: {
@@ -119,6 +126,11 @@ function createRootConfig(input: {
         token: "internal-token",
       },
     },
+    billing: {
+      stripe: input.billingStripe ?? {
+        enabled: false,
+      },
+    },
     sandbox: {
       default_base_image: "registry.example.com/sandbox:latest",
       publish_base_domain: "mistle.example",
@@ -151,6 +163,11 @@ function createRootConfig(input: {
         cpu_count: 4,
         memory_mb: 8192,
       },
+      tensorlake: {
+        enabled: true,
+        api_key: "tensorlake-api-key",
+      },
+      ...input.sandbox,
     },
   };
 }
@@ -207,5 +224,105 @@ describe("selectControlPlaneApiConfig", () => {
     const config = selectControlPlaneApiConfig(createRootConfig({ allowSignups: false }));
 
     expect(config.auth.allowSignups).toBe(false);
+  });
+
+  it("selects disabled Stripe billing for the control-plane API", () => {
+    const config = selectControlPlaneApiConfig(createRootConfig({}));
+
+    expect(config.billing.stripe).toEqual({
+      enabled: false,
+    });
+  });
+
+  it("selects enabled Stripe billing for the control-plane API without exposing the secret", () => {
+    const config = selectControlPlaneApiConfig(
+      createRootConfig({
+        billingStripe: {
+          enabled: true,
+          secret_key: "sk_test_secret",
+        },
+      }),
+    );
+
+    expect(config.billing.stripe).toEqual({
+      enabled: true,
+    });
+  });
+
+  it("projects Tensorlake as an enabled managed sandbox provider", () => {
+    const config = selectControlPlaneApiConfig(createRootConfig({}));
+
+    expect(config.sandbox.tensorlake).toEqual({
+      enabled: true,
+      apiKey: "tensorlake-api-key",
+    });
+  });
+});
+
+describe("selectControlPlaneWorkerConfig", () => {
+  it("selects enabled Stripe billing with the worker secret", () => {
+    const config = selectControlPlaneWorkerConfig(
+      createRootConfig({
+        billingStripe: {
+          enabled: true,
+          secret_key: "sk_test_secret",
+        },
+      }),
+    );
+
+    expect(config.billing.stripe).toEqual({
+      enabled: true,
+      secretKey: "sk_test_secret",
+    });
+  });
+
+  it("selects disabled Stripe billing with a provisioned worker secret", () => {
+    const config = selectControlPlaneWorkerConfig(
+      createRootConfig({
+        billingStripe: {
+          enabled: false,
+          secret_key: "sk_test_secret",
+        },
+      }),
+    );
+
+    expect(config.billing.stripe).toEqual({
+      enabled: false,
+      secretKey: "sk_test_secret",
+    });
+  });
+});
+
+describe("selectDataPlaneApiConfig", () => {
+  it("projects remote sandbox providers", () => {
+    const config = selectDataPlaneApiConfig(createRootConfig({}));
+
+    expect(config.sandbox.e2b).toEqual({
+      enabled: true,
+      apiKey: "e2b-api-key",
+      domain: "e2b.example.com",
+    });
+    expect(config.sandbox.tensorlake).toEqual({
+      enabled: true,
+      apiKey: "tensorlake-api-key",
+    });
+  });
+});
+
+describe("selectDataPlaneWorkerConfig", () => {
+  it("projects remote sandbox providers", () => {
+    const config = selectDataPlaneWorkerConfig(createRootConfig({}));
+
+    expect(config.sandbox.e2b).toEqual({
+      enabled: true,
+      apiKey: "e2b-api-key",
+      domain: "e2b.example.com",
+      cpuCount: 4,
+      memoryMb: 8192,
+    });
+    expect(config.sandbox.tensorlake).toEqual({
+      enabled: true,
+      apiKey: "tensorlake-api-key",
+    });
   });
 });

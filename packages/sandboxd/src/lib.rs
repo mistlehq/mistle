@@ -1,9 +1,10 @@
 //! `sandboxd` is the long-lived sandbox supervisor daemon.
 //!
 //! The default entrypoint runs the daemon behind the local Unix control socket.
-//! The supported lifecycle subcommands, `init` and `resume`, are thin local
-//! clients that read one startup payload from stdin, submit it to the running
-//! daemon, print the daemon response, and exit.
+//! The supported lifecycle subcommands, `ready`, `init`, `resume`, and
+//! `wait-init`, are thin local clients that submit requests to the running
+//! daemon and exit. The `version` subcommand prints the binary version used by
+//! release artifact validation and runtime updates.
 
 use std::fmt;
 use std::io;
@@ -70,6 +71,7 @@ fn initialize_sandboxd_tracing() {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SandboxdCommand {
     Daemon,
+    Ready,
     Init { detach: bool },
     Resume,
     Sign,
@@ -92,7 +94,7 @@ impl fmt::Display for ParseSandboxdCommandError {
             }
             Self::UnknownCommand(command) => write!(
                 f,
-                "unknown sandboxd subcommand '{command}' (expected 'init', 'resume', 'wait-init', or 'version')"
+                "unknown sandboxd subcommand '{command}' (expected 'ready', 'init', 'resume', 'wait-init', or 'version')"
             ),
         }
     }
@@ -112,6 +114,7 @@ where
     };
 
     let command = match command.as_str() {
+        "ready" => SandboxdCommand::Ready,
         "init" => {
             let mut detach = false;
             for argument in parsed_args.by_ref() {
@@ -190,6 +193,15 @@ where
             };
 
             match server.wait() {
+                Ok(()) => 0,
+                Err(error) => {
+                    let _ = writeln!(stderr, "{error}");
+                    1
+                }
+            }
+        }
+        SandboxdCommand::Ready => {
+            match control::submit_ready(Path::new(control::DEFAULT_CONTROL_SOCKET_PATH)) {
                 Ok(()) => 0,
                 Err(error) => {
                     let _ = writeln!(stderr, "{error}");
@@ -276,6 +288,13 @@ mod tests {
         let command = parse_sandboxd_command(["init", "--detach"]);
 
         assert_eq!(command, Ok(SandboxdCommand::Init { detach: true }));
+    }
+
+    #[test]
+    fn parses_ready() {
+        let command = parse_sandboxd_command(["ready"]);
+
+        assert_eq!(command, Ok(SandboxdCommand::Ready));
     }
 
     #[test]

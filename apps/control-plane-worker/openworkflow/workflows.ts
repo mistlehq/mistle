@@ -1,6 +1,7 @@
 import { HandleAutomationConversationDeliveryWorkflow } from "./handle-automation-conversation-delivery/workflow.js";
 import { HandleAutomationRunWorkflow } from "./handle-automation-run/workflow.js";
 import { HandleIntegrationWebhookEventWorkflow } from "./handle-integration-webhook-event/workflow.js";
+import { ProvisionStripeCustomerWorkflow } from "./provision-stripe-customer/workflow.js";
 import { RequestDeleteSandboxProfileWorkflow } from "./request-delete-sandbox-profile/workflow.js";
 import { ScheduleDispatchBatchWorkflow } from "./schedule-dispatch/batch-workflow.js";
 import { ScheduleDispatchWorkflow } from "./schedule-dispatch/workflow.js";
@@ -21,6 +22,7 @@ export const ControlPlaneWorkerWorkflows = [
   HandleAutomationConversationDeliveryWorkflow,
   HandleAutomationRunWorkflow,
   HandleIntegrationWebhookEventWorkflow,
+  ProvisionStripeCustomerWorkflow,
   RequestDeleteSandboxProfileWorkflow,
   ScheduleDispatchBatchWorkflow,
   ScheduleDispatchWorkflow,

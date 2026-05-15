@@ -8,6 +8,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
+import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
 import { SessionWorkbenchPage } from "./session-workbench-page.js";
 
 function renderSessionWorkbenchPage(input?: {
@@ -29,6 +30,10 @@ function renderSessionWorkbenchPage(input?: {
       failureCode: null,
       failureMessage: null,
       id: sandboxInstanceId,
+      automationConversation: null,
+      connectable: false,
+      runtimeContext: null,
+      startupOperation: null,
       status: input.seededStatus,
       title: "Test session",
     });
@@ -111,16 +116,19 @@ describe("SessionWorkbenchPage", () => {
     });
 
     await act(async () => {
-      view.queryClient.setQueryData(sandboxInstanceStatusQueryKey(sandboxInstanceId), {
+      const status = {
         automationConversation: null,
         connectable: false,
         failureCode: null,
         failureMessage: null,
         id: sandboxInstanceId,
         runtimeContext: null,
-        status: "running" as const,
+        startupOperation: null,
+        status: "running",
         title: "Test session",
-      });
+      } satisfies SandboxInstanceStatusResult;
+
+      view.queryClient.setQueryData(sandboxInstanceStatusQueryKey(sandboxInstanceId), status);
     });
 
     const workspaceHeader = screen.getByRole("banner");
@@ -140,16 +148,26 @@ describe("SessionWorkbenchPage", () => {
     });
 
     await act(async () => {
-      view.queryClient.setQueryData(sandboxInstanceStatusQueryKey(sandboxInstanceId), {
+      const status = {
         failureCode: null,
         failureMessage: null,
         id: sandboxInstanceId,
-        status: "pending" as const,
+        automationConversation: null,
+        connectable: false,
+        runtimeContext: null,
+        startupOperation: {
+          operationId: "owfr_session_startup_test",
+          operationKind: "start",
+        },
+        status: "pending",
         title: "Test session",
-      });
+      } satisfies SandboxInstanceStatusResult;
+
+      view.queryClient.setQueryData(sandboxInstanceStatusQueryKey(sandboxInstanceId), status);
     });
 
     expect(await screen.findByRole("status", { name: "Preparing sandbox" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Session startup" })).toBeNull();
     expect(screen.queryByPlaceholderText("Ask anything")).toBeNull();
   });
 
@@ -161,16 +179,26 @@ describe("SessionWorkbenchPage", () => {
     });
 
     await act(async () => {
-      view.queryClient.setQueryData(sandboxInstanceStatusQueryKey(sandboxInstanceId), {
+      const status = {
         failureCode: null,
         failureMessage: null,
         id: sandboxInstanceId,
-        status: "starting" as const,
+        automationConversation: null,
+        connectable: false,
+        runtimeContext: null,
+        startupOperation: {
+          operationId: "owfr_session_startup_test",
+          operationKind: "start",
+        },
+        status: "starting",
         title: "Test session",
-      });
+      } satisfies SandboxInstanceStatusResult;
+
+      view.queryClient.setQueryData(sandboxInstanceStatusQueryKey(sandboxInstanceId), status);
     });
 
     expect(await screen.findByRole("status", { name: "Running setup" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Session startup" })).toBeNull();
     expect(screen.queryByPlaceholderText("Ask anything")).toBeNull();
   });
 
@@ -182,16 +210,28 @@ describe("SessionWorkbenchPage", () => {
     });
 
     await act(async () => {
-      view.queryClient.setQueryData(sandboxInstanceStatusQueryKey(sandboxInstanceId), {
+      const status = {
         failureCode: null,
         failureMessage: null,
         id: sandboxInstanceId,
-        status: "running" as const,
+        automationConversation: null,
+        connectable: true,
+        runtimeContext: {
+          agentRuntimeId: "codex",
+          launchCwd: null,
+          primaryRepositoryRoot: null,
+        },
+        startupOperation: {
+          operationId: "owfr_session_startup_test",
+          operationKind: "start",
+        },
+        status: "running",
         title: "Test session",
-      });
+      } satisfies SandboxInstanceStatusResult;
+
+      view.queryClient.setQueryData(sandboxInstanceStatusQueryKey(sandboxInstanceId), status);
     });
 
     expect(await screen.findByRole("status", { name: "Connecting chat" })).toBeTruthy();
-    expect(screen.queryByPlaceholderText("Ask anything")).toBeNull();
   });
 });

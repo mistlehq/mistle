@@ -1,6 +1,6 @@
 import type { ServiceId } from "./service-ids.js";
 
-export type IntegrationSandboxProvider = "docker" | "e2b";
+export type IntegrationSandboxProvider = "docker" | "e2b" | "tensorlake";
 
 export type IntegrationSandboxE2BOptions = {
   apiKey: string;
@@ -10,10 +10,15 @@ export type IntegrationSandboxE2BOptions = {
   templateLockDirectoryPath?: string;
 };
 
+export type IntegrationSandboxTensorlakeOptions = {
+  apiKey: string;
+};
+
 export type IntegrationSandboxOptions = {
   provider: IntegrationSandboxProvider;
   defaultBaseImageRef?: string;
   e2b?: IntegrationSandboxE2BOptions;
+  tensorlake?: IntegrationSandboxTensorlakeOptions;
   publicServiceBaseUrls?: ReadonlyMap<ServiceId, string>;
 };
 

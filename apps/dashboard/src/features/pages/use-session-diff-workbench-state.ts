@@ -172,3 +172,5 @@ export function useSessionDiffWorkbenchState(input: {
     togglePanel,
   };
 }
+
+export type { SessionDiffWorkbenchState };

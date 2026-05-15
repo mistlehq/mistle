@@ -29,6 +29,7 @@ import {
 import {
   buildIntegrationConnectionDetailItems,
   type ProviderAppSetupState,
+  type ReauthorizationState,
   resolveIntegrationConnectionDetailWebhookPolicy,
 } from "./integrations-page-view-model.js";
 import { OrganizationIntegrationsSettingsPageView } from "./organization-integrations-settings-page-view.js";
@@ -46,6 +47,28 @@ function buildProviderAppSetupStateByConnectionId(input: {
   errorMessageByConnectionId: Readonly<Record<string, string | undefined>>;
   pendingConnectionId: string | null | undefined;
 }): ReadonlyMap<string, ProviderAppSetupState> {
+  return new Map(
+    input.connections.map((connection) => {
+      const errorMessage = input.errorMessageByConnectionId[connection.id];
+
+      return [
+        connection.id,
+        {
+          ...(errorMessage === undefined ? {} : { errorMessage }),
+          isPending: input.pendingConnectionId === connection.id,
+        },
+      ];
+    }),
+  );
+}
+
+function buildReauthorizationStateByConnectionId(input: {
+  connections: readonly {
+    id: string;
+  }[];
+  errorMessageByConnectionId: Readonly<Record<string, string | undefined>>;
+  pendingConnectionId: string | null | undefined;
+}): ReadonlyMap<string, ReauthorizationState> {
   return new Map(
     input.connections.map((connection) => {
       const errorMessage = input.errorMessageByConnectionId[connection.id];
@@ -167,6 +190,11 @@ export function IntegrationsPage() {
     errorMessageByConnectionId: connectionEditors.providerAppSetup.errorMessageByConnectionId,
     pendingConnectionId: connectionEditors.providerAppSetup.pendingConnectionId,
   });
+  const reauthorizationStateByConnectionId = buildReauthorizationStateByConnectionId({
+    connections: directoryState.selectedDetailConnections,
+    errorMessageByConnectionId: connectionEditors.reauthorization.errorMessageByConnectionId,
+    pendingConnectionId: connectionEditors.reauthorization.pendingConnectionId,
+  });
 
   if (
     detailTargetKey !== null &&
@@ -240,6 +268,7 @@ export function IntegrationsPage() {
           connections: directoryState.selectedDetailConnections,
           controlPlaneApiOrigin: dashboardConfig.controlPlaneApiOrigin,
           providerAppSetupStateByConnectionId,
+          reauthorizationStateByConnectionId,
           refreshingConnectionIds: directoryState.refreshingConnectionIds,
           refreshingResourceKeys: directoryState.refreshingResourceKeys,
           ...(directoryState.selectedDetailCard === null
@@ -277,6 +306,11 @@ export function IntegrationsPage() {
 
           if (editingConnection.connectionMethodId === "api-key") {
             connectionEditors.onEditApiKey(connectionId);
+            return;
+          }
+
+          if (editingConnection.connectionMethodId === "oauth2-authorization-code") {
+            void connectionEditors.reauthorization.onStart(connectionId);
             return;
           }
 

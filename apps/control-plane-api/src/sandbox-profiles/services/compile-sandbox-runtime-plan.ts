@@ -1,4 +1,7 @@
-import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import type {
+  ControlPlaneDatabase,
+  SandboxProfileVersionAgentRuntimeId,
+} from "@mistle/db/control-plane";
 import {
   CompilerErrorCodes,
   IntegrationCompilerError,
@@ -76,6 +79,7 @@ export type CompileSandboxRuntimePlanInput = {
   organizationId: string;
   profileId: string;
   profileVersion: number;
+  agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
   image: ResolvedSandboxImage;
 };
 
@@ -313,7 +317,7 @@ export async function compileSandboxRuntimePlan(
       sandboxProfileId: input.profileId,
       version: input.profileVersion,
       image: input.image,
-      agentRuntimeId: sandboxProfileVersion.agentRuntimeId,
+      agentRuntimeId: input.agentRuntimeId ?? sandboxProfileVersion.agentRuntimeId,
       bindings: compileBindings,
       definitions: input.integrationDefinitions,
     });

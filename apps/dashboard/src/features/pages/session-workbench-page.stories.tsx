@@ -34,6 +34,8 @@ const meta = {
           title: args.sessionTitle,
           status: args.sandboxStatus,
           connectable: args.connectable,
+          failureCode: null,
+          failureMessage: null,
           runtimeContext: args.connectable
             ? {
                 agentRuntimeId: "codex",
@@ -41,6 +43,13 @@ const meta = {
                 primaryRepositoryRoot: null,
               }
             : null,
+          startupOperation:
+            args.sandboxStatus === "pending" || args.sandboxStatus === "starting"
+              ? {
+                  operationId: "owfr_story_session_startup",
+                  operationKind: "start",
+                }
+              : null,
         }}
         sandboxInstancesList={{
           items: [

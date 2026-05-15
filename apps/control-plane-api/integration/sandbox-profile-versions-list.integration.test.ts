@@ -73,6 +73,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
           id: "ssj_versions_list_v1_publish",
           sandboxProfileId: "sbp_versions_list_001",
           sandboxProfileVersion: 1,
+          sandboxInstanceId: "sbi_versions_list_v1_publish",
           trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
           state: SandboxProfileVersionSnapshotJobStates.RUNNING,
           createdAt: "2026-03-01T00:02:00.000Z",
@@ -82,6 +83,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
           id: "ssj_versions_list_v2_refresh_failed",
           sandboxProfileId: "sbp_versions_list_001",
           sandboxProfileVersion: 2,
+          sandboxInstanceId: "sbi_versions_list_v2_refresh_failed",
           trigger: SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH,
           state: SandboxProfileVersionSnapshotJobStates.FAILED,
           errorCode: "snapshot_refresh_failed",
@@ -126,6 +128,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
         refreshSchedule: null,
         latestSnapshotJob: {
           id: "ssj_versions_list_v2_refresh_failed",
+          sandboxInstanceId: "sbi_versions_list_v2_refresh_failed",
           trigger: SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH,
           state: SandboxProfileVersionSnapshotJobStates.FAILED,
           errorCode: "snapshot_refresh_failed",
@@ -146,6 +149,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
         refreshSchedule: null,
         latestSnapshotJob: {
           id: "ssj_versions_list_v1_publish",
+          sandboxInstanceId: "sbi_versions_list_v1_publish",
           trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
           state: SandboxProfileVersionSnapshotJobStates.RUNNING,
           errorCode: null,
@@ -235,6 +239,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
         id: "ssj_versions_list_failed_materialization_publish",
         sandboxProfileId: "sbp_versions_list_failed_materialization_001",
         sandboxProfileVersion: 1,
+        sandboxInstanceId: "sbi_versions_list_failed_materialization_publish",
         trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
         state: SandboxProfileVersionSnapshotJobStates.FAILED,
         errorCode: "snapshot_materialization_failed",
@@ -267,6 +272,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
         refreshSchedule: null,
         latestSnapshotJob: {
           id: "ssj_versions_list_failed_materialization_publish",
+          sandboxInstanceId: "sbi_versions_list_failed_materialization_publish",
           trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
           state: SandboxProfileVersionSnapshotJobStates.FAILED,
           errorCode: "snapshot_materialization_failed",

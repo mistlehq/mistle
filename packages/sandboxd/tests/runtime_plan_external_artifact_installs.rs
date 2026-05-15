@@ -13,6 +13,7 @@ static TEMP_TEST_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 fn applies_typed_mise_install_steps() {
     let startup_input = StartupInput {
         startup_mode: StartupMode::New,
+        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
         execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -69,6 +70,7 @@ fn applies_github_release_artifact_install_steps_from_pinned_public_release() {
     };
     let startup_input = StartupInput {
         startup_mode: StartupMode::New,
+        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
         execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),

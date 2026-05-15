@@ -129,7 +129,7 @@ if [[ -z "${runtime_docker_image}" || -z "${runtime_sandbox_base_image}" ]]; the
   release_version="$(read_release_version)"
 
   if [[ -z "${runtime_docker_image}" ]]; then
-    runtime_docker_image="ghcr.io/mistlehq/mistle:docker-v${release_version}"
+    runtime_docker_image="ghcr.io/mistlehq/mistle:v${release_version}"
   fi
 
   if [[ -z "${runtime_sandbox_base_image}" ]]; then

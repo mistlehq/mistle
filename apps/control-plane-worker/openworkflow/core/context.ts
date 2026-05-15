@@ -22,6 +22,7 @@ const ControlPlaneInternalRequestTimeoutMs = 60_000;
 const DefaultTestEnvironmentIdHeader = "x-mistle-test-environment-id";
 
 export type WorkflowContext = {
+  billing: OpenWorkflowRuntime["workerConfig"]["billing"];
   db: ControlPlaneDatabase;
   tables: ControlPlaneTables;
   dbPool: Pool;
@@ -109,6 +110,7 @@ async function createWorkflowContext(input?: {
 
     return {
       context: {
+        billing: workerConfig.billing,
         controlPlaneInternalClient,
         dataPlaneClient,
         db,

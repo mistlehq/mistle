@@ -56,6 +56,7 @@ export type SandboxInstanceStatus = {
   failureMessage: string | null;
   runtimeContext: SandboxInstanceRuntimeContext | null;
   automationConversation: SandboxInstanceAutomationConversation | null;
+  startupOperation: NonNullable<GetSandboxInstanceResponse>["startupOperation"];
 };
 
 export type ListSandboxInstancesResult = Omit<ListSandboxInstancesResponse, "items"> & {

@@ -48,6 +48,35 @@ const OrganizationE2BProvider = {
   managed: false,
 } satisfies SandboxProviderSummary;
 
+const TensorlakeProvider = {
+  id: "tensorlake",
+  displayName: "Tensorlake",
+  managed: true,
+  supportsOrganizationConnection: true,
+  resourceCapabilities: {
+    vcpuCount: {
+      min: 1,
+      max: 8,
+      step: 1,
+      default: 1,
+    },
+    memoryMb: {
+      min: 1024,
+      max: 65536,
+      step: 1024,
+      default: 1024,
+      minPerVcpu: 1024,
+      maxPerVcpu: 8192,
+    },
+    storageMb: {
+      min: 10240,
+      max: 102400,
+      step: 1024,
+      default: 10240,
+    },
+  },
+} satisfies SandboxProviderSummary;
+
 const OrganizationStorageE2BProvider = {
   id: "e2b",
   displayName: "E2B",
@@ -368,6 +397,30 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(screen.getByText("2 vCPU")).toBeTruthy();
     expect(screen.getByText("4096 MB")).toBeTruthy();
     expect(screen.queryByLabelText("Storage (MB)")).toBeNull();
+  });
+
+  it("scales per-vCPU memory controls for providers with ratio-based memory limits", () => {
+    render(
+      <SandboxProfileRuntimeSection
+        availableConnections={[]}
+        availableTargets={[]}
+        disabled={false}
+        isDraft={true}
+        providers={[TensorlakeProvider]}
+        version={createVersion({
+          sandboxProvider: "tensorlake",
+          sandboxConnectionId: null,
+          sandboxResources: {
+            vcpuCount: 4,
+            memoryMb: 32768,
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByLabelText("Memory (MB)")).toBeTruthy();
+    expect(screen.getByLabelText("Storage (MB)")).toBeTruthy();
+    expect(screen.getByText("32768 MB")).toBeTruthy();
   });
 
   it("renders storage when the selected provider advertises storage capabilities", () => {

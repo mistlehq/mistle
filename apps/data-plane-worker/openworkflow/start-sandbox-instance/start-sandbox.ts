@@ -3,7 +3,10 @@ import type {
   SandboxProvider,
   SandboxStartStoragePreparation,
 } from "@mistle/sandbox";
-import type { StartSandboxInstanceWorkflowImageInput } from "@mistle/workflow-registry/data-plane";
+import type {
+  StartSandboxInstanceWorkflowImageInput,
+  SandboxRuntimeResourceInput,
+} from "@mistle/workflow-registry/data-plane";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 
@@ -37,6 +40,7 @@ export async function startSandbox(
     sandboxInstanceId: string;
     image: StartSandboxInstanceWorkflowImageInput;
     runtimeProvider: SandboxProvider;
+    resources?: SandboxRuntimeResourceInput;
     storagePreparation?: SandboxStartStoragePreparation;
   },
 ): Promise<{
@@ -49,6 +53,7 @@ export async function startSandbox(
   }
 
   const startedSandbox = await ctx.sandboxAdapter.start({
+    sandboxInstanceId: input.sandboxInstanceId,
     image: {
       ...input.image,
       createdAt: input.image.createdAt ?? new Date().toISOString(),
@@ -57,6 +62,7 @@ export async function startSandbox(
       config: ctx.config,
       sandboxInstanceId: input.sandboxInstanceId,
     }),
+    ...(input.resources === undefined ? {} : { resources: input.resources }),
     ...(input.storagePreparation === undefined
       ? {}
       : { storagePreparation: input.storagePreparation }),

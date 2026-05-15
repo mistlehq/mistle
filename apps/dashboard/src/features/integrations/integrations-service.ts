@@ -20,6 +20,7 @@ export {
   startRedirectProviderAppSetup,
   startDeviceAuthorizationIntegrationConnection,
   startRedirectIntegrationConnection,
+  startRedirectIntegrationConnectionReauthorization,
   updateFormIntegrationConnection,
   updateApiKeyIntegrationConnection,
   updateIntegrationConnection,

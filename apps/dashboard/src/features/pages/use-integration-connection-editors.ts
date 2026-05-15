@@ -8,6 +8,7 @@ import type { IntegrationConnectionMethod } from "../integrations/integrations-s
 import {
   deleteIntegrationConnection,
   startRedirectProviderAppSetup,
+  startRedirectIntegrationConnectionReauthorization,
   updateApiKeyIntegrationConnection,
   updateIntegrationConnection,
 } from "../integrations/integrations-service.js";
@@ -61,6 +62,9 @@ export function useIntegrationConnectionEditors(input: {
   const [apiKeyDraft, setApiKeyDraft] = useState("");
   const [apiKeyError, setApiKeyError] = useState<string | undefined>(undefined);
   const [providerAppSetupErrorByConnectionId, setProviderAppSetupErrorByConnectionId] = useState<
+    Readonly<Record<string, string | undefined>>
+  >({});
+  const [reauthorizationErrorByConnectionId, setReauthorizationErrorByConnectionId] = useState<
     Readonly<Record<string, string | undefined>>
   >({});
   const [deletingConnectionId, setDeletingConnectionId] = useState<string | null>(null);
@@ -129,6 +133,11 @@ export function useIntegrationConnectionEditors(input: {
       startErrorMessage: string;
       unexpectedResultMessage: string;
     }) => startRedirectProviderAppSetup(payload),
+  });
+
+  const startReauthorizationMutation = useMutation({
+    mutationFn: async (payload: { connectionId: string }) =>
+      startRedirectIntegrationConnectionReauthorization(payload),
   });
 
   const editingApiKeyConnection =
@@ -251,6 +260,35 @@ export function useIntegrationConnectionEditors(input: {
           });
 
           setProviderAppSetupErrorByConnectionId((current) => ({
+            ...current,
+            [connectionId]: errorMessage,
+          }));
+        }
+      },
+    },
+    reauthorization: {
+      errorMessageByConnectionId: reauthorizationErrorByConnectionId,
+      pendingConnectionId: startReauthorizationMutation.isPending
+        ? (startReauthorizationMutation.variables?.connectionId ?? null)
+        : null,
+      onStart: async (connectionId: string) => {
+        setReauthorizationErrorByConnectionId((current) => ({
+          ...current,
+          [connectionId]: undefined,
+        }));
+
+        try {
+          const startedReauthorization = await startReauthorizationMutation.mutateAsync({
+            connectionId,
+          });
+          globalThis.location.assign(startedReauthorization.authorizationUrl);
+        } catch (error) {
+          const errorMessage = resolveApiErrorMessage({
+            error,
+            fallbackMessage: "Could not start connection reauthorization.",
+          });
+
+          setReauthorizationErrorByConnectionId((current) => ({
             ...current,
             [connectionId]: errorMessage,
           }));

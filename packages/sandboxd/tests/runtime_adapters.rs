@@ -145,6 +145,7 @@ fn runtime_adapter_registry_starts_codex_proxy_adapter() {
 
     let startup_input = StartupInput {
         startup_mode: StartupMode::New,
+        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
         execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
@@ -349,6 +350,7 @@ fn runtime_adapter_registry_starts_opencode_proxy_adapter() {
 
     let startup_input = StartupInput {
         startup_mode: StartupMode::New,
+        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
         execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),

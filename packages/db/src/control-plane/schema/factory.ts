@@ -1,6 +1,8 @@
 import { pgSchema } from "drizzle-orm/pg-core";
 
 import { defineAccounts } from "./accounts.js";
+import { defineApiKeyPermissions } from "./api-key-permissions.js";
+import { defineApiKeys } from "./api-keys.js";
 import { defineAutomationConversationDeliveryProcessors } from "./automation-conversation-delivery-processors.js";
 import { defineAutomationConversationDeliveryTasks } from "./automation-conversation-delivery-tasks.js";
 import { defineAutomationConversationRoutes } from "./automation-conversation-routes.js";
@@ -22,6 +24,7 @@ import { defineIntegrationWebhookEvents } from "./integration-webhook-events.js"
 import { defineIntegrationWebhookSources } from "./integration-webhook-sources.js";
 import { defineInvitations } from "./invitations.js";
 import { defineMembers } from "./members.js";
+import { defineOrganizationBillingCustomers } from "./organization-billing-customers.js";
 import { defineOrganizationCredentialKeys } from "./organization-credential-keys.js";
 import { defineOrganizationIdentityLinkProviderConfigs } from "./organization-identity-link-provider-configs.js";
 import { defineOrganizationSandboxStorageSettings } from "./organization-sandbox-storage-settings.js";
@@ -55,6 +58,8 @@ import { defineWebhookAutomations } from "./webhook-automations.js";
 export function createControlPlaneDbSchema(schemaName: string) {
   const schema = pgSchema(schemaName);
   const accounts = defineAccounts(schema);
+  const apiKeys = defineApiKeys(schema);
+  const apiKeyPermissions = defineApiKeyPermissions(schema);
   const automationConversationDeliveryProcessors =
     defineAutomationConversationDeliveryProcessors(schema);
   const automationConversationDeliveryTasks = defineAutomationConversationDeliveryTasks(schema);
@@ -77,6 +82,7 @@ export function createControlPlaneDbSchema(schemaName: string) {
   const integrationWebhookSources = defineIntegrationWebhookSources(schema);
   const invitations = defineInvitations(schema);
   const members = defineMembers(schema);
+  const organizationBillingCustomers = defineOrganizationBillingCustomers(schema);
   const organizationCredentialKeys = defineOrganizationCredentialKeys(schema);
   const organizationIdentityLinkProviderConfigs =
     defineOrganizationIdentityLinkProviderConfigs(schema);
@@ -116,6 +122,8 @@ export function createControlPlaneDbSchema(schemaName: string) {
 
   return {
     accounts,
+    apiKeyPermissions,
+    apiKeys,
     automationConversationDeliveryProcessors,
     automationConversationDeliveryTasks,
     automationConversationRoutes,
@@ -136,6 +144,7 @@ export function createControlPlaneDbSchema(schemaName: string) {
     integrationWebhookSources,
     invitations,
     members,
+    organizationBillingCustomers,
     organizationCredentialKeys,
     organizationIdentityLinkProviderConfigs,
     organizationSandboxStorageSettings,

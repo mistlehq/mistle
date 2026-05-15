@@ -43,7 +43,9 @@ export function SidebarNavGroups(input: {
                     isActive={isSidebarNavItemActive(input.pathname, item)}
                     render={<NavLink to={item.to} />}
                   >
-                    {item.icon ? <item.icon aria-hidden className="size-4 shrink-0" /> : null}
+                    {item.icon ? (
+                      <item.icon aria-hidden className="size-5 shrink-0 md:size-4" />
+                    ) : null}
                     <span>{item.label}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

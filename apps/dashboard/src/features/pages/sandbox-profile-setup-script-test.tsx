@@ -1,14 +1,4 @@
-import { SandboxPtyStates, type SandboxPtyState } from "@mistle/sandbox-session-client";
-import {
-  Button,
-  ButtonGroup,
-  Label,
-  Notice,
-  Switch,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@mistle/ui";
+import { Button, ButtonGroup, Notice, Tooltip, TooltipContent, TooltipTrigger } from "@mistle/ui";
 import {
   CheckCircleIcon,
   PlayIcon,
@@ -19,20 +9,19 @@ import {
   XIcon,
 } from "@phosphor-icons/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { startSandboxProfileSetupScriptTestRun } from "../sandbox-profiles/sandbox-profiles-service.js";
+import type { SandboxProfileSetupScriptTestRuntimeConfig } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
-import { getSandboxInstanceStatus, stopSandboxInstance } from "../sessions/sessions-service.js";
-import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
-import { NoLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
 import {
-  SandboxBaseRuntimeShell,
-  SandboxBaseRuntimeWorkingDirectory,
-} from "./sandbox-base-inventory-copy.js";
-import { INITIAL_PTY_DIMENSIONS, SessionTerminalSurface } from "./session-terminal-surface.js";
-import { useSessionWorkbenchTransport } from "./use-session-workbench-transport.js";
+  getSandboxInstanceStatus,
+  stopSandboxInstance,
+  type SandboxInstanceStatusResult,
+} from "../sessions/sessions-service.js";
+import { NoLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
+import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
 
 type SetupScriptTestStatus = "blank" | "failed" | "idle" | "running" | "starting" | "success";
 
@@ -40,15 +29,9 @@ type SetupScriptTestViewProps = {
   disabled?: boolean;
   isDraft: boolean;
   onClose?: () => void;
-  onFailOnFirstErrorChange?: (checked: boolean) => void;
-  onResize?: (dimensions: { cols: number; rows: number }) => Promise<void>;
   onRun?: () => void;
   onStop?: () => void;
-  onWriteInput?: (input: string) => Promise<void>;
-  failOnFirstError?: boolean;
-  outputChunks?: readonly Uint8Array[];
-  outputText?: string;
-  ptyLifecycleState?: SandboxPtyState;
+  operationProgress?: ReactNode;
   status: SetupScriptTestStatus;
   statusMessage?: string | null;
   setupAssistant?: {
@@ -62,6 +45,7 @@ type SetupScriptTestViewProps = {
 type SetupScriptTestRunnerProps = {
   disabled?: boolean;
   isDraft: boolean;
+  buildRuntimeConfig?: () => SandboxProfileSetupScriptTestRuntimeConfig;
   profileId: string;
   setupScript: string;
   version: number;
@@ -73,74 +57,19 @@ type SetupScriptTestRunState = {
 };
 
 type StartedSetupScriptTestRun = {
-  failOnFirstError: boolean;
-  ptySessionId: string;
   sandboxInstanceId: string;
   setupScript: string;
+  workflowRunId: string;
 };
 
 type SetupScriptTestRunRequest = {
-  failOnFirstError: boolean;
+  runtimeConfig?: SandboxProfileSetupScriptTestRuntimeConfig;
   setupScript: string;
 };
 
-const SetupScriptTestPtySessionPrefix = "setup-script-test";
+type SetupScriptTestTerminalResult = "success" | null;
+
 const SetupScriptTestSandboxStatusRefetchIntervalMs = 1_000;
-
-const DefaultSetupScriptTestOutput = `$ pnpm install
-Lockfile is up to date, resolution step is skipped
-Already up to date
-
-$ pnpm dev:bootstrap
-Generated .env.local
-Database migrations are current
-Setup completed in 18.4s`;
-
-const FailedSetupScriptTestOutput = `$ pnpm install
-Lockfile is up to date, resolution step is skipped
-
-$ pnpm dev:bootstrap
-Missing required environment variable: GITHUB_TOKEN
-Setup failed with exit code 1`;
-
-function createSetupScriptTestPtySessionId(): string {
-  return `${SetupScriptTestPtySessionPrefix}-${crypto.randomUUID()}`;
-}
-
-function encodeSetupScriptBase64(setupScript: string): string {
-  const bytes = new TextEncoder().encode(setupScript);
-  let binary = "";
-
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-
-  return btoa(binary);
-}
-
-export function createSetupScriptTestShellPayload(input: {
-  failOnFirstError: boolean;
-  setupScript: string;
-}): string {
-  const encodedSetupScript = encodeSetupScriptBase64(input.setupScript);
-  const shellArgs = input.failOnFirstError ? "-l -e" : "-l";
-
-  return [
-    'setup_script_path="$(mktemp /tmp/mistle-setup-script-test.XXXXXX)"',
-    'cleanup_setup_script() { rm -f "$setup_script_path"; }',
-    "trap cleanup_setup_script EXIT",
-    `base64 -d > "$setup_script_path" <<'MISTLE_SETUP_SCRIPT'`,
-    encodedSetupScript,
-    "MISTLE_SETUP_SCRIPT",
-    'chmod 700 "$setup_script_path"',
-    'if head -c 2 "$setup_script_path" | grep -q "^#!"; then',
-    '  "$setup_script_path"',
-    '  exit "$?"',
-    "fi",
-    `${SandboxBaseRuntimeShell} ${shellArgs} "$setup_script_path"`,
-    'exit "$?"',
-  ].join("\n");
-}
 
 function resolveSetupScriptTestButtonLabel(input: {
   canStop: boolean;
@@ -209,37 +138,37 @@ function resolveSetupScriptTestButtonTitle(input: {
   return "Test setup script";
 }
 
-function resolveSetupScriptTestOutput(input: SetupScriptTestViewProps): string {
-  if (input.outputText !== undefined) {
-    return input.outputText;
-  }
-
-  return input.status === "failed" ? FailedSetupScriptTestOutput : DefaultSetupScriptTestOutput;
-}
-
 export function resolveSetupScriptTestStatus(input: {
-  isOpenRequested: boolean;
-  ptyErrorMessage: string | null;
-  ptyExitCode: number | null;
   runErrorMessage: string | null;
+  sandboxStatus: SandboxInstanceStatusResult["status"] | null;
   scriptIsBlank: boolean;
   startIsPending: boolean;
   startedRun: StartedSetupScriptTestRun | null;
+  terminalResult: SetupScriptTestTerminalResult;
 }): SetupScriptTestStatus {
-  if (input.ptyExitCode !== null) {
-    return input.ptyExitCode === 0 ? "success" : "failed";
+  if (input.terminalResult === "success") {
+    return "success";
   }
 
-  if (input.runErrorMessage !== null || input.ptyErrorMessage !== null) {
+  if (
+    input.startedRun !== null &&
+    (input.sandboxStatus === "running" || input.sandboxStatus === "stopped")
+  ) {
+    return "success";
+  }
+
+  if (
+    input.runErrorMessage !== null ||
+    input.sandboxStatus === "failed" ||
+    input.sandboxStatus === "stopped"
+  ) {
     return "failed";
   }
 
-  if (input.isOpenRequested) {
-    return "running";
-  }
-
   if (input.startIsPending || input.startedRun !== null) {
-    return "starting";
+    return input.sandboxStatus === null || input.sandboxStatus === "pending"
+      ? "starting"
+      : "running";
   }
 
   if (input.scriptIsBlank) {
@@ -250,7 +179,6 @@ export function resolveSetupScriptTestStatus(input: {
 }
 
 export function resolveSetupScriptTestStatusMessage(input: {
-  ptyErrorMessage: string | null;
   runErrorMessage: string | null;
   sandboxFailureMessage: string | null;
 }): string | null {
@@ -260,10 +188,6 @@ export function resolveSetupScriptTestStatusMessage(input: {
 
   if (input.sandboxFailureMessage !== null) {
     return input.sandboxFailureMessage;
-  }
-
-  if (input.ptyErrorMessage !== null) {
-    return input.ptyErrorMessage;
   }
 
   return null;
@@ -289,7 +213,6 @@ export function SandboxProfileSetupScriptTestButton(
     input.disabled === true || !input.isDraft || input.status === "blank" || (isBusy && !canStop);
   const onButtonClick = canStop ? input.onStop : input.onRun;
 
-  const failOnFirstErrorSwitchId = "setup-script-test-fail-on-first-error";
   const setupAssistantButton =
     input.setupAssistant === undefined ? null : (
       <Button
@@ -313,18 +236,6 @@ export function SandboxProfileSetupScriptTestButton(
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-3">
-      <div className="flex items-center gap-2">
-        <Switch
-          checked={input.failOnFirstError ?? true}
-          disabled={isBusy || input.disabled === true || !input.isDraft}
-          id={failOnFirstErrorSwitchId}
-          onCheckedChange={input.onFailOnFirstErrorChange}
-          size="sm"
-        />
-        <Label className="text-xs normal-case" htmlFor={failOnFirstErrorSwitchId}>
-          Fail on error
-        </Label>
-      </div>
       <ButtonGroup>
         <Button
           disabled={isButtonDisabled}
@@ -369,13 +280,7 @@ export function SandboxProfileSetupScriptTestPanel(
   const isBusy = input.status === "starting" || input.status === "running";
   const isSuccess = input.status === "success";
   const isFailed = input.status === "failed";
-  const terminalOutputChunks = input.outputChunks;
-  const terminalResize = input.onResize;
-  const terminalWriteInput = input.onWriteInput;
-  const renderTerminalSurface =
-    terminalOutputChunks !== undefined &&
-    terminalResize !== undefined &&
-    terminalWriteInput !== undefined;
+  const renderOperationProgress = input.operationProgress !== undefined;
 
   return (
     <section className="mt-2 overflow-hidden rounded-md border border-border bg-background">
@@ -425,21 +330,13 @@ export function SandboxProfileSetupScriptTestPanel(
         </div>
       ) : null}
 
-      <div className="h-64 bg-[#132723]">
-        {renderTerminalSurface ? (
-          <SessionTerminalSurface
-            isVisible={true}
-            lifecycleState={input.ptyLifecycleState ?? SandboxPtyStates.CLOSED}
-            onResize={terminalResize}
-            onWriteInput={terminalWriteInput}
-            outputChunks={terminalOutputChunks}
-          />
-        ) : (
-          <pre className="h-full overflow-auto p-3 font-mono text-xs leading-5 text-[#dbf1ec]">
-            <code>{resolveSetupScriptTestOutput(input)}</code>
-          </pre>
-        )}
-      </div>
+      {renderOperationProgress ? (
+        <div className="border-b border-border">{input.operationProgress}</div>
+      ) : (
+        <div className="p-3 text-sm text-muted-foreground">
+          Waiting for setup-check sandbox startup events.
+        </div>
+      )}
     </section>
   );
 }
@@ -447,40 +344,18 @@ export function SandboxProfileSetupScriptTestPanel(
 export function useSandboxProfileSetupScriptTestRun(
   input: SetupScriptTestRunnerProps,
 ): SetupScriptTestRunState {
+  const { buildRuntimeConfig, disabled, isDraft, profileId, setupScript, version } = input;
   const [startedRun, setStartedRun] = useState<StartedSetupScriptTestRun | null>(null);
   const [runErrorMessage, setRunErrorMessage] = useState<string | null>(null);
-  const [isOpenRequested, setIsOpenRequested] = useState(false);
-  const [failOnFirstError, setFailOnFirstError] = useState(true);
-  const openedPtySessionIdRef = useRef<string | null>(null);
+  const [terminalResult, setTerminalResult] = useState<SetupScriptTestTerminalResult>(null);
   const stopRequestedSandboxInstanceIdsRef = useRef<ReadonlySet<string>>(new Set());
-  const transportManager = useSessionWorkbenchTransport({
-    sandboxInstanceId: startedRun?.sandboxInstanceId ?? null,
-  });
-  const ptyState = useSandboxPtyState({
-    ensureTransportConnected: transportManager.ensureTransportConnected,
-  });
-  const closePty = ptyState.actions.closePty;
-  const disconnectPty = ptyState.actions.disconnectPty;
-  const openPty = ptyState.actions.openPty;
-  const resizePty = ptyState.actions.resizePty;
-  const writeInput = ptyState.actions.writeInput;
-  const scriptIsBlank = input.setupScript.trim().length === 0;
+  const scriptIsBlank = setupScript.trim().length === 0;
   const startedRunRef = useRef<StartedSetupScriptTestRun | null>(null);
   const clearStartedRun = useCallback((): void => {
     setStartedRun(null);
     startedRunRef.current = null;
-    openedPtySessionIdRef.current = null;
-    setIsOpenRequested(false);
+    setTerminalResult(null);
   }, []);
-  const closeActivePtySession = useCallback((): void => {
-    if (startedRunRef.current === null) {
-      return;
-    }
-
-    void closePty().catch(() => {
-      void disconnectPty();
-    });
-  }, [closePty, disconnectPty]);
   const stopTestSandboxBestEffort = useCallback((run: StartedSetupScriptTestRun): void => {
     if (stopRequestedSandboxInstanceIdsRef.current.has(run.sandboxInstanceId)) {
       return;
@@ -493,34 +368,26 @@ export function useSandboxProfileSetupScriptTestRun(
 
     void stopSandboxInstance({
       instanceId: run.sandboxInstanceId,
-      idempotencyKey: `setup-script-test-stop:${run.ptySessionId}`,
+      idempotencyKey: `setup-script-test-stop:${run.workflowRunId}`,
     }).catch(() => undefined);
   }, []);
-  const stopCompletedTestSandbox = useCallback(
-    (run: StartedSetupScriptTestRun): void => {
-      void closePty().catch(() => undefined);
-      stopTestSandboxBestEffort(run);
-    },
-    [closePty, stopTestSandboxBestEffort],
-  );
   const startMutation = useMutation({
     meta: NoLoadingIndicatorMeta,
     mutationFn: async (request: SetupScriptTestRunRequest) =>
       startSandboxProfileSetupScriptTestRun({
         idempotencyKey: crypto.randomUUID(),
-        profileId: input.profileId,
+        profileId,
+        ...(request.runtimeConfig === undefined ? {} : { runtimeConfig: request.runtimeConfig }),
         setupScript: request.setupScript,
-        version: input.version,
+        version,
       }),
     onSuccess: (result, request) => {
       setRunErrorMessage(null);
-      setIsOpenRequested(false);
-      openedPtySessionIdRef.current = null;
+      setTerminalResult(null);
       const nextStartedRun = {
-        failOnFirstError: request.failOnFirstError,
-        ptySessionId: createSetupScriptTestPtySessionId(),
         sandboxInstanceId: result.sandboxInstanceId,
         setupScript: request.setupScript,
+        workflowRunId: result.workflowRunId,
       };
       startedRunRef.current = nextStartedRun;
       setStartedRun(nextStartedRun);
@@ -550,10 +417,10 @@ export function useSandboxProfileSetupScriptTestRun(
         signal,
       });
     },
-    enabled: startedRun !== null && ptyState.lifecycle.exitInfo === null,
+    enabled: startedRun !== null && terminalResult === null,
     refetchInterval: (query) =>
       query.state.error !== null ||
-      query.state.data?.connectable === true ||
+      query.state.data?.status === "running" ||
       query.state.data?.status === "failed" ||
       query.state.data?.status === "stopped"
         ? false
@@ -564,73 +431,59 @@ export function useSandboxProfileSetupScriptTestRun(
     failureMessage: sandboxStatusQuery.data?.failureMessage,
     status: sandboxStatusQuery.data?.status,
   });
-  const sandboxStatusErrorMessage =
-    ptyState.lifecycle.exitInfo === null && sandboxStatusQuery.isError
-      ? resolveApiErrorMessage({
-          error: sandboxStatusQuery.error,
-          fallbackMessage: "Could not check setup script test sandbox status.",
-        })
-      : null;
+  const sandboxStatusErrorMessage = sandboxStatusQuery.isError
+    ? resolveApiErrorMessage({
+        error: sandboxStatusQuery.error,
+        fallbackMessage: "Could not check setup script test sandbox status.",
+      })
+    : null;
   const testRunErrorMessage = sandboxFailureMessage ?? sandboxStatusErrorMessage ?? runErrorMessage;
   const status = resolveSetupScriptTestStatus({
-    isOpenRequested,
-    ptyErrorMessage: ptyState.lifecycle.errorMessage,
-    ptyExitCode: ptyState.lifecycle.exitInfo?.exitCode ?? null,
     runErrorMessage: testRunErrorMessage,
+    sandboxStatus: sandboxStatusQuery.data?.status ?? null,
     scriptIsBlank,
     startIsPending: startMutation.isPending,
     startedRun,
+    terminalResult,
   });
   const statusMessage = resolveSetupScriptTestStatusMessage({
-    ptyErrorMessage: ptyState.lifecycle.errorMessage,
     runErrorMessage: sandboxStatusErrorMessage ?? runErrorMessage,
     sandboxFailureMessage,
   });
 
   useEffect(() => {
-    if (startedRun === null || sandboxStatusQuery.data?.connectable !== true) {
+    if (startedRun === null || sandboxStatusQuery.data?.status !== "running") {
       return;
     }
 
-    if (openedPtySessionIdRef.current === startedRun.ptySessionId) {
-      return;
-    }
+    setTerminalResult("success");
+  }, [sandboxStatusQuery.data?.status, startedRun]);
 
-    openedPtySessionIdRef.current = startedRun.ptySessionId;
-    setIsOpenRequested(true);
+  const startSetupScriptTest = useCallback((): void => {
+    setRunErrorMessage(null);
+    setTerminalResult(null);
 
-    void openPty({
-      ...INITIAL_PTY_DIMENSIONS,
-      args: [
-        "-lc",
-        createSetupScriptTestShellPayload({
-          failOnFirstError: startedRun.failOnFirstError,
-          setupScript: startedRun.setupScript,
-        }),
-      ],
-      command: SandboxBaseRuntimeShell,
-      cwd: SandboxBaseRuntimeWorkingDirectory,
-      ptySessionId: startedRun.ptySessionId,
-      sandboxInstanceId: startedRun.sandboxInstanceId,
-    }).catch((error: unknown) => {
+    let runtimeConfig: SandboxProfileSetupScriptTestRuntimeConfig | undefined;
+    try {
+      runtimeConfig = buildRuntimeConfig?.();
+    } catch (error: unknown) {
       setRunErrorMessage(
-        error instanceof Error ? error.message : "Could not open setup script test terminal.",
+        error instanceof Error ? error.message : "Could not validate sandbox runtime settings.",
       );
-    });
-  }, [openPty, sandboxStatusQuery.data?.connectable, startedRun]);
-
-  useEffect(() => {
-    if (startedRun === null || ptyState.lifecycle.exitInfo === null) {
       return;
     }
 
-    stopCompletedTestSandbox(startedRun);
-  }, [ptyState.lifecycle.exitInfo, startedRun, stopCompletedTestSandbox]);
+    clearStartedRun();
+    startMutation.mutate({
+      setupScript,
+      ...(runtimeConfig === undefined ? {} : { runtimeConfig }),
+    });
+  }, [buildRuntimeConfig, clearStartedRun, setupScript, startMutation]);
 
   const handleRun = useCallback((): void => {
     if (
-      !input.isDraft ||
-      input.disabled === true ||
+      !isDraft ||
+      disabled === true ||
       scriptIsBlank ||
       status === "starting" ||
       status === "running"
@@ -638,24 +491,8 @@ export function useSandboxProfileSetupScriptTestRun(
       return;
     }
 
-    setRunErrorMessage(null);
-    closeActivePtySession();
-    clearStartedRun();
-    startMutation.mutate({
-      failOnFirstError,
-      setupScript: input.setupScript,
-    });
-  }, [
-    clearStartedRun,
-    closeActivePtySession,
-    failOnFirstError,
-    input.disabled,
-    input.isDraft,
-    input.setupScript,
-    scriptIsBlank,
-    startMutation,
-    status,
-  ]);
+    startSetupScriptTest();
+  }, [disabled, isDraft, scriptIsBlank, startSetupScriptTest, status]);
 
   const handleStop = useCallback((): void => {
     const currentRun = startedRunRef.current;
@@ -664,42 +501,34 @@ export function useSandboxProfileSetupScriptTestRun(
     }
 
     setRunErrorMessage(null);
-    void closePty().catch(() => {
-      void disconnectPty();
-    });
     clearStartedRun();
     stopTestSandboxBestEffort(currentRun);
-  }, [clearStartedRun, closePty, disconnectPty, status, stopTestSandboxBestEffort]);
+  }, [clearStartedRun, status, stopTestSandboxBestEffort]);
 
   const handleClose = useCallback((): void => {
     setRunErrorMessage(null);
-    closeActivePtySession();
     clearStartedRun();
-  }, [clearStartedRun, closeActivePtySession]);
-
-  useEffect(() => {
-    return () => {
-      closeActivePtySession();
-    };
-  }, [closeActivePtySession]);
+  }, [clearStartedRun]);
 
   return {
     buttonProps: {
-      failOnFirstError,
-      isDraft: input.isDraft,
-      onFailOnFirstErrorChange: setFailOnFirstError,
+      isDraft,
       onRun: handleRun,
       ...(startedRun === null ? {} : { onStop: handleStop }),
       status,
-      ...(input.disabled === undefined ? {} : { disabled: input.disabled }),
+      ...(disabled === undefined ? {} : { disabled }),
     },
     panelProps: {
-      isDraft: input.isDraft,
+      isDraft,
       onClose: handleClose,
-      onResize: resizePty,
-      onWriteInput: writeInput,
-      outputChunks: ptyState.output.chunks,
-      ptyLifecycleState: ptyState.lifecycle.state,
+      operationProgress:
+        startedRun === null ? undefined : (
+          <SandboxOperationProgress
+            emptyMessage="Waiting for setup-check sandbox startup events."
+            operationId={startedRun.workflowRunId}
+            sandboxInstanceId={startedRun.sandboxInstanceId}
+          />
+        ),
       status,
       statusMessage,
     },

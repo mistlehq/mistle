@@ -9,7 +9,6 @@ import { loadRootConfigFromEnv } from "./root/load-env.js";
 import { ConfigSchema } from "./root/schema.js";
 
 type ConfigRecord = Record<string, unknown>;
-type ContainerProfile = "docker-sandbox" | "remote-sandbox";
 
 export const DefaultGeneratedConfigPath = "/run/mistle/config.toml";
 export const DefaultGeneratedSecretsPath = "/var/lib/mistle/generated-secrets.env";
@@ -28,6 +27,7 @@ const CommonRequiredEnvVars = [
   "MISTLE_SERVICES_DASHBOARD_PUBLIC_URL",
   "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL",
   "MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL",
+  "MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL",
   "MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL",
   "MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL",
   "MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL",
@@ -46,10 +46,16 @@ const CommonRequiredEnvVars = [
   "MISTLE_SANDBOX_PUBLISH_BASE_DOMAIN",
 ];
 
-const RemoteSandboxRequiredEnvVars = [
-  "MISTLE_SANDBOX_E2B_API_KEY",
+const DockerSandboxRequiredEnvVars = ["MISTLE_SANDBOX_DOCKER_SOCKET_PATH"];
+
+const E2BSandboxRequiredEnvVars = ["MISTLE_SANDBOX_E2B_API_KEY"];
+
+const TensorlakeSandboxRequiredEnvVars = ["MISTLE_SANDBOX_TENSORLAKE_API_KEY"];
+
+const ArchilStorageRequiredEnvVars = [
   "MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY",
   "MISTLE_SANDBOX_STORAGE_ARCHIL_REGION",
+  "MISTLE_SANDBOX_STORAGE_ARCHIL_MOUNT_OBJECT_STORE",
   "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_BUCKET_NAME",
   "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ENDPOINT",
   "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ACCESS_KEY_ID",
@@ -74,25 +80,59 @@ function readRequiredEnv(env: NodeJS.ProcessEnv, envVar: string): string {
   return value;
 }
 
-function readProfile(env: NodeJS.ProcessEnv): ContainerProfile {
-  const profile = readRequiredEnv(env, "MISTLE_PROFILE");
-  if (profile === "docker-sandbox" || profile === "remote-sandbox") {
-    return profile;
+function readOptionalBooleanEnv(env: NodeJS.ProcessEnv, envVar: string): boolean | undefined {
+  const value = readOptionalEnv(env, envVar);
+  if (value === undefined) {
+    return undefined;
   }
 
-  throw new Error(
-    `Unsupported MISTLE_PROFILE '${profile}'. Expected 'docker-sandbox' or 'remote-sandbox'.`,
-  );
+  if (value === "true") {
+    return true;
+  }
+
+  if (value === "false") {
+    return false;
+  }
+
+  throw new Error(`Invalid value for ${envVar}. Expected 'true' or 'false'.`);
 }
 
-function requireProfileEnv(input: { profile: ContainerProfile; env: NodeJS.ProcessEnv }): void {
-  const requiredEnvVars =
-    input.profile === "remote-sandbox"
-      ? [...CommonRequiredEnvVars, ...RemoteSandboxRequiredEnvVars]
-      : CommonRequiredEnvVars;
+function requireRuntimeEnv(env: NodeJS.ProcessEnv): void {
+  const dockerEnabled = readOptionalBooleanEnv(env, "MISTLE_SANDBOX_DOCKER_ENABLED") === true;
+  const e2bEnabled = readOptionalBooleanEnv(env, "MISTLE_SANDBOX_E2B_ENABLED") === true;
+  const tensorlakeEnabled =
+    readOptionalBooleanEnv(env, "MISTLE_SANDBOX_TENSORLAKE_ENABLED") === true;
+  const storageBackend = readRequiredEnv(env, "MISTLE_SANDBOX_STORAGE_BACKEND");
+  const requiredEnvVars = [...CommonRequiredEnvVars];
+
+  if (!dockerEnabled && !e2bEnabled && !tensorlakeEnabled) {
+    throw new Error(
+      "At least one sandbox runtime provider must be enabled. Set MISTLE_SANDBOX_DOCKER_ENABLED, MISTLE_SANDBOX_E2B_ENABLED, or MISTLE_SANDBOX_TENSORLAKE_ENABLED to true.",
+    );
+  }
+
+  if (dockerEnabled) {
+    requiredEnvVars.push(...DockerSandboxRequiredEnvVars);
+  }
+
+  if (e2bEnabled) {
+    requiredEnvVars.push(...E2BSandboxRequiredEnvVars);
+  }
+
+  if (tensorlakeEnabled) {
+    requiredEnvVars.push(...TensorlakeSandboxRequiredEnvVars);
+  }
+
+  if (storageBackend === "archil") {
+    requiredEnvVars.push(...ArchilStorageRequiredEnvVars);
+  } else if (storageBackend !== "docker_volume") {
+    throw new Error(
+      `Unsupported MISTLE_SANDBOX_STORAGE_BACKEND '${storageBackend}'. Expected 'archil' or 'docker_volume'.`,
+    );
+  }
 
   for (const envVar of requiredEnvVars) {
-    readRequiredEnv(input.env, envVar);
+    readRequiredEnv(env, envVar);
   }
 }
 
@@ -216,6 +256,10 @@ function buildCommonBaseConfig(env: NodeJS.ProcessEnv): ConfigRecord {
           env,
           "MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL",
         ),
+        sandbox_ws_internal_url: readRequiredEnv(
+          env,
+          "MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL",
+        ),
       },
       control_plane_worker: {
         workflow_concurrency: 4,
@@ -277,64 +321,6 @@ function buildCommonBaseConfig(env: NodeJS.ProcessEnv): ConfigRecord {
   };
 }
 
-function buildDockerSandboxBaseConfig(env: NodeJS.ProcessEnv): ConfigRecord {
-  return mergeConfigRoots(buildCommonBaseConfig(env), {
-    services: {
-      data_plane_gateway: {
-        sandbox_ws_internal_url:
-          readOptionalEnv(env, "MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL") ??
-          "ws://mistle-single-container:5202/tunnel/sandbox",
-      },
-    },
-    sandbox: {
-      storage: {
-        backend: "docker_volume",
-        docker_volume: {
-          name_prefix: "mistle-",
-        },
-      },
-      docker: {
-        enabled: true,
-        socket_path: "/var/run/docker.sock",
-        network_name: "mistle-single-container-network",
-      },
-    },
-  });
-}
-
-function buildRemoteSandboxBaseConfig(env: NodeJS.ProcessEnv): ConfigRecord {
-  const sandboxGatewayPublicUrl = readRequiredEnv(
-    env,
-    "MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL",
-  );
-
-  return mergeConfigRoots(buildCommonBaseConfig(env), {
-    services: {
-      data_plane_gateway: {
-        sandbox_ws_internal_url:
-          readOptionalEnv(env, "MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL") ??
-          sandboxGatewayPublicUrl,
-      },
-    },
-    object_store: {
-      sandbox_storage: {
-        force_path_style: true,
-      },
-    },
-    sandbox: {
-      storage: {
-        backend: "archil",
-        archil: {
-          mount_object_store: "sandbox_storage",
-        },
-      },
-      e2b: {
-        enabled: true,
-      },
-    },
-  });
-}
-
 function buildGeneratedSecretsConfig(env: Record<string, string>): ConfigRecord {
   const readGeneratedEnv = (envVar: string): string => {
     const value = env[envVar];
@@ -392,13 +378,9 @@ export function generateContainerRuntimeConfig(input: {
   env: NodeJS.ProcessEnv;
   secretsPath?: string;
 }): ConfigRecord {
-  const profile = readProfile(input.env);
-  requireProfileEnv({ profile, env: input.env });
+  requireRuntimeEnv(input.env);
 
-  const baseConfig =
-    profile === "docker-sandbox"
-      ? buildDockerSandboxBaseConfig(input.env)
-      : buildRemoteSandboxBaseConfig(input.env);
+  const baseConfig = buildCommonBaseConfig(input.env);
   const generatedSecretsConfig = buildGeneratedSecretsConfig(
     loadOrCreateGeneratedSecrets(input.secretsPath ?? DefaultGeneratedSecretsPath),
   );

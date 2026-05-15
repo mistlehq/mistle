@@ -6,7 +6,7 @@ import {
   SandboxBaseImageSourceKinds,
   SandboxProvider,
   type SandboxBaseImageBuilder,
-  type SandboxBuildBaseImageRequest,
+  type SandboxEnsureBaseImageRequest,
   type SandboxImageHandle,
 } from "../../types.js";
 
@@ -41,7 +41,7 @@ export class DockerBaseImageBuilder implements SandboxBaseImageBuilder {
     this.#options = options;
   }
 
-  async buildBaseImage(request: SandboxBuildBaseImageRequest): Promise<SandboxImageHandle> {
+  async ensureBaseImage(request: SandboxEnsureBaseImageRequest): Promise<SandboxImageHandle> {
     const command = createDockerBuildBaseImageCommand(request);
     const result = spawnSync(command.command, command.args, {
       cwd: command.cwd,
@@ -83,7 +83,7 @@ export function createDockerBaseImageBuilder(
 }
 
 export function createDockerBuildBaseImageCommand(
-  request: SandboxBuildBaseImageRequest,
+  request: SandboxEnsureBaseImageRequest,
 ): DockerBuildBaseImageCommand {
   if (request.source.kind !== SandboxBaseImageSourceKinds.DOCKERFILE) {
     throw new SandboxConfigurationError("Docker base image builder requires a Dockerfile source.");

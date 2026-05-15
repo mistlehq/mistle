@@ -3,7 +3,7 @@ import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 
 export const SandboxRuntimeProviderInputSchema = z
   .object({
-    provider: z.enum(["docker", "e2b"]),
+    provider: z.enum(["docker", "e2b", "tensorlake"]),
     connectionId: z.string().min(1).optional(),
     resources: z
       .object({
@@ -22,7 +22,7 @@ export const StartSandboxInstanceInputSchema = z
     sandboxProfileId: z.string().min(1),
     sandboxProfileVersion: z.number().int().min(1),
     persistenceMode: z.enum(["ephemeral", "persistent"]),
-    purpose: z.enum(["session", "snapshot", "setup_check"]),
+    purpose: z.enum(["session", "snapshot", "setup_assistant", "setup_check"]),
     idempotencyKey: z.string().min(1).max(255).optional(),
     runtimePlan: CompiledRuntimePlanSchema,
     startedBy: z
@@ -56,7 +56,7 @@ export const StartSandboxInstanceInputSchema = z
         imageId: z.string().min(1),
         createdAt: z.string().min(1).optional(),
         kind: z.enum(["base", "snapshot"]),
-        provider: z.enum(["docker", "e2b"]),
+        provider: z.enum(["docker", "e2b", "tensorlake"]),
       })
       .strict(),
     sandboxRuntime: SandboxRuntimeProviderInputSchema,

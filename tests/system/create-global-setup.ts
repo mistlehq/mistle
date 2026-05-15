@@ -6,8 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   DEFAULT_SHARED_SYSTEM_INFRA_KEY,
-  DockerIntegrationConfigPathInContainer,
-  E2BIntegrationConfigPathInContainer,
+  IntegrationConfigPathInContainer,
   readTestContext,
   removeTestContext,
   startOtlpReceiver,
@@ -49,14 +48,6 @@ function readSystemSandboxProvider(): SystemSandboxProvider {
   throw new Error(
     `Unsupported MISTLE_TEST_SYSTEM_SANDBOX_PROVIDER '${rawProvider}'. Expected 'docker' or 'e2b'.`,
   );
-}
-
-function resolveConfigPathInContainer(provider: SystemSandboxProvider): string {
-  if (provider === SystemSandboxProvider.DOCKER) {
-    return DockerIntegrationConfigPathInContainer;
-  }
-
-  return E2BIntegrationConfigPathInContainer;
 }
 
 function readRequiredEnvVar(name: string): string {
@@ -173,7 +164,7 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
     });
     const environment = await startFullSystemEnvironment({
       buildContextHostPath: PROJECT_ROOT_HOST_PATH,
-      configPathInContainer: resolveConfigPathInContainer(sandboxProvider),
+      configPathInContainer: IntegrationConfigPathInContainer,
       sandboxProvider,
       sandboxPublicGatewayTunnel: resolveSandboxPublicGatewayTunnel({
         provider: sandboxProvider,

@@ -29,19 +29,20 @@ const inputGroupVariants = cva(
   },
 );
 
-const inputGroupInputVariants = cva("w-full min-w-0 outline-none", {
-  variants: {
-    variant: {
-      default:
-        "flex-1 h-full rounded-none border-0 bg-transparent px-0 shadow-none ring-0 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 aria-invalid:ring-0 dark:bg-transparent disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
-      inline:
-        "flex-1 h-full rounded-none border-0 bg-transparent px-0 shadow-none ring-0 text-sm focus-visible:ring-0 focus-visible:ring-offset-0 aria-invalid:ring-0 dark:bg-transparent disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+const inputGroupInputVariants = cva(
+  "w-full min-w-0 flex-1 h-full rounded-none border-0 bg-transparent px-0 text-base shadow-none ring-0 outline-none md:text-sm focus-visible:ring-0 focus-visible:ring-offset-0 aria-invalid:ring-0 dark:bg-transparent disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+  {
+    variants: {
+      variant: {
+        default: "",
+        inline: "",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
     },
   },
-  defaultVariants: {
-    variant: "default",
-  },
-});
+);
 
 function InputGroup({
   className,

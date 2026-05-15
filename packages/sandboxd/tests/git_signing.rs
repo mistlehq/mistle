@@ -467,6 +467,7 @@ fn wait_for_init_phase(server: &control::ControlServer, expected: control::InitP
 fn valid_signing_startup_input(tunnel_gateway_ws_url: &str, signer_program: &str) -> StartupInput {
     StartupInput {
         startup_mode: StartupMode::New,
+        operation_kind: sandboxd::protocol::startup::StartupOperationKind::Start,
         execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),

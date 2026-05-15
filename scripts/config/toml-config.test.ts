@@ -55,7 +55,7 @@ describe("toml config generation", () => {
     const content = stringifyTomlConfig({
       header: "",
       configRoot: buildIntegrationTomlConfig({
-        provider: "docker",
+        providers: ["docker"],
         environment: {},
       }),
     });
@@ -68,7 +68,7 @@ describe("toml config generation", () => {
     const content = stringifyTomlConfig({
       header: "",
       configRoot: buildIntegrationTomlConfig({
-        provider: "e2b",
+        providers: ["e2b"],
         e2bSandboxBaseImage: "ghcr.io/mistlehq/sandbox-base:test",
         environment: {
           MISTLE_SANDBOX_E2B_API_KEY: "e2b-test-key",

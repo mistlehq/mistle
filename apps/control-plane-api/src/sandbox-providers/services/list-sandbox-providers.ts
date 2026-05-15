@@ -12,7 +12,10 @@ export function listSandboxProviders(ctx: {
   integrationRegistry: IntegrationRegistry;
   sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
 }): ListSandboxProvidersResponse {
-  const e2bDefinition = findSandboxRuntimeDefinition(ctx.integrationRegistry, SandboxProvider.E2B);
+  const sandboxRuntimeDefinitions = [
+    findSandboxRuntimeDefinition(ctx.integrationRegistry, SandboxProvider.E2B),
+    findSandboxRuntimeDefinition(ctx.integrationRegistry, SandboxProvider.TENSORLAKE),
+  ];
 
   return {
     items: [
@@ -23,13 +26,18 @@ export function listSandboxProviders(ctx: {
         supportsOrganizationConnection: false,
         resourceCapabilities: null,
       },
-      {
-        id: e2bDefinition.sandboxRuntime.providerId,
-        displayName: e2bDefinition.sandboxRuntime.displayName,
-        managed: ctx.sandboxConfig.e2b?.enabled === true,
+      ...sandboxRuntimeDefinitions.map((definition) => ({
+        id: definition.sandboxRuntime.providerId,
+        displayName: definition.sandboxRuntime.displayName,
+        managed:
+          definition.sandboxRuntime.providerId === SandboxProvider.E2B
+            ? ctx.sandboxConfig.e2b?.enabled === true
+            : definition.sandboxRuntime.providerId === SandboxProvider.TENSORLAKE
+              ? ctx.sandboxConfig.tensorlake?.enabled === true
+              : false,
         supportsOrganizationConnection: true,
-        resourceCapabilities: e2bDefinition.sandboxRuntime.resourceCapabilities,
-      },
+        resourceCapabilities: definition.sandboxRuntime.resourceCapabilities,
+      })),
     ],
   };
 }

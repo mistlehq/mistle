@@ -20,6 +20,7 @@ describe("SessionHeaderTitle", () => {
       failureMessage: null,
       runtimePlan: null,
       automationConversation: null,
+      startupOperation: null,
     });
 
     render(

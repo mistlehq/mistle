@@ -17,7 +17,8 @@ use std::thread::{self, JoinHandle};
 
 use crate::codex_proxy::CodexProxyControlHandle;
 use crate::command::{
-    CommandFailure, CommandSpec, DEFAULT_COMMAND_POLL_INTERVAL, run_command_with_details,
+    CommandFailure, CommandOutputSink, CommandOutputStream, CommandSpec,
+    DEFAULT_COMMAND_POLL_INTERVAL, run_command_with_details_and_output_sink,
 };
 use crate::egress_proxy::EgressProxy;
 use crate::keepalive::KeepaliveManager;
@@ -33,7 +34,8 @@ use crate::runtime::readiness::{
     RuntimeReadinessManager, RuntimeReadinessMode, derive_runtime_ready,
 };
 use crate::startup_diagnostics::{
-    StartupDiagnosticsLogger, startup_diagnostics_string, startup_diagnostics_u64,
+    StartupDiagnosticsLogger, StartupTranscriptStream, startup_diagnostics_string,
+    startup_diagnostics_u64,
 };
 use crate::supervision::{SandboxdHealthSnapshot, SandboxdSupervisorHandle, SupervisedComponent};
 use crate::time::{Clock, Sleeper};
@@ -180,6 +182,12 @@ impl SandboxdState {
                 diagnostics_logger: &diagnostics_logger,
             },
         )?);
+        if let (Some(logger), Some(tunnel_session)) = (&diagnostics_logger, &startup_tunnel_session)
+        {
+            logger.attach_operation_sender(tunnel_session.operation_record_sender());
+            record_operation_phase_started(&diagnostics_logger, "sandboxd");
+            record_operation_phase_completed(&diagnostics_logger, "start_tunnel_session");
+        }
         if wait_for_storage_attach {
             wait_for_storage_attach_signal(clock.as_ref(), sleeper.as_ref(), &diagnostics_logger);
         }
@@ -307,7 +315,11 @@ impl SandboxdState {
 
         if !uses_pre_materialized_snapshot {
             record_operation_phase_started(&diagnostics_logger, "apply_runtime_plan");
-            match runtime::apply_compiled_runtime_plan(&runtime_plan, Some(&runtime_env)) {
+            match runtime::apply_compiled_runtime_plan_with_output_sink(
+                &runtime_plan,
+                Some(&runtime_env),
+                command_output_sink(&diagnostics_logger, "apply_runtime_plan"),
+            ) {
                 Ok(()) => {
                     record_operation_phase_completed(&diagnostics_logger, "apply_runtime_plan")
                 }
@@ -329,11 +341,12 @@ impl SandboxdState {
         }
         if !uses_pre_materialized_snapshot {
             record_operation_phase_started(&diagnostics_logger, "run_setup_script");
-            match run_setup_script(
+            match run_setup_script_with_output_sink(
                 &runtime_plan,
                 &runtime_env,
                 clock.as_ref(),
                 sleeper.as_ref(),
+                command_output_sink(&diagnostics_logger, "run_setup_script"),
             ) {
                 Ok(()) => {
                     record_operation_phase_completed(&diagnostics_logger, "run_setup_script");
@@ -378,13 +391,6 @@ impl SandboxdState {
             // mount persistent storage at paths like /root and /etc/codex, which would shadow any
             // image contents there, so snapshot workflows must stop here and run on ephemeral
             // sandboxes without session runtime resources or persistent mounts.
-            if let Some(tunnel_session) = startup_tunnel_session.take() {
-                close_tunnel_session(
-                    tunnel_session,
-                    &diagnostics_logger,
-                    "stop_snapshot_tunnel_session",
-                );
-            }
             record_operation_phase_started(&diagnostics_logger, "stop_egress_proxy");
             if let Some(egress_proxy) = egress_proxy.take() {
                 egress_proxy.close().map_err(|error| {
@@ -400,6 +406,14 @@ impl SandboxdState {
                 })?;
             }
             record_operation_phase_completed(&diagnostics_logger, "stop_egress_proxy");
+            close_operation_stream(&diagnostics_logger);
+            if let Some(tunnel_session) = startup_tunnel_session.take() {
+                close_tunnel_session(
+                    tunnel_session,
+                    &diagnostics_logger,
+                    "stop_snapshot_tunnel_session",
+                );
+            }
 
             return Ok(Self {
                 execution_mode,
@@ -578,6 +592,8 @@ impl SandboxdState {
             runtime_readiness_mode,
             runtime_readiness_shutdown_requested.clone(),
         ));
+        record_operation_phase_started(&diagnostics_logger, "ready");
+        close_operation_stream(&diagnostics_logger);
         let tunnel_session = Some(tunnel_session);
         let codex_coordination_shutdown_requested = Arc::new(AtomicBool::new(false));
         let codex_coordination_thread = match (
@@ -655,6 +671,11 @@ impl SandboxdState {
             supervisor_handle: self.supervisor_handle.clone(),
             diagnostics_logger: &diagnostics_logger,
         })?;
+        if let Some(logger) = &diagnostics_logger {
+            logger.attach_operation_sender(tunnel_session.operation_record_sender());
+            record_operation_phase_started(&diagnostics_logger, "sandboxd");
+            record_operation_phase_completed(&diagnostics_logger, "start_tunnel_session");
+        }
         record_operation_phase_started(&diagnostics_logger, "apply_git_identity");
         if let Err(error) =
             runtime::git_identity::apply_git_identity(startup_input, global_git_config_path)
@@ -708,6 +729,8 @@ impl SandboxdState {
             return Err(SandboxdStateError::StartTunnelSession(error.to_string()));
         }
         record_operation_phase_completed(&diagnostics_logger, "attach_runtime_agent_endpoint");
+        record_operation_phase_started(&diagnostics_logger, "ready");
+        close_operation_stream(&diagnostics_logger);
         self.tunnel_session = Some(tunnel_session);
         let runtime_readiness_mode = determine_runtime_readiness_mode(&self.supervisor_handle);
         sync_runtime_readiness_from_snapshot(
@@ -823,15 +846,59 @@ fn wait_for_storage_attach_signal(
     );
 }
 
+#[derive(Clone)]
+struct StartupCommandOutputSink {
+    logger: StartupDiagnosticsLogger,
+    phase: &'static str,
+}
+
+impl CommandOutputSink for StartupCommandOutputSink {
+    fn record_output(&self, stream: CommandOutputStream, bytes: &[u8]) {
+        let transcript_stream = match stream {
+            CommandOutputStream::Stdout => StartupTranscriptStream::Stdout,
+            CommandOutputStream::Stderr => StartupTranscriptStream::Stderr,
+        };
+        if let Err(error) =
+            self.logger
+                .record_transcript(Some(self.phase), transcript_stream, bytes)
+        {
+            eprintln!("sandboxd failed to record startup diagnostics transcript: {error}");
+        }
+    }
+}
+
+fn command_output_sink(
+    diagnostics_logger: &Option<StartupDiagnosticsLogger>,
+    phase: &'static str,
+) -> Option<Arc<dyn CommandOutputSink>> {
+    diagnostics_logger.clone().map(|logger| {
+        Arc::new(StartupCommandOutputSink { logger, phase }) as Arc<dyn CommandOutputSink>
+    })
+}
+
 fn record_operation_phase_failure(
     diagnostics_logger: &Option<StartupDiagnosticsLogger>,
     phase: &str,
     attributes: BTreeMap<String, serde_json::Value>,
 ) {
-    if let Some(logger) = diagnostics_logger
-        && let Err(error) = logger.record_phase_failed(phase, attributes)
-    {
-        eprintln!("sandboxd failed to record startup diagnostics phase failure: {error}");
+    if let Some(logger) = diagnostics_logger {
+        let transcript_message = attributes
+            .get("error")
+            .and_then(serde_json::Value::as_str)
+            .map_or_else(
+                || format!("{phase} failed"),
+                |error| format!("{phase} failed: {error}"),
+            );
+        if let Err(error) = logger.record_phase_failed(phase, attributes) {
+            eprintln!("sandboxd failed to record startup diagnostics phase failure: {error}");
+        }
+        if let Err(error) = logger.record_transcript(
+            Some(phase),
+            StartupTranscriptStream::System,
+            transcript_message.as_bytes(),
+        ) {
+            eprintln!("sandboxd failed to record startup diagnostics transcript: {error}");
+        }
     }
 }
 
@@ -839,10 +906,17 @@ fn record_operation_phase_started(
     diagnostics_logger: &Option<StartupDiagnosticsLogger>,
     phase: &str,
 ) {
-    if let Some(logger) = diagnostics_logger
-        && let Err(error) = logger.record_phase_started(phase)
-    {
-        eprintln!("sandboxd failed to record startup diagnostics phase start: {error}");
+    if let Some(logger) = diagnostics_logger {
+        if let Err(error) = logger.record_phase_started(phase) {
+            eprintln!("sandboxd failed to record startup diagnostics phase start: {error}");
+        }
+        if let Err(error) = logger.record_transcript(
+            Some(phase),
+            StartupTranscriptStream::System,
+            format!("{phase} started").as_bytes(),
+        ) {
+            eprintln!("sandboxd failed to record startup diagnostics transcript: {error}");
+        }
     }
 }
 
@@ -858,10 +932,17 @@ fn record_operation_phase_completed_with_attributes(
     phase: &str,
     attributes: BTreeMap<String, serde_json::Value>,
 ) {
-    if let Some(logger) = diagnostics_logger
-        && let Err(error) = logger.record_phase_completed_with_attributes(phase, attributes)
-    {
-        eprintln!("sandboxd failed to record startup diagnostics phase completion: {error}");
+    if let Some(logger) = diagnostics_logger {
+        if let Err(error) = logger.record_phase_completed_with_attributes(phase, attributes) {
+            eprintln!("sandboxd failed to record startup diagnostics phase completion: {error}");
+        }
+        if let Err(error) = logger.record_transcript(
+            Some(phase),
+            StartupTranscriptStream::System,
+            format!("{phase} completed").as_bytes(),
+        ) {
+            eprintln!("sandboxd failed to record startup diagnostics transcript: {error}");
+        }
     }
 }
 
@@ -1403,8 +1484,15 @@ fn close_tunnel_session(
     phase: &str,
 ) {
     record_operation_phase_started(diagnostics_logger, phase);
+    close_operation_stream(diagnostics_logger);
     tunnel_session.close();
     record_operation_phase_completed(diagnostics_logger, phase);
+}
+
+fn close_operation_stream(diagnostics_logger: &Option<StartupDiagnosticsLogger>) {
+    if let Some(logger) = diagnostics_logger {
+        logger.close_operation_stream();
+    }
 }
 
 fn close_tunnel_session_after_failure(
@@ -1543,6 +1631,7 @@ fn scrub_snapshot_runtime_artifacts_at_paths(
     Ok(())
 }
 
+#[cfg(test)]
 fn run_setup_script<C, S>(
     runtime_plan: &runtime::CompiledRuntimePlan,
     runtime_env: &BTreeMap<String, String>,
@@ -1553,21 +1642,59 @@ where
     C: Clock + ?Sized,
     S: Sleeper + ?Sized,
 {
-    run_setup_script_in_directory(
+    run_setup_script_with_output_sink(runtime_plan, runtime_env, clock, sleeper, None)
+}
+
+fn run_setup_script_with_output_sink<C, S>(
+    runtime_plan: &runtime::CompiledRuntimePlan,
+    runtime_env: &BTreeMap<String, String>,
+    clock: &C,
+    sleeper: &S,
+    output_sink: Option<Arc<dyn CommandOutputSink>>,
+) -> Result<(), CommandFailure>
+where
+    C: Clock + ?Sized,
+    S: Sleeper + ?Sized,
+{
+    run_setup_script_in_directory_with_output_sink(
         runtime_plan,
         runtime_env,
         SETUP_SCRIPT_WORKING_DIRECTORY,
         clock,
         sleeper,
+        output_sink,
     )
 }
 
+#[cfg(test)]
 fn run_setup_script_in_directory<C, S>(
     runtime_plan: &runtime::CompiledRuntimePlan,
     runtime_env: &BTreeMap<String, String>,
     working_directory: &str,
     clock: &C,
     sleeper: &S,
+) -> Result<(), CommandFailure>
+where
+    C: Clock + ?Sized,
+    S: Sleeper + ?Sized,
+{
+    run_setup_script_in_directory_with_output_sink(
+        runtime_plan,
+        runtime_env,
+        working_directory,
+        clock,
+        sleeper,
+        None,
+    )
+}
+
+fn run_setup_script_in_directory_with_output_sink<C, S>(
+    runtime_plan: &runtime::CompiledRuntimePlan,
+    runtime_env: &BTreeMap<String, String>,
+    working_directory: &str,
+    clock: &C,
+    sleeper: &S,
+    output_sink: Option<Arc<dyn CommandOutputSink>>,
 ) -> Result<(), CommandFailure>
 where
     C: Clock + ?Sized,
@@ -1616,7 +1743,7 @@ where
     let shell_args = build_setup_script_command_args(setup_script, setup_script_command_path);
     let environment = build_setup_script_environment(runtime_env);
 
-    let run_result = run_command_with_details(
+    let run_result = run_command_with_details_and_output_sink(
         CommandSpec {
             args: &shell_args,
             env: Some(&environment),
@@ -1626,6 +1753,7 @@ where
         clock,
         sleeper,
         DEFAULT_COMMAND_POLL_INTERVAL,
+        output_sink,
     );
     let cleanup_result = setup_script_path.close().map_err(|error| {
         setup_script_file_failure(format!("failed to remove temporary script file: {error}"))
@@ -2018,6 +2146,79 @@ mod tests {
     }
 
     #[test]
+    fn run_setup_script_writes_stdout_and_stderr_transcript_records() {
+        let log_dir = std::env::temp_dir().join(format!(
+            "mistle-setup-script-transcript-log-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after unix epoch")
+                .as_nanos()
+        ));
+        let _ = fs::remove_dir_all(&log_dir);
+        fs::create_dir_all(&log_dir).expect("startup diagnostics log dir should be creatable");
+        let _env_guard = TestEnvVarsGuard::set([(
+            "MISTLE_SANDBOXD_OPERATION_LOG_DIR",
+            log_dir.to_string_lossy().to_string(),
+        )]);
+        let bootstrap_url = "ws://127.0.0.1:4000/tunnel/sandbox/sbi_setup_transcript";
+        let diagnostics_logger =
+            StartupDiagnosticsLogger::initialize(StartupOperation::Init, bootstrap_url)
+                .expect("startup diagnostics logger should initialize");
+        let runtime_plan = CompiledRuntimePlan {
+            image: test_runtime_plan_image(crate::runtime::CompiledRuntimePlanImageSource::Base),
+            setup_script: Some(
+                "printf setup-script-stdout; printf setup-script-stderr >&2".to_string(),
+            ),
+            egress_routes: Vec::new(),
+            artifacts: Vec::new(),
+            workspace_sources: Vec::new(),
+            runtime_clients: Vec::new(),
+            agent_runtimes: Vec::new(),
+        };
+
+        super::run_setup_script_in_directory_with_output_sink(
+            &runtime_plan,
+            &BTreeMap::new(),
+            std::env::temp_dir()
+                .to_str()
+                .expect("temporary directory should be valid unicode"),
+            &SystemClock,
+            &ThreadSleeper,
+            super::command_output_sink(&Some(diagnostics_logger), "run_setup_script"),
+        )
+        .expect("setup script should run successfully");
+
+        let init_log = fs::read_to_string(log_dir.join("init.log"))
+            .expect("startup diagnostics init log should be readable");
+        let transcript_records = parse_startup_diagnostic_records(&init_log)
+            .into_iter()
+            .filter(|event| event["event"] == "sandbox_init_transcript")
+            .collect::<Vec<_>>();
+        assert!(
+            transcript_records.iter().any(|event| {
+                event["phase"] == "run_setup_script"
+                    && event["stream"] == "stdout"
+                    && event["message"]
+                        .as_str()
+                        .is_some_and(|message| message.contains("setup-script-stdout"))
+            }),
+            "setup script stdout should be captured in init transcript: {transcript_records:?}"
+        );
+        assert!(
+            transcript_records.iter().any(|event| {
+                event["phase"] == "run_setup_script"
+                    && event["stream"] == "stderr"
+                    && event["message"]
+                        .as_str()
+                        .is_some_and(|message| message.contains("setup-script-stderr"))
+            }),
+            "setup script stderr should be captured in init transcript: {transcript_records:?}"
+        );
+
+        let _ = fs::remove_dir_all(log_dir);
+    }
+
+    #[test]
     fn run_setup_script_captures_stdout_and_stderr_on_failure() {
         let runtime_plan = CompiledRuntimePlan {
             image: test_runtime_plan_image(crate::runtime::CompiledRuntimePlanImageSource::Base),
@@ -2269,7 +2470,10 @@ mod tests {
                                             "args": [
                                                 "sh",
                                                 "-c",
-                                                format!("printf snapshot-gateway > {}", output_path.display())
+                                                format!(
+                                                    "printf runtime-plan-stdout; printf runtime-plan-stderr >&2; printf snapshot-gateway > {}",
+                                                    output_path.display()
+                                                )
                                             ]
                                         }
                                     }
@@ -2338,6 +2542,30 @@ mod tests {
         assert!(
             start_tunnel_index < apply_runtime_plan_index,
             "common gateway tunnel must start before runtime plan materialization; phases: {phases:?}"
+        );
+        let transcript_records = parse_startup_diagnostic_records(&init_log)
+            .into_iter()
+            .filter(|event| event["event"] == "sandbox_init_transcript")
+            .collect::<Vec<_>>();
+        assert!(
+            transcript_records.iter().any(|event| {
+                event["phase"] == "apply_runtime_plan"
+                    && event["stream"] == "stdout"
+                    && event["message"]
+                        .as_str()
+                        .is_some_and(|message| message.contains("runtime-plan-stdout"))
+            }),
+            "runtime plan stdout should be captured in init transcript: {transcript_records:?}"
+        );
+        assert!(
+            transcript_records.iter().any(|event| {
+                event["phase"] == "apply_runtime_plan"
+                    && event["stream"] == "stderr"
+                    && event["message"]
+                        .as_str()
+                        .is_some_and(|message| message.contains("runtime-plan-stderr"))
+            }),
+            "runtime plan stderr should be captured in init transcript: {transcript_records:?}"
         );
 
         let _ = std::fs::remove_file(output_path);
@@ -2665,6 +2893,16 @@ mod tests {
         })
     }
 
+    fn parse_startup_diagnostic_records(log_text: &str) -> Vec<serde_json::Value> {
+        log_text
+            .lines()
+            .map(|line| {
+                serde_json::from_str::<serde_json::Value>(line)
+                    .expect("startup diagnostic line should be valid json")
+            })
+            .collect()
+    }
+
     fn test_runtime_plan_image(
         source: crate::runtime::CompiledRuntimePlanImageSource,
     ) -> crate::runtime::CompiledRuntimePlanImage {
@@ -2683,6 +2921,7 @@ mod tests {
     ) -> StartupInput {
         StartupInput {
             startup_mode,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
             execution_mode,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),

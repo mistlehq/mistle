@@ -7,7 +7,10 @@ import type {
 } from "./webhook-automation-form-types.js";
 import { WebhookAutomationWorkspaceRootRepositoryOptionValue } from "./webhook-automation-option-builders.js";
 import { resolveSelectedWebhookAutomationEventOptions } from "./webhook-automation-trigger-picker-state.js";
-import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
+import type {
+  WebhookAutomationEventOption,
+  WebhookAutomationTriggerParameterValueMap,
+} from "./webhook-automation-trigger-types.js";
 
 export function resolveWebhookAutomationFormPresentation(input: {
   mode: "create" | "edit";
@@ -44,6 +47,7 @@ export function resolveWebhookAutomationFormState(input: {
   webhookEventOptions: readonly WebhookAutomationEventOption[];
   selectedTriggerIds: readonly string[];
   conversationKeyTemplate: string;
+  triggerParameterValues?: WebhookAutomationTriggerParameterValueMap;
   triggerIdsError: string | undefined;
 }): {
   selectedTriggerOptions: readonly WebhookAutomationEventOption[];
@@ -69,6 +73,9 @@ export function resolveWebhookAutomationFormState(input: {
   const conversationKeySelectionState = resolveConversationKeyFieldOptions({
     selectedEventOptions: selectedTriggerOptions,
     currentTemplate: input.conversationKeyTemplate,
+    ...(input.triggerParameterValues === undefined
+      ? {}
+      : { triggerParameterValues: input.triggerParameterValues }),
   });
   const selectedConversationGroupingLabel = conversationKeySelectionState.options.find(
     (option) => option.template === conversationKeySelectionState.selectedTemplate,

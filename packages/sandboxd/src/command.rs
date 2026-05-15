@@ -6,6 +6,7 @@
 use std::collections::BTreeMap;
 use std::io::Read;
 use std::process::{Command, ExitStatus, Stdio};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
@@ -22,6 +23,16 @@ pub struct CommandSpec<'a> {
     pub env: Option<&'a BTreeMap<String, String>>,
     pub cwd: Option<&'a str>,
     pub timeout_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandOutputStream {
+    Stdout,
+    Stderr,
+}
+
+pub trait CommandOutputSink: Send + Sync {
+    fn record_output(&self, stream: CommandOutputStream, bytes: &[u8]);
 }
 
 struct CommandResult {
@@ -72,6 +83,20 @@ where
     C: Clock + ?Sized,
     S: Sleeper + ?Sized,
 {
+    run_command_with_details_and_output_sink(command, clock, sleeper, poll_interval, None)
+}
+
+pub fn run_command_with_details_and_output_sink<C, S>(
+    command: CommandSpec<'_>,
+    clock: &C,
+    sleeper: &S,
+    poll_interval: Duration,
+    output_sink: Option<Arc<dyn CommandOutputSink>>,
+) -> Result<(), CommandFailure>
+where
+    C: Clock + ?Sized,
+    S: Sleeper + ?Sized,
+{
     let executable = command.args.first().ok_or_else(|| CommandFailure {
         message: "command args must not be empty".to_string(),
         exit_code: None,
@@ -112,8 +137,12 @@ where
         output_tails: CommandOutputTails::default(),
     })?;
 
-    let stdout_thread = thread::spawn(move || read_pipe(stdout));
-    let stderr_thread = thread::spawn(move || read_pipe(stderr));
+    let stdout_sink = output_sink.clone();
+    let stderr_sink = output_sink;
+    let stdout_thread =
+        thread::spawn(move || read_pipe(stdout, stdout_sink, CommandOutputStream::Stdout));
+    let stderr_thread =
+        thread::spawn(move || read_pipe(stderr, stderr_sink, CommandOutputStream::Stderr));
     let (status, timed_out) = wait_for_child(
         &mut child,
         command.timeout_ms,
@@ -238,14 +267,28 @@ where
     }
 }
 
-fn read_pipe<R>(mut reader: R) -> Result<String, String>
+fn read_pipe<R>(
+    mut reader: R,
+    output_sink: Option<Arc<dyn CommandOutputSink>>,
+    stream: CommandOutputStream,
+) -> Result<String, String>
 where
     R: Read,
 {
     let mut bytes = Vec::new();
-    reader
-        .read_to_end(&mut bytes)
-        .map_err(|error| format!("failed to read command output: {error}"))?;
+    let mut buffer = [0_u8; 4096];
+    loop {
+        match reader.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(bytes_read) => {
+                if let Some(output_sink) = &output_sink {
+                    output_sink.record_output(stream, &buffer[..bytes_read]);
+                }
+                bytes.extend_from_slice(&buffer[..bytes_read]);
+            }
+            Err(error) => return Err(format!("failed to read command output: {error}")),
+        }
+    }
     String::from_utf8(bytes).map_err(|error| format!("command output was not valid utf-8: {error}"))
 }
 

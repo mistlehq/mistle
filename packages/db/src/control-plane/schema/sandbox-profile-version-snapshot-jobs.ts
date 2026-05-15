@@ -45,6 +45,7 @@ export function defineSandboxProfileVersionSnapshotJobs(schema: PgSchema) {
       sandboxProfileVersion: bigint("sandbox_profile_version", {
         mode: "number",
       }).notNull(),
+      sandboxInstanceId: text("sandbox_instance_id"),
       workflowRunId: text("workflow_run_id"),
       sourceScheduledActionId: text("source_scheduled_action_id").references(
         () => scheduledActions.id,

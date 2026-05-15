@@ -623,7 +623,7 @@ function LinkedAccountCard(input: {
                   />
                 )}
                 <Textarea
-                  className="field-sizing-fixed min-w-0 max-w-full text-sm"
+                  className="field-sizing-fixed min-w-0 max-w-full"
                   onChange={(event) => {
                     setCommitSigningDialogErrorMessage(null);
                     setCheckedCommitSigningKey(null);

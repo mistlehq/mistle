@@ -18,7 +18,7 @@ describe("SessionWorkbenchPageView", () => {
     });
   });
 
-  it("retains scrollbar gutter and removes chat-width side padding until the desktop breakpoint", () => {
+  it("retains scrollbar gutter and keeps chat-width side padding on mobile", () => {
     const { container } = render(
       <SessionWorkbenchPageView
         alert={null}
@@ -37,9 +37,7 @@ describe("SessionWorkbenchPageView", () => {
     );
     const chatWidthContainers = container.querySelectorAll(".max-w-3xl");
 
-    expect(chatWidthContainers[0]?.className).toContain("pr-2");
-    expect(chatWidthContainers[0]?.className).toContain("md:px-4");
-    expect(chatWidthContainers[0]?.className).not.toContain("px-4 pb-4");
+    expect(chatWidthContainers[0]?.className).toContain("px-4 pb-4");
     expect(chatWidthContainers[1]?.className).toContain("px-4");
   });
 

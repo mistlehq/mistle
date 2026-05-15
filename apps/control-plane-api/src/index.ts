@@ -1,12 +1,13 @@
 import { shutdownTelemetry } from "@mistle/telemetry";
 
-import { appConfig } from "./instrument.js";
+import { appConfig, globalConfig } from "./instrument.js";
 import { logger } from "./logger.js";
 import { createControlPlaneApiRuntime } from "./main.js";
 
 async function startControlPlaneApi(): Promise<void> {
   const runtime = await createControlPlaneApiRuntime({
     app: appConfig,
+    global: globalConfig,
   });
 
   await runtime.start();

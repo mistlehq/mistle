@@ -59,6 +59,32 @@ export const SendOrganizationInvitationWorkflowSpec = defineWorkflowSpec<
   version: SendOrganizationInvitationWorkflowVersion,
 });
 
+export const ProvisionStripeCustomerWorkflowName =
+  "control-plane.billing.provision-stripe-customer";
+export const ProvisionStripeCustomerWorkflowVersion = "1";
+
+export type ProvisionStripeCustomerWorkflowInput = {
+  organizationId: string;
+  organizationName: string;
+};
+
+export type ProvisionStripeCustomerWorkflowOutput = {
+  organizationId: string;
+  stripeCustomerId: string;
+};
+
+export const ProvisionStripeCustomerWorkflowSpec = defineWorkflowSpec<
+  ProvisionStripeCustomerWorkflowInput,
+  ProvisionStripeCustomerWorkflowOutput
+>({
+  name: ProvisionStripeCustomerWorkflowName,
+  version: ProvisionStripeCustomerWorkflowVersion,
+});
+
+export function createStripeCustomerProvisioningIdempotencyKey(organizationId: string): string {
+  return `organization:${organizationId}:stripe-customer`;
+}
+
 export const RequestDeleteSandboxProfileWorkflowName =
   "control-plane.sandbox-profiles.request-delete-profile";
 export const RequestDeleteSandboxProfileWorkflowVersion = "1";

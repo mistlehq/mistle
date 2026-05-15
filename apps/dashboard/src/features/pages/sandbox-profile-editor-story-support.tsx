@@ -310,16 +310,20 @@ function createSnapshotPanelState(status: SnapshotStoryStatus): SnapshotPanelSta
   if (status === "creating-snapshot") {
     return {
       kind: "creating",
+      operationId: "ssj_story_creating_snapshot",
       publishedVersion: 4,
       runnableVersion: 3,
+      sandboxInstanceId: "sbi_story_creating_snapshot",
     };
   }
 
   if (status === "creating-first-snapshot") {
     return {
       kind: "creating",
+      operationId: "ssj_story_creating_first_snapshot",
       publishedVersion: 1,
       runnableVersion: null,
+      sandboxInstanceId: "sbi_story_creating_first_snapshot",
     };
   }
 
@@ -342,6 +346,8 @@ function createSnapshotPanelState(status: SnapshotStoryStatus): SnapshotPanelSta
   return {
     kind: "ready",
     latestSnapshotCreatedAt: "Apr 27, 2026, 10:21 AM",
+    operationId: null,
+    sandboxInstanceId: null,
   };
 }
 
@@ -433,7 +439,6 @@ function SetupScriptStoryControls(input: {
 
   return (
     <SandboxProfileSetupScriptTestButton
-      failOnFirstError={true}
       isDraft={input.isDraft}
       status={input.testStatus}
       {...(input.testStatus === "running" ? { onStop: noopStoryAction } : {})}

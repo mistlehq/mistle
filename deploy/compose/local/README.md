@@ -64,7 +64,7 @@ The main optional overrides are:
 - `MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL`
 
 If the image values are blank, `./up.sh` derives them from the installed or repository `VERSION`
-file. For `VERSION=0.8.0`, that resolves to `ghcr.io/mistlehq/mistle:docker-v0.8.0` and
+file. For `VERSION=0.8.0`, that resolves to `ghcr.io/mistlehq/mistle:v0.8.0` and
 `ghcr.io/mistlehq/sandbox-base:v0.8.0`.
 
 For `MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL`:

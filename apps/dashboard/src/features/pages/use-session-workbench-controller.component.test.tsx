@@ -17,7 +17,6 @@ import {
   resolveStoppedSessionMessageForWorkbenchEntryPhase,
   resolveWorkbenchEntryPhase,
   shouldWaitForAutomationSessionThread,
-  shouldGenerateInitialSessionTitle,
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
 import { resolveSandboxStatusRefetchInterval } from "./use-session-workbench-lifecycle-state.js";
@@ -114,6 +113,7 @@ describe("useSessionWorkbenchController", () => {
         primaryRepositoryRoot: "/workspace/repo",
       },
       automationConversation: null,
+      startupOperation: null,
     };
     queryClient.setQueryData(sandboxInstanceStatusQueryKey("sbi_opencode"), sandboxStatus);
 
@@ -138,48 +138,6 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.workbench.primaryPanelState.cliTerminalContentInset).toBe("none");
     expect(result.current.workbench.primaryPanelState.cliTerminalThemeMode).toBe("system");
     expect(result.current.workbench.primaryPanelState.cliRuntimeDisplayName).toBe("OpenCode");
-  });
-
-  it("generates an initial session title only for the first message while the title is unset", () => {
-    expect(
-      shouldGenerateInitialSessionTitle({
-        sandboxInstanceId: "sbi_123",
-        cachedTitle: null,
-        messageCount: 0,
-      }),
-    ).toBe(true);
-
-    expect(
-      shouldGenerateInitialSessionTitle({
-        sandboxInstanceId: "sbi_123",
-        cachedTitle: undefined,
-        messageCount: 0,
-      }),
-    ).toBe(true);
-
-    expect(
-      shouldGenerateInitialSessionTitle({
-        sandboxInstanceId: "sbi_123",
-        cachedTitle: "Existing title",
-        messageCount: 0,
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldGenerateInitialSessionTitle({
-        sandboxInstanceId: "sbi_123",
-        cachedTitle: null,
-        messageCount: 1,
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldGenerateInitialSessionTitle({
-        sandboxInstanceId: null,
-        cachedTitle: null,
-        messageCount: 0,
-      }),
-    ).toBe(false);
   });
 
   it("starts session recovery from a recoverable disconnect and preserves attempts for the same event", () => {
@@ -768,6 +726,7 @@ describe("useSessionWorkbenchController", () => {
       failureMessage: null,
       runtimeContext: null,
       automationConversation: null,
+      startupOperation: null,
     });
 
     const { result } = renderSessionWorkbenchController({
@@ -794,6 +753,7 @@ describe("useSessionWorkbenchController", () => {
         primaryRepositoryRoot: "/workspace/repo",
       },
       automationConversation: null,
+      startupOperation: null,
     };
     const queryClient = createControllerQueryClient({
       staleTime: Number.POSITIVE_INFINITY,

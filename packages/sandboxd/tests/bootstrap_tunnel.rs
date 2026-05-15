@@ -16,6 +16,7 @@ fn connects_to_bootstrap_tunnel_with_bootstrap_token_query() {
 
     let server_thread = thread::spawn(move || {
         let (stream, _) = listener.accept().expect("server should accept a client");
+        #[allow(clippy::result_large_err)]
         let mut websocket = accept_hdr(stream, |request: &Request, response: Response| {
             request_path_sender
                 .send(request.uri().to_string())

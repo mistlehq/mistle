@@ -113,6 +113,28 @@ export const PartialDataPlaneWorkerSandboxE2BConfigSchema = z
   })
   .strict();
 
+export const DataPlaneWorkerSandboxTensorlakeConfigSchema = z.discriminatedUnion("enabled", [
+  z
+    .object({
+      enabled: z.literal(true),
+      apiKey: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      enabled: z.literal(false),
+      apiKey: z.string().min(1).optional(),
+    })
+    .strict(),
+]);
+
+export const PartialDataPlaneWorkerSandboxTensorlakeConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    apiKey: z.string().min(1).optional(),
+  })
+  .strict();
+
 export const DataPlaneWorkerSandboxConfigSchema = z
   .object({
     storage: GlobalSandboxStorageConfigSchema.optional(),
@@ -121,6 +143,7 @@ export const DataPlaneWorkerSandboxConfigSchema = z
     sandboxdTestFaultsEnabled: z.boolean().optional(),
     docker: DataPlaneWorkerSandboxDockerConfigSchema.optional(),
     e2b: DataPlaneWorkerSandboxE2BConfigSchema.optional(),
+    tensorlake: DataPlaneWorkerSandboxTensorlakeConfigSchema.optional(),
   })
   .strict();
 
@@ -132,6 +155,7 @@ export const PartialDataPlaneWorkerSandboxConfigSchema = z
     sandboxdTestFaultsEnabled: z.boolean().optional(),
     docker: PartialDataPlaneWorkerSandboxDockerConfigSchema.optional(),
     e2b: PartialDataPlaneWorkerSandboxE2BConfigSchema.optional(),
+    tensorlake: PartialDataPlaneWorkerSandboxTensorlakeConfigSchema.optional(),
   })
   .strict();
 

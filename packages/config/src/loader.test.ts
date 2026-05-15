@@ -42,6 +42,8 @@ function buildControlPlaneApiServiceEnv(): NodeJS.ProcessEnv {
     MISTLE_SANDBOX_DOCKER_ENABLED: "true",
     MISTLE_SANDBOX_E2B_ENABLED: "true",
     MISTLE_SANDBOX_E2B_API_KEY: "shared-e2b-secret",
+    MISTLE_SANDBOX_TENSORLAKE_ENABLED: "true",
+    MISTLE_SANDBOX_TENSORLAKE_API_KEY: "shared-tensorlake-secret",
     MISTLE_SANDBOX_TOKENS_BOOTSTRAP_SECRET: "bootstrap-secret",
     MISTLE_SANDBOX_TOKENS_BOOTSTRAP_ISSUER: "mistle",
     MISTLE_SANDBOX_TOKENS_BOOTSTRAP_AUDIENCE: "sandbox-bootstrap",
@@ -63,6 +65,26 @@ function buildDataPlaneApiServiceEnv(): NodeJS.ProcessEnv {
     MISTLE_INTERNAL_AUTH_SHARED_TOKEN: "internal-service-token",
     MISTLE_SANDBOX_DOCKER_ENABLED: "true",
     MISTLE_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
+  };
+}
+
+function buildControlPlaneWorkerServiceEnv(): NodeJS.ProcessEnv {
+  return {
+    MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL: "postgresql://control-pooled.example/mistle",
+    MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: "postgresql://control-direct.example/mistle",
+    MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: "staging",
+    MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY: "4",
+    MISTLE_EMAIL_SMTP_FROM_ADDRESS: "no-reply@example.com",
+    MISTLE_EMAIL_SMTP_FROM_NAME: "Mistle",
+    MISTLE_EMAIL_SMTP_HOST: "smtp.example.com",
+    MISTLE_EMAIL_SMTP_PORT: "587",
+    MISTLE_EMAIL_SMTP_SECURE: "false",
+    MISTLE_EMAIL_SMTP_USERNAME: "smtp-user",
+    MISTLE_EMAIL_SMTP_PASSWORD: "smtp-password",
+    MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL: "http://data-plane-api:8082",
+    MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: "http://control-plane-api:8080",
+    MISTLE_INTERNAL_AUTH_SHARED_TOKEN: "internal-service-token",
+    MISTLE_SANDBOX_DEFAULT_BASE_IMAGE: "ghcr.io/mistlehq/sandbox-base:test",
   };
 }
 
@@ -244,6 +266,10 @@ describe("loadConfig", () => {
       apiKey: "shared-e2b-secret",
       domain: "e2b.app",
     });
+    expect(loadedConfig.app.sandbox.tensorlake).toEqual({
+      enabled: true,
+      apiKey: "shared-tensorlake-secret",
+    });
   });
 
   it("loads env data-plane API Docker config when shared E2B env is also present", () => {
@@ -258,6 +284,22 @@ describe("loadConfig", () => {
         enabled: true,
         socketPath: "/var/run/docker.sock",
       },
+    });
+  });
+
+  it("keeps control-plane worker Stripe billing disabled when only the secret is provisioned", () => {
+    const loadedConfig = loadConfig({
+      app: AppIds.CONTROL_PLANE_WORKER,
+      includeGlobal: false,
+      env: {
+        ...buildControlPlaneWorkerServiceEnv(),
+        MISTLE_BILLING_STRIPE_SECRET_KEY: "sk_test_secret",
+      },
+    });
+
+    expect(loadedConfig.app.billing.stripe).toEqual({
+      enabled: false,
+      secretKey: "sk_test_secret",
     });
   });
 

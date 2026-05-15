@@ -20,6 +20,7 @@ import type {
   SandboxProfileVersionAutomationConfig,
   SandboxProfileVersionRefreshSchedule,
   SandboxProfileVersionSetupScript,
+  SandboxProfileSetupScriptTestRuntimeConfig,
   SandboxProvidersResult,
   SandboxProfileSetupAssistant,
   SandboxProfileSetupScriptTestRun,
@@ -385,9 +386,21 @@ const SandboxRuntimeResourceCapabilitySchema = z
   })
   .strict();
 
+const SandboxRuntimeMemoryResourceCapabilitySchema = SandboxRuntimeResourceCapabilitySchema.extend({
+  maxPerVcpu: z.number().int().min(0).optional(),
+  minPerVcpu: z.number().int().min(0).optional(),
+}).transform((capability) => ({
+  default: capability.default,
+  max: capability.max,
+  ...(capability.maxPerVcpu === undefined ? {} : { maxPerVcpu: capability.maxPerVcpu }),
+  min: capability.min,
+  ...(capability.minPerVcpu === undefined ? {} : { minPerVcpu: capability.minPerVcpu }),
+  step: capability.step,
+}));
+
 const SandboxRuntimeResourceCapabilitiesSchema = z
   .object({
-    memoryMb: SandboxRuntimeResourceCapabilitySchema,
+    memoryMb: SandboxRuntimeMemoryResourceCapabilitySchema,
     storageMb: SandboxRuntimeResourceCapabilitySchema.optional(),
     vcpuCount: SandboxRuntimeResourceCapabilitySchema,
   })
@@ -422,6 +435,7 @@ const SandboxProfileVersionSchema = z
     latestSnapshotJob: z
       .object({
         id: z.string().min(1),
+        sandboxInstanceId: z.string().min(1).nullable(),
         trigger: z.enum(["publish", "manual_refresh", "scheduled_refresh"]),
         state: z.enum(["queued", "running", "succeeded", "failed"]),
         errorCode: z.string().min(1).nullable(),
@@ -486,6 +500,7 @@ const PublishSandboxProfileVersionResultSchema = z
     snapshotJob: z
       .object({
         id: z.string().min(1),
+        sandboxInstanceId: z.string().min(1).nullable(),
         trigger: z.enum(["publish", "manual_refresh", "scheduled_refresh"]),
         state: z.enum(["queued", "running", "succeeded", "failed"]),
         errorCode: z.string().min(1).nullable(),
@@ -1182,6 +1197,7 @@ export async function startSandboxProfileSetupScriptTestRun(input: {
   profileId: string;
   version: number;
   setupScript: string;
+  runtimeConfig?: SandboxProfileSetupScriptTestRuntimeConfig;
   idempotencyKey?: string;
   signal?: AbortSignal;
 }): Promise<SandboxProfileSetupScriptTestRun> {
@@ -1194,6 +1210,16 @@ export async function startSandboxProfileSetupScriptTestRun(input: {
       )}/setup-script/test-runs`,
       body: {
         setupScript: input.setupScript,
+        ...(input.runtimeConfig === undefined
+          ? {}
+          : {
+              agentRuntimeId: input.runtimeConfig.agentRuntimeId,
+              ...(input.runtimeConfig.sandboxProvider === null
+                ? {}
+                : { sandboxProvider: input.runtimeConfig.sandboxProvider }),
+              sandboxConnectionId: input.runtimeConfig.sandboxConnectionId,
+              sandboxResources: input.runtimeConfig.sandboxResources,
+            }),
         ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
       },
       ...(input.signal === undefined ? {} : { signal: input.signal }),

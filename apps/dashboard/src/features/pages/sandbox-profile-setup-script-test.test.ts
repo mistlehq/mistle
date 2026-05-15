@@ -1,76 +1,71 @@
 import { describe, expect, it } from "vitest";
 
-import { SandboxBaseRuntimeShell } from "./sandbox-base-inventory-copy.js";
 import {
-  createSetupScriptTestShellPayload,
   resolveSetupScriptTestStatus,
   resolveSetupScriptTestStatusMessage,
 } from "./sandbox-profile-setup-script-test.js";
 
-describe("createSetupScriptTestShellPayload", () => {
-  it("enables fail-fast execution before the user setup script when requested", () => {
-    const payload = createSetupScriptTestShellPayload({
-      failOnFirstError: true,
-      setupScript: "pnpm install\npnpm dev:bootstrap",
-    });
-
-    expect(payload).toContain("base64 -d");
-    expect(payload).toContain(`${SandboxBaseRuntimeShell} -l -e`);
-  });
-
-  it("runs non-shebang scripts without fail-fast shell options when disabled", () => {
-    const payload = createSetupScriptTestShellPayload({
-      failOnFirstError: false,
-      setupScript: "pnpm install || npm install",
-    });
-
-    expect(payload).toContain("base64 -d");
-    expect(payload).toContain(`${SandboxBaseRuntimeShell} -l`);
-    expect(payload).not.toContain(`${SandboxBaseRuntimeShell} -l -e`);
-  });
-
-  it("executes shebang scripts directly from the generated script file", () => {
-    const payload = createSetupScriptTestShellPayload({
-      failOnFirstError: true,
-      setupScript: "#!/usr/bin/env python3\nprint('hello')",
-    });
-
-    expect(payload).toContain('if head -c 2 "$setup_script_path" | grep -q "^#!"; then');
-    expect(payload).toContain('  "$setup_script_path"');
-    expect(payload).toContain('  exit "$?"');
-  });
-});
-
 describe("resolveSetupScriptTestStatus", () => {
-  it("prefers the terminal exit result over later sandbox status errors", () => {
+  it("reports success when the setup-check sandbox reaches running", () => {
     expect(
       resolveSetupScriptTestStatus({
-        isOpenRequested: false,
-        ptyErrorMessage: null,
-        ptyExitCode: 0,
-        runErrorMessage: "Sandbox instance 'sbi_test' was not found.",
+        runErrorMessage: null,
+        sandboxStatus: "running",
         scriptIsBlank: false,
         startIsPending: false,
         startedRun: {
-          failOnFirstError: true,
-          ptySessionId: "setup-script-test-1",
           sandboxInstanceId: "sbi_setup_test_1",
           setupScript: "pnpm install",
+          workflowRunId: "owfr_setup_test_1",
         },
+        terminalResult: null,
       }),
     ).toBe("success");
+  });
+
+  it("reports success when the setup-check sandbox is stopped after worker cleanup", () => {
+    expect(
+      resolveSetupScriptTestStatus({
+        runErrorMessage: null,
+        sandboxStatus: "stopped",
+        scriptIsBlank: false,
+        startIsPending: false,
+        startedRun: {
+          sandboxInstanceId: "sbi_setup_test_1",
+          setupScript: "pnpm install",
+          workflowRunId: "owfr_setup_test_1",
+        },
+        terminalResult: null,
+      }),
+    ).toBe("success");
+  });
+
+  it("reports failed when sandbox status lookup fails before completion", () => {
+    expect(
+      resolveSetupScriptTestStatus({
+        runErrorMessage: "Could not check setup script test sandbox status.",
+        sandboxStatus: null,
+        scriptIsBlank: false,
+        startIsPending: false,
+        startedRun: {
+          sandboxInstanceId: "sbi_setup_test_1",
+          setupScript: "pnpm install",
+          workflowRunId: "owfr_setup_test_1",
+        },
+        terminalResult: null,
+      }),
+    ).toBe("failed");
   });
 
   it("reports blank only when there is no active setup script test run", () => {
     expect(
       resolveSetupScriptTestStatus({
-        isOpenRequested: false,
-        ptyErrorMessage: null,
-        ptyExitCode: null,
         runErrorMessage: null,
+        sandboxStatus: null,
         scriptIsBlank: true,
         startIsPending: false,
         startedRun: null,
+        terminalResult: null,
       }),
     ).toBe("blank");
   });
@@ -78,18 +73,16 @@ describe("resolveSetupScriptTestStatus", () => {
   it("keeps an active setup script test visible when the editor is cleared", () => {
     expect(
       resolveSetupScriptTestStatus({
-        isOpenRequested: false,
-        ptyErrorMessage: null,
-        ptyExitCode: null,
         runErrorMessage: null,
+        sandboxStatus: "pending",
         scriptIsBlank: true,
         startIsPending: false,
         startedRun: {
-          failOnFirstError: true,
-          ptySessionId: "setup-script-test-1",
           sandboxInstanceId: "sbi_setup_test_1",
           setupScript: "pnpm install",
+          workflowRunId: "owfr_setup_test_1",
         },
+        terminalResult: null,
       }),
     ).toBe("starting");
   });
@@ -97,18 +90,16 @@ describe("resolveSetupScriptTestStatus", () => {
   it("keeps a running setup script test visible when the editor is cleared", () => {
     expect(
       resolveSetupScriptTestStatus({
-        isOpenRequested: true,
-        ptyErrorMessage: null,
-        ptyExitCode: null,
         runErrorMessage: null,
+        sandboxStatus: "starting",
         scriptIsBlank: true,
         startIsPending: false,
         startedRun: {
-          failOnFirstError: true,
-          ptySessionId: "setup-script-test-1",
           sandboxInstanceId: "sbi_setup_test_1",
           setupScript: "pnpm install",
+          workflowRunId: "owfr_setup_test_1",
         },
+        terminalResult: null,
       }),
     ).toBe("running");
   });
@@ -118,7 +109,6 @@ describe("resolveSetupScriptTestStatusMessage", () => {
   it("does not render a summary without a specific error", () => {
     expect(
       resolveSetupScriptTestStatusMessage({
-        ptyErrorMessage: null,
         runErrorMessage: null,
         sandboxFailureMessage: null,
       }),
@@ -128,7 +118,6 @@ describe("resolveSetupScriptTestStatusMessage", () => {
   it("keeps platform error messages visible", () => {
     expect(
       resolveSetupScriptTestStatusMessage({
-        ptyErrorMessage: null,
         runErrorMessage: "Could not check setup script test sandbox status.",
         sandboxFailureMessage: null,
       }),

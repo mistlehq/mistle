@@ -71,6 +71,13 @@
       "when": 1778653800775,
       "tag": "0009_remove-redundant-indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1778763509168,
+      "tag": "0010_add-sandbox-operation-events",
+      "breakpoints": true
     }
   ]
 }

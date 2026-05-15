@@ -111,24 +111,10 @@ RUN chmod +x \
 
 EXPOSE 3000 5100 5202
 
-FROM base AS remote-sandbox
+FROM base AS single-container
 
-ENV MISTLE_PROFILE=remote-sandbox
 ENV MISTLE_CONFIG_PATH=/run/mistle/config.toml
 ENV MISTLE_GENERATED_CONFIG_PATH=/run/mistle/config.toml
-LABEL io.mistle.profile="remote-sandbox"
-
-ENTRYPOINT ["/init"]
-
-FROM base AS docker-sandbox
-
-ENV MISTLE_PROFILE=docker-sandbox
-ENV MISTLE_CONFIG_PATH=/run/mistle/config.toml
-ENV MISTLE_GENERATED_CONFIG_PATH=/run/mistle/config.toml
-LABEL io.mistle.profile="docker-sandbox"
-
-COPY docker/single/docker/cont-init.d/20-validate-docker-sandbox-runtime /etc/cont-init.d/20-validate-docker-sandbox-runtime
-
-RUN chmod +x /etc/cont-init.d/20-validate-docker-sandbox-runtime
+LABEL io.mistle.profile="single-container"
 
 ENTRYPOINT ["/init"]
