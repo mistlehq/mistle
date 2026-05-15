@@ -66,8 +66,8 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
     conversationKeyOptions: [
       {
         id: "pull-request",
-        label: "Per pull request",
-        description: "All matching events for the same pull request go to one conversation.",
+        label: "Pull request",
+        description: "Events from the same pull request go to the same conversation.",
         template:
           "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number | default: payload.issue.number}}",
       },
@@ -421,6 +421,26 @@ describe("validateWebhookAutomationFormValues", () => {
           inputTemplate: DefaultWebhookAutomationMessageTemplate,
           conversationKeyTemplate:
             "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number | default: payload.issue.number}}",
+        },
+        GitHubEventOptions,
+      ),
+    ).toEqual({});
+  });
+
+  it("accepts pull request grouping for pull request events and filtered pull request comments", () => {
+    expect(
+      validateWebhookAutomationFormValues(
+        {
+          ...BaseFormValues,
+          conversationKeyTemplate:
+            "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number | default: payload.issue.number}}",
+          triggerIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
+          triggerParameterValues: {
+            [IssueCommentCreatedTriggerId]: {
+              invocationToken: "pr-review",
+              target: "exists",
+            },
+          },
         },
         GitHubEventOptions,
       ),

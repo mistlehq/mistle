@@ -47,7 +47,10 @@ import {
   type WebhookAutomationFormValueKey,
   type WebhookAutomationFormValues,
 } from "./webhook-automation-form-types.js";
-import { WebhookAutomationTypeSpecificSection } from "./webhook-automation-form.js";
+import {
+  WebhookAutomationInstructionsSection,
+  WebhookAutomationTypeSpecificSection,
+} from "./webhook-automation-form.js";
 import { DefaultWebhookAutomationMessageTemplate } from "./webhook-automation-input-template.js";
 import {
   buildWebhookAutomationEventOptions,
@@ -779,6 +782,22 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
     setFormError(null);
   }
 
+  function onWebhookInstructionsChange(value: string): void {
+    setFormValues((currentValues) => ({
+      ...currentValues,
+      instructions: value,
+    }));
+    setFieldErrors((currentErrors) => {
+      const { instructions: _instructions, ...remainingErrors } = currentErrors;
+
+      void _instructions;
+
+      return remainingErrors;
+    });
+    setValidationSummaryError(null);
+    setFormError(null);
+  }
+
   function onScheduledValueChange(
     key: "conversationMode" | "cronExpression" | "timezone",
     value: string,
@@ -870,6 +889,7 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
     onKindChange,
     onCommonValueChange,
     onWebhookValueChange,
+    onWebhookInstructionsChange,
     onScheduledValueChange,
     onSubmit,
   };
@@ -972,6 +992,16 @@ export function CreateAutomationEditor(
       shouldShowPrimaryRepositoryField={presentation.shouldShowPrimaryRepositoryField}
       submitLabel={presentation.submitLabel}
       validationSummaryError={state.validationSummaryError}
+      extraSectionsBeforeMessage={
+        state.kind === "trigger" ? (
+          <WebhookAutomationInstructionsSection
+            disabled={state.isSaving}
+            instructionsLabelId="automation-instructions-label"
+            onValueChange={state.onWebhookInstructionsChange}
+            value={state.formValues.instructions}
+          />
+        ) : undefined
+      }
       typeSpecificSection={
         state.kind === null ? null : state.kind === "scheduled" ? (
           <ScheduledAutomationTypeSpecificSection

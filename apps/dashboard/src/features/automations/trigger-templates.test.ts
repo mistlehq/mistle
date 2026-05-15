@@ -27,8 +27,10 @@ describe("trigger templates", () => {
       "{{payload.pull_request.number | default: payload.issue.number}}",
     );
     expect(template.inputTemplate).toContain("{{webhookEvent.eventType}}");
-    expect(template.inputTemplate).toContain("{{payload.pull_request.head.ref}}");
-    expect(template.inputTemplate).toContain("{{payload.comment.body}}");
+    expect(template.inputTemplate).toContain('{{payload.pull_request.base.ref | default: ""}}');
+    expect(template.inputTemplate).toContain('{{payload.pull_request.head.ref | default: ""}}');
+    expect(template.inputTemplate).toContain('{{payload.comment.body | default: ""}}');
+    expect(template.inputTemplate).toContain('{{payload.pull_request.body | default: ""}}');
     expect(template.inputTemplate).not.toContain("{{payload.pull_request.html_url}}");
     expect(template.inputTemplate).not.toContain("{{payload.pull_request.title}}");
     expect(template.inputTemplate).not.toContain("{{payload.action}}");

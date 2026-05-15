@@ -290,6 +290,7 @@ describe("AutomationCreatePage", () => {
     expect(screen.getByText("Select source")).toBeDefined();
     expect(screen.queryByRole("heading", { name: "When this happens" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "When this runs" })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: "Response instructions" })).toBeNull();
     expect(screen.queryByRole("textbox", { name: "User message" })).toBeNull();
   });
 
@@ -325,6 +326,9 @@ describe("AutomationCreatePage", () => {
     expect(screen.getByText("Event")).toBeDefined();
     expect(getFormControlValue(screen.getByRole("textbox", { name: "Trigger name" }))).toBe(
       "Slack Mention",
+    );
+    expect(screen.getByRole("textbox", { name: "Response instructions" }).textContent).toContain(
+      "`slack` CLI",
     );
     expect(screen.getByRole("textbox", { name: "User message" }).textContent).toContain(
       "{{payload.event}}",

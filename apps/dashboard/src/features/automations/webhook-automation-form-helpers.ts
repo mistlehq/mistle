@@ -183,6 +183,7 @@ export function validateWebhookAutomationFormValues(
       eventOptions,
       selectedTriggerIds: values.triggerIds,
     }),
+    triggerParameterValues: values.triggerParameterValues,
   });
   if (
     selectedConversationKeyOptions.length > 0 &&
