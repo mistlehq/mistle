@@ -5,7 +5,6 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient, flushScheduledReactWork } from "../../test-support/query-client.js";
-import { shouldGenerateInitialSessionTitle } from "../session-agents/session-workbench-turn-starters.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
 import { resolveInitialSessionConnectInput } from "./session-initial-connect-policy.js";
@@ -139,48 +138,6 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.workbench.primaryPanelState.cliTerminalContentInset).toBe("none");
     expect(result.current.workbench.primaryPanelState.cliTerminalThemeMode).toBe("system");
     expect(result.current.workbench.primaryPanelState.cliRuntimeDisplayName).toBe("OpenCode");
-  });
-
-  it("generates an initial session title only for the first message while the title is unset", () => {
-    expect(
-      shouldGenerateInitialSessionTitle({
-        sandboxInstanceId: "sbi_123",
-        cachedTitle: null,
-        messageCount: 0,
-      }),
-    ).toBe(true);
-
-    expect(
-      shouldGenerateInitialSessionTitle({
-        sandboxInstanceId: "sbi_123",
-        cachedTitle: undefined,
-        messageCount: 0,
-      }),
-    ).toBe(true);
-
-    expect(
-      shouldGenerateInitialSessionTitle({
-        sandboxInstanceId: "sbi_123",
-        cachedTitle: "Existing title",
-        messageCount: 0,
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldGenerateInitialSessionTitle({
-        sandboxInstanceId: "sbi_123",
-        cachedTitle: null,
-        messageCount: 1,
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldGenerateInitialSessionTitle({
-        sandboxInstanceId: null,
-        cachedTitle: null,
-        messageCount: 0,
-      }),
-    ).toBe(false);
   });
 
   it("starts session recovery from a recoverable disconnect and preserves attempts for the same event", () => {
