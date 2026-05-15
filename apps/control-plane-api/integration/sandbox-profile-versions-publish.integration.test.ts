@@ -334,6 +334,107 @@ describe.concurrent("sandbox profile versions publish integration", () => {
     });
   });
 
+  it("updates the draft refresh schedule when copying previous active settings during publish", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publish-update-draft-schedule@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_version_publish_update_draft_schedule",
+        organizationId: session.organizationId,
+        displayName: "Publish Update Draft Schedule Profile",
+        activeVersion: 1,
+        createdAt: "2026-05-15T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_version_publish_update_draft_schedule",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        publishedAt: "2026-05-15T00:01:00.000Z",
+        maintenanceScript: "echo active maintenance",
+      }),
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_version_publish_update_draft_schedule",
+        version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    ]);
+
+    const activeScheduleResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_version_publish_update_draft_schedule/versions/1/refresh-schedule",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          name: "Active refresh",
+          cronExpression: "30 8 * * *",
+          timezone: "Asia/Singapore",
+        }),
+      },
+    );
+    expect(activeScheduleResponse.status).toBe(200);
+
+    const draftScheduleResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_version_publish_update_draft_schedule/versions/2/refresh-schedule",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          name: "Draft refresh",
+          cronExpression: "45 9 * * *",
+          timezone: "UTC",
+        }),
+      },
+    );
+    expect(draftScheduleResponse.status).toBe(200);
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_version_publish_update_draft_schedule/versions/2/publish",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+    expect(responseBody.version).toMatchObject({
+      maintenanceScript: "echo active maintenance",
+      refreshSchedule: {
+        name: "Active refresh",
+        cronExpression: "30 8 * * *",
+        timezone: "Asia/Singapore",
+      },
+    });
+
+    const draftVersionTargets =
+      await env.controlPlaneDb.query.sandboxProfileSnapshotRefreshScheduleTargets.findMany({
+        columns: {
+          scheduleId: true,
+        },
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.sandboxProfileId, "sbp_version_publish_update_draft_schedule"),
+            eq(table.sandboxProfileVersion, 2),
+          ),
+      });
+    expect(draftVersionTargets).toHaveLength(1);
+  });
+
   it("returns 409 when the selected version is not a draft", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-version-publish-not-draft@example.com",

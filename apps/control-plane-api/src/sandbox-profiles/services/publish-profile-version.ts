@@ -136,6 +136,58 @@ async function copyRefreshScheduleToPublishedVersion(
     throw new Error("Copied snapshot refresh schedule has no next occurrence.");
   }
 
+  const [existingTarget] = await tx
+    .select({
+      scheduleId: tables.sandboxProfileSnapshotRefreshScheduleTargets.scheduleId,
+    })
+    .from(tables.sandboxProfileSnapshotRefreshScheduleTargets)
+    .where(
+      and(
+        eq(tables.sandboxProfileSnapshotRefreshScheduleTargets.sandboxProfileId, input.profileId),
+        eq(
+          tables.sandboxProfileSnapshotRefreshScheduleTargets.sandboxProfileVersion,
+          input.toVersion,
+        ),
+      ),
+    )
+    .limit(1);
+
+  if (existingTarget !== undefined) {
+    const [updatedSchedule] = await tx
+      .update(tables.schedules)
+      .set({
+        name: sourceSchedule.name,
+        cronExpression: sourceSchedule.cronExpression,
+        timezone: sourceSchedule.timezone,
+        enabled: sourceSchedule.enabled,
+        nextScheduledAt: nextOccurrence.scheduledAt.toISOString(),
+        deletedAt: null,
+        updatedAt: sql`now()`,
+      })
+      .where(eq(tables.schedules.id, existingTarget.scheduleId))
+      .returning({
+        id: tables.schedules.id,
+        name: tables.schedules.name,
+        cronExpression: tables.schedules.cronExpression,
+        timezone: tables.schedules.timezone,
+        enabled: tables.schedules.enabled,
+        nextScheduledAt: tables.schedules.nextScheduledAt,
+      });
+
+    if (updatedSchedule === undefined) {
+      throw new Error("Expected existing snapshot refresh schedule to be updated.");
+    }
+
+    return {
+      scheduleId: updatedSchedule.id,
+      name: updatedSchedule.name,
+      cronExpression: updatedSchedule.cronExpression,
+      timezone: updatedSchedule.timezone,
+      enabled: updatedSchedule.enabled,
+      nextScheduledAt: updatedSchedule.nextScheduledAt,
+    };
+  }
+
   const [createdSchedule] = await tx
     .insert(tables.schedules)
     .values({
