@@ -23,7 +23,11 @@ import { toAutomationListItemViewModel } from "../automations/automation-list-vi
 import { automationsListQueryKey } from "../automations/automations-query-keys.js";
 import { listAutomations } from "../automations/automations-service.js";
 import { getScheduledAutomation } from "../automations/scheduled-automations-service.js";
-import { TriggerTemplates, type TriggerTemplate } from "../automations/trigger-templates.js";
+import {
+  resolveTriggerTemplateEventOptionIds,
+  TriggerTemplates,
+  type TriggerTemplate,
+} from "../automations/trigger-templates.js";
 import { useWebhookAutomationEventPrerequisites } from "../automations/use-webhook-automation-prerequisites.js";
 import {
   buildWebhookAutomationEventOptions,
@@ -156,9 +160,7 @@ function isTriggerTemplateAvailable(input: {
   eventOptions: readonly WebhookAutomationEventOption[];
   template: Extract<TriggerTemplate, { kind: "trigger" }>;
 }): boolean {
-  return input.template.eventTypes.every((eventType) =>
-    input.eventOptions.some((option) => option.eventType === eventType),
-  );
+  return resolveTriggerTemplateEventOptionIds(input) !== null;
 }
 
 function resolveTriggerTemplateAvailability(input: {

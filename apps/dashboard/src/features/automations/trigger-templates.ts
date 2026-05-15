@@ -1,4 +1,6 @@
 import { ScheduledAutomationConversationModes } from "./scheduled-automation-form-types.js";
+import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
+import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 
 type WebhookTriggerTemplate = {
   id: string;
@@ -27,6 +29,45 @@ type ScheduledTriggerTemplate = {
 };
 
 export type TriggerTemplate = WebhookTriggerTemplate | ScheduledTriggerTemplate;
+
+export function resolveTriggerTemplateEventOptionIds(input: {
+  eventOptions: readonly WebhookAutomationEventOption[];
+  template: Extract<TriggerTemplate, { kind: "trigger" }>;
+}): string[] | null {
+  const availableEventOptions = input.eventOptions.filter(
+    (option) => !isWebhookAutomationEventOptionUnavailable(option),
+  );
+  const webhookSourceIds = [
+    ...new Set(availableEventOptions.map((option) => option.integrationWebhookSourceId)),
+  ];
+
+  for (const webhookSourceId of webhookSourceIds) {
+    const triggerIds: string[] = [];
+
+    for (const eventType of input.template.eventTypes) {
+      const matchingOptions = availableEventOptions.filter(
+        (option) =>
+          option.integrationWebhookSourceId === webhookSourceId && option.eventType === eventType,
+      );
+      if (matchingOptions.length !== 1) {
+        triggerIds.length = 0;
+        break;
+      }
+
+      const [matchingOption] = matchingOptions;
+      if (matchingOption === undefined) {
+        throw new Error(`Expected matching trigger option for '${eventType}'.`);
+      }
+      triggerIds.push(matchingOption.id);
+    }
+
+    if (triggerIds.length === input.template.eventTypes.length) {
+      return triggerIds;
+    }
+  }
+
+  return null;
+}
 
 export const TriggerTemplates = [
   {

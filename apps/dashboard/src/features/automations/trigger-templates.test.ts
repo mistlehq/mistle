@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { getTriggerTemplateById } from "./trigger-templates.js";
+import {
+  getTriggerTemplateById,
+  resolveTriggerTemplateEventOptionIds,
+} from "./trigger-templates.js";
+import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
+import {
+  createGithubIssueCommentCreatedEventOption,
+  createGithubPullRequestOpenedEventOption,
+  GitHubWebhookSourceId,
+} from "./webhook-automation-test-fixtures.js";
+
+const OtherGitHubWebhookSourceId = "iws_other_github";
 
 describe("trigger templates", () => {
   it("defines the GitHub PR review template for opened pull requests and review request comments", () => {
@@ -44,5 +55,47 @@ describe("trigger templates", () => {
     expect(template.conversationKeyTemplate).toBe(
       "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number | default: payload.issue.number}}",
     );
+  });
+
+  it("resolves template trigger ids only when every event is available from one webhook source", () => {
+    const template = getTriggerTemplateById("github-pr-review");
+    if (template.kind !== "trigger") {
+      throw new Error("Expected GitHub PR review template to be a webhook trigger template.");
+    }
+
+    expect(
+      resolveTriggerTemplateEventOptionIds({
+        template,
+        eventOptions: [
+          createGithubPullRequestOpenedEventOption(),
+          createGithubIssueCommentCreatedEventOption(),
+        ],
+      }),
+    ).toEqual([
+      createWebhookAutomationTriggerId({
+        webhookSourceId: GitHubWebhookSourceId,
+        eventType: "github.pull_request.opened",
+      }),
+      createWebhookAutomationTriggerId({
+        webhookSourceId: GitHubWebhookSourceId,
+        eventType: "github.issue_comment.created",
+      }),
+    ]);
+
+    expect(
+      resolveTriggerTemplateEventOptionIds({
+        template,
+        eventOptions: [
+          createGithubPullRequestOpenedEventOption(),
+          createGithubIssueCommentCreatedEventOption({
+            id: createWebhookAutomationTriggerId({
+              webhookSourceId: OtherGitHubWebhookSourceId,
+              eventType: "github.issue_comment.created",
+            }),
+            integrationWebhookSourceId: OtherGitHubWebhookSourceId,
+          }),
+        ],
+      }),
+    ).toBeNull();
   });
 });

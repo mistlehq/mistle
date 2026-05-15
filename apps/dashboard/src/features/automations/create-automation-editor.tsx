@@ -28,7 +28,11 @@ import {
 } from "./scheduled-automation-form-types.js";
 import { ScheduledAutomationTypeSpecificSection } from "./scheduled-automation-form.js";
 import { createScheduledAutomation } from "./scheduled-automations-service.js";
-import { getTriggerTemplateById, type TriggerTemplate } from "./trigger-templates.js";
+import {
+  getTriggerTemplateById,
+  resolveTriggerTemplateEventOptionIds,
+  type TriggerTemplate,
+} from "./trigger-templates.js";
 import { useAutomationSandboxProfileOptions } from "./use-automation-sandbox-profile-options.js";
 import {
   resolveNoActiveProfileVersionMessage,
@@ -36,7 +40,6 @@ import {
 } from "./use-webhook-automation-editor-state.js";
 import { useWebhookAutomationEventPrerequisites } from "./use-webhook-automation-prerequisites.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
-import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
 import {
   toCreateWebhookAutomationPayload,
   toWebhookAutomationFormValues,
@@ -292,31 +295,6 @@ function applyTriggerIdsChange(input: {
   };
 }
 
-function resolveTemplateTriggerIds(input: {
-  eventTypes: readonly string[];
-  eventOptions: readonly WebhookAutomationEventOption[];
-}): string[] | null {
-  const triggerIds: string[] = [];
-  for (const eventType of input.eventTypes) {
-    const matchingOptions = input.eventOptions.filter(
-      (eventOption) =>
-        eventOption.eventType === eventType &&
-        !isWebhookAutomationEventOptionUnavailable(eventOption),
-    );
-    if (matchingOptions.length !== 1) {
-      return null;
-    }
-
-    const [matchingOption] = matchingOptions;
-    if (matchingOption === undefined) {
-      throw new Error(`Expected matching trigger option for '${eventType}'.`);
-    }
-    triggerIds.push(matchingOption.id);
-  }
-
-  return triggerIds;
-}
-
 function resolveDefaultInputTemplate(kind: AutomationTypeValue): string {
   return kind === "scheduled"
     ? toScheduledAutomationFormValues(null).inputTemplate
@@ -506,8 +484,8 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
       return;
     }
 
-    const templateTriggerIds = resolveTemplateTriggerIds({
-      eventTypes: initialTemplate.eventTypes,
+    const templateTriggerIds = resolveTriggerTemplateEventOptionIds({
+      template: initialTemplate,
       eventOptions: webhookEventOptions,
     });
     if (templateTriggerIds === null) {
