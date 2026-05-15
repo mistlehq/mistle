@@ -247,31 +247,27 @@ function SandboxOperationTimeline(input: {
       {input.items.map(({ event, startedAt }) => {
         const diagnosticMessage = resolveLifecycleDiagnosticMessage(event);
         const isExpanded = expandedEventIds.has(event.id);
+        const phaseLabel = formatLifecyclePhase(event.phase);
 
         return (
           <li className="grid grid-cols-[1rem_minmax(0,1fr)] items-start gap-2" key={event.id}>
             <span className="pt-0.5">{renderStatusIcon(event.status)}</span>
-            <span className="min-w-0">
+            <div className="min-w-0">
               <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                <span className="text-sm font-medium">{formatLifecyclePhase(event.phase)}</span>
+                <span className="text-sm font-medium">{phaseLabel}</span>
+                <span className="sr-only">{formatLifecycleStatus(event.status)}</span>
                 <time className="text-xs text-muted-foreground" dateTime={event.observedAt}>
                   {formatLifecycleItemTime({ event, startedAt })}
                 </time>
                 {diagnosticMessage === null ? null : (
                   <button
                     aria-expanded={isExpanded}
-                    aria-label={`${isExpanded ? "Hide" : "Show"} ${formatLifecyclePhase(event.phase)} details`}
+                    aria-label={`${isExpanded ? "Hide" : "Show"} ${phaseLabel} details`}
                     className="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                     onClick={() => {
-                      setExpandedEventIds((currentIds) => {
-                        const nextIds = new Set(currentIds);
-                        if (nextIds.has(event.id)) {
-                          nextIds.delete(event.id);
-                        } else {
-                          nextIds.add(event.id);
-                        }
-                        return nextIds;
-                      });
+                      setExpandedEventIds((currentIds) =>
+                        toggleExpandedTimelineEventId(currentIds, event.id),
+                      );
                     }}
                     type="button"
                   >
@@ -287,12 +283,25 @@ function SandboxOperationTimeline(input: {
                   {diagnosticMessage}
                 </p>
               )}
-            </span>
+            </div>
           </li>
         );
       })}
     </ol>
   );
+}
+
+function toggleExpandedTimelineEventId(
+  currentIds: ReadonlySet<string>,
+  eventId: string,
+): ReadonlySet<string> {
+  const nextIds = new Set(currentIds);
+  if (nextIds.has(eventId)) {
+    nextIds.delete(eventId);
+  } else {
+    nextIds.add(eventId);
+  }
+  return nextIds;
 }
 
 function SandboxOperationTranscript(input: {
@@ -526,6 +535,14 @@ function formatLifecyclePhase(phase: SandboxOperationEvent["phase"]): string {
     case "teardown":
       return "Teardown";
   }
+}
+
+function formatLifecycleStatus(status: SandboxOperationEvent["status"]): string {
+  if (status === null) {
+    return "event";
+  }
+
+  return status.replaceAll("_", " ");
 }
 
 function resolveLifecycleDiagnosticMessage(event: SandboxOperationEvent): string | null {

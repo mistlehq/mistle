@@ -102,7 +102,8 @@ describe("SandboxOperationProgressView", () => {
     expect(within(timeline).queryByText("Snapshot sandbox provider start started.")).toBeNull();
     expect(within(timeline).queryByText("Snapshot sandbox provider start completed.")).toBeNull();
     expect(within(timeline).getAllByText("Sandbox")).toHaveLength(1);
-    expect(within(timeline).queryByText("completed")).toBeNull();
+    const completedStatus = within(timeline).getByText("completed");
+    expect(completedStatus.classList.contains("sr-only")).toBe(true);
   });
 
   it("keeps one lifecycle row when worker and sandboxd report the same phase", () => {
@@ -138,7 +139,8 @@ describe("SandboxOperationProgressView", () => {
     expect(within(timeline).queryByText("Snapshot sandboxd initialization started.")).toBeNull();
     expect(within(timeline).queryByText("sandboxd started")).toBeNull();
     expect(within(timeline).getAllByText("Sandbox daemon")).toHaveLength(1);
-    expect(within(timeline).queryByText("started")).toBeNull();
+    const startedStatus = within(timeline).getByText("started");
+    expect(startedStatus.classList.contains("sr-only")).toBe(true);
   });
 
   it("keeps collapsed lifecycle rows in first-seen phase order", () => {
@@ -180,10 +182,12 @@ describe("SandboxOperationProgressView", () => {
     expect(timelineText.indexOf("Sandbox daemon")).toBeLessThan(timelineText.indexOf("Tunnel"));
     expect(within(timeline).queryByText("Snapshot sandboxd initialization started.")).toBeNull();
     expect(within(timeline).queryByText("Snapshot sandboxd initialization completed.")).toBeNull();
-    expect(within(timeline).queryByText("completed")).toBeNull();
+    for (const completedStatus of within(timeline).getAllByText("completed")) {
+      expect(completedStatus.classList.contains("sr-only")).toBe(true);
+    }
   });
 
-  it("does not render text badges for warning and failed lifecycle rows", () => {
+  it("keeps warning and failed status text screen-reader-only", () => {
     render(
       <SandboxOperationProgressView
         displayMode="timeline"
@@ -212,8 +216,8 @@ describe("SandboxOperationProgressView", () => {
       throw new Error("Expected sandbox operation timeline to render.");
     }
 
-    expect(within(timeline).queryByText("warning")).toBeNull();
-    expect(within(timeline).queryByText("failed")).toBeNull();
+    expect(within(timeline).getByText("warning").classList.contains("sr-only")).toBe(true);
+    expect(within(timeline).getByText("failed").classList.contains("sr-only")).toBe(true);
   });
 
   it("expands warning and failure details from lifecycle messages", () => {
