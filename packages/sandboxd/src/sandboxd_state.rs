@@ -162,8 +162,13 @@ impl SandboxdState {
         let uses_pre_materialized_snapshot = startup_input.startup_mode == StartupMode::New
             && startup_input.execution_mode == StartupExecutionMode::Session
             && runtime_plan.image.source == CompiledRuntimePlanImageSource::Snapshot;
-        let should_run_setup_script =
-            should_run_setup_script_for_startup(uses_pre_materialized_snapshot, startup_input);
+        let should_apply_runtime_plan =
+            should_apply_runtime_plan_for_startup(uses_pre_materialized_snapshot, startup_input);
+        let should_run_setup_script = should_run_setup_script_for_startup(
+            should_apply_runtime_plan,
+            uses_pre_materialized_snapshot,
+            startup_input,
+        );
         let sandbox_instance_id = derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)
             .map_err(|error| SandboxdStateError::StartTunnelSession(error.to_string()))?;
         let supervisor_handle = SandboxdSupervisorHandle::new(
@@ -317,7 +322,7 @@ impl SandboxdState {
             return Err(error);
         }
 
-        if !uses_pre_materialized_snapshot {
+        if should_apply_runtime_plan {
             record_operation_phase_started(&diagnostics_logger, "apply_runtime_plan");
             match runtime::apply_compiled_runtime_plan_with_output_sink(
                 &runtime_plan,
@@ -888,11 +893,22 @@ fn is_snapshot_preparation_operation(operation_kind: StartupOperationKind) -> bo
 }
 
 fn should_run_setup_script_for_startup(
+    should_apply_runtime_plan: bool,
     uses_pre_materialized_snapshot: bool,
     startup_input: &StartupInput,
 ) -> bool {
-    !uses_pre_materialized_snapshot
-        || is_snapshot_preparation_operation(startup_input.operation_kind)
+    should_apply_runtime_plan
+        && (!uses_pre_materialized_snapshot
+            || is_snapshot_preparation_operation(startup_input.operation_kind))
+}
+
+fn should_apply_runtime_plan_for_startup(
+    uses_pre_materialized_snapshot: bool,
+    startup_input: &StartupInput,
+) -> bool {
+    startup_input.startup_mode == StartupMode::New
+        && (!uses_pre_materialized_snapshot
+            || is_snapshot_preparation_operation(startup_input.operation_kind))
 }
 
 fn record_operation_phase_failure(
@@ -2678,20 +2694,53 @@ mod tests {
         );
 
         assert!(!super::should_run_setup_script_for_startup(
+            false,
             true,
             &start_input
         ));
         assert!(super::should_run_setup_script_for_startup(
+            true,
+            true,
+            &setup_check_input
+        ));
+        assert!(super::should_apply_runtime_plan_for_startup(
             true,
             &setup_check_input
         ));
         assert!(super::should_run_setup_script_for_startup(
             true,
+            true,
+            &snapshot_input
+        ));
+        assert!(super::should_apply_runtime_plan_for_startup(
+            true,
             &snapshot_input
         ));
         assert!(super::should_run_setup_script_for_startup(
+            true,
             false,
             &start_input
+        ));
+        assert!(!super::should_apply_runtime_plan_for_startup(
+            false,
+            &build_startup_input(
+                StartupMode::Existing,
+                StartupExecutionMode::Session,
+                "ws://127.0.0.1:1/tunnel/sandbox/sbi_test",
+                minimal_runtime_plan_json(),
+                None,
+            ),
+        ));
+        assert!(!super::should_run_setup_script_for_startup(
+            false,
+            false,
+            &build_startup_input(
+                StartupMode::Existing,
+                StartupExecutionMode::Session,
+                "ws://127.0.0.1:1/tunnel/sandbox/sbi_test",
+                minimal_runtime_plan_json(),
+                None,
+            ),
         ));
     }
 
