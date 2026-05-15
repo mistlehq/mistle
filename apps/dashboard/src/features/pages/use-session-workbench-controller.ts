@@ -6,19 +6,9 @@ import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef } from "react";
 
-import { formatCodexContextUsage } from "../session-agents/codex/session-state/codex-context-usage.js";
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import { useOpenCodeSessionState } from "../session-agents/opencode/session-state/index.js";
 import { SessionRuntimeWorkbenchCapabilities } from "../session-agents/session-runtime-workbench-capabilities.js";
-import {
-  useCodexWorkbenchComposerState,
-  useOpenCodeWorkbenchComposerState,
-} from "../session-agents/session-workbench-composer-bootstrap.js";
-import {
-  buildCodexConversationRuntime,
-  buildOpenCodeConversationRuntime,
-  type SessionWorkbenchRuntimeAdapter,
-} from "../session-agents/session-workbench-conversation-runtimes.js";
 import {
   buildCodexHandoffRuntime,
   buildCodexLifecycleForHandoff,
@@ -27,18 +17,8 @@ import {
   buildOpenCodeLifecycleForWorkbench,
   resolveSessionLifecycleForWorkbench,
 } from "../session-agents/session-workbench-handoff-runtimes.js";
-import {
-  buildCodexTurnStarter,
-  buildOpenCodeTurnStarter,
-} from "../session-agents/session-workbench-turn-starters.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
-import {
-  useSessionComposerAttachmentControl,
-  type SessionComposerSharedInput,
-  type SessionComposerStateInput,
-  type SessionTurnControl,
-} from "./session-composer/index.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import type { SessionStartupState } from "./session-startup-status.js";
 import type {
@@ -66,6 +46,10 @@ import { useSessionPortAccess } from "./use-session-port-access.js";
 import type { SessionPrimaryRepositoryState } from "./use-session-primary-repository-state.js";
 import { useSessionRepositoryStatus } from "./use-session-repository-status.js";
 import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
+import {
+  useSessionWorkbenchConversationRuntime,
+  type SessionConversationPaneState,
+} from "./use-session-workbench-conversation-runtime.js";
 import { useSessionWorkbenchLifecycleState } from "./use-session-workbench-lifecycle-state.js";
 import { useSessionWorkbenchRepositoryControl } from "./use-session-workbench-repository-control.js";
 import { useSessionWorkbenchTransport } from "./use-session-workbench-transport.js";
@@ -132,11 +116,6 @@ type SessionWorkbenchState = {
     switchPrimaryRepository: (nextSelectedRepositoryPath: string | null) => Promise<void>;
   };
   portAccessState: ReturnType<typeof useSessionPortAccess>;
-};
-
-type SessionConversationPaneState = SessionWorkbenchRuntimeAdapter["conversation"] & {
-  composerStateInput: SessionComposerStateInput;
-  serverRequestsState: SessionWorkbenchRuntimeAdapter["serverRequestsState"];
 };
 
 const CodexWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
@@ -235,11 +214,6 @@ export function useSessionWorkbenchController(input: {
       }),
     [lifecycle, openCodeLifecycleForWorkbench],
   );
-  const contextUsage =
-    sessionState.threadTokenUsageSnapshot?.threadId ===
-    sessionState.lifecycle.sessionSnapshot?.activeThreadId
-      ? formatCodexContextUsage(sessionState.threadTokenUsageSnapshot)
-      : null;
   const cliPtyState = useSandboxPtyState({
     ensureTransportConnected: transportManager.ensureTransportConnected,
   });
@@ -249,21 +223,18 @@ export function useSessionWorkbenchController(input: {
   const diffPanelState = useSessionDiffWorkbenchState({
     sandboxInstanceId: input.sandboxInstanceId,
   });
-  const chat = sessionState.chat;
-  const serverRequests = sessionState.serverRequests;
-  const sessionMessage = sessionState.sessionMessage;
   const codexHandoffRuntime = useMemo(
     () =>
       buildCodexHandoffRuntime({
-        chat,
+        chat: sessionState.chat,
         lifecycle: codexLifecycleForHandoff,
-        serverRequests,
+        serverRequests: sessionState.serverRequests,
         threadAuthority: sessionState.threadAuthority,
       }),
     [
-      chat.hydrateChatFromThread,
+      sessionState.chat.hydrateChatFromThread,
       codexLifecycleForHandoff,
-      serverRequests.resetServerRequests,
+      sessionState.serverRequests.resetServerRequests,
       sessionState.threadAuthority.clearActiveThreadIdAfterCliLaunch,
       sessionState.threadAuthority.providerThreadId,
       sessionState.threadAuthority.resolveCliLaunchTarget,
@@ -317,7 +288,6 @@ export function useSessionWorkbenchController(input: {
     selectedRepositoryPathRef,
   });
   const isOpenCodeRuntime = repositoryControl.isOpenCodeRuntime;
-  const activeRuntimeCapabilities = repositoryControl.activeRuntimeCapabilities;
   const selectedRepositoryPath = repositoryControl.selectedRepositoryPath;
   const branchDiffState = useSessionBranchDiff({
     cwd: selectedRepositoryPath,
@@ -339,23 +309,19 @@ export function useSessionWorkbenchController(input: {
     sandboxInstanceId: input.sandboxInstanceId,
     stoppedSessionMessage: workbenchLifecycleState.stoppedSessionMessage,
   });
-  const { bootstrap: openCodeComposerBootstrap, configControl: openCodeConfigControl } =
-    useOpenCodeWorkbenchComposerState({
-      enabled: isOpenCodeRuntime,
-      sandboxInstanceId: input.sandboxInstanceId,
-      selectedRepositoryPath,
-      sessionState: openCodeSessionState,
-    });
-  const { configControl } = useCodexWorkbenchComposerState({
+  const sessionSnapshot = workbenchLifecycleState.sessionSnapshot;
+  const conversationRuntime = useSessionWorkbenchConversationRuntime({
+    ensureTransportConnected: transportManager.ensureTransportConnected,
+    isOpenCodeRuntime,
+    openCodeSessionState,
+    queryClient,
+    repositoryStatus,
+    sandboxInstanceId: input.sandboxInstanceId,
+    sandboxStatus,
+    selectedRepositoryPath,
+    sessionSnapshot,
     sessionState,
   });
-  const sessionSnapshot = workbenchLifecycleState.sessionSnapshot;
-  const activeSessionThreadId = isOpenCodeRuntime
-    ? null
-    : (sessionSnapshot?.activeThreadId ?? null);
-  const activeConversationId = isOpenCodeRuntime
-    ? (openCodeSessionState.lifecycle.sessionSnapshot?.activeSessionId ?? null)
-    : activeSessionThreadId;
   const enterCliDisabledReason =
     input.sandboxInstanceId === null
       ? "Session id is required."
@@ -365,127 +331,8 @@ export function useSessionWorkbenchController(input: {
           ? (workbenchLifecycleState.stoppedSessionMessage ??
             "TUI is available only when the sandbox is running.")
           : handoff.transitionState !== "stable_chat"
-            ? `Finish the current primary-panel transition before opening ${activeRuntimeCapabilities.displayName} TUI.`
+            ? `Finish the current primary-panel transition before opening ${conversationRuntime.cliRuntimeDisplayName} TUI.`
             : null;
-  const attachmentControl = useSessionComposerAttachmentControl({
-    attachmentTarget:
-      input.sandboxInstanceId !== null && sessionSnapshot !== null && activeConversationId !== null
-        ? {
-            sandboxInstanceId: input.sandboxInstanceId,
-            threadId: activeConversationId,
-          }
-        : null,
-    ensureTransportConnected: transportManager.ensureTransportConnected,
-  });
-  const startCodexTurn = useMemo<SessionTurnControl["startTurn"]>(
-    () =>
-      buildCodexTurnStarter({
-        cachedTitle: sandboxStatus?.title,
-        chat,
-        ensureTransportConnected: transportManager.ensureTransportConnected,
-        queryClient,
-        sandboxInstanceId: input.sandboxInstanceId,
-        selectedRepositoryPath,
-      }),
-    [
-      chat,
-      input.sandboxInstanceId,
-      queryClient,
-      sandboxStatus?.title,
-      selectedRepositoryPath,
-      transportManager.ensureTransportConnected,
-    ],
-  );
-  const startOpenCodeTurn = useMemo<SessionTurnControl["startTurn"]>(
-    () =>
-      buildOpenCodeTurnStarter({
-        cachedTitle: sandboxStatus?.title,
-        chat: openCodeSessionState.chat,
-        modelSelection: {
-          hasExplicitModelSelection: openCodeConfigControl.hasExplicitModelSelection,
-          selectedModel: openCodeConfigControl.selectedModel,
-        },
-        queryClient,
-        sandboxInstanceId: input.sandboxInstanceId,
-        selectedRepositoryPath,
-      }),
-    [
-      input.sandboxInstanceId,
-      openCodeConfigControl.hasExplicitModelSelection,
-      openCodeConfigControl.selectedModel,
-      openCodeSessionState.chat,
-      openCodeSessionState.chat.chatState.messageOrder.length,
-      queryClient,
-      sandboxStatus?.title,
-      selectedRepositoryPath,
-    ],
-  );
-  const codexRuntime = useMemo<SessionWorkbenchRuntimeAdapter>(
-    () =>
-      buildCodexConversationRuntime({
-        activeConversationId: activeSessionThreadId,
-        bootstrap: sessionState.bootstrap,
-        chat,
-        configControl,
-        contextUsage,
-        serverRequests,
-        sessionMessage,
-        startTurn: startCodexTurn,
-      }),
-    [
-      activeSessionThreadId,
-      chat.canInterruptTurn,
-      chat.canSteerTurn,
-      chat.chatState,
-      chat.dismissUserMessageAction,
-      chat.interruptTurn,
-      chat.isInterruptingTurn,
-      chat.isStartingTurn,
-      chat.isSteeringTurn,
-      chat.steerTurn,
-      configControl,
-      contextUsage,
-      serverRequests.isRespondingToServerRequest,
-      serverRequests.pendingServerRequests,
-      serverRequests.respondToServerRequest,
-      sessionMessage.clearSessionErrorMessage,
-      sessionMessage.sessionErrorMessage,
-      sessionState.bootstrap,
-      startCodexTurn,
-    ],
-  );
-  const openCodeRuntime = useMemo<SessionWorkbenchRuntimeAdapter>(
-    () =>
-      buildOpenCodeConversationRuntime({
-        bootstrap: openCodeComposerBootstrap,
-        chat: openCodeSessionState.chat,
-        configControl: openCodeConfigControl,
-        sessionMessage: openCodeSessionState.sessionMessage,
-        sessionSnapshot: openCodeSessionState.lifecycle.sessionSnapshot,
-        startTurn: startOpenCodeTurn,
-      }),
-    [
-      openCodeComposerBootstrap,
-      openCodeConfigControl,
-      openCodeSessionState.chat.abortSession,
-      openCodeSessionState.chat.canInterruptTurn,
-      openCodeSessionState.chat.chatState,
-      openCodeSessionState.chat.isInterruptingTurn,
-      openCodeSessionState.chat.isRespondingToPermission,
-      openCodeSessionState.chat.isStartingTurn,
-      openCodeSessionState.chat.respondToPermission,
-      openCodeSessionState.lifecycle.sessionSnapshot,
-      openCodeSessionState.sessionMessage.clearSessionErrorMessage,
-      openCodeSessionState.sessionMessage.reportSessionErrorMessage,
-      openCodeSessionState.sessionMessage.sessionErrorMessage,
-      startOpenCodeTurn,
-    ],
-  );
-  const activeRuntime = isOpenCodeRuntime ? openCodeRuntime : codexRuntime;
-  const sharedComposerInput: SessionComposerSharedInput = {
-    attachmentControl,
-    repositoryStatus,
-  };
 
   return {
     workbench: {
@@ -506,9 +353,9 @@ export function useSessionWorkbenchController(input: {
         error: handoff.error,
         isCliToggleActive: handoff.isCliToggleActive,
         showsChatComposer: handoff.transitionState === "stable_chat",
-        cliTerminalContentInset: activeRuntime.cliTerminalContentInset,
+        cliTerminalContentInset: conversationRuntime.cliTerminalContentInset,
         cliTerminalThemeMode: "system",
-        cliRuntimeDisplayName: activeRuntime.displayName,
+        cliRuntimeDisplayName: conversationRuntime.cliRuntimeDisplayName,
         enterCliMode: handoff.handoffToCli,
         exitCliMode: handoff.handoffToChat,
       },
@@ -527,17 +374,6 @@ export function useSessionWorkbenchController(input: {
       portAccessState,
       primaryRepositoryControlState: repositoryControl.primaryRepositoryControlState,
     },
-    conversationPane: {
-      activeConversationId: activeRuntime.conversation.activeConversationId,
-      chatState: activeRuntime.conversation.chatState,
-      ...(activeRuntime.conversation.dismissUserMessageAction === undefined
-        ? {}
-        : { dismissUserMessageAction: activeRuntime.conversation.dismissUserMessageAction }),
-      composerStateInput: {
-        ...activeRuntime.composerRuntimeInput,
-        ...sharedComposerInput,
-      },
-      serverRequestsState: activeRuntime.serverRequestsState,
-    },
+    conversationPane: conversationRuntime.conversationPane,
   };
 }

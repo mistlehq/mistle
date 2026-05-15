@@ -16,9 +16,6 @@ const CodexWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
 const OpenCodeWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.OPENCODE;
 
 type SessionWorkbenchRepositoryControlState = {
-  activeRuntimeCapabilities:
-    | typeof CodexWorkbenchCapabilities
-    | typeof OpenCodeWorkbenchCapabilities;
   isOpenCodeRuntime: boolean;
   primaryRepositoryControlState: {
     disabledReason: string | null;
@@ -86,7 +83,6 @@ export function useSessionWorkbenchRepositoryControl(input: {
   );
 
   return {
-    activeRuntimeCapabilities,
     isOpenCodeRuntime,
     primaryRepositoryControlState: {
       disabledReason:
