@@ -1434,7 +1434,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByText("Cron")).toBeDefined();
     expect(screen.getAllByDisplayValue("0 9 * * 1")).toHaveLength(1);
     expect(screen.getByText("Asia/Singapore")).toBeDefined();
-    expect(screen.getByText("2026-04-30T01:00:00.000Z")).toBeDefined();
+    expect(screen.getByText("Apr 30, 2026, 9:00 AM GMT+8")).toBeDefined();
     expect(screen.getByRole("button", { name: "Save schedule" })).toBeDefined();
   });
 
@@ -1456,7 +1456,7 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(screen.getByText("Snapshots will not refresh automatically.")).toBeDefined();
     expect(screen.queryByLabelText("Cron expression")).toBeNull();
-    expect(screen.queryByText("2026-04-30T01:00:00.000Z")).toBeNull();
+    expect(screen.queryByText("Apr 30, 2026, 9:00 AM GMT+8")).toBeNull();
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDefined();
   });
 

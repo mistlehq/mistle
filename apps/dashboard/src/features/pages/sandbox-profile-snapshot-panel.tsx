@@ -31,6 +31,7 @@ import {
 import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { ActionTile } from "../shared/action-tile.js";
 import { ActivityStatus } from "../shared/activity-status.js";
+import { formatDateTime, formatTimeZoneOffset } from "../shared/date-formatters.js";
 import { FormPageSection } from "../shared/form-page.js";
 import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
 import {
@@ -85,6 +86,16 @@ export type SnapshotRefreshScheduleInput = {
   cronExpression: string;
   timezone: string;
 };
+
+function formatSnapshotRefreshNextScheduledAt(input: {
+  nextScheduledAt: string;
+  timezone: string;
+}): string {
+  return `${formatDateTime(input.nextScheduledAt, input.timezone)} ${formatTimeZoneOffset({
+    isoDateTime: input.nextScheduledAt,
+    timeZone: input.timezone,
+  })}`;
+}
 
 export function resolveSnapshotPanelState(
   version: SandboxProfileVersion | null,
@@ -599,7 +610,13 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
                 {
                   id: "snapshot-refresh-next",
                   label: "Next refresh",
-                  value: existingSchedule.nextScheduledAt ?? "Not scheduled",
+                  value:
+                    existingSchedule.nextScheduledAt === null
+                      ? "Not scheduled"
+                      : formatSnapshotRefreshNextScheduledAt({
+                          nextScheduledAt: existingSchedule.nextScheduledAt,
+                          timezone: existingSchedule.timezone,
+                        }),
                 },
               ]}
             />
