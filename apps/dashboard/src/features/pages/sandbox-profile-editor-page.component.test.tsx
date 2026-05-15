@@ -63,6 +63,7 @@ import {
 import {
   SandboxProfileDefaultRedirect,
   SetupAssistantCloseDialog,
+  SetupAssistantStartupProgress,
   SandboxProfileEditorPage,
   SandboxProfileEditorShell,
   SandboxProfileEditorView,
@@ -2502,6 +2503,24 @@ describe("SandboxProfileEditorPage", () => {
         name: "Close Setup Assistant panel",
       }),
     ).toBeTruthy();
+  });
+
+  it("shows operation timeline progress while Setup Assistant startup is active", () => {
+    const queryClient = createTestQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SetupAssistantStartupProgress
+          sandboxInstanceId={null}
+          startupOperation={null}
+          startupOperationId={null}
+          startupState="preparing_sandbox"
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Preparing sandbox")).toBeTruthy();
+    expect(screen.getByText("No lifecycle events yet.")).toBeTruthy();
   });
 
   it("confirms before closing an active Setup Assistant sandbox", () => {

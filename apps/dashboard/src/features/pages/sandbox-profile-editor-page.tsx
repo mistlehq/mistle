@@ -108,6 +108,7 @@ import {
   resolveSandboxBaseRepositoryHandles,
   SetupScriptTimingDescription,
 } from "./sandbox-base-inventory-copy.js";
+import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
 import { SandboxProfileAutomationsSection } from "./sandbox-profile-automations-section.js";
 import type {
   IntegrationConnectionSummary,
@@ -171,7 +172,7 @@ import {
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
 import type { PendingSessionDiffComment } from "./session-diff-comment.js";
-import { SessionStartupStatus } from "./session-startup-status.js";
+import { SessionStartupStatus, type SessionStartupState } from "./session-startup-status.js";
 import {
   SessionTerminalWorkspace,
   type SessionTerminalWorkspaceHandle,
@@ -229,7 +230,12 @@ type SetupScriptAssistantPanelState = {
   initialComposerText: string;
   isOpen: boolean;
   sandboxInstanceId: string | null;
+  startupOperationId: string | null;
 };
+
+type SetupAssistantStartupOperation = {
+  operationId: string;
+} | null;
 
 type SetupAssistantCloseDialogState = {
   sandboxInstanceId: string;
@@ -1371,6 +1377,7 @@ function ReadySandboxProfileEditorPage(input: {
         return {
           ...currentState,
           sandboxInstanceId: result.sandboxInstanceId,
+          startupOperationId: result.workflowRunId,
         };
       });
     },
@@ -1480,6 +1487,7 @@ function ReadySandboxProfileEditorPage(input: {
         initialComposerText,
         isOpen: true,
         sandboxInstanceId: currentState?.sandboxInstanceId ?? null,
+        startupOperationId: currentState?.startupOperationId ?? null,
       }));
 
       if (
@@ -1781,6 +1789,7 @@ function ReadySandboxProfileEditorPage(input: {
           <SetupScriptAssistantPanel
             onClose={requestSetupAssistantPanelClose}
             sandboxInstanceId={setupAssistantPanelState.sandboxInstanceId}
+            startupOperationId={setupAssistantPanelState.startupOperationId}
             initialComposerText={setupAssistantPanelState.initialComposerText}
           />
         </ResizablePanel>
@@ -1873,6 +1882,7 @@ function resolveSetupAssistantCloseDisabledReason(input: {
 function SetupScriptAssistantPanel(input: {
   onClose: () => void;
   sandboxInstanceId: string | null;
+  startupOperationId: string | null;
   initialComposerText: string;
 }): React.JSX.Element {
   const { conversationPane, workbench } = useSessionWorkbenchController({
@@ -2043,6 +2053,12 @@ function SetupScriptAssistantPanel(input: {
                     : "setup-assistant-cli:terminal-closed",
                 },
                 initialEntryStartupState: workbench.initialEntryStartupState,
+                sandboxInstanceId: input.sandboxInstanceId,
+                startupOperation:
+                  workbench.sandboxStatusQuery.data?.startupOperation === undefined
+                    ? null
+                    : workbench.sandboxStatusQuery.data.startupOperation,
+                startupOperationId: input.startupOperationId,
                 transitionState: workbench.primaryPanelState.transitionState,
               })}
             </div>
@@ -2113,18 +2129,22 @@ type SetupAssistantConversationContent = React.ComponentProps<
 function renderSetupAssistantMainContent(input: {
   cli: React.ComponentProps<typeof SessionCliPanel>;
   conversation: SetupAssistantConversationContent;
-  initialEntryStartupState: ReturnType<
-    typeof useSessionWorkbenchController
-  >["workbench"]["initialEntryStartupState"];
+  initialEntryStartupState: SessionStartupState | null;
+  sandboxInstanceId: string | null;
+  startupOperation: SetupAssistantStartupOperation;
+  startupOperationId: string | null;
   transitionState: ReturnType<
     typeof useSessionWorkbenchController
   >["workbench"]["primaryPanelState"]["transitionState"];
 }): React.JSX.Element {
   if (input.initialEntryStartupState !== null) {
     return (
-      <div className="mx-auto flex h-full w-full max-w-5xl items-center justify-center px-4 py-6">
-        <SessionStartupStatus state={input.initialEntryStartupState} />
-      </div>
+      <SetupAssistantStartupProgress
+        sandboxInstanceId={input.sandboxInstanceId}
+        startupOperation={input.startupOperation}
+        startupOperationId={input.startupOperationId}
+        startupState={input.initialEntryStartupState}
+      />
     );
   }
 
@@ -2137,6 +2157,27 @@ function renderSetupAssistantMainContent(input: {
     case "stable_chat":
       return <SessionConversationMainContent {...input.conversation} />;
   }
+}
+
+export function SetupAssistantStartupProgress(input: {
+  sandboxInstanceId: string | null;
+  startupOperation: SetupAssistantStartupOperation;
+  startupOperationId: string | null;
+  startupState: SessionStartupState;
+}): React.JSX.Element {
+  return (
+    <div className="mx-auto flex h-full w-full max-w-5xl flex-col justify-center gap-4 px-4 py-6">
+      <SessionStartupStatus state={input.startupState} />
+      <SandboxOperationProgress
+        displayMode="timeline"
+        emptyMessage="Waiting for Setup Assistant startup events."
+        operationId={input.startupOperation?.operationId ?? input.startupOperationId}
+        sandboxInstanceId={input.sandboxInstanceId}
+        showBorder
+        showLoadError={false}
+      />
+    </div>
+  );
 }
 
 function SandboxProfileEditorSectionPanels(input: {

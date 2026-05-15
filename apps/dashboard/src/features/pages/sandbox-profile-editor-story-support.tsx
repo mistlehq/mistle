@@ -13,6 +13,7 @@ import type {
   SandboxProfileVersion,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { SessionComposerFixtureProps } from "../session-agents/codex/fixtures/session-fixtures.js";
+import type { SandboxOperationEvent } from "../sessions/sessions-types.js";
 import {
   createIntegrationsEditorSectionStoryQueryClient,
   seedStoryIntegrationResources,
@@ -30,6 +31,7 @@ import {
   StorySlackConnection,
 } from "./integrations-editor-section-story-support.js";
 import { resolveSandboxBaseRepositoryHandles } from "./sandbox-base-inventory-copy.js";
+import { SandboxOperationProgressView } from "./sandbox-operation-progress.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -59,6 +61,7 @@ import {
   type SnapshotRefreshSchedule,
 } from "./sandbox-profile-snapshot-panel.js";
 import { SessionConversationMainContent } from "./session-conversation-pane.js";
+import { SessionStartupStatus } from "./session-startup-status.js";
 import { buildSetupAssistantInitialComposerText } from "./setup-assistant-instructions.js";
 
 export {
@@ -522,18 +525,35 @@ function SetupAssistantPanel(input: {
         </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-3">
-          <SessionConversationMainContent
-            activeTurnId={null}
-            chatEntries={SetupAssistantChatEntries}
-            isRespondingToServerRequest={false}
-            isTurnInProgress={input.state === "starting"}
-            onRespondToServerRequest={noopRespondToServerRequest}
-            pendingTurnId={null}
-            scrollBehavior="follow-streaming-at-bottom"
-            serverRequestPanelEntries={[]}
-          />
-        </div>
+        {input.state === "starting" ? (
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-6">
+            <div className="mx-auto flex h-full w-full max-w-5xl flex-col justify-center gap-4">
+              <SessionStartupStatus state="preparing_sandbox" />
+              <SandboxOperationProgressView
+                displayMode="timeline"
+                emptyMessage="Waiting for Setup Assistant startup events."
+                errorMessage={null}
+                events={SetupAssistantStartupOperationEvents}
+                isLoading
+                showBorder
+                showLoadError={false}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-3">
+            <SessionConversationMainContent
+              activeTurnId={null}
+              chatEntries={SetupAssistantChatEntries}
+              isRespondingToServerRequest={false}
+              isTurnInProgress={false}
+              onRespondToServerRequest={noopRespondToServerRequest}
+              pendingTurnId={null}
+              scrollBehavior="follow-streaming-at-bottom"
+              serverRequestPanelEntries={[]}
+            />
+          </div>
+        )}
         <div className="shrink-0 bg-background px-5 py-4">
           <ChatComposer
             {...SessionComposerFixtureProps}
@@ -545,6 +565,52 @@ function SetupAssistantPanel(input: {
       </div>
     </aside>
   );
+}
+
+const SetupAssistantStartupOperationEvents = [
+  setupAssistantStartupLifecycleEvent({
+    id: "soe_setup_assistant_provider_started",
+    message: "Starting setup assistant sandbox.",
+    phase: "provider",
+    sequence: 1,
+    source: "worker",
+    status: "started",
+  }),
+  setupAssistantStartupLifecycleEvent({
+    id: "soe_setup_assistant_sandboxd_started",
+    message: "Starting sandbox daemon.",
+    phase: "sandboxd",
+    sequence: 2,
+    source: "worker",
+    status: "started",
+  }),
+] satisfies readonly SandboxOperationEvent[];
+
+function setupAssistantStartupLifecycleEvent(input: {
+  id: string;
+  message: string;
+  phase: NonNullable<SandboxOperationEvent["phase"]>;
+  sequence: number;
+  source: SandboxOperationEvent["source"];
+  status: NonNullable<SandboxOperationEvent["status"]>;
+}): SandboxOperationEvent {
+  return {
+    attributes: {},
+    createdAt: "2026-05-13T10:00:00.000Z",
+    id: input.id,
+    message: input.message,
+    observedAt: "2026-05-13T10:00:00.000Z",
+    operationId: "owfr_story_setup_assistant",
+    operationKind: "start",
+    payloadBase64: null,
+    phase: input.phase,
+    recordKind: "lifecycle",
+    sandboxInstanceId: "sbi_story_setup_assistant",
+    sequence: input.sequence,
+    source: input.source,
+    status: input.status,
+    stream: null,
+  };
 }
 
 function renderUnavailableIntegrationsSectionPanel(input: {
