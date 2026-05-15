@@ -241,27 +241,14 @@ function createGitHubAutomationTarget(): IntegrationTarget {
         },
       },
       {
-        eventType: "github.pull_request.reopened",
-        providerEventType: "pull_request",
-        displayName: "Pull request reopened",
+        eventType: "github.issue_comment.created",
+        providerEventType: "issue_comment",
+        displayName: "Issue comment created",
         requirements: {
           anyOf: [
             {
-              event: "pull_request",
-              permissions: [{ permission: "pull_requests", access: "read" }],
-            },
-          ],
-        },
-      },
-      {
-        eventType: "github.pull_request.synchronize",
-        providerEventType: "pull_request",
-        displayName: "Pull request updated",
-        requirements: {
-          anyOf: [
-            {
-              event: "pull_request",
-              permissions: [{ permission: "pull_requests", access: "read" }],
+              event: "issue_comment",
+              permissions: [{ permission: "issues", access: "read" }],
             },
           ],
         },
@@ -283,8 +270,11 @@ function createGitHubAutomationWebhookSource(): IntegrationWebhookSource {
     status: "active",
     providerMetadata: createStoryWebhookTriggerCapabilitiesProviderMetadata({
       definition: GitHubCloudBrowserDefinition,
-      events: ["pull_request"],
-      permissions: [{ permission: "pull_requests", access: "read" }],
+      events: ["pull_request", "issue_comment"],
+      permissions: [
+        { permission: "pull_requests", access: "read" },
+        { permission: "issues", access: "read" },
+      ],
     }),
     createdAt: "2026-04-23T00:00:00.000Z",
     updatedAt: "2026-04-23T00:00:00.000Z",
@@ -1728,7 +1718,9 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(screen.getByRole("heading", { name: "Create from template" })).toBeDefined();
     expect(screen.getByText("GitHub PR Review")).toBeDefined();
-    expect(screen.getByText("Review a pull request when it is opened or updated.")).toBeDefined();
+    expect(
+      screen.getByText("Review a pull request when it is opened or requested with pr-review."),
+    ).toBeDefined();
     expect(screen.queryByText("GitHub connection required.")).toBeNull();
     expect(screen.getAllByRole("button", { name: "Select" }).length).toBeGreaterThan(0);
   });

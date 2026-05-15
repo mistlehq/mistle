@@ -11,6 +11,7 @@ type WebhookTriggerTemplate = {
   inputTemplate: string;
   instructions: string;
   conversationKeyTemplate: string;
+  triggerParameterValuesByEventType?: Record<string, Record<string, string>>;
 };
 
 type ScheduledTriggerTemplate = {
@@ -46,21 +47,18 @@ export const TriggerTemplates = [
     id: "github-pr-review",
     kind: "trigger",
     title: "GitHub PR Review",
-    description: "Review a pull request when it is opened or updated.",
+    description: "Review a pull request when it is opened or requested with pr-review.",
     logoKey: "github",
-    eventTypes: [
-      "github.pull_request.opened",
-      "github.pull_request.reopened",
-      "github.pull_request.synchronize",
-    ],
+    eventTypes: ["github.pull_request.opened", "github.issue_comment.created"],
     name: "GitHub PR Review",
     inputTemplate: [
       "Repository: {{payload.repository.full_name}}",
-      "PR #{{payload.pull_request.number}}",
+      "PR #{{payload.pull_request.number | default: payload.issue.number}}",
       "Event type: {{webhookEvent.eventType}}",
       "Base branch: {{payload.pull_request.base.ref}}",
       "Head branch: {{payload.pull_request.head.ref}}",
       "Author: {{payload.sender.login}}",
+      "Comment body: {{payload.comment.body}}",
       "Pull request body: {{payload.pull_request.body}}",
     ].join("\n"),
     instructions: [
@@ -72,7 +70,13 @@ export const TriggerTemplates = [
       "For inline file review comments, use `gh api` against the pull request review comment or review endpoints after identifying the file path, line, side, and current head commit.",
     ].join(" "),
     conversationKeyTemplate:
-      "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
+      "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number | default: payload.issue.number}}",
+    triggerParameterValuesByEventType: {
+      "github.issue_comment.created": {
+        invocationToken: "pr-review",
+        target: "exists",
+      },
+    },
   },
 ] satisfies readonly TriggerTemplate[];
 

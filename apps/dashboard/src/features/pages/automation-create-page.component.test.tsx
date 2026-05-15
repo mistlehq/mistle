@@ -26,6 +26,14 @@ import { AutomationCreatePage } from "./automation-create-page.js";
 const SlackConnectionId = "icn_slack_test";
 const GitHubConnectionId = "icn_github_test";
 const SandboxProfileId = "sbp_slack_test";
+const GitHubPrReviewTemplateEventTypes = [
+  "github.pull_request.opened",
+  "github.issue_comment.created",
+];
+const GitHubPrReviewTemplateSupportedEvents =
+  GitHubCloudBrowserDefinition.supportedWebhookEvents?.filter((eventDefinition) =>
+    GitHubPrReviewTemplateEventTypes.some((eventType) => eventType === eventDefinition.eventType),
+  ) ?? [];
 
 function renderCreatePage(input: {
   initialEntry: string;
@@ -105,47 +113,7 @@ function renderCreatePage(input: {
                 ...(GitHubCloudBrowserDefinition.logoKey === undefined
                   ? {}
                   : { logoKey: GitHubCloudBrowserDefinition.logoKey }),
-                supportedWebhookEvents: [
-                  {
-                    eventType: "github.pull_request.opened",
-                    providerEventType: "pull_request",
-                    displayName: "Pull request opened",
-                    requirements: {
-                      anyOf: [
-                        {
-                          event: "pull_request",
-                          permissions: [{ permission: "pull_requests", access: "read" }],
-                        },
-                      ],
-                    },
-                  },
-                  {
-                    eventType: "github.pull_request.reopened",
-                    providerEventType: "pull_request",
-                    displayName: "Pull request reopened",
-                    requirements: {
-                      anyOf: [
-                        {
-                          event: "pull_request",
-                          permissions: [{ permission: "pull_requests", access: "read" }],
-                        },
-                      ],
-                    },
-                  },
-                  {
-                    eventType: "github.pull_request.synchronize",
-                    providerEventType: "pull_request",
-                    displayName: "Pull request updated",
-                    requirements: {
-                      anyOf: [
-                        {
-                          event: "pull_request",
-                          permissions: [{ permission: "pull_requests", access: "read" }],
-                        },
-                      ],
-                    },
-                  },
-                ],
+                supportedWebhookEvents: GitHubPrReviewTemplateSupportedEvents,
                 targetHealth: {
                   configStatus: "valid",
                 },
@@ -190,8 +158,11 @@ function renderCreatePage(input: {
             status: "active",
             providerMetadata: createStoryWebhookTriggerCapabilitiesProviderMetadata({
               definition: GitHubCloudBrowserDefinition,
-              events: ["pull_request"],
-              permissions: [{ permission: "pull_requests", access: "read" }],
+              events: ["pull_request", "issue_comment"],
+              permissions: [
+                { permission: "pull_requests", access: "read" },
+                { permission: "issues", access: "read" },
+              ],
             }),
             createdAt: "2026-05-01T00:00:00.000Z",
             updatedAt: "2026-05-08T00:00:00.000Z",
@@ -383,7 +354,7 @@ describe("AutomationCreatePage", () => {
     });
   });
 
-  it("selects all GitHub PR review template events after profile bindings are available", async () => {
+  it("selects the GitHub PR review template events and comment filters after profile bindings are available", async () => {
     renderCreatePage({
       initialEntry: `/automations/new?sandboxProfileId=${SandboxProfileId}&template=github-pr-review`,
       seedGitHubProfile: true,
@@ -391,8 +362,9 @@ describe("AutomationCreatePage", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Pull request opened")).toBeDefined();
-      expect(screen.getByText("Pull request reopened")).toBeDefined();
-      expect(screen.getByText("Pull request updated")).toBeDefined();
+      expect(screen.getByText("Issue comment created")).toBeDefined();
+      expect(screen.getByDisplayValue("pr-review")).toBeDefined();
+      expect(screen.getByText("pull request")).toBeDefined();
     });
   });
 

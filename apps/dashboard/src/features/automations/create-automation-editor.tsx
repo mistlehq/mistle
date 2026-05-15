@@ -228,11 +228,13 @@ function resolveNormalizedConversationKeyTemplate(input: {
     webhookEventOptions: input.eventOptions,
     selectedTriggerIds: input.values.triggerIds,
     conversationKeyTemplate: input.values.conversationKeyTemplate,
+    triggerParameterValues: input.values.triggerParameterValues,
     triggerIdsError: undefined,
   });
   const conversationKeyFieldOptions = resolveConversationKeyFieldOptions({
     selectedEventOptions: formState.selectedTriggerOptions,
     currentTemplate: input.values.conversationKeyTemplate,
+    triggerParameterValues: input.values.triggerParameterValues,
   });
 
   if (conversationKeyFieldOptions.options.length === 0) {
@@ -257,15 +259,24 @@ function applyTriggerIdsChange(input: {
   values: CreateAutomationFormValues;
   triggerIds: string[];
   eventOptions: readonly WebhookAutomationEventOption[];
+  triggerParameterValuesByEventType?: Record<string, Record<string, string>>;
 }): CreateAutomationFormValues {
   const nextValues: CreateAutomationFormValues = {
     ...input.values,
     triggerIds: input.triggerIds,
     triggerParameterValues: Object.fromEntries(
-      input.triggerIds.map((triggerId) => [
-        triggerId,
-        input.values.triggerParameterValues[triggerId] ?? {},
-      ]),
+      input.triggerIds.map((triggerId) => {
+        const eventOption = input.eventOptions.find((option) => option.id === triggerId);
+        const templateParameterValues =
+          eventOption === undefined
+            ? undefined
+            : input.triggerParameterValuesByEventType?.[eventOption.eventType];
+
+        return [
+          triggerId,
+          templateParameterValues ?? input.values.triggerParameterValues[triggerId] ?? {},
+        ];
+      }),
     ),
   };
 
@@ -506,6 +517,11 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
         values: currentValues,
         triggerIds: templateTriggerIds,
         eventOptions: webhookEventOptions,
+        ...(initialTemplate.triggerParameterValuesByEventType === undefined
+          ? {}
+          : {
+              triggerParameterValuesByEventType: initialTemplate.triggerParameterValuesByEventType,
+            }),
       }),
     );
     setAppliedTemplateId(input.initialTemplateId);
@@ -713,10 +729,22 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
         });
       }
 
-      return {
+      const nextValues = {
         ...currentValues,
         [key]: value,
       };
+
+      if (key === "triggerParameterValues") {
+        return {
+          ...nextValues,
+          conversationKeyTemplate: resolveNormalizedConversationKeyTemplate({
+            values: nextValues,
+            eventOptions: webhookEventOptions,
+          }),
+        };
+      }
+
+      return nextValues;
     });
     setFieldErrors((currentErrors) => {
       if (key === "triggerIds") {
@@ -887,6 +915,7 @@ export function CreateAutomationEditor(
     webhookEventOptions: state.webhookEventOptions,
     selectedTriggerIds: state.formValues.triggerIds,
     conversationKeyTemplate: state.formValues.conversationKeyTemplate,
+    triggerParameterValues: state.formValues.triggerParameterValues,
     triggerIdsError: state.fieldErrors.triggerIds,
   });
 

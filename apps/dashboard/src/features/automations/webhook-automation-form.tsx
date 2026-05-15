@@ -239,6 +239,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
     webhookEventOptions: input.webhookEventOptions,
     selectedTriggerIds: input.values.triggerIds,
     conversationKeyTemplate: input.values.conversationKeyTemplate,
+    triggerParameterValues: input.values.triggerParameterValues,
     triggerIdsError: input.fieldErrors.triggerIds,
   });
 

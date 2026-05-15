@@ -68,7 +68,8 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
         id: "pull-request",
         label: "Per pull request",
         description: "All matching events for the same pull request go to one conversation.",
-        template: "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
+        template:
+          "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number | default: payload.issue.number}}",
       },
       {
         id: "repository",
@@ -419,7 +420,7 @@ describe("validateWebhookAutomationFormValues", () => {
           ...BaseFormValues,
           inputTemplate: DefaultWebhookAutomationMessageTemplate,
           conversationKeyTemplate:
-            "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
+            "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number | default: payload.issue.number}}",
         },
         GitHubEventOptions,
       ),
