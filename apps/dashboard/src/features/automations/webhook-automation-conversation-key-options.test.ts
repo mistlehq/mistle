@@ -23,7 +23,7 @@ const GitHubPullRequestOpenedTriggerId = createWebhookAutomationTriggerId({
   eventType: "github.pull_request.opened",
 });
 const GitHubPullRequestConversationKeyTemplate =
-  "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number | default: payload.issue.number}}";
+  "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}";
 
 function createSlackEventOption(eventType: string) {
   const eventDefinition = SlackBrowserDefinition.supportedWebhookEvents?.find(

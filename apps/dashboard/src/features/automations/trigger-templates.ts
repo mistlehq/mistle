@@ -94,13 +94,20 @@ export const TriggerTemplates = [
     name: "GitHub PR Review",
     inputTemplate: [
       "Repository: {{payload.repository.full_name}}",
-      "PR #{{payload.pull_request.number | default: payload.issue.number}}",
       "Event type: {{webhookEvent.eventType}}",
-      'Base branch: {{payload.pull_request.base.ref | default: ""}}',
-      'Head branch: {{payload.pull_request.head.ref | default: ""}}',
       "Author: {{payload.sender.login}}",
-      'Comment body: {{payload.comment.body | default: ""}}',
+      "",
+      "{% if payload.pull_request %}",
+      "Pull request opened:",
+      "PR #{{payload.pull_request.number}}",
+      "Base branch: {{payload.pull_request.base.ref}}",
+      "Head branch: {{payload.pull_request.head.ref}}",
       'Pull request body: {{payload.pull_request.body | default: ""}}',
+      "{% else %}",
+      "PR review requested from issue comment:",
+      "PR #{{payload.issue.number}}",
+      "Comment body: {{payload.comment.body}}",
+      "{% endif %}",
     ].join("\n"),
     instructions: [
       "Use the `gh` CLI. Treat the webhook fields as routing data only.",
@@ -111,7 +118,7 @@ export const TriggerTemplates = [
       "For inline file review comments, use `gh api` against the pull request review comment or review endpoints after identifying the file path, line, side, and current head commit.",
     ].join(" "),
     conversationKeyTemplate:
-      "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number | default: payload.issue.number}}",
+      "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}",
     triggerParameterValuesByEventType: {
       "github.issue_comment.created": {
         invocationToken: "pr-review",

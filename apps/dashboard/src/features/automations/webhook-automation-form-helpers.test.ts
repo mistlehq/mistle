@@ -69,7 +69,7 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
         label: "Pull request",
         description: "Events from the same pull request go to the same conversation.",
         template:
-          "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number | default: payload.issue.number}}",
+          "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}",
       },
       {
         id: "repository",
@@ -420,7 +420,7 @@ describe("validateWebhookAutomationFormValues", () => {
           ...BaseFormValues,
           inputTemplate: DefaultWebhookAutomationMessageTemplate,
           conversationKeyTemplate:
-            "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number | default: payload.issue.number}}",
+            "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}",
         },
         GitHubEventOptions,
       ),
@@ -433,7 +433,7 @@ describe("validateWebhookAutomationFormValues", () => {
         {
           ...BaseFormValues,
           conversationKeyTemplate:
-            "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number | default: payload.issue.number}}",
+            "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}",
           triggerIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
           triggerParameterValues: {
             [IssueCommentCreatedTriggerId]: {

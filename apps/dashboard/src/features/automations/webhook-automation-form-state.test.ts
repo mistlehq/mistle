@@ -29,7 +29,7 @@ const PrimaryRepositoryOptions: readonly WebhookAutomationFormOption[] = [
   },
 ];
 const GitHubPullRequestConversationKeyTemplate =
-  "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number | default: payload.issue.number}}";
+  "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}";
 
 describe("resolveWebhookAutomationFormPresentation", () => {
   it("shows create-only and edit-only controls based on mode", () => {

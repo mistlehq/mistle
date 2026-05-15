@@ -34,14 +34,16 @@ describe("trigger templates", () => {
       },
     });
     expect(template.inputTemplate).toContain("{{payload.repository.full_name}}");
-    expect(template.inputTemplate).toContain(
-      "{{payload.pull_request.number | default: payload.issue.number}}",
-    );
     expect(template.inputTemplate).toContain("{{webhookEvent.eventType}}");
-    expect(template.inputTemplate).toContain('{{payload.pull_request.base.ref | default: ""}}');
-    expect(template.inputTemplate).toContain('{{payload.pull_request.head.ref | default: ""}}');
-    expect(template.inputTemplate).toContain('{{payload.comment.body | default: ""}}');
+    expect(template.inputTemplate).toContain("{% if payload.pull_request %}");
+    expect(template.inputTemplate).toContain("Pull request opened:");
+    expect(template.inputTemplate).toContain("{{payload.pull_request.number}}");
+    expect(template.inputTemplate).toContain("{{payload.pull_request.base.ref}}");
+    expect(template.inputTemplate).toContain("{{payload.pull_request.head.ref}}");
     expect(template.inputTemplate).toContain('{{payload.pull_request.body | default: ""}}');
+    expect(template.inputTemplate).toContain("PR review requested from issue comment:");
+    expect(template.inputTemplate).toContain("{{payload.issue.number}}");
+    expect(template.inputTemplate).toContain("{{payload.comment.body}}");
     expect(template.inputTemplate).not.toContain("{{payload.pull_request.html_url}}");
     expect(template.inputTemplate).not.toContain("{{payload.pull_request.title}}");
     expect(template.inputTemplate).not.toContain("{{payload.action}}");
@@ -53,7 +55,7 @@ describe("trigger templates", () => {
     expect(template.instructions).toContain("`gh pr review`");
     expect(template.instructions).toContain("`gh api`");
     expect(template.conversationKeyTemplate).toBe(
-      "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number | default: payload.issue.number}}",
+      "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}",
     );
   });
 

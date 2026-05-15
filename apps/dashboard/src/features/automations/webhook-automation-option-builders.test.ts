@@ -136,7 +136,7 @@ describe("buildWebhookAutomationEventOptions", () => {
                     description:
                       "All matching events for the same pull request go to one conversation.",
                     template:
-                      "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number | default: payload.issue.number}}",
+                      "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}",
                   },
                 ],
               },
@@ -231,7 +231,7 @@ describe("buildWebhookAutomationEventOptions", () => {
             label: "Per pull request",
             description: "All matching events for the same pull request go to one conversation.",
             template:
-              "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number | default: payload.issue.number}}",
+              "{{payload.repository.full_name}}:pull-request:{% if payload.pull_request %}{{payload.pull_request.number}}{% else %}{{payload.issue.number}}{% endif %}",
           },
         ],
         category: "GitHub Engineering / Pull requests",
