@@ -36,6 +36,20 @@ describe("ChatMarkdownMessage", () => {
     expect(screen.getByText("apps/control-plane-api")).toBeDefined();
   });
 
+  it("preserves single newlines as visible line breaks", () => {
+    const { container } = render(
+      <ChatMarkdownMessage
+        isStreaming={false}
+        text={
+          "Repository: mistlehq/mistle.dev\nEvent type: github.issue_comment.created\nAuthor: jlowhy"
+        }
+      />,
+    );
+
+    expect(screen.getByText(/Repository: mistlehq\/mistle\.dev/)).toBeDefined();
+    expect(container.querySelectorAll("br")).toHaveLength(2);
+  });
+
   it("renders markdown task lists with native checkboxes", () => {
     render(
       <ChatMarkdownMessage

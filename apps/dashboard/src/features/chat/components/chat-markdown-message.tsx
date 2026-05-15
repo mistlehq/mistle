@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import { Streamdown } from "streamdown";
+import { defaultRemarkPlugins, Streamdown } from "streamdown";
 
 import { ChatExternalLinkDialog } from "./chat-external-link-dialog.js";
 import { StreamdownPlugins } from "./streamdown-plugins.js";
@@ -10,6 +10,56 @@ type ChatMarkdownMessageProps = {
   isStreaming: boolean;
   text: string;
 };
+
+type MarkdownTreeNode = {
+  children?: MarkdownTreeNode[];
+  type: string;
+  value?: string;
+};
+
+function createSoftBreakNode(): MarkdownTreeNode {
+  return { type: "break" };
+}
+
+function createTextNode(value: string): MarkdownTreeNode {
+  return { type: "text", value };
+}
+
+function preserveSoftBreaksRemarkPlugin(): (tree: MarkdownTreeNode) => void {
+  return function preserveSoftBreaks(tree: MarkdownTreeNode): void {
+    rewriteSoftBreaks(tree);
+  };
+}
+
+function rewriteSoftBreaks(node: MarkdownTreeNode): void {
+  const children = node.children;
+  if (children === undefined) {
+    return;
+  }
+
+  node.children = children.flatMap((child) => {
+    if (child.type !== "text" || child.value === undefined || !child.value.includes("\n")) {
+      rewriteSoftBreaks(child);
+      return [child];
+    }
+
+    const segments = child.value.split("\n");
+    const rewrittenNodes: MarkdownTreeNode[] = [];
+
+    for (const [index, segment] of segments.entries()) {
+      if (index > 0) {
+        rewrittenNodes.push(createSoftBreakNode());
+      }
+      if (segment.length > 0) {
+        rewrittenNodes.push(createTextNode(segment));
+      }
+    }
+
+    return rewrittenNodes;
+  });
+}
+
+const RemarkPlugins = [...Object.values(defaultRemarkPlugins), preserveSoftBreaksRemarkPlugin];
 
 export function ChatMarkdownMessage(props: ChatMarkdownMessageProps): JSX.Element {
   return (
@@ -36,6 +86,7 @@ export function ChatMarkdownMessage(props: ChatMarkdownMessageProps): JSX.Elemen
         }}
         mode={props.isStreaming ? "streaming" : "static"}
         plugins={StreamdownPlugins}
+        remarkPlugins={RemarkPlugins}
       >
         {props.text}
       </Streamdown>
