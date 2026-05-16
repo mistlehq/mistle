@@ -31,7 +31,7 @@ function SandboxProfilesNavIcon(props: {
   return <PackageIcon {...props} />;
 }
 
-function AutomationsNavIcon(props: {
+function TriggersNavIcon(props: {
   className?: string;
   "aria-hidden"?: boolean;
 }): React.JSX.Element {
@@ -62,13 +62,13 @@ export function resolveAppShellFrame(input: {
   handleNavigateToSettings: () => void;
   handleSignOut: () => void;
   handleSwitchOrganization: (organizationId: string) => void;
-  inAutomations: boolean;
   inDashboardRoot: boolean;
   inIntegrations: boolean;
   inSandboxProfiles: boolean;
   inSessionDetail: boolean;
   inSessions: boolean;
   inSettings: boolean;
+  inTriggers: boolean;
   isSigningOut: boolean;
   isSwitchingOrganization: boolean;
   locationPathname: string;
@@ -182,12 +182,12 @@ function MainSidebarContent(input: {
           <SidebarMenuItem>
             <SidebarMenuButton
               isActive={
-                input.locationPathname === "/automations" ||
-                input.locationPathname.startsWith("/automations/")
+                input.locationPathname === "/triggers" ||
+                input.locationPathname.startsWith("/triggers/")
               }
-              render={<NavLink to="/automations" />}
+              render={<NavLink to="/triggers" />}
             >
-              <AutomationsNavIcon aria-hidden className="size-5 shrink-0 md:size-4" />
+              <TriggersNavIcon aria-hidden className="size-5 shrink-0 md:size-4" />
               <span>Triggers</span>
             </SidebarMenuButton>
           </SidebarMenuItem>

@@ -254,7 +254,7 @@ export const SessionSelected: Story = {
 
 export const ToggleRoundTripFromTriggers: Story = {
   args: {
-    initialEntries: ["/automations"],
+    initialEntries: ["/triggers"],
     showSessionsSidebar: false,
   },
 };

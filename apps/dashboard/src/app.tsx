@@ -15,8 +15,6 @@ import {
   AuthSwitchOrganizationPage,
 } from "./features/auth/auth-switch-organization-page.js";
 import { ROUTE_HANDLES } from "./features/navigation/route-handles.js";
-import { AutomationCreatePage } from "./features/pages/automation-create-page.js";
-import { AutomationsPage } from "./features/pages/automations-page.js";
 import { HomePage } from "./features/pages/home-page.js";
 import { IntegrationConnectionCreatePage } from "./features/pages/integration-connection-create-page.js";
 import { IntegrationConnectionEditPage } from "./features/pages/integration-connection-edit-page.js";
@@ -35,10 +33,11 @@ import {
   SandboxProfileEditorShell,
 } from "./features/pages/sandbox-profile-editor-page.js";
 import { SandboxProfilesPage } from "./features/pages/sandbox-profiles-page.js";
-import { ScheduledAutomationEditorPage } from "./features/pages/scheduled-automation-editor-page.js";
 import { SessionWorkbenchPage } from "./features/pages/session-workbench-page.js";
 import { SessionsPage } from "./features/pages/sessions-page.js";
-import { WebhookAutomationEditorPage } from "./features/pages/webhook-automation-editor-page.js";
+import { TriggerCreatePage } from "./features/pages/trigger-create-page.js";
+import { TriggerEditorPage } from "./features/pages/trigger-editor-page.js";
+import { TriggersPage } from "./features/pages/triggers-page.js";
 import { SETTINGS_DEFAULT_PATH } from "./features/settings/model.js";
 import { AppShell } from "./features/shell/app-shell.js";
 import { RequireAuth } from "./features/shell/require-auth.js";
@@ -92,11 +91,11 @@ export const APP_ROUTES = createRoutesFromElements(
               </Route>
               <Route
                 element={<RouteOutlet />}
-                handle={ROUTE_HANDLES.sandboxProfileAutomations}
-                path="automations"
+                handle={ROUTE_HANDLES.sandboxProfileTriggers}
+                path="triggers"
               >
                 <Route element={<RouteOutlet />} index />
-                <Route element={<RouteOutlet />} path=":automationId" />
+                <Route element={<RouteOutlet />} path=":triggerId" />
               </Route>
               <Route
                 element={<RouteOutlet />}
@@ -106,23 +105,13 @@ export const APP_ROUTES = createRoutesFromElements(
             </Route>
           </Route>
         </Route>
-        <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.automations} path="automations">
-          <Route element={<AutomationsPage />} index />
+        <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.triggers} path="triggers">
+          <Route element={<TriggersPage />} index />
+          <Route element={<TriggerCreatePage />} handle={ROUTE_HANDLES.triggersNew} path="new" />
           <Route
-            element={<AutomationCreatePage />}
-            handle={ROUTE_HANDLES.automationsNew}
-            path="new"
-          />
-          <Route element={<Navigate replace to="/automations/new" />} path="schedules/new" />
-          <Route
-            element={<ScheduledAutomationEditorPage mode="edit" />}
-            handle={ROUTE_HANDLES.scheduledAutomationsDetail}
-            path="schedules/:automationId"
-          />
-          <Route
-            element={<WebhookAutomationEditorPage mode="edit" />}
-            handle={ROUTE_HANDLES.automationsDetail}
-            path=":automationId"
+            element={<TriggerEditorPage />}
+            handle={ROUTE_HANDLES.triggersDetail}
+            path=":triggerId"
           />
         </Route>
         <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.integrations} path="integrations">

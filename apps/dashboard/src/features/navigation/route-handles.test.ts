@@ -107,20 +107,17 @@ describe("route handles", () => {
     );
     expect(ROUTE_HANDLES.sandboxProfileDraft.appShellInsetOwner).toBe("child");
 
-    expect(ROUTE_HANDLES.automations.title).toBe("Triggers");
-    expect(ROUTE_HANDLES.automations.description).toBe("Manage triggers.");
-    expect(ROUTE_HANDLES.automations.appShellInsetOwner).toBe("child");
-    expect(ROUTE_HANDLES.automationsNew.title).toBe("Create trigger");
-    expect(ROUTE_HANDLES.automationsNew.description).toBe("");
-    expect(ROUTE_HANDLES.automationsNew.appShellInsetOwner).toBe("child");
-    expect(ROUTE_HANDLES.automationsNew.pageBreadcrumbVisible).toBe(true);
-    expect(ROUTE_HANDLES.automationsDetail.title).toBe("");
-    expect(ROUTE_HANDLES.automationsDetail.description).toBe("");
-    expect(ROUTE_HANDLES.automationsDetail.appShellInsetOwner).toBe("child");
-    expect(ROUTE_HANDLES.automationsDetail.pageBreadcrumbVisible).toBe(true);
-    expect(ROUTE_HANDLES.scheduledAutomationsDetail.title).toBe("");
-    expect(ROUTE_HANDLES.scheduledAutomationsDetail.description).toBe("");
-    expect(ROUTE_HANDLES.scheduledAutomationsDetail.appShellInsetOwner).toBe("child");
+    expect(ROUTE_HANDLES.triggers.title).toBe("Triggers");
+    expect(ROUTE_HANDLES.triggers.description).toBe("Manage triggers.");
+    expect(ROUTE_HANDLES.triggers.appShellInsetOwner).toBe("child");
+    expect(ROUTE_HANDLES.triggersNew.title).toBe("Create trigger");
+    expect(ROUTE_HANDLES.triggersNew.description).toBe("");
+    expect(ROUTE_HANDLES.triggersNew.appShellInsetOwner).toBe("child");
+    expect(ROUTE_HANDLES.triggersNew.pageBreadcrumbVisible).toBe(true);
+    expect(ROUTE_HANDLES.triggersDetail.title).toBe("");
+    expect(ROUTE_HANDLES.triggersDetail.description).toBe("");
+    expect(ROUTE_HANDLES.triggersDetail.appShellInsetOwner).toBe("child");
+    expect(ROUTE_HANDLES.triggersDetail.pageBreadcrumbVisible).toBe(true);
 
     expect(ROUTE_HANDLES.settingsProfile.breadcrumb).toBe("My Profile");
     expect(ROUTE_HANDLES.settingsProfile.title).toBe("My Profile");
@@ -238,15 +235,15 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.sessionsDetail).not.toHaveProperty("header");
   });
 
-  it("resolves automation detail breadcrumb with edit fallback", () => {
-    const detailBreadcrumb = ROUTE_HANDLES.automationsDetail.breadcrumb;
+  it("resolves trigger detail breadcrumb with edit fallback", () => {
+    const detailBreadcrumb = ROUTE_HANDLES.triggersDetail.breadcrumb;
     expect(typeof detailBreadcrumb).toBe("function");
 
     if (typeof detailBreadcrumb !== "function") {
-      throw new Error("automationsDetail breadcrumb must be a function");
+      throw new Error("triggersDetail breadcrumb must be a function");
     }
 
-    expect(detailBreadcrumb({ params: { automationId: "aut_123" } })).toBe("Edit");
+    expect(detailBreadcrumb({ params: { triggerId: "aut_123" } })).toBe("Edit");
     expect(detailBreadcrumb({ params: {} })).toBe("Edit");
   });
 });
@@ -285,26 +282,21 @@ const DurableAppShellLeafRoutes: DurableAppShellLeafRoute[] = [
     handle: ROUTE_HANDLES.sandboxProfilePublished,
   },
   {
-    path: "/sandbox-profiles/:profileId/automations",
-    handleName: "sandboxProfileAutomations",
-    handle: ROUTE_HANDLES.sandboxProfileAutomations,
+    path: "/sandbox-profiles/:profileId/triggers",
+    handleName: "sandboxProfileTriggers",
+    handle: ROUTE_HANDLES.sandboxProfileTriggers,
   },
   {
     path: "/sandbox-profiles/:profileId/snapshots",
     handleName: "sandboxProfileSnapshots",
     handle: ROUTE_HANDLES.sandboxProfileSnapshots,
   },
-  { path: "/automations", handleName: "automations", handle: ROUTE_HANDLES.automations },
-  { path: "/automations/new", handleName: "automationsNew", handle: ROUTE_HANDLES.automationsNew },
+  { path: "/triggers", handleName: "triggers", handle: ROUTE_HANDLES.triggers },
+  { path: "/triggers/new", handleName: "triggersNew", handle: ROUTE_HANDLES.triggersNew },
   {
-    path: "/automations/schedules/:automationId",
-    handleName: "scheduledAutomationsDetail",
-    handle: ROUTE_HANDLES.scheduledAutomationsDetail,
-  },
-  {
-    path: "/automations/:automationId",
-    handleName: "automationsDetail",
-    handle: ROUTE_HANDLES.automationsDetail,
+    path: "/triggers/:triggerId",
+    handleName: "triggersDetail",
+    handle: ROUTE_HANDLES.triggersDetail,
   },
   { path: "/integrations", handleName: "integrations", handle: ROUTE_HANDLES.integrations },
   {

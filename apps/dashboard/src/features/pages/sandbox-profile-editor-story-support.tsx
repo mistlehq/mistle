@@ -108,7 +108,7 @@ export type SandboxProfileEditorPageStoryArgs = {
   };
   draftSaveErrorMessage?: string;
   draftAutomationImpactError?: string;
-  draftAutomationImpactAffectedAutomations?: readonly SandboxProfileVersionDraftAutomationImpactAutomation[];
+  draftAutomationImpactAffectedTriggers?: readonly SandboxProfileVersionDraftAutomationImpactAutomation[];
   initialBindings?: readonly {
     id: string;
     connectionId: string;
@@ -127,7 +127,7 @@ export type SandboxProfileEditorPageStoryArgs = {
 type IntegrationsSectionState = NonNullable<
   SandboxProfileEditorPageStoryArgs["integrationsSectionState"]
 >;
-type StorySectionId = "sandbox-profile" | "automations" | "snapshot";
+type StorySectionId = "sandbox-profile" | "triggers" | "snapshot";
 
 const StorySections = [
   {
@@ -139,7 +139,7 @@ const StorySections = [
     label: "Snapshots",
   },
   {
-    id: "automations",
+    id: "triggers",
     label: "Triggers",
   },
 ] as const satisfies readonly SandboxProfileEditorSection<StorySectionId>[];
@@ -808,9 +808,7 @@ function SandboxProfileEditorPageStoryView(
       deleteProfileError={null}
       deleteProfileIsPending={false}
       draftAutomationImpactError={input.draftAutomationImpactError ?? null}
-      draftAutomationImpactAffectedAutomations={
-        input.draftAutomationImpactAffectedAutomations ?? null
-      }
+      draftAutomationImpactAffectedTriggers={input.draftAutomationImpactAffectedTriggers ?? null}
       onDraftAutomationImpactErrorDismiss={() => {}}
       hasUnpersistedSetupScriptChanges={setupScriptDraft !== persistedSetupScript}
       isDeleteProfileDialogOpen={false}
@@ -974,7 +972,7 @@ function SandboxProfileEditorPageStoryView(
           );
         }
 
-        if (sectionId === "automations") {
+        if (sectionId === "triggers") {
           return (
             <div className="flex min-h-64 items-center justify-center rounded-md border bg-background p-6 text-center text-sm text-muted-foreground">
               No triggers use this sandbox profile.

@@ -96,8 +96,8 @@ export function SessionsStoryHarness(input: SessionsStoryHarnessProps): React.JS
         >
           <Route
             element={<AutomationsStoryPage />}
-            handle={ROUTE_HANDLES.automations}
-            path="/automations"
+            handle={ROUTE_HANDLES.triggers}
+            path="/triggers"
           />
           <Route element={<Outlet />} handle={ROUTE_HANDLES.sessions} path="/sessions">
             <Route element={<SessionsPage />} index />
@@ -144,13 +144,13 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
     handleNavigateToSettings: () => {},
     handleSignOut: () => {},
     handleSwitchOrganization: () => {},
-    inAutomations: routeState.inAutomations,
     inDashboardRoot: routeState.inDashboardRoot,
     inIntegrations: routeState.inIntegrations,
     inSandboxProfiles: routeState.inSandboxProfiles,
     inSessionDetail: routeState.inSessionDetail,
     inSessions: routeState.inSessions,
     inSettings: routeState.inSettings,
+    inTriggers: routeState.inTriggers,
     isSigningOut: false,
     isSwitchingOrganization: false,
     locationPathname: location.pathname,

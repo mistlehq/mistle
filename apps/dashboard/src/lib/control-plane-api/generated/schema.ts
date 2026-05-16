@@ -875,6 +875,134 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/automations/{automationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          automationId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Get an automation summary. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              enabled: boolean;
+              id: string;
+              issue?: {
+                /** @enum {string} */
+                code:
+                  | "MISSING_TARGET_METADATA"
+                  | "MISSING_WEBHOOK_SOURCE"
+                  | "MISSING_INTEGRATION_CONNECTION"
+                  | "MISSING_SANDBOX_PROFILE";
+                message: string;
+              };
+              /** @enum {string} */
+              kind: "webhook" | "schedule";
+              name: string;
+              source:
+                | {
+                    events: {
+                      label: string;
+                      logoKey?: string;
+                      unavailable?: boolean;
+                    }[];
+                    /** @enum {string} */
+                    kind: "webhook";
+                  }
+                | {
+                    cronExpression: string;
+                    /** @enum {string} */
+                    kind: "schedule";
+                    nextScheduledAt: string | null;
+                    timezone: string;
+                  };
+              target: {
+                primaryRepositoryId: string | null;
+                primaryRepositoryName: string | null;
+                sandboxProfileId: string;
+                sandboxProfileName: string | null;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Automation was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/automations/schedules": {
     parameters: {
       query?: never;

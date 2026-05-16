@@ -136,7 +136,7 @@ type SandboxProfileEditorTestVersionState =
   | "published-failed";
 
 type SandboxProfileEditorTestRouteView = "published" | "draft" | "default";
-type SandboxProfileEditorTestRouteSection = "sandbox-profile" | "automations" | "snapshot" | null;
+type SandboxProfileEditorTestRouteSection = "sandbox-profile" | "triggers" | "snapshot" | null;
 
 const SlackAutomationConnectionId = "icn_slack_test";
 const SlackAutomationWebhookSourceId = "iws_slack_test";
@@ -789,8 +789,8 @@ function renderSandboxProfileEditor(input?: {
       ? ""
       : resolvedRouteSection === "snapshot"
         ? "/snapshots"
-        : resolvedRouteSection === "automations"
-          ? "/automations"
+        : resolvedRouteSection === "triggers"
+          ? "/triggers"
           : resolvedRouteView === "default"
             ? "/sandbox-profile"
             : `/sandbox-profile/${resolvedRouteView}`;
@@ -810,9 +810,9 @@ function renderSandboxProfileEditor(input?: {
               <Route element={<Outlet />} path="published" />
               <Route element={<Outlet />} path="draft" />
             </Route>
-            <Route element={<Outlet />} path="automations">
+            <Route element={<Outlet />} path="triggers">
               <Route element={<Outlet />} index />
-              <Route element={<Outlet />} path=":automationId" />
+              <Route element={<Outlet />} path=":triggerId" />
             </Route>
             <Route element={<Outlet />} path="snapshots" />
           </Route>
@@ -860,7 +860,7 @@ function DeleteProfileDialogHarness(input: {
       deleteProfileAutomationUsagesIsPending={input.automationUsagesIsPending ?? false}
       deleteProfileError={null}
       deleteProfileIsPending={false}
-      draftAutomationImpactAffectedAutomations={null}
+      draftAutomationImpactAffectedTriggers={null}
       draftAutomationImpactError={null}
       onDraftAutomationImpactErrorDismiss={() => {}}
       hasUnpersistedIntegrationChanges={false}
@@ -898,7 +898,7 @@ function DeleteProfileDialogHarness(input: {
 }
 
 function DraftActionsHarness(input: {
-  draftAutomationImpactAffectedAutomations?:
+  draftAutomationImpactAffectedTriggers?:
     | readonly SandboxProfileVersionDraftAutomationImpactAutomation[]
     | null;
   draftAutomationImpactError?: string | null;
@@ -919,9 +919,7 @@ function DraftActionsHarness(input: {
       deleteProfileError={null}
       deleteProfileIsPending={false}
       draftSaveError={input.draftSaveError ?? null}
-      draftAutomationImpactAffectedAutomations={
-        input.draftAutomationImpactAffectedAutomations ?? null
-      }
+      draftAutomationImpactAffectedTriggers={input.draftAutomationImpactAffectedTriggers ?? null}
       draftAutomationImpactError={draftAutomationImpactError}
       onDraftAutomationImpactErrorDismiss={() => {
         setDraftAutomationImpactError(null);
@@ -979,7 +977,7 @@ function renderDeleteProfileDialogHarness(input: {
 }
 
 function renderDraftActionsHarness(input?: {
-  draftAutomationImpactAffectedAutomations?:
+  draftAutomationImpactAffectedTriggers?:
     | readonly SandboxProfileVersionDraftAutomationImpactAutomation[]
     | null;
   draftAutomationImpactError?: string | null;
@@ -1721,14 +1719,14 @@ describe("SandboxProfileEditorPage", () => {
           config: {},
         },
       ],
-      routeSection: "automations",
+      routeSection: "triggers",
       versionState: "published",
     });
 
     expect(screen.getByRole("tab", { name: "Triggers" }).getAttribute("aria-selected")).toBe(
       "true",
     );
-    expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/automations`);
+    expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/triggers`);
     expect(screen.getByRole("heading", { name: "Create from template" })).toBeDefined();
     expect(screen.getByText("Slack Mention")).toBeDefined();
   });
@@ -1736,7 +1734,7 @@ describe("SandboxProfileEditorPage", () => {
   it("shows unavailable trigger templates with a reason when the required connection is missing", () => {
     renderSandboxProfileEditor({
       automationTargets: [createSlackAutomationTarget()],
-      routeSection: "automations",
+      routeSection: "triggers",
       versionState: "published",
     });
 
@@ -1761,7 +1759,7 @@ describe("SandboxProfileEditorPage", () => {
           config: {},
         },
       ],
-      routeSection: "automations",
+      routeSection: "triggers",
       versionState: "published",
     });
 
@@ -1812,7 +1810,7 @@ describe("SandboxProfileEditorPage", () => {
           config: {},
         },
       ],
-      routeSection: "automations",
+      routeSection: "triggers",
       versionState: "published",
     });
 
@@ -1826,7 +1824,7 @@ describe("SandboxProfileEditorPage", () => {
 
   it("preserves the profile automation page cursor when selecting an automation", () => {
     const { profileId, router } = renderSandboxProfileEditor({
-      routeSection: "automations",
+      routeSection: "triggers",
       routeSearch: "?after=cursor_after",
       versionState: "published",
       profileAutomationsListResult: {
@@ -1865,7 +1863,7 @@ describe("SandboxProfileEditorPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /Page two webhook/ }));
 
     expect(router.state.location.pathname).toBe(
-      `/sandbox-profiles/${profileId}/automations/atm_profile_page_2`,
+      `/sandbox-profiles/${profileId}/triggers/atm_profile_page_2`,
     );
     expect(router.state.location.search).toBe("?after=cursor_after");
   });
@@ -2900,7 +2898,7 @@ describe("SandboxProfileEditorPage", () => {
 
   it("surfaces saved draft automation impact warnings", () => {
     renderDraftActionsHarness({
-      draftAutomationImpactAffectedAutomations: [
+      draftAutomationImpactAffectedTriggers: [
         {
           enabled: true,
           id: "webhook_repository_triage",
@@ -2932,16 +2930,12 @@ describe("SandboxProfileEditorPage", () => {
     expect(noticeTitle).toBeDefined();
     expect(noticeTitle.closest('[role="tabpanel"]')).not.toBeNull();
     const webhookAutomationLink = screen.getByRole("link", { name: "Repository triage" });
-    expect(webhookAutomationLink.getAttribute("href")).toBe(
-      "/automations/webhook_repository_triage",
-    );
+    expect(webhookAutomationLink.getAttribute("href")).toBe("/triggers/webhook_repository_triage");
     expect(webhookAutomationLink.getAttribute("target")).toBe("_blank");
     expect(webhookAutomationLink.getAttribute("rel")).toBe("noreferrer");
 
     const scheduledAutomationLink = screen.getByRole("link", { name: "Release notes" });
-    expect(scheduledAutomationLink.getAttribute("href")).toBe(
-      "/automations/schedules/sch_release_notes",
-    );
+    expect(scheduledAutomationLink.getAttribute("href")).toBe("/triggers/sch_release_notes");
     expect(scheduledAutomationLink.getAttribute("target")).toBe("_blank");
     expect(scheduledAutomationLink.getAttribute("rel")).toBe("noreferrer");
     expect(

@@ -560,7 +560,7 @@ export function useLoadedWebhookAutomationEditorState(
       await invalidateAutomationsQuery(queryClient);
       await input.navigate(
         input.createSuccessPath === undefined
-          ? `/automations/${automation.id}`
+          ? `/triggers/${automation.id}`
           : input.createSuccessPath(automation),
       );
     },
@@ -620,7 +620,7 @@ export function useLoadedWebhookAutomationEditorState(
     },
     onSuccess: async () => {
       await invalidateAutomationsQuery(queryClient);
-      await input.navigate(input.deleteSuccessPath ?? "/automations");
+      await input.navigate(input.deleteSuccessPath ?? "/triggers");
     },
     onError: (error: unknown) => {
       setDeleteError(

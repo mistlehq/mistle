@@ -208,7 +208,7 @@ describe("route breadcrumb metadata", () => {
             description: "",
           },
           params: {},
-          pathname: "/automations/new",
+          pathname: "/triggers/new",
         },
       ]),
     ).toEqual({

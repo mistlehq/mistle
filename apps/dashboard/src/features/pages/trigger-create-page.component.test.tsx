@@ -22,7 +22,7 @@ import {
   sandboxProfileVersionAutomationConfigQueryKey,
   sandboxProfileVersionsQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
-import { AutomationCreatePage } from "./automation-create-page.js";
+import { TriggerCreatePage } from "./trigger-create-page.js";
 
 const SlackConnectionId = "icn_slack_test";
 const GitHubConnectionId = "icn_github_test";
@@ -258,9 +258,9 @@ function renderCreatePage(input: {
   const router = createMemoryRouter(
     createRoutesFromElements(
       <Route
-        element={<AutomationCreatePage />}
-        handle={ROUTE_HANDLES.automationsNew}
-        path="/automations/new"
+        element={<TriggerCreatePage />}
+        handle={ROUTE_HANDLES.triggersNew}
+        path="/triggers/new"
       />,
     ),
     {
@@ -285,9 +285,9 @@ function getFormControlValue(element: HTMLElement): string {
   throw new Error("Expected an input or textarea form control.");
 }
 
-describe("AutomationCreatePage", () => {
+describe("TriggerCreatePage", () => {
   it("starts without a selected trigger source", () => {
-    renderCreatePage({ initialEntry: "/automations/new" });
+    renderCreatePage({ initialEntry: "/triggers/new" });
 
     expect(screen.getByRole("region", { name: "Create trigger page" }).getAttribute("style")).toBe(
       "scrollbar-gutter: stable;",
@@ -302,7 +302,7 @@ describe("AutomationCreatePage", () => {
   });
 
   it("orders the create form fields by profile, type, and name", () => {
-    renderCreatePage({ initialEntry: "/automations/new" });
+    renderCreatePage({ initialEntry: "/triggers/new" });
 
     const sandboxProfileLabel = screen.getByText("Sandbox profile");
     const automationTypeLabel = screen.getByText("Trigger source");
@@ -317,7 +317,7 @@ describe("AutomationCreatePage", () => {
   });
 
   it("ignores type query values when choosing the initial trigger source", () => {
-    renderCreatePage({ initialEntry: "/automations/new?type=event" });
+    renderCreatePage({ initialEntry: "/triggers/new?type=event" });
 
     expect(screen.getByRole("heading", { name: "Create trigger" })).toBeDefined();
     expect(screen.getByText("Trigger source")).toBeDefined();
@@ -328,7 +328,7 @@ describe("AutomationCreatePage", () => {
   });
 
   it("prefills the create form from the Slack mention template", () => {
-    renderCreatePage({ initialEntry: "/automations/new?template=slack-app-mention" });
+    renderCreatePage({ initialEntry: "/triggers/new?template=slack-app-mention" });
 
     expect(screen.getByText("Event")).toBeDefined();
     expect(getFormControlValue(screen.getByRole("textbox", { name: "Trigger name" }))).toBe(
@@ -343,7 +343,7 @@ describe("AutomationCreatePage", () => {
   });
 
   it("prefills the create form from the GitHub PR review template", () => {
-    renderCreatePage({ initialEntry: "/automations/new?template=github-pr-review" });
+    renderCreatePage({ initialEntry: "/triggers/new?template=github-pr-review" });
 
     expect(screen.getByText("Event")).toBeDefined();
     expect(getFormControlValue(screen.getByRole("textbox", { name: "Trigger name" }))).toBe(
@@ -356,7 +356,7 @@ describe("AutomationCreatePage", () => {
 
   it("selects the Slack mention template event after profile bindings are available", async () => {
     renderCreatePage({
-      initialEntry: `/automations/new?sandboxProfileId=${AutomationSandboxProfileId}&template=slack-app-mention`,
+      initialEntry: `/triggers/new?sandboxProfileId=${AutomationSandboxProfileId}&template=slack-app-mention`,
       seedSlackProfile: true,
     });
 
@@ -367,7 +367,7 @@ describe("AutomationCreatePage", () => {
 
   it("selects the GitHub PR review template events and comment filters after profile bindings are available", async () => {
     renderCreatePage({
-      initialEntry: `/automations/new?sandboxProfileId=${AutomationSandboxProfileId}&template=github-pr-review`,
+      initialEntry: `/triggers/new?sandboxProfileId=${AutomationSandboxProfileId}&template=github-pr-review`,
       seedGitHubProfile: true,
     });
 
@@ -380,7 +380,7 @@ describe("AutomationCreatePage", () => {
   });
 
   it("requires the user to select a trigger source before creating", () => {
-    renderCreatePage({ initialEntry: "/automations/new" });
+    renderCreatePage({ initialEntry: "/triggers/new" });
 
     fireEvent.click(screen.getByRole("button", { name: "Create" }));
 

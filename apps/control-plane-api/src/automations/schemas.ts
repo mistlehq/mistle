@@ -57,3 +57,14 @@ export const AutomationListItemSchema = z
     updatedAt: z.string().min(1),
   })
   .strict();
+
+export const AutomationParamsSchema = z
+  .object({
+    automationId: z
+      .string()
+      .min(1)
+      .regex(/^atm_[a-zA-Z0-9_-]+$/, {
+        message: "`automationId` must be an automation id.",
+      }),
+  })
+  .strict();

@@ -58,7 +58,7 @@ export const OrganizationE2BMissingConnection: Story = {
 
 export const EmptyTriggersTab: Story = {
   args: {
-    initialSectionId: "automations",
+    initialSectionId: "triggers",
   },
 };
 

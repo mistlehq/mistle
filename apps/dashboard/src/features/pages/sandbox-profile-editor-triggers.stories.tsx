@@ -20,7 +20,7 @@ import {
   sandboxProfileVersionsQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
-import { SandboxProfileAutomationsSection } from "./sandbox-profile-automations-section.js";
+import { SandboxProfileTriggersSection } from "./sandbox-profile-triggers-section.js";
 
 const ProfileId = "sbp_repo_maintainer";
 const SlackConnectionId = "icn_slack_story";
@@ -375,7 +375,7 @@ function createStoryQueryClient(input: {
   return queryClient;
 }
 
-export function SandboxProfileAutomationsStory(input: {
+export function SandboxProfileTriggersStory(input: {
   additionalPages?: readonly StoryAutomationPage[];
   automations: AutomationsListResult;
   selectedAutomationId?: string;
@@ -392,18 +392,18 @@ export function SandboxProfileAutomationsStory(input: {
   );
   const initialPath =
     input.selectedAutomationId === undefined
-      ? `/sandbox-profiles/${ProfileId}/automations`
-      : `/sandbox-profiles/${ProfileId}/automations/${input.selectedAutomationId}`;
+      ? `/sandbox-profiles/${ProfileId}/triggers`
+      : `/sandbox-profiles/${ProfileId}/triggers/${input.selectedAutomationId}`;
   const [router] = useState(() =>
     createMemoryRouter(
       createRoutesFromElements(
         <Route
-          element={<SandboxProfileAutomationsSection profileId={ProfileId} />}
-          path="/sandbox-profiles/:profileId/automations"
+          element={<SandboxProfileTriggersSection profileId={ProfileId} />}
+          path="/sandbox-profiles/:profileId/triggers"
         >
           <Route
-            element={<SandboxProfileAutomationsSection profileId={ProfileId} />}
-            path=":automationId"
+            element={<SandboxProfileTriggersSection profileId={ProfileId} />}
+            path=":triggerId"
           />
         </Route>,
       ),
@@ -422,17 +422,17 @@ export function SandboxProfileAutomationsStory(input: {
 
 const meta = {
   title: "Dashboard/SandboxProfiles/Editor/Triggers",
-  component: SandboxProfileAutomationsStory,
+  component: SandboxProfileTriggersStory,
   decorators: [withDashboardCenteredStory],
   excludeStories: [
     "ProfileAutomations",
-    "SandboxProfileAutomationsStory",
+    "SandboxProfileTriggersStory",
     "SelectedScheduleAutomationId",
   ],
   args: {
     automations: ProfileAutomations,
   },
-} satisfies Meta<typeof SandboxProfileAutomationsStory>;
+} satisfies Meta<typeof SandboxProfileTriggersStory>;
 
 export default meta;
 
@@ -479,7 +479,7 @@ export const MobilePaginated: Story = {
   render: function RenderMobilePaginated(args): React.JSX.Element {
     return (
       <div className="w-[375px]">
-        <SandboxProfileAutomationsStory {...args} />
+        <SandboxProfileTriggersStory {...args} />
       </div>
     );
   },

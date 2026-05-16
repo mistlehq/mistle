@@ -3,6 +3,7 @@ import { OpenApiValidationHook } from "@mistle/http/errors.js";
 
 import type { AppContextBindings, AppRoutes } from "../types.js";
 import { AUTOMATIONS_ROUTE_BASE_PATH } from "./constants.js";
+import * as getAutomation from "./get-automation/index.js";
 import * as listAutomations from "./list-automations/index.js";
 
 export function createAutomationsRoutes(): AppRoutes<typeof AUTOMATIONS_ROUTE_BASE_PATH> {
@@ -11,6 +12,7 @@ export function createAutomationsRoutes(): AppRoutes<typeof AUTOMATIONS_ROUTE_BA
   });
 
   routes.openapi(listAutomations.route, listAutomations.handler);
+  routes.openapi(getAutomation.route, getAutomation.handler);
 
   return {
     basePath: AUTOMATIONS_ROUTE_BASE_PATH,

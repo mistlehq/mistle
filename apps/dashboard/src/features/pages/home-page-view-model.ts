@@ -71,7 +71,7 @@ function createBaseSteps(): HomeChecklistStep[] {
       description:
         "Triggers respond to events that happen in other tools, like GitHub, Slack, or Jira.",
       status: "upcoming",
-      href: "/automations/new",
+      href: "/triggers/new",
       actionLabel: "Create trigger",
     },
   ];

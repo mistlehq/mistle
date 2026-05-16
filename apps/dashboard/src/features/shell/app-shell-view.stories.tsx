@@ -31,7 +31,7 @@ function SandboxProfilesNavIcon(props: {
   return <PackageIcon {...props} />;
 }
 
-function AutomationsNavIcon(props: {
+function TriggersNavIcon(props: {
   className?: string;
   "aria-hidden"?: boolean;
 }): React.JSX.Element {
@@ -90,12 +90,12 @@ function StorySidebarContent(input: {
           <SidebarMenuItem>
             <SidebarMenuButton
               isActive={
-                input.locationPathname === "/automations" ||
-                input.locationPathname.startsWith("/automations/")
+                input.locationPathname === "/triggers" ||
+                input.locationPathname.startsWith("/triggers/")
               }
-              render={<NavLink to="/automations" />}
+              render={<NavLink to="/triggers" />}
             >
-              <AutomationsNavIcon aria-hidden className="size-5 shrink-0 md:size-4" />
+              <TriggersNavIcon aria-hidden className="size-5 shrink-0 md:size-4" />
               <span>Triggers</span>
             </SidebarMenuButton>
           </SidebarMenuItem>

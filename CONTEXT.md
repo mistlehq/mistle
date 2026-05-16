@@ -1,6 +1,6 @@
 # Mistle
 
-This context defines the product language used for sandbox profiles, snapshots, sessions, integrations, and automations.
+This context defines the product language used for sandbox profiles, snapshots, sessions, integrations, and triggers.
 
 ## Language
 
@@ -32,6 +32,14 @@ _Avoid_: Generic script
 A top-level page that lists existing product objects and offers the primary action for creating the first one.
 _Avoid_: Detail tab, filtered results view
 
+**Trigger**:
+A configured event or schedule that starts an agent response.
+_Avoid_: Automation when naming product-facing concepts
+
+**Automation**:
+The internal system record and runtime execution model behind a **Trigger**.
+_Avoid_: Trigger when naming persistence, API, or workflow contracts
+
 ## Relationships
 
 - A **Sandbox profile version** may have one usable **Snapshot**.
@@ -43,6 +51,8 @@ _Avoid_: Detail tab, filtered results view
 - A **Maintenance script** test run starts from an existing usable **Snapshot** but does not replace it.
 - When a new **Sandbox profile version** is published, the **Maintenance script** and refresh schedule definition should be copied forward from the previous version.
 - A **Collection landing page** may list **Sandbox profile version** families, triggers, sessions, or organization members.
+- A **Trigger** is backed by one **Automation** record.
+- An **Automation** may start from a webhook event or a schedule.
 
 ## Example Dialogue
 
@@ -57,3 +67,8 @@ _Avoid_: Detail tab, filtered results view
 - A queued maintenance refresh was considered as a script-capturing job — resolved for the first implementation: scheduled refresh uses the latest saved **Maintenance script** at execution time.
 - Copied refresh schedules should keep their definition but recompute their next occurrence for the newly published **Sandbox profile version**.
 - "empty state" could mean first-use creation guidance, filtered no-results copy, or unavailable dependency copy — resolved: for collection pages, use it to mean the zero-object state before the first item exists.
+- "automation" was used for both the user-facing configured behavior and the internal runtime model — resolved: use **Trigger** for the product-facing concept and **Automation** for persistence, API, and workflow contracts.
+- Dashboard URLs are user-facing language — resolved: use **Trigger** naming for dashboard routes, while keeping backend API and persistence contracts under **Automation** unless those contracts are intentionally versioned.
+- Dashboard route parameters are user-facing route language — resolved: use `triggerId` for dashboard route-facing code and translate to `automationId` only at backend API/service boundaries.
+- A unified dashboard trigger detail page should not infer the trigger kind by trying type-specific endpoints — resolved: expose a backend automation detail read contract and use it before rendering the type-specific editor.
+- The backend automation detail read contract should return the same summary shape as the unified automation list item so the dashboard has one discriminator shape for trigger routing.

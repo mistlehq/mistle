@@ -3,7 +3,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useLocation } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
@@ -13,7 +13,7 @@ import type {
   AutomationListItem,
   AutomationsListResult,
 } from "../automations/automations-types.js";
-import { AutomationsPage } from "./automations-page.js";
+import { TriggersPage } from "./triggers-page.js";
 
 function createListResult(
   items: AutomationsListResult["items"],
@@ -63,7 +63,13 @@ function seedAutomationsList(
   );
 }
 
-describe("AutomationsPage", () => {
+function LocationProbe(input: { onPathChange: (path: string) => void }): null {
+  const location = useLocation();
+  input.onPathChange(`${location.pathname}${location.search}`);
+  return null;
+}
+
+describe("TriggersPage", () => {
   it("does not render pagination while the initial automation query has no data", () => {
     const queryClient = createTestQueryClient({
       refetchOnMount: false,
@@ -73,7 +79,7 @@ describe("AutomationsPage", () => {
     const markup = renderToStaticMarkup(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <AutomationsPage />
+          <TriggersPage />
         </MemoryRouter>
       </QueryClientProvider>,
     );
@@ -92,7 +98,7 @@ describe("AutomationsPage", () => {
     const markup = renderToStaticMarkup(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <AutomationsPage />
+          <TriggersPage />
         </MemoryRouter>
       </QueryClientProvider>,
     );
@@ -148,7 +154,7 @@ describe("AutomationsPage", () => {
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <AutomationsPage />
+          <TriggersPage />
         </MemoryRouter>
       </QueryClientProvider>,
     );
@@ -157,7 +163,7 @@ describe("AutomationsPage", () => {
     expect(screen.queryByLabelText("pagination")).toBeNull();
   });
 
-  it("renders event and schedule automations from the unified list", () => {
+  it("renders event and schedule triggers from the unified list", () => {
     const queryClient = createTestQueryClient({
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,
@@ -192,7 +198,7 @@ describe("AutomationsPage", () => {
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <AutomationsPage />
+          <TriggersPage />
         </MemoryRouter>
       </QueryClientProvider>,
     );
@@ -229,7 +235,7 @@ describe("AutomationsPage", () => {
     render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <AutomationsPage />
+          <TriggersPage />
         </MemoryRouter>
       </QueryClientProvider>,
     );
@@ -271,7 +277,7 @@ describe("AutomationsPage", () => {
     const markup = renderToStaticMarkup(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <AutomationsPage />
+          <TriggersPage />
         </MemoryRouter>
       </QueryClientProvider>,
     );
@@ -306,7 +312,7 @@ describe("AutomationsPage", () => {
     const rendered = render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
-          <AutomationsPage />
+          <TriggersPage />
         </MemoryRouter>
       </QueryClientProvider>,
     );
@@ -322,5 +328,49 @@ describe("AutomationsPage", () => {
       expect(screen.queryByRole("button", { name: "Alpha trigger" })).toBeNull();
     });
     expect(screen.getByRole("button", { name: "Backlog sync" })).toBeDefined();
+  });
+
+  it("opens webhook and schedule triggers through the unified trigger detail route", () => {
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    const paths: string[] = [];
+
+    seedAutomationsList(
+      queryClient,
+      createListResult([
+        createAutomationListItem({
+          id: "atm_webhook_open",
+          name: "Webhook trigger",
+        }),
+        createAutomationListItem({
+          id: "atm_schedule_open",
+          kind: "schedule",
+          name: "Schedule trigger",
+          source: {
+            kind: "schedule",
+            cronExpression: "0 9 * * *",
+            timezone: "Asia/Singapore",
+            nextScheduledAt: "2026-04-30T01:00:00.000Z",
+          },
+        }),
+      ]),
+    );
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/triggers"]}>
+          <LocationProbe onPathChange={(path) => paths.push(path)} />
+          <TriggersPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Webhook trigger" }));
+    expect(paths.at(-1)).toBe("/triggers/atm_webhook_open");
+
+    fireEvent.click(screen.getByRole("button", { name: "Schedule trigger" }));
+    expect(paths.at(-1)).toBe("/triggers/atm_schedule_open");
   });
 });

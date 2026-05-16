@@ -550,7 +550,7 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
       await invalidateAutomationsQuery(queryClient);
       await input.navigate(
         input.createSuccessPath === undefined
-          ? `/automations/${automation.id}`
+          ? `/triggers/${automation.id}`
           : input.createSuccessPath(automation),
       );
     },
@@ -578,7 +578,7 @@ function useCreateAutomationEditorState(input: CreateAutomationEditorProps) {
       await invalidateAutomationsQuery(queryClient);
       await input.navigate(
         input.createSuccessPath === undefined
-          ? `/automations/schedules/${automation.id}`
+          ? `/triggers/${automation.id}`
           : input.createSuccessPath(automation),
       );
     },

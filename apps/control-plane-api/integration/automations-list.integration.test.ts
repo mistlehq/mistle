@@ -7,6 +7,7 @@ import { createIntegrationTest } from "@mistle/test-harness/integration";
 import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
+import { GetAutomationResponseSchema } from "../src/automations/get-automation/schema.js";
 import { ListAutomationsResponseSchema } from "../src/automations/list-automations/schema.js";
 import {
   seedAutomationWebhookTargets,
@@ -111,6 +112,60 @@ describe.concurrent("automations list integration", () => {
       "sbp_automations_list_filter_a",
       "sbp_automations_list_filter_a",
     ]);
+  });
+
+  it("gets a mixed automation summary by id within the active organization", async ({ env }) => {
+    const firstOrgSession = await env.auth.createSession({
+      email: "automations-get-summary-org-a@example.com",
+    });
+    const secondOrgSession = await env.auth.createSession({
+      email: "automations-get-summary-org-b@example.com",
+    });
+    await seedScheduledAutomation(env, {
+      organizationId: firstOrgSession.organizationId,
+      automationId: "atm_automations_get_summary_schedule",
+      scheduleId: "sch_automations_get_summary_schedule",
+      targetId: "atg_automations_get_summary_schedule",
+      profileId: "sbp_automations_get_summary_schedule",
+      name: "Daily summary",
+      createdAt: "2026-03-05T00:00:00.000Z",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/automations/atm_automations_get_summary_schedule",
+      {
+        headers: {
+          cookie: firstOrgSession.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const body = GetAutomationResponseSchema.parse(await response.json());
+    expect(body).toMatchObject({
+      id: "atm_automations_get_summary_schedule",
+      kind: "schedule",
+      name: "Daily summary",
+      target: {
+        sandboxProfileId: "sbp_automations_get_summary_schedule",
+      },
+      source: {
+        kind: "schedule",
+        cronExpression: "0 9 * * *",
+        timezone: "Asia/Singapore",
+      },
+    });
+
+    const otherOrgResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/automations/atm_automations_get_summary_schedule",
+      {
+        headers: {
+          cookie: secondOrgSession.cookie,
+        },
+      },
+    );
+
+    expect(otherOrgResponse.status).toBe(404);
   });
 });
 

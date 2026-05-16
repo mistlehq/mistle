@@ -16,7 +16,7 @@ describe("app shell sessions sidebar mode routing", () => {
   it("identifies sessions paths and the dedicated new-session route", () => {
     expect(isSessionsPath(SessionsRoutes.INDEX)).toBe(true);
     expect(isSessionsPath("/sessions/sbi_123")).toBe(true);
-    expect(isSessionsPath("/automations")).toBe(false);
+    expect(isSessionsPath("/triggers")).toBe(false);
     expect(isNewSessionPath(SessionsRoutes.NEW)).toBe(true);
     expect(isNewSessionPath("/sessions/sbi_123")).toBe(false);
   });
@@ -52,11 +52,11 @@ describe("app shell sessions sidebar mode routing", () => {
   });
 
   it("routes non-session pages into the new-session page when enabling sidebar mode", () => {
-    expect(isExistingSandboxSessionPath("/automations")).toBe(false);
+    expect(isExistingSandboxSessionPath("/triggers")).toBe(false);
     expect(
       resolveSidebarModeEnableNavigationTarget({
         lastInteractedSessionHref: null,
-        pathname: "/automations",
+        pathname: "/triggers",
       }),
     ).toBe(SessionsRoutes.NEW);
   });
@@ -65,7 +65,7 @@ describe("app shell sessions sidebar mode routing", () => {
     expect(
       resolveSidebarModeEnableNavigationTarget({
         lastInteractedSessionHref: "/sessions/sbi_123",
-        pathname: "/automations",
+        pathname: "/triggers",
       }),
     ).toBe("/sessions/sbi_123");
   });
@@ -108,11 +108,11 @@ describe("app shell sessions sidebar mode routing", () => {
   it("builds a navigation href from pathname, search, and hash", () => {
     expect(
       resolveLocationHref({
-        pathname: "/automations",
+        pathname: "/triggers",
         search: "?tab=active",
         hash: "#details",
       }),
-    ).toBe("/automations?tab=active#details");
+    ).toBe("/triggers?tab=active#details");
   });
 
   it("returns to the previously recorded location when disabling sidebar mode", () => {
@@ -120,9 +120,9 @@ describe("app shell sessions sidebar mode routing", () => {
       resolveSidebarModeDisableNavigationTarget({
         currentLocationHref: SessionsRoutes.NEW,
         currentPathname: SessionsRoutes.NEW,
-        previousLocationHref: "/automations?tab=active#details",
+        previousLocationHref: "/triggers?tab=active#details",
       }),
-    ).toBe("/automations?tab=active#details");
+    ).toBe("/triggers?tab=active#details");
   });
 
   it("skips disable navigation when the current and previous locations match", () => {
@@ -145,8 +145,8 @@ describe("app shell sessions sidebar mode routing", () => {
   it("skips disable navigation after the user has already left sessions", () => {
     expect(
       resolveSidebarModeDisableNavigationTarget({
-        currentLocationHref: "/automations",
-        currentPathname: "/automations",
+        currentLocationHref: "/triggers",
+        currentPathname: "/triggers",
         previousLocationHref: "/dashboard",
       }),
     ).toBeNull();

@@ -120,7 +120,7 @@ function resolveIntegrationDetailHeaderIcon(input: RouteTextResolverInput): Reac
   });
 }
 
-function resolveAutomationDetailBreadcrumb(_input: RouteTextResolverInput): string {
+function resolveTriggerDetailBreadcrumb(_input: RouteTextResolverInput): string {
   return "Edit";
 }
 
@@ -246,7 +246,7 @@ export const ROUTE_HANDLES = {
     title: "Edit profile",
     description: "Edit sandbox profile configuration.",
   },
-  sandboxProfileAutomations: {
+  sandboxProfileTriggers: {
     appShellInsetOwner: "child",
     sidebarTriggerOwner: "page-frame",
     breadcrumb: "Triggers",
@@ -260,14 +260,14 @@ export const ROUTE_HANDLES = {
     title: "Edit profile",
     description: "Manage sandbox profile snapshots.",
   },
-  automations: {
+  triggers: {
     appShellInsetOwner: "child",
     sidebarTriggerOwner: "page-frame",
     breadcrumb: "Triggers",
     title: "Triggers",
     description: "Manage triggers.",
   },
-  automationsNew: {
+  triggersNew: {
     appShellInsetOwner: "child",
     appShellViewportMode: "workspace",
     sidebarTriggerOwner: "page-frame",
@@ -276,18 +276,11 @@ export const ROUTE_HANDLES = {
     title: "Create trigger",
     description: "",
   },
-  automationsDetail: {
+  triggersDetail: {
     appShellInsetOwner: "child",
     sidebarTriggerOwner: "page-frame",
-    breadcrumb: resolveAutomationDetailBreadcrumb,
+    breadcrumb: resolveTriggerDetailBreadcrumb,
     pageBreadcrumbVisible: true,
-    title: "",
-    description: "",
-  },
-  scheduledAutomationsDetail: {
-    appShellInsetOwner: "child",
-    sidebarTriggerOwner: "page-frame",
-    breadcrumb: resolveAutomationDetailBreadcrumb,
     title: "",
     description: "",
   },

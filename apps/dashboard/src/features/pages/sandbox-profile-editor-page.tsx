@@ -109,7 +109,6 @@ import {
   SetupScriptTimingDescription,
 } from "./sandbox-base-inventory-copy.js";
 import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
-import { SandboxProfileAutomationsSection } from "./sandbox-profile-automations-section.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -165,6 +164,7 @@ import {
   resolveSnapshotPanelState,
   type SnapshotPanelState,
 } from "./sandbox-profile-snapshot-panel.js";
+import { SandboxProfileTriggersSection } from "./sandbox-profile-triggers-section.js";
 import { SandboxSetupScriptEditor } from "./sandbox-setup-script-editor.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import {
@@ -191,7 +191,7 @@ type SandboxProfileEditorPageProps =
       mode: "edit";
     };
 
-type SandboxProfileEditorSectionId = "sandbox-profile" | "automations" | "snapshot";
+type SandboxProfileEditorSectionId = "sandbox-profile" | "triggers" | "snapshot";
 type SandboxProfileEditorNavigationState = {
   notice: "publish-success" | null;
 };
@@ -306,7 +306,7 @@ pnpm dev:bootstrap`;
 
 const SandboxProfileEditorSectionIds = {
   SANDBOX_PROFILE: "sandbox-profile",
-  AUTOMATIONS: "automations",
+  TRIGGERS: "triggers",
   SNAPSHOT: "snapshot",
 } satisfies Record<string, SandboxProfileEditorSectionId>;
 const PublishSuccessNavigationState: SandboxProfileEditorNavigationState = {
@@ -330,8 +330,8 @@ function createSandboxProfileSnapshotsPath(profileId: string): string {
   return `/sandbox-profiles/${profileId}/snapshots`;
 }
 
-function createSandboxProfileAutomationsPath(profileId: string): string {
-  return `/sandbox-profiles/${profileId}/automations`;
+function createSandboxProfileTriggersPath(profileId: string): string {
+  return `/sandbox-profiles/${profileId}/triggers`;
 }
 
 function pathnameMatchesPathOrChild(input: { basePath: string; pathname: string }): boolean {
@@ -347,8 +347,8 @@ function createSandboxProfileTabPath(input: {
     return createSandboxProfileSnapshotsPath(input.profileId);
   }
 
-  if (input.sectionId === SandboxProfileEditorSectionIds.AUTOMATIONS) {
-    return createSandboxProfileAutomationsPath(input.profileId);
+  if (input.sectionId === SandboxProfileEditorSectionIds.TRIGGERS) {
+    return createSandboxProfileTriggersPath(input.profileId);
   }
 
   return createSandboxProfileEditorPath({
@@ -404,11 +404,11 @@ function readSandboxProfileEditorSectionPathSegment(input: {
 
   if (
     pathnameMatchesPathOrChild({
-      basePath: createSandboxProfileAutomationsPath(input.profileId),
+      basePath: createSandboxProfileTriggersPath(input.profileId),
       pathname: input.pathname,
     })
   ) {
-    return SandboxProfileEditorSectionIds.AUTOMATIONS;
+    return SandboxProfileEditorSectionIds.TRIGGERS;
   }
 
   return null;
@@ -447,12 +447,12 @@ function readSandboxProfileEditorRoute(input: {
 
   if (
     pathnameMatchesPathOrChild({
-      basePath: createSandboxProfileAutomationsPath(input.profileId),
+      basePath: createSandboxProfileTriggersPath(input.profileId),
       pathname: input.pathname,
     })
   ) {
     return {
-      sectionId: SandboxProfileEditorSectionIds.AUTOMATIONS,
+      sectionId: SandboxProfileEditorSectionIds.TRIGGERS,
     };
   }
 
@@ -1317,7 +1317,7 @@ function ReadySandboxProfileEditorPage(input: {
   const [publishRequestIsPending, setPublishRequestIsPending] = useState(false);
   const [saveDraftRequestIsPending, setSaveDraftRequestIsPending] = useState(false);
   const [publishFlushError, setPublishFlushError] = useState<string | null>(null);
-  const [draftAutomationImpactAffectedAutomations, setDraftAutomationImpactAffectedAutomations] =
+  const [draftAutomationImpactAffectedTriggers, setDraftAutomationImpactAffectedTriggers] =
     useState<readonly SandboxProfileVersionDraftAutomationImpactAutomation[] | null>(null);
   const [draftAutomationImpactError, setDraftAutomationImpactError] = useState<string | null>(null);
   const [setupAssistantError, setSetupAssistantError] = useState<string | null>(null);
@@ -1618,7 +1618,7 @@ function ReadySandboxProfileEditorPage(input: {
 
   async function handleSaveDraft(): Promise<void> {
     setSaveDraftRequestIsPending(true);
-    setDraftAutomationImpactAffectedAutomations(null);
+    setDraftAutomationImpactAffectedTriggers(null);
     setDraftAutomationImpactError(null);
     try {
       const draftSaved = await saveDraftChanges();
@@ -1631,9 +1631,7 @@ function ReadySandboxProfileEditorPage(input: {
           profileId: input.profileId,
           version: input.mode.version,
         });
-        setDraftAutomationImpactAffectedAutomations(
-          getDraftAutomationImpactAffectedAutomations(impact),
-        );
+        setDraftAutomationImpactAffectedTriggers(getDraftAutomationImpactAffectedTriggers(impact));
       } catch {
         setDraftAutomationImpactError(DraftAutomationImpactCheckFailedMessage);
       }
@@ -1720,7 +1718,7 @@ function ReadySandboxProfileEditorPage(input: {
       saveDraftRequestIsPending={saveDraftRequestIsPending}
       draftSaveError={publishFlushError}
       draftAutomationImpactError={draftAutomationImpactError}
-      draftAutomationImpactAffectedAutomations={draftAutomationImpactAffectedAutomations}
+      draftAutomationImpactAffectedTriggers={draftAutomationImpactAffectedTriggers}
       onDraftAutomationImpactErrorDismiss={() => {
         setDraftAutomationImpactError(null);
       }}
@@ -2208,8 +2206,8 @@ function SandboxProfileEditorSectionPanels(input: {
   selectedAgentRuntimeId: SandboxProfileVersion["agentRuntimeId"];
   versionActionIsPending: boolean;
 }): React.JSX.Element {
-  if (input.activeSectionId === SandboxProfileEditorSectionIds.AUTOMATIONS) {
-    return <SandboxProfileAutomationsSection profileId={input.profileId} />;
+  if (input.activeSectionId === SandboxProfileEditorSectionIds.TRIGGERS) {
+    return <SandboxProfileTriggersSection profileId={input.profileId} />;
   }
 
   if (input.activeSectionId === SandboxProfileEditorSectionIds.SNAPSHOT) {
@@ -2479,7 +2477,7 @@ const SandboxProfileEditorTabs = [
     label: "Snapshots",
   },
   {
-    id: SandboxProfileEditorSectionIds.AUTOMATIONS,
+    id: SandboxProfileEditorSectionIds.TRIGGERS,
     label: "Triggers",
   },
 ] as const satisfies readonly SandboxProfileEditorSection<SandboxProfileEditorSectionId>[];
@@ -2488,7 +2486,7 @@ const DraftSaveErrorMessage = "Saving draft failed. Please try again later.";
 const DraftAutomationImpactCheckFailedMessage =
   "Couldn't check whether this draft affects related triggers.";
 
-function getDraftAutomationImpactAffectedAutomations(
+function getDraftAutomationImpactAffectedTriggers(
   impact: SandboxProfileVersionDraftAutomationImpact,
 ): readonly SandboxProfileVersionDraftAutomationImpactAutomation[] | null {
   if (!impact.hasBreakingChanges || impact.affectedAutomations.length === 0) {
@@ -2501,19 +2499,15 @@ function getDraftAutomationImpactAffectedAutomations(
 function getAutomationDetailPath(
   automation: SandboxProfileVersionDraftAutomationImpactAutomation,
 ): string {
-  if (automation.kind === "schedule") {
-    return `/automations/schedules/${automation.id}`;
-  }
-
-  return `/automations/${automation.id}`;
+  return `/triggers/${automation.id}`;
 }
 
 function DraftAutomationImpactAutomationList(input: {
-  automations: readonly SandboxProfileVersionDraftAutomationImpactAutomation[];
+  triggers: readonly SandboxProfileVersionDraftAutomationImpactAutomation[];
 }): ReactNode {
   return (
     <ul className="list-disc space-y-2 pl-5">
-      {input.automations.map((automation) => (
+      {input.triggers.map((automation) => (
         <li key={automation.id}>
           <TextLink
             className="font-medium text-amber-900 decoration-amber-900/35 hover:text-amber-950 dark:text-amber-100 dark:decoration-amber-100/35 dark:hover:text-amber-50"
@@ -2654,7 +2648,7 @@ export function SandboxProfileEditorView(input: {
   draftSaveError?: string | null;
   versionActionError: string | null;
   versionActionIsPending: boolean;
-  draftAutomationImpactAffectedAutomations:
+  draftAutomationImpactAffectedTriggers:
     | readonly SandboxProfileVersionDraftAutomationImpactAutomation[]
     | null;
   draftAutomationImpactError: string | null;
@@ -2776,13 +2770,13 @@ export function SandboxProfileEditorView(input: {
                 {input.draftSaveError === undefined || input.draftSaveError === null ? null : (
                   <Notice variant="alert">{input.draftSaveError}</Notice>
                 )}
-                {input.draftAutomationImpactAffectedAutomations === null ? null : (
+                {input.draftAutomationImpactAffectedTriggers === null ? null : (
                   <Notice
                     title="Publishing this draft will break the following triggers"
                     variant="warning"
                   >
                     <DraftAutomationImpactAutomationList
-                      automations={input.draftAutomationImpactAffectedAutomations}
+                      triggers={input.draftAutomationImpactAffectedTriggers}
                     />
                   </Notice>
                 )}

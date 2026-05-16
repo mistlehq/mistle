@@ -272,7 +272,7 @@ export function useLoadedScheduledAutomationEditorState(
       });
       await input.navigate(
         input.createSuccessPath === undefined
-          ? `/automations/schedules/${automation.id}`
+          ? `/triggers/${automation.id}`
           : input.createSuccessPath(automation),
       );
     },
@@ -342,7 +342,7 @@ export function useLoadedScheduledAutomationEditorState(
         queryClient,
         automationId: input.automationId,
       });
-      await input.navigate(input.deleteSuccessPath ?? "/automations");
+      await input.navigate(input.deleteSuccessPath ?? "/triggers");
     },
     onError: (error: unknown) => {
       setDeleteError(

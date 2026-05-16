@@ -1,7 +1,6 @@
 import { Button, Notice } from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import type { AutomationCreateSuccessPath } from "../automations/automation-editor-navigation.js";
@@ -16,43 +15,7 @@ import { useWebhookAutomationPrerequisites } from "../automations/use-webhook-au
 import { toWebhookAutomationFormValues } from "../automations/webhook-automation-form-helpers.js";
 import { WebhookAutomationForm } from "../automations/webhook-automation-form.js";
 import { getWebhookAutomation } from "../automations/webhook-automations-service.js";
-import { useAppPageBreadcrumbs } from "../navigation/app-breadcrumbs.js";
-import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageSection } from "../shared/form-page.js";
-import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
-
-type WebhookAutomationEditorPageProps = {
-  mode: "create" | "edit";
-};
-
-export function WebhookAutomationEditorPage(
-  input: WebhookAutomationEditorPageProps,
-): React.JSX.Element {
-  const pageMeta = useAppPageMeta();
-  const breadcrumbs = useAppPageBreadcrumbs();
-  const navigate = useNavigate();
-  const params = useParams();
-  const fallbackTitle = input.mode === "create" ? "Create trigger" : "Edit trigger";
-  const { title, description } = resolvePageFrameText(pageMeta, fallbackTitle);
-  if (input.mode === "create") {
-    return (
-      <PageFrame width="form" breadcrumbs={breadcrumbs} description={description} title={title}>
-        <CreateWebhookAutomationEditor navigate={navigate} />
-      </PageFrame>
-    );
-  }
-
-  const automationId = params["automationId"];
-  if (automationId === undefined) {
-    throw new Error("Trigger id is required.");
-  }
-
-  return (
-    <PageFrame width="form" breadcrumbs={breadcrumbs} description={description} title={title}>
-      <EditWebhookAutomationEditor automationId={automationId} navigate={navigate} />
-    </PageFrame>
-  );
-}
 
 function renderWebhookAutomationEditorError(input: {
   title: string;
@@ -90,7 +53,7 @@ export function CreateWebhookAutomationEditor(input: {
       title: "Could not load form",
       description: prerequisites.errorMessage,
       onBack: () => {
-        void input.navigate("/automations");
+        void input.navigate("/triggers");
       },
     });
   }
@@ -151,7 +114,7 @@ export function EditWebhookAutomationEditor(input: {
         fallbackMessage: prerequisites.errorMessage ?? "Could not load trigger.",
       }),
       onBack: () => {
-        void input.navigate(input.backPath ?? "/automations");
+        void input.navigate(input.backPath ?? "/triggers");
       },
     });
   }
@@ -179,7 +142,7 @@ export function EditWebhookAutomationEditor(input: {
         fallbackMessage: "Could not load trigger.",
       }),
       onBack: () => {
-        void input.navigate(input.backPath ?? "/automations");
+        void input.navigate(input.backPath ?? "/triggers");
       },
     });
   }

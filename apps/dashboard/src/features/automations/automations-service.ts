@@ -6,7 +6,12 @@ import {
   createAutomationsApiError,
   toAutomationsApiError,
 } from "./automations-api-errors.js";
-import { AutomationsListResultSchema, type AutomationsListResult } from "./automations-types.js";
+import {
+  AutomationListItemSchema,
+  type AutomationListItem,
+  AutomationsListResultSchema,
+  type AutomationsListResult,
+} from "./automations-types.js";
 
 async function readJsonWithSchema<T>(input: {
   response: Response;
@@ -65,6 +70,35 @@ export async function listAutomations(input: {
       operation: "listAutomations",
       error,
       fallbackMessage: "Could not load triggers.",
+    });
+  }
+}
+
+export async function getAutomation(input: {
+  automationId: string;
+  signal?: AbortSignal;
+}): Promise<AutomationListItem> {
+  try {
+    const response = await requestControlPlane({
+      operation: "getAutomation",
+      method: "GET",
+      pathname: `/v1/automations/${encodeURIComponent(input.automationId)}`,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not load trigger.",
+      errorFactory: createAutomationsApiError,
+    });
+
+    return await readJsonWithSchema({
+      response,
+      schema: AutomationListItemSchema,
+      operation: "getAutomation",
+      invalidMessage: "Trigger response payload is invalid.",
+    });
+  } catch (error) {
+    throw toAutomationsApiError({
+      operation: "getAutomation",
+      error,
+      fallbackMessage: "Could not load trigger.",
     });
   }
 }

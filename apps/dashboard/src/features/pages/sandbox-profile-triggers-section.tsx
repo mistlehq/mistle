@@ -22,7 +22,6 @@ import type { AutomationListItemViewModel } from "../automations/automation-list
 import { toAutomationListItemViewModel } from "../automations/automation-list-view-model.js";
 import { automationsListQueryKey } from "../automations/automations-query-keys.js";
 import { listAutomations } from "../automations/automations-service.js";
-import { getScheduledAutomation } from "../automations/scheduled-automations-service.js";
 import {
   resolveTriggerTemplateEventOptionIds,
   TriggerTemplates,
@@ -34,7 +33,6 @@ import {
   resolveEligibleProfileAutomationConnectionIds,
 } from "../automations/webhook-automation-option-builders.js";
 import type { WebhookAutomationEventOption } from "../automations/webhook-automation-trigger-types.js";
-import { getWebhookAutomation } from "../automations/webhook-automations-service.js";
 import { IntegrationLogo } from "../integrations/integration-logo.js";
 import type {
   IntegrationConnection,
@@ -56,8 +54,7 @@ import type {
 import { ActionTile } from "../shared/action-tile.js";
 import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
 import { TablePagination } from "../shared/table-pagination.js";
-import { EditScheduledAutomationEditor } from "./scheduled-automation-editor-page.js";
-import { EditWebhookAutomationEditor } from "./webhook-automation-editor-page.js";
+import { TriggerEditorContent } from "./trigger-editor-content.js";
 
 const ProfileAutomationsListLimit = 25;
 
@@ -80,7 +77,7 @@ function createAutomationCreatePath(profileId: string, templateId?: string): str
     searchParams.set("template", templateId);
   }
 
-  return `/automations/new?${searchParams.toString()}`;
+  return `/triggers/new?${searchParams.toString()}`;
 }
 
 function TriggerTemplateIcon(input: { template: TriggerTemplate }): React.JSX.Element | null {
@@ -331,86 +328,13 @@ function ProfileAutomationListRow(input: {
   );
 }
 
-type ProfileAutomationDetailResolution =
-  | {
-      kind: "schedule";
-    }
-  | {
-      kind: "webhook";
-    }
-  | {
-      kind: "not-found";
-    };
-
-async function resolveProfileAutomationDetail(input: {
-  automationId: string;
-  profileId: string;
-  signal?: AbortSignal;
-}): Promise<ProfileAutomationDetailResolution> {
-  const [scheduledResult, webhookResult] = await Promise.allSettled([
-    getScheduledAutomation({
-      automationId: input.automationId,
-      ...(input.signal === undefined ? {} : { signal: input.signal }),
-    }),
-    getWebhookAutomation({
-      automationId: input.automationId,
-      ...(input.signal === undefined ? {} : { signal: input.signal }),
-    }),
-  ]);
-
-  if (
-    scheduledResult.status === "fulfilled" &&
-    scheduledResult.value.target.sandboxProfileId === input.profileId
-  ) {
-    return {
-      kind: "schedule",
-    };
-  }
-
-  if (
-    webhookResult.status === "fulfilled" &&
-    webhookResult.value.target.sandboxProfileId === input.profileId
-  ) {
-    return {
-      kind: "webhook",
-    };
-  }
-
-  if (scheduledResult.status === "rejected" && webhookResult.status === "rejected") {
-    throw scheduledResult.reason;
-  }
-
-  return {
-    kind: "not-found",
-  };
-}
-
-function ProfileAutomationDetail(input: {
-  profileId: string;
-  selectedAutomation: AutomationListItemViewModel | null;
-}): React.JSX.Element {
+function ProfileAutomationDetail(input: { profileId: string }): React.JSX.Element {
   const navigate = useNavigate();
   const params = useParams();
-  const automationId = params["automationId"];
+  const triggerId = params["triggerId"];
   const backPath = createProfileAutomationsPath(input.profileId);
-  const detailResolutionQuery = useQuery({
-    queryKey: ["sandbox-profile-automation-detail-resolution", input.profileId, automationId],
-    queryFn: async ({ signal }) => {
-      if (automationId === undefined) {
-        throw new Error("Trigger id is required.");
-      }
 
-      return resolveProfileAutomationDetail({
-        automationId,
-        profileId: input.profileId,
-        signal,
-      });
-    },
-    enabled: automationId !== undefined && input.selectedAutomation === null,
-    retry: false,
-  });
-
-  if (automationId === undefined) {
+  if (triggerId === undefined) {
     return (
       <div className="flex min-h-64 items-center justify-center p-6 text-center text-sm text-muted-foreground">
         Select a trigger to view and edit it.
@@ -418,83 +342,25 @@ function ProfileAutomationDetail(input: {
     );
   }
 
-  const selectedAutomationKind =
-    input.selectedAutomation?.kind ?? detailResolutionQuery.data?.kind ?? null;
-
-  if (detailResolutionQuery.isPending && input.selectedAutomation === null) {
-    return <div className="min-h-64" />;
-  }
-
-  if (detailResolutionQuery.isError && input.selectedAutomation === null) {
-    return (
-      <div className="flex min-h-64 flex-col items-center justify-center gap-4 p-6 text-center">
-        <Notice title="Could not load trigger" variant="alert">
-          {resolveApiErrorMessage({
-            error: detailResolutionQuery.error,
-            fallbackMessage: "Could not load trigger.",
-          })}
-        </Notice>
-        <Button
-          onClick={() => {
-            void navigate(backPath);
-          }}
-          type="button"
-          variant="outline"
-        >
-          Back to triggers
-        </Button>
-      </div>
-    );
-  }
-
-  if (selectedAutomationKind === null || selectedAutomationKind === "not-found") {
-    return (
-      <div className="flex min-h-64 flex-col items-center justify-center gap-4 p-6 text-center">
-        <Notice title="Trigger not found for this sandbox profile" variant="alert">
-          The selected trigger is not available for this sandbox profile.
-        </Notice>
-        <Button
-          onClick={() => {
-            void navigate(backPath);
-          }}
-          type="button"
-          variant="outline"
-        >
-          Back to triggers
-        </Button>
-      </div>
-    );
-  }
-
-  if (selectedAutomationKind === "schedule") {
-    return (
-      <EditScheduledAutomationEditor
-        automationId={automationId}
-        backPath={backPath}
-        deleteSuccessPath={backPath}
-        navigate={navigate}
-      />
-    );
-  }
-
   return (
-    <EditWebhookAutomationEditor
-      automationId={automationId}
+    <TriggerEditorContent
+      triggerId={triggerId}
       backPath={backPath}
       deleteSuccessPath={backPath}
       navigate={navigate}
+      requiredSandboxProfileId={input.profileId}
     />
   );
 }
 
-export function SandboxProfileAutomationsSection(input: { profileId: string }): React.JSX.Element {
+export function SandboxProfileTriggersSection(input: { profileId: string }): React.JSX.Element {
   const navigate = useNavigate();
   const params = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isMobileAutomationSelectOpen, setIsMobileAutomationSelectOpen] = useState(false);
   const { after, before } = readKeysetPaginationCursors(searchParams);
-  const automationId = params["automationId"];
-  const shouldLoadTemplates = automationId === undefined;
+  const triggerId = params["triggerId"];
+  const shouldLoadTemplates = triggerId === undefined;
   const automationsQuery = useQuery({
     queryKey: automationsListQueryKey({
       limit: ProfileAutomationsListLimit,
@@ -551,7 +417,7 @@ export function SandboxProfileAutomationsSection(input: { profileId: string }): 
 
   const items = automationsQuery.data?.items.map(toAutomationListItemViewModel) ?? [];
   const selectedAutomation =
-    automationId === undefined ? null : (items.find((item) => item.id === automationId) ?? null);
+    triggerId === undefined ? null : (items.find((item) => item.id === triggerId) ?? null);
   const errorMessage = automationsQuery.isError
     ? resolveApiErrorMessage({
         error: automationsQuery.error,
@@ -620,7 +486,7 @@ export function SandboxProfileAutomationsSection(input: { profileId: string }): 
     void navigate(
       createProfileAutomationDetailPath({
         profileId: input.profileId,
-        automationId: item.id,
+        triggerId: item.id,
         searchParams,
       }),
     );
@@ -754,14 +620,14 @@ export function SandboxProfileAutomationsSection(input: { profileId: string }): 
                   onSelect={() => {
                     selectAutomation(item);
                   }}
-                  selected={item.id === automationId}
+                  selected={item.id === triggerId}
                 />
               ))}
           {renderDesktopPagination()}
         </nav>
         <div aria-hidden className="hidden bg-border md:block" />
         <div className="min-w-0 md:pl-8">
-          {automationId === undefined && !automationsQuery.isPending && errorMessage === null ? (
+          {triggerId === undefined && !automationsQuery.isPending && errorMessage === null ? (
             <TriggerTemplateList
               errorMessage={templateErrorMessage}
               isPending={templatesPending}
@@ -769,10 +635,7 @@ export function SandboxProfileAutomationsSection(input: { profileId: string }): 
               templates={triggerTemplateAvailability}
             />
           ) : (
-            <ProfileAutomationDetail
-              profileId={input.profileId}
-              selectedAutomation={selectedAutomation}
-            />
+            <ProfileAutomationDetail profileId={input.profileId} />
           )}
         </div>
       </div>

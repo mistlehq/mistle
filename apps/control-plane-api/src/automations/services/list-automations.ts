@@ -4,7 +4,7 @@ import {
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import type { AutomationKind, ControlPlaneDatabase } from "@mistle/db/control-plane";
-import { BadRequestError } from "@mistle/http/errors.js";
+import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
 import {
   createKeysetPaginationQuerySchema,
@@ -53,6 +53,11 @@ export type ListAutomationsInput = {
   after?: string | undefined;
   before?: string | undefined;
   sandboxProfileId?: string | undefined;
+};
+
+export type GetAutomationInput = {
+  organizationId: string;
+  automationId: string;
 };
 
 type AutomationListIssue = {
@@ -656,6 +661,7 @@ async function loadAutomationListPageItems(input: {
 function buildListableAutomationWhereClause(input: {
   tables: ControlPlaneTables;
   organizationId: string;
+  automationId?: string | undefined;
   sandboxProfileId?: string | undefined;
   cursor?: z.infer<typeof CursorSchema> | undefined;
   direction?: (typeof KeysetPaginationDirections)[keyof typeof KeysetPaginationDirections];
@@ -663,6 +669,7 @@ function buildListableAutomationWhereClause(input: {
   const { tables } = input;
   const organizationScope = and(
     eq(tables.automations.organizationId, input.organizationId),
+    input.automationId === undefined ? undefined : eq(tables.automations.id, input.automationId),
     or(
       eq(tables.automations.kind, AutomationKinds.WEBHOOK),
       and(
@@ -706,6 +713,40 @@ function buildListableAutomationWhereClause(input: {
       ),
     ),
   );
+}
+
+async function loadAutomationPageReferenceById(input: {
+  db: ControlPlaneDatabase;
+  organizationId: string;
+  automationId: string;
+}): Promise<AutomationPageReference | null> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+  const [automation] = await input.db
+    .select({
+      id: tables.automations.id,
+      kind: tables.automations.kind,
+      createdAt: tables.automations.createdAt,
+    })
+    .from(tables.automations)
+    .leftJoin(
+      tables.scheduleAutomations,
+      eq(tables.scheduleAutomations.automationId, tables.automations.id),
+    )
+    .leftJoin(tables.schedules, eq(tables.schedules.id, tables.scheduleAutomations.scheduleId))
+    .innerJoin(
+      tables.automationTargets,
+      eq(tables.automationTargets.automationId, tables.automations.id),
+    )
+    .where(
+      buildListableAutomationWhereClause({
+        tables,
+        organizationId: input.organizationId,
+        automationId: input.automationId,
+      }),
+    )
+    .limit(1);
+
+  return automation ?? null;
 }
 
 async function listAutomationPageReferences(input: {
@@ -879,4 +920,32 @@ export async function listAutomations(
 
     throw error;
   }
+}
+
+export async function getAutomation(
+  ctx: { db: ControlPlaneDatabase },
+  input: GetAutomationInput,
+): Promise<AutomationListItem> {
+  const automationReference = await loadAutomationPageReferenceById({
+    db: ctx.db,
+    organizationId: input.organizationId,
+    automationId: input.automationId,
+  });
+
+  if (automationReference === null) {
+    throw new NotFoundError("NOT_FOUND", "Automation was not found.");
+  }
+
+  const [automation] = await loadAutomationListPageItems({
+    db: ctx.db,
+    organizationId: input.organizationId,
+    automations: [automationReference],
+  });
+
+  if (automation === undefined) {
+    throw new Error(`Automation '${input.automationId}' could not be loaded.`);
+  }
+
+  const { createdAt: _createdAt, ...item } = automation;
+  return item;
 }

@@ -12,22 +12,22 @@ import { CollectionEmptyState } from "../shared/collection-empty-state.js";
 import { PageFrame } from "../shared/page-frame.js";
 import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
 
-const AUTOMATIONS_LIST_LIMIT = 25;
+const TRIGGERS_LIST_LIMIT = 25;
 
-export function AutomationsPage(): React.JSX.Element {
+export function TriggersPage(): React.JSX.Element {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { after, before } = readKeysetPaginationCursors(searchParams);
 
   const automationsQuery = useQuery({
     queryKey: automationsListQueryKey({
-      limit: AUTOMATIONS_LIST_LIMIT,
+      limit: TRIGGERS_LIST_LIMIT,
       after,
       before,
     }),
     queryFn: async ({ signal }) =>
       listAutomations({
-        limit: AUTOMATIONS_LIST_LIMIT,
+        limit: TRIGGERS_LIST_LIMIT,
         after,
         before,
         signal,
@@ -56,7 +56,7 @@ export function AutomationsPage(): React.JSX.Element {
   }
 
   function createTrigger(): void {
-    void navigate("/automations/new");
+    void navigate("/triggers/new");
   }
 
   const canShowSummary = automationsQuery.data !== undefined && !automationsQuery.isError;
@@ -101,12 +101,7 @@ export function AutomationsPage(): React.JSX.Element {
             });
           }}
           onOpenAutomation={(automation) => {
-            if (automation.kind === "schedule") {
-              void navigate(`/automations/schedules/${automation.id}`);
-              return;
-            }
-
-            void navigate(`/automations/${automation.id}`);
+            void navigate(`/triggers/${automation.id}`);
           }}
           onPreviousPage={() => {
             const previousPage = automationsQuery.data?.previousPage;

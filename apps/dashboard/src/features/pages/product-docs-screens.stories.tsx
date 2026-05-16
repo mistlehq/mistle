@@ -49,17 +49,17 @@ import {
   SlackNotLinkedCard,
 } from "./profile-settings-page-view.story-fixtures.js";
 import {
-  ProfileAutomations,
-  SandboxProfileAutomationsStory,
-  SelectedScheduleAutomationId,
-} from "./sandbox-profile-editor-automations.stories.js";
-import {
   DefaultSandboxProfileEditorStoryArgs,
   SandboxProfileEditorPageStory,
   StoryBindings,
   StoryAnthropicConnection,
   StoryOpenCodeGoConnection,
 } from "./sandbox-profile-editor-story-support.js";
+import {
+  ProfileAutomations,
+  SandboxProfileTriggersStory,
+  SelectedScheduleAutomationId,
+} from "./sandbox-profile-editor-triggers.stories.js";
 import { SessionConversationBottomPanel } from "./session-conversation-pane.js";
 import {
   buildPendingSessionDiffCommentSummaryLabel,
@@ -595,11 +595,11 @@ function SandboxProfileSnapshotReadyStory(): React.JSX.Element {
   );
 }
 
-function SandboxProfileAutomationsStoryForDocs(): React.JSX.Element {
+function SandboxProfileTriggersStoryForDocs(): React.JSX.Element {
   return (
     <DocsProductScreen>
       <div className="mx-auto max-w-6xl px-6 py-8">
-        <SandboxProfileAutomationsStory
+        <SandboxProfileTriggersStory
           automations={ProfileAutomations}
           selectedAutomationId={SelectedScheduleAutomationId}
         />
@@ -745,7 +745,7 @@ export const SandboxProfileSnapshotReady: Story = {
 };
 
 export const SandboxProfileTriggers: Story = {
-  render: SandboxProfileAutomationsStoryForDocs,
+  render: SandboxProfileTriggersStoryForDocs,
 };
 
 export const NewSessionCreation: Story = {

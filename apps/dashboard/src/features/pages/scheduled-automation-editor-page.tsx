@@ -1,7 +1,6 @@
 import { Button, Notice } from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import type { AutomationCreateSuccessPath } from "../automations/automation-editor-navigation.js";
@@ -13,43 +12,7 @@ import { ScheduledAutomationForm } from "../automations/scheduled-automation-for
 import { getScheduledAutomation } from "../automations/scheduled-automations-service.js";
 import { useAutomationSandboxProfileOptions } from "../automations/use-automation-sandbox-profile-options.js";
 import { useLoadedScheduledAutomationEditorState } from "../automations/use-scheduled-automation-editor-state.js";
-import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageSection } from "../shared/form-page.js";
-import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
-
-type ScheduledAutomationEditorPageProps = {
-  mode: "create" | "edit";
-};
-
-export function ScheduledAutomationEditorPage(
-  input: ScheduledAutomationEditorPageProps,
-): React.JSX.Element {
-  const pageMeta = useAppPageMeta();
-  const navigate = useNavigate();
-  const params = useParams();
-  const fallbackTitle =
-    input.mode === "create" ? "Create scheduled trigger" : "Edit scheduled trigger";
-  const { title, description } = resolvePageFrameText(pageMeta, fallbackTitle);
-
-  if (input.mode === "create") {
-    return (
-      <PageFrame description={description} title={title} width="form">
-        <CreateScheduledAutomationEditor navigate={navigate} />
-      </PageFrame>
-    );
-  }
-
-  const automationId = params["automationId"];
-  if (automationId === undefined) {
-    throw new Error("Trigger id is required.");
-  }
-
-  return (
-    <PageFrame description={description} title={title} width="form">
-      <EditScheduledAutomationEditor automationId={automationId} navigate={navigate} />
-    </PageFrame>
-  );
-}
 
 function renderScheduledAutomationEditorError(input: {
   title: string;
@@ -85,7 +48,7 @@ export function CreateScheduledAutomationEditor(input: {
       title: "Could not load form",
       description: prerequisites.errorMessage,
       onBack: () => {
-        void input.navigate("/automations");
+        void input.navigate("/triggers");
       },
     });
   }
@@ -138,7 +101,7 @@ export function EditScheduledAutomationEditor(input: {
         fallbackMessage: prerequisites.errorMessage ?? "Could not load trigger.",
       }),
       onBack: () => {
-        void input.navigate(input.backPath ?? "/automations");
+        void input.navigate(input.backPath ?? "/triggers");
       },
     });
   }
