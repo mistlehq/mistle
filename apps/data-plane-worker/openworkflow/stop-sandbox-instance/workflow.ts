@@ -3,8 +3,13 @@ import {
   type StopSandboxInstanceWorkflowInput,
   type StopSandboxInstanceWorkflowOutput,
 } from "@mistle/workflow-registry/data-plane";
+import { shouldRethrowDurableStepErrorForRetry } from "@mistle/workflow-registry/durable-step-retry.js";
 import { trace } from "@opentelemetry/api";
 
+import {
+  SandboxBootstrapAttachmentTerminateOutcomes,
+  type TerminateSandboxBootstrapAttachmentResult,
+} from "../../runtime-state/sandbox-bootstrap-attachment-terminator.js";
 import { getWorkflowContext } from "../core/context.js";
 import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
 import { createWorkerSandboxLifecycleEventRecorder } from "../shared/sandbox-operation-events.js";
@@ -51,6 +56,80 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
     });
 
     let result: StopSandboxInstanceResult;
+    function rethrowDurableStepErrorForRetry(error: unknown): void {
+      if (shouldRethrowDurableStepErrorForRetry(error)) {
+        logger.warn(
+          {
+            eventName: "sandbox_instance.stop_step_retry",
+            sandboxInstanceId: input.sandboxInstanceId,
+            err: error,
+          },
+          "Retrying sandbox stop workflow after durable step failure.",
+        );
+        throw error;
+      }
+    }
+
+    async function terminateBootstrapAttachmentStep(
+      stopResult: StopSandboxInstanceResult,
+    ): Promise<TerminateSandboxBootstrapAttachmentResult | undefined> {
+      const target = stopResult.bootstrapAttachmentTerminationTarget;
+      if (target === undefined) {
+        return undefined;
+      }
+
+      try {
+        const terminateResult = await step.run(
+          { name: "terminate-bootstrap-attachment" },
+          async () => {
+            return ctx.bootstrapAttachmentTerminator.terminate({
+              sandboxInstanceId: input.sandboxInstanceId,
+              expectedOwnerLeaseId: target.expectedOwnerLeaseId,
+              expectedSessionId: target.expectedSessionId,
+            });
+          },
+        );
+
+        if (
+          terminateResult.outcome === SandboxBootstrapAttachmentTerminateOutcomes.FENCE_MISMATCH
+        ) {
+          logger.info(
+            {
+              sandboxInstanceId: input.sandboxInstanceId,
+              expectedOwnerLeaseId: target.expectedOwnerLeaseId,
+              expectedSessionId: target.expectedSessionId,
+              outcome: terminateResult.outcome,
+            },
+            "Skipped stale sandbox bootstrap attachment termination.",
+          );
+          return terminateResult;
+        }
+
+        logger.info(
+          {
+            sandboxInstanceId: input.sandboxInstanceId,
+            expectedOwnerLeaseId: target.expectedOwnerLeaseId,
+            expectedSessionId: target.expectedSessionId,
+            outcome: terminateResult.outcome,
+          },
+          "Terminated sandbox bootstrap attachment after stop.",
+        );
+        return terminateResult;
+      } catch (error) {
+        rethrowDurableStepErrorForRetry(error);
+        await operationEvents.record({
+          attributes: {
+            error: formatLifecycleEventError(error),
+            stopReason: input.stopReason,
+          },
+          message: "Sandbox bootstrap attachment termination failed.",
+          phase: "stop",
+          status: "failed",
+        });
+        throw error;
+      }
+    }
+
     try {
       result = await step.run({ name: "stop-sandbox-instance" }, async () => {
         return stopSandboxInstance(
@@ -71,6 +150,7 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         );
       });
     } catch (error) {
+      rethrowDurableStepErrorForRetry(error);
       await operationEvents.record({
         attributes: {
           error: formatLifecycleEventError(error),
@@ -83,11 +163,16 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       throw error;
     }
 
+    const terminationResult = await terminateBootstrapAttachmentStep(result);
+
     await operationEvents.record({
       attributes: {
         executed: result.executed,
         outcome: result.outcome,
         stopReason: input.stopReason,
+        ...(terminationResult === undefined
+          ? {}
+          : { bootstrapAttachmentTerminationOutcome: terminationResult.outcome }),
       },
       message: resolveStopCompletedMessage(result),
       phase: "stop",
@@ -106,6 +191,9 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         stopReason: input.stopReason,
         executed: result.executed,
         outcome: result.outcome,
+        ...(terminationResult === undefined
+          ? {}
+          : { bootstrapAttachmentTerminationOutcome: terminationResult.outcome }),
       },
       "Handled sandbox instance stop workflow.",
     );

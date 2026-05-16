@@ -36,6 +36,11 @@ type RunningSandboxInstanceStopState = {
   providerSandboxId: string;
 };
 
+export type BootstrapAttachmentTerminationTarget = {
+  expectedOwnerLeaseId: string;
+  expectedSessionId: string;
+};
+
 export type StopSandboxInstanceOutcome =
   | "stopped"
   | "already_stopped"
@@ -46,6 +51,7 @@ export type StopSandboxInstanceOutcome =
 export type StopSandboxInstanceResult = {
   executed: boolean;
   outcome: StopSandboxInstanceOutcome;
+  bootstrapAttachmentTerminationTarget?: BootstrapAttachmentTerminationTarget;
 };
 
 function includeExpectedOwnerLeaseId(input: { expectedOwnerLeaseId: string | undefined }): {
@@ -153,6 +159,44 @@ async function isSandboxStopStillPermitted(ctx: {
   });
 }
 
+function resolveBootstrapAttachmentTerminationTarget(
+  snapshot: SandboxRuntimeStateSnapshot,
+): BootstrapAttachmentTerminationTarget | undefined {
+  if (snapshot.attachment === null) {
+    return undefined;
+  }
+
+  return {
+    expectedOwnerLeaseId: snapshot.attachment.ownerLeaseId,
+    expectedSessionId: snapshot.attachment.sessionId,
+  };
+}
+
+async function readSandboxStopPermission(ctx: {
+  runtimeStateReader: SandboxRuntimeStateReader;
+  clock: Clock;
+  sandboxInstanceId: string;
+  stopReason: SandboxStopReason;
+  expectedOwnerLeaseId?: string;
+}): Promise<{
+  permitted: boolean;
+  snapshot: SandboxRuntimeStateSnapshot;
+}> {
+  const snapshot = await ctx.runtimeStateReader.readSnapshot({
+    sandboxInstanceId: ctx.sandboxInstanceId,
+    nowMs: ctx.clock.nowMs(),
+  });
+
+  return {
+    permitted: shouldExecuteSandboxStop({
+      stopReason: ctx.stopReason,
+      snapshot,
+      ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: ctx.expectedOwnerLeaseId }),
+    }),
+    snapshot,
+  };
+}
+
 export function isUserStopSupportedPurpose(purpose: SandboxInstancePurpose): boolean {
   return (
     purpose === SandboxInstancePurposes.SETUP_ASSISTANT ||
@@ -192,20 +236,22 @@ export async function stopSandboxInstance(
     expectedOwnerLeaseId?: string;
   },
 ): Promise<StopSandboxInstanceResult> {
-  if (
-    !(await isSandboxStopStillPermitted({
-      runtimeStateReader: ctx.runtimeStateReader,
-      clock: ctx.clock,
-      sandboxInstanceId: input.sandboxInstanceId,
-      stopReason: input.stopReason,
-      ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
-    }))
-  ) {
+  const initialPermission = await readSandboxStopPermission({
+    runtimeStateReader: ctx.runtimeStateReader,
+    clock: ctx.clock,
+    sandboxInstanceId: input.sandboxInstanceId,
+    stopReason: input.stopReason,
+    ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
+  });
+  if (!initialPermission.permitted) {
     return {
       executed: false,
       outcome: "runtime_state_fence_before_load",
     };
   }
+  let bootstrapAttachmentTerminationTarget = resolveBootstrapAttachmentTerminationTarget(
+    initialPermission.snapshot,
+  );
 
   const sandboxInstanceState = await resolveRunningSandboxInstanceStopState({
     db: ctx.db,
@@ -216,6 +262,9 @@ export async function stopSandboxInstance(
     return {
       executed: false,
       outcome: "already_stopped",
+      ...(bootstrapAttachmentTerminationTarget === undefined
+        ? {}
+        : { bootstrapAttachmentTerminationTarget }),
     };
   }
 
@@ -225,20 +274,22 @@ export async function stopSandboxInstance(
     purpose: sandboxInstanceState.purpose,
   });
 
-  if (
-    !(await isSandboxStopStillPermitted({
-      runtimeStateReader: ctx.runtimeStateReader,
-      clock: ctx.clock,
-      sandboxInstanceId: input.sandboxInstanceId,
-      stopReason: input.stopReason,
-      ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
-    }))
-  ) {
+  const beforeStopPermission = await readSandboxStopPermission({
+    runtimeStateReader: ctx.runtimeStateReader,
+    clock: ctx.clock,
+    sandboxInstanceId: input.sandboxInstanceId,
+    stopReason: input.stopReason,
+    ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
+  });
+  if (!beforeStopPermission.permitted) {
     return {
       executed: false,
       outcome: "runtime_state_fence_before_stop",
     };
   }
+  bootstrapAttachmentTerminationTarget = resolveBootstrapAttachmentTerminationTarget(
+    beforeStopPermission.snapshot,
+  );
 
   const resolvedRuntime = await ctx.sandboxRuntimeProviderResolver.resolve(
     createResolveSandboxRuntimeInput(sandboxInstanceState),
@@ -292,11 +343,17 @@ export async function stopSandboxInstance(
     return {
       executed: false,
       outcome: "already_stopped",
+      ...(bootstrapAttachmentTerminationTarget === undefined
+        ? {}
+        : { bootstrapAttachmentTerminationTarget }),
     };
   }
 
   return {
     executed: true,
     outcome: "stopped",
+    ...(bootstrapAttachmentTerminationTarget === undefined
+      ? {}
+      : { bootstrapAttachmentTerminationTarget }),
   };
 }

@@ -13,7 +13,9 @@ import { systemClock, systemSleeper, type Clock, type Sleeper } from "@mistle/ti
 import { Pool } from "pg";
 
 import { logger } from "../../logger.js";
+import { createSandboxBootstrapAttachmentTerminator } from "../../runtime-state/create-sandbox-bootstrap-attachment-terminator.js";
 import { createSandboxRuntimeStateReader } from "../../runtime-state/create-sandbox-runtime-state-reader.js";
+import type { SandboxBootstrapAttachmentTerminator } from "../../runtime-state/sandbox-bootstrap-attachment-terminator.js";
 import type { SandboxRuntimeStateReader } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import { createDataPlaneWorkerRuntimeConfig, type DataPlaneWorkerRuntimeConfig } from "./config.js";
 import { readServiceReleaseVersion } from "./release-version.js";
@@ -40,6 +42,7 @@ export type WorkflowContext = {
   sandboxRuntimeProviderResolver: SandboxRuntimeProviderResolver;
   sandboxdArtifactResolver: SandboxdArtifactResolver | undefined;
   runtimeStateReader: SandboxRuntimeStateReader;
+  bootstrapAttachmentTerminator: SandboxBootstrapAttachmentTerminator;
   controlPlaneInternalClient: ControlPlaneInternalClient;
   tunnelReadinessPolicy: {
     timeoutMs: number;
@@ -128,6 +131,18 @@ async function createWorkflowContext(input?: {
             testEnvironmentId: testIsolation.testEnvironmentId,
             testEnvironmentIdHeader: testIsolation.testEnvironmentIdHeader,
           });
+    const bootstrapAttachmentTerminator =
+      testIsolation === undefined
+        ? createSandboxBootstrapAttachmentTerminator({
+            gatewayBaseUrl: workerConfig.runtimeState.gatewayBaseUrl,
+            serviceToken: workerConfig.internalAuth.serviceToken,
+          })
+        : createSandboxBootstrapAttachmentTerminator({
+            gatewayBaseUrl: workerConfig.runtimeState.gatewayBaseUrl,
+            serviceToken: workerConfig.internalAuth.serviceToken,
+            testEnvironmentId: testIsolation.testEnvironmentId,
+            testEnvironmentIdHeader: testIsolation.testEnvironmentIdHeader,
+          });
 
     return {
       context: {
@@ -148,6 +163,7 @@ async function createWorkflowContext(input?: {
               })
             : undefined,
         runtimeStateReader,
+        bootstrapAttachmentTerminator,
         controlPlaneInternalClient,
         tunnelReadinessPolicy: createDefaultTunnelReadinessPolicy(),
         clock: systemClock,
