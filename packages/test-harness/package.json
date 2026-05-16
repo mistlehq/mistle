@@ -39,6 +39,7 @@
     "@mistle/sandbox": "workspace:*",
     "@mistle/telemetry": "workspace:*",
     "@mistle/time": "workspace:*",
+    "@nats-io/transport-node": "^3.4.0",
     "@testcontainers/postgresql": "^11.13.0",
     "mailpit-api": "^1.9.0",
     "openworkflow": "0.9.0",

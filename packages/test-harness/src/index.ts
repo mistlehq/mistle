@@ -1,5 +1,6 @@
 export * from "./services/mailpit/index.js";
 export * from "./services/http-echo/index.js";
+export * from "./services/nats/index.js";
 export * from "./services/postgres/index.js";
 export * from "./services/seaweedfs/index.js";
 export * from "./services/valkey/index.js";

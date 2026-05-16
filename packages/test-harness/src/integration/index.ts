@@ -18,6 +18,7 @@ import type {
   TestServiceSelection,
 } from "../environment/types.js";
 import type { IntegrationTestEnvironment } from "./environment.js";
+import { createAliasedServiceDefinition } from "./service-alias.js";
 import type { IntegrationServiceOptions } from "./services/options.js";
 import { ServiceIds, type ServiceId } from "./services/service-ids.js";
 import {
@@ -30,7 +31,7 @@ export { TestEnvironmentIdHeader };
 export type { IntegrationAuthenticatedSession, IntegrationAuth } from "./auth.js";
 export type { IntegrationTestEnvironment } from "./environment.js";
 
-type MistleTestExtraInfraId = "mailpit" | "otlp" | "seaweedfs";
+type MistleTestExtraInfraId = "mailpit" | "nats" | "otlp" | "seaweedfs";
 
 type ServiceAttachableInfraId =
   | MistleTestExtraInfraId
@@ -40,6 +41,7 @@ type ServiceAttachableInfraId =
 type IntegrationServiceSelection =
   | ServiceId
   | {
+      id?: string;
       service: ServiceId;
       mode: TestServiceLaunchMode;
     };
@@ -53,7 +55,7 @@ type CreateIntegrationTestInput = {
   __dangerouslyIsolatedServices?: DangerouslyIsolatedTestRegistry;
   __internalInfra?: readonly TestInfraRequirement[];
   __afterStart?: (input: {
-    environment: TestEnvironment<ServiceId>;
+    environment: TestEnvironment<string>;
     integrationEnvironment: IntegrationTestEnvironment;
   }) => Promise<void | (() => Promise<void>)>;
   __serviceOptions?:
@@ -78,7 +80,9 @@ function formatSelectedServices(selectionsInput: readonly IntegrationServiceSele
         return selection;
       }
 
-      return `${selection.service}:${selection.mode}`;
+      return selection.id === undefined
+        ? `${selection.service}:${selection.mode}`
+        : `${selection.id}=${selection.service}:${selection.mode}`;
     })
     .join(", ");
 }
@@ -98,14 +102,15 @@ export function createIntegrationTest(input: CreateIntegrationTestInput) {
       async ({}, use) => {
         writeIntegrationTimingEvent("env fixture start", `services=${selectedServices}`);
         const setupStartedAt = Date.now();
-        const registry = await registryFor(input);
+        const environmentDefinition = await environmentDefinitionFor(input);
         const services = selections({
-          registry,
+          registry: environmentDefinition.registry,
           selections: input.services,
         });
         const environment = await startTestEnvironment({
-          registry,
+          registry: environmentDefinition.registry,
           services,
+          extraInfra: environmentDefinition.extraInfra,
         });
         const { createIntegrationEnvironment } = await import("./environment.js");
         const integrationEnvironment = createIntegrationEnvironment({
@@ -176,8 +181,15 @@ function readCallerFromStack(): string {
   return "unknown";
 }
 
-async function registryFor(input: CreateIntegrationTestInput): Promise<TestServiceRegistry> {
-  const serviceEntries = await loadSelectedServices(input.services);
+type IntegrationEnvironmentDefinition = {
+  registry: TestServiceRegistry;
+  extraInfra: readonly TestInfraRequirement[];
+};
+
+async function environmentDefinitionFor(
+  input: CreateIntegrationTestInput,
+): Promise<IntegrationEnvironmentDefinition> {
+  const serviceEntries = await loadSelectedServiceInstances(input.services);
   const { createTestExtraInfra, createTestRegistry } =
     await import("../environment/service-catalog.js");
   const serviceCatalog = createTestRegistry();
@@ -200,7 +212,7 @@ async function registryFor(input: CreateIntegrationTestInput): Promise<TestServi
     if (catalogService === undefined) {
       throw new Error(`Unknown integration test service '${entry.serviceId}'.`);
     }
-    services[entry.serviceId] = entry.service(
+    const serviceDefinition = entry.service(
       [
         ...catalogService.infra,
         ...extraInfraForService({
@@ -223,16 +235,27 @@ async function registryFor(input: CreateIntegrationTestInput): Promise<TestServi
             }),
       },
     );
+    services[entry.registryId] =
+      entry.registryId === entry.serviceId
+        ? serviceDefinition
+        : createAliasedServiceDefinition({
+            registryId: entry.registryId,
+            serviceId: entry.serviceId,
+            service: serviceDefinition,
+          });
   }
 
-  return createServiceRegistry({
-    services,
-    ...(input.__dangerouslyIsolatedServices === undefined
-      ? {}
-      : {
-          __dangerouslyIsolatedServices: input.__dangerouslyIsolatedServices,
-        }),
-  });
+  return {
+    registry: createServiceRegistry({
+      services,
+      ...(input.__dangerouslyIsolatedServices === undefined
+        ? {}
+        : {
+            __dangerouslyIsolatedServices: input.__dangerouslyIsolatedServices,
+          }),
+    }),
+    extraInfra,
+  };
 }
 
 function extraInfraForService(input: {
@@ -252,7 +275,7 @@ function supportedExtraInfraIdsForService(
     case ServiceIds.CONTROL_PLANE_WORKER:
       return ["mailpit", "sandbox-base-image"];
     case ServiceIds.DATA_PLANE_GATEWAY:
-      return ["otlp", "sandbox-base-image"];
+      return ["nats", "otlp", "sandbox-base-image"];
     case ServiceIds.DATA_PLANE_WORKER:
       return ["sandbox-base-image", "sandbox-docker-network"];
     case ServiceIds.DATA_PLANE_API:
@@ -260,7 +283,7 @@ function supportedExtraInfraIdsForService(
   }
 }
 
-type IntegrationServiceEntry = {
+type IntegrationServiceFactory = {
   serviceId: ServiceId;
   service: (
     infra: TestServiceDefinition["infra"],
@@ -268,30 +291,73 @@ type IntegrationServiceEntry = {
   ) => TestServiceDefinition;
 };
 
-async function loadSelectedServices(
+type IntegrationServiceEntry = IntegrationServiceFactory & {
+  registryId: string;
+};
+
+async function loadSelectedServiceInstances(
   selectionsInput: readonly IntegrationServiceSelection[],
 ): Promise<readonly IntegrationServiceEntry[]> {
-  const selectedServiceIds = uniqueSelectedServiceIds(selectionsInput);
+  const serviceInstances = selectedServiceInstances(selectionsInput);
+  const loadedServiceFactories = await Promise.all(
+    uniqueServiceIds(serviceInstances).map(async (serviceId) => loadService(serviceId)),
+  );
+  const serviceFactories = new Map(
+    loadedServiceFactories.map((serviceFactory) => [serviceFactory.serviceId, serviceFactory]),
+  );
 
-  return Promise.all(selectedServiceIds.map(loadService));
+  return serviceInstances.map((instance) => {
+    const serviceFactory = serviceFactories.get(instance.serviceId);
+    if (serviceFactory === undefined) {
+      throw new Error(`Failed to load integration test service '${instance.serviceId}'.`);
+    }
+
+    return {
+      registryId: instance.registryId,
+      serviceId: instance.serviceId,
+      service: serviceFactory.service,
+    };
+  });
 }
 
-function uniqueSelectedServiceIds(
+function selectedServiceInstances(
   selectionsInput: readonly IntegrationServiceSelection[],
-): readonly ServiceId[] {
-  const serviceIds: ServiceId[] = [];
+): readonly { registryId: string; serviceId: ServiceId }[] {
+  const serviceInstances: Array<{ registryId: string; serviceId: ServiceId }> = [];
+  const registryIds = new Set<string>();
 
   for (const selection of selectionsInput) {
     const serviceId = typeof selection === "string" ? selection : selection.service;
-    if (!serviceIds.includes(serviceId)) {
-      serviceIds.push(serviceId);
+    const registryId =
+      typeof selection === "string" ? selection : (selection.id ?? selection.service);
+    if (registryIds.has(registryId)) {
+      throw new Error(`Duplicate integration test service selection id '${registryId}'.`);
+    }
+    registryIds.add(registryId);
+    serviceInstances.push({
+      registryId,
+      serviceId,
+    });
+  }
+
+  return serviceInstances;
+}
+
+function uniqueServiceIds(
+  serviceInstances: readonly { registryId: string; serviceId: ServiceId }[],
+): readonly ServiceId[] {
+  const serviceIds: ServiceId[] = [];
+
+  for (const serviceInstance of serviceInstances) {
+    if (!serviceIds.includes(serviceInstance.serviceId)) {
+      serviceIds.push(serviceInstance.serviceId);
     }
   }
 
   return serviceIds;
 }
 
-async function loadService(serviceId: ServiceId): Promise<IntegrationServiceEntry> {
+async function loadService(serviceId: ServiceId): Promise<IntegrationServiceFactory> {
   // Dynamic imports are intentionally isolated to the integration harness. The
   // public API asks tests to declare selected services, so loading every app and
   // worker runtime up front makes small integration tests pay for unrelated
@@ -337,7 +403,7 @@ async function loadService(serviceId: ServiceId): Promise<IntegrationServiceEntr
 
 async function loadServiceModule(
   modulePath: string,
-): Promise<{ service: IntegrationServiceEntry["service"] }> {
+): Promise<{ service: IntegrationServiceFactory["service"] }> {
   const moduleUrl = new URL(modulePath, import.meta.url).href;
   const module: unknown = await import(/* @vite-ignore */ moduleUrl);
   if (!isIntegrationServiceModule(module)) {
@@ -366,7 +432,11 @@ function selections(input: {
 
   for (const selection of input.selections) {
     if (typeof selection !== "string") {
-      normalized.push(selection);
+      const service = selection.id ?? selection.service;
+      normalized.push({
+        service,
+        mode: selection.mode,
+      });
       continue;
     }
 

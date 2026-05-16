@@ -33,7 +33,7 @@ import type { TestEnvironment, TestServiceHandle } from "../environment/types.js
 import { createMailpitInbox, type MailpitInbox } from "../services/mailpit/index.js";
 import { readOtlpTestCollector, type OtlpTestCollector } from "../services/otlp-test-collector.js";
 import { createIntegrationAuth, type IntegrationAuth } from "./auth.js";
-import { ServiceIds, type ServiceId } from "./services/service-ids.js";
+import { ServiceIds } from "./services/service-ids.js";
 import { httpService, type IntegrationHttpService } from "./services/shared.js";
 
 const DefaultDatabasePoolMax = 4;
@@ -57,6 +57,10 @@ const OtlpValues = {
   COLLECTOR_ID: "collectorId",
 };
 const ValkeyInfraId = "valkey";
+const NatsInfraId = "nats";
+const NatsValues = {
+  URL: "url",
+};
 const ValkeyValues = {
   HOST_URL: "host.url",
   KEY_PREFIX: "keyPrefix",
@@ -89,6 +93,10 @@ export type IntegrationRuntimeStateStore = {
   keyPrefix: string;
 };
 
+export type IntegrationNats = {
+  url: string;
+};
+
 export type IntegrationDatabaseInfo = {
   directUrl: string;
   pooledUrl: string;
@@ -97,6 +105,8 @@ export type IntegrationDatabaseInfo = {
 
 export type IntegrationTestEnvironment = {
   id: string;
+  service: (serviceId: string) => TestServiceHandle;
+  httpService: (serviceId: string) => IntegrationHttpService;
   auth: IntegrationAuth;
   controlPlaneDatabase: IntegrationDatabaseInfo;
   controlPlaneDb: ControlPlaneDatabase;
@@ -109,6 +119,7 @@ export type IntegrationTestEnvironment = {
   dataPlaneWorkflow: IntegrationWorkflowClient;
   dataPlaneApi: IntegrationHttpService;
   dataPlaneGateway: IntegrationHttpService;
+  nats: IntegrationNats;
   dataPlaneGatewayRuntimeState: IntegrationRuntimeStateStore;
   dataPlaneWorker: IntegrationProcessService;
   mailpit: MailpitInbox;
@@ -125,7 +136,7 @@ export type IntegrationProcessService = TestServiceHandle & {
 };
 
 export function createIntegrationEnvironment(input: {
-  environment: TestEnvironment<ServiceId>;
+  environment: TestEnvironment<string>;
   poolFactory?: IntegrationDatabasePoolFactory;
 }): ManagedIntegrationTestEnvironment {
   const poolFactory = input.poolFactory ?? ((config) => new Pool(config));
@@ -140,6 +151,8 @@ export function createIntegrationEnvironment(input: {
 
   const integrationEnvironment: ManagedIntegrationTestEnvironment = {
     id: input.environment.id,
+    service: (serviceId) => input.environment.services.get(serviceId),
+    httpService: (serviceId) => httpService(input.environment.services.get(serviceId)),
     get auth() {
       auth ??= createIntegrationAuth(integrationEnvironment);
 
@@ -220,6 +233,16 @@ export function createIntegrationEnvironment(input: {
     get dataPlaneGateway() {
       return httpService(input.environment.services.get(ServiceIds.DATA_PLANE_GATEWAY));
     },
+    get nats() {
+      const nats = input.environment.infra.get(NatsInfraId);
+      if (nats === undefined) {
+        throw new Error("Expected integration environment to include NATS infra.");
+      }
+
+      return {
+        url: readInfraValue(nats, NatsValues.URL),
+      };
+    },
     get dataPlaneGatewayRuntimeState() {
       const valkey = input.environment.infra.get(ValkeyInfraId);
       if (valkey === undefined) {
@@ -279,7 +302,7 @@ export function createIntegrationEnvironment(input: {
   return integrationEnvironment;
 }
 
-function createObjectStore(environment: TestEnvironment<ServiceId>): IntegrationObjectStore {
+function createObjectStore(environment: TestEnvironment<string>): IntegrationObjectStore {
   const seaweedfs = environment.infra.get(SeaweedfsInfraId);
   if (seaweedfs === undefined) {
     throw new Error("Expected integration environment to include SeaweedFS infra.");
@@ -340,7 +363,7 @@ type IntegrationWorkflowResources = {
 export type IntegrationWorkflowClient = Pick<OpenWorkflow, "runWorkflow" | "sendSignal">;
 
 function createControlPlaneWorkflowResources(
-  environment: TestEnvironment<ServiceId>,
+  environment: TestEnvironment<string>,
 ): IntegrationWorkflowResources {
   const backend = BackendPostgres.connect(
     readPostgresDirectUrl({
@@ -358,7 +381,7 @@ function createControlPlaneWorkflowResources(
 }
 
 function createDataPlaneWorkflowResources(
-  environment: TestEnvironment<ServiceId>,
+  environment: TestEnvironment<string>,
 ): IntegrationWorkflowResources {
   const backend = BackendPostgres.connect(
     readPostgresDirectUrl({
@@ -453,7 +476,7 @@ function createPool(input: {
 }
 
 function readPostgresDirectUrl(input: {
-  environment: TestEnvironment<ServiceId>;
+  environment: TestEnvironment<string>;
   infraId: string;
 }): string {
   const postgres = input.environment.infra.get(input.infraId);
@@ -468,7 +491,7 @@ function readPostgresDirectUrl(input: {
 }
 
 function readPostgresPooledUrl(input: {
-  environment: TestEnvironment<ServiceId>;
+  environment: TestEnvironment<string>;
   infraId: string;
 }): string {
   const postgres = input.environment.infra.get(input.infraId);
@@ -482,7 +505,7 @@ function readPostgresPooledUrl(input: {
   return pooledUrl;
 }
 
-function readDataPlaneSchemaName(environment: TestEnvironment<ServiceId>): string {
+function readDataPlaneSchemaName(environment: TestEnvironment<string>): string {
   const postgres = environment.infra.get(PostgresInfraIds.DATA_PLANE);
   const schemaName = postgres?.values.get(PostgresValues.DATA_PLANE_SCHEMA_NAME);
   if (schemaName === undefined) {
@@ -492,7 +515,7 @@ function readDataPlaneSchemaName(environment: TestEnvironment<ServiceId>): strin
   return schemaName;
 }
 
-function readControlPlaneSchemaName(environment: TestEnvironment<ServiceId>): string {
+function readControlPlaneSchemaName(environment: TestEnvironment<string>): string {
   const postgres = environment.infra.get(PostgresInfraIds.CONTROL_PLANE);
   const schemaName = postgres?.values.get(PostgresValues.CONTROL_PLANE_SCHEMA_NAME);
   if (schemaName === undefined) {

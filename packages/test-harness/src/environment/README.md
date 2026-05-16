@@ -87,6 +87,22 @@ const it = createIntegrationTest({
 });
 ```
 
+Use `id` when a test needs multiple live instances of one service in the same
+logical environment:
+
+```ts
+const it = createIntegrationTest({
+  services: [
+    { id: "gateway-a", service: "data-plane-gateway", mode: "runtime" },
+    { id: "gateway-b", service: "data-plane-gateway", mode: "runtime" },
+  ],
+});
+```
+
+Aliased instances share the environment's infrastructure and logical state but
+receive distinct service endpoints. Access them with `env.httpService("gateway-a")`
+or `env.service("gateway-a")`.
+
 Docker mode should be uncommon in integration tests. Use it for packaging or
 deployment-shape behavior, not as the default way to test application behavior.
 
@@ -151,6 +167,8 @@ reason obvious in the test file.
 Common `env` properties include:
 
 - `env.id`: the logical test environment id.
+- `env.service(id)` / `env.httpService(id)`: access selected service instances,
+  including aliased multi-instance selections.
 - `env.auth`: helpers for creating authenticated control-plane sessions.
 - `env.controlPlaneApi`, `env.dataPlaneApi`, `env.dataPlaneGateway`: service
   handles with `hostBaseUrl` and reusable HTTP clients.
@@ -167,6 +185,8 @@ Common `env` properties include:
 - `env.mailpit`, `env.objectStore`, `env.otlpCollector`: optional clients
   available only when the matching `extraInfra` was requested and attached to a
   selected service.
+- `env.nats`: optional NATS endpoint available only when `extraInfra: ["nats"]`
+  was requested.
 
 ## Authentication
 
@@ -245,6 +265,7 @@ Supported extra infra ids are:
 
 - `mailpit`: email delivery assertions, such as auth OTP flows through the
   control-plane worker.
+- `nats`: distributed gateway relay behavior that needs a real NATS server.
 - `otlp`: telemetry assertions through services that emit or forward OTLP
   requests, such as data-plane gateway sandbox tunnel telemetry.
 - `seaweedfs`: object-store behavior, such as avatar or organization logo

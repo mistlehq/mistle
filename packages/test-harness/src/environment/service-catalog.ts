@@ -28,6 +28,7 @@ import { startDataPlaneGateway } from "../apps/data-plane-gateway.js";
 import { startDataPlaneWorker } from "../apps/data-plane-worker.js";
 import { registerProcessCleanupTask } from "../cleanup/index.js";
 import { startDockerNetwork } from "../network/start-docker-network.js";
+import { startNats } from "../services/nats/index.js";
 import { startOtlpTestCollector } from "../services/otlp-test-collector.js";
 import { ensureSeaweedfsS3BucketExists } from "../services/seaweedfs/index.js";
 import { createTestEnvironmentSharedInfraKey } from "../services/shared-infra-coordinator.js";
@@ -94,6 +95,7 @@ const InfraIds = {
   DATA_PLANE_POSTGRES: "postgres.data-plane",
   VALKEY: "valkey",
   MAILPIT: "mailpit",
+  NATS: "nats",
   SEAWEEDFS: "seaweedfs",
   OTLP: "otlp",
   SANDBOX_BASE_IMAGE: "sandbox-base-image",
@@ -115,6 +117,7 @@ const InfraKinds = {
   POSTGRES: "postgres",
   VALKEY: "valkey",
   MAILPIT: "mailpit",
+  NATS: "nats",
   SEAWEEDFS: "seaweedfs",
   OTLP: "otlp",
   SANDBOX_BASE_IMAGE: "sandbox-base-image",
@@ -131,6 +134,10 @@ const MailpitValues = {
   SMTP_HOST: "smtp.host",
   SMTP_PORT: "smtp.port",
   HTTP_BASE_URL: "http.baseUrl",
+};
+
+const NatsValues = {
+  URL: "url",
 };
 
 const SeaweedfsValues = {
@@ -213,7 +220,7 @@ export type MistleTestServiceId =
   | "data-plane-gateway"
   | "data-plane-worker";
 
-export type MistleTestExtraInfraId = "mailpit" | "otlp" | "seaweedfs";
+export type MistleTestExtraInfraId = "mailpit" | "nats" | "otlp" | "seaweedfs";
 
 export type MistleTestRegistry = TestServiceRegistry & {
   "control-plane-api": TestServiceDefinition;
@@ -312,6 +319,9 @@ export function createTestExtraInfra(input: {
             sharedInfraKey,
           }),
         );
+        break;
+      case "nats":
+        requirements.push(createNatsRequirement());
         break;
       case "otlp":
         requirements.push(createOtlpRequirement());
@@ -896,6 +906,44 @@ function createOtlpProvisioner(): TestInfraProvisioner {
           writeProvisionerTimingSummary({
             environmentId: provisionInput.environmentId,
             provisioner: "otlp cleanup",
+            timings: cleanupTimings,
+          });
+        },
+      }));
+    },
+  };
+}
+
+function createNatsRequirement(): TestInfraRequirement {
+  return {
+    id: InfraIds.NATS,
+    kind: InfraKinds.NATS,
+    provisioner: createNatsProvisioner(),
+  };
+}
+
+function createNatsProvisioner(): TestInfraProvisioner {
+  return {
+    kind: InfraKinds.NATS,
+    provision: async (provisionInput) => {
+      const timings = new Map<string, number>();
+      const nats = await measure(timings, "start", startNats);
+      writeProvisionerTimingSummary({
+        environmentId: provisionInput.environmentId,
+        provisioner: "nats",
+        timings,
+      });
+
+      return provisionInput.requirements.map((requirement) => ({
+        id: requirement.id,
+        kind: requirement.kind,
+        values: new Map([[NatsValues.URL, nats.url]]),
+        stop: async () => {
+          const cleanupTimings = new Map<string, number>();
+          await measure(cleanupTimings, "stop", nats.stop);
+          writeProvisionerTimingSummary({
+            environmentId: provisionInput.environmentId,
+            provisioner: "nats cleanup",
             timings: cleanupTimings,
           });
         },
