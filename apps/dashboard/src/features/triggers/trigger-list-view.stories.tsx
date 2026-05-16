@@ -157,7 +157,9 @@ const meta = {
     layout: "fullscreen",
   },
   args: {
+    activeFilter: "all",
     items: MixedItems,
+    searchValue: "",
     errorMessage: null,
     totalResults: MixedItems.length,
     hasNextPage: false,
@@ -166,6 +168,8 @@ const meta = {
     previousPageDisabled: false,
     onNextPage: function onNextPage() {},
     onPreviousPage: function onPreviousPage() {},
+    onFilterChange: function onFilterChange() {},
+    onSearchValueChange: function onSearchValueChange() {},
     onOpenTrigger: function onOpenTrigger() {},
   },
 } satisfies Meta<typeof TriggerListView>;
@@ -198,8 +202,9 @@ export const Paginated: Story = {
   },
 };
 
-export const Empty: Story = {
+export const FilteredEmpty: Story = {
   args: {
+    searchValue: "missing",
     items: [],
     totalResults: 0,
   },

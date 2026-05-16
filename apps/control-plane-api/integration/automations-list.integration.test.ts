@@ -114,6 +114,145 @@ describe.concurrent("automations list integration", () => {
     ]);
   });
 
+  it("applies trigger list filters before pagination and total results", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "automations-list-query-filters@example.com",
+    });
+    await seedAutomationWebhookTargets(env);
+    await seedWebhookAutomationFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_automations_list_query_filters_webhook",
+      webhookSourceId: "iws_automations_list_query_filters_webhook",
+      profileId: "sbp_automations_list_query_filters_webhook",
+      profileVersion: 1,
+      bindingRepositories: ["mistlehq/server-search"],
+    });
+    await seedWebhookAutomationFixture(env, {
+      organizationId: session.organizationId,
+      connectionId: "icn_automations_list_query_filters_disabled",
+      webhookSourceId: "iws_automations_list_query_filters_disabled",
+      profileId: "sbp_automations_list_query_filters_disabled",
+      profileVersion: 1,
+    });
+    await seedPersistedWebhookAutomation(env, {
+      automationId: "atm_automations_list_query_filters_webhook",
+      organizationId: session.organizationId,
+      webhookSourceId: "iws_automations_list_query_filters_webhook",
+      profileId: "sbp_automations_list_query_filters_webhook",
+      profileVersion: 1,
+      targetId: "atg_automations_list_query_filters_webhook",
+      primaryRepositoryId: "mistlehq/server-search",
+      name: "Webhook issue comment triage",
+      createdAt: "2026-03-13T00:00:00.000Z",
+    });
+    await seedPersistedWebhookAutomation(env, {
+      automationId: "atm_automations_list_query_filters_disabled",
+      organizationId: session.organizationId,
+      webhookSourceId: "iws_automations_list_query_filters_disabled",
+      profileId: "sbp_automations_list_query_filters_disabled",
+      profileVersion: 1,
+      targetId: "atg_automations_list_query_filters_disabled",
+      name: "Disabled webhook triage",
+      enabled: false,
+      createdAt: "2026-03-12T00:00:00.000Z",
+    });
+    await seedScheduledAutomation(env, {
+      organizationId: session.organizationId,
+      automationId: "atm_automations_list_query_filters_schedule",
+      scheduleId: "sch_automations_list_query_filters_schedule",
+      targetId: "atg_automations_list_query_filters_schedule",
+      profileId: "sbp_automations_list_query_filters_schedule",
+      name: "Daily Singapore schedule",
+      createdAt: "2026-03-11T00:00:00.000Z",
+      primaryRepositoryId: "mistlehq/scheduled-search",
+    });
+
+    const eventResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/automations?kind=webhook&limit=1",
+      {
+        headers: { cookie: session.cookie },
+      },
+    );
+    const disabledResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/automations?enabled=false&limit=10",
+      {
+        headers: { cookie: session.cookie },
+      },
+    );
+    const eventLabelSearchResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/automations?search=${encodeURIComponent("Issue comment created")}&limit=10`,
+      {
+        headers: { cookie: session.cookie },
+      },
+    );
+    const eventAliasSearchResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/automations?search=${encodeURIComponent("events")}&limit=10`,
+      {
+        headers: { cookie: session.cookie },
+      },
+    );
+    const scheduleSearchResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/automations?kind=schedule&search=${encodeURIComponent("Asia/Singapore")}&limit=10`,
+      {
+        headers: { cookie: session.cookie },
+      },
+    );
+    const repositorySearchResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/automations?search=${encodeURIComponent("mistlehq/server-search")}&limit=10`,
+      {
+        headers: { cookie: session.cookie },
+      },
+    );
+
+    expect(eventResponse.status).toBe(200);
+    expect(disabledResponse.status).toBe(200);
+    expect(eventLabelSearchResponse.status).toBe(200);
+    expect(eventAliasSearchResponse.status).toBe(200);
+    expect(scheduleSearchResponse.status).toBe(200);
+    expect(repositorySearchResponse.status).toBe(200);
+
+    const eventBody = ListAutomationsResponseSchema.parse(await eventResponse.json());
+    expect(eventBody.totalResults).toBe(2);
+    expect(eventBody.items.map((item) => item.kind)).toEqual(["webhook"]);
+    expect(eventBody.nextPage).not.toBeNull();
+
+    const disabledBody = ListAutomationsResponseSchema.parse(await disabledResponse.json());
+    expect(disabledBody.totalResults).toBe(1);
+    expect(disabledBody.items.map((item) => item.id)).toEqual([
+      "atm_automations_list_query_filters_disabled",
+    ]);
+
+    const eventLabelSearchBody = ListAutomationsResponseSchema.parse(
+      await eventLabelSearchResponse.json(),
+    );
+    expect(eventLabelSearchBody.items.map((item) => item.id)).toEqual([
+      "atm_automations_list_query_filters_webhook",
+      "atm_automations_list_query_filters_disabled",
+    ]);
+
+    const eventAliasSearchBody = ListAutomationsResponseSchema.parse(
+      await eventAliasSearchResponse.json(),
+    );
+    expect(eventAliasSearchBody.items.map((item) => item.id)).toEqual([
+      "atm_automations_list_query_filters_webhook",
+      "atm_automations_list_query_filters_disabled",
+    ]);
+
+    const scheduleSearchBody = ListAutomationsResponseSchema.parse(
+      await scheduleSearchResponse.json(),
+    );
+    expect(scheduleSearchBody.items.map((item) => item.id)).toEqual([
+      "atm_automations_list_query_filters_schedule",
+    ]);
+
+    const repositorySearchBody = ListAutomationsResponseSchema.parse(
+      await repositorySearchResponse.json(),
+    );
+    expect(repositorySearchBody.items.map((item) => item.id)).toEqual([
+      "atm_automations_list_query_filters_webhook",
+    ]);
+  });
+
   it("gets a mixed automation summary by id within the active organization", async ({ env }) => {
     const scheduleAutomationId = "atm_automations_get_summary_schedule";
     const webhookAutomationId = "atm_automations_get_summary_webhook";
@@ -199,6 +338,7 @@ async function seedScheduledAutomation(
     profileId: string;
     name: string;
     createdAt: string;
+    primaryRepositoryId?: string | null;
   },
 ): Promise<void> {
   await env.controlPlaneDb
@@ -257,6 +397,7 @@ async function seedScheduledAutomation(
     automationId: input.automationId,
     sandboxProfileId: input.profileId,
     sandboxProfileVersion: 1,
+    primaryRepositoryId: input.primaryRepositoryId ?? null,
     createdAt: input.createdAt,
     updatedAt: input.createdAt,
   });

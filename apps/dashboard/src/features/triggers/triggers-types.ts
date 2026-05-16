@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+import type { paths } from "../../lib/control-plane-api/generated/schema.js";
+
+export type ListTriggersQuery = NonNullable<paths["/v1/automations"]["get"]["parameters"]["query"]>;
+
 export const TriggerListIssueSchema = z
   .object({
     code: z.enum([

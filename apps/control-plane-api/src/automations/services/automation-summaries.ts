@@ -17,7 +17,8 @@ import {
   paginateKeyset,
   parseKeysetPageSize,
 } from "@mistle/http/pagination";
-import { and, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
+import { listIntegrationDefinitions } from "@mistle/integrations-definitions/server";
+import { and, eq, gt, ilike, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -40,19 +41,33 @@ const CursorSchema = z
   })
   .strict();
 
-export const ListAutomationsQuerySchema = createKeysetPaginationQuerySchema({
-  defaultLimit: DEFAULT_PAGE_SIZE,
-  maxLimit: MAX_PAGE_SIZE,
-}).extend({
-  sandboxProfileId: z.string().min(1).optional(),
-});
+function parseOptionalBooleanQueryValue(value: unknown): unknown {
+  if (value === undefined || typeof value === "boolean") {
+    return value;
+  }
 
-export type ListAutomationsInput = {
+  if (value === "true") {
+    return true;
+  }
+
+  if (value === "false") {
+    return false;
+  }
+
+  return value;
+}
+
+export const ListAutomationsQuerySchema = createKeysetPaginationQuerySchema(PageSizeOptions).extend(
+  {
+    sandboxProfileId: z.string().min(1).optional(),
+    kind: z.enum([AutomationKinds.WEBHOOK, AutomationKinds.SCHEDULE]).optional(),
+    enabled: z.preprocess(parseOptionalBooleanQueryValue, z.boolean().optional()),
+    search: z.string().trim().min(1).optional(),
+  },
+);
+
+export type ListAutomationsInput = z.infer<typeof ListAutomationsQuerySchema> & {
   organizationId: string;
-  limit?: number;
-  after?: string | undefined;
-  before?: string | undefined;
-  sandboxProfileId?: string | undefined;
 };
 
 export type GetAutomationInput = {
@@ -114,6 +129,95 @@ type AutomationPageReference = {
 };
 
 type ControlPlaneTables = ReturnType<typeof getControlPlaneDatabaseSchema>;
+
+const WebhookEventSearchRecords = listIntegrationDefinitions().flatMap((definition) =>
+  (definition.supportedWebhookEvents ?? []).map((eventDefinition) => ({
+    eventType: eventDefinition.eventType,
+    searchableText: `${eventDefinition.eventType} ${eventDefinition.providerEventType} ${eventDefinition.displayName}`,
+  })),
+);
+
+function normalizeAutomationSearchTerm(search: string | undefined): string | undefined {
+  if (search === undefined) {
+    return undefined;
+  }
+
+  const normalizedSearch = search.trim().toLocaleLowerCase();
+  return normalizedSearch.length === 0 ? undefined : normalizedSearch;
+}
+
+function toSqlLikePattern(search: string): string {
+  return `%${search.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
+}
+
+function resolveMatchingWebhookEventTypes(search: string): string[] {
+  return [
+    ...new Set(
+      WebhookEventSearchRecords.filter((record) =>
+        record.searchableText.toLocaleLowerCase().includes(search),
+      ).map((record) => record.eventType),
+    ),
+  ];
+}
+
+function buildWebhookEventSearchClause(input: {
+  tables: ControlPlaneTables;
+  search: string;
+  searchPattern: string;
+}) {
+  const matchingEventTypes = resolveMatchingWebhookEventTypes(input.search);
+  return and(
+    eq(input.tables.automations.kind, AutomationKinds.WEBHOOK),
+    or(
+      ilike(sql`${input.tables.webhookAutomations.eventTypes}::text`, input.searchPattern),
+      input.search === "all" || "all events".includes(input.search)
+        ? isNull(input.tables.webhookAutomations.eventTypes)
+        : undefined,
+      matchingEventTypes.length === 0
+        ? undefined
+        : sql`${input.tables.webhookAutomations.eventTypes}::jsonb ?| array[${sql.join(
+            matchingEventTypes.map((eventType) => sql`${eventType}`),
+            sql`, `,
+          )}]`,
+    ),
+  );
+}
+
+function buildAutomationSearchClause(input: {
+  tables: ControlPlaneTables;
+  search: string | undefined;
+}) {
+  const normalizedSearch = normalizeAutomationSearchTerm(input.search);
+  if (normalizedSearch === undefined) {
+    return undefined;
+  }
+
+  const { tables } = input;
+  const searchPattern = toSqlLikePattern(normalizedSearch);
+
+  return or(
+    ilike(tables.automations.name, searchPattern),
+    ilike(tables.automations.kind, searchPattern),
+    normalizedSearch === "trigger" ||
+      normalizedSearch === "triggers" ||
+      normalizedSearch === "event" ||
+      normalizedSearch === "events"
+      ? eq(tables.automations.kind, AutomationKinds.WEBHOOK)
+      : undefined,
+    normalizedSearch === "enabled" ? eq(tables.automations.enabled, true) : undefined,
+    normalizedSearch === "disabled" ? eq(tables.automations.enabled, false) : undefined,
+    ilike(tables.automationTargets.sandboxProfileId, searchPattern),
+    ilike(tables.sandboxProfiles.displayName, searchPattern),
+    ilike(tables.automationTargets.primaryRepositoryId, searchPattern),
+    ilike(tables.schedules.cronExpression, searchPattern),
+    ilike(tables.schedules.timezone, searchPattern),
+    buildWebhookEventSearchClause({
+      tables,
+      search: normalizedSearch,
+      searchPattern,
+    }),
+  );
+}
 
 function resolveAutomationListEvents(input: {
   eventTypes: string[] | null;
@@ -663,6 +767,9 @@ function buildListableAutomationWhereClause(input: {
   organizationId: string;
   automationId?: string | undefined;
   sandboxProfileId?: string | undefined;
+  kind?: AutomationKind | undefined;
+  enabled?: boolean | undefined;
+  search?: string | undefined;
   cursor?: z.infer<typeof CursorSchema> | undefined;
   direction?: (typeof KeysetPaginationDirections)[keyof typeof KeysetPaginationDirections];
 }) {
@@ -684,6 +791,9 @@ function buildListableAutomationWhereClause(input: {
     input.sandboxProfileId === undefined
       ? undefined
       : eq(tables.automationTargets.sandboxProfileId, input.sandboxProfileId),
+    input.kind === undefined ? undefined : eq(tables.automations.kind, input.kind),
+    input.enabled === undefined ? undefined : eq(tables.automations.enabled, input.enabled),
+    buildAutomationSearchClause({ tables, search: input.search }),
   );
 
   if (input.cursor === undefined || input.direction === undefined) {
@@ -720,6 +830,9 @@ async function listAutomationPageReferences(input: {
   organizationId: string;
   automationId?: string | undefined;
   sandboxProfileId?: string | undefined;
+  kind?: AutomationKind | undefined;
+  enabled?: boolean | undefined;
+  search?: string | undefined;
   limitPlusOne: number;
   cursor?: z.infer<typeof CursorSchema> | undefined;
   direction: (typeof KeysetPaginationDirections)[keyof typeof KeysetPaginationDirections];
@@ -741,12 +854,23 @@ async function listAutomationPageReferences(input: {
       tables.automationTargets,
       eq(tables.automationTargets.automationId, tables.automations.id),
     )
+    .leftJoin(
+      tables.webhookAutomations,
+      eq(tables.webhookAutomations.automationId, tables.automations.id),
+    )
+    .leftJoin(
+      tables.sandboxProfiles,
+      eq(tables.sandboxProfiles.id, tables.automationTargets.sandboxProfileId),
+    )
     .where(
       buildListableAutomationWhereClause({
         tables,
         organizationId: input.organizationId,
         automationId: input.automationId,
         sandboxProfileId: input.sandboxProfileId,
+        kind: input.kind,
+        enabled: input.enabled,
+        search: input.search,
         cursor: input.cursor,
         direction: input.direction,
       }),
@@ -771,6 +895,9 @@ async function countListableAutomations(input: {
   db: ControlPlaneDatabase;
   organizationId: string;
   sandboxProfileId?: string | undefined;
+  kind?: AutomationKind | undefined;
+  enabled?: boolean | undefined;
+  search?: string | undefined;
 }): Promise<number> {
   const tables = getControlPlaneDatabaseSchema(input.db);
   const [result] = await input.db
@@ -787,11 +914,22 @@ async function countListableAutomations(input: {
       tables.automationTargets,
       eq(tables.automationTargets.automationId, tables.automations.id),
     )
+    .leftJoin(
+      tables.webhookAutomations,
+      eq(tables.webhookAutomations.automationId, tables.automations.id),
+    )
+    .leftJoin(
+      tables.sandboxProfiles,
+      eq(tables.sandboxProfiles.id, tables.automationTargets.sandboxProfileId),
+    )
     .where(
       buildListableAutomationWhereClause({
         tables,
         organizationId: input.organizationId,
         sandboxProfileId: input.sandboxProfileId,
+        kind: input.kind,
+        enabled: input.enabled,
+        search: input.search,
       }),
     );
 
@@ -852,6 +990,9 @@ export async function listAutomations(
           db: ctx.db,
           organizationId: input.organizationId,
           sandboxProfileId: input.sandboxProfileId,
+          kind: input.kind,
+          enabled: input.enabled,
+          search: input.search,
           limitPlusOne,
           cursor,
           direction,
@@ -868,6 +1009,9 @@ export async function listAutomations(
           db: ctx.db,
           organizationId: input.organizationId,
           sandboxProfileId: input.sandboxProfileId,
+          kind: input.kind,
+          enabled: input.enabled,
+          search: input.search,
         }),
     });
 

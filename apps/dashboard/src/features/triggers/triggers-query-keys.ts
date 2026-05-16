@@ -1,18 +1,28 @@
+import type { ListTriggersQuery } from "./triggers-types.js";
+
 export const TRIGGERS_QUERY_KEY_PREFIX: readonly ["triggers"] = ["triggers"];
 
-export function triggersListQueryKey(input: {
+type TriggersListQueryKeyInput = Omit<ListTriggersQuery, "after" | "before"> & {
   limit: number;
   after: string | null;
   before: string | null;
-  sandboxProfileId?: string | undefined;
-}): readonly ["triggers", "list", number, string | null, string | null, string | undefined] {
+};
+
+export function triggersListQueryKey(
+  input: TriggersListQueryKeyInput,
+): readonly ["triggers", "list", TriggersListQueryKeyInput] {
   return [
     TRIGGERS_QUERY_KEY_PREFIX[0],
     "list",
-    input.limit,
-    input.after,
-    input.before,
-    input.sandboxProfileId,
+    {
+      limit: input.limit,
+      after: input.after,
+      before: input.before,
+      ...(input.sandboxProfileId === undefined ? {} : { sandboxProfileId: input.sandboxProfileId }),
+      ...(input.kind === undefined ? {} : { kind: input.kind }),
+      ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
+      ...(input.search === undefined ? {} : { search: input.search }),
+    },
   ];
 }
 

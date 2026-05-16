@@ -752,8 +752,11 @@ export interface paths {
         query?: {
           after?: string;
           before?: string;
+          enabled?: boolean;
+          kind?: "webhook" | "schedule";
           limit?: number;
           sandboxProfileId?: string;
+          search?: string;
         };
         header?: never;
         path?: never;

@@ -8,6 +8,7 @@ import {
 } from "./triggers-api-errors.js";
 import {
   TriggerListItemSchema,
+  type ListTriggersQuery,
   type TriggerListItem,
   TriggersListResultSchema,
   type TriggersListResult,
@@ -34,13 +35,14 @@ async function readJsonWithSchema<T>(input: {
   return parsed.data;
 }
 
-export async function listTriggers(input: {
+type ListTriggersInput = Omit<ListTriggersQuery, "after" | "before"> & {
   limit: number;
   after: string | null;
   before: string | null;
-  sandboxProfileId?: string | undefined;
   signal?: AbortSignal;
-}): Promise<TriggersListResult> {
+};
+
+export async function listTriggers(input: ListTriggersInput): Promise<TriggersListResult> {
   try {
     const response = await requestControlPlane({
       operation: "listTriggers",
@@ -53,6 +55,9 @@ export async function listTriggers(input: {
         ...(input.sandboxProfileId === undefined
           ? {}
           : { sandboxProfileId: input.sandboxProfileId }),
+        ...(input.kind === undefined ? {} : { kind: input.kind }),
+        ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
+        ...(input.search === undefined ? {} : { search: input.search }),
       },
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not load triggers.",
@@ -120,17 +125,16 @@ export async function listWebhookTriggersForSandboxProfile(input: {
       limit: 100,
       after,
       before: null,
+      kind: "webhook",
       sandboxProfileId: input.sandboxProfileId,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
     });
 
     for (const trigger of page.items) {
-      if (trigger.kind === "webhook") {
-        matchingTriggers.push({
-          id: trigger.id,
-          name: trigger.name,
-        });
-      }
+      matchingTriggers.push({
+        id: trigger.id,
+        name: trigger.name,
+      });
     }
 
     after = page.nextPage?.after ?? null;

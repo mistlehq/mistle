@@ -20,15 +20,38 @@ describe("triggers query keys", () => {
         after: "cursor_after",
         before: null,
       }),
-    ).toEqual(["triggers", "list", 25, "cursor_after", null, undefined]);
+    ).toEqual([
+      "triggers",
+      "list",
+      {
+        limit: 25,
+        after: "cursor_after",
+        before: null,
+      },
+    ]);
     expect(
       triggersListQueryKey({
         limit: 25,
         after: null,
         before: null,
         sandboxProfileId: "sbp_123",
+        kind: "schedule",
+        enabled: false,
+        search: "daily",
       }),
-    ).toEqual(["triggers", "list", 25, null, null, "sbp_123"]);
+    ).toEqual([
+      "triggers",
+      "list",
+      {
+        limit: 25,
+        after: null,
+        before: null,
+        sandboxProfileId: "sbp_123",
+        kind: "schedule",
+        enabled: false,
+        search: "daily",
+      },
+    ]);
   });
 
   it("builds the trigger summary detail query key", () => {

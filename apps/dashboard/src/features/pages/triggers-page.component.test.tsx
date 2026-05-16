@@ -49,12 +49,18 @@ function createTriggerListItem(overrides?: Partial<TriggerListItem>): TriggerLis
 function seedTriggersList(
   queryClient: ReturnType<typeof createTestQueryClient>,
   listResult: TriggersListResult,
+  query?: {
+    kind?: "webhook" | "schedule";
+    enabled?: boolean;
+    search?: string;
+  },
 ): void {
   queryClient.setQueryData(
     triggersListQueryKey({
       limit: 25,
       after: null,
       before: null,
+      ...query,
     }),
     listResult,
   );
@@ -283,7 +289,7 @@ describe("TriggersPage", () => {
     expect(markup).toContain('aria-label="pagination"');
   });
 
-  it("updates the result summary when the list is filtered client-side", async () => {
+  it("updates the result summary from server-backed search results", async () => {
     const queryClient = createTestQueryClient({
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,
@@ -304,6 +310,20 @@ describe("TriggersPage", () => {
           },
         }),
       ]),
+    );
+    seedTriggersList(
+      queryClient,
+      createListResult([
+        createTriggerListItem({
+          id: "atm_456",
+          name: "Backlog sync",
+          source: {
+            kind: "webhook",
+            events: [createTriggerListEvent({ label: "Issue comment created" })],
+          },
+        }),
+      ]),
+      { search: "Backlog" },
     );
 
     const rendered = render(
@@ -330,6 +350,84 @@ describe("TriggersPage", () => {
       expect(screen.queryByRole("button", { name: "Alpha trigger" })).toBeNull();
     });
     expect(screen.getByRole("button", { name: "Backlog sync" })).toBeDefined();
+    expect(screen.getByText("Showing 1 of 1")).toBeDefined();
+  });
+
+  it("keeps the search and filter toolbar visible for server-backed empty results", async () => {
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+
+    seedTriggersList(
+      queryClient,
+      createListResult([
+        createTriggerListItem({
+          name: "Alpha trigger",
+        }),
+      ]),
+    );
+    seedTriggersList(queryClient, createListResult([]), { search: "missing" });
+
+    const rendered = render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <TriggersPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    fireEvent.change(within(rendered.container).getByRole("textbox", { name: "Search triggers" }), {
+      target: { value: "missing" },
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Alpha trigger" })).toBeNull();
+    });
+    expect(
+      within(rendered.container).getByRole("textbox", { name: "Search triggers" }),
+    ).toBeDefined();
+    expect(
+      within(rendered.container).getByRole("combobox", { name: "Filter triggers" }),
+    ).toBeDefined();
+    expect(screen.getByText("No triggers match the current search or filter.")).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "Create your first trigger" })).toBeNull();
+  });
+
+  it("keeps the search toolbar visible while server-backed search results are loading", () => {
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+
+    seedTriggersList(
+      queryClient,
+      createListResult([
+        createTriggerListItem({
+          name: "Alpha trigger",
+        }),
+      ]),
+    );
+
+    const rendered = render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <TriggersPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const searchInput = within(rendered.container).getByRole("textbox", {
+      name: "Search triggers",
+    });
+    fireEvent.change(searchInput, {
+      target: { value: "unseeded" },
+    });
+
+    expect(within(rendered.container).getByRole("textbox", { name: "Search triggers" })).toBe(
+      searchInput,
+    );
+    expect(screen.getByDisplayValue("unseeded")).toBeDefined();
   });
 
   it("opens webhook and schedule triggers through the unified trigger detail route", () => {

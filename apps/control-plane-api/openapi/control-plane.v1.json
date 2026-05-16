@@ -659,6 +659,32 @@
             "required": false,
             "name": "sandboxProfileId",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["webhook", "schedule"]
+            },
+            "required": false,
+            "name": "kind",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "boolean"
+            },
+            "required": false,
+            "name": "enabled",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "search",
+            "in": "query"
           }
         ],
         "responses": {

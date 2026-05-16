@@ -14,9 +14,9 @@ import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 import { resolveEventSummary } from "./trigger-list-event-summary.js";
 import { TriggerIssueIndicator } from "./trigger-list-indicators.js";
+import type { TriggerListFilter } from "./trigger-list-model.js";
 import { TriggerListToolbar } from "./trigger-list-toolbar.js";
 import type { TriggerListItemViewModel } from "./trigger-list-types.js";
-import { useTriggerListState } from "./use-trigger-list-state.js";
 
 function renderTriggerPagination(input: {
   hasNextPage: boolean;
@@ -48,6 +48,8 @@ function renderTriggerPagination(input: {
 
 type TriggerListViewProps = {
   items: readonly TriggerListItemViewModel[];
+  activeFilter: TriggerListFilter;
+  searchValue: string;
   errorMessage: string | null;
   totalResults: number | null;
   hasNextPage: boolean;
@@ -56,7 +58,9 @@ type TriggerListViewProps = {
   previousPageDisabled?: boolean;
   onNextPage: () => void;
   onPreviousPage: () => void;
-  onOpenTrigger: (trigger: { id: string; kind: TriggerListItemViewModel["kind"] }) => void;
+  onFilterChange: (nextValue: TriggerListFilter) => void;
+  onSearchValueChange: (nextValue: string) => void;
+  onOpenTrigger: (triggerId: string) => void;
 };
 
 function EventSummaryCell(input: {
@@ -132,7 +136,7 @@ function TriggerIdentityCell(input: {
             className: "text-left break-words",
           })}
           onClick={() => {
-            input.onOpenTrigger({ id: input.item.id, kind: input.item.kind });
+            input.onOpenTrigger(input.item.id);
           }}
           type="button"
         >
@@ -157,11 +161,6 @@ function TargetCell(input: { item: TriggerListItemViewModel }): React.JSX.Elemen
 }
 
 export function TriggerListView(input: TriggerListViewProps): React.JSX.Element {
-  const { activeFilter, setActiveFilter, searchValue, setSearchValue, visibleItems, hasItems } =
-    useTriggerListState({
-      items: input.items,
-    });
-
   return (
     <div className="flex flex-col gap-4">
       {input.errorMessage !== null ? (
@@ -170,14 +169,12 @@ export function TriggerListView(input: TriggerListViewProps): React.JSX.Element 
         </Notice>
       ) : (
         <>
-          {input.items.length > 0 ? (
-            <TriggerListToolbar
-              activeFilter={activeFilter}
-              onFilterChange={setActiveFilter}
-              onSearchValueChange={setSearchValue}
-              searchValue={searchValue}
-            />
-          ) : null}
+          <TriggerListToolbar
+            activeFilter={input.activeFilter}
+            onFilterChange={input.onFilterChange}
+            onSearchValueChange={input.onSearchValueChange}
+            searchValue={input.searchValue}
+          />
 
           <Table className="table-fixed">
             <colgroup>
@@ -203,16 +200,14 @@ export function TriggerListView(input: TriggerListViewProps): React.JSX.Element 
               </TableRow>
             </TableHeader>
             <TableBody>
-              {visibleItems.length === 0 ? (
+              {input.items.length === 0 ? (
                 <TableRow>
                   <TableCell className="text-muted-foreground" colSpan={4}>
-                    {hasItems
-                      ? "No triggers match the current search or filter."
-                      : "No triggers have been created yet."}
+                    No triggers match the current search or filter.
                   </TableCell>
                 </TableRow>
               ) : null}
-              {visibleItems.map((item) => (
+              {input.items.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="whitespace-normal">
                     <TriggerIdentityCell item={item} onOpenTrigger={input.onOpenTrigger} />
@@ -237,7 +232,7 @@ export function TriggerListView(input: TriggerListViewProps): React.JSX.Element 
         resultsCount={
           input.totalResults === null ? null : (
             <p className="text-muted-foreground text-sm">
-              Showing {visibleItems.length} of {input.totalResults}
+              Showing {input.items.length} of {input.totalResults}
             </p>
           )
         }

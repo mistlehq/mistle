@@ -33,13 +33,17 @@ describe("TriggerListView", () => {
   it("places the GMT offset after the next scheduled time", () => {
     render(
       <TriggerListView
+        activeFilter="all"
         errorMessage={null}
         hasNextPage={false}
         hasPreviousPage={false}
         items={[ScheduleTrigger]}
+        onFilterChange={noop}
         onNextPage={noop}
         onOpenTrigger={noop}
         onPreviousPage={noop}
+        onSearchValueChange={noop}
+        searchValue=""
         totalResults={1}
       />,
     );

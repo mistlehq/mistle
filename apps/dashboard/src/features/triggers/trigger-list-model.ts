@@ -1,4 +1,4 @@
-import type { TriggerListItemViewModel } from "./trigger-list-types.js";
+import type { ListTriggersQuery } from "./triggers-types.js";
 
 type TriggerListFilterOption = {
   value: string;
@@ -21,6 +21,8 @@ export const TRIGGER_LIST_FILTER_OPTIONS = defineTriggerListFilterOptions([
 
 export type TriggerListFilter = (typeof TRIGGER_LIST_FILTER_OPTIONS)[number]["value"];
 
+export type TriggerListServerFilters = Pick<ListTriggersQuery, "kind" | "enabled">;
+
 export function toTriggerListFilter(value: string | null): TriggerListFilter {
   if (value === null) {
     throw new Error("Trigger filter value must not be null.");
@@ -36,66 +38,22 @@ export function toTriggerListFilter(value: string | null): TriggerListFilter {
   throw new Error(`Unexpected trigger filter value: "${value}".`);
 }
 
-function normalizeSearch(value: string): string {
-  return value.trim().toLocaleLowerCase();
-}
-
-function includesSearchValue(value: string | null, searchValue: string): boolean {
-  return value !== null && value.toLocaleLowerCase().includes(searchValue);
-}
-
-function matchesFilter(item: TriggerListItemViewModel, filter: TriggerListFilter): boolean {
+export function toTriggerListServerFilters(filter: TriggerListFilter): TriggerListServerFilters {
   switch (filter) {
     case "all":
-      return true;
+      return {};
     case "enabled":
-      return item.enabled;
+      return { enabled: true };
     case "disabled":
-      return !item.enabled;
+      return { enabled: false };
     case "events":
-      return item.source.kind === "webhook";
+      return { kind: "webhook" };
     case "schedules":
-      return item.source.kind === "schedule";
+      return { kind: "schedule" };
   }
 }
 
-function matchesSourceSearch(item: TriggerListItemViewModel, searchValue: string): boolean {
-  if (item.source.kind === "webhook") {
-    return item.source.events.some((event) => includesSearchValue(event.label, searchValue));
-  }
-
-  return (
-    includesSearchValue(item.source.cronExpression, searchValue) ||
-    includesSearchValue(item.source.timezone, searchValue) ||
-    includesSearchValue(item.source.nextScheduledAtLabel, searchValue)
-  );
-}
-
-export function filterTriggerListItems(input: {
-  items: readonly TriggerListItemViewModel[];
-  filter: TriggerListFilter;
-  search: string;
-}): TriggerListItemViewModel[] {
-  const searchValue = normalizeSearch(input.search);
-
-  return input.items.filter((item) => {
-    if (!matchesFilter(item, input.filter)) {
-      return false;
-    }
-
-    if (searchValue.length === 0) {
-      return true;
-    }
-
-    return (
-      includesSearchValue(item.name, searchValue) ||
-      includesSearchValue(item.kind === "schedule" ? "schedule" : "trigger", searchValue) ||
-      includesSearchValue(item.target.sandboxProfileName, searchValue) ||
-      includesSearchValue(item.target.sandboxProfileId, searchValue) ||
-      includesSearchValue(item.target.primaryRepositoryName, searchValue) ||
-      includesSearchValue(item.target.primaryRepositoryId, searchValue) ||
-      includesSearchValue(item.enabled ? "enabled" : "disabled", searchValue) ||
-      matchesSourceSearch(item, searchValue)
-    );
-  });
+export function normalizeTriggerListSearch(search: string): string | undefined {
+  const normalizedSearch = search.trim();
+  return normalizedSearch.length === 0 ? undefined : normalizedSearch;
 }
