@@ -22,7 +22,7 @@ use std::time::{Duration as StdDuration, Instant};
 
 use base64::Engine;
 use bytes::Bytes;
-use futures_util::{FutureExt, SinkExt, StreamExt};
+use futures_util::{FutureExt, Sink, SinkExt, StreamExt};
 use http_body_util::{BodyExt, Empty};
 use hyper::header::{AUTHORIZATION, CONTENT_LENGTH};
 use hyper::{Request, StatusCode};
@@ -518,6 +518,10 @@ enum TunnelWriterMessage {
         response_sender: std::sync::mpsc::Sender<Result<(), String>>,
     },
     Close,
+}
+
+enum BootstrapWriterControlMessage {
+    Pong(Vec<u8>),
 }
 
 enum TunnelSessionEvent {
@@ -2876,74 +2880,39 @@ fn startup_transparent_passthrough_socket_mark(startup_input: &StartupInput) -> 
 }
 
 fn spawn_bootstrap_socket_task(
-    mut socket: TunnelWebSocket,
-    mut receiver: mpsc::UnboundedReceiver<TunnelWriterMessage>,
+    socket: TunnelWebSocket,
+    receiver: mpsc::UnboundedReceiver<TunnelWriterMessage>,
     event_sender: mpsc::UnboundedSender<TunnelSessionEvent>,
 ) -> TokioJoinHandle<Result<(), TunnelSessionError>> {
     tokio::spawn(async move {
-        let notify_bootstrap_closed = |reason: Option<String>| {
-            let _ = event_sender.send(TunnelSessionEvent::BootstrapClosed { reason });
-        };
+        let (writer, mut reader) = socket.split();
+        let (control_sender, control_receiver) = mpsc::unbounded_channel();
+        let writer_event_sender = event_sender.clone();
+        let mut writer_task = tokio::spawn(async move {
+            run_bootstrap_writer(writer, receiver, control_receiver, writer_event_sender).await
+        });
 
         loop {
             tokio::select! {
-                outbound = receiver.recv() => {
-                    let Some(message) = outbound else {
-                        notify_bootstrap_closed(Some("bootstrap tunnel writer channel closed".to_string()));
-                        return Ok(());
-                    };
-
-                    match message {
-                        TunnelWriterMessage::Text(payload) => {
-                            if let Err(error) = socket.send(Message::Text(payload.into())).await {
-                                notify_bootstrap_closed(Some(format!(
-                                    "failed to write bootstrap tunnel text frame: {error}"
-                                )));
-                                return Err(TunnelSessionError::WriteTunnelText(error.to_string()));
-                            }
-                        }
-                        TunnelWriterMessage::Binary(payload) => {
-                            if let Err(error) = socket.send(Message::Binary(payload.into())).await {
-                                notify_bootstrap_closed(Some(format!(
-                                    "failed to write bootstrap tunnel binary frame: {error}"
-                                )));
-                                return Err(TunnelSessionError::WriteTunnelBinary(error.to_string()));
-                            }
-                        }
-                        TunnelWriterMessage::Pong(payload) => {
-                            if let Err(error) = socket.send(Message::Pong(payload.into())).await {
-                                notify_bootstrap_closed(Some(format!(
-                                    "failed to write bootstrap tunnel pong frame: {error}"
-                                )));
-                                return Err(TunnelSessionError::WriteTunnelText(error.to_string()));
-                            }
-                        }
-                        TunnelWriterMessage::Flush { response_sender } => {
-                            let _ = response_sender.send(Ok(()));
-                        }
-                        TunnelWriterMessage::Close => {
-                            if let Err(error) = socket.send(Message::Close(None)).await {
-                                notify_bootstrap_closed(Some(format!(
-                                    "failed to write bootstrap tunnel close frame: {error}"
-                                )));
-                                return Err(TunnelSessionError::WriteTunnelText(error.to_string()));
-                            }
-                            notify_bootstrap_closed(None);
-                            return Ok(());
-                        }
-                    }
+                writer_result = &mut writer_task => {
+                    return writer_result
+                        .map_err(|error| TunnelSessionError::WriteTunnelText(error.to_string()))?;
                 }
-                inbound = socket.next() => {
+                inbound = reader.next() => {
                     match inbound {
                         Some(Ok(Message::Close(_))) | Some(Err(WebSocketError::ConnectionClosed)) | None => {
                             let _ = event_sender.send(TunnelSessionEvent::BootstrapClosed { reason: None });
+                            writer_task.abort();
                             return Ok(());
                         }
                         Some(Ok(Message::Ping(payload))) => {
-                            socket
-                                .send(Message::Pong(payload))
-                                .await
-                                .map_err(|error| TunnelSessionError::WriteTunnelText(error.to_string()))?;
+                            control_sender
+                                .send(BootstrapWriterControlMessage::Pong(payload.to_vec()))
+                                .map_err(|_| {
+                                    TunnelSessionError::WriteTunnelText(
+                                        "bootstrap tunnel writer is closed".to_string(),
+                                    )
+                                })?;
                         }
                         Some(Ok(message)) => {
                             let _ = event_sender.send(TunnelSessionEvent::BootstrapMessage(message));
@@ -2952,6 +2921,7 @@ fn spawn_bootstrap_socket_task(
                             let _ = event_sender.send(TunnelSessionEvent::BootstrapClosed {
                                 reason: Some(error.to_string()),
                             });
+                            writer_task.abort();
                             return Ok(());
                         }
                     }
@@ -2959,6 +2929,157 @@ fn spawn_bootstrap_socket_task(
             }
         }
     })
+}
+
+async fn run_bootstrap_writer<W>(
+    mut writer: W,
+    mut receiver: mpsc::UnboundedReceiver<TunnelWriterMessage>,
+    mut control_receiver: mpsc::UnboundedReceiver<BootstrapWriterControlMessage>,
+    event_sender: mpsc::UnboundedSender<TunnelSessionEvent>,
+) -> Result<(), TunnelSessionError>
+where
+    W: Sink<Message, Error = WebSocketError> + Unpin,
+{
+    let notify_bootstrap_closed = |reason: Option<String>| {
+        let _ = event_sender.send(TunnelSessionEvent::BootstrapClosed { reason });
+    };
+    let mut pending_outbound = VecDeque::new();
+
+    loop {
+        while let Ok(control) = control_receiver.try_recv() {
+            write_bootstrap_control_message(&mut writer, control, &notify_bootstrap_closed).await?;
+        }
+        while let Ok(message) = receiver.try_recv() {
+            match message {
+                TunnelWriterMessage::Pong(payload) => {
+                    write_bootstrap_pong(&mut writer, payload, &notify_bootstrap_closed).await?;
+                }
+                TunnelWriterMessage::Close => {
+                    write_bootstrap_close(&mut writer, &notify_bootstrap_closed).await?;
+                    return Ok(());
+                }
+                TunnelWriterMessage::Text(_)
+                | TunnelWriterMessage::Binary(_)
+                | TunnelWriterMessage::Flush { .. } => pending_outbound.push_back(message),
+            }
+        }
+        if let Some(message) = pending_outbound.pop_front() {
+            if write_bootstrap_message(&mut writer, message, &notify_bootstrap_closed).await? {
+                return Ok(());
+            }
+            continue;
+        }
+
+        tokio::select! {
+            biased;
+            control = control_receiver.recv() => {
+                if let Some(control) = control {
+                    write_bootstrap_control_message(&mut writer, control, &notify_bootstrap_closed).await?;
+                }
+            }
+            outbound = receiver.recv() => {
+                let Some(message) = outbound else {
+                    notify_bootstrap_closed(Some("bootstrap tunnel writer channel closed".to_string()));
+                    return Ok(());
+                };
+
+                if write_bootstrap_message(&mut writer, message, &notify_bootstrap_closed).await? {
+                    return Ok(());
+                }
+            }
+        }
+    }
+}
+
+async fn write_bootstrap_control_message<W>(
+    writer: &mut W,
+    message: BootstrapWriterControlMessage,
+    notify_bootstrap_closed: &impl Fn(Option<String>),
+) -> Result<(), TunnelSessionError>
+where
+    W: Sink<Message, Error = WebSocketError> + Unpin,
+{
+    match message {
+        BootstrapWriterControlMessage::Pong(payload) => {
+            write_bootstrap_pong(writer, payload, notify_bootstrap_closed).await
+        }
+    }
+}
+
+async fn write_bootstrap_message<W>(
+    writer: &mut W,
+    message: TunnelWriterMessage,
+    notify_bootstrap_closed: &impl Fn(Option<String>),
+) -> Result<bool, TunnelSessionError>
+where
+    W: Sink<Message, Error = WebSocketError> + Unpin,
+{
+    match message {
+        TunnelWriterMessage::Text(payload) => {
+            if let Err(error) = writer.send(Message::Text(payload.into())).await {
+                notify_bootstrap_closed(Some(format!(
+                    "failed to write bootstrap tunnel text frame: {error}"
+                )));
+                return Err(TunnelSessionError::WriteTunnelText(error.to_string()));
+            }
+            Ok(false)
+        }
+        TunnelWriterMessage::Binary(payload) => {
+            if let Err(error) = writer.send(Message::Binary(payload.into())).await {
+                notify_bootstrap_closed(Some(format!(
+                    "failed to write bootstrap tunnel binary frame: {error}"
+                )));
+                return Err(TunnelSessionError::WriteTunnelBinary(error.to_string()));
+            }
+            Ok(false)
+        }
+        TunnelWriterMessage::Pong(payload) => {
+            write_bootstrap_pong(writer, payload, notify_bootstrap_closed).await?;
+            Ok(false)
+        }
+        TunnelWriterMessage::Flush { response_sender } => {
+            let _ = response_sender.send(Ok(()));
+            Ok(false)
+        }
+        TunnelWriterMessage::Close => {
+            write_bootstrap_close(writer, notify_bootstrap_closed).await?;
+            Ok(true)
+        }
+    }
+}
+
+async fn write_bootstrap_pong<W>(
+    writer: &mut W,
+    payload: Vec<u8>,
+    notify_bootstrap_closed: &impl Fn(Option<String>),
+) -> Result<(), TunnelSessionError>
+where
+    W: Sink<Message, Error = WebSocketError> + Unpin,
+{
+    if let Err(error) = writer.send(Message::Pong(payload.into())).await {
+        notify_bootstrap_closed(Some(format!(
+            "failed to write bootstrap tunnel pong frame: {error}"
+        )));
+        return Err(TunnelSessionError::WriteTunnelText(error.to_string()));
+    }
+    Ok(())
+}
+
+async fn write_bootstrap_close<W>(
+    writer: &mut W,
+    notify_bootstrap_closed: &impl Fn(Option<String>),
+) -> Result<(), TunnelSessionError>
+where
+    W: Sink<Message, Error = WebSocketError> + Unpin,
+{
+    if let Err(error) = writer.send(Message::Close(None)).await {
+        notify_bootstrap_closed(Some(format!(
+            "failed to write bootstrap tunnel close frame: {error}"
+        )));
+        return Err(TunnelSessionError::WriteTunnelText(error.to_string()));
+    }
+    notify_bootstrap_closed(None);
+    Ok(())
 }
 
 fn spawn_tunnel_wake_thread(
