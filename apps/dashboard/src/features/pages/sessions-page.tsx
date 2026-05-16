@@ -41,6 +41,24 @@ const SANDBOX_INSTANCE_LIST_LIMIT = 20;
 const SANDBOX_INSTANCE_LIST_MAX_LIMIT = 100;
 const SessionTitleTooltipSideOffset = 8;
 
+type SessionsEmptyStateRenderState =
+  | {
+      kind: "none";
+    }
+  | {
+      kind: "launchableProfilesError";
+      message: string;
+    }
+  | {
+      kind: "pendingLaunchableProfiles";
+    }
+  | {
+      kind: "startSession";
+    }
+  | {
+      kind: "publishProfile";
+    };
+
 function parseListLimit(rawValue: string | null): number {
   if (rawValue === null) {
     return SANDBOX_INSTANCE_LIST_LIMIT;
@@ -85,6 +103,83 @@ function SessionTitleCell(input: { href?: string; title: string }): React.JSX.El
     >
       {titleText}
     </TextLink>
+  );
+}
+
+function resolveSessionsEmptyState(input: {
+  hasNoSessions: boolean;
+  isLoadingSessions: boolean;
+  launchableProfilesErrorMessage: string | null;
+  launchableProfilesCount: number;
+  launchableProfilesPending: boolean;
+}): SessionsEmptyStateRenderState {
+  if (input.isLoadingSessions || !input.hasNoSessions) {
+    return { kind: "none" };
+  }
+
+  if (input.launchableProfilesErrorMessage !== null) {
+    return {
+      kind: "launchableProfilesError",
+      message: input.launchableProfilesErrorMessage,
+    };
+  }
+
+  if (input.launchableProfilesPending) {
+    return { kind: "pendingLaunchableProfiles" };
+  }
+
+  if (input.launchableProfilesCount > 0) {
+    return { kind: "startSession" };
+  }
+
+  return { kind: "publishProfile" };
+}
+
+function SessionsEmptyState(input: {
+  state: SessionsEmptyStateRenderState;
+}): React.JSX.Element | null {
+  if (input.state.kind === "none") {
+    return null;
+  }
+
+  if (input.state.kind === "launchableProfilesError") {
+    return (
+      <Notice title="Could not load launchable sandbox profiles" variant="alert">
+        {input.state.message}
+      </Notice>
+    );
+  }
+
+  if (input.state.kind === "pendingLaunchableProfiles") {
+    return <div className="min-h-64" />;
+  }
+
+  if (input.state.kind === "startSession") {
+    return (
+      <CollectionEmptyState
+        action={
+          <Button nativeButton={false} render={<RouterLink to={SessionsRoutes.NEW} />}>
+            <PlusIcon aria-hidden className="size-4" />
+            New session
+          </Button>
+        }
+        description="Starting a session creates a sandbox based on one of your published sandbox profiles."
+        title="Start your first session"
+      />
+    );
+  }
+
+  return (
+    <CollectionEmptyState
+      action={
+        <Button nativeButton={false} render={<RouterLink to="/sandbox-profiles" />}>
+          <PlusIcon aria-hidden className="size-4" />
+          Open sandbox profiles
+        </Button>
+      }
+      description="Sessions need a launchable sandbox profile. Create or publish a sandbox profile before starting one."
+      title="Publish a sandbox profile to start sessions"
+    />
   );
 }
 
@@ -222,7 +317,6 @@ export function SessionsPage(): React.JSX.Element {
 
   const isLoadingSessions = sandboxInstancesQuery.isPending;
   const hasNoSessions = sandboxInstancesQuery.data?.totalResults === 0;
-  const canShowSessionList = sandboxInstancesQuery.data !== undefined && !hasNoSessions;
   const shouldLoadLaunchableProfiles =
     !isLoadingSessions && listErrorMessage === null && hasNoSessions;
   const launchableProfilesQuery = useLaunchableSandboxProfiles({
@@ -235,13 +329,14 @@ export function SessionsPage(): React.JSX.Element {
           fallbackMessage: "Could not load launchable sandbox profiles.",
         })
       : null;
-  const hasLaunchableSandboxProfiles =
-    shouldLoadLaunchableProfiles && (launchableProfilesQuery.data?.items.length ?? 0) > 0;
-  const hasConfirmedNoLaunchableSandboxProfiles =
-    shouldLoadLaunchableProfiles &&
-    !launchableProfilesQuery.isPending &&
-    launchableProfilesErrorMessage === null &&
-    !hasLaunchableSandboxProfiles;
+  const sessionsEmptyState = resolveSessionsEmptyState({
+    hasNoSessions,
+    isLoadingSessions,
+    launchableProfilesCount: launchableProfilesQuery.data?.items.length ?? 0,
+    launchableProfilesErrorMessage,
+    launchableProfilesPending: launchableProfilesQuery.isPending,
+  });
+  const canShowSessionList = sandboxInstancesQuery.data !== undefined && !hasNoSessions;
 
   const hasNextPage = sandboxInstancesQuery.data?.nextPage != null;
   const hasPreviousPage = sandboxInstancesQuery.data?.previousPage != null;
@@ -250,7 +345,7 @@ export function SessionsPage(): React.JSX.Element {
   return (
     <PageFrame
       headerActions={
-        hasConfirmedNoLaunchableSandboxProfiles ? (
+        sessionsEmptyState.kind === "publishProfile" ? (
           <Button
             disabled
             title="Publish a sandbox profile before starting a session."
@@ -275,47 +370,7 @@ export function SessionsPage(): React.JSX.Element {
           </Notice>
         )}
 
-        {!isLoadingSessions && hasNoSessions && launchableProfilesErrorMessage !== null ? (
-          <Notice title="Could not load launchable sandbox profiles" variant="alert">
-            {launchableProfilesErrorMessage}
-          </Notice>
-        ) : null}
-
-        {!isLoadingSessions &&
-        hasNoSessions &&
-        launchableProfilesErrorMessage === null &&
-        launchableProfilesQuery.isPending ? (
-          <div className="min-h-64" />
-        ) : null}
-
-        {!isLoadingSessions &&
-        hasNoSessions &&
-        launchableProfilesErrorMessage === null &&
-        !launchableProfilesQuery.isPending ? (
-          hasLaunchableSandboxProfiles ? (
-            <CollectionEmptyState
-              action={
-                <Button nativeButton={false} render={<RouterLink to={SessionsRoutes.NEW} />}>
-                  <PlusIcon aria-hidden className="size-4" />
-                  New session
-                </Button>
-              }
-              description="Starting a session creates a sandbox based on one of your published sandbox profiles."
-              title="Start your first session"
-            />
-          ) : (
-            <CollectionEmptyState
-              action={
-                <Button nativeButton={false} render={<RouterLink to="/sandbox-profiles" />}>
-                  <PlusIcon aria-hidden className="size-4" />
-                  Open sandbox profiles
-                </Button>
-              }
-              description="Sessions need a launchable sandbox profile. Create or publish a sandbox profile before starting one."
-              title="Publish a sandbox profile to start sessions"
-            />
-          )
-        ) : null}
+        <SessionsEmptyState state={sessionsEmptyState} />
 
         {canShowSessionList ? (
           <Table className="min-w-[40rem] table-fixed">

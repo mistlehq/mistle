@@ -55,18 +55,17 @@ export function AutomationsPage(): React.JSX.Element {
     setSearchParams(nextSearchParams);
   }
 
+  function createTrigger(): void {
+    void navigate("/automations/new");
+  }
+
   const canShowSummary = automationsQuery.data !== undefined && !automationsQuery.isError;
   const hasNoTriggers = automationsQuery.data?.totalResults === 0;
 
   return (
     <PageFrame
       headerActions={
-        <Button
-          onClick={() => {
-            void navigate("/automations/new");
-          }}
-          type="button"
-        >
+        <Button onClick={createTrigger} type="button">
           Create trigger
         </Button>
       }
@@ -75,12 +74,7 @@ export function AutomationsPage(): React.JSX.Element {
       {automationsQuery.isPending ? null : hasNoTriggers && errorMessage === null ? (
         <CollectionEmptyState
           action={
-            <Button
-              onClick={() => {
-                void navigate("/automations/new");
-              }}
-              type="button"
-            >
+            <Button onClick={createTrigger} type="button">
               <PlusIcon aria-hidden className="size-4" />
               Create trigger
             </Button>
