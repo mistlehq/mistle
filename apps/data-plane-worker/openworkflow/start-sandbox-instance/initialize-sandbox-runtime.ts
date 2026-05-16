@@ -207,7 +207,7 @@ export async function initializeSandboxRuntime(
   try {
     await ctx.sandboxRuntimeControl.beginInit(initRequest);
   } catch (error) {
-    if (!isSandboxdAlreadyInitializedError(error)) {
+    if (!isSandboxdAlreadySubmittedError(error)) {
       throw error;
     }
 
@@ -228,10 +228,12 @@ export async function initializeSandboxRuntime(
   }
 }
 
-function isSandboxdAlreadyInitializedError(error: unknown): boolean {
+function isSandboxdAlreadySubmittedError(error: unknown): boolean {
   return (
     error instanceof Error &&
-    error.message.includes("sandboxd has already completed initialization")
+    (error.message.includes("sandboxd has already completed initialization") ||
+      error.message.includes("sandboxd is already initializing") ||
+      error.message.includes("sandboxd init worker is already running"))
   );
 }
 
