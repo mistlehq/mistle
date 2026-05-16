@@ -205,7 +205,7 @@ describe("SandboxProfilesPage", () => {
     expect(screen.getByRole("button", { name: "Draft profile" })).toBeDefined();
     expect(screen.getByText("Not published")).toBeDefined();
     expect(screen.getByRole("button", { name: "Published profile" })).toBeDefined();
-    expect(screen.getByText("Published")).toBeDefined();
+    expect(screen.getByText("Published v1")).toBeDefined();
     expect(screen.queryByLabelText("pagination")).toBeNull();
   });
 });

@@ -8,6 +8,10 @@ This context defines the product language used for sandbox profiles, snapshots, 
 A versioned sandbox profile configuration that can be published and used to prepare sandbox sessions.
 _Avoid_: Profile revision
 
+**Referenced sandbox profile version**:
+The **Sandbox profile version** an object is configured to use or was created from.
+_Avoid_: Current version, latest version
+
 **Snapshot**:
 A prepared sandbox image for a published **Sandbox profile version**.
 _Avoid_: Template, cache
@@ -47,6 +51,7 @@ _Avoid_: Trigger when naming persistence, API, or workflow contracts
 ## Relationships
 
 - A **Sandbox profile version** may have one usable **Snapshot**.
+- A session, trigger, or other profile-backed object may have a **Referenced sandbox profile version** that differs from the profile's latest published **Sandbox profile version**.
 - A **Setup script** prepares a **Snapshot** from a **Base image**.
 - A **Snapshot maintenance script** prepares a replacement **Snapshot** from an existing usable **Snapshot**.
 - A **Snapshot maintenance script** belongs to one **Sandbox profile version** but may be edited without publishing a new version.
@@ -79,3 +84,4 @@ _Avoid_: Trigger when naming persistence, API, or workflow contracts
 - Dashboard route parameters are user-facing route language — resolved: use `triggerId` for dashboard route-facing code and translate to `automationId` only at backend API/service boundaries.
 - A unified dashboard trigger detail page should not infer the trigger kind by trying type-specific endpoints — resolved: expose a backend automation detail read contract and use it before rendering the type-specific editor.
 - The backend automation detail read contract should return the same summary shape as the unified automation list item so the dashboard has one discriminator shape for trigger routing.
+- "version" was used ambiguously to mean the latest published **Sandbox profile version** or an object's **Referenced sandbox profile version** — resolved: when describing a session, trigger, or other profile-backed object, use the object's referenced version.

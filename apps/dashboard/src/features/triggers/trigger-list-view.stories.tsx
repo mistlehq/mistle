@@ -14,6 +14,7 @@ const MixedItems: readonly TriggerListItemViewModel[] = [
     target: {
       sandboxProfileId: "sbp_repo_maintainer",
       sandboxProfileName: "Repo Maintainer",
+      sandboxProfileVersion: 3,
       primaryRepositoryId: "mistlehq/platform",
       primaryRepositoryName: "mistlehq/platform",
     },
@@ -40,6 +41,7 @@ const MixedItems: readonly TriggerListItemViewModel[] = [
     target: {
       sandboxProfileId: "sbp_repo_maintainer",
       sandboxProfileName: "Repo Maintainer",
+      sandboxProfileVersion: 3,
       primaryRepositoryId: "mistlehq/platform",
       primaryRepositoryName: "mistlehq/platform",
     },
@@ -60,6 +62,7 @@ const MixedItems: readonly TriggerListItemViewModel[] = [
     target: {
       sandboxProfileId: "sbp_finance_investigator",
       sandboxProfileName: "Finance Investigator",
+      sandboxProfileVersion: 3,
       primaryRepositoryId: null,
       primaryRepositoryName: null,
     },
@@ -80,6 +83,7 @@ const MixedItems: readonly TriggerListItemViewModel[] = [
     target: {
       sandboxProfileId: "sbp_incident_commander",
       sandboxProfileName: "Incident Commander",
+      sandboxProfileVersion: 3,
       primaryRepositoryId: "mistlehq/dashboard",
       primaryRepositoryName: "mistlehq/dashboard",
     },
@@ -107,6 +111,7 @@ const RowLevelIssueItem: TriggerListItemViewModel = {
   target: {
     sandboxProfileId: "sbp_incident_commander",
     sandboxProfileName: null,
+    sandboxProfileVersion: 3,
     primaryRepositoryId: "mistlehq/legacy",
     primaryRepositoryName: "mistlehq/legacy",
   },
@@ -131,6 +136,7 @@ const ScheduleWithoutNextRunItem: TriggerListItemViewModel = {
   target: {
     sandboxProfileId: "sbp_repo_maintainer",
     sandboxProfileName: "Repo Maintainer",
+    sandboxProfileVersion: 3,
     primaryRepositoryId: null,
     primaryRepositoryName: null,
   },

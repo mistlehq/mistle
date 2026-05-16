@@ -24,6 +24,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link as RouterLink, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { formatCompactSandboxProfileVersion } from "../sandbox-profiles/sandbox-profile-version-labels.js";
 import { useLaunchableSandboxProfiles } from "../sandbox-profiles/use-launchable-sandbox-profiles.js";
 import { isSessionPageNavigableSandboxStatus } from "../sessions/session-connect-policy.js";
 import { resolveSessionTitleLabel } from "../sessions/session-title-presentation.js";
@@ -724,8 +725,9 @@ export function SessionsPage(): React.JSX.Element {
                         </div>
                       </TableCell>
                       <TableCell className="align-top text-sm whitespace-normal">
-                        <span className="break-words text-sm text-muted-foreground">
-                          {session.sandboxProfileDisplayName ?? session.sandboxProfileId}
+                        <span className="break-words text-sm text-foreground/80">
+                          {session.sandboxProfileDisplayName ?? session.sandboxProfileId}{" "}
+                          {formatCompactSandboxProfileVersion(session.sandboxProfileVersion)}
                         </span>
                       </TableCell>
                       <TableCell className="align-top text-sm whitespace-normal">

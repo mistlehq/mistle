@@ -101,6 +101,7 @@ export function buildStoryTriggerListItem(
     target: {
       sandboxProfileId: "sbp_profile_alpha",
       sandboxProfileName: "Alpha Profile",
+      sandboxProfileVersion: 3,
       primaryRepositoryId: null,
       primaryRepositoryName: null,
     },

@@ -87,6 +87,7 @@ type AutomationListIssue = {
 type AutomationListTarget = {
   sandboxProfileId: string;
   sandboxProfileName: string | null;
+  sandboxProfileVersion: number;
   primaryRepositoryId: string | null;
   primaryRepositoryName: string | null;
 };
@@ -281,11 +282,13 @@ function resolveUnavailableAutomationListEvents(input: {
 function createListTarget(input: {
   sandboxProfileId: string;
   sandboxProfileDisplayName: string | null;
+  sandboxProfileVersion: number;
   primaryRepositoryId: string | null;
 }): AutomationListTarget {
   return {
     sandboxProfileId: input.sandboxProfileId,
     sandboxProfileName: input.sandboxProfileDisplayName,
+    sandboxProfileVersion: input.sandboxProfileVersion,
     primaryRepositoryId: input.primaryRepositoryId,
     primaryRepositoryName: input.primaryRepositoryId,
   };
@@ -303,6 +306,7 @@ type WebhookAutomationListPageRow = {
   resolvedIntegrationConnectionId: string | null;
   sandboxProfileId: string;
   sandboxProfileDisplayName: string | null;
+  sandboxProfileVersion: number;
   primaryRepositoryId: string | null;
   integrationTargetFamilyId: string | null;
   integrationTargetVariantId: string | null;
@@ -316,6 +320,7 @@ function createWebhookAutomationListPageItem(
   const target = createListTarget({
     sandboxProfileId: row.sandboxProfileId,
     sandboxProfileDisplayName: row.sandboxProfileDisplayName,
+    sandboxProfileVersion: row.sandboxProfileVersion,
     primaryRepositoryId: row.primaryRepositoryId,
   });
 
@@ -480,6 +485,7 @@ function createScheduleAutomationListPageItem(
   const target = createListTarget({
     sandboxProfileId: row.sandboxProfileId,
     sandboxProfileDisplayName: row.sandboxProfileDisplayName,
+    sandboxProfileVersion: row.sandboxProfileVersion,
     primaryRepositoryId: row.primaryRepositoryId,
   });
 
@@ -532,6 +538,7 @@ async function loadWebhookAutomationListPageItems(input: {
       resolvedIntegrationConnectionId: tables.integrationConnections.id,
       sandboxProfileId: tables.automationTargets.sandboxProfileId,
       sandboxProfileDisplayName: tables.sandboxProfiles.displayName,
+      sandboxProfileVersion: tables.automationTargets.sandboxProfileVersion,
       primaryRepositoryId: tables.automationTargets.primaryRepositoryId,
       integrationTargetFamilyId: tables.integrationTargets.familyId,
       integrationTargetVariantId: tables.integrationTargets.variantId,
@@ -625,6 +632,7 @@ type ScheduleAutomationListPageRow = {
   updatedAt: string;
   sandboxProfileId: string;
   sandboxProfileDisplayName: string | null;
+  sandboxProfileVersion: number;
   primaryRepositoryId: string | null;
   cronExpression: string;
   timezone: string;
@@ -650,6 +658,7 @@ async function loadScheduleAutomationListPageItems(input: {
       updatedAt: tables.automations.updatedAt,
       sandboxProfileId: tables.automationTargets.sandboxProfileId,
       sandboxProfileDisplayName: tables.sandboxProfiles.displayName,
+      sandboxProfileVersion: tables.automationTargets.sandboxProfileVersion,
       primaryRepositoryId: tables.automationTargets.primaryRepositoryId,
       cronExpression: tables.schedules.cronExpression,
       timezone: tables.schedules.timezone,

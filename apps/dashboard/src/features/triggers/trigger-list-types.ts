@@ -1,12 +1,5 @@
 import type { TriggerListEvent, TriggerListIssue, TriggerListItem } from "./triggers-types.js";
 
-export type TriggerListTargetViewModel = {
-  sandboxProfileId: string;
-  sandboxProfileName: string | null;
-  primaryRepositoryId: string | null;
-  primaryRepositoryName: string | null;
-};
-
 export type TriggerListScheduleSourceViewModel = {
   kind: "schedule";
   cronExpression: string;
@@ -25,7 +18,7 @@ export type TriggerListItemViewModel = {
   kind: TriggerListItem["kind"];
   name: string;
   enabled: boolean;
-  target: TriggerListTargetViewModel;
+  target: TriggerListItem["target"];
   issue?: TriggerListIssue;
   source: TriggerListWebhookSourceViewModel | TriggerListScheduleSourceViewModel;
   updatedAtLabel: string;

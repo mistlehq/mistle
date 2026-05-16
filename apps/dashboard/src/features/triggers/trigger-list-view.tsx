@@ -10,6 +10,7 @@ import {
 } from "@mistle/ui";
 
 import { IntegrationLogo } from "../integrations/integration-logo.js";
+import { formatCompactSandboxProfileVersion } from "../sandbox-profiles/sandbox-profile-version-labels.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 import { resolveEventSummary } from "./trigger-list-event-summary.js";
@@ -150,11 +151,16 @@ function TriggerIdentityCell(input: {
 function TargetCell(input: { item: TriggerListItemViewModel }): React.JSX.Element {
   const sandboxProfileName =
     input.item.target.sandboxProfileName ?? input.item.target.sandboxProfileId;
+  const sandboxProfileVersion = formatCompactSandboxProfileVersion(
+    input.item.target.sandboxProfileVersion,
+  );
   const repositoryName = input.item.target.primaryRepositoryName ?? "Workspace root";
 
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <span className="truncate text-sm text-foreground">{sandboxProfileName}</span>
+      <span className="truncate text-sm text-foreground">
+        {sandboxProfileName} {sandboxProfileVersion}
+      </span>
       <span className="truncate text-xs text-muted-foreground">{repositoryName}</span>
     </div>
   );

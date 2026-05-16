@@ -97,9 +97,9 @@ describe("NewSessionPage", () => {
     }
 
     fireEvent.click(profileTriggerButton);
-    fireEvent.click(screen.getByRole("option", { name: "Alpha Profile" }));
+    fireEvent.click(screen.getByRole("option", { name: "Alpha Profile v3" }));
 
-    expect((profileCombobox as HTMLInputElement).value).toBe("Alpha Profile");
+    expect((profileCombobox as HTMLInputElement).value).toBe("Alpha Profile v3");
   });
 
   it("shows a neutral notice and hides launch controls when no profiles are available", () => {

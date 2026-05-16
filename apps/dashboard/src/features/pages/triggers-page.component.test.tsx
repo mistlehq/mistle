@@ -34,6 +34,7 @@ function createTriggerListItem(overrides?: Partial<TriggerListItem>): TriggerLis
     target: {
       sandboxProfileId: "sbp_repo_maintainer",
       sandboxProfileName: "Repo Maintainer",
+      sandboxProfileVersion: 3,
       primaryRepositoryId: "mistlehq/platform",
       primaryRepositoryName: "mistlehq/platform",
     },
@@ -185,6 +186,7 @@ describe("TriggersPage", () => {
           target: {
             sandboxProfileId: "sbp_repo_maintainer",
             sandboxProfileName: "Repo Maintainer",
+            sandboxProfileVersion: 3,
             primaryRepositoryId: null,
             primaryRepositoryName: null,
           },
@@ -209,6 +211,7 @@ describe("TriggersPage", () => {
     expect(screen.getByRole("button", { name: "Event trigger" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Daily schedule" })).toBeDefined();
     expect(screen.getByText("0 9 * * 1-5")).toBeDefined();
+    expect(screen.getAllByText("Repo Maintainer v3").length).toBeGreaterThan(0);
     expect(screen.getByText("Workspace root")).toBeDefined();
   });
 

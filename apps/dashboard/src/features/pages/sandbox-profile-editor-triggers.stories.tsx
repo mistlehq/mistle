@@ -47,6 +47,7 @@ export const ProfileTriggers: TriggersListResult = {
       target: {
         sandboxProfileId: ProfileId,
         sandboxProfileName: "Repo Maintainer",
+        sandboxProfileVersion: 3,
         primaryRepositoryId: "mistlehq/platform",
         primaryRepositoryName: "mistlehq/platform",
       },
@@ -66,6 +67,7 @@ export const ProfileTriggers: TriggersListResult = {
       target: {
         sandboxProfileId: ProfileId,
         sandboxProfileName: "Repo Maintainer",
+        sandboxProfileVersion: 3,
         primaryRepositoryId: "mistlehq/platform",
         primaryRepositoryName: "mistlehq/platform",
       },
@@ -97,6 +99,7 @@ export const ProfileTriggers: TriggersListResult = {
       target: {
         sandboxProfileId: ProfileId,
         sandboxProfileName: "Repo Maintainer",
+        sandboxProfileVersion: 3,
         primaryRepositoryId: "mistlehq/legacy",
         primaryRepositoryName: "mistlehq/legacy",
       },
@@ -132,6 +135,7 @@ function createPaginatedProfileTriggerItem(input: {
       target: {
         sandboxProfileId: ProfileId,
         sandboxProfileName: "Repo Maintainer",
+        sandboxProfileVersion: 3,
         primaryRepositoryId: "mistlehq/platform",
         primaryRepositoryName: "mistlehq/platform",
       },
@@ -153,6 +157,7 @@ function createPaginatedProfileTriggerItem(input: {
     target: {
       sandboxProfileId: ProfileId,
       sandboxProfileName: "Repo Maintainer",
+      sandboxProfileVersion: 3,
       primaryRepositoryId: "mistlehq/platform",
       primaryRepositoryName: "mistlehq/platform",
     },

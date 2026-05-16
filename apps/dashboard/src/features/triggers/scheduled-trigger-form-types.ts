@@ -3,6 +3,8 @@ export type ScheduledTriggerFormOption = {
   label: string;
   description?: string;
   path?: string;
+  sandboxProfileDisplayName?: string;
+  sandboxProfileVersion?: number | null;
 };
 
 export const ScheduledTriggerConversationModes = {

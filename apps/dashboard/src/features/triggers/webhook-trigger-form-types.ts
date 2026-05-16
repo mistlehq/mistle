@@ -5,6 +5,8 @@ export type WebhookTriggerFormOption = {
   label: string;
   description?: string;
   path?: string;
+  sandboxProfileDisplayName?: string;
+  sandboxProfileVersion?: number | null;
 };
 
 export type WebhookTriggerFormValues = {

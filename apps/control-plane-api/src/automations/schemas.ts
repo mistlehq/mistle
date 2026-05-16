@@ -16,6 +16,7 @@ export const AutomationListTargetSchema = z
   .object({
     sandboxProfileId: z.string().min(1),
     sandboxProfileName: z.string().min(1).nullable(),
+    sandboxProfileVersion: z.number().int().min(1),
     primaryRepositoryId: z.string().min(1).nullable(),
     primaryRepositoryName: z.string().min(1).nullable(),
   })

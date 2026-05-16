@@ -21,7 +21,7 @@ const it = createIntegrationTest({
 });
 
 describe.concurrent("automations list integration", () => {
-  it("filters mixed automations by sandbox profile within the active organization", async ({
+  it("filters mixed automations by sandbox profile and returns referenced versions within the active organization", async ({
     env,
   }) => {
     const firstOrgSession = await env.auth.createSession({
@@ -36,7 +36,7 @@ describe.concurrent("automations list integration", () => {
       connectionId: "icn_automations_list_filter_profile_a",
       webhookSourceId: "iws_automations_list_filter_profile_a",
       profileId: "sbp_automations_list_filter_a",
-      profileVersion: 1,
+      profileVersion: 2,
     });
     await seedWebhookAutomationFixture(env, {
       organizationId: firstOrgSession.organizationId,
@@ -57,7 +57,7 @@ describe.concurrent("automations list integration", () => {
       organizationId: firstOrgSession.organizationId,
       webhookSourceId: "iws_automations_list_filter_profile_a",
       profileId: "sbp_automations_list_filter_a",
-      profileVersion: 1,
+      profileVersion: 2,
       targetId: "atg_automations_list_filter_webhook_a",
       name: "Profile A webhook",
       createdAt: "2026-03-03T00:00:00.000Z",
@@ -88,6 +88,7 @@ describe.concurrent("automations list integration", () => {
       scheduleId: "sch_automations_list_filter_schedule_a",
       targetId: "atg_automations_list_filter_schedule_a",
       profileId: "sbp_automations_list_filter_a",
+      profileVersion: 4,
       name: "Profile A schedule",
       createdAt: "2026-03-01T00:00:00.000Z",
     });
@@ -112,6 +113,7 @@ describe.concurrent("automations list integration", () => {
       "sbp_automations_list_filter_a",
       "sbp_automations_list_filter_a",
     ]);
+    expect(body.items.map((item) => item.target.sandboxProfileVersion)).toEqual([2, 4]);
   });
 
   it("applies trigger list filters before pagination and total results", async ({ env }) => {
@@ -336,11 +338,14 @@ async function seedScheduledAutomation(
     scheduleId: string;
     targetId: string;
     profileId: string;
+    profileVersion?: number;
     name: string;
     createdAt: string;
     primaryRepositoryId?: string | null;
   },
 ): Promise<void> {
+  const profileVersion = input.profileVersion ?? 1;
+
   await env.controlPlaneDb
     .insert(env.controlPlaneTables.sandboxProfiles)
     .values(
@@ -348,7 +353,7 @@ async function seedScheduledAutomation(
         id: input.profileId,
         organizationId: input.organizationId,
         displayName: `${input.profileId} display`,
-        activeVersion: 1,
+        activeVersion: profileVersion,
         createdAt: input.createdAt,
       }),
     )
@@ -358,7 +363,7 @@ async function seedScheduledAutomation(
     .values(
       sandboxProfileVersionRow({
         sandboxProfileId: input.profileId,
-        version: 1,
+        version: profileVersion,
       }),
     )
     .onConflictDoNothing();
@@ -396,7 +401,7 @@ async function seedScheduledAutomation(
     id: input.targetId,
     automationId: input.automationId,
     sandboxProfileId: input.profileId,
-    sandboxProfileVersion: 1,
+    sandboxProfileVersion: profileVersion,
     primaryRepositoryId: input.primaryRepositoryId ?? null,
     createdAt: input.createdAt,
     updatedAt: input.createdAt,

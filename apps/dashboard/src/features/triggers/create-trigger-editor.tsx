@@ -3,15 +3,8 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tansta
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import {
-  sandboxProfileVersionTriggerConfigQueryKey,
-  sandboxProfileVersionsQueryKey,
-} from "../sandbox-profiles/sandbox-profiles-query-keys.js";
-import {
-  getSandboxProfileVersionTriggerConfig,
-  listSandboxProfileVersions,
-} from "../sandbox-profiles/sandbox-profiles-service.js";
-import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { sandboxProfileVersionTriggerConfigQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
+import { getSandboxProfileVersionTriggerConfig } from "../sandbox-profiles/sandbox-profiles-service.js";
 import {
   toCreateScheduledTriggerPayload,
   toScheduledTriggerFormValues,
@@ -33,6 +26,7 @@ import {
 } from "./trigger-templates.js";
 import { TriggerTypeSelectField, type TriggerTypeValue } from "./trigger-type-field.js";
 import { TRIGGERS_QUERY_KEY_PREFIX } from "./triggers-query-keys.js";
+import { useSelectedSandboxProfileVersion } from "./use-selected-sandbox-profile-version.js";
 import { useTriggerSandboxProfileOptions } from "./use-trigger-sandbox-profile-options.js";
 import {
   resolveNoActiveProfileVersionMessage,
@@ -59,6 +53,7 @@ import {
   buildWebhookTriggerEventOptions,
   buildWebhookTriggerPrimaryRepositoryOptions,
   WebhookTriggerWorkspaceRootRepositoryOptionValue,
+  withSelectedSandboxProfileOptionVersion,
 } from "./webhook-trigger-option-builders.js";
 import { createWebhookTrigger } from "./webhook-triggers-service.js";
 
@@ -89,20 +84,10 @@ type CreateTriggerFormValueKey =
   | Exclude<WebhookTriggerFormValueKey, keyof CommonCreateTriggerFormValues>
   | Exclude<ScheduledTriggerFormValueKey, keyof CommonCreateTriggerFormValues>;
 
-type SelectedSandboxProfileVersion = {
-  profileId: string;
-  version: number;
-};
-
 const RequiredFieldSummaryMessage = "Please address the fields highlighted in red.";
 const RequiredTriggerTypeSelectionMessage = "Select a trigger source.";
 const RequiredTriggerSelectionMessage = "Please add an event";
 const MissingProfileVersionQueryId = 0;
-
-function resolveActiveVersion(versions: readonly SandboxProfileVersion[]): number | null {
-  const activeVersion = versions.find((version) => version.isActive);
-  return activeVersion?.version ?? null;
-}
 
 function createInitialCreateTriggerFormValues(
   initialSandboxProfileId: string | undefined,
@@ -323,8 +308,6 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
   const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(
     initialTemplate?.kind === "scheduled" ? (input.initialTemplateId ?? null) : null,
   );
-  const [selectedSandboxProfileVersion, setSelectedSandboxProfileVersion] =
-    useState<SelectedSandboxProfileVersion | null>(null);
   const [fieldErrors, setFieldErrors] = useState<
     Partial<Record<CreateTriggerFormValueKey, string>>
   >({});
@@ -335,33 +318,15 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
     enabled: kind === "trigger",
   });
   const selectedProfileId = formValues.sandboxProfileId.trim();
-  const isUsingPinnedSelectedProfileVersion =
-    selectedSandboxProfileVersion?.profileId === selectedProfileId;
-  const selectedProfileVersionsQuery = useQuery({
-    queryKey: sandboxProfileVersionsQueryKey(selectedProfileId),
-    queryFn: async ({ signal }) =>
-      listSandboxProfileVersions({
-        profileId: selectedProfileId,
-        signal,
-      }),
-    enabled: selectedProfileId.length > 0 && !isUsingPinnedSelectedProfileVersion,
-    retry: false,
+  const {
+    effectiveSelectedProfileVersion,
+    hasActiveProfileVersion,
+    isUsingPinnedSelectedProfileVersion,
+    selectedProfileVersionsQuery,
+    setSelectedSandboxProfileVersion,
+  } = useSelectedSandboxProfileVersion({
+    selectedProfileId,
   });
-  const activeSelectedProfileVersion = useMemo(
-    () => resolveActiveVersion(selectedProfileVersionsQuery.data?.versions ?? []),
-    [selectedProfileVersionsQuery.data],
-  );
-  const effectiveSelectedProfileVersion = isUsingPinnedSelectedProfileVersion
-    ? selectedSandboxProfileVersion.version
-    : activeSelectedProfileVersion;
-  const hasActiveProfileVersion =
-    selectedProfileId.length === 0
-      ? null
-      : isUsingPinnedSelectedProfileVersion
-        ? true
-        : selectedProfileVersionsQuery.data === undefined
-          ? null
-          : activeSelectedProfileVersion !== null;
   const selectedProfileTriggerConfigQuery = useQuery({
     queryKey: sandboxProfileVersionTriggerConfigQueryKey({
       profileId: selectedProfileId,
@@ -391,6 +356,19 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
       }),
     [selectedProfileRepositoryOptions],
   );
+  const sandboxProfileOptions = useMemo(
+    () =>
+      withSelectedSandboxProfileOptionVersion({
+        options: sandboxProfilePrerequisites.sandboxProfileOptions,
+        selectedProfileId,
+        selectedVersion: effectiveSelectedProfileVersion,
+      }),
+    [
+      effectiveSelectedProfileVersion,
+      sandboxProfilePrerequisites.sandboxProfileOptions,
+      selectedProfileId,
+    ],
+  );
   const selectedProfileBindingsError = isUsingPinnedSelectedProfileVersion
     ? selectedProfileTriggerConfigQuery.error
     : (selectedProfileVersionsQuery.error ?? selectedProfileTriggerConfigQuery.error);
@@ -401,7 +379,7 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
           error: selectedProfileBindingsError,
           fallbackMessage: "Could not load profile bindings.",
         });
-  const selectedProfileName = sandboxProfilePrerequisites.sandboxProfileOptions.find(
+  const selectedProfileName = sandboxProfileOptions.find(
     (option) => option.value === selectedProfileId,
   )?.label;
   const selectedProfileTriggerState = useMemo(
@@ -850,7 +828,7 @@ function useCreateTriggerEditorState(input: CreateTriggerEditorProps) {
         : eventPrerequisites.errorMessage === null &&
           (eventPrerequisites.isPending || eventPrerequisites.directoryData === undefined)),
     isSaving: createWebhookMutation.isPending || createScheduledMutation.isPending,
-    sandboxProfileOptions: sandboxProfilePrerequisites.sandboxProfileOptions,
+    sandboxProfileOptions,
     primaryRepositoryOptions,
     sandboxProfileStatusMessage,
     connectionOptions: eventPrerequisites.connectionOptions,

@@ -214,6 +214,60 @@ describe("useLoadedWebhookTriggerEditorState", () => {
     });
   });
 
+  it("uses the referenced profile version in edit-mode trigger availability copy", () => {
+    const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
+    queryClient.setQueryData(
+      sandboxProfileVersionTriggerConfigQueryKey({
+        profileId: "sbp_123",
+        version: 1,
+      }),
+      createTriggerConfig({ bindings: [] }),
+    );
+
+    const { result } = renderHook(
+      () =>
+        useLoadedWebhookTriggerEditorState({
+          mode: "edit",
+          triggerId: "atm_123",
+          navigate: async () => {},
+          initialSandboxProfileVersion: 1,
+          initialValues: {
+            name: "Linear trigger",
+            sandboxProfileId: "sbp_123",
+            primaryRepositoryId: "",
+            enabled: true,
+            inputTemplate: "",
+            instructions: "",
+            conversationKeyTemplate: "",
+            eventIds: [],
+            eventParameterValues: {},
+          },
+          connectionOptions: [],
+          sandboxProfileOptions: [
+            {
+              value: "sbp_123",
+              label: "Repo Maintainer v3",
+              sandboxProfileDisplayName: "Repo Maintainer",
+              sandboxProfileVersion: 3,
+            },
+          ],
+          directoryData: createDirectoryData(),
+        }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+
+    expect(result.current.sandboxProfileOptions[0]?.label).toBe("Repo Maintainer v1");
+    expect(result.current.triggerPickerDisabledState).toEqual({
+      reason:
+        "The sandbox profile Repo Maintainer v1 has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event triggers.",
+      variant: "default",
+    });
+  });
+
   it("surfaces binding query failures instead of showing a loading state", () => {
     expect(
       resolveSelectedProfileTriggerState({

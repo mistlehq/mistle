@@ -16,6 +16,7 @@ const ScheduleTrigger: TriggerListItemViewModel = {
   target: {
     sandboxProfileId: "sbp_repo_maintainer",
     sandboxProfileName: "Repo Maintainer",
+    sandboxProfileVersion: 3,
     primaryRepositoryId: "mistlehq/platform",
     primaryRepositoryName: "mistlehq/platform",
   },

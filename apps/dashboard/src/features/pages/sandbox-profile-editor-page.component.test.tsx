@@ -1343,7 +1343,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByText("Snapshot creation failed")).toBeDefined();
     expect(
       screen.getByText(
-        "Version v3 was published, but its snapshot could not be created. New sessions and triggers will continue using v2 until the snapshot is retried successfully.",
+        "Version 3 was published, but its snapshot could not be created. New sessions and triggers will continue using v2 until the snapshot is retried successfully.",
       ),
     ).toBeDefined();
     expect(screen.queryByText("Snapshot materialization failed.")).toBeNull();
@@ -1873,6 +1873,7 @@ describe("SandboxProfileEditorPage", () => {
             target: {
               sandboxProfileId: "sbp_test",
               sandboxProfileName: "Prototype Profile",
+              sandboxProfileVersion: 3,
               primaryRepositoryId: null,
               primaryRepositoryName: null,
             },

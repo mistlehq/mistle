@@ -354,6 +354,7 @@ describe("SessionsPage", () => {
           target: {
             sandboxProfileId: "sbp_profile_alpha",
             sandboxProfileName: "Alpha Profile",
+            sandboxProfileVersion: 3,
             primaryRepositoryId: null,
             primaryRepositoryName: null,
           },
@@ -433,7 +434,7 @@ describe("SessionsPage", () => {
     });
 
     expect(screen.getByText("Single session")).toBeDefined();
-    expect(screen.getByText("Profile metadata")).toBeDefined();
+    expect(screen.getByText("Profile metadata v3")).toBeDefined();
     expect(screen.queryByLabelText("pagination")).toBeNull();
   });
 
@@ -484,7 +485,7 @@ describe("SessionsPage", () => {
     });
 
     expect(screen.getByText("Untitled")).toBeDefined();
-    expect(screen.getByText("Alpha Profile")).toBeDefined();
+    expect(screen.getByText("Alpha Profile v3")).toBeDefined();
   });
 
   it("renders a compact failure indicator with tooltip details", () => {

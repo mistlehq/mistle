@@ -27,6 +27,10 @@ import {
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
 import {
+  formatCompactSandboxProfileVersion,
+  formatSandboxProfileVersionLabel,
+} from "../sandbox-profiles/sandbox-profile-version-labels.js";
+import {
   deleteSandboxProfileVersionRefreshSchedule,
   putSandboxProfileVersionMaintenanceScript,
   putSandboxProfileVersionRefreshSchedule,
@@ -519,12 +523,12 @@ function formatPublishSnapshotFailureMessage(input: {
   publishedVersion: number;
   runnableVersion: number | null;
 }): string {
-  const publishedVersion = `v${String(input.publishedVersion)}`;
+  const publishedVersion = formatSandboxProfileVersionLabel(input.publishedVersion);
   if (input.runnableVersion === null) {
-    return `Version ${publishedVersion} was published, but its snapshot could not be created. New sessions and triggers cannot use this profile until the snapshot is retried successfully.`;
+    return `${publishedVersion} was published, but its snapshot could not be created. New sessions and triggers cannot use this profile until the snapshot is retried successfully.`;
   }
 
-  return `Version ${publishedVersion} was published, but its snapshot could not be created. New sessions and triggers will continue using v${String(input.runnableVersion)} until the snapshot is retried successfully.`;
+  return `${publishedVersion} was published, but its snapshot could not be created. New sessions and triggers will continue using ${formatCompactSandboxProfileVersion(input.runnableVersion)} until the snapshot is retried successfully.`;
 }
 
 function resolveSnapshotStatusSummaryDescription(state: SnapshotStatusState): string {
@@ -533,7 +537,9 @@ function resolveSnapshotStatusSummaryDescription(state: SnapshotStatusState): st
   }
 
   const fallbackVersion =
-    state.runnableVersion !== null ? `v${String(state.runnableVersion)}` : null;
+    state.runnableVersion !== null
+      ? formatCompactSandboxProfileVersion(state.runnableVersion)
+      : null;
 
   return resolveSnapshotStatusDescription({
     fallbackVersion,
@@ -546,10 +552,10 @@ function resolveSnapshotStatusTitle(input: {
   version: number;
 }): string {
   if (input.state.kind === "ready" || input.state.kind === "refresh-error") {
-    return `Sandbox Profile v${String(input.version)}'s snapshot is ready`;
+    return `Sandbox Profile ${formatCompactSandboxProfileVersion(input.version)}'s snapshot is ready`;
   }
 
-  const currentVersion = `v${String(input.state.publishedVersion)}`;
+  const currentVersion = formatCompactSandboxProfileVersion(input.state.publishedVersion);
   return input.state.kind === "creating"
     ? `Sandbox Profile ${currentVersion}'s snapshot is being created`
     : `Sandbox Profile ${currentVersion}'s snapshot is unavailable`;

@@ -9,6 +9,7 @@ import type {
   IntegrationWebhookSource,
   IntegrationTarget,
 } from "../integrations/integrations-service.js";
+import { formatCompactSandboxProfileVersion } from "../sandbox-profiles/sandbox-profile-version-labels.js";
 import type {
   SandboxProfile,
   SandboxProfileRepositoryOption,
@@ -213,9 +214,62 @@ export function buildWebhookTriggerSandboxProfileOptions(input: {
   return sortOptionsByLabel(
     input.sandboxProfiles.map((profile) => ({
       value: profile.id,
-      label: profile.displayName,
+      label: formatWebhookTriggerSandboxProfileOptionLabel({
+        displayName: profile.displayName,
+        version: profile.activeVersion,
+      }),
+      sandboxProfileDisplayName: profile.displayName,
+      sandboxProfileVersion: profile.activeVersion,
     })),
   );
+}
+
+export function withSelectedSandboxProfileOptionVersion<
+  TOption extends {
+    value: string;
+    label: string;
+    sandboxProfileDisplayName?: string;
+    sandboxProfileVersion?: number | null;
+  },
+>(input: {
+  options: readonly TOption[];
+  selectedProfileId: string;
+  selectedVersion: number | null;
+}): readonly TOption[] {
+  if (input.selectedProfileId.length === 0 || input.selectedVersion === null) {
+    return input.options;
+  }
+
+  let didUpdate = false;
+  const options = input.options.map((option) => {
+    if (
+      option.value !== input.selectedProfileId ||
+      option.sandboxProfileDisplayName === undefined
+    ) {
+      return option;
+    }
+
+    didUpdate = true;
+    return {
+      ...option,
+      label: formatWebhookTriggerSandboxProfileOptionLabel({
+        displayName: option.sandboxProfileDisplayName,
+        version: input.selectedVersion,
+      }),
+      sandboxProfileVersion: input.selectedVersion,
+    };
+  });
+
+  return didUpdate ? options : input.options;
+}
+
+function formatWebhookTriggerSandboxProfileOptionLabel(input: {
+  displayName: string;
+  version: number | null;
+}): string {
+  return input.version === null
+    ? input.displayName
+    : `${input.displayName} ${formatCompactSandboxProfileVersion(input.version)}`;
 }
 
 export function buildWebhookTriggerPrimaryRepositoryOptions(input: {

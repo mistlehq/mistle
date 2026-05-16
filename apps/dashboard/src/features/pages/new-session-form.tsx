@@ -14,6 +14,7 @@ import { useNavigate } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
+import { formatCompactSandboxProfileVersion } from "../sandbox-profiles/sandbox-profile-version-labels.js";
 import type { LaunchableSandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { useLaunchableSandboxProfiles } from "../sandbox-profiles/use-launchable-sandbox-profiles.js";
 import { startSandboxInstanceFromProfileVersion } from "../sessions/sessions-service.js";
@@ -59,7 +60,7 @@ export function NewSessionForm(input?: { initialSelectedProfileId?: string }): R
   const selectableProfiles = selectableProfilesQuery.data?.items ?? [];
   const profileOptions = selectableProfiles.map((profile) => ({
     value: profile.id,
-    label: profile.displayName,
+    label: `${profile.displayName} ${formatCompactSandboxProfileVersion(profile.latestVersion)}`,
   }));
   const selectedProfile =
     selectedProfileId === null

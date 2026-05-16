@@ -730,6 +730,10 @@
                                 "type": ["string", "null"],
                                 "minLength": 1
                               },
+                              "sandboxProfileVersion": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
                               "primaryRepositoryId": {
                                 "type": ["string", "null"],
                                 "minLength": 1
@@ -742,6 +746,7 @@
                             "required": [
                               "sandboxProfileId",
                               "sandboxProfileName",
+                              "sandboxProfileVersion",
                               "primaryRepositoryId",
                               "primaryRepositoryName"
                             ],
@@ -1024,6 +1029,10 @@
                           "type": ["string", "null"],
                           "minLength": 1
                         },
+                        "sandboxProfileVersion": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
                         "primaryRepositoryId": {
                           "type": ["string", "null"],
                           "minLength": 1
@@ -1036,6 +1045,7 @@
                       "required": [
                         "sandboxProfileId",
                         "sandboxProfileName",
+                        "sandboxProfileVersion",
                         "primaryRepositoryId",
                         "primaryRepositoryName"
                       ],

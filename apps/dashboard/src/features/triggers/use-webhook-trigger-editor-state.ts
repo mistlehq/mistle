@@ -7,19 +7,13 @@ import type {
   IntegrationWebhookSource,
   IntegrationTarget,
 } from "../integrations/integrations-service.js";
-import {
-  sandboxProfileVersionTriggerConfigQueryKey,
-  sandboxProfileVersionsQueryKey,
-} from "../sandbox-profiles/sandbox-profiles-query-keys.js";
-import {
-  getSandboxProfileVersionTriggerConfig,
-  listSandboxProfileVersions,
-} from "../sandbox-profiles/sandbox-profiles-service.js";
+import { sandboxProfileVersionTriggerConfigQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
+import { getSandboxProfileVersionTriggerConfig } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxProfileVersionIntegrationBinding } from "../sandbox-profiles/sandbox-profiles-types.js";
-import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { TriggerCreateSuccessPath } from "./trigger-editor-navigation.js";
 import type { TriggerFormShellStatusMessage } from "./trigger-form-shell.js";
 import { TRIGGERS_QUERY_KEY_PREFIX } from "./triggers-query-keys.js";
+import { useSelectedSandboxProfileVersion } from "./use-selected-sandbox-profile-version.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-trigger-conversation-key-field.js";
 import {
   resolveSelectedWebhookTriggerEventOptions,
@@ -32,13 +26,17 @@ import {
   toWebhookTriggerFormValues,
   validateWebhookTriggerFormValues,
 } from "./webhook-trigger-form-helpers.js";
-import type { WebhookTriggerFormValues } from "./webhook-trigger-form-types.js";
+import type {
+  WebhookTriggerFormOption,
+  WebhookTriggerFormValues,
+} from "./webhook-trigger-form-types.js";
 import {
   buildWebhookTriggerPrimaryRepositoryOptions,
   buildWebhookTriggerEventOptions,
   createWebhookTriggerEventId,
   resolveEligibleProfileTriggerConnectionIds,
   WebhookTriggerWorkspaceRootRepositoryOptionValue,
+  withSelectedSandboxProfileOptionVersion,
 } from "./webhook-trigger-option-builders.js";
 import {
   createWebhookTrigger,
@@ -53,13 +51,6 @@ type DirectoryData = {
   connections: readonly IntegrationConnection[];
   targets: readonly IntegrationTarget[];
   webhookSources: readonly IntegrationWebhookSource[];
-};
-
-type WebhookTriggerOption = {
-  value: string;
-  label: string;
-  description?: string;
-  path?: string;
 };
 
 type SelectedProfileTriggerState = {
@@ -78,11 +69,6 @@ export function resolveNoActiveProfileVersionMessage(input: {
   selectedProfileName?: string | undefined;
 }): string {
   return `The sandbox profile ${input.selectedProfileName ?? input.selectedProfileId} has no active version. Publish the profile before creating triggers.`;
-}
-
-function resolveActiveVersion(versions: readonly SandboxProfileVersion[]): number | null {
-  const activeVersion = versions.find((version) => version.isActive);
-  return activeVersion?.version ?? null;
 }
 
 function hasRequiredFieldErrors(
@@ -254,22 +240,17 @@ type LoadedWebhookTriggerEditorStateInput = {
   deleteSuccessPath?: string;
   initialValues: WebhookTriggerFormValues;
   initialSandboxProfileVersion?: number;
-  connectionOptions: readonly WebhookTriggerOption[];
-  sandboxProfileOptions: readonly WebhookTriggerOption[];
+  connectionOptions: readonly WebhookTriggerFormOption[];
+  sandboxProfileOptions: readonly WebhookTriggerFormOption[];
   directoryData: DirectoryData;
   preservedWebhookSourceId?: string;
-};
-
-type SelectedSandboxProfileVersion = {
-  profileId: string;
-  version: number;
 };
 
 function resolvePrimaryRepositorySelectionNormalization(input: {
   currentValues: WebhookTriggerFormValues;
   selectedProfileId: string;
   hasLoadedTriggerConfig: boolean;
-  primaryRepositoryOptions: readonly WebhookTriggerOption[];
+  primaryRepositoryOptions: readonly WebhookTriggerFormOption[];
 }): string | null {
   if (!input.hasLoadedTriggerConfig) {
     return null;
@@ -348,9 +329,9 @@ export function resolveWebhookTriggerEditInitialValues(input: {
 }
 
 export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEditorStateInput): {
-  connectionOptions: readonly WebhookTriggerOption[];
-  sandboxProfileOptions: readonly WebhookTriggerOption[];
-  primaryRepositoryOptions: readonly WebhookTriggerOption[];
+  connectionOptions: readonly WebhookTriggerFormOption[];
+  sandboxProfileOptions: readonly WebhookTriggerFormOption[];
+  primaryRepositoryOptions: readonly WebhookTriggerFormOption[];
   sandboxProfileStatusMessage?: TriggerFormShellStatusMessage | undefined;
   webhookEventOptions: readonly WebhookTriggerEventOption[];
   triggerPickerDisabledState: WebhookTriggerEventPickerDisabledState | null;
@@ -373,16 +354,6 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
 } {
   const queryClient = useQueryClient();
   const [formValues, setFormValues] = useState(input.initialValues);
-  const [selectedSandboxProfileVersion, setSelectedSandboxProfileVersion] =
-    useState<SelectedSandboxProfileVersion | null>(
-      input.initialSandboxProfileVersion === undefined ||
-        input.initialValues.sandboxProfileId.trim().length === 0
-        ? null
-        : {
-            profileId: input.initialValues.sandboxProfileId.trim(),
-            version: input.initialSandboxProfileVersion,
-          },
-    );
   const [fieldErrors, setFieldErrors] = useState<
     Partial<Record<keyof WebhookTriggerFormValues, string>>
   >({});
@@ -391,33 +362,16 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const selectedProfileId = formValues.sandboxProfileId.trim();
-  const isUsingPinnedSelectedProfileVersion =
-    selectedSandboxProfileVersion?.profileId === selectedProfileId;
-  const selectedProfileVersionsQuery = useQuery({
-    queryKey: sandboxProfileVersionsQueryKey(selectedProfileId),
-    queryFn: async ({ signal }) =>
-      listSandboxProfileVersions({
-        profileId: selectedProfileId,
-        signal,
-      }),
-    enabled: selectedProfileId.length > 0 && !isUsingPinnedSelectedProfileVersion,
-    retry: false,
+  const {
+    effectiveSelectedProfileVersion,
+    hasActiveProfileVersion,
+    isUsingPinnedSelectedProfileVersion,
+    selectedProfileVersionsQuery,
+    setSelectedSandboxProfileVersion,
+  } = useSelectedSandboxProfileVersion({
+    initialSandboxProfileVersion: input.initialSandboxProfileVersion,
+    selectedProfileId,
   });
-  const activeSelectedProfileVersion = useMemo(
-    () => resolveActiveVersion(selectedProfileVersionsQuery.data?.versions ?? []),
-    [selectedProfileVersionsQuery.data],
-  );
-  const effectiveSelectedProfileVersion = isUsingPinnedSelectedProfileVersion
-    ? selectedSandboxProfileVersion.version
-    : activeSelectedProfileVersion;
-  const hasActiveProfileVersion =
-    selectedProfileId.length === 0
-      ? null
-      : isUsingPinnedSelectedProfileVersion
-        ? true
-        : selectedProfileVersionsQuery.data === undefined
-          ? null
-          : activeSelectedProfileVersion !== null;
   const selectedProfileTriggerConfigQuery = useQuery({
     queryKey: sandboxProfileVersionTriggerConfigQueryKey({
       profileId: selectedProfileId,
@@ -451,7 +405,16 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
       }),
     [selectedProfileRepositoryOptions],
   );
-  const selectedProfileName = input.sandboxProfileOptions.find(
+  const sandboxProfileOptions = useMemo(
+    () =>
+      withSelectedSandboxProfileOptionVersion({
+        options: input.sandboxProfileOptions,
+        selectedProfileId,
+        selectedVersion: effectiveSelectedProfileVersion,
+      }),
+    [effectiveSelectedProfileVersion, input.sandboxProfileOptions, selectedProfileId],
+  );
+  const selectedProfileName = sandboxProfileOptions.find(
     (option) => option.value === selectedProfileId,
   )?.label;
   const selectedProfileTriggerState = useMemo(
@@ -710,7 +673,7 @@ export function useLoadedWebhookTriggerEditorState(input: LoadedWebhookTriggerEd
 
   return {
     connectionOptions: input.connectionOptions,
-    sandboxProfileOptions: input.sandboxProfileOptions,
+    sandboxProfileOptions,
     primaryRepositoryOptions,
     sandboxProfileStatusMessage,
     webhookEventOptions,

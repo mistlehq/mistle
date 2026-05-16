@@ -67,11 +67,11 @@ const ConnectionOptions: readonly WebhookTriggerFormOption[] = [
 const SandboxProfileOptions: readonly WebhookTriggerFormOption[] = [
   {
     value: "sbp_repo_maintainer",
-    label: "Repo Maintainer",
+    label: "Repo Maintainer v3",
   },
   {
     value: "sbp_finance_investigator",
-    label: "Finance Investigator",
+    label: "Finance Investigator v2",
   },
 ];
 

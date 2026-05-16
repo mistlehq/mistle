@@ -42,6 +42,7 @@ function createScheduleTriggerSummary(overrides?: Partial<TriggerListItem>): Tri
     target: {
       sandboxProfileId: SandboxProfileId,
       sandboxProfileName: "Schedule Profile",
+      sandboxProfileVersion: 3,
       primaryRepositoryId: null,
       primaryRepositoryName: null,
     },
@@ -65,6 +66,7 @@ function createWebhookTriggerSummary(overrides?: Partial<TriggerListItem>): Trig
     target: {
       sandboxProfileId: SandboxProfileId,
       sandboxProfileName: "Schedule Profile",
+      sandboxProfileVersion: 3,
       primaryRepositoryId: null,
       primaryRepositoryName: null,
     },
@@ -148,6 +150,7 @@ function seedScheduledTriggerEditor(
     {
       id: SandboxProfileId,
       displayName: "Schedule Profile",
+      activeVersion: 3,
     },
   ]);
   queryClient.setQueryData(
@@ -175,6 +178,7 @@ function seedWebhookTriggerEditor(
     {
       id: SandboxProfileId,
       displayName: "Schedule Profile",
+      activeVersion: 3,
     },
   ]);
   queryClient.setQueryData(WEBHOOK_TRIGGER_INTEGRATION_DIRECTORY_QUERY_KEY, {
@@ -284,6 +288,7 @@ describe("TriggerEditorPage", () => {
     expect(await screen.findByDisplayValue("0 9 * * 1-5")).toBeDefined();
     expect(screen.getByText("Trigger source")).toBeDefined();
     expect(screen.getAllByText("Schedule").length).toBeGreaterThan(0);
+    expect(screen.getByText("Schedule Profile v1")).toBeDefined();
   });
 
   it("uses the loaded trigger summary to render the webhook trigger editor", async () => {
@@ -311,6 +316,7 @@ describe("TriggerEditorPage", () => {
     expect(await screen.findByDisplayValue("Webhook trigger")).toBeDefined();
     expect(screen.getByText("Trigger source")).toBeDefined();
     expect(screen.getAllByText("Event").length).toBeGreaterThan(0);
+    expect(screen.getByText("Schedule Profile v1")).toBeDefined();
   });
 });
 
@@ -323,6 +329,7 @@ describe("TriggerEditorContent", () => {
         target: {
           sandboxProfileId: "sbp_other_profile",
           sandboxProfileName: "Other Profile",
+          sandboxProfileVersion: 3,
           primaryRepositoryId: null,
           primaryRepositoryName: null,
         },

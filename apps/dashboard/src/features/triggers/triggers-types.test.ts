@@ -14,6 +14,7 @@ describe("TriggersListResultSchema", () => {
           target: {
             sandboxProfileId: "sbp_repo_maintainer",
             sandboxProfileName: "Repo Maintainer",
+            sandboxProfileVersion: 3,
             primaryRepositoryId: "mistlehq/platform",
             primaryRepositoryName: "mistlehq/platform",
           },
@@ -36,6 +37,7 @@ describe("TriggersListResultSchema", () => {
           target: {
             sandboxProfileId: "sbp_repo_maintainer",
             sandboxProfileName: "Repo Maintainer",
+            sandboxProfileVersion: 3,
             primaryRepositoryId: null,
             primaryRepositoryName: null,
           },

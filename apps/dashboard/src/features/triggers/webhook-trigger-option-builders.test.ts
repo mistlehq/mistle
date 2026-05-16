@@ -585,21 +585,21 @@ function buildSlackMessageEventTypes(input: {
 
 describe("buildWebhookTriggerSandboxProfileOptions", () => {
   it("does not expose sandbox profile status as option copy", () => {
-    expect(
-      buildWebhookTriggerSandboxProfileOptions({
-        sandboxProfiles: [
-          {
-            activeVersion: null,
-            id: "sbp_1",
-            organizationId: "org_1",
-            displayName: "Repo Maintainer",
-            status: "active",
-            createdAt: "2026-03-16T10:00:00.000Z",
-            updatedAt: "2026-03-16T10:00:00.000Z",
-          },
-        ],
-      }),
-    ).toEqual([
+    const options = buildWebhookTriggerSandboxProfileOptions({
+      sandboxProfiles: [
+        {
+          activeVersion: null,
+          id: "sbp_1",
+          organizationId: "org_1",
+          displayName: "Repo Maintainer",
+          status: "active",
+          createdAt: "2026-03-16T10:00:00.000Z",
+          updatedAt: "2026-03-16T10:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(options.map((option) => ({ value: option.value, label: option.label }))).toEqual([
       {
         value: "sbp_1",
         label: "Repo Maintainer",

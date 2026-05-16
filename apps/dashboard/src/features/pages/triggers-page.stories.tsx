@@ -72,6 +72,7 @@ const meta = {
             primaryRepositoryName: "mistlehq/mistle",
             sandboxProfileId: "sbp_repo_maintainer",
             sandboxProfileName: "Repo Maintainer",
+            sandboxProfileVersion: 3,
           },
           updatedAt: "2026-05-14T08:30:00.000Z",
         },

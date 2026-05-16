@@ -16,11 +16,11 @@ import { TriggerTypeDisplayField, TriggerTypeSelectField } from "./trigger-type-
 const SandboxProfileOptions: readonly ScheduledTriggerFormOption[] = [
   {
     value: "sbp_repo_maintainer",
-    label: "Repo Maintainer",
+    label: "Repo Maintainer v3",
   },
   {
     value: "sbp_finance_investigator",
-    label: "Finance Investigator",
+    label: "Finance Investigator v2",
   },
 ];
 

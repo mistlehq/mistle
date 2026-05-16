@@ -808,6 +808,7 @@ export interface paths {
                   primaryRepositoryName: string | null;
                   sandboxProfileId: string;
                   sandboxProfileName: string | null;
+                  sandboxProfileVersion: number;
                 };
                 updatedAt: string;
               }[];
@@ -939,6 +940,7 @@ export interface paths {
                 primaryRepositoryName: string | null;
                 sandboxProfileId: string;
                 sandboxProfileName: string | null;
+                sandboxProfileVersion: number;
               };
               updatedAt: string;
             };

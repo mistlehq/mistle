@@ -2,15 +2,8 @@ import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tansta
 import { useEffect, useMemo, useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import {
-  sandboxProfileVersionTriggerConfigQueryKey,
-  sandboxProfileVersionsQueryKey,
-} from "../sandbox-profiles/sandbox-profiles-query-keys.js";
-import {
-  getSandboxProfileVersionTriggerConfig,
-  listSandboxProfileVersions,
-} from "../sandbox-profiles/sandbox-profiles-service.js";
-import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { sandboxProfileVersionTriggerConfigQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
+import { getSandboxProfileVersionTriggerConfig } from "../sandbox-profiles/sandbox-profiles-service.js";
 import {
   toCreateScheduledTriggerPayload,
   toScheduledTriggerFormValues,
@@ -30,8 +23,12 @@ import {
 import type { TriggerCreateSuccessPath } from "./trigger-editor-navigation.js";
 import { scheduledTriggerDetailQueryKey } from "./triggers-query-keys.js";
 import { TRIGGERS_QUERY_KEY_PREFIX } from "./triggers-query-keys.js";
-import { buildWebhookTriggerPrimaryRepositoryOptions } from "./webhook-trigger-option-builders.js";
-import { WebhookTriggerWorkspaceRootRepositoryOptionValue } from "./webhook-trigger-option-builders.js";
+import { useSelectedSandboxProfileVersion } from "./use-selected-sandbox-profile-version.js";
+import {
+  buildWebhookTriggerPrimaryRepositoryOptions,
+  WebhookTriggerWorkspaceRootRepositoryOptionValue,
+  withSelectedSandboxProfileOptionVersion,
+} from "./webhook-trigger-option-builders.js";
 
 type NavigateFunction = (to: string) => void | Promise<void>;
 
@@ -46,18 +43,8 @@ type LoadedScheduledTriggerEditorStateInput = {
   sandboxProfileOptions: readonly ScheduledTriggerFormOption[];
 };
 
-type SelectedSandboxProfileVersion = {
-  profileId: string;
-  version: number;
-};
-
 const MissingProfileVersionQueryId = 0;
 const RequiredFieldSummaryMessage = "Please address the fields highlighted in red.";
-
-function resolveActiveVersion(versions: readonly SandboxProfileVersion[]): number | null {
-  const activeVersion = versions.find((version) => version.isActive);
-  return activeVersion?.version ?? null;
-}
 
 function hasRequiredFieldErrors(
   fieldErrors: Partial<Record<ScheduledTriggerFormValueKey, string>>,
@@ -163,16 +150,6 @@ export function useLoadedScheduledTriggerEditorState(
   const queryClient = useQueryClient();
   const [formValues, setFormValues] = useState(input.initialValues);
   const [savedFormValues, setSavedFormValues] = useState(input.initialValues);
-  const [selectedSandboxProfileVersion, setSelectedSandboxProfileVersion] =
-    useState<SelectedSandboxProfileVersion | null>(
-      input.initialSandboxProfileVersion === undefined ||
-        input.initialValues.sandboxProfileId.trim().length === 0
-        ? null
-        : {
-            profileId: input.initialValues.sandboxProfileId.trim(),
-            version: input.initialSandboxProfileVersion,
-          },
-    );
   const [fieldErrors, setFieldErrors] = useState<
     Partial<Record<ScheduledTriggerFormValueKey, string>>
   >({});
@@ -181,25 +158,11 @@ export function useLoadedScheduledTriggerEditorState(
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const selectedProfileId = formValues.sandboxProfileId.trim();
-  const isUsingPinnedSelectedProfileVersion =
-    selectedSandboxProfileVersion?.profileId === selectedProfileId;
-  const selectedProfileVersionsQuery = useQuery({
-    queryKey: sandboxProfileVersionsQueryKey(selectedProfileId),
-    queryFn: async ({ signal }) =>
-      listSandboxProfileVersions({
-        profileId: selectedProfileId,
-        signal,
-      }),
-    enabled: selectedProfileId.length > 0 && !isUsingPinnedSelectedProfileVersion,
-    retry: false,
-  });
-  const activeSelectedProfileVersion = useMemo(
-    () => resolveActiveVersion(selectedProfileVersionsQuery.data?.versions ?? []),
-    [selectedProfileVersionsQuery.data],
-  );
-  const effectiveSelectedProfileVersion = isUsingPinnedSelectedProfileVersion
-    ? selectedSandboxProfileVersion.version
-    : activeSelectedProfileVersion;
+  const { effectiveSelectedProfileVersion, setSelectedSandboxProfileVersion } =
+    useSelectedSandboxProfileVersion({
+      initialSandboxProfileVersion: input.initialSandboxProfileVersion,
+      selectedProfileId,
+    });
   const selectedProfileTriggerConfigQuery = useQuery({
     queryKey: sandboxProfileVersionTriggerConfigQueryKey({
       profileId: selectedProfileId,
@@ -228,6 +191,15 @@ export function useLoadedScheduledTriggerEditorState(
         repositoryOptions: selectedProfileRepositoryOptions,
       }),
     [selectedProfileRepositoryOptions],
+  );
+  const sandboxProfileOptions = useMemo(
+    () =>
+      withSelectedSandboxProfileOptionVersion({
+        options: input.sandboxProfileOptions,
+        selectedProfileId,
+        selectedVersion: effectiveSelectedProfileVersion,
+      }),
+    [effectiveSelectedProfileVersion, input.sandboxProfileOptions, selectedProfileId],
   );
 
   useEffect(() => {
@@ -421,7 +393,7 @@ export function useLoadedScheduledTriggerEditorState(
   }
 
   return {
-    sandboxProfileOptions: input.sandboxProfileOptions,
+    sandboxProfileOptions,
     primaryRepositoryOptions,
     values: formValues,
     fieldErrors,

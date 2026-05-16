@@ -27,6 +27,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { formatPublishedSandboxProfileVersionBadge } from "../sandbox-profiles/sandbox-profile-version-labels.js";
 import { formatSandboxProfileUpdatedAt } from "../sandbox-profiles/sandbox-profiles-formatters.js";
 import { sandboxProfilesListQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import {
@@ -43,7 +44,9 @@ const DEFAULT_LIST_LIMIT = 20;
 const MAX_LIST_LIMIT = 100;
 
 function formatSandboxProfilePublicationStatus(activeVersion: number | null): string {
-  return activeVersion === null ? "Not published" : "Published";
+  return activeVersion === null
+    ? "Not published"
+    : formatPublishedSandboxProfileVersionBadge(activeVersion);
 }
 
 function parseListLimit(rawValue: string | null): number {
