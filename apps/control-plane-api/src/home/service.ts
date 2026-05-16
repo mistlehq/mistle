@@ -105,6 +105,7 @@ export async function getHomeSummary(
         },
         {
           organizationId: params.organizationId,
+          userId: params.userId,
           limit: HOME_RECENT_SESSIONS_LIMIT,
           startedByKind: "user",
           startedById: params.userId,

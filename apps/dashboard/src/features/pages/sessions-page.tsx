@@ -3,6 +3,11 @@ import {
   Button,
   Notice,
   OverflowTooltipText,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Table,
   TableBody,
   TableCell,
@@ -31,7 +36,11 @@ import { PageFrame } from "../shared/page-frame.js";
 import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
+import { ToolbarSearchInput } from "../shared/toolbar-search-input.js";
 import { SessionsRoutes } from "../shell/app-shell-sessions-sidebar-mode.js";
+import { triggersListQueryKey } from "../triggers/triggers-query-keys.js";
+import { listTriggers } from "../triggers/triggers-service.js";
+import type { TriggerListItem } from "../triggers/triggers-types.js";
 import {
   resolveSandboxStatusBadgeUi,
   type SandboxLifecycleStatus,
@@ -39,7 +48,18 @@ import {
 
 const SANDBOX_INSTANCE_LIST_LIMIT = 20;
 const SANDBOX_INSTANCE_LIST_MAX_LIMIT = 100;
+const SESSION_FILTER_TRIGGER_LIST_LIMIT = 100;
 const SessionTitleTooltipSideOffset = 8;
+
+type SessionOwnerFilter = "anyone" | "me";
+type SessionStartedFromFilter = "any" | "manual" | "trigger" | "event" | "schedule";
+
+type SessionListFilters = {
+  search: string;
+  owner: SessionOwnerFilter;
+  startedFrom: SessionStartedFromFilter;
+  triggerId: string | null;
+};
 
 type SessionsEmptyStateRenderState =
   | {
@@ -74,6 +94,90 @@ function parseListLimit(rawValue: string | null): number {
   }
 
   return parsed;
+}
+
+function parseOwnerFilter(rawValue: string | null): SessionOwnerFilter {
+  if (rawValue === "me") {
+    return rawValue;
+  }
+
+  return "anyone";
+}
+
+function parseStartedFromFilter(rawValue: string | null): SessionStartedFromFilter {
+  if (
+    rawValue === "manual" ||
+    rawValue === "trigger" ||
+    rawValue === "event" ||
+    rawValue === "schedule"
+  ) {
+    return rawValue;
+  }
+
+  return "any";
+}
+
+function resolveOwnerFilterLabel(owner: SessionOwnerFilter): string {
+  if (owner === "me") {
+    return "Me";
+  }
+
+  return "Anyone";
+}
+
+function resolveStartedFromFilterLabel(startedFrom: SessionStartedFromFilter): string {
+  if (startedFrom === "manual") {
+    return "Manual";
+  }
+
+  if (startedFrom === "trigger") {
+    return "Any trigger";
+  }
+
+  if (startedFrom === "event") {
+    return "Event trigger";
+  }
+
+  if (startedFrom === "schedule") {
+    return "Scheduled trigger";
+  }
+
+  return "Any";
+}
+
+function resolveStartedFromSelectedLabel(input: {
+  filters: SessionListFilters;
+  triggerOptions: readonly TriggerListItem[];
+}): string {
+  if (input.filters.triggerId === null) {
+    return `Started from: ${resolveStartedFromFilterLabel(input.filters.startedFrom)}`;
+  }
+
+  return `Trigger: ${
+    input.triggerOptions.find((trigger) => trigger.id === input.filters.triggerId)?.name ??
+    "Specific trigger"
+  }`;
+}
+
+function readSessionListFilters(searchParams: URLSearchParams): SessionListFilters {
+  const startedFrom = parseStartedFromFilter(searchParams.get("startedFrom"));
+  const triggerId = searchParams.get("triggerId");
+
+  return {
+    search: searchParams.get("search")?.trim() ?? "",
+    owner: parseOwnerFilter(searchParams.get("owner")),
+    startedFrom,
+    triggerId: startedFrom === "trigger" && triggerId !== null ? triggerId : null,
+  };
+}
+
+function hasActiveSessionListFilters(filters: SessionListFilters): boolean {
+  return (
+    filters.search.length > 0 ||
+    filters.owner !== "anyone" ||
+    filters.startedFrom !== "any" ||
+    filters.triggerId !== null
+  );
 }
 
 function SessionTitleCell(input: { href?: string; title: string }): React.JSX.Element {
@@ -240,23 +344,162 @@ function resolveUpdatedLabel(input: {
   );
 }
 
+function SessionsListToolbar(input: {
+  filters: SessionListFilters;
+  triggerOptions: readonly TriggerListItem[];
+  onFiltersChange: (nextFilters: SessionListFilters) => void;
+  onClearFilters: () => void;
+}): React.JSX.Element {
+  const startedFromValue = input.filters.triggerId ?? input.filters.startedFrom;
+  const hasActiveFilters = hasActiveSessionListFilters(input.filters);
+
+  function updateSearch(nextSearch: string): void {
+    input.onFiltersChange({
+      ...input.filters,
+      search: nextSearch,
+    });
+  }
+
+  function updateOwner(nextOwner: string | null): void {
+    if (nextOwner === null) {
+      return;
+    }
+
+    if (nextOwner !== "anyone" && nextOwner !== "me") {
+      return;
+    }
+
+    input.onFiltersChange({
+      ...input.filters,
+      owner: nextOwner,
+    });
+  }
+
+  function updateStartedFrom(nextStartedFrom: string | null): void {
+    if (nextStartedFrom === null) {
+      return;
+    }
+
+    if (
+      nextStartedFrom === "any" ||
+      nextStartedFrom === "manual" ||
+      nextStartedFrom === "trigger" ||
+      nextStartedFrom === "event" ||
+      nextStartedFrom === "schedule"
+    ) {
+      input.onFiltersChange({
+        ...input.filters,
+        startedFrom: nextStartedFrom,
+        triggerId: null,
+      });
+      return;
+    }
+
+    const matchingTrigger = input.triggerOptions.find((trigger) => trigger.id === nextStartedFrom);
+    if (matchingTrigger === undefined) {
+      return;
+    }
+
+    input.onFiltersChange({
+      ...input.filters,
+      startedFrom: "trigger",
+      triggerId: matchingTrigger.id,
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <ToolbarSearchInput
+        ariaLabel="Search sessions"
+        onValueChange={updateSearch}
+        placeholder="Search sessions"
+        value={input.filters.search}
+      />
+
+      <Select onValueChange={updateOwner} value={input.filters.owner}>
+        <SelectTrigger aria-label="Filter sessions by owner" className="w-full sm:w-44">
+          <SelectValue placeholder="Owner">
+            Owner: {resolveOwnerFilterLabel(input.filters.owner)}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="anyone">Anyone</SelectItem>
+          <SelectItem value="me">Me</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <Select onValueChange={updateStartedFrom} value={startedFromValue}>
+        <SelectTrigger aria-label="Filter sessions by start source" className="w-full sm:w-60">
+          <SelectValue placeholder="Started from">
+            {resolveStartedFromSelectedLabel({
+              filters: input.filters,
+              triggerOptions: input.triggerOptions,
+            })}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="any">Any</SelectItem>
+          <SelectItem value="manual">Manual</SelectItem>
+          <SelectItem value="event">Event trigger</SelectItem>
+          <SelectItem value="schedule">Scheduled trigger</SelectItem>
+          <SelectItem value="trigger">Any trigger</SelectItem>
+          {input.triggerOptions.map((trigger) => (
+            <SelectItem key={trigger.id} value={trigger.id}>
+              {trigger.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {hasActiveFilters ? (
+        <Button onClick={input.onClearFilters} type="button" variant="secondary">
+          Clear filters
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 export function SessionsPage(): React.JSX.Element {
   const [searchParams, setSearchParams] = useSearchParams();
   const sandboxInstanceListLimit = parseListLimit(searchParams.get("limit"));
   const { after: sandboxInstancesAfter, before: sandboxInstancesBefore } =
     readKeysetPaginationCursors(searchParams);
+  const filters = readSessionListFilters(searchParams);
 
   const sandboxInstancesQuery = useQuery({
     queryKey: sandboxInstancesListQueryKey({
       limit: sandboxInstanceListLimit,
       after: sandboxInstancesAfter,
       before: sandboxInstancesBefore,
+      search: filters.search,
+      owner: filters.owner,
+      startedFrom: filters.startedFrom,
+      triggerId: filters.triggerId,
     }),
     queryFn: async ({ signal }) =>
       listSandboxInstances({
         limit: sandboxInstanceListLimit,
         after: sandboxInstancesAfter,
         before: sandboxInstancesBefore,
+        ...(filters.search.length === 0 ? {} : { search: filters.search }),
+        ...(filters.owner === "anyone" ? {} : { owner: filters.owner }),
+        ...(filters.startedFrom === "any" ? {} : { startedFrom: filters.startedFrom }),
+        ...(filters.triggerId === null ? {} : { triggerId: filters.triggerId }),
+        signal,
+      }),
+  });
+  const triggerOptionsQuery = useQuery({
+    queryKey: triggersListQueryKey({
+      limit: SESSION_FILTER_TRIGGER_LIST_LIMIT,
+      after: null,
+      before: null,
+    }),
+    queryFn: async ({ signal }) =>
+      listTriggers({
+        limit: SESSION_FILTER_TRIGGER_LIST_LIMIT,
+        after: null,
+        before: null,
         signal,
       }),
   });
@@ -280,6 +523,50 @@ export function SessionsPage(): React.JSX.Element {
       nextSearchParams.set("before", input.nextBefore);
     }
     setSearchParams(nextSearchParams);
+  }
+
+  function updateFilters(nextFilters: SessionListFilters): void {
+    const nextSearchParams = new URLSearchParams(searchParams);
+
+    nextSearchParams.set("limit", String(sandboxInstanceListLimit));
+    nextSearchParams.delete("after");
+    nextSearchParams.delete("before");
+
+    if (nextFilters.search.trim().length === 0) {
+      nextSearchParams.delete("search");
+    } else {
+      nextSearchParams.set("search", nextFilters.search.trim());
+    }
+
+    if (nextFilters.owner === "anyone") {
+      nextSearchParams.delete("owner");
+    } else {
+      nextSearchParams.set("owner", nextFilters.owner);
+    }
+
+    if (nextFilters.startedFrom === "any") {
+      nextSearchParams.delete("startedFrom");
+    } else {
+      nextSearchParams.set("startedFrom", nextFilters.startedFrom);
+    }
+
+    if (nextFilters.triggerId === null) {
+      nextSearchParams.delete("triggerId");
+    } else {
+      nextSearchParams.set("startedFrom", "trigger");
+      nextSearchParams.set("triggerId", nextFilters.triggerId);
+    }
+
+    setSearchParams(nextSearchParams);
+  }
+
+  function clearFilters(): void {
+    updateFilters({
+      search: "",
+      owner: "anyone",
+      startedFrom: "any",
+      triggerId: null,
+    });
   }
 
   function goToNextPage(): void {
@@ -316,7 +603,8 @@ export function SessionsPage(): React.JSX.Element {
     : null;
 
   const isLoadingSessions = sandboxInstancesQuery.isPending;
-  const hasNoSessions = sandboxInstancesQuery.data?.totalResults === 0;
+  const hasActiveFilters = hasActiveSessionListFilters(filters);
+  const hasNoSessions = sandboxInstancesQuery.data?.totalResults === 0 && !hasActiveFilters;
   const shouldLoadLaunchableProfiles =
     !isLoadingSessions && listErrorMessage === null && hasNoSessions;
   const launchableProfilesQuery = useLaunchableSandboxProfiles({
@@ -336,7 +624,8 @@ export function SessionsPage(): React.JSX.Element {
     launchableProfilesErrorMessage,
     launchableProfilesPending: launchableProfilesQuery.isPending,
   });
-  const canShowSessionList = sandboxInstancesQuery.data !== undefined && !hasNoSessions;
+  const canShowSessionList =
+    sandboxInstancesQuery.data !== undefined && (!hasNoSessions || hasActiveFilters);
 
   const hasNextPage = sandboxInstancesQuery.data?.nextPage != null;
   const hasPreviousPage = sandboxInstancesQuery.data?.previousPage != null;
@@ -373,81 +662,97 @@ export function SessionsPage(): React.JSX.Element {
         <SessionsEmptyState state={sessionsEmptyState} />
 
         {canShowSessionList ? (
-          <Table className="min-w-[40rem] table-fixed">
-            <TableHeader className="bg-muted/60">
-              <TableRow className="h-9 border-b">
-                <TableHead className="text-foreground w-[36%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
-                  Sessions
-                </TableHead>
-                <TableHead className="text-foreground w-[20%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
-                  Sandbox profile
-                </TableHead>
-                <TableHead className="text-foreground w-[18%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
-                  Started by
-                </TableHead>
-                <TableHead className="text-foreground w-[14%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
-                  Created
-                </TableHead>
-                <TableHead className="text-right text-foreground w-[12%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
-                  Updated
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {displayedSessions.map((session) => {
-                const isNavigable = isSessionPageNavigableSandboxStatus(session.status);
+          <>
+            <SessionsListToolbar
+              filters={filters}
+              onClearFilters={clearFilters}
+              onFiltersChange={updateFilters}
+              triggerOptions={triggerOptionsQuery.data?.items ?? []}
+            />
 
-                return (
-                  <TableRow
-                    className={
-                      isNavigable
-                        ? "group/session-row focus-within:bg-muted/50 hover:bg-muted/50"
-                        : "group/session-row hover:bg-transparent"
-                    }
-                    key={session.id}
-                    {...(isNavigable ? {} : { "aria-disabled": true })}
-                  >
-                    <TableCell className="max-w-0 align-top whitespace-normal">
-                      <div className="flex min-w-0">
-                        <SessionTitleCell
-                          title={resolveSessionTitleLabel(session.title)}
-                          {...(isNavigable
-                            ? {
-                                href: `/sessions/${encodeURIComponent(session.id)}`,
-                              }
-                            : {})}
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell className="align-top text-sm whitespace-normal">
-                      <span className="break-words text-sm text-muted-foreground">
-                        {session.sandboxProfileDisplayName ?? session.sandboxProfileId}
-                      </span>
-                    </TableCell>
-                    <TableCell className="align-top text-sm whitespace-normal">
-                      <span className="break-words text-sm text-foreground/80">
-                        {formatStartedByLabel(session.startedBy)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="align-top whitespace-nowrap">
-                      <span className="text-muted-foreground text-sm">
-                        {formatCompactRelativeOrDate(session.createdAt)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="align-top text-right whitespace-nowrap">
-                      <div className="flex justify-end">
-                        {resolveUpdatedLabel({
-                          status: session.status,
-                          updatedAt: session.updatedAt,
-                          failureMessage: session.failureMessage,
-                        })}
-                      </div>
+            <Table className="min-w-[40rem] table-fixed">
+              <TableHeader className="bg-muted/60">
+                <TableRow className="h-9 border-b">
+                  <TableHead className="text-foreground w-[36%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                    Sessions
+                  </TableHead>
+                  <TableHead className="text-foreground w-[20%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                    Sandbox profile
+                  </TableHead>
+                  <TableHead className="text-foreground w-[18%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                    Started by
+                  </TableHead>
+                  <TableHead className="text-foreground w-[14%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
+                    Created
+                  </TableHead>
+                  <TableHead className="text-right text-foreground w-[12%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
+                    Updated
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {displayedSessions.length === 0 && hasActiveFilters ? (
+                  <TableRow>
+                    <TableCell className="text-muted-foreground" colSpan={5}>
+                      No sessions match these filters.
                     </TableCell>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                ) : null}
+                {displayedSessions.map((session) => {
+                  const isNavigable = isSessionPageNavigableSandboxStatus(session.status);
+
+                  return (
+                    <TableRow
+                      className={
+                        isNavigable
+                          ? "group/session-row focus-within:bg-muted/50 hover:bg-muted/50"
+                          : "group/session-row hover:bg-transparent"
+                      }
+                      key={session.id}
+                      {...(isNavigable ? {} : { "aria-disabled": true })}
+                    >
+                      <TableCell className="max-w-0 align-top whitespace-normal">
+                        <div className="flex min-w-0">
+                          <SessionTitleCell
+                            title={resolveSessionTitleLabel(session.title)}
+                            {...(isNavigable
+                              ? {
+                                  href: `/sessions/${encodeURIComponent(session.id)}`,
+                                }
+                              : {})}
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell className="align-top text-sm whitespace-normal">
+                        <span className="break-words text-sm text-muted-foreground">
+                          {session.sandboxProfileDisplayName ?? session.sandboxProfileId}
+                        </span>
+                      </TableCell>
+                      <TableCell className="align-top text-sm whitespace-normal">
+                        <span className="break-words text-sm text-foreground/80">
+                          {formatStartedByLabel(session.startedBy)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="align-top whitespace-nowrap">
+                        <span className="text-muted-foreground text-sm">
+                          {formatCompactRelativeOrDate(session.createdAt)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="align-top text-right whitespace-nowrap">
+                        <div className="flex justify-end">
+                          {resolveUpdatedLabel({
+                            status: session.status,
+                            updatedAt: session.updatedAt,
+                            failureMessage: session.failureMessage,
+                          })}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </>
         ) : null}
 
         {canShowSessionList ? (

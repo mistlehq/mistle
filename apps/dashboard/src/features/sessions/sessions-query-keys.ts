@@ -2,6 +2,10 @@ export function sandboxInstancesListQueryKey(input: {
   limit: number;
   after: string | null;
   before: string | null;
+  search: string;
+  owner: "anyone" | "me";
+  startedFrom: "any" | "manual" | "trigger" | "event" | "schedule";
+  triggerId: string | null;
 }) {
   return [
     "sandbox-instances",
@@ -10,6 +14,10 @@ export function sandboxInstancesListQueryKey(input: {
       limit: input.limit,
       after: input.after,
       before: input.before,
+      search: input.search,
+      owner: input.owner,
+      startedFrom: input.startedFrom,
+      triggerId: input.triggerId,
     },
   ] as const;
 }

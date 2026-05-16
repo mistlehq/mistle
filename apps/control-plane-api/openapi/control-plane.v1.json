@@ -14527,6 +14527,43 @@
             "required": false,
             "name": "before",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "search",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["me"]
+            },
+            "required": false,
+            "name": "owner",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["manual", "trigger", "event", "schedule"]
+            },
+            "required": false,
+            "name": "startedFrom",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "triggerId",
+            "in": "query"
           }
         ],
         "responses": {

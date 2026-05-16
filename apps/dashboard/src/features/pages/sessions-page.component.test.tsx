@@ -15,6 +15,8 @@ import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
 import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
 import { PageHeaderSidebarTriggerProvider } from "../shared/page-header-sidebar-trigger-context.js";
 import { SessionsRoutes } from "../shell/app-shell-sessions-sidebar-mode.js";
+import { triggersListQueryKey } from "../triggers/triggers-query-keys.js";
+import type { TriggerListItem, TriggersListResult } from "../triggers/triggers-types.js";
 import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionsPage } from "./sessions-page.js";
 import {
@@ -27,6 +29,19 @@ function createSessionsPageQueryClient(
 ): ReturnType<typeof createTestQueryClient> {
   const queryClient = createTestQueryClient(input);
   seedAuthenticatedSession(queryClient);
+  queryClient.setQueryData(
+    triggersListQueryKey({
+      limit: 100,
+      after: null,
+      before: null,
+    }),
+    {
+      items: [],
+      nextPage: null,
+      previousPage: null,
+      totalResults: 0,
+    } satisfies TriggersListResult,
+  );
   return queryClient;
 }
 
@@ -34,12 +49,24 @@ function seedSessionsList(input: {
   queryClient: ReturnType<typeof createTestQueryClient>;
   items: SandboxInstanceListItem[];
   totalResults?: number;
+  after?: string | null;
+  before?: string | null;
+  filters?: {
+    search: string;
+    owner: "anyone" | "me";
+    startedFrom: "any" | "manual" | "trigger" | "event" | "schedule";
+    triggerId: string | null;
+  };
 }): void {
   input.queryClient.setQueryData(
     sandboxInstancesListQueryKey({
       limit: 20,
-      after: null,
-      before: null,
+      after: input.after ?? null,
+      before: input.before ?? null,
+      search: input.filters?.search ?? "",
+      owner: input.filters?.owner ?? "anyone",
+      startedFrom: input.filters?.startedFrom ?? "any",
+      triggerId: input.filters?.triggerId ?? null,
     }),
     {
       items: input.items,
@@ -57,6 +84,25 @@ function seedLaunchableSandboxProfiles(input: {
   input.queryClient.setQueryData(launchableSandboxProfilesQueryKey(), {
     items: input.items,
   } satisfies LaunchableSandboxProfilesResult);
+}
+
+function seedSessionFilterTriggers(input: {
+  queryClient: ReturnType<typeof createTestQueryClient>;
+  items: TriggerListItem[];
+}): void {
+  input.queryClient.setQueryData(
+    triggersListQueryKey({
+      limit: 100,
+      after: null,
+      before: null,
+    }),
+    {
+      items: input.items,
+      nextPage: null,
+      previousPage: null,
+      totalResults: input.items.length,
+    } satisfies TriggersListResult,
+  );
 }
 
 function renderSessionsPage(input?: {
@@ -223,6 +269,111 @@ describe("SessionsPage", () => {
       await queryClient.cancelQueries();
       queryClient.clear();
     }
+  });
+
+  it("shows filtered no-results separately from the first-use empty state", () => {
+    const queryClient = createSessionsPageQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    seedSessionsList({
+      queryClient,
+      items: [],
+      totalResults: 0,
+      filters: {
+        search: "PlanetScale",
+        owner: "me",
+        startedFrom: "trigger",
+        triggerId: null,
+      },
+    });
+
+    renderSessionsPage({
+      queryClient,
+      initialEntries: ["/sessions?search=PlanetScale&owner=me&startedFrom=trigger"],
+    });
+
+    expect(screen.getByRole("textbox", { name: "Search sessions" }).getAttribute("value")).toBe(
+      "PlanetScale",
+    );
+    expect(screen.getByText("No sessions match these filters.")).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "Start your first session" })).toBeNull();
+  });
+
+  it("stores session search changes in the URL and clears pagination cursors", () => {
+    const queryClient = createSessionsPageQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    seedSessionsList({
+      queryClient,
+      items: [buildSandboxInstanceListItemFixture({ id: "sbi_filter_url" })],
+      after: "cursor_1",
+    });
+
+    function LocationProbe(): React.JSX.Element {
+      const location = useLocation();
+      return <span data-testid="location-search">{location.search}</span>;
+    }
+
+    renderSessionsPage({
+      queryClient,
+      initialEntries: ["/sessions?after=cursor_1"],
+      routes: (
+        <>
+          <SessionsPage />
+          <LocationProbe />
+        </>
+      ),
+    });
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Search sessions" }), {
+      target: { value: "Slack" },
+    });
+
+    expect(screen.getByTestId("location-search").textContent).toBe("?limit=20&search=Slack");
+  });
+
+  it("offers specific triggers in the start source filter", () => {
+    const queryClient = createSessionsPageQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    seedSessionsList({
+      queryClient,
+      items: [buildSandboxInstanceListItemFixture({ id: "sbi_trigger_filter" })],
+    });
+    seedSessionFilterTriggers({
+      queryClient,
+      items: [
+        {
+          id: "atm_slack",
+          kind: "webhook",
+          name: "Slack app mention received",
+          enabled: true,
+          target: {
+            sandboxProfileId: "sbp_profile_alpha",
+            sandboxProfileName: "Alpha Profile",
+            primaryRepositoryId: null,
+            primaryRepositoryName: null,
+          },
+          source: {
+            kind: "webhook",
+            events: [{ label: "app_mention" }],
+          },
+          updatedAt: "2026-03-10T00:00:00.000Z",
+        },
+      ],
+    });
+
+    renderSessionsPage({
+      queryClient,
+      initialEntries: ["/sessions"],
+    });
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Filter sessions by start source" }));
+
+    expect(screen.getByRole("option", { name: "Slack app mention received" })).toBeDefined();
   });
 
   it("keeps a single horizontally scrollable table layout", () => {

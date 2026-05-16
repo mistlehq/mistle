@@ -24,10 +24,14 @@ import {
   resolveSidebarModeEnableNavigationTarget,
 } from "../shell/app-shell-sessions-sidebar-mode.js";
 import { AppShellView } from "../shell/app-shell-view.js";
+import type { TriggerListItem } from "../triggers/triggers-types.js";
 import { NewSessionPage } from "./new-session-page.js";
 import { SessionWorkbenchPage } from "./session-workbench-page.js";
 import { SessionsPage } from "./sessions-page.js";
-import { createSessionsPageStoryQueryClient } from "./sessions-page.story-fixtures.js";
+import {
+  createSessionsPageStoryQueryClient,
+  type SessionsPageStoryListFilters,
+} from "./sessions-page.story-fixtures.js";
 
 type SessionsStoryHarnessProps = {
   initialEntries: readonly string[];
@@ -51,6 +55,7 @@ type SessionsStoryHarnessProps = {
     } | null;
   };
   sandboxInstancesList?: SandboxInstancesListResult;
+  sandboxInstancesListFilters?: SessionsPageStoryListFilters;
   sessionsSidebarQueryState?:
     | {
         kind: "success";
@@ -63,6 +68,7 @@ type SessionsStoryHarnessProps = {
         kind: "error";
       };
   showSessionsSidebar?: boolean;
+  triggerOptions?: TriggerListItem[];
 };
 
 export function SessionsStoryHarness(input: SessionsStoryHarnessProps): React.JSX.Element {
@@ -74,12 +80,16 @@ export function SessionsStoryHarness(input: SessionsStoryHarnessProps): React.JS
       ...(input.sandboxInstancesList !== undefined
         ? { sandboxInstancesList: input.sandboxInstancesList }
         : {}),
+      ...(input.sandboxInstancesListFilters !== undefined
+        ? { sandboxInstancesListFilters: input.sandboxInstancesListFilters }
+        : {}),
       ...(input.sandboxInstanceStatus !== undefined
         ? { sandboxInstanceStatus: input.sandboxInstanceStatus }
         : {}),
       ...(input.sessionsSidebarQueryState !== undefined
         ? { sessionsSidebarQueryState: input.sessionsSidebarQueryState }
         : {}),
+      ...(input.triggerOptions !== undefined ? { triggerOptions: input.triggerOptions } : {}),
     }),
   );
   const [router] = useState(() =>

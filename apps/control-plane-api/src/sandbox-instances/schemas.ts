@@ -170,7 +170,16 @@ export const sandboxInstanceListItemSchema = z
 export const listSandboxInstancesQuerySchema = createKeysetPaginationQuerySchema({
   defaultLimit: 20,
   maxLimit: 100,
-});
+})
+  .extend({
+    search: z.string().trim().min(1).max(200).optional(),
+    owner: z.enum(["me"]).optional(),
+    startedFrom: z.enum(["manual", "trigger", "event", "schedule"]).optional(),
+    triggerId: z.string().min(1).optional(),
+  })
+  .refine((value) => value.triggerId === undefined || value.startedFrom === "trigger", {
+    message: "`triggerId` can only be provided when `startedFrom` is `trigger`.",
+  });
 
 export const listSandboxInstancesResponseSchema = createKeysetPaginationEnvelopeSchema(
   sandboxInstanceListItemSchema,

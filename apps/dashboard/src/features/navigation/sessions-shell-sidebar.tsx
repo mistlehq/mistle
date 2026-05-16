@@ -41,6 +41,10 @@ export function SessionsShellSidebar(): React.JSX.Element {
       limit: SESSIONS_SIDEBAR_LIST_LIMIT,
       after: null,
       before: null,
+      search: "",
+      owner: "anyone",
+      startedFrom: "any",
+      triggerId: null,
     }),
     queryFn: async ({ signal }) =>
       listSandboxInstances({

@@ -15,6 +15,8 @@ import type {
   SandboxInstanceListItem,
   SandboxInstancesListResult,
 } from "../sessions/sessions-types.js";
+import { triggersListQueryKey } from "../triggers/triggers-query-keys.js";
+import type { TriggerListItem, TriggersListResult } from "../triggers/triggers-types.js";
 
 type SessionsSidebarQueryState =
   | {
@@ -27,6 +29,13 @@ type SessionsSidebarQueryState =
       errorMessage?: string;
       kind: "error";
     };
+
+export type SessionsPageStoryListFilters = {
+  search: string;
+  owner: "anyone" | "me";
+  startedFrom: "any" | "manual" | "trigger" | "event" | "schedule";
+  triggerId: string | null;
+};
 
 function storyOrganizationSummaryQueryKey(
   organizationId: string | null,
@@ -79,9 +88,35 @@ export function buildSandboxInstanceListItemFixture(
   };
 }
 
+export function buildStoryTriggerListItem(
+  overrides: Partial<TriggerListItem> & Pick<TriggerListItem, "id" | "name">,
+): TriggerListItem {
+  const { id, name, ...restOverrides } = overrides;
+
+  return {
+    id,
+    kind: "webhook",
+    name,
+    enabled: true,
+    target: {
+      sandboxProfileId: "sbp_profile_alpha",
+      sandboxProfileName: "Alpha Profile",
+      primaryRepositoryId: null,
+      primaryRepositoryName: null,
+    },
+    source: {
+      kind: "webhook",
+      events: [{ label: "app_mention" }],
+    },
+    updatedAt: "2026-03-10T00:00:00.000Z",
+    ...restOverrides,
+  };
+}
+
 export function createSessionsPageStoryQueryClient(input?: {
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
   sandboxInstancesList?: SandboxInstancesListResult;
+  sandboxInstancesListFilters?: SessionsPageStoryListFilters;
   sandboxInstanceStatus?: {
     id: string;
     title: string | null;
@@ -100,6 +135,7 @@ export function createSessionsPageStoryQueryClient(input?: {
     } | null;
   };
   sessionsSidebarQueryState?: SessionsSidebarQueryState;
+  triggerOptions?: TriggerListItem[];
 }): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -125,6 +161,10 @@ export function createSessionsPageStoryQueryClient(input?: {
       limit: 20,
       after: null,
       before: null,
+      search: input?.sandboxInstancesListFilters?.search ?? "",
+      owner: input?.sandboxInstancesListFilters?.owner ?? "anyone",
+      startedFrom: input?.sandboxInstancesListFilters?.startedFrom ?? "any",
+      triggerId: input?.sandboxInstancesListFilters?.triggerId ?? null,
     }),
     input?.sandboxInstancesList ?? {
       items: [],
@@ -137,6 +177,10 @@ export function createSessionsPageStoryQueryClient(input?: {
     limit: 100,
     after: null,
     before: null,
+    search: "",
+    owner: "anyone",
+    startedFrom: "any",
+    triggerId: null,
   });
   const sessionsSidebarQueryState = input?.sessionsSidebarQueryState ?? {
     kind: "success",
@@ -165,6 +209,20 @@ export function createSessionsPageStoryQueryClient(input?: {
       },
     });
   }
+
+  queryClient.setQueryData(
+    triggersListQueryKey({
+      limit: 100,
+      after: null,
+      before: null,
+    }),
+    {
+      items: input?.triggerOptions ?? [],
+      nextPage: null,
+      previousPage: null,
+      totalResults: input?.triggerOptions?.length ?? 0,
+    } satisfies TriggersListResult,
+  );
 
   if (input?.sandboxInstanceStatus !== undefined) {
     queryClient.setQueryData(sandboxInstanceStatusQueryKey(input.sandboxInstanceStatus.id), {

@@ -6,6 +6,14 @@ export const ListSandboxInstancesInputSchema = z
     limit: z.number().int().min(1).max(100).optional(),
     startedByKind: z.enum(["user", "system"]).optional(),
     startedById: z.string().min(1).optional(),
+    startedByScope: z.enum(["self", "others"]).optional(),
+    startedByUserId: z.string().min(1).optional(),
+    source: z.enum(["dashboard", "trigger", "webhook", "schedule"]).optional(),
+    titleSearch: z.string().trim().min(1).max(200).optional(),
+    matchingSandboxProfileIds: z.array(z.string().min(1)).min(1).optional(),
+    matchingStartedByUserIds: z.array(z.string().min(1)).min(1).optional(),
+    matchingStartedBySystemIds: z.array(z.string().min(1)).min(1).optional(),
+    startedBySystemIds: z.array(z.string().min(1)).min(1).optional(),
     after: z.string().min(1).optional(),
     before: z.string().min(1).optional(),
   })
@@ -19,6 +27,14 @@ export const ListSandboxInstancesInputSchema = z
       (value.startedByKind !== undefined && value.startedById !== undefined),
     {
       message: "`startedByKind` and `startedById` must be provided together.",
+    },
+  )
+  .refine(
+    (value) =>
+      (value.startedByScope === undefined && value.startedByUserId === undefined) ||
+      (value.startedByScope !== undefined && value.startedByUserId !== undefined),
+    {
+      message: "`startedByScope` and `startedByUserId` must be provided together.",
     },
   );
 

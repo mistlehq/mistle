@@ -17,9 +17,17 @@ export interface paths {
           after?: string;
           before?: string;
           limit?: number;
+          matchingSandboxProfileIds?: string[];
+          matchingStartedBySystemIds?: string[];
+          matchingStartedByUserIds?: string[];
           organizationId: string;
+          source?: "dashboard" | "trigger" | "webhook" | "schedule";
           startedById?: string;
           startedByKind?: "user" | "system";
+          startedByScope?: "self" | "others";
+          startedBySystemIds?: string[];
+          startedByUserId?: string;
+          titleSearch?: string;
         };
         header?: never;
         path?: never;
@@ -1681,6 +1689,133 @@ export interface paths {
             "application/json": {
               /** @enum {string} */
               code: "USER_STOP_NOT_SUPPORTED";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/internal/sandbox/instances/list": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            after?: string;
+            before?: string;
+            limit?: number;
+            matchingSandboxProfileIds?: string[];
+            matchingStartedBySystemIds?: string[];
+            matchingStartedByUserIds?: string[];
+            organizationId: string;
+            /** @enum {string} */
+            source?: "dashboard" | "trigger" | "webhook" | "schedule";
+            startedById?: string;
+            /** @enum {string} */
+            startedByKind?: "user" | "system";
+            /** @enum {string} */
+            startedByScope?: "self" | "others";
+            startedBySystemIds?: string[];
+            startedByUserId?: string;
+            titleSearch?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description List sandbox instances for internal callers. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              items: {
+                createdAt: string;
+                failureCode: string | null;
+                failureMessage: string | null;
+                id: string;
+                sandboxProfileId: string;
+                sandboxProfileVersion: number;
+                /** @enum {string} */
+                source: "dashboard" | "webhook" | "schedule" | "system";
+                startedBy: {
+                  id: string;
+                  /** @enum {string} */
+                  kind: "user" | "system";
+                };
+                /** @enum {string} */
+                status: "pending" | "starting" | "running" | "stopped" | "failed";
+                title: string | null;
+                updatedAt: string;
+              }[];
+              nextPage: {
+                after: string;
+                limit: number;
+              } | null;
+              previousPage: {
+                before: string;
+                limit: number;
+              } | null;
+              totalResults: number;
+            };
+          };
+        };
+        /** @description Invalid request body. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_LIST_INPUT" | "INVALID_PAGINATION_CURSOR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Internal service authentication failed. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
               message: string;
             };
           };

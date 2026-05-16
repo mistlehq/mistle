@@ -126,6 +126,10 @@ export async function listSandboxInstances(input: {
   limit: number;
   after: string | null;
   before: string | null;
+  search?: string;
+  owner?: "me";
+  startedFrom?: "manual" | "trigger" | "event" | "schedule";
+  triggerId?: string;
   signal?: AbortSignal;
 }): Promise<SandboxInstancesListResult> {
   try {
@@ -135,6 +139,10 @@ export async function listSandboxInstances(input: {
       params: {
         query: {
           limit: input.limit,
+          ...(input.search === undefined ? {} : { search: input.search }),
+          ...(input.owner === undefined ? {} : { owner: input.owner }),
+          ...(input.startedFrom === undefined ? {} : { startedFrom: input.startedFrom }),
+          ...(input.triggerId === undefined ? {} : { triggerId: input.triggerId }),
           ...(input.after === null ? {} : { after: input.after }),
           ...(input.before === null ? {} : { before: input.before }),
         },

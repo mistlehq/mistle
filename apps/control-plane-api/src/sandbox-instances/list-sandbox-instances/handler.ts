@@ -21,7 +21,12 @@ const routeHandler = async (
     },
     {
       organizationId: session.activeOrganizationId,
+      userId: session.userId,
       ...(query.limit === undefined ? {} : { limit: query.limit }),
+      ...(query.search === undefined ? {} : { search: query.search }),
+      ...(query.owner === undefined ? {} : { owner: query.owner }),
+      ...(query.startedFrom === undefined ? {} : { startedFrom: query.startedFrom }),
+      ...(query.triggerId === undefined ? {} : { triggerId: query.triggerId }),
       ...(query.after === undefined ? {} : { after: query.after }),
       ...(query.before === undefined ? {} : { before: query.before }),
     },

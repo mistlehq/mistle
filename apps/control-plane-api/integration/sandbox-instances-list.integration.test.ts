@@ -2,9 +2,10 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
-import { SandboxProfileStatuses } from "@mistle/db/control-plane";
+import { AutomationRunStatuses, SandboxProfileStatuses } from "@mistle/db/control-plane";
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
+import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import { ListSandboxInstancesResponseSchema } from "../src/sandbox-instances/index.js";
@@ -55,7 +56,7 @@ describe.concurrent("sandbox instances list integration", () => {
     await env.controlPlaneDb.insert(env.controlPlaneTables.automationRuns).values({
       id: "aru_cp_list",
       automationId: "atm_cp_list",
-      status: "running",
+      status: AutomationRunStatuses.RUNNING,
       createdAt: "2026-03-11T00:00:00.000Z",
       startedAt: "2026-03-11T00:00:00.000Z",
       updatedAt: "2026-03-11T00:00:00.000Z",
@@ -218,5 +219,295 @@ describe.concurrent("sandbox instances list integration", () => {
       code: "INVALID_LIST_INSTANCES_INPUT",
       message: expect.stringContaining("`after` cursor"),
     });
+  });
+
+  it("filters sandbox instances by search, owner, start source, and trigger", async ({ env }) => {
+    const ownerSession = await env.auth.createSession({
+      email: "integration-new-sandbox-instances-filter-owner@example.com",
+    });
+    const memberSession = await env.auth.createSession({
+      email: "integration-new-sandbox-instances-filter-member@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.members).values({
+      organizationId: ownerSession.organizationId,
+      userId: memberSession.userId,
+      role: "member",
+    });
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.sessions)
+      .set({
+        activeOrganizationId: ownerSession.organizationId,
+      })
+      .where(eq(env.controlPlaneTables.sessions.userId, memberSession.userId));
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values([
+      {
+        id: "sbp_cp_filter_planetscale",
+        organizationId: ownerSession.organizationId,
+        displayName: "PlanetScale Inspector",
+        status: SandboxProfileStatuses.ACTIVE,
+        createdAt: "2026-03-01T00:00:00.000Z",
+        updatedAt: "2026-03-01T00:00:00.000Z",
+      },
+      {
+        id: "sbp_cp_filter_general",
+        organizationId: ownerSession.organizationId,
+        displayName: "General Worker",
+        status: SandboxProfileStatuses.ACTIVE,
+        createdAt: "2026-03-01T00:00:00.000Z",
+        updatedAt: "2026-03-01T00:00:00.000Z",
+      },
+    ]);
+    await env.controlPlaneDb.insert(env.controlPlaneTables.automations).values([
+      {
+        id: "atm_cp_filter_slack",
+        organizationId: ownerSession.organizationId,
+        kind: "webhook",
+        name: "Slack app mention received",
+        enabled: true,
+        createdAt: "2026-03-02T00:00:00.000Z",
+        updatedAt: "2026-03-02T00:00:00.000Z",
+      },
+      {
+        id: "atm_cp_filter_schedule",
+        organizationId: ownerSession.organizationId,
+        kind: "schedule",
+        name: "Nightly cleanup",
+        enabled: true,
+        createdAt: "2026-03-02T00:00:00.000Z",
+        updatedAt: "2026-03-02T00:00:00.000Z",
+      },
+    ]);
+    await env.controlPlaneDb.insert(env.controlPlaneTables.automationRuns).values([
+      {
+        id: "aru_cp_filter_slack",
+        automationId: "atm_cp_filter_slack",
+        status: AutomationRunStatuses.RUNNING,
+        createdAt: "2026-03-11T00:00:00.000Z",
+        startedAt: "2026-03-11T00:00:00.000Z",
+        updatedAt: "2026-03-11T00:00:00.000Z",
+      },
+      {
+        id: "aru_cp_filter_schedule",
+        automationId: "atm_cp_filter_schedule",
+        status: AutomationRunStatuses.RUNNING,
+        createdAt: "2026-03-12T00:00:00.000Z",
+        startedAt: "2026-03-12T00:00:00.000Z",
+        updatedAt: "2026-03-12T00:00:00.000Z",
+      },
+    ]);
+
+    await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values([
+      {
+        id: "sbi_cp_filter_owner",
+        organizationId: ownerSession.organizationId,
+        sandboxProfileId: "sbp_cp_filter_planetscale",
+        title: "Inspect PlanetScale data",
+        sandboxProfileVersion: 1,
+        runtimeProvider: "docker",
+        providerSandboxId: "provider-cp-filter-owner",
+        status: SandboxInstanceStatuses.RUNNING,
+        startedByKind: "user",
+        startedById: ownerSession.userId,
+        source: "dashboard",
+        createdAt: "2026-03-15T00:00:00.000Z",
+        updatedAt: "2026-03-15T00:00:00.000Z",
+      },
+      {
+        id: "sbi_cp_filter_other_user",
+        organizationId: ownerSession.organizationId,
+        sandboxProfileId: "sbp_cp_filter_general",
+        title: "Manual member session",
+        sandboxProfileVersion: 1,
+        runtimeProvider: "docker",
+        providerSandboxId: "provider-cp-filter-other-user",
+        status: SandboxInstanceStatuses.RUNNING,
+        startedByKind: "user",
+        startedById: memberSession.userId,
+        source: "dashboard",
+        createdAt: "2026-03-14T00:00:00.000Z",
+        updatedAt: "2026-03-14T00:00:00.000Z",
+      },
+      {
+        id: "sbi_cp_filter_slack",
+        organizationId: ownerSession.organizationId,
+        sandboxProfileId: "sbp_cp_filter_general",
+        title: "Slack app mention received",
+        sandboxProfileVersion: 1,
+        runtimeProvider: "docker",
+        providerSandboxId: "provider-cp-filter-slack",
+        status: SandboxInstanceStatuses.RUNNING,
+        startedByKind: "system",
+        startedById: "aru_cp_filter_slack",
+        source: "webhook",
+        createdAt: "2026-03-13T00:00:00.000Z",
+        updatedAt: "2026-03-13T00:00:00.000Z",
+      },
+      {
+        id: "sbi_cp_filter_schedule",
+        organizationId: ownerSession.organizationId,
+        sandboxProfileId: "sbp_cp_filter_general",
+        title: "Scheduled cleanup",
+        sandboxProfileVersion: 1,
+        runtimeProvider: "docker",
+        providerSandboxId: "provider-cp-filter-schedule",
+        status: SandboxInstanceStatuses.RUNNING,
+        startedByKind: "system",
+        startedById: "aru_cp_filter_schedule",
+        source: "schedule",
+        createdAt: "2026-03-12T00:00:00.000Z",
+        updatedAt: "2026-03-12T00:00:00.000Z",
+      },
+    ]);
+
+    const ownerResponse = await env.controlPlaneApi.http.fetch("/v1/sandbox/instances?owner=me", {
+      headers: { cookie: ownerSession.cookie },
+    });
+    expect(ownerResponse.status).toBe(200);
+    const ownerBody = ListSandboxInstancesResponseSchema.parse(await ownerResponse.json());
+    expect(ownerBody.items.map((item) => item.id)).toEqual(["sbi_cp_filter_owner"]);
+
+    const unsupportedOwnerResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/instances?owner=others",
+      {
+        headers: { cookie: ownerSession.cookie },
+      },
+    );
+    expect(unsupportedOwnerResponse.status).toBe(400);
+
+    const triggerResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/instances?startedFrom=trigger",
+      {
+        headers: { cookie: ownerSession.cookie },
+      },
+    );
+    expect(triggerResponse.status).toBe(200);
+    const triggerBody = ListSandboxInstancesResponseSchema.parse(await triggerResponse.json());
+    expect(triggerBody.items.map((item) => item.id)).toEqual([
+      "sbi_cp_filter_slack",
+      "sbi_cp_filter_schedule",
+    ]);
+
+    const specificTriggerResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/instances?startedFrom=trigger&triggerId=atm_cp_filter_slack",
+      {
+        headers: { cookie: ownerSession.cookie },
+      },
+    );
+    expect(specificTriggerResponse.status).toBe(200);
+    const specificTriggerBody = ListSandboxInstancesResponseSchema.parse(
+      await specificTriggerResponse.json(),
+    );
+    expect(specificTriggerBody.items.map((item) => item.id)).toEqual(["sbi_cp_filter_slack"]);
+
+    const searchResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/instances?search=PlanetScale",
+      {
+        headers: { cookie: ownerSession.cookie },
+      },
+    );
+    expect(searchResponse.status).toBe(200);
+    const searchBody = ListSandboxInstancesResponseSchema.parse(await searchResponse.json());
+    expect(searchBody.items.map((item) => item.id)).toEqual(["sbi_cp_filter_owner"]);
+  });
+
+  it("filters a specific trigger when it has more automation runs than one data-plane id filter can carry", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-instances-long-trigger@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values({
+      id: "sbp_cp_filter_long_trigger",
+      organizationId: session.organizationId,
+      displayName: "Long-running Trigger Profile",
+      status: SandboxProfileStatuses.ACTIVE,
+      createdAt: "2026-03-01T00:00:00.000Z",
+      updatedAt: "2026-03-01T00:00:00.000Z",
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.automations).values({
+      id: "atm_cp_filter_long_trigger",
+      organizationId: session.organizationId,
+      kind: "webhook",
+      name: "Long-running trigger",
+      enabled: true,
+      createdAt: "2026-03-02T00:00:00.000Z",
+      updatedAt: "2026-03-02T00:00:00.000Z",
+    });
+
+    const automationRuns = Array.from({ length: 501 }, (_, index) => {
+      const suffix = String(index).padStart(3, "0");
+      return {
+        id: `aru_cp_filter_long_trigger_${suffix}`,
+        automationId: "atm_cp_filter_long_trigger",
+        status: AutomationRunStatuses.RUNNING,
+        createdAt: "2026-03-11T00:00:00.000Z",
+        startedAt: "2026-03-11T00:00:00.000Z",
+        updatedAt: "2026-03-11T00:00:00.000Z",
+      };
+    });
+    const firstAutomationRunId = automationRuns[0]?.id;
+    const lastAutomationRunId = automationRuns.at(-1)?.id;
+    if (firstAutomationRunId === undefined || lastAutomationRunId === undefined) {
+      throw new Error("Expected generated automation runs for long trigger filter test.");
+    }
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.automationRuns).values(automationRuns);
+    await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values([
+      {
+        id: "sbi_cp_filter_long_trigger_newer",
+        organizationId: session.organizationId,
+        sandboxProfileId: "sbp_cp_filter_long_trigger",
+        title: "Newest long trigger session",
+        sandboxProfileVersion: 1,
+        runtimeProvider: "docker",
+        providerSandboxId: "provider-cp-filter-long-trigger-newer",
+        status: SandboxInstanceStatuses.RUNNING,
+        startedByKind: "system",
+        startedById: lastAutomationRunId,
+        source: "webhook",
+        createdAt: "2026-03-16T00:00:00.000Z",
+        updatedAt: "2026-03-16T00:00:00.000Z",
+      },
+      {
+        id: "sbi_cp_filter_long_trigger_older",
+        organizationId: session.organizationId,
+        sandboxProfileId: "sbp_cp_filter_long_trigger",
+        title: "Older long trigger session",
+        sandboxProfileVersion: 1,
+        runtimeProvider: "docker",
+        providerSandboxId: "provider-cp-filter-long-trigger-older",
+        status: SandboxInstanceStatuses.RUNNING,
+        startedByKind: "system",
+        startedById: firstAutomationRunId,
+        source: "webhook",
+        createdAt: "2026-03-15T00:00:00.000Z",
+        updatedAt: "2026-03-15T00:00:00.000Z",
+      },
+    ]);
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/instances?startedFrom=trigger&triggerId=atm_cp_filter_long_trigger",
+      {
+        headers: { cookie: session.cookie },
+      },
+    );
+    expect(response.status).toBe(200);
+    const body = ListSandboxInstancesResponseSchema.parse(await response.json());
+    expect(body.items.map((item) => item.id)).toEqual([
+      "sbi_cp_filter_long_trigger_newer",
+      "sbi_cp_filter_long_trigger_older",
+    ]);
+
+    const searchResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/instances?search=Long-running%20trigger",
+      {
+        headers: { cookie: session.cookie },
+      },
+    );
+    expect(searchResponse.status).toBe(200);
+    ListSandboxInstancesResponseSchema.parse(await searchResponse.json());
   });
 });

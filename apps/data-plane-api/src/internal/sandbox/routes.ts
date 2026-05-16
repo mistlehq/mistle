@@ -13,6 +13,7 @@ import * as patchSandboxInstanceTitle from "./sandbox-instances/patch-sandbox-in
 import * as putSandboxInstanceDeadline from "./sandbox-instances/put-sandbox-instance-deadline/index.js";
 import * as reconcileSandboxInstance from "./sandbox-instances/reconcile-sandbox-instance/index.js";
 import * as resumeSandboxInstance from "./sandbox-instances/resume-sandbox-instance/index.js";
+import * as searchSandboxInstances from "./sandbox-instances/search-sandbox-instances/index.js";
 import * as stopSandboxInstance from "./sandbox-instances/stop-sandbox-instance/index.js";
 import * as stopUserRequestedSandboxInstance from "./sandbox-instances/stop-user-requested-sandbox-instance/index.js";
 import * as materializeSnapshotJob from "./sandbox-profile-version-snapshot-jobs/materialize-snapshot-job/index.js";
@@ -33,6 +34,7 @@ export function createInternalSandboxRoutes(): AppRoutes<typeof INTERNAL_SANDBOX
   routes.openapi(materializeSnapshotJob.route, materializeSnapshotJob.handler);
   routes.openapi(createSandboxInstance.route, createSandboxInstance.handler);
   routes.openapi(listSandboxInstances.route, listSandboxInstances.handler);
+  routes.openapi(searchSandboxInstances.route, searchSandboxInstances.handler);
   routes.openapi(getSandboxInstance.route, getSandboxInstance.handler);
   routes.openapi(listSandboxOperationEvents.route, listSandboxOperationEvents.handler);
   routes.openapi(patchSandboxInstanceTitle.route, patchSandboxInstanceTitle.handler);

@@ -3,11 +3,24 @@ import {
   type DataPlaneSandboxInstancesClient,
   type ListSandboxInstancesResponse,
 } from "@mistle/data-plane-internal-client";
-import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { getControlPlaneDatabaseSchema, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { and, eq, ilike, or } from "drizzle-orm";
 
 import { resolveUserDisplayName } from "../../lib/user-display-name.js";
+import { escapeLikePattern } from "../../organizations/services/directory-shared.js";
 import { SandboxInstancesBadRequestCodes, SandboxInstancesBadRequestError } from "../errors.js";
 import type { ListSandboxInstancesResult } from "./types.js";
+
+const MAX_AUTOMATION_RUN_FILTER_IDS = 5_000;
+
+function createEmptyListResult(): ListSandboxInstancesResult {
+  return {
+    items: [],
+    nextPage: null,
+    previousPage: null,
+    totalResults: 0,
+  };
+}
 
 function assertUserVisibleSandboxSource(
   source: ListSandboxInstancesResponse["items"][number]["source"],
@@ -139,6 +152,124 @@ type ListInstancesStartedByFilter =
       startedById?: undefined;
     };
 
+type ListInstancesFilterInput = {
+  userId: string;
+  search?: string;
+  owner?: "me";
+  startedFrom?: "manual" | "trigger" | "event" | "schedule";
+  triggerId?: string;
+};
+
+async function resolveMatchingSandboxProfileIds(
+  db: ControlPlaneDatabase,
+  input: {
+    organizationId: string;
+    search: string;
+  },
+): Promise<string[]> {
+  const tables = getControlPlaneDatabaseSchema(db);
+  const searchPattern = `%${escapeLikePattern(input.search)}%`;
+  const rows = await db
+    .select({ id: tables.sandboxProfiles.id })
+    .from(tables.sandboxProfiles)
+    .where(
+      and(
+        eq(tables.sandboxProfiles.organizationId, input.organizationId),
+        or(
+          ilike(tables.sandboxProfiles.id, searchPattern),
+          ilike(tables.sandboxProfiles.displayName, searchPattern),
+        ),
+      ),
+    );
+
+  return rows.map((row) => row.id);
+}
+
+async function resolveMatchingUserIds(
+  db: ControlPlaneDatabase,
+  input: {
+    search: string;
+  },
+): Promise<string[]> {
+  const tables = getControlPlaneDatabaseSchema(db);
+  const searchPattern = `%${escapeLikePattern(input.search)}%`;
+  const rows = await db
+    .select({ id: tables.users.id })
+    .from(tables.users)
+    .where(or(ilike(tables.users.name, searchPattern), ilike(tables.users.email, searchPattern)));
+
+  return rows.map((row) => row.id);
+}
+
+async function resolveMatchingAutomationRunIds(
+  db: ControlPlaneDatabase,
+  input:
+    | {
+        kind: "search";
+        organizationId: string;
+        search: string;
+      }
+    | {
+        kind: "trigger";
+        organizationId: string;
+        triggerId: string;
+      },
+): Promise<string[]> {
+  const tables = getControlPlaneDatabaseSchema(db);
+  const automationRows =
+    input.kind === "search"
+      ? await db
+          .select({ id: tables.automations.id })
+          .from(tables.automations)
+          .where(
+            and(
+              eq(tables.automations.organizationId, input.organizationId),
+              ilike(tables.automations.name, `%${escapeLikePattern(input.search)}%`),
+            ),
+          )
+      : await db
+          .select({ id: tables.automations.id })
+          .from(tables.automations)
+          .where(
+            and(
+              eq(tables.automations.organizationId, input.organizationId),
+              eq(tables.automations.id, input.triggerId),
+            ),
+          );
+
+  const automationIds = automationRows.map((row) => row.id);
+  if (automationIds.length === 0) {
+    return [];
+  }
+
+  const automationRuns = await db.query.automationRuns.findMany({
+    columns: {
+      id: true,
+    },
+    where: (table, { inArray }) => inArray(table.automationId, automationIds),
+  });
+
+  return automationRuns.map((automationRun) => automationRun.id);
+}
+
+function assertAutomationRunFilterWithinBound(input: {
+  kind: "search" | "trigger";
+  automationRunIds: string[] | undefined;
+}): void {
+  if (
+    input.automationRunIds === undefined ||
+    input.automationRunIds.length <= MAX_AUTOMATION_RUN_FILTER_IDS
+  ) {
+    return;
+  }
+
+  const filterLabel = input.kind === "trigger" ? "trigger" : "search";
+  throw new SandboxInstancesBadRequestError(
+    SandboxInstancesBadRequestCodes.INVALID_LIST_INSTANCES_INPUT,
+    `The ${filterLabel} filter matches too many automation runs. Narrow the filter before listing sessions.`,
+  );
+}
+
 export async function listInstances(
   {
     db,
@@ -152,15 +283,83 @@ export async function listInstances(
     limit?: number;
     after?: string;
     before?: string;
-  } & ListInstancesStartedByFilter,
+  } & ListInstancesStartedByFilter &
+    ListInstancesFilterInput,
 ): Promise<ListSandboxInstancesResult> {
   try {
+    const matchingSandboxProfileIds =
+      input.search === undefined
+        ? undefined
+        : await resolveMatchingSandboxProfileIds(db, {
+            organizationId: input.organizationId,
+            search: input.search,
+          });
+    const matchingUserIds =
+      input.search === undefined
+        ? undefined
+        : await resolveMatchingUserIds(db, {
+            search: input.search,
+          });
+    const matchingSearchAutomationRunIds =
+      input.search === undefined
+        ? undefined
+        : await resolveMatchingAutomationRunIds(db, {
+            kind: "search",
+            organizationId: input.organizationId,
+            search: input.search,
+          });
+    const triggerAutomationRunIds =
+      input.triggerId === undefined
+        ? undefined
+        : await resolveMatchingAutomationRunIds(db, {
+            kind: "trigger",
+            organizationId: input.organizationId,
+            triggerId: input.triggerId,
+          });
+
+    assertAutomationRunFilterWithinBound({
+      kind: "search",
+      automationRunIds: matchingSearchAutomationRunIds,
+    });
+    assertAutomationRunFilterWithinBound({
+      kind: "trigger",
+      automationRunIds: triggerAutomationRunIds,
+    });
+
+    if (triggerAutomationRunIds !== undefined && triggerAutomationRunIds.length === 0) {
+      return createEmptyListResult();
+    }
+
     const sandboxInstances = await dataPlaneClient.listSandboxInstances({
       organizationId: input.organizationId,
       ...(input.limit === undefined ? {} : { limit: input.limit }),
       ...(input.startedByKind === undefined
         ? {}
         : { startedByKind: input.startedByKind, startedById: input.startedById }),
+      ...(input.owner === undefined
+        ? {}
+        : {
+            startedByScope: "self",
+            startedByUserId: input.userId,
+          }),
+      ...(input.startedFrom === "manual" ? { source: "dashboard" } : {}),
+      ...(input.startedFrom === "trigger" ? { source: "trigger" } : {}),
+      ...(input.startedFrom === "event" ? { source: "webhook" } : {}),
+      ...(input.startedFrom === "schedule" ? { source: "schedule" } : {}),
+      ...(input.search === undefined ? {} : { titleSearch: input.search }),
+      ...(matchingSandboxProfileIds === undefined || matchingSandboxProfileIds.length === 0
+        ? {}
+        : { matchingSandboxProfileIds }),
+      ...(matchingUserIds === undefined || matchingUserIds.length === 0
+        ? {}
+        : { matchingStartedByUserIds: matchingUserIds }),
+      ...(matchingSearchAutomationRunIds === undefined ||
+      matchingSearchAutomationRunIds.length === 0
+        ? {}
+        : { matchingStartedBySystemIds: matchingSearchAutomationRunIds }),
+      ...(triggerAutomationRunIds === undefined
+        ? {}
+        : { startedBySystemIds: triggerAutomationRunIds }),
       ...(input.after === undefined ? {} : { after: input.after }),
       ...(input.before === undefined ? {} : { before: input.before }),
     });

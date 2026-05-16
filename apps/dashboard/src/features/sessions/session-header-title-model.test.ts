@@ -64,6 +64,10 @@ describe("session header title model", () => {
       limit: 25,
       after: null,
       before: null,
+      search: "",
+      owner: "anyone",
+      startedFrom: "any",
+      triggerId: null,
     });
     queryClient.setQueryData<SandboxInstancesListResult>(listQueryKey, {
       items: [

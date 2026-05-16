@@ -7362,6 +7362,10 @@ export interface paths {
           after?: string;
           before?: string;
           limit?: number;
+          owner?: "me";
+          search?: string;
+          startedFrom?: "manual" | "trigger" | "event" | "schedule";
+          triggerId?: string;
         };
         header?: never;
         path?: never;

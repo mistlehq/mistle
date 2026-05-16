@@ -14,7 +14,7 @@ import {
   KeysetPaginationInputErrorReasons,
   paginateKeyset,
 } from "@mistle/http/pagination";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, gt, ilike, inArray, lt, ne, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 
 import type { ListSandboxInstancesInput } from "../list-sandbox-instances/schema.js";
@@ -63,11 +63,22 @@ type StartedByFilterInput =
       startedById?: undefined;
     };
 
+type StartedByScopeFilterInput =
+  | {
+      startedByScope: "self" | "others";
+      startedByUserId: string;
+    }
+  | {
+      startedByScope?: undefined;
+      startedByUserId?: undefined;
+    };
+
 type ListSandboxInstancesServiceInput = Omit<
   ListSandboxInstancesInput,
-  "startedById" | "startedByKind"
+  "startedById" | "startedByKind" | "startedByScope" | "startedByUserId"
 > &
-  StartedByFilterInput;
+  StartedByFilterInput &
+  StartedByScopeFilterInput;
 
 function createInvalidCursorErrorMessage(input: {
   cursorName: string;
@@ -82,6 +93,28 @@ function createInvalidCursorErrorMessage(input: {
   }
 
   return `\`${input.cursorName}\` cursor has an invalid shape.`;
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
+}
+
+function combineAnd(conditions: SQL[]): SQL {
+  const expression = and(...conditions);
+  if (expression === undefined) {
+    throw new Error("At least one condition is required.");
+  }
+
+  return expression;
+}
+
+function combineOr(conditions: SQL[]): SQL {
+  const expression = or(...conditions);
+  if (expression === undefined) {
+    throw new Error("At least one condition is required.");
+  }
+
+  return expression;
 }
 
 export async function listSandboxInstances(
@@ -132,41 +165,86 @@ export async function listSandboxInstances(
             failureCode: true,
             failureMessage: true,
           },
-          where: (table, { and, eq, gt, lt, or }) => {
-            const organizationScope = and(
+          where: (table) => {
+            const filters: SQL[] = [
               eq(table.organizationId, input.organizationId),
               eq(table.purpose, SandboxInstancePurposes.SESSION),
-            );
-            const startedByScope =
-              input.startedByKind === undefined
-                ? organizationScope
-                : and(
-                    organizationScope,
-                    eq(table.startedByKind, input.startedByKind),
-                    eq(table.startedById, input.startedById),
-                  );
+            ];
+
+            if (input.startedByKind !== undefined) {
+              filters.push(eq(table.startedByKind, input.startedByKind));
+              filters.push(eq(table.startedById, input.startedById));
+            }
+
+            if (input.startedByScope === "self") {
+              filters.push(eq(table.startedByKind, "user"));
+              filters.push(eq(table.startedById, input.startedByUserId));
+            } else if (input.startedByScope === "others") {
+              filters.push(eq(table.startedByKind, "user"));
+              filters.push(ne(table.startedById, input.startedByUserId));
+            }
+
+            if (input.startedBySystemIds !== undefined) {
+              filters.push(eq(table.startedByKind, "system"));
+              filters.push(inArray(table.startedById, input.startedBySystemIds));
+            }
+
+            if (input.source === "dashboard") {
+              filters.push(eq(table.source, "dashboard"));
+            } else if (input.source === "trigger") {
+              filters.push(inArray(table.source, ["webhook", "schedule"]));
+            } else if (input.source === "webhook" || input.source === "schedule") {
+              filters.push(eq(table.source, input.source));
+            }
+
+            const searchFilters: SQL[] = [];
+            if (input.titleSearch !== undefined) {
+              searchFilters.push(ilike(table.title, `%${escapeLikePattern(input.titleSearch)}%`));
+            }
+            if (input.matchingSandboxProfileIds !== undefined) {
+              searchFilters.push(inArray(table.sandboxProfileId, input.matchingSandboxProfileIds));
+            }
+            if (input.matchingStartedByUserIds !== undefined) {
+              searchFilters.push(
+                combineAnd([
+                  eq(table.startedByKind, "user"),
+                  inArray(table.startedById, input.matchingStartedByUserIds),
+                ]),
+              );
+            }
+            if (input.matchingStartedBySystemIds !== undefined) {
+              searchFilters.push(
+                combineAnd([
+                  eq(table.startedByKind, "system"),
+                  inArray(table.startedById, input.matchingStartedBySystemIds),
+                ]),
+              );
+            }
+            if (searchFilters.length > 0) {
+              filters.push(combineOr(searchFilters));
+            }
 
             if (cursor === undefined) {
-              return startedByScope;
+              return combineAnd(filters);
             }
 
             if (direction === KeysetPaginationDirections.FORWARD) {
-              return and(
-                startedByScope,
-                or(
+              return combineAnd([
+                ...filters,
+                combineOr([
                   lt(table.createdAt, cursor.createdAt),
-                  and(eq(table.createdAt, cursor.createdAt), lt(table.id, cursor.id)),
-                ),
-              );
+                  combineAnd([eq(table.createdAt, cursor.createdAt), lt(table.id, cursor.id)]),
+                ]),
+              ]);
             }
 
-            return and(
-              startedByScope,
-              or(
+            return combineAnd([
+              ...filters,
+              combineOr([
                 gt(table.createdAt, cursor.createdAt),
-                and(eq(table.createdAt, cursor.createdAt), gt(table.id, cursor.id)),
-              ),
-            );
+                combineAnd([eq(table.createdAt, cursor.createdAt), gt(table.id, cursor.id)]),
+              ]),
+            ]);
           },
           orderBy:
             direction === KeysetPaginationDirections.BACKWARD
@@ -175,23 +253,74 @@ export async function listSandboxInstances(
           limit: limitPlusOne,
         }),
       countTotalResults: async () => {
+        const countFilters: SQL[] = [
+          eq(sandboxInstances.organizationId, input.organizationId),
+          eq(sandboxInstances.purpose, SandboxInstancePurposes.SESSION),
+        ];
+
+        if (input.startedByKind !== undefined) {
+          countFilters.push(eq(sandboxInstances.startedByKind, input.startedByKind));
+          countFilters.push(eq(sandboxInstances.startedById, input.startedById));
+        }
+
+        if (input.startedByScope === "self") {
+          countFilters.push(eq(sandboxInstances.startedByKind, "user"));
+          countFilters.push(eq(sandboxInstances.startedById, input.startedByUserId));
+        } else if (input.startedByScope === "others") {
+          countFilters.push(eq(sandboxInstances.startedByKind, "user"));
+          countFilters.push(ne(sandboxInstances.startedById, input.startedByUserId));
+        }
+
+        if (input.startedBySystemIds !== undefined) {
+          countFilters.push(eq(sandboxInstances.startedByKind, "system"));
+          countFilters.push(inArray(sandboxInstances.startedById, input.startedBySystemIds));
+        }
+
+        if (input.source === "dashboard") {
+          countFilters.push(eq(sandboxInstances.source, "dashboard"));
+        } else if (input.source === "trigger") {
+          countFilters.push(inArray(sandboxInstances.source, ["webhook", "schedule"]));
+        } else if (input.source === "webhook" || input.source === "schedule") {
+          countFilters.push(eq(sandboxInstances.source, input.source));
+        }
+
+        const searchFilters: SQL[] = [];
+        if (input.titleSearch !== undefined) {
+          searchFilters.push(
+            ilike(sandboxInstances.title, `%${escapeLikePattern(input.titleSearch)}%`),
+          );
+        }
+        if (input.matchingSandboxProfileIds !== undefined) {
+          searchFilters.push(
+            inArray(sandboxInstances.sandboxProfileId, input.matchingSandboxProfileIds),
+          );
+        }
+        if (input.matchingStartedByUserIds !== undefined) {
+          searchFilters.push(
+            combineAnd([
+              eq(sandboxInstances.startedByKind, "user"),
+              inArray(sandboxInstances.startedById, input.matchingStartedByUserIds),
+            ]),
+          );
+        }
+        if (input.matchingStartedBySystemIds !== undefined) {
+          searchFilters.push(
+            combineAnd([
+              eq(sandboxInstances.startedByKind, "system"),
+              inArray(sandboxInstances.startedById, input.matchingStartedBySystemIds),
+            ]),
+          );
+        }
+        if (searchFilters.length > 0) {
+          countFilters.push(combineOr(searchFilters));
+        }
+
         const [result] = await ctx.db
           .select({
             totalResults: sql<number>`count(*)::int`,
           })
           .from(sandboxInstances)
-          .where(
-            and(
-              eq(sandboxInstances.organizationId, input.organizationId),
-              eq(sandboxInstances.purpose, SandboxInstancePurposes.SESSION),
-              ...(input.startedByKind === undefined
-                ? []
-                : [
-                    eq(sandboxInstances.startedByKind, input.startedByKind),
-                    eq(sandboxInstances.startedById, input.startedById),
-                  ]),
-            ),
-          );
+          .where(combineAnd(countFilters));
 
         return result?.totalResults ?? 0;
       },

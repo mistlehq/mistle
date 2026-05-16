@@ -3,13 +3,20 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
-import { buildSandboxInstanceListItemFixture } from "./sessions-page.story-fixtures.js";
+import type { TriggerListItem } from "../triggers/triggers-types.js";
+import {
+  buildSandboxInstanceListItemFixture,
+  buildStoryTriggerListItem,
+  type SessionsPageStoryListFilters,
+} from "./sessions-page.story-fixtures.js";
 import { SessionsStoryHarness } from "./sessions-story-harness.js";
 
 type SessionsPageStoryArgs = {
   initialEntries: readonly string[];
   launchableProfiles?: LaunchableSandboxProfilesResult["items"];
   sandboxInstancesList?: SandboxInstancesListResult;
+  sandboxInstancesListFilters?: SessionsPageStoryListFilters;
+  triggerOptions?: TriggerListItem[];
 };
 
 const meta = {
@@ -68,9 +75,13 @@ const meta = {
         {...(args.sandboxInstancesList !== undefined
           ? { sandboxInstancesList: args.sandboxInstancesList }
           : {})}
+        {...(args.sandboxInstancesListFilters !== undefined
+          ? { sandboxInstancesListFilters: args.sandboxInstancesListFilters }
+          : {})}
         {...(args.launchableProfiles !== undefined
           ? { launchableProfiles: args.launchableProfiles }
           : {})}
+        {...(args.triggerOptions !== undefined ? { triggerOptions: args.triggerOptions } : {})}
       />
     );
   },
@@ -102,5 +113,71 @@ export const EmptyStateWithoutLaunchableProfiles: Story = {
       previousPage: null,
       totalResults: 0,
     },
+  },
+};
+
+export const FilteredNoResults: Story = {
+  args: {
+    initialEntries: ["/sessions?search=PlanetScale&owner=me&startedFrom=trigger"],
+    sandboxInstancesListFilters: {
+      search: "PlanetScale",
+      owner: "me",
+      startedFrom: "trigger",
+      triggerId: null,
+    },
+    sandboxInstancesList: {
+      items: [],
+      nextPage: null,
+      previousPage: null,
+      totalResults: 0,
+    },
+  },
+};
+
+export const SpecificTriggerFilter: Story = {
+  args: {
+    initialEntries: ["/sessions?startedFrom=trigger&triggerId=atm_slack_mentions"],
+    sandboxInstancesListFilters: {
+      search: "",
+      owner: "anyone",
+      startedFrom: "trigger",
+      triggerId: "atm_slack_mentions",
+    },
+    sandboxInstancesList: {
+      items: [
+        buildSandboxInstanceListItemFixture({
+          id: "sbi_slack_mentions",
+          title: "Slack app mention received",
+          sandboxProfileDisplayName: "Mistlebot",
+          startedBy: {
+            kind: "system",
+            id: "aru_slack_mentions",
+            name: "Slack app mention received",
+          },
+          source: "webhook",
+          updatedAt: "2026-04-01T09:00:00.000Z",
+        }),
+      ],
+      nextPage: null,
+      previousPage: null,
+      totalResults: 1,
+    },
+    triggerOptions: [
+      buildStoryTriggerListItem({
+        id: "atm_slack_mentions",
+        name: "Slack app mention received",
+      }),
+      buildStoryTriggerListItem({
+        id: "atm_nightly_cleanup",
+        name: "Nightly cleanup",
+        kind: "schedule",
+        source: {
+          kind: "schedule",
+          cronExpression: "0 9 * * 1",
+          timezone: "Asia/Singapore",
+          nextScheduledAt: "2026-04-06T01:00:00.000Z",
+        },
+      }),
+    ],
   },
 };

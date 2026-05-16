@@ -1658,6 +1658,99 @@
           {
             "schema": {
               "type": "string",
+              "enum": ["self", "others"]
+            },
+            "required": false,
+            "name": "startedByScope",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "startedByUserId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["dashboard", "trigger", "webhook", "schedule"]
+            },
+            "required": false,
+            "name": "source",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "titleSearch",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "maxItems": 500
+            },
+            "required": false,
+            "name": "matchingSandboxProfileIds",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "maxItems": 500
+            },
+            "required": false,
+            "name": "matchingStartedByUserIds",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "maxItems": 500
+            },
+            "required": false,
+            "name": "matchingStartedBySystemIds",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "maxItems": 500
+            },
+            "required": false,
+            "name": "startedBySystemIds",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
               "minLength": 1
             },
             "required": false,
@@ -1804,6 +1897,302 @@
           },
           "400": {
             "description": "Invalid request query.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["INVALID_LIST_INPUT", "INVALID_PAGINATION_CURSOR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/sandbox/instances/list": {
+      "post": {
+        "tags": ["Internal"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "organizationId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
+                  "startedByKind": {
+                    "type": "string",
+                    "enum": ["user", "system"]
+                  },
+                  "startedById": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "startedByScope": {
+                    "type": "string",
+                    "enum": ["self", "others"]
+                  },
+                  "startedByUserId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": ["dashboard", "trigger", "webhook", "schedule"]
+                  },
+                  "titleSearch": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "matchingSandboxProfileIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "matchingStartedByUserIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "matchingStartedBySystemIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "startedBySystemIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "after": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "before": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": ["organizationId"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "List sandbox instances for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "totalResults": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "sandboxProfileId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "title": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          },
+                          "sandboxProfileVersion": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": ["pending", "starting", "running", "stopped", "failed"]
+                          },
+                          "startedBy": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": ["user", "system"]
+                              },
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": ["kind", "id"],
+                            "additionalProperties": false
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": ["dashboard", "webhook", "schedule", "system"]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "failureCode": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          },
+                          "failureMessage": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "sandboxProfileId",
+                          "title",
+                          "sandboxProfileVersion",
+                          "status",
+                          "startedBy",
+                          "source",
+                          "createdAt",
+                          "updatedAt",
+                          "failureCode",
+                          "failureMessage"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "nextPage": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "after": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        }
+                      },
+                      "required": ["after", "limit"],
+                      "additionalProperties": false
+                    },
+                    "previousPage": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "before": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        }
+                      },
+                      "required": ["before", "limit"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["totalResults", "items", "nextPage", "previousPage"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body.",
             "content": {
               "application/json": {
                 "schema": {

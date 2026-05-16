@@ -866,10 +866,8 @@ export function createDataPlaneSandboxInstancesClient(
     },
 
     async listSandboxInstances(listInput): Promise<ListSandboxInstancesResponse> {
-      const result = await internalClient.client.GET("/internal/sandbox/instances", {
-        params: {
-          query: listInput,
-        },
+      const result = await internalClient.client.POST("/internal/sandbox/instances/list", {
+        body: listInput,
         signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
       });
 
