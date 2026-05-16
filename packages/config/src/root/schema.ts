@@ -70,6 +70,40 @@ const KvSchema = z
   })
   .strict();
 
+const NatsUrlSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine((value) => {
+    try {
+      const parsedUrl = new URL(value);
+      return parsedUrl.protocol === "nats:" || parsedUrl.protocol === "tls:";
+    } catch {
+      return false;
+    }
+  }, "Expected a nats or tls URL.");
+
+const GatewayRelaySchema = z
+  .discriminatedUnion("backend", [
+    z
+      .object({
+        backend: z.literal("memory"),
+      })
+      .strict(),
+    z
+      .object({
+        backend: z.literal("nats"),
+        nats: z
+          .object({
+            url: NatsUrlSchema,
+            name_prefix: z.string().trim().min(1),
+          })
+          .strict(),
+      })
+      .strict(),
+  ])
+  .default({ backend: "memory" });
+
 const SandboxStorageArchilSchema = z
   .object({
     api_key: z.string().trim().min(1),
@@ -302,6 +336,7 @@ export const ConfigSchema = z
         data_plane: KvSchema,
       })
       .strict(),
+    gateway_relay: GatewayRelaySchema,
     object_store: z
       .object({
         assets: ObjectStoreSchema,

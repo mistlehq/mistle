@@ -411,6 +411,18 @@ export function selectDataPlaneGatewayConfig(config: Config): DataPlaneGatewayCo
         keyPrefix: config.kv.data_plane.key_prefix,
       },
     },
+    gatewayRelay:
+      config.gateway_relay.backend === "nats"
+        ? {
+            backend: "nats",
+            nats: {
+              url: config.gateway_relay.nats.url,
+              namePrefix: config.gateway_relay.nats.name_prefix,
+            },
+          }
+        : {
+            backend: "memory",
+          },
     dataPlaneApi: {
       baseUrl: config.services.data_plane_api.internal_url,
     },

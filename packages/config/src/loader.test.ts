@@ -243,6 +243,9 @@ describe("loadConfig", () => {
         keyPrefix: "mistle:runtime-state",
       },
     });
+    expect(loadedConfig.app.gatewayRelay).toEqual({
+      backend: "memory",
+    });
   });
 
   it("loads env control-plane API config without unrelated service config", () => {

@@ -5,6 +5,7 @@ import {
   selectControlPlaneApiConfig,
   selectControlPlaneWorkerConfig,
   selectDataPlaneApiConfig,
+  selectDataPlaneGatewayConfig,
   selectDataPlaneWorkerConfig,
 } from "./selectors.js";
 
@@ -12,6 +13,7 @@ function createRootConfig(input: {
   allowSignups?: boolean;
   billingStripe?: { enabled: false; secret_key?: string } | { enabled: true; secret_key: string };
   enabledMethods?: Array<"otp" | "google">;
+  gatewayRelay?: Config["gateway_relay"];
   google?: {
     client_id: string;
     client_secret: string;
@@ -101,6 +103,9 @@ function createRootConfig(input: {
         url: "redis://data-valkey:6379",
         key_prefix: "mistle:data",
       },
+    },
+    gateway_relay: input.gatewayRelay ?? {
+      backend: "memory",
     },
     object_store: {
       assets: {
@@ -305,6 +310,38 @@ describe("selectDataPlaneApiConfig", () => {
     expect(config.sandbox.tensorlake).toEqual({
       enabled: true,
       apiKey: "tensorlake-api-key",
+    });
+  });
+});
+
+describe("selectDataPlaneGatewayConfig", () => {
+  it("projects the default memory gateway relay backend", () => {
+    const config = selectDataPlaneGatewayConfig(createRootConfig({}));
+
+    expect(config.gatewayRelay).toEqual({
+      backend: "memory",
+    });
+  });
+
+  it("projects NATS gateway relay config", () => {
+    const config = selectDataPlaneGatewayConfig(
+      createRootConfig({
+        gatewayRelay: {
+          backend: "nats",
+          nats: {
+            url: "nats://gateway-relay:4222",
+            name_prefix: "mistle-prod",
+          },
+        },
+      }),
+    );
+
+    expect(config.gatewayRelay).toEqual({
+      backend: "nats",
+      nats: {
+        url: "nats://gateway-relay:4222",
+        namePrefix: "mistle-prod",
+      },
     });
   });
 });

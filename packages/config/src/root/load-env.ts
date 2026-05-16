@@ -171,6 +171,18 @@ const RootEnvDescriptors = [
     path: ["kv", "data_plane", "key_prefix"],
   },
   {
+    envVar: "MISTLE_GATEWAY_RELAY_BACKEND",
+    path: ["gateway_relay", "backend"],
+  },
+  {
+    envVar: "MISTLE_GATEWAY_RELAY_NATS_URL",
+    path: ["gateway_relay", "nats", "url"],
+  },
+  {
+    envVar: "MISTLE_GATEWAY_RELAY_NATS_NAME_PREFIX",
+    path: ["gateway_relay", "nats", "name_prefix"],
+  },
+  {
     envVar: "MISTLE_OBJECT_STORE_ASSETS_BUCKET_NAME",
     path: ["object_store", "assets", "bucket_name"],
   },

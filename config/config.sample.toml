@@ -98,6 +98,17 @@ backend = "valkey"
 url = "redis://valkey:6379"
 key_prefix = "mistle:runtime-state"
 
+[gateway_relay]
+backend = "memory"
+
+# Required before running data-plane-gateway with more than one replica.
+#[gateway_relay]
+#backend = "nats"
+#
+#[gateway_relay.nats]
+#url = "nats://nats:4222"
+#name_prefix = "mistle-prod"
+
 [object_store.assets]
 bucket_name = "mistle-assets"
 region = "us-east-1"

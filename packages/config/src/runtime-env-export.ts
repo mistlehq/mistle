@@ -221,6 +221,12 @@ const DataPlaneGatewayResourceRuntimeEnvExports: readonly RuntimeEnvExportDescri
   { path: ["runtimeState", "backend"], envVar: "MISTLE_KV_DATA_PLANE_BACKEND" },
   { path: ["runtimeState", "valkey", "url"], envVar: "MISTLE_KV_DATA_PLANE_URL" },
   { path: ["runtimeState", "valkey", "keyPrefix"], envVar: "MISTLE_KV_DATA_PLANE_KEY_PREFIX" },
+  { path: ["gatewayRelay", "backend"], envVar: "MISTLE_GATEWAY_RELAY_BACKEND" },
+  { path: ["gatewayRelay", "nats", "url"], envVar: "MISTLE_GATEWAY_RELAY_NATS_URL" },
+  {
+    path: ["gatewayRelay", "nats", "namePrefix"],
+    envVar: "MISTLE_GATEWAY_RELAY_NATS_NAME_PREFIX",
+  },
   { path: ["dataPlaneApi", "baseUrl"], envVar: "MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL" },
   {
     path: ["controlPlaneApi", "baseUrl"],

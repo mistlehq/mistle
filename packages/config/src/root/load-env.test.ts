@@ -24,6 +24,9 @@ describe("loadRootConfigFromEnv", () => {
       MISTLE_KV_DATA_PLANE_BACKEND: "valkey",
       MISTLE_KV_DATA_PLANE_URL: "redis://data-valkey:6379",
       MISTLE_KV_DATA_PLANE_KEY_PREFIX: "mistle:data",
+      MISTLE_GATEWAY_RELAY_BACKEND: "nats",
+      MISTLE_GATEWAY_RELAY_NATS_URL: "nats://gateway-relay:4222",
+      MISTLE_GATEWAY_RELAY_NATS_NAME_PREFIX: "mistle-prod",
       MISTLE_OBJECT_STORE_ASSETS_BUCKET_NAME: "assets",
       MISTLE_OBJECT_STORE_ASSETS_REGION: "us-east-1",
       MISTLE_OBJECT_STORE_ASSETS_ENDPOINT: "https://assets.example",
@@ -151,6 +154,13 @@ describe("loadRootConfigFromEnv", () => {
           backend: "valkey",
           url: "redis://data-valkey:6379",
           key_prefix: "mistle:data",
+        },
+      },
+      gateway_relay: {
+        backend: "nats",
+        nats: {
+          url: "nats://gateway-relay:4222",
+          name_prefix: "mistle-prod",
         },
       },
       object_store: {

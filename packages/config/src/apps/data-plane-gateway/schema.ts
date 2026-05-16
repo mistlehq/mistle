@@ -17,6 +17,11 @@ const ValkeyUrlSchema = z.url().refine((value) => {
   return parsedUrl.protocol === "redis:" || parsedUrl.protocol === "rediss:";
 }, "Expected a redis or rediss URL.");
 
+const NatsUrlSchema = z.url().refine((value) => {
+  const parsedUrl = new URL(value);
+  return parsedUrl.protocol === "nats:" || parsedUrl.protocol === "tls:";
+}, "Expected a nats or tls URL.");
+
 export const DataPlaneGatewayServerConfigSchema = z
   .object({
     host: z.string().min(1),
@@ -71,6 +76,40 @@ export const PartialDataPlaneGatewayRuntimeStateConfigSchema = z
   })
   .strict();
 
+export const DataPlaneGatewayRelayConfigSchema = z
+  .discriminatedUnion("backend", [
+    z
+      .object({
+        backend: z.literal("memory"),
+      })
+      .strict(),
+    z
+      .object({
+        backend: z.literal("nats"),
+        nats: z
+          .object({
+            url: NatsUrlSchema,
+            namePrefix: z.string().min(1),
+          })
+          .strict(),
+      })
+      .strict(),
+  ])
+  .default({ backend: "memory" });
+
+export const PartialDataPlaneGatewayRelayConfigSchema = z
+  .object({
+    backend: z.enum(["memory", "nats"]).optional(),
+    nats: z
+      .object({
+        url: NatsUrlSchema.optional(),
+        namePrefix: z.string().min(1).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 export const DataPlaneGatewayDataPlaneApiConfigSchema = z
   .object({
     baseUrl: HttpBaseUrlSchema,
@@ -95,6 +134,7 @@ export const DataPlaneGatewayConfigSchema = z
     server: DataPlaneGatewayServerConfigSchema,
     database: DataPlaneGatewayDatabaseConfigSchema,
     runtimeState: DataPlaneGatewayRuntimeStateConfigSchema,
+    gatewayRelay: DataPlaneGatewayRelayConfigSchema,
     dataPlaneApi: DataPlaneGatewayDataPlaneApiConfigSchema,
     controlPlaneApi: DataPlaneGatewayControlPlaneApiConfigSchema,
     internalAuth: DataPlaneGatewayInternalAuthConfigSchema,
@@ -108,6 +148,7 @@ export const PartialDataPlaneGatewayConfigSchema = z
     server: DataPlaneGatewayServerConfigSchema.partial().optional(),
     database: DataPlaneGatewayDatabaseConfigSchema.partial().optional(),
     runtimeState: PartialDataPlaneGatewayRuntimeStateConfigSchema.optional(),
+    gatewayRelay: PartialDataPlaneGatewayRelayConfigSchema.optional(),
     dataPlaneApi: DataPlaneGatewayDataPlaneApiConfigSchema.partial().optional(),
     controlPlaneApi: DataPlaneGatewayControlPlaneApiConfigSchema.partial().optional(),
     internalAuth: DataPlaneGatewayInternalAuthConfigSchema.partial().optional(),

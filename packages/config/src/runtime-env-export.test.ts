@@ -177,6 +177,10 @@ describe("exportServiceConfigToEnv", () => {
       value: "redis://valkey:6379",
     });
     expectEntry(entries, {
+      name: "MISTLE_GATEWAY_RELAY_BACKEND",
+      value: "memory",
+    });
+    expectEntry(entries, {
       name: "MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL",
       value: "http://data-plane-api:8082",
     });

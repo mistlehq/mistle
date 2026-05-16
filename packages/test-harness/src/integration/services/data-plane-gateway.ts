@@ -172,6 +172,9 @@ function config(input: {
         keyPrefix: infraValue(input.valkey, ValkeyValues.KEY_PREFIX),
       },
     },
+    gatewayRelay: {
+      backend: "memory",
+    },
     dataPlaneApi: {
       baseUrl: input.dataPlaneApiBaseUrl,
     },

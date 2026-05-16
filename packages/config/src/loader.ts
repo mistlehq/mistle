@@ -618,6 +618,12 @@ const DataPlaneGatewayEnvDescriptors = [
   { envVar: "MISTLE_KV_DATA_PLANE_BACKEND", path: ["runtimeState", "backend"] },
   { envVar: "MISTLE_KV_DATA_PLANE_URL", path: ["runtimeState", "valkey", "url"] },
   { envVar: "MISTLE_KV_DATA_PLANE_KEY_PREFIX", path: ["runtimeState", "valkey", "keyPrefix"] },
+  { envVar: "MISTLE_GATEWAY_RELAY_BACKEND", path: ["gatewayRelay", "backend"] },
+  { envVar: "MISTLE_GATEWAY_RELAY_NATS_URL", path: ["gatewayRelay", "nats", "url"] },
+  {
+    envVar: "MISTLE_GATEWAY_RELAY_NATS_NAME_PREFIX",
+    path: ["gatewayRelay", "nats", "namePrefix"],
+  },
   { envVar: "MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL", path: ["dataPlaneApi", "baseUrl"] },
   {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL",
