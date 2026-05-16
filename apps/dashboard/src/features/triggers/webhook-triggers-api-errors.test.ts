@@ -13,10 +13,10 @@ describe("webhook triggers api errors", () => {
       operation: "createWebhookTrigger",
       status: 400,
       body: {
-        code: "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE",
+        code: "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE",
         message: "Connection target is not webhook capable.",
       },
-      code: "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE",
+      code: "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE",
       message: "Connection target is not webhook capable.",
     });
 
@@ -60,9 +60,9 @@ describe("webhook triggers api errors", () => {
   it("reads mapped messages directly from unknown error values", () => {
     expect(
       readWebhookTriggersErrorMessage({
-        code: "INVALID_SANDBOX_PROFILE_REFERENCE",
+        code: "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE",
         message: "Sandbox profile was invalid.",
       }),
-    ).toBe("The selected sandbox profile is invalid.");
+    ).toBe("The selected sandbox profile cannot use this webhook trigger.");
   });
 });

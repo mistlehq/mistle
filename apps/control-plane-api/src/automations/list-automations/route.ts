@@ -1,7 +1,7 @@
 import { createRoute } from "@hono/zod-openapi";
 import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
-import { ListAutomationsQuerySchema } from "../services/list-automations.js";
+import { ListAutomationsQuerySchema } from "../services/automation-summaries.js";
 import {
   ListAutomationsBadRequestResponseSchema,
   ListAutomationsResponseSchema,

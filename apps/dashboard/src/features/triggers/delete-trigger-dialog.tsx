@@ -8,7 +8,7 @@ import {
   Notice,
 } from "@mistle/ui";
 
-type DeleteWebhookTriggerDialogProps = {
+type DeleteTriggerDialogProps = {
   triggerName: string;
   errorMessage: string | null;
   isOpen: boolean;
@@ -17,9 +17,7 @@ type DeleteWebhookTriggerDialogProps = {
   onOpenChange: (open: boolean) => void;
 };
 
-export function DeleteWebhookTriggerDialog(
-  input: DeleteWebhookTriggerDialogProps,
-): React.JSX.Element {
+export function DeleteTriggerDialog(input: DeleteTriggerDialogProps): React.JSX.Element {
   return (
     <Dialog
       isBusy={input.isPending}

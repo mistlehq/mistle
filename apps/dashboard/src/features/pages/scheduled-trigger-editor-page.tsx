@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { FormPageSection } from "../shared/form-page.js";
-import { DeleteWebhookTriggerDialog } from "../triggers/delete-webhook-trigger-dialog.js";
+import { DeleteTriggerDialog } from "../triggers/delete-trigger-dialog.js";
 import { toScheduledTriggerFormValues } from "../triggers/scheduled-trigger-form-helpers.js";
 import { ScheduledTriggerForm } from "../triggers/scheduled-trigger-form.js";
 import { getScheduledTrigger } from "../triggers/scheduled-triggers-service.js";
@@ -161,7 +161,7 @@ function LoadedScheduledTriggerEditor(input: {
       />
 
       {input.mode === "edit" ? (
-        <DeleteWebhookTriggerDialog
+        <DeleteTriggerDialog
           triggerName={state.values.name}
           errorMessage={state.deleteError}
           isOpen={state.isDeleteDialogOpen}

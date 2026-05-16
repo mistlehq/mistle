@@ -3,7 +3,7 @@ import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
-import { getAutomation } from "../services/list-automations.js";
+import { getAutomation } from "../services/automation-summaries.js";
 import { route } from "./route.js";
 
 const routeHandler = async (

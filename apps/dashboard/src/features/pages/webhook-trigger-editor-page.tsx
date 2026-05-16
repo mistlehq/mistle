@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { FormPageSection } from "../shared/form-page.js";
-import { DeleteWebhookTriggerDialog } from "../triggers/delete-webhook-trigger-dialog.js";
+import { DeleteTriggerDialog } from "../triggers/delete-trigger-dialog.js";
 import type { TriggerCreateSuccessPath } from "../triggers/trigger-editor-navigation.js";
 import { TriggerTypeDisplayField } from "../triggers/trigger-type-field.js";
 import { webhookTriggerDetailQueryKey } from "../triggers/triggers-query-keys.js";
@@ -206,7 +206,7 @@ function LoadedWebhookTriggerEditor(input: {
       />
 
       {input.mode === "edit" ? (
-        <DeleteWebhookTriggerDialog
+        <DeleteTriggerDialog
           triggerName={state.values.name}
           errorMessage={state.deleteError}
           isOpen={state.isDeleteDialogOpen}

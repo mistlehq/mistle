@@ -3,14 +3,14 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { DeleteWebhookTriggerDialog } from "./delete-webhook-trigger-dialog.js";
+import { DeleteTriggerDialog } from "./delete-trigger-dialog.js";
 
-describe("DeleteWebhookTriggerDialog", () => {
+describe("DeleteTriggerDialog", () => {
   it("prevents escape dismissal while deletion is pending", () => {
     let openChangeCalls = 0;
 
     render(
-      <DeleteWebhookTriggerDialog
+      <DeleteTriggerDialog
         triggerName="GitHub pushes to repo triage"
         errorMessage={null}
         isOpen
@@ -31,7 +31,7 @@ describe("DeleteWebhookTriggerDialog", () => {
     const openChanges: boolean[] = [];
 
     render(
-      <DeleteWebhookTriggerDialog
+      <DeleteTriggerDialog
         triggerName="GitHub pushes to repo triage"
         errorMessage={null}
         isOpen
@@ -52,7 +52,7 @@ describe("DeleteWebhookTriggerDialog", () => {
     let openChangeCalls = 0;
 
     render(
-      <DeleteWebhookTriggerDialog
+      <DeleteTriggerDialog
         triggerName="GitHub pushes to repo triage"
         errorMessage={null}
         isOpen
@@ -78,7 +78,7 @@ describe("DeleteWebhookTriggerDialog", () => {
     const openChanges: boolean[] = [];
 
     render(
-      <DeleteWebhookTriggerDialog
+      <DeleteTriggerDialog
         triggerName="GitHub pushes to repo triage"
         errorMessage={null}
         isOpen
@@ -102,7 +102,7 @@ describe("DeleteWebhookTriggerDialog", () => {
 
   it("disables the cancel button while deletion is pending", () => {
     render(
-      <DeleteWebhookTriggerDialog
+      <DeleteTriggerDialog
         triggerName="GitHub pushes to repo triage"
         errorMessage={null}
         isOpen

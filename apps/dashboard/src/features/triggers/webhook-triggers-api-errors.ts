@@ -7,11 +7,15 @@ import {
 } from "../api/http-api-error.js";
 
 const WebhookTriggerErrorMessages = {
-  CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE:
+  INVALID_PRIMARY_REPOSITORY: "The selected primary repository is invalid.",
+  INVALID_SANDBOX_PROFILE_REFERENCE: "The selected sandbox profile is invalid.",
+  INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE:
+    "The selected sandbox profile cannot use this webhook trigger.",
+  INVALID_WEBHOOK_SOURCE_REFERENCE: "The selected webhook source is invalid.",
+  INVALID_WEBHOOK_TRIGGER_REQUIREMENTS: "The selected webhook trigger requirements are invalid.",
+  WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE:
     "The selected integration connection does not support webhook triggers.",
   FORBIDDEN: "Select an active organization to manage webhook triggers.",
-  INVALID_CONNECTION_REFERENCE: "The selected integration connection is invalid.",
-  INVALID_SANDBOX_PROFILE_REFERENCE: "The selected sandbox profile is invalid.",
   NOT_FOUND: "The webhook trigger no longer exists.",
   UNAUTHORIZED: "Sign in again to manage webhook triggers.",
 } as const;

@@ -1,11 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
-import { DeleteWebhookTriggerDialog } from "./delete-webhook-trigger-dialog.js";
+import { DeleteTriggerDialog } from "./delete-trigger-dialog.js";
 
 const meta = {
   title: "Dashboard/Triggers/Schedule/DeleteDialog",
-  component: DeleteWebhookTriggerDialog,
+  component: DeleteTriggerDialog,
   decorators: [withDashboardCenteredStory],
   parameters: {
     layout: "fullscreen",
@@ -18,7 +18,7 @@ const meta = {
     onConfirm: function onConfirm() {},
     onOpenChange: function onOpenChange() {},
   },
-} satisfies Meta<typeof DeleteWebhookTriggerDialog>;
+} satisfies Meta<typeof DeleteTriggerDialog>;
 
 export default meta;
 
