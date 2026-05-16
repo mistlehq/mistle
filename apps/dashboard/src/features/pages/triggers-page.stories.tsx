@@ -4,16 +4,16 @@ import { useState } from "react";
 import { MemoryRouter } from "react-router";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
-import { createAutomationListEvent } from "../automations/automation-list-test-fixtures.js";
-import { automationsListQueryKey } from "../automations/automations-query-keys.js";
-import type { AutomationsListResult } from "../automations/automations-types.js";
-import { AutomationsPage } from "./automations-page.js";
+import { createTriggerListEvent } from "../triggers/trigger-list-test-fixtures.js";
+import { triggersListQueryKey } from "../triggers/triggers-query-keys.js";
+import type { TriggersListResult } from "../triggers/triggers-types.js";
+import { TriggersPage } from "./triggers-page.js";
 
-type AutomationsPageStoryArgs = {
-  automationsList: AutomationsListResult;
+type TriggersPageStoryArgs = {
+  triggersList: TriggersListResult;
 };
 
-function createAutomationsStoryQueryClient(automationsList: AutomationsListResult): QueryClient {
+function createTriggersStoryQueryClient(triggersList: TriggersListResult): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -24,24 +24,24 @@ function createAutomationsStoryQueryClient(automationsList: AutomationsListResul
   });
 
   queryClient.setQueryData(
-    automationsListQueryKey({
+    triggersListQueryKey({
       limit: 25,
       after: null,
       before: null,
     }),
-    automationsList,
+    triggersList,
   );
 
   return queryClient;
 }
 
-function AutomationsPageStory(args: AutomationsPageStoryArgs): React.JSX.Element {
-  const [queryClient] = useState(() => createAutomationsStoryQueryClient(args.automationsList));
+function TriggersPageStory(args: TriggersPageStoryArgs): React.JSX.Element {
+  const [queryClient] = useState(() => createTriggersStoryQueryClient(args.triggersList));
 
   return (
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={["/automations"]}>
-        <AutomationsPage />
+      <MemoryRouter initialEntries={["/triggers"]}>
+        <TriggersPage />
       </MemoryRouter>
     </QueryClientProvider>
   );
@@ -49,14 +49,14 @@ function AutomationsPageStory(args: AutomationsPageStoryArgs): React.JSX.Element
 
 const meta = {
   title: "Dashboard/Triggers/Page",
-  component: AutomationsPageStory,
+  component: TriggersPageStory,
   tags: ["autodocs"],
   parameters: {
     layout: "fullscreen",
   },
   decorators: [withDashboardPageStory],
   args: {
-    automationsList: {
+    triggersList: {
       items: [
         {
           enabled: true,
@@ -64,7 +64,7 @@ const meta = {
           kind: "webhook",
           name: "Review pull requests",
           source: {
-            events: [createAutomationListEvent({ label: "Pull request opened" })],
+            events: [createTriggerListEvent({ label: "Pull request opened" })],
             kind: "webhook",
           },
           target: {
@@ -82,9 +82,9 @@ const meta = {
     },
   },
   render: function RenderStory(args): React.JSX.Element {
-    return <AutomationsPageStory {...args} />;
+    return <TriggersPageStory {...args} />;
   },
-} satisfies Meta<AutomationsPageStoryArgs>;
+} satisfies Meta<TriggersPageStoryArgs>;
 
 export default meta;
 
@@ -94,7 +94,7 @@ export const Default: Story = {};
 
 export const EmptyState: Story = {
   args: {
-    automationsList: {
+    triggersList: {
       items: [],
       nextPage: null,
       previousPage: null,
