@@ -68,6 +68,7 @@ type RegisterSandboxTunnelRouteInput = {
   telemetryIngressService: SandboxTelemetryIngressService;
   sandboxTunnelTaskTracker: AsyncTaskTracker;
   gatewayEgressTransportService: GatewayEgressTransportService;
+  allowRemoteOwnerConnections: boolean;
   clock: Clock;
   scheduler: Scheduler;
 };
@@ -87,6 +88,7 @@ function toSourcePeerSide(tokenKind: TokenKind): RelayPeerSide {
 
 export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInput): void {
   const tunnelWebSocketAdmission = new SandboxTunnelWebSocketAdmission({
+    allowRemoteOwnerConnections: input.allowRemoteOwnerConnections,
     bootstrapTokenConfig: input.bootstrapTokenConfig,
     connectionTokenConfig: input.connectionTokenConfig,
     sandboxOwnerResolver: input.sandboxOwnerResolver,

@@ -61,10 +61,12 @@ type CreateIntegrationTestInput = {
   __serviceOptions?:
     | {
         controlPlaneApi?: IntegrationServiceOptions["controlPlaneApi"];
+        dataPlaneGateway?: IntegrationServiceOptions["dataPlaneGateway"];
         sandbox?: IntegrationServiceOptions["sandbox"];
       }
     | (() => Promise<{
         controlPlaneApi?: IntegrationServiceOptions["controlPlaneApi"];
+        dataPlaneGateway?: IntegrationServiceOptions["dataPlaneGateway"];
         sandbox?: IntegrationServiceOptions["sandbox"];
       }>);
 };
@@ -228,6 +230,11 @@ async function environmentDefinitionFor(
                 ...inputServiceOptions?.controlPlaneApi,
                 googleAuth: input.auth.google,
               },
+        ...(inputServiceOptions?.dataPlaneGateway === undefined
+          ? {}
+          : {
+              dataPlaneGateway: inputServiceOptions.dataPlaneGateway,
+            }),
         ...(inputServiceOptions?.sandbox === undefined
           ? {}
           : {

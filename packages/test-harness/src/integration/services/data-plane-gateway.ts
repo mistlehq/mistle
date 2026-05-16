@@ -11,7 +11,11 @@ import type {
   TestServiceStartInput,
 } from "../../environment/index.js";
 import { TestEnvironmentIdHeader } from "../../environment/test-isolation.js";
-import type { IntegrationServiceOptions, IntegrationSandboxOptions } from "./options.js";
+import type {
+  IntegrationDataPlaneGatewayRelayOptions,
+  IntegrationServiceOptions,
+  IntegrationSandboxOptions,
+} from "./options.js";
 import { peers } from "./peers.js";
 import { ServiceIds } from "./service-ids.js";
 import {
@@ -27,6 +31,7 @@ const Host = "127.0.0.1";
 const DockerSandboxReachableHost = "0.0.0.0";
 
 const InfraIds = {
+  NATS: "nats",
   OTLP: "otlp",
   POSTGRES: "postgres.data-plane",
   SANDBOX_BASE_IMAGE: "sandbox-base-image",
@@ -46,6 +51,10 @@ const OtlpValues = {
   TRACES_ENDPOINT: "traces.endpoint",
   LOGS_ENDPOINT: "logs.endpoint",
   METRICS_ENDPOINT: "metrics.endpoint",
+};
+
+const NatsValues = {
+  URL: "url",
 };
 
 const SandboxBaseImageValues = {
@@ -70,6 +79,7 @@ export function service(
     supportedModes: ["runtime"],
     healthCheck: async (runtime) => httpHealth(runtime, ServiceIds.DATA_PLANE_GATEWAY),
     start: start({
+      dataPlaneGateway: options.dataPlaneGateway,
       postgresInfra: infraRequirement(infra, InfraIds.POSTGRES, ServiceIds.DATA_PLANE_GATEWAY),
       valkeyInfra: infraRequirement(infra, InfraIds.VALKEY, ServiceIds.DATA_PLANE_GATEWAY),
       sandbox: options.sandbox,
@@ -78,6 +88,7 @@ export function service(
 }
 
 function start(input: {
+  dataPlaneGateway: IntegrationServiceOptions["dataPlaneGateway"] | undefined;
   postgresInfra: TestInfraRequirement;
   valkeyInfra: TestInfraRequirement;
   sandbox: IntegrationSandboxOptions | undefined;
@@ -104,6 +115,8 @@ function start(input: {
         sandbox: input.sandbox,
         peer,
       }),
+      gatewayRelay: input.dataPlaneGateway?.gatewayRelay,
+      nats: startInput.infra.get(InfraIds.NATS),
       sandbox: input.sandbox,
     });
     const telemetry =
@@ -152,8 +165,15 @@ function config(input: {
   dataPlaneApiBaseUrl: string;
   controlPlaneBaseUrl: string;
   gatewayWsUrl: string;
+  gatewayRelay: IntegrationDataPlaneGatewayRelayOptions | undefined;
+  nats: ResolvedTestInfra | undefined;
   sandbox: IntegrationSandboxOptions | undefined;
 }): DataPlaneGatewayConfig {
+  const gatewayRelay = resolveGatewayRelayConfig({
+    gatewayRelay: input.gatewayRelay,
+    nats: input.nats,
+  });
+
   return {
     server: {
       host: input.host,
@@ -172,9 +192,7 @@ function config(input: {
         keyPrefix: infraValue(input.valkey, ValkeyValues.KEY_PREFIX),
       },
     },
-    gatewayRelay: {
-      backend: "memory",
-    },
+    gatewayRelay,
     dataPlaneApi: {
       baseUrl: input.dataPlaneApiBaseUrl,
     },
@@ -234,6 +252,28 @@ function config(input: {
             },
             resourceAttributes: "deployment.environment=integration-new",
           },
+  };
+}
+
+function resolveGatewayRelayConfig(input: {
+  gatewayRelay: IntegrationDataPlaneGatewayRelayOptions | undefined;
+  nats: ResolvedTestInfra | undefined;
+}): DataPlaneGatewayConfig["gatewayRelay"] {
+  if (input.gatewayRelay === undefined || input.gatewayRelay.backend === "memory") {
+    return {
+      backend: "memory",
+    };
+  }
+  if (input.nats === undefined) {
+    throw new Error("NATS infra is required when data-plane gateway relay backend is 'nats'.");
+  }
+
+  return {
+    backend: "nats",
+    nats: {
+      url: infraValue(input.nats, NatsValues.URL),
+      namePrefix: input.gatewayRelay.namePrefix,
+    },
   };
 }
 

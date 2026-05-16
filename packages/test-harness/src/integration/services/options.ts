@@ -27,5 +27,12 @@ export type IntegrationServiceOptions = {
     allowSignups?: boolean;
     googleAuth?: "simulated";
   };
+  dataPlaneGateway?: {
+    gatewayRelay?: { backend: "memory" } | { backend: "nats"; namePrefix: string };
+  };
   sandbox?: IntegrationSandboxOptions;
 };
+
+export type IntegrationDataPlaneGatewayRelayOptions = NonNullable<
+  IntegrationServiceOptions["dataPlaneGateway"]
+>["gatewayRelay"];

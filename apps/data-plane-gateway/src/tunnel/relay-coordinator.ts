@@ -1,4 +1,6 @@
 import type { LocalPeerRegistryAdapter } from "./local-peer-registry/local-peer-registry-adapter.js";
+import { LocalRelayPeerResolver } from "./local-peer-registry/local-relay-peer-resolver.js";
+import type { RelayPeerResolver } from "./relay-peer-resolver.js";
 import type { RelayTransportAdapter } from "./relay-transport/relay-transport-adapter.js";
 import type {
   RelayCloseEnvelope,
@@ -55,6 +57,7 @@ export class TunnelRelayCoordinator {
     private readonly nodeId: string,
     private readonly peerRegistry: LocalPeerRegistryAdapter,
     private readonly relayTransport: RelayTransportAdapter,
+    private readonly peerResolver: RelayPeerResolver = new LocalRelayPeerResolver(peerRegistry),
   ) {}
 
   public attachPeer(input: {
@@ -120,15 +123,16 @@ export class TunnelRelayCoordinator {
   }): Promise<void> {
     const target =
       input.fromSide === "connection"
-        ? this.getTargetBootstrapPeer({
+        ? await this.peerResolver.resolveBootstrapPeer({
             sandboxInstanceId: input.sandboxInstanceId,
-            targetSessionId: input.targetSessionId,
+            ...(input.targetSessionId === undefined
+              ? {}
+              : { targetSessionId: input.targetSessionId }),
           })
         : input.targetSessionId === undefined
           ? undefined
-          : this.peerRegistry.getConnectionPeer({
+          : await this.peerResolver.resolveConnectionPeer({
               sandboxInstanceId: input.sandboxInstanceId,
-              side: "connection",
               sessionId: input.targetSessionId,
             });
     if (target === undefined) {
@@ -213,22 +217,5 @@ export class TunnelRelayCoordinator {
     return this.peerRegistry.getBootstrapPeer({
       sandboxInstanceId: input.sandboxInstanceId,
     });
-  }
-
-  private getTargetBootstrapPeer(input: {
-    sandboxInstanceId: string;
-    targetSessionId?: string | undefined;
-  }): RelayTarget | undefined {
-    const target = this.peerRegistry.getBootstrapPeer({
-      sandboxInstanceId: input.sandboxInstanceId,
-    });
-    if (target === undefined) {
-      return undefined;
-    }
-    if (input.targetSessionId !== undefined && target.sessionId !== input.targetSessionId) {
-      return undefined;
-    }
-
-    return target;
   }
 }

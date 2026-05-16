@@ -13,6 +13,7 @@ import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-intern
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { BootstrapTokenConfig } from "@mistle/gateway-tunnel-auth";
 import { systemClock, systemScheduler } from "@mistle/time";
+import { connect, type NatsConnection } from "@nats-io/transport-node";
 import { typeid } from "typeid-js";
 import WebSocket, { type WebSocketServer } from "ws";
 
@@ -42,14 +43,23 @@ import { ValkeySandboxPresenceStore } from "../runtime-state/adapters/valkey-san
 import { ValkeySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/valkey-sandbox-runtime-attachment-store.js";
 import { ValkeySandboxRuntimeReadinessStore } from "../runtime-state/adapters/valkey-sandbox-runtime-readiness-store.js";
 import { installPortAccessUpgradeEntrypoint, startServer } from "../server.js";
-import { createInMemoryTunnelRelayCoordinator } from "../tunnel/create-in-memory-relay-coordinator.js";
 import { LocalGatewayForwardingClientAdapter } from "../tunnel/gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
 import { LocalGatewayForwardingServerAdapter } from "../tunnel/gateway-forwarding/adapters/local-gateway-forwarding-server-adapter.js";
+import { NatsGatewayForwardingAdapter } from "../tunnel/gateway-forwarding/adapters/nats-gateway-forwarding-adapter.js";
+import type { GatewayForwardingClientAdapter } from "../tunnel/gateway-forwarding/gateway-forwarding-client-adapter.js";
 import { InteractiveStreamRouter } from "../tunnel/gateway-forwarding/index.js";
+import { InMemoryLocalPeerRegistryAdapter } from "../tunnel/local-peer-registry/adapters/in-memory-local-peer-registry-adapter.js";
+import { LocalRelayPeerResolver } from "../tunnel/local-peer-registry/local-relay-peer-resolver.js";
 import { SandboxOperationIngressService } from "../tunnel/operation-ingress/index.js";
 import { AttachmentBackedSandboxOwnerResolver } from "../tunnel/ownership/attachment-backed-sandbox-owner-resolver.js";
 import { registerSandboxTunnelRoute } from "../tunnel/register-sandbox-tunnel-route.js";
 import { registerSandboxTunnelTokenExchangeRoute } from "../tunnel/register-sandbox-tunnel-token-exchange-route.js";
+import { TunnelRelayCoordinator } from "../tunnel/relay-coordinator.js";
+import type { RelayPeerResolver } from "../tunnel/relay-peer-resolver.js";
+import { NatsRelayPeerResolver } from "../tunnel/relay-peer-resolvers/nats-relay-peer-resolver.js";
+import { InMemoryRelayTransportAdapter } from "../tunnel/relay-transport/adapters/in-memory-relay-transport-adapter.js";
+import { NatsRelayTransportAdapter } from "../tunnel/relay-transport/adapters/nats-relay-transport-adapter.js";
+import type { RelayTransportAdapter } from "../tunnel/relay-transport/relay-transport-adapter.js";
 import { SandboxSigningRequestService } from "../tunnel/signing/sandbox-signing-request-service.js";
 import {
   createSandboxTelemetryIngressSink,
@@ -58,6 +68,7 @@ import {
 import { InMemoryTunnelSessionRegistryAdapter } from "../tunnel/tunnel-session/adapters/in-memory-tunnel-session-registry-adapter.js";
 import { TunnelSessionRegistry } from "../tunnel/tunnel-session/index.js";
 import type {
+  DataPlaneGatewayConfig,
   DataPlaneGatewayRuntime,
   DataPlaneGatewayRuntimeConfig,
   StartedServer,
@@ -65,6 +76,13 @@ import type {
 import { AsyncTaskTracker } from "./async-task-tracker.js";
 
 const DefaultMaxActiveBindingsPerSandbox = 32;
+
+type GatewayRelayRuntimeResources = {
+  gatewayForwardingClient: GatewayForwardingClientAdapter;
+  relayCoordinator: TunnelRelayCoordinator;
+  start: () => Promise<void>;
+  stop: () => Promise<void>;
+};
 
 function closeWebSocketClient(client: WebSocket): Promise<void> {
   if (client.readyState === WebSocket.CLOSED) {
@@ -106,13 +124,102 @@ async function closeWebSocketServer(webSocketServer: WebSocketServer): Promise<v
   });
 }
 
+function createGatewayRelayRuntimeResources(input: {
+  activeBootstrapSessionStore: ReturnType<typeof createAttachmentBackedActiveBootstrapSessionStore>;
+  config: DataPlaneGatewayConfig["gatewayRelay"];
+  gatewayForwardingServer: LocalGatewayForwardingServerAdapter;
+  nodeId: string;
+}): GatewayRelayRuntimeResources {
+  const peerRegistry = new InMemoryLocalPeerRegistryAdapter();
+  let relayTransport: RelayTransportAdapter;
+  let peerResolver: RelayPeerResolver;
+  let gatewayForwardingClient: GatewayForwardingClientAdapter;
+  let natsConnection: NatsConnection | undefined;
+  let natsRelayTransport: NatsRelayTransportAdapter | undefined;
+  let natsPeerResolver: NatsRelayPeerResolver | undefined;
+  let natsGatewayForwarding: NatsGatewayForwardingAdapter | undefined;
+
+  if (input.config.backend === "memory") {
+    relayTransport = new InMemoryRelayTransportAdapter(input.nodeId);
+    peerResolver = new LocalRelayPeerResolver(peerRegistry);
+    gatewayForwardingClient = new LocalGatewayForwardingClientAdapter(
+      input.nodeId,
+      input.gatewayForwardingServer,
+    );
+  } else {
+    const subjectPrefix = `${input.config.nats.namePrefix}.gateway`;
+    natsRelayTransport = new NatsRelayTransportAdapter(input.nodeId, subjectPrefix);
+    natsPeerResolver = new NatsRelayPeerResolver(
+      input.nodeId,
+      subjectPrefix,
+      input.activeBootstrapSessionStore,
+      peerRegistry,
+      systemClock,
+    );
+    natsGatewayForwarding = new NatsGatewayForwardingAdapter(
+      input.nodeId,
+      subjectPrefix,
+      input.gatewayForwardingServer,
+    );
+    relayTransport = natsRelayTransport;
+    peerResolver = natsPeerResolver;
+    gatewayForwardingClient = natsGatewayForwarding;
+  }
+
+  return {
+    gatewayForwardingClient,
+    relayCoordinator: new TunnelRelayCoordinator(
+      input.nodeId,
+      peerRegistry,
+      relayTransport,
+      peerResolver,
+    ),
+    start: async () => {
+      if (input.config.backend === "memory") {
+        return;
+      }
+      if (
+        natsRelayTransport === undefined ||
+        natsPeerResolver === undefined ||
+        natsGatewayForwarding === undefined
+      ) {
+        throw new Error("Expected NATS gateway relay resources to be initialized.");
+      }
+      if (natsConnection !== undefined) {
+        throw new Error("NATS gateway relay resources are already started.");
+      }
+
+      const connection = await connect({
+        name: `mistle-data-plane-gateway-${input.nodeId}`,
+        noEcho: true,
+        servers: input.config.nats.url,
+      });
+      natsConnection = connection;
+      natsRelayTransport.start(connection);
+      natsPeerResolver.start(connection);
+      natsGatewayForwarding.start(connection);
+    },
+    stop: async () => {
+      if (input.config.backend === "memory") {
+        return;
+      }
+
+      await natsGatewayForwarding?.stop();
+      await natsPeerResolver?.stop();
+      await natsRelayTransport?.stop();
+      const connection = natsConnection;
+      natsConnection = undefined;
+      await connection?.close();
+    },
+  };
+}
+
 export function createDataPlaneGatewayRuntime(
   config: DataPlaneGatewayRuntimeConfig,
 ): DataPlaneGatewayRuntime {
   const app = createApp(config.app);
   const nodeWebSocket = createNodeWebSocket({ app });
   const nodeId = typeid("dpg").toString();
-  const relayCoordinator = createInMemoryTunnelRelayCoordinator(nodeId);
   const sandboxTunnelTaskTracker = new AsyncTaskTracker();
   let hasValkeyClient = false;
   let valkeyClient!: ValkeyClient;
@@ -202,10 +309,14 @@ export function createDataPlaneGatewayRuntime(
     new InMemoryTunnelSessionRegistryAdapter(DefaultMaxActiveBindingsPerSandbox),
   );
   const gatewayForwardingServer = new LocalGatewayForwardingServerAdapter(tunnelSessionRegistry);
-  const gatewayForwardingClient = new LocalGatewayForwardingClientAdapter(
-    nodeId,
+  const relayResources = createGatewayRelayRuntimeResources({
+    activeBootstrapSessionStore,
+    config: config.app.gatewayRelay,
     gatewayForwardingServer,
-  );
+    nodeId,
+  });
+  const relayCoordinator = relayResources.relayCoordinator;
+  const gatewayForwardingClient = relayResources.gatewayForwardingClient;
   const interactiveStreamRouter = new InteractiveStreamRouter(
     nodeId,
     sandboxOwnerResolver,
@@ -343,6 +454,7 @@ export function createDataPlaneGatewayRuntime(
     telemetryIngressService,
     sandboxTunnelTaskTracker,
     gatewayEgressTransportService,
+    allowRemoteOwnerConnections: config.app.gatewayRelay.backend === "nats",
     clock: systemClock,
     scheduler: systemScheduler,
   });
@@ -386,6 +498,7 @@ export function createDataPlaneGatewayRuntime(
     await sandboxTunnelTaskTracker.drain();
     operationIngressService.shutdown();
     await telemetryIngressService.shutdown();
+    await relayResources.stop();
 
     if (startedServer !== undefined) {
       await startedServer.close();
@@ -419,6 +532,7 @@ export function createDataPlaneGatewayRuntime(
       if (hasValkeyClient) {
         await connectValkeyClient(valkeyClient);
       }
+      await relayResources.start();
 
       startedServer = startServer({
         app,

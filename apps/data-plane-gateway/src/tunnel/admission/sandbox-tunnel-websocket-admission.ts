@@ -57,6 +57,7 @@ type SandboxTunnelAdmissionResult =
     };
 
 type SandboxTunnelWebSocketAdmissionConfig = {
+  allowRemoteOwnerConnections: boolean;
   bootstrapTokenConfig: BootstrapTokenConfig;
   connectionTokenConfig: ConnectionTokenConfig;
   sandboxOwnerResolver: SandboxOwnerResolver;
@@ -118,7 +119,7 @@ export class SandboxTunnelWebSocketAdmission {
           },
         };
       }
-      if (ownerResolution.kind === "remote") {
+      if (ownerResolution.kind === "remote" && !this.config.allowRemoteOwnerConnections) {
         return {
           kind: "rejected",
           rejection: {
