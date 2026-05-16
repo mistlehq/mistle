@@ -3,9 +3,16 @@
 version = 4
 
 [[package]]
+name = "bpaf"
+version = "0.9.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b86829876e7e200161a5aa6ea688d46c32d64d70ee3100127790dde84688d6e"
+
+[[package]]
 name = "mstl-cli"
 version = "0.0.0"
 dependencies = [
+ "bpaf",
  "mstl-core",
 ]
 

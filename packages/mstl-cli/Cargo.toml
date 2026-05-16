@@ -8,4 +8,5 @@ name = "mstl"
 path = "src/main.rs"
 
 [dependencies]
+bpaf = "0.9.26"
 mstl-core = { path = "../mstl-core" }
