@@ -25,6 +25,7 @@ import {
 import { ActiveSandboxRuntimePlanCache } from "../egress/active-runtime-plan-cache.js";
 import { CredentialCache } from "../egress/credential-cache.js";
 import { GatewayEgressTransportService } from "../egress/egress-transport-service.js";
+import { registerSandboxBootstrapAttachmentTerminateRoute } from "../internal/runtime-state/register-sandbox-bootstrap-attachment-terminate-route.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
 import { logger } from "../logger.js";
 import { createPortAccessNodeEntrypoint } from "../publishing/port-access-node-entrypoint.js";
@@ -300,6 +301,14 @@ export function createDataPlaneGatewayRuntime(
     sandboxKeepaliveStore,
     sandboxPresenceStore,
     sandboxRuntimeReadinessStore,
+  });
+  registerSandboxBootstrapAttachmentTerminateRoute({
+    app,
+    clock: systemClock,
+    internalAuthServiceToken: config.app.internalAuth.serviceToken,
+    activeBootstrapSessionStore,
+    sandboxRuntimeAttachmentStore,
+    relayCoordinator,
   });
 
   registerSandboxTunnelRoute({

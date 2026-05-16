@@ -20,6 +20,7 @@ import { systemSleeper } from "@mistle/time";
 import { typeid } from "typeid-js";
 import { expect } from "vitest";
 import WebSocket from "ws";
+import { z } from "zod";
 
 import {
   closeWebSocket,
@@ -37,6 +38,11 @@ const BootstrapTokenIssuer = "integration-new-data-plane-worker";
 const GatewayTokenAudience = "integration-new-data-plane-gateway";
 const ConnectionTokenSecret = "integration-new-connection-secret";
 const ConnectionTokenIssuer = "integration-new-control-plane-api";
+const TerminateBootstrapAttachmentResponseSchema = z
+  .object({
+    outcome: z.enum(["terminated", "closed", "not_attached", "fence_mismatch"]),
+  })
+  .strict();
 
 const it = createIntegrationTest({
   services: ["data-plane-api", "data-plane-gateway"],
@@ -90,6 +96,101 @@ it(
         ready: false,
       },
     });
+  },
+  TestTimeoutMs,
+);
+
+it(
+  "terminates the active bootstrap attachment through the fenced internal route",
+  async ({ env }) => {
+    const sandboxInstanceId = typeid("sbi").toString();
+    await insertSandboxInstanceRow({
+      env,
+      sandboxInstanceId,
+      testId: "runtime_state_route_terminate",
+    });
+
+    const bootstrapSocket = await connectBootstrapSocket({
+      env,
+      sandboxInstanceId,
+    });
+    const attached = await waitForRuntimeState({
+      env,
+      sandboxInstanceId,
+      predicate: (snapshot) => snapshot.ownerLeaseId !== null && snapshot.attachment !== null,
+    });
+    if (attached.attachment === null) {
+      throw new Error("Expected bootstrap attachment before termination.");
+    }
+
+    const closeEvent = waitForWebSocketClose(bootstrapSocket);
+    const terminated = await terminateBootstrapAttachment({
+      env,
+      sandboxInstanceId,
+      expectedOwnerLeaseId: attached.attachment.ownerLeaseId,
+      expectedSessionId: attached.attachment.sessionId,
+    });
+
+    expect(["terminated", "closed"]).toContain(terminated.outcome);
+    await expect(closeEvent).resolves.toEqual({
+      code: 1012,
+      reason: "Sandbox stopped.",
+    });
+
+    const cleared = await waitForRuntimeState({
+      env,
+      sandboxInstanceId,
+      predicate: (snapshot) => snapshot.ownerLeaseId === null && snapshot.attachment === null,
+    });
+
+    expect(cleared.ownerLeaseId).toBeNull();
+    expect(cleared.attachment).toBeNull();
+  },
+  TestTimeoutMs,
+);
+
+it(
+  "leaves the active bootstrap attachment open when termination is fenced to a stale session",
+  async ({ env }) => {
+    const sandboxInstanceId = typeid("sbi").toString();
+    await insertSandboxInstanceRow({
+      env,
+      sandboxInstanceId,
+      testId: "runtime_state_route_terminate_fence",
+    });
+
+    const bootstrapSocket = await connectBootstrapSocket({
+      env,
+      sandboxInstanceId,
+    });
+    const attached = await waitForRuntimeState({
+      env,
+      sandboxInstanceId,
+      predicate: (snapshot) => snapshot.ownerLeaseId !== null && snapshot.attachment !== null,
+    });
+    if (attached.attachment === null) {
+      throw new Error("Expected bootstrap attachment before fenced termination.");
+    }
+
+    const rejected = await terminateBootstrapAttachment({
+      env,
+      sandboxInstanceId,
+      expectedOwnerLeaseId: attached.attachment.ownerLeaseId,
+      expectedSessionId: `${attached.attachment.sessionId}-stale`,
+    });
+    expect(rejected).toEqual({
+      outcome: "fence_mismatch",
+    });
+
+    const stillAttached = await readRuntimeState({
+      env,
+      sandboxInstanceId,
+    });
+    expect(stillAttached.attachment?.ownerLeaseId).toBe(attached.attachment.ownerLeaseId);
+    expect(stillAttached.attachment?.sessionId).toBe(attached.attachment.sessionId);
+    expect(bootstrapSocket.readyState).toBe(WebSocket.OPEN);
+
+    await closeWebSocket(bootstrapSocket);
   },
   TestTimeoutMs,
 );
@@ -422,6 +523,32 @@ async function readRuntimeState(input: {
 
   expect(response.status).toBe(200);
   return SandboxRuntimeStateSnapshotSchema.parse(await response.json());
+}
+
+async function terminateBootstrapAttachment(input: {
+  env: IntegrationTestEnvironment;
+  sandboxInstanceId: string;
+  expectedOwnerLeaseId: string;
+  expectedSessionId: string;
+}): Promise<z.infer<typeof TerminateBootstrapAttachmentResponseSchema>> {
+  const response = await input.env.dataPlaneGateway.http.fetch(
+    `/internal/sandbox-instances/${encodeURIComponent(input.sandboxInstanceId)}/bootstrap-attachment/terminate`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        [InternalServiceTokenHeader]: "integration-new-internal-service-token",
+        [TestEnvironmentIdHeader]: input.env.id,
+      },
+      body: JSON.stringify({
+        expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+        expectedSessionId: input.expectedSessionId,
+      }),
+    },
+  );
+
+  expect(response.status).toBe(200);
+  return TerminateBootstrapAttachmentResponseSchema.parse(await response.json());
 }
 
 async function waitForRuntimeState(input: {
