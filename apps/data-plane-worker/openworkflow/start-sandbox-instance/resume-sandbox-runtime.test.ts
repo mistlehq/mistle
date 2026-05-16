@@ -1,32 +1,9 @@
-import { SandboxProvider } from "@mistle/sandbox";
 import { describe, expect, it } from "vitest";
 
 import {
   isSandboxdAlreadyInitializedForResume,
   isSandboxdInitializationAlreadyInProgressForResume,
-  resolveProviderResumeStateRestoration,
 } from "./resume-sandbox-runtime.js";
-
-describe("resolveProviderResumeStateRestoration", () => {
-  it.each([SandboxProvider.DOCKER, SandboxProvider.TENSORLAKE])(
-    "declares filesystem-only state restoration for provider resumes: %s",
-    (runtimeProvider) => {
-      expect(
-        resolveProviderResumeStateRestoration({
-          runtimeProvider,
-        }),
-      ).toBe("filesystem");
-    },
-  );
-
-  it("declares memory state restoration for E2B provider resumes", () => {
-    expect(
-      resolveProviderResumeStateRestoration({
-        runtimeProvider: SandboxProvider.E2B,
-      }),
-    ).toBe("memory");
-  });
-});
 
 describe("sandboxd resume initialization errors", () => {
   it("identifies already-initialized sandboxd as requiring resume", () => {

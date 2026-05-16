@@ -12,36 +12,6 @@ import {
 } from "./sandbox-startup-input.js";
 import { createSandboxRuntimeEnv } from "./start-sandbox.js";
 
-function assertUnreachable(_value: never): never {
-  throw new Error("Unsupported sandbox provider for resume state restoration resolution.");
-}
-
-export const SandboxResumeStateRestorations = {
-  FILESYSTEM: "filesystem",
-  MEMORY: "memory",
-} as const;
-
-export type SandboxResumeStateRestoration =
-  (typeof SandboxResumeStateRestorations)[keyof typeof SandboxResumeStateRestorations];
-
-export function resolveProviderResumeStateRestoration(input: {
-  runtimeProvider: SandboxProvider;
-}): SandboxResumeStateRestoration {
-  if (input.runtimeProvider === SandboxProvider.DOCKER) {
-    return SandboxResumeStateRestorations.FILESYSTEM;
-  }
-
-  if (input.runtimeProvider === SandboxProvider.E2B) {
-    return SandboxResumeStateRestorations.MEMORY;
-  }
-
-  if (input.runtimeProvider === SandboxProvider.TENSORLAKE) {
-    return SandboxResumeStateRestorations.FILESYSTEM;
-  }
-
-  return assertUnreachable(input.runtimeProvider);
-}
-
 export function isSandboxdAlreadyInitializedForResume(error: unknown): boolean {
   return (
     error instanceof Error &&
@@ -104,13 +74,9 @@ export async function resumeSandboxRuntime(
     id: input.providerSandboxId,
     env: runtimeEnv,
   });
-  const resumeStateRestoration = resolveProviderResumeStateRestoration({
-    runtimeProvider: input.runtimeProvider,
-  });
   ctx.logger.info(
     {
       providerSandboxId: input.providerSandboxId,
-      resumeStateRestoration,
       runtimeProvider: input.runtimeProvider,
       sandboxInstanceId: input.sandboxInstanceId,
       sandboxdVersion,
@@ -143,7 +109,6 @@ export async function resumeSandboxRuntime(
     ctx.logger.info(
       {
         providerSandboxId: input.providerSandboxId,
-        resumeStateRestoration,
         runtimeProvider: input.runtimeProvider,
         sandboxInstanceId: input.sandboxInstanceId,
       },
@@ -159,7 +124,6 @@ export async function resumeSandboxRuntime(
       ctx.logger.info(
         {
           providerSandboxId: input.providerSandboxId,
-          resumeStateRestoration,
           runtimeProvider: input.runtimeProvider,
           sandboxInstanceId: input.sandboxInstanceId,
         },
@@ -179,7 +143,6 @@ export async function resumeSandboxRuntime(
     ctx.logger.info(
       {
         providerSandboxId: input.providerSandboxId,
-        resumeStateRestoration,
         runtimeProvider: input.runtimeProvider,
         sandboxInstanceId: input.sandboxInstanceId,
       },
