@@ -1293,7 +1293,6 @@ describe("SandboxProfileEditorPage", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Snapshots" }));
 
-    expect(screen.getByRole("button", { name: "Creating snapshot" })).toBeDefined();
     expect(screen.getByText("Sandbox Profile v3's snapshot is being created")).toBeDefined();
     expect(
       screen.getByText(
@@ -1301,6 +1300,7 @@ describe("SandboxProfileEditorPage", () => {
       ),
     ).toBeDefined();
     const detailsToggle = screen.getByRole("button", { name: "Creating snapshot" });
+    expect(detailsToggle).toBeDefined();
     expect(detailsToggle.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByRole("status", { name: "Creating snapshot" })).toBeDefined();
     expect(screen.getByText("No lifecycle events yet.")).toBeDefined();

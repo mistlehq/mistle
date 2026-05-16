@@ -241,11 +241,12 @@ export function SandboxProfileSnapshotPanelView(input: {
   state: SnapshotPanelState;
   version: number | null;
 }): React.JSX.Element {
-  const retainedCreatingState = useRetainedCreatingSnapshotState(input.state);
-  const shouldDefaultDetailsExpanded = shouldDefaultSnapshotOperationDetailsExpanded({
-    retainedState: retainedCreatingState,
-    state: input.state,
-  });
+  const operationProgressState = useRetainedSnapshotOperationState(input.state);
+  const shouldDefaultDetailsExpanded =
+    operationProgressState !== null &&
+    (input.state.kind === "creating" ||
+      input.state.kind === "publish-snapshot-error" ||
+      input.state.kind === "refresh-error");
   const [detailsExpanded, setDetailsExpanded] = useState(() => shouldDefaultDetailsExpanded);
 
   useEffect(() => {
@@ -253,8 +254,8 @@ export function SandboxProfileSnapshotPanelView(input: {
   }, [
     shouldDefaultDetailsExpanded,
     input.state.kind,
-    retainedCreatingState?.operationId,
-    retainedCreatingState?.sandboxInstanceId,
+    operationProgressState?.operationId,
+    operationProgressState?.sandboxInstanceId,
   ]);
 
   if (input.state.kind === "draft-unavailable" || input.version === null) {
@@ -302,7 +303,7 @@ export function SandboxProfileSnapshotPanelView(input: {
         onMaintenanceRefreshSnapshot={input.onMaintenanceRefreshSnapshot}
         onRefreshSnapshot={input.onRefreshSnapshot}
         onRetryPublishSnapshot={input.onRetryPublishSnapshot}
-        retainedCreatingState={retainedCreatingState}
+        operationProgressState={operationProgressState}
         state={input.state}
         version={input.version}
       />
@@ -322,12 +323,12 @@ function SnapshotStatusPanel(input: {
   onMaintenanceRefreshSnapshot: () => void;
   onRefreshSnapshot: () => void;
   onRetryPublishSnapshot: () => void;
-  retainedCreatingState: SnapshotOperationProgressState | null;
+  operationProgressState: SnapshotOperationProgressState | null;
   state: SnapshotStatusState;
   version: number;
 }): React.JSX.Element {
-  const retainedCreatingState = input.retainedCreatingState;
-  const hasDetails = retainedCreatingState !== null;
+  const operationProgressState = input.operationProgressState;
+  const hasDetails = operationProgressState !== null;
 
   return (
     <section className="overflow-hidden rounded-md border border-border bg-card">
@@ -392,12 +393,12 @@ function SnapshotStatusPanel(input: {
         </div>
       </div>
 
-      {retainedCreatingState !== null && input.detailsExpanded ? (
+      {operationProgressState !== null && input.detailsExpanded ? (
         <div className="border-t border-border bg-background/60">
           <SandboxOperationProgress
             emptyMessage="Waiting for snapshot creation events."
-            operationId={retainedCreatingState.operationId}
-            sandboxInstanceId={retainedCreatingState.sandboxInstanceId}
+            operationId={operationProgressState.operationId}
+            sandboxInstanceId={operationProgressState.sandboxInstanceId}
             showBorder={false}
             showLoadError={false}
           />
@@ -407,7 +408,7 @@ function SnapshotStatusPanel(input: {
   );
 }
 
-function useRetainedCreatingSnapshotState(
+function useRetainedSnapshotOperationState(
   state: SnapshotPanelState,
 ): SnapshotOperationProgressState | null {
   const [retainedState, setRetainedState] = useState<SnapshotOperationProgressState | null>(
@@ -458,21 +459,6 @@ export function resolveRetainedSnapshotOperationState(input: {
   }
 
   return input.retainedState;
-}
-
-function shouldDefaultSnapshotOperationDetailsExpanded(input: {
-  retainedState: SnapshotOperationProgressState | null;
-  state: SnapshotPanelState;
-}): boolean {
-  if (input.retainedState === null) {
-    return false;
-  }
-
-  return (
-    input.state.kind === "creating" ||
-    input.state.kind === "publish-snapshot-error" ||
-    input.state.kind === "refresh-error"
-  );
 }
 
 function SnapshotStatusAction(input: {
