@@ -28,7 +28,7 @@ export class GatewayHttpSandboxBootstrapAttachmentTerminator implements SandboxB
   public async terminate(input: {
     sandboxInstanceId: string;
     expectedOwnerLeaseId: string;
-    expectedSessionId: string;
+    expectedSessionId?: string;
   }): Promise<TerminateSandboxBootstrapAttachmentResult> {
     const url = new URL(
       `/internal/sandbox-instances/${encodeURIComponent(input.sandboxInstanceId)}/bootstrap-attachment/terminate`,
@@ -42,7 +42,9 @@ export class GatewayHttpSandboxBootstrapAttachmentTerminator implements SandboxB
       },
       body: JSON.stringify({
         expectedOwnerLeaseId: input.expectedOwnerLeaseId,
-        expectedSessionId: input.expectedSessionId,
+        ...(input.expectedSessionId === undefined
+          ? {}
+          : { expectedSessionId: input.expectedSessionId }),
       }),
       signal: AbortSignal.timeout(this.input.requestTimeoutMs ?? DefaultRequestTimeoutMs),
     });

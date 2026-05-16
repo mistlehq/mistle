@@ -57,10 +57,61 @@ export type ReconcileSandboxInstanceOutcome =
   | "runtime_state_fence_before_stop"
   | "runtime_state_fence_before_mark";
 
+export type ReconcileBootstrapAttachmentTerminationTarget = {
+  expectedOwnerLeaseId: string;
+  expectedSessionId?: string;
+};
+
 export type ReconcileSandboxInstanceResult = {
   executed: boolean;
   outcome: ReconcileSandboxInstanceOutcome;
+  bootstrapAttachmentTerminationTarget?: ReconcileBootstrapAttachmentTerminationTarget;
 };
+
+function withBootstrapAttachmentTerminationTarget(input: {
+  result: ReconcileSandboxInstanceResult;
+  expectedOwnerLeaseId: string;
+  expectedSessionId?: string;
+}): ReconcileSandboxInstanceResult {
+  return {
+    ...input.result,
+    bootstrapAttachmentTerminationTarget: {
+      expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+      ...(input.expectedSessionId === undefined
+        ? {}
+        : { expectedSessionId: input.expectedSessionId }),
+    },
+  };
+}
+
+function isTerminalCleanupFenceMatched(input: {
+  expectedOwnerLeaseId: string;
+  snapshot: SandboxRuntimeStateSnapshot;
+}): boolean {
+  if (
+    input.snapshot.ownerLeaseId !== null &&
+    input.snapshot.ownerLeaseId !== input.expectedOwnerLeaseId
+  ) {
+    return false;
+  }
+
+  return (
+    input.snapshot.attachment === null ||
+    input.snapshot.attachment.ownerLeaseId === input.expectedOwnerLeaseId
+  );
+}
+
+function resolveTerminalBootstrapAttachmentTerminationTarget(input: {
+  expectedOwnerLeaseId: string;
+  snapshot: SandboxRuntimeStateSnapshot;
+}): ReconcileBootstrapAttachmentTerminationTarget {
+  return {
+    expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+    ...(input.snapshot.attachment === null
+      ? {}
+      : { expectedSessionId: input.snapshot.attachment.sessionId }),
+  };
+}
 
 /**
  * Disconnect reconciliation is fenced the same way the old disconnected-stop
@@ -268,6 +319,9 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
       return {
         executed: true,
         outcome: "failed",
+        bootstrapAttachmentTerminationTarget: {
+          expectedOwnerLeaseId: ctx.expectedOwnerLeaseId,
+        },
       };
     }
 
@@ -302,6 +356,9 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
     return {
       executed: true,
       outcome: "stopped",
+      bootstrapAttachmentTerminationTarget: {
+        expectedOwnerLeaseId: ctx.expectedOwnerLeaseId,
+      },
     };
   }
 
@@ -329,12 +386,18 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
     return {
       executed: false,
       outcome: "already_stopped",
+      bootstrapAttachmentTerminationTarget: {
+        expectedOwnerLeaseId: ctx.expectedOwnerLeaseId,
+      },
     };
   }
 
   return {
     executed: true,
     outcome: "stopped",
+    bootstrapAttachmentTerminationTarget: {
+      expectedOwnerLeaseId: ctx.expectedOwnerLeaseId,
+    },
   };
 }
 
@@ -363,19 +426,10 @@ export async function reconcileSandboxInstance(
     expectedOwnerLeaseId: string;
   },
 ): Promise<ReconcileSandboxInstanceResult> {
-  if (
-    !(await isDisconnectReconciliationStillPermitted({
-      runtimeStateReader: ctx.runtimeStateReader,
-      clock: ctx.clock,
-      sandboxInstanceId: input.sandboxInstanceId,
-      expectedOwnerLeaseId: input.expectedOwnerLeaseId,
-    }))
-  ) {
-    return {
-      executed: false,
-      outcome: "runtime_state_fence_before_load",
-    };
-  }
+  const initialSnapshot = await ctx.runtimeStateReader.readSnapshot({
+    sandboxInstanceId: input.sandboxInstanceId,
+    nowMs: ctx.clock.nowMs(),
+  });
 
   const sandboxInstance = await resolveActiveSandboxInstance({
     db: ctx.db,
@@ -383,9 +437,37 @@ export async function reconcileSandboxInstance(
     sandboxInstanceId: input.sandboxInstanceId,
   });
   if (sandboxInstance === null) {
+    if (
+      !isTerminalCleanupFenceMatched({
+        expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+        snapshot: initialSnapshot,
+      })
+    ) {
+      return {
+        executed: false,
+        outcome: "runtime_state_fence_before_load",
+      };
+    }
+
     return {
       executed: false,
       outcome: "already_terminal",
+      bootstrapAttachmentTerminationTarget: resolveTerminalBootstrapAttachmentTerminationTarget({
+        expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+        snapshot: initialSnapshot,
+      }),
+    };
+  }
+
+  if (
+    !shouldExecuteSandboxDisconnectReconciliation({
+      expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+      snapshot: initialSnapshot,
+    })
+  ) {
+    return {
+      executed: false,
+      outcome: "runtime_state_fence_before_load",
     };
   }
 
@@ -451,13 +533,19 @@ export async function reconcileSandboxInstance(
         return {
           executed: false,
           outcome: "already_failed",
+          bootstrapAttachmentTerminationTarget: {
+            expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+          },
         };
       }
 
-      return {
-        executed: true,
-        outcome: "failed",
-      };
+      return withBootstrapAttachmentTerminationTarget({
+        result: {
+          executed: true,
+          outcome: "failed",
+        },
+        expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+      });
     }
     case "mark_stopped": {
       const markOutcome = await markSandboxInstanceStopped({
@@ -485,13 +573,19 @@ export async function reconcileSandboxInstance(
         return {
           executed: false,
           outcome: "already_stopped",
+          bootstrapAttachmentTerminationTarget: {
+            expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+          },
         };
       }
 
-      return {
-        executed: true,
-        outcome: "stopped",
-      };
+      return withBootstrapAttachmentTerminationTarget({
+        result: {
+          executed: true,
+          outcome: "stopped",
+        },
+        expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+      });
     }
     case "stop_then_mark_stopped":
       if (

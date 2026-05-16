@@ -14,7 +14,10 @@ import {
   StartSandboxInstanceWorkflowSpec,
   type StartSandboxInstanceWorkflowOutput,
 } from "@mistle/workflow-registry/data-plane";
-import { shouldRethrowDurableStepErrorForRetry } from "@mistle/workflow-registry/durable-step-retry.js";
+import {
+  rethrowDurableStepErrorForRetry,
+  shouldRethrowDurableStepErrorForRetry,
+} from "@mistle/workflow-registry/durable-step-retry.js";
 
 import { getWorkflowContext } from "../core/context.js";
 import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
@@ -409,12 +412,6 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           phase: "stop",
           status: "failed",
         });
-      }
-    }
-
-    function rethrowDurableStepErrorForRetry(error: unknown): void {
-      if (shouldRethrowDurableStepErrorForRetry(error)) {
-        throw error;
       }
     }
 

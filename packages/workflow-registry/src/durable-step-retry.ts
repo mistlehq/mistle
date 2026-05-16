@@ -8,6 +8,17 @@ type DurableStepRetryPolicyShape = {
   maximumAttempts?: unknown;
 };
 
+type DurableStepRetryLogger = {
+  warn(attributes: Record<string, unknown>, message: string): void;
+};
+
+type DurableStepRetryLogOptions = {
+  attributes?: Record<string, unknown>;
+  eventName: string;
+  logger: DurableStepRetryLogger;
+  message: string;
+};
+
 export function shouldRethrowDurableStepErrorForRetry(error: unknown): boolean {
   if (!isDurableStepErrorShape(error)) {
     return false;
@@ -26,6 +37,28 @@ export function shouldRethrowDurableStepErrorForRetry(error: unknown): boolean {
   }
 
   return stepFailedAttempts < retryPolicy.maximumAttempts;
+}
+
+export function rethrowDurableStepErrorForRetry(
+  error: unknown,
+  logOptions?: DurableStepRetryLogOptions,
+): void {
+  if (!shouldRethrowDurableStepErrorForRetry(error)) {
+    return;
+  }
+
+  if (logOptions !== undefined) {
+    logOptions.logger.warn(
+      {
+        ...logOptions.attributes,
+        eventName: logOptions.eventName,
+        err: error,
+      },
+      logOptions.message,
+    );
+  }
+
+  throw error;
 }
 
 function isDurableStepErrorShape(error: unknown): error is DurableStepErrorShape {

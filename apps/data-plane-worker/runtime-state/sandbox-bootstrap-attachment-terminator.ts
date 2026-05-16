@@ -24,6 +24,6 @@ export interface SandboxBootstrapAttachmentTerminator {
   terminate(input: {
     sandboxInstanceId: string;
     expectedOwnerLeaseId: string;
-    expectedSessionId: string;
+    expectedSessionId?: string;
   }): Promise<TerminateSandboxBootstrapAttachmentResult>;
 }

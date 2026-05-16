@@ -5,7 +5,7 @@ import {
   SandboxStartImageKinds,
   type StartSandboxInstanceWorkflowImageInput,
 } from "@mistle/workflow-registry/data-plane";
-import { shouldRethrowDurableStepErrorForRetry } from "@mistle/workflow-registry/durable-step-retry.js";
+import { rethrowDurableStepErrorForRetry } from "@mistle/workflow-registry/durable-step-retry.js";
 
 import { getWorkflowContext } from "../core/context.js";
 import { createResolveSandboxRuntimeInput } from "../core/sandbox-runtime-resolver.js";
@@ -84,18 +84,15 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       sandboxInstanceId: input.sandboxInstanceId,
     });
 
-    function rethrowDurableStepErrorForRetry(error: unknown): void {
-      if (shouldRethrowDurableStepErrorForRetry(error)) {
-        logger.warn(
-          {
-            eventName: "sandbox_instance.resume_step_retry",
-            sandboxInstanceId: input.sandboxInstanceId,
-            err: error,
-          },
-          "Retrying sandbox resume workflow after durable step failure.",
-        );
-        throw error;
-      }
+    function rethrowResumeDurableStepErrorForRetry(error: unknown): void {
+      rethrowDurableStepErrorForRetry(error, {
+        attributes: {
+          sandboxInstanceId: input.sandboxInstanceId,
+        },
+        eventName: "sandbox_instance.resume_step_retry",
+        logger,
+        message: "Retrying sandbox resume workflow after durable step failure.",
+      });
     }
 
     logger.info(
@@ -304,7 +301,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               "Attached sandbox storage before resumed runtime initialization.",
             );
           } catch (error) {
-            rethrowDurableStepErrorForRetry(error);
+            rethrowResumeDurableStepErrorForRetry(error);
             existingResumeFailureHandled = true;
             const failureMessage = formatPersistedFailureMessage({
               summary: "Failed to attach sandbox storage before resume runtime initialization.",
@@ -443,7 +440,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               "Initialized resumed sandbox runtime.",
             );
           } catch (error) {
-            rethrowDurableStepErrorForRetry(error);
+            rethrowResumeDurableStepErrorForRetry(error);
             existingResumeFailureHandled = true;
             const failureMessage = formatPersistedFailureMessage({
               summary: "Failed to initialize resumed sandbox runtime.",
@@ -587,7 +584,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               "Finished waiting for resumed sandbox runtime readiness.",
             );
           } catch (error) {
-            rethrowDurableStepErrorForRetry(error);
+            rethrowResumeDurableStepErrorForRetry(error);
             await operationEvents.record({
               attributes: {
                 providerSandboxId: resumedRuntime.providerSandboxId,
@@ -798,7 +795,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               "Sandbox resume workflow completed successfully.",
             );
           } catch (error) {
-            rethrowDurableStepErrorForRetry(error);
+            rethrowResumeDurableStepErrorForRetry(error);
             existingResumeFailureHandled = true;
             const failureMessage = formatPersistedFailureMessage({
               summary: "Failed to mark resumed sandbox instance as running.",
@@ -876,7 +873,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           };
         }
       } catch (error) {
-        rethrowDurableStepErrorForRetry(error);
+        rethrowResumeDurableStepErrorForRetry(error);
         if (existingResumeFailureHandled) {
           throw error;
         }
@@ -1093,7 +1090,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           );
         });
       } catch (error) {
-        rethrowDurableStepErrorForRetry(error);
+        rethrowResumeDurableStepErrorForRetry(error);
         replacementFailureHandled = true;
         const failureMessage = formatPersistedFailureMessage({
           summary: "Failed to attach sandbox storage before replacement runtime initialization.",
@@ -1240,7 +1237,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           },
         );
       } catch (error) {
-        rethrowDurableStepErrorForRetry(error);
+        rethrowResumeDurableStepErrorForRetry(error);
         replacementFailureHandled = true;
         const failureMessage = formatPersistedFailureMessage({
           summary: "Failed to initialize replacement sandbox runtime.",
@@ -1384,7 +1381,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           });
         }
       } catch (error) {
-        rethrowDurableStepErrorForRetry(error);
+        rethrowResumeDurableStepErrorForRetry(error);
         await operationEvents.record({
           attributes: {
             providerSandboxId: replacementProviderSandboxId,
@@ -1641,7 +1638,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           },
         );
       } catch (error) {
-        rethrowDurableStepErrorForRetry(error);
+        rethrowResumeDurableStepErrorForRetry(error);
         replacementFailureHandled = true;
         const failureMessage = formatPersistedFailureMessage({
           summary: "Failed to mark replacement sandbox instance as running.",
@@ -1748,7 +1745,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         throw error;
       }
     } catch (error) {
-      rethrowDurableStepErrorForRetry(error);
+      rethrowResumeDurableStepErrorForRetry(error);
       if (!replacementFailureHandled) {
         const failureMessage = formatPersistedFailureMessage({
           summary: "Failed to replace missing sandbox compute during resume.",

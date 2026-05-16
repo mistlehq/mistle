@@ -3,7 +3,7 @@ import {
   type StopSandboxInstanceWorkflowInput,
   type StopSandboxInstanceWorkflowOutput,
 } from "@mistle/workflow-registry/data-plane";
-import { shouldRethrowDurableStepErrorForRetry } from "@mistle/workflow-registry/durable-step-retry.js";
+import { rethrowDurableStepErrorForRetry } from "@mistle/workflow-registry/durable-step-retry.js";
 import { trace } from "@opentelemetry/api";
 
 import {
@@ -56,18 +56,15 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
     });
 
     let result: StopSandboxInstanceResult;
-    function rethrowDurableStepErrorForRetry(error: unknown): void {
-      if (shouldRethrowDurableStepErrorForRetry(error)) {
-        logger.warn(
-          {
-            eventName: "sandbox_instance.stop_step_retry",
-            sandboxInstanceId: input.sandboxInstanceId,
-            err: error,
-          },
-          "Retrying sandbox stop workflow after durable step failure.",
-        );
-        throw error;
-      }
+    function rethrowStopDurableStepErrorForRetry(error: unknown): void {
+      rethrowDurableStepErrorForRetry(error, {
+        attributes: {
+          sandboxInstanceId: input.sandboxInstanceId,
+        },
+        eventName: "sandbox_instance.stop_step_retry",
+        logger,
+        message: "Retrying sandbox stop workflow after durable step failure.",
+      });
     }
 
     async function terminateBootstrapAttachmentStep(
@@ -116,7 +113,7 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         );
         return terminateResult;
       } catch (error) {
-        rethrowDurableStepErrorForRetry(error);
+        rethrowStopDurableStepErrorForRetry(error);
         await operationEvents.record({
           attributes: {
             error: formatLifecycleEventError(error),
@@ -150,7 +147,7 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         );
       });
     } catch (error) {
-      rethrowDurableStepErrorForRetry(error);
+      rethrowStopDurableStepErrorForRetry(error);
       await operationEvents.record({
         attributes: {
           error: formatLifecycleEventError(error),
