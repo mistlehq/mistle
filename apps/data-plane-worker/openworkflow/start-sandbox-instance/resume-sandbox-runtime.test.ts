@@ -16,21 +16,16 @@ describe("resolveResumeStartupMode", () => {
     ).toBe("new");
   });
 
-  it("uses existing startup mode for E2B provider resumes", () => {
-    expect(
-      resolveResumeStartupMode({
-        runtimeProvider: SandboxProvider.E2B,
-      }),
-    ).toBe("existing");
-  });
-
-  it("uses existing startup mode for Tensorlake provider resumes", () => {
-    expect(
-      resolveResumeStartupMode({
-        runtimeProvider: SandboxProvider.TENSORLAKE,
-      }),
-    ).toBe("existing");
-  });
+  it.each([SandboxProvider.E2B, SandboxProvider.TENSORLAKE])(
+    "uses existing startup mode for managed provider resumes: %s",
+    (runtimeProvider) => {
+      expect(
+        resolveResumeStartupMode({
+          runtimeProvider,
+        }),
+      ).toBe("existing");
+    },
+  );
 });
 
 describe("sandboxd resume initialization errors", () => {
