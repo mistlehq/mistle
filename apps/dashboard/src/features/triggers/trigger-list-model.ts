@@ -1,23 +1,36 @@
 import type { TriggerListItemViewModel } from "./trigger-list-types.js";
 
-export type TriggerListFilter = "all" | "enabled" | "disabled";
-
-export const TRIGGER_LIST_FILTER_OPTIONS: ReadonlyArray<{
-  value: TriggerListFilter;
+type TriggerListFilterOption = {
+  value: string;
   label: string;
-}> = [
+};
+
+function defineTriggerListFilterOptions<const TOptions extends readonly TriggerListFilterOption[]>(
+  options: TOptions,
+): TOptions {
+  return options;
+}
+
+export const TRIGGER_LIST_FILTER_OPTIONS = defineTriggerListFilterOptions([
   { value: "all", label: "All" },
   { value: "enabled", label: "Enabled" },
   { value: "disabled", label: "Disabled" },
-];
+  { value: "events", label: "Events" },
+  { value: "schedules", label: "Schedules" },
+]);
+
+export type TriggerListFilter = (typeof TRIGGER_LIST_FILTER_OPTIONS)[number]["value"];
 
 export function toTriggerListFilter(value: string | null): TriggerListFilter {
   if (value === null) {
     throw new Error("Trigger filter value must not be null.");
   }
 
-  if (value === "all" || value === "enabled" || value === "disabled") {
-    return value;
+  const matchingOption = TRIGGER_LIST_FILTER_OPTIONS.find(
+    (filterOption) => filterOption.value === value,
+  );
+  if (matchingOption !== undefined) {
+    return matchingOption.value;
   }
 
   throw new Error(`Unexpected trigger filter value: "${value}".`);
@@ -39,6 +52,10 @@ function matchesFilter(item: TriggerListItemViewModel, filter: TriggerListFilter
       return item.enabled;
     case "disabled":
       return !item.enabled;
+    case "events":
+      return item.source.kind === "webhook";
+    case "schedules":
+      return item.source.kind === "schedule";
   }
 }
 

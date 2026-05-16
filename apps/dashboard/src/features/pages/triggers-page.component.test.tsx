@@ -316,6 +316,11 @@ describe("TriggersPage", () => {
 
     expect(screen.getByRole("button", { name: "Alpha trigger" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Backlog sync" })).toBeDefined();
+    expect(
+      within(rendered.container)
+        .getByRole("textbox", { name: "Search triggers" })
+        .getAttribute("placeholder"),
+    ).toBe("Search triggers");
 
     fireEvent.change(within(rendered.container).getByRole("textbox", { name: "Search triggers" }), {
       target: { value: "Backlog" },

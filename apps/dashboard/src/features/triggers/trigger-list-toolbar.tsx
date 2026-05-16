@@ -20,7 +20,7 @@ export function TriggerListToolbar(input: {
       onFilterValueChange={(nextValue) => input.onFilterChange(toTriggerListFilter(nextValue))}
       onSearchValueChange={input.onSearchValueChange}
       searchAriaLabel="Search triggers"
-      searchPlaceholder="Search triggers, events, schedules, profiles, or repositories"
+      searchPlaceholder="Search triggers"
       searchValue={input.searchValue}
     />
   );
