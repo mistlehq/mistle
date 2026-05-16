@@ -11151,6 +11151,8 @@ export interface paths {
         content: {
           "application/json": {
             idempotencyKey?: string;
+            /** @enum {string} */
+            scriptKind?: "setup" | "maintenance";
           };
         };
       };
@@ -11244,6 +11246,19 @@ export interface paths {
             "application/json": {
               /** @enum {string} */
               code: "PROFILE_NOT_FOUND" | "PROFILE_VERSION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile version cannot start the requested Setup Assistant. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_VERSION_NOT_USABLE";
               message: string;
             };
           };

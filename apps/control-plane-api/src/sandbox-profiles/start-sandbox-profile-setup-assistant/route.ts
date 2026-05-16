@@ -8,6 +8,7 @@ import {
 } from "../schemas.js";
 import {
   badRequestResponseSchema,
+  conflictResponseSchema,
   notFoundResponseSchema,
 } from "../start-sandbox-profile-instance/schema.js";
 
@@ -48,6 +49,14 @@ export const route = createRoute({
       content: {
         "application/json": {
           schema: notFoundResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: "Sandbox profile version cannot start the requested Setup Assistant.",
+      content: {
+        "application/json": {
+          schema: conflictResponseSchema,
         },
       },
     },

@@ -484,6 +484,7 @@ export const startSandboxProfileMaintenanceScriptTestRunBodySchema = z
 export const startSandboxProfileSetupAssistantBodySchema = z
   .object({
     idempotencyKey: z.string().min(1).max(255).optional(),
+    scriptKind: z.enum(["setup", "maintenance"]).optional(),
   })
   .strict();
 

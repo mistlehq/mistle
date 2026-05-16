@@ -1363,10 +1363,11 @@ function ReadySandboxProfileEditorPage(input: {
   );
   const startSetupAssistantMutation = useMutation({
     meta: NoLoadingIndicatorMeta,
-    mutationFn: async (request: { version: number }) =>
+    mutationFn: async (request: { scriptKind: SetupAssistantScriptKind; version: number }) =>
       startSandboxProfileSetupAssistant({
         idempotencyKey: crypto.randomUUID(),
         profileId: input.profileId,
+        scriptKind: request.scriptKind,
         version: request.version,
       }),
     onSuccess: (result) => {
@@ -1507,7 +1508,7 @@ function ReadySandboxProfileEditorPage(input: {
         return;
       }
 
-      startSetupAssistantMutation.mutate({ version: input.mode.version });
+      startSetupAssistantMutation.mutate({ scriptKind, version: input.mode.version });
     },
     title: setupAssistantPanelIsOpen
       ? "Setup Assistant is open in the right panel."
@@ -1541,7 +1542,7 @@ function ReadySandboxProfileEditorPage(input: {
         return;
       }
 
-      startSetupAssistantMutation.mutate({ version: snapshotVersion.version });
+      startSetupAssistantMutation.mutate({ scriptKind, version: snapshotVersion.version });
     },
     title: setupAssistantPanelIsOpen
       ? "Setup Assistant is open in the right panel."

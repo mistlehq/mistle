@@ -1318,6 +1318,7 @@ export async function startSandboxProfileSetupAssistant(input: {
   profileId: string;
   version: number;
   idempotencyKey?: string;
+  scriptKind?: "maintenance" | "setup";
   signal?: AbortSignal;
 }): Promise<SandboxProfileSetupAssistant> {
   try {
@@ -1329,6 +1330,7 @@ export async function startSandboxProfileSetupAssistant(input: {
       )}/setup-script/assistant`,
       body: {
         ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
+        ...(input.scriptKind === undefined ? {} : { scriptKind: input.scriptKind }),
       },
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not start Setup Assistant.",

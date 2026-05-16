@@ -21895,6 +21895,10 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 255
+                  },
+                  "scriptKind": {
+                    "type": "string",
+                    "enum": ["setup", "maintenance"]
                   }
                 },
                 "additionalProperties": false
@@ -22056,6 +22060,28 @@
                     "code": {
                       "type": "string",
                       "enum": ["PROFILE_NOT_FOUND", "PROFILE_VERSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Sandbox profile version cannot start the requested Setup Assistant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROFILE_VERSION_NOT_USABLE"]
                     },
                     "message": {
                       "type": "string",

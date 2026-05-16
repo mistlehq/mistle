@@ -44,21 +44,28 @@ type StartProfileMaintenanceScriptTestRunOutput = {
   sandboxInstanceId: string;
 };
 
-export async function startProfileMaintenanceScriptTestRun(
-  {
-    db,
-    integrationRegistry,
-    integrationsConfig,
-    sandboxConfig,
-    dataPlaneClient,
-    defaultBaseImage,
-  }: Pick<CreateSandboxProfilesServiceInput, "db" | "integrationsConfig" | "dataPlaneClient"> & {
-    integrationRegistry: CreateSandboxProfilesServiceInput["integrationRegistry"];
-    sandboxConfig: CreateSandboxProfilesServiceInput["sandboxConfig"];
-    defaultBaseImage: string;
+type StartProfileMaintenanceSetupAssistantInput = Omit<
+  StartProfileMaintenanceScriptTestRunInput,
+  "agentRuntimeId" | "maintenanceScript" | "sandboxRuntimeConfig"
+>;
+
+type StartProfileMaintenanceScriptServiceInput = Pick<
+  CreateSandboxProfilesServiceInput,
+  "db" | "integrationsConfig" | "dataPlaneClient"
+> & {
+  integrationRegistry: CreateSandboxProfilesServiceInput["integrationRegistry"];
+  sandboxConfig: CreateSandboxProfilesServiceInput["sandboxConfig"];
+  defaultBaseImage: string;
+};
+
+async function resolveMaintenanceSnapshotImageId(
+  { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
+  input: {
+    organizationId: string;
+    profileId: string;
+    profileVersion: number;
   },
-  input: StartProfileMaintenanceScriptTestRunInput,
-): Promise<StartProfileMaintenanceScriptTestRunOutput> {
+): Promise<string> {
   const tables = getControlPlaneDatabaseSchema(db);
   const [sandboxProfileVersion] = await db
     .select({
@@ -101,33 +108,54 @@ export async function startProfileMaintenanceScriptTestRun(
     );
   }
 
-  return await startProfileSetupSandbox(
-    {
-      db,
-      integrationRegistry,
-      integrationsConfig,
-      sandboxConfig,
-      dataPlaneClient,
-      defaultBaseImage,
+  return sandboxProfileVersion.snapshotImageId;
+}
+
+export async function startProfileMaintenanceSetupAssistant(
+  serviceInput: StartProfileMaintenanceScriptServiceInput,
+  input: StartProfileMaintenanceSetupAssistantInput,
+): Promise<StartProfileMaintenanceScriptTestRunOutput> {
+  const snapshotImageId = await resolveMaintenanceSnapshotImageId(serviceInput, input);
+
+  return await startProfileSetupSandbox(serviceInput, {
+    organizationId: input.organizationId,
+    profileId: input.profileId,
+    profileVersion: input.profileVersion,
+    purpose: SandboxInstancePurposes.SETUP_ASSISTANT,
+    snapshotPreparationScriptKind: "maintenance",
+    image: {
+      kind: "snapshot",
+      imageId: snapshotImageId,
     },
-    {
-      organizationId: input.organizationId,
-      profileId: input.profileId,
-      profileVersion: input.profileVersion,
-      purpose: SandboxInstancePurposes.SETUP_CHECK,
-      setupScript: input.maintenanceScript,
-      snapshotPreparationScriptKind: "maintenance",
-      image: {
-        kind: "snapshot",
-        imageId: sandboxProfileVersion.snapshotImageId,
-      },
-      ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
-      ...(input.sandboxRuntimeConfig === undefined
-        ? {}
-        : { sandboxRuntimeConfig: input.sandboxRuntimeConfig }),
-      startedBy: input.startedBy,
-      source: input.source,
-      ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
+    startedBy: input.startedBy,
+    source: input.source,
+    ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
+  });
+}
+
+export async function startProfileMaintenanceScriptTestRun(
+  serviceInput: StartProfileMaintenanceScriptServiceInput,
+  input: StartProfileMaintenanceScriptTestRunInput,
+): Promise<StartProfileMaintenanceScriptTestRunOutput> {
+  const snapshotImageId = await resolveMaintenanceSnapshotImageId(serviceInput, input);
+
+  return await startProfileSetupSandbox(serviceInput, {
+    organizationId: input.organizationId,
+    profileId: input.profileId,
+    profileVersion: input.profileVersion,
+    purpose: SandboxInstancePurposes.SETUP_CHECK,
+    setupScript: input.maintenanceScript,
+    snapshotPreparationScriptKind: "maintenance",
+    image: {
+      kind: "snapshot",
+      imageId: snapshotImageId,
     },
-  );
+    ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
+    ...(input.sandboxRuntimeConfig === undefined
+      ? {}
+      : { sandboxRuntimeConfig: input.sandboxRuntimeConfig }),
+    startedBy: input.startedBy,
+    source: input.source,
+    ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
+  });
 }
