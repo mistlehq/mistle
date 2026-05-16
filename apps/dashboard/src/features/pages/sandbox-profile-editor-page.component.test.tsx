@@ -1293,16 +1293,23 @@ describe("SandboxProfileEditorPage", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Snapshots" }));
 
-    expect(screen.getByText("Creating snapshot")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Creating snapshot" })).toBeDefined();
     expect(screen.getByText("Sandbox Profile v3's snapshot is being created")).toBeDefined();
     expect(
       screen.getByText(
         "New sessions and triggers will be available after snapshot creation succeeds.",
       ),
     ).toBeDefined();
-    const status = screen.getByRole("status", { name: "Creating snapshot" });
-    expect(status.className).toContain("sm:justify-end");
-    expect(status.querySelector(".text-right")?.textContent).toContain("Creating snapshot");
+    const detailsToggle = screen.getByRole("button", { name: "Creating snapshot" });
+    expect(detailsToggle.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("status", { name: "Creating snapshot" })).toBeDefined();
+    expect(screen.getByText("No lifecycle events yet.")).toBeDefined();
+    expect(screen.getByText("Terminal output")).toBeDefined();
+    expect(screen.getByText("No output yet.")).toBeDefined();
+    fireEvent.click(detailsToggle);
+    expect(detailsToggle.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("No lifecycle events yet.")).toBeNull();
+    expect(screen.queryByText("Terminal output")).toBeNull();
   });
 
   it("shows the interim runnable snapshot while a newer published snapshot is being created", () => {
@@ -1325,7 +1332,7 @@ describe("SandboxProfileEditorPage", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Snapshots" }));
 
-    expect(screen.getByText("Creating snapshot")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Creating snapshot" })).toBeDefined();
     expect(screen.queryByText("Refreshing")).toBeNull();
   });
 
@@ -1347,6 +1354,10 @@ describe("SandboxProfileEditorPage", () => {
     expect(
       screen.getByText("v2's snapshot will be used for new sessions and triggers."),
     ).toBeDefined();
+    const detailsToggle = screen.getByRole("button", { name: "Snapshot creation details" });
+    expect(detailsToggle.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("No lifecycle events yet.")).toBeDefined();
+    expect(screen.getByText("Terminal output")).toBeDefined();
     expect(screen.getByRole("button", { name: "Retry snapshot creation" })).toBeDefined();
   });
 
@@ -1375,6 +1386,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByText("Sandbox Profile v3's snapshot is unavailable")).toBeDefined();
     expect(screen.getByRole("button", { name: "Retry snapshot creation" })).toBeDefined();
     expect(screen.queryByRole("button", { name: "Create snapshot" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Snapshot creation details" })).toBeDefined();
   });
 
   it("shows ready snapshots as the version used for new sessions and triggers", () => {
@@ -1678,7 +1690,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByRole("tab", { name: "Snapshots" }).getAttribute("aria-selected")).toBe(
       "true",
     );
-    expect(screen.getByText("Creating snapshot")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Creating snapshot" })).toBeDefined();
   });
 
   it("pushes a history entry when changing editor sections", async () => {
@@ -1954,7 +1966,7 @@ describe("SandboxProfileEditorPage", () => {
     });
     expect(snapshotsPanel.textContent).not.toContain("Viewing: Published");
     expect(screen.getByText("Publish successful, creating a snapshot")).toBeDefined();
-    expect(screen.getByText("Creating snapshot")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Creating snapshot" })).toBeDefined();
   });
 
   it("polls while a published version is waiting on initial snapshot materialization", () => {

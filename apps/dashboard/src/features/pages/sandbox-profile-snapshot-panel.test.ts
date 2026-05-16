@@ -48,6 +48,8 @@ describe("resolveRetainedSnapshotOperationState", () => {
           kind: "refresh-error",
           latestSnapshotCreatedAt: null,
           message: "Snapshot materialization failed.",
+          operationId: null,
+          sandboxInstanceId: null,
         },
       }),
     ).toEqual({

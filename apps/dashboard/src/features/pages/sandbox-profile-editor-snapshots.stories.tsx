@@ -55,6 +55,14 @@ export const CreatingWithPreviousSnapshot: Story = {
   },
 };
 
+export const CreatingWithLifecycleEvents: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotState: "creating-snapshot-with-events",
+  },
+};
+
 export const PublishSuccessfulCreatingSnapshot: Story = {
   args: {
     initialSectionId: "snapshot",
