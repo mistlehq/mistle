@@ -8,28 +8,35 @@ import { createSandboxStartupInput } from "./initialize-sandbox-runtime.js";
 import {
   SandboxStartupModes,
   type SandboxStartupInput,
-  type SandboxStartupMode,
   encodeSandboxStartupInput,
 } from "./sandbox-startup-input.js";
 import { createSandboxRuntimeEnv } from "./start-sandbox.js";
 
 function assertUnreachable(_value: never): never {
-  throw new Error("Unsupported sandbox provider for resume startup mode resolution.");
+  throw new Error("Unsupported sandbox provider for resume state restoration resolution.");
 }
 
-export function resolveResumeStartupMode(input: {
+export const SandboxResumeStateRestorations = {
+  FILESYSTEM: "filesystem",
+  MEMORY: "memory",
+} as const;
+
+export type SandboxResumeStateRestoration =
+  (typeof SandboxResumeStateRestorations)[keyof typeof SandboxResumeStateRestorations];
+
+export function resolveProviderResumeStateRestoration(input: {
   runtimeProvider: SandboxProvider;
-}): SandboxStartupMode {
+}): SandboxResumeStateRestoration {
   if (input.runtimeProvider === SandboxProvider.DOCKER) {
-    return SandboxStartupModes.NEW;
+    return SandboxResumeStateRestorations.FILESYSTEM;
   }
 
   if (input.runtimeProvider === SandboxProvider.E2B) {
-    return SandboxStartupModes.EXISTING;
+    return SandboxResumeStateRestorations.MEMORY;
   }
 
   if (input.runtimeProvider === SandboxProvider.TENSORLAKE) {
-    return SandboxStartupModes.EXISTING;
+    return SandboxResumeStateRestorations.FILESYSTEM;
   }
 
   return assertUnreachable(input.runtimeProvider);
@@ -97,9 +104,13 @@ export async function resumeSandboxRuntime(
     id: input.providerSandboxId,
     env: runtimeEnv,
   });
+  const resumeStateRestoration = resolveProviderResumeStateRestoration({
+    runtimeProvider: input.runtimeProvider,
+  });
   ctx.logger.info(
     {
       providerSandboxId: input.providerSandboxId,
+      resumeStateRestoration,
       runtimeProvider: input.runtimeProvider,
       sandboxInstanceId: input.sandboxInstanceId,
       sandboxdVersion,
@@ -113,9 +124,7 @@ export async function resumeSandboxRuntime(
     operationId: input.operationId,
     operationKind: input.operationKind,
     sandboxInstanceId: input.sandboxInstanceId,
-    startupMode: resolveResumeStartupMode({
-      runtimeProvider: input.runtimeProvider,
-    }),
+    startupMode: SandboxStartupModes.EXISTING,
     runtimePlan: input.runtimePlan,
     ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
     ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
@@ -134,6 +143,7 @@ export async function resumeSandboxRuntime(
     ctx.logger.info(
       {
         providerSandboxId: input.providerSandboxId,
+        resumeStateRestoration,
         runtimeProvider: input.runtimeProvider,
         sandboxInstanceId: input.sandboxInstanceId,
       },
@@ -149,6 +159,7 @@ export async function resumeSandboxRuntime(
       ctx.logger.info(
         {
           providerSandboxId: input.providerSandboxId,
+          resumeStateRestoration,
           runtimeProvider: input.runtimeProvider,
           sandboxInstanceId: input.sandboxInstanceId,
         },
@@ -168,6 +179,7 @@ export async function resumeSandboxRuntime(
     ctx.logger.info(
       {
         providerSandboxId: input.providerSandboxId,
+        resumeStateRestoration,
         runtimeProvider: input.runtimeProvider,
         sandboxInstanceId: input.sandboxInstanceId,
       },

@@ -4,28 +4,28 @@ import { describe, expect, it } from "vitest";
 import {
   isSandboxdAlreadyInitializedForResume,
   isSandboxdInitializationAlreadyInProgressForResume,
-  resolveResumeStartupMode,
+  resolveProviderResumeStateRestoration,
 } from "./resume-sandbox-runtime.js";
 
-describe("resolveResumeStartupMode", () => {
-  it("uses a fresh startup mode for Docker provider resumes", () => {
-    expect(
-      resolveResumeStartupMode({
-        runtimeProvider: SandboxProvider.DOCKER,
-      }),
-    ).toBe("new");
-  });
-
-  it.each([SandboxProvider.E2B, SandboxProvider.TENSORLAKE])(
-    "uses existing startup mode for managed provider resumes: %s",
+describe("resolveProviderResumeStateRestoration", () => {
+  it.each([SandboxProvider.DOCKER, SandboxProvider.TENSORLAKE])(
+    "declares filesystem-only state restoration for provider resumes: %s",
     (runtimeProvider) => {
       expect(
-        resolveResumeStartupMode({
+        resolveProviderResumeStateRestoration({
           runtimeProvider,
         }),
-      ).toBe("existing");
+      ).toBe("filesystem");
     },
   );
+
+  it("declares memory state restoration for E2B provider resumes", () => {
+    expect(
+      resolveProviderResumeStateRestoration({
+        runtimeProvider: SandboxProvider.E2B,
+      }),
+    ).toBe("memory");
+  });
 });
 
 describe("sandboxd resume initialization errors", () => {
