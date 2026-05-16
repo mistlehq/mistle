@@ -607,16 +607,6 @@ async function start(): Promise<void> {
       env: sharedDevEnv,
     });
 
-    for (const port of DISTRIBUTED_GATEWAY_PORTS) {
-      spawnTrackedDevProcess({
-        args: ["--filter", "@mistle/data-plane-gateway", "dev"],
-        env: {
-          ...sharedDevEnv,
-          MISTLE_SERVICES_DATA_PLANE_GATEWAY_PORT: String(port),
-        },
-      });
-    }
-
     return;
   }
 

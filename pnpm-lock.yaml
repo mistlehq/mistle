@@ -835,6 +835,10 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
 
+  packages/dev-data-plane-gateway-a: {}
+
+  packages/dev-data-plane-gateway-b: {}
+
   packages/docs:
     devDependencies:
       mint:

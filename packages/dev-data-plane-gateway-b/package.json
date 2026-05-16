@@ -1,0 +1,8 @@
+{
+  "name": "@mistle/dev-data-plane-gateway-b",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "MISTLE_SERVICES_DATA_PLANE_GATEWAY_PORT=5204 pnpm --filter @mistle/data-plane-gateway dev"
+  }
+}
