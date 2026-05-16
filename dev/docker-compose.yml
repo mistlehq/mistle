@@ -97,6 +97,17 @@ services:
     networks:
       - sandbox-dev
 
+  data-plane-gateway-lb:
+    image: nginx:1.27-alpine
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${DEV_DATA_PLANE_GATEWAY_LB_PORT:-5202}:5202"
+    volumes:
+      - "./data-plane-gateway-lb.nginx.conf:/etc/nginx/conf.d/default.conf:ro"
+    networks:
+      - sandbox-dev
+
   data-plane-gateway-relay:
     image: nginx:1.27-alpine
     extra_hosts:

@@ -31,6 +31,7 @@ const DEV_CLOUDFLARED_CONFIG_PATH = resolve(DEV_CLOUDFLARED_CONFIG_DIR, "cloudfl
 
 const TUNNEL_SERVICE_NAME = "tunnel";
 const LOCAL_REGISTRY_HOST = "127.0.0.1:5001";
+const DISTRIBUTED_GATEWAY_PORTS = [5203, 5204] as const;
 const SANDBOX_BASE_IMAGE_TAG = getLocalPreparedRuntimeSandboxBaseImageRef();
 const SANDBOX_BASE_IMAGE_REGISTRY_TAG = getLocalDevDockerRegistrySandboxBaseImageRef();
 const SANDBOX_BASE_DOCKERFILE_PATH = "packages/sandboxd/Dockerfile";
@@ -46,10 +47,13 @@ const SANDBOX_BASE_BUILD_INPUT_PATHS: readonly string[] = [
 
 let localInfraStartAttempted = false;
 let localInfraEnv: NodeJS.ProcessEnv | undefined;
-let appDevProcess: ChildProcess | undefined;
+let appDevProcesses: ChildProcess[] = [];
 let terminated = false;
 
-type DevStartMode = "tunnel" | "ios";
+type DevStartOptions = {
+  gatewayMode: "single" | "distributed";
+  connectionMode: "tunnel" | "ios";
+};
 
 type CloudflaredConfigInput = {
   controlPlaneApiTunnelHostname: string;
@@ -88,14 +92,27 @@ type RunInput = {
   stdio?: "inherit" | "pipe";
 };
 
-function readDevStartOptions(): DevStartMode {
+function readDevStartOptions(): DevStartOptions {
   const args = process.argv.slice(2);
   if (args.length === 0) {
-    return "tunnel";
+    return {
+      connectionMode: "tunnel",
+      gatewayMode: "single",
+    };
   }
 
   if (args.length === 1 && args[0] === "--ios") {
-    return "ios";
+    return {
+      connectionMode: "ios",
+      gatewayMode: "single",
+    };
+  }
+
+  if (args.length === 1 && args[0] === "--distributed") {
+    return {
+      connectionMode: "tunnel",
+      gatewayMode: "distributed",
+    };
   }
 
   throw new Error(`Unsupported dev start option(s): ${args.join(", ")}`);
@@ -156,7 +173,7 @@ function createTunnelDevConfig(input: TunnelDevEnvInput): TunnelDevConfig {
 function createDevModeConfig(input: {
   controlPlaneApiLocalPort: number;
   dataPlaneGatewayLocalPort: number;
-  mode: DevStartMode;
+  mode: DevStartOptions["connectionMode"];
 }): DevModeConfig {
   const controlPlaneApiLocalUrl = `http://localhost:${String(input.controlPlaneApiLocalPort)}`;
   if (input.mode === "ios") {
@@ -244,6 +261,20 @@ function shouldTeardownLocalInfra(): boolean {
   return hasRunningComposeServices(localInfraEnv);
 }
 
+function terminateAppDevProcesses(signal: NodeJS.Signals): void {
+  for (const appDevProcess of appDevProcesses) {
+    if (appDevProcess.exitCode !== null || appDevProcess.signalCode !== null) {
+      continue;
+    }
+
+    try {
+      appDevProcess.kill(signal);
+    } catch {
+      // Process can already be gone if it handled the signal first.
+    }
+  }
+}
+
 function cleanupAndExit(exitCode: number): never {
   if (shouldTeardownLocalInfra()) {
     try {
@@ -268,14 +299,7 @@ function forwardSignal(signal: NodeJS.Signals): void {
   }
 
   terminated = true;
-
-  if (appDevProcess !== undefined) {
-    try {
-      appDevProcess.kill(signal);
-    } catch {
-      // Process can already be gone if it handled the signal first.
-    }
-  }
+  terminateAppDevProcesses(signal);
 
   cleanupAndExit(signalExitCode(signal));
 }
@@ -394,9 +418,44 @@ function dockerImageExists(imageTag: string): boolean {
   return result.status === 0;
 }
 
+function spawnTrackedDevProcess(input: {
+  args: readonly string[];
+  env: NodeJS.ProcessEnv;
+}): ChildProcess {
+  const childProcess = spawn("pnpm", input.args, {
+    cwd: REPO_ROOT,
+    env: {
+      ...process.env,
+      ...input.env,
+    },
+    stdio: "inherit",
+  });
+
+  childProcess.on("exit", (code, signal) => {
+    if (terminated) {
+      return;
+    }
+
+    terminated = true;
+    terminateAppDevProcesses("SIGTERM");
+
+    if (signal !== null) {
+      cleanupAndExit(signalExitCode(signal));
+    }
+
+    cleanupAndExit(code ?? 0);
+  });
+
+  appDevProcesses.push(childProcess);
+  return childProcess;
+}
+
 async function start(): Promise<void> {
-  const mode = readDevStartOptions();
-  const infraPlan = createLocalDevInfraPlan(DEV_CONFIG_PATH);
+  const startOptions = readDevStartOptions();
+  const distributedGatewayEnabled = startOptions.gatewayMode === "distributed";
+  const infraPlan = createLocalDevInfraPlan(DEV_CONFIG_PATH, process.env, {
+    distributedGatewayEnabled,
+  });
   const dockerSandboxProviderEnabled = infraPlan.dockerSandboxProviderEnabled;
   console.log(`Starting local infra dependencies (${infraPlan.summary})...`);
   const controlPlaneApiLocalPort = readControlPlaneApiLocalPort(DEV_CONFIG_PATH);
@@ -404,12 +463,13 @@ async function start(): Promise<void> {
   const modeConfig = createDevModeConfig({
     controlPlaneApiLocalPort,
     dataPlaneGatewayLocalPort,
-    mode,
+    mode: startOptions.connectionMode,
   });
 
   const sharedDevEnv: NodeJS.ProcessEnv = {
     MISTLE_CONFIG_PATH: DEV_CONFIG_PATH,
     CONTROL_PLANE_API_LOCAL_PORT: String(controlPlaneApiLocalPort),
+    DEV_DATA_PLANE_GATEWAY_LB_PORT: String(dataPlaneGatewayLocalPort),
     ...modeConfig.env,
   };
   localInfraEnv = sharedDevEnv;
@@ -537,25 +597,32 @@ async function start(): Promise<void> {
   }
   console.log("");
 
-  appDevProcess = spawn("pnpm", ["dev:workspace"], {
-    cwd: REPO_ROOT,
-    env: {
-      ...process.env,
-      ...sharedDevEnv,
-    },
-    stdio: "inherit",
-  });
+  if (distributedGatewayEnabled) {
+    console.log(
+      `Starting distributed data-plane gateways on ports ${DISTRIBUTED_GATEWAY_PORTS.join(", ")} behind local nginx port ${String(dataPlaneGatewayLocalPort)}...`,
+    );
 
-  appDevProcess.on("exit", (code, signal) => {
-    if (terminated) {
-      return;
+    spawnTrackedDevProcess({
+      args: ["dev:workspace:distributed"],
+      env: sharedDevEnv,
+    });
+
+    for (const port of DISTRIBUTED_GATEWAY_PORTS) {
+      spawnTrackedDevProcess({
+        args: ["--filter", "@mistle/data-plane-gateway", "dev"],
+        env: {
+          ...sharedDevEnv,
+          MISTLE_SERVICES_DATA_PLANE_GATEWAY_PORT: String(port),
+        },
+      });
     }
 
-    if (signal !== null) {
-      cleanupAndExit(signalExitCode(signal));
-    }
+    return;
+  }
 
-    cleanupAndExit(code ?? 0);
+  spawnTrackedDevProcess({
+    args: ["dev:workspace"],
+    env: sharedDevEnv,
   });
 }
 

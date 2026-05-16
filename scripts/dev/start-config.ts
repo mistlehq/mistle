@@ -21,6 +21,10 @@ export type LocalDevInfraPlan = {
   summary: string;
 };
 
+export type LocalDevInfraPlanOptions = {
+  distributedGatewayEnabled?: boolean;
+};
+
 type ReadEnv = Pick<NodeJS.ProcessEnv, string>;
 
 const BaseInfraServiceNames = [
@@ -174,11 +178,19 @@ export function readGatewayRelayConfig(
 export function createLocalDevInfraPlan(
   configPath: string,
   env: ReadEnv = process.env,
+  options: LocalDevInfraPlanOptions = {},
 ): LocalDevInfraPlan {
   const dockerSandboxProviderEnabled = readDockerSandboxProviderEnabled(configPath, env);
   const gatewayRelay = readGatewayRelayConfig(configPath, env);
   const serviceNames = [...BaseInfraServiceNames];
   const summaryParts = ["SeaweedFS", "Postgres 18", "PgBouncer", "Mailpit", "OTel LGTM", "Valkey"];
+  const distributedGatewayEnabled = options.distributedGatewayEnabled ?? false;
+
+  if (distributedGatewayEnabled && gatewayRelay.backend !== "nats") {
+    throw new Error(
+      "pnpm dev:distributed requires gateway_relay.backend = 'nats' in config/config.development.toml.",
+    );
+  }
 
   if (dockerSandboxProviderEnabled) {
     serviceNames.splice(4, 0, "registry");
@@ -190,6 +202,11 @@ export function createLocalDevInfraPlan(
   if (gatewayRelay.backend === "nats") {
     serviceNames.push("nats");
     summaryParts.push("NATS gateway relay");
+  }
+
+  if (distributedGatewayEnabled) {
+    serviceNames.push("data-plane-gateway-lb");
+    summaryParts.push("distributed gateway load balancer");
   }
 
   return {

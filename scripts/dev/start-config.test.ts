@@ -76,6 +76,49 @@ describe("dev start config", () => {
     );
   });
 
+  it("starts the distributed gateway load balancer only in distributed mode", () => {
+    withTemporaryConfig(
+      `
+        [gateway_relay]
+        backend = "nats"
+
+        [gateway_relay.nats]
+        url = "nats://127.0.0.1:4222"
+        name_prefix = "mistle-dev"
+
+        [sandbox.docker]
+        enabled = false
+      `,
+      (configPath) => {
+        const plan = createLocalDevInfraPlan(configPath, {}, { distributedGatewayEnabled: true });
+
+        expect(plan.serviceNames).toContain("nats");
+        expect(plan.serviceNames).toContain("data-plane-gateway-lb");
+        expect(plan.serviceNames).not.toContain("data-plane-gateway-relay");
+        expect(plan.summary).toContain("distributed gateway load balancer");
+      },
+    );
+  });
+
+  it("rejects distributed gateway mode without NATS relay config", () => {
+    withTemporaryConfig(
+      `
+        [gateway_relay]
+        backend = "memory"
+
+        [sandbox.docker]
+        enabled = false
+      `,
+      (configPath) => {
+        expect(() =>
+          createLocalDevInfraPlan(configPath, {}, { distributedGatewayEnabled: true }),
+        ).toThrow(
+          "pnpm dev:distributed requires gateway_relay.backend = 'nats' in config/config.development.toml.",
+        );
+      },
+    );
+  });
+
   it("keeps the Docker sandbox bridge separate from NATS gateway relay", () => {
     withTemporaryConfig(
       `
