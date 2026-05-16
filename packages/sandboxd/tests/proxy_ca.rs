@@ -4,6 +4,14 @@ use nix::fcntl::{FcntlArg, FdFlag, fcntl};
 use nix::unistd::{dup, read};
 use sandboxd::time::SystemClock;
 
+#[test]
+fn proxy_ca_validity_is_long_lived_for_sandbox_instance_reuse() {
+    assert_eq!(
+        sandboxd::proxy_ca::PROXY_CA_VALIDITY_MS,
+        10 * 365 * 24 * 60 * 60 * 1000
+    );
+}
+
 fn read_all_from_prepared_fd(
     prepared: &sandboxd::proxy_ca::PreparedProxyCaRuntime,
     getter: fn(

@@ -3,16 +3,17 @@
 //! Runtime tools like `gh` and `git` expect standard `HTTP[S]_PROXY` semantics,
 //! while Mistle keeps credential-bearing egress decisions in the data-plane
 //! gateway. This module exposes one local forward proxy inside the sandbox,
-//! terminates proxied HTTPS sessions with an ephemeral CA, matches each
+//! terminates proxied HTTPS sessions with a per-sandbox CA, matches each
 //! decrypted request against the compiled runtime-plan egress routes, and
 //! forwards the request through the bootstrap tunnel.
 
 use std::collections::BTreeMap;
 use std::convert::Infallible;
 use std::fmt::{self, Display};
-use std::fs::{self, DirBuilder};
+use std::fs::{self, DirBuilder, OpenOptions};
+use std::io::Write;
 use std::net::{IpAddr, SocketAddr, TcpListener as StdTcpListener, ToSocketAddrs};
-use std::os::unix::fs::DirBuilderExt;
+use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 #[cfg(target_os = "linux")]
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
@@ -50,7 +51,9 @@ use crate::protocol::startup::{
     StartupInput, TransparentProxyBypassKind, TransparentProxyConfiguration,
     TransparentProxyExclusionKind,
 };
-use crate::proxy_ca::{generate_proxy_ca, issue_proxy_leaf_certificate};
+use crate::proxy_ca::{
+    GeneratedProxyCa, generate_proxy_ca, issue_proxy_leaf_certificate, validate_proxy_ca_material,
+};
 use crate::runtime::{CompiledEgressRoute, CompiledRuntimePlan};
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
 use crate::time::{Clock, SystemClock, format_rfc3339_timestamp};
@@ -60,6 +63,8 @@ use crate::tunnel::session::{
 
 const RUNTIME_PROXY_CA_CERT_PATH: &str = "/run/mistle/sandboxd/egress-proxy-ca.pem";
 const RUNTIME_PROXY_CA_BUNDLE_PATH: &str = "/run/mistle/sandboxd/egress-proxy-ca-bundle.pem";
+const PERSISTENT_PROXY_CA_CERT_PATH: &str = "/var/lib/mistle/sandboxd/egress-proxy-ca.pem";
+const PERSISTENT_PROXY_CA_KEY_PATH: &str = "/var/lib/mistle/sandboxd/egress-proxy-ca-key.pem";
 const RUNTIME_PROXY_CA_TRUST_STORE_PATH: &str =
     "/usr/local/share/ca-certificates/mistle-egress-proxy-ca.crt";
 const SYSTEM_CA_CERT_BUNDLE_PATH: &str = "/etc/ssl/certs/ca-certificates.crt";
@@ -100,6 +105,8 @@ type HyperBody = BoxBody<Bytes, BoxError>;
 struct ProxyCaConfig<'a> {
     runtime_certificate_path: &'a Path,
     runtime_certificate_bundle_path: &'a Path,
+    persistent_certificate_path: &'a Path,
+    persistent_private_key_path: &'a Path,
     trust_store_certificate_path: &'a Path,
     system_certificate_bundle_path: &'a Path,
     refresh_command: &'a Path,
@@ -357,19 +364,6 @@ impl ProxyCaInstallation {
     }
 
     fn cleanup(&self) -> Result<(), EgressProxyError> {
-        match fs::remove_file(&self.trust_store_certificate_path) {
-            Ok(()) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => {
-                return Err(EgressProxyError::new(format!(
-                    "failed to remove local egress proxy trust store certificate '{}': {error}",
-                    self.trust_store_certificate_path.display()
-                )));
-            }
-        }
-
-        self.refresh_system_trust_store()?;
-
         match fs::remove_file(&self.runtime_certificate_path) {
             Ok(()) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
@@ -605,6 +599,8 @@ impl EgressProxy {
             ProxyCaConfig {
                 runtime_certificate_path: Path::new(RUNTIME_PROXY_CA_CERT_PATH),
                 runtime_certificate_bundle_path: Path::new(RUNTIME_PROXY_CA_BUNDLE_PATH),
+                persistent_certificate_path: Path::new(PERSISTENT_PROXY_CA_CERT_PATH),
+                persistent_private_key_path: Path::new(PERSISTENT_PROXY_CA_KEY_PATH),
                 trust_store_certificate_path: Path::new(RUNTIME_PROXY_CA_TRUST_STORE_PATH),
                 system_certificate_bundle_path: Path::new(SYSTEM_CA_CERT_BUNDLE_PATH),
                 refresh_command: Path::new(UPDATE_CA_CERTIFICATES_COMMAND),
@@ -638,8 +634,8 @@ impl EgressProxy {
             .map(build_gateway_egress_route)
             .collect::<Result<Vec<_>, _>>()?;
 
-        let generated_proxy_ca = generate_proxy_ca(clock.as_ref())
-            .map_err(|error| EgressProxyError::new(error.to_string()))?;
+        let generated_proxy_ca =
+            load_or_create_persistent_proxy_ca(proxy_ca_config, clock.as_ref(), log_context)?;
         let proxy_ca_installation = match ProxyCaInstallation::install(
             &generated_proxy_ca.certificate_pem,
             proxy_ca_config.runtime_certificate_path,
@@ -961,6 +957,126 @@ impl EgressProxy {
 
 fn default_loopback_proxy_listener_address() -> SocketAddr {
     SocketAddr::from(([127, 0, 0, 1], DEFAULT_LOOPBACK_PROXY_PORT))
+}
+
+fn load_or_create_persistent_proxy_ca(
+    proxy_ca_config: ProxyCaConfig<'_>,
+    clock: &dyn Clock,
+    _log_context: EgressProxyLogContext<'_>,
+) -> Result<GeneratedProxyCa, EgressProxyError> {
+    let certificate_exists = proxy_ca_config.persistent_certificate_path.exists();
+    let private_key_exists = proxy_ca_config.persistent_private_key_path.exists();
+
+    match (certificate_exists, private_key_exists) {
+        (true, true) => load_persistent_proxy_ca(proxy_ca_config),
+        (false, false) => {
+            let generated_proxy_ca = generate_proxy_ca(clock)
+                .map_err(|error| EgressProxyError::new(error.to_string()))?;
+            write_persistent_proxy_ca(proxy_ca_config, &generated_proxy_ca)?;
+            Ok(generated_proxy_ca)
+        }
+        (true, false) => Err(EgressProxyError::new(format!(
+            "persistent egress proxy CA certificate exists at '{}' but private key is missing at '{}'",
+            proxy_ca_config.persistent_certificate_path.display(),
+            proxy_ca_config.persistent_private_key_path.display()
+        ))),
+        (false, true) => Err(EgressProxyError::new(format!(
+            "persistent egress proxy CA private key exists at '{}' but certificate is missing at '{}'",
+            proxy_ca_config.persistent_private_key_path.display(),
+            proxy_ca_config.persistent_certificate_path.display()
+        ))),
+    }
+}
+
+fn load_persistent_proxy_ca(
+    proxy_ca_config: ProxyCaConfig<'_>,
+) -> Result<GeneratedProxyCa, EgressProxyError> {
+    let generated_proxy_ca =
+        GeneratedProxyCa {
+            certificate_pem: fs::read_to_string(proxy_ca_config.persistent_certificate_path)
+                .map_err(|error| {
+                    EgressProxyError::new(format!(
+                        "failed to read persistent egress proxy CA certificate '{}': {error}",
+                        proxy_ca_config.persistent_certificate_path.display()
+                    ))
+                })?,
+            private_key_pem: fs::read_to_string(proxy_ca_config.persistent_private_key_path)
+                .map_err(|error| {
+                    EgressProxyError::new(format!(
+                        "failed to read persistent egress proxy CA private key '{}': {error}",
+                        proxy_ca_config.persistent_private_key_path.display()
+                    ))
+                })?,
+        };
+    validate_proxy_ca_material(&generated_proxy_ca)
+        .map_err(|error| EgressProxyError::new(error.to_string()))?;
+    Ok(generated_proxy_ca)
+}
+
+fn write_persistent_proxy_ca(
+    proxy_ca_config: ProxyCaConfig<'_>,
+    generated_proxy_ca: &GeneratedProxyCa,
+) -> Result<(), EgressProxyError> {
+    let certificate_directory = proxy_ca_config
+        .persistent_certificate_path
+        .parent()
+        .ok_or_else(|| {
+            EgressProxyError::new("persistent egress proxy CA path must include a parent directory")
+        })?;
+    let private_key_directory = proxy_ca_config
+        .persistent_private_key_path
+        .parent()
+        .ok_or_else(|| {
+            EgressProxyError::new(
+                "persistent egress proxy CA private-key path must include a parent directory",
+            )
+        })?;
+    prepare_proxy_directory(certificate_directory)?;
+    prepare_proxy_directory(private_key_directory)?;
+    validate_proxy_ca_material(generated_proxy_ca)
+        .map_err(|error| EgressProxyError::new(error.to_string()))?;
+
+    write_new_file(
+        proxy_ca_config.persistent_certificate_path,
+        generated_proxy_ca.certificate_pem.as_bytes(),
+        0o644,
+        "persistent egress proxy CA certificate",
+    )?;
+    if let Err(error) = write_new_file(
+        proxy_ca_config.persistent_private_key_path,
+        generated_proxy_ca.private_key_pem.as_bytes(),
+        0o600,
+        "persistent egress proxy CA private key",
+    ) {
+        let _ = fs::remove_file(proxy_ca_config.persistent_certificate_path);
+        return Err(error);
+    }
+    Ok(())
+}
+
+fn write_new_file(
+    path: &Path,
+    contents: &[u8],
+    mode: u32,
+    description: &str,
+) -> Result<(), EgressProxyError> {
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(mode)
+        .open(path)
+        .map_err(|error| {
+            EgressProxyError::new(format!(
+                "failed to create {description} '{}': {error}",
+                path.display()
+            ))
+        })?;
+    file.write_all(contents).map_err(|error| {
+        EgressProxyError::new(format!(
+            "failed to write {description} '{}': {error}",
+            path.display()
+        ))
+    })
 }
 
 fn spawn_active_egress_proxy_server(
@@ -3126,6 +3242,8 @@ mod tests {
         system_certificate_bundle_path: PathBuf,
         runtime_certificate_path: PathBuf,
         runtime_certificate_bundle_path: PathBuf,
+        persistent_certificate_path: PathBuf,
+        persistent_private_key_path: PathBuf,
         trust_store_certificate_path: PathBuf,
         refresh_command_path: PathBuf,
         refresh_marker_path: PathBuf,
@@ -3642,7 +3760,7 @@ mod tests {
     }
 
     #[test]
-    fn installs_combined_ca_bundle_and_removes_proxy_ca_files_while_refreshing_the_trust_store() {
+    fn installs_combined_ca_bundle_and_keeps_persistent_ca_material_after_close() {
         let listener_address = reserve_test_listener_address();
         let proxy_ca_paths = test_proxy_ca_paths();
         let runtime_plan = sample_runtime_plan();
@@ -3691,6 +3809,17 @@ mod tests {
             1,
             "startup should refresh the trust store once"
         );
+        let persistent_certificate =
+            fs::read_to_string(&proxy_ca_paths.persistent_certificate_path)
+                .expect("persistent proxy CA certificate should exist");
+        let persistent_private_key =
+            fs::read_to_string(&proxy_ca_paths.persistent_private_key_path)
+                .expect("persistent proxy CA private key should exist");
+        assert_eq!(persistent_certificate, runtime_certificate);
+        assert!(
+            persistent_private_key.contains("BEGIN PRIVATE KEY"),
+            "persistent proxy CA private key should contain a PEM private key"
+        );
 
         proxy.close().expect("egress proxy close should succeed");
 
@@ -3703,13 +3832,142 @@ mod tests {
             "runtime proxy CA bundle should be removed during cleanup"
         );
         assert!(
-            !proxy_ca_paths.trust_store_certificate_path.exists(),
-            "trust store proxy CA certificate should be removed during cleanup"
+            proxy_ca_paths.trust_store_certificate_path.exists(),
+            "trust store proxy CA certificate should remain installed after proxy close"
+        );
+        assert!(
+            proxy_ca_paths.persistent_certificate_path.exists(),
+            "persistent proxy CA certificate should remain after proxy close"
+        );
+        assert!(
+            proxy_ca_paths.persistent_private_key_path.exists(),
+            "persistent proxy CA private key should remain after proxy close"
+        );
+        assert_eq!(
+            count_refresh_events(&proxy_ca_paths.refresh_marker_path),
+            1,
+            "cleanup should not refresh the trust store because the CA remains installed"
+        );
+
+        let _ = fs::remove_dir_all(&proxy_ca_paths.root_directory);
+    }
+
+    #[test]
+    fn reuses_existing_persistent_proxy_ca_when_egress_proxy_starts_again() {
+        let proxy_ca_paths = test_proxy_ca_paths();
+        let runtime_plan = sample_runtime_plan();
+        let startup_input = sample_startup_input();
+        let supervisor_handle = SandboxdSupervisorHandle::new(
+            "sandbox-123",
+            Arc::new(SystemClock),
+            BTreeSet::from([SupervisedComponent::EgressProxy]),
+        );
+
+        let first_proxy = EgressProxy::start_with_options(
+            &runtime_plan,
+            &startup_input,
+            EgressProxyForwardingMode::Gateway {
+                forwarder: GatewayEgressForwarder::new(),
+            },
+            reserve_test_listener_address(),
+            test_proxy_ca_config(&proxy_ca_paths),
+            Arc::new(SystemClock),
+            supervisor_handle.clone(),
+        )
+        .expect("first egress proxy start should succeed")
+        .expect("first egress proxy should be configured");
+        let first_persistent_certificate =
+            fs::read_to_string(&proxy_ca_paths.persistent_certificate_path)
+                .expect("first persistent proxy CA certificate should exist");
+        let first_persistent_private_key =
+            fs::read_to_string(&proxy_ca_paths.persistent_private_key_path)
+                .expect("first persistent proxy CA private key should exist");
+        first_proxy
+            .close()
+            .expect("first egress proxy close should succeed");
+
+        let second_proxy = EgressProxy::start_with_options(
+            &runtime_plan,
+            &startup_input,
+            EgressProxyForwardingMode::Gateway {
+                forwarder: GatewayEgressForwarder::new(),
+            },
+            reserve_test_listener_address(),
+            test_proxy_ca_config(&proxy_ca_paths),
+            Arc::new(SystemClock),
+            supervisor_handle,
+        )
+        .expect("second egress proxy start should succeed")
+        .expect("second egress proxy should be configured");
+
+        assert_eq!(
+            fs::read_to_string(&proxy_ca_paths.persistent_certificate_path)
+                .expect("second persistent proxy CA certificate should exist"),
+            first_persistent_certificate
+        );
+        assert_eq!(
+            fs::read_to_string(&proxy_ca_paths.persistent_private_key_path)
+                .expect("second persistent proxy CA private key should exist"),
+            first_persistent_private_key
+        );
+        assert_eq!(
+            fs::read_to_string(&proxy_ca_paths.runtime_certificate_path)
+                .expect("runtime proxy CA certificate should be reinstalled"),
+            first_persistent_certificate
         );
         assert_eq!(
             count_refresh_events(&proxy_ca_paths.refresh_marker_path),
             2,
-            "cleanup should refresh the trust store after removing the certificate"
+            "each proxy start should refresh the trust store with stable CA material"
+        );
+
+        second_proxy
+            .close()
+            .expect("second egress proxy close should succeed");
+        let _ = fs::remove_dir_all(&proxy_ca_paths.root_directory);
+    }
+
+    #[test]
+    fn fails_when_persistent_proxy_ca_state_is_partial() {
+        let proxy_ca_paths = test_proxy_ca_paths();
+        fs::create_dir_all(
+            proxy_ca_paths
+                .persistent_certificate_path
+                .parent()
+                .expect("persistent proxy CA certificate path should have a parent"),
+        )
+        .expect("persistent proxy CA directory should be creatable");
+        fs::write(&proxy_ca_paths.persistent_certificate_path, "certificate")
+            .expect("partial persistent proxy CA certificate should be writable");
+        let runtime_plan = sample_runtime_plan();
+        let startup_input = sample_startup_input();
+        let supervisor_handle = SandboxdSupervisorHandle::new(
+            "sandbox-123",
+            Arc::new(SystemClock),
+            BTreeSet::from([SupervisedComponent::EgressProxy]),
+        );
+
+        let error = EgressProxy::start_with_options(
+            &runtime_plan,
+            &startup_input,
+            EgressProxyForwardingMode::Gateway {
+                forwarder: GatewayEgressForwarder::new(),
+            },
+            reserve_test_listener_address(),
+            test_proxy_ca_config(&proxy_ca_paths),
+            Arc::new(SystemClock),
+            supervisor_handle,
+        )
+        .expect_err("egress proxy start should fail when persistent CA state is partial");
+
+        assert!(
+            error.to_string().contains("certificate exists")
+                && error.to_string().contains("private key is missing"),
+            "partial persistent CA state should be reported explicitly: {error}"
+        );
+        assert!(
+            !proxy_ca_paths.persistent_private_key_path.exists(),
+            "partial persistent CA state should not be repaired by regenerating a private key"
         );
 
         let _ = fs::remove_dir_all(&proxy_ca_paths.root_directory);
@@ -3800,6 +4058,10 @@ mod tests {
             root_directory.join("run/mistle/sandboxd/egress-proxy-ca.pem");
         let runtime_certificate_bundle_path =
             root_directory.join("run/mistle/sandboxd/egress-proxy-ca-bundle.pem");
+        let persistent_certificate_path =
+            root_directory.join("var/lib/mistle/sandboxd/egress-proxy-ca.pem");
+        let persistent_private_key_path =
+            root_directory.join("var/lib/mistle/sandboxd/egress-proxy-ca-key.pem");
         let trust_store_certificate_path =
             root_directory.join("usr/local/share/ca-certificates/mistle-egress-proxy-ca.crt");
         let refresh_marker_path = root_directory.join("update-ca-certificates.log");
@@ -3838,6 +4100,8 @@ mod tests {
             system_certificate_bundle_path,
             runtime_certificate_path,
             runtime_certificate_bundle_path,
+            persistent_certificate_path,
+            persistent_private_key_path,
             trust_store_certificate_path,
             refresh_command_path,
             refresh_marker_path,
@@ -3848,6 +4112,8 @@ mod tests {
         ProxyCaConfig {
             runtime_certificate_path: &proxy_ca_paths.runtime_certificate_path,
             runtime_certificate_bundle_path: &proxy_ca_paths.runtime_certificate_bundle_path,
+            persistent_certificate_path: &proxy_ca_paths.persistent_certificate_path,
+            persistent_private_key_path: &proxy_ca_paths.persistent_private_key_path,
             trust_store_certificate_path: &proxy_ca_paths.trust_store_certificate_path,
             system_certificate_bundle_path: &proxy_ca_paths.system_certificate_bundle_path,
             refresh_command: &proxy_ca_paths.refresh_command_path,

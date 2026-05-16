@@ -1,8 +1,8 @@
-//! Ephemeral certificate-authority helpers for the runtime-side local proxy.
+//! Certificate-authority helpers for the runtime-side local proxy.
 //!
-//! This module generates a short-lived in-memory CA, issues per-runtime leaf
+//! This module generates a long-lived per-sandbox CA, issues per-runtime leaf
 //! certificates, and prepares inherited file descriptors so the future runtime
-//! exec handoff can consume the CA material without persisting it to disk.
+//! exec handoff can consume the CA material.
 
 use std::collections::BTreeMap;
 use std::fmt::{self, Display};
@@ -20,7 +20,7 @@ use rcgen::{
 use crate::time::{Clock, add_millis, subtract_millis};
 
 const PROXY_CA_COMMON_NAME: &str = "Mistle Sandbox Proxy CA";
-const PROXY_CA_VALIDITY_MS: u64 = 30 * 24 * 60 * 60 * 1000;
+pub const PROXY_CA_VALIDITY_MS: u64 = 10 * 365 * 24 * 60 * 60 * 1000;
 const PROXY_LEAF_VALIDITY_MS: u64 = 12 * 60 * 60 * 1000;
 const CERTIFICATE_CLOCK_SKEW_MS: u64 = 60 * 1000;
 
@@ -29,7 +29,7 @@ pub const PROXY_CA_CERT_FD_ENV: &str = "SANDBOX_RUNTIME_PROXY_CA_CERT_FD";
 /// Environment variable pointing at the inherited proxy CA private-key fd.
 pub const PROXY_CA_KEY_FD_ENV: &str = "SANDBOX_RUNTIME_PROXY_CA_KEY_FD";
 
-/// Carries one freshly generated proxy CA as PEM strings.
+/// Carries one proxy CA as PEM strings.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GeneratedProxyCa {
     pub certificate_pem: String,
@@ -57,7 +57,7 @@ pub struct ProxyCaError {
 }
 
 impl ProxyCaError {
-    fn new(message: impl Into<String>) -> Self {
+    pub(crate) fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
         }
@@ -154,7 +154,7 @@ fn base_proxy_ca_params(clock: &dyn Clock) -> CertificateParams {
     params
 }
 
-/// Generates a short-lived proxy CA for one runtime supervisor instance.
+/// Generates a long-lived proxy CA for one sandbox instance.
 pub fn generate_proxy_ca(clock: &dyn Clock) -> Result<GeneratedProxyCa, ProxyCaError> {
     let key_pair = KeyPair::generate().map_err(|error| {
         ProxyCaError::new(format!("failed to generate proxy ca private key: {error}"))
@@ -168,6 +168,17 @@ pub fn generate_proxy_ca(clock: &dyn Clock) -> Result<GeneratedProxyCa, ProxyCaE
         certificate_pem: certificate.pem(),
         private_key_pem: key_pair.serialize_pem(),
     })
+}
+
+/// Validates persisted proxy CA material before it is reused.
+pub fn validate_proxy_ca_material(proxy_ca: &GeneratedProxyCa) -> Result<(), ProxyCaError> {
+    if proxy_ca.certificate_pem.trim().is_empty() {
+        return Err(ProxyCaError::new("proxy ca certificate pem is invalid"));
+    }
+    KeyPair::from_pem(&proxy_ca.private_key_pem).map_err(|error| {
+        ProxyCaError::new(format!("failed to parse proxy ca private key: {error}"))
+    })?;
+    Ok(())
 }
 
 /// Issues one proxy leaf certificate signed by the provided CA material.
