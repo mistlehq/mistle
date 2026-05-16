@@ -281,7 +281,7 @@ export const IntegrationWebhookTriggerCapabilitiesRefreshActionSchema = z
   })
   .strict();
 
-export const IntegrationConnectionSchema = z
+const IntegrationConnectionApiSchema = z
   .object({
     id: z.string().min(1),
     targetKey: z.string().min(1),
@@ -318,6 +318,13 @@ export const IntegrationConnectionSchema = z
   })
   .strict();
 
+export const IntegrationConnectionSchema = IntegrationConnectionApiSchema.transform(
+  ({ automationCount, ...connection }) => ({
+    ...connection,
+    ...(automationCount === undefined ? {} : { triggerCount: automationCount }),
+  }),
+);
+
 export const ManagedWebhookSetupResultSchema = z.discriminatedUnion("status", [
   z
     .object({
@@ -334,9 +341,14 @@ export const ManagedWebhookSetupResultSchema = z.discriminatedUnion("status", [
 ]);
 export type ManagedWebhookSetupResult = z.output<typeof ManagedWebhookSetupResultSchema>;
 
-export const CreatedFormIntegrationConnectionSchema = IntegrationConnectionSchema.extend({
+export const CreatedFormIntegrationConnectionSchema = IntegrationConnectionApiSchema.extend({
   managedWebhookSetup: ManagedWebhookSetupResultSchema.optional(),
-}).strict();
+})
+  .strict()
+  .transform(({ automationCount, ...connection }) => ({
+    ...connection,
+    ...(automationCount === undefined ? {} : { triggerCount: automationCount }),
+  }));
 
 export type CreatedFormIntegrationConnection = z.output<
   typeof CreatedFormIntegrationConnectionSchema

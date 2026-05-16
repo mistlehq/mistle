@@ -17,7 +17,7 @@ describe("session initial connect policy", () => {
     ).toThrow(MissingConnectableRuntimeContextMessage);
   });
 
-  it("prefers the provider thread when automation state exposes one", () => {
+  it("prefers the provider thread when trigger state exposes one", () => {
     expect(
       resolveInitialSessionConnectInput({
         connectable: true,

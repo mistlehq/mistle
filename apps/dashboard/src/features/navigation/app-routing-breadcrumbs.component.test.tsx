@@ -155,7 +155,7 @@ describe("app routing breadcrumb integration", () => {
     </Route>,
   );
 
-  const automationRoutes = createRoutesFromElements(
+  const triggerRoutes = createRoutesFromElements(
     <Route element={<Outlet />} path="/">
       <Route element={<Outlet />} handle={ROUTE_HANDLES.triggers} path="triggers">
         <Route element={<PageHarness />} index />
@@ -351,7 +351,7 @@ describe("app routing breadcrumb integration", () => {
       failureCode: null,
       failureMessage: null,
       runtimeContext: null,
-      automationConversation: null,
+      triggerConversation: null,
       startupOperation: null,
     });
     const router = createMemoryRouter(dashboardRoutes, {
@@ -381,7 +381,7 @@ describe("app routing breadcrumb integration", () => {
       failureCode: null,
       failureMessage: null,
       runtimeContext: null,
-      automationConversation: null,
+      triggerConversation: null,
       startupOperation: null,
     });
     const router = createMemoryRouter(dashboardRoutes, {
@@ -421,7 +421,7 @@ describe("app routing breadcrumb integration", () => {
   });
 
   it("renders triggers breadcrumbs for create and detail routes", async () => {
-    const router = createMemoryRouter(automationRoutes, {
+    const router = createMemoryRouter(triggerRoutes, {
       initialEntries: ["/triggers"],
     });
     let markup = renderRoutingMarkup(router);
@@ -449,7 +449,7 @@ describe("app routing breadcrumb integration", () => {
   });
 
   it("does not render supporting description text for create trigger", () => {
-    const router = createMemoryRouter(automationRoutes, {
+    const router = createMemoryRouter(triggerRoutes, {
       initialEntries: ["/triggers/new"],
     });
     const markup = renderRoutingMarkup(router);

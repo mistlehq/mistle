@@ -9,14 +9,14 @@ import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.j
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
 import { resolveInitialSessionConnectInput } from "./session-initial-connect-policy.js";
 import {
-  hasAutomationSessionPreparationTimedOut,
+  hasTriggerSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
   hasFreshSandboxStatusReadSinceRecoveryBoundary,
   resolveSandboxStatusReadState,
-  resolveAutomationSessionPreparationTimeoutDelayMs,
+  resolveTriggerSessionPreparationTimeoutDelayMs,
   resolveStoppedSessionMessageForWorkbenchEntryPhase,
   resolveWorkbenchEntryPhase,
-  shouldWaitForAutomationSessionThread,
+  shouldWaitForTriggerSessionThread,
   useSessionWorkbenchController,
 } from "./use-session-workbench-controller.js";
 import { resolveSandboxStatusRefetchInterval } from "./use-session-workbench-lifecycle-state.js";
@@ -112,7 +112,7 @@ describe("useSessionWorkbenchController", () => {
         launchCwd: "/workspace/repo",
         primaryRepositoryRoot: "/workspace/repo",
       },
-      automationConversation: null,
+      triggerConversation: null,
       startupOperation: null,
     };
     queryClient.setQueryData(sandboxInstanceStatusQueryKey("sbi_opencode"), sandboxStatus);
@@ -172,7 +172,7 @@ describe("useSessionWorkbenchController", () => {
         connected: false,
         hasLifecycleError: false,
         isStartingSession: false,
-        isWaitingForAutomationThread: false,
+        isWaitingForTriggerThread: false,
         sandboxInstanceId: "sbi_123",
         sandboxStatus: "running",
       },
@@ -234,7 +234,7 @@ describe("useSessionWorkbenchController", () => {
           connected: false,
           hasLifecycleError: false,
           isStartingSession: false,
-          isWaitingForAutomationThread: false,
+          isWaitingForTriggerThread: false,
           sandboxInstanceId: "sbi_123",
           sandboxStatus: "stopped",
         },
@@ -249,7 +249,7 @@ describe("useSessionWorkbenchController", () => {
           connected: false,
           hasLifecycleError: false,
           isStartingSession: false,
-          isWaitingForAutomationThread: false,
+          isWaitingForTriggerThread: false,
           sandboxInstanceId: "sbi_123",
           sandboxStatus: "running",
         },
@@ -272,7 +272,7 @@ describe("useSessionWorkbenchController", () => {
             connected: false,
             hasLifecycleError: false,
             isStartingSession: false,
-            isWaitingForAutomationThread: false,
+            isWaitingForTriggerThread: false,
             sandboxInstanceId: "sbi_123",
             sandboxStatus: "running",
           },
@@ -301,7 +301,7 @@ describe("useSessionWorkbenchController", () => {
         canConnect: true,
         hasLifecycleError: false,
         isStartingSession: false,
-        isWaitingForAutomationThread: false,
+        isWaitingForTriggerThread: false,
         previousSandboxInstanceId: "sbi_old",
         sandboxInstanceId: "sbi_new",
         sandboxStatus: "running",
@@ -332,7 +332,7 @@ describe("useSessionWorkbenchController", () => {
           connected: false,
           hasLifecycleError: false,
           isStartingSession: false,
-          isWaitingForAutomationThread: false,
+          isWaitingForTriggerThread: false,
           sandboxInstanceId: "sbi_123",
           sandboxStatus: "running",
         },
@@ -361,7 +361,7 @@ describe("useSessionWorkbenchController", () => {
           connected: false,
           hasLifecycleError: false,
           isStartingSession: false,
-          isWaitingForAutomationThread: false,
+          isWaitingForTriggerThread: false,
           sandboxInstanceId: "sbi_123",
           sandboxStatus: "failed",
         },
@@ -536,11 +536,11 @@ describe("useSessionWorkbenchController", () => {
     expect(result.current.workbench.diffPanelState.isVisible).toBe(expectedVisibility);
   });
 
-  it("waits for automation-backed sessions whose persisted thread id is still pending", () => {
+  it("waits for trigger-backed sessions whose persisted thread id is still pending", () => {
     expect(
-      shouldWaitForAutomationSessionThread({
+      shouldWaitForTriggerSessionThread({
         sandboxStatus: "running",
-        automationConversation: {
+        triggerConversation: {
           conversationId: "cnv_pending",
           routeId: "cvr_pending",
           providerConversationId: null,
@@ -549,9 +549,9 @@ describe("useSessionWorkbenchController", () => {
     ).toBe(true);
 
     expect(
-      shouldWaitForAutomationSessionThread({
+      shouldWaitForTriggerSessionThread({
         sandboxStatus: "running",
-        automationConversation: {
+        triggerConversation: {
           conversationId: "cnv_ready",
           routeId: "cvr_ready",
           providerConversationId: "thread_ready",
@@ -560,60 +560,60 @@ describe("useSessionWorkbenchController", () => {
     ).toBe(false);
 
     expect(
-      shouldWaitForAutomationSessionThread({
+      shouldWaitForTriggerSessionThread({
         sandboxStatus: "running",
-        automationConversation: null,
+        triggerConversation: null,
       }),
     ).toBe(false);
   });
 
-  it("times out automation pending state after the configured wait window", () => {
+  it("times out trigger pending state after the configured wait window", () => {
     expect(
-      hasAutomationSessionPreparationTimedOut({
+      hasTriggerSessionPreparationTimedOut({
         pendingSinceMs: null,
         nowMs: 30_000,
       }),
     ).toBe(false);
 
     expect(
-      hasAutomationSessionPreparationTimedOut({
+      hasTriggerSessionPreparationTimedOut({
         pendingSinceMs: 0,
         nowMs: 29_999,
       }),
     ).toBe(false);
 
     expect(
-      hasAutomationSessionPreparationTimedOut({
+      hasTriggerSessionPreparationTimedOut({
         pendingSinceMs: 0,
         nowMs: 30_000,
       }),
     ).toBe(true);
   });
 
-  it("computes the remaining automation preparation timeout delay", () => {
+  it("computes the remaining trigger preparation timeout delay", () => {
     expect(
-      resolveAutomationSessionPreparationTimeoutDelayMs({
+      resolveTriggerSessionPreparationTimeoutDelayMs({
         pendingSinceMs: null,
         nowMs: 30_000,
       }),
     ).toBeNull();
 
     expect(
-      resolveAutomationSessionPreparationTimeoutDelayMs({
+      resolveTriggerSessionPreparationTimeoutDelayMs({
         pendingSinceMs: 0,
         nowMs: 0,
       }),
     ).toBe(30_000);
 
     expect(
-      resolveAutomationSessionPreparationTimeoutDelayMs({
+      resolveTriggerSessionPreparationTimeoutDelayMs({
         pendingSinceMs: 0,
         nowMs: 29_999,
       }),
     ).toBe(1);
 
     expect(
-      resolveAutomationSessionPreparationTimeoutDelayMs({
+      resolveTriggerSessionPreparationTimeoutDelayMs({
         pendingSinceMs: 0,
         nowMs: 30_000,
       }),
@@ -725,7 +725,7 @@ describe("useSessionWorkbenchController", () => {
       failureCode: null,
       failureMessage: null,
       runtimeContext: null,
-      automationConversation: null,
+      triggerConversation: null,
       startupOperation: null,
     });
 
@@ -752,7 +752,7 @@ describe("useSessionWorkbenchController", () => {
         launchCwd: "/workspace/repo",
         primaryRepositoryRoot: "/workspace/repo",
       },
-      automationConversation: null,
+      triggerConversation: null,
       startupOperation: null,
     };
     const queryClient = createControllerQueryClient({
@@ -790,7 +790,7 @@ describe("useSessionWorkbenchController", () => {
   it("stops polling once a session is connectable", () => {
     expect(
       resolveSandboxStatusRefetchInterval({
-        automationConversation: null,
+        triggerConversation: null,
         connectable: true,
         isAutoResumingStoppedSandbox: false,
         status: "running",

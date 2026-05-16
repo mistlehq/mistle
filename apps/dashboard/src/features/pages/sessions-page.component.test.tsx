@@ -509,7 +509,7 @@ describe("SessionsPage", () => {
     expect(within(rendered.container).getByText("Failed")).toBeDefined();
   });
 
-  it("renders automation names in the started by column without the source sublabel", () => {
+  it("renders trigger names in the started by column without the source sublabel", () => {
     const queryClient = createSessionsPageQueryClient({
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,
@@ -518,10 +518,10 @@ describe("SessionsPage", () => {
       queryClient,
       items: [
         buildSandboxInstanceListItemFixture({
-          id: "sbi_automation",
+          id: "sbi_trigger",
           startedBy: {
             kind: "system",
-            id: "aru_automation",
+            id: "aru_trigger",
             name: "GitHub Repo Triage",
           },
           source: "webhook",

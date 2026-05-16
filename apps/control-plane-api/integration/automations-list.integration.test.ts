@@ -115,15 +115,35 @@ describe.concurrent("automations list integration", () => {
   });
 
   it("gets a mixed automation summary by id within the active organization", async ({ env }) => {
+    const scheduleAutomationId = "atm_automations_get_summary_schedule";
+    const webhookAutomationId = "atm_automations_get_summary_webhook";
     const firstOrgSession = await env.auth.createSession({
       email: "automations-get-summary-org-a@example.com",
     });
     const secondOrgSession = await env.auth.createSession({
       email: "automations-get-summary-org-b@example.com",
     });
+    await seedAutomationWebhookTargets(env);
+    await seedWebhookAutomationFixture(env, {
+      organizationId: firstOrgSession.organizationId,
+      connectionId: "icn_automations_get_summary_webhook",
+      webhookSourceId: "iws_automations_get_summary_webhook",
+      profileId: "sbp_automations_get_summary_webhook",
+      profileVersion: 1,
+    });
+    await seedPersistedWebhookAutomation(env, {
+      organizationId: firstOrgSession.organizationId,
+      automationId: webhookAutomationId,
+      webhookSourceId: "iws_automations_get_summary_webhook",
+      profileId: "sbp_automations_get_summary_webhook",
+      profileVersion: 1,
+      targetId: "atg_automations_get_summary_webhook",
+      name: "Webhook summary",
+      createdAt: "2026-03-06T00:00:00.000Z",
+    });
     await seedScheduledAutomation(env, {
       organizationId: firstOrgSession.organizationId,
-      automationId: "atm_automations_get_summary_schedule",
+      automationId: scheduleAutomationId,
       scheduleId: "sch_automations_get_summary_schedule",
       targetId: "atg_automations_get_summary_schedule",
       profileId: "sbp_automations_get_summary_schedule",
@@ -131,33 +151,33 @@ describe.concurrent("automations list integration", () => {
       createdAt: "2026-03-05T00:00:00.000Z",
     });
 
-    const response = await env.controlPlaneApi.http.fetch(
-      "/v1/automations/atm_automations_get_summary_schedule",
-      {
-        headers: {
-          cookie: firstOrgSession.cookie,
-        },
-      },
-    );
-
-    expect(response.status).toBe(200);
-    const body = GetAutomationResponseSchema.parse(await response.json());
-    expect(body).toMatchObject({
-      id: "atm_automations_get_summary_schedule",
-      kind: "schedule",
-      name: "Daily summary",
-      target: {
-        sandboxProfileId: "sbp_automations_get_summary_schedule",
-      },
-      source: {
-        kind: "schedule",
-        cronExpression: "0 9 * * *",
-        timezone: "Asia/Singapore",
+    const listResponse = await env.controlPlaneApi.http.fetch("/v1/automations?limit=10", {
+      headers: {
+        cookie: firstOrgSession.cookie,
       },
     });
 
+    expect(listResponse.status).toBe(200);
+    const listBody = ListAutomationsResponseSchema.parse(await listResponse.json());
+    for (const automationId of [webhookAutomationId, scheduleAutomationId]) {
+      const listedAutomation = listBody.items.find((item) => item.id === automationId);
+      if (listedAutomation === undefined) {
+        throw new Error(`Expected seeded automation '${automationId}' in list response.`);
+      }
+
+      const response = await env.controlPlaneApi.http.fetch(`/v1/automations/${automationId}`, {
+        headers: {
+          cookie: firstOrgSession.cookie,
+        },
+      });
+
+      expect(response.status).toBe(200);
+      const body = GetAutomationResponseSchema.parse(await response.json());
+      expect(body).toEqual(listedAutomation);
+    }
+
     const otherOrgResponse = await env.controlPlaneApi.http.fetch(
-      "/v1/automations/atm_automations_get_summary_schedule",
+      `/v1/automations/${scheduleAutomationId}`,
       {
         headers: {
           cookie: secondOrgSession.cookie,

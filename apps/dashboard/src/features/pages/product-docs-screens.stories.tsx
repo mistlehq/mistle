@@ -2,15 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import type React from "react";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
-import {
-  ExistingScheduledAutomationValues,
-  ScheduledAutomationFormStoryHarness,
-} from "../automations/scheduled-automation-form.stories.js";
-import {
-  ExistingSlackAutomationValues,
-  SlackWebhookEventOptions,
-  WebhookAutomationFormStoryHarness,
-} from "../automations/webhook-automation-form.stories.js";
 import { noopRespondToServerRequest } from "../chat/components/chat-story-support.js";
 import {
   IntegrationConnectionDetailView,
@@ -25,6 +16,15 @@ import {
   SessionComposerFixtureProps,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
 import type { OrganizationSandboxStorageFormState } from "../settings/organization/sandbox-storage-model.js";
+import {
+  ExistingScheduledTriggerValues,
+  ScheduledTriggerFormStoryHarness,
+} from "../triggers/scheduled-trigger-form.stories.js";
+import {
+  ExistingSlackTriggerValues,
+  SlackWebhookEventOptions,
+  WebhookTriggerFormStoryHarness,
+} from "../triggers/webhook-trigger-form.stories.js";
 import { NewSessionPageStory } from "./new-session-page.stories.js";
 import {
   OrganizationIdentityLinkingSettingsPageView,
@@ -56,9 +56,9 @@ import {
   StoryOpenCodeGoConnection,
 } from "./sandbox-profile-editor-story-support.js";
 import {
-  ProfileAutomations,
+  ProfileTriggers,
   SandboxProfileTriggersStory,
-  SelectedScheduleAutomationId,
+  SelectedScheduleTriggerId,
 } from "./sandbox-profile-editor-triggers.stories.js";
 import { SessionConversationBottomPanel } from "./session-conversation-pane.js";
 import {
@@ -600,8 +600,8 @@ function SandboxProfileTriggersStoryForDocs(): React.JSX.Element {
     <DocsProductScreen>
       <div className="mx-auto max-w-6xl px-6 py-8">
         <SandboxProfileTriggersStory
-          automations={ProfileAutomations}
-          selectedAutomationId={SelectedScheduleAutomationId}
+          triggers={ProfileTriggers}
+          selectedTriggerId={SelectedScheduleTriggerId}
         />
       </div>
     </DocsProductScreen>
@@ -639,20 +639,20 @@ function NewSessionCreationStory(): React.JSX.Element {
   );
 }
 
-function EventAutomationStory(): React.JSX.Element {
+function EventTriggerStory(): React.JSX.Element {
   return (
-    <WebhookAutomationFormStoryHarness
+    <WebhookTriggerFormStoryHarness
       mode="edit"
       onDelete={() => {}}
-      values={ExistingSlackAutomationValues}
+      values={ExistingSlackTriggerValues}
       webhookEventOptions={SlackWebhookEventOptions}
     />
   );
 }
 
-function ScheduledAutomationStory(): React.JSX.Element {
+function ScheduledTriggerStory(): React.JSX.Element {
   return (
-    <ScheduledAutomationFormStoryHarness
+    <ScheduledTriggerFormStoryHarness
       mode="edit"
       onDelete={() => {}}
       primaryRepositoryOptions={[
@@ -662,7 +662,7 @@ function ScheduledAutomationStory(): React.JSX.Element {
           path: "/root/mistlehq/platform",
         },
       ]}
-      values={ExistingScheduledAutomationValues}
+      values={ExistingScheduledTriggerValues}
     />
   );
 }
@@ -765,11 +765,11 @@ export const SessionPortAccess: Story = {
 };
 
 export const EventTrigger: Story = {
-  render: EventAutomationStory,
+  render: EventTriggerStory,
 };
 
 export const ScheduledTrigger: Story = {
-  render: ScheduledAutomationStory,
+  render: ScheduledTriggerStory,
 };
 
 export const PersistentSandboxesOrganizationSettings: Story = {

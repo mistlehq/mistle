@@ -2,11 +2,11 @@ import { Button, Notice } from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { automationDetailQueryKey } from "../automations/automations-query-keys.js";
-import { getAutomation } from "../automations/automations-service.js";
 import { FormPageSection } from "../shared/form-page.js";
-import { EditScheduledAutomationEditor } from "./scheduled-automation-editor-page.js";
-import { EditWebhookAutomationEditor } from "./webhook-automation-editor-page.js";
+import { triggerDetailQueryKey } from "../triggers/triggers-query-keys.js";
+import { getTrigger } from "../triggers/triggers-service.js";
+import { EditScheduledTriggerEditor } from "./scheduled-trigger-editor-page.js";
+import { EditWebhookTriggerEditor } from "./webhook-trigger-editor-page.js";
 
 function renderTriggerEditorError(input: {
   title: string;
@@ -43,21 +43,21 @@ export function TriggerEditorContent(input: {
   deleteSuccessPath: string;
   requiredSandboxProfileId?: string | undefined;
 }): React.JSX.Element | null {
-  const automationQuery = useQuery({
-    queryKey: automationDetailQueryKey(input.triggerId),
+  const triggerQuery = useQuery({
+    queryKey: triggerDetailQueryKey(input.triggerId),
     queryFn: async ({ signal }) =>
-      getAutomation({
-        automationId: input.triggerId,
+      getTrigger({
+        triggerId: input.triggerId,
         signal,
       }),
     retry: false,
   });
 
-  if (automationQuery.isError) {
+  if (triggerQuery.isError) {
     return renderTriggerEditorError({
       title: "Could not load trigger",
       description: resolveApiErrorMessage({
-        error: automationQuery.error,
+        error: triggerQuery.error,
         fallbackMessage: "Could not load trigger.",
       }),
       backPath: input.backPath,
@@ -65,13 +65,13 @@ export function TriggerEditorContent(input: {
     });
   }
 
-  if (automationQuery.isPending || automationQuery.data === undefined) {
+  if (triggerQuery.isPending || triggerQuery.data === undefined) {
     return null;
   }
 
   if (
     input.requiredSandboxProfileId !== undefined &&
-    automationQuery.data.target.sandboxProfileId !== input.requiredSandboxProfileId
+    triggerQuery.data.target.sandboxProfileId !== input.requiredSandboxProfileId
   ) {
     return renderTriggerEditorError({
       title: "Trigger not found for this sandbox profile",
@@ -81,10 +81,10 @@ export function TriggerEditorContent(input: {
     });
   }
 
-  if (automationQuery.data.kind === "schedule") {
+  if (triggerQuery.data.kind === "schedule") {
     return (
-      <EditScheduledAutomationEditor
-        automationId={input.triggerId}
+      <EditScheduledTriggerEditor
+        triggerId={input.triggerId}
         backPath={input.backPath}
         deleteSuccessPath={input.deleteSuccessPath}
         navigate={input.navigate}
@@ -93,8 +93,8 @@ export function TriggerEditorContent(input: {
   }
 
   return (
-    <EditWebhookAutomationEditor
-      automationId={input.triggerId}
+    <EditWebhookTriggerEditor
+      triggerId={input.triggerId}
       backPath={input.backPath}
       deleteSuccessPath={input.deleteSuccessPath}
       navigate={input.navigate}

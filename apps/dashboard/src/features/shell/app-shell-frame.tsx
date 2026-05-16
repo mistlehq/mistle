@@ -68,7 +68,6 @@ export function resolveAppShellFrame(input: {
   inSessionDetail: boolean;
   inSessions: boolean;
   inSettings: boolean;
-  inTriggers: boolean;
   isSigningOut: boolean;
   isSwitchingOrganization: boolean;
   locationPathname: string;

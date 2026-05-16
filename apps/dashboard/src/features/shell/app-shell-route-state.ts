@@ -8,7 +8,6 @@ export function resolveAppShellRouteState(pathname: string): {
   inSessionDetail: boolean;
   inSessions: boolean;
   inSettings: boolean;
-  inTriggers: boolean;
 } {
   return {
     inDashboardRoot: pathname === "/",
@@ -18,6 +17,5 @@ export function resolveAppShellRouteState(pathname: string): {
     inSessionDetail: isExistingSandboxSessionPath(pathname),
     inSessions: isSessionsPath(pathname),
     inSettings: isSettingsPath(pathname),
-    inTriggers: pathname === "/triggers" || pathname.startsWith("/triggers/"),
   };
 }

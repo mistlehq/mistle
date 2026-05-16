@@ -19,7 +19,7 @@ describe("SessionHeaderTitle", () => {
       failureCode: null,
       failureMessage: null,
       runtimePlan: null,
-      automationConversation: null,
+      triggerConversation: null,
       startupOperation: null,
     });
 

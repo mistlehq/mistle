@@ -150,7 +150,7 @@ export function buildIntegrationConnectionDetailItems(input: {
 }): readonly IntegrationConnectionDetailItem[] {
   return input.connections.map((connection) => {
     const bindingCount = connection.bindingCount ?? 0;
-    const automationCount = connection.automationCount ?? 0;
+    const triggerCount = connection.triggerCount ?? 0;
     const currentMethod =
       connection.connectionMethodId === undefined
         ? null
@@ -191,9 +191,9 @@ export function buildIntegrationConnectionDetailItems(input: {
       displayName: connection.displayName,
       status: connection.status,
       ...(isIdentityLinked ? { isIdentityLinked: true } : {}),
-      automationCount,
+      triggerCount,
       bindingCount,
-      canDelete: bindingCount === 0 && automationCount === 0 && !isIdentityLinked,
+      canDelete: bindingCount === 0 && triggerCount === 0 && !isIdentityLinked,
       ...(connection.connectionMethodId === undefined
         ? { authMethodId: null }
         : { authMethodId: connection.connectionMethodId }),

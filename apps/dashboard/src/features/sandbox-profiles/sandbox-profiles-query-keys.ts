@@ -24,10 +24,10 @@ export function sandboxProfileDetailQueryKey(
   return [SANDBOX_PROFILES_QUERY_KEY_PREFIX[0], "detail", profileId];
 }
 
-export function sandboxProfileAutomationUsagesQueryKey(
+export function sandboxProfileTriggerUsagesQueryKey(
   profileId: string,
-): readonly ["sandbox-profiles", "automation-usages", string] {
-  return [SANDBOX_PROFILES_QUERY_KEY_PREFIX[0], "automation-usages", profileId];
+): readonly ["sandbox-profiles", "trigger-usages", string] {
+  return [SANDBOX_PROFILES_QUERY_KEY_PREFIX[0], "trigger-usages", profileId];
 }
 
 export function sandboxProfileIntegrationDirectoryQueryKey(): readonly [
@@ -62,14 +62,9 @@ export function sandboxProfileVersionSetupScriptQueryKey(input: {
   return [SANDBOX_PROFILES_QUERY_KEY_PREFIX[0], "setup-script", input.profileId, input.version];
 }
 
-export function sandboxProfileVersionAutomationConfigQueryKey(input: {
+export function sandboxProfileVersionTriggerConfigQueryKey(input: {
   profileId: string;
   version: number;
-}): readonly ["sandbox-profiles", "automation-config", string, number] {
-  return [
-    SANDBOX_PROFILES_QUERY_KEY_PREFIX[0],
-    "automation-config",
-    input.profileId,
-    input.version,
-  ];
+}): readonly ["sandbox-profiles", "trigger-config", string, number] {
+  return [SANDBOX_PROFILES_QUERY_KEY_PREFIX[0], "trigger-config", input.profileId, input.version];
 }

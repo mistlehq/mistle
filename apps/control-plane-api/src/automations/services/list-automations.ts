@@ -715,43 +715,10 @@ function buildListableAutomationWhereClause(input: {
   );
 }
 
-async function loadAutomationPageReferenceById(input: {
-  db: ControlPlaneDatabase;
-  organizationId: string;
-  automationId: string;
-}): Promise<AutomationPageReference | null> {
-  const tables = getControlPlaneDatabaseSchema(input.db);
-  const [automation] = await input.db
-    .select({
-      id: tables.automations.id,
-      kind: tables.automations.kind,
-      createdAt: tables.automations.createdAt,
-    })
-    .from(tables.automations)
-    .leftJoin(
-      tables.scheduleAutomations,
-      eq(tables.scheduleAutomations.automationId, tables.automations.id),
-    )
-    .leftJoin(tables.schedules, eq(tables.schedules.id, tables.scheduleAutomations.scheduleId))
-    .innerJoin(
-      tables.automationTargets,
-      eq(tables.automationTargets.automationId, tables.automations.id),
-    )
-    .where(
-      buildListableAutomationWhereClause({
-        tables,
-        organizationId: input.organizationId,
-        automationId: input.automationId,
-      }),
-    )
-    .limit(1);
-
-  return automation ?? null;
-}
-
 async function listAutomationPageReferences(input: {
   db: ControlPlaneDatabase;
   organizationId: string;
+  automationId?: string | undefined;
   sandboxProfileId?: string | undefined;
   limitPlusOne: number;
   cursor?: z.infer<typeof CursorSchema> | undefined;
@@ -778,6 +745,7 @@ async function listAutomationPageReferences(input: {
       buildListableAutomationWhereClause({
         tables,
         organizationId: input.organizationId,
+        automationId: input.automationId,
         sandboxProfileId: input.sandboxProfileId,
         cursor: input.cursor,
         direction: input.direction,
@@ -926,13 +894,15 @@ export async function getAutomation(
   ctx: { db: ControlPlaneDatabase },
   input: GetAutomationInput,
 ): Promise<AutomationListItem> {
-  const automationReference = await loadAutomationPageReferenceById({
+  const [automationReference] = await listAutomationPageReferences({
     db: ctx.db,
     organizationId: input.organizationId,
     automationId: input.automationId,
+    direction: KeysetPaginationDirections.FORWARD,
+    limitPlusOne: 1,
   });
 
-  if (automationReference === null) {
+  if (automationReference === undefined) {
     throw new NotFoundError("NOT_FOUND", "Automation was not found.");
   }
 

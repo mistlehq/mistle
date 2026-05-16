@@ -11,7 +11,6 @@ describe("resolveAppShellRouteState", () => {
       inSessionDetail: true,
       inSessions: true,
       inSettings: false,
-      inTriggers: false,
     });
   });
 
@@ -23,7 +22,6 @@ describe("resolveAppShellRouteState", () => {
       inSessionDetail: false,
       inSessions: true,
       inSettings: false,
-      inTriggers: false,
     });
   });
 
@@ -35,7 +33,6 @@ describe("resolveAppShellRouteState", () => {
       inSessionDetail: false,
       inSessions: false,
       inSettings: true,
-      inTriggers: false,
     });
   });
 
@@ -47,19 +44,6 @@ describe("resolveAppShellRouteState", () => {
       inSessionDetail: false,
       inSessions: false,
       inSettings: false,
-      inTriggers: false,
-    });
-  });
-
-  it("marks trigger routes independently", () => {
-    expect(resolveAppShellRouteState("/triggers/atm_123")).toEqual({
-      inDashboardRoot: false,
-      inIntegrations: false,
-      inSandboxProfiles: false,
-      inSessionDetail: false,
-      inSessions: false,
-      inSettings: false,
-      inTriggers: true,
     });
   });
 });

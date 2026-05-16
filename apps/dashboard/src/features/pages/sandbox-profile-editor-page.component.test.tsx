@@ -19,12 +19,6 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { cleanupTestQueryClients, createTestQueryClient } from "../../test-support/query-client.js";
-import { automationsListQueryKey } from "../automations/automations-query-keys.js";
-import type { AutomationsListResult } from "../automations/automations-types.js";
-import {
-  WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY,
-  WEBHOOK_AUTOMATION_WEBHOOK_SOURCES_QUERY_KEY_PREFIX,
-} from "../automations/use-webhook-automation-prerequisites.js";
 import { createStoryWebhookTriggerCapabilitiesProviderMetadata } from "../integrations/integration-story-harness.js";
 import type {
   IntegrationConnection,
@@ -34,7 +28,7 @@ import type {
 import {
   sandboxProfileDetailQueryKey,
   sandboxProfileIntegrationDirectoryQueryKey,
-  sandboxProfileVersionAutomationConfigQueryKey,
+  sandboxProfileVersionTriggerConfigQueryKey,
   sandboxProfileVersionIntegrationBindingsQueryKey,
   sandboxProfileVersionSetupScriptQueryKey,
   sandboxProfileVersionsQueryKey,
@@ -42,9 +36,15 @@ import {
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type {
   SandboxProfileVersion,
-  SandboxProfileVersionDraftAutomationImpactAutomation,
+  SandboxProfileVersionDraftTriggerImpactTrigger,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { organizationSandboxStorageSettingsQueryKey } from "../settings/organization/sandbox-storage-service.js";
+import { triggersListQueryKey } from "../triggers/triggers-query-keys.js";
+import type { TriggersListResult } from "../triggers/triggers-types.js";
+import {
+  WEBHOOK_TRIGGER_INTEGRATION_DIRECTORY_QUERY_KEY,
+  WEBHOOK_TRIGGER_WEBHOOK_SOURCES_QUERY_KEY_PREFIX,
+} from "../triggers/use-webhook-trigger-prerequisites.js";
 import type { SandboxProfileBindingEditorRow } from "./sandbox-profile-binding-config-editor.js";
 import {
   applyCreatedSandboxProfileVersionDraftToVersions,
@@ -138,14 +138,14 @@ type SandboxProfileEditorTestVersionState =
 type SandboxProfileEditorTestRouteView = "published" | "draft" | "default";
 type SandboxProfileEditorTestRouteSection = "sandbox-profile" | "triggers" | "snapshot" | null;
 
-const SlackAutomationConnectionId = "icn_slack_test";
-const SlackAutomationWebhookSourceId = "iws_slack_test";
-const GitHubAutomationConnectionId = "icn_github_test";
-const GitHubAutomationWebhookSourceId = "iws_github_test";
+const SlackTriggerConnectionId = "icn_slack_test";
+const SlackTriggerWebhookSourceId = "iws_slack_test";
+const GitHubTriggerConnectionId = "icn_github_test";
+const GitHubTriggerWebhookSourceId = "iws_github_test";
 
-function createSlackAutomationConnection(input: { id?: string } = {}): IntegrationConnection {
+function createSlackTriggerConnection(input: { id?: string } = {}): IntegrationConnection {
   return {
-    id: input.id ?? SlackAutomationConnectionId,
+    id: input.id ?? SlackTriggerConnectionId,
     targetKey: "slack-default",
     displayName: "Slack Engineering",
     status: "active",
@@ -154,7 +154,7 @@ function createSlackAutomationConnection(input: { id?: string } = {}): Integrati
   };
 }
 
-function createSlackAutomationTarget(): IntegrationTarget {
+function createSlackTriggerTarget(): IntegrationTarget {
   return {
     targetKey: "slack-default",
     familyId: SlackBrowserDefinition.familyId,
@@ -188,11 +188,11 @@ function createSlackAutomationTarget(): IntegrationTarget {
   };
 }
 
-function createSlackAutomationWebhookSource(): IntegrationWebhookSource {
+function createSlackTriggerWebhookSource(): IntegrationWebhookSource {
   return {
-    id: SlackAutomationWebhookSourceId,
+    id: SlackTriggerWebhookSourceId,
     targetKey: "slack-default",
-    integrationConnectionId: SlackAutomationConnectionId,
+    integrationConnectionId: SlackTriggerConnectionId,
     displayName: "Slack Events API webhook",
     endpointKey: "ep_slack_test",
     status: "active",
@@ -206,9 +206,9 @@ function createSlackAutomationWebhookSource(): IntegrationWebhookSource {
   };
 }
 
-function createGitHubAutomationConnection(input: { id?: string } = {}): IntegrationConnection {
+function createGitHubTriggerConnection(input: { id?: string } = {}): IntegrationConnection {
   return {
-    id: input.id ?? GitHubAutomationConnectionId,
+    id: input.id ?? GitHubTriggerConnectionId,
     targetKey: "github-cloud",
     displayName: "GitHub",
     status: "active",
@@ -217,7 +217,7 @@ function createGitHubAutomationConnection(input: { id?: string } = {}): Integrat
   };
 }
 
-function createGitHubAutomationTarget(): IntegrationTarget {
+function createGitHubTriggerTarget(): IntegrationTarget {
   return {
     targetKey: "github-cloud",
     familyId: GitHubCloudBrowserDefinition.familyId,
@@ -264,7 +264,7 @@ function createGitHubAutomationTarget(): IntegrationTarget {
   };
 }
 
-function createGitHubAutomationWebhookSource(
+function createGitHubTriggerWebhookSource(
   input: {
     id?: string;
     connectionId?: string;
@@ -273,9 +273,9 @@ function createGitHubAutomationWebhookSource(
   } = {},
 ): IntegrationWebhookSource {
   return {
-    id: input.id ?? GitHubAutomationWebhookSourceId,
+    id: input.id ?? GitHubTriggerWebhookSourceId,
     targetKey: "github-cloud",
-    integrationConnectionId: input.connectionId ?? GitHubAutomationConnectionId,
+    integrationConnectionId: input.connectionId ?? GitHubTriggerConnectionId,
     displayName: "GitHub webhook",
     endpointKey: "ep_github_test",
     status: "active",
@@ -545,9 +545,9 @@ function renderSandboxProfileEditor(input?: {
     status: "active" | "error" | "revoked";
     config?: Record<string, unknown>;
   }[];
-  automationConnections?: readonly IntegrationConnection[];
-  automationTargets?: readonly IntegrationTarget[];
-  automationWebhookSources?: readonly IntegrationWebhookSource[];
+  triggerConnections?: readonly IntegrationConnection[];
+  triggerTargets?: readonly IntegrationTarget[];
+  triggerWebhookSources?: readonly IntegrationWebhookSource[];
   setupScript?: string | null;
   setupScriptsByVersion?: Record<number, string | null>;
   targets?: readonly {
@@ -566,7 +566,7 @@ function renderSandboxProfileEditor(input?: {
   defaultPersistenceMode?: SandboxProfileVersion["defaultPersistenceMode"];
   persistentSandboxesEnabled?: boolean;
   maintenanceScript?: string | null;
-  profileAutomationsListResult?: AutomationsListResult;
+  profileTriggersListResult?: TriggersListResult;
   routeSearch?: string;
   routeState?: unknown;
   routeSection?: SandboxProfileEditorTestRouteSection;
@@ -672,18 +672,17 @@ function renderSandboxProfileEditor(input?: {
     createdAt: "2026-04-23T00:00:00.000Z",
     updatedAt: "2026-04-23T00:00:00.000Z",
   });
-  const automationRouteSearchParams = new URLSearchParams(input?.routeSearch ?? "");
-  const automationAfter = automationRouteSearchParams.get("after");
-  const automationBefore =
-    automationAfter === null ? automationRouteSearchParams.get("before") : null;
+  const triggerRouteSearchParams = new URLSearchParams(input?.routeSearch ?? "");
+  const triggerAfter = triggerRouteSearchParams.get("after");
+  const triggerBefore = triggerAfter === null ? triggerRouteSearchParams.get("before") : null;
   queryClient.setQueryData(
-    automationsListQueryKey({
+    triggersListQueryKey({
       limit: 25,
-      after: automationAfter,
-      before: automationBefore,
+      after: triggerAfter,
+      before: triggerBefore,
       sandboxProfileId: profileId,
     }),
-    input?.profileAutomationsListResult ?? {
+    input?.profileTriggersListResult ?? {
       items: [],
       nextPage: null,
       previousPage: null,
@@ -742,7 +741,7 @@ function renderSandboxProfileEditor(input?: {
     targets: input?.targets ?? [],
   });
   queryClient.setQueryData(
-    sandboxProfileVersionAutomationConfigQueryKey({
+    sandboxProfileVersionTriggerConfigQueryKey({
       profileId,
       version,
     }),
@@ -751,14 +750,14 @@ function renderSandboxProfileEditor(input?: {
       repositoryOptions: [],
     },
   );
-  queryClient.setQueryData(WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY, {
-    connections: input?.automationConnections ?? [],
-    targets: input?.automationTargets ?? [],
+  queryClient.setQueryData(WEBHOOK_TRIGGER_INTEGRATION_DIRECTORY_QUERY_KEY, {
+    connections: input?.triggerConnections ?? [],
+    targets: input?.triggerTargets ?? [],
   });
-  for (const connection of input?.automationConnections ?? []) {
+  for (const connection of input?.triggerConnections ?? []) {
     queryClient.setQueryData(
-      [...WEBHOOK_AUTOMATION_WEBHOOK_SOURCES_QUERY_KEY_PREFIX, connection.id],
-      (input?.automationWebhookSources ?? []).filter(
+      [...WEBHOOK_TRIGGER_WEBHOOK_SOURCES_QUERY_KEY_PREFIX, connection.id],
+      (input?.triggerWebhookSources ?? []).filter(
         (source) => source.integrationConnectionId === connection.id,
       ),
     );
@@ -843,26 +842,26 @@ function renderSandboxProfileEditor(input?: {
 }
 
 function DeleteProfileDialogHarness(input: {
-  automationUsages?: readonly {
+  triggerUsages?: readonly {
     id: string;
     name: string;
   }[];
-  automationUsagesError?: string | null;
-  automationUsagesIsPending?: boolean;
+  triggerUsagesError?: string | null;
+  triggerUsagesIsPending?: boolean;
 }): JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
     <SandboxProfileEditorView
       activeSectionId="sandbox-profile"
-      deleteProfileAutomationUsages={input.automationUsages ?? []}
-      deleteProfileAutomationUsagesError={input.automationUsagesError ?? null}
-      deleteProfileAutomationUsagesIsPending={input.automationUsagesIsPending ?? false}
+      deleteProfileTriggerUsages={input.triggerUsages ?? []}
+      deleteProfileTriggerUsagesError={input.triggerUsagesError ?? null}
+      deleteProfileTriggerUsagesIsPending={input.triggerUsagesIsPending ?? false}
       deleteProfileError={null}
       deleteProfileIsPending={false}
-      draftAutomationImpactAffectedTriggers={null}
-      draftAutomationImpactError={null}
-      onDraftAutomationImpactErrorDismiss={() => {}}
+      draftTriggerImpactAffectedTriggers={null}
+      draftTriggerImpactError={null}
+      onDraftTriggerImpactErrorDismiss={() => {}}
       hasUnpersistedIntegrationChanges={false}
       isDeleteProfileDialogOpen={isOpen}
       mode={{
@@ -898,31 +897,31 @@ function DeleteProfileDialogHarness(input: {
 }
 
 function DraftActionsHarness(input: {
-  draftAutomationImpactAffectedTriggers?:
-    | readonly SandboxProfileVersionDraftAutomationImpactAutomation[]
+  draftTriggerImpactAffectedTriggers?:
+    | readonly SandboxProfileVersionDraftTriggerImpactTrigger[]
     | null;
-  draftAutomationImpactError?: string | null;
+  draftTriggerImpactError?: string | null;
   hasUnpersistedIntegrationChanges?: boolean;
   draftSaveError?: string | null;
 }): JSX.Element {
   const [discarded, setDiscarded] = useState(false);
-  const [draftAutomationImpactError, setDraftAutomationImpactError] = useState(
-    input.draftAutomationImpactError ?? null,
+  const [draftTriggerImpactError, setDraftTriggerImpactError] = useState(
+    input.draftTriggerImpactError ?? null,
   );
 
   return (
     <SandboxProfileEditorView
       activeSectionId="sandbox-profile"
-      deleteProfileAutomationUsages={[]}
-      deleteProfileAutomationUsagesError={null}
-      deleteProfileAutomationUsagesIsPending={false}
+      deleteProfileTriggerUsages={[]}
+      deleteProfileTriggerUsagesError={null}
+      deleteProfileTriggerUsagesIsPending={false}
       deleteProfileError={null}
       deleteProfileIsPending={false}
       draftSaveError={input.draftSaveError ?? null}
-      draftAutomationImpactAffectedTriggers={input.draftAutomationImpactAffectedTriggers ?? null}
-      draftAutomationImpactError={draftAutomationImpactError}
-      onDraftAutomationImpactErrorDismiss={() => {
-        setDraftAutomationImpactError(null);
+      draftTriggerImpactAffectedTriggers={input.draftTriggerImpactAffectedTriggers ?? null}
+      draftTriggerImpactError={draftTriggerImpactError}
+      onDraftTriggerImpactErrorDismiss={() => {
+        setDraftTriggerImpactError(null);
       }}
       hasUnpersistedIntegrationChanges={input.hasUnpersistedIntegrationChanges ?? false}
       isDeleteProfileDialogOpen={false}
@@ -960,12 +959,12 @@ function DraftActionsHarness(input: {
 }
 
 function renderDeleteProfileDialogHarness(input: {
-  automationUsages?: readonly {
+  triggerUsages?: readonly {
     id: string;
     name: string;
   }[];
-  automationUsagesError?: string | null;
-  automationUsagesIsPending?: boolean;
+  triggerUsagesError?: string | null;
+  triggerUsagesIsPending?: boolean;
 }): void {
   const router = createMemoryRouter(
     createRoutesFromElements(
@@ -977,10 +976,10 @@ function renderDeleteProfileDialogHarness(input: {
 }
 
 function renderDraftActionsHarness(input?: {
-  draftAutomationImpactAffectedTriggers?:
-    | readonly SandboxProfileVersionDraftAutomationImpactAutomation[]
+  draftTriggerImpactAffectedTriggers?:
+    | readonly SandboxProfileVersionDraftTriggerImpactTrigger[]
     | null;
-  draftAutomationImpactError?: string | null;
+  draftTriggerImpactError?: string | null;
   hasUnpersistedIntegrationChanges?: boolean;
   draftSaveError?: string | null;
 }): void {
@@ -1708,13 +1707,13 @@ describe("SandboxProfileEditorPage", () => {
 
   it("opens the triggers tab from the section route segment", () => {
     const { profileId, router } = renderSandboxProfileEditor({
-      automationConnections: [createSlackAutomationConnection()],
-      automationTargets: [createSlackAutomationTarget()],
-      automationWebhookSources: [createSlackAutomationWebhookSource()],
+      triggerConnections: [createSlackTriggerConnection()],
+      triggerTargets: [createSlackTriggerTarget()],
+      triggerWebhookSources: [createSlackTriggerWebhookSource()],
       bindings: [
         {
           id: "binding-slack",
-          connectionId: SlackAutomationConnectionId,
+          connectionId: SlackTriggerConnectionId,
           kind: "connector",
           config: {},
         },
@@ -1733,7 +1732,7 @@ describe("SandboxProfileEditorPage", () => {
 
   it("shows unavailable trigger templates with a reason when the required connection is missing", () => {
     renderSandboxProfileEditor({
-      automationTargets: [createSlackAutomationTarget()],
+      triggerTargets: [createSlackTriggerTarget()],
       routeSection: "triggers",
       versionState: "published",
     });
@@ -1748,13 +1747,13 @@ describe("SandboxProfileEditorPage", () => {
 
   it("shows the GitHub PR review template when the profile can receive pull request events", () => {
     renderSandboxProfileEditor({
-      automationConnections: [createGitHubAutomationConnection()],
-      automationTargets: [createGitHubAutomationTarget()],
-      automationWebhookSources: [createGitHubAutomationWebhookSource()],
+      triggerConnections: [createGitHubTriggerConnection()],
+      triggerTargets: [createGitHubTriggerTarget()],
+      triggerWebhookSources: [createGitHubTriggerWebhookSource()],
       bindings: [
         {
           id: "binding-github",
-          connectionId: GitHubAutomationConnectionId,
+          connectionId: GitHubTriggerConnectionId,
           kind: "git",
           config: {},
         },
@@ -1777,19 +1776,19 @@ describe("SandboxProfileEditorPage", () => {
     const issueCommentConnectionId = "icn_github_issue_comment_test";
 
     renderSandboxProfileEditor({
-      automationConnections: [
-        createGitHubAutomationConnection({ id: pullRequestConnectionId }),
-        createGitHubAutomationConnection({ id: issueCommentConnectionId }),
+      triggerConnections: [
+        createGitHubTriggerConnection({ id: pullRequestConnectionId }),
+        createGitHubTriggerConnection({ id: issueCommentConnectionId }),
       ],
-      automationTargets: [createGitHubAutomationTarget()],
-      automationWebhookSources: [
-        createGitHubAutomationWebhookSource({
+      triggerTargets: [createGitHubTriggerTarget()],
+      triggerWebhookSources: [
+        createGitHubTriggerWebhookSource({
           id: "iws_github_pull_request_test",
           connectionId: pullRequestConnectionId,
           events: ["pull_request"],
           permissions: [{ permission: "pull_requests", access: "read" }],
         }),
-        createGitHubAutomationWebhookSource({
+        createGitHubTriggerWebhookSource({
           id: "iws_github_issue_comment_test",
           connectionId: issueCommentConnectionId,
           events: ["issue_comment"],
@@ -1822,12 +1821,12 @@ describe("SandboxProfileEditorPage", () => {
     ).toBeDefined();
   });
 
-  it("preserves the profile automation page cursor when selecting an automation", () => {
+  it("preserves the profile trigger page cursor when selecting an trigger", () => {
     const { profileId, router } = renderSandboxProfileEditor({
       routeSection: "triggers",
       routeSearch: "?after=cursor_after",
       versionState: "published",
-      profileAutomationsListResult: {
+      profileTriggersListResult: {
         items: [
           {
             id: "atm_profile_page_2",
@@ -2896,9 +2895,9 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByText("Saving draft failed. Please try again later.")).toBeDefined();
   });
 
-  it("surfaces saved draft automation impact warnings", () => {
+  it("surfaces saved draft trigger impact warnings", () => {
     renderDraftActionsHarness({
-      draftAutomationImpactAffectedTriggers: [
+      draftTriggerImpactAffectedTriggers: [
         {
           enabled: true,
           id: "webhook_repository_triage",
@@ -2929,15 +2928,15 @@ describe("SandboxProfileEditorPage", () => {
     const noticeTitle = screen.getByText("Publishing this draft will break the following triggers");
     expect(noticeTitle).toBeDefined();
     expect(noticeTitle.closest('[role="tabpanel"]')).not.toBeNull();
-    const webhookAutomationLink = screen.getByRole("link", { name: "Repository triage" });
-    expect(webhookAutomationLink.getAttribute("href")).toBe("/triggers/webhook_repository_triage");
-    expect(webhookAutomationLink.getAttribute("target")).toBe("_blank");
-    expect(webhookAutomationLink.getAttribute("rel")).toBe("noreferrer");
+    const webhookTriggerLink = screen.getByRole("link", { name: "Repository triage" });
+    expect(webhookTriggerLink.getAttribute("href")).toBe("/triggers/webhook_repository_triage");
+    expect(webhookTriggerLink.getAttribute("target")).toBe("_blank");
+    expect(webhookTriggerLink.getAttribute("rel")).toBe("noreferrer");
 
-    const scheduledAutomationLink = screen.getByRole("link", { name: "Release notes" });
-    expect(scheduledAutomationLink.getAttribute("href")).toBe("/triggers/sch_release_notes");
-    expect(scheduledAutomationLink.getAttribute("target")).toBe("_blank");
-    expect(scheduledAutomationLink.getAttribute("rel")).toBe("noreferrer");
+    const scheduledTriggerLink = screen.getByRole("link", { name: "Release notes" });
+    expect(scheduledTriggerLink.getAttribute("href")).toBe("/triggers/sch_release_notes");
+    expect(scheduledTriggerLink.getAttribute("target")).toBe("_blank");
+    expect(scheduledTriggerLink.getAttribute("rel")).toBe("noreferrer");
     expect(
       screen.getByText("This trigger's webhook source connection is not bound in the draft."),
     ).toBeDefined();
@@ -2946,9 +2945,9 @@ describe("SandboxProfileEditorPage", () => {
     ).toBeDefined();
   });
 
-  it("shows failed draft automation checks as a dismissible notice", () => {
+  it("shows failed draft trigger checks as a dismissible notice", () => {
     renderDraftActionsHarness({
-      draftAutomationImpactError: "Couldn't check whether this draft affects related triggers.",
+      draftTriggerImpactError: "Couldn't check whether this draft affects related triggers.",
     });
 
     expect(screen.getByText("Trigger checks failed")).toBeDefined();
@@ -3080,9 +3079,9 @@ describe("SandboxProfileEditorPage", () => {
     );
   });
 
-  it("confirms profile deletion with automation usage context", () => {
+  it("confirms profile deletion with trigger usage context", () => {
     renderDeleteProfileDialogHarness({
-      automationUsages: [
+      triggerUsages: [
         {
           id: "atm_triage",
           name: "Repository triage",
@@ -3106,9 +3105,9 @@ describe("SandboxProfileEditorPage", () => {
     ).toBeDefined();
   });
 
-  it("blocks profile deletion while automation usage context is loading", () => {
+  it("blocks profile deletion while trigger usage context is loading", () => {
     renderDeleteProfileDialogHarness({
-      automationUsagesIsPending: true,
+      triggerUsagesIsPending: true,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));

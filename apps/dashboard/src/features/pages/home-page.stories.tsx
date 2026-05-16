@@ -106,7 +106,7 @@ export const LaunchFirstSession: Story = {
 
 export const CreateATrigger: Story = {
   args: {
-    onboarding: HomePageStoryModels.createAutomation,
+    onboarding: HomePageStoryModels.createTrigger,
   },
 };
 

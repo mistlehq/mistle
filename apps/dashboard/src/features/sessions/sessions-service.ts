@@ -14,7 +14,7 @@ const StartSandboxProfileInstanceResponseSchema = z
   })
   .strict();
 
-const SandboxInstanceStatusResponseSchema = z
+const SandboxInstanceStatusApiResponseSchema = z
   .object({
     id: z.string().min(1),
     title: z.string().min(1).nullable(),
@@ -48,7 +48,14 @@ const SandboxInstanceStatusResponseSchema = z
   .strict();
 
 const SandboxInstanceRuntimeContextSchema =
-  SandboxInstanceStatusResponseSchema.shape.runtimeContext;
+  SandboxInstanceStatusApiResponseSchema.shape.runtimeContext;
+
+const SandboxInstanceStatusResponseSchema = SandboxInstanceStatusApiResponseSchema.transform(
+  ({ automationConversation, ...status }) => ({
+    ...status,
+    triggerConversation: automationConversation,
+  }),
+);
 
 const SandboxInstanceConnectionTokenSchema = z
   .object({

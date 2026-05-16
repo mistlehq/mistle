@@ -5,27 +5,27 @@ import { useState } from "react";
 import { createMemoryRouter, Route, RouterProvider, createRoutesFromElements } from "react-router";
 
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
-import { scheduledAutomationDetailQueryKey } from "../automations/automations-query-keys.js";
-import { automationsListQueryKey } from "../automations/automations-query-keys.js";
-import type { AutomationsListResult } from "../automations/automations-types.js";
-import type { ScheduledAutomation } from "../automations/scheduled-automations-types.js";
-import { AUTOMATION_SANDBOX_PROFILES_QUERY_KEY } from "../automations/use-automation-sandbox-profile-options.js";
-import {
-  WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY,
-  WEBHOOK_AUTOMATION_WEBHOOK_SOURCES_QUERY_KEY_PREFIX,
-} from "../automations/use-webhook-automation-prerequisites.js";
 import { createStoryWebhookTriggerCapabilitiesProviderMetadata } from "../integrations/integration-story-harness.js";
 import {
-  sandboxProfileVersionAutomationConfigQueryKey,
+  sandboxProfileVersionTriggerConfigQueryKey,
   sandboxProfileVersionsQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type { ScheduledTrigger } from "../triggers/scheduled-triggers-types.js";
+import { scheduledTriggerDetailQueryKey } from "../triggers/triggers-query-keys.js";
+import { triggersListQueryKey } from "../triggers/triggers-query-keys.js";
+import type { TriggersListResult } from "../triggers/triggers-types.js";
+import { TRIGGER_SANDBOX_PROFILES_QUERY_KEY } from "../triggers/use-trigger-sandbox-profile-options.js";
+import {
+  WEBHOOK_TRIGGER_INTEGRATION_DIRECTORY_QUERY_KEY,
+  WEBHOOK_TRIGGER_WEBHOOK_SOURCES_QUERY_KEY_PREFIX,
+} from "../triggers/use-webhook-trigger-prerequisites.js";
 import { SandboxProfileTriggersSection } from "./sandbox-profile-triggers-section.js";
 
 const ProfileId = "sbp_repo_maintainer";
 const SlackConnectionId = "icn_slack_story";
 const SlackWebhookSourceId = "iws_slack_story";
-export const SelectedScheduleAutomationId = "atm_schedule_daily_triage";
+export const SelectedScheduleTriggerId = "atm_schedule_daily_triage";
 
 const Profile: SandboxProfile = {
   id: ProfileId,
@@ -37,10 +37,10 @@ const Profile: SandboxProfile = {
   updatedAt: "2026-05-08T00:00:00.000Z",
 };
 
-export const ProfileAutomations: AutomationsListResult = {
+export const ProfileTriggers: TriggersListResult = {
   items: [
     {
-      id: SelectedScheduleAutomationId,
+      id: SelectedScheduleTriggerId,
       kind: "schedule",
       name: "Daily repository triage",
       enabled: true,
@@ -117,10 +117,10 @@ export const ProfileAutomations: AutomationsListResult = {
   totalResults: 3,
 };
 
-function createPaginatedProfileAutomationItem(input: {
+function createPaginatedProfileTriggerItem(input: {
   index: number;
   page: number;
-}): AutomationsListResult["items"][number] {
+}): TriggersListResult["items"][number] {
   const index = input.index;
   const itemNumber = index + 1;
   if (index % 2 === 0) {
@@ -169,9 +169,9 @@ function createPaginatedProfileAutomationItem(input: {
   };
 }
 
-const PaginatedProfileAutomations: AutomationsListResult = {
+const PaginatedProfileTriggers: TriggersListResult = {
   items: Array.from({ length: 25 }, (_value, index) =>
-    createPaginatedProfileAutomationItem({ index, page: 1 }),
+    createPaginatedProfileTriggerItem({ index, page: 1 }),
   ),
   nextPage: {
     after: "cursor_page_2",
@@ -181,9 +181,9 @@ const PaginatedProfileAutomations: AutomationsListResult = {
   totalResults: 42,
 };
 
-const PaginatedProfileAutomationsSecondPage: AutomationsListResult = {
+const PaginatedProfileTriggersSecondPage: TriggersListResult = {
   items: Array.from({ length: 17 }, (_value, index) =>
-    createPaginatedProfileAutomationItem({ index: index + 25, page: 2 }),
+    createPaginatedProfileTriggerItem({ index: index + 25, page: 2 }),
   ),
   nextPage: null,
   previousPage: {
@@ -193,8 +193,8 @@ const PaginatedProfileAutomationsSecondPage: AutomationsListResult = {
   totalResults: 42,
 };
 
-const SelectedScheduleAutomation: ScheduledAutomation = {
-  id: SelectedScheduleAutomationId,
+const SelectedScheduleTrigger: ScheduledTrigger = {
+  id: SelectedScheduleTriggerId,
   kind: "schedule",
   name: "Daily repository triage",
   enabled: true,
@@ -220,15 +220,15 @@ const SelectedScheduleAutomation: ScheduledAutomation = {
   updatedAt: "2026-05-08T02:15:00.000Z",
 };
 
-type StoryAutomationPage = {
+type StoryTriggerPage = {
   after: string | null;
-  automations: AutomationsListResult;
+  triggers: TriggersListResult;
   before: string | null;
 };
 
 function createStoryQueryClient(input: {
-  additionalPages?: readonly StoryAutomationPage[];
-  automations: AutomationsListResult;
+  additionalPages?: readonly StoryTriggerPage[];
+  triggers: TriggersListResult;
   slackConnectionAvailable?: boolean;
 }): QueryClient {
   const queryClient = new QueryClient({
@@ -241,28 +241,28 @@ function createStoryQueryClient(input: {
   });
 
   queryClient.setQueryData(
-    automationsListQueryKey({
+    triggersListQueryKey({
       limit: 25,
       after: null,
       before: null,
       sandboxProfileId: ProfileId,
     }),
-    input.automations,
+    input.triggers,
   );
   for (const page of input.additionalPages ?? []) {
     queryClient.setQueryData(
-      automationsListQueryKey({
+      triggersListQueryKey({
         limit: 25,
         after: page.after,
         before: page.before,
         sandboxProfileId: ProfileId,
       }),
-      page.automations,
+      page.triggers,
     );
   }
-  queryClient.setQueryData(AUTOMATION_SANDBOX_PROFILES_QUERY_KEY, [Profile]);
-  queryClient.setQueryData(scheduledAutomationDetailQueryKey(SelectedScheduleAutomationId), {
-    ...SelectedScheduleAutomation,
+  queryClient.setQueryData(TRIGGER_SANDBOX_PROFILES_QUERY_KEY, [Profile]);
+  queryClient.setQueryData(scheduledTriggerDetailQueryKey(SelectedScheduleTriggerId), {
+    ...SelectedScheduleTrigger,
   });
   queryClient.setQueryData(sandboxProfileVersionsQueryKey(ProfileId), {
     versions: [
@@ -286,7 +286,7 @@ function createStoryQueryClient(input: {
     ],
   });
   queryClient.setQueryData(
-    sandboxProfileVersionAutomationConfigQueryKey({
+    sandboxProfileVersionTriggerConfigQueryKey({
       profileId: ProfileId,
       version: 3,
     }),
@@ -315,7 +315,7 @@ function createStoryQueryClient(input: {
             ],
     },
   );
-  queryClient.setQueryData(WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY, {
+  queryClient.setQueryData(WEBHOOK_TRIGGER_INTEGRATION_DIRECTORY_QUERY_KEY, {
     connections:
       input.slackConnectionAvailable === false
         ? []
@@ -351,7 +351,7 @@ function createStoryQueryClient(input: {
   });
   if (input.slackConnectionAvailable !== false) {
     queryClient.setQueryData(
-      [...WEBHOOK_AUTOMATION_WEBHOOK_SOURCES_QUERY_KEY_PREFIX, SlackConnectionId],
+      [...WEBHOOK_TRIGGER_WEBHOOK_SOURCES_QUERY_KEY_PREFIX, SlackConnectionId],
       [
         {
           id: SlackWebhookSourceId,
@@ -376,14 +376,14 @@ function createStoryQueryClient(input: {
 }
 
 export function SandboxProfileTriggersStory(input: {
-  additionalPages?: readonly StoryAutomationPage[];
-  automations: AutomationsListResult;
-  selectedAutomationId?: string;
+  additionalPages?: readonly StoryTriggerPage[];
+  triggers: TriggersListResult;
+  selectedTriggerId?: string;
   slackConnectionAvailable?: boolean;
 }): React.JSX.Element {
   const [queryClient] = useState(() =>
     createStoryQueryClient({
-      automations: input.automations,
+      triggers: input.triggers,
       ...(input.additionalPages === undefined ? {} : { additionalPages: input.additionalPages }),
       ...(input.slackConnectionAvailable === undefined
         ? {}
@@ -391,9 +391,9 @@ export function SandboxProfileTriggersStory(input: {
     }),
   );
   const initialPath =
-    input.selectedAutomationId === undefined
+    input.selectedTriggerId === undefined
       ? `/sandbox-profiles/${ProfileId}/triggers`
-      : `/sandbox-profiles/${ProfileId}/triggers/${input.selectedAutomationId}`;
+      : `/sandbox-profiles/${ProfileId}/triggers/${input.selectedTriggerId}`;
   const [router] = useState(() =>
     createMemoryRouter(
       createRoutesFromElements(
@@ -424,13 +424,9 @@ const meta = {
   title: "Dashboard/SandboxProfiles/Editor/Triggers",
   component: SandboxProfileTriggersStory,
   decorators: [withDashboardCenteredStory],
-  excludeStories: [
-    "ProfileAutomations",
-    "SandboxProfileTriggersStory",
-    "SelectedScheduleAutomationId",
-  ],
+  excludeStories: ["ProfileTriggers", "SandboxProfileTriggersStory", "SelectedScheduleTriggerId"],
   args: {
-    automations: ProfileAutomations,
+    triggers: ProfileTriggers,
   },
 } satisfies Meta<typeof SandboxProfileTriggersStory>;
 
@@ -444,7 +440,7 @@ export const TemplatePickerWithExistingTriggers: Story = {};
 
 export const TemplatePickerEmpty: Story = {
   args: {
-    automations: {
+    triggers: {
       items: [],
       nextPage: null,
       previousPage: null,
@@ -455,7 +451,7 @@ export const TemplatePickerEmpty: Story = {
 
 export const TemplatePickerUnavailable: Story = {
   args: {
-    automations: {
+    triggers: {
       items: [],
       nextPage: null,
       previousPage: null,
@@ -470,11 +466,11 @@ export const MobilePaginated: Story = {
     additionalPages: [
       {
         after: "cursor_page_2",
-        automations: PaginatedProfileAutomationsSecondPage,
+        triggers: PaginatedProfileTriggersSecondPage,
         before: null,
       },
     ],
-    automations: PaginatedProfileAutomations,
+    triggers: PaginatedProfileTriggers,
   },
   render: function RenderMobilePaginated(args): React.JSX.Element {
     return (
@@ -487,13 +483,13 @@ export const MobilePaginated: Story = {
 
 export const SelectedScheduledTrigger: Story = {
   args: {
-    selectedAutomationId: SelectedScheduleAutomationId,
+    selectedTriggerId: SelectedScheduleTriggerId,
   },
 };
 
 export const Empty: Story = {
   args: {
-    automations: {
+    triggers: {
       items: [],
       nextPage: null,
       previousPage: null,

@@ -85,12 +85,18 @@ export type SandboxProviderSummary = SandboxProvidersResult["items"][number];
 export type SandboxProfileVersionPublishability =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/publishability"]["get"]["responses"][200]["content"]["application/json"];
 
-export type SandboxProfileVersionDraftAutomationImpact =
+type SandboxProfileVersionDraftTriggerImpactResponse =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/draft-automation-impact"]["get"]["responses"][200]["content"]["application/json"];
-export type SandboxProfileVersionDraftAutomationImpactAutomation =
-  SandboxProfileVersionDraftAutomationImpact["affectedAutomations"][number];
-export type SandboxProfileVersionDraftAutomationImpactIssue =
-  SandboxProfileVersionDraftAutomationImpactAutomation["issues"][number];
+export type SandboxProfileVersionDraftTriggerImpact = Omit<
+  SandboxProfileVersionDraftTriggerImpactResponse,
+  "affectedAutomations"
+> & {
+  affectedTriggers: SandboxProfileVersionDraftTriggerImpactResponse["affectedAutomations"];
+};
+export type SandboxProfileVersionDraftTriggerImpactTrigger =
+  SandboxProfileVersionDraftTriggerImpact["affectedTriggers"][number];
+export type SandboxProfileVersionDraftTriggerImpactIssue =
+  SandboxProfileVersionDraftTriggerImpactTrigger["issues"][number];
 
 export type PublishSandboxProfileVersionResult = {
   activeVersion: number | null;
@@ -122,5 +128,5 @@ export type SandboxProfileSetupScriptTestRuntimeConfig = Pick<
 >;
 export type SandboxProfileSetupAssistant =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/setup-script/assistant"]["post"]["responses"][201]["content"]["application/json"];
-export type SandboxProfileVersionAutomationConfig =
+export type SandboxProfileVersionTriggerConfig =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/automation-config"]["get"]["responses"][200]["content"]["application/json"];

@@ -17,26 +17,26 @@ import {
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import type { SessionStartupState } from "./session-startup-status.js";
 import {
-  hasAutomationSessionPreparationTimedOut,
+  hasTriggerSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
   hasFreshSandboxStatusReadSinceRecoveryBoundary,
-  resolveAutomationSessionPreparationTimeoutDelayMs,
+  resolveTriggerSessionPreparationTimeoutDelayMs,
   resolveSessionWorkbenchStatus,
   resolveSandboxLifecycleStatusForWorkbenchEntryPhase,
   resolveSandboxStatusReadState,
   resolveStoppedSessionMessageForWorkbenchEntryPhase,
   resolveTrustedSandboxStatus,
   resolveWorkbenchEntryPhase,
-  shouldWaitForAutomationSessionThread,
+  shouldWaitForTriggerSessionThread,
 } from "./session-workbench-state.js";
 import { useSessionWorkbenchRecovery } from "./use-session-workbench-recovery.js";
 
-const AutomationSessionStatusRefetchIntervalMs = 2_000;
-const AutomationSessionPreparationTimeoutMessage =
+const TriggerSessionStatusRefetchIntervalMs = 2_000;
+const TriggerSessionPreparationTimeoutMessage =
   "This chat session is taking longer than expected to become ready. Please try again shortly.";
 
 type SessionWorkbenchSandboxStatusSnapshot = {
-  automationConversation: SandboxInstanceStatusResult["automationConversation"];
+  triggerConversation: SandboxInstanceStatusResult["triggerConversation"];
   connectable: SandboxInstanceStatusResult["connectable"] | null;
   status: SandboxInstanceStatusResult["status"] | null;
 };
@@ -73,12 +73,12 @@ export function resolveSandboxStatusRefetchInterval(
   },
 ): false | number {
   if (
-    shouldWaitForAutomationSessionThread({
+    shouldWaitForTriggerSessionThread({
       sandboxStatus: input.status,
-      automationConversation: input.automationConversation,
+      triggerConversation: input.triggerConversation,
     })
   ) {
-    return AutomationSessionStatusRefetchIntervalMs;
+    return TriggerSessionStatusRefetchIntervalMs;
   }
 
   if (input.isAutoResumingStoppedSandbox && input.status === "stopped") {
@@ -102,10 +102,8 @@ export function useSessionWorkbenchLifecycleState(input: {
   const [hasAttemptedAutoResume, setHasAttemptedAutoResume] = useState(false);
   const [isAutoResumingStoppedSandbox, setIsAutoResumingStoppedSandbox] = useState(false);
   const [autoResumeErrorMessage, setAutoResumeErrorMessage] = useState<string | null>(null);
-  const [automationPendingSinceMs, setAutomationPendingSinceMs] = useState<number | null>(null);
-  const [automationPendingErrorMessage, setAutomationPendingErrorMessage] = useState<string | null>(
-    null,
-  );
+  const [triggerPendingSinceMs, setTriggerPendingSinceMs] = useState<number | null>(null);
+  const [triggerPendingErrorMessage, setTriggerPendingErrorMessage] = useState<string | null>(null);
   const initialSandboxStatusDataUpdatedAtRef = useRef<number | null>(null);
   // Recovery must not trust cached status after a reset/disconnect until a recovery-triggered
   // refresh completes after the latest observed recovery event.
@@ -137,7 +135,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     staleTime: Number.POSITIVE_INFINITY,
     refetchInterval: (query) => {
       return resolveSandboxStatusRefetchInterval({
-        automationConversation: query.state.data?.automationConversation ?? null,
+        triggerConversation: query.state.data?.triggerConversation ?? null,
         connectable: query.state.data?.connectable ?? null,
         isAutoResumingStoppedSandbox,
         status: query.state.data?.status ?? null,
@@ -225,11 +223,11 @@ export function useSessionWorkbenchLifecycleState(input: {
   });
   const displaySandboxLifecycleStatus =
     resolveSandboxLifecycleStatusForWorkbenchEntryPhase(workbenchEntryPhase);
-  const automationConversation = sandboxStatus?.automationConversation ?? null;
-  const providerThreadId = automationConversation?.providerConversationId ?? null;
-  const isWaitingForAutomationThread = shouldWaitForAutomationSessionThread({
+  const triggerConversation = sandboxStatus?.triggerConversation ?? null;
+  const providerThreadId = triggerConversation?.providerConversationId ?? null;
+  const isWaitingForTriggerThread = shouldWaitForTriggerSessionThread({
     sandboxStatus: displaySandboxLifecycleStatus,
-    automationConversation,
+    triggerConversation,
   });
   const connectionReadiness = resolveSessionConnectionReadiness({
     sandboxInstanceId: input.sandboxInstanceId,
@@ -254,8 +252,8 @@ export function useSessionWorkbenchLifecycleState(input: {
     setHasAttemptedAutoResume(false);
     setIsAutoResumingStoppedSandbox(false);
     setAutoResumeErrorMessage(null);
-    setAutomationPendingSinceMs(null);
-    setAutomationPendingErrorMessage(null);
+    setTriggerPendingSinceMs(null);
+    setTriggerPendingErrorMessage(null);
     if (input.sandboxInstanceId === null) {
       initialSandboxStatusDataUpdatedAtRef.current = null;
     } else {
@@ -339,29 +337,29 @@ export function useSessionWorkbenchLifecycleState(input: {
   ]);
 
   useEffect(() => {
-    if (!isWaitingForAutomationThread) {
-      setAutomationPendingSinceMs(null);
-      setAutomationPendingErrorMessage(null);
+    if (!isWaitingForTriggerThread) {
+      setTriggerPendingSinceMs(null);
+      setTriggerPendingErrorMessage(null);
       return;
     }
 
-    if (automationPendingSinceMs === null) {
-      setAutomationPendingSinceMs(Date.now());
+    if (triggerPendingSinceMs === null) {
+      setTriggerPendingSinceMs(Date.now());
       return;
     }
 
     if (
-      hasAutomationSessionPreparationTimedOut({
-        pendingSinceMs: automationPendingSinceMs,
+      hasTriggerSessionPreparationTimedOut({
+        pendingSinceMs: triggerPendingSinceMs,
         nowMs: Date.now(),
       })
     ) {
-      setAutomationPendingErrorMessage(AutomationSessionPreparationTimeoutMessage);
+      setTriggerPendingErrorMessage(TriggerSessionPreparationTimeoutMessage);
       return;
     }
 
-    const timeoutDelayMs = resolveAutomationSessionPreparationTimeoutDelayMs({
-      pendingSinceMs: automationPendingSinceMs,
+    const timeoutDelayMs = resolveTriggerSessionPreparationTimeoutDelayMs({
+      pendingSinceMs: triggerPendingSinceMs,
       nowMs: Date.now(),
     });
 
@@ -370,21 +368,21 @@ export function useSessionWorkbenchLifecycleState(input: {
     }
 
     const timeoutHandle = systemScheduler.schedule(() => {
-      setAutomationPendingErrorMessage(AutomationSessionPreparationTimeoutMessage);
+      setTriggerPendingErrorMessage(TriggerSessionPreparationTimeoutMessage);
     }, timeoutDelayMs);
 
     return () => {
       systemScheduler.cancel(timeoutHandle);
     };
-  }, [automationPendingSinceMs, isWaitingForAutomationThread]);
+  }, [triggerPendingSinceMs, isWaitingForTriggerThread]);
 
-  const resolvedLifecycleErrorMessage = lifecycleErrorMessage ?? automationPendingErrorMessage;
+  const resolvedLifecycleErrorMessage = lifecycleErrorMessage ?? triggerPendingErrorMessage;
   const sessionRecoveryState = useSessionWorkbenchRecovery({
     canConnect: connectionReadiness.canConnect,
     connectSession,
     hasLifecycleError: resolvedLifecycleErrorMessage !== null,
     isStartingSession,
-    isWaitingForAutomationThread,
+    isWaitingForTriggerThread,
     mainPanelTransitionState: input.mainPanelTransitionState,
     requestRecoveryStatusRefresh,
     recoverSession,
@@ -416,7 +414,7 @@ export function useSessionWorkbenchLifecycleState(input: {
       return;
     }
 
-    if (isWaitingForAutomationThread) {
+    if (isWaitingForTriggerThread) {
       return;
     }
 
@@ -436,7 +434,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     hasAttemptedAutoConnect,
     input.sandboxInstanceId,
     isStartingSession,
-    isWaitingForAutomationThread,
+    isWaitingForTriggerThread,
     resolvedLifecycleErrorMessage,
     providerThreadId,
     sandboxStatus?.runtimeContext,

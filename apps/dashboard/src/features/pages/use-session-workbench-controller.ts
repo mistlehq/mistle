@@ -17,14 +17,14 @@ import {
   type SessionWorkbenchPrimaryPanelState,
 } from "./session-workbench-primary-panel-state.js";
 import {
-  hasAutomationSessionPreparationTimedOut,
+  hasTriggerSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
   hasFreshSandboxStatusReadSinceRecoveryBoundary,
   resolveSandboxStatusReadState,
-  resolveAutomationSessionPreparationTimeoutDelayMs,
+  resolveTriggerSessionPreparationTimeoutDelayMs,
   resolveStoppedSessionMessageForWorkbenchEntryPhase,
   resolveWorkbenchEntryPhase,
-  shouldWaitForAutomationSessionThread,
+  shouldWaitForTriggerSessionThread,
 } from "./session-workbench-state.js";
 import type { SessionWorkbenchStatus } from "./session-workbench-state.js";
 import { type SessionMainPanelRuntimeId } from "./use-session-main-panel-handoff.js";
@@ -89,14 +89,14 @@ type UseSessionWorkbenchControllerResult = {
 
 export {
   sandboxInstanceStatusQueryKey,
-  hasAutomationSessionPreparationTimedOut,
+  hasTriggerSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
   hasFreshSandboxStatusReadSinceRecoveryBoundary,
   resolveSandboxStatusReadState,
-  resolveAutomationSessionPreparationTimeoutDelayMs,
+  resolveTriggerSessionPreparationTimeoutDelayMs,
   resolveStoppedSessionMessageForWorkbenchEntryPhase,
   resolveWorkbenchEntryPhase,
-  shouldWaitForAutomationSessionThread,
+  shouldWaitForTriggerSessionThread,
 };
 export type {
   SessionConversationPaneState,

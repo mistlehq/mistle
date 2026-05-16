@@ -13,26 +13,6 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import {
-  createProfileAutomationDetailPath,
-  createProfileAutomationsPath,
-} from "../automations/automation-editor-navigation.js";
-import { AutomationIssueIndicator } from "../automations/automation-list-indicators.js";
-import type { AutomationListItemViewModel } from "../automations/automation-list-types.js";
-import { toAutomationListItemViewModel } from "../automations/automation-list-view-model.js";
-import { automationsListQueryKey } from "../automations/automations-query-keys.js";
-import { listAutomations } from "../automations/automations-service.js";
-import {
-  resolveTriggerTemplateEventOptionIds,
-  TriggerTemplates,
-  type TriggerTemplate,
-} from "../automations/trigger-templates.js";
-import { useWebhookAutomationEventPrerequisites } from "../automations/use-webhook-automation-prerequisites.js";
-import {
-  buildWebhookAutomationEventOptions,
-  resolveEligibleProfileAutomationConnectionIds,
-} from "../automations/webhook-automation-option-builders.js";
-import type { WebhookAutomationEventOption } from "../automations/webhook-automation-trigger-types.js";
 import { IntegrationLogo } from "../integrations/integration-logo.js";
 import type {
   IntegrationConnection,
@@ -40,23 +20,43 @@ import type {
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
 import {
-  sandboxProfileVersionAutomationConfigQueryKey,
+  sandboxProfileVersionTriggerConfigQueryKey,
   sandboxProfileVersionsQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import {
-  getSandboxProfileVersionAutomationConfig,
+  getSandboxProfileVersionTriggerConfig,
   listSandboxProfileVersions,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type {
   SandboxProfileVersion,
-  SandboxProfileVersionAutomationConfig,
+  SandboxProfileVersionTriggerConfig,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { ActionTile } from "../shared/action-tile.js";
 import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
 import { TablePagination } from "../shared/table-pagination.js";
+import {
+  createProfileTriggerDetailPath,
+  createProfileTriggersPath,
+} from "../triggers/trigger-editor-navigation.js";
+import { TriggerIssueIndicator } from "../triggers/trigger-list-indicators.js";
+import type { TriggerListItemViewModel } from "../triggers/trigger-list-types.js";
+import { toTriggerListItemViewModel } from "../triggers/trigger-list-view-model.js";
+import {
+  resolveTriggerTemplateEventOptionIds,
+  TriggerTemplates,
+  type TriggerTemplate,
+} from "../triggers/trigger-templates.js";
+import { triggersListQueryKey } from "../triggers/triggers-query-keys.js";
+import { listTriggers } from "../triggers/triggers-service.js";
+import { useWebhookTriggerEventPrerequisites } from "../triggers/use-webhook-trigger-prerequisites.js";
+import type { WebhookTriggerEventOption } from "../triggers/webhook-trigger-event-types.js";
+import {
+  buildWebhookTriggerEventOptions,
+  resolveEligibleProfileTriggerConnectionIds,
+} from "../triggers/webhook-trigger-option-builders.js";
 import { TriggerEditorContent } from "./trigger-editor-content.js";
 
-const ProfileAutomationsListLimit = 25;
+const ProfileTriggersListLimit = 25;
 
 type TriggerTemplateAvailability =
   | {
@@ -69,7 +69,7 @@ type TriggerTemplateAvailability =
       template: TriggerTemplate;
     };
 
-function createAutomationCreatePath(profileId: string, templateId?: string): string {
+function createTriggerCreatePath(profileId: string, templateId?: string): string {
   const searchParams = new URLSearchParams({
     sandboxProfileId: profileId,
   });
@@ -99,7 +99,7 @@ function TriggerTemplateList(input: {
       <div>
         <h2 className="text-2xl font-semibold">Create from template</h2>
         <p className="mt-2 text-base text-muted-foreground">
-          Choose a starting point for the automation you want to create.
+          Choose a starting point for the trigger you want to create.
         </p>
       </div>
       {input.errorMessage === null ? null : (
@@ -154,16 +154,16 @@ function resolveActiveSandboxProfileVersion(
 }
 
 function isTriggerTemplateAvailable(input: {
-  eventOptions: readonly WebhookAutomationEventOption[];
+  eventOptions: readonly WebhookTriggerEventOption[];
   template: Extract<TriggerTemplate, { kind: "trigger" }>;
 }): boolean {
   return resolveTriggerTemplateEventOptionIds(input) !== null;
 }
 
 function resolveTriggerTemplateAvailability(input: {
-  automationConfig: SandboxProfileVersionAutomationConfig;
+  triggerConfig: SandboxProfileVersionTriggerConfig;
   connections: readonly IntegrationConnection[];
-  eventOptions: readonly WebhookAutomationEventOption[];
+  eventOptions: readonly WebhookTriggerEventOption[];
   selectableConnectionIds: readonly string[];
   targets: readonly IntegrationTarget[];
   template: TriggerTemplate;
@@ -200,7 +200,7 @@ function resolveTriggerTemplateAvailability(input: {
   const firstMatchingTarget = matchingTargets[0];
   const integrationName = firstMatchingTarget?.displayName ?? "the required integration";
   const matchingConnectionIds = new Set(matchingConnections.map((connection) => connection.id));
-  const hasProfileBinding = input.automationConfig.bindings.some((binding) =>
+  const hasProfileBinding = input.triggerConfig.bindings.some((binding) =>
     matchingConnectionIds.has(binding.connectionId),
   );
   if (!hasProfileBinding) {
@@ -235,7 +235,7 @@ function resolveTriggerTemplateAvailability(input: {
   };
 }
 
-function SourceSummary(input: { item: AutomationListItemViewModel }): React.JSX.Element {
+function SourceSummary(input: { item: TriggerListItemViewModel }): React.JSX.Element {
   if (input.item.source.kind === "schedule") {
     const timing =
       input.item.source.nextScheduledAtLabel === null
@@ -266,9 +266,7 @@ function SourceSummary(input: { item: AutomationListItemViewModel }): React.JSX.
   );
 }
 
-function AutomationKindIcon(input: {
-  kind: AutomationListItemViewModel["kind"];
-}): React.JSX.Element {
+function TriggerKindIcon(input: { kind: TriggerListItemViewModel["kind"] }): React.JSX.Element {
   if (input.kind === "schedule") {
     return (
       <>
@@ -286,8 +284,8 @@ function AutomationKindIcon(input: {
   );
 }
 
-function ProfileAutomationListRow(input: {
-  item: AutomationListItemViewModel;
+function ProfileTriggerListRow(input: {
+  item: TriggerListItemViewModel;
   selected: boolean;
   onSelect: () => void;
 }): React.JSX.Element {
@@ -301,7 +299,7 @@ function ProfileAutomationListRow(input: {
     >
       <div className="grid w-full min-w-0 grid-cols-[1.25rem_minmax(0,1fr)_1.25rem] gap-x-3 px-3 py-3">
         <span className="flex h-5 items-center justify-center">
-          <AutomationIssueIndicator enabled={input.item.enabled} issue={input.item.issue} />
+          <TriggerIssueIndicator enabled={input.item.enabled} issue={input.item.issue} />
         </span>
         <button
           aria-current={input.selected ? "true" : undefined}
@@ -321,18 +319,18 @@ function ProfileAutomationListRow(input: {
           </span>
         </button>
         <span className="flex h-5 items-center justify-center">
-          <AutomationKindIcon kind={input.item.kind} />
+          <TriggerKindIcon kind={input.item.kind} />
         </span>
       </div>
     </div>
   );
 }
 
-function ProfileAutomationDetail(input: { profileId: string }): React.JSX.Element {
+function ProfileTriggerDetail(input: { profileId: string }): React.JSX.Element {
   const navigate = useNavigate();
   const params = useParams();
   const triggerId = params["triggerId"];
-  const backPath = createProfileAutomationsPath(input.profileId);
+  const backPath = createProfileTriggersPath(input.profileId);
 
   if (triggerId === undefined) {
     return (
@@ -357,20 +355,20 @@ export function SandboxProfileTriggersSection(input: { profileId: string }): Rea
   const navigate = useNavigate();
   const params = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [isMobileAutomationSelectOpen, setIsMobileAutomationSelectOpen] = useState(false);
+  const [isMobileTriggerSelectOpen, setIsMobileTriggerSelectOpen] = useState(false);
   const { after, before } = readKeysetPaginationCursors(searchParams);
   const triggerId = params["triggerId"];
   const shouldLoadTemplates = triggerId === undefined;
-  const automationsQuery = useQuery({
-    queryKey: automationsListQueryKey({
-      limit: ProfileAutomationsListLimit,
+  const triggersQuery = useQuery({
+    queryKey: triggersListQueryKey({
+      limit: ProfileTriggersListLimit,
       after,
       before,
       sandboxProfileId: input.profileId,
     }),
     queryFn: async ({ signal }) =>
-      listAutomations({
-        limit: ProfileAutomationsListLimit,
+      listTriggers({
+        limit: ProfileTriggersListLimit,
         after,
         before,
         sandboxProfileId: input.profileId,
@@ -392,8 +390,8 @@ export function SandboxProfileTriggersSection(input: { profileId: string }): Rea
     () => resolveActiveSandboxProfileVersion(profileVersionsQuery.data?.versions ?? []),
     [profileVersionsQuery.data?.versions],
   );
-  const automationConfigQuery = useQuery({
-    queryKey: sandboxProfileVersionAutomationConfigQueryKey({
+  const triggerConfigQuery = useQuery({
+    queryKey: sandboxProfileVersionTriggerConfigQueryKey({
       profileId: input.profileId,
       version: activeSandboxProfileVersion ?? 0,
     }),
@@ -402,7 +400,7 @@ export function SandboxProfileTriggersSection(input: { profileId: string }): Rea
         throw new Error("An active sandbox profile version is required.");
       }
 
-      return getSandboxProfileVersionAutomationConfig({
+      return getSandboxProfileVersionTriggerConfig({
         profileId: input.profileId,
         version: activeSandboxProfileVersion,
         signal,
@@ -411,42 +409,42 @@ export function SandboxProfileTriggersSection(input: { profileId: string }): Rea
     enabled: shouldLoadTemplates && activeSandboxProfileVersion !== null,
     retry: false,
   });
-  const eventPrerequisites = useWebhookAutomationEventPrerequisites({
+  const eventPrerequisites = useWebhookTriggerEventPrerequisites({
     enabled: shouldLoadTemplates && activeSandboxProfileVersion !== null,
   });
 
-  const items = automationsQuery.data?.items.map(toAutomationListItemViewModel) ?? [];
-  const selectedAutomation =
+  const items = triggersQuery.data?.items.map(toTriggerListItemViewModel) ?? [];
+  const selectedTrigger =
     triggerId === undefined ? null : (items.find((item) => item.id === triggerId) ?? null);
-  const errorMessage = automationsQuery.isError
+  const errorMessage = triggersQuery.isError
     ? resolveApiErrorMessage({
-        error: automationsQuery.error,
+        error: triggersQuery.error,
         fallbackMessage: "Could not load triggers.",
       })
     : null;
   const triggerTemplateAvailability = useMemo(() => {
-    const automationConfig = automationConfigQuery.data;
+    const triggerConfig = triggerConfigQuery.data;
     const directoryData = eventPrerequisites.directoryData;
-    if (automationConfig === undefined || directoryData === undefined) {
+    if (triggerConfig === undefined || directoryData === undefined) {
       return [];
     }
 
-    const selectableConnectionIds = resolveEligibleProfileAutomationConnectionIds({
-      bindings: automationConfig.bindings,
+    const selectableConnectionIds = resolveEligibleProfileTriggerConnectionIds({
+      bindings: triggerConfig.bindings,
       connections: directoryData.connections,
       targets: directoryData.targets,
     });
-    const eventOptions = buildWebhookAutomationEventOptions({
+    const eventOptions = buildWebhookTriggerEventOptions({
       connections: directoryData.connections,
       targets: directoryData.targets,
       webhookSources: directoryData.webhookSources,
       selectableConnectionIds,
-      selectedTriggerIds: [],
+      selectedEventIds: [],
     });
 
     return TriggerTemplates.map((template) =>
       resolveTriggerTemplateAvailability({
-        automationConfig,
+        triggerConfig,
         connections: directoryData.connections,
         eventOptions,
         selectableConnectionIds,
@@ -455,18 +453,18 @@ export function SandboxProfileTriggersSection(input: { profileId: string }): Rea
         webhookSources: directoryData.webhookSources,
       }),
     );
-  }, [automationConfigQuery.data, eventPrerequisites.directoryData]);
+  }, [triggerConfigQuery.data, eventPrerequisites.directoryData]);
   const templateErrorMessage =
-    profileVersionsQuery.isError || automationConfigQuery.isError
+    profileVersionsQuery.isError || triggerConfigQuery.isError
       ? resolveApiErrorMessage({
-          error: profileVersionsQuery.error ?? automationConfigQuery.error,
+          error: profileVersionsQuery.error ?? triggerConfigQuery.error,
           fallbackMessage: "Could not load trigger templates.",
         })
       : eventPrerequisites.errorMessage;
   const templatesPending =
     profileVersionsQuery.isPending ||
     (activeSandboxProfileVersion !== null &&
-      (automationConfigQuery.isPending || eventPrerequisites.isPending));
+      (triggerConfigQuery.isPending || eventPrerequisites.isPending));
 
   function updatePagination(inputValue: {
     nextAfter: string | null;
@@ -482,9 +480,9 @@ export function SandboxProfileTriggersSection(input: { profileId: string }): Rea
     setSearchParams(nextSearchParams);
   }
 
-  function selectAutomation(item: AutomationListItemViewModel): void {
+  function selectTrigger(item: TriggerListItemViewModel): void {
     void navigate(
-      createProfileAutomationDetailPath({
+      createProfileTriggerDetailPath({
         profileId: input.profileId,
         triggerId: item.id,
         searchParams,
@@ -493,11 +491,11 @@ export function SandboxProfileTriggersSection(input: { profileId: string }): Rea
   }
 
   function createFromTemplate(templateId: string): void {
-    void navigate(createAutomationCreatePath(input.profileId, templateId));
+    void navigate(createTriggerCreatePath(input.profileId, templateId));
   }
 
   function goToNextPage(): void {
-    const nextPage = automationsQuery.data?.nextPage;
+    const nextPage = triggersQuery.data?.nextPage;
     if (nextPage === null || nextPage === undefined) {
       return;
     }
@@ -509,7 +507,7 @@ export function SandboxProfileTriggersSection(input: { profileId: string }): Rea
   }
 
   function goToPreviousPage(): void {
-    const previousPage = automationsQuery.data?.previousPage;
+    const previousPage = triggersQuery.data?.previousPage;
     if (previousPage === null || previousPage === undefined) {
       return;
     }
@@ -521,18 +519,18 @@ export function SandboxProfileTriggersSection(input: { profileId: string }): Rea
   }
 
   function renderPagination(): React.JSX.Element | null {
-    if (automationsQuery.data?.nextPage == null && automationsQuery.data?.previousPage == null) {
+    if (triggersQuery.data?.nextPage == null && triggersQuery.data?.previousPage == null) {
       return null;
     }
 
     return (
       <TablePagination
-        hasNextPage={automationsQuery.data?.nextPage != null}
-        hasPreviousPage={automationsQuery.data?.previousPage != null}
-        nextPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
+        hasNextPage={triggersQuery.data?.nextPage != null}
+        hasPreviousPage={triggersQuery.data?.previousPage != null}
+        nextPageDisabled={triggersQuery.isFetching || triggersQuery.isPending}
         onNextPage={goToNextPage}
         onPreviousPage={goToPreviousPage}
-        previousPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
+        previousPageDisabled={triggersQuery.isFetching || triggersQuery.isPending}
       />
     );
   }
@@ -557,33 +555,33 @@ export function SandboxProfileTriggersSection(input: { profileId: string }): Rea
       <div className="flex flex-col gap-3 md:hidden">
         <Button
           onClick={() => {
-            void navigate(createAutomationCreatePath(input.profileId));
+            void navigate(createTriggerCreatePath(input.profileId));
           }}
           type="button"
         >
           <PlusIcon />
           Create Trigger
         </Button>
-        {automationsQuery.isPending || items.length === 0 ? null : (
+        {triggersQuery.isPending || items.length === 0 ? null : (
           <Select
-            onOpenChange={setIsMobileAutomationSelectOpen}
-            onValueChange={(nextAutomationId) => {
-              const nextAutomation = items.find((item) => item.id === nextAutomationId);
-              if (nextAutomation === undefined) {
+            onOpenChange={setIsMobileTriggerSelectOpen}
+            onValueChange={(nextTriggerId) => {
+              const nextTrigger = items.find((item) => item.id === nextTriggerId);
+              if (nextTrigger === undefined) {
                 return;
               }
 
-              selectAutomation(nextAutomation);
-              setIsMobileAutomationSelectOpen(false);
+              selectTrigger(nextTrigger);
+              setIsMobileTriggerSelectOpen(false);
             }}
-            value={selectedAutomation?.id ?? ""}
+            value={selectedTrigger?.id ?? ""}
           >
             <SelectTrigger aria-label="Select trigger" className="w-full">
               <SelectValue placeholder="Select trigger">
-                {selectedAutomation?.name ?? "Select trigger"}
+                {selectedTrigger?.name ?? "Select trigger"}
               </SelectValue>
             </SelectTrigger>
-            {isMobileAutomationSelectOpen ? (
+            {isMobileTriggerSelectOpen ? (
               <SelectContent>
                 {items.map((item) => (
                   <SelectItem key={item.id} value={item.id}>
@@ -603,7 +601,7 @@ export function SandboxProfileTriggersSection(input: { profileId: string }): Rea
             <Button
               className="w-full justify-start"
               onClick={() => {
-                void navigate(createAutomationCreatePath(input.profileId));
+                void navigate(createTriggerCreatePath(input.profileId));
               }}
               type="button"
             >
@@ -611,14 +609,14 @@ export function SandboxProfileTriggersSection(input: { profileId: string }): Rea
               Create Trigger
             </Button>
           </div>
-          {automationsQuery.isPending || items.length === 0
+          {triggersQuery.isPending || items.length === 0
             ? null
             : items.map((item) => (
-                <ProfileAutomationListRow
+                <ProfileTriggerListRow
                   item={item}
                   key={item.id}
                   onSelect={() => {
-                    selectAutomation(item);
+                    selectTrigger(item);
                   }}
                   selected={item.id === triggerId}
                 />
@@ -627,7 +625,7 @@ export function SandboxProfileTriggersSection(input: { profileId: string }): Rea
         </nav>
         <div aria-hidden className="hidden bg-border md:block" />
         <div className="min-w-0 md:pl-8">
-          {triggerId === undefined && !automationsQuery.isPending && errorMessage === null ? (
+          {triggerId === undefined && !triggersQuery.isPending && errorMessage === null ? (
             <TriggerTemplateList
               errorMessage={templateErrorMessage}
               isPending={templatesPending}
@@ -635,7 +633,7 @@ export function SandboxProfileTriggersSection(input: { profileId: string }): Rea
               templates={triggerTemplateAvailability}
             />
           ) : (
-            <ProfileAutomationDetail profileId={input.profileId} />
+            <ProfileTriggerDetail profileId={input.profileId} />
           )}
         </div>
       </div>

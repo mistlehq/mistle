@@ -1,14 +1,14 @@
 import type { CSSProperties } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
-import {
-  createProfileAutomationDetailPath,
-  type CreatedAutomationNavigationTarget,
-} from "../automations/automation-editor-navigation.js";
-import { CreateAutomationEditor } from "../automations/create-automation-editor.js";
-import { findTriggerTemplateById } from "../automations/trigger-templates.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { CreateTriggerEditor } from "../triggers/create-trigger-editor.js";
+import {
+  createProfileTriggerDetailPath,
+  type CreatedTriggerNavigationTarget,
+} from "../triggers/trigger-editor-navigation.js";
+import { findTriggerTemplateById } from "../triggers/trigger-templates.js";
 
 const TriggerCreatePageScrollStyle: CSSProperties = {
   scrollbarGutter: "stable",
@@ -50,10 +50,10 @@ export function TriggerCreatePage(): React.JSX.Element {
   const createSuccessPath =
     initialSandboxProfileId === undefined
       ? undefined
-      : (automation: CreatedAutomationNavigationTarget) =>
-          createProfileAutomationDetailPath({
-            profileId: automation.target.sandboxProfileId,
-            triggerId: automation.id,
+      : (trigger: CreatedTriggerNavigationTarget) =>
+          createProfileTriggerDetailPath({
+            profileId: trigger.target.sandboxProfileId,
+            triggerId: trigger.id,
           });
 
   return (
@@ -64,7 +64,7 @@ export function TriggerCreatePage(): React.JSX.Element {
       style={TriggerCreatePageScrollStyle}
     >
       <PageFrame description={description} title={title} width="form">
-        <CreateAutomationEditor
+        <CreateTriggerEditor
           {...(initialSandboxProfileId === undefined ? {} : { initialSandboxProfileId })}
           {...(initialTemplateId === undefined ? {} : { initialTemplateId })}
           {...(createSuccessPath === undefined ? {} : { createSuccessPath })}

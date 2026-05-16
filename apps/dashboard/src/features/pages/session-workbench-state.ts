@@ -4,7 +4,7 @@ export type SandboxLifecycleStatus = "pending" | "starting" | "running" | "stopp
 
 export type WorkbenchSandboxLifecycleStatus = SandboxLifecycleStatus | "resuming" | null;
 
-export type SandboxAutomationConversation = {
+export type SandboxTriggerConversation = {
   conversationId: string;
   routeId: string | null;
   providerConversationId: string | null;
@@ -38,18 +38,18 @@ export type SessionWorkbenchStatus =
       alert: SessionWorkbenchStatusAlert | null;
     };
 
-export function shouldWaitForAutomationSessionThread(input: {
+export function shouldWaitForTriggerSessionThread(input: {
   sandboxStatus: WorkbenchSandboxLifecycleStatus;
-  automationConversation: SandboxAutomationConversation;
+  triggerConversation: SandboxTriggerConversation;
 }): boolean {
   return (
     input.sandboxStatus === "running" &&
-    input.automationConversation !== null &&
-    input.automationConversation.providerConversationId === null
+    input.triggerConversation !== null &&
+    input.triggerConversation.providerConversationId === null
   );
 }
 
-export function hasAutomationSessionPreparationTimedOut(input: {
+export function hasTriggerSessionPreparationTimedOut(input: {
   pendingSinceMs: number | null;
   nowMs: number;
 }): boolean {
@@ -60,7 +60,7 @@ export function hasAutomationSessionPreparationTimedOut(input: {
   return input.nowMs - input.pendingSinceMs >= 30_000;
 }
 
-export function resolveAutomationSessionPreparationTimeoutDelayMs(input: {
+export function resolveTriggerSessionPreparationTimeoutDelayMs(input: {
   pendingSinceMs: number | null;
   nowMs: number;
 }): number | null {

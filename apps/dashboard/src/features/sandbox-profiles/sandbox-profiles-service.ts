@@ -16,10 +16,10 @@ import type {
   PutSandboxProfileVersionRefreshScheduleInput,
   SandboxProfile,
   SandboxProfileVersion,
-  SandboxProfileVersionDraftAutomationImpact,
+  SandboxProfileVersionDraftTriggerImpact,
   SandboxProfileVersionPublishability,
   SandboxProfileVersionIntegrationBinding,
-  SandboxProfileVersionAutomationConfig,
+  SandboxProfileVersionTriggerConfig,
   SandboxProfileVersionRefreshSchedule,
   SandboxProfileVersionSetupScript,
   SandboxProfileSetupScriptTestRuntimeConfig,
@@ -60,7 +60,7 @@ const LaunchableSandboxProfilesResultSchema = z
   })
   .strict();
 
-const SandboxProfileVersionDraftAutomationImpactSchema = z
+const SandboxProfileVersionDraftTriggerImpactSchema = z
   .object({
     hasBreakingChanges: z.boolean(),
     affectedAutomations: z.array(
@@ -96,8 +96,8 @@ const SandboxProfileVersionDraftAutomationImpactSchema = z
     ),
   })
   .strict();
-type ParsedSandboxProfileVersionDraftAutomationImpact = z.infer<
-  typeof SandboxProfileVersionDraftAutomationImpactSchema
+type ParsedSandboxProfileVersionDraftTriggerImpact = z.infer<
+  typeof SandboxProfileVersionDraftTriggerImpactSchema
 >;
 
 export async function listSandboxProfiles(input: {
@@ -599,7 +599,7 @@ const SandboxProfileRepositoryOptionSchema = z
   })
   .strict();
 
-const SandboxProfileVersionAutomationConfigResponseSchema = z
+const SandboxProfileVersionTriggerConfigResponseSchema = z
   .object({
     bindings: z.array(SandboxProfileVersionIntegrationBindingSchema),
     repositoryOptions: z.array(SandboxProfileRepositoryOptionSchema),
@@ -736,14 +736,14 @@ export async function getSandboxProfileVersionPublishability(input: {
   }
 }
 
-export async function getSandboxProfileVersionDraftAutomationImpact(input: {
+export async function getSandboxProfileVersionDraftTriggerImpact(input: {
   profileId: string;
   version: number;
   signal?: AbortSignal;
-}): Promise<SandboxProfileVersionDraftAutomationImpact> {
+}): Promise<SandboxProfileVersionDraftTriggerImpact> {
   try {
     const response = await requestControlPlane({
-      operation: "getSandboxProfileVersionDraftAutomationImpact",
+      operation: "getSandboxProfileVersionDraftTriggerImpact",
       method: "GET",
       pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
         input.version,
@@ -753,21 +753,21 @@ export async function getSandboxProfileVersionDraftAutomationImpact(input: {
     });
 
     const responseBody = await response.json();
-    const parsedResponse = SandboxProfileVersionDraftAutomationImpactSchema.safeParse(responseBody);
+    const parsedResponse = SandboxProfileVersionDraftTriggerImpactSchema.safeParse(responseBody);
     if (!parsedResponse.success) {
       throw new SandboxProfilesApiError({
-        operation: "getSandboxProfileVersionDraftAutomationImpact",
+        operation: "getSandboxProfileVersionDraftTriggerImpact",
         status: 500,
         body: responseBody,
         message: "Sandbox profile draft trigger impact response payload is invalid.",
       });
     }
 
-    return normalizeSandboxProfileVersionDraftAutomationImpact(parsedResponse.data);
+    return normalizeSandboxProfileVersionDraftTriggerImpact(parsedResponse.data);
   } catch (error) {
     throw new SandboxProfilesApiError(
       normalizeHttpApiError({
-        operation: "getSandboxProfileVersionDraftAutomationImpact",
+        operation: "getSandboxProfileVersionDraftTriggerImpact",
         error,
         fallbackMessage: "Could not check draft trigger impact.",
       }),
@@ -775,15 +775,15 @@ export async function getSandboxProfileVersionDraftAutomationImpact(input: {
   }
 }
 
-function normalizeSandboxProfileVersionDraftAutomationImpact(
-  input: ParsedSandboxProfileVersionDraftAutomationImpact,
-): SandboxProfileVersionDraftAutomationImpact {
+function normalizeSandboxProfileVersionDraftTriggerImpact(
+  input: ParsedSandboxProfileVersionDraftTriggerImpact,
+): SandboxProfileVersionDraftTriggerImpact {
   return {
     hasBreakingChanges: input.hasBreakingChanges,
-    affectedAutomations: input.affectedAutomations.map((automation) => ({
-      enabled: automation.enabled,
-      id: automation.id,
-      issues: automation.issues.map((issue) => ({
+    affectedTriggers: input.affectedAutomations.map((trigger) => ({
+      enabled: trigger.enabled,
+      id: trigger.id,
+      issues: trigger.issues.map((issue) => ({
         code: issue.code,
         message: issue.message,
         ...(issue.bindingId === undefined ? {} : { bindingId: issue.bindingId }),
@@ -793,8 +793,8 @@ function normalizeSandboxProfileVersionDraftAutomationImpact(
           ? {}
           : { primaryRepositoryId: issue.primaryRepositoryId }),
       })),
-      kind: automation.kind,
-      name: automation.name,
+      kind: trigger.kind,
+      name: trigger.name,
     })),
   };
 }
@@ -1117,14 +1117,14 @@ export async function getSandboxProfileVersionIntegrationBindings(input: {
   }
 }
 
-export async function getSandboxProfileVersionAutomationConfig(input: {
+export async function getSandboxProfileVersionTriggerConfig(input: {
   profileId: string;
   version: number;
   signal?: AbortSignal;
-}): Promise<SandboxProfileVersionAutomationConfig> {
+}): Promise<SandboxProfileVersionTriggerConfig> {
   try {
     const response = await requestControlPlane({
-      operation: "getSandboxProfileVersionAutomationConfig",
+      operation: "getSandboxProfileVersionTriggerConfig",
       method: "GET",
       pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
         input.version,
@@ -1134,11 +1134,10 @@ export async function getSandboxProfileVersionAutomationConfig(input: {
     });
 
     const responseBody = await response.json();
-    const parsedResponse =
-      SandboxProfileVersionAutomationConfigResponseSchema.safeParse(responseBody);
+    const parsedResponse = SandboxProfileVersionTriggerConfigResponseSchema.safeParse(responseBody);
     if (!parsedResponse.success) {
       throw new SandboxProfilesApiError({
-        operation: "getSandboxProfileVersionAutomationConfig",
+        operation: "getSandboxProfileVersionTriggerConfig",
         status: 500,
         body: responseBody,
         message: "Sandbox profile trigger config response payload is invalid.",
@@ -1149,7 +1148,7 @@ export async function getSandboxProfileVersionAutomationConfig(input: {
   } catch (error) {
     throw new SandboxProfilesApiError(
       normalizeHttpApiError({
-        operation: "getSandboxProfileVersionAutomationConfig",
+        operation: "getSandboxProfileVersionTriggerConfig",
         error,
         fallbackMessage: "Could not load sandbox profile trigger config.",
       }),

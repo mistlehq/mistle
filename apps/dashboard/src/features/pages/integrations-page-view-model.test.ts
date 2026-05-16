@@ -777,12 +777,12 @@ describe("integrations page view model", () => {
     const [item] = buildIntegrationConnectionDetailItems({
       connections: [
         {
-          id: "icn_automation_guarded",
+          id: "icn_trigger_guarded",
           targetKey: "github",
           displayName: "Engineering GitHub",
           status: "active",
           bindingCount: 0,
-          automationCount: 1,
+          triggerCount: 1,
           createdAt: "2026-03-03T00:00:00.000Z",
           updatedAt: "2026-03-11T04:30:00.000Z",
         } satisfies IntegrationConnection,
@@ -803,7 +803,7 @@ describe("integrations page view model", () => {
           displayName: "Engineering GitHub",
           status: "active",
           bindingCount: 2,
-          automationCount: 0,
+          triggerCount: 0,
           createdAt: "2026-03-03T00:00:00.000Z",
           updatedAt: "2026-03-11T04:30:00.000Z",
         } satisfies IntegrationConnection,
@@ -1115,7 +1115,7 @@ function createConnection(
     displayName: input.displayName ?? `GitHub ${input.id}`,
     status: input.status,
     bindingCount: input.bindingCount ?? 0,
-    automationCount: input.automationCount ?? 0,
+    triggerCount: input.triggerCount ?? 0,
     createdAt: "2026-03-03T00:00:00.000Z",
     updatedAt: "2026-03-11T04:30:00.000Z",
     ...(input.resources === undefined ? {} : { resources: input.resources }),

@@ -748,7 +748,7 @@ export function createGitHubNotSyncedDetailViewStoryProps(): IntegrationConnecti
 }
 
 type ScenarioDetailStorySpec = {
-  automationCount?: number;
+  triggerCount?: number;
   authMethod?: StoryAuthMethodSpec;
   bindingCount?: number;
   connectionConfig?: Record<string, unknown>;
@@ -899,7 +899,7 @@ function createScenarioDetailViewStoryProps(
   const webhookPolicy = createWebhookPolicy(input);
   const webhookSourceStateByConnectionId = createWebhookSourceSectionState(input);
   const reauthorization = resolveStoryReauthorization(input);
-  const automationCount = input.automationCount ?? 0;
+  const triggerCount = input.triggerCount ?? 0;
   const bindingCount = input.bindingCount ?? 0;
   const supportedWebhookEvents =
     input.authMethod === undefined
@@ -912,9 +912,9 @@ function createScenarioDetailViewStoryProps(
   return {
     connections: [
       {
-        automationCount,
+        triggerCount,
         bindingCount,
-        canDelete: bindingCount === 0 && automationCount === 0,
+        canDelete: bindingCount === 0 && triggerCount === 0,
         ...(authMethod === undefined ? {} : authMethod),
         ...(input.contextItems === undefined ? {} : { contextItems: input.contextItems }),
         displayName: input.displayName,

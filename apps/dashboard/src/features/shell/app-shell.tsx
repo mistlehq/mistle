@@ -204,7 +204,6 @@ export function AppShell(): React.JSX.Element {
     inSessionDetail: routeState.inSessionDetail,
     inSessions: routeState.inSessions,
     inSettings: routeState.inSettings,
-    inTriggers: routeState.inTriggers,
     isSigningOut,
     isSwitchingOrganization,
     locationPathname: location.pathname,

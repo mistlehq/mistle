@@ -21,7 +21,7 @@ type SessionRecoveryObservedState = {
   connected: boolean;
   hasLifecycleError: boolean;
   isStartingSession: boolean;
-  isWaitingForAutomationThread: boolean;
+  isWaitingForTriggerThread: boolean;
   sandboxInstanceId: string | null;
   sandboxStatus: WorkbenchSandboxLifecycleStatus;
 };
@@ -164,7 +164,7 @@ export function reduceSessionWorkbenchRecoveryState(
             !event.observation.canConnect ||
             event.observation.hasLifecycleError ||
             event.observation.isStartingSession ||
-            event.observation.isWaitingForAutomationThread ||
+            event.observation.isWaitingForTriggerThread ||
             event.observation.sandboxStatus !== "running"
           ) {
             return state.reconnectCommand === "none"
@@ -229,7 +229,7 @@ export function resolveSessionWorkbenchRecoveryStateForRender(input: {
   canConnect: boolean;
   hasLifecycleError: boolean;
   isStartingSession: boolean;
-  isWaitingForAutomationThread: boolean;
+  isWaitingForTriggerThread: boolean;
   previousSandboxInstanceId: string | null;
   sandboxInstanceId: string | null;
   sandboxStatus: WorkbenchSandboxLifecycleStatus;
@@ -253,7 +253,7 @@ export function resolveSessionWorkbenchRecoveryStateForRender(input: {
           connected: false,
           hasLifecycleError: input.hasLifecycleError,
           isStartingSession: input.isStartingSession,
-          isWaitingForAutomationThread: input.isWaitingForAutomationThread,
+          isWaitingForTriggerThread: input.isWaitingForTriggerThread,
           sandboxInstanceId: input.sandboxInstanceId,
           sandboxStatus: input.sandboxStatus,
         },
@@ -265,7 +265,7 @@ export function useSessionWorkbenchRecovery(input: {
   connectSession: SessionRecoveryLifecycle["connectSession"];
   hasLifecycleError: boolean;
   isStartingSession: boolean;
-  isWaitingForAutomationThread: boolean;
+  isWaitingForTriggerThread: boolean;
   mainPanelTransitionState: MainPanelTransitionState;
   requestRecoveryStatusRefresh: () => void;
   recoverSession: SessionRecoveryLifecycle["recoverSession"];
@@ -287,7 +287,7 @@ export function useSessionWorkbenchRecovery(input: {
     canConnect: input.canConnect,
     hasLifecycleError: input.hasLifecycleError,
     isStartingSession: input.isStartingSession,
-    isWaitingForAutomationThread: input.isWaitingForAutomationThread,
+    isWaitingForTriggerThread: input.isWaitingForTriggerThread,
     previousSandboxInstanceId: previousSandboxInstanceIdRef.current,
     sandboxInstanceId: input.sandboxInstanceId,
     sandboxStatus: input.sandboxStatus,

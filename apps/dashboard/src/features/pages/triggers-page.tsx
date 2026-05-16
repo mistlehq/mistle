@@ -4,13 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { toAutomationListItemViewModel } from "../automations/automation-list-view-model.js";
-import { AutomationListView } from "../automations/automation-list-view.js";
-import { automationsListQueryKey } from "../automations/automations-query-keys.js";
-import { listAutomations } from "../automations/automations-service.js";
 import { CollectionEmptyState } from "../shared/collection-empty-state.js";
 import { PageFrame } from "../shared/page-frame.js";
 import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
+import { toTriggerListItemViewModel } from "../triggers/trigger-list-view-model.js";
+import { TriggerListView } from "../triggers/trigger-list-view.js";
+import { triggersListQueryKey } from "../triggers/triggers-query-keys.js";
+import { listTriggers } from "../triggers/triggers-service.js";
 
 const TRIGGERS_LIST_LIMIT = 25;
 
@@ -19,14 +19,14 @@ export function TriggersPage(): React.JSX.Element {
   const [searchParams, setSearchParams] = useSearchParams();
   const { after, before } = readKeysetPaginationCursors(searchParams);
 
-  const automationsQuery = useQuery({
-    queryKey: automationsListQueryKey({
+  const triggersQuery = useQuery({
+    queryKey: triggersListQueryKey({
       limit: TRIGGERS_LIST_LIMIT,
       after,
       before,
     }),
     queryFn: async ({ signal }) =>
-      listAutomations({
+      listTriggers({
         limit: TRIGGERS_LIST_LIMIT,
         after,
         before,
@@ -35,11 +35,11 @@ export function TriggersPage(): React.JSX.Element {
     retry: false,
   });
 
-  const items = automationsQuery.data?.items.map(toAutomationListItemViewModel) ?? [];
+  const items = triggersQuery.data?.items.map(toTriggerListItemViewModel) ?? [];
 
-  const errorMessage = automationsQuery.isError
+  const errorMessage = triggersQuery.isError
     ? resolveApiErrorMessage({
-        error: automationsQuery.error,
+        error: triggersQuery.error,
         fallbackMessage: "Could not load triggers.",
       })
     : null;
@@ -59,8 +59,8 @@ export function TriggersPage(): React.JSX.Element {
     void navigate("/triggers/new");
   }
 
-  const canShowSummary = automationsQuery.data !== undefined && !automationsQuery.isError;
-  const hasNoTriggers = automationsQuery.data?.totalResults === 0;
+  const canShowSummary = triggersQuery.data !== undefined && !triggersQuery.isError;
+  const hasNoTriggers = triggersQuery.data?.totalResults === 0;
 
   return (
     <PageFrame
@@ -71,7 +71,7 @@ export function TriggersPage(): React.JSX.Element {
       }
       title="Triggers"
     >
-      {automationsQuery.isPending ? null : hasNoTriggers && errorMessage === null ? (
+      {triggersQuery.isPending ? null : hasNoTriggers && errorMessage === null ? (
         <CollectionEmptyState
           action={
             <Button onClick={createTrigger} type="button">
@@ -83,14 +83,14 @@ export function TriggersPage(): React.JSX.Element {
           title="Create your first trigger"
         />
       ) : (
-        <AutomationListView
+        <TriggerListView
           errorMessage={errorMessage}
-          hasNextPage={automationsQuery.data?.nextPage != null}
-          hasPreviousPage={automationsQuery.data?.previousPage != null}
+          hasNextPage={triggersQuery.data?.nextPage != null}
+          hasPreviousPage={triggersQuery.data?.previousPage != null}
           items={items}
-          nextPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
+          nextPageDisabled={triggersQuery.isFetching || triggersQuery.isPending}
           onNextPage={() => {
-            const nextPage = automationsQuery.data?.nextPage;
+            const nextPage = triggersQuery.data?.nextPage;
             if (nextPage === null || nextPage === undefined) {
               return;
             }
@@ -100,11 +100,11 @@ export function TriggersPage(): React.JSX.Element {
               nextBefore: null,
             });
           }}
-          onOpenAutomation={(automation) => {
-            void navigate(`/triggers/${automation.id}`);
+          onOpenTrigger={(trigger) => {
+            void navigate(`/triggers/${trigger.id}`);
           }}
           onPreviousPage={() => {
-            const previousPage = automationsQuery.data?.previousPage;
+            const previousPage = triggersQuery.data?.previousPage;
             if (previousPage === null || previousPage === undefined) {
               return;
             }
@@ -114,8 +114,8 @@ export function TriggersPage(): React.JSX.Element {
               nextBefore: previousPage.before,
             });
           }}
-          previousPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
-          totalResults={canShowSummary ? automationsQuery.data.totalResults : null}
+          previousPageDisabled={triggersQuery.isFetching || triggersQuery.isPending}
+          totalResults={canShowSummary ? triggersQuery.data.totalResults : null}
         />
       )}
     </PageFrame>

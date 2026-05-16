@@ -30,7 +30,7 @@ function renderSessionWorkbenchPage(input?: {
       failureCode: null,
       failureMessage: null,
       id: sandboxInstanceId,
-      automationConversation: null,
+      triggerConversation: null,
       connectable: false,
       runtimeContext: null,
       startupOperation: null,
@@ -117,7 +117,7 @@ describe("SessionWorkbenchPage", () => {
 
     await act(async () => {
       const status = {
-        automationConversation: null,
+        triggerConversation: null,
         connectable: false,
         failureCode: null,
         failureMessage: null,
@@ -152,7 +152,7 @@ describe("SessionWorkbenchPage", () => {
         failureCode: null,
         failureMessage: null,
         id: sandboxInstanceId,
-        automationConversation: null,
+        triggerConversation: null,
         connectable: false,
         runtimeContext: null,
         startupOperation: {
@@ -183,7 +183,7 @@ describe("SessionWorkbenchPage", () => {
         failureCode: null,
         failureMessage: null,
         id: sandboxInstanceId,
-        automationConversation: null,
+        triggerConversation: null,
         connectable: false,
         runtimeContext: null,
         startupOperation: {
@@ -214,7 +214,7 @@ describe("SessionWorkbenchPage", () => {
         failureCode: null,
         failureMessage: null,
         id: sandboxInstanceId,
-        automationConversation: null,
+        triggerConversation: null,
         connectable: true,
         runtimeContext: {
           agentRuntimeId: "codex",

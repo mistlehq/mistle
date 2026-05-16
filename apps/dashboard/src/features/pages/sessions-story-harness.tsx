@@ -94,11 +94,7 @@ export function SessionsStoryHarness(input: SessionsStoryHarnessProps): React.JS
             />
           }
         >
-          <Route
-            element={<AutomationsStoryPage />}
-            handle={ROUTE_HANDLES.triggers}
-            path="/triggers"
-          />
+          <Route element={<TriggersStoryPage />} handle={ROUTE_HANDLES.triggers} path="/triggers" />
           <Route element={<Outlet />} handle={ROUTE_HANDLES.sessions} path="/sessions">
             <Route element={<SessionsPage />} index />
             <Route element={<NewSessionPage />} handle={ROUTE_HANDLES.sessionsNew} path="new" />
@@ -150,7 +146,6 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
     inSessionDetail: routeState.inSessionDetail,
     inSessions: routeState.inSessions,
     inSettings: routeState.inSettings,
-    inTriggers: routeState.inTriggers,
     isSigningOut: false,
     isSwitchingOrganization: false,
     locationPathname: location.pathname,
@@ -232,7 +227,7 @@ function SessionDetailStoryPage(): React.JSX.Element {
   );
 }
 
-function AutomationsStoryPage(): React.JSX.Element {
+function TriggersStoryPage(): React.JSX.Element {
   return (
     <div className="flex min-h-full flex-col bg-background">
       <div className="flex flex-1 items-center justify-center px-6 py-10">

@@ -4,14 +4,14 @@ export type HomeChecklistState =
   | "complete_profile"
   | "launch_first_session"
   | "add_webhook_integration"
-  | "create_automation"
+  | "create_trigger"
   | "completed";
 
 export type HomeChecklistStepId =
   | "add_integrations"
   | "set_up_profile"
   | "launch_first_session"
-  | "create_automation";
+  | "create_trigger";
 
 export type HomeChecklistStep = {
   id: HomeChecklistStepId;
@@ -33,7 +33,7 @@ export type HomeOnboardingSummary = {
   hasUsableProfiles: boolean;
   hasStartedSession: boolean;
   hasWebhookCapableIntegration: boolean;
-  hasAutomations: boolean;
+  hasTriggers: boolean;
 };
 
 function createBaseSteps(): HomeChecklistStep[] {
@@ -66,7 +66,7 @@ function createBaseSteps(): HomeChecklistStep[] {
       actionLabel: "Start session",
     },
     {
-      id: "create_automation",
+      id: "create_trigger",
       title: "Create a trigger",
       description:
         "Triggers respond to events that happen in other tools, like GitHub, Slack, or Jira.",
@@ -101,13 +101,13 @@ export const HomePageStoryModels = {
     add_integrations: "current",
     set_up_profile: "upcoming",
     launch_first_session: "upcoming",
-    create_automation: "upcoming",
+    create_trigger: "upcoming",
   }),
   setUpProfile: createChecklistModel("set_up_profile", {
     add_integrations: "complete",
     set_up_profile: "current",
     launch_first_session: "upcoming",
-    create_automation: "upcoming",
+    create_trigger: "upcoming",
   }),
   completeProfile: createChecklistModel(
     "complete_profile",
@@ -115,7 +115,7 @@ export const HomePageStoryModels = {
       add_integrations: "complete",
       set_up_profile: "current",
       launch_first_session: "upcoming",
-      create_automation: "upcoming",
+      create_trigger: "upcoming",
     },
     {
       stepOverrides: {
@@ -133,7 +133,7 @@ export const HomePageStoryModels = {
     add_integrations: "complete",
     set_up_profile: "complete",
     launch_first_session: "current",
-    create_automation: "upcoming",
+    create_trigger: "upcoming",
   }),
   addWebhookIntegration: createChecklistModel(
     "add_webhook_integration",
@@ -141,11 +141,11 @@ export const HomePageStoryModels = {
       add_integrations: "complete",
       set_up_profile: "complete",
       launch_first_session: "complete",
-      create_automation: "current",
+      create_trigger: "current",
     },
     {
       stepOverrides: {
-        create_automation: {
+        create_trigger: {
           title: "Add a webhook integration",
           description:
             "Triggers respond to events from tools like GitHub, Slack, or Jira, so you need a webhook-capable integration before you can create one.",
@@ -155,17 +155,17 @@ export const HomePageStoryModels = {
       },
     },
   ),
-  createAutomation: createChecklistModel("create_automation", {
+  createTrigger: createChecklistModel("create_trigger", {
     add_integrations: "complete",
     set_up_profile: "complete",
     launch_first_session: "complete",
-    create_automation: "current",
+    create_trigger: "current",
   }),
   completed: createChecklistModel("completed", {
     add_integrations: "complete",
     set_up_profile: "complete",
     launch_first_session: "complete",
-    create_automation: "complete",
+    create_trigger: "complete",
   }),
 } as const;
 
@@ -188,12 +188,12 @@ export function createHomeOnboardingViewModel(
     return HomePageStoryModels.launchFirstSession;
   }
 
-  if (!input.hasWebhookCapableIntegration && !input.hasAutomations) {
+  if (!input.hasWebhookCapableIntegration && !input.hasTriggers) {
     return HomePageStoryModels.addWebhookIntegration;
   }
 
-  if (!input.hasAutomations) {
-    return HomePageStoryModels.createAutomation;
+  if (!input.hasTriggers) {
+    return HomePageStoryModels.createTrigger;
   }
 
   return HomePageStoryModels.completed;

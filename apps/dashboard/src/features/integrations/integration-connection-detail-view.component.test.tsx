@@ -155,7 +155,7 @@ describe("IntegrationConnectionDetailView", () => {
         connections={[
           {
             id: "icn_github_primary",
-            automationCount: 1,
+            triggerCount: 1,
             bindingCount: 0,
             canDelete: false,
             displayName: "Engineering GitHub",
