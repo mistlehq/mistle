@@ -7,7 +7,7 @@ function Empty({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="empty"
       className={cn(
-        "gap-4 rounded-lg border-dashed p-12 flex w-full min-w-0 flex-1 flex-col items-center justify-center text-center text-balance",
+        "border-border/80 bg-muted/20 flex min-h-64 w-full min-w-0 flex-col items-center justify-center rounded-md border border-dashed px-6 py-12 text-center",
         className,
       )}
       {...props}
@@ -19,7 +19,7 @@ function EmptyHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="empty-header"
-      className={cn("gap-2 flex max-w-sm flex-col items-center", className)}
+      className={cn("flex max-w-lg flex-col items-center gap-2", className)}
       {...props}
     />
   );
@@ -57,11 +57,7 @@ function EmptyMedia({
 
 function EmptyTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <div
-      data-slot="empty-title"
-      className={cn("text-lg font-medium tracking-tight", className)}
-      {...props}
-    />
+    <div data-slot="empty-title" className={cn("text-lg font-semibold", className)} {...props} />
   );
 }
 
@@ -70,7 +66,7 @@ function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
     <div
       data-slot="empty-description"
       className={cn(
-        "text-sm/relaxed text-muted-foreground [&>a:hover]:text-primary [&>a]:underline [&>a]:underline-offset-4",
+        "text-muted-foreground text-sm [&>a:hover]:text-primary [&>a]:underline [&>a]:underline-offset-4",
         className,
       )}
       {...props}
@@ -82,10 +78,7 @@ function EmptyContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="empty-content"
-      className={cn(
-        "gap-4 text-sm flex w-full max-w-sm min-w-0 flex-col items-center text-balance",
-        className,
-      )}
+      className={cn("flex max-w-lg min-w-0 flex-col items-center gap-4 text-sm", className)}
       {...props}
     />
   );

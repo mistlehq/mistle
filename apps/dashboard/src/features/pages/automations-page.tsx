@@ -1,4 +1,5 @@
 import { Button } from "@mistle/ui";
+import { PlusIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router";
 
@@ -7,6 +8,7 @@ import { toAutomationListItemViewModel } from "../automations/automation-list-vi
 import { AutomationListView } from "../automations/automation-list-view.js";
 import { automationsListQueryKey } from "../automations/automations-query-keys.js";
 import { listAutomations } from "../automations/automations-service.js";
+import { CollectionEmptyState } from "../shared/collection-empty-state.js";
 import { PageFrame } from "../shared/page-frame.js";
 import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
 
@@ -54,6 +56,7 @@ export function AutomationsPage(): React.JSX.Element {
   }
 
   const canShowSummary = automationsQuery.data !== undefined && !automationsQuery.isError;
+  const hasNoTriggers = automationsQuery.data?.totalResults === 0;
 
   return (
     <PageFrame
@@ -64,12 +67,28 @@ export function AutomationsPage(): React.JSX.Element {
           }}
           type="button"
         >
-          Create
+          Create trigger
         </Button>
       }
       title="Triggers"
     >
-      {automationsQuery.isPending ? null : (
+      {automationsQuery.isPending ? null : hasNoTriggers && errorMessage === null ? (
+        <CollectionEmptyState
+          action={
+            <Button
+              onClick={() => {
+                void navigate("/automations/new");
+              }}
+              type="button"
+            >
+              <PlusIcon aria-hidden className="size-4" />
+              Create trigger
+            </Button>
+          }
+          description="Triggers run Mistle automatically from webhook events or schedules."
+          title="Create your first trigger"
+        />
+      ) : (
         <AutomationListView
           errorMessage={errorMessage}
           hasNextPage={automationsQuery.data?.nextPage != null}

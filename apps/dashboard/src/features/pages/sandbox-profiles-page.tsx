@@ -20,6 +20,7 @@ import {
   TableRow,
   textLinkVariants,
 } from "@mistle/ui";
+import { PlusIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SyntheticEvent } from "react";
 import { useState } from "react";
@@ -32,6 +33,7 @@ import {
   createSandboxProfile,
   listSandboxProfiles,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
+import { CollectionEmptyState } from "../shared/collection-empty-state.js";
 import { PageFrame } from "../shared/page-frame.js";
 import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
@@ -196,6 +198,7 @@ export function SandboxProfilesPage(): React.JSX.Element {
 
   const items = listQuery.data?.items ?? [];
   const isCreateProfileInvalid = createProfileDisplayName.trim().length === 0;
+  const hasNoProfiles = listQuery.data?.totalResults === 0;
 
   return (
     <PageFrame
@@ -277,7 +280,20 @@ export function SandboxProfilesPage(): React.JSX.Element {
         </Notice>
       ) : null}
 
-      {!listQuery.isPending && !listQuery.isError ? (
+      {!listQuery.isPending && !listQuery.isError && hasNoProfiles ? (
+        <CollectionEmptyState
+          action={
+            <Button onClick={openCreateDialog} type="button">
+              <PlusIcon aria-hidden className="size-4" />
+              Create profile
+            </Button>
+          }
+          description="Sandbox profiles define the environment agents use when starting sessions or running triggers."
+          title="Create your first sandbox profile"
+        />
+      ) : null}
+
+      {!listQuery.isPending && !listQuery.isError && !hasNoProfiles ? (
         <>
           <Table className="min-w-[40rem]">
             <TableHeader className="bg-muted/60">

@@ -1,12 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
+import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
 import { buildSandboxInstanceListItemFixture } from "./sessions-page.story-fixtures.js";
 import { SessionsStoryHarness } from "./sessions-story-harness.js";
 
 type SessionsPageStoryArgs = {
   initialEntries: readonly string[];
+  launchableProfiles?: LaunchableSandboxProfilesResult["items"];
   sandboxInstancesList?: SandboxInstancesListResult;
 };
 
@@ -66,6 +68,9 @@ const meta = {
         {...(args.sandboxInstancesList !== undefined
           ? { sandboxInstancesList: args.sandboxInstancesList }
           : {})}
+        {...(args.launchableProfiles !== undefined
+          ? { launchableProfiles: args.launchableProfiles }
+          : {})}
       />
     );
   },
@@ -79,6 +84,18 @@ export const MixedStates: Story = {};
 
 export const EmptyState: Story = {
   args: {
+    sandboxInstancesList: {
+      items: [],
+      nextPage: null,
+      previousPage: null,
+      totalResults: 0,
+    },
+  },
+};
+
+export const EmptyStateWithoutLaunchableProfiles: Story = {
+  args: {
+    launchableProfiles: [],
     sandboxInstancesList: {
       items: [],
       nextPage: null,

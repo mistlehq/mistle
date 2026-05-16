@@ -63,6 +63,50 @@ describe("SandboxProfilesPage", () => {
     expect(screen.queryByRole("heading", { name: "Create profile" })).toBeNull();
   });
 
+  it("shows first-use guidance when there are no sandbox profiles", () => {
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+
+    queryClient.setQueryData(
+      sandboxProfilesListQueryKey({
+        limit: 20,
+        after: null,
+        before: null,
+      }),
+      {
+        items: [],
+        nextPage: null,
+        previousPage: null,
+        totalResults: 0,
+      } satisfies SandboxProfilesListResult,
+    );
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <SandboxProfilesPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(
+      screen.getByRole("heading", { name: "Create your first sandbox profile" }),
+    ).toBeDefined();
+    expect(screen.queryByRole("table")).toBeNull();
+
+    const createButtons = screen.getAllByRole("button", { name: "Create profile" });
+    const emptyStateCreateButton = createButtons[1];
+    if (emptyStateCreateButton === undefined) {
+      throw new Error("Expected the empty state create button to render.");
+    }
+
+    fireEvent.click(emptyStateCreateButton);
+
+    expect(screen.getByRole("heading", { name: "Create profile" })).toBeDefined();
+  });
+
   it("uses the shared dashboard table styling for the profiles list", () => {
     const queryClient = createTestQueryClient({
       refetchOnMount: false,

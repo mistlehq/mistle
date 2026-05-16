@@ -28,6 +28,10 @@ _Avoid_: Setup script variant, refresh script, update script
 The script that a snapshot refresh runs while preparing a **Snapshot**.
 _Avoid_: Generic script
 
+**Collection landing page**:
+A top-level page that lists existing product objects and offers the primary action for creating the first one.
+_Avoid_: Detail tab, filtered results view
+
 ## Relationships
 
 - A **Sandbox profile version** may have one usable **Snapshot**.
@@ -38,6 +42,7 @@ _Avoid_: Generic script
 - A **Snapshot preparation script** is either the **Setup script** or the **Maintenance script** used by a refresh execution.
 - A **Maintenance script** test run starts from an existing usable **Snapshot** but does not replace it.
 - When a new **Sandbox profile version** is published, the **Maintenance script** and refresh schedule definition should be copied forward from the previous version.
+- A **Collection landing page** may list **Sandbox profile version** families, triggers, sessions, or organization members.
 
 ## Example Dialogue
 
@@ -51,3 +56,4 @@ _Avoid_: Generic script
 - **Maintenance script** was initially discussed as ordinary versioned profile-version data — resolved: it is scoped to a **Sandbox profile version** but can be updated without publishing a new version or rebuilding from the **Setup script**.
 - A queued maintenance refresh was considered as a script-capturing job — resolved for the first implementation: scheduled refresh uses the latest saved **Maintenance script** at execution time.
 - Copied refresh schedules should keep their definition but recompute their next occurrence for the newly published **Sandbox profile version**.
+- "empty state" could mean first-use creation guidance, filtered no-results copy, or unavailable dependency copy — resolved: for collection pages, use it to mean the zero-object state before the first item exists.

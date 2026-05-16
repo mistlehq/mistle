@@ -8,6 +8,8 @@ import { describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { createTestQueryClient } from "../../test-support/query-client.js";
+import { launchableSandboxProfilesQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
+import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
 import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
@@ -15,7 +17,10 @@ import { PageHeaderSidebarTriggerProvider } from "../shared/page-header-sidebar-
 import { SessionsRoutes } from "../shell/app-shell-sessions-sidebar-mode.js";
 import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionsPage } from "./sessions-page.js";
-import { buildSandboxInstanceListItemFixture } from "./sessions-page.story-fixtures.js";
+import {
+  buildSandboxInstanceListItemFixture,
+  buildStoryLaunchableSandboxProfile,
+} from "./sessions-page.story-fixtures.js";
 
 function createSessionsPageQueryClient(
   input?: Parameters<typeof createTestQueryClient>[0],
@@ -43,6 +48,15 @@ function seedSessionsList(input: {
       totalResults: input.totalResults ?? input.items.length,
     },
   );
+}
+
+function seedLaunchableSandboxProfiles(input: {
+  queryClient: ReturnType<typeof createTestQueryClient>;
+  items: LaunchableSandboxProfilesResult["items"];
+}): void {
+  input.queryClient.setQueryData(launchableSandboxProfilesQueryKey(), {
+    items: input.items,
+  } satisfies LaunchableSandboxProfilesResult);
 }
 
 function renderSessionsPage(input?: {
@@ -87,7 +101,7 @@ describe("SessionsPage", () => {
       expect(screen.queryByRole("combobox", { name: "Sandbox profile" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Start session" })).toBeNull();
 
-      fireEvent.click(screen.getByRole("link", { name: "New session" }));
+      fireEvent.click(screen.getByRole("button", { name: "New session" }));
 
       expect(screen.getByText(SessionsRoutes.NEW)).toBeDefined();
     } finally {
@@ -98,7 +112,14 @@ describe("SessionsPage", () => {
   });
 
   it("uses the shared dashboard table styling for the session list", () => {
-    const queryClient = createSessionsPageQueryClient();
+    const queryClient = createSessionsPageQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    seedSessionsList({
+      queryClient,
+      items: [buildSandboxInstanceListItemFixture({ id: "sbi_table_style" })],
+    });
 
     const markup = renderToStaticMarkup(
       <QueryClientProvider client={queryClient}>
@@ -117,6 +138,63 @@ describe("SessionsPage", () => {
     expect(markup).toContain(">Sandbox profile<");
     expect(markup).toContain(">Created<");
     expect(markup).toContain(">Updated<");
+  });
+
+  it("guides users to publish a sandbox profile when no sessions can be started yet", () => {
+    const queryClient = createSessionsPageQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    seedSessionsList({
+      queryClient,
+      items: [],
+      totalResults: 0,
+    });
+    seedLaunchableSandboxProfiles({
+      queryClient,
+      items: [],
+    });
+
+    renderSessionsPage({
+      queryClient,
+    });
+
+    expect(
+      screen.getByRole("heading", { name: "Publish a sandbox profile to start sessions" }),
+    ).toBeDefined();
+    const headerNewSessionButton = screen.getByRole("button", { name: "New session" });
+    expect(headerNewSessionButton.hasAttribute("disabled")).toBe(true);
+    expect(headerNewSessionButton.getAttribute("title")).toBe(
+      "Publish a sandbox profile before starting a session.",
+    );
+    expect(screen.getByRole("button", { name: "Open sandbox profiles" }).getAttribute("href")).toBe(
+      "/sandbox-profiles",
+    );
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it("guides users to start a session when a launchable sandbox profile exists", () => {
+    const queryClient = createSessionsPageQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    seedSessionsList({
+      queryClient,
+      items: [],
+      totalResults: 0,
+    });
+    seedLaunchableSandboxProfiles({
+      queryClient,
+      items: [buildStoryLaunchableSandboxProfile({ id: "sbp_launchable" })],
+    });
+
+    renderSessionsPage({
+      queryClient,
+    });
+
+    expect(screen.getByRole("heading", { name: "Start your first session" })).toBeDefined();
+    expect(screen.getAllByRole("button", { name: "New session" })).toHaveLength(2);
+    expect(screen.queryByRole("table")).toBeNull();
   });
 
   it("renders the shell sidebar trigger in the sessions page header", async () => {

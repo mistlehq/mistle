@@ -106,6 +106,30 @@ describe("AutomationsPage", () => {
     expect(markup).toContain("text-xs font-semibold tracking-wide uppercase");
   });
 
+  it("shows first-use guidance when there are no triggers", () => {
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+
+    seedAutomationsList(queryClient, createListResult([]));
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <AutomationsPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole("heading", { name: "Create your first trigger" })).toBeDefined();
+    expect(
+      screen.getByText("Triggers run Mistle automatically from webhook events or schedules."),
+    ).toBeDefined();
+    expect(screen.getAllByRole("button", { name: /Create/i })).toHaveLength(2);
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+
   it("renders the seeded automation without pagination when there is only one page", () => {
     const queryClient = createTestQueryClient({
       refetchOnMount: false,

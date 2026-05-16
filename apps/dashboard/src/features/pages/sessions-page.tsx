@@ -19,11 +19,13 @@ import { useQuery } from "@tanstack/react-query";
 import { Link as RouterLink, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { useLaunchableSandboxProfiles } from "../sandbox-profiles/use-launchable-sandbox-profiles.js";
 import { isSessionPageNavigableSandboxStatus } from "../sessions/session-connect-policy.js";
 import { resolveSessionTitleLabel } from "../sessions/session-title-presentation.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
 import { listSandboxInstances } from "../sessions/sessions-service.js";
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
+import { CollectionEmptyState } from "../shared/collection-empty-state.js";
 import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
 import { PageFrame } from "../shared/page-frame.js";
 import { readKeysetPaginationCursors } from "../shared/pagination-search-params.js";
@@ -211,8 +213,6 @@ export function SessionsPage(): React.JSX.Element {
     });
   }
 
-  const hasSessions = displayedSessions.length > 0;
-
   const listErrorMessage = sandboxInstancesQuery.isError
     ? resolveApiErrorMessage({
         error: sandboxInstancesQuery.error,
@@ -221,6 +221,27 @@ export function SessionsPage(): React.JSX.Element {
     : null;
 
   const isLoadingSessions = sandboxInstancesQuery.isPending;
+  const hasNoSessions = sandboxInstancesQuery.data?.totalResults === 0;
+  const canShowSessionList = sandboxInstancesQuery.data !== undefined && !hasNoSessions;
+  const shouldLoadLaunchableProfiles =
+    !isLoadingSessions && listErrorMessage === null && hasNoSessions;
+  const launchableProfilesQuery = useLaunchableSandboxProfiles({
+    enabled: shouldLoadLaunchableProfiles,
+  });
+  const launchableProfilesErrorMessage =
+    shouldLoadLaunchableProfiles && launchableProfilesQuery.isError
+      ? resolveApiErrorMessage({
+          error: launchableProfilesQuery.error,
+          fallbackMessage: "Could not load launchable sandbox profiles.",
+        })
+      : null;
+  const hasLaunchableSandboxProfiles =
+    shouldLoadLaunchableProfiles && (launchableProfilesQuery.data?.items.length ?? 0) > 0;
+  const hasConfirmedNoLaunchableSandboxProfiles =
+    shouldLoadLaunchableProfiles &&
+    !launchableProfilesQuery.isPending &&
+    launchableProfilesErrorMessage === null &&
+    !hasLaunchableSandboxProfiles;
 
   const hasNextPage = sandboxInstancesQuery.data?.nextPage != null;
   const hasPreviousPage = sandboxInstancesQuery.data?.previousPage != null;
@@ -229,10 +250,21 @@ export function SessionsPage(): React.JSX.Element {
   return (
     <PageFrame
       headerActions={
-        <Button render={<RouterLink to={SessionsRoutes.NEW} />}>
-          <PlusIcon aria-hidden className="size-4" />
-          New session
-        </Button>
+        hasConfirmedNoLaunchableSandboxProfiles ? (
+          <Button
+            disabled
+            title="Publish a sandbox profile before starting a session."
+            type="button"
+          >
+            <PlusIcon aria-hidden className="size-4" />
+            New session
+          </Button>
+        ) : (
+          <Button nativeButton={false} render={<RouterLink to={SessionsRoutes.NEW} />}>
+            <PlusIcon aria-hidden className="size-4" />
+            New session
+          </Button>
+        )
       }
       title="Sessions"
     >
@@ -243,35 +275,71 @@ export function SessionsPage(): React.JSX.Element {
           </Notice>
         )}
 
-        <Table className="min-w-[40rem] table-fixed">
-          <TableHeader className="bg-muted/60">
-            <TableRow className="h-9 border-b">
-              <TableHead className="text-foreground w-[36%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
-                Sessions
-              </TableHead>
-              <TableHead className="text-foreground w-[20%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
-                Sandbox profile
-              </TableHead>
-              <TableHead className="text-foreground w-[18%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
-                Started by
-              </TableHead>
-              <TableHead className="text-foreground w-[14%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
-                Created
-              </TableHead>
-              <TableHead className="text-right text-foreground w-[12%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
-                Updated
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {!isLoadingSessions && !hasSessions ? (
-              <TableRow>
-                <TableCell className="text-muted-foreground" colSpan={5}>
-                  No sessions yet.
-                </TableCell>
+        {!isLoadingSessions && hasNoSessions && launchableProfilesErrorMessage !== null ? (
+          <Notice title="Could not load launchable sandbox profiles" variant="alert">
+            {launchableProfilesErrorMessage}
+          </Notice>
+        ) : null}
+
+        {!isLoadingSessions &&
+        hasNoSessions &&
+        launchableProfilesErrorMessage === null &&
+        launchableProfilesQuery.isPending ? (
+          <div className="min-h-64" />
+        ) : null}
+
+        {!isLoadingSessions &&
+        hasNoSessions &&
+        launchableProfilesErrorMessage === null &&
+        !launchableProfilesQuery.isPending ? (
+          hasLaunchableSandboxProfiles ? (
+            <CollectionEmptyState
+              action={
+                <Button nativeButton={false} render={<RouterLink to={SessionsRoutes.NEW} />}>
+                  <PlusIcon aria-hidden className="size-4" />
+                  New session
+                </Button>
+              }
+              description="Starting a session creates a sandbox based on one of your published sandbox profiles."
+              title="Start your first session"
+            />
+          ) : (
+            <CollectionEmptyState
+              action={
+                <Button nativeButton={false} render={<RouterLink to="/sandbox-profiles" />}>
+                  <PlusIcon aria-hidden className="size-4" />
+                  Open sandbox profiles
+                </Button>
+              }
+              description="Sessions need a launchable sandbox profile. Create or publish a sandbox profile before starting one."
+              title="Publish a sandbox profile to start sessions"
+            />
+          )
+        ) : null}
+
+        {canShowSessionList ? (
+          <Table className="min-w-[40rem] table-fixed">
+            <TableHeader className="bg-muted/60">
+              <TableRow className="h-9 border-b">
+                <TableHead className="text-foreground w-[36%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                  Sessions
+                </TableHead>
+                <TableHead className="text-foreground w-[20%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                  Sandbox profile
+                </TableHead>
+                <TableHead className="text-foreground w-[18%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                  Started by
+                </TableHead>
+                <TableHead className="text-foreground w-[14%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
+                  Created
+                </TableHead>
+                <TableHead className="text-right text-foreground w-[12%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
+                  Updated
+                </TableHead>
               </TableRow>
-            ) : (
-              displayedSessions.map((session) => {
+            </TableHeader>
+            <TableBody>
+              {displayedSessions.map((session) => {
                 const isNavigable = isSessionPageNavigableSandboxStatus(session.status);
 
                 return (
@@ -322,33 +390,35 @@ export function SessionsPage(): React.JSX.Element {
                     </TableCell>
                   </TableRow>
                 );
-              })
-            )}
-          </TableBody>
-        </Table>
+              })}
+            </TableBody>
+          </Table>
+        ) : null}
 
-        <TableListingFooter
-          resultsCount={
-            sandboxInstancesQuery.data === undefined ? null : (
-              <p className="text-muted-foreground text-sm">
-                Showing {sandboxInstancesQuery.data.items.length} of{" "}
-                {sandboxInstancesQuery.data.totalResults}
-              </p>
-            )
-          }
-          pagination={
-            !hasNextPage && !hasPreviousPage ? null : (
-              <TablePagination
-                hasNextPage={hasNextPage}
-                hasPreviousPage={hasPreviousPage}
-                nextPageDisabled={nextPageDisabled}
-                onNextPage={goToNextPage}
-                onPreviousPage={goToPreviousPage}
-                previousPageDisabled={previousPageDisabled}
-              />
-            )
-          }
-        />
+        {canShowSessionList ? (
+          <TableListingFooter
+            resultsCount={
+              sandboxInstancesQuery.data === undefined ? null : (
+                <p className="text-muted-foreground text-sm">
+                  Showing {sandboxInstancesQuery.data.items.length} of{" "}
+                  {sandboxInstancesQuery.data.totalResults}
+                </p>
+              )
+            }
+            pagination={
+              !hasNextPage && !hasPreviousPage ? null : (
+                <TablePagination
+                  hasNextPage={hasNextPage}
+                  hasPreviousPage={hasPreviousPage}
+                  nextPageDisabled={nextPageDisabled}
+                  onNextPage={goToNextPage}
+                  onPreviousPage={goToPreviousPage}
+                  previousPageDisabled={previousPageDisabled}
+                />
+              )
+            }
+          />
+        ) : null}
       </div>
     </PageFrame>
   );
