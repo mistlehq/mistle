@@ -25,11 +25,12 @@ import { createInternalSandboxProfileVersionSnapshotJobRoutes } from "./internal
 import { createInternalSandboxRuntimeRoutes } from "./internal/sandbox-runtime/index.js";
 import { createInternalSandboxStorageRoutes } from "./internal/sandbox-storage/index.js";
 import { createInternalSchedulesRoutes } from "./internal/schedules/index.js";
-import { createMeRoutes } from "./me/index.js";
+import { createCurrentActorMeRoutes, createMeRoutes } from "./me/index.js";
 import { createAppContextMiddleware } from "./middleware/app-context.js";
 import { createCorsMiddleware } from "./middleware/cors.js";
 import { withActiveOrganizationAccess } from "./middleware/with-active-organization-access.js";
 import { withAuthSession } from "./middleware/with-auth-session.js";
+import { withAuthenticatedRequest } from "./middleware/with-authenticated-request.js";
 import { createOrganizationRoutes } from "./organizations/index.js";
 import { createPublicSessionLinksRoutes } from "./public-session-links/index.js";
 import { createSandboxInstancesRoutes } from "./sandbox-instances/index.js";
@@ -164,6 +165,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   );
   const integrationTargetsRoutes = withAuthSession(createIntegrationTargetsRoutes());
   const integrationWebhooksRoutes = createIntegrationWebhooksRoutes();
+  const currentActorMeRoutes = withAuthenticatedRequest(createCurrentActorMeRoutes());
   const meRoutes = withAuthSession(createMeRoutes());
   const organizationRoutes = withActiveOrganizationAccess(createOrganizationRoutes());
   const publicSessionLinksRoutes = createPublicSessionLinksRoutes();
@@ -182,6 +184,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   app.route(integrationConnectionsRoutes.basePath, integrationConnectionsRoutes.routes);
   app.route(integrationTargetsRoutes.basePath, integrationTargetsRoutes.routes);
   app.route(integrationWebhooksRoutes.basePath, integrationWebhooksRoutes.routes);
+  app.route(currentActorMeRoutes.basePath, currentActorMeRoutes.routes);
   app.route(meRoutes.basePath, meRoutes.routes);
   app.route(organizationRoutes.basePath, organizationRoutes.routes);
   app.route(publicSessionLinksRoutes.basePath, publicSessionLinksRoutes.routes);

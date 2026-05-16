@@ -10,6 +10,7 @@ import type { OpenWorkflow } from "openworkflow";
 
 import type { ControlPlaneAuth } from "./auth/index.js";
 import type { GoogleProviderConfig } from "./auth/providers/types.js";
+import type { OrganizationPermission } from "./auth/services/organization-policy.js";
 
 type LoadControlPlaneApiConfigResult = ReturnType<
   typeof loadConfig<typeof AppIds.CONTROL_PLANE_API>
@@ -51,6 +52,21 @@ export type AppSession = {
   };
 };
 
+export type AppAuthContext =
+  | {
+      kind: "session";
+      session: AppSession;
+    }
+  | {
+      kind: "api_key";
+      apiKey: {
+        id: string;
+        name: string;
+        organizationId: string;
+      };
+      permissions: readonly OrganizationPermission[];
+    };
+
 export type AppContextVariables = {
   config: ControlPlaneApiConfig;
   sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
@@ -64,6 +80,7 @@ export type AppContextVariables = {
   openWorkflow: OpenWorkflow;
   auth: ControlPlaneAuth;
   session: AppSession | null;
+  authContext: AppAuthContext | null;
 };
 
 export type AppContext = Context<AppContextBindings>;

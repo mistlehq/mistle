@@ -1,4 +1,4 @@
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import { z } from "zod";
 
 import type { AppContextBindings, AppSession } from "../types.js";
@@ -89,7 +89,47 @@ export function createRequireAuthSessionMiddleware(): MiddlewareHandler<AppConte
       );
     }
 
-    ctx.set("session", parsedSession.session);
+    setSessionContext(ctx, parsedSession.session);
     await next();
   };
+}
+
+export async function requireAuthSession(
+  ctx: Context<AppContextBindings>,
+): Promise<Response | null> {
+  const session = await ctx.get("auth").api.getSession({
+    headers: ctx.req.raw.headers,
+  });
+  const parsedSession = parseSession(session);
+
+  if (parsedSession.kind === "unauthorized") {
+    return ctx.json(
+      {
+        code: AuthErrorCodes.UNAUTHORIZED,
+        message: "Unauthorized API request.",
+      },
+      401,
+    );
+  }
+
+  if (parsedSession.kind === "forbidden") {
+    return ctx.json(
+      {
+        code: AuthErrorCodes.FORBIDDEN,
+        message: "Active organization is required for this request.",
+      },
+      403,
+    );
+  }
+
+  setSessionContext(ctx, parsedSession.session);
+  return null;
+}
+
+function setSessionContext(ctx: Context<AppContextBindings>, session: AppSession): void {
+  ctx.set("session", session);
+  ctx.set("authContext", {
+    kind: "session",
+    session,
+  });
 }

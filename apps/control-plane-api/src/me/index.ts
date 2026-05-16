@@ -1,5 +1,7 @@
 export { createMeRoutes } from "./routes.js";
+export { createCurrentActorMeRoutes } from "./current-actor-routes.js";
 export { ME_ROUTE_BASE_PATH } from "./constants.js";
+export { route as getCurrentActorRoute } from "./get-current-actor/route.js";
 export { route as getProfileImageRoute } from "./get-profile-image/route.js";
 export { route as getProfileImageContentRoute } from "./get-profile-image-content/route.js";
 export { route as putProfileImageRoute } from "./put-profile-image/route.js";
@@ -20,3 +22,4 @@ export {
   profileImageUploadFormSchema as ProfileImageUploadFormSchema,
   StartLinkedAccountAuthorizationResponseSchema,
 } from "./schemas.js";
+export { CurrentActorResponseSchema } from "./get-current-actor/schema.js";

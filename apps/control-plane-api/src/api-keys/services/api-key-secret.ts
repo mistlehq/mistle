@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 
 const ApiKeySecretPrefixByteLength = 16;
+export const ApiKeySecretPrefixLength = 22;
 const ApiKeySecretByteLength = 32;
 
 export const ApiKeySecretHashAlgorithms = {

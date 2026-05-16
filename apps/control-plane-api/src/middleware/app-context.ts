@@ -7,7 +7,7 @@ type DynamicAppContextValues = Pick<
   "auth" | "dataPlaneClient" | "db" | "openWorkflow"
 >;
 
-type CreateAppContextInput = Omit<AppContextVariables, "session"> & {
+type CreateAppContextInput = Omit<AppContextVariables, "authContext" | "session"> & {
   resolveTestContext?: (input: { testEnvironmentId: string }) => Promise<DynamicAppContextValues>;
 };
 
@@ -32,6 +32,7 @@ export function createAppContextMiddleware(
     ctx.set("openWorkflow", dynamicContext.openWorkflow);
     ctx.set("auth", dynamicContext.auth);
     ctx.set("session", null);
+    ctx.set("authContext", null);
     await next();
   };
 }
