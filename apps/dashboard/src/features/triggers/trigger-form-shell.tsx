@@ -265,7 +265,7 @@ export function TriggerFormShell(input: TriggerFormShellProps): React.JSX.Elemen
 
       <FormPageSection>
         {input.shouldShowTriggerEnabledField ? (
-          <div className="border-b px-4 py-4">
+          <div className="px-4 py-4">
             <div className="flex min-h-10 items-center justify-between gap-3">
               <div className="space-y-1">
                 <FieldLabel htmlFor={triggerEnabledId}>Trigger enabled</FieldLabel>
@@ -298,7 +298,7 @@ export function TriggerFormShell(input: TriggerFormShellProps): React.JSX.Elemen
         )}
 
         {input.shouldShowPrimaryRepositoryField ? (
-          <div className="border-t p-4">
+          <div className="p-4">
             <Field contentWidth="fill" orientation="horizontal">
               <FieldHeader>
                 <FieldLabel htmlFor={primaryRepositoryInputId}>Primary repository</FieldLabel>
