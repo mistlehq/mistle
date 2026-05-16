@@ -192,6 +192,7 @@ describe.concurrent("sandbox profile version refresh schedule integration", () =
       sandboxProfileVersionRow({
         sandboxProfileId: "sbp_refresh_schedule_invalid",
         version: 1,
+        maintenanceScript: "echo keep after invalid schedule",
         publishedAt: "2026-04-28T00:01:00.000Z",
       }),
     );
@@ -218,9 +219,17 @@ describe.concurrent("sandbox profile version refresh schedule integration", () =
       where: (table, { eq }) => eq(table.organizationId, session.organizationId),
     });
     expect(persistedSchedules).toHaveLength(0);
+    const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        maintenanceScript: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, "sbp_refresh_schedule_invalid"), eq(table.version, 1)),
+    });
+    expect(persistedVersion?.maintenanceScript).toBe("echo keep after invalid schedule");
   });
 
-  it("preserves the maintenance script when a schedule update omits it", async ({ env }) => {
+  it("preserves the maintenance script when schedule creation omits it", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-refresh-schedule-omit-script@example.com",
     });

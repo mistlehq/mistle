@@ -20,26 +20,53 @@ Account for any required environment variables, credentials, external services, 
 When the right setup approach is unclear, ask clarifying questions or make a recommendation before drafting changes so the user can confirm alignment.
 `.trim();
 
+export const SnapshotMaintenanceAssistantDeveloperInstructions = `
+You are a setup assistant helping the user author a snapshot maintenance script for refreshing an existing prepared sandbox snapshot.
+
+In this product, a snapshot maintenance script starts from the current usable snapshot for a published sandbox profile version and prepares a replacement snapshot without republishing the profile version.
+
+The script should focus on lightweight updates that are safe to run repeatedly from an already-prepared snapshot, such as refreshing dependencies, caches, generated assets, or other maintenance work.
+
+Do not rewrite it as a full setup script from the base image unless the user explicitly asks. If the requested work requires rebuilding from the base image, explain that the setup script is the right place for that instead.
+
+Author scripts that are repeatable, fail fast when required configuration is missing, and avoid relying on state created only in this assistant session.
+
+The script runs non-interactively when refreshing a snapshot, so it cannot wait for user input.
+
+Write commands with explicit non-interactive flags or environment variables, and account for required environment variables, credentials, external services, or manual prerequisites.
+
+When the right maintenance approach is unclear, ask clarifying questions or make a recommendation before drafting changes so the user can confirm alignment.
+`.trim();
+
+export type SetupAssistantScriptKind = "maintenance" | "setup";
+
 export function buildSetupAssistantCollaborationModeSettings(
   existingSettings?: AgentConversationCollaborationModeSettings,
+  scriptKind: SetupAssistantScriptKind = "setup",
 ): AgentConversationCollaborationModeSettings {
   return {
     developerInstructions: joinDeveloperInstructionBlocks([
       existingSettings?.developerInstructions,
-      SetupAssistantDeveloperInstructions,
+      scriptKind === "maintenance"
+        ? SnapshotMaintenanceAssistantDeveloperInstructions
+        : SetupAssistantDeveloperInstructions,
     ]),
   };
 }
 
-export function buildSetupAssistantInitialComposerText(setupScript: string): string {
-  const trimmedSetupScript = setupScript.trim();
-  const prompt = "Write a setup script";
+export function buildSetupAssistantInitialComposerText(
+  script: string,
+  scriptKind: SetupAssistantScriptKind = "setup",
+): string {
+  const trimmedScript = script.trim();
+  const prompt =
+    scriptKind === "maintenance" ? "Write a snapshot maintenance script" : "Write a setup script";
 
-  if (trimmedSetupScript.length === 0) {
+  if (trimmedScript.length === 0) {
     return prompt;
   }
 
-  return ["Fix this script:", "", "```sh", setupScript, "```"].join("\n");
+  return ["Fix this script:", "", "```sh", script, "```"].join("\n");
 }
 
 function joinDeveloperInstructionBlocks(input: readonly (string | null | undefined)[]): string {

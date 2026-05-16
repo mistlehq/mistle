@@ -32,7 +32,7 @@ import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
 
 type SetupScriptTestStatus = "blank" | "failed" | "idle" | "running" | "starting" | "success";
 
-type SetupScriptTestButtonProps = {
+export type SetupScriptTestButtonProps = {
   canRun: boolean;
   disabled?: boolean;
   labels?: ScriptTestLabels;
@@ -144,7 +144,7 @@ const MaintenanceScriptTestLabels: ScriptTestLabels = {
   statusErrorFallbackMessage: "Could not check snapshot maintenance script test sandbox status.",
   stopIdempotencyPrefix: "maintenance-script-test-stop",
   stopTitle: "Stop snapshot maintenance script test.",
-  testButtonLabel: "Test snapshot maintenance script",
+  testButtonLabel: "Test",
   testTitle: "Test snapshot maintenance script",
   unavailableTitle: "Snapshot maintenance script testing requires a usable snapshot.",
   waitingMessage: "Waiting for maintenance-check sandbox startup events.",

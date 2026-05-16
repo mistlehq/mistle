@@ -29,7 +29,8 @@ export const route = createRoute({
   },
   responses: {
     200: {
-      description: "Create or replace the refresh schedule for a sandbox profile version.",
+      description:
+        "Create or replace the refresh schedule and optionally save the maintenance script for a sandbox profile version.",
       content: {
         "application/json": {
           schema: sandboxProfileVersionRefreshScheduleResponseSchema,

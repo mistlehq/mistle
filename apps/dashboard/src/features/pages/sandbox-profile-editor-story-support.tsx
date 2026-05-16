@@ -951,8 +951,6 @@ function SandboxProfileEditorPageStoryView(
               refreshScheduleSection={
                 snapshotStatus === "draft-unavailable" ? null : (
                   <SandboxProfileSnapshotRefreshScheduleForm
-                    canRunMaintenanceScript={snapshotPanelState.kind === "ready"}
-                    canRunMaintenanceRefresh={canRunSnapshotMaintenance}
                     disabled={false}
                     existingSchedule={createSnapshotRefreshSchedule(snapshotRefreshScheduleState)}
                     {...(snapshotRefreshScheduleInitialDraft === null
@@ -967,24 +965,28 @@ function SandboxProfileEditorPageStoryView(
                     }
                     onChangeMaintenanceScript={() => {}}
                     onDeleteSchedule={() => {}}
-                    onMaintenanceRefreshSnapshot={() => {}}
                     onSaveSchedule={() => {}}
                     previewAfter={new Date("2026-04-29T00:00:00.000Z")}
+                    savedMaintenanceScript={snapshotMaintenanceScript ?? ""}
                     savedMaintenanceScriptHasContent={hasSnapshotMaintenanceScript}
-                    testControl={
-                      <Button
-                        disabled={!canRunSnapshotMaintenance}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        <PlayIcon aria-hidden className="size-4" />
-                        Test snapshot maintenance script
-                      </Button>
-                    }
+                    setupAssistantControl={{
+                      disabled: false,
+                      isStarting: false,
+                      onToggle: () => {},
+                      title: "Open the right panel to write this snapshot maintenance script.",
+                    }}
+                    testButtonProps={{
+                      canRun: canRunSnapshotMaintenance,
+                      disabled: !canRunSnapshotMaintenance,
+                      status: hasSnapshotMaintenanceScript ? "idle" : "blank",
+                    }}
                     testPanel={null}
                   />
                 )
+              }
+              showMaintenanceRefreshAction={
+                createSnapshotRefreshSchedule(snapshotRefreshScheduleState) !== null &&
+                hasSnapshotMaintenanceScript
               }
               state={snapshotPanelState}
               version={resolveSnapshotStoryVersion({

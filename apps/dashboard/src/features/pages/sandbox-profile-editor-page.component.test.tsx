@@ -1411,20 +1411,19 @@ describe("SandboxProfileEditorPage", () => {
     });
 
     expect(screen.getByRole("button", { name: "Refresh from setup script" })).toBeDefined();
-    expect(screen.queryByText("Snapshot maintenance")).toBeNull();
+    expect(screen.queryByText("Snapshot maintenance script")).toBeNull();
 
-    fireEvent.click(screen.getByRole("switch", { name: "Automatic snapshot refresh" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Refresh enabled" }));
 
     expect(
       screen.queryByRole("button", { name: "Refresh from snapshot maintenance script" }),
     ).toBeNull();
-    expect(screen.getByText("Snapshot maintenance")).toBeDefined();
     expect(screen.getByText("Snapshot maintenance script")).toBeDefined();
-    expect(
-      screen
-        .getByRole("button", { name: "Test snapshot maintenance script" })
-        .getAttribute("disabled"),
-    ).toBeNull();
+    expect(screen.getByRole("button", { name: "Test" }).getAttribute("disabled")).toBeNull();
+    expect(screen.getByRole("button", { name: "Setup Assistant" }).hasAttribute("disabled")).toBe(
+      false,
+    );
   });
 
   it("shows automatic snapshot refresh as disabled when it is not configured", () => {
@@ -1433,12 +1432,13 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "published",
     });
 
-    const refreshSwitch = screen.getByRole("switch", { name: "Automatic snapshot refresh" });
-    expect(refreshSwitch.getAttribute("aria-checked")).toBe("false");
     expect(screen.getByText("Snapshots will not refresh automatically.")).toBeDefined();
+    expect(screen.getByText("Refresh enabled")).toBeDefined();
+    expect(screen.getAllByText("No").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("switch", { name: "Refresh enabled" })).toBeNull();
     expect(screen.queryByLabelText("Cron expression")).toBeNull();
-    expect(screen.queryByText("Snapshot maintenance")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Save schedule" })).toBeNull();
+    expect(screen.queryByText("Snapshot maintenance script")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
   });
 
   it("shows schedule fields after automatic snapshot refresh is enabled", () => {
@@ -1447,16 +1447,17 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "published",
     });
 
-    fireEvent.click(screen.getByRole("switch", { name: "Automatic snapshot refresh" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Refresh enabled" }));
 
     expect(
       screen.getByText("Automatic snapshot refresh will start after a schedule is saved."),
     ).toBeDefined();
-    expect(screen.getByText("Snapshot maintenance")).toBeDefined();
+    expect(screen.getByText("Snapshot maintenance script")).toBeDefined();
     const cronExpressionInput = screen.getByLabelText("Cron expression");
     expect(cronExpressionInput).toBeInstanceOf(HTMLInputElement);
     expect(cronExpressionInput).toHaveProperty("value", "");
-    expect(screen.getByRole("button", { name: "Save schedule" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDefined();
   });
 
   it("shows an existing automatic snapshot refresh schedule", () => {
@@ -1473,19 +1474,20 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "published",
     });
 
-    const refreshSwitch = screen.getByRole("switch", { name: "Automatic snapshot refresh" });
-    expect(refreshSwitch.getAttribute("aria-checked")).toBe("true");
     expect(
       screen.getByText("Snapshot refresh will build from the base image with setup script."),
     ).toBeDefined();
-    expect(screen.getByText("Snapshot maintenance")).toBeDefined();
+    expect(screen.queryByRole("switch", { name: "Refresh enabled" })).toBeNull();
+    expect(screen.getByText("Refresh enabled")).toBeDefined();
+    expect(screen.getByText("Yes")).toBeDefined();
+    expect(screen.getByText("Snapshot maintenance script")).toBeDefined();
     expect(screen.getByText("Cron")).toBeDefined();
     expect(screen.queryByLabelText("Cron expression")).toBeNull();
     expect(screen.getByText("Asia/Singapore")).toBeDefined();
     expect(screen.getByText("Apr 30, 2026, 9:00 AM GMT+8")).toBeDefined();
-    fireEvent.click(screen.getByRole("button", { name: "Edit schedule" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     expect(screen.getByLabelText("Cron expression")).toHaveProperty("value", "0 9 * * 1");
-    expect(screen.getByRole("button", { name: "Save schedule" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeDefined();
   });
 
@@ -1512,7 +1514,8 @@ describe("SandboxProfileEditorPage", () => {
     expect(
       screen.getByRole("button", { name: "Refresh from snapshot maintenance script" }),
     ).toBeDefined();
-    expect(screen.getByRole("button", { name: "Edit schedule" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Edit" })).toBeDefined();
+    expect(screen.getByText("echo maintain")).toBeDefined();
   });
 
   it("marks an existing automatic snapshot refresh schedule for removal when disabled", () => {
@@ -1529,16 +1532,27 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "published",
     });
 
-    fireEvent.click(screen.getByRole("switch", { name: "Automatic snapshot refresh" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Refresh enabled" }));
 
-    expect(screen.getByText("Snapshots will not refresh automatically.")).toBeDefined();
+    expect(
+      screen.getByText("Automatic snapshot refresh will stop after changes are saved."),
+    ).toBeDefined();
     expect(
       screen.queryByText("Snapshot refresh will build from the base image with setup script."),
     ).toBeNull();
     expect(screen.queryByLabelText("Cron expression")).toBeNull();
-    expect(screen.queryByText("Snapshot maintenance")).toBeNull();
-    expect(screen.queryByText("Apr 30, 2026, 9:00 AM GMT+8")).toBeNull();
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeDefined();
+    expect(screen.queryByText("Snapshot maintenance script")).toBeNull();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(
+      screen.getByText("Snapshot refresh will build from the base image with setup script."),
+    ).toBeDefined();
+    expect(screen.queryByRole("switch", { name: "Refresh enabled" })).toBeNull();
+    expect(screen.getByText("Yes")).toBeDefined();
   });
 
   it("updates the automatic snapshot refresh behavior description while editing", async () => {
@@ -1547,7 +1561,8 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "published",
     });
 
-    fireEvent.click(screen.getByRole("switch", { name: "Automatic snapshot refresh" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Refresh enabled" }));
     const cronExpressionInput = screen.getByLabelText("Cron expression");
     const timezoneInput = screen.getByLabelText("Timezone");
     fireEvent.change(cronExpressionInput, { target: { value: "0 9 * * *" } });
@@ -1634,9 +1649,10 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "published",
     });
 
-    fireEvent.click(screen.getByRole("switch", { name: "Automatic snapshot refresh" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Refresh enabled" }));
     fireEvent.change(screen.getByLabelText("Cron expression"), { target: { value: "   " } });
-    fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
       expect(screen.getByText("Schedule update failed")).toBeDefined();
@@ -1662,7 +1678,7 @@ describe("SandboxProfileEditorPage", () => {
       screen.getByRole("tabpanel", { name: "Snapshots" }).querySelector(".max-w-5xl"),
     ).not.toBeNull();
     expect(screen.queryByText("Automatic snapshot refresh")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Save schedule" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
   });
 
   it("does not show a refresh snapshot action in the published version menu", () => {

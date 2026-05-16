@@ -154,9 +154,9 @@ import {
   useSandboxProfileSetupScriptLoader,
 } from "./sandbox-profile-setup-script-state.js";
 import {
-  SandboxProfileSetupScriptTestButton,
   SandboxProfileSetupScriptTestPanel,
   useSandboxProfileSetupScriptTestRun,
+  type SetupScriptTestButtonProps,
 } from "./sandbox-profile-setup-script-test.js";
 import {
   SandboxProfileSnapshotPanel,
@@ -178,6 +178,7 @@ import {
 import {
   buildSetupAssistantCollaborationModeSettings,
   buildSetupAssistantInitialComposerText,
+  type SetupAssistantScriptKind,
 } from "./setup-assistant-instructions.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 
@@ -221,13 +222,14 @@ type SetupScriptAssistantControl = {
   disabled: boolean;
   errorMessage: string | null;
   isStarting: boolean;
-  onToggle: (input: { setupScript: string }) => void;
+  onToggle: (input: { script: string; scriptKind: SetupAssistantScriptKind }) => void;
   title: string;
 };
 type SetupScriptAssistantPanelState = {
   initialComposerText: string;
   isOpen: boolean;
   sandboxInstanceId: string | null;
+  scriptKind: SetupAssistantScriptKind;
   startupOperationId: string | null;
 };
 
@@ -1361,11 +1363,11 @@ function ReadySandboxProfileEditorPage(input: {
   );
   const startSetupAssistantMutation = useMutation({
     meta: NoLoadingIndicatorMeta,
-    mutationFn: async () =>
+    mutationFn: async (request: { version: number }) =>
       startSandboxProfileSetupAssistant({
         idempotencyKey: crypto.randomUUID(),
         profileId: input.profileId,
-        version: input.mode.version,
+        version: request.version,
       }),
     onSuccess: (result) => {
       setSetupAssistantError(null);
@@ -1470,23 +1472,30 @@ function ReadySandboxProfileEditorPage(input: {
             : startSetupAssistantMutation.isPending
               ? "Setup Assistant is starting."
               : null;
+  const maintenanceAssistantDisabledReason =
+    snapshotVersion === null
+      ? "Publish this sandbox profile before using Setup Assistant."
+      : startSetupAssistantMutation.isPending
+        ? "Setup Assistant is starting."
+        : null;
   const setupAssistantPanelIsOpen = setupAssistantPanelState?.isOpen === true;
   const setupAssistantControl: SetupScriptAssistantControl = {
     disabled: setupAssistantPanelIsOpen || setupAssistantDisabledReason !== null,
     errorMessage: setupAssistantError,
     isStarting: !setupAssistantPanelIsOpen && startSetupAssistantMutation.isPending,
-    onToggle: ({ setupScript }) => {
+    onToggle: ({ script, scriptKind }) => {
       if (setupAssistantPanelState?.isOpen === true) {
         return;
       }
 
       setSetupAssistantError(null);
-      const initialComposerText = buildSetupAssistantInitialComposerText(setupScript);
+      const initialComposerText = buildSetupAssistantInitialComposerText(script, scriptKind);
 
       setSetupAssistantPanelState((currentState) => ({
         initialComposerText,
         isOpen: true,
         sandboxInstanceId: currentState?.sandboxInstanceId ?? null,
+        scriptKind,
         startupOperationId: currentState?.startupOperationId ?? null,
       }));
 
@@ -1498,11 +1507,46 @@ function ReadySandboxProfileEditorPage(input: {
         return;
       }
 
-      startSetupAssistantMutation.mutate();
+      startSetupAssistantMutation.mutate({ version: input.mode.version });
     },
     title: setupAssistantPanelIsOpen
       ? "Setup Assistant is open in the right panel."
       : (setupAssistantDisabledReason ?? "Open the right panel to write this setup script."),
+  };
+  const maintenanceAssistantControl: SetupScriptAssistantControl = {
+    disabled: setupAssistantPanelIsOpen || maintenanceAssistantDisabledReason !== null,
+    errorMessage: setupAssistantError,
+    isStarting: !setupAssistantPanelIsOpen && startSetupAssistantMutation.isPending,
+    onToggle: ({ script, scriptKind }) => {
+      if (setupAssistantPanelState?.isOpen === true || snapshotVersion === null) {
+        return;
+      }
+
+      setSetupAssistantError(null);
+      const initialComposerText = buildSetupAssistantInitialComposerText(script, scriptKind);
+
+      setSetupAssistantPanelState((currentState) => ({
+        initialComposerText,
+        isOpen: true,
+        sandboxInstanceId: currentState?.sandboxInstanceId ?? null,
+        scriptKind,
+        startupOperationId: currentState?.startupOperationId ?? null,
+      }));
+
+      if (
+        (setupAssistantPanelState !== null &&
+          setupAssistantPanelState.sandboxInstanceId !== null) ||
+        startSetupAssistantMutation.isPending
+      ) {
+        return;
+      }
+
+      startSetupAssistantMutation.mutate({ version: snapshotVersion.version });
+    },
+    title: setupAssistantPanelIsOpen
+      ? "Setup Assistant is open in the right panel."
+      : (maintenanceAssistantDisabledReason ??
+        "Open the right panel to write this snapshot maintenance script."),
   };
 
   useEffect(() => {
@@ -1744,6 +1788,7 @@ function ReadySandboxProfileEditorPage(input: {
           onRetryPublishSnapshot={input.onRetryPublishSnapshot}
           onSetupScriptDraftStateChange={setSetupScriptDraftState}
           setupAssistantControl={setupAssistantControl}
+          maintenanceAssistantControl={maintenanceAssistantControl}
           profileId={input.profileId}
           publishSuccessMessage={showPublishSuccessMessage}
           publishSuccessMessageKey={publishSuccessNoticeKey}
@@ -1787,6 +1832,7 @@ function ReadySandboxProfileEditorPage(input: {
           <SetupScriptAssistantPanel
             onClose={requestSetupAssistantPanelClose}
             sandboxInstanceId={setupAssistantPanelState.sandboxInstanceId}
+            scriptKind={setupAssistantPanelState.scriptKind}
             startupOperationId={setupAssistantPanelState.startupOperationId}
             initialComposerText={setupAssistantPanelState.initialComposerText}
           />
@@ -1880,6 +1926,7 @@ function resolveSetupAssistantCloseDisabledReason(input: {
 function SetupScriptAssistantPanel(input: {
   onClose: () => void;
   sandboxInstanceId: string | null;
+  scriptKind: SetupAssistantScriptKind;
   startupOperationId: string | null;
   initialComposerText: string;
 }): React.JSX.Element {
@@ -2069,6 +2116,7 @@ function SetupScriptAssistantPanel(input: {
                     ...conversationPane.composerStateInput,
                     collaborationModeSettings: buildSetupAssistantCollaborationModeSettings(
                       conversationPane.composerStateInput.collaborationModeSettings,
+                      input.scriptKind,
                     ),
                   }}
                   draftState={{
@@ -2196,6 +2244,7 @@ function SandboxProfileEditorSectionPanels(input: {
   onRetryPublishSnapshot: (version: number) => void;
   onSetupScriptDraftStateChange: (state: SandboxProfileDraftSectionState) => void;
   setupAssistantControl: SetupScriptAssistantControl;
+  maintenanceAssistantControl: SetupScriptAssistantControl;
   profileId: string;
   publishSuccessMessage: boolean;
   publishSuccessMessageKey: Key;
@@ -2220,6 +2269,7 @@ function SandboxProfileEditorSectionPanels(input: {
         isActionPending={input.versionActionIsPending}
         invalidateProfileVersions={input.invalidateProfileVersions}
         maintenanceScript={input.snapshotVersion?.maintenanceScript ?? null}
+        setupAssistantControl={input.maintenanceAssistantControl}
         onRefreshSnapshot={() => {
           if (input.snapshotVersion !== null) {
             input.onRefreshSnapshot({
@@ -3165,21 +3215,18 @@ function ReadySandboxProfileSetupScriptSection(input: {
       <SandboxProfileSetupScriptPanel
         errorMessage={setupScriptState.errorMessage}
         onChange={setupScriptState.onChange}
-        testControl={
-          <SandboxProfileSetupScriptTestButton
-            {...setupScriptTest.buttonProps}
-            setupAssistant={{
-              disabled: input.setupAssistantControl.disabled,
-              isStarting: input.setupAssistantControl.isStarting,
-              onClick: () => {
-                input.setupAssistantControl.onToggle({
-                  setupScript: setupScriptState.draftValue,
-                });
-              },
-              title: input.setupAssistantControl.title,
-            }}
-          />
-        }
+        setupAssistant={{
+          disabled: input.setupAssistantControl.disabled,
+          isStarting: input.setupAssistantControl.isStarting,
+          onClick: () => {
+            input.setupAssistantControl.onToggle({
+              script: setupScriptState.draftValue,
+              scriptKind: "setup",
+            });
+          },
+          title: input.setupAssistantControl.title,
+        }}
+        testButtonProps={setupScriptTest.buttonProps}
         testPanel={<SandboxProfileSetupScriptTestPanel {...setupScriptTest.panelProps} />}
         value={setupScriptState.draftValue}
         disabled={input.disabled}
@@ -3221,6 +3268,13 @@ export function SandboxProfileSetupScriptPanel(input: {
   errorMessage?: string | null;
   onChange?: (nextValue: string) => void;
   repositoryHandles?: readonly string[];
+  setupAssistant?: {
+    disabled: boolean;
+    isStarting: boolean;
+    onClick: () => void;
+    title: string;
+  };
+  testButtonProps?: SetupScriptTestButtonProps;
   testControl?: ReactNode;
   testPanel?: ReactNode;
 }): React.JSX.Element {
@@ -3236,6 +3290,8 @@ export function SandboxProfileSetupScriptPanel(input: {
       fieldLabel="Setup script"
       onChange={input.onChange}
       placeholderText={SetupScriptPlaceholder}
+      setupAssistant={input.setupAssistant}
+      testButtonProps={input.testButtonProps}
       testControl={input.testControl}
       testPanel={input.testPanel}
       title="Setup Script"

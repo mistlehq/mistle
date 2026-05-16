@@ -10676,7 +10676,7 @@ export interface paths {
         };
       };
       responses: {
-        /** @description Create or replace the refresh schedule for a sandbox profile version. */
+        /** @description Create or replace the refresh schedule and optionally save the maintenance script for a sandbox profile version. */
         200: {
           headers: {
             [name: string]: unknown;
