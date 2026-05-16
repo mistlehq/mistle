@@ -29,7 +29,7 @@ import {
   SandboxExecutionModes,
   SandboxStartupModes,
 } from "../start-sandbox-instance/sandbox-startup-input.js";
-import { startSandbox } from "../start-sandbox-instance/start-sandbox.js";
+import { prepareSandboxImage, startSandbox } from "../start-sandbox-instance/start-sandbox.js";
 import { markSandboxInstanceStopped } from "../stop-sandbox-instance/mark-sandbox-instance-stopped.js";
 
 const SnapshotMaterializationFailureCodes = {
@@ -133,6 +133,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     | "resolve"
     | "compile"
     | "ensure"
+    | "prepare_image"
     | "start"
     | "persist"
     | "init"
@@ -355,6 +356,39 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     });
     ensuredSandboxInstance = true;
 
+    currentPhase = "prepare_image";
+    const preparedImage = await recordWorkerSandboxLifecyclePhase(
+      operationEvents,
+      {
+        attributes: {
+          runtimeProvider: requestedRuntimeProvider,
+          snapshotJobId: workflowInput.snapshotJobId,
+        },
+        completedMessage: "Snapshot sandbox provider image preparation completed.",
+        failedMessage: "Snapshot sandbox provider image preparation failed.",
+        phase: "provider",
+        startedMessage: "Snapshot sandbox provider image preparation started.",
+      },
+      async () => {
+        return step.run({ name: "prepare-snapshot-sandbox-image" }, async () => {
+          const resolvedRuntime =
+            await ctx.sandboxRuntimeProviderResolver.resolveForImagePreparation(
+              sandboxRuntimeInput,
+            );
+
+          return prepareSandboxImage(
+            {
+              sandboxAdapter: resolvedRuntime.sandboxAdapter,
+            },
+            {
+              image: workflowInput.image,
+              runtimeProvider: requestedRuntimeProvider,
+            },
+          );
+        });
+      },
+    );
+
     currentPhase = "start";
     const startedSandbox = await recordWorkerSandboxLifecyclePhase(
       operationEvents,
@@ -384,7 +418,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
             },
             {
               sandboxInstanceId: workflowInput.sandboxInstanceId,
-              image: workflowInput.image,
+              image: preparedImage,
               runtimeProvider: requestedRuntimeProvider,
               ...(workflowInput.sandboxRuntime.resources === undefined
                 ? {}
@@ -607,6 +641,7 @@ function mapSnapshotFailure(input: {
     | "resolve"
     | "compile"
     | "ensure"
+    | "prepare_image"
     | "start"
     | "persist"
     | "init"
@@ -630,6 +665,13 @@ function mapSnapshotFailure(input: {
     return {
       failureCode: SnapshotMaterializationFailureCodes.RUNTIME_PLAN_COMPILE_FAILED,
       summary: "Failed to compile snapshot runtime plan.",
+    };
+  }
+
+  if (input.phase === "prepare_image") {
+    return {
+      failureCode: SnapshotMaterializationFailureCodes.SANDBOX_START_FAILED,
+      summary: "Failed to prepare snapshot sandbox image.",
     };
   }
 

@@ -24,7 +24,7 @@ import { initializeSandboxRuntime } from "../start-sandbox-instance/initialize-s
 import { markSandboxInstanceFailed } from "../start-sandbox-instance/mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "../start-sandbox-instance/mark-sandbox-instance-running.js";
 import { resumeSandboxRuntime } from "../start-sandbox-instance/resume-sandbox-runtime.js";
-import { startSandbox } from "../start-sandbox-instance/start-sandbox.js";
+import { prepareSandboxImage, startSandbox } from "../start-sandbox-instance/start-sandbox.js";
 import { waitForSandboxRuntimeReadiness } from "../start-sandbox-instance/wait-for-sandbox-runtime-readiness.js";
 import { markSandboxInstanceStarting } from "./mark-sandbox-instance-starting.js";
 import { persistSandboxInstanceComputeReplacement } from "./persist-sandbox-instance-compute-replacement.js";
@@ -990,6 +990,25 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
     let replacementFailureHandled = false;
 
     try {
+      const preparedReplacementImage = await step.run(
+        { name: "prepare-replacement-sandbox-image" },
+        async () => {
+          const imagePreparationRuntime =
+            await ctx.sandboxRuntimeProviderResolver.resolveForImagePreparation(
+              createResolveSandboxRuntimeInput(resumableSandboxState),
+            );
+
+          return prepareSandboxImage(
+            {
+              sandboxAdapter: imagePreparationRuntime.sandboxAdapter,
+            },
+            {
+              image: replacementImage,
+              runtimeProvider: resumableSandboxState.runtimeProvider,
+            },
+          );
+        },
+      );
       const storagePreparation = await step.run(
         { name: "prepare-replacement-sandbox-storage-for-start" },
         async () => {
@@ -1006,7 +1025,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             {
               organizationId: resumableSandboxState.organizationId,
               sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
-              image: replacementImage,
+              image: preparedReplacementImage,
               persistenceMode: resumableSandboxState.persistenceMode,
               runtimeProvider: resumableSandboxState.runtimeProvider,
             },
@@ -1035,7 +1054,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               },
               {
                 sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
-                image: replacementImage,
+                image: preparedReplacementImage,
                 runtimeProvider: resumableSandboxState.runtimeProvider,
                 storagePreparation,
               },

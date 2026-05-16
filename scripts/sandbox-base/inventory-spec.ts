@@ -182,11 +182,11 @@ export const SandboxBaseInventorySpec = {
     },
     {
       category: SandboxBaseToolCategories.DEBUGGING_AND_SYSTEM,
-      command: "tini",
-      displayName: "tini",
-      dockerfileAssertions: [aptPackage("tini", SandboxBaseCommonStage)],
-      versionCommand: ["tini", "--version"],
-      versionParser: parseTrailingVersion,
+      command: "systemctl",
+      displayName: "systemd",
+      dockerfileAssertions: [aptPackage("systemd", SandboxBaseCommonStage)],
+      versionCommand: ["systemctl", "--version"],
+      versionParser: parseSecondToken,
     },
   ],
 } satisfies SandboxBaseInventorySpec;

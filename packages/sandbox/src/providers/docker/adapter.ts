@@ -17,6 +17,7 @@ import {
   type SandboxHandle,
   type SandboxImageHandle,
   type SandboxInspectRequest,
+  type SandboxPrepareImageRequest,
   type SandboxPrepareStorageForStartRequest,
   type SandboxResumeRequestV1,
   type SandboxStartStoragePreparation,
@@ -61,6 +62,18 @@ export class DockerSandboxAdapter implements SandboxAdapter {
 
   getTransparentProxyConfiguration(): SandboxTransparentProxyConfiguration {
     return createDockerTransparentProxyConfiguration();
+  }
+
+  async prepareImage(request: SandboxPrepareImageRequest): Promise<SandboxImageHandle> {
+    if (request.image.provider !== SandboxProvider.DOCKER) {
+      throw new SandboxConfigurationError("Docker adapter received a non-Docker image handle.");
+    }
+
+    await this.#client.prepareImage({
+      imageRef: request.image.imageId,
+    });
+
+    return request.image;
   }
 
   async prepareStorageForStart(

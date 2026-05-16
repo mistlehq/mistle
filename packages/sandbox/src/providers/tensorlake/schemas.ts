@@ -1,10 +1,25 @@
 import { z } from "zod";
 
+import { SandboxSdkImageSandboxdSourceKinds } from "../../types.js";
+
 export const TensorlakeSandboxConfigSchema = z
   .object({
     apiKey: z.string().trim().min(1, {
       message: "Tensorlake config field `apiKey` is required.",
     }),
+    sandboxd: z
+      .object({
+        kind: z.literal(SandboxSdkImageSandboxdSourceKinds.RELEASE),
+        artifact: z
+          .object({
+            version: z.string().trim().min(1),
+            url: z.url(),
+            sha256: z.string().regex(/^[a-f0-9]{64}$/u),
+          })
+          .strict(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

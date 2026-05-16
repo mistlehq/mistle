@@ -55,7 +55,7 @@ export const E2BClientOperationIds = {
    */
   KILL_SANDBOX: "kill_sandbox",
   /**
-   * `sandbox.commands.run(...)` and `CommandHandle.wait()` for `/usr/bin/tini -- /opt/mistle/bin/sandboxd`,
+   * `sandbox.commands.run(...)` and `CommandHandle.wait()` for `systemctl start sandboxd.service`,
    * plus readiness probes executed through `sandbox.commands.run(...)`.
    * Sources:
    * https://github.com/e2b-dev/E2B/blob/a240f99db52396306857b7fc9a07c225ac7d5221/packages/js-sdk/src/sandbox/commands/index.ts#L411-L469

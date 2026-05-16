@@ -22,11 +22,10 @@ import {
 import { createTensorlakeSdkImageBuildContext } from "./base-image-builder.js";
 import {
   TensorlakeClientOperationIds,
-  TensorlakeClientError,
-  TensorlakeClientErrorCodes,
   TensorlakeCommandExitError,
   mapTensorlakeClientError,
 } from "./client-errors.js";
+import type { TensorlakeStartImage } from "./image-handle.js";
 import { registerTensorlakeSandboxBaseImage } from "./image-registration.js";
 import {
   TensorlakeRuntimeControlRequestSchema,
@@ -48,19 +47,44 @@ const ResumeCommand = "/opt/mistle/bin/sandboxd";
 const ResumeCommandArgs = ["resume"];
 const ReadyCommand = "/opt/mistle/bin/sandboxd";
 const ReadyCommandArgs = ["ready"];
-const StartDaemonCommand = "/usr/bin/tini";
-const StartDaemonCommandArgs = ["-s", "--", "/opt/mistle/bin/sandboxd"];
+const StartDaemonCommand = "sh";
+export const TensorlakeDaemonSystemdEnvironmentVariables = [
+  "SANDBOX_RUNTIME_LISTEN_ADDR",
+  "SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID",
+  "MISTLE_SANDBOXD_ENABLE_TEST_FAULTS",
+  "MISTLE_SANDBOXD_WAIT_FOR_STORAGE_ATTACH",
+  "MISTLE_SANDBOXD_OPERATION_LOG_DIR",
+] as const;
+const StartDaemonCommandArgs = ["-lc", createTensorlakeStartDaemonShellCommand()];
 const DaemonPath = "/opt/mistle/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin";
 const DaemonReadinessPollIntervalMs = 100;
 const DaemonReadinessPollAttempts = 100;
 const StartupCommandPollIntervalMs = 250;
 const StartupCommandPollAttempts = 1200;
-const TensorlakeImageNotRegisteredMessagePattern = /Image '.*' is not registered in the server/u;
+
+export function createTensorlakeStartDaemonShellCommand(): string {
+  return [
+    // Tensorlake injects provider-owned environment variables into sandbox
+    // processes. Importing the whole process environment made systemd reject
+    // TL_SSH_PROXY_PUBKEY because the value can contain control characters.
+    // Keep this aligned with packages/sandboxd/systemd/sandboxd.service
+    // PassEnvironment and import only the variables sandboxd actually needs.
+    // Tensorlake currently starts SDK commands as a non-root user, so the
+    // systemd manager operations need sudo. Preserve the command environment
+    // only for import-environment; the service unit decides what to pass on.
+    `sudo -E systemctl import-environment ${TensorlakeDaemonSystemdEnvironmentVariables.join(" ")}`,
+    "sudo systemctl start sandboxd.service",
+    "while sudo systemctl is-active --quiet sandboxd.service; do sleep 3600; done",
+    "sudo systemctl status sandboxd.service --no-pager",
+    "exit 1",
+  ].join(" && ");
+}
 
 export type TensorlakeStartSandboxResponse = { sandboxId: string };
 export type TensorlakeCaptureSandboxSnapshotResponse = { snapshotId: string };
 
 export interface TensorlakeClient {
+  prepareImage(request: { image: TensorlakeStartImage }): Promise<void>;
   startSandbox(request: TensorlakeStartSandboxRequest): Promise<TensorlakeStartSandboxResponse>;
   inspectSandbox(request: TensorlakeSandboxIdRequest): Promise<TensorlakeSandboxInspectResult>;
   resumeSandbox(request: TensorlakeSandboxIdRequest): Promise<TensorlakeStartSandboxResponse>;
@@ -148,18 +172,6 @@ function createSandboxOptions(request: TensorlakeStartSandboxRequest): CreateAnd
   };
 }
 
-function isMissingRegisteredBaseImageError(
-  error: TensorlakeClientError,
-  image: TensorlakeStartSandboxRequest["image"],
-): boolean {
-  return (
-    image.kind === TensorlakeStartImageKinds.IMAGE &&
-    image.sourceBaseImageRef !== undefined &&
-    error.code === TensorlakeClientErrorCodes.INVALID_ARGUMENT &&
-    TensorlakeImageNotRegisteredMessagePattern.test(error.message)
-  );
-}
-
 const TensorlakeSandboxNameRegex = /^[a-z][a-z0-9-]{0,62}$/;
 
 export function createTensorlakeSandboxName(sandboxInstanceId: string): string {
@@ -244,23 +256,20 @@ export class TensorlakeApiClient implements TensorlakeClient {
     try {
       return await this.#createSandbox(parsedRequest);
     } catch (error) {
-      const mappedError = mapTensorlakeClientError(
-        TensorlakeClientOperationIds.CREATE_SANDBOX,
-        error,
-      );
-
-      if (!isMissingRegisteredBaseImageError(mappedError, parsedRequest.image)) {
-        throw mappedError;
-      }
-
-      await this.#ensureBaseImageRegistered(parsedRequest.image);
-
-      try {
-        return await this.#createSandbox(parsedRequest);
-      } catch (retryError) {
-        throw mapTensorlakeClientError(TensorlakeClientOperationIds.CREATE_SANDBOX, retryError);
-      }
+      throw mapTensorlakeClientError(TensorlakeClientOperationIds.CREATE_SANDBOX, error);
     }
+  }
+
+  async prepareImage(request: { image: TensorlakeStartImage }): Promise<void> {
+    if (
+      request.image.kind !== TensorlakeStartImageKinds.IMAGE ||
+      request.image.sourceBaseImageRef === undefined ||
+      this.#config.sandboxd === undefined
+    ) {
+      return;
+    }
+
+    await this.#ensureBaseImageRegistered(request.image);
   }
 
   async #createSandbox(
@@ -299,27 +308,27 @@ export class TensorlakeApiClient implements TensorlakeClient {
       throw new Error("Tensorlake base image registration requires a source base image ref.");
     }
 
+    if (this.#config.sandboxd === undefined) {
+      throw new Error("Tensorlake missing-image registration requires a sandboxd artifact source.");
+    }
+
     const buildContext = await createTensorlakeSdkImageBuildContext({
       kind: SandboxBaseImageSourceKinds.SDK_IMAGE,
       baseImageRef: image.sourceBaseImageRef,
       contextPath: process.cwd(),
       imageId: image.id,
+      sandboxd: this.#config.sandboxd,
     });
     let registrationError: unknown;
 
     try {
-      // E2B exposes first-class template existence checks in its SDK, so it can
-      // ensure the template before launch. Tensorlake's TypeScript SDK currently
-      // exposes image creation but not image lookup; the CLI has list/describe
-      // commands backed by unexposed platform endpoints. Prefer a check-based
-      // path here once the SDK exposes one, instead of depending on those raw
-      // endpoints from application code.
       await registerTensorlakeSandboxBaseImage({
         apiKey: this.#config.apiKey,
         contextPath: buildContext.path,
         source: {
           baseImageRef: image.sourceBaseImageRef,
           imageId: image.id,
+          sandboxd: this.#config.sandboxd,
         },
       });
     } catch (error) {

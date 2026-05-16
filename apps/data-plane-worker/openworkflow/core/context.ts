@@ -143,6 +143,12 @@ async function createWorkflowContext(input?: {
             testEnvironmentId: testIsolation.testEnvironmentId,
             testEnvironmentIdHeader: testIsolation.testEnvironmentIdHeader,
           });
+    const sandboxdArtifactResolver =
+      environment === "production"
+        ? createSandboxdArtifactResolver({
+            releaseVersion: readServiceReleaseVersion(),
+          })
+        : undefined;
 
     return {
       context: {
@@ -155,13 +161,9 @@ async function createWorkflowContext(input?: {
         sandboxRuntimeProviderResolver: createSandboxRuntimeProviderResolver({
           config,
           controlPlaneInternalClient,
+          ...(sandboxdArtifactResolver === undefined ? {} : { sandboxdArtifactResolver }),
         }),
-        sandboxdArtifactResolver:
-          environment === "production"
-            ? createSandboxdArtifactResolver({
-                releaseVersion: readServiceReleaseVersion(),
-              })
-            : undefined,
+        sandboxdArtifactResolver,
         runtimeStateReader,
         bootstrapAttachmentTerminator,
         controlPlaneInternalClient,

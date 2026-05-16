@@ -130,9 +130,9 @@
         "id": "debugging-and-system",
         "title": "Debugging and system"
       },
-      "command": "tini",
-      "displayName": "tini",
-      "version": "0.19.0"
+      "command": "systemctl",
+      "displayName": "systemd",
+      "version": "255"
     }
   ]
 }

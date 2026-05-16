@@ -21,7 +21,7 @@
     "dev:reset:hard": "tsx ./scripts/dev/down.ts --volumes --rmi-local",
     "dev:sandbox-base:push:docker": "pnpm sandbox-base:build --provider docker --publish-mode push",
     "dev:sandbox-base:push:e2b": "pnpm --filter @mistle/sandbox... build && pnpm sandbox-base:build --provider e2b",
-    "dev:sandbox-base:push:tensorlake": "pnpm --filter @mistle/sandbox... build && pnpm sandbox-base:build --provider tensorlake",
+    "dev:sandbox-base:push:tensorlake": "pnpm --filter @mistle/sandbox... build && pnpm sandbox-base:build --provider tensorlake --sandboxd-source local",
     "dev:workspace:distributed": "turbo watch dev dev:schedules @mistle/dev-data-plane-gateway-a#dev @mistle/dev-data-plane-gateway-b#dev --ui=tui --filter=!@mistle/docs --filter=!@mistle/data-plane-gateway --filter=!@mistle/dev-data-plane-gateway-a --filter=!@mistle/dev-data-plane-gateway-b --env-mode=loose",
     "dev:workspace": "turbo watch dev dev:schedules --ui=tui --filter=!@mistle/docs --filter=!@mistle/dev-data-plane-gateway-a --filter=!@mistle/dev-data-plane-gateway-b --env-mode=loose",
     "docs:dev": "nix develop .#docs -c pnpm --filter @mistle/docs dev",

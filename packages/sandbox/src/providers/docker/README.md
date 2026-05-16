@@ -38,8 +38,9 @@ const runtimeControl = createSandboxRuntimeControl({
 
 ## Provider Behavior
 
+- `prepareImage({ image })` pulls non-local image references and returns the same Docker image handle.
 - `prepareStorageForStart({ image, storage })` requires a Docker image handle and a `docker_volume` storage attachment. It runs a short-lived `alpine:3.20` init container that creates the configured volume subpaths before the sandbox container starts.
-- `start({ image, env, storagePreparation })` pulls non-local image references, injects the shared required runtime env, mounts Docker volume subpaths when provided, binds `/sys/fs/cgroup` read-write, uses the host cgroup namespace, optionally joins `networkName`, and starts a container from `image.imageId`.
+- `start({ image, env, storagePreparation })` injects the shared required runtime env, mounts Docker volume subpaths when provided, binds `/sys/fs/cgroup` read-write, uses the host cgroup namespace, optionally joins `networkName`, and starts a container from `image.imageId`.
 - `inspect({ id })` returns normalized lifecycle fields plus the raw Docker `container.inspect()` payload.
 - `resume({ id })` starts the existing stopped container and returns the same runtime id.
 - `captureSnapshot({ id })` commits the container with `pause: true` and returns a Docker image handle whose `imageId` is the commit id.

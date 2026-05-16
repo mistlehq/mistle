@@ -44,18 +44,27 @@ describe("TensorlakeBaseImageBuilder", () => {
       }),
     );
 
-    expect(dockerfileText).toContain("FROM ghcr.io/mistlehq/sandbox-base:v1.2.3");
+    expect(dockerfileText).toContain("FROM tensorlake/ubuntu-systemd");
     expect(dockerfileText).toContain("apt-get install -y --no-install-recommends");
-    expect(dockerfileText).toContain("kmod linux-modules-$(uname -r)");
+    expect(dockerfileText).toContain("kmod");
+    expect(dockerfileText).toContain("linux-modules-$(uname -r)");
+    expect(dockerfileText).toContain("systemd");
+    expect(dockerfileText).toContain("systemd-sysv");
+    expect(dockerfileText).toContain("https://mise.run");
+    expect(dockerfileText).toContain("https://archil.com/install");
+    expect(dockerfileText).toContain("WORKDIR /root");
+    expect(dockerfileText).toContain(
+      "COPY packages/sandboxd/scripts/cmddir /opt/mistle/bin/cmddir",
+    );
+    expect(dockerfileText).toContain(
+      "COPY packages/sandboxd/systemd/sandboxd.service /etc/systemd/system/sandboxd.service",
+    );
+    expect(dockerfileText).toContain(
+      "ln -sf /etc/systemd/system/sandboxd.service /etc/systemd/system/multi-user.target.wants/sandboxd.service",
+    );
     expect(dockerfileText).not.toContain("modprobe nf_tables");
     expect(dockerfileText).not.toContain("nft add table");
-    expect(dockerfileText).not.toContain("DEBIAN_FRONTEND");
-    expect(dockerfileText).not.toContain("WORKDIR /root");
     expect(dockerfileText).not.toContain("test -x /opt/mistle/bin/sandboxd");
-    expect(dockerfileText).not.toContain("command -v mise");
-    expect(dockerfileText).not.toContain("command -v archil");
-    expect(dockerfileText).not.toContain("https://mise.run");
-    expect(dockerfileText).not.toContain("https://archil.com/install");
     expect(dockerfileText).toContain(
       "COPY packages/sandboxd/.generated/tensorlake/sandboxd-parts /tmp/sandboxd-parts",
     );
@@ -123,12 +132,11 @@ describe("TensorlakeBaseImageBuilder", () => {
 });
 
 describe("createTensorlakeSdkImageBuildContext", () => {
-  it("creates an empty Tensorlake build context when the image does not copy local files", async () => {
+  it("copies shared sandbox base files into the Tensorlake build context", async () => {
     const repoPath = await mkdtemp(join(tmpdir(), "mistle-tensorlake-source-"));
 
     try {
-      await mkdir(join(repoPath, "node_modules", ".pnpm", "dependency"), { recursive: true });
-      await writeFile(join(repoPath, "node_modules", ".pnpm", "dependency", "index.js"), "");
+      await writeTensorlakeBaseContextFiles(repoPath);
 
       const buildContext = await createTensorlakeSdkImageBuildContext({
         kind: SandboxBaseImageSourceKinds.SDK_IMAGE,
@@ -138,7 +146,16 @@ describe("createTensorlakeSdkImageBuildContext", () => {
       });
 
       try {
-        await expect(readdir(buildContext.path)).resolves.toEqual([".mistle-tensorlake-context"]);
+        await expect(readdir(buildContext.path)).resolves.toEqual([
+          ".mistle-tensorlake-context",
+          "packages",
+        ]);
+        await expect(
+          access(join(buildContext.path, "packages", "sandboxd", "scripts", "cmddir")),
+        ).resolves.toBeUndefined();
+        await expect(
+          access(join(buildContext.path, "packages", "sandboxd", "systemd", "sandboxd.service")),
+        ).resolves.toBeUndefined();
       } finally {
         await buildContext.cleanup();
       }
@@ -161,6 +178,7 @@ describe("createTensorlakeSdkImageBuildContext", () => {
       );
       await mkdir(partsPath, { recursive: true });
       await writeFile(join(partsPath, "part-aa"), "sandboxd");
+      await writeTensorlakeBaseContextFiles(repoPath);
       await mkdir(join(repoPath, "node_modules", ".pnpm", "dependency"), { recursive: true });
       await writeFile(join(repoPath, "node_modules", ".pnpm", "dependency", "index.js"), "");
 
@@ -197,3 +215,12 @@ describe("createTensorlakeSdkImageBuildContext", () => {
     }
   });
 });
+
+async function writeTensorlakeBaseContextFiles(repoPath: string): Promise<void> {
+  const cmddirPath = join(repoPath, "packages", "sandboxd", "scripts", "cmddir");
+  const servicePath = join(repoPath, "packages", "sandboxd", "systemd", "sandboxd.service");
+  await mkdir(join(repoPath, "packages", "sandboxd", "scripts"), { recursive: true });
+  await mkdir(join(repoPath, "packages", "sandboxd", "systemd"), { recursive: true });
+  await writeFile(cmddirPath, "#!/bin/sh\n");
+  await writeFile(servicePath, "[Service]\nExecStart=/opt/mistle/bin/sandboxd\n");
+}

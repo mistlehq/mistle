@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 
 import { E2BClientError, E2BClientErrorCodes, E2BClientOperationIds } from "./client-errors.js";
 import {
+  E2BDaemonSystemdEnvironmentVariables,
   createE2BDaemonCommandOptions,
+  createE2BStartDaemonShellCommand,
   createE2BStartupCommandOptions,
   E2BStartRateLimiter,
   isE2BTemplateStartRefNotReadyError,
@@ -42,6 +44,17 @@ describe("E2BStartRateLimiter", () => {
 
     expect(secondStartMs - firstStartMs).toBe(1_000);
     expect(thirdStartMs - secondStartMs).toBe(1_000);
+  });
+});
+
+describe("createE2BStartDaemonShellCommand", () => {
+  it("imports only the Mistle environment variables passed through the systemd service", () => {
+    const command = createE2BStartDaemonShellCommand();
+
+    expect(command).toContain(
+      `systemctl import-environment ${E2BDaemonSystemdEnvironmentVariables.join(" ")}`,
+    );
+    expect(command).not.toContain("systemctl import-environment &&");
   });
 });
 

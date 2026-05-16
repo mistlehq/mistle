@@ -57,6 +57,7 @@ export type DockerCaptureSandboxSnapshotResponse = {
 export interface DockerClient {
   createVolume(request: DockerCreateVolumeRequest): Promise<DockerCreateVolumeResponse>;
   prepareVolumeForStart(request: DockerPrepareVolumeForStartRequest): Promise<void>;
+  prepareImage(request: { imageRef: string }): Promise<void>;
   startSandbox(request: DockerStartSandboxRequest): Promise<DockerStartSandboxResponse>;
   inspectSandbox(request: DockerInspectSandboxRequest): Promise<DockerSandboxInspectResult>;
   resumeSandbox(request: DockerResumeSandboxRequest): Promise<DockerStartSandboxResponse>;
@@ -288,10 +289,6 @@ export class DockerApiClient implements DockerClient {
   async startSandbox(request: DockerStartSandboxRequest): Promise<DockerStartSandboxResponse> {
     const parsedRequest = DockerStartSandboxRequestSchema.parse(request);
 
-    if (!isDockerLocalImageId(parsedRequest.imageRef)) {
-      await this.#pullImage(parsedRequest.imageRef);
-    }
-
     const hostConfig = createDockerSandboxHostConfig({
       ...(this.#config.networkName === undefined ? {} : { networkName: this.#config.networkName }),
       ...(parsedRequest.storagePreparation === undefined
@@ -328,6 +325,12 @@ export class DockerApiClient implements DockerClient {
     return {
       runtimeId: container.id,
     };
+  }
+
+  async prepareImage(request: { imageRef: string }): Promise<void> {
+    if (!isDockerLocalImageId(request.imageRef)) {
+      await this.#pullImage(request.imageRef);
+    }
   }
 
   async inspectSandbox(request: DockerInspectSandboxRequest): Promise<DockerSandboxInspectResult> {
@@ -509,6 +512,7 @@ export function createDockerSandboxHostConfig(input: {
   // sandbox-owned scopes.
   hostConfig.Binds = ["/sys/fs/cgroup:/sys/fs/cgroup:rw"];
   hostConfig.CgroupnsMode = "host";
+  hostConfig.Privileged = true;
   hostConfig.CapAdd = ["NET_ADMIN"];
   if (input.storagePreparation !== undefined) {
     hostConfig.Mounts = createDockerVolumeSubpathMounts({

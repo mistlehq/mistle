@@ -56,7 +56,14 @@ const InitCommand = "/opt/mistle/bin/sandboxd init";
 const DetachedInitCommand = "/opt/mistle/bin/sandboxd init --detach";
 const WaitInitCommand = "/opt/mistle/bin/sandboxd wait-init";
 const ResumeCommand = "/opt/mistle/bin/sandboxd resume";
-const StartDaemonCommand = "/usr/bin/tini -s -- /opt/mistle/bin/sandboxd";
+export const E2BDaemonSystemdEnvironmentVariables = [
+  "SANDBOX_RUNTIME_LISTEN_ADDR",
+  "SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID",
+  "MISTLE_SANDBOXD_ENABLE_TEST_FAULTS",
+  "MISTLE_SANDBOXD_WAIT_FOR_STORAGE_ATTACH",
+  "MISTLE_SANDBOXD_OPERATION_LOG_DIR",
+] as const;
+const StartDaemonCommand = createE2BStartDaemonShellCommand();
 const ReadyCommand = "/opt/mistle/bin/sandboxd ready";
 const DaemonReadinessPollIntervalMs = 100;
 const DaemonReadinessPollAttempts = 100;
@@ -72,6 +79,21 @@ const StartupInitResponseSchema = z.discriminatedUnion("ok", [
   z.object({ ok: z.literal(true) }),
   z.object({ ok: z.literal(false), error: z.string() }),
 ]);
+
+export function createE2BStartDaemonShellCommand(): string {
+  return [
+    // Keep this aligned with packages/sandboxd/systemd/sandboxd.service
+    // PassEnvironment and import only the variables sandboxd actually needs.
+    // This matches Tensorlake and avoids coupling daemon startup to provider-owned
+    // environment variables that may not be valid systemd manager environment.
+    `systemctl import-environment ${E2BDaemonSystemdEnvironmentVariables.join(" ")}`,
+    "systemctl start sandboxd.service",
+    "while systemctl is-active --quiet sandboxd.service; do sleep 3600; done",
+    "systemctl status sandboxd.service --no-pager",
+    "exit 1",
+  ].join(" && ");
+}
+
 export type E2BStartSandboxResponse = {
   sandboxId: string;
 };
@@ -81,6 +103,7 @@ export type E2BCaptureSandboxSnapshotResponse = {
 };
 
 export interface E2BClient {
+  prepareImage(request: { imageRef: string }): Promise<{ imageRef: string }>;
   startSandbox(request: E2BStartSandboxRequest): Promise<E2BStartSandboxResponse>;
   inspectSandbox(request: E2BInspectSandboxRequest): Promise<E2BSandboxInspectResult>;
   resumeSandbox(request: E2BResumeSandboxRequest): Promise<E2BStartSandboxResponse>;
@@ -410,7 +433,7 @@ export class E2BApiClient implements E2BClient {
 
   async startSandbox(request: E2BStartSandboxRequest): Promise<E2BStartSandboxResponse> {
     const parsedRequest = E2BStartSandboxRequestSchema.parse(request);
-    const templateAlias = await this.#resolveStartTemplateRef(parsedRequest.imageRef);
+    const templateAlias = parsedRequest.imageRef;
 
     try {
       const sandbox = await runE2BOperationWithTransientRetries({
@@ -437,6 +460,12 @@ export class E2BApiClient implements E2BClient {
     } catch (error) {
       throw mapE2BClientError(E2BClientOperationIds.CREATE_SANDBOX, error);
     }
+  }
+
+  async prepareImage(request: { imageRef: string }): Promise<{ imageRef: string }> {
+    return {
+      imageRef: await this.#resolveStartTemplateRef(request.imageRef),
+    };
   }
 
   async inspectSandbox(request: E2BInspectSandboxRequest): Promise<E2BSandboxInspectResult> {

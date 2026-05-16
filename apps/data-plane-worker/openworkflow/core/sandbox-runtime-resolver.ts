@@ -7,12 +7,15 @@ import {
   createSandboxRuntimeControl,
   type CreateSandboxAdapterInput,
   SandboxProvider,
+  SandboxSdkImageSandboxdSourceKinds,
   type SandboxAdapter,
+  type SandboxSdkImageReleaseSandboxdSource,
   type SandboxRuntimeControl,
   type SandboxProvider as SandboxProviderValue,
 } from "@mistle/sandbox";
 
 import type { DataPlaneWorkerRuntimeConfig } from "./config.js";
+import type { SandboxdArtifactResolver } from "./sandboxd-artifact-resolver.js";
 
 export type ResolveSandboxRuntimeInput = {
   organizationId: string;
@@ -33,6 +36,7 @@ export type ResolvedSandboxRuntime = {
 
 export type SandboxRuntimeProviderResolver = {
   resolve(input: ResolveSandboxRuntimeInput): Promise<ResolvedSandboxRuntime>;
+  resolveForImagePreparation(input: ResolveSandboxRuntimeInput): Promise<ResolvedSandboxRuntime>;
 };
 
 export type PersistedSandboxSelection = {
@@ -60,79 +64,101 @@ export function createResolveSandboxRuntimeInput(
 export function createSandboxRuntimeProviderResolver(input: {
   config: DataPlaneWorkerRuntimeConfig;
   controlPlaneInternalClient: ControlPlaneInternalClient;
+  sandboxdArtifactResolver?: SandboxdArtifactResolver;
 }): SandboxRuntimeProviderResolver {
-  return {
-    resolve: async (runtimeInput) => {
-      if (runtimeInput.provider === SandboxProvider.DOCKER) {
-        if (runtimeInput.connectionId !== undefined) {
-          throw new Error("Docker sandbox runtime cannot use a sandbox connection.");
-        }
-
-        if (input.config.app.sandbox.docker?.enabled !== true) {
-          throw new Error("Expected data-plane worker Docker sandbox config.");
-        }
-
-        const providerConfig = {
-          provider: SandboxProvider.DOCKER,
-          docker: {
-            socketPath: input.config.app.sandbox.docker.socketPath,
-            ...(input.config.app.sandbox.docker.networkName === undefined
-              ? {}
-              : { networkName: input.config.app.sandbox.docker.networkName }),
-          },
-        };
-
-        return {
-          provider: SandboxProvider.DOCKER,
-          sandboxAdapter: createSandboxAdapter(providerConfig),
-          sandboxRuntimeControl: createSandboxRuntimeControl(providerConfig),
-        };
-      }
-
-      if (runtimeInput.provider === SandboxProvider.E2B) {
-        const credentials = await input.controlPlaneInternalClient.resolveSandboxRuntimeCredentials(
-          {
-            organizationId: runtimeInput.organizationId,
-            provider: SandboxProvider.E2B,
-            ...(runtimeInput.connectionId === undefined
-              ? {}
-              : { connectionId: runtimeInput.connectionId }),
-          },
-        );
-        if (credentials.provider !== SandboxProvider.E2B) {
-          throw new Error("Control-plane returned non-E2B credentials for E2B runtime.");
-        }
-
-        return createE2BSandboxRuntime({
-          credentials,
-          resources: runtimeInput.resources,
-        });
-      }
-
-      if (runtimeInput.provider === SandboxProvider.TENSORLAKE) {
-        const credentials = await input.controlPlaneInternalClient.resolveSandboxRuntimeCredentials(
-          {
-            organizationId: runtimeInput.organizationId,
-            provider: SandboxProvider.TENSORLAKE,
-            ...(runtimeInput.connectionId === undefined
-              ? {}
-              : { connectionId: runtimeInput.connectionId }),
-          },
-        );
-        if (credentials.provider !== SandboxProvider.TENSORLAKE) {
-          throw new Error(
-            "Control-plane returned non-Tensorlake credentials for Tensorlake runtime.",
-          );
-        }
-
-        return createTensorlakeSandboxRuntime({
-          credentials,
-          resources: runtimeInput.resources,
-        });
-      }
-
-      return assertUnreachableSandboxProvider(runtimeInput.provider);
+  async function resolveRuntime(
+    inputRuntime: ResolveSandboxRuntimeInput,
+    options: {
+      includeImagePreparationArtifacts: boolean;
     },
+  ): Promise<ResolvedSandboxRuntime> {
+    if (inputRuntime.provider === SandboxProvider.DOCKER) {
+      if (inputRuntime.connectionId !== undefined) {
+        throw new Error("Docker sandbox runtime cannot use a sandbox connection.");
+      }
+
+      if (input.config.app.sandbox.docker?.enabled !== true) {
+        throw new Error("Expected data-plane worker Docker sandbox config.");
+      }
+
+      const providerConfig = {
+        provider: SandboxProvider.DOCKER,
+        docker: {
+          socketPath: input.config.app.sandbox.docker.socketPath,
+          ...(input.config.app.sandbox.docker.networkName === undefined
+            ? {}
+            : { networkName: input.config.app.sandbox.docker.networkName }),
+        },
+      };
+
+      return {
+        provider: SandboxProvider.DOCKER,
+        sandboxAdapter: createSandboxAdapter(providerConfig),
+        sandboxRuntimeControl: createSandboxRuntimeControl(providerConfig),
+      };
+    }
+
+    if (inputRuntime.provider === SandboxProvider.E2B) {
+      const credentials = await input.controlPlaneInternalClient.resolveSandboxRuntimeCredentials({
+        organizationId: inputRuntime.organizationId,
+        provider: SandboxProvider.E2B,
+        ...(inputRuntime.connectionId === undefined
+          ? {}
+          : { connectionId: inputRuntime.connectionId }),
+      });
+      if (credentials.provider !== SandboxProvider.E2B) {
+        throw new Error("Control-plane returned non-E2B credentials for E2B runtime.");
+      }
+
+      return createE2BSandboxRuntime({
+        credentials,
+        resources: inputRuntime.resources,
+      });
+    }
+
+    if (inputRuntime.provider === SandboxProvider.TENSORLAKE) {
+      const credentials = await input.controlPlaneInternalClient.resolveSandboxRuntimeCredentials({
+        organizationId: inputRuntime.organizationId,
+        provider: SandboxProvider.TENSORLAKE,
+        ...(inputRuntime.connectionId === undefined
+          ? {}
+          : { connectionId: inputRuntime.connectionId }),
+      });
+      if (credentials.provider !== SandboxProvider.TENSORLAKE) {
+        throw new Error(
+          "Control-plane returned non-Tensorlake credentials for Tensorlake runtime.",
+        );
+      }
+
+      const needsRuntimeImageArtifacts =
+        options.includeImagePreparationArtifacts && inputRuntime.connectionId !== undefined;
+      const sandboxdArtifact =
+        needsRuntimeImageArtifacts && input.sandboxdArtifactResolver !== undefined
+          ? await input.sandboxdArtifactResolver.resolve()
+          : undefined;
+
+      return createTensorlakeSandboxRuntime({
+        credentials,
+        resources: inputRuntime.resources,
+        ...(sandboxdArtifact === undefined
+          ? {}
+          : {
+              sandboxd: {
+                kind: SandboxSdkImageSandboxdSourceKinds.RELEASE,
+                artifact: sandboxdArtifact,
+              },
+            }),
+      });
+    }
+
+    return assertUnreachableSandboxProvider(inputRuntime.provider);
+  }
+
+  return {
+    resolve: (runtimeInput) =>
+      resolveRuntime(runtimeInput, { includeImagePreparationArtifacts: false }),
+    resolveForImagePreparation: (runtimeInput) =>
+      resolveRuntime(runtimeInput, { includeImagePreparationArtifacts: true }),
   };
 }
 
@@ -203,6 +229,7 @@ export function createE2BSandboxProviderConfig(input: {
 function createTensorlakeSandboxRuntime(input: {
   credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "tensorlake" }>;
   resources?: ResolveSandboxRuntimeInput["resources"];
+  sandboxd?: SandboxSdkImageReleaseSandboxdSource;
 }): ResolvedSandboxRuntime {
   const providerConfig = createTensorlakeSandboxProviderConfig(input);
 
@@ -216,11 +243,13 @@ function createTensorlakeSandboxRuntime(input: {
 export function createTensorlakeSandboxProviderConfig(input: {
   credentials: Extract<ResolveSandboxRuntimeCredentialsOutput, { provider: "tensorlake" }>;
   resources?: ResolveSandboxRuntimeInput["resources"];
+  sandboxd?: SandboxSdkImageReleaseSandboxdSource;
 }): CreateSandboxAdapterInput {
   return {
     provider: SandboxProvider.TENSORLAKE,
     tensorlake: {
       apiKey: input.credentials.apiKey,
+      ...(input.sandboxd === undefined ? {} : { sandboxd: input.sandboxd }),
     },
   };
 }

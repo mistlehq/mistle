@@ -16,10 +16,10 @@ describe("createDockerSandboxHostConfig", () => {
     });
   });
 
-  it("adds NET_ADMIN without privileged mode for sandbox transparent egress rules", () => {
+  it("enables the sandbox container privileges required by systemd and transparent egress rules", () => {
     expect(createDockerSandboxHostConfig({})).toMatchObject({
       CapAdd: ["NET_ADMIN"],
+      Privileged: true,
     });
-    expect(createDockerSandboxHostConfig({}).Privileged).toBeUndefined();
   });
 });

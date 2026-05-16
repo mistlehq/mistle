@@ -16,6 +16,7 @@ import {
   type SandboxHandle,
   type SandboxImageHandle,
   type SandboxInspectRequest,
+  type SandboxPrepareImageRequest,
   type SandboxPrepareStorageForStartRequest,
   type SandboxResumeRequestV1,
   type SandboxStartStoragePreparation,
@@ -91,6 +92,18 @@ export class E2BSandboxAdapter implements SandboxAdapter {
 
   getTransparentProxyConfiguration(): SandboxTransparentProxyConfiguration {
     return createE2BTransparentProxyConfiguration();
+  }
+
+  async prepareImage(request: SandboxPrepareImageRequest): Promise<SandboxImageHandle> {
+    if (request.image.provider !== SandboxProvider.E2B) {
+      throw new SandboxConfigurationError("E2B adapter received a non-E2B image handle.");
+    }
+
+    const response = await this.#client.prepareImage({
+      imageRef: request.image.imageId,
+    });
+
+    return createSandboxImageHandle(response.imageRef);
   }
 
   async prepareStorageForStart(

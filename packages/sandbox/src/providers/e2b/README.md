@@ -39,8 +39,9 @@ const runtimeControl = createSandboxRuntimeControl({
 
 ## Provider Behavior
 
+- `prepareImage({ image })` resolves or builds a deterministic E2B template alias from OCI image references and returns an E2B image handle for that alias.
 - `prepareStorageForStart(...)` returns empty storage preparation. E2B persistent storage is attached after compute starts.
-- `start({ image, env })` treats `image.imageId` as an OCI image reference, resolves or builds a deterministic E2B template alias from that reference and the configured CPU/memory defaults, injects the shared required runtime env, and creates the sandbox.
+- `start({ image, env })` treats `image.imageId` as a prepared template alias, injects the shared required runtime env, and creates the sandbox.
 - Created sandboxes use a one-hour timeout and `lifecycle.onTimeout: "pause"`.
 - Created sandboxes store the resolved template alias in E2B metadata as `mistle_template_alias`.
 - Starts are rate-limited in process and transient E2B source errors are retried before being mapped to `E2BClientError`.
@@ -53,7 +54,7 @@ const runtimeControl = createSandboxRuntimeControl({
 ## Runtime Control
 
 - `readSandboxdVersion({ id, env })` runs `/opt/mistle/bin/sandboxd version` as `root` and returns trimmed stdout.
-- `init({ id, payload, env })` connects to the sandbox, ensures `/opt/mistle/bin/sandboxd` is running as `root` through `/usr/bin/tini`, waits for daemon readiness, then runs `/opt/mistle/bin/sandboxd init` with `payload` on stdin.
+- `init({ id, payload, env })` connects to the sandbox, ensures `sandboxd.service` is running, waits for daemon readiness, then runs `/opt/mistle/bin/sandboxd init` with `payload` on stdin.
 - `resume({ id, payload, env })` uses the same daemon readiness path, then runs `/opt/mistle/bin/sandboxd resume` so a paused daemon can reattach its bootstrap tunnel.
 - `readOperationLog({ id, operation })` reads `/run/mistle/init.log` or `/run/mistle/resume.log` and returns `null` when the log is absent or empty.
 - `close()` is currently a no-op.

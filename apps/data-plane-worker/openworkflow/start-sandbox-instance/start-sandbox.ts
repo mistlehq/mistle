@@ -1,5 +1,6 @@
 import type {
   SandboxAdapter,
+  SandboxImageHandle,
   SandboxProvider,
   SandboxStartStoragePreparation,
 } from "@mistle/sandbox";
@@ -27,6 +28,48 @@ export function createSandboxRuntimeEnv(input: {
           [SandboxdTestFaultsEnabledEnv]: "1",
         }
       : {}),
+  };
+}
+
+function toSandboxImageHandle(input: {
+  image: StartSandboxInstanceWorkflowImageInput;
+  provider: SandboxProvider;
+}): SandboxImageHandle {
+  return {
+    provider: input.provider,
+    imageId: input.image.imageId,
+    createdAt: input.image.createdAt ?? new Date().toISOString(),
+  };
+}
+
+export async function prepareSandboxImage(
+  ctx: {
+    sandboxAdapter: SandboxAdapter;
+  },
+  input: {
+    image: StartSandboxInstanceWorkflowImageInput;
+    runtimeProvider: SandboxProvider;
+  },
+): Promise<StartSandboxInstanceWorkflowImageInput> {
+  if (input.image.provider !== input.runtimeProvider) {
+    throw new Error("Sandbox launch image provider does not match runtime provider.");
+  }
+
+  const preparedImage = await ctx.sandboxAdapter.prepareImage({
+    image: toSandboxImageHandle({
+      image: input.image,
+      provider: input.runtimeProvider,
+    }),
+  });
+
+  if (preparedImage.provider !== input.runtimeProvider) {
+    throw new Error("Sandbox adapter prepared image handle with unexpected provider.");
+  }
+
+  return {
+    ...input.image,
+    imageId: preparedImage.imageId,
+    createdAt: preparedImage.createdAt,
   };
 }
 

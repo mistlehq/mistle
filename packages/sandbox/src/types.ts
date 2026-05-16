@@ -199,6 +199,10 @@ export interface SandboxPrepareStorageForStartRequest {
   readonly storage?: SandboxStorageAttachment;
 }
 
+export interface SandboxPrepareImageRequest {
+  readonly image: SandboxImageHandle;
+}
+
 export const SandboxInspectStates = {
   RUNNING: "running",
   STOPPED: "stopped",
@@ -359,6 +363,7 @@ export interface SandboxCaptureSnapshotRequest {
 
 export interface SandboxAdapter {
   getTransparentProxyConfiguration(): SandboxTransparentProxyConfiguration;
+  prepareImage(request: SandboxPrepareImageRequest): Promise<SandboxImageHandle>;
   prepareStorageForStart(
     request: SandboxPrepareStorageForStartRequest,
   ): Promise<SandboxStartStoragePreparation>;

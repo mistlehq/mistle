@@ -39,7 +39,7 @@ import { markSandboxInstanceFailed } from "./mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "./mark-sandbox-instance-running.js";
 import { persistSandboxInstanceProvisioning } from "./persist-sandbox-instance-provisioning.js";
 import { SandboxExecutionModes, SandboxStartupModes } from "./sandbox-startup-input.js";
-import { createSandboxRuntimeEnv, startSandbox } from "./start-sandbox.js";
+import { createSandboxRuntimeEnv, prepareSandboxImage, startSandbox } from "./start-sandbox.js";
 import { waitForSandboxBootstrapAttachment } from "./wait-for-sandbox-bootstrap-attachment.js";
 import { waitForSandboxRuntimeReadiness } from "./wait-for-sandbox-runtime-readiness.js";
 
@@ -521,6 +521,67 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       runtimeProvider: SandboxProvider;
       providerSandboxId: string;
     };
+    let preparedImage = workflowInput.image;
+    try {
+      preparedImage = await recordWorkerSandboxLifecyclePhase(
+        operationEvents,
+        {
+          attributes: {
+            runtimeProvider,
+          },
+          completedMessage: "Sandbox provider image preparation completed.",
+          failedMessage: "Sandbox provider image preparation failed.",
+          phase: "provider",
+          startedMessage: "Sandbox provider image preparation started.",
+        },
+        async () => {
+          return step.run({ name: "prepare-sandbox-image-for-start" }, async () => {
+            logger.info(
+              {
+                image: workflowInput.image,
+                runtimeProvider,
+              },
+              "Preparing sandbox image with provider.",
+            );
+            const resolvedRuntime =
+              await ctx.sandboxRuntimeProviderResolver.resolveForImagePreparation(
+                sandboxRuntimeInput,
+              );
+
+            return prepareSandboxImage(
+              {
+                sandboxAdapter: resolvedRuntime.sandboxAdapter,
+              },
+              {
+                image: workflowInput.image,
+                runtimeProvider,
+              },
+            );
+          });
+        },
+      );
+      logger.info(
+        {
+          image: preparedImage,
+          runtimeProvider,
+        },
+        "Prepared sandbox image with provider.",
+      );
+    } catch (error) {
+      rethrowDurableStepErrorForRetry(error);
+      logger.error({ err: error }, "Sandbox provider image preparation failed.");
+      await handleFailedStartup({
+        sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
+        persistenceMode: workflowInput.persistenceMode,
+        failureCode: StartSandboxFailureCodes.SANDBOX_START_FAILED,
+        failureMessage: formatPersistedFailureMessage({
+          summary: "Sandbox provider image preparation failed before sandbox startup.",
+          error,
+        }),
+      });
+      throw error;
+    }
+
     let storagePreparation: SandboxStartStoragePreparation | undefined;
     try {
       storagePreparation = await step.run(
@@ -543,7 +604,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             {
               organizationId: workflowInput.organizationId,
               sandboxInstanceId: workflowInput.sandboxInstanceId,
-              image: workflowInput.image,
+              image: preparedImage,
               persistenceMode: workflowInput.persistenceMode,
               runtimeProvider,
             },
@@ -582,7 +643,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           return step.run({ name: "start-sandbox" }, async () => {
             logger.info(
               {
-                image: workflowInput.image,
+                image: preparedImage,
                 runtimeProvider,
               },
               "Starting sandbox with provider.",
@@ -598,7 +659,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               },
               {
                 sandboxInstanceId: workflowInput.sandboxInstanceId,
-                image: workflowInput.image,
+                image: preparedImage,
                 runtimeProvider,
                 ...(workflowInput.sandboxRuntime.resources === undefined
                   ? {}

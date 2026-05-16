@@ -36,7 +36,7 @@
     "@mistle/time": "workspace:*",
     "dockerode": "^5.0.0",
     "e2b": "^2.19.0",
-    "tensorlake": "0.5.11",
+    "tensorlake": "0.5.13",
     "zod": "^4.4.3"
   },
   "devDependencies": {

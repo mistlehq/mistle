@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, cp, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
@@ -18,6 +18,8 @@ import { registerTensorlakeSandboxBaseImage } from "./image-registration.js";
 
 const TensorlakeLocalSandboxdPartsRelativePath =
   "packages/sandboxd/.generated/tensorlake/sandboxd-parts";
+const TensorlakeCmddirRelativePath = "packages/sandboxd/scripts/cmddir";
+const TensorlakeSandboxdServiceRelativePath = "packages/sandboxd/systemd/sandboxd.service";
 const TensorlakeBuildContextPlaceholderFile = ".mistle-tensorlake-context";
 
 export type TensorlakeBaseImageBuilderOptions = {
@@ -50,6 +52,11 @@ export class TensorlakeBaseImageBuilder implements SandboxBaseImageBuilder {
     }
 
     const source = request.source;
+    if (source.sandboxd === undefined) {
+      throw new SandboxConfigurationError(
+        "Tensorlake SDK image source requires a sandboxd artifact source.",
+      );
+    }
     validateSdkImageSource({
       ...(request.platform === undefined ? {} : { platform: request.platform }),
       source,
@@ -103,6 +110,16 @@ export async function createTensorlakeSdkImageBuildContext(
 
   try {
     await writeFile(join(buildContextPath, TensorlakeBuildContextPlaceholderFile), "");
+    await copyTensorlakeBuildContextFile({
+      buildContextPath,
+      sourceContextPath: source.contextPath,
+      relativePath: TensorlakeCmddirRelativePath,
+    });
+    await copyTensorlakeBuildContextFile({
+      buildContextPath,
+      sourceContextPath: source.contextPath,
+      relativePath: TensorlakeSandboxdServiceRelativePath,
+    });
 
     if (source.sandboxd?.kind === SandboxSdkImageSandboxdSourceKinds.LOCAL) {
       const sourcePath = resolve(source.contextPath, TensorlakeLocalSandboxdPartsRelativePath);
@@ -121,6 +138,17 @@ export async function createTensorlakeSdkImageBuildContext(
     await rm(buildContextPath, { force: true, recursive: true });
     throw error;
   }
+}
+
+async function copyTensorlakeBuildContextFile(input: {
+  readonly buildContextPath: string;
+  readonly sourceContextPath: string;
+  readonly relativePath: string;
+}): Promise<void> {
+  const sourcePath = resolve(input.sourceContextPath, input.relativePath);
+  const destinationPath = resolve(input.buildContextPath, input.relativePath);
+  await mkdir(dirname(destinationPath), { recursive: true });
+  await cp(sourcePath, destinationPath);
 }
 
 function validateSdkImageSource(request: {

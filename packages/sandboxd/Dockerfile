@@ -5,6 +5,7 @@ FROM ubuntu:24.04 AS sandbox-base-common
 ARG MISE_VERSION=v2026.4.28
 
 ENV DEBIAN_FRONTEND=noninteractive \
+  container=docker \
   PATH="/opt/mistle/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 RUN apt-get update \
@@ -13,6 +14,7 @@ RUN apt-get update \
     ca-certificates \
     coreutils \
     curl \
+    dbus \
     findutils \
     gawk \
     git \
@@ -25,8 +27,9 @@ RUN apt-get update \
     nftables \
     ripgrep \
     sed \
+    systemd \
+    systemd-sysv \
     tar \
-    tini \
     unzip \
   && rm -rf /var/lib/apt/lists/*
 
@@ -45,8 +48,11 @@ EOF
 RUN mkdir -p /opt/mistle/bin
 
 COPY packages/sandboxd/scripts/cmddir /opt/mistle/bin/cmddir
+COPY packages/sandboxd/systemd/sandboxd.service /etc/systemd/system/sandboxd.service
 RUN chmod +x /opt/mistle/bin/cmddir \
-  && ln -sf /opt/mistle/bin/cmddir /usr/local/bin/cmddir
+  && ln -sf /opt/mistle/bin/cmddir /usr/local/bin/cmddir \
+  && mkdir -p /etc/systemd/system/multi-user.target.wants \
+  && ln -sf /etc/systemd/system/sandboxd.service /etc/systemd/system/multi-user.target.wants/sandboxd.service
 
 RUN mkdir -p \
     /run/mistle \
@@ -126,7 +132,9 @@ RUN chmod +x /opt/mistle/bin/sandboxd \
   && ln -sf /opt/mistle/bin/sandboxd /usr/local/bin/sandboxd \
   && ln -sf /opt/mistle/bin/mistle-ssh-sign /usr/local/bin/mistle-ssh-sign
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/opt/mistle/bin/sandboxd"]
+STOPSIGNAL SIGRTMIN+3
+
+ENTRYPOINT ["/sbin/init"]
 
 FROM sandbox-base AS sandbox-base-system-tests
 
@@ -137,4 +145,6 @@ RUN chmod +x /opt/mistle/bin/sandboxd \
   && ln -sf /opt/mistle/bin/sandboxd /usr/local/bin/sandboxd \
   && ln -sf /opt/mistle/bin/mistle-ssh-sign /usr/local/bin/mistle-ssh-sign
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/opt/mistle/bin/sandboxd"]
+STOPSIGNAL SIGRTMIN+3
+
+ENTRYPOINT ["/sbin/init"]

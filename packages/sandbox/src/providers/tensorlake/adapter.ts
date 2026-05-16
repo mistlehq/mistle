@@ -14,7 +14,9 @@ import {
   type SandboxCleanupStorageRequest,
   type SandboxDestroyRequest,
   type SandboxHandle,
+  type SandboxImageHandle,
   type SandboxInspectRequest,
+  type SandboxPrepareImageRequest,
   type SandboxPrepareStorageForStartRequest,
   type SandboxResumeRequestV1,
   type SandboxStartRequest,
@@ -30,6 +32,7 @@ import {
 } from "./client-errors.js";
 import type { TensorlakeClient } from "./client.js";
 import {
+  createTensorlakeRegisteredImageHandle,
   createTensorlakeSnapshotImageHandle,
   resolveTensorlakeStartImage,
 } from "./image-handle.js";
@@ -89,6 +92,17 @@ export class TensorlakeSandboxAdapter implements SandboxAdapter {
 
   getTransparentProxyConfiguration(): SandboxTransparentProxyConfiguration {
     return createTensorlakeTransparentProxyConfiguration();
+  }
+
+  async prepareImage(request: SandboxPrepareImageRequest): Promise<SandboxImageHandle> {
+    const image = resolveTensorlakeStartImage(request.image);
+    await this.#client.prepareImage({ image });
+
+    if (image.kind === "image" && image.sourceBaseImageRef !== undefined) {
+      return createTensorlakeRegisteredImageHandle(image.id);
+    }
+
+    return request.image;
   }
 
   async prepareStorageForStart(

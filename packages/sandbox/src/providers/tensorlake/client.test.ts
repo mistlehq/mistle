@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { createTensorlakeDaemonEnv, createTensorlakeSandboxName } from "./client.js";
+import {
+  TensorlakeDaemonSystemdEnvironmentVariables,
+  createTensorlakeDaemonEnv,
+  createTensorlakeSandboxName,
+  createTensorlakeStartDaemonShellCommand,
+} from "./client.js";
 
 describe("createTensorlakeDaemonEnv", () => {
   it("preserves the image command path for daemon child processes", () => {
@@ -14,6 +19,19 @@ describe("createTensorlakeDaemonEnv", () => {
       SANDBOX_RUNTIME_LISTEN_ADDR: "127.0.0.1:8090",
       SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID: "sbi_test",
     });
+  });
+});
+
+describe("createTensorlakeStartDaemonShellCommand", () => {
+  it("imports only the Mistle environment variables passed through the systemd service", () => {
+    const command = createTensorlakeStartDaemonShellCommand();
+
+    expect(command).toContain(
+      `sudo -E systemctl import-environment ${TensorlakeDaemonSystemdEnvironmentVariables.join(" ")}`,
+    );
+    expect(command).toContain("sudo systemctl start sandboxd.service");
+    expect(command).not.toContain("systemctl import-environment &&");
+    expect(command).not.toContain("TL_SSH_PROXY_PUBKEY");
   });
 });
 

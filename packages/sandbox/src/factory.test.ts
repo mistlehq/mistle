@@ -23,6 +23,7 @@ describe("createSandboxAdapter", () => {
     });
 
     expect(typeof adapter.prepareStorageForStart).toBe("function");
+    expect(typeof adapter.prepareImage).toBe("function");
     expect(typeof adapter.start).toBe("function");
     expect(typeof adapter.inspect).toBe("function");
     expect(typeof adapter.resume).toBe("function");
@@ -56,6 +57,7 @@ describe("createSandboxAdapter", () => {
     });
 
     expect(typeof adapter.prepareStorageForStart).toBe("function");
+    expect(typeof adapter.prepareImage).toBe("function");
     expect(typeof adapter.start).toBe("function");
     expect(typeof adapter.inspect).toBe("function");
     expect(typeof adapter.resume).toBe("function");
@@ -89,6 +91,7 @@ describe("createSandboxAdapter", () => {
     });
 
     expect(typeof adapter.prepareStorageForStart).toBe("function");
+    expect(typeof adapter.prepareImage).toBe("function");
     expect(typeof adapter.start).toBe("function");
     expect(typeof adapter.inspect).toBe("function");
     expect(typeof adapter.resume).toBe("function");

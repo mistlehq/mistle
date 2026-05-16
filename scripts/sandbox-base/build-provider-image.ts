@@ -89,7 +89,7 @@ Tensorlake options:
                                           Defaults to the deterministic name for --source-image-ref
   --source-image-ref <ref>             OCI image ref to import into Tensorlake
   --api-key <key>                      Tensorlake API key
-  --sandboxd-source <local|release>    optional sandboxd override for the Tensorlake SDK image
+  --sandboxd-source <local|release>    sandboxd source for the Tensorlake SDK image
   --sandboxd-artifact-url <url>        Release sandboxd artifact URL when --sandboxd-source release
   --sandboxd-artifact-sha256 <sha256>  Release sandboxd artifact SHA256 when --sandboxd-source release
   --sandboxd-artifact-version <value>  Release sandboxd version when --sandboxd-source release
@@ -503,7 +503,7 @@ function createTensorlakeSandboxdSource(argumentsList: ParsedCliArguments):
   | undefined {
   const sandboxdSource = argumentsList.sandboxdSource;
   if (sandboxdSource === undefined) {
-    return undefined;
+    throw new Error("--sandboxd-source is required when --provider is tensorlake.");
   }
 
   if (sandboxdSource === TensorlakeSandboxdSources.LOCAL) {

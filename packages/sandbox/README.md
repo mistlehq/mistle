@@ -6,6 +6,7 @@ Implemented providers:
 
 - Docker
 - E2B
+- Tensorlake
 
 Provider-specific documentation lives with each provider:
 
@@ -19,6 +20,7 @@ Persistent sandbox behavior across data-plane workflows is documented in [`docs/
 `@mistle/sandbox` owns the provider boundary for sandbox compute and in-provider runtime actions:
 
 - prepare provider-specific storage state before compute start
+- prepare provider-specific image/template state before compute start
 - start compute from a provider image or snapshot handle
 - inspect compute and normalize provider lifecycle state
 - resume, stop, and destroy provider compute
@@ -39,6 +41,7 @@ The main entrypoints are:
 
 `SandboxAdapter` exposes provider compute and storage attachment operations:
 
+- `prepareImage(request)`
 - `prepareStorageForStart(request)`
 - `start(request)`
 - `inspect(request)`
@@ -145,11 +148,12 @@ The shared persistent layout is:
 Start and resume storage flow:
 
 1. Data-plane chooses persistence mode and provisions/loads durable storage.
-2. Data-plane calls `prepareStorageForStart(...)` before compute start.
-3. Data-plane calls `start(...)` with the returned `storagePreparation`.
-4. Data-plane calls `attachStorage(...)` before runtime `init(...)`.
-5. Resume calls `resume(...)`, then `attachStorage(...)`, then runtime `resume(...)`.
-6. Stop and destroy paths call `cleanupStorage(...)` before and after compute teardown; adapters may no-op when no provider cleanup is currently required.
+2. Data-plane calls `prepareImage(...)` before compute start.
+3. Data-plane calls `prepareStorageForStart(...)` before compute start.
+4. Data-plane calls `start(...)` with the prepared image and returned `storagePreparation`.
+5. Data-plane calls `attachStorage(...)` before runtime `init(...)`.
+6. Resume calls `resume(...)`, then `attachStorage(...)`, then runtime `resume(...)`.
+7. Stop and destroy paths call `cleanupStorage(...)` before and after compute teardown; adapters may no-op when no provider cleanup is currently required.
 
 Provider differences:
 
@@ -171,7 +175,7 @@ The package is used by the data-plane API and worker through provider factories 
 
 Current high-level flows:
 
-- start workflow: ensure sandbox row, provision storage when persistent, `prepareStorageForStart`, `start`, `attachStorage`, persist provider metadata, runtime `init`, wait for readiness
+- start workflow: ensure sandbox row, provision storage when persistent, `prepareImage`, `prepareStorageForStart`, `start`, `attachStorage`, persist provider metadata, runtime `init`, wait for readiness
 - resume workflow: mark starting, try provider `resume`, attach storage, runtime `resume`, wait for readiness; persistent sandboxes may replace compute when provider state is missing
 - stop/destroy workflows: call storage cleanup around provider compute teardown
 - snapshot materialization: start an ephemeral setup sandbox, initialize runtime, capture a snapshot handle, then destroy compute
