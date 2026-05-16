@@ -28,7 +28,6 @@ import { resolveApiErrorMessage } from "../api/error-message.js";
 import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
 import {
   deleteSandboxProfileVersionRefreshSchedule,
-  putSandboxProfileVersionMaintenanceScript,
   putSandboxProfileVersionRefreshSchedule,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
@@ -96,6 +95,7 @@ type SnapshotOperationProgressState = {
 export type SnapshotRefreshSchedule = SandboxProfileVersion["refreshSchedule"];
 export type SnapshotRefreshScheduleInput = {
   cronExpression: string;
+  maintenanceScript: string | null;
   timezone: string;
 };
 
@@ -192,18 +192,6 @@ export function SandboxProfileSnapshotPanel(input: {
     <SandboxProfileSnapshotPanelView
       isActionPending={input.isActionPending}
       canRunMaintenanceRefresh={input.canRunMaintenanceRefresh}
-      maintenanceScriptSection={
-        input.version === null ? null : (
-          <SandboxProfileMaintenanceScriptSection
-            canRunMaintenanceScript={input.canRunMaintenanceScript}
-            disabled={input.isActionPending}
-            invalidateProfileVersions={input.invalidateProfileVersions}
-            maintenanceScript={input.maintenanceScript}
-            profileId={input.profileId}
-            version={input.version}
-          />
-        )
-      }
       onMaintenanceRefreshSnapshot={input.onMaintenanceRefreshSnapshot}
       onPublishSuccessMessageDismiss={input.onPublishSuccessMessageDismiss}
       onRefreshSnapshot={input.onRefreshSnapshot}
@@ -213,9 +201,12 @@ export function SandboxProfileSnapshotPanel(input: {
       refreshScheduleSection={
         input.version === null ? null : (
           <SandboxProfileSnapshotRefreshScheduleSection
+            canRunMaintenanceScript={input.canRunMaintenanceScript}
+            canRunMaintenanceRefresh={input.canRunMaintenanceRefresh}
             disabled={input.isActionPending}
-            hasSavedSnapshotMaintenanceScript={(input.maintenanceScript?.trim().length ?? 0) > 0}
             invalidateProfileVersions={input.invalidateProfileVersions}
+            maintenanceScript={input.maintenanceScript}
+            onMaintenanceRefreshSnapshot={input.onMaintenanceRefreshSnapshot}
             profileId={input.profileId}
             refreshSchedule={input.refreshSchedule}
             version={input.version}
@@ -231,7 +222,6 @@ export function SandboxProfileSnapshotPanel(input: {
 export function SandboxProfileSnapshotPanelView(input: {
   isActionPending: boolean;
   canRunMaintenanceRefresh: boolean;
-  maintenanceScriptSection: ReactNode;
   onMaintenanceRefreshSnapshot: () => void;
   onPublishSuccessMessageDismiss: () => void;
   onRefreshSnapshot: () => void;
@@ -297,11 +287,9 @@ export function SandboxProfileSnapshotPanelView(input: {
       ) : null}
 
       <SnapshotStatusPanel
-        canRunMaintenanceRefresh={input.canRunMaintenanceRefresh}
         detailsExpanded={detailsExpanded}
         isActionPending={input.isActionPending}
         onDetailsExpandedChange={setDetailsExpanded}
-        onMaintenanceRefreshSnapshot={input.onMaintenanceRefreshSnapshot}
         onRefreshSnapshot={input.onRefreshSnapshot}
         onRetryPublishSnapshot={input.onRetryPublishSnapshot}
         operationProgressState={operationProgressState}
@@ -309,19 +297,15 @@ export function SandboxProfileSnapshotPanelView(input: {
         version={input.version}
       />
 
-      {input.maintenanceScriptSection}
-
       {input.refreshScheduleSection}
     </SandboxProfileEditorHorizontalTabContent>
   );
 }
 
 function SnapshotStatusPanel(input: {
-  canRunMaintenanceRefresh: boolean;
   detailsExpanded: boolean;
   isActionPending: boolean;
   onDetailsExpandedChange: (expanded: boolean) => void;
-  onMaintenanceRefreshSnapshot: () => void;
   onRefreshSnapshot: () => void;
   onRetryPublishSnapshot: () => void;
   operationProgressState: SnapshotOperationProgressState | null;
@@ -383,9 +367,7 @@ function SnapshotStatusPanel(input: {
           ) : null}
           {input.state.kind === "creating" ? null : (
             <SnapshotStatusAction
-              canRunMaintenanceRefresh={input.canRunMaintenanceRefresh}
               isActionPending={input.isActionPending}
-              onMaintenanceRefreshSnapshot={input.onMaintenanceRefreshSnapshot}
               onRefreshSnapshot={input.onRefreshSnapshot}
               onRetryPublishSnapshot={input.onRetryPublishSnapshot}
               state={input.state}
@@ -463,9 +445,7 @@ export function resolveRetainedSnapshotOperationState(input: {
 }
 
 function SnapshotStatusAction(input: {
-  canRunMaintenanceRefresh: boolean;
   isActionPending: boolean;
-  onMaintenanceRefreshSnapshot: () => void;
   onRefreshSnapshot: () => void;
   onRetryPublishSnapshot: () => void;
   state: SnapshotActionState;
@@ -484,25 +464,14 @@ function SnapshotStatusAction(input: {
   }
 
   return (
-    <div className="flex w-full flex-col gap-2 sm:w-fit sm:flex-row">
-      <Button
-        className="w-fit shrink-0"
-        disabled={input.isActionPending}
-        onClick={input.onRefreshSnapshot}
-        type="button"
-      >
-        Refresh from setup script
-      </Button>
-      <Button
-        className="w-fit shrink-0"
-        disabled={input.isActionPending || !input.canRunMaintenanceRefresh}
-        onClick={input.onMaintenanceRefreshSnapshot}
-        type="button"
-        variant="secondary"
-      >
-        Refresh from snapshot maintenance script
-      </Button>
-    </div>
+    <Button
+      className="w-fit shrink-0"
+      disabled={input.isActionPending}
+      onClick={input.onRefreshSnapshot}
+      type="button"
+    >
+      Refresh from setup script
+    </Button>
   );
 }
 
@@ -571,14 +540,23 @@ function resolveSnapshotStatusDescription(input: {
 }
 
 function SandboxProfileSnapshotRefreshScheduleSection(input: {
+  canRunMaintenanceScript: boolean;
+  canRunMaintenanceRefresh: boolean;
   disabled: boolean;
-  hasSavedSnapshotMaintenanceScript: boolean;
   invalidateProfileVersions: (profileId: string) => Promise<void>;
+  maintenanceScript: string | null;
+  onMaintenanceRefreshSnapshot: () => void;
   profileId: string;
   refreshSchedule: SnapshotRefreshSchedule;
   version: number;
 }): React.JSX.Element {
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const [maintenanceScriptDraft, setMaintenanceScriptDraft] = useState(
+    input.maintenanceScript ?? "",
+  );
+  const [persistedMaintenanceScript, setPersistedMaintenanceScript] = useState(
+    input.maintenanceScript ?? "",
+  );
   const previousRefreshScheduleRef = useRef(input.refreshSchedule);
   const saveScheduleMutation = useMutation({
     mutationFn: async (schedule: SnapshotRefreshScheduleInput) => {
@@ -591,10 +569,14 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
         version: input.version,
         cronExpression: schedule.cronExpression,
         timezone: schedule.timezone,
+        maintenanceScript: schedule.maintenanceScript,
       });
     },
-    onSuccess: async () => {
+    onSuccess: async (_result, schedule) => {
+      const nextMaintenanceScript = schedule.maintenanceScript ?? "";
       setMutationError(null);
+      setMaintenanceScriptDraft(nextMaintenanceScript);
+      setPersistedMaintenanceScript(nextMaintenanceScript);
       await input.invalidateProfileVersions(input.profileId);
     },
     onError: (error: unknown) => {
@@ -634,87 +616,41 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
     }
   }, [input.refreshSchedule]);
 
-  return (
-    <SandboxProfileSnapshotRefreshScheduleForm
-      disabled={input.disabled || isMutating}
-      existingSchedule={input.refreshSchedule}
-      hasSavedSnapshotMaintenanceScript={input.hasSavedSnapshotMaintenanceScript}
-      mutationError={mutationError}
-      onDeleteSchedule={() => {
-        removeScheduleMutation.mutate();
-      }}
-      onSaveSchedule={(schedule) => {
-        saveScheduleMutation.mutate(schedule);
-      }}
-      previewAfter={new Date()}
-    />
-  );
-}
+  useEffect(() => {
+    const nextValue = input.maintenanceScript ?? "";
+    setMaintenanceScriptDraft(nextValue);
+    setPersistedMaintenanceScript(nextValue);
+    setMutationError(null);
+  }, [input.maintenanceScript]);
 
-function SandboxProfileMaintenanceScriptSection(input: {
-  canRunMaintenanceScript: boolean;
-  disabled: boolean;
-  invalidateProfileVersions: (profileId: string) => Promise<void>;
-  maintenanceScript: string | null;
-  profileId: string;
-  version: number;
-}): React.JSX.Element {
-  const [draftValue, setDraftValue] = useState(input.maintenanceScript ?? "");
-  const [persistedValue, setPersistedValue] = useState(input.maintenanceScript ?? "");
-  const [mutationError, setMutationError] = useState<string | null>(null);
-  const saveMutation = useMutation({
-    mutationFn: async (maintenanceScript: string) =>
-      putSandboxProfileVersionMaintenanceScript({
-        profileId: input.profileId,
-        version: input.version,
-        maintenanceScript: maintenanceScript.trim().length === 0 ? null : maintenanceScript,
-      }),
-    onSuccess: async (result) => {
-      const nextValue = result.maintenanceScript ?? "";
-      setMutationError(null);
-      setDraftValue(nextValue);
-      setPersistedValue(nextValue);
-      await input.invalidateProfileVersions(input.profileId);
-    },
-    onError: (error: unknown) => {
-      setMutationError(
-        resolveApiErrorMessage({
-          error,
-          fallbackMessage: "Could not save snapshot maintenance script.",
-        }),
-      );
-    },
-  });
-  const isMutating = saveMutation.isPending;
-  const hasChanges = draftValue !== persistedValue;
+  const maintenanceScriptHasChanges = maintenanceScriptDraft !== persistedMaintenanceScript;
   const maintenanceScriptTest = useSandboxProfileMaintenanceScriptTestRun({
     canRun: input.canRunMaintenanceScript,
     disabled: input.disabled || isMutating,
-    maintenanceScript: draftValue,
+    maintenanceScript: maintenanceScriptDraft,
     profileId: input.profileId,
     version: input.version,
   });
 
-  useEffect(() => {
-    const nextValue = input.maintenanceScript ?? "";
-    setDraftValue(nextValue);
-    setPersistedValue(nextValue);
-    setMutationError(null);
-  }, [input.maintenanceScript]);
-
-  function handleSubmit(event: SyntheticEvent<HTMLFormElement>): void {
-    event.preventDefault();
-    saveMutation.mutate(draftValue);
-  }
-
   return (
-    <SandboxProfileMaintenanceScriptSectionView
+    <SandboxProfileSnapshotRefreshScheduleForm
+      canRunMaintenanceScript={input.canRunMaintenanceScript}
+      canRunMaintenanceRefresh={input.canRunMaintenanceRefresh}
       disabled={input.disabled || isMutating}
-      draftValue={draftValue}
-      hasChanges={hasChanges}
+      existingSchedule={input.refreshSchedule}
+      maintenanceScriptDraft={maintenanceScriptDraft}
+      maintenanceScriptHasChanges={maintenanceScriptHasChanges}
+      savedMaintenanceScriptHasContent={persistedMaintenanceScript.trim().length > 0}
       mutationError={mutationError}
-      onChange={setDraftValue}
-      onSubmit={handleSubmit}
+      onChangeMaintenanceScript={setMaintenanceScriptDraft}
+      onDeleteSchedule={() => {
+        removeScheduleMutation.mutate();
+      }}
+      onMaintenanceRefreshSnapshot={input.onMaintenanceRefreshSnapshot}
+      onSaveSchedule={(schedule) => {
+        saveScheduleMutation.mutate(schedule);
+      }}
+      previewAfter={new Date()}
       testControl={<SandboxProfileSetupScriptTestButton {...maintenanceScriptTest.buttonProps} />}
       testPanel={<SandboxProfileSetupScriptTestPanel {...maintenanceScriptTest.panelProps} />}
     />
@@ -724,55 +660,46 @@ function SandboxProfileMaintenanceScriptSection(input: {
 export function SandboxProfileMaintenanceScriptSectionView(input: {
   disabled: boolean;
   draftValue: string;
-  hasChanges: boolean;
-  mutationError: string | null;
   onChange: (nextValue: string) => void;
-  onSubmit: (event: SyntheticEvent<HTMLFormElement>) => void;
   testControl: ReactNode;
   testPanel: ReactNode;
 }): React.JSX.Element {
   return (
-    <form onSubmit={input.onSubmit}>
-      <SandboxProfileScriptEditorPanel
-        ariaLabelledBy="sandbox-profile-maintenance-script-label"
-        description="Runs from the current usable snapshot when refreshing through the snapshot maintenance path."
-        disabled={input.disabled}
-        fieldLabel="Snapshot maintenance script"
-        footer={
-          <Button disabled={input.disabled || !input.hasChanges} type="submit">
-            Save snapshot maintenance script
-          </Button>
-        }
-        notice={
-          input.mutationError === null ? null : (
-            <Notice title="Snapshot maintenance script action failed" variant="alert">
-              {input.mutationError}
-            </Notice>
-          )
-        }
-        onChange={input.onChange}
-        placeholderText="#!/usr/bin/env bash"
-        testControl={input.testControl}
-        testPanel={input.testPanel}
-        title="Snapshot maintenance"
-        value={input.draftValue}
-      />
-    </form>
+    <SandboxProfileScriptEditorPanel
+      ariaLabelledBy="sandbox-profile-maintenance-script-label"
+      description="Runs from the current usable snapshot when refreshing through the snapshot maintenance path."
+      disabled={input.disabled}
+      fieldLabel="Snapshot maintenance script"
+      onChange={input.onChange}
+      placeholderText="#!/usr/bin/env bash"
+      testControl={input.testControl}
+      testPanel={input.testPanel}
+      title="Snapshot maintenance"
+      value={input.draftValue}
+    />
   );
 }
 
 export function SandboxProfileSnapshotRefreshScheduleForm(input: {
+  canRunMaintenanceScript: boolean;
+  canRunMaintenanceRefresh: boolean;
   disabled: boolean;
   existingSchedule: SnapshotRefreshSchedule;
-  hasSavedSnapshotMaintenanceScript: boolean;
   initialDraft?: {
     cronExpression: string;
     timezone: string;
   };
+  maintenanceScriptDraft: string;
+  maintenanceScriptHasChanges: boolean;
   mutationError: string | null;
+  onChangeMaintenanceScript: (nextValue: string) => void;
   onDeleteSchedule: () => void;
+  onMaintenanceRefreshSnapshot: () => void;
   onSaveSchedule: (schedule: SnapshotRefreshScheduleInput) => void;
   previewAfter: Date;
+  savedMaintenanceScriptHasContent: boolean;
+  testControl: ReactNode;
+  testPanel: ReactNode;
 }): React.JSX.Element {
   const existingSchedule = input.existingSchedule;
   const hasInitialDraft = input.initialDraft !== undefined;
@@ -780,6 +707,9 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
   const initialDraftTimezone = input.initialDraft?.timezone;
   const [scheduleEnabled, setScheduleEnabled] = useState(
     existingSchedule !== null || hasInitialDraft,
+  );
+  const [isEditingSchedule, setIsEditingSchedule] = useState(
+    existingSchedule === null || hasInitialDraft,
   );
   const [cronExpression, setCronExpression] = useState(
     initialDraftCronExpression ?? existingSchedule?.cronExpression ?? "",
@@ -800,31 +730,39 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
   const submitIsDisabled = input.disabled || (!scheduleEnabled && existingSchedule === null);
   const scheduleStatusMessage = scheduleEnabled
     ? existingSchedule === null
-      ? "Automatic refresh will start after a schedule is saved."
-      : "Automatic refresh is enabled for this published version."
+      ? "Automatic snapshot refresh will start after a schedule is saved."
+      : input.savedMaintenanceScriptHasContent
+        ? "Snapshot refresh will build from the current snapshot with maintenance script."
+        : "Snapshot refresh will build from the base image with setup script."
     : "Snapshots will not refresh automatically.";
-  const schedulePreparationPathMessage =
-    !scheduleEnabled || existingSchedule === null
-      ? null
-      : input.hasSavedSnapshotMaintenanceScript
-        ? "Automatic refresh will use the saved snapshot maintenance script."
-        : "Automatic refresh will use the setup script until a snapshot maintenance script is saved.";
-
   useEffect(() => {
     setScheduleEnabled(existingSchedule !== null || hasInitialDraft);
+    setIsEditingSchedule(existingSchedule === null || hasInitialDraft);
     setCronExpression(initialDraftCronExpression ?? existingSchedule?.cronExpression ?? "");
     setTimezone(initialDraftTimezone ?? existingSchedule?.timezone ?? readBrowserTimeZone());
   }, [existingSchedule, hasInitialDraft, initialDraftCronExpression, initialDraftTimezone]);
 
   function handleSubmit(event: SyntheticEvent<HTMLFormElement>): void {
     event.preventDefault();
-    if (scheduleEnabled) {
+    if (scheduleEnabled && isEditingSchedule) {
       const nextCronExpression = cronExpression.trim();
       const nextTimezone = timezone.trim();
 
       input.onSaveSchedule({
         cronExpression: nextCronExpression,
+        maintenanceScript:
+          input.maintenanceScriptDraft.trim().length === 0 ? null : input.maintenanceScriptDraft,
         timezone: nextTimezone,
+      });
+      return;
+    }
+
+    if (scheduleEnabled && input.maintenanceScriptHasChanges && existingSchedule !== null) {
+      input.onSaveSchedule({
+        cronExpression: existingSchedule.cronExpression,
+        maintenanceScript:
+          input.maintenanceScriptDraft.trim().length === 0 ? null : input.maintenanceScriptDraft,
+        timezone: existingSchedule.timezone,
       });
       return;
     }
@@ -832,6 +770,16 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
     if (existingSchedule !== null) {
       input.onDeleteSchedule();
     }
+  }
+
+  function handleEditSchedule(): void {
+    setIsEditingSchedule(true);
+  }
+
+  function handleCancelScheduleEdit(): void {
+    setIsEditingSchedule(false);
+    setCronExpression(existingSchedule?.cronExpression ?? "");
+    setTimezone(existingSchedule?.timezone ?? readBrowserTimeZone());
   }
 
   return (
@@ -842,20 +790,23 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
             <div className="flex min-h-10 items-center justify-between gap-3">
               <div className="space-y-1">
                 <FieldLabel htmlFor="sandbox-profile-snapshot-refresh-enabled">
-                  Automatic refresh
+                  Automatic snapshot refresh
                 </FieldLabel>
                 <p className="text-sm text-muted-foreground">{scheduleStatusMessage}</p>
-                {schedulePreparationPathMessage === null ? null : (
-                  <p className="text-sm text-muted-foreground">{schedulePreparationPathMessage}</p>
-                )}
               </div>
               <Switch
-                aria-label="Automatic refresh"
+                aria-label="Automatic snapshot refresh"
                 checked={scheduleEnabled}
                 disabled={input.disabled}
                 id="sandbox-profile-snapshot-refresh-enabled"
                 onCheckedChange={(checked) => {
                   setScheduleEnabled(checked);
+                  if (checked) {
+                    setIsEditingSchedule(existingSchedule === null);
+                    return;
+                  }
+
+                  setIsEditingSchedule(false);
                 }}
               />
             </div>
@@ -897,62 +848,108 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
 
           {scheduleEnabled ? (
             <>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field>
-                  <FieldHeader>
-                    <FieldLabel htmlFor="sandbox-profile-snapshot-refresh-cron">
-                      Cron expression
-                    </FieldLabel>
-                  </FieldHeader>
-                  <FieldContent>
-                    <Input
-                      disabled={input.disabled}
-                      id="sandbox-profile-snapshot-refresh-cron"
-                      onChange={(event) => {
-                        setCronExpression(event.target.value);
-                      }}
-                      placeholder="0 9 * * 1"
-                      required
-                      value={cronExpression}
-                    />
-                  </FieldContent>
-                </Field>
-                <Field>
-                  <FieldHeader>
-                    <FieldLabel htmlFor="sandbox-profile-snapshot-refresh-timezone">
-                      Timezone
-                    </FieldLabel>
-                  </FieldHeader>
-                  <FieldContent>
-                    <SingleSelectStringComboboxField
-                      contentClassName="max-h-80"
-                      disabled={input.disabled}
-                      emptyMessage="No matching timezones."
-                      inputId="sandbox-profile-snapshot-refresh-timezone"
-                      inputLabel="Timezone"
-                      onChange={(value) => {
-                        setTimezone(value ?? "");
-                      }}
-                      options={timezoneOptions}
-                      placeholder="Asia/Singapore"
-                      value={timezone}
-                    />
-                  </FieldContent>
-                </Field>
-              </div>
+              {input.maintenanceScriptHasChanges ? (
+                <p className="text-sm text-muted-foreground">
+                  Save the maintenance script to use it for snapshot refresh.
+                </p>
+              ) : null}
 
-              <CronExpressionBreakdownList
-                breakdown={cronExpressionBreakdown}
-                message={scheduleBehaviorDescription}
+              {isEditingSchedule ? (
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field>
+                      <FieldHeader>
+                        <FieldLabel htmlFor="sandbox-profile-snapshot-refresh-cron">
+                          Cron expression
+                        </FieldLabel>
+                      </FieldHeader>
+                      <FieldContent>
+                        <Input
+                          disabled={input.disabled}
+                          id="sandbox-profile-snapshot-refresh-cron"
+                          onChange={(event) => {
+                            setCronExpression(event.target.value);
+                          }}
+                          placeholder="0 9 * * 1"
+                          required
+                          value={cronExpression}
+                        />
+                      </FieldContent>
+                    </Field>
+                    <Field>
+                      <FieldHeader>
+                        <FieldLabel htmlFor="sandbox-profile-snapshot-refresh-timezone">
+                          Timezone
+                        </FieldLabel>
+                      </FieldHeader>
+                      <FieldContent>
+                        <SingleSelectStringComboboxField
+                          contentClassName="max-h-80"
+                          disabled={input.disabled}
+                          emptyMessage="No matching timezones."
+                          inputId="sandbox-profile-snapshot-refresh-timezone"
+                          inputLabel="Timezone"
+                          onChange={(value) => {
+                            setTimezone(value ?? "");
+                          }}
+                          options={timezoneOptions}
+                          placeholder="Asia/Singapore"
+                          value={timezone}
+                        />
+                      </FieldContent>
+                    </Field>
+                  </div>
+
+                  <CronExpressionBreakdownList
+                    breakdown={cronExpressionBreakdown}
+                    message={scheduleBehaviorDescription}
+                  />
+                </>
+              ) : null}
+
+              <SandboxProfileMaintenanceScriptSectionView
+                disabled={input.disabled}
+                draftValue={input.maintenanceScriptDraft}
+                onChange={input.onChangeMaintenanceScript}
+                testControl={input.testControl}
+                testPanel={input.testPanel}
               />
             </>
           ) : null}
 
           {scheduleEnabled || existingSchedule !== null ? (
             <ButtonGroup>
-              <Button disabled={submitIsDisabled} type="submit">
-                {scheduleEnabled ? "Save schedule" : "Save changes"}
-              </Button>
+              {scheduleEnabled && !isEditingSchedule && !input.maintenanceScriptHasChanges ? (
+                <Button disabled={input.disabled} onClick={handleEditSchedule} type="button">
+                  Edit schedule
+                </Button>
+              ) : (
+                <Button disabled={submitIsDisabled} type="submit">
+                  {scheduleEnabled ? "Save schedule" : "Save changes"}
+                </Button>
+              )}
+              {scheduleEnabled && isEditingSchedule && existingSchedule !== null ? (
+                <Button
+                  disabled={input.disabled}
+                  onClick={handleCancelScheduleEdit}
+                  type="button"
+                  variant="secondary"
+                >
+                  Cancel
+                </Button>
+              ) : null}
+              {scheduleEnabled &&
+              existingSchedule !== null &&
+              input.savedMaintenanceScriptHasContent ? (
+                <Button
+                  disabled={input.disabled || !input.canRunMaintenanceRefresh}
+                  onClick={input.onMaintenanceRefreshSnapshot}
+                  type="button"
+                  variant="secondary"
+                >
+                  Refresh from snapshot maintenance script
+                </Button>
+              ) : null}
             </ButtonGroup>
           ) : null}
         </div>

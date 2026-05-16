@@ -56,7 +56,6 @@ import {
   type SetupScriptTestStatus,
 } from "./sandbox-profile-setup-script-test.js";
 import {
-  SandboxProfileMaintenanceScriptSectionView,
   SandboxProfileSnapshotPanelView,
   SandboxProfileSnapshotRefreshScheduleForm,
   type SnapshotPanelState,
@@ -943,17 +942,35 @@ function SandboxProfileEditorPageStoryView(
             <SandboxProfileSnapshotPanelView
               canRunMaintenanceRefresh={canRunSnapshotMaintenance}
               isActionPending={false}
-              maintenanceScriptSection={
+              onMaintenanceRefreshSnapshot={() => {}}
+              onPublishSuccessMessageDismiss={() => {}}
+              onRefreshSnapshot={() => {}}
+              onRetryPublishSnapshot={() => {}}
+              publishSuccessMessage={input.publishSuccessMessage === true}
+              publishSuccessMessageKey={input.publishSuccessMessage === true ? "visible" : "idle"}
+              refreshScheduleSection={
                 snapshotStatus === "draft-unavailable" ? null : (
-                  <SandboxProfileMaintenanceScriptSectionView
+                  <SandboxProfileSnapshotRefreshScheduleForm
+                    canRunMaintenanceScript={snapshotPanelState.kind === "ready"}
+                    canRunMaintenanceRefresh={canRunSnapshotMaintenance}
                     disabled={false}
-                    draftValue={snapshotMaintenanceScript ?? ""}
-                    hasChanges={false}
-                    mutationError={null}
-                    onChange={() => {}}
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                    }}
+                    existingSchedule={createSnapshotRefreshSchedule(snapshotRefreshScheduleState)}
+                    {...(snapshotRefreshScheduleInitialDraft === null
+                      ? {}
+                      : { initialDraft: snapshotRefreshScheduleInitialDraft })}
+                    maintenanceScriptDraft={snapshotMaintenanceScript ?? ""}
+                    maintenanceScriptHasChanges={false}
+                    mutationError={
+                      snapshotRefreshScheduleState === "save-failure"
+                        ? "Could not save snapshot refresh schedule."
+                        : null
+                    }
+                    onChangeMaintenanceScript={() => {}}
+                    onDeleteSchedule={() => {}}
+                    onMaintenanceRefreshSnapshot={() => {}}
+                    onSaveSchedule={() => {}}
+                    previewAfter={new Date("2026-04-29T00:00:00.000Z")}
+                    savedMaintenanceScriptHasContent={hasSnapshotMaintenanceScript}
                     testControl={
                       <Button
                         disabled={!canRunSnapshotMaintenance}
@@ -966,32 +983,6 @@ function SandboxProfileEditorPageStoryView(
                       </Button>
                     }
                     testPanel={null}
-                  />
-                )
-              }
-              onMaintenanceRefreshSnapshot={() => {}}
-              onPublishSuccessMessageDismiss={() => {}}
-              onRefreshSnapshot={() => {}}
-              onRetryPublishSnapshot={() => {}}
-              publishSuccessMessage={input.publishSuccessMessage === true}
-              publishSuccessMessageKey={input.publishSuccessMessage === true ? "visible" : "idle"}
-              refreshScheduleSection={
-                snapshotStatus === "draft-unavailable" ? null : (
-                  <SandboxProfileSnapshotRefreshScheduleForm
-                    disabled={false}
-                    existingSchedule={createSnapshotRefreshSchedule(snapshotRefreshScheduleState)}
-                    hasSavedSnapshotMaintenanceScript={hasSnapshotMaintenanceScript}
-                    {...(snapshotRefreshScheduleInitialDraft === null
-                      ? {}
-                      : { initialDraft: snapshotRefreshScheduleInitialDraft })}
-                    mutationError={
-                      snapshotRefreshScheduleState === "save-failure"
-                        ? "Could not save snapshot refresh schedule."
-                        : null
-                    }
-                    onDeleteSchedule={() => {}}
-                    onSaveSchedule={() => {}}
-                    previewAfter={new Date("2026-04-29T00:00:00.000Z")}
                   />
                 )
               }

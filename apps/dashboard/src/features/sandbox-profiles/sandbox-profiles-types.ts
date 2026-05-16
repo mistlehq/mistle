@@ -26,10 +26,6 @@ type PutSandboxProfileVersionDraftRequest =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/draft"]["put"]["requestBody"]["content"]["application/json"];
 type PutSandboxProfileVersionDraftResponse =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/draft"]["put"]["responses"][200]["content"]["application/json"];
-type PutSandboxProfileVersionMaintenanceScriptRequest =
-  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/maintenance-script"]["put"]["requestBody"]["content"]["application/json"];
-type PutSandboxProfileVersionMaintenanceScriptResponse =
-  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/maintenance-script"]["put"]["responses"][200]["content"]["application/json"];
 type ListSandboxProvidersResponse =
   paths["/v1/sandbox/providers"]["get"]["responses"][200]["content"]["application/json"];
 
@@ -72,13 +68,6 @@ export type PutSandboxProfileVersionDraftInput = PutSandboxProfileVersionDraftRe
   version: number;
 };
 export type PutSandboxProfileVersionDraftResult = PutSandboxProfileVersionDraftResponse;
-export type PutSandboxProfileVersionMaintenanceScriptInput =
-  PutSandboxProfileVersionMaintenanceScriptRequest & {
-    profileId: string;
-    version: number;
-  };
-export type PutSandboxProfileVersionMaintenanceScriptResult =
-  PutSandboxProfileVersionMaintenanceScriptResponse;
 export type SandboxProvidersResult = ListSandboxProvidersResponse;
 export type SandboxProviderSummary = SandboxProvidersResult["items"][number];
 

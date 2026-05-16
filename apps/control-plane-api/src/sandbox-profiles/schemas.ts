@@ -358,25 +358,12 @@ export const putSandboxProfileVersionDraftResponseSchema = z
   })
   .strict();
 
-export const putSandboxProfileVersionMaintenanceScriptBodySchema = z
-  .object({
-    maintenanceScript: z.string().nullable(),
-  })
-  .strict();
-
-export const putSandboxProfileVersionMaintenanceScriptResponseSchema = z
-  .object({
-    sandboxProfileId: z.string().min(1),
-    version: z.number().int().min(1),
-    maintenanceScript: z.string().nullable(),
-  })
-  .strict();
-
 export const putSandboxProfileVersionRefreshScheduleBodySchema = z
   .object({
     name: z.string().min(1).optional(),
     cronExpression: z.string().min(1),
     timezone: z.string().min(1),
+    maintenanceScript: z.string().nullable().optional(),
   })
   .strict();
 

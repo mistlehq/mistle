@@ -25,6 +25,7 @@ export type PutProfileVersionRefreshScheduleInput = {
   name?: string | undefined;
   cronExpression: string;
   timezone: string;
+  maintenanceScript?: string | null | undefined;
   now: Date;
 };
 
@@ -52,6 +53,13 @@ export async function putProfileVersionRefreshSchedule(
 
   return db.transaction(async (tx) => {
     await lockProfileAndVersion(tx, tables, input);
+    if (input.maintenanceScript !== undefined) {
+      await updateProfileVersionMaintenanceScript(tx, tables, {
+        maintenanceScript: input.maintenanceScript,
+        profileId: input.profileId,
+        profileVersion: input.profileVersion,
+      });
+    }
     const existingSchedule = await findRefreshScheduleForProfileVersion(tx, tables, input);
 
     if (existingSchedule === null) {
@@ -67,6 +75,28 @@ export async function putProfileVersionRefreshSchedule(
       nextScheduledAt: occurrence.scheduledAt.toISOString(),
     });
   });
+}
+
+async function updateProfileVersionMaintenanceScript(
+  tx: ControlPlaneTransaction,
+  tables: ControlPlaneTables,
+  input: {
+    profileId: string;
+    profileVersion: number;
+    maintenanceScript: string | null;
+  },
+): Promise<void> {
+  await tx
+    .update(tables.sandboxProfileVersions)
+    .set({
+      maintenanceScript: input.maintenanceScript,
+    })
+    .where(
+      and(
+        eq(tables.sandboxProfileVersions.sandboxProfileId, input.profileId),
+        eq(tables.sandboxProfileVersions.version, input.profileVersion),
+      ),
+    );
 }
 
 function resolveInitialOccurrence(input: PutProfileVersionRefreshScheduleInput): {
@@ -208,6 +238,25 @@ async function updateRefreshSchedule(
   },
 ): Promise<ProfileVersionRefreshSchedule> {
   const name = input.name ?? DefaultRefreshScheduleName;
+  const currentSchedule = await tx.query.schedules.findFirst({
+    columns: {
+      cronExpression: true,
+      timezone: true,
+      enabled: true,
+      deletedAt: true,
+      nextScheduledAt: true,
+    },
+    where: (table, { eq: whereEq }) => whereEq(table.id, input.scheduleId),
+  });
+  if (currentSchedule === undefined) {
+    throw new Error(`Expected snapshot refresh schedule '${input.scheduleId}' to exist.`);
+  }
+
+  const scheduleDefinitionIsUnchanged =
+    currentSchedule.enabled &&
+    currentSchedule.deletedAt === null &&
+    currentSchedule.cronExpression === input.cronExpression &&
+    currentSchedule.timezone === input.timezone;
   const [schedule] = await tx
     .update(tables.schedules)
     .set({
@@ -215,7 +264,9 @@ async function updateRefreshSchedule(
       cronExpression: input.cronExpression,
       timezone: input.timezone,
       enabled: true,
-      nextScheduledAt: input.nextScheduledAt,
+      nextScheduledAt: scheduleDefinitionIsUnchanged
+        ? currentSchedule.nextScheduledAt
+        : input.nextScheduledAt,
       deletedAt: null,
       updatedAt: sql`now()`,
     })

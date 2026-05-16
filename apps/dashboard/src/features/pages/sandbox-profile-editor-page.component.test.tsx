@@ -1399,13 +1399,11 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByText("Latest snapshot: N/A")).toBeDefined();
     expect(screen.getByRole("button", { name: "Refresh from setup script" })).toBeDefined();
     expect(
-      screen
-        .getByRole("button", { name: "Refresh from snapshot maintenance script" })
-        .getAttribute("disabled"),
-    ).not.toBeNull();
+      screen.queryByRole("button", { name: "Refresh from snapshot maintenance script" }),
+    ).toBeNull();
   });
 
-  it("enables snapshot maintenance refresh when a usable published version has a snapshot maintenance script", () => {
+  it("shows snapshot maintenance editing without manual maintenance refresh before the schedule is saved", () => {
     renderSandboxProfileEditor({
       maintenanceScript: "echo maintain",
       routeSection: "snapshot",
@@ -1413,10 +1411,12 @@ describe("SandboxProfileEditorPage", () => {
     });
 
     expect(screen.getByRole("button", { name: "Refresh from setup script" })).toBeDefined();
+    expect(screen.queryByText("Snapshot maintenance")).toBeNull();
+
+    fireEvent.click(screen.getByRole("switch", { name: "Automatic snapshot refresh" }));
+
     expect(
-      screen
-        .getByRole("button", { name: "Refresh from snapshot maintenance script" })
-        .getAttribute("disabled"),
+      screen.queryByRole("button", { name: "Refresh from snapshot maintenance script" }),
     ).toBeNull();
     expect(screen.getByText("Snapshot maintenance")).toBeDefined();
     expect(screen.getByText("Snapshot maintenance script")).toBeDefined();
@@ -1433,10 +1433,11 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "published",
     });
 
-    const refreshSwitch = screen.getByRole("switch", { name: "Automatic refresh" });
+    const refreshSwitch = screen.getByRole("switch", { name: "Automatic snapshot refresh" });
     expect(refreshSwitch.getAttribute("aria-checked")).toBe("false");
     expect(screen.getByText("Snapshots will not refresh automatically.")).toBeDefined();
     expect(screen.queryByLabelText("Cron expression")).toBeNull();
+    expect(screen.queryByText("Snapshot maintenance")).toBeNull();
     expect(screen.queryByRole("button", { name: "Save schedule" })).toBeNull();
   });
 
@@ -1446,11 +1447,12 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "published",
     });
 
-    fireEvent.click(screen.getByRole("switch", { name: "Automatic refresh" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Automatic snapshot refresh" }));
 
     expect(
-      screen.getByText("Automatic refresh will start after a schedule is saved."),
+      screen.getByText("Automatic snapshot refresh will start after a schedule is saved."),
     ).toBeDefined();
+    expect(screen.getByText("Snapshot maintenance")).toBeDefined();
     const cronExpressionInput = screen.getByLabelText("Cron expression");
     expect(cronExpressionInput).toBeInstanceOf(HTMLInputElement);
     expect(cronExpressionInput).toHaveProperty("value", "");
@@ -1471,21 +1473,20 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "published",
     });
 
-    const refreshSwitch = screen.getByRole("switch", { name: "Automatic refresh" });
+    const refreshSwitch = screen.getByRole("switch", { name: "Automatic snapshot refresh" });
     expect(refreshSwitch.getAttribute("aria-checked")).toBe("true");
     expect(
-      screen.getByText("Automatic refresh is enabled for this published version."),
+      screen.getByText("Snapshot refresh will build from the base image with setup script."),
     ).toBeDefined();
-    expect(
-      screen.getByText(
-        "Automatic refresh will use the setup script until a snapshot maintenance script is saved.",
-      ),
-    ).toBeDefined();
+    expect(screen.getByText("Snapshot maintenance")).toBeDefined();
     expect(screen.getByText("Cron")).toBeDefined();
-    expect(screen.getAllByDisplayValue("0 9 * * 1")).toHaveLength(1);
+    expect(screen.queryByLabelText("Cron expression")).toBeNull();
     expect(screen.getByText("Asia/Singapore")).toBeDefined();
     expect(screen.getByText("Apr 30, 2026, 9:00 AM GMT+8")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Edit schedule" }));
+    expect(screen.getByLabelText("Cron expression")).toHaveProperty("value", "0 9 * * 1");
     expect(screen.getByRole("button", { name: "Save schedule" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDefined();
   });
 
   it("shows that automatic snapshot refresh uses the saved snapshot maintenance script", () => {
@@ -1504,8 +1505,14 @@ describe("SandboxProfileEditorPage", () => {
     });
 
     expect(
-      screen.getByText("Automatic refresh will use the saved snapshot maintenance script."),
+      screen.getByText(
+        "Snapshot refresh will build from the current snapshot with maintenance script.",
+      ),
     ).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "Refresh from snapshot maintenance script" }),
+    ).toBeDefined();
+    expect(screen.getByRole("button", { name: "Edit schedule" })).toBeDefined();
   });
 
   it("marks an existing automatic snapshot refresh schedule for removal when disabled", () => {
@@ -1522,15 +1529,14 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "published",
     });
 
-    fireEvent.click(screen.getByRole("switch", { name: "Automatic refresh" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Automatic snapshot refresh" }));
 
     expect(screen.getByText("Snapshots will not refresh automatically.")).toBeDefined();
     expect(
-      screen.queryByText(
-        "Automatic refresh will use the setup script until a snapshot maintenance script is saved.",
-      ),
+      screen.queryByText("Snapshot refresh will build from the base image with setup script."),
     ).toBeNull();
     expect(screen.queryByLabelText("Cron expression")).toBeNull();
+    expect(screen.queryByText("Snapshot maintenance")).toBeNull();
     expect(screen.queryByText("Apr 30, 2026, 9:00 AM GMT+8")).toBeNull();
     expect(screen.getByRole("button", { name: "Save changes" })).toBeDefined();
   });
@@ -1541,7 +1547,7 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "published",
     });
 
-    fireEvent.click(screen.getByRole("switch", { name: "Automatic refresh" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Automatic snapshot refresh" }));
     const cronExpressionInput = screen.getByLabelText("Cron expression");
     const timezoneInput = screen.getByLabelText("Timezone");
     fireEvent.change(cronExpressionInput, { target: { value: "0 9 * * *" } });
@@ -1628,7 +1634,7 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "published",
     });
 
-    fireEvent.click(screen.getByRole("switch", { name: "Automatic refresh" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Automatic snapshot refresh" }));
     fireEvent.change(screen.getByLabelText("Cron expression"), { target: { value: "   " } });
     fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
 
@@ -1655,7 +1661,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(
       screen.getByRole("tabpanel", { name: "Snapshots" }).querySelector(".max-w-5xl"),
     ).not.toBeNull();
-    expect(screen.queryByText("Automatic refresh")).toBeNull();
+    expect(screen.queryByText("Automatic snapshot refresh")).toBeNull();
     expect(screen.queryByRole("button", { name: "Save schedule" })).toBeNull();
   });
 

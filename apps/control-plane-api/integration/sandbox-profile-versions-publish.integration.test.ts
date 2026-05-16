@@ -108,6 +108,7 @@ describe.concurrent("sandbox profile versions publish integration", () => {
         body: JSON.stringify({
           name: "Draft refresh",
           cronExpression: "0 9 * * *",
+          maintenanceScript: null,
           timezone: "Asia/Singapore",
         }),
       },
@@ -266,6 +267,7 @@ describe.concurrent("sandbox profile versions publish integration", () => {
         body: JSON.stringify({
           name: "Existing active refresh",
           cronExpression: "15 7 * * *",
+          maintenanceScript: "echo maintain previous",
           timezone: "Asia/Singapore",
         }),
       },
@@ -377,6 +379,7 @@ describe.concurrent("sandbox profile versions publish integration", () => {
         body: JSON.stringify({
           name: "Active refresh",
           cronExpression: "30 8 * * *",
+          maintenanceScript: "echo active maintenance",
           timezone: "Asia/Singapore",
         }),
       },
@@ -394,6 +397,7 @@ describe.concurrent("sandbox profile versions publish integration", () => {
         body: JSON.stringify({
           name: "Draft refresh",
           cronExpression: "45 9 * * *",
+          maintenanceScript: "echo draft maintenance",
           timezone: "UTC",
         }),
       },

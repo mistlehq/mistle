@@ -4,6 +4,7 @@
 
 import { ScheduleTargetTypes } from "@mistle/db/control-plane";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
+import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import {
@@ -50,6 +51,7 @@ describe.concurrent("sandbox profile version refresh schedule integration", () =
         body: JSON.stringify({
           name: "Daily refresh",
           cronExpression: "0 9 * * *",
+          maintenanceScript: "echo maintain",
           timezone: "Asia/Singapore",
         }),
       },
@@ -92,6 +94,14 @@ describe.concurrent("sandbox profile version refresh schedule integration", () =
       enabled: true,
       deletedAt: null,
     });
+    const createdVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        maintenanceScript: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, "sbp_refresh_schedule_001"), eq(table.version, 1)),
+    });
+    expect(createdVersion?.maintenanceScript).toBe("echo maintain");
 
     const listVersionsResponse = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_refresh_schedule_001/versions",
@@ -129,6 +139,7 @@ describe.concurrent("sandbox profile version refresh schedule integration", () =
         },
         body: JSON.stringify({
           cronExpression: "30 10 * * *",
+          maintenanceScript: null,
           timezone: "Asia/Singapore",
         }),
       },
@@ -153,6 +164,14 @@ describe.concurrent("sandbox profile version refresh schedule integration", () =
       enabled: true,
       deletedAt: null,
     });
+    const updatedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        maintenanceScript: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, "sbp_refresh_schedule_001"), eq(table.version, 1)),
+    });
+    expect(updatedVersion?.maintenanceScript).toBeNull();
   });
 
   it("rejects invalid cron and timezone before creating a schedule", async ({ env }) => {
@@ -187,6 +206,7 @@ describe.concurrent("sandbox profile version refresh schedule integration", () =
         },
         body: JSON.stringify({
           cronExpression: "*/15 9 * * *",
+          maintenanceScript: null,
           timezone: "Mars/Olympus_Mons",
         }),
       },
@@ -198,6 +218,142 @@ describe.concurrent("sandbox profile version refresh schedule integration", () =
       where: (table, { eq }) => eq(table.organizationId, session.organizationId),
     });
     expect(persistedSchedules).toHaveLength(0);
+  });
+
+  it("preserves the maintenance script when a schedule update omits it", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-refresh-schedule-omit-script@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_refresh_schedule_omit_script",
+        organizationId: session.organizationId,
+        displayName: "Refresh Schedule Omit Script Profile",
+        activeVersion: 1,
+        createdAt: "2026-04-28T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_refresh_schedule_omit_script",
+        version: 1,
+        maintenanceScript: "echo keep",
+        publishedAt: "2026-04-28T00:01:00.000Z",
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_refresh_schedule_omit_script/versions/1/refresh-schedule",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          cronExpression: "0 9 * * *",
+          timezone: "Asia/Singapore",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        maintenanceScript: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, "sbp_refresh_schedule_omit_script"), eq(table.version, 1)),
+    });
+    expect(persistedVersion?.maintenanceScript).toBe("echo keep");
+  });
+
+  it("preserves the schedule cursor when only the maintenance script changes", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-refresh-schedule-script-only@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_refresh_schedule_script_only",
+        organizationId: session.organizationId,
+        displayName: "Refresh Schedule Script Only Profile",
+        activeVersion: 1,
+        createdAt: "2026-04-28T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_refresh_schedule_script_only",
+        version: 1,
+        maintenanceScript: "echo old",
+        publishedAt: "2026-04-28T00:01:00.000Z",
+      }),
+    );
+
+    const createResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_refresh_schedule_script_only/versions/1/refresh-schedule",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          cronExpression: "0 9 * * *",
+          timezone: "Asia/Singapore",
+          maintenanceScript: "echo old",
+        }),
+      },
+    );
+    expect(createResponse.status).toBe(200);
+    const createdBody = sandboxProfileVersionRefreshScheduleResponseSchema.parse(
+      await createResponse.json(),
+    );
+    const preservedNextScheduledAt = "2026-05-01T01:00:00.000Z";
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.schedules)
+      .set({
+        nextScheduledAt: preservedNextScheduledAt,
+      })
+      .where(eq(env.controlPlaneTables.schedules.id, createdBody.scheduleId));
+
+    const updateResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_refresh_schedule_script_only/versions/1/refresh-schedule",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          cronExpression: "0 9 * * *",
+          timezone: "Asia/Singapore",
+          maintenanceScript: "echo updated",
+        }),
+      },
+    );
+
+    expect(updateResponse.status).toBe(200);
+    const updatedBody = sandboxProfileVersionRefreshScheduleResponseSchema.parse(
+      await updateResponse.json(),
+    );
+    expect(updatedBody.nextScheduledAt).not.toBeNull();
+    expect(Date.parse(updatedBody.nextScheduledAt ?? "")).toBe(
+      Date.parse(preservedNextScheduledAt),
+    );
+    const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        maintenanceScript: true,
+      },
+      where: (table, { and, eq: whereEq }) =>
+        and(
+          whereEq(table.sandboxProfileId, "sbp_refresh_schedule_script_only"),
+          whereEq(table.version, 1),
+        ),
+    });
+    expect(persistedVersion?.maintenanceScript).toBe("echo updated");
   });
 
   it("soft-deletes an existing snapshot refresh schedule", async ({ env }) => {
@@ -232,6 +388,7 @@ describe.concurrent("sandbox profile version refresh schedule integration", () =
         },
         body: JSON.stringify({
           cronExpression: "0 9 * * *",
+          maintenanceScript: "echo keep after schedule delete",
           timezone: "Asia/Singapore",
         }),
       },
@@ -265,6 +422,14 @@ describe.concurrent("sandbox profile version refresh schedule integration", () =
       nextScheduledAt: null,
     });
     expect(persistedSchedule?.deletedAt).not.toBeNull();
+    const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        maintenanceScript: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, "sbp_refresh_schedule_delete"), eq(table.version, 1)),
+    });
+    expect(persistedVersion?.maintenanceScript).toBe("echo keep after schedule delete");
 
     const listVersionsResponse = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_refresh_schedule_delete/versions",

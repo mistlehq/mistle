@@ -21,8 +21,12 @@ The full initialization script for preparing a **Snapshot** from a **Base image*
 _Avoid_: Bootstrap script, init script
 
 **Snapshot maintenance script**:
-The version-scoped, publish-free script for refreshing an existing usable **Snapshot** into a replacement **Snapshot**.
+The version-scoped, publish-free script for **Automatic snapshot refresh** from an existing usable **Snapshot**.
 _Avoid_: Maintenance script, setup script variant, refresh script, update script
+
+**Automatic snapshot refresh**:
+A schedule that refreshes a published **Sandbox profile version**'s **Snapshot**.
+_Avoid_: Auto-refresh, scheduled rebuild
 
 **Snapshot preparation script**:
 The script that a snapshot refresh runs while preparing a **Snapshot**.
@@ -50,10 +54,14 @@ _Avoid_: Trigger when naming persistence, API, or workflow contracts
 - A **Setup script** prepares a **Snapshot** from a **Base image**.
 - A **Snapshot maintenance script** prepares a replacement **Snapshot** from an existing usable **Snapshot**.
 - A **Snapshot maintenance script** belongs to one **Sandbox profile version** but may be edited without publishing a new version.
-- Scheduled refresh uses the latest saved **Snapshot maintenance script** at execution time when one is present; otherwise it uses the **Setup script**.
+- **Automatic snapshot refresh** uses the latest saved **Snapshot maintenance script** at execution time when one is present; otherwise it uses the **Setup script**.
+- Unsaved **Snapshot maintenance script** edits do not affect **Automatic snapshot refresh**.
+- Saving **Automatic snapshot refresh** also saves **Snapshot maintenance script** edits.
+- Disabling **Automatic snapshot refresh** does not delete the saved **Snapshot maintenance script**.
+- A manual **Snapshot maintenance script** refresh is available only when **Automatic snapshot refresh** is enabled, a saved **Snapshot maintenance script** is present, and the **Sandbox profile version** has a usable **Snapshot**.
 - A **Snapshot preparation script** is either the **Setup script** or the **Snapshot maintenance script** used by a refresh execution.
 - A **Snapshot maintenance script** test run starts from an existing usable **Snapshot** but does not replace it.
-- When a new **Sandbox profile version** is published, the **Snapshot maintenance script** and refresh schedule definition should be copied forward from the previous version.
+- When a new **Sandbox profile version** is published, the **Snapshot maintenance script** and **Automatic snapshot refresh** definition should be copied forward from the previous version.
 - A **Collection landing page** may list **Sandbox profile version** families, triggers, sessions, or organization members.
 - A **Filtered collection view** narrows a **Collection landing page** without changing whether the underlying collection exists.
 - A **Trigger** is backed by one **Automation** record.
@@ -61,12 +69,13 @@ _Avoid_: Trigger when naming persistence, API, or workflow contracts
 
 ## Example Dialogue
 
-> **Dev:** "How does a scheduled refresh decide whether to run the **Setup script** or **Snapshot maintenance script**?"
+> **Dev:** "How does **Automatic snapshot refresh** decide whether to run the **Setup script** or **Snapshot maintenance script**?"
 > **Domain expert:** "If the target version has a saved **Snapshot maintenance script**, it starts from the existing **Snapshot** and runs that script; otherwise it starts from the **Base image** and runs the **Setup script**."
 
 ## Flagged Ambiguities
 
 - "refresh script" could mean either **Setup script** reuse or **Snapshot maintenance script** execution — resolved: use **Snapshot maintenance script** for the lighter existing-snapshot refresh path.
+- "auto-refresh" and "scheduled refresh" were used interchangeably — resolved: use **Automatic snapshot refresh** for the product concept.
 - "full refresh" was considered for the setup-based refresh path — resolved: use **Setup script** / `setup` when contrasting with **Snapshot maintenance script** / `maintenance`.
 - **Snapshot maintenance script** was initially discussed as ordinary versioned profile-version data — resolved: it is scoped to a **Sandbox profile version** but can be updated without publishing a new version or rebuilding from the **Setup script**.
 - "Maintenance script" collides with backend maintenance commands — resolved: use **Snapshot maintenance script** in product language.

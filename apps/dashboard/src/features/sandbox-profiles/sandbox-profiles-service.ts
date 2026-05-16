@@ -11,8 +11,6 @@ import type {
   LaunchableSandboxProfilesResult,
   PutSandboxProfileVersionDraftInput,
   PutSandboxProfileVersionDraftResult,
-  PutSandboxProfileVersionMaintenanceScriptInput,
-  PutSandboxProfileVersionMaintenanceScriptResult,
   PutSandboxProfileVersionRefreshScheduleInput,
   SandboxProfile,
   SandboxProfileVersion,
@@ -877,52 +875,6 @@ export async function refreshSandboxProfileVersion(input: {
   }
 }
 
-export async function putSandboxProfileVersionMaintenanceScript(
-  input: PutSandboxProfileVersionMaintenanceScriptInput,
-): Promise<PutSandboxProfileVersionMaintenanceScriptResult> {
-  try {
-    const response = await requestControlPlane({
-      operation: "putSandboxProfileVersionMaintenanceScript",
-      method: "PUT",
-      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
-        input.version,
-      )}/maintenance-script`,
-      body: {
-        maintenanceScript: input.maintenanceScript,
-      },
-      fallbackMessage: "Could not save sandbox profile maintenance script.",
-    });
-
-    const responseBody = await response.json();
-    const parsedResponse = z
-      .object({
-        sandboxProfileId: z.string().min(1),
-        version: z.number().int().min(1),
-        maintenanceScript: z.string().nullable(),
-      })
-      .strict()
-      .safeParse(responseBody);
-    if (!parsedResponse.success) {
-      throw new SandboxProfilesApiError({
-        operation: "putSandboxProfileVersionMaintenanceScript",
-        status: 500,
-        body: responseBody,
-        message: "Sandbox profile maintenance script response payload is invalid.",
-      });
-    }
-
-    return parsedResponse.data;
-  } catch (error) {
-    throw new SandboxProfilesApiError(
-      normalizeHttpApiError({
-        operation: "putSandboxProfileVersionMaintenanceScript",
-        error,
-        fallbackMessage: "Could not save sandbox profile maintenance script.",
-      }),
-    );
-  }
-}
-
 export async function retrySandboxProfileVersionPublishSnapshot(input: {
   profileId: string;
   version: number;
@@ -973,6 +925,7 @@ export async function putSandboxProfileVersionRefreshSchedule(
       body: {
         cronExpression: input.cronExpression,
         timezone: input.timezone,
+        maintenanceScript: input.maintenanceScript,
         ...(input.name === undefined ? {} : { name: input.name }),
       },
       fallbackMessage: "Could not save sandbox profile snapshot refresh schedule.",
