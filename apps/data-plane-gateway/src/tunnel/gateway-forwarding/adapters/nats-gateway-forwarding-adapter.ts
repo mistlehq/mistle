@@ -1,6 +1,7 @@
 import type { NatsConnection, Subscription } from "@nats-io/transport-node";
 import { z } from "zod";
 
+import { recordGatewayRelaySubscriptionFailure } from "../../gateway-relay-observability.js";
 import type { GatewayForwardingClientAdapter } from "../gateway-forwarding-client-adapter.js";
 import type { GatewayForwardingServerAdapter } from "../gateway-forwarding-server-adapter.js";
 import type {
@@ -182,7 +183,14 @@ export class NatsGatewayForwardingAdapter implements GatewayForwardingClientAdap
     const subscription = connection.subscribe(this.localForwardingSubject());
     this.connection = connection;
     this.subscription = subscription;
-    void this.processSubscription(subscription);
+    void this.processSubscription(subscription).catch((error: unknown) => {
+      recordGatewayRelaySubscriptionFailure({
+        backend: "nats",
+        error,
+        localNodeId: this.nodeId,
+        subscriptionKind: "gateway_forwarding",
+      });
+    });
   }
 
   public async stop(): Promise<void> {

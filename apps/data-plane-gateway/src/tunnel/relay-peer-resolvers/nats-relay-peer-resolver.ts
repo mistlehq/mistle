@@ -8,6 +8,10 @@ import {
 import { z } from "zod";
 
 import type { ActiveBootstrapSessionStore } from "../../runtime-state/active-bootstrap-session-store.js";
+import {
+  recordGatewayRelayPeerLookupEvent,
+  recordGatewayRelaySubscriptionFailure,
+} from "../gateway-relay-observability.js";
 import type { LocalPeerRegistryAdapter } from "../local-peer-registry/local-peer-registry-adapter.js";
 import type { RelayPeerResolver } from "../relay-peer-resolver.js";
 import type { RelayTarget } from "../types.js";
@@ -53,7 +57,14 @@ export class NatsRelayPeerResolver implements RelayPeerResolver {
     const subscription = connection.subscribe(this.connectionPeerLookupSubjectPattern());
     this.connection = connection;
     this.subscription = subscription;
-    void this.processSubscription(subscription);
+    void this.processSubscription(subscription).catch((error: unknown) => {
+      recordGatewayRelaySubscriptionFailure({
+        backend: "nats",
+        error,
+        localNodeId: this.nodeId,
+        subscriptionKind: "peer_lookup",
+      });
+    });
   }
 
   public async stop(): Promise<void> {
@@ -78,6 +89,15 @@ export class NatsRelayPeerResolver implements RelayPeerResolver {
       localTarget !== undefined &&
       (input.targetSessionId === undefined || input.targetSessionId === localTarget.sessionId)
     ) {
+      recordGatewayRelayPeerLookupEvent({
+        backend: "nats",
+        localNodeId: this.nodeId,
+        outcome: "local_hit",
+        peerSide: "bootstrap",
+        sandboxInstanceId: input.sandboxInstanceId,
+        sessionId: localTarget.sessionId,
+        targetNodeId: localTarget.nodeId,
+      });
       return localTarget;
     }
 
@@ -86,12 +106,38 @@ export class NatsRelayPeerResolver implements RelayPeerResolver {
       nowMs: this.clock.nowMs(),
     });
     if (activeSession === null) {
+      recordGatewayRelayPeerLookupEvent({
+        backend: "nats",
+        localNodeId: this.nodeId,
+        outcome: "miss",
+        peerSide: "bootstrap",
+        sandboxInstanceId: input.sandboxInstanceId,
+        ...(input.targetSessionId === undefined ? {} : { sessionId: input.targetSessionId }),
+      });
       return undefined;
     }
     if (input.targetSessionId !== undefined && activeSession.sessionId !== input.targetSessionId) {
+      recordGatewayRelayPeerLookupEvent({
+        backend: "nats",
+        localNodeId: this.nodeId,
+        outcome: "miss",
+        peerSide: "bootstrap",
+        sandboxInstanceId: input.sandboxInstanceId,
+        sessionId: input.targetSessionId,
+        targetNodeId: activeSession.nodeId,
+      });
       return undefined;
     }
 
+    recordGatewayRelayPeerLookupEvent({
+      backend: "nats",
+      localNodeId: this.nodeId,
+      outcome: "active_bootstrap_hit",
+      peerSide: "bootstrap",
+      sandboxInstanceId: activeSession.sandboxInstanceId,
+      sessionId: activeSession.sessionId,
+      targetNodeId: activeSession.nodeId,
+    });
     return {
       sandboxInstanceId: activeSession.sandboxInstanceId,
       side: "bootstrap",
@@ -110,6 +156,15 @@ export class NatsRelayPeerResolver implements RelayPeerResolver {
       sessionId: input.sessionId,
     });
     if (localTarget !== undefined) {
+      recordGatewayRelayPeerLookupEvent({
+        backend: "nats",
+        localNodeId: this.nodeId,
+        outcome: "local_hit",
+        peerSide: "connection",
+        sandboxInstanceId: input.sandboxInstanceId,
+        sessionId: input.sessionId,
+        targetNodeId: localTarget.nodeId,
+      });
       return localTarget;
     }
 
@@ -127,9 +182,38 @@ export class NatsRelayPeerResolver implements RelayPeerResolver {
         },
       );
 
-      return RelayTargetSchema.parse(decodeJson(response.data));
+      const target = RelayTargetSchema.parse(decodeJson(response.data));
+      recordGatewayRelayPeerLookupEvent({
+        backend: "nats",
+        localNodeId: this.nodeId,
+        outcome: "remote_hit",
+        peerSide: "connection",
+        sandboxInstanceId: input.sandboxInstanceId,
+        sessionId: input.sessionId,
+        targetNodeId: target.nodeId,
+      });
+      return target;
     } catch (error) {
-      if (error instanceof NoRespondersError || error instanceof TimeoutError) {
+      if (error instanceof NoRespondersError) {
+        recordGatewayRelayPeerLookupEvent({
+          backend: "nats",
+          localNodeId: this.nodeId,
+          outcome: "no_responders",
+          peerSide: "connection",
+          sandboxInstanceId: input.sandboxInstanceId,
+          sessionId: input.sessionId,
+        });
+        return undefined;
+      }
+      if (error instanceof TimeoutError) {
+        recordGatewayRelayPeerLookupEvent({
+          backend: "nats",
+          localNodeId: this.nodeId,
+          outcome: "timeout",
+          peerSide: "connection",
+          sandboxInstanceId: input.sandboxInstanceId,
+          sessionId: input.sessionId,
+        });
         return undefined;
       }
 

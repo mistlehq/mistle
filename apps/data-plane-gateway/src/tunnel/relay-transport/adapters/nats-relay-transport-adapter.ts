@@ -2,6 +2,11 @@ import type { NatsConnection, Subscription } from "@nats-io/transport-node";
 import { WebSocket } from "ws";
 import { z } from "zod";
 
+import {
+  recordGatewayRelayEnvelopeEvent,
+  recordGatewayRelayLifecycleEvent,
+  recordGatewayRelaySubscriptionFailure,
+} from "../../gateway-relay-observability.js";
 import type { RelayEnvelope, RelayPayload, RelayPeerSocket, RelayTarget } from "../../types.js";
 import type { RelayTransportAdapter } from "../relay-transport-adapter.js";
 
@@ -106,7 +111,19 @@ export class NatsRelayTransportAdapter implements RelayTransportAdapter {
     const subscription = connection.subscribe(this.localRelaySubject());
     this.connection = connection;
     this.subscription = subscription;
-    void this.processSubscription(subscription);
+    void this.processSubscription(subscription).catch((error: unknown) => {
+      recordGatewayRelaySubscriptionFailure({
+        backend: "nats",
+        error,
+        localNodeId: this.nodeId,
+        subscriptionKind: "relay_transport",
+      });
+    });
+    recordGatewayRelayLifecycleEvent({
+      backend: "nats",
+      event: "started",
+      localNodeId: this.nodeId,
+    });
   }
 
   public async stop(): Promise<void> {
@@ -118,6 +135,11 @@ export class NatsRelayTransportAdapter implements RelayTransportAdapter {
     this.subscription = undefined;
     this.connection = undefined;
     await subscription.drain();
+    recordGatewayRelayLifecycleEvent({
+      backend: "nats",
+      event: "stopped",
+      localNodeId: this.nodeId,
+    });
   }
 
   public registerLocalPeer(input: { target: RelayTarget; socket: RelayPeerSocket }): void {
@@ -150,11 +172,23 @@ export class NatsRelayTransportAdapter implements RelayTransportAdapter {
       this.relaySubject(envelope.target.nodeId),
       encodeJson(toWireEnvelope(envelope)),
     );
+    recordGatewayRelayEnvelopeEvent({
+      backend: "nats",
+      direction: "published",
+      envelope,
+      localNodeId: this.nodeId,
+    });
   }
 
   private async processSubscription(subscription: Subscription): Promise<void> {
     for await (const message of subscription) {
       const envelope = this.decodeEnvelope(message.data);
+      recordGatewayRelayEnvelopeEvent({
+        backend: "nats",
+        direction: "received",
+        envelope,
+        localNodeId: this.nodeId,
+      });
       this.deliverLocalEnvelope(envelope);
     }
   }
@@ -179,18 +213,44 @@ export class NatsRelayTransportAdapter implements RelayTransportAdapter {
 
     const socket = this.socketsBySessionId.get(envelope.target.sessionId);
     if (socket === undefined) {
+      recordGatewayRelayEnvelopeEvent({
+        backend: "nats",
+        direction: "dropped",
+        dropReason: "missing_local_socket",
+        envelope,
+        localNodeId: this.nodeId,
+      });
       return;
     }
     if (socket.readyState !== WebSocket.OPEN) {
+      recordGatewayRelayEnvelopeEvent({
+        backend: "nats",
+        direction: "dropped",
+        dropReason: "local_socket_not_open",
+        envelope,
+        localNodeId: this.nodeId,
+      });
       return;
     }
 
     if (envelope.kind === "frame") {
       socket.send(envelope.payload);
+      recordGatewayRelayEnvelopeEvent({
+        backend: "nats",
+        direction: "local_delivered",
+        envelope,
+        localNodeId: this.nodeId,
+      });
       return;
     }
 
     socket.close(envelope.closeCode, envelope.closeReason);
+    recordGatewayRelayEnvelopeEvent({
+      backend: "nats",
+      direction: "local_delivered",
+      envelope,
+      localNodeId: this.nodeId,
+    });
   }
 
   private localRelaySubject(): string {
