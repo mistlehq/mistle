@@ -17,7 +17,6 @@ import {
   Field,
   FieldContent,
   FieldDescription,
-  FieldHeader,
   FieldLabel,
   InlineCode,
   Input,
@@ -149,7 +148,7 @@ import {
   type SandboxProfileRuntimeDraftChanges,
   type SandboxProfileRuntimeDraftState,
 } from "./sandbox-profile-runtime-section.js";
-import { SandboxProfileSectionCard } from "./sandbox-profile-section-card.js";
+import { SandboxProfileScriptEditorPanel } from "./sandbox-profile-script-editor-panel.js";
 import {
   useLoadedSandboxProfileSetupScriptState,
   useSandboxProfileSetupScriptLoader,
@@ -165,7 +164,6 @@ import {
   type SnapshotPanelState,
 } from "./sandbox-profile-snapshot-panel.js";
 import { SandboxProfileTriggersSection } from "./sandbox-profile-triggers-section.js";
-import { SandboxSetupScriptEditor } from "./sandbox-setup-script-editor.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import {
   SessionConversationBottomPanelController,
@@ -3231,91 +3229,81 @@ export function SandboxProfileSetupScriptPanel(input: {
   );
 
   return (
-    <SectionBlock title="Setup Script">
-      <SandboxProfileSectionCard>
-        <Field>
-          <FieldHeader>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <FieldLabel id="sandbox-setup-script-label">Setup script</FieldLabel>
-              {input.testControl}
-            </div>
-          </FieldHeader>
-          <FieldContent>
-            <div className="gap-2 flex flex-col">
-              {input.testPanel}
-              <SandboxSetupScriptEditor
-                ariaLabelledBy="sandbox-setup-script-label"
-                disabled={input.disabled === true}
-                onChange={(nextValue) => {
-                  input.onChange?.(nextValue);
-                }}
-                placeholderText={SetupScriptPlaceholder}
-                value={input.value}
-              />
-              {input.disabled === true ? null : (
-                <div className="flex flex-col pt-1">
-                  <Accordion className="border-border/70 w-full border-y" multiple>
-                    <AccordionItem className="border-border/70" value="how-setup-script-works">
-                      <AccordionTrigger className="rounded-none border-0 px-0 py-2.5 text-sm font-medium hover:no-underline focus-visible:border-transparent focus-visible:ring-1">
-                        Setup script behavior
-                      </AccordionTrigger>
-                      <AccordionContent className="pb-3">
-                        <div className="gap-3 flex flex-col">
-                          <div className="gap-1 flex flex-col">
-                            <FieldDescription>{SetupScriptTimingDescription}</FieldDescription>
-                            <FieldDescription>
-                              Repositories are cloned under the working directory, using their
-                              <InlineCode variant="muted">owner/repository</InlineCode> path.
-                            </FieldDescription>
-                            {setupScriptContext.repositoryLocationGroup === null ? (
-                              <FieldDescription>
-                                For example,{" "}
-                                <InlineCode variant="muted">
-                                  {setupScriptContext.repositoryLocationExample.handle}
-                                </InlineCode>{" "}
-                                is available at{" "}
-                                <InlineCode variant="muted">
-                                  {setupScriptContext.repositoryLocationExample.path}
-                                </InlineCode>
-                                .
-                              </FieldDescription>
-                            ) : null}
-                          </div>
+    <SandboxProfileScriptEditorPanel
+      ariaLabelledBy="sandbox-setup-script-label"
+      disabled={input.disabled}
+      errorMessage={input.errorMessage}
+      fieldLabel="Setup script"
+      onChange={input.onChange}
+      placeholderText={SetupScriptPlaceholder}
+      testControl={input.testControl}
+      testPanel={input.testPanel}
+      title="Setup Script"
+      value={input.value}
+      detailsContent={
+        input.disabled === true ? null : (
+          <SetupScriptDetailsContent setupScriptContext={setupScriptContext} />
+        )
+      }
+    />
+  );
+}
 
-                          {setupScriptContext.repositoryLocationGroup === null ? null : (
-                            <SetupScriptContextGroupRows
-                              group={setupScriptContext.repositoryLocationGroup}
-                            />
-                          )}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
+function SetupScriptDetailsContent(input: {
+  setupScriptContext: ReturnType<typeof createSandboxBaseSetupScriptContextFromGeneratedInventory>;
+}): React.JSX.Element {
+  const setupScriptContext = input.setupScriptContext;
 
-                    <AccordionItem className="border-border/70" value="environment-and-tools">
-                      <AccordionTrigger className="rounded-none border-0 px-0 py-2.5 text-sm font-medium hover:no-underline focus-visible:border-transparent focus-visible:ring-1">
-                        Environment and installed tools
-                      </AccordionTrigger>
-                      <AccordionContent className="pb-3">
-                        <div className="gap-5 flex flex-col">
-                          {setupScriptContext.environmentAndToolGroups.map((group) => (
-                            <SetupScriptContextGroupRows group={group} key={group.id} />
-                          ))}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  </Accordion>
-                </div>
+  return (
+    <div className="flex flex-col pt-1">
+      <Accordion className="border-border/70 w-full border-y" multiple>
+        <AccordionItem className="border-border/70" value="how-setup-script-works">
+          <AccordionTrigger className="rounded-none border-0 px-0 py-2.5 text-sm font-medium hover:no-underline focus-visible:border-transparent focus-visible:ring-1">
+            Setup script behavior
+          </AccordionTrigger>
+          <AccordionContent className="pb-3">
+            <div className="gap-3 flex flex-col">
+              <div className="gap-1 flex flex-col">
+                <FieldDescription>{SetupScriptTimingDescription}</FieldDescription>
+                <FieldDescription>
+                  Repositories are cloned under the working directory, using their
+                  <InlineCode variant="muted">owner/repository</InlineCode> path.
+                </FieldDescription>
+                {setupScriptContext.repositoryLocationGroup === null ? (
+                  <FieldDescription>
+                    For example,{" "}
+                    <InlineCode variant="muted">
+                      {setupScriptContext.repositoryLocationExample.handle}
+                    </InlineCode>{" "}
+                    is available at{" "}
+                    <InlineCode variant="muted">
+                      {setupScriptContext.repositoryLocationExample.path}
+                    </InlineCode>
+                    .
+                  </FieldDescription>
+                ) : null}
+              </div>
+
+              {setupScriptContext.repositoryLocationGroup === null ? null : (
+                <SetupScriptContextGroupRows group={setupScriptContext.repositoryLocationGroup} />
               )}
-
-              {input.errorMessage ? (
-                <div aria-live="polite" className="text-destructive text-xs" role="status">
-                  {input.errorMessage}
-                </div>
-              ) : null}
             </div>
-          </FieldContent>
-        </Field>
-      </SandboxProfileSectionCard>
-    </SectionBlock>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem className="border-border/70" value="environment-and-tools">
+          <AccordionTrigger className="rounded-none border-0 px-0 py-2.5 text-sm font-medium hover:no-underline focus-visible:border-transparent focus-visible:ring-1">
+            Environment and installed tools
+          </AccordionTrigger>
+          <AccordionContent className="pb-3">
+            <div className="gap-5 flex flex-col">
+              {setupScriptContext.environmentAndToolGroups.map((group) => (
+                <SetupScriptContextGroupRows group={group} key={group.id} />
+              ))}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </div>
   );
 }

@@ -98,6 +98,20 @@ export const RefreshScheduleExisting: Story = {
   },
 };
 
+export const SnapshotMaintenanceWithRefreshSchedule: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotMaintenanceScript: `#!/usr/bin/env bash
+set -euo pipefail
+
+pnpm install --frozen-lockfile
+pnpm db:migrate`,
+    snapshotRefreshScheduleState: "existing",
+    snapshotState: "snapshot-ready",
+  },
+};
+
 export const RefreshScheduleInvalidPreview: Story = {
   args: {
     initialSectionId: "snapshot",

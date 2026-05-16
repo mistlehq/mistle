@@ -43,12 +43,12 @@ import {
   type CronExpressionBreakdown,
 } from "./sandbox-profile-editor-page-model.js";
 import { SandboxProfileEditorHorizontalTabContent } from "./sandbox-profile-editor-sections.js";
+import { SandboxProfileScriptEditorPanel } from "./sandbox-profile-script-editor-panel.js";
 import {
   SandboxProfileSetupScriptTestButton,
   SandboxProfileSetupScriptTestPanel,
   useSandboxProfileMaintenanceScriptTestRun,
 } from "./sandbox-profile-setup-script-test.js";
-import { SandboxSetupScriptEditor } from "./sandbox-setup-script-editor.js";
 
 export type SnapshotPanelState =
   | {
@@ -214,6 +214,7 @@ export function SandboxProfileSnapshotPanel(input: {
         input.version === null ? null : (
           <SandboxProfileSnapshotRefreshScheduleSection
             disabled={input.isActionPending}
+            hasSavedSnapshotMaintenanceScript={(input.maintenanceScript?.trim().length ?? 0) > 0}
             invalidateProfileVersions={input.invalidateProfileVersions}
             profileId={input.profileId}
             refreshSchedule={input.refreshSchedule}
@@ -483,7 +484,7 @@ function SnapshotStatusAction(input: {
   }
 
   return (
-    <ButtonGroup>
+    <div className="flex w-full flex-col gap-2 sm:w-fit sm:flex-row">
       <Button
         className="w-fit shrink-0"
         disabled={input.isActionPending}
@@ -499,9 +500,9 @@ function SnapshotStatusAction(input: {
         type="button"
         variant="secondary"
       >
-        Run maintenance refresh
+        Refresh from snapshot maintenance script
       </Button>
-    </ButtonGroup>
+    </div>
   );
 }
 
@@ -571,6 +572,7 @@ function resolveSnapshotStatusDescription(input: {
 
 function SandboxProfileSnapshotRefreshScheduleSection(input: {
   disabled: boolean;
+  hasSavedSnapshotMaintenanceScript: boolean;
   invalidateProfileVersions: (profileId: string) => Promise<void>;
   profileId: string;
   refreshSchedule: SnapshotRefreshSchedule;
@@ -636,6 +638,7 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
     <SandboxProfileSnapshotRefreshScheduleForm
       disabled={input.disabled || isMutating}
       existingSchedule={input.refreshSchedule}
+      hasSavedSnapshotMaintenanceScript={input.hasSavedSnapshotMaintenanceScript}
       mutationError={mutationError}
       onDeleteSchedule={() => {
         removeScheduleMutation.mutate();
@@ -677,7 +680,7 @@ function SandboxProfileMaintenanceScriptSection(input: {
       setMutationError(
         resolveApiErrorMessage({
           error,
-          fallbackMessage: "Could not save maintenance script.",
+          fallbackMessage: "Could not save snapshot maintenance script.",
         }),
       );
     },
@@ -705,49 +708,63 @@ function SandboxProfileMaintenanceScriptSection(input: {
   }
 
   return (
-    <FormPageSection>
-      <form onSubmit={handleSubmit}>
-        <div className="flex flex-col gap-4 p-4">
-          <Field>
-            <FieldHeader>
-              <FieldLabel id="sandbox-profile-maintenance-script-label">
-                Maintenance script
-              </FieldLabel>
-            </FieldHeader>
-            <FieldContent>
-              <SandboxSetupScriptEditor
-                ariaLabelledBy="sandbox-profile-maintenance-script-label"
-                disabled={input.disabled || isMutating}
-                onChange={setDraftValue}
-                placeholderText="#!/usr/bin/env bash"
-                value={draftValue}
-              />
-            </FieldContent>
-          </Field>
+    <SandboxProfileMaintenanceScriptSectionView
+      disabled={input.disabled || isMutating}
+      draftValue={draftValue}
+      hasChanges={hasChanges}
+      mutationError={mutationError}
+      onChange={setDraftValue}
+      onSubmit={handleSubmit}
+      testControl={<SandboxProfileSetupScriptTestButton {...maintenanceScriptTest.buttonProps} />}
+      testPanel={<SandboxProfileSetupScriptTestPanel {...maintenanceScriptTest.panelProps} />}
+    />
+  );
+}
 
-          {mutationError === null ? null : (
-            <Notice title="Maintenance script action failed" variant="alert">
-              {mutationError}
+export function SandboxProfileMaintenanceScriptSectionView(input: {
+  disabled: boolean;
+  draftValue: string;
+  hasChanges: boolean;
+  mutationError: string | null;
+  onChange: (nextValue: string) => void;
+  onSubmit: (event: SyntheticEvent<HTMLFormElement>) => void;
+  testControl: ReactNode;
+  testPanel: ReactNode;
+}): React.JSX.Element {
+  return (
+    <form onSubmit={input.onSubmit}>
+      <SandboxProfileScriptEditorPanel
+        ariaLabelledBy="sandbox-profile-maintenance-script-label"
+        description="Runs from the current usable snapshot when refreshing through the snapshot maintenance path."
+        disabled={input.disabled}
+        fieldLabel="Snapshot maintenance script"
+        footer={
+          <Button disabled={input.disabled || !input.hasChanges} type="submit">
+            Save snapshot maintenance script
+          </Button>
+        }
+        notice={
+          input.mutationError === null ? null : (
+            <Notice title="Snapshot maintenance script action failed" variant="alert">
+              {input.mutationError}
             </Notice>
-          )}
-
-          <SandboxProfileSetupScriptTestPanel {...maintenanceScriptTest.panelProps} />
-
-          <div className="flex flex-wrap items-center gap-3">
-            <Button disabled={input.disabled || isMutating || !hasChanges} type="submit">
-              Save maintenance script
-            </Button>
-            <SandboxProfileSetupScriptTestButton {...maintenanceScriptTest.buttonProps} />
-          </div>
-        </div>
-      </form>
-    </FormPageSection>
+          )
+        }
+        onChange={input.onChange}
+        placeholderText="#!/usr/bin/env bash"
+        testControl={input.testControl}
+        testPanel={input.testPanel}
+        title="Snapshot maintenance"
+        value={input.draftValue}
+      />
+    </form>
   );
 }
 
 export function SandboxProfileSnapshotRefreshScheduleForm(input: {
   disabled: boolean;
   existingSchedule: SnapshotRefreshSchedule;
+  hasSavedSnapshotMaintenanceScript: boolean;
   initialDraft?: {
     cronExpression: string;
     timezone: string;
@@ -786,6 +803,12 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
       ? "Automatic refresh will start after a schedule is saved."
       : "Automatic refresh is enabled for this published version."
     : "Snapshots will not refresh automatically.";
+  const schedulePreparationPathMessage =
+    !scheduleEnabled || existingSchedule === null
+      ? null
+      : input.hasSavedSnapshotMaintenanceScript
+        ? "Automatic refresh will use the saved snapshot maintenance script."
+        : "Automatic refresh will use the setup script until a snapshot maintenance script is saved.";
 
   useEffect(() => {
     setScheduleEnabled(existingSchedule !== null || hasInitialDraft);
@@ -822,6 +845,9 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
                   Automatic refresh
                 </FieldLabel>
                 <p className="text-sm text-muted-foreground">{scheduleStatusMessage}</p>
+                {schedulePreparationPathMessage === null ? null : (
+                  <p className="text-sm text-muted-foreground">{schedulePreparationPathMessage}</p>
+                )}
               </div>
               <Switch
                 aria-label="Automatic refresh"

@@ -1,5 +1,5 @@
 import { Button, Notice, ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@mistle/ui";
-import { SidebarSimpleIcon, TerminalIcon } from "@phosphor-icons/react";
+import { PlayIcon, SidebarSimpleIcon, TerminalIcon } from "@phosphor-icons/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } from "react-router";
@@ -56,6 +56,7 @@ import {
   type SetupScriptTestStatus,
 } from "./sandbox-profile-setup-script-test.js";
 import {
+  SandboxProfileMaintenanceScriptSectionView,
   SandboxProfileSnapshotPanelView,
   SandboxProfileSnapshotRefreshScheduleForm,
   type SnapshotPanelState,
@@ -101,6 +102,7 @@ export type SandboxProfileEditorPageStoryArgs = {
     | "snapshot-failed"
     | "refresh-failed";
   snapshotRefreshScheduleState?: "none" | "existing" | "invalid-preview" | "save-failure";
+  snapshotMaintenanceScript?: string | null;
   integrationsSectionState?: {
     bindingsErrorMessage?: string;
     directoryErrorMessage?: string;
@@ -778,6 +780,10 @@ function SandboxProfileEditorPageStoryView(
   const snapshotRefreshScheduleInitialDraft = createSnapshotRefreshScheduleInitialDraft(
     snapshotRefreshScheduleState,
   );
+  const snapshotMaintenanceScript = input.snapshotMaintenanceScript ?? null;
+  const hasSnapshotMaintenanceScript = (snapshotMaintenanceScript?.trim().length ?? 0) > 0;
+  const canRunSnapshotMaintenance =
+    snapshotPanelState.kind === "ready" && hasSnapshotMaintenanceScript;
   const setupScriptTestStatus =
     input.setupScriptTestStatus ?? (setupScriptDraft.trim().length === 0 ? "blank" : "idle");
   const storyConnections = [
@@ -935,9 +941,34 @@ function SandboxProfileEditorPageStoryView(
         if (sectionId === "snapshot") {
           return (
             <SandboxProfileSnapshotPanelView
-              canRunMaintenanceRefresh={false}
+              canRunMaintenanceRefresh={canRunSnapshotMaintenance}
               isActionPending={false}
-              maintenanceScriptSection={null}
+              maintenanceScriptSection={
+                snapshotStatus === "draft-unavailable" ? null : (
+                  <SandboxProfileMaintenanceScriptSectionView
+                    disabled={false}
+                    draftValue={snapshotMaintenanceScript ?? ""}
+                    hasChanges={false}
+                    mutationError={null}
+                    onChange={() => {}}
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                    }}
+                    testControl={
+                      <Button
+                        disabled={!canRunSnapshotMaintenance}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <PlayIcon aria-hidden className="size-4" />
+                        Test snapshot maintenance script
+                      </Button>
+                    }
+                    testPanel={null}
+                  />
+                )
+              }
               onMaintenanceRefreshSnapshot={() => {}}
               onPublishSuccessMessageDismiss={() => {}}
               onRefreshSnapshot={() => {}}
@@ -949,6 +980,7 @@ function SandboxProfileEditorPageStoryView(
                   <SandboxProfileSnapshotRefreshScheduleForm
                     disabled={false}
                     existingSchedule={createSnapshotRefreshSchedule(snapshotRefreshScheduleState)}
+                    hasSavedSnapshotMaintenanceScript={hasSnapshotMaintenanceScript}
                     {...(snapshotRefreshScheduleInitialDraft === null
                       ? {}
                       : { initialDraft: snapshotRefreshScheduleInitialDraft })}
