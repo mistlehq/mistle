@@ -1,5 +1,5 @@
 import { Button, Notice, ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@mistle/ui";
-import { PlayIcon, SidebarSimpleIcon, TerminalIcon } from "@phosphor-icons/react";
+import { SidebarSimpleIcon, TerminalIcon } from "@phosphor-icons/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } from "react-router";
@@ -968,7 +968,6 @@ function SandboxProfileEditorPageStoryView(
                     onSaveSchedule={() => {}}
                     previewAfter={new Date("2026-04-29T00:00:00.000Z")}
                     savedMaintenanceScript={snapshotMaintenanceScript ?? ""}
-                    savedMaintenanceScriptHasContent={hasSnapshotMaintenanceScript}
                     setupAssistantControl={{
                       disabled: false,
                       isStarting: false,

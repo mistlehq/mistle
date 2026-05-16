@@ -4,7 +4,7 @@ import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
-import { startProfileMaintenanceSetupAssistant } from "../services/start-profile-maintenance-script-test-run.js";
+import { startProfileMaintenanceSetupAssistant } from "../services/start-profile-maintenance-setup-assistant.js";
 import { startProfileSetupSandbox } from "../services/start-profile-setup-sandbox.js";
 import { route } from "./route.js";
 

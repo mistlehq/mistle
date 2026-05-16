@@ -1480,75 +1480,61 @@ function ReadySandboxProfileEditorPage(input: {
         ? "Setup Assistant is starting."
         : null;
   const setupAssistantPanelIsOpen = setupAssistantPanelState?.isOpen === true;
-  const setupAssistantControl: SetupScriptAssistantControl = {
-    disabled: setupAssistantPanelIsOpen || setupAssistantDisabledReason !== null,
-    errorMessage: setupAssistantError,
-    isStarting: !setupAssistantPanelIsOpen && startSetupAssistantMutation.isPending,
-    onToggle: ({ script, scriptKind }) => {
-      if (setupAssistantPanelState?.isOpen === true) {
-        return;
-      }
+  function createSetupAssistantControl(inputValue: {
+    defaultTitle: string;
+    disabledReason: string | null;
+    resolveVersion: () => number | null;
+  }): SetupScriptAssistantControl {
+    return {
+      disabled: setupAssistantPanelIsOpen || inputValue.disabledReason !== null,
+      errorMessage: setupAssistantError,
+      isStarting: !setupAssistantPanelIsOpen && startSetupAssistantMutation.isPending,
+      onToggle: ({ script, scriptKind }) => {
+        if (setupAssistantPanelState?.isOpen === true) {
+          return;
+        }
 
-      setSetupAssistantError(null);
-      const initialComposerText = buildSetupAssistantInitialComposerText(script, scriptKind);
+        const version = inputValue.resolveVersion();
+        if (version === null) {
+          return;
+        }
 
-      setSetupAssistantPanelState((currentState) => ({
-        initialComposerText,
-        isOpen: true,
-        sandboxInstanceId: currentState?.sandboxInstanceId ?? null,
-        scriptKind,
-        startupOperationId: currentState?.startupOperationId ?? null,
-      }));
+        setSetupAssistantError(null);
+        const initialComposerText = buildSetupAssistantInitialComposerText(script, scriptKind);
 
-      if (
-        (setupAssistantPanelState !== null &&
-          setupAssistantPanelState.sandboxInstanceId !== null) ||
-        startSetupAssistantMutation.isPending
-      ) {
-        return;
-      }
+        setSetupAssistantPanelState((currentState) => ({
+          initialComposerText,
+          isOpen: true,
+          sandboxInstanceId: currentState?.sandboxInstanceId ?? null,
+          scriptKind,
+          startupOperationId: currentState?.startupOperationId ?? null,
+        }));
 
-      startSetupAssistantMutation.mutate({ scriptKind, version: input.mode.version });
-    },
-    title: setupAssistantPanelIsOpen
-      ? "Setup Assistant is open in the right panel."
-      : (setupAssistantDisabledReason ?? "Open the right panel to write this setup script."),
-  };
-  const maintenanceAssistantControl: SetupScriptAssistantControl = {
-    disabled: setupAssistantPanelIsOpen || maintenanceAssistantDisabledReason !== null,
-    errorMessage: setupAssistantError,
-    isStarting: !setupAssistantPanelIsOpen && startSetupAssistantMutation.isPending,
-    onToggle: ({ script, scriptKind }) => {
-      if (setupAssistantPanelState?.isOpen === true || snapshotVersion === null) {
-        return;
-      }
+        if (
+          (setupAssistantPanelState !== null &&
+            setupAssistantPanelState.sandboxInstanceId !== null) ||
+          startSetupAssistantMutation.isPending
+        ) {
+          return;
+        }
 
-      setSetupAssistantError(null);
-      const initialComposerText = buildSetupAssistantInitialComposerText(script, scriptKind);
-
-      setSetupAssistantPanelState((currentState) => ({
-        initialComposerText,
-        isOpen: true,
-        sandboxInstanceId: currentState?.sandboxInstanceId ?? null,
-        scriptKind,
-        startupOperationId: currentState?.startupOperationId ?? null,
-      }));
-
-      if (
-        (setupAssistantPanelState !== null &&
-          setupAssistantPanelState.sandboxInstanceId !== null) ||
-        startSetupAssistantMutation.isPending
-      ) {
-        return;
-      }
-
-      startSetupAssistantMutation.mutate({ scriptKind, version: snapshotVersion.version });
-    },
-    title: setupAssistantPanelIsOpen
-      ? "Setup Assistant is open in the right panel."
-      : (maintenanceAssistantDisabledReason ??
-        "Open the right panel to write this snapshot maintenance script."),
-  };
+        startSetupAssistantMutation.mutate({ scriptKind, version });
+      },
+      title: setupAssistantPanelIsOpen
+        ? "Setup Assistant is open in the right panel."
+        : (inputValue.disabledReason ?? inputValue.defaultTitle),
+    };
+  }
+  const setupAssistantControl = createSetupAssistantControl({
+    defaultTitle: "Open the right panel to write this setup script.",
+    disabledReason: setupAssistantDisabledReason,
+    resolveVersion: () => input.mode.version,
+  });
+  const maintenanceAssistantControl = createSetupAssistantControl({
+    defaultTitle: "Open the right panel to write this snapshot maintenance script.",
+    disabledReason: maintenanceAssistantDisabledReason,
+    resolveVersion: () => snapshotVersion?.version ?? null,
+  });
 
   useEffect(() => {
     if (input.publishSuccessNavigationKey !== null) {

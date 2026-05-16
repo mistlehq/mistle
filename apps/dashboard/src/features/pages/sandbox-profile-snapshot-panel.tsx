@@ -675,7 +675,6 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
       maintenanceScriptDraft={maintenanceScriptDraft}
       maintenanceScriptHasChanges={maintenanceScriptHasChanges}
       savedMaintenanceScript={persistedMaintenanceScript}
-      savedMaintenanceScriptHasContent={persistedMaintenanceScript.trim().length > 0}
       mutationError={mutationError}
       onChangeMaintenanceScript={setMaintenanceScriptDraft}
       onDeleteSchedule={() => {
@@ -719,12 +718,12 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
   onSaveSchedule: (schedule: SnapshotRefreshScheduleInput) => void;
   previewAfter: Date;
   savedMaintenanceScript: string;
-  savedMaintenanceScriptHasContent: boolean;
   setupAssistantControl: SnapshotMaintenanceScriptAssistantControl;
   testButtonProps: SetupScriptTestButtonProps;
   testPanel: ReactNode;
 }): React.JSX.Element {
   const existingSchedule = input.existingSchedule;
+  const savedMaintenanceScriptHasContent = input.savedMaintenanceScript.trim().length > 0;
   const hasInitialDraft = input.initialDraft !== undefined;
   const initialDraftCronExpression = input.initialDraft?.cronExpression;
   const initialDraftTimezone = input.initialDraft?.timezone;
@@ -753,7 +752,7 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
   const scheduleStatusMessage = scheduleEnabled
     ? existingSchedule === null
       ? "Automatic snapshot refresh will start after a schedule is saved."
-      : input.savedMaintenanceScriptHasContent
+      : savedMaintenanceScriptHasContent
         ? "Snapshot refresh will build from the current snapshot with maintenance script."
         : "Snapshot refresh will build from the base image with setup script."
     : existingSchedule === null
@@ -1004,9 +1003,7 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
                             scriptKind: "maintenance",
                           });
                         },
-                        title: resolveSnapshotMaintenanceSetupAssistantTitle(
-                          input.setupAssistantControl.title,
-                        ),
+                        title: input.setupAssistantControl.title,
                       }}
                       testButtonProps={input.testButtonProps}
                       testPanel={input.testPanel}
@@ -1021,10 +1018,6 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
       </form>
     </SectionBlock>
   );
-}
-
-function resolveSnapshotMaintenanceSetupAssistantTitle(title: string): string {
-  return title.replace("this setup script", "this snapshot maintenance script");
 }
 
 function CronExpressionBreakdownList(input: {
