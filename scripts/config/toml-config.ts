@@ -33,6 +33,13 @@ const TomlConfigComments: readonly CommentedSection[] = [
     ],
   },
   {
+    heading: "[gateway_relay]",
+    comments: [
+      "# Use memory for single-process local development. Set backend to nats and",
+      "# configure gateway_relay.nats to run multiple data-plane-gateway instances.",
+    ],
+  },
+  {
     heading: "[object_store.sandbox_storage]",
     comments: [
       '# Used when sandbox.storage.archil.mount_object_store = "sandbox_storage".',
@@ -282,6 +289,9 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
         url: "redis://127.0.0.1:6379",
         key_prefix: "mistle:runtime-state:development",
       },
+    },
+    gateway_relay: {
+      backend: "memory",
     },
     object_store: {
       assets: {

@@ -90,6 +90,13 @@ services:
     networks:
       - sandbox-dev
 
+  nats:
+    image: nats:2.14.0-alpine
+    ports:
+      - "${DEV_NATS_PORT:-4222}:4222"
+    networks:
+      - sandbox-dev
+
   data-plane-gateway-relay:
     image: nginx:1.27-alpine
     extra_hosts:

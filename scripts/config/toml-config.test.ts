@@ -45,6 +45,8 @@ describe("toml config generation", () => {
     });
 
     expect(content).toContain("[services.control_plane_api]");
+    expect(content).toContain("[gateway_relay]");
+    expect(content).toContain('backend = "memory"');
     expect(content).toContain(
       "# Use direct_url for migrations and pooled_url for app runtime traffic.",
     );

@@ -5,8 +5,6 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parse as parseToml } from "smol-toml";
-
 import {
   getLocalDevDockerRegistrySandboxBaseImageRef,
   getLocalPreparedRuntimeSandboxBaseImageRef,
@@ -18,6 +16,11 @@ import {
 } from "../../packages/sandbox/src/index.js";
 import { ensureDevObjectStoreBucketExists } from "./ensure-object-store-bucket.ts";
 import { createControlPlaneStartupCommands } from "./start-commands.ts";
+import {
+  createLocalDevInfraPlan,
+  readControlPlaneApiLocalPort,
+  readDataPlaneGatewayLocalPort,
+} from "./start-config.ts";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, "..", "..");
@@ -96,81 +99,6 @@ function readDevStartOptions(): DevStartMode {
   }
 
   throw new Error(`Unsupported dev start option(s): ${args.join(", ")}`);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function getValueAtPath(root: unknown, path: readonly string[]): unknown {
-  let current: unknown = root;
-
-  for (const segment of path) {
-    if (!isRecord(current)) {
-      return undefined;
-    }
-
-    current = current[segment];
-  }
-
-  return current;
-}
-
-function readTomlConfigRoot(configPath: string): Record<string, unknown> {
-  const parsed = parseToml(readFileSync(configPath, "utf8"));
-
-  if (!isRecord(parsed)) {
-    throw new Error(`Missing or invalid TOML object in ${configPath}.`);
-  }
-
-  return parsed;
-}
-
-function readRequiredIntegerTomlValue(
-  configPath: string,
-  path: readonly string[],
-  pathLabel: string,
-): number {
-  const parsed = readTomlConfigRoot(configPath);
-  const resolvedValue = getValueAtPath(parsed, path);
-
-  if (typeof resolvedValue !== "number" || Number.isInteger(resolvedValue) === false) {
-    throw new Error(`Missing or invalid ${pathLabel} in config/config.development.toml.`);
-  }
-
-  return resolvedValue;
-}
-
-function readControlPlaneApiLocalPort(configPath: string): number {
-  return readRequiredIntegerTomlValue(
-    configPath,
-    ["services", "control_plane_api", "port"],
-    "services.control_plane_api.port",
-  );
-}
-
-function readDataPlaneGatewayLocalPort(configPath: string): number {
-  return readRequiredIntegerTomlValue(
-    configPath,
-    ["services", "data_plane_gateway", "port"],
-    "services.data_plane_gateway.port",
-  );
-}
-
-function readDockerSandboxProviderEnabled(configPath: string): boolean {
-  const configuredEnabled = process.env.MISTLE_SANDBOX_DOCKER_ENABLED?.trim();
-  if (configuredEnabled === "true") {
-    return true;
-  }
-  if (configuredEnabled === "false") {
-    return false;
-  }
-  if (configuredEnabled !== undefined && configuredEnabled.length > 0) {
-    throw new Error("MISTLE_SANDBOX_DOCKER_ENABLED must be 'true' or 'false' when set.");
-  }
-  const parsed = readTomlConfigRoot(configPath);
-  const resolvedValue = getValueAtPath(parsed, ["sandbox", "docker", "enabled"]);
-  return resolvedValue !== false && getValueAtPath(parsed, ["sandbox", "docker"]) !== undefined;
 }
 
 function readRequiredEnv(envVarName: string): string {
@@ -468,11 +396,9 @@ function dockerImageExists(imageTag: string): boolean {
 
 async function start(): Promise<void> {
   const mode = readDevStartOptions();
-  const dockerSandboxProviderEnabled = readDockerSandboxProviderEnabled(DEV_CONFIG_PATH);
-  const infraSummary = dockerSandboxProviderEnabled
-    ? "SeaweedFS, Postgres 18, PgBouncer, Mailpit, Registry, OTel LGTM, gateway relay"
-    : "SeaweedFS, Postgres 18, PgBouncer, Mailpit, OTel LGTM";
-  console.log(`Starting local infra dependencies (${infraSummary})...`);
+  const infraPlan = createLocalDevInfraPlan(DEV_CONFIG_PATH);
+  const dockerSandboxProviderEnabled = infraPlan.dockerSandboxProviderEnabled;
+  console.log(`Starting local infra dependencies (${infraPlan.summary})...`);
   const controlPlaneApiLocalPort = readControlPlaneApiLocalPort(DEV_CONFIG_PATH);
   const dataPlaneGatewayLocalPort = readDataPlaneGatewayLocalPort(DEV_CONFIG_PATH);
   const modeConfig = createDevModeConfig({
@@ -489,23 +415,9 @@ async function start(): Promise<void> {
   localInfraEnv = sharedDevEnv;
   localInfraStartAttempted = true;
 
-  const infraServiceNames = [
-    "seaweedfs",
-    "postgres",
-    "pgbouncer",
-    "mailpit",
-    "otel-lgtm",
-    "valkey",
-  ];
-
-  if (dockerSandboxProviderEnabled) {
-    infraServiceNames.splice(4, 0, "registry");
-    infraServiceNames.push("data-plane-gateway-relay");
-  }
-
   runOrThrow({
     command: "docker",
-    args: ["compose", "-f", DEV_COMPOSE_PATH, "up", "-d", "--wait", ...infraServiceNames],
+    args: ["compose", "-f", DEV_COMPOSE_PATH, "up", "-d", "--wait", ...infraPlan.serviceNames],
     env: sharedDevEnv,
   });
 
