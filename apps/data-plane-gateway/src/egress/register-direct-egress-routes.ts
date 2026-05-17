@@ -1,0 +1,273 @@
+import type { NodeWebSocket } from "@hono/node-ws";
+import type { WSContext, WSMessageReceive } from "hono/ws";
+import WebSocket, { type RawData } from "ws";
+
+import type { DataPlaneGatewayApp } from "../types.js";
+import {
+  DirectEgressHttpRoutePath,
+  DirectEgressProxyError,
+  type DirectEgressProxyService,
+  DirectEgressWebSocketRoutePath,
+  logDirectEgressFailure,
+} from "./direct-egress-proxy-service.js";
+
+type RegisterDirectEgressRoutesInput = {
+  app: DataPlaneGatewayApp;
+  directEgressProxyService: DirectEgressProxyService;
+  upgradeWebSocket: NodeWebSocket["upgradeWebSocket"];
+};
+
+const WebSocketCloseCodes = {
+  POLICY_VIOLATION: 1008,
+  INTERNAL_ERROR: 1011,
+};
+
+export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInput): void {
+  input.app.all(DirectEgressHttpRoutePath, async (ctx) => {
+    const target = new URL(ctx.req.url).searchParams.get("target");
+    try {
+      const admission = await input.directEgressProxyService.authorize({
+        authorizationHeader: ctx.req.header("authorization"),
+        db: ctx.get("db"),
+        headers: ctx.req.raw.headers,
+        method: ctx.req.method,
+        tables: ctx.get("tables"),
+        target,
+        ...(ctx.get("testEnvironmentId") === undefined
+          ? {}
+          : { testEnvironmentId: ctx.get("testEnvironmentId") }),
+      });
+      const body = await readRequestBody(ctx.req.raw);
+      return await input.directEgressProxyService.proxyHttp({
+        admission,
+        body,
+        ...(ctx.get("testEnvironmentId") === undefined
+          ? {}
+          : { testEnvironmentId: ctx.get("testEnvironmentId") }),
+      });
+    } catch (error) {
+      if (error instanceof DirectEgressProxyError) {
+        logDirectEgressFailure({
+          error,
+          target,
+        });
+        return new Response(error.message, { status: error.status });
+      }
+
+      throw error;
+    }
+  });
+
+  input.app.get(
+    DirectEgressWebSocketRoutePath,
+    async (ctx, next) => {
+      if (ctx.req.header("upgrade")?.toLowerCase() !== "websocket") {
+        return ctx.text("Direct websocket egress endpoint requires websocket upgrade.", 400);
+      }
+      const target = new URL(ctx.req.url).searchParams.get("target");
+      try {
+        const admission = await input.directEgressProxyService.authorize({
+          authorizationHeader: ctx.req.header("authorization"),
+          db: ctx.get("db"),
+          headers: ctx.req.raw.headers,
+          method: "GET",
+          tables: ctx.get("tables"),
+          target: normalizeWebSocketTarget(target),
+          ...(ctx.get("testEnvironmentId") === undefined
+            ? {}
+            : { testEnvironmentId: ctx.get("testEnvironmentId") }),
+        });
+        ctx.set("directEgressAdmission", admission);
+        await next();
+      } catch (error) {
+        if (error instanceof DirectEgressProxyError) {
+          logDirectEgressFailure({
+            error,
+            target,
+          });
+          return new Response(error.message, { status: error.status });
+        }
+
+        throw error;
+      }
+    },
+    input.upgradeWebSocket((ctx) => {
+      const admission = ctx.get("directEgressAdmission");
+      if (admission === undefined) {
+        throw new Error("Expected direct egress websocket request admission.");
+      }
+      let upstreamSocket: WebSocket | undefined;
+      const pendingClientMessages: WSMessageReceive[] = [];
+
+      return {
+        onOpen: (_event, ws) => {
+          input.directEgressProxyService
+            .resolveWebSocketUpstream({ admission })
+            .then((upstreamUrl) => {
+              upstreamSocket = connectUpstreamWebSocket({
+                client: ws,
+                onOpen: (upstream) => {
+                  for (const message of pendingClientMessages.splice(0)) {
+                    sendUpstreamWebSocketMessage({
+                      data: message,
+                      upstream,
+                    });
+                  }
+                },
+                upstreamUrl,
+              });
+            })
+            .catch((error: unknown) => {
+              ws.close(
+                WebSocketCloseCodes.POLICY_VIOLATION,
+                error instanceof Error ? error.message : String(error),
+              );
+            });
+        },
+        onMessage: (event, ws) => {
+          const upstream = upstreamSocket;
+          if (upstream === undefined || upstream.readyState === WebSocket.CONNECTING) {
+            pendingClientMessages.push(event.data);
+            return;
+          }
+          if (upstream.readyState !== WebSocket.OPEN) {
+            ws.close(
+              WebSocketCloseCodes.INTERNAL_ERROR,
+              "Direct egress upstream websocket is not connected.",
+            );
+            return;
+          }
+
+          sendUpstreamWebSocketMessage({
+            data: event.data,
+            upstream,
+          });
+        },
+        onClose: () => {
+          upstreamSocket?.close();
+        },
+        onError: () => {
+          upstreamSocket?.terminate();
+        },
+      };
+    }),
+  );
+}
+
+async function readRequestBody(request: Request): Promise<Uint8Array | undefined> {
+  if (request.body === null) {
+    return undefined;
+  }
+
+  return new Uint8Array(await request.arrayBuffer());
+}
+
+function normalizeWebSocketTarget(target: string | null): string | null {
+  if (target === null) {
+    return null;
+  }
+
+  if (target.startsWith("ws://")) {
+    return `http://${target.slice("ws://".length)}`;
+  }
+  if (target.startsWith("wss://")) {
+    return `https://${target.slice("wss://".length)}`;
+  }
+
+  return target;
+}
+
+function connectUpstreamWebSocket(input: {
+  client: WSContext<WebSocket>;
+  onOpen: (upstream: WebSocket) => void;
+  upstreamUrl: URL;
+}): WebSocket {
+  const upstream = new WebSocket(input.upstreamUrl);
+  upstream.on("open", () => {
+    if (input.client.readyState !== WebSocket.OPEN) {
+      upstream.close();
+      return;
+    }
+
+    input.onOpen(upstream);
+  });
+  upstream.on("message", (data, isBinary) => {
+    if (input.client.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    input.client.send(toClientWebSocketMessage(data, isBinary));
+  });
+  upstream.on("close", (code, reason) => {
+    if (input.client.readyState === WebSocket.OPEN) {
+      input.client.close(code, reason.toString("utf8"));
+    }
+  });
+  upstream.on("error", (error) => {
+    if (input.client.readyState === WebSocket.OPEN) {
+      input.client.close(WebSocketCloseCodes.INTERNAL_ERROR, error.message);
+    }
+  });
+
+  return upstream;
+}
+
+function sendUpstreamWebSocketMessage(input: {
+  data: WSMessageReceive;
+  upstream: WebSocket;
+}): void {
+  if (typeof input.data === "string") {
+    input.upstream.send(input.data);
+    return;
+  }
+  if (input.data instanceof ArrayBuffer) {
+    input.upstream.send(Buffer.from(input.data));
+    return;
+  }
+  if (input.data instanceof SharedArrayBuffer) {
+    input.upstream.send(Buffer.from(input.data));
+    return;
+  }
+
+  void input.data.arrayBuffer().then(
+    (buffer: ArrayBuffer) => {
+      if (input.upstream.readyState === WebSocket.OPEN) {
+        input.upstream.send(Buffer.from(buffer));
+      }
+    },
+    (_error: unknown) => {
+      input.upstream.terminate();
+    },
+  );
+}
+
+function toClientWebSocketMessage(data: RawData, isBinary: boolean): string | ArrayBuffer {
+  if (!isBinary) {
+    return toRawDataBuffer(data).toString("utf8");
+  }
+  if (Buffer.isBuffer(data)) {
+    return copyBytesToArrayBuffer(data);
+  }
+  if (data instanceof ArrayBuffer) {
+    return data;
+  }
+
+  return copyBytesToArrayBuffer(Buffer.concat(data));
+}
+
+function toRawDataBuffer(data: RawData): Buffer {
+  if (Buffer.isBuffer(data)) {
+    return data;
+  }
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(data);
+  }
+
+  return Buffer.concat(data);
+}
+
+function copyBytesToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}

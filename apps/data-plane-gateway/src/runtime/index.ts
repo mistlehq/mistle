@@ -25,7 +25,9 @@ import {
 } from "../deadlines/sandbox-instance-deadline-service.js";
 import { ActiveSandboxRuntimePlanCache } from "../egress/active-runtime-plan-cache.js";
 import { CredentialCache } from "../egress/credential-cache.js";
+import { DirectEgressProxyService } from "../egress/direct-egress-proxy-service.js";
 import { GatewayEgressTransportService } from "../egress/egress-transport-service.js";
+import { registerDirectEgressRoutes } from "../egress/register-direct-egress-routes.js";
 import { SandboxEgressTokenService } from "../egress/sandbox-egress-token-service.js";
 import { registerSandboxBootstrapAttachmentTerminateRoute } from "../internal/runtime-state/register-sandbox-bootstrap-attachment-terminate-route.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
@@ -350,6 +352,26 @@ export function createDataPlaneGatewayRuntime(
     }),
     credentialCache,
   );
+  const directEgressProxyService = new DirectEgressProxyService(
+    activeRuntimePlanCache,
+    config.app.controlPlaneApi.publicBaseUrl,
+    new ControlPlaneInternalClient({
+      baseUrl: config.app.controlPlaneApi.baseUrl,
+      internalAuthServiceToken: config.app.internalAuth.serviceToken,
+      ...(config.app.__dangerouslyEnableTestIsolation === undefined
+        ? {}
+        : {
+            testEnvironmentIdHeader:
+              config.app.__dangerouslyEnableTestIsolation.testEnvironmentIdHeader,
+          }),
+    }),
+    credentialCache,
+    {
+      tokenSecret: config.app.sandbox.egress.tokenSecret,
+      tokenIssuer: config.app.sandbox.egress.tokenIssuer,
+      tokenAudience: config.app.sandbox.egress.tokenAudience,
+    },
+  );
   const portAccessNodeEntrypoint = createPortAccessNodeEntrypoint({
     bootstrapTokenConfig: {
       tokenSecret: config.app.sandbox.publish.access.tokenSecret,
@@ -477,6 +499,11 @@ export function createDataPlaneGatewayRuntime(
       tokenIssuer: config.app.sandbox.bootstrap.tokenIssuer,
       tokenAudience: config.app.sandbox.bootstrap.tokenAudience,
     },
+  });
+  registerDirectEgressRoutes({
+    app,
+    directEgressProxyService,
+    upgradeWebSocket: nodeWebSocket.upgradeWebSocket,
   });
   registerPortAccessRoutes({
     app,

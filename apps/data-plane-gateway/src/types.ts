@@ -3,6 +3,7 @@ import { AppIds, type loadConfig } from "@mistle/config";
 import type { DataPlaneDatabase, DataPlaneTables } from "@mistle/db/data-plane";
 import type { Context, Hono } from "hono";
 
+import type { DirectEgressAdmission } from "./egress/direct-egress-proxy-service.js";
 import type { GatewayEgressTransportService } from "./egress/egress-transport-service.js";
 import type { PortAccessNodeEntrypoint } from "./publishing/port-access-node-entrypoint.js";
 import type { PortAccessTransportService } from "./publishing/port-access-transport.js";
@@ -39,6 +40,7 @@ export type AppContextVariables = {
   db: DataPlaneDatabase;
   tables: DataPlaneTables;
   testEnvironmentId?: string;
+  directEgressAdmission?: DirectEgressAdmission;
   sandboxTunnelAdmission?: AdmittedSandboxTunnelWebSocketRequest;
 };
 
