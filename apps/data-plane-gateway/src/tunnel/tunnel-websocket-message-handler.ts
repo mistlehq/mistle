@@ -47,6 +47,13 @@ export type EgressTransportDelivery = Extract<
   }
 >;
 
+export type EgressTokenRequestDelivery = Extract<
+  TunnelProtocolDelivery,
+  {
+    kind: "egressTokenRequest";
+  }
+>;
+
 /**
  * Normalizes websocket message payloads to the tunnel relay payload types.
  */
@@ -75,6 +82,7 @@ export async function handleTunnelWebSocketMessage(input: {
   currentSocket: Pick<WSContext<WebSocket>, "raw" | "send">;
   db: DataPlaneDatabase;
   gatewayEgressTransportService: GatewayEgressTransportService;
+  handleEgressTokenRequestDelivery?: (delivery: EgressTokenRequestDelivery) => Promise<void>;
   handleSigningDelivery?: ((delivery: SigningDelivery) => Promise<void>) | undefined;
   handleOperationDelivery?: ((delivery: OperationDelivery) => Promise<void>) | undefined;
   sandboxKeepaliveRepository: SandboxKeepaliveRepository;
@@ -173,6 +181,12 @@ export async function handleTunnelWebSocketMessage(input: {
         ? {}
         : { testEnvironmentId: input.testEnvironmentId }),
     });
+  } else if (translation.delivery.kind === "egressTokenRequest") {
+    if (input.handleEgressTokenRequestDelivery === undefined) {
+      throw new Error("Egress token request delivery requires an egress token handler.");
+    }
+
+    await input.handleEgressTokenRequestDelivery(translation.delivery);
   } else if (translation.delivery.kind === "egressMalformed") {
     input.gatewayEgressTransportService.rejectMalformedBootstrapMessage({
       message: translation.delivery.message,

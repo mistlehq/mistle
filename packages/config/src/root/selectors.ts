@@ -163,6 +163,11 @@ export function selectGlobalConfig(config: Config): GlobalConfig {
         tokenIssuer: config.sandbox.tokens.bootstrap.issuer,
         tokenAudience: config.sandbox.tokens.bootstrap.audience,
       },
+      egress: {
+        tokenSecret: config.sandbox.tokens.egress.secret,
+        tokenIssuer: config.sandbox.tokens.egress.issuer,
+        tokenAudience: config.sandbox.tokens.egress.audience,
+      },
     },
   };
 }

@@ -6,6 +6,13 @@ export {
 } from "./bootstrap-token.js";
 export type { BootstrapTokenConfig, VerifiedBootstrapToken } from "./bootstrap-token.js";
 export {
+  EgressTokenError,
+  EgressTokenErrorCode,
+  mintEgressToken,
+  verifyEgressToken,
+} from "./egress-token.js";
+export type { EgressTokenClaims, EgressTokenConfig, VerifiedEgressToken } from "./egress-token.js";
+export {
   TunnelExchangeTokenError,
   TunnelExchangeTokenErrorCode,
   mintTunnelExchangeToken,

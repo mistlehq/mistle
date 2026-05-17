@@ -187,6 +187,11 @@ secret = "replace-with-bootstrap-token-secret"
 issuer = "data-plane-worker"
 audience = "data-plane-gateway"
 
+[sandbox.tokens.egress]
+secret = "replace-with-egress-token-secret"
+issuer = "data-plane-gateway"
+audience = "mistle-gateway-egress"
+
 [sandbox.publish.access_token]
 secret = "replace-with-publish-access-token-secret"
 issuer = "control-plane-api"

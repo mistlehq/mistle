@@ -490,6 +490,18 @@ const RootEnvDescriptors = [
     path: ["sandbox", "tokens", "bootstrap", "audience"],
   },
   {
+    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_SECRET",
+    path: ["sandbox", "tokens", "egress", "secret"],
+  },
+  {
+    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_ISSUER",
+    path: ["sandbox", "tokens", "egress", "issuer"],
+  },
+  {
+    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_AUDIENCE",
+    path: ["sandbox", "tokens", "egress", "audience"],
+  },
+  {
     envVar: "MISTLE_SANDBOX_TOKENS_CONNECT_SECRET",
     path: ["sandbox", "tokens", "connect", "secret"],
   },

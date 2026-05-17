@@ -64,6 +64,18 @@ const GlobalResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
     envVar: "MISTLE_SANDBOX_TOKENS_BOOTSTRAP_AUDIENCE",
   },
   {
+    path: ["sandbox", "egress", "tokenSecret"],
+    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_SECRET",
+  },
+  {
+    path: ["sandbox", "egress", "tokenIssuer"],
+    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_ISSUER",
+  },
+  {
+    path: ["sandbox", "egress", "tokenAudience"],
+    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_AUDIENCE",
+  },
+  {
     path: ["sandbox", "connect", "tokenSecret"],
     envVar: "MISTLE_SANDBOX_TOKENS_CONNECT_SECRET",
   },

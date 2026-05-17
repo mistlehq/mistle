@@ -150,6 +150,11 @@ function createRootConfig(input: {
           issuer: "data-plane-worker",
           audience: "data-plane-gateway",
         },
+        egress: {
+          secret: "egress-secret",
+          issuer: "data-plane-gateway",
+          audience: "mistle-gateway-egress",
+        },
       },
       publish: {
         access_token: {

@@ -355,6 +355,31 @@ const EgressTransportMessageSchema = z.union([
   EgressStreamCancelSchema,
 ]);
 
+const EgressTokenRequestSchema = z.object({
+  type: z.literal("egress.token.request"),
+  requestId: NonEmptyStringSchema,
+});
+
+const EgressTokenResponseSchema = z.object({
+  type: z.literal("egress.token.response"),
+  requestId: NonEmptyStringSchema,
+  token: NonEmptyStringSchema,
+  expiresAt: NonEmptyStringSchema,
+});
+
+const EgressTokenErrorSchema = z.object({
+  type: z.literal("egress.token.error"),
+  requestId: NonEmptyStringSchema,
+  code: z.enum(["invalid_sandbox_state", "internal_error"]),
+  message: NonEmptyStringSchema,
+});
+
+const EgressTokenControlMessageSchema = z.discriminatedUnion("type", [
+  EgressTokenRequestSchema,
+  EgressTokenResponseSchema,
+  EgressTokenErrorSchema,
+]);
+
 const StreamOpenSchema = z.object({
   type: z.literal("stream.open"),
   streamId: PositiveIntegerSchema,
@@ -639,6 +664,10 @@ export type EgressTcpData = z.infer<typeof EgressTcpDataSchema>;
 export type EgressTcpClose = z.infer<typeof EgressTcpCloseSchema>;
 export type EgressStreamCancel = z.infer<typeof EgressStreamCancelSchema>;
 export type EgressTransportMessage = z.infer<typeof EgressTransportMessageSchema>;
+export type EgressTokenRequest = z.infer<typeof EgressTokenRequestSchema>;
+export type EgressTokenResponse = z.infer<typeof EgressTokenResponseSchema>;
+export type EgressTokenError = z.infer<typeof EgressTokenErrorSchema>;
+export type EgressTokenControlMessage = z.infer<typeof EgressTokenControlMessageSchema>;
 
 export type StreamOpen = z.infer<typeof StreamOpenSchema>;
 export type StreamOpenOK = z.infer<typeof StreamOpenOKSchema>;
@@ -778,10 +807,23 @@ export function parseEgressTransportMessage(payload: string): EgressTransportMes
   const result = EgressTransportMessageSchema.safeParse(parsedPayload);
   return result.success ? result.data : undefined;
 }
+
+export function parseEgressTokenControlMessage(
+  payload: string,
+): EgressTokenControlMessage | undefined {
+  const parsedPayload = parseJSON(payload);
+  if (parsedPayload === undefined) {
+    return undefined;
+  }
+
+  const result = EgressTokenControlMessageSchema.safeParse(parsedPayload);
+  return result.success ? result.data : undefined;
+}
 export type SandboxSessionControlMessage =
   | StreamControlMessage
   | TelemetryControlMessage
   | OperationControlMessage
   | SigningControlMessage
+  | EgressTokenControlMessage
   | KeepaliveControlMessage
   | RuntimeReadyControlMessage;

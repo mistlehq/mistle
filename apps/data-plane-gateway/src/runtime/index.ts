@@ -26,6 +26,7 @@ import {
 import { ActiveSandboxRuntimePlanCache } from "../egress/active-runtime-plan-cache.js";
 import { CredentialCache } from "../egress/credential-cache.js";
 import { GatewayEgressTransportService } from "../egress/egress-transport-service.js";
+import { SandboxEgressTokenService } from "../egress/sandbox-egress-token-service.js";
 import { registerSandboxBootstrapAttachmentTerminateRoute } from "../internal/runtime-state/register-sandbox-bootstrap-attachment-terminate-route.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
 import { logger } from "../logger.js";
@@ -380,6 +381,11 @@ export function createDataPlaneGatewayRuntime(
           }),
     }),
   });
+  const sandboxEgressTokenService = new SandboxEgressTokenService({
+    tokenSecret: config.app.sandbox.egress.tokenSecret,
+    tokenIssuer: config.app.sandbox.egress.tokenIssuer,
+    tokenAudience: config.app.sandbox.egress.tokenAudience,
+  });
   const telemetryIngressSink = createSandboxTelemetryIngressSink({
     clock: systemClock,
     gatewayNodeId: nodeId,
@@ -437,6 +443,7 @@ export function createDataPlaneGatewayRuntime(
       tokenAudience: config.app.sandbox.connect.tokenAudience,
     } satisfies ConnectionTokenConfig,
     sandboxSigningRequestService,
+    sandboxEgressTokenService,
     portAccessTransportService,
     portsTargetAuthorizeService,
     interactiveStreamRouter,

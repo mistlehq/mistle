@@ -19,6 +19,7 @@ const GeneratedSecretEnvVars = [
   "MISTLE_INTERNAL_AUTH_SHARED_TOKEN",
   "MISTLE_SANDBOX_TOKENS_CONNECT_SECRET",
   "MISTLE_SANDBOX_TOKENS_BOOTSTRAP_SECRET",
+  "MISTLE_SANDBOX_TOKENS_EGRESS_SECRET",
   "MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET",
   "MISTLE_SANDBOX_PUBLISH_SESSION_COOKIE_SIGNING_SECRET",
 ];
@@ -145,6 +146,7 @@ function buildGeneratedSecretsEnv(): Record<string, string> {
     MISTLE_INTERNAL_AUTH_SHARED_TOKEN: createSecret(),
     MISTLE_SANDBOX_TOKENS_CONNECT_SECRET: createSecret(),
     MISTLE_SANDBOX_TOKENS_BOOTSTRAP_SECRET: createSecret(),
+    MISTLE_SANDBOX_TOKENS_EGRESS_SECRET: createSecret(),
     MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET: createSecret(),
     MISTLE_SANDBOX_PUBLISH_SESSION_COOKIE_SIGNING_SECRET: createSecret(),
   };
@@ -309,6 +311,10 @@ function buildCommonBaseConfig(env: NodeJS.ProcessEnv): ConfigRecord {
           issuer: "data-plane-worker",
           audience: "data-plane-gateway",
         },
+        egress: {
+          issuer: "data-plane-gateway",
+          audience: "mistle-gateway-egress",
+        },
       },
       publish: {
         access_token: {
@@ -358,6 +364,9 @@ function buildGeneratedSecretsConfig(env: Record<string, string>): ConfigRecord 
         },
         bootstrap: {
           secret: readGeneratedEnv("MISTLE_SANDBOX_TOKENS_BOOTSTRAP_SECRET"),
+        },
+        egress: {
+          secret: readGeneratedEnv("MISTLE_SANDBOX_TOKENS_EGRESS_SECRET"),
         },
       },
       publish: {

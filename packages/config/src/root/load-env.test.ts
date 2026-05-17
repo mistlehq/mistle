@@ -99,6 +99,9 @@ describe("loadRootConfigFromEnv", () => {
       MISTLE_SANDBOX_TOKENS_BOOTSTRAP_SECRET: "bootstrap-secret",
       MISTLE_SANDBOX_TOKENS_BOOTSTRAP_ISSUER: "data-plane-worker",
       MISTLE_SANDBOX_TOKENS_BOOTSTRAP_AUDIENCE: "data-plane-gateway",
+      MISTLE_SANDBOX_TOKENS_EGRESS_SECRET: "egress-secret",
+      MISTLE_SANDBOX_TOKENS_EGRESS_ISSUER: "data-plane-gateway",
+      MISTLE_SANDBOX_TOKENS_EGRESS_AUDIENCE: "mistle-gateway-egress",
       MISTLE_SANDBOX_TOKENS_CONNECT_SECRET: "connect-secret",
       MISTLE_SANDBOX_TOKENS_CONNECT_ISSUER: "control-plane-api",
       MISTLE_SANDBOX_TOKENS_CONNECT_AUDIENCE: "data-plane-gateway",
@@ -288,6 +291,11 @@ describe("loadRootConfigFromEnv", () => {
             secret: "bootstrap-secret",
             issuer: "data-plane-worker",
             audience: "data-plane-gateway",
+          },
+          egress: {
+            secret: "egress-secret",
+            issuer: "data-plane-gateway",
+            audience: "mistle-gateway-egress",
           },
           connect: {
             secret: "connect-secret",

@@ -3,6 +3,7 @@ import {
   PayloadKindWebSocketBinary,
   PayloadKindWebSocketText,
   parseBootstrapControlMessage,
+  parseEgressTokenControlMessage,
   parseEgressTransportMessage,
   parsePortsControlMessage,
   parsePortsTransportMessage,
@@ -14,6 +15,7 @@ import {
   type KeepaliveControlMessage,
   type RuntimeReadyControlMessage,
   type EgressTransportMessage,
+  type EgressTokenRequest,
   type SigningRequest,
   type StreamControlMessage,
   type TelemetryClose,
@@ -102,6 +104,10 @@ export type TunnelProtocolDelivery =
       kind: "egressMalformed";
       message: string;
       streamId: number;
+    }
+  | {
+      kind: "egressTokenRequest";
+      message: EgressTokenRequest;
     };
 
 export type TunnelProtocolTranslation = {
@@ -807,6 +813,22 @@ export class TunnelProtocolTranslator {
         delivery: {
           kind: "egressTransport",
           message: egressTransportMessage,
+        },
+      });
+    }
+
+    const egressTokenControlMessage = parseEgressTokenControlMessage(input.payload);
+    if (egressTokenControlMessage !== undefined) {
+      if (egressTokenControlMessage.type !== "egress.token.request") {
+        throw new TunnelProtocolViolationError(
+          `Bootstrap websocket cannot send egress token control message type '${egressTokenControlMessage.type}'.`,
+        );
+      }
+
+      return createTranslation({
+        delivery: {
+          kind: "egressTokenRequest",
+          message: egressTokenControlMessage,
         },
       });
     }

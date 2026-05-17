@@ -320,6 +320,18 @@ const SandboxEnvDescriptors = [
     path: ["bootstrap", "tokenAudience"],
   },
   {
+    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_SECRET",
+    path: ["egress", "tokenSecret"],
+  },
+  {
+    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_ISSUER",
+    path: ["egress", "tokenIssuer"],
+  },
+  {
+    envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_AUDIENCE",
+    path: ["egress", "tokenAudience"],
+  },
+  {
     envVar: "MISTLE_SANDBOX_PUBLISH_BASE_DOMAIN",
     path: ["publish", "baseDomain"],
   },

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   parseBootstrapControlMessage,
+  parseEgressTokenControlMessage,
   parseEgressTransportMessage,
   parsePortsControlMessage,
   parsePortsTransportMessage,
@@ -586,6 +587,60 @@ describe("stream control message parser", () => {
         kind: "processes",
       },
     });
+  });
+});
+
+describe("egress token control message parser", () => {
+  it("parses egress token request and response messages", () => {
+    expect(
+      parseEgressTokenControlMessage(
+        JSON.stringify({
+          type: "egress.token.request",
+          requestId: "egress_token_req_123",
+        }),
+      ),
+    ).toEqual({
+      type: "egress.token.request",
+      requestId: "egress_token_req_123",
+    });
+
+    expect(
+      parseEgressTokenControlMessage(
+        JSON.stringify({
+          type: "egress.token.response",
+          requestId: "egress_token_req_123",
+          token: "egress-token",
+          expiresAt: "2026-05-17T00:05:00.000Z",
+        }),
+      ),
+    ).toEqual({
+      type: "egress.token.response",
+      requestId: "egress_token_req_123",
+      token: "egress-token",
+      expiresAt: "2026-05-17T00:05:00.000Z",
+    });
+  });
+
+  it("rejects malformed egress token control messages", () => {
+    expect(
+      parseEgressTokenControlMessage(
+        JSON.stringify({
+          type: "egress.token.request",
+          requestId: "",
+        }),
+      ),
+    ).toBeUndefined();
+
+    expect(
+      parseEgressTokenControlMessage(
+        JSON.stringify({
+          type: "egress.token.error",
+          requestId: "egress_token_req_123",
+          code: "unauthorized",
+          message: "Nope.",
+        }),
+      ),
+    ).toBeUndefined();
   });
 });
 

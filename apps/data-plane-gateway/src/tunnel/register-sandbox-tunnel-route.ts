@@ -7,6 +7,7 @@ import { SpanStatusCode, type Span } from "@opentelemetry/api";
 import type { SandboxDeadlineLifecycleCoordinator } from "../deadlines/sandbox-deadline-lifecycle-coordinator.js";
 import type { SandboxInstanceDeadlineService } from "../deadlines/sandbox-instance-deadline-service.js";
 import { GatewayEgressTransportService } from "../egress/egress-transport-service.js";
+import { SandboxEgressTokenService } from "../egress/sandbox-egress-token-service.js";
 import { logger } from "../logger.js";
 import { PortAccessTransportService } from "../publishing/port-access-transport.js";
 import { PortsTargetAuthorizeService } from "../publishing/ports-target-authorize-service.js";
@@ -51,6 +52,7 @@ type RegisterSandboxTunnelRouteInput = {
   bootstrapTokenConfig: BootstrapTokenConfig;
   connectionTokenConfig: ConnectionTokenConfig;
   sandboxSigningRequestService: SandboxSigningRequestService;
+  sandboxEgressTokenService: SandboxEgressTokenService;
   portAccessTransportService: PortAccessTransportService;
   portsTargetAuthorizeService: PortsTargetAuthorizeService;
   interactiveStreamRouter: InteractiveStreamRouter;
@@ -331,6 +333,16 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                   currentSocket: ws,
                   db: ctx.get("db"),
                   gatewayEgressTransportService: input.gatewayEgressTransportService,
+                  handleEgressTokenRequestDelivery: async (delivery) => {
+                    const result =
+                      await input.sandboxEgressTokenService.handleBootstrapTokenRequest({
+                        db: ctx.get("db"),
+                        request: delivery.message,
+                        sandboxInstanceId,
+                        sourceBootstrapSessionId: relaySessionId,
+                      });
+                    ws.send(JSON.stringify(result));
+                  },
                   handleSigningDelivery: async (delivery) => {
                     const result =
                       await input.sandboxSigningRequestService.handleBootstrapSigningRequest({

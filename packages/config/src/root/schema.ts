@@ -409,6 +409,7 @@ export const ConfigSchema = z
           .object({
             connect: TokenConfigSchema,
             bootstrap: TokenConfigSchema,
+            egress: TokenConfigSchema,
           })
           .strict(),
         publish: z

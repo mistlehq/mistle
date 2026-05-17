@@ -351,6 +351,11 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
           issuer: "data-plane-worker",
           audience: "data-plane-gateway",
         },
+        egress: {
+          secret: createSecret(),
+          issuer: "data-plane-gateway",
+          audience: "mistle-gateway-egress",
+        },
       },
       publish: {
         access_token: {
