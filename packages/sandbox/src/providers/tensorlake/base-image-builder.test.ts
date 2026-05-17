@@ -48,6 +48,7 @@ describe("TensorlakeBaseImageBuilder", () => {
     expect(dockerfileText).toContain("apt-get install -y --no-install-recommends");
     expect(dockerfileText).toContain("kmod");
     expect(dockerfileText).toContain("linux-modules-$(uname -r)");
+    expect(dockerfileText).toContain("sudo");
     expect(dockerfileText).toContain("systemd");
     expect(dockerfileText).toContain("systemd-sysv");
     expect(dockerfileText).toContain("https://mise.run");

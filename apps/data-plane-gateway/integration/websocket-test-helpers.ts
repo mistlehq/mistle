@@ -190,7 +190,10 @@ export type ReceivedWebSocketMessage = {
   isBinary: boolean;
 };
 
-export function waitForWebSocketMessage(socket: WebSocket): Promise<ReceivedWebSocketMessage> {
+export function waitForWebSocketMessage(
+  socket: WebSocket,
+  options?: { timeoutMs?: number },
+): Promise<ReceivedWebSocketMessage> {
   return new Promise((resolve, reject) => {
     const onMessage = (data: RawData, isBinary: boolean): void => {
       cleanup();
@@ -206,9 +209,24 @@ export function waitForWebSocketMessage(socket: WebSocket): Promise<ReceivedWebS
     };
 
     const cleanup = (): void => {
+      if (timeoutHandle !== undefined) {
+        systemScheduler.cancel(timeoutHandle);
+      }
       socket.off("message", onMessage);
       socket.off("error", onError);
     };
+
+    const timeoutHandle =
+      options?.timeoutMs === undefined
+        ? undefined
+        : systemScheduler.schedule(() => {
+            cleanup();
+            reject(
+              new Error(
+                `Timed out waiting for websocket message within ${String(options.timeoutMs)}ms.`,
+              ),
+            );
+          }, options.timeoutMs);
 
     socket.once("message", onMessage);
     socket.once("error", onError);

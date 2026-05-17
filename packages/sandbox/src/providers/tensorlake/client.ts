@@ -39,14 +39,19 @@ import {
 } from "./schemas.js";
 import type { TensorlakeSandboxInspectResult } from "./types.js";
 
-const InitCommand = "/opt/mistle/bin/sandboxd";
-const InitCommandArgs = ["init"];
-const DetachedInitCommandArgs = ["init", "--detach"];
-const WaitInitCommandArgs = ["wait-init"];
-const ResumeCommand = "/opt/mistle/bin/sandboxd";
-const ResumeCommandArgs = ["resume"];
-const ReadyCommand = "/opt/mistle/bin/sandboxd";
-const ReadyCommandArgs = ["ready"];
+const SandboxdCommand = "/opt/mistle/bin/sandboxd";
+const TensorlakeSandboxdControlCommand = "sudo";
+// Tensorlake currently starts SDK commands as tl-user and does not expose a
+// root/user option. sandboxd's control socket lives under /run/mistle, so every
+// client command that talks to that socket must go through sudo.
+const InitCommand = TensorlakeSandboxdControlCommand;
+const InitCommandArgs = [SandboxdCommand, "init"];
+const DetachedInitCommandArgs = [SandboxdCommand, "init", "--detach"];
+const WaitInitCommandArgs = [SandboxdCommand, "wait-init"];
+const ResumeCommand = TensorlakeSandboxdControlCommand;
+const ResumeCommandArgs = [SandboxdCommand, "resume"];
+const ReadyCommand = TensorlakeSandboxdControlCommand;
+const ReadyCommandArgs = [SandboxdCommand, "ready"];
 const StartDaemonCommand = "sh";
 export const TensorlakeDaemonSystemdEnvironmentVariables = [
   "SANDBOX_RUNTIME_LISTEN_ADDR",
@@ -78,6 +83,15 @@ export function createTensorlakeStartDaemonShellCommand(): string {
     "sudo systemctl status sandboxd.service --no-pager",
     "exit 1",
   ].join(" && ");
+}
+
+export function createTensorlakeSandboxdControlCommand(input: {
+  readonly args: readonly string[];
+}): { command: string; args: readonly string[] } {
+  return {
+    command: TensorlakeSandboxdControlCommand,
+    args: [SandboxdCommand, ...input.args],
+  };
 }
 
 export type TensorlakeStartSandboxResponse = { sandboxId: string };

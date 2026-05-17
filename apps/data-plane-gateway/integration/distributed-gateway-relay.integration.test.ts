@@ -21,7 +21,7 @@ import {
   waitForWebSocketMessage,
 } from "./websocket-test-helpers.js";
 
-const TestTimeoutMs = 60_000;
+const RelayMessageTimeoutMs = 10_000;
 const BootstrapTokenSecret = "integration-new-bootstrap-token-secret";
 const BootstrapTokenIssuer = "integration-new-data-plane-worker";
 const GatewayTokenAudience = "integration-new-data-plane-gateway";
@@ -51,105 +51,105 @@ const it = createIntegrationTest({
   },
 });
 
-it(
-  "routes sandbox tunnel messages across two gateway instances through NATS",
-  async ({ env }) => {
-    const sandboxInstanceId = typeid("sbi").toString();
+it("routes sandbox tunnel messages across two gateway instances through NATS", async ({ env }) => {
+  const sandboxInstanceId = typeid("sbi").toString();
 
-    await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
-      id: sandboxInstanceId,
-      organizationId: "org_integration_distributed_gateway_relay",
-      sandboxProfileId: "sbp_integration_distributed_gateway_relay",
-      sandboxProfileVersion: 1,
-      runtimeProvider: "docker",
-      providerSandboxId: `provider-${sandboxInstanceId}`,
-      status: SandboxInstanceStatuses.STARTING,
-      startedByKind: "system",
-      startedById: "workflow_integration_distributed_gateway_relay",
-      source: "webhook",
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
+    id: sandboxInstanceId,
+    organizationId: "org_integration_distributed_gateway_relay",
+    sandboxProfileId: "sbp_integration_distributed_gateway_relay",
+    sandboxProfileVersion: 1,
+    runtimeProvider: "docker",
+    providerSandboxId: `provider-${sandboxInstanceId}`,
+    status: SandboxInstanceStatuses.STARTING,
+    startedByKind: "system",
+    startedById: "workflow_integration_distributed_gateway_relay",
+    source: "webhook",
+  });
+
+  const firstGateway = env.httpService(FirstGatewayId);
+  const secondGateway = env.httpService(SecondGatewayId);
+  const headers = {
+    [TestEnvironmentIdHeader]: env.id,
+  };
+  let bootstrapSocket: WebSocket | undefined;
+  let clientSocket: WebSocket | undefined;
+
+  try {
+    bootstrapSocket = await connectSandboxTunnelWebSocket({
+      websocketBaseUrl: createWebSocketBaseUrl(firstGateway.hostBaseUrl),
+      sandboxInstanceId,
+      tokenKind: "bootstrap",
+      headers,
+      token: await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: BootstrapTokenSecret,
+          tokenIssuer: BootstrapTokenIssuer,
+          tokenAudience: GatewayTokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      }),
+    });
+    clientSocket = await connectConnectionWebSocketWhenReady({
+      headers,
+      sandboxInstanceId,
+      websocketBaseUrl: createWebSocketBaseUrl(secondGateway.hostBaseUrl),
     });
 
-    const firstGateway = env.httpService(FirstGatewayId);
-    const secondGateway = env.httpService(SecondGatewayId);
-    const headers = {
-      [TestEnvironmentIdHeader]: env.id,
-    };
-    let bootstrapSocket: WebSocket | undefined;
-    let clientSocket: WebSocket | undefined;
-
-    try {
-      bootstrapSocket = await connectSandboxTunnelWebSocket({
-        websocketBaseUrl: createWebSocketBaseUrl(firstGateway.hostBaseUrl),
-        sandboxInstanceId,
-        tokenKind: "bootstrap",
-        headers,
-        token: await mintBootstrapToken({
-          config: {
-            bootstrapTokenSecret: BootstrapTokenSecret,
-            tokenIssuer: BootstrapTokenIssuer,
-            tokenAudience: GatewayTokenAudience,
-          },
-          jti: randomUUID(),
-          sandboxInstanceId,
-          ttlSeconds: 120,
-        }),
-      });
-      clientSocket = await connectConnectionWebSocketWhenReady({
-        headers,
-        sandboxInstanceId,
-        websocketBaseUrl: createWebSocketBaseUrl(secondGateway.hostBaseUrl),
-      });
-
-      const bootstrapMessagePromise = waitForWebSocketMessage(bootstrapSocket);
-      await sendWebSocketMessage(
-        clientSocket,
-        JSON.stringify({
-          type: "stream.open",
-          streamId: 42,
-          channel: {
-            kind: "agent",
-          },
-        }),
-      );
-      const bootstrapMessage = await bootstrapMessagePromise;
-      if (typeof bootstrapMessage.data !== "string") {
-        throw new Error("Expected bootstrap peer to receive a text stream.open message.");
-      }
-
-      expect(bootstrapMessage.isBinary).toBe(false);
-      expect(parseStreamControlMessage(bootstrapMessage.data)).toEqual({
+    const bootstrapMessagePromise = waitForWebSocketMessage(bootstrapSocket, {
+      timeoutMs: RelayMessageTimeoutMs,
+    });
+    await sendWebSocketMessage(
+      clientSocket,
+      JSON.stringify({
         type: "stream.open",
-        streamId: 1,
+        streamId: 42,
         channel: {
           kind: "agent",
         },
-      });
-
-      const clientMessagePromise = waitForWebSocketMessage(clientSocket);
-      await sendWebSocketMessage(
-        bootstrapSocket,
-        JSON.stringify({
-          type: "stream.open.ok",
-          streamId: 1,
-        }),
-      );
-      const clientMessage = await clientMessagePromise;
-      if (typeof clientMessage.data !== "string") {
-        throw new Error("Expected connection peer to receive a text stream.open.ok message.");
-      }
-
-      expect(clientMessage.isBinary).toBe(false);
-      expect(parseStreamControlMessage(clientMessage.data)).toEqual({
-        type: "stream.open.ok",
-        streamId: 42,
-      });
-    } finally {
-      await closeIfOpen(clientSocket);
-      await closeIfOpen(bootstrapSocket);
+      }),
+    );
+    const bootstrapMessage = await bootstrapMessagePromise;
+    if (typeof bootstrapMessage.data !== "string") {
+      throw new Error("Expected bootstrap peer to receive a text stream.open message.");
     }
-  },
-  TestTimeoutMs,
-);
+
+    expect(bootstrapMessage.isBinary).toBe(false);
+    expect(parseStreamControlMessage(bootstrapMessage.data)).toEqual({
+      type: "stream.open",
+      streamId: 1,
+      channel: {
+        kind: "agent",
+      },
+    });
+
+    const clientMessagePromise = waitForWebSocketMessage(clientSocket, {
+      timeoutMs: RelayMessageTimeoutMs,
+    });
+    await sendWebSocketMessage(
+      bootstrapSocket,
+      JSON.stringify({
+        type: "stream.open.ok",
+        streamId: 1,
+      }),
+    );
+    const clientMessage = await clientMessagePromise;
+    if (typeof clientMessage.data !== "string") {
+      throw new Error("Expected connection peer to receive a text stream.open.ok message.");
+    }
+
+    expect(clientMessage.isBinary).toBe(false);
+    expect(parseStreamControlMessage(clientMessage.data)).toEqual({
+      type: "stream.open.ok",
+      streamId: 42,
+    });
+  } finally {
+    await closeIfOpen(clientSocket);
+    await closeIfOpen(bootstrapSocket);
+  }
+});
 
 function createWebSocketBaseUrl(httpBaseUrl: string): string {
   const url = new URL(httpBaseUrl);
