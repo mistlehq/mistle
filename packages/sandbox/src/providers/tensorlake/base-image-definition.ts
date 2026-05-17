@@ -113,9 +113,7 @@ function installSandboxd(image: Image, sandboxd: SandboxSdkImageSandboxdSource):
         `${SandboxdInstallEnvVars.URL}=${shellQuote(sandboxd.artifact.url)}`,
         `${SandboxdInstallEnvVars.SHA256}=${shellQuote(sandboxd.artifact.sha256)}`,
         `${SandboxdInstallEnvVars.VERSION}=${shellQuote(sandboxd.artifact.version)}`,
-        "sh",
-        "-euc",
-        shellQuote(SandboxdInstallCommand),
+        dockerfileSafeShellScript(SandboxdInstallCommand),
       ].join(" "),
       "ln -sf /opt/mistle/bin/sandboxd /usr/local/bin/sandboxd",
       "ln -sf /opt/mistle/bin/mistle-ssh-sign /usr/local/bin/mistle-ssh-sign",
@@ -125,4 +123,9 @@ function installSandboxd(image: Image, sandboxd: SandboxSdkImageSandboxdSource):
 
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\"'\"'")}'`;
+}
+
+function dockerfileSafeShellScript(command: string): string {
+  const lines = command.split("\n").map((line) => shellQuote(line));
+  return `printf '%s\\n' ${lines.join(" ")} | sh -eu`;
 }

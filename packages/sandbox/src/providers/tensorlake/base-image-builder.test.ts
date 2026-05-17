@@ -94,6 +94,8 @@ describe("TensorlakeBaseImageBuilder", () => {
     expect(dockerfileText).toContain("MISTLE_SANDBOXD_ARTIFACT_VERSION=");
     expect(dockerfileText).toContain("curl -fL --retry 3");
     expect(dockerfileText).not.toContain("COPY packages/sandboxd/.generated/tensorlake");
+    expect(dockerfileText).not.toMatch(/\ninstall_dir=/u);
+    expect(dockerfileText).toContain("printf '%s\\n'");
   });
 
   it("fails fast for Dockerfile sources because Tensorlake uses an SDK image source", async () => {
