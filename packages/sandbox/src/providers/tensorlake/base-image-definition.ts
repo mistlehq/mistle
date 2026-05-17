@@ -109,12 +109,11 @@ function installSandboxd(image: Image, sandboxd: SandboxSdkImageSandboxdSource):
 
   return image.run(
     [
-      [
-        `${SandboxdInstallEnvVars.URL}=${shellQuote(sandboxd.artifact.url)}`,
-        `${SandboxdInstallEnvVars.SHA256}=${shellQuote(sandboxd.artifact.sha256)}`,
-        `${SandboxdInstallEnvVars.VERSION}=${shellQuote(sandboxd.artifact.version)}`,
-        dockerfileSafeShellScript(SandboxdInstallCommand),
-      ].join(" "),
+      dockerfileSafeShellScript(SandboxdInstallCommand, {
+        [SandboxdInstallEnvVars.URL]: sandboxd.artifact.url,
+        [SandboxdInstallEnvVars.SHA256]: sandboxd.artifact.sha256,
+        [SandboxdInstallEnvVars.VERSION]: sandboxd.artifact.version,
+      }),
       "ln -sf /opt/mistle/bin/sandboxd /usr/local/bin/sandboxd",
       "ln -sf /opt/mistle/bin/mistle-ssh-sign /usr/local/bin/mistle-ssh-sign",
     ].join(" && "),
@@ -125,7 +124,8 @@ function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\"'\"'")}'`;
 }
 
-function dockerfileSafeShellScript(command: string): string {
+function dockerfileSafeShellScript(command: string, env: Record<string, string>): string {
   const lines = command.split("\n").map((line) => shellQuote(line));
-  return `printf '%s\\n' ${lines.join(" ")} | sh -eu`;
+  const envAssignments = Object.entries(env).map(([key, value]) => `${key}=${shellQuote(value)}`);
+  return `printf '%s\\n' ${lines.join(" ")} | ${envAssignments.join(" ")} sh -eu`;
 }

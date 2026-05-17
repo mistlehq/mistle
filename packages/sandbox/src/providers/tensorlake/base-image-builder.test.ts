@@ -96,6 +96,9 @@ describe("TensorlakeBaseImageBuilder", () => {
     expect(dockerfileText).not.toContain("COPY packages/sandboxd/.generated/tensorlake");
     expect(dockerfileText).not.toMatch(/\ninstall_dir=/u);
     expect(dockerfileText).toContain("printf '%s\\n'");
+    expect(dockerfileText).toContain(
+      "| MISTLE_SANDBOXD_ARTIFACT_URL='https://github.com/mistlehq/mistle/releases/download/v1.2.3/sandboxd-x86_64-unknown-linux-gnu.tar.gz' MISTLE_SANDBOXD_ARTIFACT_SHA256='0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' MISTLE_SANDBOXD_ARTIFACT_VERSION='1.2.3' sh -eu",
+    );
   });
 
   it("fails fast for Dockerfile sources because Tensorlake uses an SDK image source", async () => {
