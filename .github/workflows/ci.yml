@@ -30,6 +30,7 @@ jobs:
       github_actions_security: ${{ steps.filter.outputs.github_actions_security }}
       knip: ${{ steps.filter.outputs.knip }}
       rust_static: ${{ steps.filter.outputs.rust_static }}
+      mstl: ${{ steps.filter.outputs.mstl }}
       commit_sign: ${{ steps.filter.outputs.commit_sign }}
       sandboxd: ${{ steps.filter.outputs.sandboxd }}
       sandbox_base_linux: ${{ steps.filter.outputs.sandbox_base_linux }}
@@ -50,7 +51,7 @@ jobs:
             ts_static:
               - '.envrc'
               - 'apps/**'
-              - 'packages/!(commit-sign|sandboxd)/**'
+              - 'packages/!(commit-sign|mstl-cli|mstl-core|sandboxd)/**'
               - 'tests/**'
               - 'scripts/**'
               - 'flake.nix'
@@ -63,7 +64,7 @@ jobs:
             ts_build:
               - '.envrc'
               - 'apps/**'
-              - 'packages/!(commit-sign|docs|sandboxd)/**'
+              - 'packages/!(commit-sign|docs|mstl-cli|mstl-core|sandboxd)/**'
               - 'scripts/**'
               - 'flake.nix'
               - 'flake.lock'
@@ -75,7 +76,7 @@ jobs:
             ts_test:
               - '.envrc'
               - 'apps/**'
-              - 'packages/!(commit-sign|docs|sandboxd)/**'
+              - 'packages/!(commit-sign|docs|mstl-cli|mstl-core|sandboxd)/**'
               - 'tests/**'
               - 'scripts/**'
               - 'flake.nix'
@@ -88,7 +89,7 @@ jobs:
             ts_integration:
               - '.envrc'
               - 'apps/**'
-              - 'packages/!(commit-sign|docs|sandboxd)/**'
+              - 'packages/!(commit-sign|docs|mstl-cli|mstl-core|sandboxd)/**'
               - 'tests/**'
               - 'scripts/test/**'
               - 'flake.nix'
@@ -121,7 +122,7 @@ jobs:
             knip:
               - '.envrc'
               - 'apps/**'
-              - 'packages/!(commit-sign|sandboxd)/**'
+              - 'packages/!(commit-sign|mstl-cli|mstl-core|sandboxd)/**'
               - 'tests/**'
               - 'scripts/**'
               - 'flake.nix'
@@ -135,8 +136,16 @@ jobs:
             rust_static:
               - '.envrc'
               - 'packages/commit-sign/**'
+              - 'packages/mstl-cli/**'
+              - 'packages/mstl-core/**'
               - 'packages/sandboxd/**'
               - 'packages/sandbox-runtime-contract/**'
+              - 'flake.nix'
+              - 'flake.lock'
+            mstl:
+              - '.envrc'
+              - 'packages/mstl-cli/**'
+              - 'packages/mstl-core/**'
               - 'flake.nix'
               - 'flake.lock'
             commit_sign:
@@ -407,6 +416,8 @@ jobs:
           shared-key: sandbox-rust
           workspaces: |
             packages/commit-sign -> target
+            packages/mstl-cli -> target
+            packages/mstl-core -> target
             packages/sandboxd -> target
           env-vars: AR CARGO CC CFLAGS CMAKE CXX DEVELOPER_DIR HOST_PATH LD MACOSX_DEPLOYMENT_TARGET NIX NM RANLIB RUST SDKROOT
           cmd-format: nix develop --command {0}
@@ -455,7 +466,9 @@ jobs:
           nix develop --command bash -c
           "pnpm --filter @mistle/sandboxd format:check &&
           pnpm --filter @mistle/commit-sign format:check &&
-          pnpm turbo run lint typecheck --output-logs=full --concurrency=2 --filter=@mistle/sandboxd --filter=@mistle/commit-sign"
+          pnpm --filter @mistle/mstl-cli format:check &&
+          pnpm --filter @mistle/mstl-core format:check &&
+          pnpm turbo run lint typecheck --output-logs=full --concurrency=2 --filter=@mistle/sandboxd --filter=@mistle/commit-sign --filter=@mistle/mstl-cli --filter=@mistle/mstl-core"
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.static-rust-turbo-cache.outputs.cache-hit != 'true' }}
@@ -1155,6 +1168,80 @@ jobs:
           path: .local/sandboxd-test/target-debian-container
           key: ${{ runner.os }}-sandboxd-test-target-debian-${{ hashFiles('packages/sandboxd/Cargo.lock') }}-${{ github.sha }}
 
+  test-mstl:
+    name: MSTL Test
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 30
+    needs:
+      - changes
+    if: needs.changes.outputs.mstl == 'true'
+    env:
+      CI: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - name: Create Nix directories
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chmod -R 777 /nix
+
+      - name: Mount Nix sticky disk
+        uses: useblacksmith/stickydisk@13af8883542ca949a717e70fef89d15edbb29d88 # v1
+        with:
+          key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
+          path: /nix
+
+      - name: Prepare single-user Nix store
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chown "$USER:$USER" /nix /nix/store
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+        with:
+          install_options: --no-daemon
+
+      - name: Restore MSTL cargo cache
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          shared-key: mstl-rust
+          workspaces: |
+            packages/mstl-cli -> target
+            packages/mstl-core -> target
+          env-vars: AR CARGO CC CFLAGS CMAKE CXX DEVELOPER_DIR HOST_PATH LD MACOSX_DEPLOYMENT_TARGET NIX NM RANLIB RUST SDKROOT
+          cmd-format: nix develop --command {0}
+
+      - name: Restore pnpm store cache
+        id: test-mstl-pnpm-store-cache
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Materialize Nix shell
+        run: nix develop --command true
+
+      - name: Install pnpm dependencies
+        run: nix develop --command pnpm install --frozen-lockfile
+
+      - name: Save pnpm store cache
+        if: steps.test-mstl-pnpm-store-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Run MSTL tests in Nix shell
+        run: >-
+          nix develop --command bash -c
+          "pnpm --filter @mistle/mstl-core test &&
+          pnpm --filter @mistle/mstl-cli test"
+
   sandbox-base-linux:
     name: Sandbox Base Image (Linux)
     runs-on: blacksmith-2vcpu-ubuntu-2404
@@ -1206,6 +1293,7 @@ jobs:
       - test-ts-component
       - test-commit-sign
       - test-sandboxd
+      - test-mstl
       - sandbox-base-linux
       - control-plane-migration-smoke
       - data-plane-migration-smoke
@@ -1225,6 +1313,7 @@ jobs:
       TS_COMPONENT_TEST_RESULT: ${{ needs.test-ts-component.result }}
       COMMIT_SIGN_TEST_RESULT: ${{ needs.test-commit-sign.result }}
       SANDBOXD_TEST_RESULT: ${{ needs.test-sandboxd.result }}
+      MSTL_TEST_RESULT: ${{ needs.test-mstl.result }}
       SANDBOX_BASE_RESULT: ${{ needs.sandbox-base-linux.result }}
       CONTROL_PLANE_MIGRATION_SMOKE_RESULT: ${{ needs.control-plane-migration-smoke.result }}
       DATA_PLANE_MIGRATION_SMOKE_RESULT: ${{ needs.data-plane-migration-smoke.result }}
@@ -1259,6 +1348,7 @@ jobs:
               os.environ["TS_COMPONENT_TEST_RESULT"],
               os.environ["COMMIT_SIGN_TEST_RESULT"],
               os.environ["SANDBOXD_TEST_RESULT"],
+              os.environ["MSTL_TEST_RESULT"],
               os.environ["CONTROL_PLANE_MIGRATION_SMOKE_RESULT"],
               os.environ["DATA_PLANE_MIGRATION_SMOKE_RESULT"],
           ]
