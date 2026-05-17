@@ -914,12 +914,8 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
             </SandboxProfileSectionCard>
           ) : (
             <SandboxProfileSectionCard>
-              <div className="flex flex-col gap-4">
-                <div
-                  className={`flex min-h-10 items-center justify-between gap-3 ${
-                    scheduleEnabled ? "border-b border-border pb-4" : ""
-                  }`}
-                >
+              <div className="flex flex-col">
+                <div className="flex min-h-10 items-center justify-between gap-3">
                   <FieldLabel htmlFor="sandbox-profile-snapshot-refresh-enabled">
                     Refresh enabled
                   </FieldLabel>
@@ -937,7 +933,7 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
                 </div>
 
                 {scheduleEnabled ? (
-                  <>
+                  <div className="mt-4 flex flex-col gap-4 border-t border-border pt-4">
                     {input.maintenanceScriptHasChanges ? (
                       <p className="text-sm text-muted-foreground">
                         Save the maintenance script to use it for snapshot refresh.
@@ -1015,7 +1011,7 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
                       testPanel={input.testPanel}
                       value={input.maintenanceScriptDraft}
                     />
-                  </>
+                  </div>
                 ) : null}
               </div>
             </SandboxProfileSectionCard>
