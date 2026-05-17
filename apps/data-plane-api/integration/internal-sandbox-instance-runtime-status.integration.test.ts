@@ -55,12 +55,15 @@ it("reports a provider-running sandbox as starting until the gateway runtime is 
   });
   const organizationId = `org_${typeid("org").toString()}`;
   const sandboxInstanceId = typeid("sbi").toString();
-  const sandbox = await adapter.start({
+  const image = await adapter.prepareImage({
     image: {
       provider: SandboxProvider.DOCKER,
       imageId: "registry:3",
       createdAt: "2026-03-27T00:00:00.000Z",
     },
+  });
+  const sandbox = await adapter.start({
+    image,
   });
   let bootstrapSocket: WebSocket | undefined;
   const runtimePlan = createRuntimePlan({
