@@ -35,7 +35,9 @@ use nix::fcntl::{FcntlArg, OFlag, fcntl};
 use nix::sys::signal::{Signal, kill};
 use nix::unistd::Pid;
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{Map, Value};
+use time::OffsetDateTime;
+use time::format_description::well_known::Rfc3339;
 use tokio::net::{TcpSocket, TcpStream, lookup_host};
 use tokio::runtime::Builder;
 use tokio::sync::mpsc;
@@ -44,6 +46,7 @@ use tokio::time::timeout;
 use tokio_tungstenite::tungstenite::{Error as WebSocketError, Message, client::IntoClientRequest};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use tokio_tungstenite::{client_async_tls_with_config, connect_async};
+use tracing::{info, warn};
 use url::Url;
 
 use crate::cgroups::{DEFAULT_CGROUP_ROOT, UserScopePaths, is_scope_populated};
@@ -68,23 +71,24 @@ use crate::tunnel::protocol::{
     CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE, CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED,
     CONNECT_ERROR_CODE_PTY_SESSION_EXISTS, CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE,
     EgressHttpOpen, EgressHttpRequest, EgressHttpRequestBodyChunk, EgressHttpRequestBodyEnd,
-    EgressHttpResponseStart, EgressTcpClose, EgressTcpData,
-    FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH,
-    FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE, FileUploadCompletedEventInput,
-    PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
-    PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
+    EgressHttpResponseStart, EgressTcpClose, EgressTcpData, EgressTokenControlMessage,
+    EgressTokenRequest, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED,
+    FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH, FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE,
+    FileUploadCompletedEventInput, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY,
+    PAYLOAD_KIND_WEBSOCKET_TEXT, PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
     PORT_ACCESS_AUTHORIZE_REASON_UNSUPPORTED_PROTOCOL, RepeatedHeaderValues,
     STREAM_RESET_CODE_EXEC_COMMAND_FAILED, STREAM_RESET_CODE_INVALID_STREAM_CLOSE,
     STREAM_RESET_CODE_INVALID_STREAM_DATA, STREAM_RESET_CODE_INVALID_STREAM_SIGNAL,
     STREAM_RESET_CODE_INVALID_STREAM_WINDOW, STREAM_RESET_CODE_PROCESSES_SNAPSHOT_FAILED,
     STREAM_RESET_CODE_STREAM_CLOSE_FAILED, STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
     STREAM_RESET_CODE_TARGET_CLOSED, SigningControlMessage, SigningRequest, StreamControlMessage,
-    StreamSendWindow, decode_stream_data_frame, encode_stream_data_frame, exec_result_event,
-    file_upload_completed_event, parse_egress_transport_message, parse_ports_control_message,
-    parse_ports_transport_message, parse_processes_stream_message, parse_signing_control_message,
-    parse_stream_control_message, ports_target_authorize_failure_result,
-    ports_target_authorize_success_result, pty_exit_event, signing_request, stream_complete,
-    stream_open_error, stream_open_ok, stream_reset, stream_window,
+    StreamSendWindow, decode_stream_data_frame, egress_token_request, encode_stream_data_frame,
+    exec_result_event, file_upload_completed_event, parse_egress_token_control_message,
+    parse_egress_transport_message, parse_ports_control_message, parse_ports_transport_message,
+    parse_processes_stream_message, parse_signing_control_message, parse_stream_control_message,
+    ports_target_authorize_failure_result, ports_target_authorize_success_result, pty_exit_event,
+    signing_request, stream_complete, stream_open_error, stream_open_ok, stream_reset,
+    stream_window,
 };
 use crate::tunnel::runtime_processes::collect_processes_snapshot;
 use crate::tunnel::telemetry::{SandboxTelemetryLogLevel, TelemetryRelay, TelemetryRelayFrame};
@@ -113,6 +117,8 @@ const SANDBOX_OPERATION_STREAM_FORMAT: &str = "mistle.sandbox-operation.v1+jsonl
 const DEFAULT_EXEC_MAX_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
 const DEFAULT_AGENT_ENDPOINT_UPDATE_TIMEOUT: StdDuration = StdDuration::from_secs(10);
 const DEFAULT_SIGNING_REQUEST_TIMEOUT: StdDuration = StdDuration::from_secs(120);
+const DEFAULT_EGRESS_TOKEN_REQUEST_TIMEOUT: StdDuration = StdDuration::from_secs(10);
+const EGRESS_TOKEN_REFRESH_SKEW_MS: u64 = 30_000;
 const DEFAULT_EGRESS_HTTP_REQUEST_TIMEOUT: StdDuration = StdDuration::from_secs(120);
 const EXEC_OUTPUT_READ_BUFFER_BYTES: usize = 8192;
 const DEFAULT_PROCESSES_SNAPSHOT_INTERVAL: Duration = Duration::from_millis(500);
@@ -168,6 +174,19 @@ pub enum TunnelSigningResponse {
         code: String,
         message: String,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TunnelEgressToken {
+    pub token: String,
+    pub expires_at: String,
+}
+
+#[derive(Debug, Clone)]
+struct CachedEgressToken {
+    token: TunnelEgressToken,
+    expires_at_ms: u64,
+    source_request_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -352,6 +371,120 @@ impl Default for GatewayEgressForwarder {
     }
 }
 
+#[derive(Clone)]
+pub struct GatewayEgressTokenProvider {
+    request_sender: Arc<RwLock<Option<mpsc::UnboundedSender<TunnelSessionRequest>>>>,
+    cached_token: Arc<Mutex<Option<CachedEgressToken>>>,
+    next_request_id: Arc<AtomicU64>,
+    clock: Arc<dyn Clock>,
+    sandbox_instance_id: String,
+}
+
+impl GatewayEgressTokenProvider {
+    pub fn new(clock: Arc<dyn Clock>, sandbox_instance_id: impl Into<String>) -> Self {
+        Self {
+            request_sender: Arc::new(RwLock::new(None)),
+            cached_token: Arc::new(Mutex::new(None)),
+            next_request_id: Arc::new(AtomicU64::new(1)),
+            clock,
+            sandbox_instance_id: sandbox_instance_id.into(),
+        }
+    }
+
+    fn attach(&self, request_sender: mpsc::UnboundedSender<TunnelSessionRequest>) {
+        match self.request_sender.write() {
+            Ok(mut sender) => *sender = Some(request_sender),
+            Err(error) => {
+                eprintln!("sandboxd failed to attach gateway egress token provider: {error}");
+            }
+        }
+    }
+
+    pub fn token(&self) -> Result<TunnelEgressToken, TunnelSessionError> {
+        if let Some(token) = self.cached_token()? {
+            return Ok(token);
+        }
+
+        let request_sender = self
+            .request_sender
+            .read()
+            .map_err(|error| TunnelSessionError::EgressToken(error.to_string()))?
+            .clone()
+            .ok_or_else(|| {
+                TunnelSessionError::EgressToken(
+                    "gateway egress token provider is not attached to the bootstrap session"
+                        .to_string(),
+                )
+            })?;
+        let request_id = format!(
+            "egress_token_req_{}",
+            self.next_request_id.fetch_add(1, Ordering::Relaxed)
+        );
+        let (response_sender, response_receiver) = std::sync::mpsc::channel();
+        request_sender
+            .send(TunnelSessionRequest::EgressToken {
+                request_id: request_id.clone(),
+                response_sender,
+            })
+            .map_err(|error| TunnelSessionError::EgressToken(error.to_string()))?;
+
+        match response_receiver.recv_timeout(DEFAULT_EGRESS_TOKEN_REQUEST_TIMEOUT) {
+            Ok(Ok(token)) => {
+                self.store_token(token.clone(), &request_id)?;
+                Ok(token)
+            }
+            Ok(Err(error)) => Err(error),
+            Err(error) => Err(TunnelSessionError::EgressToken(format!(
+                "egress token request {request_id} timed out or disconnected: {error}"
+            ))),
+        }
+    }
+
+    fn cached_token(&self) -> Result<Option<TunnelEgressToken>, TunnelSessionError> {
+        let cached_token = self
+            .cached_token
+            .lock()
+            .map_err(|error| TunnelSessionError::EgressToken(error.to_string()))?
+            .clone();
+        let Some(cached_token) = cached_token else {
+            return Ok(None);
+        };
+        let refresh_deadline_ms = self
+            .clock
+            .now_ms()
+            .saturating_add(EGRESS_TOKEN_REFRESH_SKEW_MS);
+        if cached_token.expires_at_ms <= refresh_deadline_ms {
+            return Ok(None);
+        }
+        info!(
+            event = "egress_token_cache_hit",
+            request_id = cached_token.source_request_id.as_str(),
+            sandbox_instance_id = self.sandbox_instance_id.as_str(),
+            expires_at = cached_token.token.expires_at.as_str(),
+            "using cached gateway egress token"
+        );
+        Ok(Some(cached_token.token))
+    }
+
+    fn store_token(
+        &self,
+        token: TunnelEgressToken,
+        request_id: &str,
+    ) -> Result<(), TunnelSessionError> {
+        let expires_at_ms = parse_egress_token_expires_at_ms(&token.expires_at)?;
+        let mut cached_token = self
+            .cached_token
+            .lock()
+            .map_err(|error| TunnelSessionError::EgressToken(error.to_string()))?;
+        *cached_token = Some(CachedEgressToken {
+            token,
+            expires_at_ms,
+            source_request_id: request_id.to_string(),
+        });
+        Ok(())
+    }
+}
+
 fn resolve_default_attachment_root() -> PathBuf {
     if let Some(attachment_root) = crate::test_support::attachment_root_override() {
         return attachment_root;
@@ -367,6 +500,20 @@ fn resolve_default_attachment_root() -> PathBuf {
 
     #[cfg(not(test))]
     PathBuf::from(DEFAULT_ATTACHMENT_ROOT)
+}
+
+fn parse_egress_token_expires_at_ms(expires_at: &str) -> Result<u64, TunnelSessionError> {
+    let expires_at = OffsetDateTime::parse(expires_at, &Rfc3339)
+        .map_err(|error| TunnelSessionError::EgressToken(error.to_string()))?;
+    expires_at
+        .unix_timestamp_nanos()
+        .checked_div(1_000_000)
+        .and_then(|expires_at_ms| u64::try_from(expires_at_ms).ok())
+        .ok_or_else(|| {
+            TunnelSessionError::EgressToken(
+                "egress token expiresAt must be a non-negative RFC3339 timestamp".to_string(),
+            )
+        })
 }
 
 fn prioritize_ipv4_socket_addresses(mut addresses: Vec<SocketAddr>) -> Vec<SocketAddr> {
@@ -391,6 +538,7 @@ pub enum TunnelSessionError {
     ParseControl(String),
     ParseDataFrame(String),
     Signing(String),
+    EgressToken(String),
     AgentDial(String),
     AgentSocket(String),
     AgentRead(String),
@@ -445,6 +593,9 @@ impl Display for TunnelSessionError {
                 write!(f, "invalid bootstrap tunnel data frame: {error}")
             }
             Self::Signing(error) => write!(f, "failed to handle signing request: {error}"),
+            Self::EgressToken(error) => {
+                write!(f, "failed to handle egress token request: {error}")
+            }
             Self::AgentDial(error) => {
                 write!(f, "failed to connect agent runtime endpoint: {error}")
             }
@@ -565,6 +716,10 @@ enum TunnelSessionRequest {
     Signing {
         request: TunnelSigningRequest,
         response_sender: std::sync::mpsc::Sender<Result<TunnelSigningResponse, TunnelSessionError>>,
+    },
+    EgressToken {
+        request_id: String,
+        response_sender: std::sync::mpsc::Sender<Result<TunnelEgressToken, TunnelSessionError>>,
     },
     EgressHttpOpen {
         request: TunnelEgressHttpRequest,
@@ -942,6 +1097,10 @@ impl TunnelSession {
         forwarder.attach(self.request_sender.clone());
     }
 
+    pub fn attach_gateway_egress_token_provider(&self, provider: &GatewayEgressTokenProvider) {
+        provider.attach(self.request_sender.clone());
+    }
+
     pub fn set_agent_endpoint_url(
         &self,
         agent_endpoint_url: Option<String>,
@@ -1110,6 +1269,8 @@ struct TunnelSessionMutableState {
         String,
         std::sync::mpsc::Sender<Result<TunnelSigningResponse, TunnelSessionError>>,
     >,
+    pending_egress_token_requests:
+        BTreeMap<String, std::sync::mpsc::Sender<Result<TunnelEgressToken, TunnelSessionError>>>,
     pending_egress_http_requests: BTreeMap<u32, PendingEgressHttpRequest>,
     pending_agent_opens: BTreeMap<u32, PendingAgentOpenState>,
     pending_exec_opens: BTreeMap<u32, PendingExecOpenState>,
@@ -1658,6 +1819,17 @@ fn fail_pending_signing_requests(session_state: &mut TunnelSessionMutableState, 
     }
 }
 
+fn fail_pending_egress_token_requests(
+    session_state: &mut TunnelSessionMutableState,
+    message: &str,
+) {
+    for response_sender in
+        std::mem::take(&mut session_state.pending_egress_token_requests).into_values()
+    {
+        let _ = response_sender.send(Err(TunnelSessionError::EgressToken(message.to_string())));
+    }
+}
+
 fn fail_pending_egress_http_requests(session_state: &mut TunnelSessionMutableState, message: &str) {
     for pending_request in
         std::mem::take(&mut session_state.pending_egress_http_requests).into_values()
@@ -1914,6 +2086,7 @@ async fn run_connected_tunnel_session(
         runtime_env: connection_state.runtime_env,
         telemetry_relay: TelemetryRelay::default(),
         pending_signing_requests: BTreeMap::new(),
+        pending_egress_token_requests: BTreeMap::new(),
         pending_egress_http_requests: BTreeMap::new(),
         pending_agent_opens: BTreeMap::new(),
         pending_exec_opens: BTreeMap::new(),
@@ -2248,6 +2421,10 @@ async fn run_connected_tunnel_session(
                 &mut session_state,
                 "bootstrap tunnel session shut down before a signing result arrived",
             );
+            fail_pending_egress_token_requests(
+                &mut session_state,
+                "bootstrap tunnel session shut down before an egress token arrived",
+            );
             fail_pending_egress_http_requests(
                 &mut session_state,
                 "bootstrap tunnel session shut down before an egress response arrived",
@@ -2293,6 +2470,10 @@ async fn run_connected_tunnel_session(
                     &mut session_state,
                     "bootstrap tunnel session restarted before a signing result arrived",
                 );
+                fail_pending_egress_token_requests(
+                    &mut session_state,
+                    "bootstrap tunnel session restarted before an egress token arrived",
+                );
                 fail_pending_egress_http_requests(
                     &mut session_state,
                     "bootstrap tunnel session restarted before an egress response arrived",
@@ -2325,6 +2506,10 @@ async fn run_connected_tunnel_session(
                 fail_pending_signing_requests(
                     &mut session_state,
                     "bootstrap tunnel session failed before a signing result arrived",
+                );
+                fail_pending_egress_token_requests(
+                    &mut session_state,
+                    "bootstrap tunnel session failed before an egress token arrived",
                 );
                 fail_pending_egress_http_requests(
                     &mut session_state,
@@ -4024,6 +4209,29 @@ async fn handle_tunnel_session_event(
                     }
                 }
 
+                match parse_egress_token_control_message(&payload) {
+                    Ok(Some(message)) => {
+                        handle_egress_token_control_message(
+                            session_state,
+                            tunnel_writer_sender,
+                            context.clock,
+                            context.sandbox_instance_id,
+                            message,
+                        );
+                        return Ok(TunnelSessionControlFlow::Continue);
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        report_dropped_bootstrap_text_message(
+                            tunnel_writer_sender,
+                            &mut session_state.telemetry_relay,
+                            context.clock,
+                            error.to_string(),
+                        );
+                        return Ok(TunnelSessionControlFlow::Continue);
+                    }
+                }
+
                 if handle_operation_control_message(&payload, tunnel_writer_sender, session_state) {
                     return Ok(TunnelSessionControlFlow::Continue);
                 }
@@ -4580,6 +4788,67 @@ fn handle_tunnel_session_request(
                 }
             }
         }
+        TunnelSessionRequest::EgressToken {
+            request_id,
+            response_sender,
+        } => {
+            if request_id.trim().is_empty() {
+                let _ = response_sender.send(Err(TunnelSessionError::EgressToken(
+                    "egress token request id is required".to_string(),
+                )));
+                return Ok(TunnelSessionControlFlow::Continue);
+            }
+
+            if session_state
+                .pending_egress_token_requests
+                .contains_key(&request_id)
+            {
+                let _ = response_sender.send(Err(TunnelSessionError::EgressToken(
+                    "duplicate egress token request id".to_string(),
+                )));
+                return Ok(TunnelSessionControlFlow::Continue);
+            }
+
+            record_egress_token_event(
+                tunnel_writer_sender,
+                session_state,
+                runtime.clock.as_ref(),
+                runtime.sandbox_instance_id.as_str(),
+                "egress_token_request_started",
+                &request_id,
+                &[],
+            );
+            session_state
+                .pending_egress_token_requests
+                .insert(request_id.clone(), response_sender);
+            let payload = egress_token_request(&EgressTokenRequest {
+                message_type: "egress.token.request".to_string(),
+                request_id: request_id.clone(),
+            });
+
+            match write_tunnel_text(tunnel_writer_sender, payload) {
+                Ok(()) => Ok(TunnelSessionControlFlow::Continue),
+                Err(error) => {
+                    if let Some(response_sender) = session_state
+                        .pending_egress_token_requests
+                        .remove(&request_id)
+                    {
+                        let _ = response_sender
+                            .send(Err(TunnelSessionError::EgressToken(error.to_string())));
+                    }
+                    record_egress_token_event(
+                        tunnel_writer_sender,
+                        session_state,
+                        runtime.clock.as_ref(),
+                        runtime.sandbox_instance_id.as_str(),
+                        "egress_token_request_failed",
+                        &request_id,
+                        &[("error", Value::String(error.to_string()))],
+                    );
+                    Err(error)
+                }
+            }
+        }
         TunnelSessionRequest::EgressHttpOpen {
             request,
             response_sender,
@@ -4905,6 +5174,69 @@ fn flush_pending_operation_records(
     close_operation_stream_if_drained(tunnel_writer_sender, session_state);
 }
 
+fn record_egress_token_event(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    session_state: &mut TunnelSessionMutableState,
+    clock: &dyn Clock,
+    sandbox_instance_id: &str,
+    event: &str,
+    request_id: &str,
+    extra_fields: &[(&str, Value)],
+) {
+    let maybe_error = extra_fields
+        .iter()
+        .find_map(|(field, value)| (*field == "error").then_some(value))
+        .and_then(Value::as_str);
+    if let Some(error) = maybe_error {
+        warn!(
+            event = event,
+            request_id = request_id,
+            sandbox_instance_id = sandbox_instance_id,
+            error = error,
+            "gateway egress token request failed"
+        );
+    } else {
+        info!(
+            event = event,
+            request_id = request_id,
+            sandbox_instance_id = sandbox_instance_id,
+            "gateway egress token request advanced"
+        );
+    }
+
+    if !session_state.operation_stream_requested
+        && session_state.operation_stream_send_window.is_none()
+    {
+        return;
+    }
+
+    let Ok(observed_at) = crate::time::format_rfc3339_timestamp(clock.now_system_time()) else {
+        return;
+    };
+    let mut payload = Map::new();
+    payload.insert("event".to_string(), Value::String(event.to_string()));
+    payload.insert(
+        "component".to_string(),
+        Value::String(SupervisedComponent::TunnelSession.as_str().to_string()),
+    );
+    payload.insert(
+        "sandboxInstanceId".to_string(),
+        Value::String(sandbox_instance_id.to_string()),
+    );
+    payload.insert(
+        "requestId".to_string(),
+        Value::String(request_id.to_string()),
+    );
+    payload.insert("observedAt".to_string(), Value::String(observed_at));
+    for (field_name, field_value) in extra_fields {
+        payload.insert((*field_name).to_string(), field_value.clone());
+    }
+    if let Ok(line) = serde_json::to_string(&Value::Object(payload)) {
+        enqueue_operation_record(session_state, line + "\n");
+        flush_pending_operation_records(tunnel_writer_sender, session_state);
+    }
+}
+
 fn handle_signing_control_message(
     session_state: &mut TunnelSessionMutableState,
     message: SigningControlMessage,
@@ -4937,6 +5269,68 @@ fn handle_signing_control_message(
                     code: result.code,
                     message: result.message,
                 }));
+            }
+        }
+    }
+}
+
+fn handle_egress_token_control_message(
+    session_state: &mut TunnelSessionMutableState,
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    clock: &dyn Clock,
+    sandbox_instance_id: &str,
+    message: EgressTokenControlMessage,
+) {
+    match message {
+        EgressTokenControlMessage::Request(request) => {
+            eprintln!(
+                "sandboxd dropped unexpected egress token request '{}' from the gateway",
+                request.request_id
+            );
+        }
+        EgressTokenControlMessage::Response(response) => {
+            if let Some(response_sender) = session_state
+                .pending_egress_token_requests
+                .remove(&response.request_id)
+            {
+                let request_id = response.request_id;
+                let expires_at = response.expires_at;
+                let _ = response_sender.send(Ok(TunnelEgressToken {
+                    token: response.token,
+                    expires_at: expires_at.clone(),
+                }));
+                record_egress_token_event(
+                    tunnel_writer_sender,
+                    session_state,
+                    clock,
+                    sandbox_instance_id,
+                    "egress_token_request_completed",
+                    &request_id,
+                    &[("expiresAt", Value::String(expires_at))],
+                );
+            }
+        }
+        EgressTokenControlMessage::Error(error) => {
+            if let Some(response_sender) = session_state
+                .pending_egress_token_requests
+                .remove(&error.request_id)
+            {
+                let _ = response_sender.send(Err(TunnelSessionError::EgressToken(format!(
+                    "{}: {}",
+                    error.code, error.message
+                ))));
+                record_egress_token_event(
+                    tunnel_writer_sender,
+                    session_state,
+                    clock,
+                    sandbox_instance_id,
+                    "egress_token_request_failed",
+                    &error.request_id,
+                    &[
+                        ("code", Value::String(error.code)),
+                        ("error", Value::String(error.message)),
+                    ],
+                );
             }
         }
     }
@@ -6596,7 +6990,8 @@ mod tests {
         parse_stream_control_message,
     };
     use crate::tunnel::session::{
-        TunnelSession, TunnelSigningRequest, TunnelSigningResponse, decode_bounded_output,
+        GatewayEgressTokenProvider, TunnelSession, TunnelSigningRequest, TunnelSigningResponse,
+        decode_bounded_output,
     };
     use crate::tunnel::telemetry::{
         SANDBOX_TELEMETRY_LOG_STREAM_ID, TelemetryRelay, decode_telemetry_data_frame,
@@ -6697,6 +7092,7 @@ mod tests {
             runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
+            pending_egress_token_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
             pending_agent_opens: BTreeMap::new(),
             pending_exec_opens: BTreeMap::new(),
@@ -6849,6 +7245,7 @@ mod tests {
             runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
+            pending_egress_token_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
             pending_agent_opens: BTreeMap::new(),
             pending_exec_opens: BTreeMap::new(),
@@ -7001,6 +7398,7 @@ mod tests {
             runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
+            pending_egress_token_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::from([(
                 91,
                 PendingEgressHttpRequest {
@@ -7087,6 +7485,7 @@ mod tests {
             runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
+            pending_egress_token_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::from([(
                 95,
                 PendingEgressHttpRequest {
@@ -7159,6 +7558,7 @@ mod tests {
             runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
+            pending_egress_token_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::from([(
                 94,
                 PendingEgressHttpRequest {
@@ -7242,6 +7642,7 @@ mod tests {
             runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
+            pending_egress_token_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::from([(
                 92,
                 PendingEgressHttpRequest {
@@ -7303,6 +7704,7 @@ mod tests {
             runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
+            pending_egress_token_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
             pending_agent_opens: BTreeMap::new(),
             pending_exec_opens: BTreeMap::new(),
@@ -7382,6 +7784,7 @@ mod tests {
             runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
+            pending_egress_token_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
             pending_agent_opens: BTreeMap::new(),
             pending_exec_opens: BTreeMap::new(),
@@ -7526,6 +7929,7 @@ mod tests {
             runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
+            pending_egress_token_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
             pending_agent_opens: BTreeMap::new(),
             pending_exec_opens: BTreeMap::new(),
@@ -7581,6 +7985,7 @@ mod tests {
             runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
+            pending_egress_token_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
             pending_agent_opens: BTreeMap::new(),
             pending_exec_opens: BTreeMap::new(),
@@ -7628,6 +8033,7 @@ mod tests {
             runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
+            pending_egress_token_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
             pending_agent_opens: BTreeMap::new(),
             pending_exec_opens: BTreeMap::new(),
@@ -7690,6 +8096,7 @@ mod tests {
             runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
+            pending_egress_token_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
             pending_agent_opens: BTreeMap::new(),
             pending_exec_opens: BTreeMap::new(),
@@ -7783,6 +8190,7 @@ mod tests {
             runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
+            pending_egress_token_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
             pending_agent_opens: BTreeMap::new(),
             pending_exec_opens: BTreeMap::new(),
@@ -7866,6 +8274,7 @@ mod tests {
             runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
+            pending_egress_token_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
             pending_agent_opens: BTreeMap::new(),
             pending_exec_opens: BTreeMap::new(),
@@ -7960,6 +8369,7 @@ mod tests {
             runtime_env: BTreeMap::new(),
             telemetry_relay: TelemetryRelay::default(),
             pending_signing_requests: BTreeMap::new(),
+            pending_egress_token_requests: BTreeMap::new(),
             pending_egress_http_requests: BTreeMap::new(),
             pending_agent_opens: BTreeMap::new(),
             pending_exec_opens: BTreeMap::new(),
@@ -9439,6 +9849,124 @@ mod tests {
         gateway_close_sender
             .send(())
             .expect("gateway should close after the signing response is observed");
+
+        tunnel_session.close();
+        gateway_thread
+            .join()
+            .expect("gateway thread should exit cleanly");
+    }
+
+    #[test]
+    fn requests_and_caches_egress_tokens_over_the_bootstrap_tunnel() {
+        let bootstrap_listener =
+            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+        let bootstrap_url = format!(
+            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
+            bootstrap_listener
+                .local_addr()
+                .expect("bootstrap listener should expose an address")
+                .port()
+        );
+        let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
+        let (gateway_close_sender, gateway_close_receiver) = mpsc::channel::<()>();
+        let gateway_thread = thread::spawn(move || {
+            let (stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the bootstrap tunnel");
+            let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
+
+            expect_tunnel_connected_publications(&mut websocket);
+
+            let token_request = read_json_text_message(&mut websocket);
+            assert_eq!(
+                token_request,
+                json!({
+                    "type": "egress.token.request",
+                    "requestId": "egress_token_req_1"
+                })
+            );
+
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "egress.token.response",
+                        "requestId": "egress_token_req_1",
+                        "token": "short-lived-egress-jwt",
+                        "expiresAt": "2100-01-01T00:00:00Z"
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should return an egress token");
+
+            gateway_done_sender
+                .send(())
+                .expect("gateway should signal the token response was sent");
+            gateway_close_receiver
+                .recv()
+                .expect("gateway should wait until the cached token is observed");
+            websocket
+                .close(None)
+                .expect("gateway websocket should close cleanly");
+        });
+
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+            bootstrap_token: "bootstrap-token-value".to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+            tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            }),
+            git_identity: None,
+            transparent_proxy: None,
+        };
+
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        let clock = Arc::new(SystemClock);
+        let tunnel_session = TunnelSession::start(
+            &startup_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            None,
+            BTreeMap::new(),
+            clock.clone(),
+            Arc::new(ThreadSleeper),
+        )
+        .expect("tunnel session should start");
+        let token_provider = GatewayEgressTokenProvider::new(clock, "sbi_tunnel_session");
+        tunnel_session.attach_gateway_egress_token_provider(&token_provider);
+
+        let token = token_provider
+            .token()
+            .expect("egress token request should complete through the tunnel");
+        assert_eq!(token.token, "short-lived-egress-jwt");
+        assert_eq!(token.expires_at, "2100-01-01T00:00:00Z");
+        gateway_done_receiver
+            .recv()
+            .expect("gateway should complete the egress token interaction");
+
+        let cached_token = token_provider
+            .token()
+            .expect("valid cached egress token should be reused");
+        assert_eq!(cached_token, token);
+        gateway_close_sender
+            .send(())
+            .expect("gateway should close after the cached token is observed");
 
         tunnel_session.close();
         gateway_thread

@@ -744,6 +744,45 @@ pub struct SigningFailureResult {
     pub message: String,
 }
 
+/// Outbound `egress.token.request` payload sent from sandboxd to the gateway.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EgressTokenRequest {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub request_id: String,
+}
+
+/// Successful `egress.token.response` payload sent by the gateway.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EgressTokenResponse {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub request_id: String,
+    pub token: String,
+    pub expires_at: String,
+}
+
+/// Failed `egress.token.error` payload sent by the gateway.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EgressTokenError {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub request_id: String,
+    pub code: String,
+    pub message: String,
+}
+
+/// Egress-token control messages exchanged over the bootstrap tunnel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EgressTokenControlMessage {
+    Request(EgressTokenRequest),
+    Response(EgressTokenResponse),
+    Error(EgressTokenError),
+}
+
 /// Signing control messages exchanged over the bootstrap tunnel.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SigningControlMessage {
@@ -1322,6 +1361,45 @@ pub fn parse_signing_control_message(
     }
 }
 
+/// Parses one inbound `egress.token.*` control message.
+pub fn parse_egress_token_control_message(
+    payload: &str,
+) -> Result<Option<EgressTokenControlMessage>, TunnelProtocolError> {
+    let parsed_payload: serde_json::Value = serde_json::from_str(payload).map_err(|error| {
+        TunnelProtocolError::new(format!(
+            "egress token control message must be valid json: {error}"
+        ))
+    })?;
+    let Some(message_type) = parsed_payload
+        .get("type")
+        .and_then(serde_json::Value::as_str)
+    else {
+        return Ok(None);
+    };
+
+    match message_type {
+        "egress.token.request" => {
+            let message: EgressTokenRequest = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_egress_token_request(&message)?;
+            Ok(Some(EgressTokenControlMessage::Request(message)))
+        }
+        "egress.token.response" => {
+            let message: EgressTokenResponse = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_egress_token_response(&message)?;
+            Ok(Some(EgressTokenControlMessage::Response(message)))
+        }
+        "egress.token.error" => {
+            let message: EgressTokenError = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_egress_token_error(&message)?;
+            Ok(Some(EgressTokenControlMessage::Error(message)))
+        }
+        _ => Ok(None),
+    }
+}
+
 /// Encodes one outbound stream data frame for websocket binary transport.
 pub fn encode_stream_data_frame(
     stream_id: u32,
@@ -1411,6 +1489,11 @@ pub fn stream_complete(stream_id: u32) -> String {
 
 /// Builds one outbound `signing.request` payload.
 pub fn signing_request(request: &SigningRequest) -> String {
+    serialize_json(request)
+}
+
+/// Builds one outbound `egress.token.request` payload.
+pub fn egress_token_request(request: &EgressTokenRequest) -> String {
     serialize_json(request)
 }
 
@@ -2433,14 +2516,79 @@ fn validate_signing_failure_result(
     Ok(())
 }
 
+fn validate_egress_token_request(message: &EgressTokenRequest) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "egress.token.request" {
+        return Err(TunnelProtocolError::new(
+            "egress.token.request message type must be 'egress.token.request'",
+        ));
+    }
+    if message.request_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "egress.token.request requestId is required",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_egress_token_response(
+    message: &EgressTokenResponse,
+) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "egress.token.response" {
+        return Err(TunnelProtocolError::new(
+            "egress.token.response message type must be 'egress.token.response'",
+        ));
+    }
+    if message.request_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "egress.token.response requestId is required",
+        ));
+    }
+    if message.token.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "egress.token.response token is required",
+        ));
+    }
+    if message.expires_at.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "egress.token.response expiresAt is required",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_egress_token_error(message: &EgressTokenError) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "egress.token.error" {
+        return Err(TunnelProtocolError::new(
+            "egress.token.error message type must be 'egress.token.error'",
+        ));
+    }
+    if message.request_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "egress.token.error requestId is required",
+        ));
+    }
+    if message.code != "invalid_sandbox_state" && message.code != "internal_error" {
+        return Err(TunnelProtocolError::new(
+            "egress.token.error code is invalid",
+        ));
+    }
+    if message.message.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "egress.token.error message is required",
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use crate::tunnel::protocol::{
-        BootstrapTelemetryControlMessage, FileUploadCompletedEventInput, PAYLOAD_KIND_RAW_BYTES,
-        PAYLOAD_KIND_WEBSOCKET_TEXT, ProcessesStreamMessage, PtyControlMessage,
-        SigningControlMessage, SigningRequest, StreamControlMessage, StreamSendWindow,
-        decode_stream_data_frame, encode_stream_data_frame, exec_result_event,
-        file_upload_completed_event, parse_bootstrap_telemetry_control_message,
+        BootstrapTelemetryControlMessage, EgressTokenControlMessage, EgressTokenRequest,
+        FileUploadCompletedEventInput, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT,
+        ProcessesStreamMessage, PtyControlMessage, SigningControlMessage, SigningRequest,
+        StreamControlMessage, StreamSendWindow, decode_stream_data_frame, egress_token_request,
+        encode_stream_data_frame, exec_result_event, file_upload_completed_event,
+        parse_bootstrap_telemetry_control_message, parse_egress_token_control_message,
         parse_egress_transport_message, parse_ports_control_message, parse_ports_transport_message,
         parse_processes_stream_message, parse_pty_control_message, parse_signing_control_message,
         parse_stream_control_message, ports_target_authorize_failure_result,
@@ -2828,6 +2976,47 @@ mod tests {
     }
 
     #[test]
+    fn parses_valid_egress_token_control_messages() {
+        let request = parse_egress_token_control_message(
+            r#"{"type":"egress.token.request","requestId":"egress_token_req_123"}"#,
+        )
+        .expect("egress.token.request should parse");
+        assert!(matches!(
+            request,
+            Some(EgressTokenControlMessage::Request(_))
+        ));
+
+        let response = parse_egress_token_control_message(
+            r#"{"type":"egress.token.response","requestId":"egress_token_req_123","token":"jwt-token","expiresAt":"2026-05-17T00:05:00Z"}"#,
+        )
+        .expect("egress.token.response should parse");
+        assert!(matches!(
+            response,
+            Some(EgressTokenControlMessage::Response(_))
+        ));
+
+        let error = parse_egress_token_control_message(
+            r#"{"type":"egress.token.error","requestId":"egress_token_req_123","code":"invalid_sandbox_state","message":"Sandbox instance is not active."}"#,
+        )
+        .expect("egress.token.error should parse");
+        assert!(matches!(error, Some(EgressTokenControlMessage::Error(_))));
+    }
+
+    #[test]
+    fn rejects_invalid_egress_token_errors() {
+        let invalid_code = parse_egress_token_control_message(
+            r#"{"type":"egress.token.error","requestId":"egress_token_req_123","code":"not_in_contract","message":"Nope."}"#,
+        );
+
+        assert!(
+            invalid_code
+                .expect_err("invalid error code should fail validation")
+                .to_string()
+                .contains("egress.token.error code is invalid")
+        );
+    }
+
+    #[test]
     fn round_trips_data_frames() {
         let encoded = encode_stream_data_frame(9, PAYLOAD_KIND_WEBSOCKET_TEXT, b"hello")
             .expect("frame should encode");
@@ -2875,6 +3064,13 @@ mod tests {
                 encoding: "base64".to_string(),
             }),
             r#"{"type":"signing.request","requestId":"sign_req_123","organizationId":"org_123","sandboxInstanceId":"sbi_123","actingUserId":"usr_123","providerFamily":"github","format":"ssh","keyRef":"key::ssh-ed25519 AAAA","grant":"grant-token","payload":"c2lnbi1tZQ==","encoding":"base64"}"#
+        );
+        assert_eq!(
+            egress_token_request(&EgressTokenRequest {
+                message_type: "egress.token.request".to_string(),
+                request_id: "egress_token_req_123".to_string(),
+            }),
+            r#"{"type":"egress.token.request","requestId":"egress_token_req_123"}"#
         );
         assert_eq!(
             ports_target_authorize_success_result("req_port_access_1", "https", true),

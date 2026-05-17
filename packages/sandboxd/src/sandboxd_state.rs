@@ -42,8 +42,8 @@ use crate::startup_diagnostics::{
 use crate::supervision::{SandboxdHealthSnapshot, SandboxdSupervisorHandle, SupervisedComponent};
 use crate::time::{Clock, Sleeper};
 use crate::tunnel::session::{
-    GatewayEgressForwarder, TunnelSession, TunnelSessionError, TunnelSigningRequest,
-    TunnelSigningResponse, derive_sandbox_instance_id,
+    GatewayEgressForwarder, GatewayEgressTokenProvider, TunnelSession, TunnelSessionError,
+    TunnelSigningRequest, TunnelSigningResponse, derive_sandbox_instance_id,
 };
 
 /// Describes why the initialized daemon runtime failed to start or stop.
@@ -135,6 +135,7 @@ pub struct SandboxdState {
     agent_endpoint_url: Option<String>,
     runtime_env: BTreeMap<String, String>,
     gateway_egress_forwarder: Option<GatewayEgressForwarder>,
+    gateway_egress_token_provider: Option<GatewayEgressTokenProvider>,
     clock: Arc<dyn Clock>,
     sleeper: Arc<dyn Sleeper>,
     tunnel_session: Option<TunnelSession>,
@@ -172,11 +173,15 @@ impl SandboxdState {
         let sandbox_instance_id = derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)
             .map_err(|error| SandboxdStateError::StartTunnelSession(error.to_string()))?;
         let supervisor_handle = SandboxdSupervisorHandle::new(
-            sandbox_instance_id,
+            sandbox_instance_id.clone(),
             clock.clone(),
             collect_tracked_components(&runtime_plan),
         );
         let gateway_egress_forwarder = Some(GatewayEgressForwarder::new());
+        let gateway_egress_token_provider = Some(GatewayEgressTokenProvider::new(
+            clock.clone(),
+            sandbox_instance_id,
+        ));
         let execution_mode = startup_input.execution_mode;
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
         let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
@@ -228,6 +233,11 @@ impl SandboxdState {
             && let Some(forwarder) = &gateway_egress_forwarder
         {
             tunnel_session.attach_gateway_egress_forwarder(forwarder);
+        }
+        if let Some(tunnel_session) = &startup_tunnel_session
+            && let Some(provider) = &gateway_egress_token_provider
+        {
+            tunnel_session.attach_gateway_egress_token_provider(provider);
         }
 
         let mut egress_proxy: Option<EgressProxy>;
@@ -442,6 +452,7 @@ impl SandboxdState {
                 agent_endpoint_url: None,
                 runtime_env,
                 gateway_egress_forwarder: None,
+                gateway_egress_token_provider: None,
                 clock,
                 sleeper,
                 tunnel_session: None,
@@ -638,6 +649,7 @@ impl SandboxdState {
             agent_endpoint_url,
             runtime_env,
             gateway_egress_forwarder,
+            gateway_egress_token_provider,
             clock,
             sleeper,
             tunnel_session,
@@ -707,6 +719,9 @@ impl SandboxdState {
         record_operation_phase_completed(&diagnostics_logger, "apply_git_identity");
         if let Some(forwarder) = &self.gateway_egress_forwarder {
             tunnel_session.attach_gateway_egress_forwarder(forwarder);
+        }
+        if let Some(provider) = &self.gateway_egress_token_provider {
+            tunnel_session.attach_gateway_egress_token_provider(provider);
         }
         if let Err(error) = attach_runtime_environment_to_tunnel(
             &tunnel_session,
