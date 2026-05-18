@@ -1,7 +1,8 @@
 use bpaf::{OptionParser, Parser, construct, pure};
 use mstl_core::auth::API_KEY_ENV_VAR;
 use mstl_core::client::{
-    CurrentActor, CurrentActorAuthentication, MistleClient, MistleClientConfig, MistleClientError,
+    CurrentActor, CurrentActorAuthentication, ListSandboxProfilesResponse, MistleClient,
+    MistleClientConfig, MistleClientError, SandboxProfile, SandboxProfileStatus,
 };
 use std::env::{self, VarError};
 use std::fmt;
@@ -20,14 +21,24 @@ fn main() {
 #[derive(Debug, Clone, Copy)]
 enum CliCommand {
     Whoami,
+    ProfileList,
 }
 
 #[derive(Debug)]
 enum CliError {
-    MissingEnvironmentVariable { name: &'static str },
-    BlankEnvironmentVariable { name: &'static str },
-    NonUnicodeEnvironmentVariable { name: &'static str },
-    Client(MistleClientError),
+    MissingEnvironmentVariable {
+        name: &'static str,
+    },
+    BlankEnvironmentVariable {
+        name: &'static str,
+    },
+    NonUnicodeEnvironmentVariable {
+        name: &'static str,
+    },
+    Client {
+        action: &'static str,
+        source: MistleClientError,
+    },
 }
 
 impl fmt::Display for CliError {
@@ -40,8 +51,8 @@ impl fmt::Display for CliError {
             Self::NonUnicodeEnvironmentVariable { name } => {
                 write!(formatter, "{name} must be valid Unicode")
             }
-            Self::Client(error) => {
-                write!(formatter, "failed to get current Mistle identity: {error}")
+            Self::Client { action, source } => {
+                write!(formatter, "failed to {action}: {source}")
             }
         }
     }
@@ -55,7 +66,17 @@ fn options() -> OptionParser<CliCommand> {
         .descr("Print the current Mistle identity")
         .command("whoami");
 
-    construct!([whoami])
+    let profile_list = pure(CliCommand::ProfileList)
+        .to_options()
+        .descr("List sandbox profiles")
+        .command("list");
+
+    let profile = construct!([profile_list])
+        .to_options()
+        .descr("Manage sandbox profiles")
+        .command("profile");
+
+    construct!([whoami, profile])
         .to_options()
         .descr("Mistle command line interface")
         .version(env!("CARGO_PKG_VERSION"))
@@ -80,17 +101,48 @@ where
                 1
             }
         },
+        CliCommand::ProfileList => match list_sandbox_profiles() {
+            Ok(profiles) => match write_sandbox_profiles(stdout, &profiles) {
+                Ok(()) => 0,
+                Err(error) => {
+                    let _ = writeln!(stderr, "failed to write sandbox profiles: {error}");
+                    1
+                }
+            },
+            Err(error) => {
+                let _ = writeln!(stderr, "{error}");
+                1
+            }
+        },
     }
 }
 
 fn current_actor() -> Result<CurrentActor, CliError> {
+    mistle_client()?
+        .current_actor()
+        .map_err(|source| CliError::Client {
+            action: "get current Mistle identity",
+            source,
+        })
+}
+
+fn list_sandbox_profiles() -> Result<ListSandboxProfilesResponse, CliError> {
+    mistle_client()?
+        .list_sandbox_profiles()
+        .map_err(|source| CliError::Client {
+            action: "list sandbox profiles",
+            source,
+        })
+}
+
+fn mistle_client() -> Result<MistleClient, CliError> {
     let api_key = required_env_var(API_KEY_ENV_VAR)?;
     let base_url = required_env_var(CONTROL_PLANE_API_PUBLIC_URL_ENV_VAR)?;
 
-    MistleClient::new(MistleClientConfig { base_url, api_key })
-        .map_err(CliError::Client)?
-        .current_actor()
-        .map_err(CliError::Client)
+    MistleClient::new(MistleClientConfig { base_url, api_key }).map_err(|source| CliError::Client {
+        action: "configure Mistle client",
+        source,
+    })
 }
 
 fn required_env_var(name: &'static str) -> Result<String, CliError> {
@@ -113,4 +165,170 @@ where
     }
 
     writeln!(stdout, "organization: {}", actor.organization.id)
+}
+
+fn write_sandbox_profiles<W>(
+    stdout: &mut W,
+    response: &ListSandboxProfilesResponse,
+) -> io::Result<()>
+where
+    W: Write,
+{
+    write!(stdout, "{}", render_sandbox_profiles(response))
+}
+
+fn render_sandbox_profiles(response: &ListSandboxProfilesResponse) -> String {
+    if response.items.is_empty() {
+        return "No profiles found.\n".to_owned();
+    }
+
+    let rows: Vec<SandboxProfileRow> = response
+        .items
+        .iter()
+        .map(SandboxProfileRow::from_profile)
+        .collect();
+    let widths = SandboxProfileTableWidths::from_rows(&rows);
+    let mut output = String::new();
+
+    output.push_str(&format!(
+        "{:<id_width$}  {:<name_width$}  {:<active_version_width$}  {:<status_width$}  {}\n",
+        "ID",
+        "NAME",
+        "ACTIVE VERSION",
+        "STATUS",
+        "UPDATED",
+        id_width = widths.id,
+        name_width = widths.name,
+        active_version_width = widths.active_version,
+        status_width = widths.status,
+    ));
+
+    for row in rows {
+        output.push_str(&format!(
+            "{:<id_width$}  {:<name_width$}  {:<active_version_width$}  {:<status_width$}  {}\n",
+            row.id,
+            row.name,
+            row.active_version,
+            row.status,
+            row.updated,
+            id_width = widths.id,
+            name_width = widths.name,
+            active_version_width = widths.active_version,
+            status_width = widths.status,
+        ));
+    }
+
+    output
+}
+
+struct SandboxProfileRow {
+    id: String,
+    name: String,
+    active_version: String,
+    status: &'static str,
+    updated: String,
+}
+
+impl SandboxProfileRow {
+    fn from_profile(profile: &SandboxProfile) -> Self {
+        let active_version = match profile.active_version {
+            Some(active_version) => active_version.to_string(),
+            None => "-".to_owned(),
+        };
+
+        Self {
+            id: profile.id.clone(),
+            name: profile.display_name.clone(),
+            active_version,
+            status: profile_status_label(&profile.status),
+            updated: profile.updated_at.clone(),
+        }
+    }
+}
+
+struct SandboxProfileTableWidths {
+    id: usize,
+    name: usize,
+    active_version: usize,
+    status: usize,
+}
+
+impl SandboxProfileTableWidths {
+    fn from_rows(rows: &[SandboxProfileRow]) -> Self {
+        let mut widths = Self {
+            id: "ID".len(),
+            name: "NAME".len(),
+            active_version: "ACTIVE VERSION".len(),
+            status: "STATUS".len(),
+        };
+
+        for row in rows {
+            widths.id = widths.id.max(row.id.len());
+            widths.name = widths.name.max(row.name.len());
+            widths.active_version = widths.active_version.max(row.active_version.len());
+            widths.status = widths.status.max(row.status.len());
+        }
+
+        widths
+    }
+}
+
+fn profile_status_label(status: &SandboxProfileStatus) -> &'static str {
+    match status {
+        SandboxProfileStatus::Active => "active",
+        SandboxProfileStatus::Inactive => "inactive",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use mstl_core::client::{ListSandboxProfilesResponse, SandboxProfile, SandboxProfileStatus};
+
+    use crate::render_sandbox_profiles;
+
+    #[test]
+    fn renders_empty_profile_list() {
+        let response = ListSandboxProfilesResponse {
+            total_results: 0,
+            items: Vec::new(),
+            next_page: None,
+            previous_page: None,
+        };
+
+        assert_eq!(render_sandbox_profiles(&response), "No profiles found.\n");
+    }
+
+    #[test]
+    fn renders_profile_list_table() {
+        let response = ListSandboxProfilesResponse {
+            total_results: 2,
+            items: vec![
+                SandboxProfile {
+                    id: "sbp_python".to_owned(),
+                    display_name: "Python Dev".to_owned(),
+                    active_version: Some(3),
+                    status: SandboxProfileStatus::Active,
+                    updated_at: "2026-05-18T01:02:03.000Z".to_owned(),
+                },
+                SandboxProfile {
+                    id: "sbp_node".to_owned(),
+                    display_name: "Node".to_owned(),
+                    active_version: None,
+                    status: SandboxProfileStatus::Inactive,
+                    updated_at: "2026-05-17T01:02:03.000Z".to_owned(),
+                },
+            ],
+            next_page: None,
+            previous_page: None,
+        };
+
+        assert_eq!(
+            render_sandbox_profiles(&response),
+            concat!(
+                "ID          NAME        ACTIVE VERSION  STATUS    UPDATED\n",
+                "sbp_python  Python Dev  3               active    2026-05-18T01:02:03.000Z\n",
+                "sbp_node    Node        -               inactive  2026-05-17T01:02:03.000Z\n",
+            ),
+        );
+    }
 }

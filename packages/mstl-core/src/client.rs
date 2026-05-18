@@ -19,7 +19,46 @@ impl MistleClient {
     }
 
     pub fn current_actor(&self) -> Result<CurrentActor, MistleClientError> {
-        let mut response = ureq::get(self.current_actor_url().as_str())
+        self.get_json(self.current_actor_url().as_str())
+    }
+
+    pub fn list_sandbox_profiles(&self) -> Result<ListSandboxProfilesResponse, MistleClientError> {
+        let mut page = self.list_sandbox_profiles_page(None)?;
+        let total_results = page.total_results;
+        let mut items = page.items;
+        let mut next_page = page.next_page;
+
+        while let Some(next_page_cursor) = next_page {
+            let after = next_page_cursor
+                .after
+                .ok_or(MistleClientError::InvalidResponse(
+                    "profile list next page is missing its `after` cursor",
+                ))?;
+            page = self.list_sandbox_profiles_page(Some(&after))?;
+            items.append(&mut page.items);
+            next_page = page.next_page;
+        }
+
+        Ok(ListSandboxProfilesResponse {
+            total_results,
+            items,
+            next_page: None,
+            previous_page: None,
+        })
+    }
+
+    fn list_sandbox_profiles_page(
+        &self,
+        after: Option<&str>,
+    ) -> Result<ListSandboxProfilesResponse, MistleClientError> {
+        self.get_json(self.list_sandbox_profiles_url(after).as_str())
+    }
+
+    fn get_json<TResponse>(&self, url: &str) -> Result<TResponse, MistleClientError>
+    where
+        TResponse: for<'de> Deserialize<'de>,
+    {
+        let mut response = ureq::get(url)
             .header("authorization", format!("Bearer {}", self.api_key))
             .call()
             .map_err(MistleClientError::Request)?;
@@ -34,6 +73,16 @@ impl MistleClient {
 
     fn current_actor_url(&self) -> Url {
         endpoint_url(&self.base_url, "/v1/me")
+    }
+
+    fn list_sandbox_profiles_url(&self, after: Option<&str>) -> Url {
+        let mut url = endpoint_url(&self.base_url, "/v1/sandbox/profiles");
+
+        if let Some(after) = after {
+            url.query_pairs_mut().append_pair("after", after);
+        }
+
+        url
     }
 }
 
@@ -77,6 +126,39 @@ pub struct CurrentActorOrganization {
     pub id: String,
 }
 
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ListSandboxProfilesResponse {
+    pub total_results: u32,
+    pub items: Vec<SandboxProfile>,
+    pub next_page: Option<KeysetPage>,
+    pub previous_page: Option<KeysetPage>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SandboxProfile {
+    pub id: String,
+    pub display_name: String,
+    pub active_version: Option<u32>,
+    pub status: SandboxProfileStatus,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SandboxProfileStatus {
+    Active,
+    Inactive,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct KeysetPage {
+    pub limit: u32,
+    pub after: Option<String>,
+    pub before: Option<String>,
+}
+
 #[derive(Debug)]
 pub enum MistleClientError {
     InvalidConfig(&'static str),
@@ -84,6 +166,7 @@ pub enum MistleClientError {
     UnsupportedBaseUrlScheme(String),
     BaseUrlCannotIncludeQuery,
     BaseUrlCannotIncludeFragment,
+    InvalidResponse(&'static str),
     Request(ureq::Error),
     ReadResponse(ureq::Error),
     DecodeResponse(serde_json::Error),
@@ -101,6 +184,7 @@ impl Display for MistleClientError {
             Self::BaseUrlCannotIncludeFragment => {
                 write!(formatter, "base URL cannot include a fragment")
             }
+            Self::InvalidResponse(message) => write!(formatter, "invalid response: {message}"),
             Self::Request(error) => write!(formatter, "request failed: {error}"),
             Self::ReadResponse(error) => write!(formatter, "failed to read response: {error}"),
             Self::DecodeResponse(error) => write!(formatter, "failed to decode response: {error}"),
@@ -117,7 +201,8 @@ impl Error for MistleClientError {
             Self::InvalidConfig(_)
             | Self::UnsupportedBaseUrlScheme(_)
             | Self::BaseUrlCannotIncludeQuery
-            | Self::BaseUrlCannotIncludeFragment => None,
+            | Self::BaseUrlCannotIncludeFragment
+            | Self::InvalidResponse(_) => None,
         }
     }
 }
@@ -192,6 +277,28 @@ mod tests {
         assert_eq!(
             client.current_actor_url().as_str(),
             "https://api.example.test/control-plane/v1/me"
+        );
+    }
+
+    #[test]
+    fn builds_list_sandbox_profiles_url_from_root_base_url() {
+        let client = client_with_base_url("https://api.example.test");
+
+        assert_eq!(
+            client.list_sandbox_profiles_url(None).as_str(),
+            "https://api.example.test/v1/sandbox/profiles"
+        );
+    }
+
+    #[test]
+    fn builds_list_sandbox_profiles_url_with_after_cursor() {
+        let client = client_with_base_url("https://api.example.test");
+
+        assert_eq!(
+            client
+                .list_sandbox_profiles_url(Some("cursor/with space"))
+                .as_str(),
+            "https://api.example.test/v1/sandbox/profiles?after=cursor%2Fwith+space"
         );
     }
 
