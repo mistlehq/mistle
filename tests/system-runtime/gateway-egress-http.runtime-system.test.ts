@@ -25,6 +25,7 @@ import { createRuntimeCodexSandboxFixture } from "./helpers/runtime-codex-sandbo
 const SYSTEM_TEST_TIMEOUT_MS = 5 * 60_000;
 const SANDBOXD_EGRESS_PROXY_URL = "http://127.0.0.1:38513";
 const SANDBOXD_TRANSPARENT_EGRESS_PROXY_PORT = 38_514;
+const SANDBOXD_EGRESS_PROXY_CA_BUNDLE_PATH = "/run/mistle/sandboxd/egress-proxy-ca-bundle.pem";
 const HTTP_REQUEST_BODY = "phase4a-gateway-egress-http-smoke";
 const TRANSPARENT_HTTP_REQUEST_BODY = "phase4c-transparent-gateway-egress-http-smoke";
 const TRANSPARENT_TCP_REQUEST_BODY = "phase4d-transparent-opaque-tcp-smoke";
@@ -157,6 +158,7 @@ describe("runtime system gateway egress HTTP smoke", () => {
               ].join("\n"),
               [
                 `export TRANSPARENT_PROXY_PORT=${shellQuote(String(SANDBOXD_TRANSPARENT_EGRESS_PROXY_PORT))}`,
+                `export TRANSPARENT_PROXY_CA_BUNDLE=${shellQuote(SANDBOXD_EGRESS_PROXY_CA_BUNDLE_PATH)}`,
                 `export TRANSPARENT_HTTP_PORT=${shellQuote(upstreamUrl.port)}`,
                 `export TRANSPARENT_SECURE_PORT=${shellQuote(secureUpstreamUrl.port)}`,
                 `export TRANSPARENT_HTTP_URL=${shellQuote(`${upstream.gatewayReachableBaseUrl}/echo?case=transparent-http`)}`,
@@ -690,7 +692,7 @@ function transparentGatewaySmokeScript(): string {
     '  printf \'GET %s HTTP/1.1\\r\\nHost: 127.0.0.1:%s\\r\\nConnection: Upgrade\\r\\nUpgrade: websocket\\r\\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\\r\\nSec-WebSocket-Version: 13\\r\\n\\r\\n\' "${TRANSPARENT_WSS_PATH}" "${TRANSPARENT_SECURE_PORT}"',
     "  sleep 0.2",
     '  WEBSOCKET_FRAME_MESSAGE="${TRANSPARENT_WSS_MESSAGE}" websocket_client_frame',
-    '} | openssl s_client -connect "127.0.0.1:${TRANSPARENT_SECURE_PORT}" -servername "127.0.0.1" -CAfile "${trusted_ca_file}" -verify_return_error -quiet >"${output_file}" 2>"${stderr_file}"',
+    '} | openssl s_client -connect "127.0.0.1:${TRANSPARENT_SECURE_PORT}" -servername "127.0.0.1" -CAfile "${TRANSPARENT_PROXY_CA_BUNDLE}" -verify_return_error -quiet >"${output_file}" 2>"${stderr_file}"',
     'openssl_exit="$?"',
     "set -e",
     "dump_transparent_wss_debug() {",
