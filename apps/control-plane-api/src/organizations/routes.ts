@@ -5,6 +5,8 @@ import type { AppContextBindings, AppRoutes } from "../types.js";
 import { ORGANIZATION_ROUTE_BASE_PATH } from "./constants.js";
 import * as deleteIdentityLinkProvider from "./delete-identity-link-provider/index.js";
 import * as deleteLogo from "./delete-logo/index.js";
+import * as ensureBillingCustomer from "./ensure-billing-customer/index.js";
+import * as getBilling from "./get-billing/index.js";
 import * as getLogoContent from "./get-logo-content/index.js";
 import * as getLogo from "./get-logo/index.js";
 import * as getMembershipCapabilities from "./get-membership-capabilities/index.js";
@@ -27,6 +29,8 @@ export function createOrganizationRoutes(): AppRoutes<typeof ORGANIZATION_ROUTE_
   routes.openapi(getLogoContent.route, getLogoContent.handler);
   routes.openapi(putLogo.route, putLogo.handler);
   routes.openapi(deleteLogo.route, deleteLogo.handler);
+  routes.openapi(getBilling.route, getBilling.handler);
+  routes.openapi(ensureBillingCustomer.route, ensureBillingCustomer.handler);
   routes.openapi(getMembershipCapabilities.route, getMembershipCapabilities.handler);
   routes.openapi(listIdentityLinkProviders.route, listIdentityLinkProviders.handler);
   routes.openapi(listIdentityLinkProviderLinks.route, listIdentityLinkProviderLinks.handler);

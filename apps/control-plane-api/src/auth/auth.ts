@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import type { OpenWorkflow } from "openworkflow";
 import { z } from "zod";
 
+import { enqueueStripeCustomerProvisioning } from "../organizations/services/organization-billing.js";
 import { AUTH_ROUTE_BASE_PATH } from "./constants.js";
 import { createAuthProviders } from "./providers/index.js";
 import type { GoogleProviderConfig } from "./providers/types.js";
@@ -15,7 +16,6 @@ import { applyActiveOrganizationToSession } from "./services/apply-active-organi
 import { createInitialOrganizationCredentialKey } from "./services/create-initial-organization-credential-key.js";
 import { createSendOrganizationInvitationService } from "./services/create-send-organization-invitation.js";
 import { createSendVerificationOTPService } from "./services/create-send-verification-otp.js";
-import { enqueueStripeCustomerProvisioning } from "./services/enqueue-stripe-customer-provisioning.js";
 
 export type ControlPlaneAuthConfig = {
   authBaseUrl: string;
@@ -182,14 +182,15 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
                 masterEncryptionKeys: config.masterEncryptionKeys,
                 table: tables.organizationCredentialKeys,
               });
-              await enqueueStripeCustomerProvisioning({
-                db,
-                table: tables.organizationBillingCustomers,
-                openWorkflow,
-                stripeEnabled: config.billing.stripe.enabled,
-                organizationId: organization.id,
-                organizationName: organization.name,
-              });
+              if (config.billing.stripe.enabled) {
+                await enqueueStripeCustomerProvisioning({
+                  db,
+                  table: tables.organizationBillingCustomers,
+                  openWorkflow,
+                  organizationId: organization.id,
+                  organizationName: organization.name,
+                });
+              }
             } catch (error) {
               await db
                 .delete(tables.organizations)

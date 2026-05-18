@@ -49,7 +49,7 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
   );
 
   const membershipCapabilitiesQuery = useQuery({
-    queryKey: membershipCapabilitiesQueryKey(),
+    queryKey: membershipCapabilitiesQueryKey(activeOrganizationId),
     queryFn: async () => getMembershipCapabilities(),
   });
 

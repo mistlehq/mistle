@@ -1,4 +1,5 @@
 import {
+  CreditCardIcon,
   HardDrivesIcon,
   LinkSimpleIcon,
   SlidersHorizontalIcon,
@@ -19,6 +20,7 @@ export const SETTINGS_NAV_GROUPS: readonly SidebarNavGroup[] = resolveSettingsNa
 
 export function resolveSettingsNavGroups(input: {
   organizationRole: OrganizationRole | null;
+  stripeBillingEnabled?: boolean;
 }): readonly SidebarNavGroup[] {
   return [
     {
@@ -57,6 +59,18 @@ export function resolveSettingsNavGroups(input: {
                 to: "/settings/organization/sandboxes",
                 label: "Sandboxes",
                 icon: SandboxStorageNavIcon,
+              },
+            ]
+          : []),
+        ...(canViewOrganizationBillingSettings({
+          organizationRole: input.organizationRole,
+          stripeBillingEnabled: input.stripeBillingEnabled ?? false,
+        })
+          ? [
+              {
+                to: "/settings/organization/billing",
+                label: "Billing",
+                icon: BillingNavIcon,
               },
             ]
           : []),
@@ -103,6 +117,10 @@ function IdentityLinkingNavIcon(props: {
   return createElement(LinkSimpleIcon, props);
 }
 
+function BillingNavIcon(props: { className?: string; "aria-hidden"?: boolean }): React.JSX.Element {
+  return createElement(CreditCardIcon, props);
+}
+
 function shouldRenderSandboxStorageSettingsNavItem(input: {
   organizationRole: OrganizationRole | null;
 }): boolean {
@@ -113,4 +131,14 @@ function shouldRenderIdentityLinkingSettingsNavItem(input: {
   organizationRole: OrganizationRole | null;
 }): boolean {
   return input.organizationRole === "owner" || input.organizationRole === "admin";
+}
+
+export function canViewOrganizationBillingSettings(input: {
+  organizationRole: OrganizationRole | null;
+  stripeBillingEnabled: boolean;
+}): boolean {
+  return (
+    input.stripeBillingEnabled &&
+    (input.organizationRole === "owner" || input.organizationRole === "admin")
+  );
 }

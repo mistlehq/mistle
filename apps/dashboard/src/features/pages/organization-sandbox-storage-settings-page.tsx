@@ -36,7 +36,7 @@ export function OrganizationSandboxStorageSettingsPage(): React.JSX.Element {
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
 
   const membershipCapabilitiesQuery = useQuery({
-    queryKey: membershipCapabilitiesQueryKey(),
+    queryKey: membershipCapabilitiesQueryKey(activeOrganizationId),
     queryFn: async () => getMembershipCapabilities(),
   });
 

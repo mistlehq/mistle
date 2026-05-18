@@ -65,6 +65,7 @@ export function service(
 ): TestServiceDefinition {
   const requiresEnvironmentScope =
     options.sandbox !== undefined ||
+    options.controlPlaneApi?.billingStripeEnabled === true ||
     options.controlPlaneApi?.googleAuth === "simulated" ||
     options.controlPlaneApi?.allowSignups === false;
 
@@ -87,6 +88,9 @@ export function service(
             ...(options.controlPlaneApi?.allowSignups === undefined
               ? {}
               : { allowSignups: options.controlPlaneApi.allowSignups }),
+            ...(options.controlPlaneApi?.billingStripeEnabled === undefined
+              ? {}
+              : { billingStripeEnabled: options.controlPlaneApi.billingStripeEnabled }),
             sandbox: options.sandbox,
           }
         : {
@@ -95,6 +99,9 @@ export function service(
             ...(options.controlPlaneApi.allowSignups === undefined
               ? {}
               : { allowSignups: options.controlPlaneApi.allowSignups }),
+            ...(options.controlPlaneApi.billingStripeEnabled === undefined
+              ? {}
+              : { billingStripeEnabled: options.controlPlaneApi.billingStripeEnabled }),
             sandbox: options.sandbox,
           },
     ),
@@ -105,6 +112,7 @@ function start(input: {
   postgresInfra: TestInfraRequirement;
   googleAuth?: "simulated";
   allowSignups?: boolean;
+  billingStripeEnabled?: boolean;
   sandbox: IntegrationSandboxOptions | undefined;
 }): (startInput: TestServiceStartInput) => Promise<TestService> {
   return async (startInput) => {
@@ -140,6 +148,9 @@ function start(input: {
               }),
               sandbox: input.sandbox,
               seaweedfs: resolvedSeaweedfs,
+              ...(input.billingStripeEnabled === undefined
+                ? {}
+                : { billingStripeEnabled: input.billingStripeEnabled }),
               ...(input.allowSignups === undefined ? {} : { allowSignups: input.allowSignups }),
             }
           : {
@@ -158,6 +169,9 @@ function start(input: {
               sandbox: input.sandbox,
               seaweedfs: resolvedSeaweedfs,
               googleAuth: input.googleAuth,
+              ...(input.billingStripeEnabled === undefined
+                ? {}
+                : { billingStripeEnabled: input.billingStripeEnabled }),
               ...(input.allowSignups === undefined ? {} : { allowSignups: input.allowSignups }),
             },
       ),
@@ -201,6 +215,7 @@ function config(input: {
   seaweedfs: ResolvedTestInfra | undefined;
   googleAuth?: "simulated";
   allowSignups?: boolean;
+  billingStripeEnabled?: boolean;
 }): ControlPlaneApiConfig {
   const hostPooledUrl = infraValue(input.postgres, PostgresValues.HOST_POOLED_URL);
   const hostDirectUrl = infraValue(input.postgres, PostgresValues.HOST_DIRECT_URL);
@@ -291,7 +306,7 @@ function config(input: {
     },
     billing: {
       stripe: {
-        enabled: false,
+        enabled: input.billingStripeEnabled ?? false,
       },
     },
     auth: {

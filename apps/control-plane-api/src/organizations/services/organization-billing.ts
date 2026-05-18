@@ -11,13 +11,14 @@ import {
 import { sql } from "drizzle-orm";
 import type { OpenWorkflow } from "openworkflow";
 
+import type { OrganizationBillingResponse } from "./organization-billing-contract.js";
+
 type ControlPlaneOpenWorkflow = Pick<OpenWorkflow, "runWorkflow">;
 
 type EnqueueStripeCustomerProvisioningInput = {
   db: ControlPlaneDatabase;
   table: ControlPlaneTables["organizationBillingCustomers"];
   openWorkflow: ControlPlaneOpenWorkflow;
-  stripeEnabled: boolean;
   organizationId: string;
   organizationName: string;
 };
@@ -25,10 +26,6 @@ type EnqueueStripeCustomerProvisioningInput = {
 export async function enqueueStripeCustomerProvisioning(
   input: EnqueueStripeCustomerProvisioningInput,
 ): Promise<void> {
-  if (!input.stripeEnabled) {
-    return;
-  }
-
   await input.db
     .insert(input.table)
     .values({
@@ -51,4 +48,50 @@ export async function enqueueStripeCustomerProvisioning(
       idempotencyKey: createStripeCustomerProvisioningIdempotencyKey(input.organizationId),
     },
   );
+}
+
+export async function readOrganizationBilling(input: {
+  db: ControlPlaneDatabase;
+  organizationId: string;
+}): Promise<OrganizationBillingResponse> {
+  const billingCustomer = await input.db.query.organizationBillingCustomers.findFirst({
+    columns: {
+      providerCustomerId: true,
+      status: true,
+    },
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.organizationId, input.organizationId),
+        eq(table.provider, BillingCustomerProviders.STRIPE),
+      ),
+  });
+
+  if (
+    billingCustomer === undefined ||
+    billingCustomer.status !== OrganizationBillingCustomerStatuses.ACTIVE ||
+    billingCustomer.providerCustomerId === null
+  ) {
+    return { available: false };
+  }
+
+  const organization = await input.db.query.organizations.findFirst({
+    columns: {
+      name: true,
+    },
+    where: (table, { eq }) => eq(table.id, input.organizationId),
+  });
+
+  if (organization === undefined) {
+    throw new Error(
+      `Organization ${input.organizationId} was not found for active billing customer.`,
+    );
+  }
+
+  return {
+    available: true,
+    organization: {
+      name: organization.name,
+      stripeCustomerId: billingCustomer.providerCustomerId,
+    },
+  };
 }

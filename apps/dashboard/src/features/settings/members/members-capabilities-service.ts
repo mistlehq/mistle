@@ -3,8 +3,10 @@ import { normalizeHttpApiError } from "../../api/http-api-error.js";
 import { MembersApiError } from "./members-api-errors.js";
 import type { MembershipCapabilities } from "./members-api-types.js";
 
-export function membershipCapabilitiesQueryKey(): readonly ["settings", "membership-capabilities"] {
-  return ["settings", "membership-capabilities"];
+export function membershipCapabilitiesQueryKey(
+  activeOrganizationId: string,
+): readonly ["settings", "membership-capabilities", string] {
+  return ["settings", "membership-capabilities", activeOrganizationId];
 }
 
 export async function getMembershipCapabilities(): Promise<MembershipCapabilities> {

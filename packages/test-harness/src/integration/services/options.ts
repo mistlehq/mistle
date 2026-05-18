@@ -25,6 +25,7 @@ export type IntegrationSandboxOptions = {
 export type IntegrationServiceOptions = {
   controlPlaneApi: {
     allowSignups?: boolean;
+    billingStripeEnabled?: boolean;
     googleAuth?: "simulated";
   };
   dataPlaneGateway?: {

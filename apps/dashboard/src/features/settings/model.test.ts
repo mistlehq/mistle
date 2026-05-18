@@ -91,4 +91,35 @@ describe("settings model", () => {
       "/settings/organization/identity-linking",
     );
   });
+
+  it("shows billing settings only for owners and admins when Stripe billing is enabled", () => {
+    const ownerOrganizationGroup = resolveSettingsNavGroups({
+      organizationRole: "owner",
+      stripeBillingEnabled: true,
+    }).find((group) => group.label === "Organization");
+    const adminOrganizationGroup = resolveSettingsNavGroups({
+      organizationRole: "admin",
+      stripeBillingEnabled: true,
+    }).find((group) => group.label === "Organization");
+    const memberOrganizationGroup = resolveSettingsNavGroups({
+      organizationRole: "member",
+      stripeBillingEnabled: true,
+    }).find((group) => group.label === "Organization");
+    const disabledOrganizationGroup = resolveSettingsNavGroups({
+      organizationRole: "owner",
+    }).find((group) => group.label === "Organization");
+
+    expect(ownerOrganizationGroup?.items.map((item) => item.to)).toContain(
+      "/settings/organization/billing",
+    );
+    expect(adminOrganizationGroup?.items.map((item) => item.to)).toContain(
+      "/settings/organization/billing",
+    );
+    expect(memberOrganizationGroup?.items.map((item) => item.to)).not.toContain(
+      "/settings/organization/billing",
+    );
+    expect(disabledOrganizationGroup?.items.map((item) => item.to)).not.toContain(
+      "/settings/organization/billing",
+    );
+  });
 });

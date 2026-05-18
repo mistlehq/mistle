@@ -6,47 +6,31 @@ import {
   BillingCustomerProviders,
   OrganizationBillingCustomerStatuses,
 } from "@mistle/db/control-plane";
-import { createControlPlaneWorkflowNamespaceId } from "@mistle/db/test-environment";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
-import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
 import {
   createStripeCustomerProvisioningIdempotencyKey,
   ProvisionStripeCustomerWorkflowSpec,
 } from "@mistle/workflow-registry/control-plane";
-import { sql } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
-import { enqueueStripeCustomerProvisioning } from "../src/auth/services/enqueue-stripe-customer-provisioning.js";
+import { countQueuedControlPlaneWorkflowRunsByIdempotencyKeyForIntegrationTest } from "./test-helpers/control-plane-workflow-runs.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api"],
+  __serviceOptions: {
+    controlPlaneApi: {
+      billingStripeEnabled: true,
+    },
+  },
 });
 
 describe.concurrent("auth Stripe customer provisioning integration", () => {
-  it("keeps billing customer enqueue safe when the same organization is initialized more than once", async ({
+  it("enqueues Stripe customer provisioning when Better Auth creates an organization", async ({
     env,
   }) => {
-    const organizationName = "Stripe Idempotency Integration";
     const session = await env.auth.createSession({
-      email: "integration-new-stripe-idempotency@example.com",
-      organizationName,
-    });
-
-    await enqueueStripeCustomerProvisioning({
-      db: env.controlPlaneDb,
-      table: env.controlPlaneTables.organizationBillingCustomers,
-      openWorkflow: env.controlPlaneWorkflow,
-      stripeEnabled: true,
-      organizationId: session.organizationId,
-      organizationName,
-    });
-    await enqueueStripeCustomerProvisioning({
-      db: env.controlPlaneDb,
-      table: env.controlPlaneTables.organizationBillingCustomers,
-      openWorkflow: env.controlPlaneWorkflow,
-      stripeEnabled: true,
-      organizationId: session.organizationId,
-      organizationName,
+      email: "integration-new-stripe-provisioning@example.com",
+      organizationName: "Stripe Provisioning Integration",
     });
 
     const billingCustomers = await env.controlPlaneDb.query.organizationBillingCustomers.findMany({
@@ -70,26 +54,11 @@ describe.concurrent("auth Stripe customer provisioning integration", () => {
       },
     ]);
     await expect(
-      countQueuedStripeProvisioningWorkflows({
+      countQueuedControlPlaneWorkflowRunsByIdempotencyKeyForIntegrationTest({
         env,
-        organizationId: session.organizationId,
+        workflowName: ProvisionStripeCustomerWorkflowSpec.name,
+        idempotencyKey: createStripeCustomerProvisioningIdempotencyKey(session.organizationId),
       }),
     ).resolves.toBe(1);
   });
 });
-
-async function countQueuedStripeProvisioningWorkflows(input: {
-  env: IntegrationTestEnvironment;
-  organizationId: string;
-}): Promise<number> {
-  const result = await input.env.controlPlaneDb.execute(sql<{ count: string }>`
-    select count(*)::text as count
-    from control_plane_openworkflow.workflow_runs
-    where
-      namespace_id = ${createControlPlaneWorkflowNamespaceId(input.env.id)}
-      and workflow_name = ${ProvisionStripeCustomerWorkflowSpec.name}
-      and idempotency_key = ${createStripeCustomerProvisioningIdempotencyKey(input.organizationId)}
-  `);
-
-  return Number(result.rows[0]?.count ?? "0");
-}

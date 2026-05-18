@@ -56,6 +56,10 @@ _Avoid_: Webhook event when naming product-facing trigger-builder concepts
 A conversation created or reused while handling a **Trigger** run.
 _Avoid_: Automation conversation
 
+**Billing customer**:
+The external billing-provider customer associated with a Mistle organization.
+_Avoid_: Billing org
+
 ## Relationships
 
 - A **Sandbox profile version** may have one usable **Snapshot**.
@@ -76,6 +80,7 @@ _Avoid_: Automation conversation
 - A **Trigger** may select one or more **Trigger events**.
 - A **Trigger** may start from a webhook event or a schedule.
 - A **Trigger** run may create or reuse one **Trigger conversation**.
+- A Mistle organization may have one **Billing customer** per billing provider.
 
 ## Example Dialogue
 
@@ -104,3 +109,4 @@ _Avoid_: Automation conversation
 - Scheduled action target language used `automation_run` while representing scheduled **Trigger** runs — resolved: use trigger-named target types and payload fields.
 - The automation-to-trigger rename was considered as a staged compatibility migration — resolved: ship it as one atomic rename, except for explicit durable workflow compatibility requirements.
 - "version" was used ambiguously to mean the latest published **Sandbox profile version** or an object's **Referenced sandbox profile version** — resolved: when describing a session, trigger, or other profile-backed object, use the object's referenced version.
+- "billing org" could mean a Mistle organization, a Better Auth organization, or an external billing-provider customer — resolved: use **Billing customer** for the billing-provider customer associated with an existing Mistle organization.

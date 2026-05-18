@@ -26,6 +26,30 @@ describe.concurrent("auth methods integration", () => {
   });
 });
 
+const stripeBillingEnabledIt = createIntegrationTest({
+  services: ["control-plane-api"],
+  __serviceOptions: {
+    controlPlaneApi: {
+      billingStripeEnabled: true,
+    },
+  },
+});
+
+describe.concurrent("auth methods with Stripe billing integration", () => {
+  stripeBillingEnabledIt("keeps auth methods scoped to auth-only metadata", async ({ env }) => {
+    const response = await env.controlPlaneApi.http.fetch("/v1/auth/methods");
+
+    expect(response.status).toBe(200);
+    expect(authMethodsResponseSchema.parse(await response.json())).toStrictEqual({
+      methods: {
+        emailOtp: true,
+        google: false,
+      },
+      allowSignups: true,
+    });
+  });
+});
+
 const signupsDisabledIt = createIntegrationTest({
   services: ["control-plane-api"],
   __serviceOptions: {

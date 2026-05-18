@@ -21,6 +21,7 @@ import { IntegrationConnectionEditPage } from "./features/pages/integration-conn
 import { IntegrationConnectionSetupPage } from "./features/pages/integration-connection-setup-page.js";
 import { InvitationAcceptPage } from "./features/pages/invitation-accept-page.js";
 import { NewSessionPage } from "./features/pages/new-session-page.js";
+import { OrganizationBillingSettingsPage } from "./features/pages/organization-billing-settings-page.js";
 import { OrganizationGeneralSettingsPage } from "./features/pages/organization-general-settings-page.js";
 import { OrganizationIdentityLinkingSettingsPage } from "./features/pages/organization-identity-linking-settings-page.js";
 import { OrganizationIntegrationsSettingsPage } from "./features/pages/organization-integrations-settings-page.js";
@@ -179,6 +180,11 @@ export const APP_ROUTES = createRoutesFromElements(
               element={<OrganizationSandboxStorageSettingsPage />}
               handle={ROUTE_HANDLES.settingsOrganizationSandboxes}
               path="sandboxes"
+            />
+            <Route
+              element={<OrganizationBillingSettingsPage />}
+              handle={ROUTE_HANDLES.settingsOrganizationBilling}
+              path="billing"
             />
           </Route>
         </Route>

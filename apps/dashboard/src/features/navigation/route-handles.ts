@@ -331,6 +331,12 @@ export const ROUTE_HANDLES = {
     title: "Sandboxes",
     description: "Configure organization-wide sandbox settings.",
   },
+  settingsOrganizationBilling: {
+    sidebarTriggerOwner: "page-frame",
+    breadcrumb: "Billing",
+    title: "Billing",
+    description: "",
+  },
   settingsOrganizationIntegrations: {
     sidebarTriggerOwner: "page-frame",
     breadcrumb: "Integrations",
@@ -345,6 +351,7 @@ export const SETTINGS_PAGE_ROUTE_HANDLE_KEYS = [
   "settingsOrganizationMembers",
   "settingsOrganizationIdentityLinking",
   "settingsOrganizationSandboxes",
+  "settingsOrganizationBilling",
   "settingsOrganizationIntegrations",
 ] as const;
 
@@ -356,5 +363,6 @@ export const SETTINGS_PAGE_ROUTE_HANDLE_CONTRACT: {
   settingsOrganizationMembers: ROUTE_HANDLES.settingsOrganizationMembers,
   settingsOrganizationIdentityLinking: ROUTE_HANDLES.settingsOrganizationIdentityLinking,
   settingsOrganizationSandboxes: ROUTE_HANDLES.settingsOrganizationSandboxes,
+  settingsOrganizationBilling: ROUTE_HANDLES.settingsOrganizationBilling,
   settingsOrganizationIntegrations: ROUTE_HANDLES.settingsOrganizationIntegrations,
 };
