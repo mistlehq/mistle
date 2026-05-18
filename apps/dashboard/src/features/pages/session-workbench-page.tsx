@@ -1,4 +1,5 @@
-import { SidebarTrigger, useSidebar } from "@mistle/ui";
+import { Button, SidebarTrigger, useSidebar } from "@mistle/ui";
+import { ListBulletsIcon } from "@phosphor-icons/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
@@ -9,7 +10,11 @@ import {
   resolveDefaultCodexThreadId,
   type CodexThreadNavigatorScope,
 } from "../session-agents/codex/codex-thread-navigator-model.js";
-import { CodexThreadNavigator } from "../session-agents/codex/codex-thread-navigator.js";
+import {
+  CodexThreadNavigator,
+  CodexThreadNavigatorSheet,
+  type CodexThreadNavigatorProps,
+} from "../session-agents/codex/codex-thread-navigator.js";
 import { SessionHeaderTitle } from "../sessions/session-header-title.js";
 import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
 import { shouldRenderSidebarTrigger } from "../shared/sidebar-trigger-visibility.js";
@@ -76,6 +81,7 @@ function SessionWorkbenchPageContent(input: {
   const [hasEnteredReadyWorkbench, setHasEnteredReadyWorkbench] = useState(false);
   const [threadNavigatorScope, setThreadNavigatorScope] =
     useState<CodexThreadNavigatorScope>("repository");
+  const [isThreadNavigatorSheetOpen, setThreadNavigatorSheetOpen] = useState(false);
   const conversationScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [composerText, setComposerText] = useState("");
   const [pendingDiffComments, setPendingDiffComments] = useState<
@@ -392,6 +398,17 @@ function SessionWorkbenchPageContent(input: {
       })
       .catch(() => {});
   }, [codexThreadNavigator, input, primaryRepositoryPath]);
+  const handleSelectThreadFromSheet = useCallback(
+    (threadId: string): void => {
+      setThreadNavigatorSheetOpen(false);
+      handleSelectThread(threadId);
+    },
+    [handleSelectThread],
+  );
+  const handleStartThreadFromSheet = useCallback((): void => {
+    setThreadNavigatorSheetOpen(false);
+    handleStartThread();
+  }, [handleStartThread]);
   useEffect(() => {
     if (codexThreadNavigator === null) {
       return;
@@ -404,20 +421,30 @@ function SessionWorkbenchPageContent(input: {
 
     void codexThreadNavigator.resumeThread(targetThreadId).catch(() => {});
   }, [codexThreadNavigator, defaultThreadId, input.requestedThreadId]);
+  const canRenderThreadNavigation =
+    codexThreadNavigator !== null && workbench.primaryPanelState.transitionState !== "stable_cli";
+  const threadNavigatorProps: CodexThreadNavigatorProps | null = canRenderThreadNavigation
+    ? {
+        canUseRepositoryScope: primaryRepositoryPath !== null,
+        isStartingThread: codexThreadNavigator.isStartingNewThread,
+        onRefreshThreads: codexThreadNavigator.refreshThreadList,
+        onScopeChange: setThreadNavigatorScope,
+        onSelectThread: handleSelectThread,
+        onStartThread: handleStartThread,
+        rows: threadNavigatorRows,
+        scope: effectiveThreadNavigatorScope,
+      }
+    : null;
+  const mobileThreadNavigatorProps: CodexThreadNavigatorProps | null =
+    threadNavigatorProps === null
+      ? null
+      : {
+          ...threadNavigatorProps,
+          onSelectThread: handleSelectThreadFromSheet,
+          onStartThread: handleStartThreadFromSheet,
+        };
   const conversationSidebar =
-    codexThreadNavigator === null ||
-    workbench.primaryPanelState.transitionState === "stable_cli" ? null : (
-      <CodexThreadNavigator
-        canUseRepositoryScope={primaryRepositoryPath !== null}
-        isStartingThread={codexThreadNavigator.isStartingNewThread}
-        onRefreshThreads={codexThreadNavigator.refreshThreadList}
-        onScopeChange={setThreadNavigatorScope}
-        onSelectThread={handleSelectThread}
-        onStartThread={handleStartThread}
-        rows={threadNavigatorRows}
-        scope={effectiveThreadNavigatorScope}
-      />
-    );
+    threadNavigatorProps === null ? null : <CodexThreadNavigator {...threadNavigatorProps} />;
 
   useEffect(() => {
     if (!workbench.connectionReadiness.canConnect) {
@@ -515,6 +542,28 @@ function SessionWorkbenchPageContent(input: {
     <ConversationWorkspaceFrame
       title={
         <div className="flex min-w-0 items-center gap-2">
+          {mobileThreadNavigatorProps === null ? null : (
+            <>
+              <Button
+                aria-label="Show threads"
+                className="md:hidden"
+                onClick={() => {
+                  setThreadNavigatorSheetOpen(true);
+                }}
+                size="icon-sm"
+                title="Show threads"
+                type="button"
+                variant="ghost"
+              >
+                <ListBulletsIcon aria-hidden className="size-4" />
+              </Button>
+              <CodexThreadNavigatorSheet
+                isOpen={isThreadNavigatorSheetOpen}
+                navigator={mobileThreadNavigatorProps}
+                onOpenChange={setThreadNavigatorSheetOpen}
+              />
+            </>
+          )}
           <div className="min-w-0 shrink">
             <SessionHeaderTitle sandboxInstanceId={input.sandboxInstanceId} />
           </div>

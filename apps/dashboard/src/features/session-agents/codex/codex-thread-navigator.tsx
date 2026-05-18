@@ -1,4 +1,13 @@
-import { Button, ButtonGroup, ButtonGroupText, OverflowTooltipText } from "@mistle/ui";
+import {
+  Button,
+  ButtonGroup,
+  ButtonGroupText,
+  OverflowTooltipText,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@mistle/ui";
 import { PlusIcon } from "@phosphor-icons/react";
 
 import type {
@@ -6,7 +15,7 @@ import type {
   CodexThreadNavigatorScope,
 } from "./codex-thread-navigator-model.js";
 
-export function CodexThreadNavigator(input: {
+export type CodexThreadNavigatorProps = {
   rows: readonly CodexThreadNavigatorRow[];
   scope: CodexThreadNavigatorScope;
   canUseRepositoryScope: boolean;
@@ -15,14 +24,41 @@ export function CodexThreadNavigator(input: {
   onScopeChange: (scope: CodexThreadNavigatorScope) => void;
   onSelectThread: (threadId: string) => void;
   onStartThread: () => void;
-}): React.JSX.Element {
-  const hasRows = input.rows.length > 0;
+};
 
+export function CodexThreadNavigator(input: CodexThreadNavigatorProps): React.JSX.Element {
   return (
     <aside
       aria-label="Threads"
       className="bg-background/98 hidden h-full min-h-0 w-64 shrink-0 flex-col border-r md:flex"
     >
+      <CodexThreadNavigatorContent {...input} />
+    </aside>
+  );
+}
+
+export function CodexThreadNavigatorSheet(input: {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  navigator: CodexThreadNavigatorProps;
+}): React.JSX.Element {
+  return (
+    <Sheet onOpenChange={input.onOpenChange} open={input.isOpen}>
+      <SheetContent className="!h-[100dvh] max-h-[100dvh] w-80 gap-0 p-0" side="left">
+        <SheetHeader className="sr-only">
+          <SheetTitle>Threads</SheetTitle>
+        </SheetHeader>
+        <CodexThreadNavigatorContent {...input.navigator} />
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function CodexThreadNavigatorContent(input: CodexThreadNavigatorProps): React.JSX.Element {
+  const hasRows = input.rows.length > 0;
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center justify-between border-b px-3 py-2">
         <h2 className="font-medium text-sm">Threads</h2>
         <Button
@@ -107,7 +143,7 @@ export function CodexThreadNavigator(input: {
           </Button>
         </ButtonGroup>
       </div>
-    </aside>
+    </div>
   );
 }
 

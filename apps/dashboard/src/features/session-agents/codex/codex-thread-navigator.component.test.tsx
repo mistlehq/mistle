@@ -4,7 +4,7 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { CodexThreadNavigatorRow } from "./codex-thread-navigator-model.js";
-import { CodexThreadNavigator } from "./codex-thread-navigator.js";
+import { CodexThreadNavigator, CodexThreadNavigatorSheet } from "./codex-thread-navigator.js";
 
 const Rows = [
   {
@@ -59,5 +59,29 @@ describe("CodexThreadNavigator", () => {
     expect(within(navigator).getByText("Opening")).toBeTruthy();
     expect(within(navigator).getByText("Current")).toBeTruthy();
     expect(within(navigator).getByText("repo-b")).toBeTruthy();
+  });
+
+  it("renders the same thread list inside the mobile sheet", () => {
+    render(
+      <CodexThreadNavigatorSheet
+        isOpen
+        navigator={{
+          canUseRepositoryScope: true,
+          isStartingThread: false,
+          onRefreshThreads: function onRefreshThreads() {},
+          onScopeChange: function onScopeChange() {},
+          onSelectThread: function onSelectThread() {},
+          onStartThread: function onStartThread() {},
+          rows: Rows,
+          scope: "repository",
+        }}
+        onOpenChange={function onOpenChange() {}}
+      />,
+    );
+
+    const sheet = screen.getByRole("dialog", { name: "Threads" });
+    expect(within(sheet).getAllByRole("heading", { name: "Threads" }).length).toBeGreaterThan(0);
+    expect(within(sheet).getByRole("button", { name: /Active work/ })).toBeTruthy();
+    expect(within(sheet).getByRole("button", { name: /Other work/ })).toBeTruthy();
   });
 });
