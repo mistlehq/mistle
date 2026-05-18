@@ -113,6 +113,25 @@ export type SnapshotRefreshScheduleInput = {
   timezone: string;
 };
 
+type SnapshotRefreshScheduleDraft = {
+  cronExpression: string;
+  timezone: string;
+};
+
+function resolveSnapshotRefreshScheduleDraft(input: {
+  existingSchedule: SnapshotRefreshSchedule;
+  initialDraft: SnapshotRefreshScheduleDraft | undefined;
+}): SnapshotRefreshScheduleDraft {
+  return {
+    cronExpression:
+      input.initialDraft?.cronExpression ??
+      input.existingSchedule?.cronExpression ??
+      DefaultSnapshotRefreshCronExpression,
+    timezone:
+      input.initialDraft?.timezone ?? input.existingSchedule?.timezone ?? readBrowserTimeZone(),
+  };
+}
+
 function formatSnapshotRefreshNextScheduledAt(input: {
   nextScheduledAt: string;
   timezone: string;
@@ -714,10 +733,7 @@ function SnapshotMaintenanceScriptSummaryValue(input: { script: string }): React
 export function SandboxProfileSnapshotRefreshScheduleForm(input: {
   disabled: boolean;
   existingSchedule: SnapshotRefreshSchedule;
-  initialDraft?: {
-    cronExpression: string;
-    timezone: string;
-  };
+  initialDraft?: SnapshotRefreshScheduleDraft;
   maintenanceScriptDraft: string;
   maintenanceScriptHasChanges: boolean;
   mutationError: string | null;
@@ -733,20 +749,16 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
   const existingSchedule = input.existingSchedule;
   const savedMaintenanceScriptHasContent = input.savedMaintenanceScript.trim().length > 0;
   const hasInitialDraft = input.initialDraft !== undefined;
-  const initialDraftCronExpression = input.initialDraft?.cronExpression;
-  const initialDraftTimezone = input.initialDraft?.timezone;
+  const resolvedDraft = resolveSnapshotRefreshScheduleDraft({
+    existingSchedule,
+    initialDraft: input.initialDraft,
+  });
   const [scheduleEnabled, setScheduleEnabled] = useState(
     existingSchedule !== null || hasInitialDraft,
   );
   const [isEditingSchedule, setIsEditingSchedule] = useState(hasInitialDraft);
-  const [cronExpression, setCronExpression] = useState(
-    initialDraftCronExpression ??
-      existingSchedule?.cronExpression ??
-      DefaultSnapshotRefreshCronExpression,
-  );
-  const [timezone, setTimezone] = useState(
-    initialDraftTimezone ?? existingSchedule?.timezone ?? readBrowserTimeZone(),
-  );
+  const [cronExpression, setCronExpression] = useState(resolvedDraft.cronExpression);
+  const [timezone, setTimezone] = useState(resolvedDraft.timezone);
   const timezoneOptions = useMemo(
     () => createTimezoneOptions(existingSchedule?.timezone ?? null),
     [existingSchedule?.timezone],
@@ -771,13 +783,9 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
   useEffect(() => {
     setScheduleEnabled(existingSchedule !== null || hasInitialDraft);
     setIsEditingSchedule(hasInitialDraft);
-    setCronExpression(
-      initialDraftCronExpression ??
-        existingSchedule?.cronExpression ??
-        DefaultSnapshotRefreshCronExpression,
-    );
-    setTimezone(initialDraftTimezone ?? existingSchedule?.timezone ?? readBrowserTimeZone());
-  }, [existingSchedule, hasInitialDraft, initialDraftCronExpression, initialDraftTimezone]);
+    setCronExpression(resolvedDraft.cronExpression);
+    setTimezone(resolvedDraft.timezone);
+  }, [existingSchedule, hasInitialDraft, resolvedDraft.cronExpression, resolvedDraft.timezone]);
 
   function handleSubmit(event: SyntheticEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -815,10 +823,15 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
   }
 
   function handleCancelScheduleEdit(): void {
+    const persistedDraft = resolveSnapshotRefreshScheduleDraft({
+      existingSchedule,
+      initialDraft: undefined,
+    });
+
     setScheduleEnabled(existingSchedule !== null);
     setIsEditingSchedule(false);
-    setCronExpression(existingSchedule?.cronExpression ?? DefaultSnapshotRefreshCronExpression);
-    setTimezone(existingSchedule?.timezone ?? readBrowserTimeZone());
+    setCronExpression(persistedDraft.cronExpression);
+    setTimezone(persistedDraft.timezone);
     input.onChangeMaintenanceScript(input.savedMaintenanceScript);
   }
 

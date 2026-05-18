@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, userEvent, within } from "storybook/test";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import {
@@ -86,6 +87,23 @@ export const RefreshScheduleNotConfigured: Story = {
     lifecycleState: "published",
     snapshotRefreshScheduleState: "none",
     snapshotState: "snapshot-ready",
+  },
+};
+
+export const RefreshScheduleNewScheduleEditing: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotRefreshScheduleState: "none",
+    snapshotState: "snapshot-ready",
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: "Edit" }));
+    await userEvent.click(await canvas.findByRole("switch", { name: "Refresh enabled" }));
+
+    await expect(canvas.getByLabelText("Cron expression")).toHaveValue("0 9 * * *");
   },
 };
 
