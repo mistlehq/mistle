@@ -3,7 +3,6 @@
  */
 
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import http from "node:http";
 import https from "node:https";
@@ -14,6 +13,7 @@ import { promisify } from "node:util";
 
 import { createSystemTest } from "@mistle/test-harness/system";
 import { describe, expect } from "vitest";
+import { type RawData, WebSocketServer } from "ws";
 import { z } from "zod";
 
 import {
@@ -247,6 +247,7 @@ async function startSimulatedHttpUpstream(): Promise<{
 }> {
   const requests: RecordedHttpRequest[] = [];
   const websocketExchanges: RecordedWebsocketExchange[] = [];
+  const websocketServer = new WebSocketServer({ noServer: true });
   const server = http.createServer((request, response) => {
     const chunks: Buffer[] = [];
     request.on("data", (chunk) => {
@@ -276,7 +277,18 @@ async function startSimulatedHttpUpstream(): Promise<{
     });
   });
   server.on("upgrade", (request, socket) => {
-    handleWebsocketUpgrade(request, socket, websocketExchanges);
+    websocketServer.handleUpgrade(request, socket, Buffer.alloc(0), (websocket) => {
+      websocket.once("message", (message) => {
+        const messageText = rawWebSocketDataToString(message);
+        websocketExchanges.push({
+          url: request.url ?? "",
+          headers: request.headers,
+          message: messageText,
+        });
+        websocket.send(`echo:${messageText}`);
+        websocket.close();
+      });
+    });
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -296,8 +308,9 @@ async function startSimulatedHttpUpstream(): Promise<{
     gatewayReachableBaseUrl: `http://127.0.0.1:${String(address.port)}`,
     requests,
     websocketExchanges,
-    stop: () =>
-      new Promise<void>((resolve, reject) => {
+    stop: async () => {
+      websocketServer.close();
+      await new Promise<void>((resolve, reject) => {
         server.close((error) => {
           if (error !== undefined) {
             reject(error);
@@ -305,7 +318,8 @@ async function startSimulatedHttpUpstream(): Promise<{
           }
           resolve();
         });
-      }),
+      });
+    },
   };
 }
 
@@ -319,6 +333,7 @@ async function startSimulatedSecureWebsocketUpstream(): Promise<{
   const certificates = await createTestTlsCertificates();
   const requests: RecordedHttpRequest[] = [];
   const websocketExchanges: RecordedWebsocketExchange[] = [];
+  const websocketServer = new WebSocketServer({ noServer: true });
   const server = https.createServer(
     {
       cert: certificates.serverCertificatePem,
@@ -354,7 +369,18 @@ async function startSimulatedSecureWebsocketUpstream(): Promise<{
     },
   );
   server.on("upgrade", (request, socket) => {
-    handleWebsocketUpgrade(request, socket, websocketExchanges);
+    websocketServer.handleUpgrade(request, socket, Buffer.alloc(0), (websocket) => {
+      websocket.once("message", (message) => {
+        const messageText = rawWebSocketDataToString(message);
+        websocketExchanges.push({
+          url: request.url ?? "",
+          headers: request.headers,
+          message: messageText,
+        });
+        websocket.send(`echo:${messageText}`);
+        websocket.close();
+      });
+    });
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -376,6 +402,7 @@ async function startSimulatedSecureWebsocketUpstream(): Promise<{
     requests,
     websocketExchanges,
     stop: async () => {
+      websocketServer.close();
       await new Promise<void>((resolve, reject) => {
         server.close((error) => {
           if (error !== undefined) {
@@ -391,6 +418,17 @@ async function startSimulatedSecureWebsocketUpstream(): Promise<{
       });
     },
   };
+}
+
+function rawWebSocketDataToString(data: RawData): string {
+  if (Buffer.isBuffer(data)) {
+    return data.toString("utf8");
+  }
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(data).toString("utf8");
+  }
+
+  return Buffer.concat(data).toString("utf8");
 }
 
 async function createTestTlsCertificates(): Promise<{
@@ -483,42 +521,6 @@ async function createTestTlsCertificates(): Promise<{
   };
 }
 
-function createWebsocketAcceptKey(key: string): string {
-  return createHash("sha1").update(`${key}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`).digest("base64");
-}
-
-function handleWebsocketUpgrade(
-  request: http.IncomingMessage,
-  socket: NodeJS.ReadWriteStream,
-  websocketExchanges: RecordedWebsocketExchange[],
-): void {
-  const key = request.headers["sec-websocket-key"];
-  if (typeof key !== "string") {
-    socket.end("HTTP/1.1 400 Bad Request\r\n\r\n");
-    return;
-  }
-
-  socket.write(
-    [
-      "HTTP/1.1 101 Switching Protocols",
-      "connection: Upgrade",
-      "upgrade: websocket",
-      `sec-websocket-accept: ${createWebsocketAcceptKey(key)}`,
-      "\r\n",
-    ].join("\r\n"),
-  );
-
-  socket.once("data", (chunk) => {
-    const message = Buffer.from(chunk).toString("utf8");
-    websocketExchanges.push({
-      url: request.url ?? "",
-      headers: request.headers,
-      message,
-    });
-    socket.end(`echo:${message}`);
-  });
-}
-
 function parseHttpEchoResponse(stdout: string): z.infer<typeof HttpEchoResponseSchema> {
   const responseLine = stdout
     .trim()
@@ -549,6 +551,7 @@ function shellQuote(value: string): string {
 function websocketProxySmokeScript(): string {
   return [
     "set -euo pipefail",
+    websocketClientFrameFunction(),
     'proxy_authority="${WS_PROXY#http://}"',
     'proxy_host="${proxy_authority%%:*}"',
     'proxy_port="${proxy_authority##*:}"',
@@ -564,9 +567,9 @@ function websocketProxySmokeScript(): string {
     "  fi",
     "done",
     "printf '%s' \"${response_head}\" | grep -q 'HTTP/1.1 101' || { printf 'unexpected websocket response head:\\n%s\\nbody:\\n' \"${response_head}\" >&2; dd bs=1 count=256 <&3 >&2 2>/dev/null || true; exit 1; }",
-    "printf '%s' \"${WS_MESSAGE}\" >&3",
+    'WEBSOCKET_FRAME_MESSAGE="${WS_MESSAGE}" websocket_client_frame >&3',
     'frame_file="$(mktemp)"',
-    "response_byte_count=$((5 + ${#WS_MESSAGE}))",
+    "response_byte_count=$((7 + ${#WS_MESSAGE}))",
     'dd bs=1 count="${response_byte_count}" <&3 >"${frame_file}" 2>/dev/null',
     'grep -a "echo:${WS_MESSAGE}" "${frame_file}" >/dev/null || { printf \'unexpected websocket frame bytes:\\n\' >&2; od -An -tx1 "${frame_file}" >&2; exit 1; }',
     "printf 'WS:echo:%s\\n' \"${WS_MESSAGE}\"",
@@ -576,6 +579,7 @@ function websocketProxySmokeScript(): string {
 function secureWebsocketProxySmokeScript(): string {
   return [
     "set -euo pipefail",
+    websocketClientFrameFunction(),
     'proxy_authority="${WS_PROXY#http://}"',
     'proxy_host="${proxy_authority%%:*}"',
     'proxy_port="${proxy_authority##*:}"',
@@ -587,7 +591,7 @@ function secureWebsocketProxySmokeScript(): string {
     "{",
     '  printf \'GET %s HTTP/1.1\\r\\nHost: %s\\r\\nConnection: Upgrade\\r\\nUpgrade: websocket\\r\\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\\r\\nSec-WebSocket-Version: 13\\r\\n\\r\\n\' "${target_path}" "${target_host_port}"',
     "  sleep 0.2",
-    "  printf '%s' \"${WSS_MESSAGE}\"",
+    '  WEBSOCKET_FRAME_MESSAGE="${WSS_MESSAGE}" websocket_client_frame',
     '} | openssl s_client -proxy "${proxy_host}:${proxy_port}" -connect "${target_host_port}" -servername "${target_host}" -quiet >"${output_file}" 2>/dev/null',
     "grep -a 'HTTP/1.1 101' \"${output_file}\" >/dev/null || { printf 'unexpected WSS response bytes:\\n' >&2; cat \"${output_file}\" >&2; exit 1; }",
     'grep -a "echo:${WSS_MESSAGE}" "${output_file}" >/dev/null || { printf \'unexpected WSS echo bytes:\\n\' >&2; cat "${output_file}" >&2; exit 1; }',
@@ -598,6 +602,7 @@ function secureWebsocketProxySmokeScript(): string {
 function transparentGatewaySmokeScript(): string {
   return [
     "set -euo pipefail",
+    websocketClientFrameFunction(),
     'tcp_port_file="$(mktemp)"',
     "perl -MIO::Socket::INET - \"${tcp_port_file}\" <<'PERL' &",
     "use strict;",
@@ -659,7 +664,7 @@ function transparentGatewaySmokeScript(): string {
     "{",
     '  printf \'GET %s HTTP/1.1\\r\\nHost: 127.0.0.1:%s\\r\\nConnection: Upgrade\\r\\nUpgrade: websocket\\r\\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\\r\\nSec-WebSocket-Version: 13\\r\\n\\r\\n\' "${TRANSPARENT_WSS_PATH}" "${TRANSPARENT_SECURE_PORT}"',
     "  sleep 0.2",
-    "  printf '%s' \"${TRANSPARENT_WSS_MESSAGE}\"",
+    '  WEBSOCKET_FRAME_MESSAGE="${TRANSPARENT_WSS_MESSAGE}" websocket_client_frame',
     '} | openssl s_client -connect "127.0.0.1:${TRANSPARENT_SECURE_PORT}" -servername "127.0.0.1" -quiet >"${output_file}" 2>/dev/null',
     "grep -a 'HTTP/1.1 101' \"${output_file}\" >/dev/null || { printf 'unexpected transparent WSS response bytes:\\n' >&2; cat \"${output_file}\" >&2; exit 1; }",
     'grep -a "echo:${TRANSPARENT_WSS_MESSAGE}" "${output_file}" >/dev/null || { printf \'unexpected transparent WSS echo bytes:\\n\' >&2; cat "${output_file}" >&2; exit 1; }',
@@ -671,5 +676,24 @@ function transparentGatewaySmokeScript(): string {
     'IFS= read -r -N "${tcp_response_byte_count}" tcp_response <&5 || { printf \'transparent TCP read failed after receiving: %s\\n\' "${tcp_response}" >&2; exit 1; }',
     '[ "${tcp_response}" = "echo:${TRANSPARENT_TCP_MESSAGE}" ] || { printf \'unexpected transparent TCP response: %s\\n\' "${tcp_response}" >&2; exit 1; }',
     "printf 'TRANSPARENT-TCP:echo:%s\\n' \"${TRANSPARENT_TCP_MESSAGE}\"",
+  ].join("\n");
+}
+
+function websocketClientFrameFunction(): string {
+  return [
+    "websocket_client_frame() {",
+    "  perl -e '",
+    "    use strict;",
+    "    use warnings;",
+    "    my $message = $ENV{WEBSOCKET_FRAME_MESSAGE};",
+    '    die "missing WEBSOCKET_FRAME_MESSAGE" unless defined $message;',
+    '    die "websocket smoke message is too long" if length($message) > 125;',
+    "    my @mask = (0x11, 0x22, 0x33, 0x44);",
+    '    print pack("C C C C C C", 0x81, 0x80 | length($message), @mask);',
+    "    for my $index (0 .. length($message) - 1) {",
+    "      print chr(ord(substr($message, $index, 1)) ^ $mask[$index % 4]);",
+    "    }",
+    "  '",
+    "}",
   ].join("\n");
 }
