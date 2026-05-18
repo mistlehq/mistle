@@ -38,6 +38,7 @@ export async function createControlPlaneApiRuntime(
       dataPlaneClient,
       connectionTokenConfig: config.connectionToken,
       portAccessConfig: config.portAccess,
+      ptyTransportConfig: config.ptyTransport,
       openWorkflow: appContext.openWorkflow,
       auth: appContext.auth,
       resolveTestContext: async ({ testEnvironmentId }) => ({

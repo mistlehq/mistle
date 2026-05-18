@@ -53,6 +53,21 @@ export const sandboxInstancePortAccessSchema = z
   })
   .strict();
 
+export const sandboxInstancePtySessionRequestSchema = z
+  .object({
+    ptySessionId: z.string().trim().min(1).max(128),
+  })
+  .strict();
+
+export const sandboxInstancePtySessionSchema = z
+  .object({
+    instanceId: z.string().min(1),
+    ptySessionId: z.string().min(1),
+    token: z.string().min(1),
+    expiresAt: z.string().min(1),
+  })
+  .strict();
+
 export const sandboxInstanceStatusResponseSchema = z
   .object({
     id: z.string().min(1),

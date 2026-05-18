@@ -7,7 +7,11 @@ import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
 
 import { SandboxInstancePersistenceModes, SandboxInstanceStatuses } from "@mistle/db/data-plane";
-import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
+import {
+  PtyTransportTokenRoles,
+  mintBootstrapToken,
+  verifyPtyTransportToken,
+} from "@mistle/gateway-tunnel-auth";
 import {
   TestEnvironmentIdHeader,
   createIntegrationTest,
@@ -20,6 +24,7 @@ import WebSocket from "ws";
 import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import {
   SandboxInstanceConnectionTokenSchema,
+  SandboxInstancePtySessionSchema,
   SandboxInstancesConflictResponseSchema,
 } from "../src/sandbox-instances/index.js";
 import { createApiKeyToken } from "./helpers/api-keys.js";
@@ -29,6 +34,9 @@ const execFileAsync = promisify(execFile);
 const BootstrapTokenSecret = "integration-new-bootstrap-token-secret";
 const BootstrapTokenIssuer = "integration-new-data-plane-worker";
 const GatewayTokenAudience = "integration-new-data-plane-gateway";
+const PtyTransportTokenSecret = "integration-new-pty-token-secret";
+const PtyTransportTokenIssuer = "integration-new-data-plane-gateway";
+const PtyTransportTokenAudience = "integration-new-gateway-pty";
 
 const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api", "data-plane-gateway"],
@@ -74,6 +82,73 @@ describe.concurrent("sandbox instance connect integration", () => {
       expect(body.url).toContain(`/tunnel/sandbox/${sandboxInstanceId}?`);
       expect(body.token).not.toBe("");
       expect(new Date(body.expiresAt).getTime()).toBeGreaterThan(Date.now());
+    } finally {
+      await closeIfOpen(bootstrapSocket);
+      await destroyDockerSandboxContainer(providerSandboxId);
+    }
+  });
+
+  it("mints a client PTY transport token for a running sandbox with an attached runtime", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-pty-running@example.com",
+    });
+    const sandboxInstanceId = "sbi_cp_pty_running_001";
+    const providerSandboxId = await startDockerSandboxContainer();
+    let bootstrapSocket: WebSocket | undefined;
+
+    try {
+      await insertSandboxInstance(env, {
+        organizationId: session.organizationId,
+        sandboxInstanceId,
+        providerSandboxId,
+        status: SandboxInstanceStatuses.RUNNING,
+        startedById: session.userId,
+      });
+      bootstrapSocket = await attachBootstrapRuntime({
+        environmentId: env.id,
+        gatewayBaseUrl: env.dataPlaneGateway.hostBaseUrl,
+        sandboxInstanceId,
+      });
+      await waitForGatewayRuntimeReady(env, sandboxInstanceId);
+
+      const response = await env.controlPlaneApi.http.fetch(
+        `/v1/sandbox/instances/${sandboxInstanceId}/pty-sessions`,
+        {
+          method: "POST",
+          headers: {
+            cookie: session.cookie,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            ptySessionId: "terminal",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(201);
+      const body = SandboxInstancePtySessionSchema.parse(await response.json());
+      expect(body.instanceId).toBe(sandboxInstanceId);
+      expect(body.ptySessionId).toBe("terminal");
+      expect(body.token).not.toBe("");
+      expect(new Date(body.expiresAt).getTime()).toBeGreaterThan(Date.now());
+
+      const verifiedToken = await verifyPtyTransportToken({
+        config: {
+          tokenSecret: PtyTransportTokenSecret,
+          tokenIssuer: PtyTransportTokenIssuer,
+          tokenAudience: PtyTransportTokenAudience,
+        },
+        token: body.token,
+      });
+      expect(verifiedToken).toMatchObject({
+        sub: sandboxInstanceId,
+        organizationId: session.organizationId,
+        ptySessionId: "terminal",
+        role: PtyTransportTokenRoles.CLIENT,
+        actingUserId: session.userId,
+      });
     } finally {
       await closeIfOpen(bootstrapSocket);
       await destroyDockerSandboxContainer(providerSandboxId);
@@ -249,6 +324,34 @@ describe.concurrent("sandbox instance connect integration", () => {
         headers: {
           authorization: `Bearer ${token}`,
         },
+      },
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("rejects API key auth for client PTY transport tokens", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-pty-api-key@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "Sandbox PTY connector",
+      permissions: [OrganizationPermissions.SANDBOX_SESSION_CONNECT],
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/instances/sbi_cp_pty_api_key_forbidden/pty-sessions",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          ptySessionId: "terminal",
+        }),
       },
     );
 

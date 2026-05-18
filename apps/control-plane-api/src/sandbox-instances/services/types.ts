@@ -3,6 +3,7 @@ import type {
   ListSandboxInstancesResponse,
 } from "@mistle/data-plane-internal-client";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
+import type { PtyTransportTokenConfig } from "@mistle/gateway-tunnel-auth";
 import type { PortAccessBootstrapTokenConfig } from "@mistle/port-access-auth";
 
 import type { SandboxInstanceRuntimeContext } from "./runtime-context.js";
@@ -37,6 +38,22 @@ export type SandboxInstancePortAccess = {
   host: string;
   bootstrapPath: "/_mistle/access/bootstrap";
   bootstrapUrl: string;
+  token: string;
+  expiresAt: string;
+};
+
+export type MintSandboxInstancePtySessionInput = {
+  organizationId: string;
+  instanceId: string;
+  ptySessionId: string;
+  actingUserId: string;
+  tokenTtlSeconds: number;
+  tokenConfig: PtyTransportTokenConfig;
+};
+
+export type SandboxInstancePtySession = {
+  instanceId: string;
+  ptySessionId: string;
   token: string;
   expiresAt: string;
 };

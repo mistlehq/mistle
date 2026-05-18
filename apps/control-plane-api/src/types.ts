@@ -25,6 +25,7 @@ export type ControlPlaneApiConfig = LoadControlPlaneApiConfigResult["app"] & {
 export type ControlPlaneApiGlobalConfig = NonNullable<LoadControlPlaneApiConfigResult["global"]>;
 export type ControlPlaneApiConnectionTokenConfig = ControlPlaneApiConfig["connectionToken"];
 export type ControlPlaneApiPortAccessConfig = ControlPlaneApiConfig["portAccess"];
+export type ControlPlaneApiPtyTransportConfig = ControlPlaneApiConfig["ptyTransport"];
 export type ControlPlaneApiSandboxRuntimeConfig = ControlPlaneApiConfig["sandbox"];
 export type ControlPlaneApiRuntimeConfig = {
   app: ControlPlaneApiConfig;
@@ -93,6 +94,7 @@ export type AppContextVariables = {
   dataPlaneClient: DataPlaneSandboxInstancesClient;
   connectionTokenConfig: ControlPlaneApiConnectionTokenConfig;
   portAccessConfig: ControlPlaneApiPortAccessConfig;
+  ptyTransportConfig: ControlPlaneApiPtyTransportConfig;
   openWorkflow: OpenWorkflow;
   auth: ControlPlaneAuth;
   session: AppSession | null;

@@ -5,6 +5,7 @@ import type { AppContextBindings, AppRoutes } from "../types.js";
 import { SANDBOX_INSTANCES_ROUTE_BASE_PATH } from "./constants.js";
 import * as createSandboxInstanceConnectionToken from "./create-sandbox-instance-connection-token/index.js";
 import * as createSandboxInstancePortAccess from "./create-sandbox-instance-port-access/index.js";
+import * as createSandboxInstancePtySession from "./create-sandbox-instance-pty-session/index.js";
 import * as getSandboxInstanceSessionLink from "./get-sandbox-instance-session-link/index.js";
 import * as getSandboxInstance from "./get-sandbox-instance/index.js";
 import * as listOperationEvents from "./list-operation-events/index.js";
@@ -32,6 +33,7 @@ export function createSandboxInstancesRoutes(): AppRoutes<
     createSandboxInstanceConnectionToken.handler,
   );
   routes.openapi(createSandboxInstancePortAccess.route, createSandboxInstancePortAccess.handler);
+  routes.openapi(createSandboxInstancePtySession.route, createSandboxInstancePtySession.handler);
 
   return {
     basePath: SANDBOX_INSTANCES_ROUTE_BASE_PATH,

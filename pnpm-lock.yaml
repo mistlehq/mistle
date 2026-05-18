@@ -132,6 +132,9 @@ importers:
       '@mistle/gateway-connection-auth':
         specifier: workspace:*
         version: link:../../packages/gateway-connection-auth
+      '@mistle/gateway-tunnel-auth':
+        specifier: workspace:*
+        version: link:../../packages/gateway-tunnel-auth
       '@mistle/http':
         specifier: workspace:*
         version: link:../../packages/http
@@ -211,9 +214,6 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
-      '@mistle/gateway-tunnel-auth':
-        specifier: workspace:*
-        version: link:../../packages/gateway-tunnel-auth
       '@mistle/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness

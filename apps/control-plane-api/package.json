@@ -48,6 +48,7 @@
     "@mistle/data-plane-internal-client": "workspace:*",
     "@mistle/db": "workspace:*",
     "@mistle/gateway-connection-auth": "workspace:*",
+    "@mistle/gateway-tunnel-auth": "workspace:*",
     "@mistle/http": "workspace:*",
     "@mistle/integrations-core": "workspace:*",
     "@mistle/integrations-definitions": "workspace:*",
@@ -76,7 +77,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@mistle/gateway-tunnel-auth": "workspace:*",
     "@mistle/test-harness": "workspace:*",
     "@types/pg": "^8.20.0",
     "@types/sshpk": "^1.17.4",

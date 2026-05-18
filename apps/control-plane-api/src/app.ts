@@ -66,6 +66,7 @@ export type CreateAppInput = {
   dataPlaneClient: DataPlaneSandboxInstancesClient;
   connectionTokenConfig: AppContextBindings["Variables"]["connectionTokenConfig"];
   portAccessConfig: AppContextBindings["Variables"]["portAccessConfig"];
+  ptyTransportConfig: AppContextBindings["Variables"]["ptyTransportConfig"];
   openWorkflow: OpenWorkflow;
   auth: AppContextVariables["auth"];
   resolveTestContext?: (input: { testEnvironmentId: string }) => Promise<{
@@ -91,6 +92,7 @@ export function createApp(input: CreateAppInput): ControlPlaneApp {
     dataPlaneClient: input.dataPlaneClient,
     connectionTokenConfig: input.connectionTokenConfig,
     portAccessConfig: input.portAccessConfig,
+    ptyTransportConfig: input.ptyTransportConfig,
     openWorkflow: input.openWorkflow,
     auth: input.auth,
     ...(input.resolveTestContext === undefined
@@ -122,6 +124,7 @@ export function configureApp(input: CreateAppInput & { app: ControlPlaneApp }): 
       dataPlaneClient: input.dataPlaneClient,
       connectionTokenConfig: input.connectionTokenConfig,
       portAccessConfig: input.portAccessConfig,
+      ptyTransportConfig: input.ptyTransportConfig,
       openWorkflow: input.openWorkflow,
       auth,
       ...(input.resolveTestContext === undefined

@@ -32,6 +32,7 @@ export function createAppContextMiddleware(
     ctx.set("dataPlaneClient", dynamicContext.dataPlaneClient);
     ctx.set("connectionTokenConfig", appContext.connectionTokenConfig);
     ctx.set("portAccessConfig", appContext.portAccessConfig);
+    ctx.set("ptyTransportConfig", appContext.ptyTransportConfig);
     ctx.set("openWorkflow", dynamicContext.openWorkflow);
     ctx.set("auth", dynamicContext.auth);
     ctx.set("session", null);
