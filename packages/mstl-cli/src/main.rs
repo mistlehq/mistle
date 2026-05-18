@@ -1,12 +1,12 @@
 use bpaf::{OptionParser, Parser, construct, long, positional, pure};
 use mstl_core::auth::{API_KEY_ENV_VAR, CONTROL_PLANE_API_PUBLIC_URL_ENV_VAR};
 use mstl_core::client::{
-    CurrentActor, CurrentActorAuthentication, ListSandboxInstancesResponse,
-    ListSandboxProfilesResponse, MistleClient, MistleClientConfig, MistleClientError,
-    SandboxInstance, SandboxInstanceAgentRuntimeId, SandboxInstanceListItem, SandboxInstanceSource,
-    SandboxInstanceStartedBy, SandboxInstanceStartupOperationKind, SandboxInstanceStatus,
-    SandboxProfile, SandboxProfileStatus, StartSandboxProfileInstanceResponse,
-    StartSandboxProfileInstanceStatus,
+    CurrentActor, CurrentActorAuthentication, ListSandboxInstancesRequest,
+    ListSandboxInstancesResponse, ListSandboxProfilesResponse, MistleClient, MistleClientConfig,
+    MistleClientError, SandboxInstance, SandboxInstanceAgentRuntimeId, SandboxInstanceListItem,
+    SandboxInstanceSource, SandboxInstanceStartedBy, SandboxInstanceStartupOperationKind,
+    SandboxInstanceStatus, SandboxProfile, SandboxProfileStatus,
+    StartSandboxProfileInstanceResponse, StartSandboxProfileInstanceStatus,
 };
 use std::env::{self, VarError};
 use std::fmt;
@@ -31,7 +31,10 @@ enum CliCommand {
         profile_id: String,
         version: Option<u32>,
     },
-    SandboxList,
+    SandboxList {
+        limit: Option<u32>,
+        after: Option<String>,
+    },
     SandboxGet {
         sandbox_id: String,
     },
@@ -123,7 +126,24 @@ fn options() -> OptionParser<CliCommand> {
     .descr("Create a sandbox")
     .command("create");
 
-    let sandbox_list = pure(CliCommand::SandboxList)
+    let limit = long("limit")
+        .help("Maximum number of sandboxes to return")
+        .argument::<u32>("limit")
+        .guard(
+            |value| (1..=100).contains(value),
+            "limit must be between 1 and 100",
+        )
+        .optional();
+    let after = long("after")
+        .help("List sandboxes after this cursor")
+        .argument::<String>("cursor")
+        .guard(
+            |value| !value.trim().is_empty(),
+            "after cursor cannot be blank",
+        )
+        .optional();
+
+    let sandbox_list = construct!(CliCommand::SandboxList { limit, after })
         .to_options()
         .descr("List sandboxes")
         .command("list");
@@ -211,7 +231,7 @@ where
                 1
             }
         },
-        CliCommand::SandboxList => match list_sandboxes() {
+        CliCommand::SandboxList { limit, after } => match list_sandboxes(limit, after) {
             Ok(sandboxes) => match write_sandboxes(stdout, &sandboxes) {
                 Ok(()) => 0,
                 Err(error) => {
@@ -283,9 +303,12 @@ fn create_sandbox(
     })
 }
 
-fn list_sandboxes() -> Result<ListSandboxInstancesResponse, CliError> {
+fn list_sandboxes(
+    limit: Option<u32>,
+    after: Option<String>,
+) -> Result<ListSandboxInstancesResponse, CliError> {
     mistle_client()?
-        .list_sandbox_instances()
+        .list_sandbox_instances(ListSandboxInstancesRequest { limit, after })
         .map_err(|source| CliError::Client {
             action: "list sandboxes",
             source,
@@ -489,6 +512,15 @@ fn render_sandboxes(response: &ListSandboxInstancesResponse) -> String {
             status_width = widths.status,
             source_width = widths.source,
             started_by_width = widths.started_by,
+        ));
+    }
+
+    if let Some(next_page) = &response.next_page
+        && let Some(after) = &next_page.after
+    {
+        output.push_str(&format!(
+            "\nNext page: mistle sandbox list --limit {} --after {}\n",
+            next_page.limit, after,
         ));
     }
 
@@ -729,7 +761,7 @@ fn format_optional_value(value: Option<&str>) -> &str {
 #[cfg(test)]
 mod tests {
     use mstl_core::client::{
-        ListSandboxInstancesResponse, ListSandboxProfilesResponse, SandboxInstance,
+        KeysetPage, ListSandboxInstancesResponse, ListSandboxProfilesResponse, SandboxInstance,
         SandboxInstanceAgentRuntimeId, SandboxInstanceListItem, SandboxInstanceRuntimeContext,
         SandboxInstanceSource, SandboxInstanceStartedBy, SandboxInstanceStartupOperation,
         SandboxInstanceStartupOperationKind, SandboxInstanceStatus,
@@ -885,7 +917,11 @@ mod tests {
                     failure_message: Some("Provider failed".to_owned()),
                 },
             ],
-            next_page: None,
+            next_page: Some(KeysetPage {
+                limit: 2,
+                after: Some("cursor_02".to_owned()),
+                before: None,
+            }),
             previous_page: None,
         };
 
@@ -895,6 +931,8 @@ mod tests {
                 "ID          TITLE       PROFILE  VERSION  STATUS   SOURCE     STARTED BY         UPDATED\n",
                 "sbi_python  Python Dev  Python   3        running  dashboard  local (apk_local)  2026-05-18T01:02:03.000Z\n",
                 "sbi_failed  -           -        1        failed   schedule   usr_01             2026-05-17T01:02:03.000Z\n",
+                "\n",
+                "Next page: mistle sandbox list --limit 2 --after cursor_02\n",
             ),
         );
     }

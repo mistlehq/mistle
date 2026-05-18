@@ -86,8 +86,10 @@ impl MistleClient {
 
     pub fn list_sandbox_instances(
         &self,
+        request: ListSandboxInstancesRequest,
     ) -> Result<ListSandboxInstancesResponse, MistleClientError> {
-        self.list_sandbox_instances_page(None)
+        validate_list_sandbox_instances_request(&request)?;
+        self.list_sandbox_instances_page(&request)
     }
 
     fn list_sandbox_profiles_page(
@@ -99,9 +101,9 @@ impl MistleClient {
 
     fn list_sandbox_instances_page(
         &self,
-        after: Option<&str>,
+        request: &ListSandboxInstancesRequest,
     ) -> Result<ListSandboxInstancesResponse, MistleClientError> {
-        self.get_json(self.list_sandbox_instances_url(after).as_str())
+        self.get_json(self.list_sandbox_instances_url(request).as_str())
     }
 
     fn get_json<TResponse>(&self, url: &str) -> Result<TResponse, MistleClientError>
@@ -203,11 +205,19 @@ impl MistleClient {
         ))
     }
 
-    fn list_sandbox_instances_url(&self, after: Option<&str>) -> Url {
+    fn list_sandbox_instances_url(&self, request: &ListSandboxInstancesRequest) -> Url {
         let mut url = endpoint_url(&self.base_url, "/v1/sandbox/instances");
 
-        if let Some(after) = after {
-            url.query_pairs_mut().append_pair("after", after);
+        if request.limit.is_some() || request.after.is_some() {
+            let mut query_pairs = url.query_pairs_mut();
+
+            if let Some(limit) = request.limit {
+                query_pairs.append_pair("limit", &limit.to_string());
+            }
+
+            if let Some(after) = &request.after {
+                query_pairs.append_pair("after", after);
+            }
         }
 
         url
@@ -320,6 +330,12 @@ pub struct ListSandboxInstancesResponse {
     pub items: Vec<SandboxInstanceListItem>,
     pub next_page: Option<KeysetPage>,
     pub previous_page: Option<KeysetPage>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ListSandboxInstancesRequest {
+    pub limit: Option<u32>,
+    pub after: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -556,6 +572,28 @@ fn validate_sandbox_instance_id(sandbox_id: &str) -> Result<&str, MistleClientEr
     Ok(trimmed_sandbox_id)
 }
 
+fn validate_list_sandbox_instances_request(
+    request: &ListSandboxInstancesRequest,
+) -> Result<(), MistleClientError> {
+    if let Some(limit) = request.limit
+        && !(1..=100).contains(&limit)
+    {
+        return Err(MistleClientError::InvalidConfig(
+            "sandbox list limit must be between 1 and 100",
+        ));
+    }
+
+    if let Some(after) = &request.after
+        && after.trim().is_empty()
+    {
+        return Err(MistleClientError::InvalidConfig(
+            "sandbox list after cursor cannot be blank",
+        ));
+    }
+
+    Ok(())
+}
+
 fn endpoint_url(base_url: &Url, endpoint_path: &str) -> Url {
     let mut endpoint_url = base_url.clone();
     let base_path = endpoint_url.path().trim_end_matches('/');
@@ -569,12 +607,13 @@ fn endpoint_url(base_url: &Url, endpoint_path: &str) -> Url {
 mod tests {
     use crate::client::{
         CurrentActor, CurrentActorApiKey, CurrentActorAuthentication, CurrentActorIdentity,
-        CurrentActorOrganization, ListSandboxInstancesResponse, MistleClient, MistleClientConfig,
-        SandboxInstance, SandboxInstanceAgentRuntimeId, SandboxInstanceListItem,
-        SandboxInstanceRuntimeContext, SandboxInstanceSource, SandboxInstanceStartedBy,
-        SandboxInstanceStartupOperation, SandboxInstanceStartupOperationKind,
-        SandboxInstanceStatus, SandboxInstanceTriggerConversation,
-        StartSandboxProfileInstanceResponse, StartSandboxProfileInstanceStatus,
+        CurrentActorOrganization, ListSandboxInstancesRequest, ListSandboxInstancesResponse,
+        MistleClient, MistleClientConfig, SandboxInstance, SandboxInstanceAgentRuntimeId,
+        SandboxInstanceListItem, SandboxInstanceRuntimeContext, SandboxInstanceSource,
+        SandboxInstanceStartedBy, SandboxInstanceStartupOperation,
+        SandboxInstanceStartupOperationKind, SandboxInstanceStatus,
+        SandboxInstanceTriggerConversation, StartSandboxProfileInstanceResponse,
+        StartSandboxProfileInstanceStatus,
     };
 
     #[test]
@@ -624,20 +663,76 @@ mod tests {
         let client = client_with_base_url("https://api.example.test");
 
         assert_eq!(
-            client.list_sandbox_instances_url(None).as_str(),
+            client
+                .list_sandbox_instances_url(&ListSandboxInstancesRequest::default())
+                .as_str(),
             "https://api.example.test/v1/sandbox/instances"
         );
     }
 
     #[test]
-    fn builds_list_sandbox_instances_url_with_after_cursor() {
+    fn builds_list_sandbox_instances_url_with_limit_and_after_cursor() {
         let client = client_with_base_url("https://api.example.test");
 
         assert_eq!(
             client
-                .list_sandbox_instances_url(Some("cursor/with space"))
+                .list_sandbox_instances_url(&ListSandboxInstancesRequest {
+                    limit: Some(50),
+                    after: Some("cursor/with space".to_owned()),
+                })
                 .as_str(),
-            "https://api.example.test/v1/sandbox/instances?after=cursor%2Fwith+space"
+            "https://api.example.test/v1/sandbox/instances?limit=50&after=cursor%2Fwith+space"
+        );
+    }
+
+    #[test]
+    fn rejects_zero_sandbox_instance_list_limit() {
+        let client = client_with_base_url("https://api.example.test");
+
+        let error = client
+            .list_sandbox_instances(ListSandboxInstancesRequest {
+                limit: Some(0),
+                after: None,
+            })
+            .expect_err("zero limit should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "sandbox list limit must be between 1 and 100"
+        );
+    }
+
+    #[test]
+    fn rejects_too_large_sandbox_instance_list_limit() {
+        let client = client_with_base_url("https://api.example.test");
+
+        let error = client
+            .list_sandbox_instances(ListSandboxInstancesRequest {
+                limit: Some(101),
+                after: None,
+            })
+            .expect_err("limit above backend max should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "sandbox list limit must be between 1 and 100"
+        );
+    }
+
+    #[test]
+    fn rejects_blank_sandbox_instance_list_after_cursor() {
+        let client = client_with_base_url("https://api.example.test");
+
+        let error = client
+            .list_sandbox_instances(ListSandboxInstancesRequest {
+                limit: None,
+                after: Some(" ".to_owned()),
+            })
+            .expect_err("blank after cursor should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "sandbox list after cursor cannot be blank"
         );
     }
 
