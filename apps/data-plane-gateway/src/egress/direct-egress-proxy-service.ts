@@ -22,6 +22,7 @@ import {
   loadActiveSandboxRuntimePlan,
 } from "./active-runtime-plan-loader.js";
 import type { CredentialCache } from "./credential-cache.js";
+import { buildDirectEgressTrustedCaCertificates } from "./direct-egress-trust-store.js";
 import type { GatewayEgressHttpRequest, RepeatedHeaderValues } from "./gateway-egress-request.js";
 import {
   buildManagedEgressRequest,
@@ -567,6 +568,9 @@ function sendDirectHttpRequest(input: {
       input.headers instanceof Headers
         ? Object.fromEntries(input.headers.entries())
         : input.headers;
+    const trustedCaCertificates = buildDirectEgressTrustedCaCertificates(
+      input.trustedUpstreamCaCertificates,
+    );
     const upstreamRequest =
       input.url.protocol === "https:"
         ? requestHttps({
@@ -576,10 +580,7 @@ function sendDirectHttpRequest(input: {
             path: `${input.url.pathname}${input.url.search}`,
             port: input.url.port.length === 0 ? undefined : Number(input.url.port),
             protocol: input.url.protocol,
-            ...(input.trustedUpstreamCaCertificates === undefined ||
-            input.trustedUpstreamCaCertificates.length === 0
-              ? {}
-              : { ca: [...input.trustedUpstreamCaCertificates] }),
+            ...(trustedCaCertificates === undefined ? {} : { ca: trustedCaCertificates }),
           })
         : requestHttp({
             headers: requestHeaders,

@@ -12,6 +12,7 @@ import {
   logDirectEgressFailure,
   logDirectEgressWebSocketEvent,
 } from "./direct-egress-proxy-service.js";
+import { buildDirectEgressTrustedCaCertificates } from "./direct-egress-trust-store.js";
 import {
   normalizeForwardedDirectEgressWebSocketCloseCode,
   normalizeForwardedDirectEgressWebSocketCloseReason,
@@ -325,10 +326,18 @@ function createUpstreamWebSocketOptions(input: {
     };
   }
 
-  return {
-    ca: [...input.trustedUpstreamCaCertificates],
-    headers: input.headers,
-  };
+  const trustedCaCertificates = buildDirectEgressTrustedCaCertificates(
+    input.trustedUpstreamCaCertificates,
+  );
+
+  return trustedCaCertificates === undefined
+    ? {
+        headers: input.headers,
+      }
+    : {
+        ca: trustedCaCertificates,
+        headers: input.headers,
+      };
 }
 
 function sendUpstreamWebSocketMessage(input: {
