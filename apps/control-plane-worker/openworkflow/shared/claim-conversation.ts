@@ -1,9 +1,9 @@
 import {
-  AutomationConversationStatuses,
-  AutomationConversationOwnerKinds,
-  type AutomationConversationCreatedByKind,
-  type InsertAutomationConversation,
-  type AutomationConversationOwnerKind,
+  TriggerConversationStatuses,
+  TriggerConversationOwnerKinds,
+  type TriggerConversationCreatedByKind,
+  type InsertTriggerConversation,
+  type TriggerConversationOwnerKind,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
   getControlPlaneDatabaseSchema,
@@ -11,14 +11,14 @@ import {
 import { typeid } from "typeid-js";
 
 import {
-  AutomationConversationPersistenceError,
-  AutomationConversationPersistenceErrorCodes,
-} from "./automation-conversation-persistence-error.js";
-export type ClaimAutomationConversationInput = {
+  TriggerConversationPersistenceError,
+  TriggerConversationPersistenceErrorCodes,
+} from "./trigger-conversation-persistence-error.js";
+export type ClaimTriggerConversationInput = {
   organizationId: string;
-  ownerKind: AutomationConversationOwnerKind;
+  ownerKind: TriggerConversationOwnerKind;
   ownerId: string;
-  createdByKind: AutomationConversationCreatedByKind;
+  createdByKind: TriggerConversationCreatedByKind;
   createdById: string;
   conversationKey?: string;
   sandboxProfileId: string;
@@ -26,40 +26,40 @@ export type ClaimAutomationConversationInput = {
   runtimeId: string;
 };
 
-export async function claimAutomationConversation(
+export async function claimTriggerConversation(
   ctx: {
     db: ControlPlaneDatabase | ControlPlaneTransaction;
   },
-  input: ClaimAutomationConversationInput,
+  input: ClaimTriggerConversationInput,
 ) {
   const tables = getControlPlaneDatabaseSchema(ctx.db);
 
   const resolvedConversationId =
-    input.ownerKind === AutomationConversationOwnerKinds.INTEGRATION_BINDING
+    input.ownerKind === TriggerConversationOwnerKinds.INTEGRATION_BINDING
       ? typeid("cnv").toString()
       : undefined;
   const resolvedConversationKey =
-    input.ownerKind === AutomationConversationOwnerKinds.INTEGRATION_BINDING
+    input.ownerKind === TriggerConversationOwnerKinds.INTEGRATION_BINDING
       ? resolvedConversationId
       : input.conversationKey;
   if (resolvedConversationKey === undefined) {
-    throw new AutomationConversationPersistenceError({
-      code: AutomationConversationPersistenceErrorCodes.CONVERSATION_KEY_REQUIRED,
+    throw new TriggerConversationPersistenceError({
+      code: TriggerConversationPersistenceErrorCodes.CONVERSATION_KEY_REQUIRED,
       message: "conversationKey is required for non-dashboard conversation claims.",
     });
   }
   if (
-    input.ownerKind === AutomationConversationOwnerKinds.INTEGRATION_BINDING &&
+    input.ownerKind === TriggerConversationOwnerKinds.INTEGRATION_BINDING &&
     input.conversationKey !== undefined
   ) {
-    throw new AutomationConversationPersistenceError({
-      code: AutomationConversationPersistenceErrorCodes.CONVERSATION_KEY_FORBIDDEN,
+    throw new TriggerConversationPersistenceError({
+      code: TriggerConversationPersistenceErrorCodes.CONVERSATION_KEY_FORBIDDEN,
       message:
         "conversationKey must not be provided for integration-binding claims because it must match the generated conversation id.",
     });
   }
 
-  const insertValues: InsertAutomationConversation = {
+  const insertValues: InsertTriggerConversation = {
     id: resolvedConversationId,
     organizationId: input.organizationId,
     ownerKind: input.ownerKind,
@@ -70,27 +70,27 @@ export async function claimAutomationConversation(
     sandboxProfileId: input.sandboxProfileId,
     integrationFamilyId: input.integrationFamilyId,
     runtimeId: input.runtimeId,
-    status: AutomationConversationStatuses.PENDING,
+    status: TriggerConversationStatuses.PENDING,
   };
 
   const insertedRows = await ctx.db
-    .insert(tables.automationConversations)
+    .insert(tables.triggerConversations)
     .values(insertValues)
     .onConflictDoNothing({
       target: [
-        tables.automationConversations.organizationId,
-        tables.automationConversations.ownerKind,
-        tables.automationConversations.ownerId,
-        tables.automationConversations.conversationKey,
+        tables.triggerConversations.organizationId,
+        tables.triggerConversations.ownerKind,
+        tables.triggerConversations.ownerId,
+        tables.triggerConversations.conversationKey,
       ],
     })
     .returning();
-  const insertedAutomationConversation = insertedRows[0];
-  if (insertedAutomationConversation !== undefined) {
-    return insertedAutomationConversation;
+  const insertedTriggerConversation = insertedRows[0];
+  if (insertedTriggerConversation !== undefined) {
+    return insertedTriggerConversation;
   }
 
-  const existingAutomationConversation = await ctx.db.query.automationConversations.findFirst({
+  const existingTriggerConversation = await ctx.db.query.triggerConversations.findFirst({
     where: (table, { and, eq }) =>
       and(
         eq(table.organizationId, input.organizationId),
@@ -99,20 +99,20 @@ export async function claimAutomationConversation(
         eq(table.conversationKey, resolvedConversationKey),
       ),
   });
-  if (existingAutomationConversation === undefined) {
-    throw new AutomationConversationPersistenceError({
-      code: AutomationConversationPersistenceErrorCodes.CONVERSATION_NOT_FOUND,
+  if (existingTriggerConversation === undefined) {
+    throw new TriggerConversationPersistenceError({
+      code: TriggerConversationPersistenceErrorCodes.CONVERSATION_NOT_FOUND,
       message:
-        "AutomationConversation claim conflict occurred but no existing conversation record could be loaded.",
+        "TriggerConversation claim conflict occurred but no existing conversation record could be loaded.",
     });
   }
 
-  if (existingAutomationConversation.status === AutomationConversationStatuses.CLOSED) {
-    throw new AutomationConversationPersistenceError({
-      code: AutomationConversationPersistenceErrorCodes.CONVERSATION_CLOSED,
-      message: `AutomationConversation '${existingAutomationConversation.id}' is closed and cannot be claimed.`,
+  if (existingTriggerConversation.status === TriggerConversationStatuses.CLOSED) {
+    throw new TriggerConversationPersistenceError({
+      code: TriggerConversationPersistenceErrorCodes.CONVERSATION_CLOSED,
+      message: `TriggerConversation '${existingTriggerConversation.id}' is closed and cannot be claimed.`,
     });
   }
 
-  return existingAutomationConversation;
+  return existingTriggerConversation;
 }

@@ -9,9 +9,6 @@ import type { OpenWorkflow } from "openworkflow";
 import { createApiKeysRoutes } from "./api-keys/index.js";
 import type { ControlPlaneAuth } from "./auth/index.js";
 import { createAuthRoutes } from "./auth/routes.js";
-import { createAutomationSchedulesRoutes } from "./automation-schedules/index.js";
-import { createAutomationWebhooksRoutes } from "./automation-webhooks/index.js";
-import { createAutomationsRoutes } from "./automations/index.js";
 import { createHomeRoutes } from "./home/index.js";
 import { createIdentityLinkingCallbacksRoutes } from "./identity-linking-callbacks/index.js";
 import { createIntegrationCallbacksRoutes } from "./integration-callbacks/index.js";
@@ -37,6 +34,9 @@ import { createPublicSessionLinksRoutes } from "./public-session-links/index.js"
 import { createSandboxInstancesRoutes } from "./sandbox-instances/index.js";
 import { createSandboxProfilesRoutes } from "./sandbox-profiles/index.js";
 import { createSandboxProvidersRoutes } from "./sandbox-providers/index.js";
+import { createTriggerSchedulesRoutes } from "./trigger-schedules/index.js";
+import { createTriggerWebhooksRoutes } from "./trigger-webhooks/index.js";
+import { createTriggersRoutes } from "./triggers/index.js";
 import type {
   AppContextBindings,
   AppContextVariables,
@@ -155,9 +155,9 @@ export function registerApiRouteModules(app: ControlPlaneApp): void {
 export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const authRoutes = createAuthRoutes();
   const apiKeysRoutes = withActiveOrganizationAccess(createApiKeysRoutes());
-  const automationsRoutes = withActiveOrganizationAccess(createAutomationsRoutes());
-  const automationSchedulesRoutes = withActiveOrganizationAccess(createAutomationSchedulesRoutes());
-  const automationWebhooksRoutes = withActiveOrganizationAccess(createAutomationWebhooksRoutes());
+  const triggersRoutes = withActiveOrganizationAccess(createTriggersRoutes());
+  const triggerSchedulesRoutes = withActiveOrganizationAccess(createTriggerSchedulesRoutes());
+  const triggerWebhooksRoutes = withActiveOrganizationAccess(createTriggerWebhooksRoutes());
   const homeRoutes = withActiveOrganizationAccess(createHomeRoutes());
   const identityLinkingCallbacksRoutes = createIdentityLinkingCallbacksRoutes();
   const integrationCallbacksRoutes = createIntegrationCallbacksRoutes();
@@ -176,9 +176,9 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
 
   app.route(authRoutes.basePath, authRoutes.routes);
   app.route(apiKeysRoutes.basePath, apiKeysRoutes.routes);
-  app.route(automationsRoutes.basePath, automationsRoutes.routes);
-  app.route(automationSchedulesRoutes.basePath, automationSchedulesRoutes.routes);
-  app.route(automationWebhooksRoutes.basePath, automationWebhooksRoutes.routes);
+  app.route(triggersRoutes.basePath, triggersRoutes.routes);
+  app.route(triggerSchedulesRoutes.basePath, triggerSchedulesRoutes.routes);
+  app.route(triggerWebhooksRoutes.basePath, triggerWebhooksRoutes.routes);
   app.route(homeRoutes.basePath, homeRoutes.routes);
   app.route(identityLinkingCallbacksRoutes.basePath, identityLinkingCallbacksRoutes.routes);
   app.route(integrationCallbacksRoutes.basePath, integrationCallbacksRoutes.routes);

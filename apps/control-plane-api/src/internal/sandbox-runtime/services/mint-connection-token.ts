@@ -183,7 +183,7 @@ export async function mintConnectionToken(
     webhookEventId?: string;
     deliveryTaskId?: string;
     externalDeliveryId?: string;
-    automationRunId?: string;
+    triggerRunId?: string;
     conversationId?: string;
   },
 ): Promise<{
@@ -213,9 +213,9 @@ export async function mintConnectionToken(
           ...(input.externalDeliveryId === undefined
             ? {}
             : { "mistle.webhook.external_delivery_id": input.externalDeliveryId }),
-          ...(input.automationRunId === undefined
+          ...(input.triggerRunId === undefined
             ? {}
-            : { "mistle.automation.run_id": input.automationRunId }),
+            : { "mistle.trigger.run_id": input.triggerRunId }),
           ...(input.conversationId === undefined
             ? {}
             : { "mistle.conversation.id": input.conversationId }),
@@ -292,9 +292,9 @@ export async function mintConnectionToken(
           ...(input.externalDeliveryId === undefined
             ? {}
             : { "mistle.webhook.external_delivery_id": input.externalDeliveryId }),
-          ...(input.automationRunId === undefined
+          ...(input.triggerRunId === undefined
             ? {}
-            : { "mistle.automation.run_id": input.automationRunId }),
+            : { "mistle.trigger.run_id": input.triggerRunId }),
           ...(input.conversationId === undefined
             ? {}
             : { "mistle.conversation.id": input.conversationId }),
@@ -313,9 +313,9 @@ export async function mintConnectionToken(
             ...(input.externalDeliveryId === undefined
               ? {}
               : { "mistle.webhook.external_delivery_id": input.externalDeliveryId }),
-            ...(input.automationRunId === undefined
+            ...(input.triggerRunId === undefined
               ? {}
-              : { "mistle.automation.run_id": input.automationRunId }),
+              : { "mistle.trigger.run_id": input.triggerRunId }),
             ...(input.conversationId === undefined
               ? {}
               : { "mistle.conversation.id": input.conversationId }),
@@ -349,9 +349,9 @@ export async function mintConnectionToken(
             ...(input.externalDeliveryId === undefined
               ? {}
               : { "mistle.webhook.external_delivery_id": input.externalDeliveryId }),
-            ...(input.automationRunId === undefined
+            ...(input.triggerRunId === undefined
               ? {}
-              : { "mistle.automation.run_id": input.automationRunId }),
+              : { "mistle.trigger.run_id": input.triggerRunId }),
             ...(input.conversationId === undefined
               ? {}
               : { "mistle.conversation.id": input.conversationId }),

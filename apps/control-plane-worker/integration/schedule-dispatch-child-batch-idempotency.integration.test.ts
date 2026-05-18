@@ -3,7 +3,7 @@
  */
 
 import {
-  AutomationKinds,
+  TriggerKinds,
   ScheduledActionStatuses,
   ScheduleTargetTypes,
 } from "@mistle/db/control-plane";
@@ -23,10 +23,10 @@ describe.concurrent("control-plane worker schedule dispatch child batch idempote
   it("starts the same recovered child batch idempotently across repeated scans", async ({
     env,
   }) => {
-    await seedAutomationSchedule({
+    await seedTriggerSchedule({
       env,
       organizationId: "org_integration_schedule_batch_idempotent",
-      automationId: "atm_integration_schedule_batch_idempotent",
+      triggerId: "atm_integration_schedule_batch_idempotent",
       scheduleId: "sch_integration_schedule_batch_idempotent",
     });
     await seedScheduledAction({
@@ -34,7 +34,7 @@ describe.concurrent("control-plane worker schedule dispatch child batch idempote
       id: "sca_integration_schedule_batch_idempotent",
       organizationId: "org_integration_schedule_batch_idempotent",
       scheduleId: "sch_integration_schedule_batch_idempotent",
-      automationId: "atm_integration_schedule_batch_idempotent",
+      triggerId: "atm_integration_schedule_batch_idempotent",
       scheduledAt: "2026-04-28T00:10:00.000Z",
       localScheduledTime: "08:10",
     });
@@ -63,10 +63,10 @@ describe.concurrent("control-plane worker schedule dispatch child batch idempote
   });
 });
 
-async function seedAutomationSchedule(input: {
+async function seedTriggerSchedule(input: {
   env: IntegrationTestEnvironment;
   organizationId: string;
-  automationId: string;
+  triggerId: string;
   scheduleId: string;
 }): Promise<void> {
   await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.organizations).values({
@@ -74,26 +74,26 @@ async function seedAutomationSchedule(input: {
     name: input.organizationId,
     slug: input.organizationId,
   });
-  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.automations).values({
-    id: input.automationId,
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.triggers).values({
+    id: input.triggerId,
     organizationId: input.organizationId,
-    kind: AutomationKinds.SCHEDULE,
-    name: input.automationId,
+    kind: TriggerKinds.SCHEDULE,
+    name: input.triggerId,
     enabled: true,
   });
   await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.schedules).values({
     id: input.scheduleId,
     organizationId: input.organizationId,
-    targetType: ScheduleTargetTypes.AUTOMATION_RUN,
+    targetType: ScheduleTargetTypes.TRIGGER_RUN,
     name: input.scheduleId,
     cronExpression: "0 9 * * *",
     timezone: "Asia/Singapore",
     enabled: true,
     nextScheduledAt: "2026-04-29T01:00:00.000Z",
   });
-  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.scheduleAutomations).values({
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.scheduleTriggers).values({
     scheduleId: input.scheduleId,
-    automationId: input.automationId,
+    triggerId: input.triggerId,
     inputTemplate: "{}",
     conversationKeyTemplate: `conversation-${input.scheduleId}`,
     idempotencyKeyTemplate: `idempotency-${input.scheduleId}`,
@@ -105,7 +105,7 @@ async function seedScheduledAction(input: {
   id: string;
   organizationId: string;
   scheduleId: string;
-  automationId: string;
+  triggerId: string;
   scheduledAt: string;
   localScheduledTime: string;
 }): Promise<void> {
@@ -113,9 +113,9 @@ async function seedScheduledAction(input: {
     id: input.id,
     scheduleId: input.scheduleId,
     organizationId: input.organizationId,
-    targetType: ScheduleTargetTypes.AUTOMATION_RUN,
+    targetType: ScheduleTargetTypes.TRIGGER_RUN,
     targetPayload: {
-      automationId: input.automationId,
+      triggerId: input.triggerId,
     },
     scheduledAt: input.scheduledAt,
     localScheduledDate: "2026-04-28",

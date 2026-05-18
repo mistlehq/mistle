@@ -61,7 +61,7 @@ const LaunchableSandboxProfilesResultSchema = z
 const SandboxProfileVersionDraftTriggerImpactSchema = z
   .object({
     hasBreakingChanges: z.boolean(),
-    affectedAutomations: z.array(
+    affectedTriggers: z.array(
       z
         .object({
           id: z.string().min(1),
@@ -745,7 +745,7 @@ export async function getSandboxProfileVersionDraftTriggerImpact(input: {
       method: "GET",
       pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
         input.version,
-      )}/draft-automation-impact`,
+      )}/draft-trigger-impact`,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not check draft trigger impact.",
     });
@@ -778,7 +778,7 @@ function normalizeSandboxProfileVersionDraftTriggerImpact(
 ): SandboxProfileVersionDraftTriggerImpact {
   return {
     hasBreakingChanges: input.hasBreakingChanges,
-    affectedTriggers: input.affectedAutomations.map((trigger) => ({
+    affectedTriggers: input.affectedTriggers.map((trigger) => ({
       enabled: trigger.enabled,
       id: trigger.id,
       issues: trigger.issues.map((issue) => ({
@@ -1081,7 +1081,7 @@ export async function getSandboxProfileVersionTriggerConfig(input: {
       method: "GET",
       pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
         input.version,
-      )}/automation-config`,
+      )}/trigger-config`,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not load sandbox profile trigger config.",
     });

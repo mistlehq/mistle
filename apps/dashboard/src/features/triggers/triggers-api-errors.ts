@@ -6,7 +6,7 @@ import {
 
 const TriggersErrorMessages = {
   FORBIDDEN: "Select an active organization to manage triggers.",
-  INVALID_LIST_AUTOMATIONS_INPUT: "The triggers request is invalid.",
+  INVALID_LIST_TRIGGERS_INPUT: "The triggers request is invalid.",
   INVALID_PAGINATION_CURSOR: "The triggers page cursor is invalid.",
   UNAUTHORIZED: "Sign in again to manage triggers.",
   VALIDATION_ERROR: "The triggers request is invalid.",

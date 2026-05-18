@@ -18,7 +18,7 @@ const HomeSummaryRowSchema = z
   .object({
     hasProfiles: z.boolean(),
     hasUsableProfiles: z.boolean(),
-    hasAutomations: z.boolean(),
+    hasTriggers: z.boolean(),
   })
   .strict();
 
@@ -69,7 +69,7 @@ export async function getHomeSummary(
       input.db.execute(sql<{
         hasProfiles: boolean;
         hasUsableProfiles: boolean;
-        hasAutomations: boolean;
+        hasTriggers: boolean;
       }>`select
         exists(
           select 1
@@ -91,9 +91,9 @@ export async function getHomeSummary(
         ) as "hasUsableProfiles",
         exists(
           select 1
-          from ${tables.automations} as a
+          from ${tables.triggers} as a
           where a."organization_id" = ${params.organizationId}
-        ) as "hasAutomations"`),
+        ) as "hasTriggers"`),
       input.dataPlaneClient.listSandboxInstances({
         organizationId: params.organizationId,
         limit: 1,
@@ -117,7 +117,7 @@ export async function getHomeSummary(
     summaryResult.rows[0] ?? {
       hasProfiles: false,
       hasUsableProfiles: false,
-      hasAutomations: false,
+      hasTriggers: false,
     },
   );
   const hasAgentCapableIntegrations = agentCapableIntegrationResult.some((row) =>
@@ -140,7 +140,7 @@ export async function getHomeSummary(
       hasUsableProfiles: summary.hasUsableProfiles,
       hasStartedSession: startedSessionResult.items.length > 0,
       hasWebhookCapableIntegration,
-      hasAutomations: summary.hasAutomations,
+      hasTriggers: summary.hasTriggers,
     },
     recentSessions: recentSessionsResult.items,
   };

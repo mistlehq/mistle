@@ -600,7 +600,7 @@ describe("GitHubWebhookHandler", () => {
     expect(resolved.event.payload).toEqual(IssueCommentCreatedPayload);
   });
 
-  it("derives source order keys for every supported GitHub automation event", async () => {
+  it("derives source order keys for every supported GitHub trigger event", async () => {
     expect(
       sortedStrings(SupportedGitHubOrderingCases.map((testCase) => testCase.eventType)),
     ).toEqual(sortedStrings(GitHubSupportedWebhookEvents.map((event) => event.eventType)));

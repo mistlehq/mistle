@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect } from "vitest";
 import {
   executeConversationProviderDelivery,
   resolveDeliveryContextNotificationParams,
-} from "../openworkflow/handle-automation-conversation-delivery/execute-conversation-provider-delivery.js";
+} from "../openworkflow/handle-trigger-conversation-delivery/execute-conversation-provider-delivery.js";
 import { startSimulatedCodexRuntimeServer } from "../test-support/simulated-codex-runtime-server.js";
 
 const ParentSpanContext = {
@@ -63,7 +63,7 @@ describe("executeConversationProviderDelivery", () => {
               webhookEventId: "iwe_123",
               deliveryTaskId: "cdt_123",
               externalDeliveryId: "slack_delivery_123",
-              automationRunId: "aru_123",
+              triggerRunId: "aru_123",
               conversationId: "acv_123",
               sandboxInstanceId: "sbi_123",
               routeId: "acr_123",
@@ -87,7 +87,7 @@ describe("executeConversationProviderDelivery", () => {
           webhookEventId: "iwe_123",
           deliveryTaskId: "cdt_123",
           externalDeliveryId: "slack_delivery_123",
-          automationRunId: "aru_123",
+          triggerRunId: "aru_123",
           conversationId: "acv_123",
           sandboxInstanceId: "sbi_123",
           routeId: "acr_123",
@@ -108,7 +108,7 @@ describe("executeConversationProviderDelivery", () => {
     }
   });
 
-  it("sends complete Codex collaboration mode settings when automation instructions are present", async () => {
+  it("sends complete Codex collaboration mode settings when trigger instructions are present", async () => {
     const server = await startSimulatedCodexRuntimeServer(
       "existing_conversation_with_collaboration_mode",
     );
@@ -132,7 +132,7 @@ describe("executeConversationProviderDelivery", () => {
               source: "webhook",
               webhookEventId: "iwe_123",
               deliveryTaskId: "cdt_123",
-              automationRunId: "aru_123",
+              triggerRunId: "aru_123",
               conversationId: "acv_123",
               sandboxInstanceId: "sbi_123",
               routeId: "acr_123",
@@ -187,7 +187,7 @@ describe("executeConversationProviderDelivery", () => {
               source: "webhook",
               webhookEventId: "iwe_123",
               deliveryTaskId: "cdt_123",
-              automationRunId: "aru_123",
+              triggerRunId: "aru_123",
               conversationId: "acv_123",
               sandboxInstanceId: "sbi_123",
             },
@@ -203,7 +203,7 @@ describe("executeConversationProviderDelivery", () => {
           source: "webhook",
           webhookEventId: "iwe_123",
           deliveryTaskId: "cdt_123",
-          automationRunId: "aru_123",
+          triggerRunId: "aru_123",
           conversationId: "acv_123",
           sandboxInstanceId: "sbi_123",
         },
@@ -240,7 +240,7 @@ describe("executeConversationProviderDelivery", () => {
               source: "webhook",
               webhookEventId: "iwe_123",
               deliveryTaskId: "cdt_123",
-              automationRunId: "aru_123",
+              triggerRunId: "aru_123",
               conversationId: "acv_123",
               sandboxInstanceId: "sbi_123",
             },
@@ -281,7 +281,7 @@ describe("executeConversationProviderDelivery", () => {
               source: "webhook",
               webhookEventId: "iwe_123",
               deliveryTaskId: "cdt_123",
-              automationRunId: "aru_123",
+              triggerRunId: "aru_123",
               conversationId: "acv_123",
               sandboxInstanceId: "sbi_123",
             },
@@ -313,12 +313,12 @@ describe("executeConversationProviderDelivery", () => {
         source: "webhook",
         webhookEventId: "iwe_123",
         deliveryTaskId: "cdt_123",
-        automationRunId: "aru_123",
+        triggerRunId: "aru_123",
         conversationId: "acv_123",
         sandboxInstanceId: "sbi_123",
       }),
     ).toThrow(
-      "Automation conversation delivery requires an active OpenTelemetry trace context before sending delivery context to Codex proxy.",
+      "Trigger conversation delivery requires an active OpenTelemetry trace context before sending delivery context to Codex proxy.",
     );
   });
 });

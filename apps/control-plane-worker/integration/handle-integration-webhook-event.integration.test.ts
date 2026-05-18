@@ -3,8 +3,8 @@
  */
 
 import {
-  AutomationKinds,
-  AutomationRunStatuses,
+  TriggerKinds,
+  TriggerRunStatuses,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
   IntegrationWebhookEventStatuses,
@@ -30,7 +30,7 @@ const OpenAiAgentTargetConfig = {
 };
 
 describe.concurrent("control-plane worker integration webhook event handling", () => {
-  it("queues automation runs for matching webhook automations", async ({ env }) => {
+  it("queues trigger runs for matching webhook triggers", async ({ env }) => {
     const scope = await seedWebhookEventScope({
       env,
       suffix: createSuffix("queue"),
@@ -84,20 +84,20 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       finalized: false,
       resourceSyncRequests: [],
     });
-    expect(preparedEvent.automationRunIds).toHaveLength(1);
+    expect(preparedEvent.triggerRunIds).toHaveLength(1);
 
-    const queuedRuns = await env.controlPlaneDb.query.automationRuns.findMany({
+    const queuedRuns = await env.controlPlaneDb.query.triggerRuns.findMany({
       where: (table, { eq }) => eq(table.sourceWebhookEventId, scope.webhookEventId),
     });
     expect(queuedRuns).toHaveLength(1);
     expect(queuedRuns[0]).toMatchObject({
-      automationId: scope.automationId,
-      automationTargetId: scope.automationTargetId,
-      status: AutomationRunStatuses.QUEUED,
+      triggerId: scope.triggerId,
+      triggerTargetId: scope.triggerTargetId,
+      status: TriggerRunStatuses.QUEUED,
     });
   });
 
-  it("marks webhook events ignored when no automation targets or sync triggers match", async ({
+  it("marks webhook events ignored when no trigger targets or sync triggers match", async ({
     env,
   }) => {
     const scope = await seedWebhookEventScope({
@@ -144,7 +144,7 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       integrationConnectionId: scope.connectionId,
       targetKey: scope.targetKey,
       webhookEventStatus: IntegrationWebhookEventStatuses.IGNORED,
-      automationRunIds: [],
+      triggerRunIds: [],
       resourceSyncRequests: [],
       finalized: true,
     });
@@ -158,7 +158,7 @@ describe.concurrent("control-plane worker integration webhook event handling", (
     expect(persistedEvent?.finalizedAt).not.toBeNull();
   });
 
-  it("ignores Slack message subtypes when the automation listens for plain messages", async ({
+  it("ignores Slack message subtypes when the trigger listens for plain messages", async ({
     env,
   }) => {
     const scope = await seedWebhookEventScope({
@@ -174,7 +174,7 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       },
       eventType: "slack:message_deleted",
       providerEventType: "message_deleted",
-      automationEventTypes: ["slack:message"],
+      triggerEventTypes: ["slack:message"],
       payloadFilter: null,
       payload: {
         event: {
@@ -197,10 +197,10 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       },
     );
 
-    expect(preparedEvent.automationRunIds).toEqual([]);
+    expect(preparedEvent.triggerRunIds).toEqual([]);
     expect(preparedEvent.webhookEventStatus).toBe(IntegrationWebhookEventStatuses.IGNORED);
 
-    const queuedRuns = await env.controlPlaneDb.query.automationRuns.findMany({
+    const queuedRuns = await env.controlPlaneDb.query.triggerRuns.findMany({
       where: (table, { eq }) => eq(table.sourceWebhookEventId, scope.webhookEventId),
     });
     expect(queuedRuns).toHaveLength(0);
@@ -219,7 +219,7 @@ describe.concurrent("control-plane worker integration webhook event handling", (
       connectionConfig: {},
       eventType: "github.installation_repositories.added",
       providerEventType: "installation_repositories",
-      createAutomation: false,
+      createTrigger: false,
       payload: {
         installation: {
           id: 12345,
@@ -242,7 +242,7 @@ describe.concurrent("control-plane worker integration webhook event handling", (
     expect(preparedEvent).toMatchObject({
       webhookEventId: scope.webhookEventId,
       webhookEventStatus: IntegrationWebhookEventStatuses.PROCESSING,
-      automationRunIds: [],
+      triggerRunIds: [],
       finalized: false,
     });
     expect(preparedEvent.resourceSyncRequests).toEqual([
@@ -264,19 +264,19 @@ type SeedWebhookEventScopeInput = {
   connectionConfig: Record<string, unknown>;
   eventType: string;
   providerEventType: string;
-  automationEventTypes?: ReadonlyArray<string>;
+  triggerEventTypes?: ReadonlyArray<string>;
   payloadFilter?: Record<string, unknown> | null;
   payload: Record<string, unknown>;
   externalEventId: string;
   externalDeliveryId: string | null;
-  createAutomation?: boolean;
+  createTrigger?: boolean;
 };
 
 type SeededWebhookEventScope = {
   organizationId: string;
   sandboxProfileId: string;
-  automationId: string;
-  automationTargetId: string;
+  triggerId: string;
+  triggerTargetId: string;
   webhookEventId: string;
   connectionId: string;
   webhookSourceId: string;
@@ -288,8 +288,8 @@ async function seedWebhookEventScope(
 ): Promise<SeededWebhookEventScope> {
   const organizationId = `org_${input.suffix}`;
   const sandboxProfileId = `sbp_${input.suffix}`;
-  const automationId = `atm_${input.suffix}`;
-  const automationTargetId = `atg_${input.suffix}`;
+  const triggerId = `atm_${input.suffix}`;
+  const triggerTargetId = `atg_${input.suffix}`;
   const webhookEventId = `iwe_${input.suffix}`;
   const connectionId = `icn_${input.suffix}`;
   const webhookSourceId = `iws_${input.suffix}`;
@@ -329,7 +329,7 @@ async function seedWebhookEventScope(
       status: "active",
     });
 
-  if (input.createAutomation !== false) {
+  if (input.createTrigger !== false) {
     await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.sandboxProfiles).values({
       id: sandboxProfileId,
       organizationId,
@@ -343,25 +343,25 @@ async function seedWebhookEventScope(
       sandboxProfileVersion: 2,
       suffix: input.suffix,
     });
-    await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.automations).values({
-      id: automationId,
+    await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.triggers).values({
+      id: triggerId,
       organizationId,
-      kind: AutomationKinds.WEBHOOK,
-      name: `Worker Webhook ${input.suffix} Automation`,
+      kind: TriggerKinds.WEBHOOK,
+      name: `Worker Webhook ${input.suffix} Trigger`,
       enabled: true,
     });
-    await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.webhookAutomations).values({
-      automationId,
+    await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.webhookTriggers).values({
+      triggerId,
       integrationWebhookSourceId: webhookSourceId,
-      eventTypes: [...(input.automationEventTypes ?? [input.eventType])],
+      eventTypes: [...(input.triggerEventTypes ?? [input.eventType])],
       payloadFilter: input.payloadFilter ?? null,
       inputTemplate: "Handle webhook event",
       conversationKeyTemplate: "github/{{payload.installation.id}}",
       idempotencyKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
     });
-    await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.automationTargets).values({
-      id: automationTargetId,
-      automationId,
+    await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.triggerTargets).values({
+      id: triggerTargetId,
+      triggerId,
       sandboxProfileId,
       sandboxProfileVersion: 2,
     });
@@ -388,8 +388,8 @@ async function seedWebhookEventScope(
   return {
     organizationId,
     sandboxProfileId,
-    automationId,
-    automationTargetId,
+    triggerId,
+    triggerTargetId,
     webhookEventId,
     connectionId,
     webhookSourceId,

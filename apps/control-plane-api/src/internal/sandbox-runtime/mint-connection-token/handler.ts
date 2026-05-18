@@ -34,7 +34,7 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
       ...(body.externalDeliveryId === undefined
         ? {}
         : { externalDeliveryId: body.externalDeliveryId }),
-      ...(body.automationRunId === undefined ? {} : { automationRunId: body.automationRunId }),
+      ...(body.triggerRunId === undefined ? {} : { triggerRunId: body.triggerRunId }),
       ...(body.conversationId === undefined ? {} : { conversationId: body.conversationId }),
     },
   );

@@ -1,56 +1,56 @@
 import {
-  AutomationConversationRouteStatuses,
-  AutomationConversationStatuses,
+  TriggerConversationRouteStatuses,
+  TriggerConversationStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 
 import {
-  AutomationConversationPersistenceError,
-  AutomationConversationPersistenceErrorCodes,
-} from "./automation-conversation-persistence-error.js";
-export type CreateAutomationConversationRouteInput = {
+  TriggerConversationPersistenceError,
+  TriggerConversationPersistenceErrorCodes,
+} from "./trigger-conversation-persistence-error.js";
+export type CreateTriggerConversationRouteInput = {
   conversationId: string;
   sandboxInstanceId: string;
 };
 
-export async function createAutomationConversationRoute(
+export async function createTriggerConversationRoute(
   deps: {
     db: ControlPlaneDatabase | ControlPlaneTransaction;
   },
-  input: CreateAutomationConversationRouteInput,
+  input: CreateTriggerConversationRouteInput,
 ) {
   const tables = getControlPlaneDatabaseSchema(deps.db);
 
-  const existingAutomationConversation = await deps.db.query.automationConversations.findFirst({
+  const existingTriggerConversation = await deps.db.query.triggerConversations.findFirst({
     where: (table, { eq }) => eq(table.id, input.conversationId),
   });
-  if (existingAutomationConversation === undefined) {
-    throw new AutomationConversationPersistenceError({
-      code: AutomationConversationPersistenceErrorCodes.CONVERSATION_NOT_FOUND,
-      message: `AutomationConversation '${input.conversationId}' was not found.`,
+  if (existingTriggerConversation === undefined) {
+    throw new TriggerConversationPersistenceError({
+      code: TriggerConversationPersistenceErrorCodes.CONVERSATION_NOT_FOUND,
+      message: `TriggerConversation '${input.conversationId}' was not found.`,
     });
   }
-  if (existingAutomationConversation.status === AutomationConversationStatuses.CLOSED) {
-    throw new AutomationConversationPersistenceError({
-      code: AutomationConversationPersistenceErrorCodes.CONVERSATION_CLOSED,
-      message: `AutomationConversation '${input.conversationId}' is closed and cannot create a route.`,
+  if (existingTriggerConversation.status === TriggerConversationStatuses.CLOSED) {
+    throw new TriggerConversationPersistenceError({
+      code: TriggerConversationPersistenceErrorCodes.CONVERSATION_CLOSED,
+      message: `TriggerConversation '${input.conversationId}' is closed and cannot create a route.`,
     });
   }
 
   const insertedRows = await deps.db
-    .insert(tables.automationConversationRoutes)
+    .insert(tables.triggerConversationRoutes)
     .values({
       conversationId: input.conversationId,
       sandboxInstanceId: input.sandboxInstanceId,
       providerConversationId: null,
       providerExecutionId: null,
       providerState: null,
-      status: AutomationConversationRouteStatuses.ACTIVE,
+      status: TriggerConversationRouteStatuses.ACTIVE,
     })
     .onConflictDoNothing({
-      target: [tables.automationConversationRoutes.conversationId],
+      target: [tables.triggerConversationRoutes.conversationId],
     })
     .returning();
   const insertedRoute = insertedRows[0];
@@ -58,20 +58,20 @@ export async function createAutomationConversationRoute(
     return insertedRoute;
   }
 
-  const existingRoute = await deps.db.query.automationConversationRoutes.findFirst({
+  const existingRoute = await deps.db.query.triggerConversationRoutes.findFirst({
     where: (table, { eq }) => eq(table.conversationId, input.conversationId),
   });
   if (existingRoute === undefined) {
-    throw new AutomationConversationPersistenceError({
-      code: AutomationConversationPersistenceErrorCodes.CONVERSATION_ROUTE_NOT_FOUND,
+    throw new TriggerConversationPersistenceError({
+      code: TriggerConversationPersistenceErrorCodes.CONVERSATION_ROUTE_NOT_FOUND,
       message:
-        "AutomationConversation route insert conflict occurred but no existing conversation route record could be loaded.",
+        "TriggerConversation route insert conflict occurred but no existing conversation route record could be loaded.",
     });
   }
-  if (existingRoute.status === AutomationConversationRouteStatuses.CLOSED) {
-    throw new AutomationConversationPersistenceError({
-      code: AutomationConversationPersistenceErrorCodes.CONVERSATION_ROUTE_CLOSED,
-      message: `AutomationConversation route '${existingRoute.id}' is closed and cannot be reused.`,
+  if (existingRoute.status === TriggerConversationRouteStatuses.CLOSED) {
+    throw new TriggerConversationPersistenceError({
+      code: TriggerConversationPersistenceErrorCodes.CONVERSATION_ROUTE_CLOSED,
+      message: `TriggerConversation route '${existingRoute.id}' is closed and cannot be reused.`,
     });
   }
 

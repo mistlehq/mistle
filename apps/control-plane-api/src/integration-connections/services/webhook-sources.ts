@@ -1004,18 +1004,18 @@ export async function deleteIntegrationWebhookSource(
     );
   }
 
-  const sourceAutomationUsage = await ctx.db.query.webhookAutomations.findFirst({
+  const sourceTriggerUsage = await ctx.db.query.webhookTriggers.findFirst({
     columns: {
-      automationId: true,
+      triggerId: true,
     },
     where: (table, { eq: whereEq }) =>
       whereEq(table.integrationWebhookSourceId, input.webhookSourceId),
   });
 
-  if (sourceAutomationUsage !== undefined) {
+  if (sourceTriggerUsage !== undefined) {
     throw new ConflictError(
-      IntegrationConnectionsConflictCodes.WEBHOOK_SOURCE_HAS_AUTOMATIONS,
-      "This webhook source cannot be deleted while it is still used by one or more webhook automations.",
+      IntegrationConnectionsConflictCodes.WEBHOOK_SOURCE_HAS_TRIGGERS,
+      "This webhook source cannot be deleted while it is still used by one or more webhook triggers.",
     );
   }
 

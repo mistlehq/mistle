@@ -1,6 +1,6 @@
 import {
-  HandleAutomationConversationDeliveryWorkflowSpec,
-  HandleAutomationRunWorkflowSpec,
+  HandleTriggerConversationDeliveryWorkflowSpec,
+  HandleTriggerRunWorkflowSpec,
   HandleIntegrationWebhookEventWorkflowSpec,
   ProvisionStripeCustomerWorkflowSpec,
   RequestDeleteSandboxProfileWorkflowSpec,
@@ -20,15 +20,15 @@ const workflows = new Map(
 );
 
 describe("control-plane worker openworkflow entrypoints", () => {
-  it("preserves the handle automation conversation delivery workflow identity", () => {
-    expect(readWorkflowSpec(HandleAutomationConversationDeliveryWorkflowSpec.name)).toMatchObject(
-      HandleAutomationConversationDeliveryWorkflowSpec,
+  it("preserves the handle trigger conversation delivery workflow identity", () => {
+    expect(readWorkflowSpec(HandleTriggerConversationDeliveryWorkflowSpec.name)).toMatchObject(
+      HandleTriggerConversationDeliveryWorkflowSpec,
     );
   });
 
-  it("preserves the handle automation run workflow identity", () => {
-    expect(readWorkflowSpec(HandleAutomationRunWorkflowSpec.name)).toMatchObject(
-      HandleAutomationRunWorkflowSpec,
+  it("preserves the handle trigger run workflow identity", () => {
+    expect(readWorkflowSpec(HandleTriggerRunWorkflowSpec.name)).toMatchObject(
+      HandleTriggerRunWorkflowSpec,
     );
   });
 

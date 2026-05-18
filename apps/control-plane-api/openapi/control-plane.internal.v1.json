@@ -3907,7 +3907,7 @@
                     "type": "string",
                     "minLength": 1
                   },
-                  "automationRunId": {
+                  "triggerRunId": {
                     "type": "string",
                     "minLength": 1
                   },

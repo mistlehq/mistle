@@ -684,7 +684,7 @@ describe("system sandbox codex turn survives disconnect", () => {
   );
 
   it(
-    "keeps a codex turn running to completion after the automation conversation client disconnects",
+    "keeps a codex turn running to completion after the trigger conversation client disconnects",
     async ({ fixture }) => {
       const openAiApiKey = requireEnv(OPENAI_API_KEY_ENV_NAME);
       const authenticatedSession = await fixture.authSession({

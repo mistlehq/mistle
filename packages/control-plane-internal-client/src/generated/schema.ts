@@ -1065,12 +1065,12 @@ export interface paths {
         content: {
           "application/json": {
             actingUserId?: string;
-            automationRunId?: string;
             conversationId?: string;
             deliveryTaskId?: string;
             externalDeliveryId?: string;
             instanceId: string;
             organizationId: string;
+            triggerRunId?: string;
             webhookEventId?: string;
           };
         };

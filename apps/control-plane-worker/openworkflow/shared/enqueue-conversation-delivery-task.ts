@@ -1,36 +1,35 @@
 import {
-  AutomationConversationDeliveryTaskStatuses,
+  TriggerConversationDeliveryTaskStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 
 import {
-  AutomationConversationPersistenceError,
-  AutomationConversationPersistenceErrorCodes,
-} from "./automation-conversation-persistence-error.js";
-export type EnqueueAutomationConversationDeliveryTaskInput = {
+  TriggerConversationPersistenceError,
+  TriggerConversationPersistenceErrorCodes,
+} from "./trigger-conversation-persistence-error.js";
+export type EnqueueTriggerConversationDeliveryTaskInput = {
   conversationId: string;
-  automationRunId: string;
+  triggerRunId: string;
   sourceWebhookEventId?: string | undefined;
   sourceScheduledActionId?: string | undefined;
   sourceOrderKey: string;
 };
 
-export async function enqueueAutomationConversationDeliveryTask(
+export async function enqueueTriggerConversationDeliveryTask(
   ctx: {
     db: ControlPlaneDatabase | ControlPlaneTransaction;
   },
-  input: EnqueueAutomationConversationDeliveryTaskInput,
+  input: EnqueueTriggerConversationDeliveryTaskInput,
 ) {
   if (
     (input.sourceWebhookEventId === undefined && input.sourceScheduledActionId === undefined) ||
     (input.sourceWebhookEventId !== undefined && input.sourceScheduledActionId !== undefined)
   ) {
-    throw new AutomationConversationPersistenceError({
-      code: AutomationConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_INPUT_MISMATCH,
-      message:
-        "AutomationConversation delivery task enqueue requires exactly one source reference.",
+    throw new TriggerConversationPersistenceError({
+      code: TriggerConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_INPUT_MISMATCH,
+      message: "TriggerConversation delivery task enqueue requires exactly one source reference.",
     });
   }
   const sourceWebhookEventId = input.sourceWebhookEventId ?? null;
@@ -38,17 +37,17 @@ export async function enqueueAutomationConversationDeliveryTask(
   const tables = getControlPlaneDatabaseSchema(ctx.db);
 
   const insertedRows = await ctx.db
-    .insert(tables.automationConversationDeliveryTasks)
+    .insert(tables.triggerConversationDeliveryTasks)
     .values({
       conversationId: input.conversationId,
-      automationRunId: input.automationRunId,
+      triggerRunId: input.triggerRunId,
       sourceWebhookEventId,
       sourceScheduledActionId,
       sourceOrderKey: input.sourceOrderKey,
-      status: AutomationConversationDeliveryTaskStatuses.QUEUED,
+      status: TriggerConversationDeliveryTaskStatuses.QUEUED,
     })
     .onConflictDoNothing({
-      target: [tables.automationConversationDeliveryTasks.automationRunId],
+      target: [tables.triggerConversationDeliveryTasks.triggerRunId],
     })
     .returning();
   const insertedTask = insertedRows[0];
@@ -56,14 +55,14 @@ export async function enqueueAutomationConversationDeliveryTask(
     return insertedTask;
   }
 
-  const existingTask = await ctx.db.query.automationConversationDeliveryTasks.findFirst({
-    where: (table, { eq }) => eq(table.automationRunId, input.automationRunId),
+  const existingTask = await ctx.db.query.triggerConversationDeliveryTasks.findFirst({
+    where: (table, { eq }) => eq(table.triggerRunId, input.triggerRunId),
   });
   if (existingTask === undefined) {
-    throw new AutomationConversationPersistenceError({
-      code: AutomationConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_NOT_FOUND,
+    throw new TriggerConversationPersistenceError({
+      code: TriggerConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_NOT_FOUND,
       message:
-        "AutomationConversation delivery task insert conflicted but no existing task row could be loaded.",
+        "TriggerConversation delivery task insert conflicted but no existing task row could be loaded.",
     });
   }
 
@@ -73,8 +72,8 @@ export async function enqueueAutomationConversationDeliveryTask(
     existingTask.sourceScheduledActionId !== sourceScheduledActionId ||
     existingTask.sourceOrderKey !== input.sourceOrderKey
   ) {
-    throw new AutomationConversationPersistenceError({
-      code: AutomationConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_INPUT_MISMATCH,
+    throw new TriggerConversationPersistenceError({
+      code: TriggerConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_INPUT_MISMATCH,
       message:
         "Existing conversation delivery task does not match the requested conversation, webhook event, or source order key.",
     });

@@ -5,7 +5,7 @@ import { DeleteScheduledTriggerResultSchema } from "./scheduled-triggers-types.j
 describe("scheduled triggers types", () => {
   it("parses delete responses", () => {
     const parsed = DeleteScheduledTriggerResultSchema.parse({
-      automationId: "aut_123",
+      triggerId: "aut_123",
     });
 
     expect(parsed).toEqual({

@@ -411,7 +411,7 @@ async function connectCodexSession(input: { connectionUrl: string }): Promise<{
   };
 }
 
-async function initializeAutomationWorkerSession(input: {
+async function initializeTriggerWorkerSession(input: {
   rpcClient: CodexJsonRpcClient;
   sessionClient: AgentStreamClient;
 }): Promise<void> {
@@ -535,7 +535,7 @@ describe("system sandbox codex app-server restart recovery", () => {
       });
 
       try {
-        await initializeAutomationWorkerSession({
+        await initializeTriggerWorkerSession({
           rpcClient: preKillAgentConnection.rpcClient,
           sessionClient: preKillAgentConnection.sessionClient,
         });
@@ -620,7 +620,7 @@ describe("system sandbox codex app-server restart recovery", () => {
       });
 
       try {
-        await initializeAutomationWorkerSession({
+        await initializeTriggerWorkerSession({
           rpcClient: recoveredAgentConnection.rpcClient,
           sessionClient: recoveredAgentConnection.sessionClient,
         });

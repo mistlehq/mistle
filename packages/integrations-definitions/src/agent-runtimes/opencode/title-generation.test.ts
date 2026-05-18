@@ -24,7 +24,7 @@ describe("waitForGeneratedOpenCodeConversationTitle", () => {
       waitForGeneratedOpenCodeConversationTitle({
         previousTitle: "New Session",
         readCurrentTitle: async () => {
-          const title = titleIndex === 0 ? "New Session" : "  Generated   automation title.  ";
+          const title = titleIndex === 0 ? "New Session" : "  Generated   trigger title.  ";
           titleIndex += 1;
           return title;
         },
@@ -32,7 +32,7 @@ describe("waitForGeneratedOpenCodeConversationTitle", () => {
         pollIntervalMs: 1,
         timeoutMs: 2,
       }),
-    ).resolves.toBe("Generated automation title");
+    ).resolves.toBe("Generated trigger title");
   });
 
   it("fails when OpenCode keeps returning the pre-turn title", async () => {

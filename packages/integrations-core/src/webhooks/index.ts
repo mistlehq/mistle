@@ -136,7 +136,7 @@ function assertSupportedWebhookEventHasSourceOrderKey(input: {
 
   throw createWebhookError(
     WebhookErrorCodes.WEBHOOK_SOURCE_ORDER_KEY_MISSING,
-    `Webhook event '${input.event.eventType}' from integration '${input.definition.familyId}/${input.definition.variantId}' is advertised for automations but is missing sourceOrderKey.`,
+    `Webhook event '${input.event.eventType}' from integration '${input.definition.familyId}/${input.definition.variantId}' is advertised for triggers but is missing sourceOrderKey.`,
   );
 }
 

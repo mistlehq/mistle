@@ -9,7 +9,7 @@ type WebhookDeliveryTelemetryAttributeValue = string | number | boolean;
 export type WebhookDeliveryTelemetryContext = {
   webhookEventId?: string | undefined;
   externalDeliveryId?: string | undefined;
-  automationRunId?: string | undefined;
+  triggerRunId?: string | undefined;
   conversationId?: string | undefined;
   deliveryTaskId?: string | undefined;
   targetKey?: string | undefined;
@@ -26,9 +26,7 @@ export function createWebhookDeliveryTelemetryAttributes(
     ...(input.externalDeliveryId === undefined
       ? {}
       : { "mistle.webhook.external_delivery_id": input.externalDeliveryId }),
-    ...(input.automationRunId === undefined
-      ? {}
-      : { "mistle.automation.run_id": input.automationRunId }),
+    ...(input.triggerRunId === undefined ? {} : { "mistle.trigger.run_id": input.triggerRunId }),
     ...(input.conversationId === undefined
       ? {}
       : { "mistle.conversation.id": input.conversationId }),

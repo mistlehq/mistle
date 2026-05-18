@@ -1,5 +1,5 @@
 import {
-  AutomationRunStatuses,
+  TriggerRunStatuses,
   IntegrationWebhookEventStatuses,
   type ControlPlaneDatabase,
   getControlPlaneDatabaseSchema,
@@ -8,7 +8,7 @@ import type { IntegrationRegistry } from "@mistle/integrations-core";
 import type { HandleIntegrationWebhookEventWorkflowInput } from "@mistle/workflow-registry/control-plane";
 
 import { resolveResourceSyncKindsForWebhookEvent } from "./resolve-resource-sync-kinds-for-webhook-event.js";
-import { resolveWebhookAutomationTargets } from "./resolve-webhook-automation-targets.js";
+import { resolveWebhookTriggerTargets } from "./resolve-webhook-trigger-targets.js";
 import { updateWebhookEventStatus } from "./update-webhook-event-status.js";
 
 export type IntegrationWebhookResourceSyncRequest = {
@@ -23,7 +23,7 @@ export type PrepareIntegrationWebhookEventOutput = {
   integrationConnectionId: string;
   targetKey: string;
   webhookEventStatus: (typeof IntegrationWebhookEventStatuses)[keyof typeof IntegrationWebhookEventStatuses];
-  automationRunIds: ReadonlyArray<string>;
+  triggerRunIds: ReadonlyArray<string>;
   resourceSyncRequests: ReadonlyArray<IntegrationWebhookResourceSyncRequest>;
   finalized: boolean;
 };
@@ -54,7 +54,7 @@ export async function prepareIntegrationWebhookEvent(
 
   if (isTerminalWebhookEventStatus(webhookEvent.status)) {
     return {
-      automationRunIds: [],
+      triggerRunIds: [],
       externalDeliveryId: webhookEvent.externalDeliveryId,
       finalized: true,
       integrationConnectionId: webhookEvent.integrationConnectionId,
@@ -92,7 +92,7 @@ export async function prepareIntegrationWebhookEvent(
         isTerminalWebhookEventStatus(currentWebhookEvent.status)
       ) {
         return {
-          automationRunIds: [],
+          triggerRunIds: [],
           externalDeliveryId: webhookEvent.externalDeliveryId,
           finalized: true,
           integrationConnectionId: webhookEvent.integrationConnectionId,
@@ -124,7 +124,7 @@ export async function prepareIntegrationWebhookEvent(
       kind,
     }));
 
-    const resolvedTargets = await resolveWebhookAutomationTargets(ctx.db, {
+    const resolvedTargets = await resolveWebhookTriggerTargets(ctx.db, {
       organizationId: webhookEvent.organizationId,
       integrationWebhookSourceId: webhookEvent.integrationWebhookSourceId,
       eventType: webhookEvent.eventType,
@@ -140,7 +140,7 @@ export async function prepareIntegrationWebhookEvent(
       });
 
       return {
-        automationRunIds: [],
+        triggerRunIds: [],
         externalDeliveryId: webhookEvent.externalDeliveryId,
         finalized: true,
         integrationConnectionId: webhookEvent.integrationConnectionId,
@@ -151,45 +151,42 @@ export async function prepareIntegrationWebhookEvent(
       };
     }
 
-    let queuedAutomationRunIds: ReadonlyArray<string> = [];
+    let queuedTriggerRunIds: ReadonlyArray<string> = [];
     if (resolvedTargets.length > 0) {
       await ctx.db
-        .insert(tables.automationRuns)
+        .insert(tables.triggerRuns)
         .values(
           resolvedTargets.map((resolvedTarget) => ({
-            automationId: resolvedTarget.automationId,
-            automationTargetId: resolvedTarget.automationTargetId,
+            triggerId: resolvedTarget.triggerId,
+            triggerTargetId: resolvedTarget.triggerTargetId,
             sourceWebhookEventId: input.webhookEventId,
-            status: AutomationRunStatuses.QUEUED,
+            status: TriggerRunStatuses.QUEUED,
           })),
         )
         .onConflictDoNothing({
-          target: [
-            tables.automationRuns.automationTargetId,
-            tables.automationRuns.sourceWebhookEventId,
-          ],
+          target: [tables.triggerRuns.triggerTargetId, tables.triggerRuns.sourceWebhookEventId],
         });
 
-      const queuedAutomationRuns = await ctx.db.query.automationRuns.findMany({
+      const queuedTriggerRuns = await ctx.db.query.triggerRuns.findMany({
         columns: {
           id: true,
         },
         where: (table, { and: whereAnd, eq: whereEq, inArray: whereInArray }) =>
           whereAnd(
             whereEq(table.sourceWebhookEventId, input.webhookEventId),
-            whereEq(table.status, AutomationRunStatuses.QUEUED),
+            whereEq(table.status, TriggerRunStatuses.QUEUED),
             whereInArray(
-              table.automationTargetId,
-              resolvedTargets.map((target) => target.automationTargetId),
+              table.triggerTargetId,
+              resolvedTargets.map((target) => target.triggerTargetId),
             ),
           ),
       });
 
-      queuedAutomationRunIds = queuedAutomationRuns.map((queuedRun) => queuedRun.id);
+      queuedTriggerRunIds = queuedTriggerRuns.map((queuedRun) => queuedRun.id);
     }
 
     return {
-      automationRunIds: queuedAutomationRunIds,
+      triggerRunIds: queuedTriggerRunIds,
       externalDeliveryId: webhookEvent.externalDeliveryId,
       finalized: false,
       integrationConnectionId: webhookEvent.integrationConnectionId,

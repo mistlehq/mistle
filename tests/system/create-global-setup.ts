@@ -18,7 +18,7 @@ import { updateGitHubAppWebhookConfig } from "./helpers/github-app-installation.
 import {
   SharedGitHubWebhookHarnessContextId,
   SharedGitHubWebhookHarnessContextSchema,
-} from "./helpers/github-webhook-automation.js";
+} from "./helpers/github-webhook-trigger.js";
 
 const PROJECT_ROOT_HOST_PATH = fileURLToPath(new URL("../..", import.meta.url));
 const APP_STARTUP_TIMEOUT_MS = 120_000;

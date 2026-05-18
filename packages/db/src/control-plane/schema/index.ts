@@ -12,19 +12,19 @@ export {
   type InsertApiKey,
 } from "./api-keys.js";
 export {
-  automations,
-  AutomationKinds,
-  type InsertAutomation,
-  type Automation,
-  type AutomationKind,
-} from "./automations.js";
+  triggers,
+  TriggerKinds,
+  type InsertTrigger,
+  type Trigger,
+  type TriggerKind,
+} from "./triggers.js";
 export {
-  automationRuns,
-  AutomationRunStatuses,
-  type InsertAutomationRun,
-  type AutomationRun,
-  type AutomationRunStatus,
-} from "./automation-runs.js";
+  triggerRuns,
+  TriggerRunStatuses,
+  type InsertTriggerRun,
+  type TriggerRun,
+  type TriggerRunStatus,
+} from "./trigger-runs.js";
 export {
   scheduledActions,
   ScheduledActionStatuses,
@@ -39,11 +39,7 @@ export {
   type Schedule,
   type ScheduleTargetType,
 } from "./schedules.js";
-export {
-  automationTargets,
-  type InsertAutomationTarget,
-  type AutomationTarget,
-} from "./automation-targets.js";
+export { triggerTargets, type InsertTriggerTarget, type TriggerTarget } from "./trigger-targets.js";
 export {
   identityLinkRedirectSessions,
   type InsertIdentityLinkRedirectSession,
@@ -85,37 +81,37 @@ export {
   type IntegrationConnectionStatus,
 } from "./integration-connections.js";
 export {
-  automationConversationDeliveryProcessors,
-  AutomationConversationDeliveryProcessorStatuses,
-  type AutomationConversationDeliveryProcessor,
-  type AutomationConversationDeliveryProcessorStatus,
-  type InsertAutomationConversationDeliveryProcessor,
-} from "./automation-conversation-delivery-processors.js";
+  triggerConversationDeliveryProcessors,
+  TriggerConversationDeliveryProcessorStatuses,
+  type TriggerConversationDeliveryProcessor,
+  type TriggerConversationDeliveryProcessorStatus,
+  type InsertTriggerConversationDeliveryProcessor,
+} from "./trigger-conversation-delivery-processors.js";
 export {
-  automationConversationDeliveryTasks,
-  AutomationConversationDeliveryTaskStatuses,
-  type AutomationConversationDeliveryTask,
-  type AutomationConversationDeliveryTaskStatus,
-  type InsertAutomationConversationDeliveryTask,
-} from "./automation-conversation-delivery-tasks.js";
+  triggerConversationDeliveryTasks,
+  TriggerConversationDeliveryTaskStatuses,
+  type TriggerConversationDeliveryTask,
+  type TriggerConversationDeliveryTaskStatus,
+  type InsertTriggerConversationDeliveryTask,
+} from "./trigger-conversation-delivery-tasks.js";
 export {
-  automationConversations,
-  AutomationConversationCreatedByKinds,
-  AutomationConversationOwnerKinds,
-  AutomationConversationStatuses,
-  type AutomationConversation,
-  type AutomationConversationCreatedByKind,
-  type AutomationConversationOwnerKind,
-  type AutomationConversationStatus,
-  type InsertAutomationConversation,
-} from "./automation-conversations.js";
+  triggerConversations,
+  TriggerConversationCreatedByKinds,
+  TriggerConversationOwnerKinds,
+  TriggerConversationStatuses,
+  type TriggerConversation,
+  type TriggerConversationCreatedByKind,
+  type TriggerConversationOwnerKind,
+  type TriggerConversationStatus,
+  type InsertTriggerConversation,
+} from "./trigger-conversations.js";
 export {
-  automationConversationRoutes,
-  AutomationConversationRouteStatuses,
-  type AutomationConversationRoute,
-  type AutomationConversationRouteStatus,
-  type InsertAutomationConversationRoute,
-} from "./automation-conversation-routes.js";
+  triggerConversationRoutes,
+  TriggerConversationRouteStatuses,
+  type TriggerConversationRoute,
+  type TriggerConversationRouteStatus,
+  type InsertTriggerConversationRoute,
+} from "./trigger-conversation-routes.js";
 export {
   integrationCredentials,
   IntegrationCredentialSecretKinds,
@@ -151,10 +147,10 @@ export {
   type IntegrationDeviceAuthorizationAttemptStatus,
 } from "./integration-connection-device-authorization-attempts.js";
 export {
-  scheduleAutomations,
-  type InsertScheduleAutomation,
-  type ScheduleAutomation,
-} from "./schedule-automations.js";
+  scheduleTriggers,
+  type InsertScheduleTrigger,
+  type ScheduleTrigger,
+} from "./schedule-triggers.js";
 export {
   integrationWebhookEvents,
   IntegrationWebhookEventStatuses,
@@ -170,10 +166,10 @@ export {
   type IntegrationWebhookSourceStatus,
 } from "./integration-webhook-sources.js";
 export {
-  webhookAutomations,
-  type InsertWebhookAutomation,
-  type WebhookAutomation,
-} from "./webhook-automations.js";
+  webhookTriggers,
+  type InsertWebhookTrigger,
+  type WebhookTrigger,
+} from "./webhook-triggers.js";
 export { invitations } from "./invitations.js";
 export { members, MemberRoles } from "./members.js";
 export type { MemberRole } from "./members.js";

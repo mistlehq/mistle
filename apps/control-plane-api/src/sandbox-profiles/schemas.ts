@@ -1,6 +1,6 @@
 import { z } from "@hono/zod-openapi";
 import {
-  AutomationKinds,
+  TriggerKinds,
   IntegrationBindingKinds,
   SandboxProfileStatuses,
   SandboxProfileVersionAgentRuntimeIds,
@@ -19,7 +19,7 @@ import {
 import { createSelectSchema } from "drizzle-zod";
 
 import {
-  SandboxProfileAutomationImpactIssueCodes,
+  SandboxProfileTriggerImpactIssueCodes,
   SandboxProfilePublishabilityIssueCodes,
 } from "./errors.js";
 
@@ -86,7 +86,7 @@ const sandboxProfileVersionRefreshScheduleSummarySchema = z
     nextScheduledAt: z.string().min(1).nullable(),
   })
   .strict();
-const automationKindSchema = z.enum([AutomationKinds.WEBHOOK, AutomationKinds.SCHEDULE]);
+const triggerKindSchema = z.enum([TriggerKinds.WEBHOOK, TriggerKinds.SCHEDULE]);
 
 export const sandboxProfileSchema = createSelectSchema(sandboxProfiles, {
   activeVersion: z.number().int().min(1).nullable(),
@@ -210,30 +210,30 @@ export const getSandboxProfileVersionPublishabilityResponseSchema = z
   })
   .strict();
 
-export const getSandboxProfileVersionDraftAutomationImpactResponseSchema = z
+export const getSandboxProfileVersionDraftTriggerImpactResponseSchema = z
   .object({
     hasBreakingChanges: z.boolean(),
-    affectedAutomations: z.array(
+    affectedTriggers: z.array(
       z
         .object({
           id: z.string().min(1),
           name: z.string().min(1),
-          kind: automationKindSchema,
+          kind: triggerKindSchema,
           enabled: z.boolean(),
           issues: z.array(
             z
               .object({
                 code: z.enum([
-                  SandboxProfileAutomationImpactIssueCodes.AGENT_BINDING_REQUIRED,
-                  SandboxProfileAutomationImpactIssueCodes.AGENT_BINDING_PRIMARY_REQUIRED,
-                  SandboxProfileAutomationImpactIssueCodes.AGENT_BINDING_AMBIGUOUS,
-                  SandboxProfileAutomationImpactIssueCodes.AGENT_BINDING_RUNTIME_INCOMPATIBLE,
-                  SandboxProfileAutomationImpactIssueCodes.INVALID_BINDING_CONNECTION_REFERENCE,
-                  SandboxProfileAutomationImpactIssueCodes.CONNECTION_NOT_ACTIVE,
-                  SandboxProfileAutomationImpactIssueCodes.TARGET_DISABLED,
-                  SandboxProfileAutomationImpactIssueCodes.TARGET_MISSING,
-                  SandboxProfileAutomationImpactIssueCodes.WEBHOOK_SOURCE_CONNECTION_NOT_BOUND,
-                  SandboxProfileAutomationImpactIssueCodes.PRIMARY_REPOSITORY_UNAVAILABLE,
+                  SandboxProfileTriggerImpactIssueCodes.AGENT_BINDING_REQUIRED,
+                  SandboxProfileTriggerImpactIssueCodes.AGENT_BINDING_PRIMARY_REQUIRED,
+                  SandboxProfileTriggerImpactIssueCodes.AGENT_BINDING_AMBIGUOUS,
+                  SandboxProfileTriggerImpactIssueCodes.AGENT_BINDING_RUNTIME_INCOMPATIBLE,
+                  SandboxProfileTriggerImpactIssueCodes.INVALID_BINDING_CONNECTION_REFERENCE,
+                  SandboxProfileTriggerImpactIssueCodes.CONNECTION_NOT_ACTIVE,
+                  SandboxProfileTriggerImpactIssueCodes.TARGET_DISABLED,
+                  SandboxProfileTriggerImpactIssueCodes.TARGET_MISSING,
+                  SandboxProfileTriggerImpactIssueCodes.WEBHOOK_SOURCE_CONNECTION_NOT_BOUND,
+                  SandboxProfileTriggerImpactIssueCodes.PRIMARY_REPOSITORY_UNAVAILABLE,
                 ]),
                 message: z.string().min(1),
                 bindingId: z.string().min(1).optional(),
@@ -309,7 +309,7 @@ export const sandboxProfileVersionIntegrationBindingsResponseSchema = z
 export const getSandboxProfileVersionIntegrationBindingsResponseSchema =
   sandboxProfileVersionIntegrationBindingsResponseSchema;
 
-export const getSandboxProfileVersionAutomationConfigResponseSchema = z
+export const getSandboxProfileVersionTriggerConfigResponseSchema = z
   .object({
     bindings: z.array(sandboxProfileVersionIntegrationBindingSchema),
     repositoryOptions: z.array(sandboxProfileRepositoryOptionSchema),

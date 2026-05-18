@@ -38,7 +38,7 @@ describe("resolveCodexTurnStartParams", () => {
         model: "gpt-5.3-codex",
         modelReasoningEffort: "high",
         collaborationModeSettings: {
-          developerInstructions: "Always include the automation marker.",
+          developerInstructions: "Always include the trigger marker.",
         },
       }),
     ).toEqual({
@@ -56,7 +56,7 @@ describe("resolveCodexTurnStartParams", () => {
         settings: {
           model: "gpt-5.3-codex",
           reasoning_effort: "high",
-          developer_instructions: "Always include the automation marker.",
+          developer_instructions: "Always include the trigger marker.",
         },
       },
     });

@@ -168,7 +168,7 @@ export async function listIntegrationConnections(
       connectionIds: result.items.map((connection) => connection.id),
       organizationId: input.organizationId,
     });
-    const automationCountsByConnectionId = await listAutomationCountsByConnectionId({
+    const triggerCountsByConnectionId = await listTriggerCountsByConnectionId({
       db,
       connectionIds: result.items.map((connection) => connection.id),
     });
@@ -225,7 +225,7 @@ export async function listIntegrationConnections(
               integrationRegistry,
             }),
             bindingCount: bindingCountsByConnectionId.get(connection.id) ?? 0,
-            automationCount: automationCountsByConnectionId.get(connection.id) ?? 0,
+            triggerCount: triggerCountsByConnectionId.get(connection.id) ?? 0,
             ...(identityLinkedConnectionIds.has(connection.id) ? { isIdentityLinked: true } : {}),
             ...(supportsWebhookSources === undefined ? {} : { supportsWebhookSources }),
             ...(webhookTriggerCapabilitiesRefreshAction === undefined
@@ -284,7 +284,7 @@ async function listIdentityLinkedConnectionIds(input: {
   return new Set(rows.map((row) => row.connectionId));
 }
 
-async function listAutomationCountsByConnectionId(input: {
+async function listTriggerCountsByConnectionId(input: {
   db: ControlPlaneDatabase;
   connectionIds: readonly string[];
 }): Promise<Map<string, number>> {
@@ -294,15 +294,15 @@ async function listAutomationCountsByConnectionId(input: {
     return new Map();
   }
 
-  const automationCounts = await input.db
+  const triggerCounts = await input.db
     .select({
       resolvedConnectionId: tables.integrationConnections.id,
-      automationCount: sql<number>`count(*)::int`,
+      triggerCount: sql<number>`count(*)::int`,
     })
-    .from(tables.webhookAutomations)
+    .from(tables.webhookTriggers)
     .innerJoin(
       tables.integrationWebhookSources,
-      eq(tables.integrationWebhookSources.id, tables.webhookAutomations.integrationWebhookSourceId),
+      eq(tables.integrationWebhookSources.id, tables.webhookTriggers.integrationWebhookSourceId),
     )
     .innerJoin(
       tables.integrationConnections,
@@ -315,7 +315,7 @@ async function listAutomationCountsByConnectionId(input: {
     .groupBy(tables.integrationConnections.id);
 
   return new Map<string, number>(
-    automationCounts.map((entry) => [entry.resolvedConnectionId, entry.automationCount]),
+    triggerCounts.map((entry) => [entry.resolvedConnectionId, entry.triggerCount]),
   );
 }
 

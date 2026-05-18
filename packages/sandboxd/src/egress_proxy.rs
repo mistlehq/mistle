@@ -2888,8 +2888,7 @@ fn build_direct_forward_uri(
 fn websocket_target_url(target_url: &Uri) -> Result<String, EgressProxyError> {
     let mut parsed_target = Url::parse(&target_url.to_string()).map_err(|error| {
         EgressProxyError::new(format!(
-            "failed to parse websocket egress target '{}': {error}",
-            target_url
+            "failed to parse websocket egress target '{target_url}': {error}"
         ))
     })?;
     match parsed_target.scheme() {

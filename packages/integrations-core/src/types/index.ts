@@ -1943,7 +1943,7 @@ export type IntegrationWebhookEventParameterOptionDefinition = {
 };
 
 /**
- * Metadata shown to users when configuring webhook automations.
+ * Metadata shown to users when configuring webhook triggers.
  *
  * `path` is the JSON path within the provider payload that the UI should
  * surface as useful context for previewing or filtering the event.
@@ -2015,12 +2015,12 @@ export type IntegrationWebhookTriggerCapabilities = {
 
 /**
  * A normalized webhook event that an integration exposes to the rest of
- * Mistle. These definitions drive automation event pickers, payload previews,
+ * Mistle. These definitions drive trigger event pickers, payload previews,
  * conversation-key selection, and provider-specific trigger parameter UIs.
  */
 export type IntegrationWebhookEventDefinition = {
   /**
-   * Canonical Mistle event type stored on webhook automations and emitted by
+   * Canonical Mistle event type stored on webhook triggers and emitted by
    * webhook handlers, for example `github.issue_comment.created`.
    */
   eventType: string;
@@ -2029,7 +2029,7 @@ export type IntegrationWebhookEventDefinition = {
    * example GitHub's `issue_comment` or Jira's `jira:issue_updated`.
    */
   providerEventType: string;
-  /** Human-readable label shown in automation UIs. */
+  /** Human-readable label shown in trigger UIs. */
   displayName: string;
   /** Optional top-level UI category for grouping related events. */
   category?: string | undefined;
@@ -2348,7 +2348,7 @@ export type IntegrationDefinition<
   >;
   /**
    * Provider-advertised webhook events that can be selected by webhook
-   * automations and emitted by `webhookHandler`.
+   * triggers and emitted by `webhookHandler`.
    */
   supportedWebhookEvents?: ReadonlyArray<IntegrationWebhookEventDefinition>;
   webhookHandler?: IntegrationWebhookHandler<

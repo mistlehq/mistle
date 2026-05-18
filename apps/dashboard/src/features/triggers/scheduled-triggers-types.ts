@@ -3,9 +3,9 @@ import { z } from "zod";
 import type { paths } from "../../lib/control-plane-api/generated/schema.js";
 
 type CreateScheduledTriggerRequest =
-  paths["/v1/automations/schedules"]["post"]["requestBody"]["content"]["application/json"];
+  paths["/v1/triggers/schedules"]["post"]["requestBody"]["content"]["application/json"];
 type UpdateScheduledTriggerRequest =
-  paths["/v1/automations/schedules/{automationId}"]["patch"]["requestBody"]["content"]["application/json"];
+  paths["/v1/triggers/schedules/{triggerId}"]["patch"]["requestBody"]["content"]["application/json"];
 
 const ScheduledTriggerTargetSchema = z
   .object({
@@ -46,11 +46,11 @@ export const ScheduledTriggerSchema = z
 
 export const DeleteScheduledTriggerResultSchema = z
   .object({
-    automationId: z.string().min(1),
+    triggerId: z.string().min(1),
   })
   .strict()
-  .transform(({ automationId }) => ({
-    triggerId: automationId,
+  .transform(({ triggerId }) => ({
+    triggerId: triggerId,
   }));
 
 export type ScheduledTrigger = z.infer<typeof ScheduledTriggerSchema>;

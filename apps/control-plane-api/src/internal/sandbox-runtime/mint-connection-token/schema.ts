@@ -8,7 +8,7 @@ export const InternalSandboxRuntimeMintConnectionRequestSchema = z
     webhookEventId: z.string().min(1).optional(),
     deliveryTaskId: z.string().min(1).optional(),
     externalDeliveryId: z.string().min(1).optional(),
-    automationRunId: z.string().min(1).optional(),
+    triggerRunId: z.string().min(1).optional(),
     conversationId: z.string().min(1).optional(),
   })
   .strict();

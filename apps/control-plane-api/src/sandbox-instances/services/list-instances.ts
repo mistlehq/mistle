@@ -11,7 +11,7 @@ import { escapeLikePattern } from "../../organizations/services/directory-shared
 import { SandboxInstancesBadRequestCodes, SandboxInstancesBadRequestError } from "../errors.js";
 import type { ListSandboxInstancesResult } from "./types.js";
 
-const MAX_AUTOMATION_RUN_FILTER_IDS = 5_000;
+const MAX_TRIGGER_RUN_FILTER_IDS = 5_000;
 
 function createEmptyListResult(): ListSandboxInstancesResult {
   return {
@@ -47,7 +47,7 @@ async function resolveStartedByNames(
         .map((starter) => starter.id),
     ),
   ];
-  const startedByAutomationRunIds = [
+  const startedByTriggerRunIds = [
     ...new Set(
       input.items
         .map((item) => item.startedBy)
@@ -79,35 +79,31 @@ async function resolveStartedByNames(
     }
   }
 
-  if (startedByAutomationRunIds.length > 0) {
-    const automationRuns = await db.query.automationRuns.findMany({
+  if (startedByTriggerRunIds.length > 0) {
+    const triggerRuns = await db.query.triggerRuns.findMany({
       columns: {
         id: true,
-        automationId: true,
+        triggerId: true,
       },
-      where: (table, { inArray }) => inArray(table.id, startedByAutomationRunIds),
+      where: (table, { inArray }) => inArray(table.id, startedByTriggerRunIds),
     });
-    const automationIds = [
-      ...new Set(automationRuns.map((automationRun) => automationRun.automationId)),
-    ];
+    const triggerIds = [...new Set(triggerRuns.map((triggerRun) => triggerRun.triggerId))];
 
-    if (automationIds.length > 0) {
-      const automations = await db.query.automations.findMany({
+    if (triggerIds.length > 0) {
+      const triggers = await db.query.triggers.findMany({
         columns: {
           id: true,
           name: true,
         },
         where: (table, { and, eq, inArray }) =>
-          and(eq(table.organizationId, input.organizationId), inArray(table.id, automationIds)),
+          and(eq(table.organizationId, input.organizationId), inArray(table.id, triggerIds)),
       });
-      const automationNamesById = new Map(
-        automations.map((automation) => [automation.id, automation.name]),
-      );
+      const triggerNamesById = new Map(triggers.map((trigger) => [trigger.id, trigger.name]));
 
-      for (const automationRun of automationRuns) {
-        const automationName = automationNamesById.get(automationRun.automationId);
-        if (automationName !== undefined) {
-          startedByNames.set(automationRun.id, automationName);
+      for (const triggerRun of triggerRuns) {
+        const triggerName = triggerNamesById.get(triggerRun.triggerId);
+        if (triggerName !== undefined) {
+          startedByNames.set(triggerRun.id, triggerName);
         }
       }
     }
@@ -201,7 +197,7 @@ async function resolveMatchingUserIds(
   return rows.map((row) => row.id);
 }
 
-async function resolveMatchingAutomationRunIds(
+async function resolveMatchingTriggerRunIds(
   db: ControlPlaneDatabase,
   input:
     | {
@@ -216,49 +212,49 @@ async function resolveMatchingAutomationRunIds(
       },
 ): Promise<string[]> {
   const tables = getControlPlaneDatabaseSchema(db);
-  const automationRows =
+  const triggerRows =
     input.kind === "search"
       ? await db
-          .select({ id: tables.automations.id })
-          .from(tables.automations)
+          .select({ id: tables.triggers.id })
+          .from(tables.triggers)
           .where(
             and(
-              eq(tables.automations.organizationId, input.organizationId),
-              ilike(tables.automations.name, `%${escapeLikePattern(input.search)}%`),
+              eq(tables.triggers.organizationId, input.organizationId),
+              ilike(tables.triggers.name, `%${escapeLikePattern(input.search)}%`),
             ),
           )
       : await db
-          .select({ id: tables.automations.id })
-          .from(tables.automations)
+          .select({ id: tables.triggers.id })
+          .from(tables.triggers)
           .where(
             and(
-              eq(tables.automations.organizationId, input.organizationId),
-              eq(tables.automations.id, input.triggerId),
+              eq(tables.triggers.organizationId, input.organizationId),
+              eq(tables.triggers.id, input.triggerId),
             ),
           );
 
-  const automationIds = automationRows.map((row) => row.id);
-  if (automationIds.length === 0) {
+  const triggerIds = triggerRows.map((row) => row.id);
+  if (triggerIds.length === 0) {
     return [];
   }
 
-  const automationRuns = await db.query.automationRuns.findMany({
+  const triggerRuns = await db.query.triggerRuns.findMany({
     columns: {
       id: true,
     },
-    where: (table, { inArray }) => inArray(table.automationId, automationIds),
+    where: (table, { inArray }) => inArray(table.triggerId, triggerIds),
   });
 
-  return automationRuns.map((automationRun) => automationRun.id);
+  return triggerRuns.map((triggerRun) => triggerRun.id);
 }
 
-function assertAutomationRunFilterWithinBound(input: {
+function assertTriggerRunFilterWithinBound(input: {
   kind: "search" | "trigger";
-  automationRunIds: string[] | undefined;
+  triggerRunIds: string[] | undefined;
 }): void {
   if (
-    input.automationRunIds === undefined ||
-    input.automationRunIds.length <= MAX_AUTOMATION_RUN_FILTER_IDS
+    input.triggerRunIds === undefined ||
+    input.triggerRunIds.length <= MAX_TRIGGER_RUN_FILTER_IDS
   ) {
     return;
   }
@@ -266,7 +262,7 @@ function assertAutomationRunFilterWithinBound(input: {
   const filterLabel = input.kind === "trigger" ? "trigger" : "search";
   throw new SandboxInstancesBadRequestError(
     SandboxInstancesBadRequestCodes.INVALID_LIST_INSTANCES_INPUT,
-    `The ${filterLabel} filter matches too many automation runs. Narrow the filter before listing sessions.`,
+    `The ${filterLabel} filter matches too many trigger runs. Narrow the filter before listing sessions.`,
   );
 }
 
@@ -300,33 +296,33 @@ export async function listInstances(
         : await resolveMatchingUserIds(db, {
             search: input.search,
           });
-    const matchingSearchAutomationRunIds =
+    const matchingSearchTriggerRunIds =
       input.search === undefined
         ? undefined
-        : await resolveMatchingAutomationRunIds(db, {
+        : await resolveMatchingTriggerRunIds(db, {
             kind: "search",
             organizationId: input.organizationId,
             search: input.search,
           });
-    const triggerAutomationRunIds =
+    const triggerTriggerRunIds =
       input.triggerId === undefined
         ? undefined
-        : await resolveMatchingAutomationRunIds(db, {
+        : await resolveMatchingTriggerRunIds(db, {
             kind: "trigger",
             organizationId: input.organizationId,
             triggerId: input.triggerId,
           });
 
-    assertAutomationRunFilterWithinBound({
+    assertTriggerRunFilterWithinBound({
       kind: "search",
-      automationRunIds: matchingSearchAutomationRunIds,
+      triggerRunIds: matchingSearchTriggerRunIds,
     });
-    assertAutomationRunFilterWithinBound({
+    assertTriggerRunFilterWithinBound({
       kind: "trigger",
-      automationRunIds: triggerAutomationRunIds,
+      triggerRunIds: triggerTriggerRunIds,
     });
 
-    if (triggerAutomationRunIds !== undefined && triggerAutomationRunIds.length === 0) {
+    if (triggerTriggerRunIds !== undefined && triggerTriggerRunIds.length === 0) {
       return createEmptyListResult();
     }
 
@@ -353,13 +349,10 @@ export async function listInstances(
       ...(matchingUserIds === undefined || matchingUserIds.length === 0
         ? {}
         : { matchingStartedByUserIds: matchingUserIds }),
-      ...(matchingSearchAutomationRunIds === undefined ||
-      matchingSearchAutomationRunIds.length === 0
+      ...(matchingSearchTriggerRunIds === undefined || matchingSearchTriggerRunIds.length === 0
         ? {}
-        : { matchingStartedBySystemIds: matchingSearchAutomationRunIds }),
-      ...(triggerAutomationRunIds === undefined
-        ? {}
-        : { startedBySystemIds: triggerAutomationRunIds }),
+        : { matchingStartedBySystemIds: matchingSearchTriggerRunIds }),
+      ...(triggerTriggerRunIds === undefined ? {} : { startedBySystemIds: triggerTriggerRunIds }),
       ...(input.after === undefined ? {} : { after: input.after }),
       ...(input.before === undefined ? {} : { before: input.before }),
     });

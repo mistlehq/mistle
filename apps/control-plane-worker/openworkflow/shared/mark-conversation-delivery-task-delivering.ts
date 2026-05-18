@@ -1,5 +1,5 @@
 import {
-  AutomationConversationDeliveryTaskStatuses,
+  TriggerConversationDeliveryTaskStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
   getControlPlaneDatabaseSchema,
@@ -7,36 +7,36 @@ import {
 import { and, eq, sql } from "drizzle-orm";
 
 import {
-  AutomationConversationPersistenceError,
-  AutomationConversationPersistenceErrorCodes,
-} from "./automation-conversation-persistence-error.js";
-export type MarkAutomationConversationDeliveryTaskDeliveringInput = {
+  TriggerConversationPersistenceError,
+  TriggerConversationPersistenceErrorCodes,
+} from "./trigger-conversation-persistence-error.js";
+export type MarkTriggerConversationDeliveryTaskDeliveringInput = {
   taskId: string;
   generation: number;
 };
 
-export async function markAutomationConversationDeliveryTaskDelivering(
+export async function markTriggerConversationDeliveryTaskDelivering(
   deps: {
     db: ControlPlaneDatabase | ControlPlaneTransaction;
   },
-  input: MarkAutomationConversationDeliveryTaskDeliveringInput,
+  input: MarkTriggerConversationDeliveryTaskDeliveringInput,
 ) {
   const tables = getControlPlaneDatabaseSchema(deps.db);
 
   const updatedRows = await deps.db
-    .update(tables.automationConversationDeliveryTasks)
+    .update(tables.triggerConversationDeliveryTasks)
     .set({
-      status: AutomationConversationDeliveryTaskStatuses.DELIVERING,
+      status: TriggerConversationDeliveryTaskStatuses.DELIVERING,
       deliveryStartedAt: sql`now()`,
       updatedAt: sql`now()`,
     })
     .where(
       and(
-        eq(tables.automationConversationDeliveryTasks.id, input.taskId),
-        eq(tables.automationConversationDeliveryTasks.processorGeneration, input.generation),
+        eq(tables.triggerConversationDeliveryTasks.id, input.taskId),
+        eq(tables.triggerConversationDeliveryTasks.processorGeneration, input.generation),
         eq(
-          tables.automationConversationDeliveryTasks.status,
-          AutomationConversationDeliveryTaskStatuses.CLAIMED,
+          tables.triggerConversationDeliveryTasks.status,
+          TriggerConversationDeliveryTaskStatuses.CLAIMED,
         ),
       ),
     )
@@ -46,18 +46,18 @@ export async function markAutomationConversationDeliveryTaskDelivering(
     return updatedTask;
   }
 
-  const existingTask = await deps.db.query.automationConversationDeliveryTasks.findFirst({
+  const existingTask = await deps.db.query.triggerConversationDeliveryTasks.findFirst({
     where: (table, { eq }) => eq(table.id, input.taskId),
   });
   if (existingTask === undefined) {
-    throw new AutomationConversationPersistenceError({
-      code: AutomationConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_NOT_FOUND,
-      message: `AutomationConversation delivery task '${input.taskId}' was not found.`,
+    throw new TriggerConversationPersistenceError({
+      code: TriggerConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_NOT_FOUND,
+      message: `TriggerConversation delivery task '${input.taskId}' was not found.`,
     });
   }
 
-  throw new AutomationConversationPersistenceError({
-    code: AutomationConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_NOT_CLAIMED,
-    message: `AutomationConversation delivery task '${input.taskId}' is not claimed by generation '${input.generation}'.`,
+  throw new TriggerConversationPersistenceError({
+    code: TriggerConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_NOT_CLAIMED,
+    message: `TriggerConversation delivery task '${input.taskId}' is not claimed by generation '${input.generation}'.`,
   });
 }

@@ -33,7 +33,7 @@ export const JiraBaseDefinition: JiraBaseIntegrationDefinition = {
   variantId: "jira-default",
   kind: IntegrationKinds.CONNECTOR,
   displayName: "Jira",
-  description: "Enable Jira issue access, automation, and optional Jira CLI in sandbox.",
+  description: "Enable Jira issue access, trigger, and optional Jira CLI in sandbox.",
   logoKey: "jira",
   targetConfigSchema: JiraTargetConfigSchema,
   targetSecretSchema: JiraTargetSecretSchema,

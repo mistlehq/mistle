@@ -161,7 +161,7 @@ fn start_delivery_proxy_span(
         "mistle.webhook_event_id" = %delivery_webhook_event_id(delivery_context),
         "mistle.scheduled_action_id" = %delivery_scheduled_action_id(delivery_context),
         "mistle.delivery_task_id" = %delivery_context.delivery_task_id,
-        "mistle.automation_run_id" = %delivery_context.automation_run_id,
+        "mistle.trigger_run_id" = %delivery_context.trigger_run_id,
         "mistle.conversation_id" = %delivery_context.conversation_id,
         "mistle.sandbox_instance_id" = %delivery_context.sandbox_instance_id,
         "mistle.route_id" = field::display(delivery_context.route_id.as_deref().unwrap_or("")),
@@ -181,7 +181,7 @@ fn log_delivery_context_received(delivery_context: &DeliveryContext) {
         "mistle.webhook_event_id" = %delivery_webhook_event_id(delivery_context),
         "mistle.scheduled_action_id" = %delivery_scheduled_action_id(delivery_context),
         "mistle.delivery_task_id" = %delivery_context.delivery_task_id,
-        "mistle.automation_run_id" = %delivery_context.automation_run_id,
+        "mistle.trigger_run_id" = %delivery_context.trigger_run_id,
         "mistle.conversation_id" = %delivery_context.conversation_id,
         "mistle.sandbox_instance_id" = %delivery_context.sandbox_instance_id,
         "mistle.route_id" = field::display(delivery_context.route_id.as_deref().unwrap_or("")),
@@ -207,7 +207,7 @@ fn log_delivery_context_mapping(
         "mistle.webhook_event_id" = %delivery_webhook_event_id(delivery_context),
         "mistle.scheduled_action_id" = %delivery_scheduled_action_id(delivery_context),
         "mistle.delivery_task_id" = %delivery_context.delivery_task_id,
-        "mistle.automation_run_id" = %delivery_context.automation_run_id,
+        "mistle.trigger_run_id" = %delivery_context.trigger_run_id,
         "mistle.conversation_id" = %delivery_context.conversation_id,
         "mistle.sandbox_instance_id" = %delivery_context.sandbox_instance_id,
         "mistle.route_id" = field::display(delivery_context.route_id.as_deref().unwrap_or("")),
@@ -256,7 +256,7 @@ fn read_interrupt_target_turn_id_from_request(value: &Value) -> Option<String> {
 
 fn interruption_source_for_client_kind(client_kind: ProxyClientKind) -> &'static str {
     match client_kind {
-        ProxyClientKind::MistleAgentClient => "automation_interrupt",
+        ProxyClientKind::MistleAgentClient => "trigger_interrupt",
         ProxyClientKind::Other => "manual_user_interrupt",
         ProxyClientKind::Unknown => "unknown_interrupt",
     }
@@ -265,7 +265,7 @@ fn interruption_source_for_client_kind(client_kind: ProxyClientKind) -> &'static
 fn interruption_expected_for_source(source: &str) -> bool {
     matches!(
         source,
-        "manual_user_interrupt" | "automation_interrupt" | "control_plane_interrupt"
+        "manual_user_interrupt" | "trigger_interrupt" | "control_plane_interrupt"
     )
 }
 
@@ -434,7 +434,7 @@ fn log_turn_lifecycle_event(
         deliveryTaskId = %active_turn.delivery_context.delivery_task_id,
         externalDeliveryId =
             field::display(active_turn.delivery_context.external_delivery_id.as_deref().unwrap_or("")),
-        automationRunId = %active_turn.delivery_context.automation_run_id,
+        triggerRunId = %active_turn.delivery_context.trigger_run_id,
         conversationId = %active_turn.delivery_context.conversation_id,
         sandboxInstanceId = %active_turn.delivery_context.sandbox_instance_id,
         routeId = field::display(active_turn.delivery_context.route_id.as_deref().unwrap_or("")),
@@ -490,7 +490,7 @@ fn log_turn_request_failure(
         deliveryTaskId = %delivery_context.delivery_task_id,
         externalDeliveryId =
             field::display(delivery_context.external_delivery_id.as_deref().unwrap_or("")),
-        automationRunId = %delivery_context.automation_run_id,
+        triggerRunId = %delivery_context.trigger_run_id,
         conversationId = %delivery_context.conversation_id,
         sandboxInstanceId = %delivery_context.sandbox_instance_id,
         routeId = field::display(delivery_context.route_id.as_deref().unwrap_or("")),
@@ -533,7 +533,7 @@ fn log_turn_interrupt_requested(
         deliveryTaskId = %delivery_context.delivery_task_id,
         externalDeliveryId =
             field::display(delivery_context.external_delivery_id.as_deref().unwrap_or("")),
-        automationRunId = %delivery_context.automation_run_id,
+        triggerRunId = %delivery_context.trigger_run_id,
         conversationId = %delivery_context.conversation_id,
         sandboxInstanceId = %delivery_context.sandbox_instance_id,
         routeId = field::display(delivery_context.route_id.as_deref().unwrap_or("")),
@@ -578,7 +578,7 @@ fn log_turn_interrupt_request_failed(
         deliveryTaskId = %delivery_context.delivery_task_id,
         externalDeliveryId =
             field::display(delivery_context.external_delivery_id.as_deref().unwrap_or("")),
-        automationRunId = %delivery_context.automation_run_id,
+        triggerRunId = %delivery_context.trigger_run_id,
         conversationId = %delivery_context.conversation_id,
         sandboxInstanceId = %delivery_context.sandbox_instance_id,
         routeId = field::display(delivery_context.route_id.as_deref().unwrap_or("")),
@@ -629,11 +629,11 @@ fn log_thread_compaction_event(
         externalDeliveryId = field::display(
             active_compaction.delivery_context.as_ref().and_then(|context| context.external_delivery_id.as_deref()).unwrap_or("")
         ),
-        automationRunId = field::display(
+        triggerRunId = field::display(
             active_compaction
                 .delivery_context
                 .as_ref()
-                .map_or("", |context| context.automation_run_id.as_str())
+                .map_or("", |context| context.trigger_run_id.as_str())
         ),
         conversationId = field::display(
             active_compaction
@@ -693,8 +693,8 @@ fn log_thread_compaction_requested(
         externalDeliveryId = field::display(
             delivery_context.and_then(|context| context.external_delivery_id.as_deref()).unwrap_or("")
         ),
-        automationRunId =
-            field::display(delivery_context.map_or("", |context| context.automation_run_id.as_str())),
+        triggerRunId =
+            field::display(delivery_context.map_or("", |context| context.trigger_run_id.as_str())),
         conversationId =
             field::display(delivery_context.map_or("", |context| context.conversation_id.as_str())),
         sandboxInstanceId =
@@ -741,8 +741,8 @@ fn log_thread_compaction_request_failed(
         externalDeliveryId = field::display(
             delivery_context.and_then(|context| context.external_delivery_id.as_deref()).unwrap_or("")
         ),
-        automationRunId =
-            field::display(delivery_context.map_or("", |context| context.automation_run_id.as_str())),
+        triggerRunId =
+            field::display(delivery_context.map_or("", |context| context.trigger_run_id.as_str())),
         conversationId =
             field::display(delivery_context.map_or("", |context| context.conversation_id.as_str())),
         sandboxInstanceId =
@@ -794,8 +794,8 @@ fn log_pending_thread_compaction_unknown_terminal_outcome(
         externalDeliveryId = field::display(
             delivery_context.and_then(|context| context.external_delivery_id.as_deref()).unwrap_or("")
         ),
-        automationRunId =
-            field::display(delivery_context.map_or("", |context| context.automation_run_id.as_str())),
+        triggerRunId =
+            field::display(delivery_context.map_or("", |context| context.trigger_run_id.as_str())),
         conversationId =
             field::display(delivery_context.map_or("", |context| context.conversation_id.as_str())),
         sandboxInstanceId =
@@ -1984,13 +1984,13 @@ mod tests {
         DeliveryContext {
             traceparent: "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01".to_string(),
             tracestate: Some("vendor=value".to_string()),
-            baggage: Some("automation=webhook".to_string()),
+            baggage: Some("trigger=webhook".to_string()),
             source: DeliveryContextSource::Webhook,
             webhook_event_id: Some("iwe_123".to_string()),
             scheduled_action_id: None,
             delivery_task_id: "cdt_123".to_string(),
             external_delivery_id: Some("slack_delivery_123".to_string()),
-            automation_run_id: "aru_123".to_string(),
+            trigger_run_id: "aru_123".to_string(),
             conversation_id: "acv_123".to_string(),
             sandbox_instance_id: "sbi_123".to_string(),
             route_id: Some("acr_123".to_string()),
@@ -2054,7 +2054,7 @@ mod tests {
                         "source": "webhook",
                         "webhookEventId": "iwe_123",
                         "deliveryTaskId": "cdt_123",
-                        "automationRunId": "aru_123",
+                        "triggerRunId": "aru_123",
                         "conversationId": "acv_123",
                         "sandboxInstanceId": "sbi_123"
                     }
@@ -2087,7 +2087,7 @@ mod tests {
                 scheduled_action_id: None,
                 delivery_task_id: "cdt_123".to_string(),
                 external_delivery_id: None,
-                automation_run_id: "aru_123".to_string(),
+                trigger_run_id: "aru_123".to_string(),
                 conversation_id: "acv_123".to_string(),
                 sandbox_instance_id: "sbi_123".to_string(),
                 route_id: None,
@@ -2112,7 +2112,7 @@ mod tests {
                         "source": "schedule",
                         "scheduledActionId": "sca_123",
                         "deliveryTaskId": "cdt_123",
-                        "automationRunId": "aru_123",
+                        "triggerRunId": "aru_123",
                         "conversationId": "acv_123",
                         "sandboxInstanceId": "sbi_123"
                     }
@@ -2145,7 +2145,7 @@ mod tests {
                 scheduled_action_id: Some("sca_123".to_string()),
                 delivery_task_id: "cdt_123".to_string(),
                 external_delivery_id: None,
-                automation_run_id: "aru_123".to_string(),
+                trigger_run_id: "aru_123".to_string(),
                 conversation_id: "acv_123".to_string(),
                 sandbox_instance_id: "sbi_123".to_string(),
                 route_id: None,
@@ -2919,7 +2919,7 @@ mod tests {
     }
 
     #[test]
-    fn classifies_automation_interrupt_requests() {
+    fn classifies_trigger_interrupt_requests() {
         let log_writer = SharedLogWriter::default();
         let tracer_provider = SdkTracerProvider::default();
         let tracer = tracer_provider.tracer("sandboxd-test");
@@ -2980,13 +2980,13 @@ mod tests {
                 active_turns
                     .get("turn_123")
                     .and_then(|active_turn| active_turn.interruption_source.as_deref()),
-                Some("automation_interrupt")
+                Some("trigger_interrupt")
             );
         });
 
         let output = log_writer.contents();
         assert!(output.contains("codex_proxy.turn.interrupt_requested"));
-        assert_log_field(&output, "interruptionSource", "automation_interrupt");
+        assert_log_field(&output, "interruptionSource", "trigger_interrupt");
     }
 
     #[test]

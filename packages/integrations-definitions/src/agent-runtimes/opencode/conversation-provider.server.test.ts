@@ -14,7 +14,7 @@ describe("renderOpenCodePromptSystem", () => {
           webhookEventId: "evt_123",
           deliveryTaskId: "task_123",
           externalDeliveryId: "delivery_123",
-          automationRunId: "run_123",
+          triggerRunId: "run_123",
           conversationId: "conversation_123",
           sandboxInstanceId: "sandbox_123",
           routeId: "route_123",
@@ -26,13 +26,13 @@ describe("renderOpenCodePromptSystem", () => {
       }),
     ).toBe(`Always include a reproducible next step.
 
-Mistle automation delivery context:
+Mistle trigger delivery context:
 {
   "source": "webhook",
   "webhookEventId": "evt_123",
   "deliveryTaskId": "task_123",
   "externalDeliveryId": "delivery_123",
-  "automationRunId": "run_123",
+  "triggerRunId": "run_123",
   "conversationId": "conversation_123",
   "sandboxInstanceId": "sandbox_123",
   "routeId": "route_123",

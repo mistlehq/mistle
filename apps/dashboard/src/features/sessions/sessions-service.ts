@@ -30,7 +30,7 @@ const SandboxInstanceStatusApiResponseSchema = z
       })
       .strict()
       .nullable(),
-    automationConversation: z
+    triggerConversation: z
       .object({
         conversationId: z.string().min(1),
         routeId: z.string().min(1).nullable(),
@@ -51,9 +51,9 @@ const SandboxInstanceRuntimeContextSchema =
   SandboxInstanceStatusApiResponseSchema.shape.runtimeContext;
 
 const SandboxInstanceStatusResponseSchema = SandboxInstanceStatusApiResponseSchema.transform(
-  ({ automationConversation, ...status }) => ({
+  ({ triggerConversation, ...status }) => ({
     ...status,
-    triggerConversation: automationConversation,
+    triggerConversation: triggerConversation,
   }),
 );
 

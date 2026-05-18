@@ -153,7 +153,7 @@ export const SandboxProfilePublishabilityIssueCodes = {
 export type SandboxProfilePublishabilityIssueCode =
   (typeof SandboxProfilePublishabilityIssueCodes)[keyof typeof SandboxProfilePublishabilityIssueCodes];
 
-export const SandboxProfileAutomationImpactIssueCodes = {
+export const SandboxProfileTriggerImpactIssueCodes = {
   AGENT_BINDING_REQUIRED: "AGENT_BINDING_REQUIRED",
   AGENT_BINDING_PRIMARY_REQUIRED: "AGENT_BINDING_PRIMARY_REQUIRED",
   AGENT_BINDING_AMBIGUOUS: "AGENT_BINDING_AMBIGUOUS",
@@ -166,5 +166,5 @@ export const SandboxProfileAutomationImpactIssueCodes = {
   PRIMARY_REPOSITORY_UNAVAILABLE: "PRIMARY_REPOSITORY_UNAVAILABLE",
 } as const;
 
-export type SandboxProfileAutomationImpactIssueCode =
-  (typeof SandboxProfileAutomationImpactIssueCodes)[keyof typeof SandboxProfileAutomationImpactIssueCodes];
+export type SandboxProfileTriggerImpactIssueCode =
+  (typeof SandboxProfileTriggerImpactIssueCodes)[keyof typeof SandboxProfileTriggerImpactIssueCodes];

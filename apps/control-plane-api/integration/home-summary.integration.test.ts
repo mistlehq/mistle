@@ -3,7 +3,7 @@
  */
 
 import {
-  AutomationKinds,
+  TriggerKinds,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
   SandboxProfileStatuses,
@@ -40,7 +40,7 @@ describe.concurrent("home summary integration", () => {
         hasUsableProfiles: false,
         hasStartedSession: false,
         hasWebhookCapableIntegration: false,
-        hasAutomations: false,
+        hasTriggers: false,
       },
       recentSessions: [],
     });
@@ -59,7 +59,7 @@ describe.concurrent("home summary integration", () => {
         hasUsableProfiles: true,
         hasStartedSession: true,
         hasWebhookCapableIntegration: false,
-        hasAutomations: true,
+        hasTriggers: true,
       },
       recentSessions: [
         {
@@ -117,15 +117,15 @@ describe.concurrent("home summary integration", () => {
     ]);
   });
 
-  it("counts scheduled automations as completed automation onboarding", async ({ env }) => {
+  it("counts scheduled triggers as completed trigger onboarding", async ({ env }) => {
     const session = await env.auth.createSession({
-      email: "integration-new-home-summary-scheduled-automation@example.com",
+      email: "integration-new-home-summary-scheduled-trigger@example.com",
     });
 
     await seedAgentReadyHomeState({
       env,
-      automationKind: AutomationKinds.SCHEDULE,
-      idPrefix: "scheduled_automation",
+      triggerKind: TriggerKinds.SCHEDULE,
+      idPrefix: "scheduled_trigger",
       organizationId: session.organizationId,
       userId: session.userId,
     });
@@ -133,30 +133,30 @@ describe.concurrent("home summary integration", () => {
     const body = await readHomeSummary(env, session.cookie);
     expect(body.onboarding).toMatchObject({
       hasWebhookCapableIntegration: false,
-      hasAutomations: true,
+      hasTriggers: true,
     });
   });
 
-  it("does not count another organization's automations as completed automation onboarding", async ({
+  it("does not count another organization's triggers as completed trigger onboarding", async ({
     env,
   }) => {
     const session = await env.auth.createSession({
-      email: "integration-new-home-summary-own-automation@example.com",
+      email: "integration-new-home-summary-own-trigger@example.com",
     });
     const otherSession = await env.auth.createSession({
-      email: "integration-new-home-summary-other-automation@example.com",
+      email: "integration-new-home-summary-other-trigger@example.com",
     });
 
     await seedAgentReadyHomeState({
       env,
-      automationKind: AutomationKinds.SCHEDULE,
-      idPrefix: "other_org_automation",
+      triggerKind: TriggerKinds.SCHEDULE,
+      idPrefix: "other_org_trigger",
       organizationId: otherSession.organizationId,
       userId: otherSession.userId,
     });
 
     const body = await readHomeSummary(env, session.cookie);
-    expect(body.onboarding.hasAutomations).toBe(false);
+    expect(body.onboarding.hasTriggers).toBe(false);
   });
 
   it("does not count inactive connections as completed integrations", async ({ env }) => {
@@ -347,7 +347,7 @@ async function seedAgentReadyHomeState(input: {
   idPrefix: string;
   organizationId: string;
   userId: string;
-  automationKind?: typeof AutomationKinds.SCHEDULE | typeof AutomationKinds.WEBHOOK;
+  triggerKind?: typeof TriggerKinds.SCHEDULE | typeof TriggerKinds.WEBHOOK;
   startedByKind?: "system" | "user";
   startedById?: string;
   sandboxInstanceSource?: SandboxInstanceSource;
@@ -397,11 +397,11 @@ async function seedAgentReadyHomeState(input: {
       createdAt: "2026-03-01T00:00:00.000Z",
       updatedAt: "2026-03-01T00:00:00.000Z",
     });
-  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.automations).values({
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.triggers).values({
     id: `atm_home_summary_${input.idPrefix}`,
     organizationId: input.organizationId,
-    kind: input.automationKind ?? AutomationKinds.WEBHOOK,
-    name: "Home Summary Automation",
+    kind: input.triggerKind ?? TriggerKinds.WEBHOOK,
+    name: "Home Summary Trigger",
     enabled: true,
     createdAt: "2026-03-01T00:00:00.000Z",
     updatedAt: "2026-03-01T00:00:00.000Z",

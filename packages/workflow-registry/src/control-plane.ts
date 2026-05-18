@@ -182,45 +182,51 @@ export const SyncIntegrationConnectionResourcesWorkflowSpec = defineWorkflowSpec
   version: SyncIntegrationConnectionResourcesWorkflowVersion,
 });
 
-export const HandleAutomationRunWorkflowName = "control-plane.automations.handle-run";
-export const HandleAutomationRunWorkflowVersion = "1";
+export const HandleTriggerRunWorkflowName = "control-plane.automations.handle-run";
+export const HandleTriggerRunWorkflowVersion = "1";
 
-export type HandleAutomationRunWorkflowInput = {
-  automationRunId: string;
+export type HandleTriggerRunWorkflowInput =
+  | {
+      triggerRunId: string;
+      automationRunId?: undefined;
+    }
+  | {
+      triggerRunId?: undefined;
+      automationRunId: string;
+    };
+
+export type HandleTriggerRunWorkflowOutput = {
+  triggerRunId: string;
 };
 
-export type HandleAutomationRunWorkflowOutput = {
-  automationRunId: string;
-};
-
-export const HandleAutomationRunWorkflowSpec = defineWorkflowSpec<
-  HandleAutomationRunWorkflowInput,
-  HandleAutomationRunWorkflowOutput
+export const HandleTriggerRunWorkflowSpec = defineWorkflowSpec<
+  HandleTriggerRunWorkflowInput,
+  HandleTriggerRunWorkflowOutput
 >({
-  name: HandleAutomationRunWorkflowName,
-  version: HandleAutomationRunWorkflowVersion,
+  name: HandleTriggerRunWorkflowName,
+  version: HandleTriggerRunWorkflowVersion,
 });
 
-export const HandleAutomationConversationDeliveryWorkflowName =
+export const HandleTriggerConversationDeliveryWorkflowName =
   "control-plane.automation-conversations.handle-delivery";
-export const HandleAutomationConversationDeliveryWorkflowVersion = "1";
+export const HandleTriggerConversationDeliveryWorkflowVersion = "1";
 
-export type HandleAutomationConversationDeliveryWorkflowInput = {
+export type HandleTriggerConversationDeliveryWorkflowInput = {
   conversationId: string;
   generation: number;
 };
 
-export type HandleAutomationConversationDeliveryWorkflowOutput = {
+export type HandleTriggerConversationDeliveryWorkflowOutput = {
   conversationId: string;
   generation: number;
 };
 
-export const HandleAutomationConversationDeliveryWorkflowSpec = defineWorkflowSpec<
-  HandleAutomationConversationDeliveryWorkflowInput,
-  HandleAutomationConversationDeliveryWorkflowOutput
+export const HandleTriggerConversationDeliveryWorkflowSpec = defineWorkflowSpec<
+  HandleTriggerConversationDeliveryWorkflowInput,
+  HandleTriggerConversationDeliveryWorkflowOutput
 >({
-  name: HandleAutomationConversationDeliveryWorkflowName,
-  version: HandleAutomationConversationDeliveryWorkflowVersion,
+  name: HandleTriggerConversationDeliveryWorkflowName,
+  version: HandleTriggerConversationDeliveryWorkflowVersion,
 });
 
 export const ScheduleDispatchWorkflowName = "control-plane.schedules.dispatch";

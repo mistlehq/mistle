@@ -618,9 +618,9 @@
         }
       }
     },
-    "/v1/automations": {
+    "/v1/triggers": {
       "get": {
-        "tags": ["Automations"],
+        "tags": ["Triggers"],
         "parameters": [
           {
             "schema": {
@@ -689,7 +689,7 @@
         ],
         "responses": {
           "200": {
-            "description": "List automations for the active organization.",
+            "description": "List triggers for the active organization.",
             "content": {
               "application/json": {
                 "schema": {
@@ -903,7 +903,7 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": ["INVALID_LIST_AUTOMATIONS_INPUT", "INVALID_PAGINATION_CURSOR"]
+                          "enum": ["INVALID_LIST_TRIGGERS_INPUT", "INVALID_PAGINATION_CURSOR"]
                         },
                         "message": {
                           "type": "string",
@@ -980,24 +980,24 @@
         }
       }
     },
-    "/v1/automations/{automationId}": {
+    "/v1/triggers/{triggerId}": {
       "get": {
-        "tags": ["Automations"],
+        "tags": ["Triggers"],
         "parameters": [
           {
             "schema": {
               "type": "string",
               "minLength": 1,
-              "pattern": "^atm_[a-zA-Z0-9_-]+$"
+              "pattern": "^(?:atm|trg)_[a-zA-Z0-9_-]+$"
             },
             "required": true,
-            "name": "automationId",
+            "name": "triggerId",
             "in": "path"
           }
         ],
         "responses": {
           "200": {
-            "description": "Get an automation summary.",
+            "description": "Get an trigger summary.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1208,7 +1208,7 @@
             }
           },
           "404": {
-            "description": "Automation was not found.",
+            "description": "Trigger was not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1232,9 +1232,9 @@
         }
       }
     },
-    "/v1/automations/schedules": {
+    "/v1/triggers/schedules": {
       "post": {
-        "tags": ["Automations"],
+        "tags": ["Triggers"],
         "requestBody": {
           "required": true,
           "content": {
@@ -1308,7 +1308,7 @@
         },
         "responses": {
           "201": {
-            "description": "Create a scheduled automation.",
+            "description": "Create a scheduled trigger.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1531,24 +1531,24 @@
         }
       }
     },
-    "/v1/automations/schedules/{automationId}": {
+    "/v1/triggers/schedules/{triggerId}": {
       "get": {
-        "tags": ["Automations"],
+        "tags": ["Triggers"],
         "parameters": [
           {
             "schema": {
               "type": "string",
               "minLength": 1,
-              "pattern": "^atm_[a-zA-Z0-9_-]+$"
+              "pattern": "^(?:atm|trg)_[a-zA-Z0-9_-]+$"
             },
             "required": true,
-            "name": "automationId",
+            "name": "triggerId",
             "in": "path"
           }
         ],
         "responses": {
           "200": {
-            "description": "Get a scheduled automation.",
+            "description": "Get a scheduled trigger.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1745,7 +1745,7 @@
             }
           },
           "404": {
-            "description": "Scheduled automation was not found.",
+            "description": "Scheduled trigger was not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1769,16 +1769,16 @@
         }
       },
       "patch": {
-        "tags": ["Automations"],
+        "tags": ["Triggers"],
         "parameters": [
           {
             "schema": {
               "type": "string",
               "minLength": 1,
-              "pattern": "^atm_[a-zA-Z0-9_-]+$"
+              "pattern": "^(?:atm|trg)_[a-zA-Z0-9_-]+$"
             },
             "required": true,
-            "name": "automationId",
+            "name": "triggerId",
             "in": "path"
           }
         ],
@@ -1852,7 +1852,7 @@
         },
         "responses": {
           "200": {
-            "description": "Update a scheduled automation.",
+            "description": "Update a scheduled trigger.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2073,7 +2073,7 @@
             }
           },
           "404": {
-            "description": "Scheduled automation was not found.",
+            "description": "Scheduled trigger was not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2097,33 +2097,33 @@
         }
       },
       "delete": {
-        "tags": ["Automations"],
+        "tags": ["Triggers"],
         "parameters": [
           {
             "schema": {
               "type": "string",
               "minLength": 1,
-              "pattern": "^atm_[a-zA-Z0-9_-]+$"
+              "pattern": "^(?:atm|trg)_[a-zA-Z0-9_-]+$"
             },
             "required": true,
-            "name": "automationId",
+            "name": "triggerId",
             "in": "path"
           }
         ],
         "responses": {
           "200": {
-            "description": "Delete a scheduled automation.",
+            "description": "Delete a scheduled trigger.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "automationId": {
+                    "triggerId": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["automationId"],
+                  "required": ["triggerId"],
                   "additionalProperties": false
                 }
               }
@@ -2196,7 +2196,7 @@
             }
           },
           "404": {
-            "description": "Scheduled automation was not found.",
+            "description": "Scheduled trigger was not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2220,9 +2220,9 @@
         }
       }
     },
-    "/v1/automations/webhooks": {
+    "/v1/triggers/webhooks": {
       "post": {
-        "tags": ["Automations"],
+        "tags": ["Triggers"],
         "requestBody": {
           "required": true,
           "content": {
@@ -2303,7 +2303,7 @@
         },
         "responses": {
           "201": {
-            "description": "Create a webhook automation.",
+            "description": "Create a webhook trigger.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2508,24 +2508,24 @@
         }
       }
     },
-    "/v1/automations/webhooks/{automationId}": {
+    "/v1/triggers/webhooks/{triggerId}": {
       "get": {
-        "tags": ["Automations"],
+        "tags": ["Triggers"],
         "parameters": [
           {
             "schema": {
               "type": "string",
               "minLength": 1,
-              "pattern": "^atm_[a-zA-Z0-9_-]+$"
+              "pattern": "^(?:atm|trg)_[a-zA-Z0-9_-]+$"
             },
             "required": true,
-            "name": "automationId",
+            "name": "triggerId",
             "in": "path"
           }
         ],
         "responses": {
           "200": {
-            "description": "Get a webhook automation.",
+            "description": "Get a webhook trigger.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2702,7 +2702,7 @@
             }
           },
           "404": {
-            "description": "Webhook automation was not found.",
+            "description": "Webhook trigger was not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2726,16 +2726,16 @@
         }
       },
       "patch": {
-        "tags": ["Automations"],
+        "tags": ["Triggers"],
         "parameters": [
           {
             "schema": {
               "type": "string",
               "minLength": 1,
-              "pattern": "^atm_[a-zA-Z0-9_-]+$"
+              "pattern": "^(?:atm|trg)_[a-zA-Z0-9_-]+$"
             },
             "required": true,
-            "name": "automationId",
+            "name": "triggerId",
             "in": "path"
           }
         ],
@@ -2811,7 +2811,7 @@
         },
         "responses": {
           "200": {
-            "description": "Update a webhook automation.",
+            "description": "Update a webhook trigger.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3014,7 +3014,7 @@
             }
           },
           "404": {
-            "description": "Webhook automation was not found.",
+            "description": "Webhook trigger was not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3038,33 +3038,33 @@
         }
       },
       "delete": {
-        "tags": ["Automations"],
+        "tags": ["Triggers"],
         "parameters": [
           {
             "schema": {
               "type": "string",
               "minLength": 1,
-              "pattern": "^atm_[a-zA-Z0-9_-]+$"
+              "pattern": "^(?:atm|trg)_[a-zA-Z0-9_-]+$"
             },
             "required": true,
-            "name": "automationId",
+            "name": "triggerId",
             "in": "path"
           }
         ],
         "responses": {
           "200": {
-            "description": "Delete a webhook automation.",
+            "description": "Delete a webhook trigger.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "automationId": {
+                    "triggerId": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["automationId"],
+                  "required": ["triggerId"],
                   "additionalProperties": false
                 }
               }
@@ -3137,7 +3137,7 @@
             }
           },
           "404": {
-            "description": "Webhook automation was not found.",
+            "description": "Webhook trigger was not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3190,7 +3190,7 @@
                         "hasWebhookCapableIntegration": {
                           "type": "boolean"
                         },
-                        "hasAutomations": {
+                        "hasTriggers": {
                           "type": "boolean"
                         }
                       },
@@ -3200,7 +3200,7 @@
                         "hasUsableProfiles",
                         "hasStartedSession",
                         "hasWebhookCapableIntegration",
-                        "hasAutomations"
+                        "hasTriggers"
                       ],
                       "additionalProperties": false
                     },
@@ -3796,7 +3796,7 @@
                             "type": "integer",
                             "minimum": 0
                           },
-                          "automationCount": {
+                          "triggerCount": {
                             "type": "integer",
                             "minimum": 0
                           },
@@ -5388,7 +5388,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["WEBHOOK_SOURCE_HAS_AUTOMATIONS"]
+                      "enum": ["WEBHOOK_SOURCE_HAS_TRIGGERS"]
                     },
                     "message": {
                       "type": "string",
@@ -5807,7 +5807,7 @@
                       "type": "integer",
                       "minimum": 0
                     },
-                    "automationCount": {
+                    "triggerCount": {
                       "type": "integer",
                       "minimum": 0
                     },
@@ -6200,7 +6200,7 @@
                       "type": "integer",
                       "minimum": 0
                     },
-                    "automationCount": {
+                    "triggerCount": {
                       "type": "integer",
                       "minimum": 0
                     },
@@ -6554,7 +6554,7 @@
                       "type": "integer",
                       "minimum": 0
                     },
-                    "automationCount": {
+                    "triggerCount": {
                       "type": "integer",
                       "minimum": 0
                     },
@@ -6987,7 +6987,7 @@
             }
           },
           "409": {
-            "description": "Integration connection still has active sandbox profile bindings, webhook automations, or identity-linking configuration.",
+            "description": "Integration connection still has active sandbox profile bindings, webhook triggers, or identity-linking configuration.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7001,7 +7001,7 @@
                         },
                         {
                           "type": "string",
-                          "enum": ["CONNECTION_HAS_AUTOMATIONS"]
+                          "enum": ["CONNECTION_HAS_TRIGGERS"]
                         },
                         {
                           "type": "string",
@@ -7093,7 +7093,7 @@
                       "type": "integer",
                       "minimum": 0
                     },
-                    "automationCount": {
+                    "triggerCount": {
                       "type": "integer",
                       "minimum": 0
                     },
@@ -15076,7 +15076,7 @@
                       "required": ["agentRuntimeId", "launchCwd", "primaryRepositoryRoot"],
                       "additionalProperties": false
                     },
-                    "automationConversation": {
+                    "triggerConversation": {
                       "type": ["object", "null"],
                       "properties": {
                         "conversationId": {
@@ -15118,7 +15118,7 @@
                     "failureCode",
                     "failureMessage",
                     "runtimeContext",
-                    "automationConversation",
+                    "triggerConversation",
                     "startupOperation"
                   ],
                   "additionalProperties": false
@@ -15869,7 +15869,7 @@
                       "required": ["agentRuntimeId", "launchCwd", "primaryRepositoryRoot"],
                       "additionalProperties": false
                     },
-                    "automationConversation": {
+                    "triggerConversation": {
                       "type": ["object", "null"],
                       "properties": {
                         "conversationId": {
@@ -15911,7 +15911,7 @@
                     "failureCode",
                     "failureMessage",
                     "runtimeContext",
-                    "automationConversation",
+                    "triggerConversation",
                     "startupOperation"
                   ],
                   "additionalProperties": false
@@ -18578,7 +18578,7 @@
         }
       }
     },
-    "/v1/sandbox/profiles/{profileId}/versions/{version}/automation-config": {
+    "/v1/sandbox/profiles/{profileId}/versions/{version}/trigger-config": {
       "get": {
         "tags": ["Sandbox Profiles"],
         "parameters": [
@@ -18604,7 +18604,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Get automation editor configuration for the specified sandbox profile version.",
+            "description": "Get trigger editor configuration for the specified sandbox profile version.",
             "content": {
               "application/json": {
                 "schema": {
@@ -18790,7 +18790,7 @@
         }
       }
     },
-    "/v1/sandbox/profiles/{profileId}/versions/{version}/draft-automation-impact": {
+    "/v1/sandbox/profiles/{profileId}/versions/{version}/draft-trigger-impact": {
       "get": {
         "tags": ["Sandbox Profiles"],
         "parameters": [
@@ -18816,7 +18816,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Evaluate whether the specified sandbox profile draft version would break automations that currently use the profile.",
+            "description": "Evaluate whether the specified sandbox profile draft version would break triggers that currently use the profile.",
             "content": {
               "application/json": {
                 "schema": {
@@ -18825,7 +18825,7 @@
                     "hasBreakingChanges": {
                       "type": "boolean"
                     },
-                    "affectedAutomations": {
+                    "affectedTriggers": {
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -18896,7 +18896,7 @@
                       }
                     }
                   },
-                  "required": ["hasBreakingChanges", "affectedAutomations"],
+                  "required": ["hasBreakingChanges", "affectedTriggers"],
                   "additionalProperties": false
                 }
               }

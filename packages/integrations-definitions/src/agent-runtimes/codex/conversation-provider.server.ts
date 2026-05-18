@@ -117,7 +117,7 @@ export function normalizeCodexThreadStatus(
     case "active":
       return AgentConversationStatuses.ACTIVE;
     case "systemError":
-      // Codex reports non-active terminal threads as `systemError`. Automation
+      // Codex reports non-active terminal threads as `systemError`. Trigger
       // delivery should still attempt a fresh turn on that thread instead of
       // failing the conversation before trying `turn/start`.
       return AgentConversationStatuses.IDLE;
@@ -470,7 +470,7 @@ function resolveCodexExplicitModelStartThreadParams(options: Readonly<Record<str
   if (typeof modelValue !== "string" || modelValue.trim().length === 0) {
     throw new ConversationProviderError({
       code: ConversationProviderErrorCodes.PROVIDER_CREATE_CONVERSATION_FAILED,
-      message: "Codex createAutomationConversation options.model must be a non-empty string.",
+      message: "Codex createTriggerConversation options.model must be a non-empty string.",
     });
   }
 
@@ -490,7 +490,7 @@ function resolveCodexExplicitModelStartThreadParams(options: Readonly<Record<str
       throw new ConversationProviderError({
         code: ConversationProviderErrorCodes.PROVIDER_CREATE_CONVERSATION_FAILED,
         message:
-          "Codex createAutomationConversation options.modelReasoningEffort must be a non-empty string.",
+          "Codex createTriggerConversation options.modelReasoningEffort must be a non-empty string.",
       });
     }
     params.modelReasoningEffort = modelReasoningEffortValue.trim();

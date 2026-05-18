@@ -2,7 +2,7 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
-import { AutomationRunStatuses, SandboxProfileStatuses } from "@mistle/db/control-plane";
+import { TriggerRunStatuses, SandboxProfileStatuses } from "@mistle/db/control-plane";
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { eq } from "drizzle-orm";
@@ -44,7 +44,7 @@ describe.concurrent("sandbox instances list integration", () => {
       },
     ]);
 
-    await env.controlPlaneDb.insert(env.controlPlaneTables.automations).values({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.triggers).values({
       id: "atm_cp_list",
       organizationId: firstOrgSession.organizationId,
       kind: "webhook",
@@ -53,10 +53,10 @@ describe.concurrent("sandbox instances list integration", () => {
       createdAt: "2026-03-02T00:00:00.000Z",
       updatedAt: "2026-03-02T00:00:00.000Z",
     });
-    await env.controlPlaneDb.insert(env.controlPlaneTables.automationRuns).values({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.triggerRuns).values({
       id: "aru_cp_list",
-      automationId: "atm_cp_list",
-      status: AutomationRunStatuses.RUNNING,
+      triggerId: "atm_cp_list",
+      status: TriggerRunStatuses.RUNNING,
       createdAt: "2026-03-11T00:00:00.000Z",
       startedAt: "2026-03-11T00:00:00.000Z",
       updatedAt: "2026-03-11T00:00:00.000Z",
@@ -259,7 +259,7 @@ describe.concurrent("sandbox instances list integration", () => {
         updatedAt: "2026-03-01T00:00:00.000Z",
       },
     ]);
-    await env.controlPlaneDb.insert(env.controlPlaneTables.automations).values([
+    await env.controlPlaneDb.insert(env.controlPlaneTables.triggers).values([
       {
         id: "atm_cp_filter_slack",
         organizationId: ownerSession.organizationId,
@@ -279,19 +279,19 @@ describe.concurrent("sandbox instances list integration", () => {
         updatedAt: "2026-03-02T00:00:00.000Z",
       },
     ]);
-    await env.controlPlaneDb.insert(env.controlPlaneTables.automationRuns).values([
+    await env.controlPlaneDb.insert(env.controlPlaneTables.triggerRuns).values([
       {
         id: "aru_cp_filter_slack",
-        automationId: "atm_cp_filter_slack",
-        status: AutomationRunStatuses.RUNNING,
+        triggerId: "atm_cp_filter_slack",
+        status: TriggerRunStatuses.RUNNING,
         createdAt: "2026-03-11T00:00:00.000Z",
         startedAt: "2026-03-11T00:00:00.000Z",
         updatedAt: "2026-03-11T00:00:00.000Z",
       },
       {
         id: "aru_cp_filter_schedule",
-        automationId: "atm_cp_filter_schedule",
-        status: AutomationRunStatuses.RUNNING,
+        triggerId: "atm_cp_filter_schedule",
+        status: TriggerRunStatuses.RUNNING,
         createdAt: "2026-03-12T00:00:00.000Z",
         startedAt: "2026-03-12T00:00:00.000Z",
         updatedAt: "2026-03-12T00:00:00.000Z",
@@ -412,7 +412,7 @@ describe.concurrent("sandbox instances list integration", () => {
     expect(searchBody.items.map((item) => item.id)).toEqual(["sbi_cp_filter_owner"]);
   });
 
-  it("filters a specific trigger when it has more automation runs than one data-plane id filter can carry", async ({
+  it("filters a specific trigger when it has more trigger runs than one data-plane id filter can carry", async ({
     env,
   }) => {
     const session = await env.auth.createSession({
@@ -427,7 +427,7 @@ describe.concurrent("sandbox instances list integration", () => {
       createdAt: "2026-03-01T00:00:00.000Z",
       updatedAt: "2026-03-01T00:00:00.000Z",
     });
-    await env.controlPlaneDb.insert(env.controlPlaneTables.automations).values({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.triggers).values({
       id: "atm_cp_filter_long_trigger",
       organizationId: session.organizationId,
       kind: "webhook",
@@ -437,24 +437,24 @@ describe.concurrent("sandbox instances list integration", () => {
       updatedAt: "2026-03-02T00:00:00.000Z",
     });
 
-    const automationRuns = Array.from({ length: 501 }, (_, index) => {
+    const triggerRuns = Array.from({ length: 501 }, (_, index) => {
       const suffix = String(index).padStart(3, "0");
       return {
         id: `aru_cp_filter_long_trigger_${suffix}`,
-        automationId: "atm_cp_filter_long_trigger",
-        status: AutomationRunStatuses.RUNNING,
+        triggerId: "atm_cp_filter_long_trigger",
+        status: TriggerRunStatuses.RUNNING,
         createdAt: "2026-03-11T00:00:00.000Z",
         startedAt: "2026-03-11T00:00:00.000Z",
         updatedAt: "2026-03-11T00:00:00.000Z",
       };
     });
-    const firstAutomationRunId = automationRuns[0]?.id;
-    const lastAutomationRunId = automationRuns.at(-1)?.id;
-    if (firstAutomationRunId === undefined || lastAutomationRunId === undefined) {
-      throw new Error("Expected generated automation runs for long trigger filter test.");
+    const firstTriggerRunId = triggerRuns[0]?.id;
+    const lastTriggerRunId = triggerRuns.at(-1)?.id;
+    if (firstTriggerRunId === undefined || lastTriggerRunId === undefined) {
+      throw new Error("Expected generated trigger runs for long trigger filter test.");
     }
 
-    await env.controlPlaneDb.insert(env.controlPlaneTables.automationRuns).values(automationRuns);
+    await env.controlPlaneDb.insert(env.controlPlaneTables.triggerRuns).values(triggerRuns);
     await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values([
       {
         id: "sbi_cp_filter_long_trigger_newer",
@@ -466,7 +466,7 @@ describe.concurrent("sandbox instances list integration", () => {
         providerSandboxId: "provider-cp-filter-long-trigger-newer",
         status: SandboxInstanceStatuses.RUNNING,
         startedByKind: "system",
-        startedById: lastAutomationRunId,
+        startedById: lastTriggerRunId,
         source: "webhook",
         createdAt: "2026-03-16T00:00:00.000Z",
         updatedAt: "2026-03-16T00:00:00.000Z",
@@ -481,7 +481,7 @@ describe.concurrent("sandbox instances list integration", () => {
         providerSandboxId: "provider-cp-filter-long-trigger-older",
         status: SandboxInstanceStatuses.RUNNING,
         startedByKind: "system",
-        startedById: firstAutomationRunId,
+        startedById: firstTriggerRunId,
         source: "webhook",
         createdAt: "2026-03-15T00:00:00.000Z",
         updatedAt: "2026-03-15T00:00:00.000Z",

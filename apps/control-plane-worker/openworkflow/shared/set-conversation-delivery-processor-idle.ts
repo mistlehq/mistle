@@ -1,43 +1,43 @@
 import {
-  AutomationConversationDeliveryProcessorStatuses,
+  TriggerConversationDeliveryProcessorStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
-export type SetAutomationConversationDeliveryProcessorIdleInput = {
+export type SetTriggerConversationDeliveryProcessorIdleInput = {
   conversationId: string;
   generation: number;
 };
 
-export async function setAutomationConversationDeliveryProcessorIdle(
+export async function setTriggerConversationDeliveryProcessorIdle(
   ctx: {
     db: ControlPlaneDatabase | ControlPlaneTransaction;
   },
-  input: SetAutomationConversationDeliveryProcessorIdleInput,
+  input: SetTriggerConversationDeliveryProcessorIdleInput,
 ): Promise<boolean> {
   const tables = getControlPlaneDatabaseSchema(ctx.db);
 
   const updatedRows = await ctx.db
-    .update(tables.automationConversationDeliveryProcessors)
+    .update(tables.triggerConversationDeliveryProcessors)
     .set({
-      status: AutomationConversationDeliveryProcessorStatuses.IDLE,
+      status: TriggerConversationDeliveryProcessorStatuses.IDLE,
       activeWorkflowRunId: null,
       updatedAt: sql`now()`,
     })
     .where(
       and(
-        eq(tables.automationConversationDeliveryProcessors.conversationId, input.conversationId),
-        eq(tables.automationConversationDeliveryProcessors.generation, input.generation),
+        eq(tables.triggerConversationDeliveryProcessors.conversationId, input.conversationId),
+        eq(tables.triggerConversationDeliveryProcessors.generation, input.generation),
         eq(
-          tables.automationConversationDeliveryProcessors.status,
-          AutomationConversationDeliveryProcessorStatuses.RUNNING,
+          tables.triggerConversationDeliveryProcessors.status,
+          TriggerConversationDeliveryProcessorStatuses.RUNNING,
         ),
       ),
     )
     .returning({
-      conversationId: tables.automationConversationDeliveryProcessors.conversationId,
+      conversationId: tables.triggerConversationDeliveryProcessors.conversationId,
     });
 
   return updatedRows[0] !== undefined;

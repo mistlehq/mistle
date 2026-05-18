@@ -44,7 +44,7 @@ export async function getWebhookTrigger(input: {
     const response = await requestControlPlane({
       operation: "getWebhookTrigger",
       method: "GET",
-      pathname: `/v1/automations/webhooks/${encodeURIComponent(input.triggerId)}`,
+      pathname: `/v1/triggers/webhooks/${encodeURIComponent(input.triggerId)}`,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not load webhook trigger.",
       errorFactory: createWebhookTriggersApiError,
@@ -73,7 +73,7 @@ export async function createWebhookTrigger(input: {
     const response = await requestControlPlane({
       operation: "createWebhookTrigger",
       method: "POST",
-      pathname: "/v1/automations/webhooks",
+      pathname: "/v1/triggers/webhooks",
       body: input.payload,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not create webhook trigger.",
@@ -103,7 +103,7 @@ export async function updateWebhookTrigger(input: {
     const response = await requestControlPlane({
       operation: "updateWebhookTrigger",
       method: "PATCH",
-      pathname: `/v1/automations/webhooks/${encodeURIComponent(input.payload.triggerId)}`,
+      pathname: `/v1/triggers/webhooks/${encodeURIComponent(input.payload.triggerId)}`,
       body: input.payload.payload,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not update webhook trigger.",
@@ -133,7 +133,7 @@ export async function deleteWebhookTrigger(input: {
     const response = await requestControlPlane({
       operation: "deleteWebhookTrigger",
       method: "DELETE",
-      pathname: `/v1/automations/webhooks/${encodeURIComponent(input.triggerId)}`,
+      pathname: `/v1/triggers/webhooks/${encodeURIComponent(input.triggerId)}`,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not delete webhook trigger.",
       errorFactory: createWebhookTriggersApiError,

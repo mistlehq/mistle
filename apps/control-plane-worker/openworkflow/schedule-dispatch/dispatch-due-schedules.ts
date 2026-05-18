@@ -329,8 +329,8 @@ async function resolveTargetPayload(
     targetType: string;
   },
 ): Promise<TargetPayloadResult> {
-  if (input.targetType === ScheduleTargetTypes.AUTOMATION_RUN) {
-    const target = await tx.query.scheduleAutomations.findFirst({
+  if (input.targetType === ScheduleTargetTypes.TRIGGER_RUN) {
+    const target = await tx.query.scheduleTriggers.findFirst({
       where: (table, { eq: whereEq }) => whereEq(table.scheduleId, input.scheduleId),
     });
     if (target === undefined) {
@@ -340,7 +340,7 @@ async function resolveTargetPayload(
     return {
       resolved: true,
       payload: {
-        automationId: target.automationId,
+        triggerId: target.triggerId,
       },
     };
   }

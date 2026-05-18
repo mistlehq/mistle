@@ -10,8 +10,8 @@ import { eq, sql } from "drizzle-orm";
 import type { OpenWorkflow } from "openworkflow";
 
 import { claimScheduledActionForDispatch } from "./claim-scheduled-action.js";
-import { dispatchAutomationRunScheduledAction } from "./dispatch-automation-run.js";
 import { dispatchSnapshotRefreshScheduledAction } from "./dispatch-snapshot-refresh.js";
+import { dispatchTriggerRunScheduledAction } from "./dispatch-trigger-run.js";
 import { ScheduleDispatchPermanentError } from "./schedule-dispatch-permanent-error.js";
 import { recordScheduleTargetHandoffFailure } from "./telemetry.js";
 
@@ -130,12 +130,12 @@ async function dispatchScheduleTarget(
   if (targetType === ScheduleTargetTypes.SNAPSHOT_REFRESH) {
     return dispatchSnapshotRefreshScheduledAction(ctx, input);
   }
-  if (targetType === ScheduleTargetTypes.AUTOMATION_RUN) {
+  if (targetType === ScheduleTargetTypes.TRIGGER_RUN) {
     if (ctx.openWorkflow === undefined) {
-      throw new Error("Schedule automation run dispatch requires OpenWorkflow.");
+      throw new Error("Schedule trigger run dispatch requires OpenWorkflow.");
     }
 
-    return dispatchAutomationRunScheduledAction(
+    return dispatchTriggerRunScheduledAction(
       {
         db: ctx.db,
         openWorkflow: ctx.openWorkflow,
@@ -149,8 +149,8 @@ async function dispatchScheduleTarget(
 }
 
 function parseScheduleTargetType(targetType: string): ScheduleTargetType | null {
-  if (targetType === ScheduleTargetTypes.AUTOMATION_RUN) {
-    return ScheduleTargetTypes.AUTOMATION_RUN;
+  if (targetType === ScheduleTargetTypes.TRIGGER_RUN) {
+    return ScheduleTargetTypes.TRIGGER_RUN;
   }
   if (targetType === ScheduleTargetTypes.SNAPSHOT_REFRESH) {
     return ScheduleTargetTypes.SNAPSHOT_REFRESH;

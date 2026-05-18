@@ -37,5 +37,5 @@ export const DeleteIntegrationWebhookSourceNotFoundResponseSchema = createCodeMe
 );
 
 export const DeleteIntegrationWebhookSourceConflictResponseSchema = createCodeMessageErrorSchema(
-  z.literal(IntegrationConnectionsConflictCodes.WEBHOOK_SOURCE_HAS_AUTOMATIONS),
+  z.literal(IntegrationConnectionsConflictCodes.WEBHOOK_SOURCE_HAS_TRIGGERS),
 );

@@ -1,6 +1,6 @@
 import {
-  AutomationConversationRouteStatuses,
-  AutomationConversationStatuses,
+  TriggerConversationRouteStatuses,
+  TriggerConversationStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
   getControlPlaneDatabaseSchema,
@@ -8,10 +8,10 @@ import {
 import { eq, sql } from "drizzle-orm";
 
 import {
-  AutomationConversationPersistenceError,
-  AutomationConversationPersistenceErrorCodes,
-} from "./automation-conversation-persistence-error.js";
-export type ActivateAutomationConversationRouteInput = {
+  TriggerConversationPersistenceError,
+  TriggerConversationPersistenceErrorCodes,
+} from "./trigger-conversation-persistence-error.js";
+export type ActivateTriggerConversationRouteInput = {
   conversationId: string;
   routeId: string;
   sandboxInstanceId: string;
@@ -20,79 +20,78 @@ export type ActivateAutomationConversationRouteInput = {
   providerState?: unknown;
 };
 
-export async function activateAutomationConversationRoute(
+export async function activateTriggerConversationRoute(
   deps: {
     db: ControlPlaneDatabase | ControlPlaneTransaction;
   },
-  input: ActivateAutomationConversationRouteInput,
+  input: ActivateTriggerConversationRouteInput,
 ) {
   return deps.db.transaction(async (transaction) => {
     const tables = getControlPlaneDatabaseSchema(transaction);
 
-    const persistedAutomationConversation =
-      await transaction.query.automationConversations.findFirst({
-        where: (table, { eq: whereEq }) => whereEq(table.id, input.conversationId),
-      });
-    if (persistedAutomationConversation === undefined) {
-      throw new AutomationConversationPersistenceError({
-        code: AutomationConversationPersistenceErrorCodes.CONVERSATION_NOT_FOUND,
-        message: `AutomationConversation '${input.conversationId}' was not found.`,
+    const persistedTriggerConversation = await transaction.query.triggerConversations.findFirst({
+      where: (table, { eq: whereEq }) => whereEq(table.id, input.conversationId),
+    });
+    if (persistedTriggerConversation === undefined) {
+      throw new TriggerConversationPersistenceError({
+        code: TriggerConversationPersistenceErrorCodes.CONVERSATION_NOT_FOUND,
+        message: `TriggerConversation '${input.conversationId}' was not found.`,
       });
     }
-    if (persistedAutomationConversation.status === AutomationConversationStatuses.CLOSED) {
-      throw new AutomationConversationPersistenceError({
-        code: AutomationConversationPersistenceErrorCodes.CONVERSATION_CLOSED,
-        message: `AutomationConversation '${input.conversationId}' is closed and cannot be activated.`,
+    if (persistedTriggerConversation.status === TriggerConversationStatuses.CLOSED) {
+      throw new TriggerConversationPersistenceError({
+        code: TriggerConversationPersistenceErrorCodes.CONVERSATION_CLOSED,
+        message: `TriggerConversation '${input.conversationId}' is closed and cannot be activated.`,
       });
     }
 
-    const persistedRoute = await transaction.query.automationConversationRoutes.findFirst({
+    const persistedRoute = await transaction.query.triggerConversationRoutes.findFirst({
       where: (table, { eq: whereEq }) => whereEq(table.id, input.routeId),
     });
     if (persistedRoute === undefined) {
-      throw new AutomationConversationPersistenceError({
-        code: AutomationConversationPersistenceErrorCodes.CONVERSATION_ROUTE_NOT_FOUND,
-        message: `AutomationConversation route '${input.routeId}' was not found.`,
+      throw new TriggerConversationPersistenceError({
+        code: TriggerConversationPersistenceErrorCodes.CONVERSATION_ROUTE_NOT_FOUND,
+        message: `TriggerConversation route '${input.routeId}' was not found.`,
       });
     }
     if (persistedRoute.conversationId !== input.conversationId) {
-      throw new AutomationConversationPersistenceError({
-        code: AutomationConversationPersistenceErrorCodes.CONVERSATION_ROUTE_CONVERSATION_MISMATCH,
-        message: `AutomationConversation route '${input.routeId}' does not belong to conversation '${input.conversationId}'.`,
+      throw new TriggerConversationPersistenceError({
+        code: TriggerConversationPersistenceErrorCodes.CONVERSATION_ROUTE_CONVERSATION_MISMATCH,
+        message: `TriggerConversation route '${input.routeId}' does not belong to conversation '${input.conversationId}'.`,
       });
     }
-    if (persistedRoute.status === AutomationConversationRouteStatuses.CLOSED) {
-      throw new AutomationConversationPersistenceError({
-        code: AutomationConversationPersistenceErrorCodes.CONVERSATION_ROUTE_CLOSED,
-        message: `AutomationConversation route '${input.routeId}' is closed and cannot be activated.`,
+    if (persistedRoute.status === TriggerConversationRouteStatuses.CLOSED) {
+      throw new TriggerConversationPersistenceError({
+        code: TriggerConversationPersistenceErrorCodes.CONVERSATION_ROUTE_CLOSED,
+        message: `TriggerConversation route '${input.routeId}' is closed and cannot be activated.`,
       });
     }
 
     await transaction
-      .update(tables.automationConversations)
+      .update(tables.triggerConversations)
       .set({
-        status: AutomationConversationStatuses.ACTIVE,
+        status: TriggerConversationStatuses.ACTIVE,
         updatedAt: sql`now()`,
       })
-      .where(eq(tables.automationConversations.id, input.conversationId));
+      .where(eq(tables.triggerConversations.id, input.conversationId));
 
     const updatedRouteRows = await transaction
-      .update(tables.automationConversationRoutes)
+      .update(tables.triggerConversationRoutes)
       .set({
         sandboxInstanceId: input.sandboxInstanceId,
         providerConversationId: input.providerConversationId,
         providerExecutionId: input.providerExecutionId ?? null,
         providerState: input.providerState ?? null,
-        status: AutomationConversationRouteStatuses.ACTIVE,
+        status: TriggerConversationRouteStatuses.ACTIVE,
         updatedAt: sql`now()`,
       })
-      .where(eq(tables.automationConversationRoutes.id, input.routeId))
+      .where(eq(tables.triggerConversationRoutes.id, input.routeId))
       .returning();
     const updatedRoute = updatedRouteRows[0];
     if (updatedRoute === undefined) {
-      throw new AutomationConversationPersistenceError({
-        code: AutomationConversationPersistenceErrorCodes.CONVERSATION_ROUTE_NOT_FOUND,
-        message: `AutomationConversation route '${input.routeId}' was not found during activation update.`,
+      throw new TriggerConversationPersistenceError({
+        code: TriggerConversationPersistenceErrorCodes.CONVERSATION_ROUTE_NOT_FOUND,
+        message: `TriggerConversation route '${input.routeId}' was not found during activation update.`,
       });
     }
 

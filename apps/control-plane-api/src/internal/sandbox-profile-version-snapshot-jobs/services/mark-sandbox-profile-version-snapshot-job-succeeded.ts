@@ -97,7 +97,7 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
       versionSnapshotImageId === input.image.imageId
     ) {
       return {
-        shouldAdvanceAutomationTargets: shouldAdvanceAutomationTargetsForSnapshot({
+        shouldAdvanceTriggerTargets: shouldAdvanceTriggerTargetsForSnapshot({
           trigger,
           activeVersion,
           sandboxProfileVersion,
@@ -196,7 +196,7 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
     }
 
     return {
-      shouldAdvanceAutomationTargets: shouldAdvanceAutomationTargetsForSnapshot({
+      shouldAdvanceTriggerTargets: shouldAdvanceTriggerTargetsForSnapshot({
         trigger,
         activeVersion,
         sandboxProfileVersion,
@@ -207,8 +207,8 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
     };
   });
 
-  if (successResult.shouldAdvanceAutomationTargets) {
-    await tryAdvanceAutomationTargetsToPublishedProfileVersion(ctx, {
+  if (successResult.shouldAdvanceTriggerTargets) {
+    await tryAdvanceTriggerTargetsToPublishedProfileVersion(ctx, {
       snapshotJobId: input.snapshotJobId,
       sandboxProfileId: successResult.sandboxProfileId,
       sandboxProfileVersion: successResult.sandboxProfileVersion,
@@ -220,7 +220,7 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
   };
 }
 
-function shouldAdvanceAutomationTargetsForSnapshot(input: {
+function shouldAdvanceTriggerTargetsForSnapshot(input: {
   trigger: SandboxProfileVersionSnapshotJobTrigger;
   activeVersion: number | null;
   sandboxProfileVersion: number;
@@ -232,7 +232,7 @@ function shouldAdvanceAutomationTargetsForSnapshot(input: {
   );
 }
 
-async function tryAdvanceAutomationTargetsToPublishedProfileVersion(
+async function tryAdvanceTriggerTargetsToPublishedProfileVersion(
   ctx: {
     db: ControlPlaneDatabase;
   },
@@ -245,12 +245,12 @@ async function tryAdvanceAutomationTargetsToPublishedProfileVersion(
   try {
     const tables = getControlPlaneDatabaseSchema(ctx.db);
     await ctx.db
-      .update(tables.automationTargets)
+      .update(tables.triggerTargets)
       .set({
         sandboxProfileVersion: input.sandboxProfileVersion,
         updatedAt: sql`now()`,
       })
-      .where(eq(tables.automationTargets.sandboxProfileId, input.sandboxProfileId));
+      .where(eq(tables.triggerTargets.sandboxProfileId, input.sandboxProfileId));
   } catch (error) {
     logger.error(
       {
@@ -259,7 +259,7 @@ async function tryAdvanceAutomationTargetsToPublishedProfileVersion(
         sandboxProfileId: input.sandboxProfileId,
         sandboxProfileVersion: input.sandboxProfileVersion,
       },
-      "Failed to advance automation targets after sandbox profile snapshot succeeded.",
+      "Failed to advance trigger targets after sandbox profile snapshot succeeded.",
     );
   }
 }

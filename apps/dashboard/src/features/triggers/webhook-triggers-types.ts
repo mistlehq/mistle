@@ -30,11 +30,11 @@ export const WebhookTriggerSchema = z
 
 export const DeleteWebhookTriggerResultSchema = z
   .object({
-    automationId: z.string().min(1),
+    triggerId: z.string().min(1),
   })
   .strict()
-  .transform(({ automationId }) => ({
-    triggerId: automationId,
+  .transform(({ triggerId }) => ({
+    triggerId: triggerId,
   }));
 
 export type WebhookTrigger = z.infer<typeof WebhookTriggerSchema>;

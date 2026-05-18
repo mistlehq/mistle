@@ -33,7 +33,7 @@ export type SandboxProfile = GetSandboxProfileResponse;
 export type SandboxProfileStatus = SandboxProfile["status"];
 export type SandboxProfilesListResult = ListSandboxProfilesResponse;
 export type SandboxProfileRepositoryOption =
-  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/automation-config"]["get"]["responses"][200]["content"]["application/json"]["repositoryOptions"][number];
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/trigger-config"]["get"]["responses"][200]["content"]["application/json"]["repositoryOptions"][number];
 export type LaunchableSandboxProfile = ListLaunchableSandboxProfilesResponse["items"][number];
 export type LaunchableSandboxProfilesResult = ListLaunchableSandboxProfilesResponse;
 export type KeysetPageCursor = NonNullable<SandboxProfilesListResult["nextPage"]>;
@@ -75,12 +75,12 @@ export type SandboxProfileVersionPublishability =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/publishability"]["get"]["responses"][200]["content"]["application/json"];
 
 type SandboxProfileVersionDraftTriggerImpactResponse =
-  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/draft-automation-impact"]["get"]["responses"][200]["content"]["application/json"];
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/draft-trigger-impact"]["get"]["responses"][200]["content"]["application/json"];
 export type SandboxProfileVersionDraftTriggerImpact = Omit<
   SandboxProfileVersionDraftTriggerImpactResponse,
-  "affectedAutomations"
+  "affectedTriggers"
 > & {
-  affectedTriggers: SandboxProfileVersionDraftTriggerImpactResponse["affectedAutomations"];
+  affectedTriggers: SandboxProfileVersionDraftTriggerImpactResponse["affectedTriggers"];
 };
 export type SandboxProfileVersionDraftTriggerImpactTrigger =
   SandboxProfileVersionDraftTriggerImpact["affectedTriggers"][number];
@@ -118,4 +118,4 @@ export type SandboxProfileSetupScriptTestRuntimeConfig = Pick<
 export type SandboxProfileSetupAssistant =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/setup-script/assistant"]["post"]["responses"][201]["content"]["application/json"];
 export type SandboxProfileVersionTriggerConfig =
-  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/automation-config"]["get"]["responses"][200]["content"]["application/json"];
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/trigger-config"]["get"]["responses"][200]["content"]["application/json"];

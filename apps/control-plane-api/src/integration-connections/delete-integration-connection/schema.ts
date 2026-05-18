@@ -30,7 +30,7 @@ export const DeleteIntegrationConnectionNotFoundResponseSchema = createCodeMessa
 export const DeleteIntegrationConnectionConflictResponseSchema = createCodeMessageErrorSchema(
   z.union([
     z.literal(IntegrationConnectionsConflictCodes.CONNECTION_HAS_BINDINGS),
-    z.literal(IntegrationConnectionsConflictCodes.CONNECTION_HAS_AUTOMATIONS),
+    z.literal(IntegrationConnectionsConflictCodes.CONNECTION_HAS_TRIGGERS),
     z.literal(IntegrationConnectionsConflictCodes.CONNECTION_USED_BY_IDENTITY_LINKING),
   ]),
 );

@@ -1,6 +1,0 @@
-export const AUTOMATIONS_ROUTE_BASE_PATH = "/v1/automations";
-
-export const AutomationsBadRequestCodes = {
-  INVALID_LIST_AUTOMATIONS_INPUT: "INVALID_LIST_AUTOMATIONS_INPUT",
-  INVALID_PAGINATION_CURSOR: "INVALID_PAGINATION_CURSOR",
-} as const;

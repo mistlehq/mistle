@@ -5,7 +5,7 @@
 import { randomUUID } from "node:crypto";
 
 import {
-  AutomationKinds,
+  TriggerKinds,
   SandboxProfileStatuses,
   ScheduleTargetTypes,
 } from "@mistle/db/control-plane";
@@ -66,16 +66,16 @@ describe.concurrent("request delete sandbox profile integration", () => {
         sandboxProfileId: ids.profileId,
         sandboxProfileVersion: 1,
       });
-    await env.controlPlaneDb.insert(env.controlPlaneTables.automations).values({
-      id: ids.automationId,
+    await env.controlPlaneDb.insert(env.controlPlaneTables.triggers).values({
+      id: ids.triggerId,
       organizationId: session.organizationId,
-      kind: AutomationKinds.WEBHOOK,
-      name: "Delete Profile Worker Automation",
+      kind: TriggerKinds.WEBHOOK,
+      name: "Delete Profile Worker Trigger",
       enabled: true,
     });
-    await env.controlPlaneDb.insert(env.controlPlaneTables.automationTargets).values({
-      id: ids.automationTargetId,
-      automationId: ids.automationId,
+    await env.controlPlaneDb.insert(env.controlPlaneTables.triggerTargets).values({
+      id: ids.triggerTargetId,
+      triggerId: ids.triggerId,
       sandboxProfileId: ids.profileId,
       sandboxProfileVersion: 1,
     });
@@ -93,19 +93,19 @@ describe.concurrent("request delete sandbox profile integration", () => {
       profileId: ids.profileId,
     });
 
-    const persistedAutomation = await env.controlPlaneDb.query.automations.findFirst({
-      where: (table, { eq }) => eq(table.id, ids.automationId),
+    const persistedTrigger = await env.controlPlaneDb.query.triggers.findFirst({
+      where: (table, { eq }) => eq(table.id, ids.triggerId),
     });
-    const persistedTarget = await env.controlPlaneDb.query.automationTargets.findFirst({
-      where: (table, { eq }) => eq(table.id, ids.automationTargetId),
+    const persistedTarget = await env.controlPlaneDb.query.triggerTargets.findFirst({
+      where: (table, { eq }) => eq(table.id, ids.triggerTargetId),
     });
     const persistedSchedule = await env.controlPlaneDb.query.schedules.findFirst({
       where: (table, { eq }) => eq(table.id, ids.scheduleId),
     });
 
-    expect(persistedAutomation).toEqual(
+    expect(persistedTrigger).toEqual(
       expect.objectContaining({
-        id: ids.automationId,
+        id: ids.triggerId,
       }),
     );
     expect(persistedTarget).toBeUndefined();
@@ -122,16 +122,16 @@ describe.concurrent("request delete sandbox profile integration", () => {
 function createDeleteProfileIds(): {
   profileId: string;
   scheduleId: string;
-  automationId: string;
-  automationTargetId: string;
+  triggerId: string;
+  triggerTargetId: string;
 } {
   const suffix = randomUUID().replaceAll("-", "").slice(0, 12);
 
   return {
     profileId: `sbp_delete_${suffix}`,
     scheduleId: `sch_delete_${suffix}`,
-    automationId: `atm_delete_${suffix}`,
-    automationTargetId: `atg_delete_${suffix}`,
+    triggerId: `atm_delete_${suffix}`,
+    triggerTargetId: `atg_delete_${suffix}`,
   };
 }
 

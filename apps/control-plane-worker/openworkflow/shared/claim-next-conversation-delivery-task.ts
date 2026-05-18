@@ -1,5 +1,5 @@
 import {
-  AutomationConversationDeliveryTaskStatuses,
+  TriggerConversationDeliveryTaskStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
   getControlPlaneDatabaseSchema,
@@ -11,7 +11,7 @@ export type ClaimNextConversationDeliveryTaskInput = {
   generation: number;
 };
 
-export async function claimNextAutomationConversationDeliveryTask(
+export async function claimNextTriggerConversationDeliveryTask(
   ctx: {
     db: ControlPlaneDatabase | ControlPlaneTransaction;
   },
@@ -20,11 +20,11 @@ export async function claimNextAutomationConversationDeliveryTask(
   return ctx.db.transaction(async (tx) => {
     const tables = getControlPlaneDatabaseSchema(tx);
 
-    const nextTask = await tx.query.automationConversationDeliveryTasks.findFirst({
+    const nextTask = await tx.query.triggerConversationDeliveryTasks.findFirst({
       where: (table, { and: whereAnd, eq: whereEq }) =>
         whereAnd(
           whereEq(table.conversationId, input.conversationId),
-          whereEq(table.status, AutomationConversationDeliveryTaskStatuses.QUEUED),
+          whereEq(table.status, TriggerConversationDeliveryTaskStatuses.QUEUED),
         ),
       orderBy: (table, { asc: orderAsc }) => [
         orderAsc(table.sourceOrderKey),
@@ -37,21 +37,21 @@ export async function claimNextAutomationConversationDeliveryTask(
     }
 
     const updatedRows = await tx
-      .update(tables.automationConversationDeliveryTasks)
+      .update(tables.triggerConversationDeliveryTasks)
       .set({
-        status: AutomationConversationDeliveryTaskStatuses.CLAIMED,
+        status: TriggerConversationDeliveryTaskStatuses.CLAIMED,
         processorGeneration: input.generation,
-        attemptCount: sql`${tables.automationConversationDeliveryTasks.attemptCount} + 1`,
+        attemptCount: sql`${tables.triggerConversationDeliveryTasks.attemptCount} + 1`,
         claimedAt: sql`now()`,
         deliveryStartedAt: null,
         updatedAt: sql`now()`,
       })
       .where(
         and(
-          eq(tables.automationConversationDeliveryTasks.id, nextTask.id),
+          eq(tables.triggerConversationDeliveryTasks.id, nextTask.id),
           eq(
-            tables.automationConversationDeliveryTasks.status,
-            AutomationConversationDeliveryTaskStatuses.QUEUED,
+            tables.triggerConversationDeliveryTasks.status,
+            TriggerConversationDeliveryTaskStatuses.QUEUED,
           ),
         ),
       )

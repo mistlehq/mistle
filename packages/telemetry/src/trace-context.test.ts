@@ -43,7 +43,7 @@ describe("extractActiveW3cTraceCarrier", () => {
           }),
         ),
         propagation.createBaggage({
-          automation: {
+          trigger: {
             value: "webhook",
           },
         }),
@@ -54,7 +54,7 @@ describe("extractActiveW3cTraceCarrier", () => {
     expect(carrier).toEqual({
       traceparent: "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01",
       tracestate: "vendor=value",
-      baggage: "automation=webhook",
+      baggage: "trigger=webhook",
     });
   });
 

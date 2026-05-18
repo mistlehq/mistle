@@ -9,7 +9,7 @@ export type SandboxRuntimeTelemetryContext = {
   webhookEventId?: string | undefined;
   deliveryTaskId?: string | undefined;
   externalDeliveryId?: string | undefined;
-  automationRunId?: string | undefined;
+  triggerRunId?: string | undefined;
   conversationId?: string | undefined;
 };
 
@@ -29,9 +29,7 @@ export function createSandboxRuntimeTelemetryAttributes(
     ...(input.externalDeliveryId === undefined
       ? {}
       : { "mistle.webhook.external_delivery_id": input.externalDeliveryId }),
-    ...(input.automationRunId === undefined
-      ? {}
-      : { "mistle.automation.run_id": input.automationRunId }),
+    ...(input.triggerRunId === undefined ? {} : { "mistle.trigger.run_id": input.triggerRunId }),
     ...(input.conversationId === undefined
       ? {}
       : { "mistle.conversation.id": input.conversationId }),

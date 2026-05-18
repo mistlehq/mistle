@@ -68,7 +68,7 @@ describe("webhook triggers types", () => {
 
   it("parses delete responses", () => {
     const parsed = DeleteWebhookTriggerResultSchema.parse({
-      automationId: "aut_123",
+      triggerId: "aut_123",
     });
 
     expect(parsed).toEqual({

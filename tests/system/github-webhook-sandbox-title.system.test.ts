@@ -6,12 +6,12 @@ import { describe, expect } from "vitest";
 import { z } from "zod";
 
 import {
-  hasRequiredGitHubWebhookAutomationEnv,
+  hasRequiredGitHubWebhookTriggerEnv,
   SandboxReadyTimeoutMs,
-  startGitHubWebhookAutomationConversation,
+  startGitHubWebhookTriggerConversation,
   TestTimeoutMs,
   waitForCondition,
-} from "./helpers/github-webhook-automation.js";
+} from "./helpers/github-webhook-trigger.js";
 import { it } from "./system-test-context.js";
 
 const SandboxInstanceStatusResponseSchema = z.looseObject({
@@ -22,16 +22,16 @@ const SandboxInstanceStatusResponseSchema = z.looseObject({
   failureCode: z.string().nullable(),
   failureMessage: z.string().nullable(),
   runtimeContext: z.unknown().nullable().optional(),
-  automationConversation: z.unknown().nullable().optional(),
+  triggerConversation: z.unknown().nullable().optional(),
 });
 
-const describeIf = hasRequiredGitHubWebhookAutomationEnv() ? describe : describe.skip;
+const describeIf = hasRequiredGitHubWebhookTriggerEnv() ? describe : describe.skip;
 
 describeIf("system GitHub webhook sandbox title seeding", () => {
   it(
-    "seeds a non-empty sandbox title after a real GitHub webhook automation delivery",
+    "seeds a non-empty sandbox title after a real GitHub webhook trigger delivery",
     async ({ fixture }) => {
-      const conversation = await startGitHubWebhookAutomationConversation({
+      const conversation = await startGitHubWebhookTriggerConversation({
         fixture,
       });
 

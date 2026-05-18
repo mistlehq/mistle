@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 
 import {
-  HandleAutomationConversationDeliveryWorkflowSpec,
-  HandleAutomationRunWorkflowSpec,
+  HandleTriggerConversationDeliveryWorkflowSpec,
+  HandleTriggerRunWorkflowSpec,
   HandleIntegrationWebhookEventWorkflowSpec,
   ProvisionStripeCustomerWorkflowSpec,
   RequestDeleteSandboxProfileWorkflowSpec,
@@ -25,8 +25,8 @@ describe("control-plane workflow registry", () => {
       StartSandboxProfileInstanceWorkflowSpec,
       HandleIntegrationWebhookEventWorkflowSpec,
       SyncIntegrationConnectionResourcesWorkflowSpec,
-      HandleAutomationRunWorkflowSpec,
-      HandleAutomationConversationDeliveryWorkflowSpec,
+      HandleTriggerRunWorkflowSpec,
+      HandleTriggerConversationDeliveryWorkflowSpec,
       ScheduleDispatchWorkflowSpec,
       ScheduleDispatchBatchWorkflowSpec,
     ]).toEqual([

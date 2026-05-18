@@ -27,7 +27,7 @@ type TestServer = {
 
 const openServers = new Set<TestServer>();
 
-const RenderedAutomationInput = "Investigate this failed deploy and summarize the root cause.";
+const RenderedTriggerInput = "Investigate this failed deploy and summarize the root cause.";
 
 function createDeferred<T>(): Deferred<T> {
   let resolveFn: ((value: T) => void) | undefined;
@@ -171,7 +171,7 @@ afterEach(async () => {
 
 describe("buildCodexConversationTitleGenerationPrompt", () => {
   it("uses the delivered input as the title source", () => {
-    const prompt = buildCodexConversationTitleGenerationPrompt(RenderedAutomationInput);
+    const prompt = buildCodexConversationTitleGenerationPrompt(RenderedTriggerInput);
 
     expect(prompt).toContain("Investigate this failed deploy");
     expect(prompt).not.toContain("Webhook context:");
@@ -199,7 +199,7 @@ describe("generateConversationTitleWithSandboxCodexExec", () => {
 
     const titlePromise = generateConversationTitleWithSandboxCodexExec({
       connectionUrl: server.url,
-      inputText: RenderedAutomationInput,
+      inputText: RenderedTriggerInput,
     });
 
     const openRequest = await server.openRequest;

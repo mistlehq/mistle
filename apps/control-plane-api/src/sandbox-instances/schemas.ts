@@ -69,7 +69,7 @@ export const sandboxInstanceStatusResponseSchema = z
       })
       .strict()
       .nullable(),
-    automationConversation: z
+    triggerConversation: z
       .object({
         conversationId: z.string().min(1),
         routeId: z.string().min(1).nullable(),

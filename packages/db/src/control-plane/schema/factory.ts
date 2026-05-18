@@ -3,13 +3,6 @@ import { pgSchema } from "drizzle-orm/pg-core";
 import { defineAccounts } from "./accounts.js";
 import { defineApiKeyPermissions } from "./api-key-permissions.js";
 import { defineApiKeys } from "./api-keys.js";
-import { defineAutomationConversationDeliveryProcessors } from "./automation-conversation-delivery-processors.js";
-import { defineAutomationConversationDeliveryTasks } from "./automation-conversation-delivery-tasks.js";
-import { defineAutomationConversationRoutes } from "./automation-conversation-routes.js";
-import { defineAutomationConversations } from "./automation-conversations.js";
-import { defineAutomationRuns } from "./automation-runs.js";
-import { defineAutomationTargets } from "./automation-targets.js";
-import { defineAutomations } from "./automations.js";
 import { defineIdentityLinkRedirectSessions } from "./identity-link-redirect-sessions.js";
 import { defineIntegrationConnectionCredentials } from "./integration-connection-credentials.js";
 import { defineIntegrationConnectionDeviceAuthorizationAttempts } from "./integration-connection-device-authorization-attempts.js";
@@ -34,19 +27,26 @@ import { defineSandboxProfileVersionIntegrationBindings } from "./sandbox-profil
 import { defineSandboxProfileVersionSnapshotJobs } from "./sandbox-profile-version-snapshot-jobs.js";
 import { defineSandboxProfileVersions } from "./sandbox-profile-versions.js";
 import { defineSandboxProfiles } from "./sandbox-profiles.js";
-import { defineScheduleAutomations } from "./schedule-automations.js";
+import { defineScheduleTriggers } from "./schedule-triggers.js";
 import { defineScheduledActions } from "./scheduled-actions.js";
 import { defineSchedules } from "./schedules.js";
 import { defineSessions } from "./sessions.js";
 import { defineTeamMembers } from "./team-members.js";
 import { defineTeams } from "./teams.js";
+import { defineTriggerConversationDeliveryProcessors } from "./trigger-conversation-delivery-processors.js";
+import { defineTriggerConversationDeliveryTasks } from "./trigger-conversation-delivery-tasks.js";
+import { defineTriggerConversationRoutes } from "./trigger-conversation-routes.js";
+import { defineTriggerConversations } from "./trigger-conversations.js";
+import { defineTriggerRuns } from "./trigger-runs.js";
+import { defineTriggerTargets } from "./trigger-targets.js";
+import { defineTriggers } from "./triggers.js";
 import { defineUserExternalPrincipalCredentialSecrets } from "./user-external-principal-credential-secrets.js";
 import { defineUserExternalPrincipalCredentials } from "./user-external-principal-credentials.js";
 import { defineUserExternalPrincipalKeys } from "./user-external-principal-keys.js";
 import { defineUserExternalPrincipals } from "./user-external-principals.js";
 import { defineUsers } from "./users.js";
 import { defineVerifications } from "./verifications.js";
-import { defineWebhookAutomations } from "./webhook-automations.js";
+import { defineWebhookTriggers } from "./webhook-triggers.js";
 
 /**
  * Creates control-plane table objects bound to a specific Postgres schema.
@@ -60,14 +60,13 @@ export function createControlPlaneDbSchema(schemaName: string) {
   const accounts = defineAccounts(schema);
   const apiKeys = defineApiKeys(schema);
   const apiKeyPermissions = defineApiKeyPermissions(schema);
-  const automationConversationDeliveryProcessors =
-    defineAutomationConversationDeliveryProcessors(schema);
-  const automationConversationDeliveryTasks = defineAutomationConversationDeliveryTasks(schema);
-  const automationConversationRoutes = defineAutomationConversationRoutes(schema);
-  const automationConversations = defineAutomationConversations(schema);
-  const automationRuns = defineAutomationRuns(schema);
-  const automationTargets = defineAutomationTargets(schema);
-  const automations = defineAutomations(schema);
+  const triggerConversationDeliveryProcessors = defineTriggerConversationDeliveryProcessors(schema);
+  const triggerConversationDeliveryTasks = defineTriggerConversationDeliveryTasks(schema);
+  const triggerConversationRoutes = defineTriggerConversationRoutes(schema);
+  const triggerConversations = defineTriggerConversations(schema);
+  const triggerRuns = defineTriggerRuns(schema);
+  const triggerTargets = defineTriggerTargets(schema);
+  const triggers = defineTriggers(schema);
   const identityLinkRedirectSessions = defineIdentityLinkRedirectSessions(schema);
   const integrationConnectionCredentials = defineIntegrationConnectionCredentials(schema);
   const integrationConnectionDeviceAuthorizationAttempts =
@@ -95,7 +94,7 @@ export function createControlPlaneDbSchema(schemaName: string) {
   const sandboxProfileVersionSnapshotJobs = defineSandboxProfileVersionSnapshotJobs(schema);
   const sandboxProfileVersions = defineSandboxProfileVersions(schema);
   const sandboxProfiles = defineSandboxProfiles(schema);
-  const scheduleAutomations = defineScheduleAutomations(schema);
+  const scheduleTriggers = defineScheduleTriggers(schema);
   const scheduledActions = defineScheduledActions(schema);
   const schedules = defineSchedules(schema);
   const sessions = defineSessions(schema);
@@ -108,7 +107,7 @@ export function createControlPlaneDbSchema(schemaName: string) {
   const userExternalPrincipals = defineUserExternalPrincipals(schema);
   const users = defineUsers(schema);
   const verifications = defineVerifications(schema);
-  const webhookAutomations = defineWebhookAutomations(schema);
+  const webhookTriggers = defineWebhookTriggers(schema);
   const integrationConnectionRelations = defineIntegrationConnectionRelations({
     integrationConnectionResourceStates,
     integrationConnectionResources,
@@ -124,13 +123,13 @@ export function createControlPlaneDbSchema(schemaName: string) {
     accounts,
     apiKeyPermissions,
     apiKeys,
-    automationConversationDeliveryProcessors,
-    automationConversationDeliveryTasks,
-    automationConversationRoutes,
-    automationConversations,
-    automationRuns,
-    automationTargets,
-    automations,
+    triggerConversationDeliveryProcessors,
+    triggerConversationDeliveryTasks,
+    triggerConversationRoutes,
+    triggerConversations,
+    triggerRuns,
+    triggerTargets,
+    triggers,
     identityLinkRedirectSessions,
     integrationConnectionCredentials,
     integrationConnectionDeviceAuthorizationAttempts,
@@ -154,7 +153,7 @@ export function createControlPlaneDbSchema(schemaName: string) {
     sandboxProfileVersionSnapshotJobs,
     sandboxProfileVersions,
     sandboxProfiles,
-    scheduleAutomations,
+    scheduleTriggers,
     scheduledActions,
     schedules,
     sessions,
@@ -166,7 +165,7 @@ export function createControlPlaneDbSchema(schemaName: string) {
     userExternalPrincipals,
     users,
     verifications,
-    webhookAutomations,
+    webhookTriggers,
     ...integrationConnectionRelations,
   };
 }

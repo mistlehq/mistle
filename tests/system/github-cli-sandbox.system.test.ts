@@ -82,7 +82,7 @@ const SandboxInstanceStatusResponseSchema = z.looseObject({
   failureCode: z.string().min(1).nullable(),
   failureMessage: z.string().min(1).nullable(),
   runtimeContext: z.unknown().nullable().optional(),
-  automationConversation: z.unknown().nullable().optional(),
+  triggerConversation: z.unknown().nullable().optional(),
 });
 
 const SandboxInstanceConnectionTokenResponseSchema = z

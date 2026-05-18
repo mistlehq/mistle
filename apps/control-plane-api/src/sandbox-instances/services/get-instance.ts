@@ -1,22 +1,22 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import {
-  AutomationConversationRouteStatuses,
-  AutomationConversationStatuses,
+  TriggerConversationRouteStatuses,
+  TriggerConversationStatuses,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 
 import { SandboxInstancesNotFoundCodes, SandboxInstancesNotFoundError } from "../errors.js";
 import { resolveSandboxInstanceRuntimeContext } from "./runtime-context.js";
-import type { SandboxInstanceAutomationConversation, SandboxInstanceStatus } from "./types.js";
+import type { SandboxInstanceTriggerConversation, SandboxInstanceStatus } from "./types.js";
 
-async function resolveAutomationConversation(
+async function resolveTriggerConversation(
   db: ControlPlaneDatabase,
   input: {
     organizationId: string;
     instanceId: string;
   },
-): Promise<SandboxInstanceAutomationConversation | null> {
-  const routes = await db.query.automationConversationRoutes.findMany({
+): Promise<SandboxInstanceTriggerConversation | null> {
+  const routes = await db.query.triggerConversationRoutes.findMany({
     columns: {
       updatedAt: true,
       id: true,
@@ -26,18 +26,18 @@ async function resolveAutomationConversation(
     where: (table, { and, eq }) =>
       and(
         eq(table.sandboxInstanceId, input.instanceId),
-        eq(table.status, AutomationConversationRouteStatuses.ACTIVE),
+        eq(table.status, TriggerConversationRouteStatuses.ACTIVE),
       ),
   });
 
   const matchingRoutes: Array<
-    SandboxInstanceAutomationConversation & {
+    SandboxInstanceTriggerConversation & {
       updatedAt: string;
     }
   > = [];
 
   for (const route of routes) {
-    const conversation = await db.query.automationConversations.findFirst({
+    const conversation = await db.query.triggerConversations.findFirst({
       columns: {
         id: true,
       },
@@ -46,8 +46,8 @@ async function resolveAutomationConversation(
           eq(table.id, route.conversationId),
           eq(table.organizationId, input.organizationId),
           or(
-            eq(table.status, AutomationConversationStatuses.PENDING),
-            eq(table.status, AutomationConversationStatuses.ACTIVE),
+            eq(table.status, TriggerConversationStatuses.PENDING),
+            eq(table.status, TriggerConversationStatuses.ACTIVE),
           ),
         ),
     });
@@ -112,7 +112,7 @@ export async function getInstance(
     );
   }
 
-  const automationConversation = await resolveAutomationConversation(db, input);
+  const triggerConversation = await resolveTriggerConversation(db, input);
 
   return {
     id: sandboxInstance.id,
@@ -124,7 +124,7 @@ export async function getInstance(
     runtimeContext: resolveSandboxInstanceRuntimeContext({
       runtimePlan: sandboxInstance.runtimePlan,
     }),
-    automationConversation,
+    triggerConversation,
     startupOperation: sandboxInstance.startupOperation,
   };
 }

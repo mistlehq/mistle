@@ -22,7 +22,7 @@ export const SlackAppManifestBotEvents = [
 export const SlackAppManifestTemplate = {
   display_information: {
     name: "Mistle",
-    description: "Connect Slack events and messages to Mistle automations.",
+    description: "Connect Slack events and messages to Mistle triggers.",
     background_color: "#2f855a",
   },
   features: {

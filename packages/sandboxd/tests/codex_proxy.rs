@@ -774,7 +774,7 @@ fn session_manager_auto_releases_retained_threads_on_non_active_status() {
 }
 
 #[test]
-fn automation_turn_start_buffers_success_until_retention_succeeds() {
+fn trigger_turn_start_buffers_success_until_retention_succeeds() {
     let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
     let raw_port = raw_listener
         .local_addr()
@@ -830,7 +830,7 @@ fn automation_turn_start_buffers_success_until_retention_succeeds() {
         );
         assert_eq!(
             turn_start_request["params"]["threadId"],
-            Value::String("thr_automation".to_string())
+            Value::String("thr_trigger".to_string())
         );
         client_socket
             .send(Message::Text(
@@ -838,7 +838,7 @@ fn automation_turn_start_buffers_success_until_retention_succeeds() {
                     "id": turn_start_request["id"],
                     "result": {
                         "turn": {
-                            "id": "turn_automation",
+                            "id": "turn_trigger",
                             "status": "inProgress"
                         }
                     }
@@ -852,7 +852,7 @@ fn automation_turn_start_buffers_success_until_retention_succeeds() {
                 json!({
                     "method": "turn/started",
                     "params": {
-                        "turnId": "turn_automation"
+                        "turnId": "turn_trigger"
                     }
                 })
                 .to_string()
@@ -861,7 +861,7 @@ fn automation_turn_start_buffers_success_until_retention_succeeds() {
             .expect("notification should send");
 
         let retain_request = read_json_text_message(&mut manager_socket);
-        assert_metadata_only_thread_resume_request(&retain_request, "thr_automation");
+        assert_metadata_only_thread_resume_request(&retain_request, "thr_trigger");
 
         release_retention_receiver
             .recv()
@@ -873,7 +873,7 @@ fn automation_turn_start_buffers_success_until_retention_succeeds() {
                     "id": retain_request["id"],
                     "result": {
                         "thread": {
-                            "id": "thr_automation",
+                            "id": "thr_trigger",
                             "status": {
                                 "type": "active",
                                 "activeFlags": []
@@ -919,7 +919,7 @@ fn automation_turn_start_buffers_success_until_retention_succeeds() {
                 "id": turn_start_id,
                 "method": "turn/start",
                 "params": {
-                    "threadId": "thr_automation",
+                    "threadId": "thr_trigger",
                     "input": []
                 }
             })
@@ -939,7 +939,7 @@ fn automation_turn_start_buffers_success_until_retention_succeeds() {
     assert_eq!(success_response["id"], json!(turn_start_id));
     assert_eq!(
         success_response["result"]["turn"]["id"],
-        json!("turn_automation")
+        json!("turn_trigger")
     );
 
     server_shutdown_sender
@@ -955,7 +955,7 @@ fn automation_turn_start_buffers_success_until_retention_succeeds() {
 }
 
 #[test]
-fn automation_turn_start_returns_proxy_error_when_retention_fails() {
+fn trigger_turn_start_returns_proxy_error_when_retention_fails() {
     let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
     let raw_port = raw_listener
         .local_addr()
@@ -1098,7 +1098,7 @@ fn automation_turn_start_returns_proxy_error_when_retention_fails() {
 }
 
 #[test]
-fn automation_turn_steer_buffers_success_until_retention_succeeds() {
+fn trigger_turn_steer_buffers_success_until_retention_succeeds() {
     let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
     let raw_port = raw_listener
         .local_addr()
@@ -1269,7 +1269,7 @@ fn automation_turn_steer_buffers_success_until_retention_succeeds() {
 }
 
 #[test]
-fn non_automation_turn_start_remains_passthrough() {
+fn non_trigger_turn_start_remains_passthrough() {
     let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
     let raw_port = raw_listener
         .local_addr()

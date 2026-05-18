@@ -41,7 +41,7 @@ export type SandboxInstancePortAccess = {
   expiresAt: string;
 };
 
-export type SandboxInstanceAutomationConversation = {
+export type SandboxInstanceTriggerConversation = {
   conversationId: string;
   routeId: string | null;
   providerConversationId: string | null;
@@ -55,7 +55,7 @@ export type SandboxInstanceStatus = {
   failureCode: string | null;
   failureMessage: string | null;
   runtimeContext: SandboxInstanceRuntimeContext | null;
-  automationConversation: SandboxInstanceAutomationConversation | null;
+  triggerConversation: SandboxInstanceTriggerConversation | null;
   startupOperation: NonNullable<GetSandboxInstanceResponse>["startupOperation"];
 };
 

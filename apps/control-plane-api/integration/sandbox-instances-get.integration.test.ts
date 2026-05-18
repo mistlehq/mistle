@@ -3,10 +3,10 @@
  */
 
 import {
-  AutomationConversationCreatedByKinds,
-  AutomationConversationOwnerKinds,
-  AutomationConversationRouteStatuses,
-  AutomationConversationStatuses,
+  TriggerConversationCreatedByKinds,
+  TriggerConversationOwnerKinds,
+  TriggerConversationRouteStatuses,
+  TriggerConversationStatuses,
   SandboxProfileStatuses,
 } from "@mistle/db/control-plane";
 import { SandboxInstancePurposes, SandboxInstanceStatuses } from "@mistle/db/data-plane";
@@ -25,9 +25,7 @@ const it = createIntegrationTest({
 });
 
 describe.concurrent("sandbox instances get integration", () => {
-  it("includes active automation conversation metadata for route-bound sandboxes", async ({
-    env,
-  }) => {
+  it("includes active trigger conversation metadata for route-bound sandboxes", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-instances-get-route-bound@example.com",
     });
@@ -37,14 +35,14 @@ describe.concurrent("sandbox instances get integration", () => {
       sandboxInstanceId: "sbi_cp_get_route_bound_001",
       title: "Webhook investigation",
     });
-    await seedAutomationConversation(env, {
+    await seedTriggerConversation(env, {
       organizationId: session.organizationId,
       sandboxInstanceId: "sbi_cp_get_route_bound_001",
       sandboxProfileId: "sbp_cp_get_route_bound_001",
       conversationId: "cnv_cp_get_route_bound_001",
       routeId: "cvr_cp_get_route_bound_001",
       providerConversationId: "thread_cp_get_route_bound_001",
-      conversationStatus: AutomationConversationStatuses.ACTIVE,
+      conversationStatus: TriggerConversationStatuses.ACTIVE,
     });
 
     const response = await env.controlPlaneApi.http.fetch(
@@ -64,7 +62,7 @@ describe.concurrent("sandbox instances get integration", () => {
       title: "Webhook investigation",
       status: SandboxInstanceStatuses.PENDING,
       connectable: false,
-      automationConversation: {
+      triggerConversation: {
         conversationId: "cnv_cp_get_route_bound_001",
         routeId: "cvr_cp_get_route_bound_001",
         providerConversationId: "thread_cp_get_route_bound_001",
@@ -72,7 +70,7 @@ describe.concurrent("sandbox instances get integration", () => {
     });
   });
 
-  it("includes pending automation conversation metadata while the route is preparing", async ({
+  it("includes pending trigger conversation metadata while the route is preparing", async ({
     env,
   }) => {
     const session = await env.auth.createSession({
@@ -84,14 +82,14 @@ describe.concurrent("sandbox instances get integration", () => {
       sandboxInstanceId: "sbi_cp_get_pending_route_001",
       title: null,
     });
-    await seedAutomationConversation(env, {
+    await seedTriggerConversation(env, {
       organizationId: session.organizationId,
       sandboxInstanceId: "sbi_cp_get_pending_route_001",
       sandboxProfileId: "sbp_cp_get_pending_route_001",
       conversationId: "cnv_cp_get_pending_route_001",
       routeId: "cvr_cp_get_pending_route_001",
       providerConversationId: null,
-      conversationStatus: AutomationConversationStatuses.PENDING,
+      conversationStatus: TriggerConversationStatuses.PENDING,
     });
 
     const response = await env.controlPlaneApi.http.fetch(
@@ -106,16 +104,14 @@ describe.concurrent("sandbox instances get integration", () => {
     expect(response.status).toBe(200);
     const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
 
-    expect(body.automationConversation).toEqual({
+    expect(body.triggerConversation).toEqual({
       conversationId: "cnv_cp_get_pending_route_001",
       routeId: "cvr_cp_get_pending_route_001",
       providerConversationId: null,
     });
   });
 
-  it("returns null automation conversation metadata when the sandbox is unbound", async ({
-    env,
-  }) => {
+  it("returns null trigger conversation metadata when the sandbox is unbound", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-instances-get-unbound@example.com",
     });
@@ -137,10 +133,10 @@ describe.concurrent("sandbox instances get integration", () => {
 
     expect(response.status).toBe(200);
     const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
-    expect(body.automationConversation).toBeNull();
+    expect(body.triggerConversation).toBeNull();
   });
 
-  it("returns the most recently updated active automation conversation route", async ({ env }) => {
+  it("returns the most recently updated active trigger conversation route", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-instances-get-newest-route@example.com",
     });
@@ -150,24 +146,24 @@ describe.concurrent("sandbox instances get integration", () => {
       sandboxInstanceId: "sbi_cp_get_newest_route_001",
       title: null,
     });
-    await seedAutomationConversation(env, {
+    await seedTriggerConversation(env, {
       organizationId: session.organizationId,
       sandboxInstanceId: "sbi_cp_get_newest_route_001",
       sandboxProfileId: "sbp_cp_get_newest_route_001",
       conversationId: "cnv_cp_get_newest_route_old",
       routeId: "cvr_cp_get_newest_route_old",
       providerConversationId: "thread_cp_get_newest_route_old",
-      conversationStatus: AutomationConversationStatuses.ACTIVE,
+      conversationStatus: TriggerConversationStatuses.ACTIVE,
       routeUpdatedAt: "2026-03-21T00:00:01.000Z",
     });
-    await seedAutomationConversation(env, {
+    await seedTriggerConversation(env, {
       organizationId: session.organizationId,
       sandboxInstanceId: "sbi_cp_get_newest_route_001",
       sandboxProfileId: "sbp_cp_get_newest_route_001",
       conversationId: "cnv_cp_get_newest_route_new",
       routeId: "cvr_cp_get_newest_route_new",
       providerConversationId: null,
-      conversationStatus: AutomationConversationStatuses.ACTIVE,
+      conversationStatus: TriggerConversationStatuses.ACTIVE,
       routeUpdatedAt: "2026-03-21T00:00:02.000Z",
     });
 
@@ -182,7 +178,7 @@ describe.concurrent("sandbox instances get integration", () => {
 
     expect(response.status).toBe(200);
     const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
-    expect(body.automationConversation).toEqual({
+    expect(body.triggerConversation).toEqual({
       conversationId: "cnv_cp_get_newest_route_new",
       routeId: "cvr_cp_get_newest_route_new",
       providerConversationId: null,
@@ -258,7 +254,7 @@ describe.concurrent("sandbox instances get integration", () => {
       failureMessage: null,
       runtimeContext: null,
       startupOperation: null,
-      automationConversation: null,
+      triggerConversation: null,
     });
   });
 
@@ -351,7 +347,7 @@ async function insertSandboxInstance(
   });
 }
 
-async function seedAutomationConversation(
+async function seedTriggerConversation(
   env: IntegrationTestEnvironment,
   input: {
     organizationId: string;
@@ -361,8 +357,8 @@ async function seedAutomationConversation(
     routeId: string;
     providerConversationId: string | null;
     conversationStatus:
-      | typeof AutomationConversationStatuses.ACTIVE
-      | typeof AutomationConversationStatuses.PENDING;
+      | typeof TriggerConversationStatuses.ACTIVE
+      | typeof TriggerConversationStatuses.PENDING;
     routeUpdatedAt?: string;
   },
 ): Promise<void> {
@@ -377,12 +373,12 @@ async function seedAutomationConversation(
     .onConflictDoNothing({
       target: env.controlPlaneTables.sandboxProfiles.id,
     });
-  await env.controlPlaneDb.insert(env.controlPlaneTables.automationConversations).values({
+  await env.controlPlaneDb.insert(env.controlPlaneTables.triggerConversations).values({
     id: input.conversationId,
     organizationId: input.organizationId,
-    ownerKind: AutomationConversationOwnerKinds.AUTOMATION_TARGET,
+    ownerKind: TriggerConversationOwnerKinds.TRIGGER_TARGET,
     ownerId: `aut_${input.conversationId}`,
-    createdByKind: AutomationConversationCreatedByKinds.WEBHOOK,
+    createdByKind: TriggerConversationCreatedByKinds.WEBHOOK,
     createdById: `iwe_${input.conversationId}`,
     sandboxProfileId: input.sandboxProfileId,
     integrationFamilyId: "openai",
@@ -390,14 +386,14 @@ async function seedAutomationConversation(
     conversationKey: `conversation-${input.conversationId}`,
     status: input.conversationStatus,
   });
-  await env.controlPlaneDb.insert(env.controlPlaneTables.automationConversationRoutes).values({
+  await env.controlPlaneDb.insert(env.controlPlaneTables.triggerConversationRoutes).values({
     id: input.routeId,
     conversationId: input.conversationId,
     sandboxInstanceId: input.sandboxInstanceId,
     providerConversationId: input.providerConversationId,
     providerExecutionId: null,
     providerState: null,
-    status: AutomationConversationRouteStatuses.ACTIVE,
+    status: TriggerConversationRouteStatuses.ACTIVE,
     ...(input.routeUpdatedAt === undefined ? {} : { updatedAt: input.routeUpdatedAt }),
   });
 }

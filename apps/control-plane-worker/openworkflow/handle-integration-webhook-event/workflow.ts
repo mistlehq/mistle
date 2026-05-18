@@ -1,5 +1,5 @@
 import {
-  HandleAutomationRunWorkflowSpec,
+  HandleTriggerRunWorkflowSpec,
   HandleIntegrationWebhookEventWorkflowSpec,
 } from "@mistle/workflow-registry/control-plane";
 import { trace } from "@opentelemetry/api";
@@ -53,7 +53,7 @@ export const HandleIntegrationWebhookEventWorkflow = defineTracedControlPlaneWor
               integrationConnectionId: preparedEvent.integrationConnectionId,
               targetKey: preparedEvent.targetKey,
             }),
-            "mistle.automation.run.count": preparedEvent.automationRunIds.length,
+            "mistle.trigger.run.count": preparedEvent.triggerRunIds.length,
             "mistle.webhook.event_status": preparedEvent.webhookEventStatus,
             "mistle.webhook.finalized": preparedEvent.finalized,
             "mistle.webhook.resource_sync.count": preparedEvent.resourceSyncRequests.length,
@@ -70,7 +70,7 @@ export const HandleIntegrationWebhookEventWorkflow = defineTracedControlPlaneWor
           integrationConnectionId: preparedWebhookEvent.integrationConnectionId,
           targetKey: preparedWebhookEvent.targetKey,
         }),
-        "mistle.automation.run.count": preparedWebhookEvent.automationRunIds.length,
+        "mistle.trigger.run.count": preparedWebhookEvent.triggerRunIds.length,
         "mistle.webhook.event_status": preparedWebhookEvent.webhookEventStatus,
         "mistle.webhook.finalized": preparedWebhookEvent.finalized,
         "mistle.webhook.resource_sync.count": preparedWebhookEvent.resourceSyncRequests.length,
@@ -113,50 +113,50 @@ export const HandleIntegrationWebhookEventWorkflow = defineTracedControlPlaneWor
           );
         }
 
-        for (const automationRunId of preparedWebhookEvent.automationRunIds) {
-          const automationRunAttributes = createWebhookDeliveryTelemetryAttributes({
+        for (const triggerRunId of preparedWebhookEvent.triggerRunIds) {
+          const triggerRunAttributes = createWebhookDeliveryTelemetryAttributes({
             webhookEventId: preparedWebhookEvent.webhookEventId,
             externalDeliveryId: preparedWebhookEvent.externalDeliveryId ?? undefined,
-            automationRunId,
+            triggerRunId,
             integrationConnectionId: preparedWebhookEvent.integrationConnectionId,
             targetKey: preparedWebhookEvent.targetKey,
           });
 
           await withWebhookDeliverySpan(
             {
-              name: "webhook_event.automation_run.schedule",
+              name: "webhook_event.trigger_run.schedule",
               telemetryContext: {
                 webhookEventId: preparedWebhookEvent.webhookEventId,
                 externalDeliveryId: preparedWebhookEvent.externalDeliveryId ?? undefined,
-                automationRunId,
+                triggerRunId,
                 integrationConnectionId: preparedWebhookEvent.integrationConnectionId,
                 targetKey: preparedWebhookEvent.targetKey,
               },
             },
             async (span) => {
               await openWorkflow.runWorkflow(
-                HandleAutomationRunWorkflowSpec,
+                HandleTriggerRunWorkflowSpec,
                 {
-                  automationRunId,
+                  triggerRunId,
                 },
                 {
-                  idempotencyKey: automationRunId,
+                  idempotencyKey: triggerRunId,
                 },
               );
 
-              span.addEvent("automation_run.queued", automationRunAttributes);
+              span.addEvent("trigger_run.queued", triggerRunAttributes);
             },
           );
 
-          stepSpan?.addEvent("automation_run.schedule", automationRunAttributes);
+          stepSpan?.addEvent("trigger_run.schedule", triggerRunAttributes);
 
           logWebhookDeliveryEvent({
-            eventName: "automation_run.queued",
-            message: "Queued automation run from webhook event",
+            eventName: "trigger_run.queued",
+            message: "Queued trigger run from webhook event",
             telemetryContext: {
               webhookEventId: preparedWebhookEvent.webhookEventId,
               externalDeliveryId: preparedWebhookEvent.externalDeliveryId ?? undefined,
-              automationRunId,
+              triggerRunId,
               integrationConnectionId: preparedWebhookEvent.integrationConnectionId,
               targetKey: preparedWebhookEvent.targetKey,
             },

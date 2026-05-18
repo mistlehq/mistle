@@ -3,7 +3,7 @@
  */
 
 import {
-  AutomationKinds,
+  TriggerKinds,
   SandboxProfileVersionAgentRuntimeIds,
   SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionSnapshotJobStates,
@@ -461,16 +461,16 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
         createdAt: "2026-04-26T00:03:00.000Z",
         finishedAt: "2026-04-26T00:04:00.000Z",
       });
-    await env.controlPlaneDb.insert(env.controlPlaneTables.automations).values({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.triggers).values({
       id: "aut_version_retry_publish_snapshot_001",
       organizationId: session.organizationId,
-      kind: AutomationKinds.SCHEDULE,
-      name: "Retry Publish Snapshot Automation",
+      kind: TriggerKinds.SCHEDULE,
+      name: "Retry Publish Snapshot Trigger",
       enabled: true,
     });
-    await env.controlPlaneDb.insert(env.controlPlaneTables.automationTargets).values({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.triggerTargets).values({
       id: "atg_version_retry_publish_snapshot_001",
-      automationId: "aut_version_retry_publish_snapshot_001",
+      triggerId: "aut_version_retry_publish_snapshot_001",
       sandboxProfileId: "sbp_version_retry_publish_snapshot_001",
       sandboxProfileVersion: 1,
       primaryRepositoryId: null,
@@ -510,7 +510,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
       },
       where: (table, { eq }) => eq(table.id, "sbp_version_retry_publish_snapshot_001"),
     });
-    const persistedAutomationTarget = await env.controlPlaneDb.query.automationTargets.findFirst({
+    const persistedTriggerTarget = await env.controlPlaneDb.query.triggerTargets.findFirst({
       columns: {
         sandboxProfileVersion: true,
       },
@@ -518,7 +518,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
     });
 
     expect(persistedProfile?.activeVersion).toBe(1);
-    expect(persistedAutomationTarget?.sandboxProfileVersion).toBe(1);
+    expect(persistedTriggerTarget?.sandboxProfileVersion).toBe(1);
 
     const queuedWorkflowInput = await waitForQueuedMaterializeWorkflowInput({
       env,

@@ -61,7 +61,7 @@ export const Compact = {
           <AlertDialogHeader>
             <AlertDialogTitle>Revoke access token?</AlertDialogTitle>
             <AlertDialogDescription>
-              Existing automations that use this token will fail immediately.
+              Existing triggers that use this token will fail immediately.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -183,7 +183,7 @@ const SandboxInstanceStatusResponseSchema = z
         primaryRepositoryRoot: z.string().min(1).nullable(),
       })
       .nullable(),
-    automationConversation: z
+    triggerConversation: z
       .object({
         conversationId: z.string().min(1),
         routeId: z.string().min(1).nullable(),

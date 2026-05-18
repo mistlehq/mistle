@@ -13,21 +13,21 @@ import { describe, expect } from "vitest";
 import {
   AgentReplyTimeoutMs,
   createCodexTurnObserver,
-  hasRequiredGitHubWebhookAutomationEnv,
-  startGitHubWebhookAutomationConversation,
+  hasRequiredGitHubWebhookTriggerEnv,
+  startGitHubWebhookTriggerConversation,
   TestTimeoutMs,
   waitForCondition,
   waitForGitHubIssueComment,
-} from "./helpers/github-webhook-automation.js";
+} from "./helpers/github-webhook-trigger.js";
 import { it } from "./system-test-context.js";
 
-const describeIf = hasRequiredGitHubWebhookAutomationEnv() ? describe : describe.skip;
+const describeIf = hasRequiredGitHubWebhookTriggerEnv() ? describe : describe.skip;
 
 describeIf("system GitHub session link footer", () => {
   it(
-    "appends the session link footer when the automation conversation replies through gh issue comment",
+    "appends the session link footer when the trigger conversation replies through gh issue comment",
     async ({ fixture }) => {
-      const conversation = await startGitHubWebhookAutomationConversation({
+      const conversation = await startGitHubWebhookTriggerConversation({
         fixture,
       });
 

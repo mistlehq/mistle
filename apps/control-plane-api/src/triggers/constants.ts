@@ -1,0 +1,6 @@
+export const TRIGGERS_ROUTE_BASE_PATH = "/v1/triggers";
+
+export const TriggersBadRequestCodes = {
+  INVALID_LIST_TRIGGERS_INPUT: "INVALID_LIST_TRIGGERS_INPUT",
+  INVALID_PAGINATION_CURSOR: "INVALID_PAGINATION_CURSOR",
+} as const;

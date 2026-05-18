@@ -1,0 +1,54 @@
+import { type ControlPlaneDatabase, type ControlPlaneTransaction } from "@mistle/db/control-plane";
+import { BadRequestError } from "@mistle/http/errors.js";
+
+import { TriggerWebhooksBadRequestCodes } from "../constants.js";
+
+export async function resolveSandboxProfileTriggerReferenceOrThrow(
+  ctx: {
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
+  },
+  input: {
+    sandboxProfileId: string;
+    sandboxProfileVersion?: number | undefined;
+    integrationConnectionId: string;
+  },
+): Promise<number> {
+  const sandboxProfileVersion =
+    input.sandboxProfileVersion ??
+    (
+      await ctx.db.query.sandboxProfiles.findFirst({
+        columns: {
+          activeVersion: true,
+        },
+        where: (table, { eq }) => eq(table.id, input.sandboxProfileId),
+      })
+    )?.activeVersion;
+
+  if (!sandboxProfileVersion) {
+    throw new BadRequestError(
+      TriggerWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE,
+      "Sandbox profile must bind the selected integration connection to use its trigger triggers.",
+    );
+  }
+
+  const binding = await ctx.db.query.sandboxProfileVersionIntegrationBindings.findFirst({
+    columns: {
+      id: true,
+    },
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.sandboxProfileId, input.sandboxProfileId),
+        eq(table.sandboxProfileVersion, sandboxProfileVersion),
+        eq(table.connectionId, input.integrationConnectionId),
+      ),
+  });
+
+  if (binding === undefined) {
+    throw new BadRequestError(
+      TriggerWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE,
+      "Sandbox profile must bind the selected integration connection to use its trigger triggers.",
+    );
+  }
+
+  return sandboxProfileVersion;
+}

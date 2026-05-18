@@ -740,1169 +740,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/automations": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: {
-          after?: string;
-          before?: string;
-          enabled?: boolean;
-          kind?: "webhook" | "schedule";
-          limit?: number;
-          sandboxProfileId?: string;
-          search?: string;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description List automations for the active organization. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              items: {
-                enabled: boolean;
-                id: string;
-                issue?: {
-                  /** @enum {string} */
-                  code:
-                    | "MISSING_TARGET_METADATA"
-                    | "MISSING_WEBHOOK_SOURCE"
-                    | "MISSING_INTEGRATION_CONNECTION"
-                    | "MISSING_SANDBOX_PROFILE";
-                  message: string;
-                };
-                /** @enum {string} */
-                kind: "webhook" | "schedule";
-                name: string;
-                source:
-                  | {
-                      events: {
-                        label: string;
-                        logoKey?: string;
-                        unavailable?: boolean;
-                      }[];
-                      /** @enum {string} */
-                      kind: "webhook";
-                    }
-                  | {
-                      cronExpression: string;
-                      /** @enum {string} */
-                      kind: "schedule";
-                      nextScheduledAt: string | null;
-                      timezone: string;
-                    };
-                target: {
-                  primaryRepositoryId: string | null;
-                  primaryRepositoryName: string | null;
-                  sandboxProfileId: string;
-                  sandboxProfileName: string | null;
-                  sandboxProfileVersion: number;
-                };
-                updatedAt: string;
-              }[];
-              nextPage: {
-                after: string;
-                limit: number;
-              } | null;
-              previousPage: {
-                before: string;
-                limit: number;
-              } | null;
-              totalResults: number;
-            };
-          };
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json":
-              | {
-                  /** @enum {string} */
-                  code: "INVALID_LIST_AUTOMATIONS_INPUT" | "INVALID_PAGINATION_CURSOR";
-                  message: string;
-                }
-              | {
-                  /** @enum {string} */
-                  code: "VALIDATION_ERROR";
-                  message: string;
-                };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/v1/automations/{automationId}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          automationId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Get an automation summary. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              enabled: boolean;
-              id: string;
-              issue?: {
-                /** @enum {string} */
-                code:
-                  | "MISSING_TARGET_METADATA"
-                  | "MISSING_WEBHOOK_SOURCE"
-                  | "MISSING_INTEGRATION_CONNECTION"
-                  | "MISSING_SANDBOX_PROFILE";
-                message: string;
-              };
-              /** @enum {string} */
-              kind: "webhook" | "schedule";
-              name: string;
-              source:
-                | {
-                    events: {
-                      label: string;
-                      logoKey?: string;
-                      unavailable?: boolean;
-                    }[];
-                    /** @enum {string} */
-                    kind: "webhook";
-                  }
-                | {
-                    cronExpression: string;
-                    /** @enum {string} */
-                    kind: "schedule";
-                    nextScheduledAt: string | null;
-                    timezone: string;
-                  };
-              target: {
-                primaryRepositoryId: string | null;
-                primaryRepositoryName: string | null;
-                sandboxProfileId: string;
-                sandboxProfileName: string | null;
-                sandboxProfileVersion: number;
-              };
-              updatedAt: string;
-            };
-          };
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "VALIDATION_ERROR";
-              message: string;
-            };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-        /** @description Automation was not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/v1/automations/schedules": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          "application/json": {
-            conversationKeyTemplate?: string;
-            enabled?: boolean;
-            idempotencyKeyTemplate?: string | null;
-            inputTemplate: string;
-            name: string;
-            schedule: {
-              cronExpression: string;
-              name?: string;
-              timezone: string;
-            };
-            target: {
-              primaryRepositoryId?: string | null;
-              sandboxProfileId: string;
-              sandboxProfileVersion?: number;
-            };
-          };
-        };
-      };
-      responses: {
-        /** @description Create a scheduled automation. */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              conversationKeyTemplate: string;
-              createdAt: string;
-              enabled: boolean;
-              id: string;
-              idempotencyKeyTemplate: string | null;
-              inputTemplate: string;
-              /** @enum {string} */
-              kind: "schedule";
-              name: string;
-              schedule: {
-                cronExpression: string;
-                enabled: boolean;
-                id: string;
-                lastScheduledAt: string | null;
-                name: string;
-                nextScheduledAt: string | null;
-                timezone: string;
-              };
-              target: {
-                id: string;
-                primaryRepositoryId: string | null;
-                sandboxProfileId: string;
-                sandboxProfileVersion: number;
-              };
-              updatedAt: string;
-            };
-          };
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json":
-              | {
-                  /** @enum {string} */
-                  code:
-                    | "INVALID_SCHEDULE"
-                    | "INVALID_SANDBOX_PROFILE_REFERENCE"
-                    | "INVALID_SANDBOX_PROFILE_VERSION_REFERENCE"
-                    | "INVALID_PRIMARY_REPOSITORY";
-                  message: string;
-                }
-              | {
-                  /** @enum {string} */
-                  code: "VALIDATION_ERROR";
-                  message: string;
-                };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/v1/automations/schedules/{automationId}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          automationId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Get a scheduled automation. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              conversationKeyTemplate: string;
-              createdAt: string;
-              enabled: boolean;
-              id: string;
-              idempotencyKeyTemplate: string | null;
-              inputTemplate: string;
-              /** @enum {string} */
-              kind: "schedule";
-              name: string;
-              schedule: {
-                cronExpression: string;
-                enabled: boolean;
-                id: string;
-                lastScheduledAt: string | null;
-                name: string;
-                nextScheduledAt: string | null;
-                timezone: string;
-              };
-              target: {
-                id: string;
-                primaryRepositoryId: string | null;
-                sandboxProfileId: string;
-                sandboxProfileVersion: number;
-              };
-              updatedAt: string;
-            };
-          };
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "VALIDATION_ERROR";
-              message: string;
-            };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-        /** @description Scheduled automation was not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          automationId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Delete a scheduled automation. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              automationId: string;
-            };
-          };
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "VALIDATION_ERROR";
-              message: string;
-            };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-        /** @description Scheduled automation was not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          automationId: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          "application/json": {
-            conversationKeyTemplate?: string;
-            enabled?: boolean;
-            idempotencyKeyTemplate?: string | null;
-            inputTemplate?: string;
-            name?: string;
-            schedule?: {
-              cronExpression?: string;
-              name?: string;
-              timezone?: string;
-            };
-            target?: {
-              primaryRepositoryId?: string | null;
-              sandboxProfileId?: string;
-              sandboxProfileVersion?: number;
-            };
-          };
-        };
-      };
-      responses: {
-        /** @description Update a scheduled automation. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              conversationKeyTemplate: string;
-              createdAt: string;
-              enabled: boolean;
-              id: string;
-              idempotencyKeyTemplate: string | null;
-              inputTemplate: string;
-              /** @enum {string} */
-              kind: "schedule";
-              name: string;
-              schedule: {
-                cronExpression: string;
-                enabled: boolean;
-                id: string;
-                lastScheduledAt: string | null;
-                name: string;
-                nextScheduledAt: string | null;
-                timezone: string;
-              };
-              target: {
-                id: string;
-                primaryRepositoryId: string | null;
-                sandboxProfileId: string;
-                sandboxProfileVersion: number;
-              };
-              updatedAt: string;
-            };
-          };
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json":
-              | {
-                  /** @enum {string} */
-                  code:
-                    | "INVALID_SCHEDULE"
-                    | "INVALID_SANDBOX_PROFILE_REFERENCE"
-                    | "INVALID_SANDBOX_PROFILE_VERSION_REFERENCE"
-                    | "INVALID_PRIMARY_REPOSITORY";
-                  message: string;
-                }
-              | {
-                  /** @enum {string} */
-                  code: "VALIDATION_ERROR";
-                  message: string;
-                };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-        /** @description Scheduled automation was not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-      };
-    };
-    trace?: never;
-  };
-  "/v1/automations/webhooks": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          "application/json": {
-            conversationKeyTemplate: string;
-            enabled?: boolean;
-            eventTypes?: string[] | null;
-            idempotencyKeyTemplate?: string | null;
-            inputTemplate: string;
-            instructions?: string | null;
-            integrationWebhookSourceId: string;
-            name: string;
-            payloadFilter?: {
-              [key: string]: unknown;
-            } | null;
-            target: {
-              primaryRepositoryId?: string | null;
-              sandboxProfileId: string;
-              sandboxProfileVersion?: number;
-            };
-          };
-        };
-      };
-      responses: {
-        /** @description Create a webhook automation. */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              conversationKeyTemplate: string;
-              createdAt: string;
-              enabled: boolean;
-              eventTypes: string[] | null;
-              id: string;
-              idempotencyKeyTemplate: string | null;
-              inputTemplate: string;
-              instructions: string | null;
-              integrationWebhookSourceId: string;
-              /** @enum {string} */
-              kind: "webhook";
-              name: string;
-              payloadFilter: {
-                [key: string]: unknown;
-              } | null;
-              target: {
-                id: string;
-                primaryRepositoryId: string | null;
-                sandboxProfileId: string;
-                sandboxProfileVersion: number;
-              };
-              updatedAt: string;
-            };
-          };
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json":
-              | {
-                  /** @enum {string} */
-                  code:
-                    | "INVALID_WEBHOOK_SOURCE_REFERENCE"
-                    | "INVALID_WEBHOOK_TRIGGER_REQUIREMENTS"
-                    | "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE"
-                    | "INVALID_SANDBOX_PROFILE_REFERENCE"
-                    | "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE"
-                    | "INVALID_PRIMARY_REPOSITORY";
-                  message: string;
-                }
-              | {
-                  /** @enum {string} */
-                  code: "VALIDATION_ERROR";
-                  message: string;
-                };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/v1/automations/webhooks/{automationId}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          automationId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Get a webhook automation. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              conversationKeyTemplate: string;
-              createdAt: string;
-              enabled: boolean;
-              eventTypes: string[] | null;
-              id: string;
-              idempotencyKeyTemplate: string | null;
-              inputTemplate: string;
-              instructions: string | null;
-              integrationWebhookSourceId: string;
-              /** @enum {string} */
-              kind: "webhook";
-              name: string;
-              payloadFilter: {
-                [key: string]: unknown;
-              } | null;
-              target: {
-                id: string;
-                primaryRepositoryId: string | null;
-                sandboxProfileId: string;
-                sandboxProfileVersion: number;
-              };
-              updatedAt: string;
-            };
-          };
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "VALIDATION_ERROR";
-              message: string;
-            };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-        /** @description Webhook automation was not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          automationId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Delete a webhook automation. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              automationId: string;
-            };
-          };
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "VALIDATION_ERROR";
-              message: string;
-            };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-        /** @description Webhook automation was not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          automationId: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          "application/json": {
-            conversationKeyTemplate?: string;
-            enabled?: boolean;
-            eventTypes?: string[] | null;
-            idempotencyKeyTemplate?: string | null;
-            inputTemplate?: string;
-            instructions?: string | null;
-            integrationWebhookSourceId?: string;
-            name?: string;
-            payloadFilter?: {
-              [key: string]: unknown;
-            } | null;
-            target?: {
-              primaryRepositoryId?: string | null;
-              sandboxProfileId?: string;
-              sandboxProfileVersion?: number;
-            };
-          };
-        };
-      };
-      responses: {
-        /** @description Update a webhook automation. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              conversationKeyTemplate: string;
-              createdAt: string;
-              enabled: boolean;
-              eventTypes: string[] | null;
-              id: string;
-              idempotencyKeyTemplate: string | null;
-              inputTemplate: string;
-              instructions: string | null;
-              integrationWebhookSourceId: string;
-              /** @enum {string} */
-              kind: "webhook";
-              name: string;
-              payloadFilter: {
-                [key: string]: unknown;
-              } | null;
-              target: {
-                id: string;
-                primaryRepositoryId: string | null;
-                sandboxProfileId: string;
-                sandboxProfileVersion: number;
-              };
-              updatedAt: string;
-            };
-          };
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json":
-              | {
-                  /** @enum {string} */
-                  code:
-                    | "INVALID_WEBHOOK_SOURCE_REFERENCE"
-                    | "INVALID_WEBHOOK_TRIGGER_REQUIREMENTS"
-                    | "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE"
-                    | "INVALID_SANDBOX_PROFILE_REFERENCE"
-                    | "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE"
-                    | "INVALID_PRIMARY_REPOSITORY";
-                  message: string;
-                }
-              | {
-                  /** @enum {string} */
-                  code: "VALIDATION_ERROR";
-                  message: string;
-                };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-        /** @description Webhook automation was not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-      };
-    };
-    trace?: never;
-  };
   "/v1/home": {
     parameters: {
       query?: never;
@@ -1927,10 +764,10 @@ export interface paths {
           content: {
             "application/json": {
               onboarding: {
-                hasAutomations: boolean;
                 hasIntegrations: boolean;
                 hasProfiles: boolean;
                 hasStartedSession: boolean;
+                hasTriggers: boolean;
                 hasUsableProfiles: boolean;
                 hasWebhookCapableIntegration: boolean;
               };
@@ -2031,7 +868,6 @@ export interface paths {
           content: {
             "application/json": {
               items: {
-                automationCount?: number;
                 bindingCount?: number;
                 config?: {
                   [key: string]: unknown;
@@ -2060,6 +896,7 @@ export interface paths {
                 targetSnapshotConfig?: {
                   [key: string]: unknown;
                 };
+                triggerCount?: number;
                 updatedAt: string;
                 webhookTriggerCapabilitiesRefreshAction?: {
                   actionLabel: string;
@@ -2187,7 +1024,6 @@ export interface paths {
           };
           content: {
             "application/json": {
-              automationCount?: number;
               bindingCount?: number;
               config?: {
                 [key: string]: unknown;
@@ -2216,6 +1052,7 @@ export interface paths {
               targetSnapshotConfig?: {
                 [key: string]: unknown;
               };
+              triggerCount?: number;
               updatedAt: string;
               webhookTriggerCapabilitiesRefreshAction?: {
                 actionLabel: string;
@@ -2394,7 +1231,7 @@ export interface paths {
             };
           };
         };
-        /** @description Integration connection still has active sandbox profile bindings, webhook automations, or identity-linking configuration. */
+        /** @description Integration connection still has active sandbox profile bindings, webhook triggers, or identity-linking configuration. */
         409: {
           headers: {
             [name: string]: unknown;
@@ -2403,7 +1240,7 @@ export interface paths {
             "application/json": {
               code:
                 | "CONNECTION_HAS_BINDINGS"
-                | "CONNECTION_HAS_AUTOMATIONS"
+                | "CONNECTION_HAS_TRIGGERS"
                 | "CONNECTION_USED_BY_IDENTITY_LINKING";
               message: string;
             };
@@ -2454,7 +1291,6 @@ export interface paths {
           };
           content: {
             "application/json": {
-              automationCount?: number;
               bindingCount?: number;
               config?: {
                 [key: string]: unknown;
@@ -2483,6 +1319,7 @@ export interface paths {
               targetSnapshotConfig?: {
                 [key: string]: unknown;
               };
+              triggerCount?: number;
               updatedAt: string;
               webhookTriggerCapabilitiesRefreshAction?: {
                 actionLabel: string;
@@ -3593,7 +2430,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "WEBHOOK_SOURCE_HAS_AUTOMATIONS";
+              code: "WEBHOOK_SOURCE_HAS_TRIGGERS";
               message: string;
             };
           };
@@ -3758,7 +2595,6 @@ export interface paths {
           };
           content: {
             "application/json": {
-              automationCount?: number;
               bindingCount?: number;
               config?: {
                 [key: string]: unknown;
@@ -3787,6 +2623,7 @@ export interface paths {
               targetSnapshotConfig?: {
                 [key: string]: unknown;
               };
+              triggerCount?: number;
               updatedAt: string;
               webhookTriggerCapabilitiesRefreshAction?: {
                 actionLabel: string;
@@ -4270,7 +3107,6 @@ export interface paths {
           };
           content: {
             "application/json": {
-              automationCount?: number;
               bindingCount?: number;
               config?: {
                 [key: string]: unknown;
@@ -4310,6 +3146,7 @@ export interface paths {
               targetSnapshotConfig?: {
                 [key: string]: unknown;
               };
+              triggerCount?: number;
               updatedAt: string;
               webhookTriggerCapabilitiesRefreshAction?: {
                 actionLabel: string;
@@ -7607,11 +6444,6 @@ export interface paths {
           };
           content: {
             "application/json": {
-              automationConversation: {
-                conversationId: string;
-                providerConversationId: string | null;
-                routeId: string | null;
-              } | null;
               connectable: boolean;
               failureCode: string | null;
               failureMessage: string | null;
@@ -7630,6 +6462,11 @@ export interface paths {
               /** @enum {string} */
               status: "pending" | "starting" | "running" | "stopped" | "failed";
               title: string | null;
+              triggerConversation: {
+                conversationId: string;
+                providerConversationId: string | null;
+                routeId: string | null;
+              } | null;
             };
           };
         };
@@ -8111,11 +6948,6 @@ export interface paths {
           };
           content: {
             "application/json": {
-              automationConversation: {
-                conversationId: string;
-                providerConversationId: string | null;
-                routeId: string | null;
-              } | null;
               connectable: boolean;
               failureCode: string | null;
               failureMessage: string | null;
@@ -8134,6 +6966,11 @@ export interface paths {
               /** @enum {string} */
               status: "pending" | "starting" | "running" | "stopped" | "failed";
               title: string | null;
+              triggerConversation: {
+                conversationId: string;
+                providerConversationId: string | null;
+                routeId: string | null;
+              } | null;
             };
           };
         };
@@ -9307,124 +8144,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/sandbox/profiles/{profileId}/versions/{version}/automation-config": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          profileId: string;
-          version: number;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Get automation editor configuration for the specified sandbox profile version. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              bindings: {
-                config: {
-                  [key: string]: unknown;
-                };
-                connectionId: string;
-                createdAt: string;
-                id: string;
-                /** @enum {string} */
-                kind: "agent" | "git" | "connector" | "sandbox";
-                sandboxProfileId: string;
-                sandboxProfileVersion: number;
-                updatedAt: string;
-              }[];
-              repositoryOptions: {
-                id: string;
-                label: string;
-                path: string;
-              }[];
-            };
-          };
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "VALIDATION_ERROR";
-              message: string;
-            };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-        /** @description Sandbox profile or profile version was not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "PROFILE_NOT_FOUND" | "PROFILE_VERSION_NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-        /** @description Internal server error. */
-        500: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "text/plain": string;
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/v1/sandbox/profiles/{profileId}/versions/{version}/discard": {
     parameters: {
       query?: never;
@@ -9733,7 +8452,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/sandbox/profiles/{profileId}/versions/{version}/draft-automation-impact": {
+  "/v1/sandbox/profiles/{profileId}/versions/{version}/draft-trigger-impact": {
     parameters: {
       query?: never;
       header?: never;
@@ -9752,14 +8471,14 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Evaluate whether the specified sandbox profile draft version would break automations that currently use the profile. */
+        /** @description Evaluate whether the specified sandbox profile draft version would break triggers that currently use the profile. */
         200: {
           headers: {
             [name: string]: unknown;
           };
           content: {
             "application/json": {
-              affectedAutomations: {
+              affectedTriggers: {
                 enabled: boolean;
                 id: string;
                 issues: {
@@ -11529,6 +10248,124 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/sandbox/profiles/{profileId}/versions/{version}/trigger-config": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          profileId: string;
+          version: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Get trigger editor configuration for the specified sandbox profile version. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              bindings: {
+                config: {
+                  [key: string]: unknown;
+                };
+                connectionId: string;
+                createdAt: string;
+                id: string;
+                /** @enum {string} */
+                kind: "agent" | "git" | "connector" | "sandbox";
+                sandboxProfileId: string;
+                sandboxProfileVersion: number;
+                updatedAt: string;
+              }[];
+              repositoryOptions: {
+                id: string;
+                label: string;
+                path: string;
+              }[];
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile or profile version was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_NOT_FOUND" | "PROFILE_VERSION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/sandbox/profiles/launchable": {
     parameters: {
       query?: never;
@@ -11713,6 +10550,1169 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
+    trace?: never;
+  };
+  "/v1/triggers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          after?: string;
+          before?: string;
+          enabled?: boolean;
+          kind?: "webhook" | "schedule";
+          limit?: number;
+          sandboxProfileId?: string;
+          search?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description List triggers for the active organization. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              items: {
+                enabled: boolean;
+                id: string;
+                issue?: {
+                  /** @enum {string} */
+                  code:
+                    | "MISSING_TARGET_METADATA"
+                    | "MISSING_WEBHOOK_SOURCE"
+                    | "MISSING_INTEGRATION_CONNECTION"
+                    | "MISSING_SANDBOX_PROFILE";
+                  message: string;
+                };
+                /** @enum {string} */
+                kind: "webhook" | "schedule";
+                name: string;
+                source:
+                  | {
+                      events: {
+                        label: string;
+                        logoKey?: string;
+                        unavailable?: boolean;
+                      }[];
+                      /** @enum {string} */
+                      kind: "webhook";
+                    }
+                  | {
+                      cronExpression: string;
+                      /** @enum {string} */
+                      kind: "schedule";
+                      nextScheduledAt: string | null;
+                      timezone: string;
+                    };
+                target: {
+                  primaryRepositoryId: string | null;
+                  primaryRepositoryName: string | null;
+                  sandboxProfileId: string;
+                  sandboxProfileName: string | null;
+                  sandboxProfileVersion: number;
+                };
+                updatedAt: string;
+              }[];
+              nextPage: {
+                after: string;
+                limit: number;
+              } | null;
+              previousPage: {
+                before: string;
+                limit: number;
+              } | null;
+              totalResults: number;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_LIST_TRIGGERS_INPUT" | "INVALID_PAGINATION_CURSOR";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/triggers/{triggerId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          triggerId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Get an trigger summary. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              enabled: boolean;
+              id: string;
+              issue?: {
+                /** @enum {string} */
+                code:
+                  | "MISSING_TARGET_METADATA"
+                  | "MISSING_WEBHOOK_SOURCE"
+                  | "MISSING_INTEGRATION_CONNECTION"
+                  | "MISSING_SANDBOX_PROFILE";
+                message: string;
+              };
+              /** @enum {string} */
+              kind: "webhook" | "schedule";
+              name: string;
+              source:
+                | {
+                    events: {
+                      label: string;
+                      logoKey?: string;
+                      unavailable?: boolean;
+                    }[];
+                    /** @enum {string} */
+                    kind: "webhook";
+                  }
+                | {
+                    cronExpression: string;
+                    /** @enum {string} */
+                    kind: "schedule";
+                    nextScheduledAt: string | null;
+                    timezone: string;
+                  };
+              target: {
+                primaryRepositoryId: string | null;
+                primaryRepositoryName: string | null;
+                sandboxProfileId: string;
+                sandboxProfileName: string | null;
+                sandboxProfileVersion: number;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Trigger was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/triggers/schedules": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            conversationKeyTemplate?: string;
+            enabled?: boolean;
+            idempotencyKeyTemplate?: string | null;
+            inputTemplate: string;
+            name: string;
+            schedule: {
+              cronExpression: string;
+              name?: string;
+              timezone: string;
+            };
+            target: {
+              primaryRepositoryId?: string | null;
+              sandboxProfileId: string;
+              sandboxProfileVersion?: number;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Create a scheduled trigger. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              conversationKeyTemplate: string;
+              createdAt: string;
+              enabled: boolean;
+              id: string;
+              idempotencyKeyTemplate: string | null;
+              inputTemplate: string;
+              /** @enum {string} */
+              kind: "schedule";
+              name: string;
+              schedule: {
+                cronExpression: string;
+                enabled: boolean;
+                id: string;
+                lastScheduledAt: string | null;
+                name: string;
+                nextScheduledAt: string | null;
+                timezone: string;
+              };
+              target: {
+                id: string;
+                primaryRepositoryId: string | null;
+                sandboxProfileId: string;
+                sandboxProfileVersion: number;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_SCHEDULE"
+                    | "INVALID_SANDBOX_PROFILE_REFERENCE"
+                    | "INVALID_SANDBOX_PROFILE_VERSION_REFERENCE"
+                    | "INVALID_PRIMARY_REPOSITORY";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/triggers/schedules/{triggerId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          triggerId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Get a scheduled trigger. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              conversationKeyTemplate: string;
+              createdAt: string;
+              enabled: boolean;
+              id: string;
+              idempotencyKeyTemplate: string | null;
+              inputTemplate: string;
+              /** @enum {string} */
+              kind: "schedule";
+              name: string;
+              schedule: {
+                cronExpression: string;
+                enabled: boolean;
+                id: string;
+                lastScheduledAt: string | null;
+                name: string;
+                nextScheduledAt: string | null;
+                timezone: string;
+              };
+              target: {
+                id: string;
+                primaryRepositoryId: string | null;
+                sandboxProfileId: string;
+                sandboxProfileVersion: number;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Scheduled trigger was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          triggerId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Delete a scheduled trigger. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              triggerId: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Scheduled trigger was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          triggerId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            conversationKeyTemplate?: string;
+            enabled?: boolean;
+            idempotencyKeyTemplate?: string | null;
+            inputTemplate?: string;
+            name?: string;
+            schedule?: {
+              cronExpression?: string;
+              name?: string;
+              timezone?: string;
+            };
+            target?: {
+              primaryRepositoryId?: string | null;
+              sandboxProfileId?: string;
+              sandboxProfileVersion?: number;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Update a scheduled trigger. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              conversationKeyTemplate: string;
+              createdAt: string;
+              enabled: boolean;
+              id: string;
+              idempotencyKeyTemplate: string | null;
+              inputTemplate: string;
+              /** @enum {string} */
+              kind: "schedule";
+              name: string;
+              schedule: {
+                cronExpression: string;
+                enabled: boolean;
+                id: string;
+                lastScheduledAt: string | null;
+                name: string;
+                nextScheduledAt: string | null;
+                timezone: string;
+              };
+              target: {
+                id: string;
+                primaryRepositoryId: string | null;
+                sandboxProfileId: string;
+                sandboxProfileVersion: number;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_SCHEDULE"
+                    | "INVALID_SANDBOX_PROFILE_REFERENCE"
+                    | "INVALID_SANDBOX_PROFILE_VERSION_REFERENCE"
+                    | "INVALID_PRIMARY_REPOSITORY";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Scheduled trigger was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/v1/triggers/webhooks": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            conversationKeyTemplate: string;
+            enabled?: boolean;
+            eventTypes?: string[] | null;
+            idempotencyKeyTemplate?: string | null;
+            inputTemplate: string;
+            instructions?: string | null;
+            integrationWebhookSourceId: string;
+            name: string;
+            payloadFilter?: {
+              [key: string]: unknown;
+            } | null;
+            target: {
+              primaryRepositoryId?: string | null;
+              sandboxProfileId: string;
+              sandboxProfileVersion?: number;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Create a webhook trigger. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              conversationKeyTemplate: string;
+              createdAt: string;
+              enabled: boolean;
+              eventTypes: string[] | null;
+              id: string;
+              idempotencyKeyTemplate: string | null;
+              inputTemplate: string;
+              instructions: string | null;
+              integrationWebhookSourceId: string;
+              /** @enum {string} */
+              kind: "webhook";
+              name: string;
+              payloadFilter: {
+                [key: string]: unknown;
+              } | null;
+              target: {
+                id: string;
+                primaryRepositoryId: string | null;
+                sandboxProfileId: string;
+                sandboxProfileVersion: number;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_WEBHOOK_SOURCE_REFERENCE"
+                    | "INVALID_WEBHOOK_TRIGGER_REQUIREMENTS"
+                    | "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE"
+                    | "INVALID_SANDBOX_PROFILE_REFERENCE"
+                    | "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE"
+                    | "INVALID_PRIMARY_REPOSITORY";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/triggers/webhooks/{triggerId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          triggerId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Get a webhook trigger. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              conversationKeyTemplate: string;
+              createdAt: string;
+              enabled: boolean;
+              eventTypes: string[] | null;
+              id: string;
+              idempotencyKeyTemplate: string | null;
+              inputTemplate: string;
+              instructions: string | null;
+              integrationWebhookSourceId: string;
+              /** @enum {string} */
+              kind: "webhook";
+              name: string;
+              payloadFilter: {
+                [key: string]: unknown;
+              } | null;
+              target: {
+                id: string;
+                primaryRepositoryId: string | null;
+                sandboxProfileId: string;
+                sandboxProfileVersion: number;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Webhook trigger was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          triggerId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Delete a webhook trigger. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              triggerId: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Webhook trigger was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          triggerId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            conversationKeyTemplate?: string;
+            enabled?: boolean;
+            eventTypes?: string[] | null;
+            idempotencyKeyTemplate?: string | null;
+            inputTemplate?: string;
+            instructions?: string | null;
+            integrationWebhookSourceId?: string;
+            name?: string;
+            payloadFilter?: {
+              [key: string]: unknown;
+            } | null;
+            target?: {
+              primaryRepositoryId?: string | null;
+              sandboxProfileId?: string;
+              sandboxProfileVersion?: number;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Update a webhook trigger. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              conversationKeyTemplate: string;
+              createdAt: string;
+              enabled: boolean;
+              eventTypes: string[] | null;
+              id: string;
+              idempotencyKeyTemplate: string | null;
+              inputTemplate: string;
+              instructions: string | null;
+              integrationWebhookSourceId: string;
+              /** @enum {string} */
+              kind: "webhook";
+              name: string;
+              payloadFilter: {
+                [key: string]: unknown;
+              } | null;
+              target: {
+                id: string;
+                primaryRepositoryId: string | null;
+                sandboxProfileId: string;
+                sandboxProfileVersion: number;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_WEBHOOK_SOURCE_REFERENCE"
+                    | "INVALID_WEBHOOK_TRIGGER_REQUIREMENTS"
+                    | "WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE"
+                    | "INVALID_SANDBOX_PROFILE_REFERENCE"
+                    | "INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE"
+                    | "INVALID_PRIMARY_REPOSITORY";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Webhook trigger was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
     trace?: never;
   };
 }

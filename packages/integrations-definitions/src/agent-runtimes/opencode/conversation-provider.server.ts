@@ -33,7 +33,7 @@ const OpenCodeDeliveryContextNotificationParamsSchema = z
     scheduledActionId: z.string().optional(),
     deliveryTaskId: z.string(),
     externalDeliveryId: z.string().optional(),
-    automationRunId: z.string(),
+    triggerRunId: z.string(),
     conversationId: z.string(),
     sandboxInstanceId: z.string(),
     routeId: z.string().optional(),
@@ -146,7 +146,7 @@ export function renderOpenCodePromptSystem(input: {
   if (input.deliveryContextNotificationParams !== undefined) {
     sections.push(
       [
-        "Mistle automation delivery context:",
+        "Mistle trigger delivery context:",
         JSON.stringify(input.deliveryContextNotificationParams, null, 2),
       ].join("\n"),
     );

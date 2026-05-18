@@ -104,21 +104,21 @@ async function assertConnectionDeletionGuardsOrThrow(input: {
     );
   }
 
-  const [automationUsage] = await input.db
+  const [triggerUsage] = await input.db
     .select({
-      automationCount: sql<number>`count(*)::int`,
+      triggerCount: sql<number>`count(*)::int`,
     })
-    .from(tables.webhookAutomations)
+    .from(tables.webhookTriggers)
     .innerJoin(
       tables.integrationWebhookSources,
-      eq(tables.integrationWebhookSources.id, tables.webhookAutomations.integrationWebhookSourceId),
+      eq(tables.integrationWebhookSources.id, tables.webhookTriggers.integrationWebhookSourceId),
     )
     .where(eq(tables.integrationWebhookSources.integrationConnectionId, lockedConnection.id));
 
-  if ((automationUsage?.automationCount ?? 0) > 0) {
+  if ((triggerUsage?.triggerCount ?? 0) > 0) {
     throw new ConflictError(
-      IntegrationConnectionsConflictCodes.CONNECTION_HAS_AUTOMATIONS,
-      "This integration connection cannot be deleted while it is still used by one or more webhook automations.",
+      IntegrationConnectionsConflictCodes.CONNECTION_HAS_TRIGGERS,
+      "This integration connection cannot be deleted while it is still used by one or more webhook triggers.",
     );
   }
 

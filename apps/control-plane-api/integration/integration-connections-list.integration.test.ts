@@ -3,7 +3,7 @@
  */
 
 import {
-  AutomationKinds,
+  TriggerKinds,
   IntegrationBindingKinds,
   IntegrationConnectionResourceSyncStates,
   IntegrationConnectionStatuses,
@@ -136,10 +136,10 @@ describe.concurrent("integration connections list integration", () => {
       connectionId: "icn_integration_new_list_001",
       activeVersion: 1,
     });
-    await seedWebhookAutomationUsage(env, {
+    await seedWebhookTriggerUsage(env, {
       organizationId: firstOrgSession.organizationId,
-      automationId: "atm_integration_new_list_001",
-      automationName: "GitHub webhook automation",
+      triggerId: "atm_integration_new_list_001",
+      triggerName: "GitHub webhook trigger",
       connectionId: "icn_integration_new_list_002",
       targetKey: "openai_connections_list",
       eventTypes: ["response.created"],
@@ -166,7 +166,7 @@ describe.concurrent("integration connections list integration", () => {
         displayName: "GitHub Main",
         status: IntegrationConnectionStatuses.ACTIVE,
         bindingCount: 1,
-        automationCount: 0,
+        triggerCount: 0,
         isIdentityLinked: true,
         externalSubjectId: "github-user-1",
         config: {
@@ -207,7 +207,7 @@ describe.concurrent("integration connections list integration", () => {
         displayName: "OpenAI Backup",
         status: IntegrationConnectionStatuses.ERROR,
         bindingCount: 0,
-        automationCount: 1,
+        triggerCount: 1,
         createdAt: secondConnectionCreatedAt,
         updatedAt: secondConnectionCreatedAt,
       },
@@ -231,7 +231,7 @@ describe.concurrent("integration connections list integration", () => {
         displayName: "GitHub Revoked",
         status: IntegrationConnectionStatuses.REVOKED,
         bindingCount: 0,
-        automationCount: 0,
+        triggerCount: 0,
         resources: [
           {
             kind: "repository",
@@ -565,36 +565,36 @@ async function seedBindingUsage(
     });
 }
 
-async function seedWebhookAutomationUsage(
+async function seedWebhookTriggerUsage(
   env: IntegrationTestEnvironment,
   input: {
     organizationId: string;
-    automationId: string;
-    automationName: string;
+    triggerId: string;
+    triggerName: string;
     connectionId: string;
     targetKey: string;
     eventTypes: string[];
     payloadFilter: Record<string, unknown>;
   },
 ): Promise<void> {
-  await env.controlPlaneDb.insert(env.controlPlaneTables.automations).values({
-    id: input.automationId,
+  await env.controlPlaneDb.insert(env.controlPlaneTables.triggers).values({
+    id: input.triggerId,
     organizationId: input.organizationId,
-    kind: AutomationKinds.WEBHOOK,
-    name: input.automationName,
+    kind: TriggerKinds.WEBHOOK,
+    name: input.triggerName,
     enabled: true,
   });
   await env.controlPlaneDb.insert(env.controlPlaneTables.integrationWebhookSources).values({
-    id: `iws_${input.automationId}`,
+    id: `iws_${input.triggerId}`,
     organizationId: input.organizationId,
     integrationConnectionId: input.connectionId,
     targetKey: input.targetKey,
-    endpointKey: `ep_${input.automationId}`,
+    endpointKey: `ep_${input.triggerId}`,
     status: "active",
   });
-  await env.controlPlaneDb.insert(env.controlPlaneTables.webhookAutomations).values({
-    automationId: input.automationId,
-    integrationWebhookSourceId: `iws_${input.automationId}`,
+  await env.controlPlaneDb.insert(env.controlPlaneTables.webhookTriggers).values({
+    triggerId: input.triggerId,
+    integrationWebhookSourceId: `iws_${input.triggerId}`,
     eventTypes: input.eventTypes,
     payloadFilter: input.payloadFilter,
     inputTemplate: "Handle payload",

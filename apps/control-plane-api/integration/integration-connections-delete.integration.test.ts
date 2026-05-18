@@ -3,7 +3,7 @@
  */
 
 import {
-  AutomationKinds,
+  TriggerKinds,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
   IntegrationCredentialSecretKinds,
@@ -177,39 +177,39 @@ describe.concurrent("integration connections delete integration", () => {
     await expectBindingPresent(env, "ibd_integration_new_delete_active_version_binding");
   });
 
-  it("blocks deletion while webhook automations use the connection", async ({ env }) => {
+  it("blocks deletion while webhook triggers use the connection", async ({ env }) => {
     const session = await env.auth.createSession({
-      email: "integration-new-connections-delete-automation@example.com",
+      email: "integration-new-connections-delete-trigger@example.com",
     });
 
     await seedTarget(env);
     await seedConnection(env, {
-      connectionId: "icn_integration_new_delete_automation",
+      connectionId: "icn_integration_new_delete_trigger",
       organizationId: session.organizationId,
     });
-    await seedWebhookAutomationUsage(env, {
-      automationId: "atm_integration_new_delete_automation",
-      automationName: "Delete guard automation",
-      connectionId: "icn_integration_new_delete_automation",
+    await seedWebhookTriggerUsage(env, {
+      triggerId: "atm_integration_new_delete_trigger",
+      triggerName: "Delete guard trigger",
+      connectionId: "icn_integration_new_delete_trigger",
       organizationId: session.organizationId,
     });
 
     const response = await deleteConnection({
-      connectionId: "icn_integration_new_delete_automation",
+      connectionId: "icn_integration_new_delete_trigger",
       cookie: session.cookie,
       env,
     });
 
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({
-      code: "CONNECTION_HAS_AUTOMATIONS",
+      code: "CONNECTION_HAS_TRIGGERS",
       message:
-        "This integration connection cannot be deleted while it is still used by one or more webhook automations.",
+        "This integration connection cannot be deleted while it is still used by one or more webhook triggers.",
     });
-    await expectConnectionPresent(env, "icn_integration_new_delete_automation");
+    await expectConnectionPresent(env, "icn_integration_new_delete_trigger");
     expect(
-      await env.controlPlaneDb.query.webhookAutomations.findFirst({
-        where: (table, { eq }) => eq(table.automationId, "atm_integration_new_delete_automation"),
+      await env.controlPlaneDb.query.webhookTriggers.findFirst({
+        where: (table, { eq }) => eq(table.triggerId, "atm_integration_new_delete_trigger"),
       }),
     ).toBeDefined();
   });
@@ -409,22 +409,22 @@ async function seedBindingUsage(
     });
 }
 
-async function seedWebhookAutomationUsage(
+async function seedWebhookTriggerUsage(
   env: IntegrationTestEnvironment,
   input: {
-    automationId: string;
-    automationName: string;
+    triggerId: string;
+    triggerName: string;
     connectionId: string;
     organizationId: string;
   },
 ): Promise<void> {
-  const sourceId = `iws_${input.automationId}`;
+  const sourceId = `iws_${input.triggerId}`;
 
-  await env.controlPlaneDb.insert(env.controlPlaneTables.automations).values({
-    id: input.automationId,
+  await env.controlPlaneDb.insert(env.controlPlaneTables.triggers).values({
+    id: input.triggerId,
     organizationId: input.organizationId,
-    kind: AutomationKinds.WEBHOOK,
-    name: input.automationName,
+    kind: TriggerKinds.WEBHOOK,
+    name: input.triggerName,
     enabled: true,
   });
   await env.controlPlaneDb.insert(env.controlPlaneTables.integrationWebhookSources).values({
@@ -432,11 +432,11 @@ async function seedWebhookAutomationUsage(
     organizationId: input.organizationId,
     integrationConnectionId: input.connectionId,
     targetKey: "github_cloud_connections_delete",
-    endpointKey: `ep_${input.automationId}`,
+    endpointKey: `ep_${input.triggerId}`,
     status: "active",
   });
-  await env.controlPlaneDb.insert(env.controlPlaneTables.webhookAutomations).values({
-    automationId: input.automationId,
+  await env.controlPlaneDb.insert(env.controlPlaneTables.webhookTriggers).values({
+    triggerId: input.triggerId,
     integrationWebhookSourceId: sourceId,
     eventTypes: ["issue_comment.created"],
     payloadFilter: {

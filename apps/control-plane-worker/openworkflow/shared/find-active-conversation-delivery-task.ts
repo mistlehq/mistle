@@ -1,28 +1,28 @@
 import {
-  AutomationConversationDeliveryTaskStatuses,
+  TriggerConversationDeliveryTaskStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
 } from "@mistle/db/control-plane";
 
-export type FindActiveAutomationConversationDeliveryTaskInput = {
+export type FindActiveTriggerConversationDeliveryTaskInput = {
   conversationId: string;
   generation: number;
 };
 
-export async function findActiveAutomationConversationDeliveryTask(
+export async function findActiveTriggerConversationDeliveryTask(
   ctx: {
     db: ControlPlaneDatabase | ControlPlaneTransaction;
   },
-  input: FindActiveAutomationConversationDeliveryTaskInput,
+  input: FindActiveTriggerConversationDeliveryTaskInput,
 ) {
-  return ctx.db.query.automationConversationDeliveryTasks.findFirst({
+  return ctx.db.query.triggerConversationDeliveryTasks.findFirst({
     where: (table, { and: whereAnd, eq: whereEq, or: whereOr }) =>
       whereAnd(
         whereEq(table.conversationId, input.conversationId),
         whereEq(table.processorGeneration, input.generation),
         whereOr(
-          whereEq(table.status, AutomationConversationDeliveryTaskStatuses.CLAIMED),
-          whereEq(table.status, AutomationConversationDeliveryTaskStatuses.DELIVERING),
+          whereEq(table.status, TriggerConversationDeliveryTaskStatuses.CLAIMED),
+          whereEq(table.status, TriggerConversationDeliveryTaskStatuses.DELIVERING),
         ),
       ),
     orderBy: (table, { asc: orderAsc }) => [

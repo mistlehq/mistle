@@ -47,7 +47,7 @@ export async function listTriggers(input: ListTriggersInput): Promise<TriggersLi
     const response = await requestControlPlane({
       operation: "listTriggers",
       method: "GET",
-      pathname: "/v1/automations",
+      pathname: "/v1/triggers",
       query: {
         limit: input.limit,
         ...(input.after === null ? {} : { after: input.after }),
@@ -87,7 +87,7 @@ export async function getTrigger(input: {
     const response = await requestControlPlane({
       operation: "getTrigger",
       method: "GET",
-      pathname: `/v1/automations/${encodeURIComponent(input.triggerId)}`,
+      pathname: `/v1/triggers/${encodeURIComponent(input.triggerId)}`,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not load trigger.",
       errorFactory: createTriggersApiError,

@@ -8,11 +8,11 @@ import * as createSandboxProfile from "./create-sandbox-profile/index.js";
 import * as deleteSandboxProfileVersionRefreshSchedule from "./delete-sandbox-profile-version-refresh-schedule/index.js";
 import * as deleteSandboxProfile from "./delete-sandbox-profile/index.js";
 import * as discardSandboxProfileVersionDraft from "./discard-sandbox-profile-version-draft/index.js";
-import * as getSandboxProfileVersionAutomationConfig from "./get-sandbox-profile-version-automation-config/index.js";
-import * as getSandboxProfileVersionDraftAutomationImpact from "./get-sandbox-profile-version-draft-automation-impact/index.js";
+import * as getSandboxProfileVersionDraftTriggerImpact from "./get-sandbox-profile-version-draft-trigger-impact/index.js";
 import * as getSandboxProfileVersionIntegrationBindings from "./get-sandbox-profile-version-integration-bindings/index.js";
 import * as getSandboxProfileVersionPublishability from "./get-sandbox-profile-version-publishability/index.js";
 import * as getSandboxProfileVersionSetupScript from "./get-sandbox-profile-version-setup-script/index.js";
+import * as getSandboxProfileVersionTriggerConfig from "./get-sandbox-profile-version-trigger-config/index.js";
 import * as getSandboxProfile from "./get-sandbox-profile/index.js";
 import * as listLaunchableSandboxProfiles from "./list-launchable-sandbox-profiles/index.js";
 import * as listSandboxProfileVersions from "./list-sandbox-profile-versions/index.js";
@@ -46,12 +46,12 @@ export function createSandboxProfilesRoutes(): AppRoutes<typeof SANDBOX_PROFILES
     getSandboxProfileVersionPublishability.handler,
   );
   routes.openapi(
-    getSandboxProfileVersionAutomationConfig.route,
-    getSandboxProfileVersionAutomationConfig.handler,
+    getSandboxProfileVersionTriggerConfig.route,
+    getSandboxProfileVersionTriggerConfig.handler,
   );
   routes.openapi(
-    getSandboxProfileVersionDraftAutomationImpact.route,
-    getSandboxProfileVersionDraftAutomationImpact.handler,
+    getSandboxProfileVersionDraftTriggerImpact.route,
+    getSandboxProfileVersionDraftTriggerImpact.handler,
   );
   routes.openapi(
     getSandboxProfileVersionSetupScript.route,

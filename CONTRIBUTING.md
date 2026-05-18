@@ -100,7 +100,7 @@ pnpm --filter @mistle/control-plane-api integration-targets:sync
 - review the available integration targets
 - create or connect an integration
 - create a sandbox profile
-- start a session or configure an automation
+- start a session or configure a trigger
 
 `pnpm dev` also prints public tunnel URLs along with local Mailpit and Grafana endpoints for supporting services.
 

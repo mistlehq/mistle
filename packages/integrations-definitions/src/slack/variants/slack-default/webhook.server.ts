@@ -152,7 +152,7 @@ function resolveSlackEventClassification(input: {
   throw new Error(`Slack event type '${providerEventType}' is not supported.`);
 }
 
-function enrichSlackEventForAutomation(
+function enrichSlackEventForTrigger(
   event: Readonly<Record<string, unknown>>,
   eventType: string,
 ): Record<string, unknown> {
@@ -523,10 +523,7 @@ export const SlackWebhookHandler: IntegrationWebhookHandler<
       rawProviderEventType,
       event: rawEvent,
     });
-    const normalizedEventPayload = enrichSlackEventForAutomation(
-      rawEvent,
-      classification.eventType,
-    );
+    const normalizedEventPayload = enrichSlackEventForTrigger(rawEvent, classification.eventType);
     const payload = {
       ...rawPayload,
       event: normalizedEventPayload,

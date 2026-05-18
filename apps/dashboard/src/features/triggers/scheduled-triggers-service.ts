@@ -44,7 +44,7 @@ export async function getScheduledTrigger(input: {
     const response = await requestControlPlane({
       operation: "getScheduledTrigger",
       method: "GET",
-      pathname: `/v1/automations/schedules/${encodeURIComponent(input.triggerId)}`,
+      pathname: `/v1/triggers/schedules/${encodeURIComponent(input.triggerId)}`,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not load scheduled trigger.",
       errorFactory: createScheduledTriggersApiError,
@@ -73,7 +73,7 @@ export async function createScheduledTrigger(input: {
     const response = await requestControlPlane({
       operation: "createScheduledTrigger",
       method: "POST",
-      pathname: "/v1/automations/schedules",
+      pathname: "/v1/triggers/schedules",
       body: input.payload,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not create scheduled trigger.",
@@ -103,7 +103,7 @@ export async function updateScheduledTrigger(input: {
     const response = await requestControlPlane({
       operation: "updateScheduledTrigger",
       method: "PATCH",
-      pathname: `/v1/automations/schedules/${encodeURIComponent(input.payload.triggerId)}`,
+      pathname: `/v1/triggers/schedules/${encodeURIComponent(input.payload.triggerId)}`,
       body: input.payload.payload,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not update scheduled trigger.",
@@ -133,7 +133,7 @@ export async function deleteScheduledTrigger(input: {
     const response = await requestControlPlane({
       operation: "deleteScheduledTrigger",
       method: "DELETE",
-      pathname: `/v1/automations/schedules/${encodeURIComponent(input.triggerId)}`,
+      pathname: `/v1/triggers/schedules/${encodeURIComponent(input.triggerId)}`,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not delete scheduled trigger.",
       errorFactory: createScheduledTriggersApiError,

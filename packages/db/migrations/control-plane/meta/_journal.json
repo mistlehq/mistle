@@ -225,6 +225,13 @@
       "when": 1778861309094,
       "tag": "0031_update-api-key-list-index",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1779073991773,
+      "tag": "0032_rename-automation-to-trigger",
+      "breakpoints": true
     }
   ]
 }

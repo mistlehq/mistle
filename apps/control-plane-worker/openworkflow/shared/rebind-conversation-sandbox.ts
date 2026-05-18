@@ -1,6 +1,6 @@
 import {
-  AutomationConversationRouteStatuses,
-  AutomationConversationStatuses,
+  TriggerConversationRouteStatuses,
+  TriggerConversationStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
   getControlPlaneDatabaseSchema,
@@ -8,53 +8,52 @@ import {
 import { eq, sql } from "drizzle-orm";
 
 import {
-  AutomationConversationPersistenceError,
-  AutomationConversationPersistenceErrorCodes,
-} from "./automation-conversation-persistence-error.js";
-export type RebindAutomationConversationSandboxInput = {
+  TriggerConversationPersistenceError,
+  TriggerConversationPersistenceErrorCodes,
+} from "./trigger-conversation-persistence-error.js";
+export type RebindTriggerConversationSandboxInput = {
   routeId: string;
   sandboxInstanceId: string;
 };
 
-export async function rebindAutomationConversationSandbox(
+export async function rebindTriggerConversationSandbox(
   deps: {
     db: ControlPlaneDatabase | ControlPlaneTransaction;
   },
-  input: RebindAutomationConversationSandboxInput,
+  input: RebindTriggerConversationSandboxInput,
 ) {
   return deps.db.transaction(async (transaction) => {
     const tables = getControlPlaneDatabaseSchema(transaction);
 
-    const persistedRoute = await transaction.query.automationConversationRoutes.findFirst({
+    const persistedRoute = await transaction.query.triggerConversationRoutes.findFirst({
       where: (table, { eq: whereEq }) => whereEq(table.id, input.routeId),
     });
     if (persistedRoute === undefined) {
-      throw new AutomationConversationPersistenceError({
-        code: AutomationConversationPersistenceErrorCodes.CONVERSATION_ROUTE_NOT_FOUND,
-        message: `AutomationConversation route '${input.routeId}' was not found.`,
+      throw new TriggerConversationPersistenceError({
+        code: TriggerConversationPersistenceErrorCodes.CONVERSATION_ROUTE_NOT_FOUND,
+        message: `TriggerConversation route '${input.routeId}' was not found.`,
       });
     }
-    if (persistedRoute.status === AutomationConversationRouteStatuses.CLOSED) {
-      throw new AutomationConversationPersistenceError({
-        code: AutomationConversationPersistenceErrorCodes.CONVERSATION_ROUTE_CLOSED,
-        message: `AutomationConversation route '${input.routeId}' is closed and cannot be rebound.`,
+    if (persistedRoute.status === TriggerConversationRouteStatuses.CLOSED) {
+      throw new TriggerConversationPersistenceError({
+        code: TriggerConversationPersistenceErrorCodes.CONVERSATION_ROUTE_CLOSED,
+        message: `TriggerConversation route '${input.routeId}' is closed and cannot be rebound.`,
       });
     }
 
-    const persistedAutomationConversation =
-      await transaction.query.automationConversations.findFirst({
-        where: (table, { eq: whereEq }) => whereEq(table.id, persistedRoute.conversationId),
-      });
-    if (persistedAutomationConversation === undefined) {
-      throw new AutomationConversationPersistenceError({
-        code: AutomationConversationPersistenceErrorCodes.CONVERSATION_NOT_FOUND,
-        message: `AutomationConversation '${persistedRoute.conversationId}' was not found.`,
+    const persistedTriggerConversation = await transaction.query.triggerConversations.findFirst({
+      where: (table, { eq: whereEq }) => whereEq(table.id, persistedRoute.conversationId),
+    });
+    if (persistedTriggerConversation === undefined) {
+      throw new TriggerConversationPersistenceError({
+        code: TriggerConversationPersistenceErrorCodes.CONVERSATION_NOT_FOUND,
+        message: `TriggerConversation '${persistedRoute.conversationId}' was not found.`,
       });
     }
-    if (persistedAutomationConversation.status === AutomationConversationStatuses.CLOSED) {
-      throw new AutomationConversationPersistenceError({
-        code: AutomationConversationPersistenceErrorCodes.CONVERSATION_CLOSED,
-        message: `AutomationConversation '${persistedRoute.conversationId}' is closed and cannot be rebound.`,
+    if (persistedTriggerConversation.status === TriggerConversationStatuses.CLOSED) {
+      throw new TriggerConversationPersistenceError({
+        code: TriggerConversationPersistenceErrorCodes.CONVERSATION_CLOSED,
+        message: `TriggerConversation '${persistedRoute.conversationId}' is closed and cannot be rebound.`,
       });
     }
 
@@ -62,19 +61,19 @@ export async function rebindAutomationConversationSandbox(
     // step refreshes the provider conversation metadata. Dashboard sessions
     // that are already open are not currently migrated across this transition.
     const updatedRows = await transaction
-      .update(tables.automationConversationRoutes)
+      .update(tables.triggerConversationRoutes)
       .set({
         sandboxInstanceId: input.sandboxInstanceId,
         providerExecutionId: null,
         updatedAt: sql`now()`,
       })
-      .where(eq(tables.automationConversationRoutes.id, input.routeId))
+      .where(eq(tables.triggerConversationRoutes.id, input.routeId))
       .returning();
     const updatedRoute = updatedRows[0];
     if (updatedRoute === undefined) {
-      throw new AutomationConversationPersistenceError({
-        code: AutomationConversationPersistenceErrorCodes.CONVERSATION_ROUTE_NOT_FOUND,
-        message: `AutomationConversation route '${input.routeId}' was not found during rebind update.`,
+      throw new TriggerConversationPersistenceError({
+        code: TriggerConversationPersistenceErrorCodes.CONVERSATION_ROUTE_NOT_FOUND,
+        message: `TriggerConversation route '${input.routeId}' was not found during rebind update.`,
       });
     }
 

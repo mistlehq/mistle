@@ -6,7 +6,7 @@ import { controlPlaneSchema } from "./namespace.js";
 import { organizations } from "./organizations.js";
 
 export const ScheduleTargetTypes = {
-  AUTOMATION_RUN: "automation_run",
+  TRIGGER_RUN: "trigger_run",
   SNAPSHOT_REFRESH: "sandbox_profile_snapshot_refresh",
 } as const;
 

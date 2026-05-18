@@ -172,7 +172,7 @@ describe("webhook helpers", () => {
     });
   });
 
-  it("rejects advertised automation webhook events without source order keys", async () => {
+  it("rejects advertised trigger webhook events without source order keys", async () => {
     await expect(
       verifyAndResolveWebhookRequestOrThrow({
         definition: {
@@ -205,7 +205,7 @@ describe("webhook helpers", () => {
     ).rejects.toMatchObject({
       code: WebhookErrorCodes.WEBHOOK_SOURCE_ORDER_KEY_MISSING,
       message:
-        "Webhook event 'github.issue_comment.created' from integration 'github/github-cloud' is advertised for automations but is missing sourceOrderKey.",
+        "Webhook event 'github.issue_comment.created' from integration 'github/github-cloud' is advertised for triggers but is missing sourceOrderKey.",
     });
   });
 

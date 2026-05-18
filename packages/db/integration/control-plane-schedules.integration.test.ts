@@ -42,10 +42,10 @@ describe("control-plane schedules integration", () => {
           values ($1, $2, $3, $4, $5, $6, $7, $8)
         `,
         [
-          "sch_schedule_test_automation",
+          "sch_schedule_test_trigger",
           "org_schedule_test",
-          "automation_run",
-          "Schedule Test Automation",
+          "trigger_run",
+          "Schedule Test Trigger",
           "0 9 * * *",
           "Asia/Singapore",
           true,
@@ -87,7 +87,7 @@ describe("control-plane schedules integration", () => {
         [
           "sch_schedule_test_disabled",
           "org_schedule_test",
-          "automation_run",
+          "trigger_run",
           "Disabled Schedule",
           "0 9 * * *",
           "Asia/Singapore",
@@ -97,10 +97,10 @@ describe("control-plane schedules integration", () => {
 
       await pool.query(
         `
-          insert into control_plane.schedule_automations
+          insert into control_plane.schedule_triggers
             (
               schedule_id,
-              automation_id,
+              trigger_id,
               input_template,
               conversation_key_template,
               idempotency_key_template
@@ -108,7 +108,7 @@ describe("control-plane schedules integration", () => {
           values ($1, $2, $3, $4, $5)
         `,
         [
-          "sch_schedule_test_automation",
+          "sch_schedule_test_trigger",
           "atm_schedule_test",
           "{}",
           "conversation-{{schedule.id}}",
@@ -131,30 +131,30 @@ describe("control-plane schedules integration", () => {
           values ($1, $2, $3, $4, $5, $6, $7, $8)
         `,
         [
-          "sch_schedule_test_duplicate_automation",
+          "sch_schedule_test_duplicate_trigger",
           "org_schedule_test",
-          "automation_run",
-          "Duplicate Automation Schedule",
+          "trigger_run",
+          "Duplicate Trigger Schedule",
           "0 10 * * *",
           "Asia/Singapore",
           true,
           "2026-04-28T02:00:00.000Z",
         ],
       );
-      const duplicateScheduleAutomationError = await capturePgErrorCode(
+      const duplicateScheduleTriggerError = await capturePgErrorCode(
         pool.query(
           `
-            insert into control_plane.schedule_automations
+            insert into control_plane.schedule_triggers
               (
                 schedule_id,
-                automation_id,
+                trigger_id,
                 input_template,
                 conversation_key_template
               )
             values ($1, $2, $3, $4)
           `,
           [
-            "sch_schedule_test_duplicate_automation",
+            "sch_schedule_test_duplicate_trigger",
             "atm_schedule_test",
             "{}",
             "conversation-{{schedule.id}}",
@@ -162,8 +162,8 @@ describe("control-plane schedules integration", () => {
         ),
       );
       assertPgUniqueViolation(
-        duplicateScheduleAutomationError,
-        "duplicate schedule automation automation_id insert",
+        duplicateScheduleTriggerError,
+        "duplicate schedule trigger trigger_id insert",
       );
       await pool.query(
         `
@@ -176,7 +176,7 @@ describe("control-plane schedules integration", () => {
 
       await insertScheduledAction(pool, {
         id: "sca_schedule_test_one",
-        scheduleId: "sch_schedule_test_automation",
+        scheduleId: "sch_schedule_test_trigger",
         scheduledAt: "2026-04-28T01:00:00.000Z",
         localDate: "2026-04-28",
         localTime: "09:00",
@@ -200,10 +200,10 @@ describe("control-plane schedules integration", () => {
           `,
           [
             "sca_schedule_test_duplicate_utc",
-            "sch_schedule_test_automation",
+            "sch_schedule_test_trigger",
             "org_schedule_test",
-            "automation_run",
-            { automation_id: "atm_schedule_test" },
+            "trigger_run",
+            { trigger_id: "atm_schedule_test" },
             "2026-04-28T01:00:00.000Z",
             "2026-04-28",
             "10:00",
@@ -230,10 +230,10 @@ describe("control-plane schedules integration", () => {
           `,
           [
             "sca_schedule_test_duplicate_local",
-            "sch_schedule_test_automation",
+            "sch_schedule_test_trigger",
             "org_schedule_test",
-            "automation_run",
-            { automation_id: "atm_schedule_test" },
+            "trigger_run",
+            { trigger_id: "atm_schedule_test" },
             "2026-04-28T02:00:00.000Z",
             "2026-04-28",
             "09:00",
@@ -257,16 +257,16 @@ describe("control-plane schedules integration", () => {
 
       await pool.query(
         `
-          insert into control_plane.automation_runs
-            (id, automation_id, source_scheduled_action_id)
+          insert into control_plane.trigger_runs
+            (id, trigger_id, source_scheduled_action_id)
           values ($1, $2, $3)
         `,
         ["aru_schedule_test_one", "atm_schedule_test", "sca_schedule_test_one"],
       );
       await pool.query(
         `
-          insert into control_plane.automation_runs
-            (id, automation_id)
+          insert into control_plane.trigger_runs
+            (id, trigger_id)
           values ($1, $2), ($3, $4)
         `,
         [
@@ -277,19 +277,19 @@ describe("control-plane schedules integration", () => {
         ],
       );
 
-      const duplicateAutomationRunSourceError = await capturePgErrorCode(
+      const duplicateTriggerRunSourceError = await capturePgErrorCode(
         pool.query(
           `
-            insert into control_plane.automation_runs
-              (id, automation_id, source_scheduled_action_id)
+            insert into control_plane.trigger_runs
+              (id, trigger_id, source_scheduled_action_id)
             values ($1, $2, $3)
           `,
           ["aru_schedule_test_two", "atm_schedule_test", "sca_schedule_test_one"],
         ),
       );
       assertPgUniqueViolation(
-        duplicateAutomationRunSourceError,
-        "duplicate automation run scheduled action source insert",
+        duplicateTriggerRunSourceError,
+        "duplicate trigger run scheduled action source insert",
       );
 
       await pool.query(
@@ -346,7 +346,7 @@ describe("control-plane schedules integration", () => {
 
       await pool.query(
         `
-          insert into control_plane.automation_conversations
+          insert into control_plane.trigger_conversations
             (
               id,
               organization_id,
@@ -365,7 +365,7 @@ describe("control-plane schedules integration", () => {
         [
           "cnv_schedule_test",
           "org_schedule_test",
-          "automation_target",
+          "trigger_target",
           "atg_schedule_test",
           "schedule",
           "atm_schedule_test",
@@ -378,16 +378,16 @@ describe("control-plane schedules integration", () => {
       );
       await pool.query(
         `
-          insert into control_plane.automation_targets
-            (id, automation_id, sandbox_profile_id, sandbox_profile_version)
+          insert into control_plane.trigger_targets
+            (id, trigger_id, sandbox_profile_id, sandbox_profile_version)
           values ($1, $2, $3, $4)
         `,
         ["atg_schedule_test", "atm_schedule_test", "sbp_schedule_test", 1],
       );
       await pool.query(
         `
-          insert into control_plane.automation_runs
-            (id, automation_id, automation_target_id, conversation_id)
+          insert into control_plane.trigger_runs
+            (id, trigger_id, trigger_target_id, conversation_id)
           values ($1, $2, $3, $4)
         `,
         [
@@ -399,11 +399,11 @@ describe("control-plane schedules integration", () => {
       );
       await pool.query(
         `
-          insert into control_plane.automation_conversation_delivery_tasks
+          insert into control_plane.trigger_conversation_delivery_tasks
             (
               id,
               conversation_id,
-              automation_run_id,
+              trigger_run_id,
               source_scheduled_action_id,
               source_order_key
             )
@@ -420,8 +420,8 @@ describe("control-plane schedules integration", () => {
 
       await pool.query(
         `
-          insert into control_plane.automation_runs
-            (id, automation_id, automation_target_id, conversation_id)
+          insert into control_plane.trigger_runs
+            (id, trigger_id, trigger_target_id, conversation_id)
           values ($1, $2, $3, $4), ($5, $6, $7, $8)
         `,
         [
@@ -438,8 +438,8 @@ describe("control-plane schedules integration", () => {
       const deliveryTaskWithoutSourceError = await capturePgErrorCode(
         pool.query(
           `
-            insert into control_plane.automation_conversation_delivery_tasks
-              (id, conversation_id, automation_run_id, source_order_key)
+            insert into control_plane.trigger_conversation_delivery_tasks
+              (id, conversation_id, trigger_run_id, source_order_key)
             values ($1, $2, $3, $4)
           `,
           [
@@ -459,11 +459,11 @@ describe("control-plane schedules integration", () => {
       const deliveryTaskWithTwoSourcesError = await capturePgErrorCode(
         pool.query(
           `
-            insert into control_plane.automation_conversation_delivery_tasks
+            insert into control_plane.trigger_conversation_delivery_tasks
               (
                 id,
                 conversation_id,
-                automation_run_id,
+                trigger_run_id,
                 source_webhook_event_id,
                 source_scheduled_action_id,
                 source_order_key
@@ -485,19 +485,19 @@ describe("control-plane schedules integration", () => {
         "delivery task with two sources insert",
       );
 
-      const scheduleAutomationColumnsResult = await pool.query<{ column_name: string }>(
+      const scheduleTriggerColumnsResult = await pool.query<{ column_name: string }>(
         `
           select column_name
           from information_schema.columns
           where table_schema = 'control_plane'
-            and table_name = 'schedule_automations'
+            and table_name = 'schedule_triggers'
           order by ordinal_position
         `,
       );
       assertStringArraysEqual(
-        scheduleAutomationColumnsResult.rows.map((row) => row.column_name),
+        scheduleTriggerColumnsResult.rows.map((row) => row.column_name),
         [
-          "automation_id",
+          "trigger_id",
           "input_template",
           "conversation_key_template",
           "idempotency_key_template",
@@ -522,10 +522,10 @@ async function insertScheduleTestFixtures(pool: Pool): Promise<void> {
   );
   await pool.query(
     `
-      insert into control_plane.automations (id, organization_id, kind, name)
+      insert into control_plane.triggers (id, organization_id, kind, name)
       values ($1, $2, $3, $4)
     `,
-    ["atm_schedule_test", "org_schedule_test", "schedule", "Schedule Test Automation"],
+    ["atm_schedule_test", "org_schedule_test", "schedule", "Schedule Test Trigger"],
   );
   await pool.query(
     `
@@ -671,8 +671,8 @@ async function insertScheduledAction(
       input.id,
       input.scheduleId,
       "org_schedule_test",
-      input.targetType ?? "automation_run",
-      input.targetPayload ?? { automation_id: "atm_schedule_test" },
+      input.targetType ?? "trigger_run",
+      input.targetPayload ?? { trigger_id: "atm_schedule_test" },
       input.scheduledAt,
       input.localDate,
       input.localTime,
