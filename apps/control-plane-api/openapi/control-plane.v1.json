@@ -3238,7 +3238,7 @@
                             "properties": {
                               "kind": {
                                 "type": "string",
-                                "enum": ["user", "system"]
+                                "enum": ["user", "api_key", "system"]
                               },
                               "id": {
                                 "type": "string",
@@ -14821,7 +14821,7 @@
                             "properties": {
                               "kind": {
                                 "type": "string",
-                                "enum": ["user", "system"]
+                                "enum": ["user", "api_key", "system"]
                               },
                               "id": {
                                 "type": "string",

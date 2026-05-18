@@ -25,6 +25,7 @@ export type SandboxInstanceStatus =
 
 export const SandboxInstanceStarterKinds = {
   USER: "user",
+  API_KEY: "api_key",
   SYSTEM: "system",
 } as const;
 

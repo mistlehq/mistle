@@ -1384,7 +1384,7 @@
                     "properties": {
                       "kind": {
                         "type": "string",
-                        "enum": ["user", "system"]
+                        "enum": ["user", "api_key", "system"]
                       },
                       "id": {
                         "type": "string",
@@ -1640,7 +1640,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["user", "system"]
+              "enum": ["user", "api_key", "system"]
             },
             "required": false,
             "name": "startedByKind",
@@ -1809,7 +1809,7 @@
                             "properties": {
                               "kind": {
                                 "type": "string",
-                                "enum": ["user", "system"]
+                                "enum": ["user", "api_key", "system"]
                               },
                               "id": {
                                 "type": "string",
@@ -1993,7 +1993,7 @@
                   },
                   "startedByKind": {
                     "type": "string",
-                    "enum": ["user", "system"]
+                    "enum": ["user", "api_key", "system"]
                   },
                   "startedById": {
                     "type": "string",
@@ -2105,7 +2105,7 @@
                             "properties": {
                               "kind": {
                                 "type": "string",
-                                "enum": ["user", "system"]
+                                "enum": ["user", "api_key", "system"]
                               },
                               "id": {
                                 "type": "string",

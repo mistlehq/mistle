@@ -23,7 +23,7 @@ export interface paths {
           organizationId: string;
           source?: "dashboard" | "trigger" | "webhook" | "schedule";
           startedById?: string;
-          startedByKind?: "user" | "system";
+          startedByKind?: "user" | "api_key" | "system";
           startedByScope?: "self" | "others";
           startedBySystemIds?: string[];
           startedByUserId?: string;
@@ -54,7 +54,7 @@ export interface paths {
                 startedBy: {
                   id: string;
                   /** @enum {string} */
-                  kind: "user" | "system";
+                  kind: "user" | "api_key" | "system";
                 };
                 /** @enum {string} */
                 status: "pending" | "starting" | "running" | "stopped" | "failed";
@@ -503,7 +503,7 @@ export interface paths {
             startedBy: {
               id: string;
               /** @enum {string} */
-              kind: "user" | "system";
+              kind: "user" | "api_key" | "system";
             };
           };
         };
@@ -1740,7 +1740,7 @@ export interface paths {
             source?: "dashboard" | "trigger" | "webhook" | "schedule";
             startedById?: string;
             /** @enum {string} */
-            startedByKind?: "user" | "system";
+            startedByKind?: "user" | "api_key" | "system";
             /** @enum {string} */
             startedByScope?: "self" | "others";
             startedBySystemIds?: string[];
@@ -1769,7 +1769,7 @@ export interface paths {
                 startedBy: {
                   id: string;
                   /** @enum {string} */
-                  kind: "user" | "system";
+                  kind: "user" | "api_key" | "system";
                 };
                 /** @enum {string} */
                 status: "pending" | "starting" | "running" | "stopped" | "failed";

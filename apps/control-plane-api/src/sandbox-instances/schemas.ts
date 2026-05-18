@@ -11,7 +11,7 @@ const sandboxInstanceStatusSchema = z.enum(["pending", "starting", "running", "s
 const sandboxInstanceSourceSchema = z.enum(["dashboard", "webhook", "schedule"]);
 const sandboxInstanceStartedBySchema = z
   .object({
-    kind: z.enum(["user", "system"]),
+    kind: z.enum(["user", "api_key", "system"]),
     id: z.string().min(1),
     name: z.string().min(1).nullable(),
   })

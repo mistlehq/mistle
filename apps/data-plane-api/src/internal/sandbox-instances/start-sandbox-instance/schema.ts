@@ -27,7 +27,7 @@ export const StartSandboxInstanceInputSchema = z
     runtimePlan: CompiledRuntimePlanSchema,
     startedBy: z
       .object({
-        kind: z.enum(["user", "system"]),
+        kind: z.enum(["user", "api_key", "system"]),
         id: z.string().min(1),
       })
       .strict(),

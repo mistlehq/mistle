@@ -20,7 +20,7 @@ export const DataPlaneSandboxInstanceStatusSchema = z.enum([
 
 export const SandboxInstanceStartedBySchema = z
   .object({
-    kind: z.enum(["user", "system"]),
+    kind: z.enum(["user", "api_key", "system"]),
     id: z.string().min(1),
   })
   .strict();

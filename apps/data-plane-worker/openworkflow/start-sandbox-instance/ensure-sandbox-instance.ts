@@ -21,7 +21,7 @@ export async function ensureSandboxInstance(
     persistenceMode: "ephemeral" | "persistent";
     purpose: SandboxInstancePurpose;
     startedBy: {
-      kind: "user" | "system";
+      kind: "user" | "api_key" | "system";
       id: string;
     };
     source: SandboxInstanceSource;

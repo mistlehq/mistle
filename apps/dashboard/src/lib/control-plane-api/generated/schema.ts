@@ -1947,7 +1947,7 @@ export interface paths {
                 startedBy: {
                   id: string;
                   /** @enum {string} */
-                  kind: "user" | "system";
+                  kind: "user" | "api_key" | "system";
                   name: string | null;
                 };
                 /** @enum {string} */
@@ -7498,7 +7498,7 @@ export interface paths {
                 startedBy: {
                   id: string;
                   /** @enum {string} */
-                  kind: "user" | "system";
+                  kind: "user" | "api_key" | "system";
                   name: string | null;
                 };
                 /** @enum {string} */

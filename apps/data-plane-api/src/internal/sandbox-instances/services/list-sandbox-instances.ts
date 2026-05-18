@@ -55,7 +55,7 @@ type ListSandboxInstancesContext = {
 
 type StartedByFilterInput =
   | {
-      startedByKind: "system" | "user";
+      startedByKind: SandboxInstance["startedByKind"];
       startedById: string;
     }
   | {

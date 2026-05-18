@@ -33,7 +33,7 @@ export const ListSandboxInstancesQuerySchema = z
       },
       createKeysetPageSizeSchema({ defaultLimit: 20, maxLimit: 100 }),
     ),
-    startedByKind: z.enum(["user", "system"]).optional(),
+    startedByKind: z.enum(["user", "api_key", "system"]).optional(),
     startedById: z.string().min(1).optional(),
     startedByScope: z.enum(["self", "others"]).optional(),
     startedByUserId: z.string().min(1).optional(),

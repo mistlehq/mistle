@@ -14,6 +14,7 @@ import { createIntegrationTest } from "@mistle/test-harness/integration";
 import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
+import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import {
   StartSandboxProfileInstanceBadRequestResponseSchema,
   StartSandboxProfileInstanceConflictResponseSchema,
@@ -21,6 +22,7 @@ import {
   StartSandboxProfileInstanceResponseSchema,
   StartSandboxProfileSetupScriptTestRunResponseSchema,
 } from "../src/sandbox-profiles/index.js";
+import { createApiKeyToken } from "./helpers/api-keys.js";
 import { waitForQueuedStartWorkflowInput } from "./helpers/data-plane-workflows.js";
 import {
   integrationConnectionRow,
@@ -236,6 +238,84 @@ describe.concurrent("sandbox profile version start instance integration", () => 
       },
     ]);
     expect(queuedWorkflowInput.runtimePlan.egressRoutes).toEqual([]);
+  });
+
+  it("starts an instance with an API key that has sandbox session create permission", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-start-instance-api-key@example.com",
+    });
+
+    await createStartableProfile({
+      env,
+      organizationId: session.organizationId,
+      profileId: "sbp_start_instance_api_key",
+      targetKey: "openai-start-instance-api-key",
+      connectionId: "icn_start_instance_api_key",
+      bindingId: "ibd_start_instance_api_key",
+      versionState: SandboxProfileVersionStates.DRAFT,
+    });
+    const apiKeyToken = await createApiKeyToken({
+      env,
+      cookie: session.cookie,
+      name: "Start profile instance",
+      permissions: [OrganizationPermissions.SANDBOX_SESSION_CREATE],
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_start_instance_api_key/versions/1/instances",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${apiKeyToken}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(201);
+    const body = StartSandboxProfileInstanceResponseSchema.parse(await response.json());
+    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+      env,
+      sandboxInstanceId: body.sandboxInstanceId,
+    });
+
+    expect(queuedWorkflowInput.startedBy.kind).toBe("api_key");
+    expect(queuedWorkflowInput.actingUserId).toBeUndefined();
+  });
+
+  it("rejects an API key without sandbox session create permission", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-start-instance-api-key-forbidden@example.com",
+    });
+
+    await createStartableProfile({
+      env,
+      organizationId: session.organizationId,
+      profileId: "sbp_start_instance_api_key_forbidden",
+      targetKey: "openai-start-instance-api-key-forbidden",
+      connectionId: "icn_start_instance_api_key_forbidden",
+      bindingId: "ibd_start_instance_api_key_forbidden",
+      versionState: SandboxProfileVersionStates.DRAFT,
+    });
+    const apiKeyToken = await createApiKeyToken({
+      env,
+      cookie: session.cookie,
+      name: "Read sandbox sessions",
+      permissions: [OrganizationPermissions.SANDBOX_SESSION_READ],
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_start_instance_api_key_forbidden/versions/1/instances",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${apiKeyToken}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(403);
   });
 
   it("returns 400 when the setup script test run body is blank", async ({ env }) => {
