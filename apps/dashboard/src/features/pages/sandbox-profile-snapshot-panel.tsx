@@ -1030,28 +1030,30 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
                       message={scheduleBehaviorDescription}
                     />
 
-                    <SandboxProfileScriptEditorField
-                      ariaLabelledBy="sandbox-profile-maintenance-script-label"
-                      description="Runs from the current usable snapshot when refreshing through the snapshot maintenance path."
-                      disabled={input.disabled}
-                      fieldLabel="Snapshot maintenance script"
-                      onChange={input.onChangeMaintenanceScript}
-                      placeholderText="#!/usr/bin/env bash"
-                      setupAssistant={{
-                        disabled: input.setupAssistantControl.disabled,
-                        isStarting: input.setupAssistantControl.isStarting,
-                        onClick: () => {
-                          input.setupAssistantControl.onToggle({
-                            script: input.maintenanceScriptDraft,
-                            scriptKind: "maintenance",
-                          });
-                        },
-                        title: input.setupAssistantControl.title,
-                      }}
-                      testButtonProps={input.testButtonProps}
-                      testPanel={input.testPanel}
-                      value={input.maintenanceScriptDraft}
-                    />
+                    <div className="pt-2">
+                      <SandboxProfileScriptEditorField
+                        ariaLabelledBy="sandbox-profile-maintenance-script-label"
+                        description="Runs from the current usable snapshot when refreshing through the snapshot maintenance path."
+                        disabled={input.disabled}
+                        fieldLabel="Snapshot maintenance script"
+                        onChange={input.onChangeMaintenanceScript}
+                        placeholderText="#!/usr/bin/env bash"
+                        setupAssistant={{
+                          disabled: input.setupAssistantControl.disabled,
+                          isStarting: input.setupAssistantControl.isStarting,
+                          onClick: () => {
+                            input.setupAssistantControl.onToggle({
+                              script: input.maintenanceScriptDraft,
+                              scriptKind: "maintenance",
+                            });
+                          },
+                          title: input.setupAssistantControl.title,
+                        }}
+                        testButtonProps={input.testButtonProps}
+                        testPanel={input.testPanel}
+                        value={input.maintenanceScriptDraft}
+                      />
+                    </div>
                   </div>
                 ) : null}
               </div>
