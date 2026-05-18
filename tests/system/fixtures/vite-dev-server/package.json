@@ -6,6 +6,6 @@
     "dev": "vite --host 0.0.0.0 --port 6006"
   },
   "devDependencies": {
-    "vite": "8.0.11"
+    "vite": "8.0.12"
   }
 }
