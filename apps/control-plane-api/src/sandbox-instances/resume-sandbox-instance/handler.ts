@@ -1,14 +1,15 @@
 import type { RouteHandler } from "@hono/zod-openapi";
 import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
-import { withRequiredSession } from "../../middleware/with-required-session.js";
-import type { AppContextBindings, AppSession } from "../../types.js";
+import { OrganizationPermissions } from "../../auth/services/organization-policy.js";
+import { withRequiredOrganizationActor } from "../../middleware/with-required-organization-actor.js";
+import type { AppContextBindings, AppOrganizationActor } from "../../types.js";
 import { resumeInstance } from "../services/resume-instance.js";
 import { route } from "./route.js";
 
 const routeHandler = async (
   ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
-  { user, session }: AppSession,
+  organizationActor: AppOrganizationActor,
 ) => {
   const db = ctx.get("db");
   const dataPlaneClient = ctx.get("dataPlaneClient");
@@ -21,11 +22,15 @@ const routeHandler = async (
       dataPlaneClient,
     },
     {
-      organizationId: session.activeOrganizationId,
+      organizationId: organizationActor.organizationId,
       instanceId,
-      actingUser: {
-        userId: user.id,
-      },
+      ...(organizationActor.kind === "user"
+        ? {
+            actingUser: {
+              userId: organizationActor.userId,
+            },
+          }
+        : {}),
       ...(body.idempotencyKey === undefined ? {} : { idempotencyKey: body.idempotencyKey }),
     },
   );
@@ -34,5 +39,7 @@ const routeHandler = async (
 };
 
 export const handler: RouteHandler<typeof route, AppContextBindings> = withHttpErrorHandler(
-  withRequiredSession(routeHandler),
+  withRequiredOrganizationActor(routeHandler, {
+    permission: OrganizationPermissions.SANDBOX_SESSION_RESUME,
+  }),
 );

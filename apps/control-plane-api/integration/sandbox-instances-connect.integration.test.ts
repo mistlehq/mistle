@@ -17,10 +17,12 @@ import { systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
 import WebSocket from "ws";
 
+import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import {
   SandboxInstanceConnectionTokenSchema,
   SandboxInstancesConflictResponseSchema,
 } from "../src/sandbox-instances/index.js";
+import { createApiKeyToken } from "./helpers/api-keys.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -194,6 +196,63 @@ describe.concurrent("sandbox instance connect integration", () => {
     const body = SandboxInstancesConflictResponseSchema.parse(await response.json());
     expect(body.code).toBe("INSTANCE_FAILED");
     expect(body.message).toContain("Sandbox runtime failed to start.");
+  });
+
+  it("accepts API key auth before enforcing sandbox connectability", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-connect-api-key@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "Sandbox connector",
+      permissions: [OrganizationPermissions.SANDBOX_SESSION_CONNECT],
+    });
+    await insertSandboxInstance(env, {
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_cp_connect_api_key_pending_001",
+      providerSandboxId: null,
+      status: SandboxInstanceStatuses.PENDING,
+      startedById: session.userId,
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/instances/sbi_cp_connect_api_key_pending_001/connection-tokens",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(409);
+    const body = SandboxInstancesConflictResponseSchema.parse(await response.json());
+    expect(body.code).toBe("INSTANCE_NOT_RESUMABLE");
+  });
+
+  it("returns 403 when an API key lacks sandbox connect permission", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-connect-api-key-forbidden@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "Sandbox non-connector",
+      permissions: [OrganizationPermissions.SANDBOX_SESSION_READ],
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/instances/sbi_cp_connect_api_key_forbidden/connection-tokens",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(403);
   });
 });
 

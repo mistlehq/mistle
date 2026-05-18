@@ -171,7 +171,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const meRoutes = withAuthSession(createMeRoutes());
   const organizationRoutes = withActiveOrganizationAccess(createOrganizationRoutes());
   const publicSessionLinksRoutes = createPublicSessionLinksRoutes();
-  const sandboxInstancesRoutes = withActiveOrganizationAccess(createSandboxInstancesRoutes());
+  const sandboxInstancesRoutes = withOrganizationAccess(createSandboxInstancesRoutes());
   const sandboxProvidersRoutes = withActiveOrganizationAccess(createSandboxProvidersRoutes());
   const sandboxProfilesRoutes = withOrganizationAccess(createSandboxProfilesRoutes(), {
     permission: OrganizationPermissions.SANDBOX_PROFILE_READ,

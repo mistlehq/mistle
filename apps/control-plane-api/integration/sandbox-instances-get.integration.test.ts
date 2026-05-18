@@ -16,7 +16,9 @@ import {
 } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
+import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import { SandboxInstanceStatusResponseSchema } from "../src/sandbox-instances/index.js";
+import { createApiKeyToken } from "./helpers/api-keys.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api"],
@@ -258,6 +260,67 @@ describe.concurrent("sandbox instances get integration", () => {
       startupOperation: null,
       automationConversation: null,
     });
+  });
+
+  it("returns a sandbox instance in the API key organization", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-instances-get-api-key@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "Sandbox instance reader",
+      permissions: [OrganizationPermissions.SANDBOX_SESSION_READ],
+    });
+
+    await insertSandboxInstance(env, {
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_cp_get_api_key_001",
+      title: "API key readable session",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/instances/sbi_cp_get_api_key_001",
+      {
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
+    expect(body.id).toBe("sbi_cp_get_api_key_001");
+    expect(body.title).toBe("API key readable session");
+  });
+
+  it("returns 403 when an API key lacks sandbox session read permission", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-instances-get-api-key-forbidden@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "Sandbox instance non-reader",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_READ],
+    });
+
+    await insertSandboxInstance(env, {
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_cp_get_api_key_forbidden_001",
+      title: "Forbidden API key session",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/instances/sbi_cp_get_api_key_forbidden_001",
+      {
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(403);
   });
 });
 

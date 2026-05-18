@@ -11,11 +11,13 @@ import { sql } from "drizzle-orm";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
+import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import {
   SandboxInstancesConflictResponseSchema,
   SandboxInstancesNotFoundResponseSchema,
   SandboxInstanceStatusResponseSchema,
 } from "../src/sandbox-instances/index.js";
+import { createApiKeyToken } from "./helpers/api-keys.js";
 import { waitForQueuedResumeWorkflowInput } from "./helpers/data-plane-workflows.js";
 
 const it = createIntegrationTest({
@@ -171,13 +173,76 @@ describe.concurrent("sandbox instance resume integration", () => {
     const body = SandboxInstancesNotFoundResponseSchema.parse(await response.json());
     expect(body.code).toBe("INSTANCE_NOT_FOUND");
   });
+
+  it("resumes a stopped sandbox with API key auth", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-resume-api-key@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "Sandbox resumer",
+      permissions: [OrganizationPermissions.SANDBOX_SESSION_RESUME],
+    });
+    await insertSandboxInstance(env, {
+      organizationId: session.organizationId,
+      sandboxInstanceId: "sbi_cp_resume_api_key_001",
+      status: SandboxInstanceStatuses.STOPPED,
+      startedById: session.userId,
+    });
+    await insertRuntimePlan(env, {
+      sandboxInstanceId: "sbi_cp_resume_api_key_001",
+    });
+
+    const response = await resumeSandbox(env, {
+      sandboxInstanceId: "sbi_cp_resume_api_key_001",
+      bearerToken: token,
+    });
+
+    expect(response.status).toBe(200);
+    const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
+    expect(body).toMatchObject({
+      id: "sbi_cp_resume_api_key_001",
+      status: SandboxInstanceStatuses.STARTING,
+      connectable: false,
+    });
+
+    const workflowInput = await waitForQueuedResumeWorkflowInput({
+      env,
+      sandboxInstanceId: "sbi_cp_resume_api_key_001",
+    });
+    expect(workflowInput).toMatchObject({
+      sandboxInstanceId: "sbi_cp_resume_api_key_001",
+    });
+    expect(workflowInput).not.toHaveProperty("actingUserId");
+  });
+
+  it("returns 403 when an API key lacks sandbox resume permission", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-resume-api-key-forbidden@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "Sandbox non-resumer",
+      permissions: [OrganizationPermissions.SANDBOX_SESSION_READ],
+    });
+
+    const response = await resumeSandbox(env, {
+      sandboxInstanceId: "sbi_cp_resume_api_key_forbidden_001",
+      bearerToken: token,
+    });
+
+    expect(response.status).toBe(403);
+  });
 });
 
 async function resumeSandbox(
   env: IntegrationTestEnvironment,
   input: {
+    bearerToken?: string;
     sandboxInstanceId: string;
-    cookie: string;
+    cookie?: string;
     body?: Record<string, unknown>;
   },
 ) {
@@ -186,7 +251,10 @@ async function resumeSandbox(
     {
       method: "POST",
       headers: {
-        cookie: input.cookie,
+        ...(input.cookie === undefined ? {} : { cookie: input.cookie }),
+        ...(input.bearerToken === undefined
+          ? {}
+          : { authorization: `Bearer ${input.bearerToken}` }),
         ...(input.body === undefined ? {} : { "content-type": "application/json" }),
       },
       ...(input.body === undefined ? {} : { body: JSON.stringify(input.body) }),
