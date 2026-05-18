@@ -85,7 +85,7 @@
     "@commitlint/config-conventional": "^21.0.0",
     "@mistle/test-harness": "workspace:*",
     "@playwright/test": "^1.59.1",
-    "@types/node": "^25.6.0",
+    "@types/node": "^25.6.2",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@typescript/native-preview": "latest",
