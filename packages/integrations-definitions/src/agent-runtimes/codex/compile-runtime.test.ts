@@ -260,6 +260,7 @@ describe("compileCodexRuntime", () => {
     expect(configFile.content).toContain("[features]");
     expect(configFile.content).toContain("apps = false");
     expect(configFile.content).toContain("plugins = false");
+    expect(configFile.content).toContain("responses_websockets_v2 = true");
     expect(configFile.content).toContain("tool_search = true");
     expect(agentsFile.content).toContain("Mistle-managed sandbox context:");
     expect(agentsFile.content).toContain(
@@ -369,6 +370,7 @@ describe("compileCodexRuntime", () => {
     expect(configContent).not.toContain("model =");
     expect(configContent).not.toContain("model_reasoning_effort");
     expect(configContent).toContain("[features]");
+    expect(configContent).toContain("responses_websockets_v2 = true");
     expect(configContent).toContain("apps = false");
     expect(configContent).toContain("plugins = false");
     expect(configContent).toContain("tool_search = true");

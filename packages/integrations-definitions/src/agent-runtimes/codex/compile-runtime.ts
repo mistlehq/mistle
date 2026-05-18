@@ -93,6 +93,7 @@ function renderCodexConfig(input: { providerMetadata?: CodexProviderMetadata }):
     features: {
       apps: false,
       plugins: false,
+      responses_websockets_v2: true,
       tool_search: true,
     },
     projects: {
