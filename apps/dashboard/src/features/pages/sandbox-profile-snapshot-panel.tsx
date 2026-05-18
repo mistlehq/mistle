@@ -104,6 +104,8 @@ type SnapshotMaintenanceScriptAssistantControl = {
   title: string;
 };
 
+const DefaultSnapshotRefreshCronExpression = "0 9 * * *";
+
 export type SnapshotRefreshSchedule = SandboxProfileVersion["refreshSchedule"];
 export type SnapshotRefreshScheduleInput = {
   cronExpression: string;
@@ -738,7 +740,9 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
   );
   const [isEditingSchedule, setIsEditingSchedule] = useState(hasInitialDraft);
   const [cronExpression, setCronExpression] = useState(
-    initialDraftCronExpression ?? existingSchedule?.cronExpression ?? "",
+    initialDraftCronExpression ??
+      existingSchedule?.cronExpression ??
+      DefaultSnapshotRefreshCronExpression,
   );
   const [timezone, setTimezone] = useState(
     initialDraftTimezone ?? existingSchedule?.timezone ?? readBrowserTimeZone(),
@@ -767,7 +771,11 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
   useEffect(() => {
     setScheduleEnabled(existingSchedule !== null || hasInitialDraft);
     setIsEditingSchedule(hasInitialDraft);
-    setCronExpression(initialDraftCronExpression ?? existingSchedule?.cronExpression ?? "");
+    setCronExpression(
+      initialDraftCronExpression ??
+        existingSchedule?.cronExpression ??
+        DefaultSnapshotRefreshCronExpression,
+    );
     setTimezone(initialDraftTimezone ?? existingSchedule?.timezone ?? readBrowserTimeZone());
   }, [existingSchedule, hasInitialDraft, initialDraftCronExpression, initialDraftTimezone]);
 
@@ -809,7 +817,7 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
   function handleCancelScheduleEdit(): void {
     setScheduleEnabled(existingSchedule !== null);
     setIsEditingSchedule(false);
-    setCronExpression(existingSchedule?.cronExpression ?? "");
+    setCronExpression(existingSchedule?.cronExpression ?? DefaultSnapshotRefreshCronExpression);
     setTimezone(existingSchedule?.timezone ?? readBrowserTimeZone());
     input.onChangeMaintenanceScript(input.savedMaintenanceScript);
   }
@@ -954,7 +962,7 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
                             onChange={(event) => {
                               setCronExpression(event.target.value);
                             }}
-                            placeholder="0 9 * * 1"
+                            placeholder={DefaultSnapshotRefreshCronExpression}
                             required
                             value={cronExpression}
                           />

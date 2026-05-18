@@ -1456,7 +1456,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByText("Snapshot maintenance script")).toBeDefined();
     const cronExpressionInput = screen.getByLabelText("Cron expression");
     expect(cronExpressionInput).toBeInstanceOf(HTMLInputElement);
-    expect(cronExpressionInput).toHaveProperty("value", "");
+    expect(cronExpressionInput).toHaveProperty("value", "0 9 * * *");
     expect(screen.getByRole("button", { name: "Save" })).toBeDefined();
   });
 
