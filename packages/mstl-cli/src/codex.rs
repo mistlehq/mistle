@@ -239,8 +239,6 @@ fn push_mistle_codex_config_args(command_args: &mut Vec<String>) {
     ));
     command_args.push("-c".to_owned());
     command_args.push(CODEX_MISTLE_MODEL_PROVIDER_CONFIG.to_owned());
-    command_args.push("-c".to_owned());
-    command_args.push("features.responses_websockets_v2=true".to_owned());
 }
 
 async fn accept_codex(listener: &TcpListener) -> Result<WebSocketStream<TcpStream>, CodexRunError> {
@@ -637,8 +635,6 @@ mod tests {
                 "model_provider=\"mistle-remote\"",
                 "-c",
                 "model_providers.mistle-remote={ name = \"Mistle Remote\", base_url = \"http://127.0.0.1:1/v1\", wire_api = \"responses\", requires_openai_auth = false, supports_websockets = true }",
-                "-c",
-                "features.responses_websockets_v2=true",
                 "--remote",
                 "ws://127.0.0.1:1234",
                 "--model",
@@ -661,8 +657,6 @@ mod tests {
                 "model_provider=\"mistle-remote\"",
                 "-c",
                 "model_providers.mistle-remote={ name = \"Mistle Remote\", base_url = \"http://127.0.0.1:1/v1\", wire_api = \"responses\", requires_openai_auth = false, supports_websockets = true }",
-                "-c",
-                "features.responses_websockets_v2=true",
                 "--remote",
                 "ws://127.0.0.1:1234",
                 "thread_01",
