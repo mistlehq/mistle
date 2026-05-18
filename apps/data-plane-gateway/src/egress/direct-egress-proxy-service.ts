@@ -72,6 +72,11 @@ type DirectEgressRouteAuthorization =
 
 export type DirectEgressAdmission = DirectEgressRouteAuthorization;
 
+export type DirectEgressWebSocketUpstream = {
+  headers: Record<string, string>;
+  url: URL;
+};
+
 type DirectEgressLogFields = {
   authority?: string;
   durationMs?: number;
@@ -267,18 +272,31 @@ export class DirectEgressProxyService {
     });
   }
 
-  public async resolveWebSocketUpstream(input: { admission: DirectEgressAdmission }): Promise<URL> {
+  public async resolveWebSocketUpstream(input: {
+    admission: DirectEgressAdmission;
+    testEnvironmentId?: string;
+  }): Promise<DirectEgressWebSocketUpstream> {
     if (input.admission.kind === "managed") {
-      throw new DirectEgressProxyError(
-        "Direct websocket egress does not support managed egress routes yet.",
-        "managed_route_unauthorized",
-        403,
-      );
+      const managedRequest = await this.buildManagedRequest({
+        admission: input.admission,
+        body: undefined,
+        ...(input.testEnvironmentId === undefined
+          ? {}
+          : { testEnvironmentId: input.testEnvironmentId }),
+      });
+      managedRequest.url.protocol = managedRequest.url.protocol === "https:" ? "wss:" : "ws:";
+      return {
+        headers: toUpstreamHeaderRecord(managedRequest.headers),
+        url: managedRequest.url,
+      };
     }
 
     const upstreamUrl = new URL(input.admission.targetUrl.toString());
     upstreamUrl.protocol = upstreamUrl.protocol === "https:" ? "wss:" : "ws:";
-    return upstreamUrl;
+    return {
+      headers: toUpstreamHeaderRecord(input.admission.request.headers),
+      url: upstreamUrl,
+    };
   }
 
   private async verifyBearerToken(
@@ -448,6 +466,17 @@ const HopByHopHeaderNames = new Set([
   "upgrade",
 ]);
 
+const GeneratedWebSocketHeaderNames = new Set([
+  "connection",
+  "host",
+  "sec-websocket-accept",
+  "sec-websocket-extensions",
+  "sec-websocket-key",
+  "sec-websocket-protocol",
+  "sec-websocket-version",
+  "upgrade",
+]);
+
 function toRepeatedRequestHeaders(headers: Headers): RepeatedHeaderValues {
   const repeatedHeaders: RepeatedHeaderValues = {};
   for (const [name, value] of headers.entries()) {
@@ -473,6 +502,31 @@ function toHeaderRecord(headers: RepeatedHeaderValues): Record<string, string> {
     record[normalizedName] = values.join(", ");
   }
 
+  return record;
+}
+
+function toUpstreamHeaderRecord(headers: Headers | RepeatedHeaderValues): Record<string, string> {
+  const record: Record<string, string> = {};
+  if (headers instanceof Headers) {
+    for (const [name, value] of headers.entries()) {
+      const normalizedName = name.toLowerCase();
+      if (GeneratedWebSocketHeaderNames.has(normalizedName)) {
+        continue;
+      }
+
+      record[normalizedName] = value;
+    }
+    return record;
+  }
+
+  for (const [name, values] of Object.entries(headers)) {
+    const normalizedName = name.toLowerCase();
+    if (GeneratedWebSocketHeaderNames.has(normalizedName)) {
+      continue;
+    }
+
+    record[normalizedName] = values.join(", ");
+  }
   return record;
 }
 

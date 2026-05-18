@@ -56,7 +56,12 @@ type SimulatedHttpUpstream = {
 type SimulatedWebSocketUpstream = {
   baseUrl: string;
   close: () => Promise<void>;
-  nextConnection: () => Promise<void>;
+  nextConnection: () => Promise<ReceivedWebSocketConnection>;
+};
+
+type ReceivedWebSocketConnection = {
+  headers: IncomingMessage["headers"];
+  url: string;
 };
 
 describe.concurrent("direct egress proxy integration", () => {
@@ -264,6 +269,99 @@ describe.concurrent("direct egress proxy integration", () => {
           }),
         ).resolves.toEqual({
           data: "echo:hello websocket",
+          isBinary: false,
+        });
+      } finally {
+        await closeIfOpen(socket);
+        await upstream.close();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "resolves integration credentials for matched managed websocket routes before connecting upstream",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const upstream = await startSimulatedWebSocketUpstream();
+      const binding = await createDatadogBinding({
+        env,
+        uniqueId: randomUUID().replaceAll("-", ""),
+      });
+      const upstreamHttpBaseUrl = upstream.baseUrl.replace(/^ws:/u, "http:");
+      await insertSandboxInstanceRow({
+        env,
+        organizationId: binding.organizationId,
+        sandboxInstanceId,
+        runtimePlan: createRuntimePlan({
+          egressRoutes: [
+            createRoute({
+              additionalCredentialHeaders: [
+                {
+                  header: "dd_application_key",
+                  credentialResolver: {
+                    kind: "integration_connection",
+                    connectionId: binding.connectionId,
+                    secretType: "api_key",
+                    slotKey: "datadog.datadog-default.api-key.application-key",
+                  },
+                },
+              ],
+              authInjection: {
+                type: "header",
+                target: "dd_api_key",
+              },
+              bindingId: binding.bindingId,
+              connectionId: binding.connectionId,
+              egressRuleId: "egress_rule_direct_datadog_websocket",
+              familyId: "datadog",
+              hosts: [new URL(upstream.baseUrl).hostname],
+              methods: ["GET"],
+              pathPrefixes: ["/socket"],
+              secretType: "api_key",
+              slotKey: "datadog.datadog-default.api-key.api-key",
+              upstreamBaseUrl: upstreamHttpBaseUrl,
+              variantId: "datadog-default",
+            }),
+          ],
+        }),
+      });
+      const gatewayWebSocketUrl = new URL(
+        DirectEgressWebSocketRoutePath,
+        env.dataPlaneGateway.hostBaseUrl,
+      );
+      gatewayWebSocketUrl.protocol = "ws:";
+      gatewayWebSocketUrl.searchParams.set("target", `${upstream.baseUrl}/socket?room=green`);
+      const socket = await connectWebSocket(gatewayWebSocketUrl.toString(), {
+        headers: {
+          [TestEnvironmentIdHeader]: env.id,
+          authorization: `Bearer ${await mintDirectEgressToken({
+            organizationId: binding.organizationId,
+            sandboxInstanceId,
+          })}`,
+          "x-sandbox-header": "preserved",
+        },
+      });
+
+      try {
+        socket.send("hello managed websocket");
+        const connection = await withTimeout({
+          label: "waiting for simulated managed websocket upstream connection",
+          promise: upstream.nextConnection(),
+        });
+
+        expect(connection.url).toBe("/socket?room=green");
+        expect(connection.headers["dd_api_key"]).toBe("datadog-api-key");
+        expect(connection.headers["dd_application_key"]).toBe("datadog-application-key");
+        expect(connection.headers["x-sandbox-header"]).toBe("preserved");
+        expect(connection.headers.authorization).toBeUndefined();
+        await expect(
+          withTimeout({
+            label: "waiting for managed websocket echo",
+            promise: waitForWebSocketMessage(socket),
+          }),
+        ).resolves.toEqual({
+          data: "echo:hello managed websocket",
           isBinary: false,
         });
       } finally {
@@ -603,15 +701,19 @@ function handleSimulatedHttpRequest(input: {
 async function startSimulatedWebSocketUpstream(): Promise<SimulatedWebSocketUpstream> {
   const server = createServer();
   const webSocketServer = new WebSocketServer({ server });
-  const waitingConnectionResolvers: Array<() => void> = [];
-  let pendingConnections = 0;
+  const receivedConnections: ReceivedWebSocketConnection[] = [];
+  const waitingConnectionResolvers: Array<(connection: ReceivedWebSocketConnection) => void> = [];
 
-  webSocketServer.on("connection", (socket) => {
+  webSocketServer.on("connection", (socket, request) => {
+    const connection = {
+      headers: request.headers,
+      url: request.url ?? "",
+    };
     const resolver = waitingConnectionResolvers.shift();
     if (resolver !== undefined) {
-      resolver();
+      resolver(connection);
     } else {
-      pendingConnections += 1;
+      receivedConnections.push(connection);
     }
 
     socket.on("message", (data, isBinary) => {
@@ -634,12 +736,12 @@ async function startSimulatedWebSocketUpstream(): Promise<SimulatedWebSocketUpst
       await closeServer(server);
     },
     nextConnection: async () => {
-      if (pendingConnections > 0) {
-        pendingConnections -= 1;
-        return;
+      const connection = receivedConnections.shift();
+      if (connection !== undefined) {
+        return connection;
       }
 
-      await new Promise<void>((resolve) => {
+      return await new Promise<ReceivedWebSocketConnection>((resolve) => {
         waitingConnectionResolvers.push(resolve);
       });
     },

@@ -119,18 +119,24 @@ export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInpu
             startedAtMs,
           });
           input.directEgressProxyService
-            .resolveWebSocketUpstream({ admission })
-            .then((upstreamUrl) => {
+            .resolveWebSocketUpstream({
+              admission,
+              ...(ctx.get("testEnvironmentId") === undefined
+                ? {}
+                : { testEnvironmentId: ctx.get("testEnvironmentId") }),
+            })
+            .then((upstream) => {
               logDirectEgressWebSocketEvent({
                 admission,
                 event: "gateway_direct_egress_websocket_upstream_connect_started",
                 pendingClientMessageCount: pendingClientMessages.length,
                 startedAtMs,
-                upstreamUrl,
+                upstreamUrl: upstream.url,
               });
               upstreamSocket = connectUpstreamWebSocket({
                 admission,
                 client: ws,
+                headers: upstream.headers,
                 onOpen: (upstream) => {
                   for (const message of pendingClientMessages.splice(0)) {
                     sendUpstreamWebSocketMessage({
@@ -141,7 +147,7 @@ export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInpu
                 },
                 startedAtMs,
                 trustedUpstreamCaCertificates: input.trustedUpstreamCaCertificates,
-                upstreamUrl,
+                upstreamUrl: upstream.url,
               });
             })
             .catch((error: unknown) => {
@@ -232,6 +238,7 @@ function normalizeWebSocketTarget(target: string | null): string | null {
 function connectUpstreamWebSocket(input: {
   admission: DirectEgressAdmission;
   client: WSContext<WebSocket>;
+  headers: Record<string, string>;
   onOpen: (upstream: WebSocket) => void;
   startedAtMs: number;
   trustedUpstreamCaCertificates: readonly string[] | undefined;
@@ -240,6 +247,7 @@ function connectUpstreamWebSocket(input: {
   const upstream = new WebSocket(
     input.upstreamUrl,
     createUpstreamWebSocketOptions({
+      headers: input.headers,
       trustedUpstreamCaCertificates: input.trustedUpstreamCaCertificates,
     }),
   );
@@ -297,17 +305,21 @@ function connectUpstreamWebSocket(input: {
 }
 
 function createUpstreamWebSocketOptions(input: {
+  headers: Record<string, string>;
   trustedUpstreamCaCertificates: readonly string[] | undefined;
-}): WebSocket.ClientOptions | undefined {
+}): WebSocket.ClientOptions {
   if (
     input.trustedUpstreamCaCertificates === undefined ||
     input.trustedUpstreamCaCertificates.length === 0
   ) {
-    return undefined;
+    return {
+      headers: input.headers,
+    };
   }
 
   return {
     ca: [...input.trustedUpstreamCaCertificates],
+    headers: input.headers,
   };
 }
 
