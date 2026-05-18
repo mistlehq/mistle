@@ -1,8 +1,14 @@
 import { SidebarTrigger, useSidebar } from "@mistle/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useParams, useSearchParams } from "react-router";
+import { useParams, useSearchParams } from "react-router";
 
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
+import {
+  projectCodexThreadNavigatorRows,
+  resolveDefaultCodexThreadId,
+  type CodexThreadNavigatorScope,
+} from "../session-agents/codex/codex-thread-navigator-model.js";
+import { CodexThreadNavigator } from "../session-agents/codex/codex-thread-navigator.js";
 import { SessionHeaderTitle } from "../sessions/session-header-title.js";
 import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
 import { shouldRenderSidebarTrigger } from "../shared/sidebar-trigger-visibility.js";
@@ -40,23 +46,26 @@ import { SessionRepositoryNoneValue } from "./use-session-primary-repository-sta
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 
 export function SessionWorkbenchPage(): React.JSX.Element {
-  const location = useLocation();
   const params = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const sandboxInstanceId = params["sandboxInstanceId"] ?? null;
   const requestedThreadId = searchParams.get("threadId");
 
   return (
     <SessionWorkbenchPageContent
-      key={location.key}
+      key={sandboxInstanceId ?? "missing-session"}
       requestedThreadId={requestedThreadId}
       sandboxInstanceId={sandboxInstanceId}
+      searchParams={searchParams}
+      setSearchParams={setSearchParams}
     />
   );
 }
 
 function SessionWorkbenchPageContent(input: {
   requestedThreadId: string | null;
+  searchParams: URLSearchParams;
+  setSearchParams: ReturnType<typeof useSearchParams>[1];
   sandboxInstanceId: string | null;
 }): React.JSX.Element {
   const { conversationPane, workbench } = useSessionWorkbenchController({
@@ -64,6 +73,8 @@ function SessionWorkbenchPageContent(input: {
     sandboxInstanceId: input.sandboxInstanceId,
   });
   const [hasEnteredReadyWorkbench, setHasEnteredReadyWorkbench] = useState(false);
+  const [threadNavigatorScope, setThreadNavigatorScope] =
+    useState<CodexThreadNavigatorScope>("repository");
   const conversationScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [composerText, setComposerText] = useState("");
   const [pendingDiffComments, setPendingDiffComments] = useState<
@@ -304,6 +315,105 @@ function SessionWorkbenchPageContent(input: {
     ? workbench.diffPanelState.patch
     : "";
   const primaryRepositoryPath = workbench.primaryRepositoryState.selectedRepositoryPath;
+  const codexThreadNavigator = conversationPane.codexThreadNavigator;
+  const effectiveThreadNavigatorScope =
+    primaryRepositoryPath === null ? "all" : threadNavigatorScope;
+  const threadNavigatorRows = useMemo(() => {
+    if (codexThreadNavigator === null) {
+      return [];
+    }
+
+    return projectCodexThreadNavigatorRows({
+      activeThreadId: codexThreadNavigator.activeThreadId,
+      availableThreads: codexThreadNavigator.availableThreads,
+      loadedThreadIds: codexThreadNavigator.loadedThreadIds,
+      pendingThreadId: codexThreadNavigator.pendingThreadId,
+      scope: effectiveThreadNavigatorScope,
+      selectedRepositoryPath: primaryRepositoryPath,
+    });
+  }, [codexThreadNavigator, effectiveThreadNavigatorScope, primaryRepositoryPath]);
+  const defaultThreadId = useMemo(() => {
+    if (codexThreadNavigator === null) {
+      return null;
+    }
+
+    return resolveDefaultCodexThreadId({
+      availableThreads: codexThreadNavigator.availableThreads,
+    });
+  }, [codexThreadNavigator]);
+  const pushThreadSearchParams = useCallback(
+    (threadId: string): void => {
+      const nextSearchParams = new URLSearchParams(input.searchParams);
+      if (threadId === defaultThreadId) {
+        nextSearchParams.delete("threadId");
+      } else {
+        nextSearchParams.set("threadId", threadId);
+      }
+
+      input.setSearchParams(nextSearchParams);
+    },
+    [defaultThreadId, input],
+  );
+  const handleSelectThread = useCallback(
+    (threadId: string): void => {
+      if (codexThreadNavigator === null) {
+        return;
+      }
+
+      if (threadId === codexThreadNavigator.activeThreadId) {
+        pushThreadSearchParams(threadId);
+        return;
+      }
+
+      void codexThreadNavigator
+        .resumeThread(threadId)
+        .then((confirmedThreadId) => {
+          pushThreadSearchParams(confirmedThreadId);
+        })
+        .catch(() => {});
+    },
+    [codexThreadNavigator, pushThreadSearchParams],
+  );
+  const handleStartThread = useCallback((): void => {
+    if (codexThreadNavigator === null) {
+      return;
+    }
+
+    void codexThreadNavigator
+      .startNewThread(primaryRepositoryPath === null ? undefined : { cwd: primaryRepositoryPath })
+      .then((threadId) => {
+        const nextSearchParams = new URLSearchParams(input.searchParams);
+        nextSearchParams.set("threadId", threadId);
+        input.setSearchParams(nextSearchParams);
+      })
+      .catch(() => {});
+  }, [codexThreadNavigator, input, primaryRepositoryPath]);
+  useEffect(() => {
+    if (codexThreadNavigator === null) {
+      return;
+    }
+
+    const targetThreadId = input.requestedThreadId ?? defaultThreadId;
+    if (targetThreadId === null || targetThreadId === codexThreadNavigator.activeThreadId) {
+      return;
+    }
+
+    void codexThreadNavigator.resumeThread(targetThreadId).catch(() => {});
+  }, [codexThreadNavigator, defaultThreadId, input.requestedThreadId]);
+  const conversationSidebar =
+    codexThreadNavigator === null ||
+    workbench.primaryPanelState.transitionState === "stable_cli" ? null : (
+      <CodexThreadNavigator
+        canUseRepositoryScope={primaryRepositoryPath !== null}
+        isStartingThread={codexThreadNavigator.isStartingNewThread}
+        onRefreshThreads={codexThreadNavigator.refreshThreadList}
+        onScopeChange={setThreadNavigatorScope}
+        onSelectThread={handleSelectThread}
+        onStartThread={handleStartThread}
+        rows={threadNavigatorRows}
+        scope={effectiveThreadNavigatorScope}
+      />
+    );
 
   useEffect(() => {
     if (!workbench.connectionReadiness.canConnect) {
@@ -427,6 +537,7 @@ function SessionWorkbenchPageContent(input: {
         }
         isBottomPanelVisible={workbench.terminalPanelState.isVisible}
         isSecondaryPanelVisible={workbench.diffPanelState.isVisible}
+        conversationSidebar={conversationSidebar}
         mainContentLayout={
           workbench.primaryPanelState.transitionState === "stable_cli" ||
           initialEntryStartupState !== null

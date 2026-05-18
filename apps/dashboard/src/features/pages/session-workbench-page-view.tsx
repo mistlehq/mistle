@@ -38,6 +38,7 @@ type SessionWorkbenchPageViewProps = {
   isPrimaryPanelTransitioning?: boolean;
   mainContentLayout?: SessionWorkbenchMainContentLayout;
   mainContentScrollContainerRef?: React.Ref<HTMLDivElement>;
+  conversationSidebar?: React.ReactNode;
   mainContent: React.ReactNode;
   primaryBottomPanel: React.ReactNode;
   bottomPanel: React.ReactNode;
@@ -58,6 +59,7 @@ export function SessionWorkbenchPageView({
   isPrimaryPanelTransitioning = false,
   mainContentLayout = { scroll: "page", width: "chat" },
   mainContentScrollContainerRef,
+  conversationSidebar,
   mainContent,
   primaryBottomPanel,
   bottomPanel,
@@ -140,10 +142,8 @@ export function SessionWorkbenchPageView({
   const primaryPanelTransitionClassName = isPrimaryPanelTransitioning
     ? "opacity-0 transition-opacity duration-200 ease-out"
     : "opacity-100 transition-opacity duration-200 ease-in";
-  const mainWorkspace = (
-    <div
-      className={`flex h-full min-h-0 flex-col overflow-hidden ${primaryPanelTransitionClassName}`}
-    >
+  const mainWorkspaceContent = (
+    <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
       <div
         aria-label="Conversation chat"
         className={mainContentRegionClassName}
@@ -159,6 +159,12 @@ export function SessionWorkbenchPageView({
           <div className="mx-auto w-full max-w-3xl px-4">{primaryBottomPanel}</div>
         </div>
       )}
+    </div>
+  );
+  const mainWorkspace = (
+    <div className={`flex h-full min-h-0 overflow-hidden ${primaryPanelTransitionClassName}`}>
+      {conversationSidebar}
+      {mainWorkspaceContent}
     </div>
   );
   const workspaceWithBottomPanel = (

@@ -29,6 +29,7 @@ export function useCodexThreadCollections(input: {
       const threadList = await listCodexThreads({
         rpcClient,
         limit: 20,
+        sortKey: "updated_at",
       });
       if (refreshInput?.generation !== undefined) {
         input.ensureCurrentGeneration(refreshInput.generation);
