@@ -636,6 +636,69 @@ pub enum EgressTokenControlMessage {
     Error(EgressTokenError),
 }
 
+/// PTY session selection mode carried in direct PTY transport control.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PtySessionLaunchMode {
+    Create,
+    Attach,
+}
+
+/// Direct PTY launch parameters sent over the bootstrap tunnel.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PtySessionLaunch {
+    pub session: PtySessionLaunchMode,
+    pub cols: Option<u16>,
+    pub rows: Option<u16>,
+    pub cwd: Option<String>,
+    pub command: Option<String>,
+    pub args: Option<Vec<String>>,
+}
+
+/// Gateway command asking sandboxd to open a dedicated PTY transport websocket.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PtySessionOpen {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub request_id: String,
+    pub pty_session_id: String,
+    pub transport_url: String,
+    pub transport_token: String,
+    pub launch: PtySessionLaunch,
+}
+
+/// Sandboxd acknowledgement that the PTY transport websocket has opened.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PtySessionOpened {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub request_id: String,
+    pub pty_session_id: String,
+}
+
+/// Sandboxd failure response for a direct PTY session open command.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PtySessionError {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub request_id: String,
+    pub pty_session_id: String,
+    pub code: String,
+    pub message: String,
+}
+
+/// Direct PTY control messages exchanged over the bootstrap tunnel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PtySessionControlMessage {
+    Open(PtySessionOpen),
+    Opened(PtySessionOpened),
+    Error(PtySessionError),
+}
+
 /// Signing control messages exchanged over the bootstrap tunnel.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SigningControlMessage {
@@ -1167,6 +1230,45 @@ pub fn parse_egress_token_control_message(
                 .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
             validate_egress_token_error(&message)?;
             Ok(Some(EgressTokenControlMessage::Error(message)))
+        }
+        _ => Ok(None),
+    }
+}
+
+/// Parses one inbound `pty.session.*` control message.
+pub fn parse_pty_session_control_message(
+    payload: &str,
+) -> Result<Option<PtySessionControlMessage>, TunnelProtocolError> {
+    let parsed_payload: serde_json::Value = serde_json::from_str(payload).map_err(|error| {
+        TunnelProtocolError::new(format!(
+            "pty session control message must be valid json: {error}"
+        ))
+    })?;
+    let Some(message_type) = parsed_payload
+        .get("type")
+        .and_then(serde_json::Value::as_str)
+    else {
+        return Ok(None);
+    };
+
+    match message_type {
+        "pty.session.open" => {
+            let message: PtySessionOpen = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_pty_session_open(&message)?;
+            Ok(Some(PtySessionControlMessage::Open(message)))
+        }
+        "pty.session.opened" => {
+            let message: PtySessionOpened = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_pty_session_opened(&message)?;
+            Ok(Some(PtySessionControlMessage::Opened(message)))
+        }
+        "pty.session.error" => {
+            let message: PtySessionError = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_pty_session_error(&message)?;
+            Ok(Some(PtySessionControlMessage::Error(message)))
         }
         _ => Ok(None),
     }
@@ -2085,20 +2187,133 @@ fn validate_egress_token_error(message: &EgressTokenError) -> Result<(), TunnelP
     Ok(())
 }
 
+fn validate_pty_session_launch(launch: &PtySessionLaunch) -> Result<(), TunnelProtocolError> {
+    if launch.cols.is_some() != launch.rows.is_some() {
+        return Err(TunnelProtocolError::new(
+            "pty.session.open launch cols and rows must both be provided when either is set",
+        ));
+    }
+    if matches!(launch.cols, Some(0)) || matches!(launch.rows, Some(0)) {
+        return Err(TunnelProtocolError::new(
+            "pty.session.open launch cols and rows must be greater than or equal to 1",
+        ));
+    }
+    if let Some(command) = launch.command.as_ref()
+        && command.trim().is_empty()
+    {
+        return Err(TunnelProtocolError::new(
+            "pty.session.open launch command must be a non-empty string",
+        ));
+    }
+    if let Some(args) = launch.args.as_ref()
+        && args.iter().any(|value| value.trim().is_empty())
+    {
+        return Err(TunnelProtocolError::new(
+            "pty.session.open launch args must contain only non-empty strings",
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_pty_session_open(message: &PtySessionOpen) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "pty.session.open" {
+        return Err(TunnelProtocolError::new(
+            "pty.session.open message type must be 'pty.session.open'",
+        ));
+    }
+    if message.request_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "pty.session.open requestId is required",
+        ));
+    }
+    if message.pty_session_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "pty.session.open ptySessionId is required",
+        ));
+    }
+    if !message.transport_url.starts_with("ws://") && !message.transport_url.starts_with("wss://") {
+        return Err(TunnelProtocolError::new(
+            "pty.session.open transportUrl must use ws or wss",
+        ));
+    }
+    if message.transport_token.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "pty.session.open transportToken is required",
+        ));
+    }
+    validate_pty_session_launch(&message.launch)?;
+    Ok(())
+}
+
+fn validate_pty_session_opened(message: &PtySessionOpened) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "pty.session.opened" {
+        return Err(TunnelProtocolError::new(
+            "pty.session.opened message type must be 'pty.session.opened'",
+        ));
+    }
+    if message.request_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "pty.session.opened requestId is required",
+        ));
+    }
+    if message.pty_session_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "pty.session.opened ptySessionId is required",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_pty_session_error(message: &PtySessionError) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "pty.session.error" {
+        return Err(TunnelProtocolError::new(
+            "pty.session.error message type must be 'pty.session.error'",
+        ));
+    }
+    if message.request_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "pty.session.error requestId is required",
+        ));
+    }
+    if message.pty_session_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "pty.session.error ptySessionId is required",
+        ));
+    }
+    if message.code != "transport_connect_failed"
+        && message.code != "pty_create_failed"
+        && message.code != "pty_attach_failed"
+        && message.code != "internal_error"
+    {
+        return Err(TunnelProtocolError::new(
+            "pty.session.error code is invalid",
+        ));
+    }
+    if message.message.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "pty.session.error message is required",
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use crate::tunnel::protocol::{
         BootstrapTelemetryControlMessage, EgressTokenControlMessage, EgressTokenRequest,
         FileUploadCompletedEventInput, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT,
-        ProcessesStreamMessage, PtyControlMessage, SigningControlMessage, SigningRequest,
-        StreamControlMessage, StreamSendWindow, decode_stream_data_frame, egress_token_request,
-        encode_stream_data_frame, exec_result_event, file_upload_completed_event,
-        parse_bootstrap_telemetry_control_message, parse_egress_token_control_message,
-        parse_ports_control_message, parse_ports_transport_message, parse_processes_stream_message,
-        parse_pty_control_message, parse_signing_control_message, parse_stream_control_message,
-        ports_target_authorize_failure_result, ports_target_authorize_success_result,
-        pty_exit_event, signing_request, stream_complete, stream_open_error, stream_open_ok,
-        stream_reset, stream_window, telemetry_close, telemetry_open,
+        ProcessesStreamMessage, PtyControlMessage, PtySessionControlMessage, SigningControlMessage,
+        SigningRequest, StreamControlMessage, StreamSendWindow, decode_stream_data_frame,
+        egress_token_request, encode_stream_data_frame, exec_result_event,
+        file_upload_completed_event, parse_bootstrap_telemetry_control_message,
+        parse_egress_token_control_message, parse_ports_control_message,
+        parse_ports_transport_message, parse_processes_stream_message, parse_pty_control_message,
+        parse_pty_session_control_message, parse_signing_control_message,
+        parse_stream_control_message, ports_target_authorize_failure_result,
+        ports_target_authorize_success_result, pty_exit_event, signing_request, stream_complete,
+        stream_open_error, stream_open_ok, stream_reset, stream_window, telemetry_close,
+        telemetry_open,
     };
 
     #[test]
@@ -2368,6 +2583,50 @@ mod tests {
                 .expect_err("invalid error code should fail validation")
                 .to_string()
                 .contains("egress.token.error code is invalid")
+        );
+    }
+
+    #[test]
+    fn parses_valid_pty_session_control_messages() {
+        let open = parse_pty_session_control_message(
+            r#"{"type":"pty.session.open","requestId":"pty_open_req_123","ptySessionId":"pty_123","transportUrl":"wss://gateway.example.com/pty","transportToken":"jwt-token","launch":{"session":"create","cols":120,"rows":40,"cwd":"/workspace/repo","command":"codex","args":["resume","thread_123"]}}"#,
+        )
+        .expect("pty.session.open should parse");
+        assert!(matches!(open, Some(PtySessionControlMessage::Open(_))));
+
+        let opened = parse_pty_session_control_message(
+            r#"{"type":"pty.session.opened","requestId":"pty_open_req_123","ptySessionId":"pty_123"}"#,
+        )
+        .expect("pty.session.opened should parse");
+        assert!(matches!(opened, Some(PtySessionControlMessage::Opened(_))));
+
+        let error = parse_pty_session_control_message(
+            r#"{"type":"pty.session.error","requestId":"pty_open_req_123","ptySessionId":"pty_123","code":"transport_connect_failed","message":"gateway websocket failed"}"#,
+        )
+        .expect("pty.session.error should parse");
+        assert!(matches!(error, Some(PtySessionControlMessage::Error(_))));
+    }
+
+    #[test]
+    fn rejects_invalid_pty_session_control_messages() {
+        let invalid_transport_url = parse_pty_session_control_message(
+            r#"{"type":"pty.session.open","requestId":"pty_open_req_123","ptySessionId":"pty_123","transportUrl":"https://gateway.example.com/pty","transportToken":"jwt-token","launch":{"session":"create","cols":120,"rows":40}}"#,
+        );
+        assert!(
+            invalid_transport_url
+                .expect_err("invalid transport url should fail validation")
+                .to_string()
+                .contains("pty.session.open transportUrl must use ws or wss")
+        );
+
+        let invalid_error_code = parse_pty_session_control_message(
+            r#"{"type":"pty.session.error","requestId":"pty_open_req_123","ptySessionId":"pty_123","code":"not_in_contract","message":"Nope."}"#,
+        );
+        assert!(
+            invalid_error_code
+                .expect_err("invalid error code should fail validation")
+                .to_string()
+                .contains("pty.session.error code is invalid")
         );
     }
 

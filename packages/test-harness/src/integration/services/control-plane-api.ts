@@ -262,6 +262,11 @@ function config(input: {
         tokenAudience: "integration-new-data-plane-gateway",
       },
     },
+    ptyTransport: {
+      tokenSecret: "integration-new-pty-token-secret",
+      tokenIssuer: "integration-new-data-plane-gateway",
+      tokenAudience: "integration-new-gateway-pty",
+    },
     sandbox: {
       defaultBaseImage: input.sandboxBaseImageRef ?? getLocalDevDockerRegistrySandboxBaseImageRef(),
       gatewayWsUrl: input.gatewayWsUrl,

@@ -76,6 +76,18 @@ const GlobalResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
     envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_AUDIENCE",
   },
   {
+    path: ["sandbox", "ptyTransport", "tokenSecret"],
+    envVar: "MISTLE_SANDBOX_TOKENS_PTY_TRANSPORT_SECRET",
+  },
+  {
+    path: ["sandbox", "ptyTransport", "tokenIssuer"],
+    envVar: "MISTLE_SANDBOX_TOKENS_PTY_TRANSPORT_ISSUER",
+  },
+  {
+    path: ["sandbox", "ptyTransport", "tokenAudience"],
+    envVar: "MISTLE_SANDBOX_TOKENS_PTY_TRANSPORT_AUDIENCE",
+  },
+  {
     path: ["sandbox", "connect", "tokenSecret"],
     envVar: "MISTLE_SANDBOX_TOKENS_CONNECT_SECRET",
   },
@@ -296,6 +308,18 @@ const DataPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
   {
     path: ["sandbox", "bootstrap", "tokenAudience"],
     envVar: "MISTLE_SANDBOX_TOKENS_BOOTSTRAP_AUDIENCE",
+  },
+  {
+    path: ["ptyTransport", "tokenSecret"],
+    envVar: "MISTLE_SANDBOX_TOKENS_PTY_TRANSPORT_SECRET",
+  },
+  {
+    path: ["ptyTransport", "tokenIssuer"],
+    envVar: "MISTLE_SANDBOX_TOKENS_PTY_TRANSPORT_ISSUER",
+  },
+  {
+    path: ["ptyTransport", "tokenAudience"],
+    envVar: "MISTLE_SANDBOX_TOKENS_PTY_TRANSPORT_AUDIENCE",
   },
   {
     path: ["sandbox", "sandboxdTestFaultsEnabled"],

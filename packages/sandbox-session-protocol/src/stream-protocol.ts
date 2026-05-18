@@ -270,6 +270,49 @@ const EgressTokenControlMessageSchema = z.discriminatedUnion("type", [
   EgressTokenErrorSchema,
 ]);
 
+const PtySessionLaunchSchema = z.object({
+  session: z.enum(["create", "attach"]),
+  cols: PositiveIntegerSchema.optional(),
+  rows: PositiveIntegerSchema.optional(),
+  cwd: NonEmptyStringSchema.optional(),
+  command: NonEmptyStringSchema.optional(),
+  args: z.array(NonEmptyStringSchema).optional(),
+});
+
+const PtySessionOpenSchema = z.object({
+  type: z.literal("pty.session.open"),
+  requestId: NonEmptyStringSchema,
+  ptySessionId: NonEmptyStringSchema,
+  transportUrl: z.url(),
+  transportToken: NonEmptyStringSchema,
+  launch: PtySessionLaunchSchema,
+});
+
+const PtySessionOpenedSchema = z.object({
+  type: z.literal("pty.session.opened"),
+  requestId: NonEmptyStringSchema,
+  ptySessionId: NonEmptyStringSchema,
+});
+
+const PtySessionErrorSchema = z.object({
+  type: z.literal("pty.session.error"),
+  requestId: NonEmptyStringSchema,
+  ptySessionId: NonEmptyStringSchema,
+  code: z.enum([
+    "transport_connect_failed",
+    "pty_create_failed",
+    "pty_attach_failed",
+    "internal_error",
+  ]),
+  message: NonEmptyStringSchema,
+});
+
+const PtySessionControlMessageSchema = z.discriminatedUnion("type", [
+  PtySessionOpenSchema,
+  PtySessionOpenedSchema,
+  PtySessionErrorSchema,
+]);
+
 const StreamOpenSchema = z.object({
   type: z.literal("stream.open"),
   streamId: PositiveIntegerSchema,
@@ -545,6 +588,11 @@ export type EgressTokenRequest = z.infer<typeof EgressTokenRequestSchema>;
 export type EgressTokenResponse = z.infer<typeof EgressTokenResponseSchema>;
 export type EgressTokenError = z.infer<typeof EgressTokenErrorSchema>;
 export type EgressTokenControlMessage = z.infer<typeof EgressTokenControlMessageSchema>;
+export type PtySessionLaunch = z.infer<typeof PtySessionLaunchSchema>;
+export type PtySessionOpen = z.infer<typeof PtySessionOpenSchema>;
+export type PtySessionOpened = z.infer<typeof PtySessionOpenedSchema>;
+export type PtySessionError = z.infer<typeof PtySessionErrorSchema>;
+export type PtySessionControlMessage = z.infer<typeof PtySessionControlMessageSchema>;
 
 export type StreamOpen = z.infer<typeof StreamOpenSchema>;
 export type StreamOpenOK = z.infer<typeof StreamOpenOKSchema>;
@@ -686,11 +734,24 @@ export function parseEgressTokenControlMessage(
   const result = EgressTokenControlMessageSchema.safeParse(parsedPayload);
   return result.success ? result.data : undefined;
 }
+
+export function parsePtySessionControlMessage(
+  payload: string,
+): PtySessionControlMessage | undefined {
+  const parsedPayload = parseJSON(payload);
+  if (parsedPayload === undefined) {
+    return undefined;
+  }
+
+  const result = PtySessionControlMessageSchema.safeParse(parsedPayload);
+  return result.success ? result.data : undefined;
+}
 export type SandboxSessionControlMessage =
   | StreamControlMessage
   | TelemetryControlMessage
   | OperationControlMessage
   | SigningControlMessage
   | EgressTokenControlMessage
+  | PtySessionControlMessage
   | KeepaliveControlMessage
   | RuntimeReadyControlMessage;

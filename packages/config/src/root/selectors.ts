@@ -168,6 +168,11 @@ export function selectGlobalConfig(config: Config): GlobalConfig {
         tokenIssuer: config.sandbox.tokens.egress.issuer,
         tokenAudience: config.sandbox.tokens.egress.audience,
       },
+      ptyTransport: {
+        tokenSecret: config.sandbox.tokens.pty_transport.secret,
+        tokenIssuer: config.sandbox.tokens.pty_transport.issuer,
+        tokenAudience: config.sandbox.tokens.pty_transport.audience,
+      },
     },
   };
 }
@@ -243,6 +248,11 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
         tokenIssuer: config.sandbox.publish.access_token.issuer,
         tokenAudience: config.sandbox.publish.access_token.audience,
       },
+    },
+    ptyTransport: {
+      tokenSecret: config.sandbox.tokens.pty_transport.secret,
+      tokenIssuer: config.sandbox.tokens.pty_transport.issuer,
+      tokenAudience: config.sandbox.tokens.pty_transport.audience,
     },
     sandbox: {
       defaultBaseImage: config.sandbox.default_base_image,

@@ -155,6 +155,8 @@ export const ControlPlaneApiPortAccessConfigSchema = z
   })
   .strict();
 
+export const ControlPlaneApiPtyConfigSchema = GlobalSandboxTokenConfigSchema;
+
 export const ControlPlaneApiSandboxRuntimeConfigSchema = z
   .object({
     defaultBaseImage: z.string().trim().min(1),
@@ -214,6 +216,7 @@ export const ControlPlaneApiConfigSchema = z
     internalAuth: ControlPlaneApiInternalAuthConfigSchema,
     connectionToken: ControlPlaneApiConnectionTokenConfigSchema,
     portAccess: ControlPlaneApiPortAccessConfigSchema,
+    ptyTransport: ControlPlaneApiPtyConfigSchema,
     sandbox: ControlPlaneApiSandboxRuntimeConfigSchema,
     commitSign: ControlPlaneApiCommitSignConfigSchema.optional(),
     integrations: ControlPlaneApiIntegrationsConfigSchema,
@@ -244,6 +247,7 @@ export const PartialControlPlaneApiConfigSchema = z
     internalAuth: ControlPlaneApiInternalAuthConfigSchema.partial().optional(),
     connectionToken: ControlPlaneApiConnectionTokenConfigSchema.partial().optional(),
     portAccess: ControlPlaneApiPortAccessConfigSchema.partial().optional(),
+    ptyTransport: ControlPlaneApiPtyConfigSchema.partial().optional(),
     sandbox: ControlPlaneApiSandboxRuntimeConfigSchema.partial().optional(),
     commitSign: ControlPlaneApiCommitSignConfigSchema.partial().optional(),
     integrations: ControlPlaneApiIntegrationsConfigObjectSchema.partial().optional(),

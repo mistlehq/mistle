@@ -332,6 +332,18 @@ const SandboxEnvDescriptors = [
     path: ["egress", "tokenAudience"],
   },
   {
+    envVar: "MISTLE_SANDBOX_TOKENS_PTY_TRANSPORT_SECRET",
+    path: ["ptyTransport", "tokenSecret"],
+  },
+  {
+    envVar: "MISTLE_SANDBOX_TOKENS_PTY_TRANSPORT_ISSUER",
+    path: ["ptyTransport", "tokenIssuer"],
+  },
+  {
+    envVar: "MISTLE_SANDBOX_TOKENS_PTY_TRANSPORT_AUDIENCE",
+    path: ["ptyTransport", "tokenAudience"],
+  },
+  {
     envVar: "MISTLE_SANDBOX_PUBLISH_BASE_DOMAIN",
     path: ["publish", "baseDomain"],
   },
@@ -486,6 +498,18 @@ const ControlPlaneApiEnvDescriptors = [
   {
     envVar: "MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_AUDIENCE",
     path: ["portAccess", "access", "tokenAudience"],
+  },
+  {
+    envVar: "MISTLE_SANDBOX_TOKENS_PTY_TRANSPORT_SECRET",
+    path: ["ptyTransport", "tokenSecret"],
+  },
+  {
+    envVar: "MISTLE_SANDBOX_TOKENS_PTY_TRANSPORT_ISSUER",
+    path: ["ptyTransport", "tokenIssuer"],
+  },
+  {
+    envVar: "MISTLE_SANDBOX_TOKENS_PTY_TRANSPORT_AUDIENCE",
+    path: ["ptyTransport", "tokenAudience"],
   },
   { envVar: "MISTLE_SANDBOX_DEFAULT_BASE_IMAGE", path: ["sandbox", "defaultBaseImage"] },
   {

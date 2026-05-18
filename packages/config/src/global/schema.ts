@@ -125,6 +125,7 @@ export const GlobalSandboxConfigSchema = z
     connect: GlobalSandboxTokenConfigSchema,
     bootstrap: GlobalSandboxTokenConfigSchema,
     egress: GlobalSandboxTokenConfigSchema,
+    ptyTransport: GlobalSandboxTokenConfigSchema,
     publish: GlobalSandboxPublishConfigSchema,
     storage: GlobalSandboxStorageConfigSchema.optional(),
   })
@@ -138,6 +139,7 @@ export const PartialGlobalSandboxConfigSchema = z
     connect: GlobalSandboxTokenConfigSchema.partial().optional(),
     bootstrap: GlobalSandboxTokenConfigSchema.partial().optional(),
     egress: GlobalSandboxTokenConfigSchema.partial().optional(),
+    ptyTransport: GlobalSandboxTokenConfigSchema.partial().optional(),
     publish: PartialGlobalSandboxPublishConfigSchema.optional(),
     storage: PartialGlobalSandboxStorageConfigSchema.optional(),
   })

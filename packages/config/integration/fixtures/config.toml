@@ -132,6 +132,16 @@ secret = "fixture-bootstrap-token-secret"
 issuer = "data-plane-worker"
 audience = "data-plane-gateway"
 
+[sandbox.tokens.egress]
+secret = "fixture-egress-token-secret"
+issuer = "data-plane-gateway"
+audience = "mistle-gateway-egress"
+
+[sandbox.tokens.pty_transport]
+secret = "fixture-pty-token-secret"
+issuer = "data-plane-gateway"
+audience = "mistle-gateway-pty"
+
 [sandbox.publish.access_token]
 secret = "fixture-publish-token-secret"
 issuer = "control-plane-api"

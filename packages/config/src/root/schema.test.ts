@@ -23,6 +23,11 @@ describe("ConfigSchema sandbox provider config", () => {
           issuer: "data-plane-gateway",
           audience: "mistle-gateway-egress",
         },
+        pty_transport: {
+          secret: "pty-secret",
+          issuer: "data-plane-gateway",
+          audience: "mistle-gateway-pty",
+        },
       },
       publish: {
         access_token: {

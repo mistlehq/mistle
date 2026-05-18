@@ -18,6 +18,12 @@ const sandboxConnectTokenAudience = "data-plane-gateway";
 const sandboxBootstrapTokenSecret = "fixture-bootstrap-token-secret";
 const sandboxBootstrapTokenIssuer = "data-plane-worker";
 const sandboxBootstrapTokenAudience = "data-plane-gateway";
+const sandboxEgressTokenSecret = "fixture-egress-token-secret";
+const sandboxEgressTokenIssuer = "data-plane-gateway";
+const sandboxEgressTokenAudience = "mistle-gateway-egress";
+const sandboxPtyTransportTokenSecret = "fixture-pty-token-secret";
+const sandboxPtyTransportTokenIssuer = "data-plane-gateway";
+const sandboxPtyTransportTokenAudience = "mistle-gateway-pty";
 const sandboxPublishBaseDomain = "mistle.example.test";
 const sandboxPublishAccessTokenSecret = "fixture-publish-token-secret";
 const sandboxPublishAccessTokenIssuer = "control-plane-api";
@@ -72,6 +78,16 @@ const globalDevelopmentConfig = {
       tokenIssuer: sandboxBootstrapTokenIssuer,
       tokenAudience: sandboxBootstrapTokenAudience,
     },
+    egress: {
+      tokenSecret: sandboxEgressTokenSecret,
+      tokenIssuer: sandboxEgressTokenIssuer,
+      tokenAudience: sandboxEgressTokenAudience,
+    },
+    ptyTransport: {
+      tokenSecret: sandboxPtyTransportTokenSecret,
+      tokenIssuer: sandboxPtyTransportTokenIssuer,
+      tokenAudience: sandboxPtyTransportTokenAudience,
+    },
   },
 } as const;
 
@@ -121,6 +137,16 @@ const globalProductionConfig = {
       tokenSecret: sandboxBootstrapTokenSecret,
       tokenIssuer: sandboxBootstrapTokenIssuer,
       tokenAudience: sandboxBootstrapTokenAudience,
+    },
+    egress: {
+      tokenSecret: sandboxEgressTokenSecret,
+      tokenIssuer: sandboxEgressTokenIssuer,
+      tokenAudience: sandboxEgressTokenAudience,
+    },
+    ptyTransport: {
+      tokenSecret: sandboxPtyTransportTokenSecret,
+      tokenIssuer: sandboxPtyTransportTokenIssuer,
+      tokenAudience: sandboxPtyTransportTokenAudience,
     },
   },
 } as const;
@@ -186,6 +212,7 @@ const controlPlaneApiEnvConfig = {
       tokenAudience: sandboxPublishAccessTokenAudience,
     },
   },
+  ptyTransport: globalDevelopmentConfig.sandbox.ptyTransport,
   sandbox: {
     defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
     gatewayWsUrl: globalDevelopmentConfig.sandbox.gatewayWsUrl,

@@ -225,6 +225,11 @@ function config(input: {
         tokenIssuer: "integration-new-data-plane-gateway",
         tokenAudience: "integration-new-gateway-egress",
       },
+      ptyTransport: {
+        tokenSecret: "integration-new-pty-token-secret",
+        tokenIssuer: "integration-new-data-plane-gateway",
+        tokenAudience: "integration-new-gateway-pty",
+      },
       publish: {
         baseDomain: "mistle.localhost",
         access: {

@@ -6,6 +6,7 @@ import {
   parsePortsControlMessage,
   parsePortsTransportMessage,
   parseProcessesStreamMessage,
+  parsePtySessionControlMessage,
   parseSigningControlMessage,
   parseStreamControlMessage,
   parseTelemetryControlMessage,
@@ -586,6 +587,98 @@ describe("stream control message parser", () => {
         kind: "processes",
       },
     });
+  });
+});
+
+describe("PTY session control message parser", () => {
+  it("parses direct PTY session open commands", () => {
+    expect(
+      parsePtySessionControlMessage(
+        JSON.stringify({
+          type: "pty.session.open",
+          requestId: "req_123",
+          ptySessionId: "pty_123",
+          transportUrl: "wss://gateway.example.com/pty",
+          transportToken: "token_123",
+          launch: {
+            session: "create",
+            cols: 120,
+            rows: 40,
+            cwd: "/workspace/repo",
+            command: "codex",
+            args: ["resume", "thread_123"],
+          },
+          ignored: true,
+        }),
+      ),
+    ).toEqual({
+      type: "pty.session.open",
+      requestId: "req_123",
+      ptySessionId: "pty_123",
+      transportUrl: "wss://gateway.example.com/pty",
+      transportToken: "token_123",
+      launch: {
+        session: "create",
+        cols: 120,
+        rows: 40,
+        cwd: "/workspace/repo",
+        command: "codex",
+        args: ["resume", "thread_123"],
+      },
+    });
+  });
+
+  it("parses direct PTY session acknowledgements", () => {
+    expect(
+      parsePtySessionControlMessage(
+        JSON.stringify({
+          type: "pty.session.opened",
+          requestId: "req_123",
+          ptySessionId: "pty_123",
+        }),
+      ),
+    ).toEqual({
+      type: "pty.session.opened",
+      requestId: "req_123",
+      ptySessionId: "pty_123",
+    });
+  });
+
+  it("parses direct PTY session errors", () => {
+    expect(
+      parsePtySessionControlMessage(
+        JSON.stringify({
+          type: "pty.session.error",
+          requestId: "req_123",
+          ptySessionId: "pty_123",
+          code: "transport_connect_failed",
+          message: "gateway websocket failed",
+        }),
+      ),
+    ).toEqual({
+      type: "pty.session.error",
+      requestId: "req_123",
+      ptySessionId: "pty_123",
+      code: "transport_connect_failed",
+      message: "gateway websocket failed",
+    });
+  });
+
+  it("rejects malformed direct PTY session commands", () => {
+    expect(
+      parsePtySessionControlMessage(
+        JSON.stringify({
+          type: "pty.session.open",
+          requestId: "req_123",
+          ptySessionId: "pty_123",
+          transportUrl: "not-a-url",
+          transportToken: "token_123",
+          launch: {
+            session: "create",
+          },
+        }),
+      ),
+    ).toBeUndefined();
   });
 });
 

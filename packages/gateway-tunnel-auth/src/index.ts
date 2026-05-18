@@ -13,6 +13,19 @@ export {
 } from "./egress-token.js";
 export type { EgressTokenClaims, EgressTokenConfig, VerifiedEgressToken } from "./egress-token.js";
 export {
+  PtyTransportTokenError,
+  PtyTransportTokenErrorCode,
+  PtyTransportTokenRoles,
+  mintPtyTransportToken,
+  verifyPtyTransportToken,
+} from "./pty-transport-token.js";
+export type {
+  PtyTransportTokenClaims,
+  PtyTransportTokenConfig,
+  PtyTransportTokenRole,
+  VerifiedPtyTransportToken,
+} from "./pty-transport-token.js";
+export {
   TunnelExchangeTokenError,
   TunnelExchangeTokenErrorCode,
   mintTunnelExchangeToken,

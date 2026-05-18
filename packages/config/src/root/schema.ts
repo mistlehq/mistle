@@ -410,6 +410,7 @@ export const ConfigSchema = z
             connect: TokenConfigSchema,
             bootstrap: TokenConfigSchema,
             egress: TokenConfigSchema,
+            pty_transport: TokenConfigSchema,
           })
           .strict(),
         publish: z
