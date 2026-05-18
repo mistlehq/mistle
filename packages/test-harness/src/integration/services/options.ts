@@ -28,6 +28,9 @@ export type IntegrationServiceOptions = {
     googleAuth?: "simulated";
   };
   dataPlaneGateway?: {
+    directEgress?: {
+      trustedCaCertificates?: readonly string[];
+    };
     gatewayRelay?: { backend: "memory" } | { backend: "nats"; namePrefix: string };
   };
   sandbox?: IntegrationSandboxOptions;

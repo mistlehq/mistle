@@ -498,6 +498,7 @@ export function createDataPlaneGatewayRuntime(
   registerDirectEgressRoutes({
     app,
     directEgressProxyService,
+    trustedUpstreamCaCertificates: config.app.__dangerouslyTrustDirectEgressTlsCaCertificates,
     upgradeWebSocket: nodeWebSocket.upgradeWebSocket,
   });
   registerPtyTransportRoutes({

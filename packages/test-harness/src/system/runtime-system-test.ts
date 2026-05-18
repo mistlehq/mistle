@@ -58,6 +58,11 @@ export type CreateSystemTestInput = {
   services?: readonly SystemTestServiceSelection[];
   extraInfra?: readonly SystemTestExtraInfraId[];
   sandbox?: SystemTestSandbox;
+  dataPlaneGateway?: {
+    directEgress?: {
+      trustedCaCertificates?: readonly string[];
+    };
+  };
   publicAccess?: SystemTestPublicAccess;
   auth?: {
     google?: "simulated";
@@ -192,6 +197,11 @@ function createInternalInfra(input: CreateSystemTestInput): readonly TestInfraRe
 }
 
 export async function createRuntimeSystemServiceOptions(input: CreateSystemTestInput): Promise<{
+  dataPlaneGateway?: {
+    directEgress?: {
+      trustedCaCertificates?: readonly string[];
+    };
+  };
   sandbox?: {
     provider: SystemTestSandboxProvider;
     defaultBaseImageRef?: string;
@@ -208,11 +218,26 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
   };
 }> {
   if (input.sandbox === undefined) {
-    return {};
+    if (input.dataPlaneGateway === undefined) {
+      return {};
+    }
+
+    return {
+      dataPlaneGateway: input.dataPlaneGateway,
+    };
   }
 
   if (input.sandbox.provider === "docker") {
+    if (input.dataPlaneGateway === undefined) {
+      return {
+        sandbox: {
+          provider: "docker",
+        },
+      };
+    }
+
     return {
+      dataPlaneGateway: input.dataPlaneGateway,
       sandbox: {
         provider: "docker",
       },
@@ -221,7 +246,19 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
 
   const publicServiceBaseUrls = createPublicServiceBaseUrls(input.publicAccess);
   if (input.sandbox.provider === "e2b") {
+    if (input.dataPlaneGateway === undefined) {
+      return {
+        sandbox: {
+          provider: "e2b",
+          defaultBaseImageRef: await getSystemTestSandboxBaseImageRef(),
+          e2b: readE2BOptions(),
+          publicServiceBaseUrls,
+        },
+      };
+    }
+
     return {
+      dataPlaneGateway: input.dataPlaneGateway,
       sandbox: {
         provider: "e2b",
         defaultBaseImageRef: await getSystemTestSandboxBaseImageRef(),
@@ -231,7 +268,19 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
     };
   }
 
+  if (input.dataPlaneGateway === undefined) {
+    return {
+      sandbox: {
+        provider: "tensorlake",
+        defaultBaseImageRef: await getSystemTestSandboxBaseImageRef(),
+        tensorlake: readTensorlakeOptions(),
+        publicServiceBaseUrls,
+      },
+    };
+  }
+
   return {
+    dataPlaneGateway: input.dataPlaneGateway,
     sandbox: {
       provider: "tensorlake",
       defaultBaseImageRef: await getSystemTestSandboxBaseImageRef(),

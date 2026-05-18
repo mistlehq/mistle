@@ -8,11 +8,10 @@ import http from "node:http";
 import https from "node:https";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import tls from "node:tls";
 import { promisify } from "node:util";
 
 import { createSystemTest } from "@mistle/test-harness/system";
-import { describe, expect } from "vitest";
+import { afterAll, describe, expect } from "vitest";
 import { type RawData, WebSocketServer } from "ws";
 import { z } from "zod";
 
@@ -22,13 +21,6 @@ import {
   stopSandboxInstance,
 } from "../system/helpers/codex-sandbox.js";
 import { createRuntimeCodexSandboxFixture } from "./helpers/runtime-codex-sandbox.js";
-
-const it = createSystemTest({
-  extraInfra: ["mailpit"],
-  sandbox: {
-    provider: "docker",
-  },
-});
 
 const SYSTEM_TEST_TIMEOUT_MS = 5 * 60_000;
 const SANDBOXD_EGRESS_PROXY_URL = "http://127.0.0.1:38513";
@@ -46,6 +38,7 @@ const WEBSOCKET_SMOKE_MARKER = "MISTLE_GATEWAY_EGRESS_WEBSOCKET_OK";
 const SECURE_WEBSOCKET_SMOKE_MARKER = "MISTLE_GATEWAY_EGRESS_SECURE_WEBSOCKET_OK";
 const TRANSPARENT_SMOKE_MARKER = "MISTLE_GATEWAY_EGRESS_TRANSPARENT_OK";
 const execFileAsync = promisify(execFile);
+const SecureUpstreamCertificates = await createTestTlsCertificates();
 
 const HttpEchoResponseSchema = z
   .object({
@@ -69,16 +62,42 @@ type RecordedWebsocketExchange = {
   message: string;
 };
 
+type TestTlsCertificates = {
+  caCertificatePem: string;
+  directory: string;
+  serverCertificatePem: string;
+  serverPrivateKeyPem: string;
+};
+
+afterAll(async () => {
+  await rm(SecureUpstreamCertificates.directory, {
+    force: true,
+    recursive: true,
+  });
+});
+
+const it = createSystemTest({
+  extraInfra: ["mailpit"],
+  sandbox: {
+    provider: "docker",
+  },
+  dataPlaneGateway: {
+    directEgress: {
+      trustedCaCertificates: [SecureUpstreamCertificates.caCertificatePem],
+    },
+  },
+});
+
 describe("runtime system gateway egress HTTP smoke", () => {
   it(
     "forwards sandbox HTTP, HTTPS, WS, WSS, and opaque TCP traffic through the gateway tunnel",
     async ({ system }) => {
       const upstream = await startSimulatedHttpUpstream();
-      const secureUpstream = await startSimulatedSecureWebsocketUpstream();
+      const secureUpstream = await startSimulatedSecureWebsocketUpstream(
+        SecureUpstreamCertificates,
+      );
       const fixture = createRuntimeCodexSandboxFixture(system);
       let sandboxInstanceIdForCleanup: string | undefined;
-      const previousGlobalAgentCa = https.globalAgent.options.ca;
-      https.globalAgent.options.ca = [...tls.rootCertificates, secureUpstream.caCertificatePem];
 
       try {
         const { authenticatedSession, sandboxInstanceId } = await prepareCodexSandbox({
@@ -143,6 +162,7 @@ describe("runtime system gateway egress HTTP smoke", () => {
                 `export TRANSPARENT_HTTP_URL=${shellQuote(`${upstream.gatewayReachableBaseUrl}/echo?case=transparent-http`)}`,
                 `export TRANSPARENT_HTTPS_URL=${shellQuote(`${secureUpstream.gatewayReachableBaseUrl.replace(/^wss:/u, "https:")}/secure?case=transparent-https`)}`,
                 `export TRANSPARENT_WSS_PATH=${shellQuote("/socket?case=transparent-wss")}`,
+                `export TRUSTED_CA_CERT_PEM=${shellQuote(secureUpstream.caCertificatePem)}`,
                 `export TRANSPARENT_HTTP_MESSAGE=${shellQuote(TRANSPARENT_HTTP_REQUEST_BODY)}`,
                 `export TRANSPARENT_WSS_MESSAGE=${shellQuote(TRANSPARENT_SECURE_WEBSOCKET_REQUEST_BODY)}`,
                 `export TRANSPARENT_TCP_MESSAGE=${shellQuote(TRANSPARENT_TCP_REQUEST_BODY)}`,
@@ -224,7 +244,6 @@ describe("runtime system gateway egress HTTP smoke", () => {
         ).toBeUndefined();
         expect(result.stdout).toContain(`TRANSPARENT-TCP:echo:${TRANSPARENT_TCP_REQUEST_BODY}`);
       } finally {
-        https.globalAgent.options.ca = previousGlobalAgentCa;
         if (sandboxInstanceIdForCleanup !== undefined) {
           await stopSandboxInstance({
             fixture,
@@ -323,14 +342,13 @@ async function startSimulatedHttpUpstream(): Promise<{
   };
 }
 
-async function startSimulatedSecureWebsocketUpstream(): Promise<{
+async function startSimulatedSecureWebsocketUpstream(certificates: TestTlsCertificates): Promise<{
   caCertificatePem: string;
   gatewayReachableBaseUrl: string;
   requests: RecordedHttpRequest[];
   websocketExchanges: RecordedWebsocketExchange[];
   stop: () => Promise<void>;
 }> {
-  const certificates = await createTestTlsCertificates();
   const requests: RecordedHttpRequest[] = [];
   const websocketExchanges: RecordedWebsocketExchange[] = [];
   const websocketServer = new WebSocketServer({ noServer: true });
@@ -412,10 +430,6 @@ async function startSimulatedSecureWebsocketUpstream(): Promise<{
           resolve();
         });
       });
-      await rm(certificates.directory, {
-        force: true,
-        recursive: true,
-      });
     },
   };
 }
@@ -431,12 +445,7 @@ function rawWebSocketDataToString(data: RawData): string {
   return Buffer.concat(data).toString("utf8");
 }
 
-async function createTestTlsCertificates(): Promise<{
-  caCertificatePem: string;
-  directory: string;
-  serverCertificatePem: string;
-  serverPrivateKeyPem: string;
-}> {
+async function createTestTlsCertificates(): Promise<TestTlsCertificates> {
   const directory = await mkdtemp(join(tmpdir(), "mistle-gateway-egress-wss-"));
   const caKeyPath = join(directory, "ca.key");
   const caCertificatePath = join(directory, "ca.crt");
@@ -635,8 +644,11 @@ function transparentGatewaySmokeScript(): string {
     "cleanup_transparent_smoke() {",
     "  cleanup_transparent_rules",
     '  kill "${tcp_server_pid}" 2>/dev/null || true',
+    '  rm -f "${trusted_ca_file:-}"',
     "}",
     "trap cleanup_transparent_smoke EXIT",
+    'trusted_ca_file="$(mktemp)"',
+    'printf "%s\\n" "${TRUSTED_CA_CERT_PEM}" >"${trusted_ca_file}"',
     'while [ ! -s "${tcp_port_file}" ]; do sleep 0.05; done',
     'TRANSPARENT_TCP_PORT="$(cat "${tcp_port_file}")"',
     "cleanup_transparent_rules",
@@ -658,14 +670,14 @@ function transparentGatewaySmokeScript(): string {
     "unset HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY http_proxy https_proxy all_proxy no_proxy",
     'curl -fsS -X POST -H "content-type: text/plain" --data "${TRANSPARENT_HTTP_MESSAGE}" "${TRANSPARENT_HTTP_URL}"',
     "printf '\\n'",
-    'curl -fsS "${TRANSPARENT_HTTPS_URL}"',
+    'curl --cacert "${trusted_ca_file}" -fsS "${TRANSPARENT_HTTPS_URL}"',
     "printf '\\n'",
     'output_file="$(mktemp)"',
     "{",
     '  printf \'GET %s HTTP/1.1\\r\\nHost: 127.0.0.1:%s\\r\\nConnection: Upgrade\\r\\nUpgrade: websocket\\r\\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\\r\\nSec-WebSocket-Version: 13\\r\\n\\r\\n\' "${TRANSPARENT_WSS_PATH}" "${TRANSPARENT_SECURE_PORT}"',
     "  sleep 0.2",
     '  WEBSOCKET_FRAME_MESSAGE="${TRANSPARENT_WSS_MESSAGE}" websocket_client_frame',
-    '} | openssl s_client -connect "127.0.0.1:${TRANSPARENT_SECURE_PORT}" -servername "127.0.0.1" -quiet >"${output_file}" 2>/dev/null',
+    '} | openssl s_client -connect "127.0.0.1:${TRANSPARENT_SECURE_PORT}" -servername "127.0.0.1" -CAfile "${trusted_ca_file}" -verify_return_error -quiet >"${output_file}" 2>/dev/null',
     "grep -a 'HTTP/1.1 101' \"${output_file}\" >/dev/null || { printf 'unexpected transparent WSS response bytes:\\n' >&2; cat \"${output_file}\" >&2; exit 1; }",
     'grep -a "echo:${TRANSPARENT_WSS_MESSAGE}" "${output_file}" >/dev/null || { printf \'unexpected transparent WSS echo bytes:\\n\' >&2; cat "${output_file}" >&2; exit 1; }',
     "printf 'TRANSPARENT-WSS:echo:%s\\n' \"${TRANSPARENT_WSS_MESSAGE}\"",

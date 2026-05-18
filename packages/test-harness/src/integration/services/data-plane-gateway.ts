@@ -116,6 +116,8 @@ function start(input: {
         peer,
       }),
       gatewayRelay: input.dataPlaneGateway?.gatewayRelay,
+      directEgressTrustedCaCertificates:
+        input.dataPlaneGateway?.directEgress?.trustedCaCertificates,
       nats: startInput.infra.get(InfraIds.NATS),
       sandbox: input.sandbox,
     });
@@ -164,6 +166,7 @@ function config(input: {
   valkey: ResolvedTestInfra;
   dataPlaneApiBaseUrl: string;
   controlPlaneBaseUrl: string;
+  directEgressTrustedCaCertificates: readonly string[] | undefined;
   gatewayWsUrl: string;
   gatewayRelay: IntegrationDataPlaneGatewayRelayOptions | undefined;
   nats: ResolvedTestInfra | undefined;
@@ -185,6 +188,11 @@ function config(input: {
     __dangerouslyEnableTestIsolation: {
       testEnvironmentIdHeader: TestEnvironmentIdHeader,
     },
+    ...(input.directEgressTrustedCaCertificates === undefined
+      ? {}
+      : {
+          __dangerouslyTrustDirectEgressTlsCaCertificates: input.directEgressTrustedCaCertificates,
+        }),
     runtimeState: {
       backend: "valkey",
       valkey: {

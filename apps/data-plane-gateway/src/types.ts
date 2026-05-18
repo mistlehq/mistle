@@ -26,6 +26,13 @@ export type DataPlaneGatewayConfig = LoadDataPlaneGatewayConfigResult["app"] & {
   __dangerouslyEnableTestIsolation?: {
     testEnvironmentIdHeader: string;
   };
+  /**
+   * Programmatic test-only CA trust for direct egress upstream TLS.
+   *
+   * This is intentionally not part of public deployment config. Runtime system
+   * tests use it when a local simulated upstream serves TLS with an ephemeral CA.
+   */
+  __dangerouslyTrustDirectEgressTlsCaCertificates?: readonly string[];
 };
 export type DataPlaneGatewayRuntimeConfig = {
   app: DataPlaneGatewayConfig;

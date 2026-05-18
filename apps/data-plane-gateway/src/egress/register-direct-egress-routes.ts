@@ -16,6 +16,7 @@ import {
 type RegisterDirectEgressRoutesInput = {
   app: DataPlaneGatewayApp;
   directEgressProxyService: DirectEgressProxyService;
+  trustedUpstreamCaCertificates: readonly string[] | undefined;
   upgradeWebSocket: NodeWebSocket["upgradeWebSocket"];
 };
 
@@ -139,6 +140,7 @@ export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInpu
                   }
                 },
                 startedAtMs,
+                trustedUpstreamCaCertificates: input.trustedUpstreamCaCertificates,
                 upstreamUrl,
               });
             })
@@ -232,9 +234,15 @@ function connectUpstreamWebSocket(input: {
   client: WSContext<WebSocket>;
   onOpen: (upstream: WebSocket) => void;
   startedAtMs: number;
+  trustedUpstreamCaCertificates: readonly string[] | undefined;
   upstreamUrl: URL;
 }): WebSocket {
-  const upstream = new WebSocket(input.upstreamUrl);
+  const upstream = new WebSocket(
+    input.upstreamUrl,
+    createUpstreamWebSocketOptions({
+      trustedUpstreamCaCertificates: input.trustedUpstreamCaCertificates,
+    }),
+  );
   upstream.on("open", () => {
     if (input.client.readyState !== WebSocket.OPEN) {
       upstream.close();
@@ -286,6 +294,21 @@ function connectUpstreamWebSocket(input: {
   });
 
   return upstream;
+}
+
+function createUpstreamWebSocketOptions(input: {
+  trustedUpstreamCaCertificates: readonly string[] | undefined;
+}): WebSocket.ClientOptions | undefined {
+  if (
+    input.trustedUpstreamCaCertificates === undefined ||
+    input.trustedUpstreamCaCertificates.length === 0
+  ) {
+    return undefined;
+  }
+
+  return {
+    ca: [...input.trustedUpstreamCaCertificates],
+  };
 }
 
 function sendUpstreamWebSocketMessage(input: {
