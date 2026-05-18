@@ -36,6 +36,7 @@ export const DirectEgressHttpRoutePath = "/_mistle/egress/http";
 export const DirectEgressWebSocketRoutePath = "/_mistle/egress/ws";
 
 type ActiveRuntimePlan = NonNullable<Awaited<ReturnType<typeof loadActiveSandboxRuntimePlan>>>;
+type DirectEgressTransport = "http" | "websocket";
 type DirectEgressFailureCode =
   | "authentication_failed"
   | "invalid_target"
@@ -78,6 +79,27 @@ type DirectEgressRouteAuthorization =
 
 export type DirectEgressAdmission = DirectEgressRouteAuthorization;
 
+type DirectEgressLogFields = {
+  authority?: string;
+  durationMs?: number;
+  egressRuleId?: string;
+  event: string;
+  failureCode?: DirectEgressFailureCode;
+  host?: string;
+  method?: string;
+  outcome?: string;
+  path?: string;
+  requestBodyBytes?: number;
+  responseBodyBytes?: number;
+  responseChunkCount?: number;
+  routeMode?: DirectEgressAdmission["kind"];
+  sandboxInstanceId?: string;
+  scheme?: DirectEgressRequest["scheme"];
+  status?: number;
+  target?: string | null;
+  transport?: DirectEgressTransport;
+};
+
 export class DirectEgressProxyError extends Error {
   public constructor(
     message: string,
@@ -106,6 +128,7 @@ export class DirectEgressProxyService {
     tables: DataPlaneTables;
     target: string | null;
     testEnvironmentId?: string;
+    transport: DirectEgressTransport;
   }): Promise<DirectEgressAdmission> {
     const token = await this.verifyBearerToken(input.authorizationHeader);
     const targetUrl = parseDirectEgressTarget(input.target);
@@ -175,7 +198,7 @@ export class DirectEgressProxyService {
         );
       }
 
-      return {
+      const admission: DirectEgressAdmission = {
         kind: "managed",
         activeRuntimePlan,
         classification,
@@ -183,9 +206,14 @@ export class DirectEgressProxyService {
         targetUrl,
         token,
       };
+      logDirectEgressAuthorized({
+        admission,
+        transport: input.transport,
+      });
+      return admission;
     }
 
-    return {
+    const admission: DirectEgressAdmission = {
       kind: "passthrough",
       activeRuntimePlan,
       classification,
@@ -193,6 +221,11 @@ export class DirectEgressProxyService {
       targetUrl,
       token,
     };
+    logDirectEgressAuthorized({
+      admission,
+      transport: input.transport,
+    });
+    return admission;
   }
 
   public async proxyHttp(input: {
@@ -216,10 +249,27 @@ export class DirectEgressProxyService {
             url: input.admission.targetUrl,
           };
 
+    const startedAtMs = Date.now();
+    const logFields = directEgressLogFieldsForAdmission({
+      admission: input.admission,
+      event: "gateway_direct_egress_http_started",
+      transport: "http",
+    });
+    logger.info(
+      {
+        ...logFields,
+        requestBodyBytes: input.body?.byteLength ?? 0,
+      },
+      "Direct gateway HTTP egress request started",
+    );
+
     return await sendDirectHttpRequest({
       body: outgoingRequest.body,
       headers: outgoingRequest.headers,
+      logFields,
       method: outgoingRequest.method,
+      requestBodyBytes: input.body?.byteLength ?? 0,
+      startedAtMs,
       url: outgoingRequest.url,
     });
   }
@@ -456,7 +506,10 @@ function toResponseHeaders(headers: IncomingHttpHeaders): Headers {
 function sendDirectHttpRequest(input: {
   body: Uint8Array | undefined;
   headers: Headers | Record<string, string>;
+  logFields: DirectEgressLogFields;
   method: string;
+  requestBodyBytes: number;
+  startedAtMs: number;
   url: URL;
 }): Promise<Response> {
   return new Promise((resolve, reject) => {
@@ -475,14 +528,42 @@ function sendDirectHttpRequest(input: {
     });
 
     upstreamRequest.on("response", (response) => {
+      const status = response.statusCode ?? 502;
+      const responseLogFields = {
+        ...input.logFields,
+        event: "gateway_direct_egress_http_response_started",
+        durationMs: Date.now() - input.startedAtMs,
+        requestBodyBytes: input.requestBodyBytes,
+        status,
+      };
+      logger.info(responseLogFields, "Direct gateway HTTP egress response started");
+
       resolve(
-        new Response(toResponseBodyStream({ response, request: upstreamRequest }), {
-          status: response.statusCode ?? 502,
-          headers: toResponseHeaders(response.headers),
-        }),
+        new Response(
+          toResponseBodyStream({
+            logFields: responseLogFields,
+            request: upstreamRequest,
+            response,
+            startedAtMs: input.startedAtMs,
+          }),
+          {
+            status,
+            headers: toResponseHeaders(response.headers),
+          },
+        ),
       );
     });
     upstreamRequest.on("error", (error) => {
+      logger.info(
+        {
+          ...input.logFields,
+          event: "gateway_direct_egress_http_failed",
+          durationMs: Date.now() - input.startedAtMs,
+          failureCode: "upstream_connect_failed",
+          requestBodyBytes: input.requestBodyBytes,
+        },
+        error.message,
+      );
       reject(new DirectEgressProxyError(error.message, "upstream_connect_failed", 502));
     });
 
@@ -496,40 +577,144 @@ function sendDirectHttpRequest(input: {
 }
 
 function toResponseBodyStream(input: {
+  logFields: DirectEgressLogFields;
   request: ClientRequest;
   response: IncomingMessage;
+  startedAtMs: number;
 }): ReadableStream<Uint8Array> {
+  let ended = false;
+  let responseBodyBytes = 0;
+  let responseChunkCount = 0;
+
+  const finish = (event: string, outcome: string, error?: Error): void => {
+    if (ended) {
+      return;
+    }
+    ended = true;
+    logger.info(
+      {
+        ...input.logFields,
+        durationMs: Date.now() - input.startedAtMs,
+        event,
+        outcome,
+        responseBodyBytes,
+        responseChunkCount,
+      },
+      error?.message ?? "Direct gateway HTTP egress response body finished",
+    );
+  };
+
   return new ReadableStream<Uint8Array>({
     start: (controller) => {
       input.response.on("data", (chunk: Buffer) => {
+        responseBodyBytes += chunk.byteLength;
+        responseChunkCount += 1;
         controller.enqueue(chunk);
       });
       input.response.on("end", () => {
+        finish("gateway_direct_egress_http_completed", "completed");
         controller.close();
       });
       input.response.on("error", (error) => {
+        finish("gateway_direct_egress_http_failed", "upstream_response_error", error);
         controller.error(error);
       });
     },
     cancel: () => {
+      finish("gateway_direct_egress_http_cancelled", "downstream_cancelled");
       input.request.destroy();
     },
   });
 }
 
+function logDirectEgressAuthorized(input: {
+  admission: DirectEgressAdmission;
+  transport: DirectEgressTransport;
+}): void {
+  logger.info(
+    directEgressLogFieldsForAdmission({
+      admission: input.admission,
+      event: "gateway_direct_egress_authorized",
+      transport: input.transport,
+    }),
+    "Direct gateway egress request authorized",
+  );
+}
+
 export function logDirectEgressFailure(input: {
+  admission: DirectEgressAdmission | undefined;
   error: DirectEgressProxyError;
-  sandboxInstanceId?: string;
   target?: string | null;
+  transport: DirectEgressTransport;
 }): void {
   logger.info(
     {
+      ...(input.admission === undefined
+        ? {}
+        : directEgressLogFieldsForAdmission({
+            admission: input.admission,
+            event: "gateway_direct_egress_failed",
+            transport: input.transport,
+          })),
       event: "gateway_direct_egress_failed",
       failureCode: input.error.code,
-      sandboxInstanceId: input.sandboxInstanceId,
       status: input.error.status,
       target: input.target,
+      transport: input.transport,
     },
     input.error.message,
   );
+}
+
+export function logDirectEgressWebSocketEvent(input: {
+  admission: DirectEgressAdmission;
+  closeCode?: number;
+  closeReason?: string;
+  error?: Error | undefined;
+  event: string;
+  outcome?: string;
+  pendingClientMessageCount?: number;
+  startedAtMs?: number;
+  upstreamUrl?: URL;
+}): void {
+  logger.info(
+    {
+      ...directEgressLogFieldsForAdmission({
+        admission: input.admission,
+        event: input.event,
+        transport: "websocket",
+      }),
+      closeCode: input.closeCode,
+      closeReason: input.closeReason,
+      durationMs: input.startedAtMs === undefined ? undefined : Date.now() - input.startedAtMs,
+      error: input.error?.message,
+      outcome: input.outcome,
+      pendingClientMessageCount: input.pendingClientMessageCount,
+      upstreamAuthority: input.upstreamUrl?.host,
+      upstreamPath: input.upstreamUrl?.pathname,
+      upstreamScheme: input.upstreamUrl?.protocol.slice(0, -1),
+    },
+    input.error?.message ?? "Direct gateway websocket egress event",
+  );
+}
+
+function directEgressLogFieldsForAdmission(input: {
+  admission: DirectEgressAdmission;
+  event: string;
+  transport: DirectEgressTransport;
+}): DirectEgressLogFields {
+  return {
+    authority: input.admission.request.authority,
+    ...(input.admission.kind === "managed"
+      ? { egressRuleId: input.admission.classification.route.egressRuleId }
+      : {}),
+    event: input.event,
+    host: input.admission.targetUrl.hostname,
+    method: input.admission.request.method,
+    path: input.admission.request.path,
+    routeMode: input.admission.kind,
+    sandboxInstanceId: input.admission.token.sub,
+    scheme: input.admission.request.scheme,
+    transport: input.transport,
+  };
 }

@@ -6,9 +6,11 @@ import type { DataPlaneGatewayApp } from "../types.js";
 import {
   DirectEgressHttpRoutePath,
   DirectEgressProxyError,
+  type DirectEgressAdmission,
   type DirectEgressProxyService,
   DirectEgressWebSocketRoutePath,
   logDirectEgressFailure,
+  logDirectEgressWebSocketEvent,
 } from "./direct-egress-proxy-service.js";
 
 type RegisterDirectEgressRoutesInput = {
@@ -25,8 +27,9 @@ const WebSocketCloseCodes = {
 export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInput): void {
   input.app.all(DirectEgressHttpRoutePath, async (ctx) => {
     const target = new URL(ctx.req.url).searchParams.get("target");
+    let admission: DirectEgressAdmission | undefined;
     try {
-      const admission = await input.directEgressProxyService.authorize({
+      admission = await input.directEgressProxyService.authorize({
         authorizationHeader: ctx.req.header("authorization"),
         db: ctx.get("db"),
         headers: ctx.req.raw.headers,
@@ -36,6 +39,7 @@ export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInpu
         ...(ctx.get("testEnvironmentId") === undefined
           ? {}
           : { testEnvironmentId: ctx.get("testEnvironmentId") }),
+        transport: "http",
       });
       const body = await readRequestBody(ctx.req.raw);
       return await input.directEgressProxyService.proxyHttp({
@@ -48,8 +52,10 @@ export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInpu
     } catch (error) {
       if (error instanceof DirectEgressProxyError) {
         logDirectEgressFailure({
+          admission,
           error,
           target,
+          transport: "http",
         });
         return new Response(error.message, { status: error.status });
       }
@@ -65,8 +71,9 @@ export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInpu
         return ctx.text("Direct websocket egress endpoint requires websocket upgrade.", 400);
       }
       const target = new URL(ctx.req.url).searchParams.get("target");
+      let admission: DirectEgressAdmission | undefined;
       try {
-        const admission = await input.directEgressProxyService.authorize({
+        admission = await input.directEgressProxyService.authorize({
           authorizationHeader: ctx.req.header("authorization"),
           db: ctx.get("db"),
           headers: ctx.req.raw.headers,
@@ -76,14 +83,17 @@ export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInpu
           ...(ctx.get("testEnvironmentId") === undefined
             ? {}
             : { testEnvironmentId: ctx.get("testEnvironmentId") }),
+          transport: "websocket",
         });
         ctx.set("directEgressAdmission", admission);
         await next();
       } catch (error) {
         if (error instanceof DirectEgressProxyError) {
           logDirectEgressFailure({
+            admission,
             error,
             target,
+            transport: "websocket",
           });
           return new Response(error.message, { status: error.status });
         }
@@ -98,13 +108,27 @@ export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInpu
       }
       let upstreamSocket: WebSocket | undefined;
       const pendingClientMessages: WSMessageReceive[] = [];
+      const startedAtMs = Date.now();
 
       return {
         onOpen: (_event, ws) => {
+          logDirectEgressWebSocketEvent({
+            admission,
+            event: "gateway_direct_egress_websocket_client_opened",
+            startedAtMs,
+          });
           input.directEgressProxyService
             .resolveWebSocketUpstream({ admission })
             .then((upstreamUrl) => {
+              logDirectEgressWebSocketEvent({
+                admission,
+                event: "gateway_direct_egress_websocket_upstream_connect_started",
+                pendingClientMessageCount: pendingClientMessages.length,
+                startedAtMs,
+                upstreamUrl,
+              });
               upstreamSocket = connectUpstreamWebSocket({
+                admission,
                 client: ws,
                 onOpen: (upstream) => {
                   for (const message of pendingClientMessages.splice(0)) {
@@ -114,10 +138,19 @@ export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInpu
                     });
                   }
                 },
+                startedAtMs,
                 upstreamUrl,
               });
             })
             .catch((error: unknown) => {
+              logDirectEgressWebSocketEvent({
+                admission,
+                error: error instanceof Error ? error : new Error(String(error)),
+                event: "gateway_direct_egress_websocket_failed",
+                outcome: "upstream_resolution_failed",
+                pendingClientMessageCount: pendingClientMessages.length,
+                startedAtMs,
+              });
               ws.close(
                 WebSocketCloseCodes.POLICY_VIOLATION,
                 error instanceof Error ? error.message : String(error),
@@ -143,10 +176,27 @@ export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInpu
             upstream,
           });
         },
-        onClose: () => {
+        onClose: (event) => {
+          logDirectEgressWebSocketEvent({
+            admission,
+            closeCode: event.code,
+            closeReason: event.reason,
+            event: "gateway_direct_egress_websocket_client_closed",
+            outcome: "client_closed",
+            pendingClientMessageCount: pendingClientMessages.length,
+            startedAtMs,
+          });
           upstreamSocket?.close();
         },
-        onError: () => {
+        onError: (event) => {
+          logDirectEgressWebSocketEvent({
+            admission,
+            error: event instanceof Error ? event : undefined,
+            event: "gateway_direct_egress_websocket_client_error",
+            outcome: "client_error",
+            pendingClientMessageCount: pendingClientMessages.length,
+            startedAtMs,
+          });
           upstreamSocket?.terminate();
         },
       };
@@ -178,8 +228,10 @@ function normalizeWebSocketTarget(target: string | null): string | null {
 }
 
 function connectUpstreamWebSocket(input: {
+  admission: DirectEgressAdmission;
   client: WSContext<WebSocket>;
   onOpen: (upstream: WebSocket) => void;
+  startedAtMs: number;
   upstreamUrl: URL;
 }): WebSocket {
   const upstream = new WebSocket(input.upstreamUrl);
@@ -190,6 +242,13 @@ function connectUpstreamWebSocket(input: {
     }
 
     input.onOpen(upstream);
+    logDirectEgressWebSocketEvent({
+      admission: input.admission,
+      event: "gateway_direct_egress_websocket_upstream_opened",
+      outcome: "connected",
+      startedAtMs: input.startedAtMs,
+      upstreamUrl: input.upstreamUrl,
+    });
   });
   upstream.on("message", (data, isBinary) => {
     if (input.client.readyState !== WebSocket.OPEN) {
@@ -199,11 +258,28 @@ function connectUpstreamWebSocket(input: {
     input.client.send(toClientWebSocketMessage(data, isBinary));
   });
   upstream.on("close", (code, reason) => {
+    logDirectEgressWebSocketEvent({
+      admission: input.admission,
+      closeCode: code,
+      closeReason: reason.toString("utf8"),
+      event: "gateway_direct_egress_websocket_upstream_closed",
+      outcome: "upstream_closed",
+      startedAtMs: input.startedAtMs,
+      upstreamUrl: input.upstreamUrl,
+    });
     if (input.client.readyState === WebSocket.OPEN) {
       input.client.close(code, reason.toString("utf8"));
     }
   });
   upstream.on("error", (error) => {
+    logDirectEgressWebSocketEvent({
+      admission: input.admission,
+      error,
+      event: "gateway_direct_egress_websocket_upstream_error",
+      outcome: "upstream_error",
+      startedAtMs: input.startedAtMs,
+      upstreamUrl: input.upstreamUrl,
+    });
     if (input.client.readyState === WebSocket.OPEN) {
       input.client.close(WebSocketCloseCodes.INTERNAL_ERROR, error.message);
     }

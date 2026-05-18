@@ -2792,24 +2792,50 @@ async fn forward_upgrade_request_through_direct_gateway(
         })?,
     );
 
-    let (gateway_socket, _) = connect_async(gateway_request).await.map_err(|error| {
-        EgressProxyError::new(format!("direct gateway websocket egress failed: {error}"))
-    })?;
+    let (gateway_socket, _) = match connect_async(gateway_request).await {
+        Ok(connection) => connection,
+        Err(error) => {
+            let mut fields = request_context.common_fields();
+            fields.push(("outcome", Value::String("connect_failed".to_string())));
+            fields.push(("error", Value::String(error.to_string())));
+            emit_egress_proxy_log(
+                request_context.clock.as_ref(),
+                &request_context.sandbox_instance_id,
+                "egress_proxy_upgrade_failed",
+                &fields,
+            );
+            return Err(EgressProxyError::new(format!(
+                "direct gateway websocket egress failed: {error}"
+            )));
+        }
+    };
 
     let tunnel_context = request_context.clone();
     tokio::spawn(async move {
         let tunnel_result = tunnel_direct_gateway_upgrade(downstream_upgrade, gateway_socket).await;
 
-        if let Err(error) = tunnel_result {
-            let mut fields = tunnel_context.common_fields();
-            fields.push(("outcome", Value::String("tunnel_failed".to_string())));
-            fields.push(("error", Value::String(error.to_string())));
-            emit_egress_proxy_log(
-                tunnel_context.clock.as_ref(),
-                &tunnel_context.sandbox_instance_id,
-                "egress_proxy_upgrade_failed",
-                &fields,
-            );
+        match tunnel_result {
+            Ok(()) => {
+                let mut fields = tunnel_context.common_fields();
+                fields.push(("outcome", Value::String("completed".to_string())));
+                emit_egress_proxy_log(
+                    tunnel_context.clock.as_ref(),
+                    &tunnel_context.sandbox_instance_id,
+                    "egress_proxy_upgrade_completed",
+                    &fields,
+                );
+            }
+            Err(error) => {
+                let mut fields = tunnel_context.common_fields();
+                fields.push(("outcome", Value::String("tunnel_failed".to_string())));
+                fields.push(("error", Value::String(error.to_string())));
+                emit_egress_proxy_log(
+                    tunnel_context.clock.as_ref(),
+                    &tunnel_context.sandbox_instance_id,
+                    "egress_proxy_upgrade_failed",
+                    &fields,
+                );
+            }
         }
     });
 
@@ -2886,13 +2912,23 @@ async fn forward_request_through_direct_gateway(
                 "failed to build direct gateway egress request: {error}"
             ))
         })?;
-    let gateway_response = client
-        .http_client
-        .request(direct_request)
-        .await
-        .map_err(|error| {
-            EgressProxyError::new(format!("direct gateway HTTP egress failed: {error}"))
-        })?;
+    let gateway_response = match client.http_client.request(direct_request).await {
+        Ok(response) => response,
+        Err(error) => {
+            let mut fields = request_context.common_fields();
+            fields.push(("outcome", Value::String("connect_failed".to_string())));
+            fields.push(("error", Value::String(error.to_string())));
+            emit_egress_proxy_log(
+                request_context.clock.as_ref(),
+                &request_context.sandbox_instance_id,
+                "egress_proxy_request_failed",
+                &fields,
+            );
+            return Err(EgressProxyError::new(format!(
+                "direct gateway HTTP egress failed: {error}"
+            )));
+        }
+    };
 
     response_from_direct_gateway_response(gateway_response, request_context)
 }
