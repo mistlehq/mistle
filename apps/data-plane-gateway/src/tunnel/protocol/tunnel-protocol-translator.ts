@@ -11,15 +11,16 @@ import {
   parseTelemetryControlMessage,
   parseOperationControlMessage,
   type BootstrapControlMessage,
-  type KeepaliveControlMessage,
-  type RuntimeReadyControlMessage,
   type EgressTokenRequest,
+  type KeepaliveControlMessage,
   type SigningRequest,
   type StreamControlMessage,
-  type TelemetryClose,
-  type TelemetryOpen,
   type OperationClose,
   type OperationOpen,
+  parsePtySessionControlMessage,
+  type RuntimeReadyControlMessage,
+  type TelemetryClose,
+  type TelemetryOpen,
 } from "@mistle/sandbox-session-protocol";
 
 import { PortAccessTransportService } from "../../publishing/port-access-transport.js";
@@ -34,6 +35,7 @@ import type { RelayPayload, RelayPeerSide } from "../types.js";
 import { FrameCodec } from "./frame-codec.js";
 
 const ReservedOperationStreamId = 0xffff_fffd;
+const DirectPtyStreamId = 1;
 
 export type ReleaseInteractiveStream = {
   clientSessionId: string;
@@ -97,6 +99,11 @@ export type TunnelProtocolDelivery =
   | {
       kind: "egressTokenRequest";
       message: EgressTokenRequest;
+    }
+  | {
+      kind: "ptyClientControl";
+      payload: RelayPayload;
+      ptySessionId: string;
     };
 
 export type TunnelProtocolTranslation = {
@@ -787,6 +794,35 @@ export class TunnelProtocolTranslator {
         delivery: {
           kind: "signingRequest",
           message: signingControlMessage,
+        },
+      });
+    }
+
+    const ptySessionControlMessage = parsePtySessionControlMessage(input.payload);
+    if (ptySessionControlMessage !== undefined) {
+      if (ptySessionControlMessage.type === "pty.session.open") {
+        throw new TunnelProtocolViolationError(
+          "Bootstrap websocket cannot send pty.session.open control messages.",
+        );
+      }
+
+      if (ptySessionControlMessage.type === "pty.session.opened") {
+        return createTranslation({
+          delivery: {
+            kind: "drop",
+          },
+        });
+      }
+
+      return createTranslation({
+        delivery: {
+          kind: "ptyClientControl",
+          ptySessionId: ptySessionControlMessage.ptySessionId,
+          payload: createStreamResetPayload({
+            code: ptySessionControlMessage.code,
+            message: ptySessionControlMessage.message,
+            streamId: DirectPtyStreamId,
+          }),
         },
       });
     }

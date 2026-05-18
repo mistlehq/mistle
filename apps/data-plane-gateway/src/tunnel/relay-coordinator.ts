@@ -247,23 +247,7 @@ export class TunnelRelayCoordinator {
       return;
     }
 
-    if (input.target.side === "connection") {
-      return;
-    }
-
-    const oppositePeers = [
-      ...this.peerRegistry.listConnectionPeers({
-        sandboxInstanceId: input.target.sandboxInstanceId,
-      }),
-      ...this.peerRegistry.listSessionPeers({
-        sandboxInstanceId: input.target.sandboxInstanceId,
-        side: "ptyClient",
-      }),
-      ...this.peerRegistry.listSessionPeers({
-        sandboxInstanceId: input.target.sandboxInstanceId,
-        side: "ptySandbox",
-      }),
-    ];
+    const oppositePeers = this.listOppositePeersForDetachedPeer(input.target);
     if (!input.notifyOppositePeer || oppositePeers.length === 0) {
       return;
     }
@@ -279,6 +263,36 @@ export class TunnelRelayCoordinator {
         )
         .catch(() => undefined);
     }
+  }
+
+  private listOppositePeersForDetachedPeer(target: RelayTarget): RelayTarget[] {
+    if (target.side === "connection") {
+      return [];
+    }
+
+    if (target.side === "ptyClient" || target.side === "ptySandbox") {
+      const oppositeSide = target.side === "ptyClient" ? "ptySandbox" : "ptyClient";
+      return this.peerRegistry
+        .listSessionPeers({
+          sandboxInstanceId: target.sandboxInstanceId,
+          side: oppositeSide,
+        })
+        .filter((peer) => peer.sessionId === target.sessionId);
+    }
+
+    return [
+      ...this.peerRegistry.listConnectionPeers({
+        sandboxInstanceId: target.sandboxInstanceId,
+      }),
+      ...this.peerRegistry.listSessionPeers({
+        sandboxInstanceId: target.sandboxInstanceId,
+        side: "ptyClient",
+      }),
+      ...this.peerRegistry.listSessionPeers({
+        sandboxInstanceId: target.sandboxInstanceId,
+        side: "ptySandbox",
+      }),
+    ];
   }
 
   public getConnectionPeer(input: {

@@ -505,6 +505,12 @@ export function createDataPlaneGatewayRuntime(
   registerPtyTransportRoutes({
     app,
     ptyTransportService,
+    ...(config.app.__dangerouslyEnableTestIsolation === undefined
+      ? {}
+      : {
+          testEnvironmentIdQueryParam:
+            config.app.__dangerouslyEnableTestIsolation.testEnvironmentIdHeader,
+        }),
     upgradeWebSocket: nodeWebSocket.upgradeWebSocket,
   });
   registerPortAccessRoutes({

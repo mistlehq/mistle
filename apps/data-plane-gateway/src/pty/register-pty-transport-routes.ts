@@ -2,6 +2,7 @@ import type { NodeWebSocket } from "@hono/node-ws";
 import type { WSContext } from "hono/ws";
 import WebSocket from "ws";
 
+import { logger } from "../logger.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import {
   PtyTransportError,
@@ -13,6 +14,7 @@ import {
 type RegisterPtyTransportRoutesInput = {
   app: DataPlaneGatewayApp;
   ptyTransportService: PtyTransportService;
+  testEnvironmentIdQueryParam?: string;
   upgradeWebSocket: NodeWebSocket["upgradeWebSocket"];
 };
 
@@ -21,42 +23,21 @@ const WebSocketCloseCodes = {
 };
 
 export function registerPtyTransportRoutes(input: RegisterPtyTransportRoutesInput): void {
-  input.app.get(
-    PtyTransportWebSocketRoutePath,
-    async (ctx, next) => {
-      if (ctx.req.header("upgrade")?.toLowerCase() !== "websocket") {
-        return ctx.text("PTY transport endpoint requires websocket upgrade.", 400);
+  input.app.get(PtyTransportWebSocketRoutePath, async (ctx) => {
+    if (ctx.req.header("upgrade")?.toLowerCase() !== "websocket") {
+      return ctx.text("PTY transport endpoint requires websocket upgrade.", 400);
+    }
+
+    try {
+      const admission = await input.ptyTransportService.authorize({
+        token: readPtyTransportToken(ctx.req.url),
+      });
+      if (!(await input.ptyTransportService.canAttach({ admission }))) {
+        return ctx.text("PTY transport session is not attachable.", 409);
       }
-
-      try {
-        const admission = await input.ptyTransportService.authorize({
-          token: readPtyTransportToken(ctx.req.url),
-        });
-        if (!(await input.ptyTransportService.canAttach({ admission }))) {
-          return ctx.text("PTY transport session is not attachable.", 409);
-        }
-
-        ctx.set("ptyTransportAdmission", admission);
-        await next();
-      } catch (error) {
-        if (error instanceof PtyTransportError) {
-          return new Response(error.message, { status: error.status });
-        }
-
-        throw error;
-      }
-    },
-    input.upgradeWebSocket((ctx) => {
-      const admission = ctx.get("ptyTransportAdmission");
-      if (admission === undefined) {
-        throw new Error("Expected PTY transport websocket request admission.");
-      }
-
       const testEnvironmentId = ctx.get("testEnvironmentId");
-      const testEnvironmentIdQueryParam =
-        ctx.get("config").__dangerouslyEnableTestIsolation?.testEnvironmentIdHeader;
 
-      return {
+      return input.upgradeWebSocket(ctx, {
         onOpen: (_event, socket) => {
           if (admission.side === "client") {
             input.ptyTransportService.attachClient({
@@ -79,7 +60,7 @@ export function registerPtyTransportRoutes(input: RegisterPtyTransportRoutesInpu
                 message: event.data,
                 socket,
                 testEnvironmentId,
-                testEnvironmentIdQueryParam,
+                testEnvironmentIdQueryParam: input.testEnvironmentIdQueryParam,
               })
               .catch((error: unknown) => {
                 closeWithError(socket, error);
@@ -111,9 +92,31 @@ export function registerPtyTransportRoutes(input: RegisterPtyTransportRoutesInpu
             closeReason: event instanceof Error ? event.message : "PTY transport websocket error.",
           });
         },
-      };
-    }),
-  );
+      });
+    } catch (error) {
+      if (error instanceof PtyTransportError) {
+        logger.info(
+          {
+            event: "gateway_pty_transport_admission_failed",
+            failureCode: "admission_rejected",
+            status: error.status,
+          },
+          error.message,
+        );
+        return new Response(error.message, { status: error.status });
+      }
+
+      logger.error(
+        {
+          err: error,
+          event: "gateway_pty_transport_admission_failed",
+          failureCode: "internal_error",
+        },
+        "PTY transport websocket admission failed.",
+      );
+      throw error;
+    }
+  });
 }
 
 function readPtyTransportToken(requestUrl: string): string | null {

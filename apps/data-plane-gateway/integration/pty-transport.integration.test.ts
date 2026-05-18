@@ -150,6 +150,14 @@ describe.concurrent("PTY transport integration", () => {
         ).toBe(bootstrapMessage.transportToken);
 
         sandboxSocket = await connectWebSocket(bootstrapMessage.transportUrl);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "pty.session.opened",
+            requestId: bootstrapMessage.requestId,
+            ptySessionId,
+          }),
+        );
         await sendWebSocketMessage(clientSocket, "from-client");
         await expect(
           withTimeout({

@@ -1,6 +1,7 @@
 import type { Clock } from "@mistle/time";
 import {
   NoRespondersError,
+  RequestError,
   TimeoutError,
   type NatsConnection,
   type Subscription,
@@ -206,7 +207,10 @@ export class NatsRelayPeerResolver implements RelayPeerResolver {
       });
       return target;
     } catch (error) {
-      if (error instanceof NoRespondersError) {
+      if (
+        error instanceof NoRespondersError ||
+        (error instanceof RequestError && error.isNoResponders())
+      ) {
         recordGatewayRelayPeerLookupEvent({
           backend: "nats",
           localNodeId: this.nodeId,

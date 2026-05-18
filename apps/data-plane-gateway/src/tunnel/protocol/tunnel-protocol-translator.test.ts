@@ -847,6 +847,57 @@ describe("TunnelProtocolTranslator", () => {
     });
   });
 
+  it("drops direct PTY opened acknowledgements from bootstrap", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: BootstrapSessionId,
+        payload: JSON.stringify({
+          type: "pty.session.opened",
+          requestId: "pty_request_123",
+          ptySessionId: "terminal",
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "bootstrap",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "drop",
+      },
+    });
+  });
+
+  it("routes direct PTY bootstrap errors to the matching client transport", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: BootstrapSessionId,
+        payload: JSON.stringify({
+          type: "pty.session.error",
+          requestId: "pty_request_123",
+          ptySessionId: "terminal",
+          code: "transport_connect_failed",
+          message: "gateway websocket failed",
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "bootstrap",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "ptyClientControl",
+        ptySessionId: "terminal",
+        payload: JSON.stringify({
+          type: "stream.reset",
+          streamId: 1,
+          code: "transport_connect_failed",
+          message: "gateway websocket failed",
+        }),
+      },
+    });
+  });
+
   it("drops late bootstrap stream.window after the binding was already released by pty.exit", async () => {
     const { router, translator } = await createTranslatorHarness();
 

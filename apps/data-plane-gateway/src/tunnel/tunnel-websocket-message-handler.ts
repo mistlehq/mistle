@@ -162,6 +162,13 @@ export async function handleTunnelWebSocketMessage(input: {
     }
 
     await input.handleEgressTokenRequestDelivery(translation.delivery);
+  } else if (translation.delivery.kind === "ptyClientControl") {
+    await input.relayCoordinator.forwardSessionPeerMessage({
+      sandboxInstanceId: input.sandboxInstanceId,
+      targetSide: "ptyClient",
+      targetSessionId: translation.delivery.ptySessionId,
+      payload: translation.delivery.payload,
+    });
   } else if (translation.delivery.kind === "respond") {
     input.currentSocket.send(translation.delivery.payload);
   } else {
