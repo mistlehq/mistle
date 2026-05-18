@@ -357,6 +357,7 @@ export function createDataPlaneGatewayRuntime(
       tokenIssuer: config.app.sandbox.egress.tokenIssuer,
       tokenAudience: config.app.sandbox.egress.tokenAudience,
     },
+    config.app.__dangerouslyTrustDirectEgressTlsCaCertificates,
   );
   const ptyTransportService = new PtyTransportService({
     config: config.app.sandbox,

@@ -116,6 +116,7 @@ export class DirectEgressProxyService {
     private readonly controlPlaneInternalClient: ControlPlaneInternalClient,
     private readonly credentialCache: CredentialCache,
     private readonly egressTokenConfig: EgressTokenConfig,
+    private readonly trustedUpstreamCaCertificates: readonly string[] | undefined,
   ) {}
 
   public async authorize(input: {
@@ -268,6 +269,7 @@ export class DirectEgressProxyService {
       method: outgoingRequest.method,
       requestBodyBytes: input.body?.byteLength ?? 0,
       startedAtMs,
+      trustedUpstreamCaCertificates: this.trustedUpstreamCaCertificates,
       url: outgoingRequest.url,
     });
   }
@@ -557,22 +559,36 @@ function sendDirectHttpRequest(input: {
   method: string;
   requestBodyBytes: number;
   startedAtMs: number;
+  trustedUpstreamCaCertificates: readonly string[] | undefined;
   url: URL;
 }): Promise<Response> {
   return new Promise((resolve, reject) => {
-    const requestFactory = input.url.protocol === "https:" ? requestHttps : requestHttp;
     const requestHeaders =
       input.headers instanceof Headers
         ? Object.fromEntries(input.headers.entries())
         : input.headers;
-    const upstreamRequest = requestFactory({
-      headers: requestHeaders,
-      hostname: input.url.hostname,
-      method: input.method,
-      path: `${input.url.pathname}${input.url.search}`,
-      port: input.url.port.length === 0 ? undefined : Number(input.url.port),
-      protocol: input.url.protocol,
-    });
+    const upstreamRequest =
+      input.url.protocol === "https:"
+        ? requestHttps({
+            headers: requestHeaders,
+            hostname: input.url.hostname,
+            method: input.method,
+            path: `${input.url.pathname}${input.url.search}`,
+            port: input.url.port.length === 0 ? undefined : Number(input.url.port),
+            protocol: input.url.protocol,
+            ...(input.trustedUpstreamCaCertificates === undefined ||
+            input.trustedUpstreamCaCertificates.length === 0
+              ? {}
+              : { ca: [...input.trustedUpstreamCaCertificates] }),
+          })
+        : requestHttp({
+            headers: requestHeaders,
+            hostname: input.url.hostname,
+            method: input.method,
+            path: `${input.url.pathname}${input.url.search}`,
+            port: input.url.port.length === 0 ? undefined : Number(input.url.port),
+            protocol: input.url.protocol,
+          });
 
     upstreamRequest.on("response", (response) => {
       const status = response.statusCode ?? 502;
