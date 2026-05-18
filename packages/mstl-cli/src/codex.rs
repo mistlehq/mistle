@@ -17,6 +17,8 @@ const PAYLOAD_KIND_WEBSOCKET_TEXT: u8 = 0x02;
 const PAYLOAD_KIND_WEBSOCKET_BINARY: u8 = 0x03;
 const AGENT_STREAM_WINDOW_BYTES: usize = 16 * 1024 * 1024;
 const STREAM_OPEN_TIMEOUT: Duration = Duration::from_secs(30);
+const CODEX_MISTLE_MODEL_PROVIDER_ID: &str = "mistle-remote";
+const CODEX_MISTLE_MODEL_PROVIDER_CONFIG: &str = "model_providers.mistle-remote={ name = \"Mistle Remote\", base_url = \"http://127.0.0.1:1/v1\", wire_api = \"responses\", requires_openai_auth = false }";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CodexRunConfig {
@@ -210,15 +212,17 @@ fn codex_command_args(
 ) -> Result<Vec<String>, CodexRunError> {
     validate_codex_args(codex_args)?;
 
-    let mut command_args = Vec::with_capacity(codex_args.len() + 2);
+    let mut command_args = Vec::with_capacity(codex_args.len() + 6);
     match codex_args.first().map(String::as_str) {
         Some("resume" | "fork") => {
             command_args.push(codex_args[0].clone());
+            push_mistle_codex_config_args(&mut command_args);
             command_args.push("--remote".to_owned());
             command_args.push(remote_url.to_owned());
             command_args.extend(codex_args.iter().skip(1).cloned());
         }
         _ => {
+            push_mistle_codex_config_args(&mut command_args);
             command_args.push("--remote".to_owned());
             command_args.push(remote_url.to_owned());
             command_args.extend(codex_args.iter().cloned());
@@ -226,6 +230,15 @@ fn codex_command_args(
     }
 
     Ok(command_args)
+}
+
+fn push_mistle_codex_config_args(command_args: &mut Vec<String>) {
+    command_args.push("-c".to_owned());
+    command_args.push(format!(
+        "model_provider=\"{CODEX_MISTLE_MODEL_PROVIDER_ID}\""
+    ));
+    command_args.push("-c".to_owned());
+    command_args.push(CODEX_MISTLE_MODEL_PROVIDER_CONFIG.to_owned());
 }
 
 async fn accept_codex(listener: &TcpListener) -> Result<WebSocketStream<TcpStream>, CodexRunError> {
@@ -617,7 +630,16 @@ mod tests {
                 &["--model".to_owned(), "gpt-5.2".to_owned()]
             )
             .expect("codex args should be valid"),
-            vec!["--remote", "ws://127.0.0.1:1234", "--model", "gpt-5.2"]
+            vec![
+                "-c",
+                "model_provider=\"mistle-remote\"",
+                "-c",
+                "model_providers.mistle-remote={ name = \"Mistle Remote\", base_url = \"http://127.0.0.1:1/v1\", wire_api = \"responses\", requires_openai_auth = false }",
+                "--remote",
+                "ws://127.0.0.1:1234",
+                "--model",
+                "gpt-5.2",
+            ]
         );
     }
 
@@ -629,7 +651,16 @@ mod tests {
                 &["resume".to_owned(), "thread_01".to_owned()]
             )
             .expect("codex args should be valid"),
-            vec!["resume", "--remote", "ws://127.0.0.1:1234", "thread_01"]
+            vec![
+                "resume",
+                "-c",
+                "model_provider=\"mistle-remote\"",
+                "-c",
+                "model_providers.mistle-remote={ name = \"Mistle Remote\", base_url = \"http://127.0.0.1:1/v1\", wire_api = \"responses\", requires_openai_auth = false }",
+                "--remote",
+                "ws://127.0.0.1:1234",
+                "thread_01",
+            ]
         );
     }
 
