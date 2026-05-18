@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
+import { CodexThreadHeaderScope } from "../session-agents/codex/codex-thread-header-scope.js";
 import {
   projectCodexThreadNavigatorRows,
   resolveDefaultCodexThreadId,
@@ -341,6 +342,9 @@ function SessionWorkbenchPageContent(input: {
       availableThreads: codexThreadNavigator.availableThreads,
     });
   }, [codexThreadNavigator]);
+  const activeCodexThreadHeaderRow = useMemo(() => {
+    return threadNavigatorRows.find((row) => row.isActive) ?? null;
+  }, [threadNavigatorRows]);
   const pushThreadSearchParams = useCallback(
     (threadId: string): void => {
       const nextSearchParams = new URLSearchParams(input.searchParams);
@@ -509,7 +513,14 @@ function SessionWorkbenchPageContent(input: {
 
   return (
     <ConversationWorkspaceFrame
-      title={<SessionHeaderTitle sandboxInstanceId={input.sandboxInstanceId} />}
+      title={
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="min-w-0 shrink">
+            <SessionHeaderTitle sandboxInstanceId={input.sandboxInstanceId} />
+          </div>
+          <CodexThreadHeaderScope row={activeCodexThreadHeaderRow} />
+        </div>
+      }
       actions={headerActions}
       leadingControl={<SessionWorkspaceSidebarTrigger />}
     >
