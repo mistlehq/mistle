@@ -2,10 +2,10 @@ use std::process::Command;
 
 #[test]
 fn cli_prints_the_package_version_for_long_version_flag() {
-    let output = Command::new(env!("CARGO_BIN_EXE_mstl"))
+    let output = Command::new(env!("CARGO_BIN_EXE_mistle"))
         .arg("--version")
         .output()
-        .expect("mstl binary should run");
+        .expect("mistle binary should run");
 
     assert!(
         output.status.success(),
@@ -18,10 +18,10 @@ fn cli_prints_the_package_version_for_long_version_flag() {
 
 #[test]
 fn cli_prints_the_package_version_for_short_version_flag() {
-    let output = Command::new(env!("CARGO_BIN_EXE_mstl"))
+    let output = Command::new(env!("CARGO_BIN_EXE_mistle"))
         .arg("-V")
         .output()
-        .expect("mstl binary should run");
+        .expect("mistle binary should run");
 
     assert!(
         output.status.success(),

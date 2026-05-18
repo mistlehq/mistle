@@ -2,7 +2,7 @@
   "name": "@mistle/mstl-cli",
   "private": true,
   "scripts": {
-    "build": "rm -rf dist && cargo build --locked --bin mstl && mkdir -p dist && cp target/debug/mstl dist/mstl",
+    "build": "rm -rf dist && cargo build --locked --bin mistle && mkdir -p dist && cp target/debug/mistle dist/mistle",
     "lint": "cargo clippy --locked --all-targets -- -D warnings",
     "typecheck": "cargo check --locked --all-targets",
     "test": "cargo test --locked",
