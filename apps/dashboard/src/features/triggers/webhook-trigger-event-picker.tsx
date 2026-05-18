@@ -13,6 +13,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  TextLink,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -85,6 +86,13 @@ export function WebhookTriggerEventPicker(input: {
       {pickerState.helperMessage === null ? null : (
         <Notice variant={pickerState.helperVariant}>{pickerState.helperMessage}</Notice>
       )}
+
+      {pickerState.shouldShowNoAvailableTriggerEventsNotice ? (
+        <Notice>
+          No trigger events are available yet. Check your integration setup or sync trigger events
+          from <TextLink href="/integrations">Integrations</TextLink>.
+        </Notice>
+      ) : null}
 
       {selectedEventOptions.length === 0 ? (
         pickerState.disabled ? null : (

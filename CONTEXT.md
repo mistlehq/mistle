@@ -48,6 +48,10 @@ _Avoid_: Empty state, local table filter
 A configured event or schedule that starts an agent response.
 _Avoid_: Automation when naming product-facing concepts
 
+**Trigger event**:
+A provider event that can be selected as the event source for a **Trigger**.
+_Avoid_: Webhook event when naming product-facing trigger-builder concepts
+
 **Automation**:
 The internal system record and runtime execution model behind a **Trigger**.
 _Avoid_: Trigger when naming persistence, API, or workflow contracts
@@ -70,6 +74,7 @@ _Avoid_: Trigger when naming persistence, API, or workflow contracts
 - A **Collection landing page** may list **Sandbox profile version** families, triggers, sessions, or organization members.
 - A **Filtered collection view** narrows a **Collection landing page** without changing whether the underlying collection exists.
 - A **Trigger** is backed by one **Automation** record.
+- A **Trigger** may select one or more **Trigger events**.
 - An **Automation** may start from a webhook event or a schedule.
 
 ## Example Dialogue
@@ -89,6 +94,7 @@ _Avoid_: Trigger when naming persistence, API, or workflow contracts
 - "empty state" could mean first-use creation guidance, filtered no-results copy, or unavailable dependency copy — resolved: for collection pages, use it to mean the zero-object state before the first item exists.
 - "search filtering" could mean client-side filtering of visible rows or a **Filtered collection view** — resolved: collection pages should use a **Filtered collection view** when the result count spans more than the currently loaded page.
 - "automation" was used for both the user-facing configured behavior and the internal runtime model — resolved: use **Trigger** for the product-facing concept and **Automation** for persistence, API, and workflow contracts.
+- "webhook event" was used for both provider-delivered records and selectable product-facing events in the trigger builder — resolved: use **Trigger event** in product-facing trigger-builder copy and keep webhook event for integration/runtime concepts.
 - Dashboard URLs are user-facing language — resolved: use **Trigger** naming for dashboard routes, while keeping backend API and persistence contracts under **Automation** unless those contracts are intentionally versioned.
 - Dashboard route parameters are user-facing route language — resolved: use `triggerId` for dashboard route-facing code and translate to `automationId` only at backend API/service boundaries.
 - A unified dashboard trigger detail page should not infer the trigger kind by trying type-specific endpoints — resolved: expose a backend automation detail read contract and use it before rendering the type-specific editor.

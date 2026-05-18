@@ -76,6 +76,41 @@ describe("webhook trigger trigger picker state", () => {
         "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event triggers.",
       helperVariant: "default",
       inputPlaceholder: "No events available",
+      shouldShowNoAvailableTriggerEventsNotice: false,
+    });
+  });
+
+  it("shows setup guidance when connected integrations expose no selectable trigger events", () => {
+    expect(
+      resolveWebhookTriggerEventPickerState({
+        eventOptions: [],
+        hasConnectedIntegrations: true,
+        selectedEventIds: [],
+      }),
+    ).toEqual({
+      availableEventOptions: [],
+      groupedAvailableEventOptions: [],
+      disabled: true,
+      helperMessage: null,
+      helperVariant: "default",
+      inputPlaceholder: "No events available",
+      shouldShowNoAvailableTriggerEventsNotice: true,
+    });
+  });
+
+  it("does not show setup guidance after all selectable trigger events are selected", () => {
+    expect(
+      resolveWebhookTriggerEventPickerState({
+        eventOptions: WebhookEventOptions,
+        hasConnectedIntegrations: true,
+        selectedEventIds: WebhookEventOptions.map((option) => option.id),
+      }),
+    ).toMatchObject({
+      availableEventOptions: [],
+      disabled: true,
+      helperMessage: null,
+      inputPlaceholder: "No events available",
+      shouldShowNoAvailableTriggerEventsNotice: false,
     });
   });
 });

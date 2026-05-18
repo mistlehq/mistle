@@ -533,6 +533,15 @@ export const NoConnectedIntegrations: Story = {
   },
 };
 
+export const NoTriggerEventsAvailable: Story = {
+  args: {
+    mode: "create",
+    connectionOptions: ConnectionOptions,
+    values: EmptyCreateValues,
+    webhookEventOptions: [],
+  },
+};
+
 export const Saving: Story = {
   args: {
     mode: "edit",

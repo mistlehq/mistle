@@ -17,6 +17,7 @@ type WebhookTriggerEventPickerState = {
   helperMessage: string | null;
   helperVariant: "default" | "alert";
   inputPlaceholder: string;
+  shouldShowNoAvailableTriggerEventsNotice: boolean;
 };
 
 export type WebhookTriggerEventPickerDisabledState = {
@@ -89,6 +90,7 @@ export function resolveWebhookTriggerEventPickerState(input: {
       helperMessage: input.disabledState.reason,
       helperVariant: input.disabledState.variant,
       inputPlaceholder: "No events available",
+      shouldShowNoAvailableTriggerEventsNotice: false,
     };
   }
 
@@ -106,5 +108,9 @@ export function resolveWebhookTriggerEventPickerState(input: {
     helperMessage: input.hasConnectedIntegrations ? null : "Connect an integration to add events.",
     helperVariant: "default",
     inputPlaceholder: hasAvailableTriggers ? "Add event" : "No events available",
+    shouldShowNoAvailableTriggerEventsNotice:
+      input.hasConnectedIntegrations &&
+      input.selectedEventIds.length === 0 &&
+      !hasAvailableTriggers,
   };
 }

@@ -225,6 +225,7 @@ describe("WebhookTriggerEventPicker", () => {
 
     expect(input.getAttribute("disabled")).toBe("");
     expect(screen.getAllByText("Connect an integration to add events.").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/No trigger events are available yet/)).toBeNull();
   });
 
   it("shows a disabled no-triggers placeholder when connected integrations expose no triggers", () => {
@@ -242,6 +243,32 @@ describe("WebhookTriggerEventPicker", () => {
     }
 
     expect(input.getAttribute("disabled")).toBe("");
+    const noticeMessage = screen.getByText(/No trigger events are available yet/);
+    expect(noticeMessage).toBeTruthy();
+    const noticeContainer = noticeMessage.closest('[data-slot="notice"]');
+    if (noticeContainer === null) {
+      throw new Error("Expected no-trigger-events notice container.");
+    }
+    expect(noticeContainer.className.includes("text-destructive")).toBe(false);
+    const integrationsLink = screen.getByRole("link", { name: "Integrations" });
+    expect(integrationsLink.getAttribute("href")).toBe("/integrations");
+  });
+
+  it("does not show setup guidance after all available triggers are selected", () => {
+    const { container } = renderTriggerPicker({
+      hasConnectedIntegrations: true,
+      selectedConnectionId: GitHubConnectionId,
+      selectedEventIds: WebhookEventOptions.map((option) => option.id),
+      eventParameterValues: {},
+    });
+
+    const input = container.querySelector('input[placeholder="No events available"]');
+    if (input === null) {
+      throw new Error("Expected trigger input.");
+    }
+
+    expect(input.getAttribute("disabled")).toBe("");
+    expect(screen.queryByText(/No trigger events are available yet/)).toBeNull();
   });
 
   it("shows a profile binding message when trigger selection is disabled by the selected profile", () => {
@@ -269,6 +296,7 @@ describe("WebhookTriggerEventPicker", () => {
         "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event triggers.",
       ).length,
     ).toBeGreaterThan(0);
+    expect(screen.queryByText(/No trigger events are available yet/)).toBeNull();
     const helperMessage = screen.getByText(
       "The sandbox profile Repo Maintainer has no event-capable integrations connected. Add an integration like GitHub or Slack to enable event triggers.",
     );
