@@ -735,7 +735,12 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
 
 function SnapshotMaintenanceScriptSummaryValue(input: { script: string }): React.JSX.Element {
   if (input.script.trim().length === 0) {
-    return <>None</>;
+    return (
+      <span className="text-muted-foreground">
+        Not configured. Automatic refresh uses <ScriptPathEmphasis>setup script</ScriptPathEmphasis>
+        .
+      </span>
+    );
   }
 
   return (
@@ -743,6 +748,10 @@ function SnapshotMaintenanceScriptSummaryValue(input: { script: string }): React
       {input.script}
     </pre>
   );
+}
+
+function ScriptPathEmphasis(input: { children: ReactNode }): React.JSX.Element {
+  return <strong className="font-medium text-foreground">{input.children}</strong>;
 }
 
 export function SandboxProfileSnapshotRefreshScheduleForm(input: {
@@ -786,15 +795,11 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
   const cronExpressionBreakdown = resolveCronExpressionBreakdown(cronExpression);
   const submitIsDisabled = input.disabled || (!scheduleEnabled && existingSchedule === null);
   const formId = "sandbox-profile-snapshot-refresh-schedule-form";
-  const scheduleStatusMessage = scheduleEnabled
-    ? existingSchedule === null
-      ? "Automatic snapshot refresh will start after a schedule is saved."
-      : savedMaintenanceScriptHasContent
-        ? "Snapshot refresh will build from the current snapshot with maintenance script."
-        : "Snapshot refresh will build from the base image with setup script."
-    : existingSchedule === null
-      ? "Snapshots will not refresh automatically."
-      : "Automatic snapshot refresh will stop after changes are saved.";
+  const scheduleStatusMessage = resolveScheduleStatusMessage({
+    existingSchedule,
+    savedMaintenanceScriptHasContent,
+    scheduleEnabled,
+  });
   useEffect(() => {
     setScheduleEnabled(existingSchedule !== null || hasInitialDraft);
     setIsEditingSchedule(hasInitialDraft);
@@ -1055,6 +1060,38 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
         </div>
       </form>
     </SectionBlock>
+  );
+}
+
+function resolveScheduleStatusMessage(input: {
+  existingSchedule: SnapshotRefreshSchedule;
+  savedMaintenanceScriptHasContent: boolean;
+  scheduleEnabled: boolean;
+}): ReactNode {
+  if (!input.scheduleEnabled) {
+    return input.existingSchedule === null
+      ? "Snapshots will not refresh automatically."
+      : "Automatic snapshot refresh will stop after changes are saved.";
+  }
+
+  if (input.existingSchedule === null) {
+    return "Automatic snapshot refresh will start after a schedule is saved.";
+  }
+
+  if (input.savedMaintenanceScriptHasContent) {
+    return (
+      <>
+        Snapshot refresh will build from the current snapshot with{" "}
+        <ScriptPathEmphasis>maintenance script</ScriptPathEmphasis>.
+      </>
+    );
+  }
+
+  return (
+    <>
+      Snapshot refresh will build from the base image with{" "}
+      <ScriptPathEmphasis>setup script</ScriptPathEmphasis>.
+    </>
   );
 }
 

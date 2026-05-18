@@ -116,6 +116,16 @@ export const RefreshScheduleExisting: Story = {
   },
 };
 
+export const RefreshScheduleExistingWithSetupScript: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotMaintenanceScript: "",
+    snapshotRefreshScheduleState: "existing",
+    snapshotState: "snapshot-ready",
+  },
+};
+
 export const SnapshotMaintenanceWithRefreshSchedule: Story = {
   args: {
     initialSectionId: "snapshot",
