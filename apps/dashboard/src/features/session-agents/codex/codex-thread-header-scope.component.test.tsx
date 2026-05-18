@@ -19,6 +19,7 @@ function createThreadRow(input?: Partial<CodexThreadNavigatorRow>): CodexThreadN
     isLoaded: true,
     isOpening: false,
     isPinnedCurrent: false,
+    pendingServerRequestCount: 0,
     ...input,
   };
 }

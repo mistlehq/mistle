@@ -19,6 +19,7 @@ const Rows = [
     isLoaded: true,
     isOpening: false,
     isPinnedCurrent: false,
+    pendingServerRequestCount: 1,
   },
   {
     id: "thread_other",
@@ -32,6 +33,7 @@ const Rows = [
     isLoaded: false,
     isOpening: true,
     isPinnedCurrent: true,
+    pendingServerRequestCount: 0,
   },
 ] satisfies readonly CodexThreadNavigatorRow[];
 
@@ -54,6 +56,7 @@ describe("CodexThreadNavigator", () => {
     expect(within(navigator).getByRole("heading", { name: "Threads" })).toBeTruthy();
     expect(within(navigator).getByRole("button", { name: "New thread" })).toBeTruthy();
     expect(within(navigator).getByRole("button", { name: /Active work/ })).toBeTruthy();
+    expect(within(navigator).getByText("Needs input")).toBeTruthy();
     expect(within(navigator).getByText("Active")).toBeTruthy();
     expect(within(navigator).getByRole("button", { name: /Other work/ })).toBeTruthy();
     expect(within(navigator).getByText("Opening")).toBeTruthy();

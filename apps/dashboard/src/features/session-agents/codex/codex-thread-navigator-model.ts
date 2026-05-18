@@ -14,6 +14,7 @@ export type CodexThreadNavigatorRow = {
   isLoaded: boolean;
   isOpening: boolean;
   isPinnedCurrent: boolean;
+  pendingServerRequestCount: number;
 };
 
 function resolveThreadActivityMs(thread: CodexThreadSummary): number {
@@ -61,6 +62,7 @@ function createNavigatorRow(input: {
   activeThreadId: string | null;
   loadedThreadIds: ReadonlySet<string>;
   pendingThreadId: string | null;
+  pendingServerRequestCountsByThreadId: ReadonlyMap<string, number>;
   selectedRepositoryPath: string | null;
   thread: CodexThreadSummary;
   isPinnedCurrent: boolean;
@@ -80,7 +82,19 @@ function createNavigatorRow(input: {
     isLoaded: input.loadedThreadIds.has(input.thread.id),
     isOpening: input.thread.id === input.pendingThreadId,
     isPinnedCurrent: input.isPinnedCurrent,
+    pendingServerRequestCount: input.pendingServerRequestCountsByThreadId.get(input.thread.id) ?? 0,
   };
+}
+
+function countPendingServerRequestsByThreadId(
+  threadIds: readonly string[],
+): ReadonlyMap<string, number> {
+  const countsByThreadId = new Map<string, number>();
+  for (const threadId of threadIds) {
+    countsByThreadId.set(threadId, (countsByThreadId.get(threadId) ?? 0) + 1);
+  }
+
+  return countsByThreadId;
 }
 
 export function projectCodexThreadNavigatorRows(input: {
@@ -88,10 +102,14 @@ export function projectCodexThreadNavigatorRows(input: {
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
   pendingThreadId: string | null;
+  pendingServerRequestThreadIds: readonly string[];
   scope: CodexThreadNavigatorScope;
   selectedRepositoryPath: string | null;
 }): readonly CodexThreadNavigatorRow[] {
   const loadedThreadIds = new Set(input.loadedThreadIds);
+  const pendingServerRequestCountsByThreadId = countPendingServerRequestsByThreadId(
+    input.pendingServerRequestThreadIds,
+  );
   const sortedThreads = [...input.availableThreads].sort(compareThreadActivity);
   const scopedThreads =
     input.scope === "repository" && input.selectedRepositoryPath !== null
@@ -103,6 +121,7 @@ export function projectCodexThreadNavigatorRows(input: {
       activeThreadId: input.activeThreadId,
       loadedThreadIds,
       pendingThreadId: input.pendingThreadId,
+      pendingServerRequestCountsByThreadId,
       selectedRepositoryPath: input.selectedRepositoryPath,
       thread,
       isPinnedCurrent: false,
@@ -123,6 +142,7 @@ export function projectCodexThreadNavigatorRows(input: {
       activeThreadId: input.activeThreadId,
       loadedThreadIds,
       pendingThreadId: input.pendingThreadId,
+      pendingServerRequestCountsByThreadId,
       selectedRepositoryPath: input.selectedRepositoryPath,
       thread: activeThread,
       isPinnedCurrent: true,

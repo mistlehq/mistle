@@ -182,6 +182,11 @@ function CodexThreadNavigatorRowView(input: {
             tooltipSideOffset={8}
           />
           <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] leading-tight">
+            {row.pendingServerRequestCount === 0 ? null : (
+              <span className="shrink-0 rounded-sm bg-amber-500/10 px-1 py-0.5 font-medium text-amber-700 dark:text-amber-300">
+                Needs input
+              </span>
+            )}
             {rowStateLabel === null ? null : (
               <span className="shrink-0 rounded-sm bg-primary/10 px-1 py-0.5 font-medium text-primary">
                 {rowStateLabel}

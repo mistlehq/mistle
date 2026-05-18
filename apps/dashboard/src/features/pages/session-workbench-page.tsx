@@ -325,6 +325,15 @@ function SessionWorkbenchPageContent(input: {
   const codexThreadNavigator = conversationPane.codexThreadNavigator;
   const effectiveThreadNavigatorScope =
     primaryRepositoryPath === null ? "all" : threadNavigatorScope;
+  const pendingThreadServerRequestThreadIds = useMemo(() => {
+    return conversationPane.serverRequestsState.pendingServerRequests.flatMap((entry) => {
+      if (entry.kind === "command-approval" || entry.kind === "file-change-approval") {
+        return [entry.threadId];
+      }
+
+      return [];
+    });
+  }, [conversationPane.serverRequestsState.pendingServerRequests]);
   const threadNavigatorRows = useMemo(() => {
     if (codexThreadNavigator === null) {
       return [];
@@ -335,10 +344,16 @@ function SessionWorkbenchPageContent(input: {
       availableThreads: codexThreadNavigator.availableThreads,
       loadedThreadIds: codexThreadNavigator.loadedThreadIds,
       pendingThreadId: codexThreadNavigator.pendingThreadId,
+      pendingServerRequestThreadIds: pendingThreadServerRequestThreadIds,
       scope: effectiveThreadNavigatorScope,
       selectedRepositoryPath: primaryRepositoryPath,
     });
-  }, [codexThreadNavigator, effectiveThreadNavigatorScope, primaryRepositoryPath]);
+  }, [
+    codexThreadNavigator,
+    effectiveThreadNavigatorScope,
+    pendingThreadServerRequestThreadIds,
+    primaryRepositoryPath,
+  ]);
   const defaultThreadId = useMemo(() => {
     if (codexThreadNavigator === null) {
       return null;

@@ -40,6 +40,7 @@ describe("projectCodexThreadNavigatorRows", () => {
         availableThreads: Threads,
         loadedThreadIds: ["thread_new"],
         pendingThreadId: "thread_old",
+        pendingServerRequestThreadIds: ["thread_new", "thread_new"],
         scope: "repository",
         selectedRepositoryPath: "/workspace/repo-a",
       }),
@@ -56,6 +57,7 @@ describe("projectCodexThreadNavigatorRows", () => {
         isLoaded: true,
         isOpening: false,
         isPinnedCurrent: false,
+        pendingServerRequestCount: 2,
       },
       {
         id: "thread_old",
@@ -69,6 +71,7 @@ describe("projectCodexThreadNavigatorRows", () => {
         isLoaded: false,
         isOpening: true,
         isPinnedCurrent: false,
+        pendingServerRequestCount: 0,
       },
     ]);
   });
@@ -80,6 +83,7 @@ describe("projectCodexThreadNavigatorRows", () => {
         availableThreads: Threads,
         loadedThreadIds: [],
         pendingThreadId: null,
+        pendingServerRequestThreadIds: [],
         scope: "repository",
         selectedRepositoryPath: "/workspace/repo-a",
       }).map((row) => ({
