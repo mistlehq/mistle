@@ -63,6 +63,8 @@ type StartProfileInstanceOutput = {
   sandboxInstanceId: string;
 };
 
+type StartActiveProfileInstanceInput = Omit<StartProfileInstanceInput, "profileVersion">;
+
 type ResolvedLaunchImage = {
   versionState: SandboxProfileVersionState;
   defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
@@ -374,4 +376,44 @@ export async function startProfileInstance(
     workflowRunId: startedSandbox.workflowRunId,
     sandboxInstanceId: startedSandbox.sandboxInstanceId,
   };
+}
+
+export async function startActiveProfileInstance(
+  context: Pick<
+    CreateSandboxProfilesServiceInput,
+    "db" | "integrationsConfig" | "dataPlaneClient"
+  > & {
+    defaultBaseImage: string;
+  },
+  serviceInput: StartActiveProfileInstanceInput,
+): Promise<StartProfileInstanceOutput> {
+  const profile = await context.db.query.sandboxProfiles.findFirst({
+    columns: {
+      activeVersion: true,
+    },
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.id, serviceInput.profileId),
+        eq(table.organizationId, serviceInput.organizationId),
+      ),
+  });
+
+  if (profile === undefined) {
+    throw new SandboxProfilesNotFoundError(
+      SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND,
+      "Sandbox profile was not found.",
+    );
+  }
+
+  if (profile.activeVersion === null) {
+    throw new SandboxProfilesConflictError(
+      SandboxProfilesConflictCodes.PROFILE_VERSION_NOT_USABLE,
+      `Sandbox profile '${serviceInput.profileId}' does not have an active version.`,
+    );
+  }
+
+  return startProfileInstance(context, {
+    ...serviceInput,
+    profileVersion: profile.activeVersion,
+  });
 }

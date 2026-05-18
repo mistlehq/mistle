@@ -284,6 +284,77 @@ describe.concurrent("sandbox profile version start instance integration", () => 
     expect(queuedWorkflowInput.actingUserId).toBeUndefined();
   });
 
+  it("starts the active profile version without specifying a version", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-start-active-instance@example.com",
+    });
+
+    await createStartableProfile({
+      env,
+      organizationId: session.organizationId,
+      profileId: "sbp_start_active_instance",
+      targetKey: "openai-start-active-instance",
+      connectionId: "icn_start_active_instance",
+      bindingId: "ibd_start_active_instance",
+      versionState: SandboxProfileVersionStates.PUBLISHED,
+      snapshotImageId: "sha256:active-version-image",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_start_active_instance/instances",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(201);
+    const body = StartSandboxProfileInstanceResponseSchema.parse(await response.json());
+    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+      env,
+      sandboxInstanceId: body.sandboxInstanceId,
+    });
+
+    expect(queuedWorkflowInput.sandboxProfileVersion).toBe(1);
+    expect(queuedWorkflowInput.image).toEqual({
+      imageId: "sha256:active-version-image",
+      kind: "snapshot",
+      provider: "docker",
+    });
+  });
+
+  it("returns 409 when starting a profile with no active version", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-start-active-no-active-version@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_start_active_no_active_version",
+        organizationId: session.organizationId,
+        displayName: "No Active Version Profile",
+        activeVersion: null,
+        createdAt: "2026-04-24T00:00:00.000Z",
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_start_active_no_active_version/instances",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(409);
+    const body = StartSandboxProfileInstanceConflictResponseSchema.parse(await response.json());
+    expect(body.code).toBe("PROFILE_VERSION_NOT_USABLE");
+  });
+
   it("rejects an API key without sandbox session create permission", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-start-instance-api-key-forbidden@example.com",
