@@ -1,8 +1,13 @@
 use bpaf::{OptionParser, Parser, construct, pure};
-use mstl_core::auth::{API_KEY_ENV_VAR, AuthStatus, api_key_auth_status};
+use mstl_core::auth::API_KEY_ENV_VAR;
+use mstl_core::client::{
+    CurrentActor, CurrentActorAuthentication, MistleClient, MistleClientConfig, MistleClientError,
+};
 use std::env::{self, VarError};
 use std::fmt;
 use std::io::{self, Write};
+
+const CONTROL_PLANE_API_PUBLIC_URL_ENV_VAR: &str = "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL";
 
 fn main() {
     let command = options().run();
@@ -14,19 +19,29 @@ fn main() {
 
 #[derive(Debug, Clone, Copy)]
 enum CliCommand {
-    AuthStatus,
+    Whoami,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 enum CliError {
+    MissingEnvironmentVariable { name: &'static str },
+    BlankEnvironmentVariable { name: &'static str },
     NonUnicodeEnvironmentVariable { name: &'static str },
+    Client(MistleClientError),
 }
 
 impl fmt::Display for CliError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::MissingEnvironmentVariable { name } => {
+                write!(formatter, "Missing required environment variable: {name}")
+            }
+            Self::BlankEnvironmentVariable { name } => write!(formatter, "{name} cannot be blank"),
             Self::NonUnicodeEnvironmentVariable { name } => {
                 write!(formatter, "{name} must be valid Unicode")
+            }
+            Self::Client(error) => {
+                write!(formatter, "failed to get current Mistle identity: {error}")
             }
         }
     }
@@ -35,17 +50,12 @@ impl fmt::Display for CliError {
 impl std::error::Error for CliError {}
 
 fn options() -> OptionParser<CliCommand> {
-    let auth_status = pure(CliCommand::AuthStatus)
+    let whoami = pure(CliCommand::Whoami)
         .to_options()
-        .descr("Print authentication status")
-        .command("status");
+        .descr("Print the current Mistle identity")
+        .command("whoami");
 
-    let auth = construct!([auth_status])
-        .to_options()
-        .descr("Manage authentication")
-        .command("auth");
-
-    construct!([auth])
+    construct!([whoami])
         .to_options()
         .descr("Mistle command line interface")
         .version(env!("CARGO_PKG_VERSION"))
@@ -57,18 +67,11 @@ where
     E: Write,
 {
     match command {
-        CliCommand::AuthStatus => match current_auth_status() {
-            Ok(AuthStatus::Authenticated) => match writeln!(stdout, "authenticated") {
+        CliCommand::Whoami => match current_actor() {
+            Ok(actor) => match write_current_actor(stdout, &actor) {
                 Ok(()) => 0,
                 Err(error) => {
-                    let _ = writeln!(stderr, "failed to write auth status: {error}");
-                    1
-                }
-            },
-            Ok(AuthStatus::Unauthenticated) => match writeln!(stdout, "not authenticated") {
-                Ok(()) => 1,
-                Err(error) => {
-                    let _ = writeln!(stderr, "failed to write auth status: {error}");
+                    let _ = writeln!(stderr, "failed to write current Mistle identity: {error}");
                     1
                 }
             },
@@ -80,12 +83,34 @@ where
     }
 }
 
-fn current_auth_status() -> Result<AuthStatus, CliError> {
-    match env::var(API_KEY_ENV_VAR) {
-        Ok(api_key) => Ok(api_key_auth_status(Some(api_key.as_str()))),
-        Err(VarError::NotPresent) => Ok(AuthStatus::Unauthenticated),
-        Err(VarError::NotUnicode(_)) => Err(CliError::NonUnicodeEnvironmentVariable {
-            name: API_KEY_ENV_VAR,
-        }),
+fn current_actor() -> Result<CurrentActor, CliError> {
+    let api_key = required_env_var(API_KEY_ENV_VAR)?;
+    let base_url = required_env_var(CONTROL_PLANE_API_PUBLIC_URL_ENV_VAR)?;
+
+    MistleClient::new(MistleClientConfig { base_url, api_key })
+        .map_err(CliError::Client)?
+        .current_actor()
+        .map_err(CliError::Client)
+}
+
+fn required_env_var(name: &'static str) -> Result<String, CliError> {
+    match env::var(name) {
+        Ok(value) if value.trim().is_empty() => Err(CliError::BlankEnvironmentVariable { name }),
+        Ok(value) => Ok(value),
+        Err(VarError::NotPresent) => Err(CliError::MissingEnvironmentVariable { name }),
+        Err(VarError::NotUnicode(_)) => Err(CliError::NonUnicodeEnvironmentVariable { name }),
     }
+}
+
+fn write_current_actor<W>(stdout: &mut W, actor: &CurrentActor) -> io::Result<()>
+where
+    W: Write,
+{
+    match &actor.authentication {
+        CurrentActorAuthentication::ApiKey { api_key } => {
+            writeln!(stdout, "api key: {} ({})", api_key.name, api_key.id)?;
+        }
+    }
+
+    writeln!(stdout, "organization: {}", actor.organization.id)
 }
