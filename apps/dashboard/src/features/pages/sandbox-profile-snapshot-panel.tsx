@@ -555,8 +555,8 @@ function SnapshotStatusAction(input: {
 function SnapshotPanelDescription(): React.JSX.Element {
   return (
     <p className="text-sm text-muted-foreground">
-      A snapshot is the prepared sandbox image created from this published profile version and its
-      setup script. New sessions can only start after a snapshot is ready.
+      A snapshot is the prepared sandbox image for this published profile version. New sessions can
+      only start after a snapshot is ready.
     </p>
   );
 }
@@ -737,7 +737,7 @@ function SnapshotMaintenanceScriptSummaryValue(input: { script: string }): React
   if (input.script.trim().length === 0) {
     return (
       <span className="text-muted-foreground">
-        Not configured. Automatic refresh uses <ScriptPathEmphasis>setup script</ScriptPathEmphasis>
+        Not configured. Automatic refresh uses <ScriptTermEmphasis>setup script</ScriptTermEmphasis>
         .
       </span>
     );
@@ -750,7 +750,7 @@ function SnapshotMaintenanceScriptSummaryValue(input: { script: string }): React
   );
 }
 
-function ScriptPathEmphasis(input: { children: ReactNode }): React.JSX.Element {
+function ScriptTermEmphasis(input: { children: ReactNode }): React.JSX.Element {
   return <strong className="font-medium text-foreground">{input.children}</strong>;
 }
 
@@ -1084,7 +1084,7 @@ function resolveScheduleStatusMessage(input: {
     return (
       <>
         Snapshot refresh will build from the current snapshot with{" "}
-        <ScriptPathEmphasis>maintenance script</ScriptPathEmphasis>.
+        <ScriptTermEmphasis>maintenance script</ScriptTermEmphasis>.
       </>
     );
   }
@@ -1092,7 +1092,7 @@ function resolveScheduleStatusMessage(input: {
   return (
     <>
       Snapshot refresh will build from the base image with{" "}
-      <ScriptPathEmphasis>setup script</ScriptPathEmphasis>.
+      <ScriptTermEmphasis>setup script</ScriptTermEmphasis>.
     </>
   );
 }

@@ -107,15 +107,6 @@ export const RefreshScheduleNewScheduleEditing: Story = {
   },
 };
 
-export const RefreshScheduleExisting: Story = {
-  args: {
-    initialSectionId: "snapshot",
-    lifecycleState: "published",
-    snapshotRefreshScheduleState: "existing",
-    snapshotState: "snapshot-ready",
-  },
-};
-
 export const RefreshScheduleExistingWithSetupScript: Story = {
   args: {
     initialSectionId: "snapshot",
