@@ -7,6 +7,7 @@ import {
   type CodexTurnCollaborationModeSettings,
   type CodexTurnInputLocalImageItem,
   type CodexJsonRpcClient,
+  type CodexThreadReadTurn,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useReducer, useRef, useState, type RefObject } from "react";
@@ -102,6 +103,7 @@ export function useCodexChatController(input: {
   );
   const activeTurnIdRef = useRef<string | null>(chatState.activeTurnId);
   const chatStatusRef = useRef<string | null>(chatState.status);
+  const cachedThreadTurnsRef = useRef(new Map<string, readonly CodexThreadReadTurn[]>());
   const queuedSteerRequestsRef = useRef<QueuedSteerRequest[]>([]);
   const isProcessingSteerQueueRef = useRef(false);
   const [pendingSteerCount, setPendingSteerCount] = useState(0);
@@ -143,11 +145,20 @@ export function useCodexChatController(input: {
         return "empty";
       }
 
+      const cachedTurns = cachedThreadTurnsRef.current.get(threadId);
+      if (cachedTurns !== undefined) {
+        dispatchChatAction({
+          type: "hydrate_from_thread_read",
+          turns: cachedTurns,
+        });
+      }
+
       const thread = await readCodexThreadState({
         rpcClient,
         threadId,
       });
       if (thread.status === "unmaterialized") {
+        cachedThreadTurnsRef.current.set(threadId, []);
         dispatchChatAction({ type: "reset" });
         input.setSessionErrorMessage(null);
         return "empty";
@@ -160,6 +171,7 @@ export function useCodexChatController(input: {
         hydrateInput.ensureCurrentGeneration(hydrateInput.generation);
       }
 
+      cachedThreadTurnsRef.current.set(threadId, thread.turns);
       dispatchChatAction({
         type: "hydrate_from_thread_read",
         turns: thread.turns,

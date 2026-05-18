@@ -64,6 +64,26 @@ _Avoid_: Billing org
 The Atlassian Cloud site subdomain for a Jira Cloud connection.
 _Avoid_: Jira org, Jira organization, site URL when referring only to the editable subdomain
 
+**Sandbox session**:
+A live sandbox execution environment for an agent session.
+_Avoid_: Chat session when referring to runtime tools or sandbox state
+
+**Codex thread**:
+A Codex conversation that runs within a **Sandbox session**.
+_Avoid_: Session, chat tab
+
+**Active Codex thread**:
+The **Codex thread** currently selected for the chat pane within a **Sandbox session**.
+_Avoid_: Current session, selected sandbox
+
+**Default Codex thread**:
+The **Codex thread** selected by a **Session workbench** when no explicit **Active Codex thread** is requested.
+_Avoid_: Main thread
+
+**Session workbench**:
+The dashboard workspace for a **Sandbox session**, including sandbox-scoped tools and thread-scoped chat.
+_Avoid_: Chat page when referring to the whole workspace
+
 ## Relationships
 
 - A **Sandbox profile version** may have one usable **Snapshot**.
@@ -86,6 +106,37 @@ _Avoid_: Jira org, Jira organization, site URL when referring only to the editab
 - A **Trigger** run may create or reuse one **Trigger conversation**.
 - A Mistle organization may have one **Billing customer** per billing provider.
 - A Jira Cloud connection has one **Jira site name**.
+- A **Sandbox session** may contain multiple **Codex threads**.
+- A **Session workbench** keeps sandbox-scoped tools stable while the **Active Codex thread** changes.
+- A **Default Codex thread** is used only when the **Session workbench** has no explicit **Active Codex thread** request.
+- Ports, terminal access, runtime status, repository filesystem state, and sandbox-level diffs belong to the **Sandbox session**.
+- Transcript, active turn state, context usage, and Codex thread actions belong to the **Codex thread**.
+- Opening a different **Codex thread** is a thread-scoped transition; the previous **Active Codex thread** remains authoritative until the next thread is ready.
+- Starting a new **Codex thread** does not create a new **Active Codex thread** until Codex confirms the thread exists.
+- The default **Codex thread** navigator scope is the selected primary repository path when one is selected.
+- Changing the selected primary repository does not change the **Active Codex thread**.
+- A running turn belongs to its **Codex thread** and continues when that thread is no longer the **Active Codex thread**.
+- Interrupt and steering controls apply only to the **Active Codex thread**.
+- The **Active Codex thread** owns the full live transcript in the chat pane.
+- Non-active **Codex threads** may show activity summaries in navigation without rendering full live transcripts.
+- Non-active **Codex thread** activity indicators require explicit thread attribution.
+- Approval requests for non-active **Codex threads** may be indicated in navigation, but responses happen only after the thread becomes the **Active Codex thread**.
+- A **Session workbench** URL may identify an **Active Codex thread** without making the thread a separate session.
+- User-initiated **Active Codex thread** changes are navigable history within the **Session workbench**.
+- User-initiated **Active Codex thread** URL changes represent confirmed active-thread changes.
+- First-pass **Codex thread** navigation does not make **Codex threads** durable Mistle records.
+- **Codex thread** navigation is ordered by recent thread activity unless the user chooses another view.
+- A loaded **Codex thread** is runtime metadata for navigation, not a separate product category.
+- A new **Codex thread** starts from the selected primary repository path when one is selected.
+- First-pass **Codex thread** navigation supports reading, selecting, and starting threads without managing thread lifecycle actions.
+- Archived **Codex threads** are outside first-pass **Codex thread** navigation.
+- First-pass **Codex thread** navigation is visible beside the chat pane on desktop and collapses into a drawer on narrow screens.
+- A repository-scoped **Codex thread** navigator may be empty while the chat pane still shows an **Active Codex thread** from another path.
+- When the **Active Codex thread** is outside the navigator scope, the UI should make the path mismatch visible.
+- First-pass **Codex thread** navigation is Codex-specific rather than a generic runtime concept.
+- The Codex session state owns **Active Codex thread** changes for the **Session workbench**.
+- Cached **Codex thread** transcripts are ephemeral **Session workbench** state.
+- A cached **Codex thread** transcript does not become visible as active until Codex confirms the thread is resumable.
 
 ## Example Dialogue
 
@@ -116,3 +167,6 @@ _Avoid_: Jira org, Jira organization, site URL when referring only to the editab
 - "version" was used ambiguously to mean the latest published **Sandbox profile version** or an object's **Referenced sandbox profile version** — resolved: when describing a session, trigger, or other profile-backed object, use the object's referenced version.
 - "billing org" could mean a Mistle organization, a Better Auth organization, or an external billing-provider customer — resolved: use **Billing customer** for the billing-provider customer associated with an existing Mistle organization.
 - "org" could mean a Mistle organization, an Atlassian organization, or the editable Jira Cloud URL subdomain — resolved: use **Jira site name** for the editable Jira Cloud subdomain.
+- "chat session" could mean either the live sandbox environment or a Codex conversation — resolved: use **Sandbox session** for the live environment and **Codex thread** for the conversation.
+- "active thread" could imply a different sandbox — resolved: use **Active Codex thread** for the selected chat conversation inside the same **Sandbox session**.
+- Switching threads could imply changing the whole workbench — resolved: thread switching changes the **Active Codex thread** without changing the **Sandbox session**.

@@ -116,11 +116,30 @@ export function useSessionWorkbenchConversationRuntime(input: {
       openCodeSessionState.chat.chatState.messageOrder.length,
     ],
   );
+  const codexBootstrap = useMemo(() => {
+    if (
+      sessionState.threads.pendingThreadId === null &&
+      !sessionState.threads.isStartingNewThread
+    ) {
+      return sessionState.bootstrap;
+    }
+
+    return {
+      ...sessionState.bootstrap,
+      phase: {
+        status: "bootstrapping" as const,
+      },
+    };
+  }, [
+    sessionState.bootstrap,
+    sessionState.threads.isStartingNewThread,
+    sessionState.threads.pendingThreadId,
+  ]);
   const codexRuntime = useMemo<SessionWorkbenchRuntimeAdapter>(
     () =>
       buildCodexConversationRuntime({
         activeConversationId: activeSessionThreadId,
-        bootstrap: sessionState.bootstrap,
+        bootstrap: codexBootstrap,
         chat,
         configControl,
         contextUsage,
@@ -146,7 +165,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
       serverRequests.respondToServerRequest,
       sessionMessage.clearSessionErrorMessage,
       sessionMessage.sessionErrorMessage,
-      sessionState.bootstrap,
+      codexBootstrap,
       startCodexTurn,
     ],
   );

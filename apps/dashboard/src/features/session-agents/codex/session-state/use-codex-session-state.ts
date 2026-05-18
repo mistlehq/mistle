@@ -59,6 +59,7 @@ type CodexSessionThreadState = {
   availableThreads: readonly CodexThreadSummary[];
   archivedThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
+  pendingThreadId: string | null;
   isRefreshingThreads: boolean;
   isRefreshingLoadedThreads: boolean;
   isRefreshingArchivedThreads: boolean;
@@ -73,7 +74,7 @@ type CodexSessionThreadState = {
   refreshThreadList: () => void;
   refreshLoadedThreadList: () => void;
   refreshArchivedThreadList: () => void;
-  startNewThread: () => Promise<string>;
+  startNewThread: (input?: { cwd?: string }) => Promise<string>;
   resumeThread: (threadId: string) => Promise<string>;
   forkThread: (threadId: string) => void;
   archiveThread: (threadId: string) => void;
@@ -159,6 +160,7 @@ export function useCodexSessionState(input: {
   const [repositoryStatusRefreshEpoch, setRepositoryStatusRefreshEpoch] = useState(0);
   const [lifecycleErrorMessage, setLifecycleErrorMessage] = useState<string | null>(null);
   const [sessionErrorMessage, setSessionErrorMessage] = useState<string | null>(null);
+  const [pendingThreadId, setPendingThreadId] = useState<string | null>(null);
   const [threadTokenUsageSnapshot, setThreadTokenUsageSnapshot] =
     useState<CodexThreadTokenUsageSnapshot | null>(null);
 
@@ -389,6 +391,9 @@ export function useCodexSessionState(input: {
   });
 
   const resumeThreadMutation = useMutation({
+    onMutate: (threadId) => {
+      setPendingThreadId(threadId);
+    },
     mutationFn: async (threadId: string) => {
       const rpcClient = rpcClientRef.current;
       if (rpcClient === null) {
@@ -407,11 +412,13 @@ export function useCodexSessionState(input: {
       });
       resetChat();
       setLifecycleErrorMessage(null);
-      void hydrateChatFromThread();
       refreshThreadCollectionsWithErrorHandling();
     },
     onError: (error) => {
       handleThreadMutationFailure("Could not resume thread.", error);
+    },
+    onSettled: () => {
+      setPendingThreadId(null);
     },
   });
 
@@ -621,10 +628,13 @@ export function useCodexSessionState(input: {
     refreshArchivedThreadListMutate();
   }, [refreshArchivedThreadListMutate]);
 
-  const startNewThread = useCallback(async (): Promise<string> => {
-    const result = await startNewThreadMutateAsync(undefined);
-    return result.threadId;
-  }, [startNewThreadMutateAsync]);
+  const startNewThread = useCallback(
+    async (input?: { cwd?: string }): Promise<string> => {
+      const result = await startNewThreadMutateAsync(input);
+      return result.threadId;
+    },
+    [startNewThreadMutateAsync],
+  );
 
   const resumeThread = useCallback(
     async (threadId: string): Promise<string> => {
@@ -769,6 +779,7 @@ export function useCodexSessionState(input: {
       availableThreads,
       archivedThreads,
       loadedThreadIds,
+      pendingThreadId,
       isRefreshingThreads,
       isRefreshingLoadedThreads,
       isRefreshingArchivedThreads,
@@ -811,6 +822,7 @@ export function useCodexSessionState(input: {
     isUnarchivingThread,
     isUnsubscribingThread,
     loadedThreadIds,
+    pendingThreadId,
     refreshAvailableThreads,
     refreshLoadedThreads,
     refreshArchivedThreads,

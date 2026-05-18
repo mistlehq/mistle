@@ -50,6 +50,7 @@ describe("session initial connect policy", () => {
       }),
     ).toEqual({
       initialCwd: "/root/acme/repo-1/packages/app",
+      selectionPolicy: "most_recently_updated",
       sandboxInstanceId: "sbi_123",
       targetThreadId: null,
     });
@@ -68,8 +69,48 @@ describe("session initial connect policy", () => {
         },
       }),
     ).toEqual({
+      selectionPolicy: "most_recently_updated",
       sandboxInstanceId: "sbi_123",
       targetThreadId: null,
+    });
+  });
+
+  it("uses a requested thread when no provider thread is present", () => {
+    expect(
+      resolveInitialSessionConnectInput({
+        connectable: true,
+        providerThreadId: null,
+        requestedThreadId: "thread_requested",
+        sandboxInstanceId: "sbi_123",
+        runtimeContext: {
+          agentRuntimeId: "codex",
+          launchCwd: "/root/acme/repo-1",
+          primaryRepositoryRoot: "/root/acme/repo-1",
+        },
+      }),
+    ).toEqual({
+      sandboxInstanceId: "sbi_123",
+      targetThreadId: "thread_requested",
+    });
+  });
+
+  it("keeps provider thread authority over a requested thread", () => {
+    expect(
+      resolveInitialSessionConnectInput({
+        connectable: true,
+        providerThreadId: "thread_provider",
+        requestedThreadId: "thread_requested",
+        sandboxInstanceId: "sbi_123",
+        runtimeContext: {
+          agentRuntimeId: "codex",
+          launchCwd: "/root/acme/repo-1",
+          primaryRepositoryRoot: "/root/acme/repo-1",
+        },
+      }),
+    ).toEqual({
+      providerThreadId: "thread_provider",
+      sandboxInstanceId: "sbi_123",
+      targetThreadId: "thread_provider",
     });
   });
 });

@@ -1,6 +1,6 @@
 import { SidebarTrigger, useSidebar } from "@mistle/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useParams } from "react-router";
+import { useLocation, useParams, useSearchParams } from "react-router";
 
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
 import { SessionHeaderTitle } from "../sessions/session-header-title.js";
@@ -42,15 +42,25 @@ import { useSessionWorkbenchController } from "./use-session-workbench-controlle
 export function SessionWorkbenchPage(): React.JSX.Element {
   const location = useLocation();
   const params = useParams();
+  const [searchParams] = useSearchParams();
   const sandboxInstanceId = params["sandboxInstanceId"] ?? null;
+  const requestedThreadId = searchParams.get("threadId");
 
-  return <SessionWorkbenchPageContent key={location.key} sandboxInstanceId={sandboxInstanceId} />;
+  return (
+    <SessionWorkbenchPageContent
+      key={location.key}
+      requestedThreadId={requestedThreadId}
+      sandboxInstanceId={sandboxInstanceId}
+    />
+  );
 }
 
 function SessionWorkbenchPageContent(input: {
+  requestedThreadId: string | null;
   sandboxInstanceId: string | null;
 }): React.JSX.Element {
   const { conversationPane, workbench } = useSessionWorkbenchController({
+    requestedThreadId: input.requestedThreadId,
     sandboxInstanceId: input.sandboxInstanceId,
   });
   const [hasEnteredReadyWorkbench, setHasEnteredReadyWorkbench] = useState(false);
