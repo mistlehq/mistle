@@ -32,7 +32,7 @@ use futures_util::{SinkExt, StreamExt};
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Full};
 use hyper::body::{Body, Frame, Incoming, SizeHint};
-use hyper::header::{AUTHORIZATION, HOST, HeaderName, HeaderValue};
+use hyper::header::{HOST, HeaderName, HeaderValue};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode, Uri};
@@ -86,6 +86,7 @@ const EGRESS_PROXY_STARTUP_HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(5
 const EGRESS_PROXY_RESTART_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];
 const RUNTIME_NO_PROXY_DEFAULTS: [&str; 2] = ["127.0.0.1", "localhost"];
 const SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME: &str = "x-mistle-sandbox-egress-id";
+const DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME: &str = "x-mistle-egress-token";
 const DIRECT_EGRESS_HTTP_ROUTE_PATH: &str = "/_mistle/egress/http";
 const DIRECT_EGRESS_WEBSOCKET_ROUTE_PATH: &str = "/_mistle/egress/ws";
 
@@ -2511,7 +2512,7 @@ async fn forward_upgrade_request_through_direct_gateway(
             ))
         })?;
     gateway_request.headers_mut().insert(
-        AUTHORIZATION,
+        HeaderName::from_static(DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME),
         HeaderValue::from_str(&format!("Bearer {token}")).map_err(|error| {
             EgressProxyError::new(format!(
                 "failed to build egress authorization header: {error}"
@@ -2628,7 +2629,10 @@ async fn forward_request_through_direct_gateway(
     let mut request_builder = Request::builder()
         .method(request_method)
         .uri(direct_uri)
-        .header(AUTHORIZATION, format!("Bearer {token}"));
+        .header(
+            DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME,
+            format!("Bearer {token}"),
+        );
     for (header_name, header_value) in filter_direct_gateway_request_headers(&parts.headers) {
         request_builder = request_builder.header(header_name, header_value);
     }
@@ -3002,7 +3006,11 @@ fn filter_direct_gateway_request_headers(
 ) -> Vec<(HeaderName, HeaderValue)> {
     filter_outbound_request_headers(headers)
         .into_iter()
-        .filter(|(name, _)| !name.as_str().eq_ignore_ascii_case("authorization"))
+        .filter(|(name, _)| {
+            !name
+                .as_str()
+                .eq_ignore_ascii_case(DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME)
+        })
         .collect()
 }
 
@@ -3225,12 +3233,12 @@ mod tests {
     use crate::egress_proxy::socket_addr_from_sockaddr_storage;
     use crate::egress_proxy::{
         DIRECT_EGRESS_HTTP_ROUTE_PATH, DIRECT_EGRESS_WEBSOCKET_ROUTE_PATH,
-        DirectGatewayEgressClient, EgressProxy, EgressProxyForwardingMode, EgressProxyRoute,
-        ProxyCaConfig, RequestTargetOverride, TransparentProxyProtocol, build_direct_forward_uri,
-        build_direct_gateway_http_client, build_gateway_egress_route, build_managed_proxy_env,
-        classify_transparent_proxy_first_byte, filter_direct_gateway_request_headers, match_route,
-        resolve_direct_gateway_route_url, resolve_request_target, serialize_egress_proxy_log_line,
-        websocket_target_url,
+        DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME, DirectGatewayEgressClient, EgressProxy,
+        EgressProxyForwardingMode, EgressProxyRoute, ProxyCaConfig, RequestTargetOverride,
+        TransparentProxyProtocol, build_direct_forward_uri, build_direct_gateway_http_client,
+        build_gateway_egress_route, build_managed_proxy_env, classify_transparent_proxy_first_byte,
+        filter_direct_gateway_request_headers, match_route, resolve_direct_gateway_route_url,
+        resolve_request_target, serialize_egress_proxy_log_line, websocket_target_url,
     };
     #[cfg(target_os = "linux")]
     use crate::egress_proxy::{
@@ -3673,11 +3681,15 @@ mod tests {
     }
 
     #[test]
-    fn direct_gateway_request_headers_do_not_forward_upstream_authorization() {
+    fn direct_gateway_request_headers_preserve_upstream_authorization() {
         let request = hyper::Request::builder()
             .method("GET")
             .uri("https://api.example.test/v1/models")
             .header("authorization", "Bearer upstream-token")
+            .header(
+                DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME,
+                "Bearer gateway-token",
+            )
             .header("accept", "application/json")
             .body(())
             .expect("request should build");
@@ -3688,8 +3700,13 @@ mod tests {
         assert!(
             headers
                 .iter()
-                .all(|(name, _)| name.as_str() != "authorization"),
-            "direct gateway auth header must remain reserved for the egress JWT"
+                .any(|(name, value)| name.as_str() == "authorization"
+                    && value == HeaderValue::from_static("Bearer upstream-token"))
+        );
+        assert!(
+            headers
+                .iter()
+                .all(|(name, _)| name.as_str() != DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME)
         );
         assert!(
             headers.iter().any(|(name, value)| name.as_str() == "accept"

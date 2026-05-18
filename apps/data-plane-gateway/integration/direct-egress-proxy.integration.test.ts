@@ -21,6 +21,7 @@ import WebSocket, { WebSocketServer } from "ws";
 
 import {
   DirectEgressHttpRoutePath,
+  DirectEgressTokenHeaderName,
   DirectEgressWebSocketRoutePath,
 } from "../src/egress/direct-egress-proxy-service.js";
 import {
@@ -82,10 +83,11 @@ describe.concurrent("direct egress proxy integration", () => {
           {
             method: "POST",
             headers: {
-              authorization: `Bearer ${await mintDirectEgressToken({
+              [DirectEgressTokenHeaderName]: `Bearer ${await mintDirectEgressToken({
                 organizationId: "org_integration_direct_egress",
                 sandboxInstanceId,
               })}`,
+              authorization: "Bearer upstream-registry-token",
               "content-type": "text/plain; charset=utf-8",
               "x-direct-egress-marker": "http",
             },
@@ -105,12 +107,12 @@ describe.concurrent("direct egress proxy integration", () => {
           body: "hello direct egress",
           headers: expect.objectContaining({
             "content-type": "text/plain; charset=utf-8",
+            authorization: "Bearer upstream-registry-token",
             "x-direct-egress-marker": "http",
           }),
           method: "POST",
           url: "/packages/mistle.tgz?checksum=123",
         });
-        expect(request.headers.authorization).toBeUndefined();
       } finally {
         await upstream.close();
       }
@@ -172,7 +174,7 @@ describe.concurrent("direct egress proxy integration", () => {
           {
             method: "POST",
             headers: {
-              authorization: `Bearer ${await mintDirectEgressToken({
+              [DirectEgressTokenHeaderName]: `Bearer ${await mintDirectEgressToken({
                 organizationId: binding.organizationId,
                 sandboxInstanceId,
               })}`,
@@ -216,13 +218,40 @@ describe.concurrent("direct egress proxy integration", () => {
           `${DirectEgressHttpRoutePath}?target=${encodeURIComponent(target.toString())}`,
           {
             headers: {
-              authorization: "Bearer not-a-valid-token",
+              [DirectEgressTokenHeaderName]: "Bearer not-a-valid-token",
             },
           },
         );
 
         expect(response.status).toBe(401);
         await expect(response.text()).resolves.toContain("Direct egress token verification failed");
+      } finally {
+        await upstream.close();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "does not treat upstream authorization as direct HTTP proxy authentication",
+    async ({ env }) => {
+      const upstream = await startSimulatedHttpUpstream();
+
+      try {
+        const target = new URL("/private", upstream.baseUrl);
+        const response = await env.dataPlaneGateway.http.fetch(
+          `${DirectEgressHttpRoutePath}?target=${encodeURIComponent(target.toString())}`,
+          {
+            headers: {
+              authorization: "Bearer upstream-registry-token",
+            },
+          },
+        );
+
+        expect(response.status).toBe(401);
+        await expect(response.text()).resolves.toContain(
+          "Direct egress requires a bearer egress token",
+        );
       } finally {
         await upstream.close();
       }
@@ -248,7 +277,7 @@ describe.concurrent("direct egress proxy integration", () => {
       const socket = await connectWebSocket(gatewayWebSocketUrl.toString(), {
         headers: {
           [TestEnvironmentIdHeader]: env.id,
-          authorization: `Bearer ${await mintDirectEgressToken({
+          [DirectEgressTokenHeaderName]: `Bearer ${await mintDirectEgressToken({
             organizationId: "org_integration_direct_egress",
             sandboxInstanceId,
           })}`,
@@ -335,7 +364,7 @@ describe.concurrent("direct egress proxy integration", () => {
       const socket = await connectWebSocket(gatewayWebSocketUrl.toString(), {
         headers: {
           [TestEnvironmentIdHeader]: env.id,
-          authorization: `Bearer ${await mintDirectEgressToken({
+          [DirectEgressTokenHeaderName]: `Bearer ${await mintDirectEgressToken({
             organizationId: binding.organizationId,
             sandboxInstanceId,
           })}`,
@@ -389,7 +418,7 @@ describe.concurrent("direct egress proxy integration", () => {
           connectWebSocketExpectFailure(gatewayWebSocketUrl.toString(), {
             headers: {
               [TestEnvironmentIdHeader]: env.id,
-              authorization: "Bearer not-a-valid-token",
+              [DirectEgressTokenHeaderName]: "Bearer not-a-valid-token",
             },
           }),
         ).resolves.toEqual({

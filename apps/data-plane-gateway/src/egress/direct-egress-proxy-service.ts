@@ -34,6 +34,7 @@ import {
 
 export const DirectEgressHttpRoutePath = "/_mistle/egress/http";
 export const DirectEgressWebSocketRoutePath = "/_mistle/egress/ws";
+export const DirectEgressTokenHeaderName = "x-mistle-egress-token";
 
 type ActiveRuntimePlan = NonNullable<Awaited<ReturnType<typeof loadActiveSandboxRuntimePlan>>>;
 type DirectEgressTransport = "http" | "websocket";
@@ -456,7 +457,6 @@ function readBearerToken(authorizationHeader: string | undefined): string | unde
 }
 
 const HopByHopHeaderNames = new Set([
-  "authorization",
   "connection",
   "host",
   "keep-alive",
@@ -483,7 +483,7 @@ function toRepeatedRequestHeaders(headers: Headers): RepeatedHeaderValues {
   const repeatedHeaders: RepeatedHeaderValues = {};
   for (const [name, value] of headers.entries()) {
     const normalizedName = name.toLowerCase();
-    if (HopByHopHeaderNames.has(normalizedName)) {
+    if (HopByHopHeaderNames.has(normalizedName) || normalizedName === DirectEgressTokenHeaderName) {
       continue;
     }
 
@@ -497,7 +497,7 @@ function toHeaderRecord(headers: RepeatedHeaderValues): Record<string, string> {
   const record: Record<string, string> = {};
   for (const [name, values] of Object.entries(headers)) {
     const normalizedName = name.toLowerCase();
-    if (HopByHopHeaderNames.has(normalizedName)) {
+    if (HopByHopHeaderNames.has(normalizedName) || normalizedName === DirectEgressTokenHeaderName) {
       continue;
     }
 
@@ -536,7 +536,11 @@ function toResponseHeaders(headers: IncomingHttpHeaders): Headers {
   const responseHeaders = new Headers();
   for (const [name, value] of Object.entries(headers)) {
     const normalizedName = name.toLowerCase();
-    if (HopByHopHeaderNames.has(normalizedName) || value === undefined) {
+    if (
+      HopByHopHeaderNames.has(normalizedName) ||
+      normalizedName === DirectEgressTokenHeaderName ||
+      value === undefined
+    ) {
       continue;
     }
     if (Array.isArray(value)) {

@@ -6,6 +6,7 @@ import type { DataPlaneGatewayApp } from "../types.js";
 import {
   DirectEgressHttpRoutePath,
   DirectEgressProxyError,
+  DirectEgressTokenHeaderName,
   type DirectEgressAdmission,
   type DirectEgressProxyService,
   DirectEgressWebSocketRoutePath,
@@ -35,7 +36,7 @@ export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInpu
     let admission: DirectEgressAdmission | undefined;
     try {
       admission = await input.directEgressProxyService.authorize({
-        authorizationHeader: ctx.req.header("authorization"),
+        authorizationHeader: ctx.req.header(DirectEgressTokenHeaderName),
         db: ctx.get("db"),
         headers: ctx.req.raw.headers,
         method: ctx.req.method,
@@ -79,7 +80,7 @@ export function registerDirectEgressRoutes(input: RegisterDirectEgressRoutesInpu
       let admission: DirectEgressAdmission | undefined;
       try {
         admission = await input.directEgressProxyService.authorize({
-          authorizationHeader: ctx.req.header("authorization"),
+          authorizationHeader: ctx.req.header(DirectEgressTokenHeaderName),
           db: ctx.get("db"),
           headers: ctx.req.raw.headers,
           method: "GET",
