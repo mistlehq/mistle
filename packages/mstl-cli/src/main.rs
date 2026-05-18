@@ -1,4 +1,7 @@
+mod codex;
+
 use bpaf::{OptionParser, Parser, construct, long, positional, pure};
+use codex::{CodexRunConfig, CodexRunError, run_codex, validate_codex_args};
 use mstl_core::auth::{API_KEY_ENV_VAR, CONTROL_PLANE_API_PUBLIC_URL_ENV_VAR};
 use mstl_core::client::{
     CurrentActor, CurrentActorAuthentication, ListSandboxInstancesRequest,
@@ -12,11 +15,12 @@ use std::env::{self, VarError};
 use std::fmt;
 use std::io::{self, Write};
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let command = options().run();
     let mut stdout = io::stdout();
     let mut stderr = io::stderr();
-    let exit_code = run(command, &mut stdout, &mut stderr);
+    let exit_code = run(command, &mut stdout, &mut stderr).await;
     std::process::exit(exit_code);
 }
 
@@ -38,6 +42,10 @@ enum CliCommand {
     SandboxGet {
         sandbox_id: String,
     },
+    Codex {
+        sandbox_id: String,
+        codex_args: Vec<String>,
+    },
 }
 
 #[derive(Debug)]
@@ -55,6 +63,10 @@ enum CliError {
         action: &'static str,
         source: MistleClientError,
     },
+    Codex {
+        action: &'static str,
+        source: CodexRunError,
+    },
 }
 
 impl fmt::Display for CliError {
@@ -68,6 +80,9 @@ impl fmt::Display for CliError {
                 write!(formatter, "{name} must be valid Unicode")
             }
             Self::Client { action, source } => {
+                write!(formatter, "failed to {action}: {source}")
+            }
+            Self::Codex { action, source } => {
                 write!(formatter, "failed to {action}: {source}")
             }
         }
@@ -164,13 +179,32 @@ fn options() -> OptionParser<CliCommand> {
         .descr("Manage sandboxes")
         .command("sandbox");
 
-    construct!([whoami, profile, sandbox])
+    let sandbox_id = long("sandbox")
+        .help("Sandbox id")
+        .argument::<String>("sandbox-id")
+        .guard(
+            |value| !value.trim().is_empty(),
+            "sandbox id cannot be blank",
+        );
+    let codex_args = positional::<String>("codex-arg")
+        .strict()
+        .help("Arguments passed to codex after --")
+        .many();
+    let codex = construct!(CliCommand::Codex {
+        sandbox_id,
+        codex_args
+    })
+    .to_options()
+    .descr("Run Codex against a Mistle sandbox")
+    .command("codex");
+
+    construct!([whoami, profile, sandbox, codex])
         .to_options()
         .descr("Mistle command line interface")
         .version(env!("CARGO_PKG_VERSION"))
 }
 
-fn run<W, E>(command: CliCommand, stdout: &mut W, stderr: &mut E) -> i32
+async fn run<W, E>(command: CliCommand, stdout: &mut W, stderr: &mut E) -> i32
 where
     W: Write,
     E: Write,
@@ -257,6 +291,16 @@ where
                 1
             }
         },
+        CliCommand::Codex {
+            sandbox_id,
+            codex_args,
+        } => match run_codex_for_sandbox(&sandbox_id, codex_args).await {
+            Ok(()) => 0,
+            Err(error) => {
+                let _ = writeln!(stderr, "{error}");
+                1
+            }
+        },
     }
 }
 
@@ -322,6 +366,30 @@ fn get_sandbox(sandbox_id: &str) -> Result<SandboxInstance, CliError> {
             action: "get sandbox",
             source,
         })
+}
+
+async fn run_codex_for_sandbox(sandbox_id: &str, codex_args: Vec<String>) -> Result<(), CliError> {
+    validate_codex_args(&codex_args).map_err(|source| CliError::Codex {
+        action: "validate codex arguments",
+        source,
+    })?;
+
+    let connection_token = mistle_client()?
+        .create_sandbox_instance_connection_token(sandbox_id)
+        .map_err(|source| CliError::Client {
+            action: "create sandbox connection token",
+            source,
+        })?;
+
+    run_codex(CodexRunConfig {
+        tunnel_url: connection_token.url,
+        codex_args,
+    })
+    .await
+    .map_err(|source| CliError::Codex {
+        action: "run codex",
+        source,
+    })
 }
 
 fn mistle_client() -> Result<MistleClient, CliError> {

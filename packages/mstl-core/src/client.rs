@@ -84,6 +84,17 @@ impl MistleClient {
         self.get_json(self.get_sandbox_instance_url(sandbox_id)?.as_str())
     }
 
+    pub fn create_sandbox_instance_connection_token(
+        &self,
+        sandbox_id: &str,
+    ) -> Result<SandboxInstanceConnectionToken, MistleClientError> {
+        self.post_json(
+            self.create_sandbox_instance_connection_token_url(sandbox_id)?
+                .as_str(),
+            &CreateSandboxInstanceConnectionTokenBody {},
+        )
+    }
+
     pub fn list_sandbox_instances(
         &self,
         request: ListSandboxInstancesRequest,
@@ -205,6 +216,18 @@ impl MistleClient {
         ))
     }
 
+    fn create_sandbox_instance_connection_token_url(
+        &self,
+        sandbox_id: &str,
+    ) -> Result<Url, MistleClientError> {
+        let validated_sandbox_id = validate_sandbox_instance_id(sandbox_id)?;
+
+        Ok(endpoint_url(
+            &self.base_url,
+            &format!("/v1/sandbox/instances/{validated_sandbox_id}/connection-tokens"),
+        ))
+    }
+
     fn list_sandbox_instances_url(&self, request: &ListSandboxInstancesRequest) -> Url {
         let mut url = endpoint_url(&self.base_url, "/v1/sandbox/instances");
 
@@ -295,6 +318,10 @@ pub enum SandboxProfileStatus {
 #[serde(rename_all = "camelCase")]
 struct StartSandboxProfileInstanceBody {}
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CreateSandboxInstanceConnectionTokenBody {}
+
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct StartSandboxProfileInstanceResponse {
@@ -321,6 +348,15 @@ pub struct SandboxInstance {
     pub runtime_context: Option<SandboxInstanceRuntimeContext>,
     pub trigger_conversation: Option<SandboxInstanceTriggerConversation>,
     pub startup_operation: Option<SandboxInstanceStartupOperation>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SandboxInstanceConnectionToken {
+    pub instance_id: String,
+    pub url: String,
+    pub token: String,
+    pub expires_at: String,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -609,8 +645,8 @@ mod tests {
         CurrentActor, CurrentActorApiKey, CurrentActorAuthentication, CurrentActorIdentity,
         CurrentActorOrganization, ListSandboxInstancesRequest, ListSandboxInstancesResponse,
         MistleClient, MistleClientConfig, SandboxInstance, SandboxInstanceAgentRuntimeId,
-        SandboxInstanceListItem, SandboxInstanceRuntimeContext, SandboxInstanceSource,
-        SandboxInstanceStartedBy, SandboxInstanceStartupOperation,
+        SandboxInstanceConnectionToken, SandboxInstanceListItem, SandboxInstanceRuntimeContext,
+        SandboxInstanceSource, SandboxInstanceStartedBy, SandboxInstanceStartupOperation,
         SandboxInstanceStartupOperationKind, SandboxInstanceStatus,
         SandboxInstanceTriggerConversation, StartSandboxProfileInstanceResponse,
         StartSandboxProfileInstanceStatus,
@@ -819,6 +855,30 @@ mod tests {
 
         let error = client
             .get_sandbox_instance_url("sandbox/instance")
+            .expect_err("invalid sandbox id should fail");
+
+        assert_eq!(error.to_string(), "sandbox id must start with `sbi_`");
+    }
+
+    #[test]
+    fn builds_create_sandbox_instance_connection_token_url() {
+        let client = client_with_base_url("https://api.example.test");
+
+        assert_eq!(
+            client
+                .create_sandbox_instance_connection_token_url("sbi_local-dev")
+                .expect("sandbox id should be valid")
+                .as_str(),
+            "https://api.example.test/v1/sandbox/instances/sbi_local-dev/connection-tokens"
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_sandbox_instance_id_for_connection_token_url() {
+        let client = client_with_base_url("https://api.example.test");
+
+        let error = client
+            .create_sandbox_instance_connection_token_url("sandbox/instance")
             .expect_err("invalid sandbox id should fail");
 
         assert_eq!(error.to_string(), "sandbox id must start with `sbi_`");
@@ -1040,6 +1100,30 @@ mod tests {
                     operation_id: "op_01".to_owned(),
                     operation_kind: SandboxInstanceStartupOperationKind::Start,
                 }),
+            }
+        );
+    }
+
+    #[test]
+    fn decodes_sandbox_instance_connection_token_response() {
+        let response = serde_json::from_str::<SandboxInstanceConnectionToken>(
+            r#"{
+                "instanceId": "sbi_01",
+                "url": "wss://gateway.example.test/tunnel/sandbox/sbi_01?connect_token=token_01",
+                "token": "token_01",
+                "expiresAt": "2026-05-18T01:02:03.000Z"
+            }"#,
+        )
+        .expect("sandbox connection token response should decode");
+
+        assert_eq!(
+            response,
+            SandboxInstanceConnectionToken {
+                instance_id: "sbi_01".to_owned(),
+                url: "wss://gateway.example.test/tunnel/sandbox/sbi_01?connect_token=token_01"
+                    .to_owned(),
+                token: "token_01".to_owned(),
+                expires_at: "2026-05-18T01:02:03.000Z".to_owned(),
             }
         );
     }
