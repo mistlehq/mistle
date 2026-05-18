@@ -12,6 +12,10 @@ import {
   logDirectEgressFailure,
   logDirectEgressWebSocketEvent,
 } from "./direct-egress-proxy-service.js";
+import {
+  normalizeForwardedDirectEgressWebSocketCloseCode,
+  normalizeForwardedDirectEgressWebSocketCloseReason,
+} from "./direct-egress-websocket-close.js";
 
 type RegisterDirectEgressRoutesInput = {
   app: DataPlaneGatewayApp;
@@ -266,17 +270,21 @@ function connectUpstreamWebSocket(input: {
     input.client.send(toClientWebSocketMessage(data, isBinary));
   });
   upstream.on("close", (code, reason) => {
+    const closeReason = reason.toString("utf8");
     logDirectEgressWebSocketEvent({
       admission: input.admission,
       closeCode: code,
-      closeReason: reason.toString("utf8"),
+      closeReason,
       event: "gateway_direct_egress_websocket_upstream_closed",
       outcome: "upstream_closed",
       startedAtMs: input.startedAtMs,
       upstreamUrl: input.upstreamUrl,
     });
     if (input.client.readyState === WebSocket.OPEN) {
-      input.client.close(code, reason.toString("utf8"));
+      input.client.close(
+        normalizeForwardedDirectEgressWebSocketCloseCode(code),
+        normalizeForwardedDirectEgressWebSocketCloseReason(closeReason),
+      );
     }
   });
   upstream.on("error", (error) => {
