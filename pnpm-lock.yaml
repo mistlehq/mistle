@@ -74,7 +74,7 @@ importers:
         version: 19.2.3(@types/react@19.2.14)
       '@typescript/native-preview':
         specifier: latest
-        version: 7.0.0-dev.20260511.1
+        version: 7.0.0-dev.20260515.1
       knip:
         specifier: ^6.11.0
         version: 6.11.0(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
@@ -103,8 +103,8 @@ importers:
         specifier: ^4.20.6
         version: 4.21.0
       turbo:
-        specifier: ^2.9.9
-        version: 2.9.9
+        specifier: ^2.9.12
+        version: 2.9.12
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -5949,33 +5949,33 @@ packages:
   '@tootallnate/quickjs-emscripten@0.23.0':
     resolution: {integrity: sha512-C5Mc6rdnsaJDjO3UpGW/CQTHtCKaYlScZTly4JIu97Jxo/odCiH0ITnDXSJPTOrEKk/ycSZ0AOgTmkDtkOsvIA==}
 
-  '@turbo/darwin-64@2.9.9':
-    resolution: {integrity: sha512-hTEiNu2ABZZOO1qbjnKASI8eF3BdOOzU6iKv5w5uGOK65DDMc10cS40N1kqM99YT0uSAGUwNu6GdFctRPeEeVA==}
+  '@turbo/darwin-64@2.9.12':
+    resolution: {integrity: sha512-eu3eFRmE9NjgZ0wPdRJ44l+LGSeIky+tz5ZQd8zQkw/Yqi+BM7wq+8nbabeoiVUcICi/IZweMOKl/MCmkrd1+g==}
     cpu: [x64]
     os: [darwin]
 
-  '@turbo/darwin-arm64@2.9.9':
-    resolution: {integrity: sha512-MinO40EEcP5mJiTVpfjtEulsEBhVeryfq21QhYtJZ8hQJLHGgy459rcmDVAY8/JERe4dkVU4KW+zoLF22o01EA==}
+  '@turbo/darwin-arm64@2.9.12':
+    resolution: {integrity: sha512-RUkAE404z/J8NsyrUosMcBaXT6M4bRFxTQrmkDQBLQVXaC8Jl0e9bMvYDSX0GW7Ffm2m3j9y7RXgR1foeUAM9w==}
     cpu: [arm64]
     os: [darwin]
 
-  '@turbo/linux-64@2.9.9':
-    resolution: {integrity: sha512-7JNLw88Isk+gMlbsC8pulLDkrqe2B827ZsKFEHilb17AC6Xn/62pzH7afjY7fEU6Ayp4XP/vGhlRWOzqBvBvIQ==}
+  '@turbo/linux-64@2.9.12':
+    resolution: {integrity: sha512-InIUtH7cw/vqXNX1Gr7QgWfmw3ct08pV5CpfdEOR48z2u2rzdmpIuk00B/Q2xCb0PMWtKgiMQynfuphmEuUyTQ==}
     cpu: [x64]
     os: [linux]
 
-  '@turbo/linux-arm64@2.9.9':
-    resolution: {integrity: sha512-0pnXDwPw1rHii98JZPRg7SvsjIzy7jrhkwGU9Jy5fVYoMdYd3P2vbtLfII+OJ0Mm4Ar5yykdHDTz3RWiRI1o9g==}
+  '@turbo/linux-arm64@2.9.12':
+    resolution: {integrity: sha512-lC6nD//Xh67fmJM0LKaLsg74Wry0aYrgMklpiNgCbUaMdPIOqj0A00iri3NU7Lb7pZHx8ViisgpeDKlpSgFUCA==}
     cpu: [arm64]
     os: [linux]
 
-  '@turbo/windows-64@2.9.9':
-    resolution: {integrity: sha512-vjDQycz4gQVvIq4n2rPtiiIESwJlAc406qtkiZlqyL+fHZEd9SxYNlBIFYtc5cuMuwrk+sIKrhN7XvwjmvS9YQ==}
+  '@turbo/windows-64@2.9.12':
+    resolution: {integrity: sha512-conYri8VUl72JOdYnLDPYwzqbPcY5ECoHmo9FWoKznemhaAIilj4maHqs9Uar0aKfNoZIULniy+6iWaLtLO34A==}
     cpu: [x64]
     os: [win32]
 
-  '@turbo/windows-arm64@2.9.9':
-    resolution: {integrity: sha512-V6NiH43oCctepbOdQFp7UjqLyK8p6Tt824QA+G4TE+B1BBHu80A0W8OCL+H7uBJ3XZjAj/hvPDw3k3l65DoDGw==}
+  '@turbo/windows-arm64@2.9.12':
+    resolution: {integrity: sha512-XoR4bsg62/L/esRVcmoMESEiNZ36+YmyjYGLpoqk8nwMgXzzVjNOgX0lRSz5w/U/ajLGv3nhMsS0Q2QOdvp2AQ==}
     cpu: [arm64]
     os: [win32]
 
@@ -6254,50 +6254,50 @@ packages:
   '@types/yauzl@2.10.3':
     resolution: {integrity: sha512-oJoftv0LSuaDZE3Le4DbKX+KS9G36NzOeSap90UIK0yMA/NhKJhqlSGtNDORNRaIbQfzjXDrQa0ytJ6mNRGz/Q==}
 
-  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260511.1':
-    resolution: {integrity: sha512-SYrqVOlapDxDG7FzHBIJbfgaix+mXPkYzYGqwpz/TAhoPA7sgbfAoGLaqi3ut9N88C/OYNhEX4tjz/0PC9i1nw==}
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260515.1':
+    resolution: {integrity: sha512-CSvyLkNV0k4Ro0B6nzNdDXFrRD8aa6sDvXSGla2FTmBio+JLKqNuJXq1ppyj42j9pAwdUhDZV/PNdjeHRCBjWQ==}
     engines: {node: '>=16.20.0'}
     cpu: [arm64]
     os: [darwin]
 
-  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260511.1':
-    resolution: {integrity: sha512-zIe31OYgBvkgTIQEwJtKim6SYyuVTkr+9fK/87hVwKN15X3Ikjeh0C0g2W/Vl4rXeMvy95wBGDN1jpW11DIvgg==}
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260515.1':
+    resolution: {integrity: sha512-QTmm0dpF6CC3hrfudAyVcIvbr1tlBTZ7aGQHIs4PYmi+tnTi2R8jy6gDBCJWlDBSXqjPWlQZrdiOxRBCSlShSA==}
     engines: {node: '>=16.20.0'}
     cpu: [x64]
     os: [darwin]
 
-  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260511.1':
-    resolution: {integrity: sha512-YbmCQXGYkDChGFG7hXJzIgmRjtU1kE5VK/+k322nGnbq4ePqSjS3dS0+ehPATmvfO1XjCDfh3ekED+AtmWk6aQ==}
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260515.1':
+    resolution: {integrity: sha512-bH/CYrtXURXr3YwqJmlKblQ858wuJ0Qw2VSMvlsWwYZpb8eOd07T2bl1Ba6QxGBuL6EotcDQFd2OYJIj0uvM7A==}
     engines: {node: '>=16.20.0'}
     cpu: [arm64]
     os: [linux]
 
-  '@typescript/native-preview-linux-arm@7.0.0-dev.20260511.1':
-    resolution: {integrity: sha512-02b45lpPmYf125PvcnK67WW93N55qwKmtInwfVefV997S17Ib3h6hlCW4e24BDhNsGRCSLhPA4Lu7ZvTq5pLkw==}
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20260515.1':
+    resolution: {integrity: sha512-0b+Sxh8JUNMqvw06wfIoh45+G68/ikCW+aRqHGipU2uc9M9dWUKvI3zDyzP1rF6FOJ7xMKMbTbi5b2IvcRqh8g==}
     engines: {node: '>=16.20.0'}
     cpu: [arm]
     os: [linux]
 
-  '@typescript/native-preview-linux-x64@7.0.0-dev.20260511.1':
-    resolution: {integrity: sha512-e+TweaVJFaM96tV1UM1kRfk2y8QBkZtz7+0wcxrDGmyJz3IIRUlg1btocaBkhsmVtQPXMr37RutBBMgpl3vgUg==}
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20260515.1':
+    resolution: {integrity: sha512-eXgYE6pmkCiEEX7T43TYeF24uiY8+h9mbi9YSvnCoRp4BLgn9b7uJagh4ctSGCNxUy3QSDeoznkWfSVlrvJ5pA==}
     engines: {node: '>=16.20.0'}
     cpu: [x64]
     os: [linux]
 
-  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260511.1':
-    resolution: {integrity: sha512-zgkoGiCpOrly5h8ghcuu6ZNSfrnRqtHoCq584Q92+s4D/j1MU3oKkGPvmkezp5Mj2v7ffR9AjU+lWRDkrfm6eA==}
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260515.1':
+    resolution: {integrity: sha512-K1YJimcOr3/lFTJyOChT1GnRdfvoHtIvG/qcwHhHpeCBzpGfG7u2aH9MkBgsXqNJHAXHLnQRuON2uYgU8wWDzw==}
     engines: {node: '>=16.20.0'}
     cpu: [arm64]
     os: [win32]
 
-  '@typescript/native-preview-win32-x64@7.0.0-dev.20260511.1':
-    resolution: {integrity: sha512-SUm7iVYzKaflol+QwH0Ny5jZtco6PJduI+h/TEg0sgBJzVBa+9RN4I9+Xu9v+EJ1bci3XI7835IRdSP36lCgCw==}
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20260515.1':
+    resolution: {integrity: sha512-1cGEWLao/d2+Q3yMvtnDES85sM9HuI6J6PBmrcjwXzsQxnjXJkujStdp+LB6JZfY+VSDi+cpaCZmrKU6sYUfkg==}
     engines: {node: '>=16.20.0'}
     cpu: [x64]
     os: [win32]
 
-  '@typescript/native-preview@7.0.0-dev.20260511.1':
-    resolution: {integrity: sha512-cUyY4Sr6065280lB6hCwTMCBMTxlEIGjSLzHym28yikA5sFiEsAzlwiU0i+XkTUIqr5K5M/SzSJiioDN+vpjtA==}
+  '@typescript/native-preview@7.0.0-dev.20260515.1':
+    resolution: {integrity: sha512-dWhzJGb9iJfCDsjz/LzPkbMj5XDbFWyZmDyTixcmQPgX5zFOPZ+sAdlCpTZFGEJhA7OqXG+lZyajbJfjYvQorA==}
     engines: {node: '>=16.20.0'}
     hasBin: true
 
@@ -11586,8 +11586,8 @@ packages:
     engines: {node: '>=18.0.0'}
     hasBin: true
 
-  turbo@2.9.9:
-    resolution: {integrity: sha512-3xfzXE/yTjhh0S5dIWlE+3E+J9A09REpLI1ZqVh2+HrNZoVzZn0pkvjiRgVK/Ev3PF9XnaTwCntTx+CADWXcyA==}
+  turbo@2.9.12:
+    resolution: {integrity: sha512-lCPgus1NuTiBdaITWqzSH/Ff6HVL8HHGBtOXHg1dHRfcshN79XkygSdh0M6g8b0td91ILLG5MTkLOkp5UvyPJw==}
     hasBin: true
 
   tw-animate-css@1.4.0:
@@ -17792,22 +17792,22 @@ snapshots:
 
   '@tootallnate/quickjs-emscripten@0.23.0': {}
 
-  '@turbo/darwin-64@2.9.9':
+  '@turbo/darwin-64@2.9.12':
     optional: true
 
-  '@turbo/darwin-arm64@2.9.9':
+  '@turbo/darwin-arm64@2.9.12':
     optional: true
 
-  '@turbo/linux-64@2.9.9':
+  '@turbo/linux-64@2.9.12':
     optional: true
 
-  '@turbo/linux-arm64@2.9.9':
+  '@turbo/linux-arm64@2.9.12':
     optional: true
 
-  '@turbo/windows-64@2.9.9':
+  '@turbo/windows-64@2.9.12':
     optional: true
 
-  '@turbo/windows-arm64@2.9.9':
+  '@turbo/windows-arm64@2.9.12':
     optional: true
 
   '@tybys/wasm-util@0.10.2':
@@ -18149,36 +18149,36 @@ snapshots:
       '@types/node': 25.6.2
     optional: true
 
-  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260511.1':
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260515.1':
     optional: true
 
-  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260511.1':
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260515.1':
     optional: true
 
-  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260511.1':
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260515.1':
     optional: true
 
-  '@typescript/native-preview-linux-arm@7.0.0-dev.20260511.1':
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20260515.1':
     optional: true
 
-  '@typescript/native-preview-linux-x64@7.0.0-dev.20260511.1':
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20260515.1':
     optional: true
 
-  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260511.1':
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260515.1':
     optional: true
 
-  '@typescript/native-preview-win32-x64@7.0.0-dev.20260511.1':
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20260515.1':
     optional: true
 
-  '@typescript/native-preview@7.0.0-dev.20260511.1':
+  '@typescript/native-preview@7.0.0-dev.20260515.1':
     optionalDependencies:
-      '@typescript/native-preview-darwin-arm64': 7.0.0-dev.20260511.1
-      '@typescript/native-preview-darwin-x64': 7.0.0-dev.20260511.1
-      '@typescript/native-preview-linux-arm': 7.0.0-dev.20260511.1
-      '@typescript/native-preview-linux-arm64': 7.0.0-dev.20260511.1
-      '@typescript/native-preview-linux-x64': 7.0.0-dev.20260511.1
-      '@typescript/native-preview-win32-arm64': 7.0.0-dev.20260511.1
-      '@typescript/native-preview-win32-x64': 7.0.0-dev.20260511.1
+      '@typescript/native-preview-darwin-arm64': 7.0.0-dev.20260515.1
+      '@typescript/native-preview-darwin-x64': 7.0.0-dev.20260515.1
+      '@typescript/native-preview-linux-arm': 7.0.0-dev.20260515.1
+      '@typescript/native-preview-linux-arm64': 7.0.0-dev.20260515.1
+      '@typescript/native-preview-linux-x64': 7.0.0-dev.20260515.1
+      '@typescript/native-preview-win32-arm64': 7.0.0-dev.20260515.1
+      '@typescript/native-preview-win32-x64': 7.0.0-dev.20260515.1
 
   '@typescript/vfs@1.6.4(typescript@5.9.3)':
     dependencies:
@@ -24788,14 +24788,14 @@ snapshots:
     optionalDependencies:
       fsevents: 2.3.3
 
-  turbo@2.9.9:
+  turbo@2.9.12:
     optionalDependencies:
-      '@turbo/darwin-64': 2.9.9
-      '@turbo/darwin-arm64': 2.9.9
-      '@turbo/linux-64': 2.9.9
-      '@turbo/linux-arm64': 2.9.9
-      '@turbo/windows-64': 2.9.9
-      '@turbo/windows-arm64': 2.9.9
+      '@turbo/darwin-64': 2.9.12
+      '@turbo/darwin-arm64': 2.9.12
+      '@turbo/linux-64': 2.9.12
+      '@turbo/linux-arm64': 2.9.12
+      '@turbo/windows-64': 2.9.12
+      '@turbo/windows-arm64': 2.9.12
 
   tw-animate-css@1.4.0: {}
 
