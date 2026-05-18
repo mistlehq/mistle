@@ -1,4 +1,4 @@
-use bpaf::{OptionParser, Parser, construct, pure};
+use bpaf::{OptionParser, Parser, construct, positional, pure};
 use mstl_core::auth::API_KEY_ENV_VAR;
 use mstl_core::client::{
     CurrentActor, CurrentActorAuthentication, ListSandboxProfilesResponse, MistleClient,
@@ -18,10 +18,11 @@ fn main() {
     std::process::exit(exit_code);
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 enum CliCommand {
     Whoami,
     ProfileList,
+    ProfileGet { profile_id: String },
 }
 
 #[derive(Debug)]
@@ -71,7 +72,20 @@ fn options() -> OptionParser<CliCommand> {
         .descr("List sandbox profiles")
         .command("list");
 
-    let profile = construct!([profile_list])
+    let profile_id = positional::<String>("profile-id")
+        .help("Sandbox profile id")
+        .guard(
+            |value| !value.trim().is_empty(),
+            "profile id cannot be blank",
+        );
+
+    let profile_get = profile_id
+        .map(|profile_id| CliCommand::ProfileGet { profile_id })
+        .to_options()
+        .descr("Get a sandbox profile")
+        .command("get");
+
+    let profile = construct!([profile_list, profile_get])
         .to_options()
         .descr("Manage sandbox profiles")
         .command("profile");
@@ -114,6 +128,19 @@ where
                 1
             }
         },
+        CliCommand::ProfileGet { profile_id } => match get_sandbox_profile(&profile_id) {
+            Ok(profile) => match write_sandbox_profile(stdout, &profile) {
+                Ok(()) => 0,
+                Err(error) => {
+                    let _ = writeln!(stderr, "failed to write sandbox profile: {error}");
+                    1
+                }
+            },
+            Err(error) => {
+                let _ = writeln!(stderr, "{error}");
+                1
+            }
+        },
     }
 }
 
@@ -131,6 +158,15 @@ fn list_sandbox_profiles() -> Result<ListSandboxProfilesResponse, CliError> {
         .list_sandbox_profiles()
         .map_err(|source| CliError::Client {
             action: "list sandbox profiles",
+            source,
+        })
+}
+
+fn get_sandbox_profile(profile_id: &str) -> Result<SandboxProfile, CliError> {
+    mistle_client()?
+        .get_sandbox_profile(profile_id)
+        .map_err(|source| CliError::Client {
+            action: "get sandbox profile",
             source,
         })
 }
@@ -175,6 +211,25 @@ where
     W: Write,
 {
     write!(stdout, "{}", render_sandbox_profiles(response))
+}
+
+fn write_sandbox_profile<W>(stdout: &mut W, profile: &SandboxProfile) -> io::Result<()>
+where
+    W: Write,
+{
+    write!(stdout, "{}", render_sandbox_profile(profile))
+}
+
+fn render_sandbox_profile(profile: &SandboxProfile) -> String {
+    format!(
+        "Profile\nID: {}\nName: {}\nStatus: {}\nActive version: {}\nCreated: {}\nUpdated: {}\n",
+        profile.id,
+        profile.display_name,
+        profile_status_label(&profile.status),
+        format_active_version(profile.active_version),
+        profile.created_at,
+        profile.updated_at,
+    )
 }
 
 fn render_sandbox_profiles(response: &ListSandboxProfilesResponse) -> String {
@@ -231,15 +286,10 @@ struct SandboxProfileRow {
 
 impl SandboxProfileRow {
     fn from_profile(profile: &SandboxProfile) -> Self {
-        let active_version = match profile.active_version {
-            Some(active_version) => active_version.to_string(),
-            None => "-".to_owned(),
-        };
-
         Self {
             id: profile.id.clone(),
             name: profile.display_name.clone(),
-            active_version,
+            active_version: format_active_version(profile.active_version),
             status: profile_status_label(&profile.status),
             updated: profile.updated_at.clone(),
         }
@@ -280,6 +330,13 @@ fn profile_status_label(status: &SandboxProfileStatus) -> &'static str {
     }
 }
 
+fn format_active_version(active_version: Option<u32>) -> String {
+    match active_version {
+        Some(active_version) => active_version.to_string(),
+        None => "-".to_owned(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use mstl_core::client::{ListSandboxProfilesResponse, SandboxProfile, SandboxProfileStatus};
@@ -308,6 +365,7 @@ mod tests {
                     display_name: "Python Dev".to_owned(),
                     active_version: Some(3),
                     status: SandboxProfileStatus::Active,
+                    created_at: "2026-05-12T01:02:03.000Z".to_owned(),
                     updated_at: "2026-05-18T01:02:03.000Z".to_owned(),
                 },
                 SandboxProfile {
@@ -315,6 +373,7 @@ mod tests {
                     display_name: "Node".to_owned(),
                     active_version: None,
                     status: SandboxProfileStatus::Inactive,
+                    created_at: "2026-05-11T01:02:03.000Z".to_owned(),
                     updated_at: "2026-05-17T01:02:03.000Z".to_owned(),
                 },
             ],
@@ -328,6 +387,31 @@ mod tests {
                 "ID          NAME        ACTIVE VERSION  STATUS    UPDATED\n",
                 "sbp_python  Python Dev  3               active    2026-05-18T01:02:03.000Z\n",
                 "sbp_node    Node        -               inactive  2026-05-17T01:02:03.000Z\n",
+            ),
+        );
+    }
+
+    #[test]
+    fn renders_profile_details() {
+        let profile = SandboxProfile {
+            id: "sbp_python".to_owned(),
+            display_name: "Python Dev".to_owned(),
+            active_version: Some(3),
+            status: SandboxProfileStatus::Active,
+            created_at: "2026-05-12T01:02:03.000Z".to_owned(),
+            updated_at: "2026-05-18T01:02:03.000Z".to_owned(),
+        };
+
+        assert_eq!(
+            crate::render_sandbox_profile(&profile),
+            concat!(
+                "Profile\n",
+                "ID: sbp_python\n",
+                "Name: Python Dev\n",
+                "Status: active\n",
+                "Active version: 3\n",
+                "Created: 2026-05-12T01:02:03.000Z\n",
+                "Updated: 2026-05-18T01:02:03.000Z\n",
             ),
         );
     }

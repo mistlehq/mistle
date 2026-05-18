@@ -47,6 +47,13 @@ impl MistleClient {
         })
     }
 
+    pub fn get_sandbox_profile(
+        &self,
+        profile_id: &str,
+    ) -> Result<SandboxProfile, MistleClientError> {
+        self.get_json(self.get_sandbox_profile_url(profile_id)?.as_str())
+    }
+
     fn list_sandbox_profiles_page(
         &self,
         after: Option<&str>,
@@ -83,6 +90,15 @@ impl MistleClient {
         }
 
         url
+    }
+
+    fn get_sandbox_profile_url(&self, profile_id: &str) -> Result<Url, MistleClientError> {
+        let validated_profile_id = validate_sandbox_profile_id(profile_id)?;
+
+        Ok(endpoint_url(
+            &self.base_url,
+            &format!("/v1/sandbox/profiles/{validated_profile_id}"),
+        ))
     }
 }
 
@@ -142,6 +158,7 @@ pub struct SandboxProfile {
     pub display_name: String,
     pub active_version: Option<u32>,
     pub status: SandboxProfileStatus,
+    pub created_at: String,
     pub updated_at: String,
 }
 
@@ -244,6 +261,31 @@ fn validate_required_string(
     Ok(trimmed_value)
 }
 
+fn validate_sandbox_profile_id(profile_id: &str) -> Result<&str, MistleClientError> {
+    let trimmed_profile_id = profile_id.trim();
+
+    if trimmed_profile_id.is_empty() {
+        return Err(MistleClientError::InvalidConfig("profile id is required"));
+    }
+
+    if !trimmed_profile_id.starts_with("sbp_") {
+        return Err(MistleClientError::InvalidConfig(
+            "profile id must start with `sbp_`",
+        ));
+    }
+
+    if !trimmed_profile_id
+        .chars()
+        .all(|character| character.is_ascii_alphanumeric() || character == '_' || character == '-')
+    {
+        return Err(MistleClientError::InvalidConfig(
+            "profile id can only contain ASCII letters, numbers, underscores, and hyphens",
+        ));
+    }
+
+    Ok(trimmed_profile_id)
+}
+
 fn endpoint_url(base_url: &Url, endpoint_path: &str) -> Url {
     let mut endpoint_url = base_url.clone();
     let base_path = endpoint_url.path().trim_end_matches('/');
@@ -300,6 +342,30 @@ mod tests {
                 .as_str(),
             "https://api.example.test/v1/sandbox/profiles?after=cursor%2Fwith+space"
         );
+    }
+
+    #[test]
+    fn builds_get_sandbox_profile_url() {
+        let client = client_with_base_url("https://api.example.test");
+
+        assert_eq!(
+            client
+                .get_sandbox_profile_url("sbp_python-dev")
+                .expect("profile id should be valid")
+                .as_str(),
+            "https://api.example.test/v1/sandbox/profiles/sbp_python-dev"
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_sandbox_profile_id_for_get_url() {
+        let client = client_with_base_url("https://api.example.test");
+
+        let error = client
+            .get_sandbox_profile_url("sandbox/profile")
+            .expect_err("invalid profile id should fail");
+
+        assert_eq!(error.to_string(), "profile id must start with `sbp_`");
     }
 
     #[test]
