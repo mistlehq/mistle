@@ -27,7 +27,7 @@ export async function resolveSandboxProfileTriggerReferenceOrThrow(
   if (!sandboxProfileVersion) {
     throw new BadRequestError(
       TriggerWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE,
-      "Sandbox profile must bind the selected integration connection to use its trigger triggers.",
+      "Sandbox profile must bind the selected integration connection to use its webhook triggers.",
     );
   }
 
@@ -46,7 +46,7 @@ export async function resolveSandboxProfileTriggerReferenceOrThrow(
   if (binding === undefined) {
     throw new BadRequestError(
       TriggerWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE,
-      "Sandbox profile must bind the selected integration connection to use its trigger triggers.",
+      "Sandbox profile must bind the selected integration connection to use its webhook triggers.",
     );
   }
 

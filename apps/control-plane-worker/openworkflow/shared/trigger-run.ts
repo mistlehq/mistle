@@ -427,7 +427,7 @@ async function resolveTriggerConversationBindingContext(
   if (integrationFamilyId === null) {
     throw new TriggerRunExecutionError({
       code: TriggerRunFailureCodes.TRIGGER_RUN_EXECUTION_FAILED,
-      message: `Trigger run '${input.triggerRunId}' could not resolve an trigger conversation integration family.`,
+      message: `Trigger run '${input.triggerRunId}' could not resolve a trigger conversation integration family.`,
     });
   }
 
@@ -467,7 +467,7 @@ export async function prepareTriggerRun(
   if (triggerTargetId === null) {
     throw new TriggerRunExecutionError({
       code: TriggerRunFailureCodes.TRIGGER_TARGET_REFERENCE_MISSING,
-      message: `Trigger run '${input.triggerRunId}' does not reference an trigger target.`,
+      message: `Trigger run '${input.triggerRunId}' does not reference a trigger target.`,
     });
   }
 

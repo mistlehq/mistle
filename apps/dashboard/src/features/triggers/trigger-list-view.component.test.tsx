@@ -9,7 +9,7 @@ import { TriggerListView } from "./trigger-list-view.js";
 function noop(): void {}
 
 const ScheduleTrigger: TriggerListItemViewModel = {
-  id: "atm_schedule_123",
+  id: "trg_schedule_123",
   kind: "schedule",
   name: "Daily repository triage",
   enabled: true,

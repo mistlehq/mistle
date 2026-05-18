@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+import type { paths } from "../../lib/control-plane-api/generated/schema.js";
+
+type CreateWebhookTriggerRequest =
+  paths["/v1/triggers/webhooks"]["post"]["requestBody"]["content"]["application/json"];
+type UpdateWebhookTriggerRequest =
+  paths["/v1/triggers/webhooks/{triggerId}"]["patch"]["requestBody"]["content"]["application/json"];
+
 const WebhookTriggerTargetSchema = z
   .object({
     id: z.string().min(1),
@@ -32,47 +39,13 @@ export const DeleteWebhookTriggerResultSchema = z
   .object({
     triggerId: z.string().min(1),
   })
-  .strict()
-  .transform(({ triggerId }) => ({
-    triggerId: triggerId,
-  }));
+  .strict();
 
 export type WebhookTrigger = z.infer<typeof WebhookTriggerSchema>;
 export type DeleteWebhookTriggerResult = z.infer<typeof DeleteWebhookTriggerResultSchema>;
 
-export type CreateWebhookTriggerInput = {
-  name: string;
-  enabled?: boolean;
-  integrationWebhookSourceId: string;
-  eventTypes?: string[] | null;
-  payloadFilter?: Record<string, unknown> | null;
-  inputTemplate: string;
-  instructions?: string | null;
-  conversationKeyTemplate: string;
-  idempotencyKeyTemplate?: string | null;
-  target: {
-    sandboxProfileId: string;
-    sandboxProfileVersion?: number;
-    primaryRepositoryId?: string | null;
-  };
-};
-
-export type UpdateWebhookTriggerPatch = {
-  name?: string;
-  enabled?: boolean;
-  integrationWebhookSourceId?: string;
-  eventTypes?: string[] | null;
-  payloadFilter?: Record<string, unknown> | null;
-  inputTemplate?: string;
-  instructions?: string | null;
-  conversationKeyTemplate?: string;
-  idempotencyKeyTemplate?: string | null;
-  target?: {
-    sandboxProfileId?: string;
-    sandboxProfileVersion?: number;
-    primaryRepositoryId?: string | null;
-  };
-};
+export type CreateWebhookTriggerInput = CreateWebhookTriggerRequest;
+export type UpdateWebhookTriggerPatch = UpdateWebhookTriggerRequest;
 
 export type UpdateWebhookTriggerInput = {
   triggerId: string;

@@ -36,11 +36,7 @@ export const HomeSummaryResponseSchema = z
         hasWebhookCapableIntegration: z.boolean(),
         hasTriggers: z.boolean(),
       })
-      .strict()
-      .transform(({ hasTriggers, ...onboarding }) => ({
-        ...onboarding,
-        hasTriggers: hasTriggers,
-      })),
+      .strict(),
     recentSessions: z.array(HomeSandboxInstanceListItemSchema),
   })
   .strict();

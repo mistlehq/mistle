@@ -48,10 +48,7 @@ export const DeleteScheduledTriggerResultSchema = z
   .object({
     triggerId: z.string().min(1),
   })
-  .strict()
-  .transform(({ triggerId }) => ({
-    triggerId: triggerId,
-  }));
+  .strict();
 
 export type ScheduledTrigger = z.infer<typeof ScheduledTriggerSchema>;
 export type DeleteScheduledTriggerResult = z.infer<typeof DeleteScheduledTriggerResultSchema>;

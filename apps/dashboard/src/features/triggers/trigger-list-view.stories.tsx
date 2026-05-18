@@ -7,7 +7,7 @@ import { TriggerListView } from "./trigger-list-view.js";
 
 const MixedItems: readonly TriggerListItemViewModel[] = [
   {
-    id: "atm_01jps7k2z2v3qj4k9m0n1p2q3r",
+    id: "trg_01jps7k2z2v3qj4k9m0n1p2q3r",
     kind: "webhook",
     name: "GitHub pushes to repo triage",
     enabled: true,
@@ -34,7 +34,7 @@ const MixedItems: readonly TriggerListItemViewModel[] = [
     updatedAtLabel: "6 min ago",
   },
   {
-    id: "atm_01jps7mhvgc0p7e01b4z4r7c0m",
+    id: "trg_01jps7mhvgc0p7e01b4z4r7c0m",
     kind: "schedule",
     name: "Daily repository triage",
     enabled: true,
@@ -55,7 +55,7 @@ const MixedItems: readonly TriggerListItemViewModel[] = [
     updatedAtLabel: "18 min ago",
   },
   {
-    id: "atm_01jps7qxbxw6kxdj1r9s9v8y2h",
+    id: "trg_01jps7qxbxw6kxdj1r9s9v8y2h",
     kind: "schedule",
     name: "Weekly finance review",
     enabled: false,
@@ -76,7 +76,7 @@ const MixedItems: readonly TriggerListItemViewModel[] = [
     updatedAtLabel: "1 day ago",
   },
   {
-    id: "atm_01jps82rc4z62qy0m7zdb8h5qn",
+    id: "trg_01jps82rc4z62qy0m7zdb8h5qn",
     kind: "webhook",
     name: "Legacy GitHub escalation",
     enabled: true,
@@ -104,7 +104,7 @@ const ScheduleOnlyItems = MixedItems.filter((item) => item.kind === "schedule");
 const EventOnlyItems = MixedItems.filter((item) => item.kind === "webhook");
 
 const RowLevelIssueItem: TriggerListItemViewModel = {
-  id: "atm_01jps82rc4z62qy0m7zdb8h5qn",
+  id: "trg_01jps82rc4z62qy0m7zdb8h5qn",
   kind: "webhook",
   name: "Retired metadata triage",
   enabled: true,
@@ -129,7 +129,7 @@ const RowLevelIssueItem: TriggerListItemViewModel = {
 };
 
 const ScheduleWithoutNextRunItem: TriggerListItemViewModel = {
-  id: "atm_01jps9mre5e9p0n6h7c2zmwr10",
+  id: "trg_01jps9mre5e9p0n6h7c2zmwr10",
   kind: "schedule",
   name: "Archived Monday report",
   enabled: true,

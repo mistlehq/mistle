@@ -1,5 +1,4 @@
 import {
-  type HandleTriggerRunWorkflowInput,
   HandleTriggerConversationDeliveryWorkflowSpec,
   HandleTriggerRunWorkflowSpec,
 } from "@mistle/workflow-registry/control-plane";
@@ -24,17 +23,36 @@ export const DurableHandleTriggerRunStepNames = {
   MARK_FAILED: "mark-automation-run-failed",
 } as const;
 
-export function normalizeHandleTriggerRunWorkflowInput(input: HandleTriggerRunWorkflowInput): {
+type HandleTriggerRunWorkflowInputCandidate = {
+  triggerRunId?: string | undefined;
+  automationRunId?: string | undefined;
+};
+
+export function normalizeHandleTriggerRunWorkflowInput(
+  input: HandleTriggerRunWorkflowInputCandidate,
+): {
   triggerRunId: string;
 } {
-  if (input.triggerRunId !== undefined) {
+  const { triggerRunId, automationRunId } = input;
+  const hasTriggerRunId = triggerRunId !== undefined && triggerRunId.length > 0;
+  const hasAutomationRunId = automationRunId !== undefined && automationRunId.length > 0;
+
+  if (hasTriggerRunId === hasAutomationRunId) {
+    throw new Error("Handle trigger run workflow input must include exactly one trigger run id.");
+  }
+
+  if (hasTriggerRunId) {
     return {
-      triggerRunId: input.triggerRunId,
+      triggerRunId,
     };
   }
 
+  if (automationRunId === undefined || automationRunId.length === 0) {
+    throw new Error("Handle trigger run workflow input must include exactly one trigger run id.");
+  }
+
   return {
-    triggerRunId: input.automationRunId,
+    triggerRunId: automationRunId,
   };
 }
 
@@ -150,7 +168,7 @@ export const HandleTriggerRunWorkflow = defineTracedControlPlaneWorkflow(
               generation: deliveryHandoff.generation,
             },
             {
-              idempotencyKey: `trigger-conversation-delivery:${deliveryHandoff.conversationId}:${String(deliveryHandoff.generation)}`,
+              idempotencyKey: `automation-conversation-delivery:${deliveryHandoff.conversationId}:${String(deliveryHandoff.generation)}`,
             },
           );
 

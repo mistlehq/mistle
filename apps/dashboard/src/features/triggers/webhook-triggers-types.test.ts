@@ -12,7 +12,7 @@ describe("webhook triggers types", () => {
       createdAt: "2026-03-11T10:00:00.000Z",
       enabled: true,
       eventTypes: ["push"],
-      id: "aut_123",
+      id: "trg_123",
       idempotencyKeyTemplate: null,
       inputTemplate: '{"ref": "{{event.ref}}"}',
       instructions: "Use terse summaries.",
@@ -27,7 +27,7 @@ describe("webhook triggers types", () => {
         },
       },
       target: {
-        id: "target_123",
+        id: "tgt_123",
         sandboxProfileId: "sbp_123",
         sandboxProfileVersion: 4,
         primaryRepositoryId: "mistlehq/platform",
@@ -47,7 +47,7 @@ describe("webhook triggers types", () => {
         createdAt: "2026-03-11T10:00:00.000Z",
         enabled: true,
         eventTypes: null,
-        id: "aut_123",
+        id: "trg_123",
         idempotencyKeyTemplate: null,
         inputTemplate: '{"ref": "{{event.ref}}"}',
         instructions: null,
@@ -68,11 +68,11 @@ describe("webhook triggers types", () => {
 
   it("parses delete responses", () => {
     const parsed = DeleteWebhookTriggerResultSchema.parse({
-      triggerId: "aut_123",
+      triggerId: "trg_123",
     });
 
     expect(parsed).toEqual({
-      triggerId: "aut_123",
+      triggerId: "trg_123",
     });
   });
 });

@@ -17,7 +17,7 @@ export const route = createRoute({
   },
   responses: {
     200: {
-      description: "Get an trigger summary.",
+      description: "Get a trigger summary.",
       content: {
         "application/json": {
           schema: GetTriggerResponseSchema,

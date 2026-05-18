@@ -5,11 +5,11 @@ import { DeleteScheduledTriggerResultSchema } from "./scheduled-triggers-types.j
 describe("scheduled triggers types", () => {
   it("parses delete responses", () => {
     const parsed = DeleteScheduledTriggerResultSchema.parse({
-      triggerId: "aut_123",
+      triggerId: "trg_123",
     });
 
     expect(parsed).toEqual({
-      triggerId: "aut_123",
+      triggerId: "trg_123",
     });
   });
 });

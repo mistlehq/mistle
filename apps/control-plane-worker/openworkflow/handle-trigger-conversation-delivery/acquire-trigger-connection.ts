@@ -142,7 +142,7 @@ export async function acquireTriggerConnection(
               ...(input.preparedTriggerRun.actingUserId === undefined
                 ? {}
                 : { actingUserId: input.preparedTriggerRun.actingUserId }),
-              idempotencyKey: `trigger-delivery-resume:${input.deliveryTaskId}:${sandboxInstance.id}`,
+              idempotencyKey: `automation-delivery-resume:${input.deliveryTaskId}:${sandboxInstance.id}`,
             });
 
           waitSpan.setAttributes({

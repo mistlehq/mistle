@@ -55,24 +55,24 @@ describe("triggers query keys", () => {
   });
 
   it("builds the trigger summary detail query key", () => {
-    expect(triggerDetailQueryKey("atm_123")).toEqual(["triggers", "detail", "atm_123"]);
+    expect(triggerDetailQueryKey("trg_123")).toEqual(["triggers", "detail", "trg_123"]);
   });
 
   it("builds the webhook detail query key", () => {
-    expect(webhookTriggerDetailQueryKey("aut_123")).toEqual([
+    expect(webhookTriggerDetailQueryKey("trg_123")).toEqual([
       "triggers",
       "webhooks",
       "detail",
-      "aut_123",
+      "trg_123",
     ]);
   });
 
   it("builds the scheduled detail query key", () => {
-    expect(scheduledTriggerDetailQueryKey("aut_456")).toEqual([
+    expect(scheduledTriggerDetailQueryKey("trg_456")).toEqual([
       "triggers",
       "schedules",
       "detail",
-      "aut_456",
+      "trg_456",
     ]);
   });
 });

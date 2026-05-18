@@ -16,7 +16,7 @@ import type { ScheduledTrigger } from "./scheduled-triggers-types.js";
 import { WebhookTriggerWorkspaceRootRepositoryOptionValue } from "./webhook-trigger-option-builders.js";
 
 const SampleTrigger: ScheduledTrigger = {
-  id: "aut_schedule_001",
+  id: "trg_schedule_001",
   kind: "schedule",
   name: "Daily triage",
   enabled: true,
@@ -33,7 +33,7 @@ const SampleTrigger: ScheduledTrigger = {
   conversationKeyTemplate: ScheduledTriggerSameConversationKeyTemplate,
   idempotencyKeyTemplate: "{{schedule.scheduledActionId}}",
   target: {
-    id: "aut_target_001",
+    id: "tgt_target_001",
     sandboxProfileId: "sbp_001",
     sandboxProfileVersion: 3,
     primaryRepositoryId: "repo_001",

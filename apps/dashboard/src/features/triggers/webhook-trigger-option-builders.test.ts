@@ -609,7 +609,7 @@ describe("buildWebhookTriggerSandboxProfileOptions", () => {
 });
 
 describe("resolveEligibleProfileTriggerConnectionIds", () => {
-  it("returns bound connection ids whose targets expose trigger triggers", () => {
+  it("returns bound connection ids whose targets expose webhook triggers", () => {
     expect(
       resolveEligibleProfileTriggerConnectionIds({
         bindings: [

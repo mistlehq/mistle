@@ -129,7 +129,7 @@ const SlackAppMentionEventOption: WebhookTriggerEventOption = {
 };
 
 const SampleTrigger: WebhookTrigger = {
-  id: "aut_123",
+  id: "trg_123",
   kind: "webhook",
   name: "GitHub pushes to repo triage",
   enabled: true,
@@ -183,7 +183,7 @@ describe("toWebhookTriggerFormValues", () => {
     });
   });
 
-  it("maps an trigger resource into form values", () => {
+  it("maps a trigger resource into form values", () => {
     expect(toWebhookTriggerFormValues(SampleTrigger)).toEqual({
       name: "GitHub pushes to repo triage",
       sandboxProfileId: "sbp_repo",

@@ -10709,7 +10709,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Get an trigger summary. */
+        /** @description Get a trigger summary. */
         200: {
           headers: {
             [name: string]: unknown;

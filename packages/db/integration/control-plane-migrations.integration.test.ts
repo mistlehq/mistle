@@ -107,6 +107,7 @@ describe("control-plane migrations integration", () => {
         trigger_id: string | null;
         legacy_camel_trigger_id: string | null;
         legacy_snake_trigger_id: string | null;
+        webhook_trigger_id: string | null;
         owner_kind: string;
         run_trigger_id: string;
         run_target_id: string | null;
@@ -120,6 +121,7 @@ describe("control-plane migrations integration", () => {
             scheduled_actions.target_payload->>'triggerId' as trigger_id,
             scheduled_actions.target_payload->>'automationId' as legacy_camel_trigger_id,
             scheduled_actions.target_payload->>'automation_id' as legacy_snake_trigger_id,
+            webhook_triggers.trigger_id as webhook_trigger_id,
             trigger_conversations.owner_kind,
             trigger_runs.trigger_id as run_trigger_id,
             trigger_runs.trigger_target_id as run_target_id,
@@ -133,6 +135,9 @@ describe("control-plane migrations integration", () => {
           from control_plane.schedules
           join control_plane.scheduled_actions
             on scheduled_actions.schedule_id = schedules.id
+            and scheduled_actions.id = 'sca_trigger_rename_legacy'
+          join control_plane.webhook_triggers
+            on webhook_triggers.trigger_id = 'atm_trigger_rename_legacy'
           join control_plane.trigger_runs
             on trigger_runs.source_scheduled_action_id = scheduled_actions.id
           join control_plane.trigger_conversations
@@ -149,6 +154,7 @@ describe("control-plane migrations integration", () => {
           trigger_id: "atm_trigger_rename_legacy",
           legacy_camel_trigger_id: null,
           legacy_snake_trigger_id: null,
+          webhook_trigger_id: "atm_trigger_rename_legacy",
           owner_kind: "trigger_target",
           run_trigger_id: "atm_trigger_rename_legacy",
           run_target_id: "atg_trigger_rename_legacy",
@@ -160,6 +166,28 @@ describe("control-plane migrations integration", () => {
             "triggerWebhook:read",
             "triggerWebhook:update",
           ],
+        },
+      ]);
+
+      const snakePayloadRows = await pool.query<{
+        trigger_id: string | null;
+        legacy_camel_trigger_id: string | null;
+        legacy_snake_trigger_id: string | null;
+      }>(
+        `
+          select
+            target_payload->>'triggerId' as trigger_id,
+            target_payload->>'automationId' as legacy_camel_trigger_id,
+            target_payload->>'automation_id' as legacy_snake_trigger_id
+          from control_plane.scheduled_actions
+          where id = 'sca_trigger_rename_legacy_snake'
+        `.replaceAll("control_plane.", `${quoteSqlIdentifier(schemaName)}.`),
+      );
+      expect(snakePayloadRows.rows).toEqual([
+        {
+          trigger_id: "atm_trigger_rename_legacy",
+          legacy_camel_trigger_id: null,
+          legacy_snake_trigger_id: null,
         },
       ]);
 
@@ -190,7 +218,7 @@ const MigrationJournalSchema = z.object({
         tag: z.string(),
         breakpoints: z.boolean(),
       })
-      .passthrough(),
+      .loose(),
   ),
 });
 
@@ -260,6 +288,44 @@ async function seedLegacyTriggerRenameRows(input: {
   );
   await pool.query(
     `
+      insert into ${schemaName}.integration_targets
+        (target_key, family_id, variant_id, config)
+      values ('github_default', 'github', 'github-default', '{}'::jsonb)
+    `,
+  );
+  await pool.query(
+    `
+      insert into ${schemaName}.integration_connections
+        (id, organization_id, target_key, display_name)
+      values (
+        'icn_trigger_rename_legacy',
+        'org_trigger_rename',
+        'github_default',
+        'Legacy GitHub connection'
+      )
+    `,
+  );
+  await pool.query(
+    `
+      insert into ${schemaName}.integration_webhook_sources
+        (
+          id,
+          organization_id,
+          integration_connection_id,
+          target_key,
+          endpoint_key
+        )
+      values (
+        'iws_trigger_rename_legacy',
+        'org_trigger_rename',
+        'icn_trigger_rename_legacy',
+        'github_default',
+        'trigger-rename-legacy'
+      )
+    `,
+  );
+  await pool.query(
+    `
       insert into ${schemaName}.sandbox_profiles (id, organization_id, display_name)
       values ('sbp_trigger_rename', 'org_trigger_rename', 'Trigger Rename Profile')
     `,
@@ -311,6 +377,23 @@ async function seedLegacyTriggerRenameRows(input: {
   );
   await pool.query(
     `
+      insert into ${schemaName}.webhook_automations
+        (
+          automation_id,
+          integration_webhook_source_id,
+          input_template,
+          conversation_key_template
+        )
+      values (
+        'atm_trigger_rename_legacy',
+        'iws_trigger_rename_legacy',
+        'hello webhook',
+        'conversation-{{event.id}}'
+      )
+    `,
+  );
+  await pool.query(
+    `
       insert into ${schemaName}.scheduled_actions
         (
           id,
@@ -331,6 +414,31 @@ async function seedLegacyTriggerRenameRows(input: {
         '2026-05-18T01:00:00.000Z',
         '2026-05-18',
         '09:00'
+      )
+    `,
+  );
+  await pool.query(
+    `
+      insert into ${schemaName}.scheduled_actions
+        (
+          id,
+          schedule_id,
+          organization_id,
+          target_type,
+          target_payload,
+          scheduled_at,
+          local_scheduled_date,
+          local_scheduled_time
+        )
+      values (
+        'sca_trigger_rename_legacy_snake',
+        'sch_trigger_rename_legacy',
+        'org_trigger_rename',
+        'automation_run',
+        '{"automation_id":"atm_trigger_rename_legacy"}'::jsonb,
+        '2026-05-18T02:00:00.000Z',
+        '2026-05-18',
+        '10:00'
       )
     `,
   );

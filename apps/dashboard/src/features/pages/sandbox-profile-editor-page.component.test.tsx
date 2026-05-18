@@ -1900,7 +1900,7 @@ describe("SandboxProfileEditorPage", () => {
     ).toBeDefined();
   });
 
-  it("preserves the profile trigger page cursor when selecting an trigger", () => {
+  it("preserves the profile trigger page cursor when selecting a trigger", () => {
     const { profileId, router } = renderSandboxProfileEditor({
       routeSection: "triggers",
       routeSearch: "?after=cursor_after",

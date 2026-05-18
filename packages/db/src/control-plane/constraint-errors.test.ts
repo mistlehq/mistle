@@ -49,6 +49,20 @@ describe("control-plane constraint errors", () => {
     ).toBe(true);
   });
 
+  it("matches the trigger run scheduled action unique index", () => {
+    const error = {
+      code: "23505",
+      constraint: "trigger_runs_source_scheduled_action_id_uidx",
+    };
+
+    expect(
+      isControlPlaneUniqueViolation(
+        error,
+        ControlPlaneConstraintIds.TRIGGER_RUN_SOURCE_SCHEDULED_ACTION,
+      ),
+    ).toBe(true);
+  });
+
   it("returns false for unrelated control-plane constraints", () => {
     const error = {
       code: "23505",

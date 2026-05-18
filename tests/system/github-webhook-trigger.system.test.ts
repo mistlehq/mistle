@@ -15,7 +15,7 @@ const describeIf = hasRequiredGitHubWebhookTriggerEnv() ? describe : describe.sk
 
 describeIf("system GitHub webhook trigger", () => {
   it(
-    "routes a real GitHub issue comment webhook into an trigger conversation thread",
+    "routes a real GitHub issue comment webhook into a trigger conversation thread",
     async ({ fixture }) => {
       const conversation = await startGitHubWebhookTriggerConversation({
         fixture,

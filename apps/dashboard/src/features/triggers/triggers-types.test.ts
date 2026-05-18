@@ -7,7 +7,7 @@ describe("TriggersListResultSchema", () => {
     const parsed = TriggersListResultSchema.parse({
       items: [
         {
-          id: "atm_webhook_123",
+          id: "trg_webhook_123",
           kind: "webhook",
           name: "Review events",
           enabled: true,
@@ -30,7 +30,7 @@ describe("TriggersListResultSchema", () => {
           updatedAt: "2026-04-30T02:00:00.000Z",
         },
         {
-          id: "atm_schedule_123",
+          id: "trg_schedule_123",
           kind: "schedule",
           name: "Daily triage",
           enabled: false,
