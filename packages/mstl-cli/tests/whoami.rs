@@ -1,7 +1,6 @@
 use std::process::Command;
 
-const API_KEY_ENV_VAR: &str = "MISTLE_API_KEY";
-const CONTROL_PLANE_API_PUBLIC_URL_ENV_VAR: &str = "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL";
+use mstl_core::auth::{API_KEY_ENV_VAR, CONTROL_PLANE_API_PUBLIC_URL_ENV_VAR};
 
 #[test]
 fn whoami_requires_api_key_env_var() {

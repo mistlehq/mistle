@@ -84,11 +84,24 @@ impl MistleClient {
         self.get_json(self.get_sandbox_instance_url(sandbox_id)?.as_str())
     }
 
+    pub fn list_sandbox_instances(
+        &self,
+    ) -> Result<ListSandboxInstancesResponse, MistleClientError> {
+        self.list_sandbox_instances_page(None)
+    }
+
     fn list_sandbox_profiles_page(
         &self,
         after: Option<&str>,
     ) -> Result<ListSandboxProfilesResponse, MistleClientError> {
         self.get_json(self.list_sandbox_profiles_url(after).as_str())
+    }
+
+    fn list_sandbox_instances_page(
+        &self,
+        after: Option<&str>,
+    ) -> Result<ListSandboxInstancesResponse, MistleClientError> {
+        self.get_json(self.list_sandbox_instances_url(after).as_str())
     }
 
     fn get_json<TResponse>(&self, url: &str) -> Result<TResponse, MistleClientError>
@@ -189,6 +202,16 @@ impl MistleClient {
             &format!("/v1/sandbox/instances/{validated_sandbox_id}"),
         ))
     }
+
+    fn list_sandbox_instances_url(&self, after: Option<&str>) -> Url {
+        let mut url = endpoint_url(&self.base_url, "/v1/sandbox/instances");
+
+        if let Some(after) = after {
+            url.query_pairs_mut().append_pair("after", after);
+        }
+
+        url
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -288,6 +311,48 @@ pub struct SandboxInstance {
     pub runtime_context: Option<SandboxInstanceRuntimeContext>,
     pub trigger_conversation: Option<SandboxInstanceTriggerConversation>,
     pub startup_operation: Option<SandboxInstanceStartupOperation>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ListSandboxInstancesResponse {
+    pub total_results: u32,
+    pub items: Vec<SandboxInstanceListItem>,
+    pub next_page: Option<KeysetPage>,
+    pub previous_page: Option<KeysetPage>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SandboxInstanceListItem {
+    pub id: String,
+    pub sandbox_profile_id: String,
+    pub title: Option<String>,
+    pub sandbox_profile_display_name: Option<String>,
+    pub sandbox_profile_version: u32,
+    pub status: SandboxInstanceStatus,
+    pub started_by: SandboxInstanceStartedBy,
+    pub source: SandboxInstanceSource,
+    pub created_at: String,
+    pub updated_at: String,
+    pub failure_code: Option<String>,
+    pub failure_message: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum SandboxInstanceStartedBy {
+    User { id: String, name: Option<String> },
+    ApiKey { id: String, name: Option<String> },
+    System { id: String, name: Option<String> },
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SandboxInstanceSource {
+    Dashboard,
+    Webhook,
+    Schedule,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -504,8 +569,9 @@ fn endpoint_url(base_url: &Url, endpoint_path: &str) -> Url {
 mod tests {
     use crate::client::{
         CurrentActor, CurrentActorApiKey, CurrentActorAuthentication, CurrentActorIdentity,
-        CurrentActorOrganization, MistleClient, MistleClientConfig, SandboxInstance,
-        SandboxInstanceAgentRuntimeId, SandboxInstanceRuntimeContext,
+        CurrentActorOrganization, ListSandboxInstancesResponse, MistleClient, MistleClientConfig,
+        SandboxInstance, SandboxInstanceAgentRuntimeId, SandboxInstanceListItem,
+        SandboxInstanceRuntimeContext, SandboxInstanceSource, SandboxInstanceStartedBy,
         SandboxInstanceStartupOperation, SandboxInstanceStartupOperationKind,
         SandboxInstanceStatus, SandboxInstanceTriggerConversation,
         StartSandboxProfileInstanceResponse, StartSandboxProfileInstanceStatus,
@@ -550,6 +616,28 @@ mod tests {
                 .list_sandbox_profiles_url(Some("cursor/with space"))
                 .as_str(),
             "https://api.example.test/v1/sandbox/profiles?after=cursor%2Fwith+space"
+        );
+    }
+
+    #[test]
+    fn builds_list_sandbox_instances_url_from_root_base_url() {
+        let client = client_with_base_url("https://api.example.test");
+
+        assert_eq!(
+            client.list_sandbox_instances_url(None).as_str(),
+            "https://api.example.test/v1/sandbox/instances"
+        );
+    }
+
+    #[test]
+    fn builds_list_sandbox_instances_url_with_after_cursor() {
+        let client = client_with_base_url("https://api.example.test");
+
+        assert_eq!(
+            client
+                .list_sandbox_instances_url(Some("cursor/with space"))
+                .as_str(),
+            "https://api.example.test/v1/sandbox/instances?after=cursor%2Fwith+space"
         );
     }
 
@@ -857,6 +945,64 @@ mod tests {
                     operation_id: "op_01".to_owned(),
                     operation_kind: SandboxInstanceStartupOperationKind::Start,
                 }),
+            }
+        );
+    }
+
+    #[test]
+    fn decodes_list_sandbox_instances_response() {
+        let response = serde_json::from_str::<ListSandboxInstancesResponse>(
+            r#"{
+                "totalResults": 1,
+                "items": [
+                    {
+                        "id": "sbi_01",
+                        "sandboxProfileId": "sbp_01",
+                        "title": "Python dev",
+                        "sandboxProfileDisplayName": "Python Dev",
+                        "sandboxProfileVersion": 3,
+                        "status": "running",
+                        "startedBy": {
+                            "kind": "api_key",
+                            "id": "apk_01",
+                            "name": "local"
+                        },
+                        "source": "dashboard",
+                        "createdAt": "2026-05-18T01:02:03.000Z",
+                        "updatedAt": "2026-05-18T01:03:03.000Z",
+                        "failureCode": null,
+                        "failureMessage": null
+                    }
+                ],
+                "nextPage": null,
+                "previousPage": null
+            }"#,
+        )
+        .expect("sandbox instance list response should decode");
+
+        assert_eq!(
+            response,
+            ListSandboxInstancesResponse {
+                total_results: 1,
+                items: vec![SandboxInstanceListItem {
+                    id: "sbi_01".to_owned(),
+                    sandbox_profile_id: "sbp_01".to_owned(),
+                    title: Some("Python dev".to_owned()),
+                    sandbox_profile_display_name: Some("Python Dev".to_owned()),
+                    sandbox_profile_version: 3,
+                    status: SandboxInstanceStatus::Running,
+                    started_by: SandboxInstanceStartedBy::ApiKey {
+                        id: "apk_01".to_owned(),
+                        name: Some("local".to_owned()),
+                    },
+                    source: SandboxInstanceSource::Dashboard,
+                    created_at: "2026-05-18T01:02:03.000Z".to_owned(),
+                    updated_at: "2026-05-18T01:03:03.000Z".to_owned(),
+                    failure_code: None,
+                    failure_message: None,
+                }],
+                next_page: None,
+                previous_page: None,
             }
         );
     }

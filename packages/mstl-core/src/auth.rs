@@ -1,4 +1,6 @@
 pub const API_KEY_ENV_VAR: &str = "MISTLE_API_KEY";
+pub const CONTROL_PLANE_API_PUBLIC_URL_ENV_VAR: &str =
+    "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuthStatus {

@@ -1,16 +1,16 @@
 use bpaf::{OptionParser, Parser, construct, long, positional, pure};
-use mstl_core::auth::API_KEY_ENV_VAR;
+use mstl_core::auth::{API_KEY_ENV_VAR, CONTROL_PLANE_API_PUBLIC_URL_ENV_VAR};
 use mstl_core::client::{
-    CurrentActor, CurrentActorAuthentication, ListSandboxProfilesResponse, MistleClient,
-    MistleClientConfig, MistleClientError, SandboxInstance, SandboxInstanceAgentRuntimeId,
-    SandboxInstanceStartupOperationKind, SandboxInstanceStatus, SandboxProfile,
-    SandboxProfileStatus, StartSandboxProfileInstanceResponse, StartSandboxProfileInstanceStatus,
+    CurrentActor, CurrentActorAuthentication, ListSandboxInstancesResponse,
+    ListSandboxProfilesResponse, MistleClient, MistleClientConfig, MistleClientError,
+    SandboxInstance, SandboxInstanceAgentRuntimeId, SandboxInstanceListItem, SandboxInstanceSource,
+    SandboxInstanceStartedBy, SandboxInstanceStartupOperationKind, SandboxInstanceStatus,
+    SandboxProfile, SandboxProfileStatus, StartSandboxProfileInstanceResponse,
+    StartSandboxProfileInstanceStatus,
 };
 use std::env::{self, VarError};
 use std::fmt;
 use std::io::{self, Write};
-
-const CONTROL_PLANE_API_PUBLIC_URL_ENV_VAR: &str = "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL";
 
 fn main() {
     let command = options().run();
@@ -31,6 +31,7 @@ enum CliCommand {
         profile_id: String,
         version: Option<u32>,
     },
+    SandboxList,
     SandboxGet {
         sandbox_id: String,
     },
@@ -122,6 +123,11 @@ fn options() -> OptionParser<CliCommand> {
     .descr("Create a sandbox")
     .command("create");
 
+    let sandbox_list = pure(CliCommand::SandboxList)
+        .to_options()
+        .descr("List sandboxes")
+        .command("list");
+
     let sandbox_id = positional::<String>("sandbox-id").help("Sandbox id").guard(
         |value| !value.trim().is_empty(),
         "sandbox id cannot be blank",
@@ -133,7 +139,7 @@ fn options() -> OptionParser<CliCommand> {
         .descr("Get a sandbox")
         .command("get");
 
-    let sandbox = construct!([sandbox_create, sandbox_get])
+    let sandbox = construct!([sandbox_create, sandbox_list, sandbox_get])
         .to_options()
         .descr("Manage sandboxes")
         .command("sandbox");
@@ -205,6 +211,19 @@ where
                 1
             }
         },
+        CliCommand::SandboxList => match list_sandboxes() {
+            Ok(sandboxes) => match write_sandboxes(stdout, &sandboxes) {
+                Ok(()) => 0,
+                Err(error) => {
+                    let _ = writeln!(stderr, "failed to write sandboxes: {error}");
+                    1
+                }
+            },
+            Err(error) => {
+                let _ = writeln!(stderr, "{error}");
+                1
+            }
+        },
         CliCommand::SandboxGet { sandbox_id } => match get_sandbox(&sandbox_id) {
             Ok(sandbox) => match write_sandbox(stdout, &sandbox) {
                 Ok(()) => 0,
@@ -262,6 +281,15 @@ fn create_sandbox(
         action: "create sandbox",
         source,
     })
+}
+
+fn list_sandboxes() -> Result<ListSandboxInstancesResponse, CliError> {
+    mistle_client()?
+        .list_sandbox_instances()
+        .map_err(|source| CliError::Client {
+            action: "list sandboxes",
+            source,
+        })
 }
 
 fn get_sandbox(sandbox_id: &str) -> Result<SandboxInstance, CliError> {
@@ -330,6 +358,13 @@ where
     W: Write,
 {
     write!(stdout, "{}", render_created_sandbox(response))
+}
+
+fn write_sandboxes<W>(stdout: &mut W, response: &ListSandboxInstancesResponse) -> io::Result<()>
+where
+    W: Write,
+{
+    write!(stdout, "{}", render_sandboxes(response))
 }
 
 fn write_sandbox<W>(stdout: &mut W, sandbox: &SandboxInstance) -> io::Result<()>
@@ -404,6 +439,62 @@ fn render_created_sandbox(response: &StartSandboxProfileInstanceResponse) -> Str
     )
 }
 
+fn render_sandboxes(response: &ListSandboxInstancesResponse) -> String {
+    if response.items.is_empty() {
+        return "No sandboxes found.\n".to_owned();
+    }
+
+    let rows: Vec<SandboxRow> = response
+        .items
+        .iter()
+        .map(SandboxRow::from_sandbox)
+        .collect();
+    let widths = SandboxTableWidths::from_rows(&rows);
+    let mut output = String::new();
+
+    output.push_str(&format!(
+        "{:<id_width$}  {:<title_width$}  {:<profile_width$}  {:<version_width$}  {:<status_width$}  {:<source_width$}  {:<started_by_width$}  {}\n",
+        "ID",
+        "TITLE",
+        "PROFILE",
+        "VERSION",
+        "STATUS",
+        "SOURCE",
+        "STARTED BY",
+        "UPDATED",
+        id_width = widths.id,
+        title_width = widths.title,
+        profile_width = widths.profile,
+        version_width = widths.version,
+        status_width = widths.status,
+        source_width = widths.source,
+        started_by_width = widths.started_by,
+    ));
+
+    for row in rows {
+        output.push_str(&format!(
+            "{:<id_width$}  {:<title_width$}  {:<profile_width$}  {:<version_width$}  {:<status_width$}  {:<source_width$}  {:<started_by_width$}  {}\n",
+            row.id,
+            row.title,
+            row.profile,
+            row.version,
+            row.status,
+            row.source,
+            row.started_by,
+            row.updated,
+            id_width = widths.id,
+            title_width = widths.title,
+            profile_width = widths.profile,
+            version_width = widths.version,
+            status_width = widths.status,
+            source_width = widths.source,
+            started_by_width = widths.started_by,
+        ));
+    }
+
+    output
+}
+
 fn render_sandbox(sandbox: &SandboxInstance) -> String {
     let runtime_context = match &sandbox.runtime_context {
         Some(runtime_context) => format!(
@@ -444,6 +535,69 @@ fn render_sandbox(sandbox: &SandboxInstance) -> String {
         trigger_conversation,
         startup_operation,
     )
+}
+
+struct SandboxRow {
+    id: String,
+    title: String,
+    profile: String,
+    version: String,
+    status: &'static str,
+    source: &'static str,
+    started_by: String,
+    updated: String,
+}
+
+impl SandboxRow {
+    fn from_sandbox(sandbox: &SandboxInstanceListItem) -> Self {
+        Self {
+            id: sandbox.id.clone(),
+            title: format_optional_value(sandbox.title.as_deref()).to_owned(),
+            profile: format_optional_value(sandbox.sandbox_profile_display_name.as_deref())
+                .to_owned(),
+            version: sandbox.sandbox_profile_version.to_string(),
+            status: sandbox_status_label(&sandbox.status),
+            source: sandbox_source_label(&sandbox.source),
+            started_by: format_started_by(&sandbox.started_by),
+            updated: sandbox.updated_at.clone(),
+        }
+    }
+}
+
+struct SandboxTableWidths {
+    id: usize,
+    title: usize,
+    profile: usize,
+    version: usize,
+    status: usize,
+    source: usize,
+    started_by: usize,
+}
+
+impl SandboxTableWidths {
+    fn from_rows(rows: &[SandboxRow]) -> Self {
+        let mut widths = Self {
+            id: "ID".len(),
+            title: "TITLE".len(),
+            profile: "PROFILE".len(),
+            version: "VERSION".len(),
+            status: "STATUS".len(),
+            source: "SOURCE".len(),
+            started_by: "STARTED BY".len(),
+        };
+
+        for row in rows {
+            widths.id = widths.id.max(row.id.len());
+            widths.title = widths.title.max(row.title.len());
+            widths.profile = widths.profile.max(row.profile.len());
+            widths.version = widths.version.max(row.version.len());
+            widths.status = widths.status.max(row.status.len());
+            widths.source = widths.source.max(row.source.len());
+            widths.started_by = widths.started_by.max(row.started_by.len());
+        }
+
+        widths
+    }
 }
 
 struct SandboxProfileRow {
@@ -525,6 +679,25 @@ fn startup_operation_kind_label(kind: &SandboxInstanceStartupOperationKind) -> &
     }
 }
 
+fn sandbox_source_label(source: &SandboxInstanceSource) -> &'static str {
+    match source {
+        SandboxInstanceSource::Dashboard => "dashboard",
+        SandboxInstanceSource::Webhook => "webhook",
+        SandboxInstanceSource::Schedule => "schedule",
+    }
+}
+
+fn format_started_by(started_by: &SandboxInstanceStartedBy) -> String {
+    match started_by {
+        SandboxInstanceStartedBy::User { id, name }
+        | SandboxInstanceStartedBy::ApiKey { id, name }
+        | SandboxInstanceStartedBy::System { id, name } => match name {
+            Some(name) => format!("{name} ({id})"),
+            None => id.clone(),
+        },
+    }
+}
+
 fn format_agent_runtime_id(
     agent_runtime_id: &Option<SandboxInstanceAgentRuntimeId>,
 ) -> &'static str {
@@ -556,14 +729,17 @@ fn format_optional_value(value: Option<&str>) -> &str {
 #[cfg(test)]
 mod tests {
     use mstl_core::client::{
-        ListSandboxProfilesResponse, SandboxInstance, SandboxInstanceAgentRuntimeId,
-        SandboxInstanceRuntimeContext, SandboxInstanceStartupOperation,
+        ListSandboxInstancesResponse, ListSandboxProfilesResponse, SandboxInstance,
+        SandboxInstanceAgentRuntimeId, SandboxInstanceListItem, SandboxInstanceRuntimeContext,
+        SandboxInstanceSource, SandboxInstanceStartedBy, SandboxInstanceStartupOperation,
         SandboxInstanceStartupOperationKind, SandboxInstanceStatus,
         SandboxInstanceTriggerConversation, SandboxProfile, SandboxProfileStatus,
         StartSandboxProfileInstanceResponse, StartSandboxProfileInstanceStatus,
     };
 
-    use crate::{render_created_sandbox, render_sandbox, render_sandbox_profiles};
+    use crate::{
+        render_created_sandbox, render_sandbox, render_sandbox_profiles, render_sandboxes,
+    };
 
     #[test]
     fn renders_empty_profile_list() {
@@ -653,6 +829,72 @@ mod tests {
                 "ID: sbi_01\n",
                 "Status: accepted\n",
                 "Workflow: wfr_01\n",
+            ),
+        );
+    }
+
+    #[test]
+    fn renders_empty_sandbox_list() {
+        let response = ListSandboxInstancesResponse {
+            total_results: 0,
+            items: Vec::new(),
+            next_page: None,
+            previous_page: None,
+        };
+
+        assert_eq!(render_sandboxes(&response), "No sandboxes found.\n");
+    }
+
+    #[test]
+    fn renders_sandbox_list_table() {
+        let response = ListSandboxInstancesResponse {
+            total_results: 2,
+            items: vec![
+                SandboxInstanceListItem {
+                    id: "sbi_python".to_owned(),
+                    sandbox_profile_id: "sbp_python".to_owned(),
+                    title: Some("Python Dev".to_owned()),
+                    sandbox_profile_display_name: Some("Python".to_owned()),
+                    sandbox_profile_version: 3,
+                    status: SandboxInstanceStatus::Running,
+                    started_by: SandboxInstanceStartedBy::ApiKey {
+                        id: "apk_local".to_owned(),
+                        name: Some("local".to_owned()),
+                    },
+                    source: SandboxInstanceSource::Dashboard,
+                    created_at: "2026-05-18T01:01:03.000Z".to_owned(),
+                    updated_at: "2026-05-18T01:02:03.000Z".to_owned(),
+                    failure_code: None,
+                    failure_message: None,
+                },
+                SandboxInstanceListItem {
+                    id: "sbi_failed".to_owned(),
+                    sandbox_profile_id: "sbp_node".to_owned(),
+                    title: None,
+                    sandbox_profile_display_name: None,
+                    sandbox_profile_version: 1,
+                    status: SandboxInstanceStatus::Failed,
+                    started_by: SandboxInstanceStartedBy::User {
+                        id: "usr_01".to_owned(),
+                        name: None,
+                    },
+                    source: SandboxInstanceSource::Schedule,
+                    created_at: "2026-05-17T01:01:03.000Z".to_owned(),
+                    updated_at: "2026-05-17T01:02:03.000Z".to_owned(),
+                    failure_code: Some("provider_error".to_owned()),
+                    failure_message: Some("Provider failed".to_owned()),
+                },
+            ],
+            next_page: None,
+            previous_page: None,
+        };
+
+        assert_eq!(
+            render_sandboxes(&response),
+            concat!(
+                "ID          TITLE       PROFILE  VERSION  STATUS   SOURCE     STARTED BY         UPDATED\n",
+                "sbi_python  Python Dev  Python   3        running  dashboard  local (apk_local)  2026-05-18T01:02:03.000Z\n",
+                "sbi_failed  -           -        1        failed   schedule   usr_01             2026-05-17T01:02:03.000Z\n",
             ),
         );
     }

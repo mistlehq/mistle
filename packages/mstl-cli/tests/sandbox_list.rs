@@ -3,9 +3,9 @@ use std::process::Command;
 use mstl_core::auth::{API_KEY_ENV_VAR, CONTROL_PLANE_API_PUBLIC_URL_ENV_VAR};
 
 #[test]
-fn sandbox_create_requires_api_key_env_var() {
+fn sandbox_list_requires_api_key_env_var() {
     let output = Command::new(env!("CARGO_BIN_EXE_mistle"))
-        .args(["sandbox", "create", "--profile", "sbp_test"])
+        .args(["sandbox", "list"])
         .env_remove(API_KEY_ENV_VAR)
         .env_remove(CONTROL_PLANE_API_PUBLIC_URL_ENV_VAR)
         .output()
@@ -20,9 +20,9 @@ fn sandbox_create_requires_api_key_env_var() {
 }
 
 #[test]
-fn sandbox_create_requires_control_plane_public_url_env_var() {
+fn sandbox_list_requires_control_plane_public_url_env_var() {
     let output = Command::new(env!("CARGO_BIN_EXE_mistle"))
-        .args(["sandbox", "create", "--profile", "sbp_test"])
+        .args(["sandbox", "list"])
         .env(API_KEY_ENV_VAR, "mstl_test_key")
         .env_remove(CONTROL_PLANE_API_PUBLIC_URL_ENV_VAR)
         .output()
