@@ -18,7 +18,7 @@ const PAYLOAD_KIND_WEBSOCKET_BINARY: u8 = 0x03;
 const AGENT_STREAM_WINDOW_BYTES: usize = 16 * 1024 * 1024;
 const STREAM_OPEN_TIMEOUT: Duration = Duration::from_secs(30);
 const CODEX_MISTLE_MODEL_PROVIDER_ID: &str = "mistle-remote";
-const CODEX_MISTLE_MODEL_PROVIDER_CONFIG: &str = "model_providers.mistle-remote={ name = \"Mistle Remote\", base_url = \"http://127.0.0.1:1/v1\", wire_api = \"responses\", requires_openai_auth = false }";
+const CODEX_MISTLE_MODEL_PROVIDER_CONFIG: &str = "model_providers.mistle-remote={ name = \"Mistle Remote\", base_url = \"http://127.0.0.1:1/v1\", wire_api = \"responses\", requires_openai_auth = false, supports_websockets = true }";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CodexRunConfig {
@@ -239,6 +239,8 @@ fn push_mistle_codex_config_args(command_args: &mut Vec<String>) {
     ));
     command_args.push("-c".to_owned());
     command_args.push(CODEX_MISTLE_MODEL_PROVIDER_CONFIG.to_owned());
+    command_args.push("-c".to_owned());
+    command_args.push("features.responses_websockets_v2=true".to_owned());
 }
 
 async fn accept_codex(listener: &TcpListener) -> Result<WebSocketStream<TcpStream>, CodexRunError> {
@@ -634,7 +636,9 @@ mod tests {
                 "-c",
                 "model_provider=\"mistle-remote\"",
                 "-c",
-                "model_providers.mistle-remote={ name = \"Mistle Remote\", base_url = \"http://127.0.0.1:1/v1\", wire_api = \"responses\", requires_openai_auth = false }",
+                "model_providers.mistle-remote={ name = \"Mistle Remote\", base_url = \"http://127.0.0.1:1/v1\", wire_api = \"responses\", requires_openai_auth = false, supports_websockets = true }",
+                "-c",
+                "features.responses_websockets_v2=true",
                 "--remote",
                 "ws://127.0.0.1:1234",
                 "--model",
@@ -656,7 +660,9 @@ mod tests {
                 "-c",
                 "model_provider=\"mistle-remote\"",
                 "-c",
-                "model_providers.mistle-remote={ name = \"Mistle Remote\", base_url = \"http://127.0.0.1:1/v1\", wire_api = \"responses\", requires_openai_auth = false }",
+                "model_providers.mistle-remote={ name = \"Mistle Remote\", base_url = \"http://127.0.0.1:1/v1\", wire_api = \"responses\", requires_openai_auth = false, supports_websockets = true }",
+                "-c",
+                "features.responses_websockets_v2=true",
                 "--remote",
                 "ws://127.0.0.1:1234",
                 "thread_01",
