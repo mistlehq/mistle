@@ -12,11 +12,13 @@ import {
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
+import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import {
   CreateSandboxProfileVersionConflictResponseSchema,
   CreateSandboxProfileVersionNotFoundResponseSchema,
   CreateSandboxProfileVersionResponseSchema,
 } from "../src/sandbox-profiles/index.js";
+import { createApiKeyToken } from "./helpers/api-keys.js";
 import {
   integrationConnectionRow,
   integrationTargetRow,
@@ -256,6 +258,98 @@ describe.concurrent("sandbox profile versions create integration", () => {
       await response.json(),
     );
     expect(responseBody.code).toBe("DRAFT_ALREADY_EXISTS");
+  });
+
+  it("creates the next draft version with an API key that has update permission", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-create-api-key@example.com",
+    });
+    const apiKeyToken = await createApiKeyToken({
+      env,
+      cookie: session.cookie,
+      name: "Profile version updater",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_UPDATE],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_version_create_api_key_001",
+        organizationId: session.organizationId,
+        displayName: "API Key Create Draft Profile",
+        activeVersion: 1,
+        createdAt: "2026-03-13T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_version_create_api_key_001",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        publishedAt: "2026-03-13T00:01:00.000Z",
+        setupScript: "echo api-key-source",
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_version_create_api_key_001/versions",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${apiKeyToken}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(201);
+    const responseBody = CreateSandboxProfileVersionResponseSchema.parse(await response.json());
+    expect(responseBody).toMatchObject({
+      sandboxProfileId: "sbp_version_create_api_key_001",
+      version: 2,
+      state: SandboxProfileVersionStates.DRAFT,
+    });
+
+    const persistedDraft = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        setupScript: true,
+        state: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, "sbp_version_create_api_key_001"), eq(table.version, 2)),
+    });
+    expect(persistedDraft).toEqual({
+      setupScript: "echo api-key-source",
+      state: SandboxProfileVersionStates.DRAFT,
+    });
+  });
+
+  it("returns 403 when an API key does not have update permission", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-create-api-key-forbidden@example.com",
+    });
+    const apiKeyToken = await createApiKeyToken({
+      env,
+      cookie: session.cookie,
+      name: "Profile version reader",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_READ],
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_version_create_api_key_forbidden/versions",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${apiKeyToken}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      code: "FORBIDDEN",
+      message: "Forbidden API request.",
+    });
   });
 
   it("returns 404 when the profile is outside the authenticated organization", async ({ env }) => {

@@ -12,10 +12,12 @@ import {
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
+import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import {
   ListSandboxProfileVersionsResponseSchema,
   NotFoundResponseSchema,
 } from "../src/sandbox-profiles/index.js";
+import { createApiKeyToken } from "./helpers/api-keys.js";
 import { sandboxProfileRow, sandboxProfileVersionRow } from "./helpers/sandbox-profiles.js";
 
 const it = createIntegrationTest({
@@ -212,6 +214,76 @@ describe.concurrent("sandbox profile versions list integration", () => {
         latestSnapshotJob: null,
       },
     ]);
+  });
+
+  it("lists profile versions with an API key that has read permission", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-versions-list-api-key@example.com",
+    });
+    const apiKeyToken = await createApiKeyToken({
+      env,
+      cookie: session.cookie,
+      name: "Profile version reader",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_READ],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_versions_list_api_key_001",
+        organizationId: session.organizationId,
+        displayName: "API Key Versions List Profile",
+        activeVersion: null,
+        createdAt: "2026-03-04T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_versions_list_api_key_001",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_versions_list_api_key_001/versions",
+      {
+        headers: {
+          authorization: `Bearer ${apiKeyToken}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = ListSandboxProfileVersionsResponseSchema.parse(await response.json());
+    expect(responseBody.versions).toHaveLength(1);
+    expect(responseBody.versions[0]?.sandboxProfileId).toBe("sbp_versions_list_api_key_001");
+  });
+
+  it("returns 403 when an API key does not have read permission", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-versions-list-api-key-forbidden@example.com",
+    });
+    const apiKeyToken = await createApiKeyToken({
+      env,
+      cookie: session.cookie,
+      name: "Profile version updater",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_UPDATE],
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_versions_list_api_key_forbidden/versions",
+      {
+        headers: {
+          authorization: `Bearer ${apiKeyToken}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      code: "FORBIDDEN",
+      message: "Forbidden API request.",
+    });
   });
 
   it("returns failed initial materialization state for published versions without a usable snapshot", async ({

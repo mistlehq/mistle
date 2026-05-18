@@ -17,11 +17,13 @@ import { SandboxProvider } from "@mistle/sandbox";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
+import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import {
   PutSandboxProfileVersionDraftBadRequestResponseSchema,
   PutSandboxProfileVersionDraftConflictResponseSchema,
   PutSandboxProfileVersionDraftResponseSchema,
 } from "../src/sandbox-profiles/index.js";
+import { createApiKeyToken } from "./helpers/api-keys.js";
 import {
   integrationConnectionRow,
   integrationTargetRow,
@@ -229,6 +231,105 @@ describe.concurrent("sandbox profile version draft put integration", () => {
     );
     expect(responseBody.code).toBe("INVALID_SANDBOX_RUNTIME_CONFIG");
     expect(responseBody.message).toBe("Sandbox provider 'unknown-provider' is not supported.");
+  });
+
+  it("updates a draft with an API key that has update permission", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-draft-put-api-key@example.com",
+    });
+    const apiKeyToken = await createApiKeyToken({
+      env,
+      cookie: session.cookie,
+      name: "Profile draft updater",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_UPDATE],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_draft_put_api_key_001",
+        organizationId: session.organizationId,
+        displayName: "API Key Draft Put Profile",
+        createdAt: "2026-05-09T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_draft_put_api_key_001",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        setupScript: "pnpm install",
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_draft_put_api_key_001/versions/1/draft",
+      {
+        method: "PUT",
+        headers: {
+          authorization: `Bearer ${apiKeyToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          setupScript: "pnpm install\npnpm test",
+          defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = PutSandboxProfileVersionDraftResponseSchema.parse(await response.json());
+    expect(responseBody).toMatchObject({
+      sandboxProfileId: "sbp_draft_put_api_key_001",
+      version: 1,
+      setupScript: "pnpm install\npnpm test",
+      defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
+    });
+
+    const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        setupScript: true,
+        defaultPersistenceMode: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, "sbp_draft_put_api_key_001"), eq(table.version, 1)),
+    });
+    expect(persistedVersion).toEqual({
+      setupScript: "pnpm install\npnpm test",
+      defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
+    });
+  });
+
+  it("returns 403 when an API key does not have update permission", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-draft-put-api-key-forbidden@example.com",
+    });
+    const apiKeyToken = await createApiKeyToken({
+      env,
+      cookie: session.cookie,
+      name: "Profile draft reader",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_READ],
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_draft_put_api_key_forbidden/versions/1/draft",
+      {
+        method: "PUT",
+        headers: {
+          authorization: `Bearer ${apiKeyToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          setupScript: "should not update",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      code: "FORBIDDEN",
+      message: "Forbidden API request.",
+    });
   });
 
   it("accepts an organization-owned E2B sandbox runtime connection with valid resources", async ({

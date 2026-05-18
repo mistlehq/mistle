@@ -7,10 +7,12 @@ import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
+import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import {
   deleteSandboxProfileVersionRefreshScheduleResponseSchema,
   sandboxProfileVersionRefreshScheduleResponseSchema,
 } from "../src/sandbox-profiles/schemas.js";
+import { createApiKeyToken } from "./helpers/api-keys.js";
 import { sandboxProfileRow, sandboxProfileVersionRow } from "./helpers/sandbox-profiles.js";
 
 const it = createIntegrationTest({
@@ -227,6 +229,76 @@ describe.concurrent("sandbox profile version refresh schedule integration", () =
         and(eq(table.sandboxProfileId, "sbp_refresh_schedule_invalid"), eq(table.version, 1)),
     });
     expect(persistedVersion?.maintenanceScript).toBe("echo keep after invalid schedule");
+  });
+
+  it("creates a snapshot refresh schedule with an API key that has update permission", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-refresh-schedule-api-key@example.com",
+    });
+    const apiKeyToken = await createApiKeyToken({
+      env,
+      cookie: session.cookie,
+      name: "Profile refresh schedule key",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_UPDATE],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_refresh_schedule_api_key",
+        organizationId: session.organizationId,
+        displayName: "API Key Refresh Schedule Profile",
+        activeVersion: 1,
+        createdAt: "2026-04-28T02:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_refresh_schedule_api_key",
+        version: 1,
+        publishedAt: "2026-04-28T02:01:00.000Z",
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_refresh_schedule_api_key/versions/1/refresh-schedule",
+      {
+        method: "PUT",
+        headers: {
+          authorization: `Bearer ${apiKeyToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          name: "API key daily refresh",
+          cronExpression: "15 9 * * *",
+          timezone: "Asia/Singapore",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = sandboxProfileVersionRefreshScheduleResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody).toMatchObject({
+      sandboxProfileId: "sbp_refresh_schedule_api_key",
+      sandboxProfileVersion: 1,
+      name: "API key daily refresh",
+      cronExpression: "15 9 * * *",
+      timezone: "Asia/Singapore",
+      enabled: true,
+    });
+
+    const createdSchedule = await env.controlPlaneDb.query.schedules.findFirst({
+      where: (table, { eq }) => eq(table.id, responseBody.scheduleId),
+    });
+    expect(createdSchedule).toMatchObject({
+      organizationId: session.organizationId,
+      targetType: ScheduleTargetTypes.SNAPSHOT_REFRESH,
+      name: "API key daily refresh",
+      deletedAt: null,
+    });
   });
 
   it("preserves the maintenance script when schedule creation omits it", async ({ env }) => {

@@ -11,10 +11,12 @@ import {
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
+import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import {
   DiscardSandboxProfileVersionDraftConflictResponseSchema,
   DiscardSandboxProfileVersionDraftResponseSchema,
 } from "../src/sandbox-profiles/index.js";
+import { createApiKeyToken } from "./helpers/api-keys.js";
 import {
   integrationConnectionRow,
   integrationTargetRow,
@@ -189,6 +191,63 @@ describe.concurrent("sandbox profile versions discard integration", () => {
       await response.json(),
     );
     expect(body.code).toBe("PROFILE_VERSION_ACTIVE");
+  });
+
+  it("discards a draft with an API key that has update permission", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-discard-api-key@example.com",
+    });
+    const apiKeyToken = await createApiKeyToken({
+      env,
+      cookie: session.cookie,
+      name: "Profile draft discard key",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_UPDATE],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_version_discard_api_key_001",
+        organizationId: session.organizationId,
+        displayName: "API Key Discard Draft Profile",
+        activeVersion: 1,
+        createdAt: "2026-04-24T03:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_version_discard_api_key_001",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        publishedAt: "2026-04-24T03:01:00.000Z",
+      }),
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_version_discard_api_key_001",
+        version: 2,
+        state: SandboxProfileVersionStates.DRAFT,
+      }),
+    ]);
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_version_discard_api_key_001/versions/2/discard",
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${apiKeyToken}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(DiscardSandboxProfileVersionDraftResponseSchema.parse(await response.json())).toEqual({
+      discardedVersion: 2,
+      hasDraft: false,
+    });
+
+    const discardedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, "sbp_version_discard_api_key_001"), eq(table.version, 2)),
+    });
+    expect(discardedVersion).toBeUndefined();
   });
 
   it("rejects discarding the only draft version", async ({ env }) => {
