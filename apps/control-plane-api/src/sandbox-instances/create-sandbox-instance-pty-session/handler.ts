@@ -17,6 +17,7 @@ const routeHandler = async (
   }
 
   const dataPlaneClient = ctx.get("dataPlaneClient");
+  const sandboxConfig = ctx.get("sandboxConfig");
   const ptyTransportConfig = ctx.get("ptyTransportConfig");
   const { instanceId } = ctx.req.valid("param");
   const { ptySessionId } = ctx.req.valid("json");
@@ -30,6 +31,7 @@ const routeHandler = async (
       instanceId,
       ptySessionId,
       actingUserId: organizationActor.userId,
+      gatewayWebsocketUrl: sandboxConfig.gatewayWsUrl,
       tokenTtlSeconds: SANDBOX_INSTANCE_PTY_TRANSPORT_TOKEN_TTL_SECONDS,
       tokenConfig: ptyTransportConfig,
     },

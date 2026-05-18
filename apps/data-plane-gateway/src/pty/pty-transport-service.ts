@@ -9,6 +9,8 @@ import {
   type VerifiedPtyTransportToken,
 } from "@mistle/gateway-tunnel-auth";
 import {
+  PtyTransportTokenQueryParam,
+  PtyTransportWebSocketRoutePath,
   parsePtyTransportClientOpen,
   type PtySessionLaunch,
   type PtySessionOpen,
@@ -22,8 +24,7 @@ import type { TunnelRelayCoordinator } from "../tunnel/relay-coordinator.js";
 import type { RelayPayload, RelayTarget } from "../tunnel/types.js";
 import type { DataPlaneGatewayConfig } from "../types.js";
 
-export const PtyTransportWebSocketRoutePath = "/_mistle/pty/connect";
-export const PtyTransportTokenQueryParam = "pty_token";
+export { PtyTransportTokenQueryParam, PtyTransportWebSocketRoutePath };
 
 const SandboxTransportTokenTtlSeconds = 120;
 const WebSocketCloseCodes = {

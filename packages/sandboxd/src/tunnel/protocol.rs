@@ -691,6 +691,26 @@ pub struct PtySessionError {
     pub message: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PtySessionOpenedResponse<'a> {
+    #[serde(rename = "type")]
+    message_type: &'a str,
+    request_id: &'a str,
+    pty_session_id: &'a str,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PtySessionErrorResponse<'a> {
+    #[serde(rename = "type")]
+    message_type: &'a str,
+    request_id: &'a str,
+    pty_session_id: &'a str,
+    code: &'a str,
+    message: String,
+}
+
 /// Direct PTY control messages exchanged over the bootstrap tunnel.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PtySessionControlMessage {
@@ -1405,6 +1425,31 @@ pub fn pty_exit_event(stream_id: u32, exit_code: i32) -> String {
             message_type: "pty.exit",
             exit_code,
         },
+    })
+}
+
+/// Builds one `pty.session.opened` response payload.
+pub fn pty_session_opened(request_id: &str, pty_session_id: &str) -> String {
+    serialize_json(&PtySessionOpenedResponse {
+        message_type: "pty.session.opened",
+        request_id,
+        pty_session_id,
+    })
+}
+
+/// Builds one `pty.session.error` response payload.
+pub fn pty_session_error(
+    request_id: &str,
+    pty_session_id: &str,
+    code: &'static str,
+    message: impl Into<String>,
+) -> String {
+    serialize_json(&PtySessionErrorResponse {
+        message_type: "pty.session.error",
+        request_id,
+        pty_session_id,
+        code,
+        message: message.into(),
     })
 }
 

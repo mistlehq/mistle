@@ -3,6 +3,10 @@ import type {
   GetSandboxInstanceResponse,
 } from "@mistle/data-plane-internal-client";
 import { PtyTransportTokenRoles, mintPtyTransportToken } from "@mistle/gateway-tunnel-auth";
+import {
+  PtyTransportTokenQueryParam,
+  PtyTransportWebSocketRoutePath,
+} from "@mistle/sandbox-session-protocol";
 
 import {
   SandboxInstancesConflictCodes,
@@ -50,9 +54,21 @@ export async function mintPtySession(
   return {
     instanceId: sandboxInstance.id,
     ptySessionId: input.ptySessionId,
+    url: createPtyTransportUrl({
+      gatewayWebsocketUrl: input.gatewayWebsocketUrl,
+      token: minted.token,
+    }),
     token: minted.token,
     expiresAt: minted.expiresAt.toISOString(),
   };
+}
+
+function createPtyTransportUrl(input: { gatewayWebsocketUrl: string; token: string }): string {
+  const gatewayUrl = new URL(input.gatewayWebsocketUrl);
+  gatewayUrl.pathname = PtyTransportWebSocketRoutePath;
+  gatewayUrl.search = "";
+  gatewayUrl.searchParams.set(PtyTransportTokenQueryParam, input.token);
+  return gatewayUrl.toString();
 }
 
 async function getExistingSandboxInstance(

@@ -132,6 +132,8 @@ describe.concurrent("sandbox instance connect integration", () => {
       expect(body.instanceId).toBe(sandboxInstanceId);
       expect(body.ptySessionId).toBe("terminal");
       expect(body.token).not.toBe("");
+      expect(body.url).toContain("/_mistle/pty/connect");
+      expect(new URL(body.url).searchParams.get("pty_token")).toBe(body.token);
       expect(new Date(body.expiresAt).getTime()).toBeGreaterThan(Date.now());
 
       const verifiedToken = await verifyPtyTransportToken({

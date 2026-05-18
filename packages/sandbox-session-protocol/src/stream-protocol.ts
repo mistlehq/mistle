@@ -4,6 +4,9 @@ const PositiveIntegerSchema = z.int().positive();
 const HttpResponseStatusSchema = z.int().min(200).max(599);
 const NonEmptyStringSchema = z.string().min(1);
 
+export const PtyTransportWebSocketRoutePath = "/_mistle/pty/connect";
+export const PtyTransportTokenQueryParam = "pty_token";
+
 export const FileUploadResetCodes = {
   BYTE_COUNT_EXCEEDED: "byte_count_exceeded",
   BYTE_COUNT_MISMATCH: "byte_count_mismatch",

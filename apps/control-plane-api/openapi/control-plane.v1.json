@@ -16936,6 +16936,10 @@
                       "type": "string",
                       "minLength": 1
                     },
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
                     "token": {
                       "type": "string",
                       "minLength": 1
@@ -16945,7 +16949,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["instanceId", "ptySessionId", "token", "expiresAt"],
+                  "required": ["instanceId", "ptySessionId", "url", "token", "expiresAt"],
                   "additionalProperties": false
                 }
               }

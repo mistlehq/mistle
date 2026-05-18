@@ -66,6 +66,16 @@ const SandboxInstanceConnectionTokenSchema = z
   })
   .strict();
 
+const SandboxInstancePtySessionSchema = z
+  .object({
+    expiresAt: z.string().min(1),
+    instanceId: z.string().min(1),
+    ptySessionId: z.string().min(1),
+    token: z.string().min(1),
+    url: z.url(),
+  })
+  .strict();
+
 const SandboxInstancePortAccessSchema = z
   .object({
     bootstrapPath: z.literal("/_mistle/access/bootstrap"),
@@ -107,6 +117,10 @@ export type MintSandboxConnectionTokenResult = {
   connectionToken: string;
   connectionExpiresAt: string;
 };
+
+export type CreateSandboxInstancePtySessionResult = z.output<
+  typeof SandboxInstancePtySessionSchema
+>;
 
 export type CreateSandboxInstancePortAccessResult = z.output<
   typeof SandboxInstancePortAccessSchema
@@ -336,6 +350,46 @@ export async function mintSandboxInstanceConnectionToken(input: {
         operation: "mintSandboxInstanceConnectionToken",
         error,
         fallbackMessage: "Could not establish sandbox session.",
+      }),
+    );
+  }
+}
+
+export async function createSandboxInstancePtySession(input: {
+  instanceId: string;
+  ptySessionId: string;
+  signal?: AbortSignal;
+}): Promise<CreateSandboxInstancePtySessionResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "createSandboxInstancePtySession",
+      method: "POST",
+      pathname: `/v1/sandbox/instances/${encodeURIComponent(input.instanceId)}/pty-sessions`,
+      body: {
+        ptySessionId: input.ptySessionId,
+      },
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not establish sandbox PTY session.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = SandboxInstancePtySessionSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "createSandboxInstancePtySession",
+        status: 500,
+        body: responseBody,
+        message: "Sandbox instance PTY session response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "createSandboxInstancePtySession",
+        error,
+        fallbackMessage: "Could not establish sandbox PTY session.",
       }),
     );
   }

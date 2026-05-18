@@ -7184,6 +7184,8 @@ export interface paths {
               instanceId: string;
               ptySessionId: string;
               token: string;
+              /** Format: uri */
+              url: string;
             };
           };
         };

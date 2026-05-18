@@ -156,6 +156,9 @@ importers:
       '@mistle/sandbox':
         specifier: workspace:*
         version: link:../../packages/sandbox
+      '@mistle/sandbox-session-protocol':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-session-protocol
       '@mistle/sandbox-signing-auth':
         specifier: workspace:*
         version: link:../../packages/sandbox-signing-auth

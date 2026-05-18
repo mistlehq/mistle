@@ -63,6 +63,7 @@ export const sandboxInstancePtySessionSchema = z
   .object({
     instanceId: z.string().min(1),
     ptySessionId: z.string().min(1),
+    url: z.url(),
     token: z.string().min(1),
     expiresAt: z.string().min(1),
   })

@@ -47,6 +47,7 @@ export type MintSandboxInstancePtySessionInput = {
   instanceId: string;
   ptySessionId: string;
   actingUserId: string;
+  gatewayWebsocketUrl: string;
   tokenTtlSeconds: number;
   tokenConfig: PtyTransportTokenConfig;
 };
@@ -54,6 +55,7 @@ export type MintSandboxInstancePtySessionInput = {
 export type SandboxInstancePtySession = {
   instanceId: string;
   ptySessionId: string;
+  url: string;
   token: string;
   expiresAt: string;
 };
