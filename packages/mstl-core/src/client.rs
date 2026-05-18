@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use url::Url;
 
 #[derive(Debug, Clone)]
@@ -54,6 +54,36 @@ impl MistleClient {
         self.get_json(self.get_sandbox_profile_url(profile_id)?.as_str())
     }
 
+    pub fn start_active_sandbox_profile_instance(
+        &self,
+        profile_id: &str,
+    ) -> Result<StartSandboxProfileInstanceResponse, MistleClientError> {
+        self.post_json(
+            self.start_active_sandbox_profile_instance_url(profile_id)?
+                .as_str(),
+            &StartSandboxProfileInstanceBody {},
+        )
+    }
+
+    pub fn start_sandbox_profile_instance_version(
+        &self,
+        profile_id: &str,
+        version: u32,
+    ) -> Result<StartSandboxProfileInstanceResponse, MistleClientError> {
+        self.post_json(
+            self.start_sandbox_profile_instance_version_url(profile_id, version)?
+                .as_str(),
+            &StartSandboxProfileInstanceBody {},
+        )
+    }
+
+    pub fn get_sandbox_instance(
+        &self,
+        sandbox_id: &str,
+    ) -> Result<SandboxInstance, MistleClientError> {
+        self.get_json(self.get_sandbox_instance_url(sandbox_id)?.as_str())
+    }
+
     fn list_sandbox_profiles_page(
         &self,
         after: Option<&str>,
@@ -68,6 +98,30 @@ impl MistleClient {
         let mut response = ureq::get(url)
             .header("authorization", format!("Bearer {}", self.api_key))
             .call()
+            .map_err(MistleClientError::Request)?;
+
+        let response_body = response
+            .body_mut()
+            .read_to_string()
+            .map_err(MistleClientError::ReadResponse)?;
+
+        serde_json::from_str(&response_body).map_err(MistleClientError::DecodeResponse)
+    }
+
+    fn post_json<TRequest, TResponse>(
+        &self,
+        url: &str,
+        body: &TRequest,
+    ) -> Result<TResponse, MistleClientError>
+    where
+        TRequest: Serialize,
+        TResponse: for<'de> Deserialize<'de>,
+    {
+        let request_body = serde_json::to_string(body).map_err(MistleClientError::EncodeRequest)?;
+        let mut response = ureq::post(url)
+            .header("authorization", format!("Bearer {}", self.api_key))
+            .content_type("application/json")
+            .send(request_body)
             .map_err(MistleClientError::Request)?;
 
         let response_body = response
@@ -98,6 +152,41 @@ impl MistleClient {
         Ok(endpoint_url(
             &self.base_url,
             &format!("/v1/sandbox/profiles/{validated_profile_id}"),
+        ))
+    }
+
+    fn start_active_sandbox_profile_instance_url(
+        &self,
+        profile_id: &str,
+    ) -> Result<Url, MistleClientError> {
+        let validated_profile_id = validate_sandbox_profile_id(profile_id)?;
+
+        Ok(endpoint_url(
+            &self.base_url,
+            &format!("/v1/sandbox/profiles/{validated_profile_id}/instances"),
+        ))
+    }
+
+    fn start_sandbox_profile_instance_version_url(
+        &self,
+        profile_id: &str,
+        version: u32,
+    ) -> Result<Url, MistleClientError> {
+        let validated_profile_id = validate_sandbox_profile_id(profile_id)?;
+        validate_sandbox_profile_version(version)?;
+
+        Ok(endpoint_url(
+            &self.base_url,
+            &format!("/v1/sandbox/profiles/{validated_profile_id}/versions/{version}/instances"),
+        ))
+    }
+
+    fn get_sandbox_instance_url(&self, sandbox_id: &str) -> Result<Url, MistleClientError> {
+        let validated_sandbox_id = validate_sandbox_instance_id(sandbox_id)?;
+
+        Ok(endpoint_url(
+            &self.base_url,
+            &format!("/v1/sandbox/instances/{validated_sandbox_id}"),
         ))
     }
 }
@@ -169,6 +258,85 @@ pub enum SandboxProfileStatus {
     Inactive,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StartSandboxProfileInstanceBody {}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct StartSandboxProfileInstanceResponse {
+    pub status: StartSandboxProfileInstanceStatus,
+    pub workflow_run_id: String,
+    pub sandbox_instance_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum StartSandboxProfileInstanceStatus {
+    Accepted,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SandboxInstance {
+    pub id: String,
+    pub title: Option<String>,
+    pub status: SandboxInstanceStatus,
+    pub connectable: bool,
+    pub failure_code: Option<String>,
+    pub failure_message: Option<String>,
+    pub runtime_context: Option<SandboxInstanceRuntimeContext>,
+    pub trigger_conversation: Option<SandboxInstanceTriggerConversation>,
+    pub startup_operation: Option<SandboxInstanceStartupOperation>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SandboxInstanceStatus {
+    Pending,
+    Starting,
+    Running,
+    Stopped,
+    Failed,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SandboxInstanceRuntimeContext {
+    pub agent_runtime_id: Option<SandboxInstanceAgentRuntimeId>,
+    pub launch_cwd: Option<String>,
+    pub primary_repository_root: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SandboxInstanceAgentRuntimeId {
+    Codex,
+    Opencode,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SandboxInstanceTriggerConversation {
+    pub conversation_id: String,
+    pub route_id: Option<String>,
+    pub provider_conversation_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SandboxInstanceStartupOperation {
+    pub operation_id: String,
+    pub operation_kind: SandboxInstanceStartupOperationKind,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SandboxInstanceStartupOperationKind {
+    Start,
+    Resume,
+}
+
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct KeysetPage {
     pub limit: u32,
@@ -186,6 +354,7 @@ pub enum MistleClientError {
     InvalidResponse(&'static str),
     Request(ureq::Error),
     ReadResponse(ureq::Error),
+    EncodeRequest(serde_json::Error),
     DecodeResponse(serde_json::Error),
 }
 
@@ -204,6 +373,7 @@ impl Display for MistleClientError {
             Self::InvalidResponse(message) => write!(formatter, "invalid response: {message}"),
             Self::Request(error) => write!(formatter, "request failed: {error}"),
             Self::ReadResponse(error) => write!(formatter, "failed to read response: {error}"),
+            Self::EncodeRequest(error) => write!(formatter, "failed to encode request: {error}"),
             Self::DecodeResponse(error) => write!(formatter, "failed to decode response: {error}"),
         }
     }
@@ -214,7 +384,7 @@ impl Error for MistleClientError {
         match self {
             Self::InvalidBaseUrl(error) => Some(error),
             Self::Request(error) | Self::ReadResponse(error) => Some(error),
-            Self::DecodeResponse(error) => Some(error),
+            Self::EncodeRequest(error) | Self::DecodeResponse(error) => Some(error),
             Self::InvalidConfig(_)
             | Self::UnsupportedBaseUrlScheme(_)
             | Self::BaseUrlCannotIncludeQuery
@@ -286,6 +456,41 @@ fn validate_sandbox_profile_id(profile_id: &str) -> Result<&str, MistleClientErr
     Ok(trimmed_profile_id)
 }
 
+fn validate_sandbox_profile_version(version: u32) -> Result<(), MistleClientError> {
+    if version == 0 {
+        return Err(MistleClientError::InvalidConfig(
+            "profile version must be greater than zero",
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_sandbox_instance_id(sandbox_id: &str) -> Result<&str, MistleClientError> {
+    let trimmed_sandbox_id = sandbox_id.trim();
+
+    if trimmed_sandbox_id.is_empty() {
+        return Err(MistleClientError::InvalidConfig("sandbox id is required"));
+    }
+
+    if !trimmed_sandbox_id.starts_with("sbi_") {
+        return Err(MistleClientError::InvalidConfig(
+            "sandbox id must start with `sbi_`",
+        ));
+    }
+
+    if !trimmed_sandbox_id
+        .chars()
+        .all(|character| character.is_ascii_alphanumeric() || character == '_' || character == '-')
+    {
+        return Err(MistleClientError::InvalidConfig(
+            "sandbox id can only contain ASCII letters, numbers, underscores, and hyphens",
+        ));
+    }
+
+    Ok(trimmed_sandbox_id)
+}
+
 fn endpoint_url(base_url: &Url, endpoint_path: &str) -> Url {
     let mut endpoint_url = base_url.clone();
     let base_path = endpoint_url.path().trim_end_matches('/');
@@ -299,7 +504,11 @@ fn endpoint_url(base_url: &Url, endpoint_path: &str) -> Url {
 mod tests {
     use crate::client::{
         CurrentActor, CurrentActorApiKey, CurrentActorAuthentication, CurrentActorIdentity,
-        CurrentActorOrganization, MistleClient, MistleClientConfig,
+        CurrentActorOrganization, MistleClient, MistleClientConfig, SandboxInstance,
+        SandboxInstanceAgentRuntimeId, SandboxInstanceRuntimeContext,
+        SandboxInstanceStartupOperation, SandboxInstanceStartupOperationKind,
+        SandboxInstanceStatus, SandboxInstanceTriggerConversation,
+        StartSandboxProfileInstanceResponse, StartSandboxProfileInstanceStatus,
     };
 
     #[test]
@@ -366,6 +575,70 @@ mod tests {
             .expect_err("invalid profile id should fail");
 
         assert_eq!(error.to_string(), "profile id must start with `sbp_`");
+    }
+
+    #[test]
+    fn builds_start_active_sandbox_profile_instance_url() {
+        let client = client_with_base_url("https://api.example.test");
+
+        assert_eq!(
+            client
+                .start_active_sandbox_profile_instance_url("sbp_python-dev")
+                .expect("profile id should be valid")
+                .as_str(),
+            "https://api.example.test/v1/sandbox/profiles/sbp_python-dev/instances"
+        );
+    }
+
+    #[test]
+    fn builds_start_sandbox_profile_instance_version_url() {
+        let client = client_with_base_url("https://api.example.test");
+
+        assert_eq!(
+            client
+                .start_sandbox_profile_instance_version_url("sbp_python-dev", 7)
+                .expect("profile id should be valid")
+                .as_str(),
+            "https://api.example.test/v1/sandbox/profiles/sbp_python-dev/versions/7/instances"
+        );
+    }
+
+    #[test]
+    fn rejects_zero_sandbox_profile_instance_version_url() {
+        let client = client_with_base_url("https://api.example.test");
+
+        let error = client
+            .start_sandbox_profile_instance_version_url("sbp_python-dev", 0)
+            .expect_err("zero profile version should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "profile version must be greater than zero"
+        );
+    }
+
+    #[test]
+    fn builds_get_sandbox_instance_url() {
+        let client = client_with_base_url("https://api.example.test");
+
+        assert_eq!(
+            client
+                .get_sandbox_instance_url("sbi_local-dev")
+                .expect("sandbox id should be valid")
+                .as_str(),
+            "https://api.example.test/v1/sandbox/instances/sbi_local-dev"
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_sandbox_instance_id_for_get_url() {
+        let client = client_with_base_url("https://api.example.test");
+
+        let error = client
+            .get_sandbox_instance_url("sandbox/instance")
+            .expect_err("invalid sandbox id should fail");
+
+        assert_eq!(error.to_string(), "sandbox id must start with `sbi_`");
     }
 
     #[test]
@@ -510,6 +783,82 @@ mod tests {
         .expect_err("session current actor response should fail");
 
         assert!(error.to_string().contains("unknown variant `session`"));
+    }
+
+    #[test]
+    fn decodes_start_sandbox_profile_instance_response() {
+        let response = serde_json::from_str::<StartSandboxProfileInstanceResponse>(
+            r#"{
+                "status": "accepted",
+                "workflowRunId": "wfr_01",
+                "sandboxInstanceId": "sbi_01"
+            }"#,
+        )
+        .expect("start sandbox response should decode");
+
+        assert_eq!(
+            response,
+            StartSandboxProfileInstanceResponse {
+                status: StartSandboxProfileInstanceStatus::Accepted,
+                workflow_run_id: "wfr_01".to_owned(),
+                sandbox_instance_id: "sbi_01".to_owned(),
+            }
+        );
+    }
+
+    #[test]
+    fn decodes_sandbox_instance_response() {
+        let instance = serde_json::from_str::<SandboxInstance>(
+            r#"{
+                "id": "sbi_01",
+                "title": "Python dev",
+                "status": "running",
+                "connectable": true,
+                "failureCode": null,
+                "failureMessage": null,
+                "runtimeContext": {
+                    "agentRuntimeId": "codex",
+                    "launchCwd": "/workspace",
+                    "primaryRepositoryRoot": "/workspace/mistle"
+                },
+                "triggerConversation": {
+                    "conversationId": "cnv_01",
+                    "routeId": null,
+                    "providerConversationId": "provider_01"
+                },
+                "startupOperation": {
+                    "operationId": "op_01",
+                    "operationKind": "start"
+                }
+            }"#,
+        )
+        .expect("sandbox instance response should decode");
+
+        assert_eq!(
+            instance,
+            SandboxInstance {
+                id: "sbi_01".to_owned(),
+                title: Some("Python dev".to_owned()),
+                status: SandboxInstanceStatus::Running,
+                connectable: true,
+                failure_code: None,
+                failure_message: None,
+                runtime_context: Some(SandboxInstanceRuntimeContext {
+                    agent_runtime_id: Some(SandboxInstanceAgentRuntimeId::Codex),
+                    launch_cwd: Some("/workspace".to_owned()),
+                    primary_repository_root: Some("/workspace/mistle".to_owned()),
+                }),
+                trigger_conversation: Some(SandboxInstanceTriggerConversation {
+                    conversation_id: "cnv_01".to_owned(),
+                    route_id: None,
+                    provider_conversation_id: Some("provider_01".to_owned()),
+                }),
+                startup_operation: Some(SandboxInstanceStartupOperation {
+                    operation_id: "op_01".to_owned(),
+                    operation_kind: SandboxInstanceStartupOperationKind::Start,
+                }),
+            }
+        );
     }
 
     fn client_with_base_url(base_url: &str) -> MistleClient {

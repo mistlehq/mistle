@@ -1,8 +1,10 @@
-use bpaf::{OptionParser, Parser, construct, positional, pure};
+use bpaf::{OptionParser, Parser, construct, long, positional, pure};
 use mstl_core::auth::API_KEY_ENV_VAR;
 use mstl_core::client::{
     CurrentActor, CurrentActorAuthentication, ListSandboxProfilesResponse, MistleClient,
-    MistleClientConfig, MistleClientError, SandboxProfile, SandboxProfileStatus,
+    MistleClientConfig, MistleClientError, SandboxInstance, SandboxInstanceAgentRuntimeId,
+    SandboxInstanceStartupOperationKind, SandboxInstanceStatus, SandboxProfile,
+    SandboxProfileStatus, StartSandboxProfileInstanceResponse, StartSandboxProfileInstanceStatus,
 };
 use std::env::{self, VarError};
 use std::fmt;
@@ -22,7 +24,16 @@ fn main() {
 enum CliCommand {
     Whoami,
     ProfileList,
-    ProfileGet { profile_id: String },
+    ProfileGet {
+        profile_id: String,
+    },
+    SandboxCreate {
+        profile_id: String,
+        version: Option<u32>,
+    },
+    SandboxGet {
+        sandbox_id: String,
+    },
 }
 
 #[derive(Debug)]
@@ -90,7 +101,44 @@ fn options() -> OptionParser<CliCommand> {
         .descr("Manage sandbox profiles")
         .command("profile");
 
-    construct!([whoami, profile])
+    let profile_id = long("profile")
+        .help("Sandbox profile id")
+        .argument::<String>("profile-id")
+        .guard(
+            |value| !value.trim().is_empty(),
+            "profile id cannot be blank",
+        );
+    let version = long("version")
+        .help("Sandbox profile version")
+        .argument::<u32>("version")
+        .guard(|value| *value > 0, "version must be greater than zero")
+        .optional();
+
+    let sandbox_create = construct!(CliCommand::SandboxCreate {
+        profile_id,
+        version
+    })
+    .to_options()
+    .descr("Create a sandbox")
+    .command("create");
+
+    let sandbox_id = positional::<String>("sandbox-id").help("Sandbox id").guard(
+        |value| !value.trim().is_empty(),
+        "sandbox id cannot be blank",
+    );
+
+    let sandbox_get = sandbox_id
+        .map(|sandbox_id| CliCommand::SandboxGet { sandbox_id })
+        .to_options()
+        .descr("Get a sandbox")
+        .command("get");
+
+    let sandbox = construct!([sandbox_create, sandbox_get])
+        .to_options()
+        .descr("Manage sandboxes")
+        .command("sandbox");
+
+    construct!([whoami, profile, sandbox])
         .to_options()
         .descr("Mistle command line interface")
         .version(env!("CARGO_PKG_VERSION"))
@@ -141,6 +189,35 @@ where
                 1
             }
         },
+        CliCommand::SandboxCreate {
+            profile_id,
+            version,
+        } => match create_sandbox(&profile_id, version) {
+            Ok(response) => match write_created_sandbox(stdout, &response) {
+                Ok(()) => 0,
+                Err(error) => {
+                    let _ = writeln!(stderr, "failed to write created sandbox: {error}");
+                    1
+                }
+            },
+            Err(error) => {
+                let _ = writeln!(stderr, "{error}");
+                1
+            }
+        },
+        CliCommand::SandboxGet { sandbox_id } => match get_sandbox(&sandbox_id) {
+            Ok(sandbox) => match write_sandbox(stdout, &sandbox) {
+                Ok(()) => 0,
+                Err(error) => {
+                    let _ = writeln!(stderr, "failed to write sandbox: {error}");
+                    1
+                }
+            },
+            Err(error) => {
+                let _ = writeln!(stderr, "{error}");
+                1
+            }
+        },
     }
 }
 
@@ -167,6 +244,31 @@ fn get_sandbox_profile(profile_id: &str) -> Result<SandboxProfile, CliError> {
         .get_sandbox_profile(profile_id)
         .map_err(|source| CliError::Client {
             action: "get sandbox profile",
+            source,
+        })
+}
+
+fn create_sandbox(
+    profile_id: &str,
+    version: Option<u32>,
+) -> Result<StartSandboxProfileInstanceResponse, CliError> {
+    let client = mistle_client()?;
+    let response = match version {
+        Some(version) => client.start_sandbox_profile_instance_version(profile_id, version),
+        None => client.start_active_sandbox_profile_instance(profile_id),
+    };
+
+    response.map_err(|source| CliError::Client {
+        action: "create sandbox",
+        source,
+    })
+}
+
+fn get_sandbox(sandbox_id: &str) -> Result<SandboxInstance, CliError> {
+    mistle_client()?
+        .get_sandbox_instance(sandbox_id)
+        .map_err(|source| CliError::Client {
+            action: "get sandbox",
             source,
         })
 }
@@ -218,6 +320,23 @@ where
     W: Write,
 {
     write!(stdout, "{}", render_sandbox_profile(profile))
+}
+
+fn write_created_sandbox<W>(
+    stdout: &mut W,
+    response: &StartSandboxProfileInstanceResponse,
+) -> io::Result<()>
+where
+    W: Write,
+{
+    write!(stdout, "{}", render_created_sandbox(response))
+}
+
+fn write_sandbox<W>(stdout: &mut W, sandbox: &SandboxInstance) -> io::Result<()>
+where
+    W: Write,
+{
+    write!(stdout, "{}", render_sandbox(sandbox))
 }
 
 fn render_sandbox_profile(profile: &SandboxProfile) -> String {
@@ -276,6 +395,57 @@ fn render_sandbox_profiles(response: &ListSandboxProfilesResponse) -> String {
     output
 }
 
+fn render_created_sandbox(response: &StartSandboxProfileInstanceResponse) -> String {
+    format!(
+        "Sandbox\nID: {}\nStatus: {}\nWorkflow: {}\n",
+        response.sandbox_instance_id,
+        start_sandbox_profile_instance_status_label(&response.status),
+        response.workflow_run_id,
+    )
+}
+
+fn render_sandbox(sandbox: &SandboxInstance) -> String {
+    let runtime_context = match &sandbox.runtime_context {
+        Some(runtime_context) => format!(
+            "{} / {} / {}",
+            format_agent_runtime_id(&runtime_context.agent_runtime_id),
+            format_optional_value(runtime_context.launch_cwd.as_deref()),
+            format_optional_value(runtime_context.primary_repository_root.as_deref()),
+        ),
+        None => "-".to_owned(),
+    };
+    let trigger_conversation = match &sandbox.trigger_conversation {
+        Some(trigger_conversation) => format!(
+            "{} / {} / {}",
+            trigger_conversation.conversation_id,
+            format_optional_value(trigger_conversation.route_id.as_deref()),
+            format_optional_value(trigger_conversation.provider_conversation_id.as_deref()),
+        ),
+        None => "-".to_owned(),
+    };
+    let startup_operation = match &sandbox.startup_operation {
+        Some(startup_operation) => format!(
+            "{} ({})",
+            startup_operation.operation_id,
+            startup_operation_kind_label(&startup_operation.operation_kind),
+        ),
+        None => "-".to_owned(),
+    };
+
+    format!(
+        "Sandbox\nID: {}\nTitle: {}\nStatus: {}\nConnectable: {}\nFailure code: {}\nFailure message: {}\nRuntime context: {}\nTrigger conversation: {}\nStartup operation: {}\n",
+        sandbox.id,
+        format_optional_value(sandbox.title.as_deref()),
+        sandbox_status_label(&sandbox.status),
+        format_bool(sandbox.connectable),
+        format_optional_value(sandbox.failure_code.as_deref()),
+        format_optional_value(sandbox.failure_message.as_deref()),
+        runtime_context,
+        trigger_conversation,
+        startup_operation,
+    )
+}
+
 struct SandboxProfileRow {
     id: String,
     name: String,
@@ -330,6 +500,41 @@ fn profile_status_label(status: &SandboxProfileStatus) -> &'static str {
     }
 }
 
+fn start_sandbox_profile_instance_status_label(
+    status: &StartSandboxProfileInstanceStatus,
+) -> &'static str {
+    match status {
+        StartSandboxProfileInstanceStatus::Accepted => "accepted",
+    }
+}
+
+fn sandbox_status_label(status: &SandboxInstanceStatus) -> &'static str {
+    match status {
+        SandboxInstanceStatus::Pending => "pending",
+        SandboxInstanceStatus::Starting => "starting",
+        SandboxInstanceStatus::Running => "running",
+        SandboxInstanceStatus::Stopped => "stopped",
+        SandboxInstanceStatus::Failed => "failed",
+    }
+}
+
+fn startup_operation_kind_label(kind: &SandboxInstanceStartupOperationKind) -> &'static str {
+    match kind {
+        SandboxInstanceStartupOperationKind::Start => "start",
+        SandboxInstanceStartupOperationKind::Resume => "resume",
+    }
+}
+
+fn format_agent_runtime_id(
+    agent_runtime_id: &Option<SandboxInstanceAgentRuntimeId>,
+) -> &'static str {
+    match agent_runtime_id {
+        Some(SandboxInstanceAgentRuntimeId::Codex) => "codex",
+        Some(SandboxInstanceAgentRuntimeId::Opencode) => "opencode",
+        None => "-",
+    }
+}
+
 fn format_active_version(active_version: Option<u32>) -> String {
     match active_version {
         Some(active_version) => active_version.to_string(),
@@ -337,11 +542,28 @@ fn format_active_version(active_version: Option<u32>) -> String {
     }
 }
 
+fn format_bool(value: bool) -> &'static str {
+    if value { "yes" } else { "no" }
+}
+
+fn format_optional_value(value: Option<&str>) -> &str {
+    match value {
+        Some(value) => value,
+        None => "-",
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use mstl_core::client::{ListSandboxProfilesResponse, SandboxProfile, SandboxProfileStatus};
+    use mstl_core::client::{
+        ListSandboxProfilesResponse, SandboxInstance, SandboxInstanceAgentRuntimeId,
+        SandboxInstanceRuntimeContext, SandboxInstanceStartupOperation,
+        SandboxInstanceStartupOperationKind, SandboxInstanceStatus,
+        SandboxInstanceTriggerConversation, SandboxProfile, SandboxProfileStatus,
+        StartSandboxProfileInstanceResponse, StartSandboxProfileInstanceStatus,
+    };
 
-    use crate::render_sandbox_profiles;
+    use crate::{render_created_sandbox, render_sandbox, render_sandbox_profiles};
 
     #[test]
     fn renders_empty_profile_list() {
@@ -412,6 +634,67 @@ mod tests {
                 "Active version: 3\n",
                 "Created: 2026-05-12T01:02:03.000Z\n",
                 "Updated: 2026-05-18T01:02:03.000Z\n",
+            ),
+        );
+    }
+
+    #[test]
+    fn renders_created_sandbox_details() {
+        let response = StartSandboxProfileInstanceResponse {
+            status: StartSandboxProfileInstanceStatus::Accepted,
+            workflow_run_id: "wfr_01".to_owned(),
+            sandbox_instance_id: "sbi_01".to_owned(),
+        };
+
+        assert_eq!(
+            render_created_sandbox(&response),
+            concat!(
+                "Sandbox\n",
+                "ID: sbi_01\n",
+                "Status: accepted\n",
+                "Workflow: wfr_01\n",
+            ),
+        );
+    }
+
+    #[test]
+    fn renders_sandbox_details() {
+        let sandbox = SandboxInstance {
+            id: "sbi_01".to_owned(),
+            title: Some("Python dev".to_owned()),
+            status: SandboxInstanceStatus::Running,
+            connectable: true,
+            failure_code: None,
+            failure_message: None,
+            runtime_context: Some(SandboxInstanceRuntimeContext {
+                agent_runtime_id: Some(SandboxInstanceAgentRuntimeId::Codex),
+                launch_cwd: Some("/workspace".to_owned()),
+                primary_repository_root: Some("/workspace/mistle".to_owned()),
+            }),
+            trigger_conversation: Some(SandboxInstanceTriggerConversation {
+                conversation_id: "cnv_01".to_owned(),
+                route_id: None,
+                provider_conversation_id: Some("provider_01".to_owned()),
+            }),
+            startup_operation: Some(SandboxInstanceStartupOperation {
+                operation_id: "op_01".to_owned(),
+                operation_kind: SandboxInstanceStartupOperationKind::Start,
+            }),
+        };
+
+        assert_eq!(
+            render_sandbox(&sandbox),
+            concat!(
+                "Sandbox\n",
+                "ID: sbi_01\n",
+                "Title: Python dev\n",
+                "Status: running\n",
+                "Connectable: yes\n",
+                "Failure code: -\n",
+                "Failure message: -\n",
+                "Runtime context: codex / /workspace / /workspace/mistle\n",
+                "Trigger conversation: cnv_01 / - / provider_01\n",
+                "Startup operation: op_01 (start)\n",
             ),
         );
     }
