@@ -15,22 +15,54 @@ import {
   type PtySessionLaunch,
   type PtySessionOpen,
 } from "@mistle/sandbox-session-protocol";
+import type { Clock, Scheduler } from "@mistle/time";
+import { metrics, type Attributes } from "@opentelemetry/api";
 import type { WSContext, WSMessageReceive } from "hono/ws";
 import WebSocket from "ws";
 
+import { logger } from "../logger.js";
+import {
+  WEBSOCKET_PING_INTERVAL_MS,
+  WEBSOCKET_PONG_TIMEOUT_MS,
+} from "../runtime-state/durations.js";
 import { BootstrapTunnelNotConnectedError } from "../tunnel/bootstrap-tunnel-not-connected-error.js";
 import type { SandboxOwnerResolver } from "../tunnel/ownership/sandbox-owner-resolver.js";
 import type { TunnelRelayCoordinator } from "../tunnel/relay-coordinator.js";
+import {
+  startWebSocketHealthMonitor,
+  type WebSocketHealthHandle,
+} from "../tunnel/session/websocket-health-monitor.js";
 import type { RelayPayload, RelayTarget } from "../tunnel/types.js";
 import type { DataPlaneGatewayConfig } from "../types.js";
 
 export { PtyTransportTokenQueryParam, PtyTransportWebSocketRoutePath };
 
 const SandboxTransportTokenTtlSeconds = 120;
+const PtyWebSocketMaxConsecutiveMissedPongs = 3;
 const WebSocketCloseCodes = {
   POLICY_VIOLATION: 1008,
   INTERNAL_ERROR: 1011,
 };
+const PtyTransportMeter = metrics.getMeter("@mistle/data-plane-gateway/pty");
+const PtyTransportWebSocketOpened = PtyTransportMeter.createCounter(
+  "mistle.sandbox.pty_transport.websocket.opened",
+  {
+    description: "Count of direct PTY transport websocket peers opened by side.",
+  },
+);
+const PtyTransportWebSocketClosed = PtyTransportMeter.createCounter(
+  "mistle.sandbox.pty_transport.websocket.closed",
+  {
+    description: "Count of direct PTY transport websocket peers closed by side and outcome.",
+  },
+);
+const PtyTransportWebSocketDurationMs = PtyTransportMeter.createHistogram(
+  "mistle.sandbox.pty_transport.websocket.duration",
+  {
+    description: "Duration of direct PTY transport websocket peers by side and outcome.",
+    unit: "ms",
+  },
+);
 
 type PtyTransportSide = "client" | "sandbox";
 
@@ -41,9 +73,15 @@ export type PtyTransportAdmission = {
 
 type PtyTransportSession = {
   client: WSContext<WebSocket>;
-  clientTarget: RelayTarget;
+  clientPeer: AttachedPtyTransportPeer;
   clientOpenRequested: boolean;
   pendingClientMessages: WSMessageReceive[];
+};
+
+type AttachedPtyTransportPeer = {
+  openedAtMs: number;
+  relayTarget: RelayTarget;
+  websocketHealthHandle?: WebSocketHealthHandle;
 };
 
 export class PtyTransportError extends Error {
@@ -58,7 +96,7 @@ export class PtyTransportError extends Error {
 
 export class PtyTransportService {
   private readonly sessions = new Map<string, PtyTransportSession>();
-  private readonly sandboxTargets = new Map<string, RelayTarget>();
+  private readonly sandboxTargets = new Map<string, AttachedPtyTransportPeer>();
 
   public constructor(
     private readonly input: {
@@ -66,6 +104,8 @@ export class PtyTransportService {
       relayCoordinator: TunnelRelayCoordinator;
       sandboxOwnerResolver: SandboxOwnerResolver;
       tokenConfig: PtyTransportTokenConfig;
+      clock: Clock;
+      scheduler: Scheduler;
     },
   ) {}
 
@@ -121,16 +161,21 @@ export class PtyTransportService {
       return;
     }
 
-    const clientTarget = this.input.relayCoordinator.attachPeer({
+    const relayTarget = this.input.relayCoordinator.attachPeer({
       sandboxInstanceId: input.admission.claims.sub,
       side: "ptyClient",
       socket: input.socket,
       sessionId: input.admission.claims.ptySessionId,
     });
+    const clientPeer = this.createAttachedPeer({
+      admission: input.admission,
+      relayTarget,
+      socket: input.socket,
+    });
 
     this.sessions.set(key, {
       client: input.socket,
-      clientTarget,
+      clientPeer,
       clientOpenRequested: false,
       pendingClientMessages: [],
     });
@@ -141,13 +186,20 @@ export class PtyTransportService {
     socket: WSContext<WebSocket>;
   }): void {
     const key = createSessionKey(input.admission.claims);
-    const sandboxTarget = this.input.relayCoordinator.attachPeer({
+    const relayTarget = this.input.relayCoordinator.attachPeer({
       sandboxInstanceId: input.admission.claims.sub,
       side: "ptySandbox",
       socket: input.socket,
       sessionId: input.admission.claims.ptySessionId,
     });
-    this.sandboxTargets.set(key, sandboxTarget);
+    this.sandboxTargets.set(
+      key,
+      this.createAttachedPeer({
+        admission: input.admission,
+        relayTarget,
+        socket: input.socket,
+      }),
+    );
 
     const session = this.sessions.get(key);
     if (session === undefined) {
@@ -237,7 +289,12 @@ export class PtyTransportService {
       const session = this.sessions.get(key);
       if (session !== undefined) {
         this.sessions.delete(key);
-        this.input.relayCoordinator.detachPeer(session.clientTarget);
+        this.closeAttachedPeer({
+          admission: input.admission,
+          closeCode: input.closeCode,
+          closeReason: input.closeReason,
+          peer: session.clientPeer,
+        });
       }
       this.closePeer({
         sandboxInstanceId: input.admission.claims.sub,
@@ -252,7 +309,12 @@ export class PtyTransportService {
     const sandboxTarget = this.sandboxTargets.get(key);
     if (sandboxTarget !== undefined) {
       this.sandboxTargets.delete(key);
-      this.input.relayCoordinator.detachPeer(sandboxTarget);
+      this.closeAttachedPeer({
+        admission: input.admission,
+        closeCode: input.closeCode,
+        closeReason: input.closeReason,
+        peer: sandboxTarget,
+      });
     }
     this.closePeer({
       sandboxInstanceId: input.admission.claims.sub,
@@ -335,6 +397,147 @@ export class PtyTransportService {
   }): void {
     void this.input.relayCoordinator.closeSessionPeer(input).catch(() => undefined);
   }
+
+  private createAttachedPeer(input: {
+    admission: PtyTransportAdmission;
+    relayTarget: RelayTarget;
+    socket: WSContext<WebSocket>;
+  }): AttachedPtyTransportPeer {
+    const openedAtMs = this.input.clock.nowMs();
+    const attributes = createPtyTransportMetricAttributes(input.admission);
+    PtyTransportWebSocketOpened.add(1, attributes);
+    logger.info(
+      {
+        event: "gateway_pty_transport_websocket_opened",
+        sandboxInstanceId: input.admission.claims.sub,
+        ptySessionId: input.admission.claims.ptySessionId,
+        side: input.admission.side,
+        relayNodeId: input.relayTarget.nodeId,
+      },
+      "PTY transport websocket opened",
+    );
+
+    let websocketHealthHandle: WebSocketHealthHandle | undefined;
+    try {
+      websocketHealthHandle = startWebSocketHealthMonitor({
+        clock: this.input.clock,
+        socketKind: input.relayTarget.side,
+        tokenKind: "pty",
+        socket: input.socket,
+        scheduler: this.input.scheduler,
+        pingIntervalMs: WEBSOCKET_PING_INTERVAL_MS,
+        pongTimeoutMs: WEBSOCKET_PONG_TIMEOUT_MS,
+        maxConsecutiveMissedPongs: PtyWebSocketMaxConsecutiveMissedPongs,
+        onMissedPong: ({ consecutiveMissedPongs, lastPongAgeMs, maxConsecutiveMissedPongs }) => {
+          logger.warn(
+            {
+              event: "gateway_pty_transport_websocket_missed_pong",
+              sandboxInstanceId: input.admission.claims.sub,
+              ptySessionId: input.admission.claims.ptySessionId,
+              side: input.admission.side,
+              consecutiveMissedPongs,
+              lastPongAgeMs,
+              maxConsecutiveMissedPongs,
+            },
+            "PTY transport websocket missed pong health check",
+          );
+        },
+        onUnhealthy: () => {
+          logger.error(
+            {
+              event: "gateway_pty_transport_websocket_unhealthy",
+              sandboxInstanceId: input.admission.claims.sub,
+              ptySessionId: input.admission.claims.ptySessionId,
+              side: input.admission.side,
+            },
+            "PTY transport websocket stopped responding to ping/pong health checks",
+          );
+          input.socket.close(
+            WebSocketCloseCodes.INTERNAL_ERROR,
+            "PTY transport websocket stopped responding to ping.",
+          );
+        },
+      });
+    } catch (error) {
+      logger.error(
+        {
+          err: error,
+          event: "gateway_pty_transport_websocket_health_check_failed",
+          sandboxInstanceId: input.admission.claims.sub,
+          ptySessionId: input.admission.claims.ptySessionId,
+          side: input.admission.side,
+        },
+        "Failed to initialize PTY transport websocket health checks",
+      );
+      input.socket.close(
+        WebSocketCloseCodes.INTERNAL_ERROR,
+        "Failed to initialize PTY transport websocket health checks.",
+      );
+    }
+
+    return {
+      openedAtMs,
+      relayTarget: input.relayTarget,
+      ...(websocketHealthHandle === undefined ? {} : { websocketHealthHandle }),
+    };
+  }
+
+  private closeAttachedPeer(input: {
+    admission: PtyTransportAdmission;
+    closeCode: number;
+    closeReason: string;
+    peer: AttachedPtyTransportPeer;
+  }): void {
+    input.peer.websocketHealthHandle?.stop();
+    this.input.relayCoordinator.detachPeer(input.peer.relayTarget);
+
+    const durationMs = this.input.clock.nowMs() - input.peer.openedAtMs;
+    const outcome = classifyPtyTransportClose(input.closeCode);
+    const attributes = createPtyTransportMetricAttributes(input.admission, {
+      closeCode: input.closeCode,
+      outcome,
+    });
+    PtyTransportWebSocketClosed.add(1, attributes);
+    PtyTransportWebSocketDurationMs.record(durationMs, attributes);
+    const logPayload = {
+      event: "gateway_pty_transport_websocket_closed",
+      sandboxInstanceId: input.admission.claims.sub,
+      ptySessionId: input.admission.claims.ptySessionId,
+      side: input.admission.side,
+      closeCode: input.closeCode,
+      closeReason: input.closeReason,
+      durationMs,
+      outcome,
+    };
+    if (outcome === "normal") {
+      logger.info(logPayload, "PTY transport websocket closed");
+      return;
+    }
+
+    logger.warn(logPayload, "PTY transport websocket closed");
+  }
+}
+
+function createPtyTransportMetricAttributes(
+  admission: PtyTransportAdmission,
+  close?: {
+    closeCode: number;
+    outcome: "normal" | "error";
+  },
+): Attributes {
+  return {
+    "mistle.sandbox.pty.transport_side": admission.side,
+    ...(close === undefined
+      ? {}
+      : {
+          "mistle.sandbox.pty.close_code": close.closeCode,
+          "mistle.sandbox.pty.close_outcome": close.outcome,
+        }),
+  };
+}
+
+function classifyPtyTransportClose(closeCode: number): "normal" | "error" {
+  return closeCode === 1000 || closeCode === 1001 ? "normal" : "error";
 }
 
 function createPtySessionOpenMessage(input: {

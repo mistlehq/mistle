@@ -5,7 +5,7 @@ import { WebSocket } from "ws";
 import { getSandboxTunnelDeliveryCorrelationScope } from "../telemetry.js";
 import type { RelayPeerSide, RelayPeerSocket } from "../types.js";
 
-type TunnelTokenKind = "bootstrap" | "connection";
+type TunnelTokenKind = "bootstrap" | "connection" | "pty";
 
 const TunnelTelemetryMeter = metrics.getMeter("@mistle/data-plane-gateway/tunnel");
 const TunnelWebSocketRoundTripTimeMs = TunnelTelemetryMeter.createHistogram(

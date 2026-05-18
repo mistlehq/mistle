@@ -2,7 +2,7 @@ import { SpanStatusCode, trace, type Attributes, type Span } from "@opentelemetr
 
 import type { RelayPeerSide } from "./types.js";
 
-type TunnelTokenKind = "bootstrap" | "connection";
+type TunnelTokenKind = "bootstrap" | "connection" | "pty";
 export type TunnelDeliveryCorrelationScope = "join_via_connection_token_jti" | "transport_only";
 
 const NormalCloseCodes = new Set([1000, 1001]);
