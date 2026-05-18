@@ -1397,10 +1397,9 @@ describe("SandboxProfileEditorPage", () => {
       screen.queryByText("This snapshot will be used for new sessions and triggers."),
     ).toBeNull();
     expect(screen.getByText("Latest snapshot: N/A")).toBeDefined();
-    expect(screen.getByRole("button", { name: "Refresh from setup script" })).toBeDefined();
-    expect(
-      screen.queryByRole("button", { name: "Refresh from snapshot maintenance script" }),
-    ).toBeNull();
+    expect(screen.getByRole("button", { name: "Refresh snapshot (setup script)" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Refresh snapshot (maintenance)" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Snapshot refresh actions" })).toBeNull();
   });
 
   it("shows snapshot maintenance editing without manual maintenance refresh before the schedule is saved", () => {
@@ -1410,15 +1409,14 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "published",
     });
 
-    expect(screen.getByRole("button", { name: "Refresh from setup script" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Refresh snapshot (setup script)" })).toBeDefined();
     expect(screen.queryByText("Snapshot maintenance script")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     fireEvent.click(screen.getByRole("switch", { name: "Refresh enabled" }));
 
-    expect(
-      screen.queryByRole("button", { name: "Refresh from snapshot maintenance script" }),
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "Refresh snapshot (maintenance)" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Snapshot refresh actions" })).toBeNull();
     expect(screen.getByText("Snapshot maintenance script")).toBeDefined();
     expect(screen.getByRole("button", { name: "Test" }).getAttribute("disabled")).toBeNull();
     expect(screen.getByRole("button", { name: "Setup Assistant" }).hasAttribute("disabled")).toBe(
@@ -1511,9 +1509,9 @@ describe("SandboxProfileEditorPage", () => {
         "Snapshot refresh will build from the current snapshot with maintenance script.",
       ),
     ).toBeDefined();
-    expect(
-      screen.getByRole("button", { name: "Refresh from snapshot maintenance script" }),
-    ).toBeDefined();
+    expect(screen.getByRole("button", { name: "Refresh snapshot (maintenance)" })).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Snapshot refresh actions" }));
+    expect(screen.getByRole("menuitem", { name: "Refresh snapshot (setup script)" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Edit" })).toBeDefined();
     expect(screen.getByText("echo maintain")).toBeDefined();
   });

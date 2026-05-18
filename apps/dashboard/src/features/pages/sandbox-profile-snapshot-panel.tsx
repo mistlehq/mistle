@@ -3,11 +3,13 @@ import {
   Button,
   ButtonGroup,
   DefinitionList,
+  DropdownMenuItem,
   Field,
   FieldContent,
   FieldHeader,
   FieldLabel,
   Input,
+  MoreActionsMenu,
   Notice,
   NoticeAutoHideDurationsMs,
   SectionBlock,
@@ -515,24 +517,37 @@ function SnapshotStatusAction(input: {
 
   return (
     <ButtonGroup>
-      <Button
-        className="w-fit shrink-0"
-        disabled={input.isActionPending}
-        onClick={input.onRefreshSnapshot}
-        type="button"
-      >
-        Refresh from setup script
-      </Button>
       {input.showMaintenanceRefreshAction ? (
+        <>
+          <Button
+            className="w-fit shrink-0"
+            disabled={input.isActionPending || !input.canRunMaintenanceRefresh}
+            onClick={input.onMaintenanceRefreshSnapshot}
+            type="button"
+          >
+            Refresh snapshot (maintenance)
+          </Button>
+          <MoreActionsMenu
+            disabled={input.isActionPending}
+            triggerIconVariant="chevron-down"
+            triggerLabel="Snapshot refresh actions"
+            triggerVariant="default"
+          >
+            <DropdownMenuItem onClick={input.onRefreshSnapshot}>
+              Refresh snapshot (setup script)
+            </DropdownMenuItem>
+          </MoreActionsMenu>
+        </>
+      ) : (
         <Button
-          disabled={input.isActionPending || !input.canRunMaintenanceRefresh}
-          onClick={input.onMaintenanceRefreshSnapshot}
+          className="w-fit shrink-0"
+          disabled={input.isActionPending}
+          onClick={input.onRefreshSnapshot}
           type="button"
-          variant="secondary"
         >
-          Refresh from snapshot maintenance script
+          Refresh snapshot (setup script)
         </Button>
-      ) : null}
+      )}
     </ButtonGroup>
   );
 }
