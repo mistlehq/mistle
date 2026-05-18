@@ -26,7 +26,6 @@ import {
 import { ActiveSandboxRuntimePlanCache } from "../egress/active-runtime-plan-cache.js";
 import { CredentialCache } from "../egress/credential-cache.js";
 import { DirectEgressProxyService } from "../egress/direct-egress-proxy-service.js";
-import { GatewayEgressTransportService } from "../egress/egress-transport-service.js";
 import { registerDirectEgressRoutes } from "../egress/register-direct-egress-routes.js";
 import { SandboxEgressTokenService } from "../egress/sandbox-egress-token-service.js";
 import { registerSandboxBootstrapAttachmentTerminateRoute } from "../internal/runtime-state/register-sandbox-bootstrap-attachment-terminate-route.js";
@@ -337,21 +336,6 @@ export function createDataPlaneGatewayRuntime(
       scheduler: systemScheduler,
     },
   );
-  const gatewayEgressTransportService = new GatewayEgressTransportService(
-    activeRuntimePlanCache,
-    config.app.controlPlaneApi.publicBaseUrl,
-    new ControlPlaneInternalClient({
-      baseUrl: config.app.controlPlaneApi.baseUrl,
-      internalAuthServiceToken: config.app.internalAuth.serviceToken,
-      ...(config.app.__dangerouslyEnableTestIsolation === undefined
-        ? {}
-        : {
-            testEnvironmentIdHeader:
-              config.app.__dangerouslyEnableTestIsolation.testEnvironmentIdHeader,
-          }),
-    }),
-    credentialCache,
-  );
   const directEgressProxyService = new DirectEgressProxyService(
     activeRuntimePlanCache,
     config.app.controlPlaneApi.publicBaseUrl,
@@ -482,7 +466,6 @@ export function createDataPlaneGatewayRuntime(
     operationIngressService,
     telemetryIngressService,
     sandboxTunnelTaskTracker,
-    gatewayEgressTransportService,
     allowRemoteOwnerConnections: config.app.gatewayRelay.backend === "nats",
     clock: systemClock,
     scheduler: systemScheduler,
@@ -551,7 +534,6 @@ export function createDataPlaneGatewayRuntime(
   return {
     app,
     internals: {
-      gatewayEgressTransportService,
       portAccessTransportService,
       portsTargetAuthorizeService,
     },

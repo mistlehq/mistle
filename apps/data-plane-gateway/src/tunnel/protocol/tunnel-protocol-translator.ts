@@ -4,7 +4,6 @@ import {
   PayloadKindWebSocketText,
   parseBootstrapControlMessage,
   parseEgressTokenControlMessage,
-  parseEgressTransportMessage,
   parsePortsControlMessage,
   parsePortsTransportMessage,
   parseSigningControlMessage,
@@ -14,7 +13,6 @@ import {
   type BootstrapControlMessage,
   type KeepaliveControlMessage,
   type RuntimeReadyControlMessage,
-  type EgressTransportMessage,
   type EgressTokenRequest,
   type SigningRequest,
   type StreamControlMessage,
@@ -95,15 +93,6 @@ export type TunnelProtocolDelivery =
   | {
       kind: "signingRequest";
       message: SigningRequest;
-    }
-  | {
-      kind: "egressTransport";
-      message: EgressTransportMessage;
-    }
-  | {
-      kind: "egressMalformed";
-      message: string;
-      streamId: number;
     }
   | {
       kind: "egressTokenRequest";
@@ -298,43 +287,6 @@ function createUnsupportedBinaryPayloadErrorMessage(side: RelayPeerSide): string
   return side === "connection"
     ? "Connection websocket binary payloads must be valid tunnel data frames."
     : "Bootstrap websocket binary payloads must be valid tunnel data frames.";
-}
-
-function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function parseJsonObject(payload: string): Record<string, unknown> | undefined {
-  try {
-    const parsed: unknown = JSON.parse(payload);
-    return isJsonObject(parsed) ? parsed : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function parseMalformedEgressMessage(
-  payload: string,
-): { message: string; streamId: number } | undefined {
-  const parsed = parseJsonObject(payload);
-  if (parsed === undefined || typeof parsed.type !== "string") {
-    return undefined;
-  }
-  if (!parsed.type.startsWith("egress.")) {
-    return undefined;
-  }
-  if (
-    typeof parsed.streamId !== "number" ||
-    !Number.isInteger(parsed.streamId) ||
-    parsed.streamId <= 0
-  ) {
-    return undefined;
-  }
-
-  return {
-    message: `Malformed egress transport message '${parsed.type}'.`,
-    streamId: parsed.streamId,
-  };
 }
 
 function createUnsupportedConnectionTelemetryMessageError(messageType: string): Error {
@@ -807,16 +759,6 @@ export class TunnelProtocolTranslator {
       );
     }
 
-    const egressTransportMessage = parseEgressTransportMessage(input.payload);
-    if (egressTransportMessage !== undefined) {
-      return createTranslation({
-        delivery: {
-          kind: "egressTransport",
-          message: egressTransportMessage,
-        },
-      });
-    }
-
     const egressTokenControlMessage = parseEgressTokenControlMessage(input.payload);
     if (egressTokenControlMessage !== undefined) {
       if (egressTokenControlMessage.type !== "egress.token.request") {
@@ -829,17 +771,6 @@ export class TunnelProtocolTranslator {
         delivery: {
           kind: "egressTokenRequest",
           message: egressTokenControlMessage,
-        },
-      });
-    }
-
-    const malformedEgressMessage = parseMalformedEgressMessage(input.payload);
-    if (malformedEgressMessage !== undefined) {
-      return createTranslation({
-        delivery: {
-          kind: "egressMalformed",
-          message: malformedEgressMessage.message,
-          streamId: malformedEgressMessage.streamId,
         },
       });
     }

@@ -14,7 +14,6 @@ import {
   type EgressTokenConfig,
   type VerifiedEgressToken,
 } from "@mistle/gateway-tunnel-auth";
-import type { EgressHttpOpen } from "@mistle/sandbox-session-protocol";
 
 import { logger } from "../logger.js";
 import type { ActiveSandboxRuntimePlanRepository } from "./active-runtime-plan-cache.js";
@@ -23,6 +22,7 @@ import {
   loadActiveSandboxRuntimePlan,
 } from "./active-runtime-plan-loader.js";
 import type { CredentialCache } from "./credential-cache.js";
+import type { GatewayEgressHttpRequest, RepeatedHeaderValues } from "./gateway-egress-request.js";
 import {
   buildManagedEgressRequest,
   GatewayManagedEgressUnsupportedRouteError,
@@ -50,14 +50,7 @@ type DirectEgressFailureCode =
   | "request_middleware_failed"
   | "upstream_connect_failed";
 
-type DirectEgressRequest = {
-  authority: string;
-  headers: EgressHttpOpen["request"]["headers"];
-  method: string;
-  path: string;
-  query?: string;
-  scheme: "http" | "https";
-};
+type DirectEgressRequest = GatewayEgressHttpRequest;
 
 type DirectEgressRouteAuthorization =
   | {
@@ -455,8 +448,8 @@ const HopByHopHeaderNames = new Set([
   "upgrade",
 ]);
 
-function toRepeatedRequestHeaders(headers: Headers): EgressHttpOpen["request"]["headers"] {
-  const repeatedHeaders: EgressHttpOpen["request"]["headers"] = {};
+function toRepeatedRequestHeaders(headers: Headers): RepeatedHeaderValues {
+  const repeatedHeaders: RepeatedHeaderValues = {};
   for (const [name, value] of headers.entries()) {
     const normalizedName = name.toLowerCase();
     if (HopByHopHeaderNames.has(normalizedName)) {
@@ -469,7 +462,7 @@ function toRepeatedRequestHeaders(headers: Headers): EgressHttpOpen["request"]["
   return repeatedHeaders;
 }
 
-function toHeaderRecord(headers: EgressHttpOpen["request"]["headers"]): Record<string, string> {
+function toHeaderRecord(headers: RepeatedHeaderValues): Record<string, string> {
   const record: Record<string, string> = {};
   for (const [name, values] of Object.entries(headers)) {
     const normalizedName = name.toLowerCase();

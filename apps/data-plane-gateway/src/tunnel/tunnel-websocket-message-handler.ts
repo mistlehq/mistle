@@ -1,10 +1,7 @@
-import { setTimeout as sleep } from "node:timers/promises";
-
 import type { DataPlaneDatabase, DataPlaneTables } from "@mistle/db/data-plane";
 import type { WSContext, WSMessageReceive } from "hono/ws";
 import type { WebSocket } from "ws";
 
-import type { GatewayEgressTransportService } from "../egress/egress-transport-service.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
 import {
   TunnelProtocolTranslator,
@@ -37,13 +34,6 @@ export type SigningDelivery = Extract<
   TunnelProtocolDelivery,
   {
     kind: "signingRequest";
-  }
->;
-
-export type EgressTransportDelivery = Extract<
-  TunnelProtocolDelivery,
-  {
-    kind: "egressTransport";
   }
 >;
 
@@ -81,7 +71,6 @@ export async function handleTunnelWebSocketMessage(input: {
   clientSessionId: string;
   currentSocket: Pick<WSContext<WebSocket>, "raw" | "send">;
   db: DataPlaneDatabase;
-  gatewayEgressTransportService: GatewayEgressTransportService;
   handleEgressTokenRequestDelivery?: (delivery: EgressTokenRequestDelivery) => Promise<void>;
   handleSigningDelivery?: ((delivery: SigningDelivery) => Promise<void>) | undefined;
   handleOperationDelivery?: ((delivery: OperationDelivery) => Promise<void>) | undefined;
@@ -167,36 +156,12 @@ export async function handleTunnelWebSocketMessage(input: {
     }
 
     await input.handleSigningDelivery(translation.delivery);
-  } else if (translation.delivery.kind === "egressTransport") {
-    await input.gatewayEgressTransportService.handleBootstrapTransportMessage({
-      db: input.db,
-      message: translation.delivery.message,
-      sandboxInstanceId: input.sandboxInstanceId,
-      sendBootstrapMessage: (payload) => {
-        return sendWebSocketPayload({ payload, socket: input.currentSocket });
-      },
-      sourceBootstrapSessionId: input.clientSessionId,
-      tables: input.tables,
-      ...(input.testEnvironmentId === undefined
-        ? {}
-        : { testEnvironmentId: input.testEnvironmentId }),
-    });
   } else if (translation.delivery.kind === "egressTokenRequest") {
     if (input.handleEgressTokenRequestDelivery === undefined) {
       throw new Error("Egress token request delivery requires an egress token handler.");
     }
 
     await input.handleEgressTokenRequestDelivery(translation.delivery);
-  } else if (translation.delivery.kind === "egressMalformed") {
-    input.gatewayEgressTransportService.rejectMalformedBootstrapMessage({
-      message: translation.delivery.message,
-      sandboxInstanceId: input.sandboxInstanceId,
-      sendBootstrapMessage: (payload) => {
-        return sendWebSocketPayload({ payload, socket: input.currentSocket });
-      },
-      sourceBootstrapSessionId: input.clientSessionId,
-      streamId: translation.delivery.streamId,
-    });
   } else if (translation.delivery.kind === "respond") {
     input.currentSocket.send(translation.delivery.payload);
   } else {
@@ -227,50 +192,4 @@ export async function handleTunnelWebSocketMessage(input: {
         translation.notifyBootstrapPeerOfReleasedStream.targetBootstrapSessionId,
     });
   }
-}
-
-function sendWebSocketPayload(input: {
-  payload: ArrayBuffer | object | string;
-  socket: Pick<WSContext<WebSocket>, "raw" | "send">;
-}): {
-  bufferedBytes: number;
-  waitForBufferedBytesBelow: (bytes: number) => Promise<void>;
-  writeFinished: Promise<void>;
-} {
-  const payload =
-    input.payload instanceof ArrayBuffer || typeof input.payload === "string"
-      ? input.payload
-      : JSON.stringify(input.payload);
-
-  if (input.socket.raw === undefined) {
-    input.socket.send(payload);
-    return {
-      bufferedBytes: 0,
-      waitForBufferedBytesBelow: async () => {
-        await Promise.resolve();
-      },
-      writeFinished: Promise.resolve(),
-    };
-  }
-
-  const rawSocket = input.socket.raw;
-  const writeFinished = new Promise<void>((resolve, reject) => {
-    rawSocket.send(payload, { compress: false }, (error) => {
-      if (error === undefined || error === null) {
-        resolve();
-        return;
-      }
-
-      reject(error);
-    });
-  });
-  return {
-    bufferedBytes: rawSocket.bufferedAmount,
-    waitForBufferedBytesBelow: async (bytes) => {
-      while (rawSocket.readyState === rawSocket.OPEN && rawSocket.bufferedAmount > bytes) {
-        await sleep(5);
-      }
-    },
-    writeFinished,
-  };
 }

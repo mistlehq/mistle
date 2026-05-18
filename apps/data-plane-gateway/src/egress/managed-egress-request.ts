@@ -5,7 +5,6 @@ import {
   resolveProviderEgressTelemetryHandler,
 } from "@mistle/integrations-definitions/server";
 import type { CompiledRuntimePlan } from "@mistle/sandbox-runtime-contract";
-import type { EgressHttpOpen } from "@mistle/sandbox-session-protocol";
 import type { Attributes } from "@opentelemetry/api";
 import { Hash } from "@smithy/hash-node";
 import { HttpRequest as SmithyHttpRequest } from "@smithy/protocol-http";
@@ -17,6 +16,7 @@ import {
   type CachedCredential,
   type CredentialCacheKeyInput,
 } from "./credential-cache.js";
+import type { GatewayEgressHttpRequest } from "./gateway-egress-request.js";
 
 type RuntimePlanEgressRoute = CompiledRuntimePlan["egressRoutes"][number];
 type RuntimePlanEgressCredentialResolver = RuntimePlanEgressRoute["credentialResolver"];
@@ -80,7 +80,7 @@ export async function buildManagedEgressRequest(input: {
   controlPlaneInternalClient: ControlPlaneInternalClient;
   credentialCache: CredentialCache;
   organizationId: string;
-  request: EgressHttpOpen["request"];
+  request: GatewayEgressHttpRequest;
   route: RuntimePlanEgressRoute;
   sandboxInstanceId: string;
   testEnvironmentId?: string;
@@ -314,7 +314,7 @@ function createSessionLinkUrl(input: {
 }
 
 function createUpstreamUrl(input: {
-  request: EgressHttpOpen["request"];
+  request: GatewayEgressHttpRequest;
   upstreamBaseUrl: string;
 }): URL {
   const upstreamUrl = new URL(input.upstreamBaseUrl);

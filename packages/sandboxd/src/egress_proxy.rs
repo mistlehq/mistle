@@ -19,10 +19,10 @@ use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::process::Command;
+use std::sync::Arc;
 use std::sync::RwLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, TryRecvError};
-use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
@@ -45,10 +45,9 @@ use rustls_pki_types::pem::PemObject;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use serde_json::{Map, Value};
 use tokio::io::copy_bidirectional;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpSocket, TcpStream};
 use tokio::runtime::Builder;
-use tokio::sync::{mpsc as tokio_mpsc, oneshot};
+use tokio::sync::oneshot;
 use tokio_rustls::rustls::{ServerConfig, server::Acceptor as RustlsServerAcceptor};
 use tokio_rustls::{LazyConfigAcceptor, TlsAcceptor};
 use tokio_tungstenite::tungstenite::{
@@ -67,10 +66,7 @@ use crate::proxy_ca::{
 use crate::runtime::{CompiledEgressRoute, CompiledRuntimePlan};
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
 use crate::time::{Clock, SystemClock, format_rfc3339_timestamp};
-use crate::tunnel::session::{
-    GatewayEgressForwarder, GatewayEgressTokenProvider, TunnelEgressHttpRequest,
-    TunnelEgressHttpResponse, TunnelSessionError,
-};
+use crate::tunnel::session::GatewayEgressTokenProvider;
 
 const RUNTIME_PROXY_CA_CERT_PATH: &str = "/run/mistle/sandboxd/egress-proxy-ca.pem";
 const RUNTIME_PROXY_CA_BUNDLE_PATH: &str = "/run/mistle/sandboxd/egress-proxy-ca-bundle.pem";
@@ -160,10 +156,6 @@ struct EgressProxyRoute {
 
 #[derive(Clone)]
 enum EgressProxyForwardingMode {
-    // Kept for focused egress-proxy lifecycle tests that do not need a live
-    // direct gateway token path.
-    #[allow(dead_code)]
-    Gateway { forwarder: GatewayEgressForwarder },
     DirectGateway {
         client: Arc<DirectGatewayEgressClient>,
     },
@@ -271,10 +263,6 @@ struct InstrumentedResponseBody {
     forwarded_bytes: u64,
     first_chunk_at_ms: Option<u64>,
     ended: bool,
-}
-
-struct GatewayEgressResponseBody {
-    inner: Mutex<tokio_mpsc::UnboundedReceiver<Result<Bytes, TunnelSessionError>>>,
 }
 
 impl EgressProxyError {
@@ -631,27 +619,6 @@ impl Drop for InstrumentedResponseBody {
             None,
             &[],
         );
-    }
-}
-
-impl Body for GatewayEgressResponseBody {
-    type Data = Bytes;
-    type Error = BoxError;
-
-    fn poll_frame(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
-        let mut receiver = self
-            .inner
-            .lock()
-            .expect("gateway egress response body lock should not be poisoned");
-        match receiver.poll_recv(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(Some(Ok(bytes))) => Poll::Ready(Some(Ok(Frame::data(bytes)))),
-            Poll::Ready(Some(Err(error))) => Poll::Ready(Some(Err(Box::new(error)))),
-            Poll::Ready(None) => Poll::Ready(None),
-        }
     }
 }
 
@@ -2005,8 +1972,7 @@ fn transparent_proxy_listener_address_for_forwarding_mode(
     forwarding_mode: &EgressProxyForwardingMode,
 ) -> Result<Option<SocketAddr>, EgressProxyError> {
     match forwarding_mode {
-        EgressProxyForwardingMode::Gateway { .. }
-        | EgressProxyForwardingMode::DirectGateway { .. } => {
+        EgressProxyForwardingMode::DirectGateway { .. } => {
             #[cfg(target_os = "linux")]
             {
                 Ok(Some(default_transparent_proxy_listener_address()))
@@ -2441,18 +2407,6 @@ async fn forward_upgrade_request(
         request_method.as_str(),
     )?;
     match state.forwarding_mode.clone() {
-        EgressProxyForwardingMode::Gateway { forwarder } => {
-            forward_upgrade_request_through_gateway(
-                parts,
-                state,
-                request_target,
-                request_path_and_query,
-                route,
-                forwarder,
-                downstream_upgrade,
-            )
-            .await
-        }
         EgressProxyForwardingMode::DirectGateway { client } => {
             forward_upgrade_request_through_direct_gateway(
                 parts,
@@ -2488,18 +2442,6 @@ async fn forward_request(
         request_method.as_str(),
     )?;
     match state.forwarding_mode.clone() {
-        EgressProxyForwardingMode::Gateway { forwarder } => {
-            forward_request_through_gateway(
-                parts,
-                body,
-                state,
-                request_target,
-                request_path_and_query,
-                route,
-                forwarder,
-            )
-            .await
-        }
         EgressProxyForwardingMode::DirectGateway { client } => {
             forward_request_through_direct_gateway(
                 parts,
@@ -2513,221 +2455,6 @@ async fn forward_request(
             .await
         }
     }
-}
-
-async fn forward_upgrade_request_through_gateway(
-    parts: hyper::http::request::Parts,
-    state: EgressProxyState,
-    request_target: RequestTarget,
-    request_path_and_query: String,
-    route: Option<EgressProxyRoute>,
-    forwarder: GatewayEgressForwarder,
-    downstream_upgrade: hyper::upgrade::OnUpgrade,
-) -> Result<Response<HyperBody>, EgressProxyError> {
-    let request_method = parts.method.clone();
-    let request_context = Arc::new(EgressProxyRequestContext {
-        sandbox_instance_id: state.sandbox_instance_id.clone(),
-        request_id: format!(
-            "egp_{}",
-            state.next_request_id.fetch_add(1, Ordering::Relaxed)
-        ),
-        method: request_method.to_string(),
-        authority: request_target.authority.clone(),
-        host: request_target.host.clone(),
-        path_and_query: request_path_and_query,
-        route_mode: "gateway",
-        egress_rule_id: route
-            .as_ref()
-            .map(|matched_route| matched_route.egress_rule_id.clone()),
-        upstream_url: request_target.uri.to_string(),
-        started_at_ms: state.clock.now_ms(),
-        clock: state.clock.clone(),
-    });
-    let mut request_started_fields = request_context.common_fields();
-    request_started_fields.push(("upgrade", Value::String("websocket".to_string())));
-    emit_egress_proxy_log(
-        request_context.clock.as_ref(),
-        &request_context.sandbox_instance_id,
-        "egress_proxy_upgrade_started",
-        &request_started_fields,
-    );
-
-    let path = parts.uri.path().to_string();
-    let query = parts.uri.query().map(ToString::to_string);
-    let scheme = match request_target.uri.scheme_str().unwrap_or("http") {
-        "ws" => "http",
-        "wss" => "https",
-        scheme => scheme,
-    }
-    .to_string();
-    let headers =
-        repeated_headers_from_filtered_headers(filter_upgrade_request_headers(&parts.headers))?;
-    let tunnel_request = TunnelEgressHttpRequest {
-        request_id: request_context.request_id.clone(),
-        method: request_method.to_string(),
-        scheme,
-        authority: request_target.authority,
-        path,
-        query,
-        headers,
-    };
-
-    let exchange = forwarder
-        .open_http(tunnel_request)
-        .map_err(|error| EgressProxyError::new(error.to_string()))?;
-    let (request_body_sender, response_receiver) = exchange.into_parts();
-    request_body_sender
-        .send_end()
-        .map_err(|error| EgressProxyError::new(error.to_string()))?;
-    let gateway_response =
-        tokio::task::spawn_blocking(move || response_receiver.recv_response_start())
-            .await
-            .map_err(|error| {
-                EgressProxyError::new(format!("gateway egress forwarding task failed: {error}"))
-            })?
-            .map_err(|error| EgressProxyError::new(error.to_string()))?;
-
-    let status = StatusCode::from_u16(gateway_response.status).map_err(|error| {
-        EgressProxyError::new(format!(
-            "gateway egress returned invalid websocket status '{}': {error}",
-            gateway_response.status
-        ))
-    })?;
-    if status != StatusCode::SWITCHING_PROTOCOLS {
-        return response_from_gateway_egress_response(gateway_response, request_context);
-    }
-
-    let mut response_builder = Response::builder().status(status);
-    for (header_name, header_value) in
-        filtered_upgrade_response_headers_from_repeated_headers(&gateway_response.headers)?
-    {
-        response_builder = response_builder.header(header_name, header_value);
-    }
-    response_builder = response_builder.header(
-        SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME,
-        request_context.request_id.as_str(),
-    );
-
-    let tunnel_context = request_context.clone();
-    tokio::spawn(async move {
-        let tunnel_result = tunnel_gateway_upgrade(
-            downstream_upgrade,
-            request_body_sender,
-            gateway_response.body,
-        )
-        .await;
-
-        if let Err(error) = tunnel_result {
-            let mut fields = tunnel_context.common_fields();
-            fields.push(("outcome", Value::String("tunnel_failed".to_string())));
-            fields.push(("error", Value::String(error.to_string())));
-            emit_egress_proxy_log(
-                tunnel_context.clock.as_ref(),
-                &tunnel_context.sandbox_instance_id,
-                "egress_proxy_upgrade_failed",
-                &fields,
-            );
-        }
-    });
-
-    response_builder.body(empty_body()).map_err(|error| {
-        EgressProxyError::new(format!(
-            "failed to build gateway websocket upgrade response: {error}"
-        ))
-    })
-}
-
-async fn forward_request_through_gateway(
-    parts: hyper::http::request::Parts,
-    body: Incoming,
-    state: EgressProxyState,
-    request_target: RequestTarget,
-    request_path_and_query: String,
-    route: Option<EgressProxyRoute>,
-    forwarder: GatewayEgressForwarder,
-) -> Result<Response<HyperBody>, EgressProxyError> {
-    let request_method = parts.method.clone();
-    let request_context = Arc::new(EgressProxyRequestContext {
-        sandbox_instance_id: state.sandbox_instance_id.clone(),
-        request_id: format!(
-            "egp_{}",
-            state.next_request_id.fetch_add(1, Ordering::Relaxed)
-        ),
-        method: request_method.to_string(),
-        authority: request_target.authority.clone(),
-        host: request_target.host.clone(),
-        path_and_query: request_path_and_query.clone(),
-        route_mode: "gateway",
-        egress_rule_id: route
-            .as_ref()
-            .map(|matched_route| matched_route.egress_rule_id.clone()),
-        upstream_url: request_target.uri.to_string(),
-        started_at_ms: state.clock.now_ms(),
-        clock: state.clock.clone(),
-    });
-    let mut request_started_fields = request_context.common_fields();
-    request_started_fields.push((
-        "hasRequestBody",
-        Value::Bool(body.size_hint().lower() > 0 || body.size_hint().upper().unwrap_or(1) > 0),
-    ));
-    emit_egress_proxy_log(
-        request_context.clock.as_ref(),
-        &request_context.sandbox_instance_id,
-        "egress_proxy_request_started",
-        &request_started_fields,
-    );
-
-    let path = parts.uri.path().to_string();
-    let query = parts.uri.query().map(ToString::to_string);
-    let scheme = request_target
-        .uri
-        .scheme_str()
-        .ok_or_else(|| EgressProxyError::new("gateway egress request target is missing scheme"))?
-        .to_string();
-    let headers =
-        repeated_headers_from_filtered_headers(filter_outbound_request_headers(&parts.headers))?;
-    let tunnel_request = TunnelEgressHttpRequest {
-        request_id: request_context.request_id.clone(),
-        method: request_method.to_string(),
-        scheme,
-        authority: request_target.authority,
-        path,
-        query,
-        headers,
-    };
-
-    let exchange = forwarder
-        .open_http(tunnel_request)
-        .map_err(|error| EgressProxyError::new(error.to_string()))?;
-    let (request_body_sender, response_receiver) = exchange.into_parts();
-    let mut request_body_task = tokio::spawn(stream_gateway_egress_request_body(
-        body,
-        request_body_sender,
-    ));
-    let mut response_start_task =
-        tokio::task::spawn_blocking(move || response_receiver.recv_response_start());
-    let gateway_response = tokio::select! {
-        request_body_result = &mut request_body_task => {
-            request_body_result
-                .map_err(|error| EgressProxyError::new(format!("gateway egress request body task failed: {error}")))??;
-            response_start_task.await
-                .map_err(|error| EgressProxyError::new(format!("gateway egress forwarding task failed: {error}")))?
-                .map_err(|error| EgressProxyError::new(error.to_string()))?
-        }
-        response_start_result = &mut response_start_task => {
-            match response_start_result
-                .map_err(|error| EgressProxyError::new(format!("gateway egress forwarding task failed: {error}")))?
-            {
-                Ok(response) => response,
-                Err(error) => {
-                    request_body_task.abort();
-                    return Err(EgressProxyError::new(error.to_string()));
-                }
-            }
-        }
-    };
-
-    response_from_gateway_egress_response(gateway_response, request_context)
 }
 
 async fn forward_upgrade_request_through_direct_gateway(
@@ -2933,91 +2660,6 @@ async fn forward_request_through_direct_gateway(
     response_from_direct_gateway_response(gateway_response, request_context)
 }
 
-async fn stream_gateway_egress_request_body(
-    mut body: Incoming,
-    request_body_sender: crate::tunnel::session::GatewayEgressHttpRequestBodySender,
-) -> Result<(), EgressProxyError> {
-    while let Some(frame) = body.frame().await {
-        let frame = frame.map_err(|error| {
-            EgressProxyError::new(format!(
-                "failed to read proxied request body for gateway egress: {error}"
-            ))
-        })?;
-        if let Ok(bytes) = frame.into_data()
-            && !bytes.is_empty()
-        {
-            request_body_sender
-                .send_chunk(bytes)
-                .map_err(|error| EgressProxyError::new(error.to_string()))?;
-        }
-    }
-    request_body_sender
-        .send_end()
-        .map_err(|error| EgressProxyError::new(error.to_string()))
-}
-
-async fn tunnel_gateway_upgrade(
-    downstream_upgrade: hyper::upgrade::OnUpgrade,
-    request_body_sender: crate::tunnel::session::GatewayEgressHttpRequestBodySender,
-    mut gateway_response_body: tokio_mpsc::UnboundedReceiver<Result<Bytes, TunnelSessionError>>,
-) -> Result<(), EgressProxyError> {
-    let downstream = downstream_upgrade.await.map_err(|error| {
-        EgressProxyError::new(format!("failed to upgrade downstream websocket: {error}"))
-    })?;
-    let downstream = TokioIo::new(downstream);
-    let (mut downstream_reader, mut downstream_writer) = tokio::io::split(downstream);
-
-    let mut request_task = tokio::spawn(async move {
-        let mut buffer = vec![0_u8; 16 * 1024];
-        loop {
-            let byte_count = downstream_reader.read(&mut buffer).await.map_err(|error| {
-                EgressProxyError::new(format!(
-                    "failed to read downstream websocket bytes: {error}"
-                ))
-            })?;
-            if byte_count == 0 {
-                request_body_sender
-                    .close_upgraded_request()
-                    .map_err(|error| EgressProxyError::new(error.to_string()))?;
-                return Ok::<(), EgressProxyError>(());
-            }
-            request_body_sender
-                .send_upgraded_bytes(Bytes::copy_from_slice(&buffer[..byte_count]))
-                .map_err(|error| EgressProxyError::new(error.to_string()))?;
-        }
-    });
-
-    let mut response_task = tokio::spawn(async move {
-        while let Some(frame) = gateway_response_body.recv().await {
-            let bytes = frame.map_err(|error| EgressProxyError::new(error.to_string()))?;
-            if !bytes.is_empty() {
-                downstream_writer.write_all(&bytes).await.map_err(|error| {
-                    EgressProxyError::new(format!(
-                        "failed to write gateway websocket bytes downstream: {error}"
-                    ))
-                })?;
-            }
-        }
-        downstream_writer.shutdown().await.map_err(|error| {
-            EgressProxyError::new(format!("failed to close downstream websocket: {error}"))
-        })
-    });
-
-    tokio::select! {
-        request_result = &mut request_task => {
-            request_result
-                .map_err(|error| EgressProxyError::new(format!("gateway websocket request task failed: {error}")))??;
-            response_task.await
-                .map_err(|error| EgressProxyError::new(format!("gateway websocket response task failed: {error}")))?
-        }
-        response_result = &mut response_task => {
-            request_task.abort();
-            response_result
-                .map_err(|error| EgressProxyError::new(format!("gateway websocket response task failed: {error}")))?
-        }
-    }
-}
-
 async fn tunnel_direct_gateway_upgrade(
     downstream_upgrade: hyper::upgrade::OnUpgrade,
     gateway_socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
@@ -3093,54 +2735,6 @@ async fn tunnel_direct_gateway_upgrade(
                 .map_err(|error| EgressProxyError::new(format!("direct gateway websocket response task failed: {error}")))?
         }
     }
-}
-
-fn response_from_gateway_egress_response(
-    gateway_response: TunnelEgressHttpResponse,
-    request_context: Arc<EgressProxyRequestContext>,
-) -> Result<Response<HyperBody>, EgressProxyError> {
-    let status = StatusCode::from_u16(gateway_response.status).map_err(|error| {
-        EgressProxyError::new(format!(
-            "gateway egress returned invalid http status '{}': {error}",
-            gateway_response.status
-        ))
-    })?;
-    let mut response_headers_fields = request_context.common_fields();
-    response_headers_fields.push(("upstreamStatus", Value::from(u64::from(status.as_u16()))));
-    emit_egress_proxy_log(
-        request_context.clock.as_ref(),
-        &request_context.sandbox_instance_id,
-        "egress_proxy_upstream_headers_received",
-        &response_headers_fields,
-    );
-
-    let mut response_builder = Response::builder().status(status);
-    for (header_name, header_value) in
-        filtered_response_headers_from_repeated_headers(&gateway_response.headers)?
-    {
-        response_builder = response_builder.header(header_name, header_value);
-    }
-    response_builder = response_builder.header(
-        SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME,
-        request_context.request_id.as_str(),
-    );
-
-    response_builder
-        .body(box_body(InstrumentedResponseBody {
-            inner: box_body(GatewayEgressResponseBody {
-                inner: Mutex::new(gateway_response.body),
-            }),
-            context: request_context,
-            upstream_status: status,
-            upstream_trace_id: None,
-            chunk_count: 0,
-            forwarded_bytes: 0,
-            first_chunk_at_ms: None,
-            ended: false,
-        }))
-        .map_err(|error| {
-            EgressProxyError::new(format!("failed to build gateway egress response: {error}"))
-        })
 }
 
 fn response_from_direct_gateway_response(
@@ -3439,116 +3033,6 @@ fn filter_outbound_response_headers(
         .collect()
 }
 
-fn repeated_headers_from_filtered_headers(
-    headers: Vec<(HeaderName, HeaderValue)>,
-) -> Result<BTreeMap<String, Vec<String>>, EgressProxyError> {
-    let mut repeated_headers = BTreeMap::<String, Vec<String>>::new();
-    for (name, value) in headers {
-        let value = value.to_str().map_err(|error| {
-            EgressProxyError::new(format!(
-                "gateway egress request header '{}' is not valid utf-8: {error}",
-                name.as_str()
-            ))
-        })?;
-        repeated_headers
-            .entry(name.as_str().to_string())
-            .or_default()
-            .push(value.to_string());
-    }
-    Ok(repeated_headers)
-}
-
-fn filtered_response_headers_from_repeated_headers(
-    headers: &BTreeMap<String, Vec<String>>,
-) -> Result<Vec<(HeaderName, HeaderValue)>, EgressProxyError> {
-    let mut header_map = hyper::HeaderMap::new();
-    for (name, values) in headers {
-        let header_name = HeaderName::from_bytes(name.as_bytes()).map_err(|error| {
-            EgressProxyError::new(format!(
-                "gateway egress response header name '{name}' is invalid: {error}"
-            ))
-        })?;
-        for value in values {
-            let header_value = HeaderValue::from_str(value).map_err(|error| {
-                EgressProxyError::new(format!(
-                    "gateway egress response header '{name}' has invalid value: {error}"
-                ))
-            })?;
-            header_map.append(header_name.clone(), header_value);
-        }
-    }
-    Ok(filter_outbound_response_headers(&header_map))
-}
-
-fn filtered_upgrade_response_headers_from_repeated_headers(
-    headers: &BTreeMap<String, Vec<String>>,
-) -> Result<Vec<(HeaderName, HeaderValue)>, EgressProxyError> {
-    let mut header_map = hyper::HeaderMap::new();
-    for (name, values) in headers {
-        let header_name = HeaderName::from_bytes(name.as_bytes()).map_err(|error| {
-            EgressProxyError::new(format!(
-                "gateway egress upgrade response header name '{name}' is invalid: {error}"
-            ))
-        })?;
-        for value in values {
-            let header_value = HeaderValue::from_str(value).map_err(|error| {
-                EgressProxyError::new(format!(
-                    "gateway egress upgrade response header '{name}' has invalid value: {error}"
-                ))
-            })?;
-            header_map.append(header_name.clone(), header_value);
-        }
-    }
-    Ok(filter_upgrade_response_headers(&header_map))
-}
-
-fn filter_upgrade_request_headers(
-    headers: &hyper::HeaderMap<HeaderValue>,
-) -> Vec<(HeaderName, HeaderValue)> {
-    headers
-        .iter()
-        .filter_map(|(name, value)| {
-            let blocked = matches!(
-                name.as_str().to_ascii_lowercase().as_str(),
-                "host"
-                    | "proxy-authenticate"
-                    | "proxy-authorization"
-                    | "proxy-connection"
-                    | "te"
-                    | "trailer"
-                    | "transfer-encoding"
-            );
-            if blocked {
-                return None;
-            }
-            Some((name.clone(), value.clone()))
-        })
-        .collect()
-}
-
-fn filter_upgrade_response_headers(
-    headers: &hyper::HeaderMap<HeaderValue>,
-) -> Vec<(HeaderName, HeaderValue)> {
-    headers
-        .iter()
-        .filter_map(|(name, value)| {
-            let blocked = matches!(
-                name.as_str().to_ascii_lowercase().as_str(),
-                "proxy-authenticate"
-                    | "proxy-authorization"
-                    | "proxy-connection"
-                    | "te"
-                    | "trailer"
-                    | "transfer-encoding"
-            );
-            if blocked {
-                return None;
-            }
-            Some((name.clone(), value.clone()))
-        })
-        .collect()
-}
-
 fn build_tls_acceptor(
     authority: &str,
     proxy_ca_certificate_pem: &str,
@@ -3741,12 +3225,13 @@ mod tests {
     #[cfg(target_os = "linux")]
     use crate::egress_proxy::socket_addr_from_sockaddr_storage;
     use crate::egress_proxy::{
-        DIRECT_EGRESS_HTTP_ROUTE_PATH, DIRECT_EGRESS_WEBSOCKET_ROUTE_PATH, EgressProxy,
-        EgressProxyForwardingMode, EgressProxyRoute, ProxyCaConfig, RequestTargetOverride,
-        TransparentProxyProtocol, build_direct_forward_uri, build_gateway_egress_route,
-        build_managed_proxy_env, classify_transparent_proxy_first_byte,
-        filter_direct_gateway_request_headers, match_route, resolve_direct_gateway_route_url,
-        resolve_request_target, serialize_egress_proxy_log_line, websocket_target_url,
+        DIRECT_EGRESS_HTTP_ROUTE_PATH, DIRECT_EGRESS_WEBSOCKET_ROUTE_PATH,
+        DirectGatewayEgressClient, EgressProxy, EgressProxyForwardingMode, EgressProxyRoute,
+        ProxyCaConfig, RequestTargetOverride, TransparentProxyProtocol, build_direct_forward_uri,
+        build_direct_gateway_http_client, build_gateway_egress_route, build_managed_proxy_env,
+        classify_transparent_proxy_first_byte, filter_direct_gateway_request_headers, match_route,
+        resolve_direct_gateway_route_url, resolve_request_target, serialize_egress_proxy_log_line,
+        websocket_target_url,
     };
     #[cfg(target_os = "linux")]
     use crate::egress_proxy::{
@@ -3766,7 +3251,7 @@ mod tests {
     use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
     use crate::time::SystemClock;
     use crate::time::testing::MutableClock;
-    use crate::tunnel::session::GatewayEgressForwarder;
+    use crate::tunnel::session::GatewayEgressTokenProvider;
     use serde_json::Value;
 
     struct TestProxyCaPaths {
@@ -4260,9 +3745,7 @@ mod tests {
         let proxy_one = EgressProxy::start_with_options(
             &runtime_plan,
             &startup_input,
-            EgressProxyForwardingMode::Gateway {
-                forwarder: GatewayEgressForwarder::new(),
-            },
+            test_forwarding_mode(),
             listener_address,
             test_proxy_ca_config(&proxy_ca_paths),
             Arc::new(SystemClock),
@@ -4283,9 +3766,7 @@ mod tests {
         let proxy_two = EgressProxy::start_with_options(
             &runtime_plan,
             &startup_input,
-            EgressProxyForwardingMode::Gateway {
-                forwarder: GatewayEgressForwarder::new(),
-            },
+            test_forwarding_mode(),
             listener_address,
             test_proxy_ca_config(&proxy_ca_paths),
             Arc::new(SystemClock),
@@ -4331,9 +3812,7 @@ mod tests {
         let proxy = EgressProxy::start_with_options(
             &runtime_plan,
             &startup_input,
-            EgressProxyForwardingMode::Gateway {
-                forwarder: GatewayEgressForwarder::new(),
-            },
+            test_forwarding_mode(),
             listener_address,
             test_proxy_ca_config(&proxy_ca_paths),
             Arc::new(SystemClock),
@@ -4379,9 +3858,7 @@ mod tests {
         let proxy = EgressProxy::start_with_options(
             &runtime_plan,
             &startup_input,
-            EgressProxyForwardingMode::Gateway {
-                forwarder: GatewayEgressForwarder::new(),
-            },
+            test_forwarding_mode(),
             listener_address,
             test_proxy_ca_config(&proxy_ca_paths),
             Arc::new(SystemClock),
@@ -4471,9 +3948,7 @@ mod tests {
         let first_proxy = EgressProxy::start_with_options(
             &runtime_plan,
             &startup_input,
-            EgressProxyForwardingMode::Gateway {
-                forwarder: GatewayEgressForwarder::new(),
-            },
+            test_forwarding_mode(),
             reserve_test_listener_address(),
             test_proxy_ca_config(&proxy_ca_paths),
             Arc::new(SystemClock),
@@ -4494,9 +3969,7 @@ mod tests {
         let second_proxy = EgressProxy::start_with_options(
             &runtime_plan,
             &startup_input,
-            EgressProxyForwardingMode::Gateway {
-                forwarder: GatewayEgressForwarder::new(),
-            },
+            test_forwarding_mode(),
             reserve_test_listener_address(),
             test_proxy_ca_config(&proxy_ca_paths),
             Arc::new(SystemClock),
@@ -4555,9 +4028,7 @@ mod tests {
         let error = EgressProxy::start_with_options(
             &runtime_plan,
             &startup_input,
-            EgressProxyForwardingMode::Gateway {
-                forwarder: GatewayEgressForwarder::new(),
-            },
+            test_forwarding_mode(),
             reserve_test_listener_address(),
             test_proxy_ca_config(&proxy_ca_paths),
             Arc::new(SystemClock),
@@ -4644,6 +4115,31 @@ mod tests {
             runtime_plan: serde_json::json!({}),
             git_identity: None,
             transparent_proxy: None,
+        }
+    }
+
+    fn test_forwarding_mode() -> EgressProxyForwardingMode {
+        EgressProxyForwardingMode::DirectGateway {
+            client: Arc::new(DirectGatewayEgressClient {
+                http_route_url: resolve_direct_gateway_route_url(
+                    "ws://127.0.0.1:4500/tunnel/sandbox/sandbox-123",
+                    DIRECT_EGRESS_HTTP_ROUTE_PATH,
+                    DirectGatewayRouteScheme::Http,
+                )
+                .expect("direct gateway HTTP route URL should resolve"),
+                websocket_route_url: resolve_direct_gateway_route_url(
+                    "ws://127.0.0.1:4500/tunnel/sandbox/sandbox-123",
+                    DIRECT_EGRESS_WEBSOCKET_ROUTE_PATH,
+                    DirectGatewayRouteScheme::WebSocket,
+                )
+                .expect("direct gateway websocket route URL should resolve"),
+                http_client: build_direct_gateway_http_client()
+                    .expect("direct gateway HTTP client should build"),
+                token_provider: GatewayEgressTokenProvider::new(
+                    Arc::new(SystemClock),
+                    "sandbox-123",
+                ),
+            }),
         }
     }
 
