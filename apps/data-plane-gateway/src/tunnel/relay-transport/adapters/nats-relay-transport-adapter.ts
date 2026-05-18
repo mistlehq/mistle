@@ -16,7 +16,7 @@ const TextEncoderInstance = new TextEncoder();
 const RelayTargetSchema = z
   .object({
     sandboxInstanceId: z.string().min(1),
-    side: z.enum(["bootstrap", "connection"]),
+    side: z.enum(["bootstrap", "connection", "ptyClient", "ptySandbox"]),
     nodeId: z.string().min(1),
     sessionId: z.string().min(1),
   })
@@ -94,7 +94,7 @@ function decodeJson(data: Uint8Array): unknown {
 }
 
 export class NatsRelayTransportAdapter implements RelayTransportAdapter {
-  private readonly socketsBySessionId = new Map<string, RelayPeerSocket>();
+  private readonly socketsByPeerKey = new Map<string, RelayPeerSocket>();
   private connection: NatsConnection | undefined;
   private subscription: Subscription | undefined;
 
@@ -147,14 +147,14 @@ export class NatsRelayTransportAdapter implements RelayTransportAdapter {
       throw new Error("Expected local peer registration to target current gateway node.");
     }
 
-    this.socketsBySessionId.set(input.target.sessionId, input.socket);
+    this.socketsByPeerKey.set(createPeerKey(input.target), input.socket);
   }
 
   public unregisterLocalPeer(input: { target: RelayTarget }): void {
     if (input.target.nodeId !== this.nodeId) {
       return;
     }
-    this.socketsBySessionId.delete(input.target.sessionId);
+    this.socketsByPeerKey.delete(createPeerKey(input.target));
   }
 
   public async deliverEnvelope(envelope: RelayEnvelope): Promise<void> {
@@ -211,7 +211,7 @@ export class NatsRelayTransportAdapter implements RelayTransportAdapter {
       throw new Error("Expected local relay envelope to target current gateway node.");
     }
 
-    const socket = this.socketsBySessionId.get(envelope.target.sessionId);
+    const socket = this.socketsByPeerKey.get(createPeerKey(envelope.target));
     if (socket === undefined) {
       recordGatewayRelayEnvelopeEvent({
         backend: "nats",
@@ -260,4 +260,8 @@ export class NatsRelayTransportAdapter implements RelayTransportAdapter {
   private relaySubject(nodeId: string): string {
     return `${this.subjectPrefix}.relay.${nodeId}`;
   }
+}
+
+function createPeerKey(target: RelayTarget): string {
+  return `${target.side}:${target.sessionId}`;
 }

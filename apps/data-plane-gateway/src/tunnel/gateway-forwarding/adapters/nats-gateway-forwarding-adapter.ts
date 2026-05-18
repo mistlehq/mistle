@@ -22,7 +22,7 @@ const TextEncoderInstance = new TextEncoder();
 const RelayTargetSchema = z
   .object({
     sandboxInstanceId: z.string().min(1),
-    side: z.enum(["bootstrap", "connection"]),
+    side: z.enum(["bootstrap", "connection", "ptyClient", "ptySandbox"]),
     nodeId: z.string().min(1),
     sessionId: z.string().min(1),
   })

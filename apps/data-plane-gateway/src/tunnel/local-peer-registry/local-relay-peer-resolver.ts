@@ -1,5 +1,5 @@
 import type { RelayPeerResolver } from "../relay-peer-resolver.js";
-import type { RelayTarget } from "../types.js";
+import type { RelayPeerSide, RelayTarget } from "../types.js";
 import type { LocalPeerRegistryAdapter } from "./local-peer-registry-adapter.js";
 
 export class LocalRelayPeerResolver implements RelayPeerResolver {
@@ -26,9 +26,21 @@ export class LocalRelayPeerResolver implements RelayPeerResolver {
     sandboxInstanceId: string;
     sessionId: string;
   }): Promise<RelayTarget | undefined> {
-    return this.peerRegistry.getConnectionPeer({
+    return this.resolveSessionPeer({
       sandboxInstanceId: input.sandboxInstanceId,
       side: "connection",
+      sessionId: input.sessionId,
+    });
+  }
+
+  public async resolveSessionPeer(input: {
+    sandboxInstanceId: string;
+    side: RelayPeerSide;
+    sessionId: string;
+  }): Promise<RelayTarget | undefined> {
+    return this.peerRegistry.getConnectionPeer({
+      sandboxInstanceId: input.sandboxInstanceId,
+      side: input.side,
       sessionId: input.sessionId,
     });
   }

@@ -1,10 +1,13 @@
-import type { RelayTarget, SessionPeerDescriptor } from "../types.js";
+import type { RelayPeerSide, RelayTarget, SessionPeerDescriptor } from "../types.js";
 
 export interface LocalPeerRegistryAdapter {
   getBootstrapPeer(input: { sandboxInstanceId: string }): RelayTarget | undefined;
   setBootstrapPeer(input: RelayTarget): RelayTarget | undefined;
   getConnectionPeer(input: SessionPeerDescriptor): RelayTarget | undefined;
   setConnectionPeer(input: RelayTarget): RelayTarget | undefined;
+  getSessionPeer(input: SessionPeerDescriptor): RelayTarget | undefined;
+  setSessionPeer(input: RelayTarget): RelayTarget | undefined;
   listConnectionPeers(input: { sandboxInstanceId: string }): RelayTarget[];
+  listSessionPeers(input: { sandboxInstanceId: string; side: RelayPeerSide }): RelayTarget[];
   removePeer(input: RelayTarget): boolean;
 }

@@ -1,7 +1,7 @@
 import type { WSContext } from "hono/ws";
 import type { WebSocket } from "ws";
 
-export type RelayPeerSide = "bootstrap" | "connection";
+export type RelayPeerSide = "bootstrap" | "connection" | "ptyClient" | "ptySandbox";
 
 export type LocalPeerDescriptor = {
   sandboxInstanceId: string;

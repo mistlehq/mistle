@@ -7,6 +7,7 @@ import {
   parsePortsTransportMessage,
   parseProcessesStreamMessage,
   parsePtySessionControlMessage,
+  parsePtyTransportClientOpen,
   parseSigningControlMessage,
   parseStreamControlMessage,
   parseTelemetryControlMessage,
@@ -591,6 +592,48 @@ describe("stream control message parser", () => {
 });
 
 describe("PTY session control message parser", () => {
+  it("parses direct PTY transport client open messages", () => {
+    expect(
+      parsePtyTransportClientOpen(
+        JSON.stringify({
+          type: "pty.transport.open",
+          launch: {
+            session: "create",
+            cols: 120,
+            rows: 40,
+            cwd: "/workspace/repo",
+            command: "codex",
+            args: ["resume", "thread_123"],
+          },
+          ignored: true,
+        }),
+      ),
+    ).toEqual({
+      type: "pty.transport.open",
+      launch: {
+        session: "create",
+        cols: 120,
+        rows: 40,
+        cwd: "/workspace/repo",
+        command: "codex",
+        args: ["resume", "thread_123"],
+      },
+    });
+  });
+
+  it("rejects malformed direct PTY transport client open messages", () => {
+    expect(
+      parsePtyTransportClientOpen(
+        JSON.stringify({
+          type: "pty.transport.open",
+          launch: {
+            session: "recreate",
+          },
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
   it("parses direct PTY session open commands", () => {
     expect(
       parsePtySessionControlMessage(

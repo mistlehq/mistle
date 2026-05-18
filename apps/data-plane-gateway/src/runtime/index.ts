@@ -11,7 +11,7 @@ import {
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
-import type { BootstrapTokenConfig } from "@mistle/gateway-tunnel-auth";
+import type { BootstrapTokenConfig, PtyTransportTokenConfig } from "@mistle/gateway-tunnel-auth";
 import { systemClock, systemScheduler } from "@mistle/time";
 import { connect, type NatsConnection } from "@nats-io/transport-node";
 import { typeid } from "typeid-js";
@@ -31,6 +31,8 @@ import { SandboxEgressTokenService } from "../egress/sandbox-egress-token-servic
 import { registerSandboxBootstrapAttachmentTerminateRoute } from "../internal/runtime-state/register-sandbox-bootstrap-attachment-terminate-route.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
 import { logger } from "../logger.js";
+import { PtyTransportService } from "../pty/pty-transport-service.js";
+import { registerPtyTransportRoutes } from "../pty/register-pty-transport-routes.js";
 import { createPortAccessNodeEntrypoint } from "../publishing/port-access-node-entrypoint.js";
 import { PortAccessTransportService } from "../publishing/port-access-transport.js";
 import { PortsTargetAuthorizeService } from "../publishing/ports-target-authorize-service.js";
@@ -356,6 +358,16 @@ export function createDataPlaneGatewayRuntime(
       tokenAudience: config.app.sandbox.egress.tokenAudience,
     },
   );
+  const ptyTransportService = new PtyTransportService({
+    config: config.app.sandbox,
+    relayCoordinator,
+    sandboxOwnerResolver,
+    tokenConfig: {
+      tokenSecret: config.app.sandbox.ptyTransport.tokenSecret,
+      tokenIssuer: config.app.sandbox.ptyTransport.tokenIssuer,
+      tokenAudience: config.app.sandbox.ptyTransport.tokenAudience,
+    } satisfies PtyTransportTokenConfig,
+  });
   const portAccessNodeEntrypoint = createPortAccessNodeEntrypoint({
     bootstrapTokenConfig: {
       tokenSecret: config.app.sandbox.publish.access.tokenSecret,
@@ -486,6 +498,11 @@ export function createDataPlaneGatewayRuntime(
   registerDirectEgressRoutes({
     app,
     directEgressProxyService,
+    upgradeWebSocket: nodeWebSocket.upgradeWebSocket,
+  });
+  registerPtyTransportRoutes({
+    app,
+    ptyTransportService,
     upgradeWebSocket: nodeWebSocket.upgradeWebSocket,
   });
   registerPortAccessRoutes({

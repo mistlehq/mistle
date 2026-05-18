@@ -361,6 +361,46 @@ describe("InMemoryRelayTransportAdapter", () => {
     expect(closed.reason).toBe("Closed by adapter");
   });
 
+  it("keeps different peer sides with the same session id isolated", async () => {
+    const clientPair = await createWebSocketPair();
+    const sandboxPair = await createWebSocketPair();
+    openPairs.push(clientPair, sandboxPair);
+    const adapter = new InMemoryRelayTransportAdapter("dpg_local");
+    const clientTarget = createPeerLocation({
+      sandboxInstanceId: "sbi_abc",
+      side: "ptyClient",
+      nodeId: "dpg_local",
+      sessionId: "pty_one",
+    });
+    const sandboxTarget = createPeerLocation({
+      sandboxInstanceId: "sbi_abc",
+      side: "ptySandbox",
+      nodeId: "dpg_local",
+      sessionId: "pty_one",
+    });
+
+    adapter.registerLocalPeer({
+      target: clientTarget,
+      socket: clientPair.peerSocket,
+    });
+    adapter.registerLocalPeer({
+      target: sandboxTarget,
+      socket: sandboxPair.peerSocket,
+    });
+
+    const clientMessagePromise = waitForWebSocketMessage(clientPair.clientSocket);
+    await adapter.deliverEnvelope({
+      kind: "frame",
+      target: clientTarget,
+      payload: "client side only",
+    });
+    await expect(clientMessagePromise).resolves.toMatchObject({
+      data: "client side only",
+      isBinary: false,
+    });
+    await expectNoWebSocketMessage(sandboxPair.clientSocket, 150);
+  });
+
   it("throws when registering a peer for a different gateway node", async () => {
     const pair = await createWebSocketPair();
     openPairs.push(pair);

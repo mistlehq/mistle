@@ -5,6 +5,8 @@ import { WebSocket } from "ws";
 import { getSandboxTunnelDeliveryCorrelationScope } from "../telemetry.js";
 import type { RelayPeerSide, RelayPeerSocket } from "../types.js";
 
+type TunnelTokenKind = "bootstrap" | "connection";
+
 const TunnelTelemetryMeter = metrics.getMeter("@mistle/data-plane-gateway/tunnel");
 const TunnelWebSocketRoundTripTimeMs = TunnelTelemetryMeter.createHistogram(
   "mistle.sandbox.tunnel.websocket.rtt",
@@ -34,7 +36,7 @@ export type WebSocketHealthMissedPong = {
 export function startWebSocketHealthMonitor(input: {
   clock: Clock;
   socketKind: RelayPeerSide;
-  tokenKind: RelayPeerSide;
+  tokenKind: TunnelTokenKind;
   socket: RelayPeerSocket;
   scheduler: Scheduler;
   pingIntervalMs: number;
@@ -171,7 +173,7 @@ export function startWebSocketHealthMonitor(input: {
 
 function buildRoundTripAttributes(input: {
   socketKind: RelayPeerSide;
-  tokenKind: RelayPeerSide;
+  tokenKind: TunnelTokenKind;
 }): Attributes {
   const deliveryCorrelationScope = getSandboxTunnelDeliveryCorrelationScope({
     tokenKind: input.tokenKind,

@@ -313,6 +313,11 @@ const PtySessionControlMessageSchema = z.discriminatedUnion("type", [
   PtySessionErrorSchema,
 ]);
 
+const PtyTransportClientOpenSchema = z.object({
+  type: z.literal("pty.transport.open"),
+  launch: PtySessionLaunchSchema,
+});
+
 const StreamOpenSchema = z.object({
   type: z.literal("stream.open"),
   streamId: PositiveIntegerSchema,
@@ -593,6 +598,7 @@ export type PtySessionOpen = z.infer<typeof PtySessionOpenSchema>;
 export type PtySessionOpened = z.infer<typeof PtySessionOpenedSchema>;
 export type PtySessionError = z.infer<typeof PtySessionErrorSchema>;
 export type PtySessionControlMessage = z.infer<typeof PtySessionControlMessageSchema>;
+export type PtyTransportClientOpen = z.infer<typeof PtyTransportClientOpenSchema>;
 
 export type StreamOpen = z.infer<typeof StreamOpenSchema>;
 export type StreamOpenOK = z.infer<typeof StreamOpenOKSchema>;
@@ -744,6 +750,16 @@ export function parsePtySessionControlMessage(
   }
 
   const result = PtySessionControlMessageSchema.safeParse(parsedPayload);
+  return result.success ? result.data : undefined;
+}
+
+export function parsePtyTransportClientOpen(payload: string): PtyTransportClientOpen | undefined {
+  const parsedPayload = parseJSON(payload);
+  if (parsedPayload === undefined) {
+    return undefined;
+  }
+
+  const result = PtyTransportClientOpenSchema.safeParse(parsedPayload);
   return result.success ? result.data : undefined;
 }
 export type SandboxSessionControlMessage =

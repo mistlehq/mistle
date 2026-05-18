@@ -1,12 +1,12 @@
 import { metrics, type Attributes } from "@opentelemetry/api";
 
 import { logger } from "../logger.js";
-import type { RelayEnvelope, RelayPayload } from "./types.js";
+import type { RelayEnvelope, RelayPayload, RelayPeerSide } from "./types.js";
 
 type GatewayRelayBackend = "memory" | "nats";
 type GatewayRelayEnvelopeDirection = "published" | "received" | "local_delivered" | "dropped";
 type GatewayRelayPayloadKind = "text" | "binary" | "none";
-type GatewayRelayPeerLookupPeerSide = "bootstrap" | "connection";
+type GatewayRelayPeerLookupPeerSide = RelayPeerSide;
 type GatewayRelayPeerLookupOutcome =
   | "local_hit"
   | "remote_hit"

@@ -1,17 +1,21 @@
-import type { RelayTarget, SessionPeerDescriptor } from "../../types.js";
+import type { RelayPeerSide, RelayTarget, SessionPeerDescriptor } from "../../types.js";
 import type { LocalPeerRegistryAdapter } from "../local-peer-registry-adapter.js";
 
 function createBootstrapPeerKey(input: { sandboxInstanceId: string }): string {
   return `${input.sandboxInstanceId}:bootstrap`;
 }
 
-function createConnectionPeerKey(input: { sandboxInstanceId: string; sessionId: string }): string {
-  return `${input.sandboxInstanceId}:connection:${input.sessionId}`;
+function createSessionPeerKey(input: {
+  sandboxInstanceId: string;
+  side: RelayPeerSide;
+  sessionId: string;
+}): string {
+  return `${input.sandboxInstanceId}:${input.side}:${input.sessionId}`;
 }
 
 export class InMemoryLocalPeerRegistryAdapter implements LocalPeerRegistryAdapter {
   private readonly bootstrapPeersByKey = new Map<string, RelayTarget>();
-  private readonly connectionPeersByKey = new Map<string, RelayTarget>();
+  private readonly sessionPeersByKey = new Map<string, RelayTarget>();
 
   public getBootstrapPeer(input: { sandboxInstanceId: string }): RelayTarget | undefined {
     return this.bootstrapPeersByKey.get(createBootstrapPeerKey(input));
@@ -25,20 +29,38 @@ export class InMemoryLocalPeerRegistryAdapter implements LocalPeerRegistryAdapte
   }
 
   public getConnectionPeer(input: SessionPeerDescriptor): RelayTarget | undefined {
-    return this.connectionPeersByKey.get(createConnectionPeerKey(input));
+    return this.getSessionPeer(input);
   }
 
   public setConnectionPeer(input: RelayTarget): RelayTarget | undefined {
-    const key = createConnectionPeerKey(input);
-    const previous = this.connectionPeersByKey.get(key);
-    this.connectionPeersByKey.set(key, input);
+    return this.setSessionPeer(input);
+  }
+
+  public getSessionPeer(input: SessionPeerDescriptor): RelayTarget | undefined {
+    return this.sessionPeersByKey.get(createSessionPeerKey(input));
+  }
+
+  public setSessionPeer(input: RelayTarget): RelayTarget | undefined {
+    const key = createSessionPeerKey(input);
+    const previous = this.sessionPeersByKey.get(key);
+    this.sessionPeersByKey.set(key, input);
     return previous;
   }
 
   public listConnectionPeers(input: { sandboxInstanceId: string }): RelayTarget[] {
+    return this.listSessionPeers({
+      sandboxInstanceId: input.sandboxInstanceId,
+      side: "connection",
+    });
+  }
+
+  public listSessionPeers(input: {
+    sandboxInstanceId: string;
+    side: RelayPeerSide;
+  }): RelayTarget[] {
     const peers: RelayTarget[] = [];
-    for (const [key, peer] of this.connectionPeersByKey.entries()) {
-      if (!key.startsWith(`${input.sandboxInstanceId}:connection:`)) {
+    for (const [key, peer] of this.sessionPeersByKey.entries()) {
+      if (!key.startsWith(`${input.sandboxInstanceId}:${input.side}:`)) {
         continue;
       }
       peers.push(peer);
@@ -49,9 +71,9 @@ export class InMemoryLocalPeerRegistryAdapter implements LocalPeerRegistryAdapte
 
   public removePeer(input: RelayTarget): boolean {
     const key =
-      input.side === "bootstrap" ? createBootstrapPeerKey(input) : createConnectionPeerKey(input);
+      input.side === "bootstrap" ? createBootstrapPeerKey(input) : createSessionPeerKey(input);
     const peersByKey =
-      input.side === "bootstrap" ? this.bootstrapPeersByKey : this.connectionPeersByKey;
+      input.side === "bootstrap" ? this.bootstrapPeersByKey : this.sessionPeersByKey;
     const existing = peersByKey.get(key);
     if (existing === undefined) {
       return false;

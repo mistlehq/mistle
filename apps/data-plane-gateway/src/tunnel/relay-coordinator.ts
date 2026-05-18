@@ -81,7 +81,7 @@ export class TunnelRelayCoordinator {
     const replacedPeer =
       input.side === "bootstrap"
         ? this.peerRegistry.setBootstrapPeer(target)
-        : this.peerRegistry.setConnectionPeer(target);
+        : this.peerRegistry.setSessionPeer(target);
     if (replacedPeer !== undefined) {
       void this.relayTransport
         .deliverEnvelope(
@@ -103,7 +103,7 @@ export class TunnelRelayCoordinator {
         ? this.peerRegistry.getBootstrapPeer({
             sandboxInstanceId: input.sandboxInstanceId,
           })
-        : this.peerRegistry.getConnectionPeer({
+        : this.peerRegistry.getSessionPeer({
             sandboxInstanceId: input.sandboxInstanceId,
             side: input.side,
             sessionId: input.sessionId,
@@ -147,6 +147,75 @@ export class TunnelRelayCoordinator {
     );
   }
 
+  public async forwardSessionPeerMessage(input: {
+    sandboxInstanceId: string;
+    targetSide: RelayPeerSide;
+    targetSessionId: string;
+    payload: RelayPayload;
+  }): Promise<void> {
+    if (input.targetSide === "bootstrap") {
+      throw new Error("Use forwardPeerMessage to target bootstrap peers.");
+    }
+
+    const target = await this.peerResolver.resolveSessionPeer({
+      sandboxInstanceId: input.sandboxInstanceId,
+      side: input.targetSide,
+      sessionId: input.targetSessionId,
+    });
+    if (target === undefined) {
+      return;
+    }
+
+    await this.relayTransport.deliverEnvelope(
+      toFrameEnvelope({
+        target,
+        payload: input.payload,
+      }),
+    );
+  }
+
+  public async closeSessionPeer(input: {
+    sandboxInstanceId: string;
+    targetSide: RelayPeerSide;
+    targetSessionId: string;
+    closeCode: number;
+    closeReason: string;
+  }): Promise<void> {
+    if (input.targetSide === "bootstrap") {
+      throw new Error("Use closePeer to target bootstrap peers.");
+    }
+
+    const target = await this.resolveSessionPeer({
+      sandboxInstanceId: input.sandboxInstanceId,
+      side: input.targetSide,
+      sessionId: input.targetSessionId,
+    });
+    if (target === undefined) {
+      return;
+    }
+
+    await this.closePeer({
+      target,
+      closeCode: input.closeCode,
+      closeReason: input.closeReason,
+    });
+  }
+
+  public async resolveSessionPeer(input: {
+    sandboxInstanceId: string;
+    side: RelayPeerSide;
+    sessionId: string;
+  }): Promise<RelayTarget | undefined> {
+    if (input.side === "bootstrap") {
+      return this.peerResolver.resolveBootstrapPeer({
+        sandboxInstanceId: input.sandboxInstanceId,
+        targetSessionId: input.sessionId,
+      });
+    }
+
+    return this.peerResolver.resolveSessionPeer(input);
+  }
+
   public async closePeer(input: {
     target: RelayTarget;
     closeCode: number;
@@ -182,9 +251,19 @@ export class TunnelRelayCoordinator {
       return;
     }
 
-    const oppositePeers = this.peerRegistry.listConnectionPeers({
-      sandboxInstanceId: input.target.sandboxInstanceId,
-    });
+    const oppositePeers = [
+      ...this.peerRegistry.listConnectionPeers({
+        sandboxInstanceId: input.target.sandboxInstanceId,
+      }),
+      ...this.peerRegistry.listSessionPeers({
+        sandboxInstanceId: input.target.sandboxInstanceId,
+        side: "ptyClient",
+      }),
+      ...this.peerRegistry.listSessionPeers({
+        sandboxInstanceId: input.target.sandboxInstanceId,
+        side: "ptySandbox",
+      }),
+    ];
     if (!input.notifyOppositePeer || oppositePeers.length === 0) {
       return;
     }

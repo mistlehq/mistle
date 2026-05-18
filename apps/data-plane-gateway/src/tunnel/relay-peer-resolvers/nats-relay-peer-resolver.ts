@@ -14,7 +14,7 @@ import {
 } from "../gateway-relay-observability.js";
 import type { LocalPeerRegistryAdapter } from "../local-peer-registry/local-peer-registry-adapter.js";
 import type { RelayPeerResolver } from "../relay-peer-resolver.js";
-import type { RelayTarget } from "../types.js";
+import type { RelayPeerSide, RelayTarget } from "../types.js";
 
 const RequestTimeoutMs = 500;
 const TextDecoderInstance = new TextDecoder();
@@ -23,7 +23,7 @@ const TextEncoderInstance = new TextEncoder();
 const RelayTargetSchema = z
   .object({
     sandboxInstanceId: z.string().min(1),
-    side: z.enum(["bootstrap", "connection"]),
+    side: z.enum(["bootstrap", "connection", "ptyClient", "ptySandbox"]),
     nodeId: z.string().min(1),
     sessionId: z.string().min(1),
   })
@@ -150,9 +150,21 @@ export class NatsRelayPeerResolver implements RelayPeerResolver {
     sandboxInstanceId: string;
     sessionId: string;
   }): Promise<RelayTarget | undefined> {
-    const localTarget = this.localPeerRegistry.getConnectionPeer({
+    return this.resolveSessionPeer({
       sandboxInstanceId: input.sandboxInstanceId,
       side: "connection",
+      sessionId: input.sessionId,
+    });
+  }
+
+  public async resolveSessionPeer(input: {
+    sandboxInstanceId: string;
+    side: RelayPeerSide;
+    sessionId: string;
+  }): Promise<RelayTarget | undefined> {
+    const localTarget = this.localPeerRegistry.getConnectionPeer({
+      sandboxInstanceId: input.sandboxInstanceId,
+      side: input.side,
       sessionId: input.sessionId,
     });
     if (localTarget !== undefined) {
@@ -160,7 +172,7 @@ export class NatsRelayPeerResolver implements RelayPeerResolver {
         backend: "nats",
         localNodeId: this.nodeId,
         outcome: "local_hit",
-        peerSide: "connection",
+        peerSide: input.side,
         sandboxInstanceId: input.sandboxInstanceId,
         sessionId: input.sessionId,
         targetNodeId: localTarget.nodeId,
@@ -187,7 +199,7 @@ export class NatsRelayPeerResolver implements RelayPeerResolver {
         backend: "nats",
         localNodeId: this.nodeId,
         outcome: "remote_hit",
-        peerSide: "connection",
+        peerSide: input.side,
         sandboxInstanceId: input.sandboxInstanceId,
         sessionId: input.sessionId,
         targetNodeId: target.nodeId,
@@ -199,7 +211,7 @@ export class NatsRelayPeerResolver implements RelayPeerResolver {
           backend: "nats",
           localNodeId: this.nodeId,
           outcome: "no_responders",
-          peerSide: "connection",
+          peerSide: input.side,
           sandboxInstanceId: input.sandboxInstanceId,
           sessionId: input.sessionId,
         });
@@ -210,7 +222,7 @@ export class NatsRelayPeerResolver implements RelayPeerResolver {
           backend: "nats",
           localNodeId: this.nodeId,
           outcome: "timeout",
-          peerSide: "connection",
+          peerSide: input.side,
           sandboxInstanceId: input.sandboxInstanceId,
           sessionId: input.sessionId,
         });
@@ -226,7 +238,7 @@ export class NatsRelayPeerResolver implements RelayPeerResolver {
       const lookup = this.parseConnectionPeerLookupSubject(message.subject);
       const target = this.localPeerRegistry.getConnectionPeer({
         sandboxInstanceId: lookup.sandboxInstanceId,
-        side: "connection",
+        side: lookup.side,
         sessionId: lookup.sessionId,
       });
       if (target !== undefined) {
@@ -237,32 +249,50 @@ export class NatsRelayPeerResolver implements RelayPeerResolver {
 
   private connectionPeerLookupSubject(input: {
     sandboxInstanceId: string;
+    side: RelayPeerSide;
     sessionId: string;
   }): string {
-    return `${this.subjectPrefix}.peer.connection.${input.sandboxInstanceId}.${input.sessionId}`;
+    return `${this.subjectPrefix}.peer.session.${input.side}.${input.sandboxInstanceId}.${input.sessionId}`;
   }
 
   private connectionPeerLookupSubjectPattern(): string {
-    return `${this.subjectPrefix}.peer.connection.*.*`;
+    return `${this.subjectPrefix}.peer.session.*.*.*`;
   }
 
   private parseConnectionPeerLookupSubject(subject: string): {
     sandboxInstanceId: string;
+    side: RelayPeerSide;
     sessionId: string;
   } {
-    const prefix = `${this.subjectPrefix}.peer.connection.`;
+    const prefix = `${this.subjectPrefix}.peer.session.`;
     if (!subject.startsWith(prefix)) {
       throw new Error(`Unexpected NATS relay peer lookup subject '${subject}'.`);
     }
     const suffix = subject.slice(prefix.length);
     const tokens = suffix.split(".");
-    if (tokens.length !== 2 || tokens[0] === undefined || tokens[1] === undefined) {
+    const side = tokens[0];
+    if (
+      tokens.length !== 3 ||
+      !isRelayPeerSide(side) ||
+      tokens[1] === undefined ||
+      tokens[2] === undefined
+    ) {
       throw new Error(`Unexpected NATS relay peer lookup subject '${subject}'.`);
     }
 
     return {
-      sandboxInstanceId: tokens[0],
-      sessionId: tokens[1],
+      sandboxInstanceId: tokens[1],
+      side,
+      sessionId: tokens[2],
     };
   }
+}
+
+function isRelayPeerSide(value: string | undefined): value is RelayPeerSide {
+  return (
+    value === "bootstrap" ||
+    value === "connection" ||
+    value === "ptyClient" ||
+    value === "ptySandbox"
+  );
 }
