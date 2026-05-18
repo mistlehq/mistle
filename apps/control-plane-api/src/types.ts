@@ -67,6 +67,22 @@ export type AppAuthContext =
       permissions: readonly OrganizationPermission[];
     };
 
+export type AppOrganizationActor =
+  | {
+      kind: "user";
+      userId: string;
+      sessionId: string;
+      organizationId: string;
+      permissions: readonly OrganizationPermission[];
+    }
+  | {
+      kind: "api_key";
+      apiKeyId: string;
+      name: string;
+      organizationId: string;
+      permissions: readonly OrganizationPermission[];
+    };
+
 export type AppContextVariables = {
   config: ControlPlaneApiConfig;
   sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
@@ -81,6 +97,7 @@ export type AppContextVariables = {
   auth: ControlPlaneAuth;
   session: AppSession | null;
   authContext: AppAuthContext | null;
+  organizationActor: AppOrganizationActor | null;
 };
 
 export type AppContext = Context<AppContextBindings>;

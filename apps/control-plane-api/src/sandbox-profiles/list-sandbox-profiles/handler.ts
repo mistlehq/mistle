@@ -1,14 +1,14 @@
 import type { RouteHandler } from "@hono/zod-openapi";
 import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
-import { withRequiredSession } from "../../middleware/with-required-session.js";
-import type { AppContextBindings, AppSession } from "../../types.js";
+import { withRequiredOrganizationActor } from "../../middleware/with-required-organization-actor.js";
+import type { AppContextBindings, AppOrganizationActor } from "../../types.js";
 import { listProfiles } from "../services/list-profiles.js";
 import { route } from "./route.js";
 
 const routeHandler = async (
   ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
-  { session }: AppSession,
+  organizationActor: AppOrganizationActor,
 ) => {
   const db = ctx.get("db");
   const query = ctx.req.valid("query");
@@ -19,7 +19,7 @@ const routeHandler = async (
     },
     {
       ...query,
-      organizationId: session.activeOrganizationId,
+      organizationId: organizationActor.organizationId,
     },
   );
 
@@ -27,5 +27,5 @@ const routeHandler = async (
 };
 
 export const handler: RouteHandler<typeof route, AppContextBindings> = withHttpErrorHandler(
-  withRequiredSession(routeHandler),
+  withRequiredOrganizationActor(routeHandler),
 );

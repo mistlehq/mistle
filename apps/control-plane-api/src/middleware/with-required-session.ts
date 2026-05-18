@@ -1,4 +1,5 @@
 import type { RouteConfig, RouteHandler } from "@hono/zod-openapi";
+import { ForbiddenError, UnauthorizedError } from "@mistle/http/errors.js";
 
 import type { AppContextBindings, AppSession } from "../types.js";
 
@@ -16,7 +17,12 @@ export function withRequiredSession<R extends RouteConfig>(
     const session = ctx.get("session");
 
     if (session === null) {
-      throw new Error("Expected authenticated session to be available.");
+      const authContext = ctx.get("authContext");
+      if (authContext?.kind === "api_key") {
+        throw new ForbiddenError("FORBIDDEN", "Forbidden API request.");
+      }
+
+      throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
     }
 
     return handler(ctx, session, next);

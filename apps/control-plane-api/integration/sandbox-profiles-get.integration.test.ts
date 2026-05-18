@@ -6,7 +6,9 @@ import { SandboxProfileStatuses } from "@mistle/db/control-plane";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
+import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import { NotFoundResponseSchema, SandboxProfileSchema } from "../src/sandbox-profiles/index.js";
+import { createApiKeyToken } from "./helpers/api-keys.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api"],
@@ -70,6 +72,76 @@ describe.concurrent("sandbox profiles get integration", () => {
       {
         headers: {
           cookie: firstOrgSession.cookie,
+        },
+      },
+    );
+    expect(response.status).toBe(404);
+
+    const body = NotFoundResponseSchema.parse(await response.json());
+    expect(body.code).toBe("PROFILE_NOT_FOUND");
+  });
+
+  it("returns a sandbox profile in the API key organization", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profiles-api-key-get@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "Profile getter",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_READ],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values({
+      id: "sbp_api_key_get",
+      organizationId: session.organizationId,
+      displayName: "API Key Get Profile",
+      status: SandboxProfileStatuses.ACTIVE,
+      createdAt: "2026-02-01T00:00:00.000Z",
+      updatedAt: "2026-02-01T00:00:00.000Z",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/sandbox/profiles/sbp_api_key_get", {
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+    expect(response.status).toBe(200);
+
+    const body = SandboxProfileSchema.parse(await response.json());
+    expect(body.id).toBe("sbp_api_key_get");
+    expect(body.organizationId).toBe(session.organizationId);
+    expect(body.displayName).toBe("API Key Get Profile");
+  });
+
+  it("returns 404 when an API key reads a profile outside its organization", async ({ env }) => {
+    const firstOrgSession = await env.auth.createSession({
+      email: "integration-new-sandbox-profiles-api-key-get-a@example.com",
+    });
+    const secondOrgSession = await env.auth.createSession({
+      email: "integration-new-sandbox-profiles-api-key-get-b@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: firstOrgSession.cookie,
+      env,
+      name: "Profile getter outside organization",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_READ],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values({
+      id: "sbp_api_key_get_outside",
+      organizationId: secondOrgSession.organizationId,
+      displayName: "Outside API Key Get Profile",
+      status: SandboxProfileStatuses.ACTIVE,
+      createdAt: "2026-02-02T00:00:00.000Z",
+      updatedAt: "2026-02-02T00:00:00.000Z",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_api_key_get_outside",
+      {
+        headers: {
+          authorization: `Bearer ${token}`,
         },
       },
     );

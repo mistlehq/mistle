@@ -6,10 +6,12 @@ import { SandboxProfileStatuses } from "@mistle/db/control-plane";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
+import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import {
   ListSandboxProfilesResponseSchema,
   ValidationErrorResponseSchema,
 } from "../src/sandbox-profiles/index.js";
+import { createApiKeyToken } from "./helpers/api-keys.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api"],
@@ -200,5 +202,70 @@ describe.concurrent("sandbox profiles list integration", () => {
     expect(secondOrgList.totalResults).toBe(1);
     expect(secondOrgList.items.map((item) => item.activeVersion)).toEqual([null]);
     expect(secondOrgList.items.map((item) => item.id)).toEqual(["sbp_b_001"]);
+  });
+
+  it("lists profiles scoped to the API key organization", async ({ env }) => {
+    const firstOrgSession = await env.auth.createSession({
+      email: "integration-new-sandbox-profiles-api-key-list-a@example.com",
+    });
+    const secondOrgSession = await env.auth.createSession({
+      email: "integration-new-sandbox-profiles-api-key-list-b@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: firstOrgSession.cookie,
+      env,
+      name: "Profile reader",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_READ],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values([
+      {
+        id: "sbp_api_key_list_a",
+        organizationId: firstOrgSession.organizationId,
+        displayName: "API Key Profile A",
+        status: SandboxProfileStatuses.ACTIVE,
+        createdAt: "2026-02-01T00:00:00.000Z",
+        updatedAt: "2026-02-01T00:00:00.000Z",
+      },
+      {
+        id: "sbp_api_key_list_b",
+        organizationId: secondOrgSession.organizationId,
+        displayName: "API Key Profile B",
+        status: SandboxProfileStatuses.ACTIVE,
+        createdAt: "2026-02-02T00:00:00.000Z",
+        updatedAt: "2026-02-02T00:00:00.000Z",
+      },
+    ]);
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/sandbox/profiles", {
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+    expect(response.status).toBe(200);
+
+    const body = ListSandboxProfilesResponseSchema.parse(await response.json());
+    expect(body.totalResults).toBe(1);
+    expect(body.items.map((item) => item.id)).toEqual(["sbp_api_key_list_a"]);
+  });
+
+  it("forbids API keys without sandbox profile read permission", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profiles-api-key-list-forbidden@example.com",
+    });
+    const token = await createApiKeyToken({
+      cookie: session.cookie,
+      env,
+      name: "Organization reader",
+      permissions: [OrganizationPermissions.ORGANIZATION_READ],
+    });
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/sandbox/profiles", {
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.status).toBe(403);
   });
 });
