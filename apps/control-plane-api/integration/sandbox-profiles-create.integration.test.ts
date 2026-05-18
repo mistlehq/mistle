@@ -12,10 +12,12 @@ import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { and, eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
+import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import {
   SandboxProfileSchema,
   ValidationErrorResponseSchema,
 } from "../src/sandbox-profiles/index.js";
+import { createApiKeyToken } from "./helpers/api-keys.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api"],
@@ -76,6 +78,76 @@ describe.concurrent("sandbox profiles create integration", () => {
     );
     expect(initialVersion.agentRuntimeId).toBe(SandboxProfileVersionAgentRuntimeIds.CODEX);
     expect(initialVersion.publishedAt).toBeNull();
+  });
+
+  it("creates a sandbox profile with an API key that has create permission", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profiles-create-api-key@example.com",
+    });
+    const apiKeyToken = await createApiKeyToken({
+      env,
+      cookie: session.cookie,
+      name: "Profile create key",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_CREATE],
+    });
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/sandbox/profiles", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${apiKeyToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        displayName: "API Key Created Profile",
+      }),
+    });
+    expect(response.status).toBe(201);
+
+    const body = SandboxProfileSchema.parse(await response.json());
+    expect(body.organizationId).toBe(session.organizationId);
+    expect(body.displayName).toBe("API Key Created Profile");
+
+    const persistedProfile = await env.controlPlaneDb.query.sandboxProfiles.findFirst({
+      columns: {
+        id: true,
+        organizationId: true,
+        displayName: true,
+      },
+      where: (table, { eq }) => eq(table.id, body.id),
+    });
+    expect(persistedProfile).toEqual({
+      id: body.id,
+      organizationId: session.organizationId,
+      displayName: "API Key Created Profile",
+    });
+  });
+
+  it("returns 403 when an API key does not have create permission", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profiles-create-api-key-forbidden@example.com",
+    });
+    const apiKeyToken = await createApiKeyToken({
+      env,
+      cookie: session.cookie,
+      name: "Profile read key",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_READ],
+    });
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/sandbox/profiles", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${apiKeyToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        displayName: "Should Fail",
+      }),
+    });
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      code: "FORBIDDEN",
+      message: "Forbidden API request.",
+    });
   });
 
   it("rejects creation when status is provided", async ({ env }) => {

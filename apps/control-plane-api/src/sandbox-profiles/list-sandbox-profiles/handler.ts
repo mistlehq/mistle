@@ -1,6 +1,7 @@
 import type { RouteHandler } from "@hono/zod-openapi";
 import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
+import { OrganizationPermissions } from "../../auth/services/organization-policy.js";
 import { withRequiredOrganizationActor } from "../../middleware/with-required-organization-actor.js";
 import type { AppContextBindings, AppOrganizationActor } from "../../types.js";
 import { listProfiles } from "../services/list-profiles.js";
@@ -27,5 +28,7 @@ const routeHandler = async (
 };
 
 export const handler: RouteHandler<typeof route, AppContextBindings> = withHttpErrorHandler(
-  withRequiredOrganizationActor(routeHandler),
+  withRequiredOrganizationActor(routeHandler, {
+    permission: OrganizationPermissions.SANDBOX_PROFILE_READ,
+  }),
 );

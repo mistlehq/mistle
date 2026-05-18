@@ -9,7 +9,6 @@ import type { OpenWorkflow } from "openworkflow";
 import { createApiKeysRoutes } from "./api-keys/index.js";
 import type { ControlPlaneAuth } from "./auth/index.js";
 import { createAuthRoutes } from "./auth/routes.js";
-import { OrganizationPermissions } from "./auth/services/organization-policy.js";
 import { createAutomationSchedulesRoutes } from "./automation-schedules/index.js";
 import { createAutomationWebhooksRoutes } from "./automation-webhooks/index.js";
 import { createAutomationsRoutes } from "./automations/index.js";
@@ -173,9 +172,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const publicSessionLinksRoutes = createPublicSessionLinksRoutes();
   const sandboxInstancesRoutes = withActiveOrganizationAccess(createSandboxInstancesRoutes());
   const sandboxProvidersRoutes = withActiveOrganizationAccess(createSandboxProvidersRoutes());
-  const sandboxProfilesRoutes = withOrganizationAccess(createSandboxProfilesRoutes(), {
-    permission: OrganizationPermissions.SANDBOX_PROFILE_READ,
-  });
+  const sandboxProfilesRoutes = withOrganizationAccess(createSandboxProfilesRoutes());
 
   app.route(authRoutes.basePath, authRoutes.routes);
   app.route(apiKeysRoutes.basePath, apiKeysRoutes.routes);

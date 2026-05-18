@@ -7,11 +7,13 @@ import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { RequestDeleteSandboxProfileWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import { describe, expect } from "vitest";
 
+import { OrganizationPermissions } from "../src/auth/services/organization-policy.js";
 import {
   NotFoundResponseSchema,
   SandboxProfileDeletionAcceptedResponseSchema,
   ValidationErrorResponseSchema,
 } from "../src/sandbox-profiles/index.js";
+import { createApiKeyToken } from "./helpers/api-keys.js";
 import { waitForQueuedControlPlaneWorkflowInput } from "./helpers/control-plane-workflows.js";
 
 const it = createIntegrationTest({
@@ -68,6 +70,84 @@ describe.concurrent("sandbox profiles request delete integration", () => {
     });
     expect(persistedProfile).toEqual({
       id: "sbp_delete_001",
+    });
+  });
+
+  it("accepts deletion with an API key that has delete permission", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profiles-request-delete-api-key@example.com",
+    });
+    const apiKeyToken = await createApiKeyToken({
+      env,
+      cookie: session.cookie,
+      name: "Profile delete key",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_DELETE],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values({
+      id: "sbp_delete_api_key_001",
+      organizationId: session.organizationId,
+      displayName: "API Key Delete Me",
+      status: SandboxProfileStatuses.ACTIVE,
+      createdAt: "2026-01-03T00:00:00.000Z",
+      updatedAt: "2026-01-03T00:00:00.000Z",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_delete_api_key_001",
+      {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${apiKeyToken}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(202);
+    expect(SandboxProfileDeletionAcceptedResponseSchema.parse(await response.json())).toEqual({
+      status: "accepted",
+      profileId: "sbp_delete_api_key_001",
+    });
+
+    const workflowInput = await waitForQueuedControlPlaneWorkflowInput({
+      env,
+      workflowName: RequestDeleteSandboxProfileWorkflowSpec.name,
+      inputEquals: {
+        organizationId: session.organizationId,
+        profileId: "sbp_delete_api_key_001",
+      },
+    });
+    expect(workflowInput).toMatchObject({
+      organizationId: session.organizationId,
+      profileId: "sbp_delete_api_key_001",
+    });
+  });
+
+  it("returns 403 when an API key does not have delete permission", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profiles-request-delete-api-key-forbidden@example.com",
+    });
+    const apiKeyToken = await createApiKeyToken({
+      env,
+      cookie: session.cookie,
+      name: "Profile read key",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_READ],
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_delete_api_key_forbidden",
+      {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${apiKeyToken}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      code: "FORBIDDEN",
+      message: "Forbidden API request.",
     });
   });
 
