@@ -22,6 +22,18 @@ endpoint = "http://otel-collector:4318/v1/metrics"
 public_url = "https://app.mistle.example"
 control_plane_api_origin = "https://api.mistle.example"
 
+# Managed-cloud operator settings. Self-hosted deployments should leave these
+# commented out.
+#
+#[services.dashboard.posthog]
+#enabled = true
+#project_api_key = "replace-with-posthog-project-api-key"
+#host = "https://us.i.posthog.com"
+#
+#[billing.stripe]
+#enabled = true
+#secret_key = "replace-with-stripe-secret-key"
+
 [services.control_plane_api]
 host = "0.0.0.0"
 port = 8080
