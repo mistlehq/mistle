@@ -176,10 +176,8 @@ impl SandboxdState {
             clock.clone(),
             collect_tracked_components(&runtime_plan),
         );
-        let gateway_egress_token_provider = Some(GatewayEgressTokenProvider::new(
-            clock.clone(),
-            sandbox_instance_id,
-        ));
+        let gateway_egress_token_provider =
+            Some(GatewayEgressTokenProvider::new(sandbox_instance_id));
         let execution_mode = startup_input.execution_mode;
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
         let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));

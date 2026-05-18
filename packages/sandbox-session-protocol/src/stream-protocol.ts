@@ -258,6 +258,7 @@ const EgressTokenResponseSchema = z.object({
   requestId: NonEmptyStringSchema,
   token: NonEmptyStringSchema,
   expiresAt: NonEmptyStringSchema,
+  ttlMs: PositiveIntegerSchema,
 });
 
 const EgressTokenErrorSchema = z.object({

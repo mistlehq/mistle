@@ -746,6 +746,7 @@ describe("egress token control message parser", () => {
           requestId: "egress_token_req_123",
           token: "egress-token",
           expiresAt: "2026-05-17T00:05:00.000Z",
+          ttlMs: 300_000,
         }),
       ),
     ).toEqual({
@@ -753,6 +754,7 @@ describe("egress token control message parser", () => {
       requestId: "egress_token_req_123",
       token: "egress-token",
       expiresAt: "2026-05-17T00:05:00.000Z",
+      ttlMs: 300_000,
     });
   });
 

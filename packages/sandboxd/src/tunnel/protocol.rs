@@ -615,6 +615,7 @@ pub struct EgressTokenResponse {
     pub request_id: String,
     pub token: String,
     pub expires_at: String,
+    pub ttl_ms: u64,
 }
 
 /// Failed `egress.token.error` payload sent by the gateway.
@@ -2205,6 +2206,11 @@ fn validate_egress_token_response(
             "egress.token.response expiresAt is required",
         ));
     }
+    if message.ttl_ms == 0 {
+        return Err(TunnelProtocolError::new(
+            "egress.token.response ttlMs must be positive",
+        ));
+    }
     Ok(())
 }
 
@@ -2602,7 +2608,7 @@ mod tests {
         ));
 
         let response = parse_egress_token_control_message(
-            r#"{"type":"egress.token.response","requestId":"egress_token_req_123","token":"jwt-token","expiresAt":"2026-05-17T00:05:00Z"}"#,
+            r#"{"type":"egress.token.response","requestId":"egress_token_req_123","token":"jwt-token","expiresAt":"2026-05-17T00:05:00Z","ttlMs":300000}"#,
         )
         .expect("egress.token.response should parse");
         assert!(matches!(

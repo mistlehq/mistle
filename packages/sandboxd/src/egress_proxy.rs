@@ -4151,10 +4151,7 @@ mod tests {
                 .expect("direct gateway websocket route URL should resolve"),
                 http_client: build_direct_gateway_http_client()
                     .expect("direct gateway HTTP client should build"),
-                token_provider: GatewayEgressTokenProvider::new(
-                    Arc::new(SystemClock),
-                    "sandbox-123",
-                ),
+                token_provider: GatewayEgressTokenProvider::new("sandbox-123"),
             }),
         }
     }

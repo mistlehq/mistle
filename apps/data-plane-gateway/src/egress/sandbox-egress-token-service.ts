@@ -66,6 +66,7 @@ export class SandboxEgressTokenService {
       requestId: input.request.requestId,
       token: minted.token,
       expiresAt: minted.expiresAt.toISOString(),
+      ttlMs: EgressTokenTtlSeconds * 1000,
     };
   }
 }

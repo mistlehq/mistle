@@ -36,8 +36,6 @@ use nix::sys::signal::{Signal, kill};
 use nix::unistd::Pid;
 use serde::Deserialize;
 use serde_json::{Map, Value};
-use time::OffsetDateTime;
-use time::format_description::well_known::Rfc3339;
 use tokio::net::{TcpSocket, TcpStream, lookup_host};
 use tokio::runtime::Builder;
 use tokio::sync::mpsc;
@@ -179,12 +177,14 @@ pub enum TunnelSigningResponse {
 pub struct TunnelEgressToken {
     pub token: String,
     pub expires_at: String,
+    pub ttl_ms: u64,
 }
 
 #[derive(Debug, Clone)]
 struct CachedEgressToken {
     token: TunnelEgressToken,
-    expires_at_ms: u64,
+    stored_at: Instant,
+    cache_ttl_ms: u64,
     source_request_id: String,
 }
 
@@ -200,17 +200,15 @@ pub struct GatewayEgressTokenProvider {
     request_sender: Arc<RwLock<Option<mpsc::UnboundedSender<TunnelSessionRequest>>>>,
     cached_token: Arc<Mutex<Option<CachedEgressToken>>>,
     next_request_id: Arc<AtomicU64>,
-    clock: Arc<dyn Clock>,
     sandbox_instance_id: String,
 }
 
 impl GatewayEgressTokenProvider {
-    pub fn new(clock: Arc<dyn Clock>, sandbox_instance_id: impl Into<String>) -> Self {
+    pub fn new(sandbox_instance_id: impl Into<String>) -> Self {
         Self {
             request_sender: Arc::new(RwLock::new(None)),
             cached_token: Arc::new(Mutex::new(None)),
             next_request_id: Arc::new(AtomicU64::new(1)),
-            clock,
             sandbox_instance_id: sandbox_instance_id.into(),
         }
     }
@@ -273,11 +271,13 @@ impl GatewayEgressTokenProvider {
         let Some(cached_token) = cached_token else {
             return Ok(None);
         };
-        let refresh_deadline_ms = self
-            .clock
-            .now_ms()
-            .saturating_add(EGRESS_TOKEN_REFRESH_SKEW_MS);
-        if cached_token.expires_at_ms <= refresh_deadline_ms {
+        let elapsed_ms = cached_token
+            .stored_at
+            .elapsed()
+            .as_millis()
+            .try_into()
+            .unwrap_or(u64::MAX);
+        if elapsed_ms >= cached_token.cache_ttl_ms {
             return Ok(None);
         }
         info!(
@@ -285,6 +285,9 @@ impl GatewayEgressTokenProvider {
             request_id = cached_token.source_request_id.as_str(),
             sandbox_instance_id = self.sandbox_instance_id.as_str(),
             expires_at = cached_token.token.expires_at.as_str(),
+            ttl_ms = cached_token.token.ttl_ms,
+            cache_ttl_ms = cached_token.cache_ttl_ms,
+            elapsed_ms = elapsed_ms,
             "using cached gateway egress token"
         );
         Ok(Some(cached_token.token))
@@ -295,14 +298,14 @@ impl GatewayEgressTokenProvider {
         token: TunnelEgressToken,
         request_id: &str,
     ) -> Result<(), TunnelSessionError> {
-        let expires_at_ms = parse_egress_token_expires_at_ms(&token.expires_at)?;
         let mut cached_token = self
             .cached_token
             .lock()
             .map_err(|error| TunnelSessionError::EgressToken(error.to_string()))?;
         *cached_token = Some(CachedEgressToken {
+            cache_ttl_ms: token.ttl_ms.saturating_sub(EGRESS_TOKEN_REFRESH_SKEW_MS),
             token,
-            expires_at_ms,
+            stored_at: Instant::now(),
             source_request_id: request_id.to_string(),
         });
         Ok(())
@@ -324,20 +327,6 @@ fn resolve_default_attachment_root() -> PathBuf {
 
     #[cfg(not(test))]
     PathBuf::from(DEFAULT_ATTACHMENT_ROOT)
-}
-
-fn parse_egress_token_expires_at_ms(expires_at: &str) -> Result<u64, TunnelSessionError> {
-    let expires_at = OffsetDateTime::parse(expires_at, &Rfc3339)
-        .map_err(|error| TunnelSessionError::EgressToken(error.to_string()))?;
-    expires_at
-        .unix_timestamp_nanos()
-        .checked_div(1_000_000)
-        .and_then(|expires_at_ms| u64::try_from(expires_at_ms).ok())
-        .ok_or_else(|| {
-            TunnelSessionError::EgressToken(
-                "egress token expiresAt must be a non-negative RFC3339 timestamp".to_string(),
-            )
-        })
 }
 
 fn prioritize_ipv4_socket_addresses(mut addresses: Vec<SocketAddr>) -> Vec<SocketAddr> {
@@ -4928,9 +4917,11 @@ fn handle_egress_token_control_message(
             {
                 let request_id = response.request_id;
                 let expires_at = response.expires_at;
+                let ttl_ms = response.ttl_ms;
                 let _ = response_sender.send(Ok(TunnelEgressToken {
                     token: response.token,
                     expires_at: expires_at.clone(),
+                    ttl_ms,
                 }));
                 record_egress_token_event(
                     tunnel_writer_sender,
@@ -4939,7 +4930,10 @@ fn handle_egress_token_control_message(
                     sandbox_instance_id,
                     "egress_token_request_completed",
                     &request_id,
-                    &[("expiresAt", Value::String(expires_at))],
+                    &[
+                        ("expiresAt", Value::String(expires_at)),
+                        ("ttlMs", Value::from(ttl_ms)),
+                    ],
                 );
             }
         }
@@ -9039,7 +9033,8 @@ mod tests {
                         "type": "egress.token.response",
                         "requestId": "egress_token_req_1",
                         "token": "short-lived-egress-jwt",
-                        "expiresAt": "2100-01-01T00:00:00Z"
+                        "expiresAt": "2100-01-01T00:00:00Z",
+                        "ttlMs": 300000
                     })
                     .to_string()
                     .into(),
@@ -9095,7 +9090,7 @@ mod tests {
             Arc::new(ThreadSleeper),
         )
         .expect("tunnel session should start");
-        let token_provider = GatewayEgressTokenProvider::new(clock, "sbi_tunnel_session");
+        let token_provider = GatewayEgressTokenProvider::new("sbi_tunnel_session");
         tunnel_session.attach_gateway_egress_token_provider(&token_provider);
 
         let token = token_provider
@@ -9103,6 +9098,7 @@ mod tests {
             .expect("egress token request should complete through the tunnel");
         assert_eq!(token.token, "short-lived-egress-jwt");
         assert_eq!(token.expires_at, "2100-01-01T00:00:00Z");
+        assert_eq!(token.ttl_ms, 300_000);
         gateway_done_receiver
             .recv()
             .expect("gateway should complete the egress token interaction");
@@ -9114,6 +9110,118 @@ mod tests {
         gateway_close_sender
             .send(())
             .expect("gateway should close after the cached token is observed");
+
+        tunnel_session.close();
+        gateway_thread
+            .join()
+            .expect("gateway thread should exit cleanly");
+    }
+
+    #[test]
+    fn refreshes_egress_tokens_from_relative_ttl_not_expires_at_wall_time() {
+        let bootstrap_listener =
+            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+        let bootstrap_url = format!(
+            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
+            bootstrap_listener
+                .local_addr()
+                .expect("bootstrap listener should expose an address")
+                .port()
+        );
+        let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
+        let gateway_thread = thread::spawn(move || {
+            let (stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the bootstrap tunnel");
+            let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
+
+            expect_tunnel_connected_publications(&mut websocket);
+
+            for token_number in 1..=2 {
+                let token_request = read_json_text_message(&mut websocket);
+                assert_eq!(
+                    token_request,
+                    json!({
+                        "type": "egress.token.request",
+                        "requestId": format!("egress_token_req_{token_number}")
+                    })
+                );
+
+                websocket
+                    .send(Message::Text(
+                        json!({
+                            "type": "egress.token.response",
+                            "requestId": format!("egress_token_req_{token_number}"),
+                            "token": format!("short-lived-egress-jwt-{token_number}"),
+                            "expiresAt": "2100-01-01T00:00:00Z",
+                            "ttlMs": 1
+                        })
+                        .to_string()
+                        .into(),
+                    ))
+                    .expect("gateway should return an egress token");
+            }
+
+            gateway_done_sender
+                .send(())
+                .expect("gateway should signal both token responses were sent");
+            websocket
+                .close(None)
+                .expect("gateway websocket should close cleanly");
+        });
+
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            operation_kind: crate::protocol::startup::StartupOperationKind::Start,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+            bootstrap_token: "bootstrap-token-value".to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+            tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            }),
+            git_identity: None,
+            transparent_proxy: None,
+        };
+
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        let clock = Arc::new(SystemClock);
+        let tunnel_session = TunnelSession::start(
+            &startup_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            None,
+            BTreeMap::new(),
+            clock.clone(),
+            Arc::new(ThreadSleeper),
+        )
+        .expect("tunnel session should start");
+        let token_provider = GatewayEgressTokenProvider::new("sbi_tunnel_session");
+        tunnel_session.attach_gateway_egress_token_provider(&token_provider);
+
+        let first_token = token_provider
+            .token()
+            .expect("first egress token request should complete");
+        let second_token = token_provider
+            .token()
+            .expect("expired relative ttl should force a second token request");
+        assert_eq!(first_token.token, "short-lived-egress-jwt-1");
+        assert_eq!(second_token.token, "short-lived-egress-jwt-2");
+        gateway_done_receiver
+            .recv()
+            .expect("gateway should complete both egress token interactions");
 
         tunnel_session.close();
         gateway_thread

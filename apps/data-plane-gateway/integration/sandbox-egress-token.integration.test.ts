@@ -81,6 +81,7 @@ describe("sandbox egress token control integration", () => {
         expiresAt: new Date(parsedPayload.expiresAt),
       });
       expect(new Date(parsedPayload.expiresAt).getTime()).toBeGreaterThan(Date.now());
+      expect(parsedPayload.ttlMs).toBe(300_000);
 
       await closeWebSocket(bootstrapSocket);
     },
@@ -91,6 +92,7 @@ describe("sandbox egress token control integration", () => {
 function parseEgressTokenResponse(value: unknown): {
   token: string;
   expiresAt: string;
+  ttlMs: number;
 } {
   if (
     value === null ||
@@ -98,7 +100,9 @@ function parseEgressTokenResponse(value: unknown): {
     !("token" in value) ||
     typeof value.token !== "string" ||
     !("expiresAt" in value) ||
-    typeof value.expiresAt !== "string"
+    typeof value.expiresAt !== "string" ||
+    !("ttlMs" in value) ||
+    typeof value.ttlMs !== "number"
   ) {
     throw new Error("Expected egress token response payload.");
   }
@@ -106,6 +110,7 @@ function parseEgressTokenResponse(value: unknown): {
   return {
     token: value.token,
     expiresAt: value.expiresAt,
+    ttlMs: value.ttlMs,
   };
 }
 
