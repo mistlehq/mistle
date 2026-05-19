@@ -191,6 +191,7 @@ function createPiRuntimeInput(input: {
         completedErrorMessage: null,
         entries: [],
         messages: [],
+        pendingToolExecutions: [],
         pendingTurnId: null,
         sessionFile: "pi-session.json",
         status: "busy",

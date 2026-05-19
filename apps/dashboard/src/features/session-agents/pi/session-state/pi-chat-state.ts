@@ -3,12 +3,33 @@ import type {
   PiEvent,
 } from "@mistle/integrations-definitions/agent-runtimes/pi/client";
 
-import type { ChatEntry } from "../../../chat/chat-types.js";
+import {
+  formatSemanticChatDetail,
+  projectSemanticChatEntries,
+  shouldSuppressChatReasoningText,
+  type SemanticChatProjectionItem,
+} from "../../../chat/chat-semantic-projection.js";
+import type { ChatEntry, ChatSemanticGroupEntry } from "../../../chat/chat-types.js";
+
+type PiToolCall = {
+  args: unknown;
+  id: string;
+  name: string;
+};
+
+type PiToolExecution = {
+  args: unknown;
+  output: string | null;
+  status: "completed" | "streaming";
+  toolCallId: string;
+  toolName: string;
+};
 
 export type PiChatState = {
   completedErrorMessage: string | null;
   entries: readonly ChatEntry[];
   messages: readonly PiAgentMessage[];
+  pendingToolExecutions: readonly PiToolExecution[];
   pendingTurnId: string | null;
   sessionFile: string | null;
   status: "busy" | "failed" | "idle" | null;
@@ -44,6 +65,20 @@ function readStringProperty(record: Record<string, unknown>, key: string): strin
   return typeof value === "string" ? value : null;
 }
 
+function readFirstStringProperty(
+  record: Record<string, unknown>,
+  keys: readonly string[],
+): string | null {
+  for (const key of keys) {
+    const value = readStringProperty(record, key);
+    if (value !== null && value.length > 0) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
 function formatUnknownValue(value: unknown): string {
   if (typeof value === "string") {
     return value;
@@ -60,30 +95,60 @@ function formatUnknownValue(value: unknown): string {
   return "";
 }
 
-function readMessageTextContent(content: unknown): string {
-  if (typeof content === "string") {
-    return content;
+function stringifyDetails(value: unknown): string | null {
+  const details = JSON.stringify(value);
+  return details === undefined ? null : details;
+}
+
+function readMessageTextContentForTypes(input: {
+  content: unknown;
+  partTypes: readonly string[];
+}): string {
+  const allowedPartTypes = new Set(input.partTypes);
+  if (typeof input.content === "string") {
+    return allowedPartTypes.has("text") ? input.content : "";
   }
-  if (!Array.isArray(content)) {
+  if (!Array.isArray(input.content)) {
     return "";
   }
 
-  return content
+  return input.content
     .flatMap((part) => {
       if (!isRecord(part)) {
         return [];
       }
       const partType = readStringProperty(part, "type");
-      if (partType === "text") {
+      if (partType === "text" && allowedPartTypes.has("text")) {
         return [readStringProperty(part, "text") ?? ""];
       }
-      if (partType === "thinking") {
+      if (partType === "thinking" && allowedPartTypes.has("thinking")) {
         return [readStringProperty(part, "thinking") ?? ""];
       }
       return [];
     })
     .filter((text) => text.length > 0)
     .join("\n\n");
+}
+
+function readMessageTextContent(content: unknown): string {
+  return readMessageTextContentForTypes({
+    content,
+    partTypes: ["text", "thinking"],
+  });
+}
+
+function readAssistantTextContent(content: unknown): string {
+  return readMessageTextContentForTypes({
+    content,
+    partTypes: ["text"],
+  });
+}
+
+function readThinkingContent(content: unknown): string {
+  return readMessageTextContentForTypes({
+    content,
+    partTypes: ["thinking"],
+  });
 }
 
 function readToolCallParts(content: unknown): readonly Record<string, unknown>[] {
@@ -105,136 +170,355 @@ function createMessageId(input: {
   return `${input.prefix}:${input.message.role}:${timestamp}:${input.index}`;
 }
 
-function createToolEntry(input: {
-  message: PiAgentMessage;
-  messageId: string;
-  part: Record<string, unknown>;
-  status: "completed" | "streaming";
-}): ChatEntry {
-  const name = readStringProperty(input.part, "name") ?? "Tool call";
-  const args = input.part.arguments;
+function getPiToolSemanticKind(toolName: string): ChatSemanticGroupEntry["semanticKind"] {
+  switch (toolName.toLowerCase()) {
+    case "read":
+    case "grep":
+    case "find":
+    case "ls":
+      return "exploring";
+    case "bash":
+      return "running-commands";
+    case "edit":
+    case "write":
+      return "making-edits";
+    default:
+      return "tool-call";
+  }
+}
+
+function getDisplayKeys(
+  semanticKind: ChatSemanticGroupEntry["semanticKind"],
+): ChatSemanticGroupEntry["displayKeys"] {
   return {
-    id: `${input.messageId}:tool:${readStringProperty(input.part, "id") ?? name}`,
-    kind: "generic-item",
-    itemType: "pi-tool-call",
-    title: name,
-    body: formatUnknownValue(args),
-    detailsJson: JSON.stringify(input.part),
-    status: input.status,
-    turnId: input.messageId,
+    active: `${semanticKind}.active`,
+    completed: `${semanticKind}.done`,
   };
 }
 
-function buildMessageEntries(input: {
+function getPiToolLabel(toolName: string): string {
+  switch (toolName.toLowerCase()) {
+    case "read":
+      return "Read";
+    case "grep":
+    case "find":
+      return "Search";
+    case "ls":
+      return "List files";
+    case "bash":
+      return "Command";
+    case "edit":
+      return "File change";
+    case "write":
+      return "Updated";
+    default:
+      return toolName;
+  }
+}
+
+function getPiToolDetail(input: { args: unknown; toolName: string }): string | null {
+  if (!isRecord(input.args)) {
+    return formatSemanticChatDetail({
+      detail: formatUnknownValue(input.args),
+      maxLength: 88,
+    });
+  }
+
+  const toolName = input.toolName.toLowerCase();
+  if (toolName === "bash") {
+    return formatSemanticChatDetail({
+      detail: readStringProperty(input.args, "command"),
+      maxLength: 80,
+    });
+  }
+
+  if (toolName === "read" || toolName === "ls") {
+    return formatSemanticChatDetail({
+      detail: readFirstStringProperty(input.args, ["path", "filePath", "file"]),
+      maxLength: 72,
+    });
+  }
+
+  if (toolName === "grep" || toolName === "find") {
+    return formatSemanticChatDetail({
+      detail: readFirstStringProperty(input.args, ["pattern", "query", "path", "glob"]),
+      maxLength: 72,
+    });
+  }
+
+  if (toolName === "edit" || toolName === "write") {
+    return formatSemanticChatDetail({
+      detail: readFirstStringProperty(input.args, ["path", "filePath", "file"]),
+      maxLength: 88,
+    });
+  }
+
+  return formatSemanticChatDetail({
+    detail: formatUnknownValue(input.args),
+    maxLength: 72,
+  });
+}
+
+function getPiToolCounts(input: {
+  semanticKind: ChatSemanticGroupEntry["semanticKind"];
+  toolName: string;
+}): ChatSemanticGroupEntry["counts"] {
+  if (input.semanticKind !== "exploring") {
+    return null;
+  }
+
+  const toolName = input.toolName.toLowerCase();
+  return {
+    reads: toolName === "read" ? 1 : 0,
+    searches: toolName === "grep" || toolName === "find" ? 1 : 0,
+    lists: toolName === "ls" ? 1 : 0,
+  };
+}
+
+function getPiToolCommand(input: { args: unknown; toolName: string }): string | null {
+  if (input.toolName.toLowerCase() !== "bash" || !isRecord(input.args)) {
+    return null;
+  }
+
+  return readStringProperty(input.args, "command");
+}
+
+function createPiToolProjection(input: {
+  args: unknown;
+  id: string;
+  output: string | null;
+  status: "completed" | "streaming";
+  toolName: string;
+  turnId: string;
+}): SemanticChatProjectionItem {
+  const semanticKind = getPiToolSemanticKind(input.toolName);
+  const detail = getPiToolDetail({
+    args: input.args,
+    toolName: input.toolName,
+  });
+  return {
+    kind: "semantic",
+    id: input.id,
+    turnId: input.turnId,
+    semanticKind,
+    status: input.status,
+    displayKeys: getDisplayKeys(semanticKind),
+    counts: getPiToolCounts({
+      semanticKind,
+      toolName: input.toolName,
+    }),
+    sourceKind: "tool-call",
+    label: getPiToolLabel(input.toolName),
+    detail,
+    sourcePath: semanticKind === "exploring" ? detail : null,
+    detailKind: semanticKind === "running-commands" ? "code" : "plain",
+    command: getPiToolCommand({
+      args: input.args,
+      toolName: input.toolName,
+    }),
+    output: input.output,
+  };
+}
+
+function readToolCall(part: Record<string, unknown>): PiToolCall | null {
+  const id = readStringProperty(part, "id");
+  const name = readStringProperty(part, "name");
+  if (id === null || name === null) {
+    return null;
+  }
+
+  return {
+    args: part.arguments,
+    id,
+    name,
+  };
+}
+
+function buildMessageProjectionItems(input: {
+  knownToolCalls: ReadonlyMap<string, PiToolCall>;
   message: PiAgentMessage;
   messageId: string;
   status: "completed" | "streaming";
-}): readonly ChatEntry[] {
+}): readonly SemanticChatProjectionItem[] {
   if (input.message.role === "user") {
     return [
       {
-        id: input.messageId,
-        kind: "user-message",
-        text: readMessageTextContent(input.message.content),
-        turnId: input.messageId,
-        status: "completed",
+        kind: "standalone",
+        entry: {
+          id: input.messageId,
+          kind: "user-message",
+          text: readMessageTextContent(input.message.content),
+          turnId: input.messageId,
+          status: "completed",
+        },
       },
     ];
   }
 
   if (input.message.role === "assistant") {
-    const entries: ChatEntry[] = [];
-    const text = readMessageTextContent(input.message.content);
-    if (text.length > 0) {
+    const entries: SemanticChatProjectionItem[] = [];
+    const thinking = readThinkingContent(input.message.content);
+    if (!shouldSuppressChatReasoningText(thinking)) {
       entries.push({
-        id: input.messageId,
-        kind: "assistant-message",
-        text,
-        phase: null,
-        status: input.status,
+        kind: "semantic",
+        id: `${input.messageId}:thinking`,
         turnId: input.messageId,
+        semanticKind: "thinking",
+        status: input.status,
+        displayKeys: getDisplayKeys("thinking"),
+        counts: null,
+        sourceKind: "reasoning",
+        label: "Thought",
+        detail: formatSemanticChatDetail({
+          detail: thinking,
+          maxLength: 88,
+        }),
+        sourcePath: null,
+        detailKind: "plain",
+        command: null,
+        output: thinking,
       });
     }
-    for (const part of readToolCallParts(input.message.content)) {
-      entries.push(
-        createToolEntry({
-          message: input.message,
-          messageId: input.messageId,
-          part,
+
+    const text = readAssistantTextContent(input.message.content);
+    if (text.length > 0) {
+      entries.push({
+        kind: "standalone",
+        entry: {
+          id: input.messageId,
+          kind: "assistant-message",
+          text,
+          phase: null,
           status: input.status,
-        }),
-      );
+          turnId: input.messageId,
+        },
+      });
     }
+
     return entries.length === 0
       ? [
           {
-            id: input.messageId,
-            kind: "generic-item",
-            itemType: "pi-message",
-            title: "Pi message",
-            body: formatUnknownValue(input.message),
-            detailsJson: JSON.stringify(input.message),
-            status: input.status,
-            turnId: input.messageId,
+            kind: "standalone",
+            entry: {
+              id: input.messageId,
+              kind: "generic-item",
+              itemType: "pi-message",
+              title: "Pi message",
+              body: formatUnknownValue(input.message),
+              detailsJson: stringifyDetails(input.message),
+              status: input.status,
+              turnId: input.messageId,
+            },
           },
         ]
       : entries;
   }
 
   if (input.message.role === "toolResult") {
+    const toolCallId = readStringProperty(input.message, "toolCallId");
+    const toolName = readStringProperty(input.message, "toolName");
+    if (toolCallId !== null && toolName !== null) {
+      const toolCall = input.knownToolCalls.get(toolCallId);
+      return [
+        createPiToolProjection({
+          args: toolCall?.args,
+          id: input.messageId,
+          output: readMessageTextContent(input.message.content),
+          status: input.status,
+          toolName,
+          turnId: input.messageId,
+        }),
+      ];
+    }
+
     return [
       {
-        id: input.messageId,
-        kind: "generic-item",
-        itemType: "pi-tool-result",
-        title: readStringProperty(input.message, "toolName") ?? "Tool result",
-        body: readMessageTextContent(input.message.content),
-        detailsJson: JSON.stringify(input.message),
-        status: input.status,
-        turnId: input.messageId,
+        kind: "standalone",
+        entry: {
+          id: input.messageId,
+          kind: "generic-item",
+          itemType: "pi-tool-result",
+          title: readStringProperty(input.message, "toolName") ?? "Tool result",
+          body: readMessageTextContent(input.message.content),
+          detailsJson: stringifyDetails(input.message),
+          status: input.status,
+          turnId: input.messageId,
+        },
       },
     ];
   }
 
   return [
     {
-      id: input.messageId,
-      kind: "generic-item",
-      itemType: "pi-message",
-      title: input.message.role,
-      body: formatUnknownValue(input.message.content),
-      detailsJson: JSON.stringify(input.message),
-      status: input.status,
-      turnId: input.messageId,
+      kind: "standalone",
+      entry: {
+        id: input.messageId,
+        kind: "generic-item",
+        itemType: "pi-message",
+        title: input.message.role,
+        body: formatUnknownValue(input.message.content),
+        detailsJson: stringifyDetails(input.message),
+        status: input.status,
+        turnId: input.messageId,
+      },
     },
   ];
 }
 
 function buildEntries(state: Omit<PiChatState, "entries">): readonly ChatEntry[] {
-  const entries = state.messages.flatMap((message, index) =>
-    buildMessageEntries({
-      message,
-      messageId: createMessageId({ index, message, prefix: "pi" }),
-      status: "completed",
-    }),
-  );
+  const knownToolCalls = new Map<string, PiToolCall>();
+  const projectionItems: SemanticChatProjectionItem[] = [];
 
-  if (state.streamingMessage === null) {
-    return entries;
+  for (const [index, message] of state.messages.entries()) {
+    const messageId = createMessageId({ index, message, prefix: "pi" });
+    if (message.role === "assistant") {
+      for (const part of readToolCallParts(message.content)) {
+        const toolCall = readToolCall(part);
+        if (toolCall !== null) {
+          knownToolCalls.set(toolCall.id, toolCall);
+        }
+      }
+    }
+
+    projectionItems.push(
+      ...buildMessageProjectionItems({
+        knownToolCalls,
+        message,
+        messageId,
+        status: "completed",
+      }),
+    );
   }
 
-  return [
-    ...entries,
-    ...buildMessageEntries({
-      message: state.streamingMessage,
-      messageId: createMessageId({
-        index: state.messages.length,
+  if (state.streamingMessage !== null) {
+    projectionItems.push(
+      ...buildMessageProjectionItems({
+        knownToolCalls,
         message: state.streamingMessage,
-        prefix: "pi-streaming",
+        messageId: createMessageId({
+          index: state.messages.length,
+          message: state.streamingMessage,
+          prefix: "pi-streaming",
+        }),
+        status: "streaming",
       }),
-      status: "streaming",
-    }),
-  ];
+    );
+  }
+
+  projectionItems.push(
+    ...state.pendingToolExecutions.map((execution) =>
+      createPiToolProjection({
+        args: execution.args,
+        id: `pi-tool-execution:${execution.toolCallId}`,
+        output: execution.output,
+        status: execution.status,
+        toolName: execution.toolName,
+        turnId: state.pendingTurnId ?? `pi-tool-execution:${execution.toolCallId}`,
+      }),
+    ),
+  );
+
+  return projectSemanticChatEntries(projectionItems);
 }
 
 function rebuildState(state: Omit<PiChatState, "entries">): PiChatState {
@@ -259,6 +543,109 @@ function readEventMessage(event: PiEvent): PiAgentMessage | null {
   };
 }
 
+function readToolResultOutput(result: unknown): string | null {
+  if (!isRecord(result)) {
+    return formatSemanticChatDetail({
+      detail: formatUnknownValue(result),
+      maxLength: 2000,
+    });
+  }
+
+  return readMessageTextContent(result.content);
+}
+
+function readToolExecutionStart(event: PiEvent): PiToolExecution | null {
+  const toolCallId = readStringProperty(event, "toolCallId");
+  const toolName = readStringProperty(event, "toolName");
+  if (toolCallId === null || toolName === null) {
+    return null;
+  }
+
+  return {
+    args: event.args,
+    output: null,
+    status: "streaming",
+    toolCallId,
+    toolName,
+  };
+}
+
+function readToolExecutionUpdate(event: PiEvent): PiToolExecution | null {
+  const toolCallId = readStringProperty(event, "toolCallId");
+  const toolName = readStringProperty(event, "toolName");
+  if (toolCallId === null || toolName === null) {
+    return null;
+  }
+
+  const partialResult = event.partialResult;
+  return {
+    args: event.args,
+    output: readToolResultOutput(partialResult),
+    status: "streaming",
+    toolCallId,
+    toolName,
+  };
+}
+
+function readToolExecutionEnd(event: PiEvent): PiToolExecution | null {
+  const toolCallId = readStringProperty(event, "toolCallId");
+  const toolName = readStringProperty(event, "toolName");
+  if (toolCallId === null || toolName === null) {
+    return null;
+  }
+
+  const result = event.result;
+  return {
+    args: null,
+    output: readToolResultOutput(result),
+    status: "completed",
+    toolCallId,
+    toolName,
+  };
+}
+
+function upsertPendingToolExecution(input: {
+  execution: PiToolExecution;
+  state: PiChatState;
+}): readonly PiToolExecution[] {
+  const existing = input.state.pendingToolExecutions.find(
+    (execution) => execution.toolCallId === input.execution.toolCallId,
+  );
+  const nextExecution =
+    existing === undefined
+      ? input.execution
+      : {
+          ...existing,
+          ...input.execution,
+          args: input.execution.args ?? existing.args,
+        };
+
+  return [
+    ...input.state.pendingToolExecutions.filter(
+      (execution) => execution.toolCallId !== input.execution.toolCallId,
+    ),
+    nextExecution,
+  ];
+}
+
+function removePendingToolExecution(input: {
+  message: PiAgentMessage;
+  state: PiChatState;
+}): readonly PiToolExecution[] {
+  if (input.message.role !== "toolResult") {
+    return input.state.pendingToolExecutions;
+  }
+
+  const toolCallId = readStringProperty(input.message, "toolCallId");
+  if (toolCallId === null) {
+    return input.state.pendingToolExecutions;
+  }
+
+  return input.state.pendingToolExecutions.filter(
+    (execution) => execution.toolCallId !== toolCallId,
+  );
+}
+
 function appendOrReplacePendingUserMessage(input: {
   message: PiAgentMessage;
   state: PiChatState;
@@ -281,6 +668,7 @@ export function createInitialPiChatState(): PiChatState {
     completedErrorMessage: null,
     entries: [],
     messages: [],
+    pendingToolExecutions: [],
     pendingTurnId: null,
     sessionFile: null,
     status: null,
@@ -311,6 +699,7 @@ export function reducePiChatState(state: PiChatState, action: PiChatAction): PiC
           timestamp,
         },
       ],
+      pendingToolExecutions: [],
       pendingTurnId: `pi:user:${timestamp}`,
       sessionFile: action.sessionFile,
       status: "busy",
@@ -321,6 +710,7 @@ export function reducePiChatState(state: PiChatState, action: PiChatAction): PiC
     return rebuildState({
       ...state,
       completedErrorMessage: action.errorMessage,
+      pendingToolExecutions: [],
       pendingTurnId: null,
       status: "failed",
       streamingMessage: null,
@@ -360,12 +750,59 @@ export function reducePiChatState(state: PiChatState, action: PiChatAction): PiC
         message,
         state,
       }),
+      pendingToolExecutions: removePendingToolExecution({
+        message,
+        state,
+      }),
       streamingMessage: null,
+    });
+  }
+  if (event.type === "tool_execution_start") {
+    const execution = readToolExecutionStart(event);
+    if (execution === null) {
+      return state;
+    }
+    return rebuildState({
+      ...state,
+      pendingToolExecutions: upsertPendingToolExecution({
+        execution,
+        state,
+      }),
+      status: "busy",
+    });
+  }
+  if (event.type === "tool_execution_update") {
+    const execution = readToolExecutionUpdate(event);
+    if (execution === null) {
+      return state;
+    }
+    return rebuildState({
+      ...state,
+      pendingToolExecutions: upsertPendingToolExecution({
+        execution,
+        state,
+      }),
+      status: "busy",
+    });
+  }
+  if (event.type === "tool_execution_end") {
+    const execution = readToolExecutionEnd(event);
+    if (execution === null) {
+      return state;
+    }
+    return rebuildState({
+      ...state,
+      pendingToolExecutions: upsertPendingToolExecution({
+        execution,
+        state,
+      }),
+      status: "busy",
     });
   }
   if (event.type === "agent_end") {
     return rebuildState({
       ...state,
+      pendingToolExecutions: [],
       pendingTurnId: null,
       status: "idle",
       streamingMessage: null,
