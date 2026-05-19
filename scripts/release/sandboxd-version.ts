@@ -11,25 +11,33 @@ function isTomlTable(value: unknown): value is TomlTableWithoutBigInt {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function updateSandboxdCargoTomlVersion(cargoTomlContent: string, version: string): string {
+export function updateCargoTomlPackageVersion(
+  cargoTomlContent: string,
+  packageDisplayPath: string,
+  version: string,
+): string {
   const parsedCargoToml = parseToml(cargoTomlContent);
   const packageSection = parsedCargoToml.package;
 
   if (!isTomlTable(packageSection)) {
-    throw new Error("packages/sandboxd/Cargo.toml must contain a [package] table.");
+    throw new Error(`${packageDisplayPath} must contain a [package] table.`);
   }
 
   if (typeof packageSection.version !== "string") {
-    throw new Error("packages/sandboxd/Cargo.toml [package].version must be a string.");
+    throw new Error(`${packageDisplayPath} [package].version must be a string.`);
   }
 
   const updatedContent = cargoTomlContent.replace(PackageSectionVersionPattern, `$1"${version}"$2`);
 
   if (updatedContent === cargoTomlContent && packageSection.version !== version) {
-    throw new Error("Failed to update packages/sandboxd/Cargo.toml [package].version.");
+    throw new Error(`Failed to update ${packageDisplayPath} [package].version.`);
   }
 
   return updatedContent;
+}
+
+export function updateSandboxdCargoTomlVersion(cargoTomlContent: string, version: string): string {
+  return updateCargoTomlPackageVersion(cargoTomlContent, "packages/sandboxd/Cargo.toml", version);
 }
 
 export function updateSandboxdCargoTomlVersionFile(
