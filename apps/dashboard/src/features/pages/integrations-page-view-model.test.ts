@@ -671,7 +671,7 @@ describe("integrations page view model", () => {
         value: "Personal API token",
       },
       {
-        label: "Site URL",
+        label: "Site name",
         value: "https://mistle.atlassian.net",
       },
       {

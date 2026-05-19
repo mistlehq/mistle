@@ -503,7 +503,9 @@ describe("IntegrationConnectionEditorPage", () => {
       methodId: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
     });
 
-    expect(screen.getByLabelText(/Site URL/)).toBeTruthy();
+    expect(screen.getByLabelText(/Site name/)).toBeTruthy();
+    expect(screen.getByText("https://")).toBeTruthy();
+    expect(screen.getByText(".atlassian.net")).toBeTruthy();
     expect(screen.getByLabelText(/Email/)).toBeTruthy();
     expect(screen.getByPlaceholderText("Enter personal API token")).toBeTruthy();
   });

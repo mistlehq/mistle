@@ -11,6 +11,10 @@ import {
   FieldTitle,
   FieldTitleWithTooltip,
   Input,
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
   Select,
   SelectContent,
   SelectItem,
@@ -485,6 +489,122 @@ function URLWidget(
       type="url"
       value={value}
     />
+  );
+}
+
+function resolveAffixedTextWidgetOptions(
+  props: WidgetProps<JsonObject, RJSFSchema, SchemaFormContext>,
+): {
+  prefix: string;
+  suffix: string;
+  transform: "lowercase" | undefined;
+} {
+  if (typeof props.options.prefix !== "string" || typeof props.options.suffix !== "string") {
+    throw new Error("Affixed text widget requires string prefix and suffix options.");
+  }
+
+  if (props.options.transform !== undefined && props.options.transform !== "lowercase") {
+    throw new Error("Affixed text widget supports only the lowercase transform option.");
+  }
+
+  return {
+    prefix: props.options.prefix,
+    suffix: props.options.suffix,
+    transform: props.options.transform,
+  };
+}
+
+function resolveAffixedTextInputValue(input: {
+  prefix: string;
+  suffix: string;
+  value: unknown;
+}): string {
+  const { prefix, suffix, value } = input;
+  if (typeof value !== "string" || value.length === 0) {
+    return "";
+  }
+
+  if (value.startsWith(prefix) && value.endsWith(suffix)) {
+    return value.slice(prefix.length, suffix.length === 0 ? undefined : -suffix.length);
+  }
+
+  const slashTerminatedSuffix = `${suffix}/`;
+  if (suffix.length > 0 && value.startsWith(prefix) && value.endsWith(slashTerminatedSuffix)) {
+    return value.slice(prefix.length, -slashTerminatedSuffix.length);
+  }
+
+  return value;
+}
+
+function buildAffixedTextValue(input: {
+  prefix: string;
+  suffix: string;
+  text: string;
+  transform: "lowercase" | undefined;
+}): string | undefined {
+  const trimmedText = resolveAffixedTextInputValue({
+    prefix: input.prefix,
+    suffix: input.suffix,
+    value: input.text.trim(),
+  }).trim();
+  if (trimmedText.length === 0) {
+    return undefined;
+  }
+
+  const normalizedText = input.transform === "lowercase" ? trimmedText.toLowerCase() : trimmedText;
+  return `${input.prefix}${normalizedText}${input.suffix}`;
+}
+
+function AffixedTextWidget(
+  props: WidgetProps<JsonObject, RJSFSchema, SchemaFormContext>,
+): React.JSX.Element {
+  const { prefix, suffix, transform } = resolveAffixedTextWidgetOptions(props);
+  const value = resolveAffixedTextInputValue({
+    prefix,
+    suffix,
+    value: props.value,
+  });
+
+  function buildValue(text: string): string | undefined {
+    return buildAffixedTextValue({
+      prefix,
+      suffix,
+      text,
+      transform,
+    });
+  }
+
+  return (
+    <InputGroup>
+      {prefix.length > 0 ? (
+        <InputGroupAddon align="inline-start">
+          <InputGroupText>{prefix}</InputGroupText>
+        </InputGroupAddon>
+      ) : null}
+      <InputGroupInput
+        aria-label={props.label}
+        autoFocus={props.autofocus}
+        disabled={props.disabled || props.readonly}
+        id={props.id}
+        onBlur={(event) => {
+          props.onBlur(props.id, buildValue(event.currentTarget.value));
+        }}
+        onChange={(event) => {
+          props.onChange(buildValue(event.currentTarget.value));
+        }}
+        onFocus={(event) => {
+          props.onFocus(props.id, buildValue(event.currentTarget.value));
+        }}
+        placeholder={props.placeholder}
+        type="text"
+        value={value}
+      />
+      {suffix.length > 0 ? (
+        <InputGroupAddon align="inline-end">
+          <InputGroupText>{suffix}</InputGroupText>
+        </InputGroupAddon>
+      ) : null}
+    </InputGroup>
   );
 }
 
@@ -1114,6 +1234,7 @@ export const SchemaFormWidgets = {
   SelectWidget,
   CheckboxesWidget,
   TextareaWidget,
+  "affixed-text": AffixedTextWidget,
   checkboxes: CheckboxesWidget,
   "comma-separated-string-array": CommaSeparatedStringArrayWidget,
   "integration-resource-picker": IntegrationResourcePickerWidget,

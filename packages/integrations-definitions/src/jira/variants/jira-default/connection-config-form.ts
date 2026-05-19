@@ -9,7 +9,7 @@ export const JiraPersonalApiTokenConnectionConfigForm: ResolvedIntegrationForm =
         default: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
       },
       site_url: {
-        title: "Site URL",
+        title: "Site name",
       },
       email: {
         title: "Email",
@@ -21,7 +21,13 @@ export const JiraPersonalApiTokenConnectionConfigForm: ResolvedIntegrationForm =
       "ui:widget": "hidden",
     },
     site_url: {
-      "ui:placeholder": "https://your-site.atlassian.net",
+      "ui:placeholder": "your-site",
+      "ui:widget": "affixed-text",
+      "ui:options": {
+        prefix: "https://",
+        suffix: ".atlassian.net",
+        transform: "lowercase",
+      },
     },
     email: {
       "ui:placeholder": "name@example.com",

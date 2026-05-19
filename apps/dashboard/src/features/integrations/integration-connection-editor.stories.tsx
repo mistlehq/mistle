@@ -1,8 +1,10 @@
+import { JiraConnectionMethodIds } from "@mistle/integrations-definitions/browser";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import type React from "react";
 
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
+import { resolveConnectionMethodFormUiModel } from "../pages/use-integration-connection-editor-state-helpers.js";
 import {
   IntegrationConnectionEditorPage,
   IntegrationConnectionMethodIds,
@@ -60,6 +62,30 @@ const EditorState: Extract<IntegrationConnectionEditorState, { mode: "update" }>
   targetVariantId: "github-cloud",
 };
 
+const JiraCreateEditorState: Extract<IntegrationConnectionEditorState, { mode: "create" }> = {
+  methods: [
+    {
+      id: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
+      label: "Personal API token",
+      kind: "form",
+      secretFields: [
+        {
+          name: "apiKey",
+          label: "Personal API token",
+          placeholder: "Enter personal API token",
+          inputType: "password",
+        },
+      ],
+    },
+  ],
+  mode: "create",
+  targetConfig: {},
+  targetDisplayName: "Jira",
+  targetFamilyId: "jira",
+  targetKey: "jira-default",
+  targetVariantId: "jira-default",
+};
+
 function IntegrationConnectionEditorStory(input: {
   changedSecretNames?: readonly string[];
   initialSecrets?: Record<string, string>;
@@ -112,6 +138,56 @@ function IntegrationConnectionEditorStory(input: {
   );
 }
 
+function JiraPersonalApiTokenEditorStory(): React.JSX.Element {
+  const [configValue, setConfigValue] = useState<Record<string, unknown>>({
+    connection_method: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
+  });
+  const [connectionDisplayName, setConnectionDisplayName] = useState("");
+  const [secrets, setSecrets] = useState<Record<string, string>>({});
+  const [changedSecretNames, setChangedSecretNames] = useState<readonly string[]>([]);
+  const configForm = resolveConnectionMethodFormUiModel({
+    editor: JiraCreateEditorState,
+    methodId: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
+    currentValue: configValue,
+  });
+
+  return (
+    <div className="mx-auto w-full max-w-2xl">
+      <IntegrationConnectionEditorPage
+        changedSecretNames={changedSecretNames}
+        closeDisabled={false}
+        configForm={configForm}
+        configValue={configValue}
+        connectError={null}
+        connectionDisplayNamePlaceholder="Jira connection"
+        connectionDisplayNameValue={connectionDisplayName}
+        editor={JiraCreateEditorState}
+        hasChanges={true}
+        isConnectionDisplayNameChanged={connectionDisplayName.trim().length > 0}
+        methodId={JiraConnectionMethodIds.PERSONAL_API_TOKEN}
+        onClose={() => {}}
+        onConfigChange={setConfigValue}
+        onConnectionDisplayNameChange={setConnectionDisplayName}
+        onMethodChange={() => {}}
+        onSecretChange={(name, value) => {
+          setSecrets((currentSecrets) => ({
+            ...currentSecrets,
+            [name]: value,
+          }));
+          setChangedSecretNames((currentNames) =>
+            value.trim().length === 0
+              ? currentNames.filter((currentName) => currentName !== name)
+              : [...currentNames.filter((currentName) => currentName !== name), name],
+          );
+        }}
+        onSubmit={() => {}}
+        pending={false}
+        secrets={secrets}
+      />
+    </div>
+  );
+}
+
 const meta = {
   title: "Dashboard/Integrations/Connection Editor",
   component: IntegrationConnectionEditorStory,
@@ -128,6 +204,12 @@ type Story = StoryObj<typeof meta>;
 export const ConfiguredSecrets: Story = {
   render: function RenderStory() {
     return <IntegrationConnectionEditorStory />;
+  },
+};
+
+export const JiraPersonalApiToken: Story = {
+  render: function RenderStory() {
+    return <JiraPersonalApiTokenEditorStory />;
   },
 };
 

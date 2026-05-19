@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import type { IChangeEvent } from "@rjsf/core";
 import type { RJSFSchema, UiSchema } from "@rjsf/utils";
 import validator from "@rjsf/validator-ajv8";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -34,6 +35,28 @@ const UiSchema: UiSchema<JsonObject, RJSFSchema, SchemaFormContext> = {
   defaultRegion: {
     "ui:placeholder": "Select default region",
     "ui:widget": "single-select-string-combobox",
+  },
+};
+
+const JiraSiteUrlSchema: RJSFSchema = {
+  type: "object",
+  properties: {
+    site_url: {
+      title: "Site name",
+      type: "string",
+    },
+  },
+};
+
+const JiraSiteUrlUiSchema: UiSchema<JsonObject, RJSFSchema, SchemaFormContext> = {
+  site_url: {
+    "ui:placeholder": "your-site",
+    "ui:widget": "affixed-text",
+    "ui:options": {
+      prefix: "https://",
+      suffix: ".atlassian.net",
+      transform: "lowercase",
+    },
   },
 };
 
@@ -198,6 +221,119 @@ describe("SchemaFormWithoutSubmit", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("Default region")).toHaveProperty("value", "us-east-1");
     });
+  });
+
+  it("renders affixed text values as fixed text with an editable inner value", () => {
+    let changedFormData: JsonObject | null = null;
+
+    const { rerender } = render(
+      <SchemaFormWithoutSubmit
+        formContext={{}}
+        formData={{
+          site_url: "https://mistle.atlassian.net",
+        }}
+        noHtml5Validate
+        onChange={(event: IChangeEvent<JsonObject, RJSFSchema>) => {
+          changedFormData = event.formData ?? null;
+        }}
+        schema={JiraSiteUrlSchema}
+        showErrorList={false}
+        uiSchema={JiraSiteUrlUiSchema}
+        validator={validator}
+      />,
+    );
+
+    expect(screen.getByText("https://")).toBeDefined();
+    expect(screen.getByText(".atlassian.net")).toBeDefined();
+
+    const input = screen.getByLabelText("Site name");
+    expect(input).toHaveProperty("value", "mistle");
+
+    fireEvent.change(input, {
+      target: {
+        value: "Acme",
+      },
+    });
+
+    expect(changedFormData).toEqual({
+      site_url: "https://acme.atlassian.net",
+    });
+
+    rerender(
+      <SchemaFormWithoutSubmit
+        formContext={{}}
+        formData={{
+          site_url: "https://mistle.atlassian.net/",
+        }}
+        noHtml5Validate
+        onChange={(event: IChangeEvent<JsonObject, RJSFSchema>) => {
+          changedFormData = event.formData ?? null;
+        }}
+        schema={JiraSiteUrlSchema}
+        showErrorList={false}
+        uiSchema={JiraSiteUrlUiSchema}
+        validator={validator}
+      />,
+    );
+
+    expect(screen.getByLabelText("Site name")).toHaveProperty("value", "mistle");
+
+    fireEvent.change(screen.getByLabelText("Site name"), {
+      target: {
+        value: "https://Example.atlassian.net/",
+      },
+    });
+
+    expect(changedFormData).toEqual({
+      site_url: "https://example.atlassian.net",
+    });
+  });
+
+  it("fails fast when an affixed text widget is missing affix options", () => {
+    expect(() =>
+      render(
+        <SchemaFormWithoutSubmit
+          formContext={{}}
+          formData={{}}
+          noHtml5Validate
+          onChange={() => {}}
+          schema={JiraSiteUrlSchema}
+          showErrorList={false}
+          uiSchema={{
+            site_url: {
+              "ui:widget": "affixed-text",
+            },
+          }}
+          validator={validator}
+        />,
+      ),
+    ).toThrow("Affixed text widget requires string prefix and suffix options.");
+  });
+
+  it("fails fast when an affixed text widget has an unsupported transform", () => {
+    expect(() =>
+      render(
+        <SchemaFormWithoutSubmit
+          formContext={{}}
+          formData={{}}
+          noHtml5Validate
+          onChange={() => {}}
+          schema={JiraSiteUrlSchema}
+          showErrorList={false}
+          uiSchema={{
+            site_url: {
+              "ui:widget": "affixed-text",
+              "ui:options": {
+                prefix: "https://",
+                suffix: ".atlassian.net",
+                transform: "uppercase",
+              },
+            },
+          }}
+          validator={validator}
+        />,
+      ),
+    ).toThrow("Affixed text widget supports only the lowercase transform option.");
   });
 
   it("flattens nested wrapper objects into the parent two-column layout", () => {

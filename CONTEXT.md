@@ -60,6 +60,10 @@ _Avoid_: Automation conversation
 The external billing-provider customer associated with a Mistle organization.
 _Avoid_: Billing org
 
+**Jira site name**:
+The Atlassian Cloud site subdomain for a Jira Cloud connection.
+_Avoid_: Jira org, Jira organization, site URL when referring only to the editable subdomain
+
 ## Relationships
 
 - A **Sandbox profile version** may have one usable **Snapshot**.
@@ -81,6 +85,7 @@ _Avoid_: Billing org
 - A **Trigger** may start from a webhook event or a schedule.
 - A **Trigger** run may create or reuse one **Trigger conversation**.
 - A Mistle organization may have one **Billing customer** per billing provider.
+- A Jira Cloud connection has one **Jira site name**.
 
 ## Example Dialogue
 
@@ -110,3 +115,4 @@ _Avoid_: Billing org
 - The automation-to-trigger rename was considered as a staged compatibility migration — resolved: ship it as one atomic rename, except for explicit durable workflow compatibility requirements.
 - "version" was used ambiguously to mean the latest published **Sandbox profile version** or an object's **Referenced sandbox profile version** — resolved: when describing a session, trigger, or other profile-backed object, use the object's referenced version.
 - "billing org" could mean a Mistle organization, a Better Auth organization, or an external billing-provider customer — resolved: use **Billing customer** for the billing-provider customer associated with an existing Mistle organization.
+- "org" could mean a Mistle organization, an Atlassian organization, or the editable Jira Cloud URL subdomain — resolved: use **Jira site name** for the editable Jira Cloud subdomain.

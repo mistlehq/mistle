@@ -48,6 +48,25 @@ describe("Jira auth", () => {
     ).toThrow("Jira site URLs must not include a path.");
   });
 
+  it("rejects personal api token site urls with invalid Jira cloud site names", () => {
+    for (const siteUrl of [
+      "https://ab.atlassian.net",
+      "https://-mistle.atlassian.net",
+      "https://mistle-.atlassian.net",
+      "https://mistle.dev.atlassian.net",
+    ]) {
+      expect(() =>
+        JiraConnectionConfigSchema.parse({
+          connection_method: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
+          site_url: siteUrl,
+          email: "user@example.com",
+        }),
+      ).toThrow(
+        "Jira site names must be at least 3 characters and use lowercase letters, numbers, or middle hyphens.",
+      );
+    }
+  });
+
   it("treats incomplete personal api token site urls as validation failures without throwing", () => {
     const result = JiraConnectionConfigSchema.safeParse({
       connection_method: JiraConnectionMethodIds.PERSONAL_API_TOKEN,

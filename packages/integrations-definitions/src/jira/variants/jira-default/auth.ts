@@ -44,6 +44,10 @@ function tryParseJiraSiteUrl(value: string): URL | null {
   }
 }
 
+function isValidJiraCloudSiteName(value: string): boolean {
+  return /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(value) && value.length >= 3;
+}
+
 const JiraSiteUrlSchema = z.url().superRefine((value, ctx) => {
   const parsedUrl = tryParseJiraSiteUrl(value);
   if (parsedUrl === null) {
@@ -62,6 +66,18 @@ const JiraSiteUrlSchema = z.url().superRefine((value, ctx) => {
       code: "custom",
       message: "Jira site URLs must use an *.atlassian.net hostname.",
     });
+  }
+
+  const atlassianNetSuffix = ".atlassian.net";
+  if (parsedUrl.hostname.endsWith(atlassianNetSuffix)) {
+    const siteName = parsedUrl.hostname.slice(0, -atlassianNetSuffix.length);
+    if (!isValidJiraCloudSiteName(siteName)) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "Jira site names must be at least 3 characters and use lowercase letters, numbers, or middle hyphens.",
+      });
+    }
   }
 
   if (parsedUrl.pathname !== "" && parsedUrl.pathname !== "/") {
