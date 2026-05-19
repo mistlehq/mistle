@@ -824,6 +824,7 @@ fn handle_pi_method(
             let session_file = require_param_string(&request.params, "sessionFile")?;
             state.ensure_child(None)?;
             state.switch_session_if_needed(&session_file, captured_events)?;
+            PiProxyState::start_activity_monitor(state.clone());
             Ok(Value::Null)
         }
         "pi/setSessionName" => {
@@ -1025,6 +1026,71 @@ mod tests {
     }
 
     #[test]
+    fn resume_active_pi_conversation_starts_activity_monitor() {
+        let simulated_pi = SimulatedPiRpcProcess::start_active_session();
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let state = Arc::new(PiProxyState {
+            config: PiProxyConfig {
+                pi_cli_path: simulated_pi.path(),
+                env: BTreeMap::new(),
+            },
+            child: Mutex::new(None),
+            command_lock: Mutex::new(()),
+            event_subscribers: Mutex::new(Vec::new()),
+            keepalive_manager: keepalive_manager.clone(),
+            active: std::sync::atomic::AtomicBool::new(false),
+            next_id: AtomicU64::new(1),
+        });
+
+        let event_receiver = state.subscribe_pi_events();
+        let resume_responses = handle_json_rpc_request(
+            &state,
+            &json!({
+                "jsonrpc": "2.0",
+                "id": "resume",
+                "method": "pi/resumeConversation",
+                "params": {
+                    "sessionFile": simulated_pi.session_file()
+                }
+            })
+            .to_string(),
+        );
+
+        let resume_response = parse_json_rpc_message(
+            resume_responses
+                .last()
+                .expect("resume conversation should produce a response"),
+        );
+        assert_eq!(resume_response["id"], json!("resume"));
+        assert_eq!(resume_response["result"], Value::Null);
+        assert!(
+            keepalive_manager
+                .lock()
+                .expect("keepalive lock should not be poisoned")
+                .active(),
+            "resuming active Pi work should keep the sandbox alive"
+        );
+
+        thread::sleep(Duration::from_millis(1_300));
+        let broadcast_event = parse_json_rpc_message(
+            &event_receiver
+                .try_recv()
+                .expect("activity monitor should drain and broadcast resumed Pi events"),
+        );
+        assert_eq!(broadcast_event["method"], json!("pi/event"));
+        assert_eq!(broadcast_event["params"]["type"], json!("agent_end"));
+        assert!(
+            !keepalive_manager
+                .lock()
+                .expect("keepalive lock should not be poisoned")
+                .active(),
+            "activity monitor should settle after resumed Pi work ends"
+        );
+
+        state.shutdown_child();
+    }
+
+    #[test]
     fn finds_recent_pi_conversation_from_configured_session_dir() {
         let directory = tempdir().expect("temporary directory should be created");
         let session_dir = directory.path().join("sessions");
@@ -1113,13 +1179,26 @@ mod tests {
 
     impl SimulatedPiRpcProcess {
         fn start() -> Self {
+            Self::start_with_active_session(false)
+        }
+
+        fn start_active_session() -> Self {
+            Self::start_with_active_session(true)
+        }
+
+        fn start_with_active_session(active_session: bool) -> Self {
             let directory = tempdir().expect("temporary directory should be created");
             let script_path = directory.path().join("simulated-pi-rpc");
             let cwd = directory.path().join("workspace");
             fs::create_dir(&cwd).expect("workspace directory should be created");
             let session_file = directory.path().join("session.json");
+            let active_marker = directory.path().join("active");
+            if active_session {
+                fs::write(&active_marker, "").expect("active marker should be written");
+            }
             let script = format!(
                 r#"#!/bin/sh
+active_marker="{}"
 while IFS= read -r line; do
   id="$(printf '%s' "$line" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"
   case "$line" in
@@ -1127,10 +1206,17 @@ while IFS= read -r line; do
       printf '{{"type":"response","command":"new_session","id":"%s","success":true,"data":{{}}}}\n' "$id"
       ;;
     *'"type":"get_state"'*)
-      printf '{{"type":"response","command":"get_state","id":"%s","success":true,"data":{{"sessionFile":"{}","sessionName":"Simulated session","isStreaming":false,"isCompacting":false,"pendingMessageCount":0}}}}\n' "$id"
+      if [ -f "$active_marker" ]; then
+        rm "$active_marker"
+        printf '{{"type":"response","command":"get_state","id":"%s","success":true,"data":{{"sessionFile":"{}","sessionName":"Simulated session","isStreaming":true,"isCompacting":false,"pendingMessageCount":0}}}}\n' "$id"
+        sleep 0.1
+        printf '{{"type":"agent_end"}}\n'
+      else
+        printf '{{"type":"response","command":"get_state","id":"%s","success":true,"data":{{"sessionFile":"{}","sessionName":"Simulated session","isStreaming":false,"isCompacting":false,"pendingMessageCount":0}}}}\n' "$id"
+      fi
       ;;
     *'"type":"switch_session"'*)
-      printf '{{"type":"response","command":"switch_session","id":"%s","success":false,"error":"session file does not exist"}}\n' "$id"
+      printf '{{"type":"response","command":"switch_session","id":"%s","success":true,"data":{{}}}}\n' "$id"
       ;;
     *'"type":"prompt"'*)
       printf '{{"type":"agent_start"}}\n'
@@ -1144,6 +1230,8 @@ while IFS= read -r line; do
   esac
 done
 "#,
+                active_marker.display(),
+                session_file.display(),
                 session_file.display()
             );
             fs::write(&script_path, script).expect("simulated Pi RPC script should be written");
