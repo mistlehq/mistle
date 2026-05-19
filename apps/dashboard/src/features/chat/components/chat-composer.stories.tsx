@@ -139,6 +139,55 @@ export const ReadyToSend: Story = {
   },
 };
 
+export const SlashCommandAutocomplete: Story = {
+  args: {
+    composerCapabilities: [
+      {
+        kind: "composerCommand",
+        trigger: "/",
+        source: "runtimeCommand",
+        commands: [
+          {
+            id: "codex.review",
+            name: "review",
+            description: "Review the current changes",
+            submitAs: "inlineText",
+          },
+          {
+            id: "codex.explain",
+            name: "explain",
+            description: "Explain the selected code",
+            submitAs: "inlineText",
+          },
+          {
+            id: "codex.rewrite",
+            name: "rewrite",
+            description: "Rewrite with constraints",
+            submitAs: "inlineText",
+          },
+        ],
+      },
+    ],
+    composerText: "/re",
+  },
+  render: (args) => (
+    <div className="flex min-h-[420px] items-end">
+      <PlatformAwareChatComposerStory {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByRole("listbox", { name: "Slash commands" })).toBeVisible();
+    await expect(
+      canvas.getByRole("option", { name: "/review Review the current changes" }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("option", { name: "/rewrite Rewrite with constraints" }),
+    ).toBeVisible();
+  },
+};
+
 export const SteeringTurn: Story = {
   args: {
     composerText: "Focus only on Storybook asset ownership.",
