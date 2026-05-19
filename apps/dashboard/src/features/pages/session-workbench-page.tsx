@@ -44,6 +44,12 @@ import { SessionRepositoryNoneValue } from "./use-session-primary-repository-sta
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 import { useSessionWorkbenchThreadNavigation } from "./use-session-workbench-thread-navigation.js";
 
+export function shouldShowSessionWorkingIndicator(input: {
+  activeTurnState: "idle" | "running";
+}): boolean {
+  return input.activeTurnState === "running";
+}
+
 export function SessionWorkbenchPage(): React.JSX.Element {
   const params = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -434,6 +440,9 @@ function SessionWorkbenchPageContent(input: {
   }, [workbench.connectionReadiness.canConnect, workbench.primaryPanelState.transitionState]);
   const initialEntryStartupState =
     !hasEnteredReadyWorkbench && alert === null ? workbench.initialEntryStartupState : null;
+  const isConversationTurnRunning = shouldShowSessionWorkingIndicator({
+    activeTurnState: conversationPane.composerStateInput.turnControl.activeTurnState,
+  });
   if (input.sandboxInstanceId === null) {
     return (
       <ConversationWorkspaceFrame
@@ -521,7 +530,7 @@ function SessionWorkbenchPageContent(input: {
         mainContent={renderPrimaryPanelMainContent({
           conversation: {
             activeTurnId: conversationPane.chatState.activeTurnId,
-            isTurnInProgress: conversationPane.chatState.status === "inProgress",
+            isTurnInProgress: isConversationTurnRunning,
             pendingTurnId: conversationPane.chatState.pendingTurnId,
             autoScrollToBottomOnInitialLoad: true,
             initialBottomScrollResetKey: [
@@ -568,10 +577,7 @@ function SessionWorkbenchPageContent(input: {
               onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
               key={input.sandboxInstanceId ?? "missing-session"}
               serverRequestPanelEntries={unmatchedServerRequests}
-              showWorkingIndicator={
-                conversationPane.chatState.activeTurnId !== null &&
-                conversationPane.chatState.status === "inProgress"
-              }
+              showWorkingIndicator={isConversationTurnRunning}
             />
           ) : null
         }
