@@ -8,6 +8,7 @@ import { useRef } from "react";
 
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import { useOpenCodeSessionState } from "../session-agents/opencode/session-state/index.js";
+import { usePiSessionState } from "../session-agents/pi/session-state/index.js";
 import { SessionRuntimeWorkbenchCapabilities } from "../session-agents/session-runtime-workbench-capabilities.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
@@ -128,10 +129,14 @@ export function useSessionWorkbenchController(input: {
   const openCodeSessionState = useOpenCodeSessionState({
     ensureTransportConnected: transportManager.ensureTransportConnected,
   });
+  const piSessionState = usePiSessionState({
+    ensureTransportConnected: transportManager.ensureTransportConnected,
+  });
   const { cliPtyState, handoff, resolveLifecycleForWorkbench } = useSessionWorkbenchHandoffControl({
     activeHandoffRuntimeIdRef,
     ensureTransportConnected: transportManager.ensureTransportConnected,
     openCodeSessionState,
+    piSessionState,
     sandboxInstanceId: input.sandboxInstanceId,
     selectedRepositoryPathRef,
     sessionState,
@@ -157,6 +162,7 @@ export function useSessionWorkbenchController(input: {
     selectedRepositoryPathRef,
   });
   const isOpenCodeRuntime = repositoryControl.isOpenCodeRuntime;
+  const isPiRuntime = repositoryControl.isPiRuntime;
   const selectedRepositoryPath = repositoryControl.selectedRepositoryPath;
   const chromeState = useSessionWorkbenchChromeState({
     canConnect: workbenchLifecycleState.connectionReadiness.canConnect,
@@ -171,7 +177,9 @@ export function useSessionWorkbenchController(input: {
   const conversationRuntime = useSessionWorkbenchConversationRuntime({
     ensureTransportConnected: transportManager.ensureTransportConnected,
     isOpenCodeRuntime,
+    isPiRuntime,
     openCodeSessionState,
+    piSessionState,
     queryClient,
     repositoryStatus: chromeState.repositoryStatus,
     sandboxInstanceId: input.sandboxInstanceId,

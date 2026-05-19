@@ -11,8 +11,26 @@ const PiSessionStateSchema = z.looseObject({
   pendingMessageCount: z.number(),
 });
 
+const PiAgentMessageSchema = z.looseObject({
+  role: z.string(),
+  content: z.unknown().optional(),
+  timestamp: z.number().optional(),
+});
+
+const PiAgentMessagesResultSchema = z.object({
+  messages: z.array(PiAgentMessageSchema),
+});
+
+const PiEventSchema = z.looseObject({
+  type: z.string(),
+});
+
 const PiProviderConversationResultSchema = z.object({
   providerConversationId: z.string(),
+});
+
+const PiRecentConversationResultSchema = z.object({
+  providerConversationId: z.string().nullable(),
 });
 
 const PiReadMetadataResultSchema = z.object({
@@ -21,12 +39,22 @@ const PiReadMetadataResultSchema = z.object({
 });
 
 export type PiSessionState = z.output<typeof PiSessionStateSchema>;
+export type PiAgentMessage = z.output<typeof PiAgentMessageSchema>;
+export type PiEvent = z.output<typeof PiEventSchema>;
+
+export type PiEventSubscription = {
+  close(): void;
+};
 
 export type PiSessionClient = {
   close(): void;
   connect(): Promise<void>;
   createConversation(input: { cwd?: string }): Promise<{ providerConversationId: string }>;
+  findRecentConversation(input?: { cwd?: string | null }): Promise<{
+    providerConversationId: string | null;
+  }>;
   getState(input?: { sessionFile?: string }): Promise<PiSessionState>;
+  getMessages(input: { sessionFile: string }): Promise<readonly PiAgentMessage[]>;
   readMetadata(input: {
     sessionFile: string;
   }): Promise<{ name: string | null; preview: string | null }>;
@@ -36,6 +64,7 @@ export type PiSessionClient = {
   steer(input: { message: string; sessionFile: string }): Promise<void>;
   followUp(input: { message: string; sessionFile: string }): Promise<void>;
   abort(input: { sessionFile: string }): Promise<void>;
+  subscribeEvents(input: { onEvent: (event: PiEvent) => void }): PiEventSubscription;
 };
 
 type PendingRequest = {
@@ -67,9 +96,19 @@ export function createPiSessionClient(input: PiSessionClientInput): PiSessionCli
     transport: input.transport,
   });
   const pendingRequests = new Map<string | number, PendingRequest>();
+  const eventListeners = new Set<(event: PiEvent) => void>();
   let nextRequestId = 1;
   const unsubscribe = agentStream.onEvent((event) => {
     if (event.type !== "response") {
+      if (event.type === "notification" && event.notification.method === "pi/event") {
+        const parsedEvent = PiEventSchema.safeParse(event.notification.params);
+        if (!parsedEvent.success) {
+          return;
+        }
+        for (const listener of eventListeners) {
+          listener(parsedEvent.data);
+        }
+      }
       return;
     }
 
@@ -142,12 +181,29 @@ export function createPiSessionClient(input: PiSessionClientInput): PiSessionCli
         providerConversationId: created.providerConversationId,
       };
     },
+    async findRecentConversation(findInput = {}) {
+      const result = await request({
+        method: "pi/findRecentConversation",
+        params: findInput,
+      });
+      const recent = PiRecentConversationResultSchema.parse(result);
+      return {
+        providerConversationId: recent.providerConversationId,
+      };
+    },
     async getState(getStateInput = {}) {
       const result = await request({
         method: "pi/getState",
         params: getStateInput,
       });
       return PiSessionStateSchema.parse(result);
+    },
+    async getMessages(getMessagesInput) {
+      const result = await request({
+        method: "pi/getMessages",
+        params: getMessagesInput,
+      });
+      return PiAgentMessagesResultSchema.parse(result).messages;
     },
     async readMetadata(readMetadataInput) {
       const result = await request({
@@ -191,6 +247,14 @@ export function createPiSessionClient(input: PiSessionClientInput): PiSessionCli
         method: "pi/abort",
         params: abortInput,
       });
+    },
+    subscribeEvents(subscribeInput) {
+      eventListeners.add(subscribeInput.onEvent);
+      return {
+        close() {
+          eventListeners.delete(subscribeInput.onEvent);
+        },
+      };
     },
   };
 }

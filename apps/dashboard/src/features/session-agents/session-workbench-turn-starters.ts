@@ -17,6 +17,7 @@ import {
   resolveOpenCodePromptModelOverride,
   type UseOpenCodeSessionStateResult,
 } from "./opencode/session-state/index.js";
+import type { UsePiSessionStateResult } from "./pi/session-state/index.js";
 
 type EnsureSessionTransportConnected = Parameters<
   typeof generateSessionTitleWithSandboxCodexExec
@@ -121,6 +122,16 @@ export function buildOpenCodeTurnStarter(input: {
         });
       },
       queryClient: input.queryClient,
+    });
+  };
+}
+
+export function buildPiTurnStarter(input: {
+  chat: UsePiSessionStateResult["chat"];
+}): SessionTurnControl["startTurn"] {
+  return async (turnInput): Promise<void> => {
+    await input.chat.sendPrompt({
+      submittedPrompt: turnInput.transcriptPrompt ?? turnInput.submittedPrompt,
     });
   };
 }

@@ -14,9 +14,12 @@ import type { SessionWorkbenchTransportManager } from "./use-session-workbench-t
 
 const CodexWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
 const OpenCodeWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.OPENCODE;
+const PiWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.PI;
 
 type SessionWorkbenchRepositoryControlState = {
+  activeRuntimeId: SessionMainPanelRuntimeId;
   isOpenCodeRuntime: boolean;
+  isPiRuntime: boolean;
   primaryRepositoryControlState: {
     disabledReason: string | null;
     switchPrimaryRepository: (nextSelectedRepositoryPath: string | null) => Promise<void>;
@@ -39,12 +42,15 @@ export function useSessionWorkbenchRepositoryControl(input: {
   selectedRepositoryPathRef: RefObject<string | null>;
 }): SessionWorkbenchRepositoryControlState {
   const isOpenCodeRuntime = input.runtimeAgentRuntimeId === OpenCodeWorkbenchCapabilities.runtimeId;
+  const isPiRuntime = input.runtimeAgentRuntimeId === PiWorkbenchCapabilities.runtimeId;
   const activeRuntimeCapabilities = isOpenCodeRuntime
     ? OpenCodeWorkbenchCapabilities
-    : CodexWorkbenchCapabilities;
+    : isPiRuntime
+      ? PiWorkbenchCapabilities
+      : CodexWorkbenchCapabilities;
   input.activeHandoffRuntimeIdRef.current = activeRuntimeCapabilities.runtimeId;
 
-  const activeThreadCwd = isOpenCodeRuntime ? null : input.codexActiveThreadCwd;
+  const activeThreadCwd = isOpenCodeRuntime || isPiRuntime ? null : input.codexActiveThreadCwd;
   const initialSelectedRepositoryPath = resolveInitialSelectedRepositoryPath({
     activeThreadCwd: activeThreadCwd ?? undefined,
     runtimePrimaryRepositoryRoot: input.runtimePrimaryRepositoryRoot,
@@ -69,7 +75,7 @@ export function useSessionWorkbenchRepositoryControl(input: {
         return;
       }
 
-      if (!isOpenCodeRuntime) {
+      if (!isOpenCodeRuntime && !isPiRuntime) {
         await input.ensureCanSwitchPrimaryRepository();
       }
       primaryRepositoryState.setSelectedRepositoryPath(nextSelectedRepositoryPath);
@@ -77,16 +83,19 @@ export function useSessionWorkbenchRepositoryControl(input: {
     [
       input.ensureCanSwitchPrimaryRepository,
       isOpenCodeRuntime,
+      isPiRuntime,
       primaryRepositoryState.setSelectedRepositoryPath,
       selectedRepositoryPath,
     ],
   );
 
   return {
+    activeRuntimeId: activeRuntimeCapabilities.runtimeId,
     isOpenCodeRuntime,
+    isPiRuntime,
     primaryRepositoryControlState: {
       disabledReason:
-        !isOpenCodeRuntime && isPrimaryRepositorySwitchBlockedByCli
+        !isOpenCodeRuntime && !isPiRuntime && isPrimaryRepositorySwitchBlockedByCli
           ? "Exit Codex TUI before switching the primary repository."
           : null,
       switchPrimaryRepository,

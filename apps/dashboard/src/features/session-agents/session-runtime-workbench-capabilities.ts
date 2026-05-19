@@ -37,4 +37,16 @@ export const SessionRuntimeWorkbenchCapabilities = {
     preservesCliLaunchContext: true,
     hasContextUsage: false,
   },
+  PI: {
+    runtimeId: "pi",
+    displayName: "Pi",
+    cliTerminalContentInset: "none",
+    composerModelSelection: {
+      required: false,
+      showControls: false,
+    },
+    supportsSteering: true,
+    preservesCliLaunchContext: true,
+    hasContextUsage: false,
+  },
 } satisfies Record<string, SessionRuntimeWorkbenchCapability>;

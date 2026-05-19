@@ -4,10 +4,12 @@ import { describe, expect, it } from "vitest";
 import {
   buildCodexConversationRuntime,
   buildOpenCodeConversationRuntime,
+  buildPiConversationRuntime,
 } from "./session-workbench-conversation-runtimes.js";
 
 type CodexRuntimeInput = Parameters<typeof buildCodexConversationRuntime>[0];
 type OpenCodeRuntimeInput = Parameters<typeof buildOpenCodeConversationRuntime>[0];
+type PiRuntimeInput = Parameters<typeof buildPiConversationRuntime>[0];
 
 const ReadyBootstrap: CodexRuntimeInput["bootstrap"] = {
   phase: { status: "ready" },
@@ -173,6 +175,66 @@ function createOpenCodeRuntimeInput(reportedMessages: string[]): OpenCodeRuntime
   };
 }
 
+function createPiRuntimeInput(input: {
+  reportedMessages: string[];
+  steeredPrompts: string[];
+}): PiRuntimeInput {
+  return {
+    bootstrap: ReadyBootstrap,
+    chat: {
+      abortConversation: async () => {
+        return;
+      },
+      canInterruptTurn: true,
+      canSteerTurn: true,
+      chatState: {
+        completedErrorMessage: null,
+        entries: [],
+        messages: [],
+        pendingTurnId: null,
+        sessionFile: "pi-session.json",
+        status: "busy",
+        streamingMessage: null,
+      },
+      hydrateChatFromConversation: async () => {
+        return;
+      },
+      hydrateChatFromConversationOrThrow: async () => {
+        return;
+      },
+      isHydratingChat: false,
+      isInterruptingTurn: false,
+      isStartingTurn: false,
+      isSteeringTurn: false,
+      sendPrompt: async () => {
+        return;
+      },
+      steerTurn: async (turnInput) => {
+        input.steeredPrompts.push(turnInput.submittedPrompt);
+      },
+    },
+    configControl: ComposerConfigControl,
+    sessionMessage: {
+      clearSessionErrorMessage: () => {
+        return;
+      },
+      reportSessionErrorMessage: (message) => {
+        input.reportedMessages.push(message);
+      },
+      sessionErrorMessage: null,
+    },
+    sessionSnapshot: {
+      activeDirectory: null,
+      activeSessionFile: "pi-session.json",
+      connectedAtIso: "2026-05-19T00:00:00.000Z",
+      sandboxInstanceId: "sandbox_123",
+    },
+    startTurn: async () => {
+      return;
+    },
+  };
+}
+
 describe("buildCodexConversationRuntime", () => {
   it("accepts the compact runtime command for an active Codex conversation", () => {
     const compactedThreadIds: string[] = [];
@@ -234,5 +296,42 @@ describe("buildOpenCodeConversationRuntime", () => {
     const runtime = buildOpenCodeConversationRuntime(createOpenCodeRuntimeInput([]));
 
     expect("executeRuntimeCommand" in runtime.composerRuntimeInput).toBe(false);
+  });
+});
+
+describe("buildPiConversationRuntime", () => {
+  it("maps the active Pi conversation into the shared workbench contract", () => {
+    const runtime = buildPiConversationRuntime(
+      createPiRuntimeInput({
+        reportedMessages: [],
+        steeredPrompts: [],
+      }),
+    );
+
+    expect(runtime.displayName).toBe("Pi");
+    expect(runtime.conversation.activeConversationId).toBe("pi-session.json");
+    expect(runtime.composerRuntimeInput.turnControl.canSteer).toBe(true);
+    expect(runtime.composerRuntimeInput.modelSelection).toEqual({
+      required: false,
+      showControls: false,
+    });
+  });
+
+  it("steers Pi with the submitted transcript prompt", async () => {
+    const steeredPrompts: string[] = [];
+    const runtime = buildPiConversationRuntime(
+      createPiRuntimeInput({
+        reportedMessages: [],
+        steeredPrompts,
+      }),
+    );
+
+    await runtime.composerRuntimeInput.turnControl.steerTurn({
+      submittedPrompt: "raw prompt",
+      transcriptPrompt: "prompt with attachments",
+      uploadedAttachments: [],
+    });
+
+    expect(steeredPrompts).toEqual(["prompt with attachments"]);
   });
 });

@@ -12,6 +12,7 @@ import {
   buildOpenCodeCliPtyOpenInput,
   type UseOpenCodeSessionStateResult,
 } from "./opencode/session-state/index.js";
+import { buildPiCliPtyOpenInput, type UsePiSessionStateResult } from "./pi/session-state/index.js";
 import { SessionRuntimeWorkbenchCapabilities } from "./session-runtime-workbench-capabilities.js";
 
 export function buildCodexLifecycleForHandoff(
@@ -104,7 +105,72 @@ export function buildOpenCodeLifecycleForWorkbench(
     recoverSession: lifecycle.recoverSession,
     recoverableDisconnect: lifecycle.recoverableDisconnect,
     sessionConnectionState: lifecycle.sessionConnectionState,
-    sessionSnapshot: lifecycle.sessionSnapshot,
+    sessionSnapshot:
+      lifecycle.sessionSnapshot === null
+        ? null
+        : {
+            activeThreadId: lifecycle.sessionSnapshot.activeSessionId,
+            connectedAtIso: lifecycle.sessionSnapshot.connectedAtIso,
+            sandboxInstanceId: lifecycle.sessionSnapshot.sandboxInstanceId,
+          },
+  };
+}
+
+export function buildPiLifecycleForHandoff(
+  lifecycle: UsePiSessionStateResult["lifecycle"],
+): SessionMainPanelHandoffLifecycle {
+  return {
+    clearLifecycleErrorMessage: lifecycle.clearLifecycleErrorMessage,
+    connectSession: (connectInput): void => {
+      lifecycle.connectSession({
+        ...(connectInput.initialCwd === undefined ? {} : { initialCwd: connectInput.initialCwd }),
+        sandboxInstanceId: connectInput.sandboxInstanceId,
+        ...(connectInput.targetThreadId === null
+          ? {}
+          : { targetSessionFile: connectInput.targetThreadId }),
+      });
+    },
+    detachSessionConnection: lifecycle.detachSessionConnection,
+    lifecycleErrorMessage: lifecycle.lifecycleErrorMessage,
+    sessionConnectionState: lifecycle.sessionConnectionState,
+    sessionSnapshot:
+      lifecycle.sessionSnapshot === null
+        ? null
+        : {
+            activeConversationId: lifecycle.sessionSnapshot.activeSessionFile,
+          },
+  };
+}
+
+export function buildPiLifecycleForWorkbench(
+  lifecycle: UsePiSessionStateResult["lifecycle"],
+): SessionLifecycleForWorkbench {
+  return {
+    clearLifecycleErrorMessage: lifecycle.clearLifecycleErrorMessage,
+    connectSession: (connectInput: InitialSessionConnectInput): void => {
+      lifecycle.connectSession({
+        ...(connectInput.initialCwd === undefined ? {} : { initialCwd: connectInput.initialCwd }),
+        sandboxInstanceId: connectInput.sandboxInstanceId,
+        ...(connectInput.targetThreadId === null
+          ? {}
+          : { targetThreadId: connectInput.targetThreadId }),
+      });
+    },
+    detachSessionConnection: lifecycle.detachSessionConnection,
+    disconnectSession: lifecycle.disconnectSession,
+    isStartingSession: lifecycle.isStartingSession,
+    lifecycleErrorMessage: lifecycle.lifecycleErrorMessage,
+    recoverSession: lifecycle.recoverSession,
+    recoverableDisconnect: lifecycle.recoverableDisconnect,
+    sessionConnectionState: lifecycle.sessionConnectionState,
+    sessionSnapshot:
+      lifecycle.sessionSnapshot === null
+        ? null
+        : {
+            activeThreadId: lifecycle.sessionSnapshot.activeSessionFile,
+            connectedAtIso: lifecycle.sessionSnapshot.connectedAtIso,
+            sandboxInstanceId: lifecycle.sessionSnapshot.sandboxInstanceId,
+          },
   };
 }
 
@@ -112,10 +178,15 @@ export function resolveSessionLifecycleForWorkbench(input: {
   agentRuntimeId: string | null;
   codexLifecycle: SessionLifecycleForWorkbench;
   openCodeLifecycle: SessionLifecycleForWorkbench;
+  piLifecycle: SessionLifecycleForWorkbench;
 }): SessionLifecycleForWorkbench {
-  return input.agentRuntimeId === SessionRuntimeWorkbenchCapabilities.OPENCODE.runtimeId
-    ? input.openCodeLifecycle
-    : input.codexLifecycle;
+  if (input.agentRuntimeId === SessionRuntimeWorkbenchCapabilities.OPENCODE.runtimeId) {
+    return input.openCodeLifecycle;
+  }
+  if (input.agentRuntimeId === SessionRuntimeWorkbenchCapabilities.PI.runtimeId) {
+    return input.piLifecycle;
+  }
+  return input.codexLifecycle;
 }
 
 export function buildCodexHandoffRuntime(input: {
@@ -166,6 +237,38 @@ export function buildOpenCodeHandoffRuntime(input: {
       return {
         type: "resume",
         threadId: activeSessionId,
+      };
+    },
+  };
+}
+
+export function buildPiHandoffRuntime(input: {
+  chat: UsePiSessionStateResult["chat"];
+  lifecycle: SessionMainPanelHandoffLifecycle;
+  sessionSnapshot: UsePiSessionStateResult["lifecycle"]["sessionSnapshot"];
+}): SessionMainPanelHandoffRuntime {
+  return {
+    buildCliPtyOpenInput: buildPiCliPtyOpenInput,
+    clearActiveThreadIdAfterCliLaunch: () => {},
+    displayName: SessionRuntimeWorkbenchCapabilities.PI.displayName,
+    hydrateChatFromConversation: input.chat.hydrateChatFromConversationOrThrow,
+    lifecycle: input.lifecycle,
+    preserveCliLaunchForRestore: SessionRuntimeWorkbenchCapabilities.PI.preservesCliLaunchContext,
+    resetServerRequests: () => {},
+    restoreConversationId: input.sessionSnapshot?.activeSessionFile ?? null,
+    resolveCliLaunchTarget: async () => {
+      const activeSessionFile = input.sessionSnapshot?.activeSessionFile ?? null;
+
+      if (activeSessionFile === null) {
+        return {
+          type: "start_new",
+          shouldClearActiveThreadId: false,
+        };
+      }
+
+      return {
+        type: "resume",
+        threadId: activeSessionFile,
       };
     },
   };

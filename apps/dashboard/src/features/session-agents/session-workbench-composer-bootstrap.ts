@@ -12,6 +12,7 @@ import {
   buildRefreshingOpenCodeComposerBootstrap,
   type UseOpenCodeSessionStateResult,
 } from "./opencode/session-state/index.js";
+import type { UsePiSessionStateResult } from "./pi/session-state/index.js";
 
 export function useCodexWorkbenchComposerState(input: {
   sessionState: UseCodexSessionStateResult;
@@ -119,6 +120,31 @@ export function useOpenCodeWorkbenchComposerState(input: {
       input.sandboxInstanceId,
       input.sessionState.lifecycle.sessionSnapshot?.activeSessionId ?? null,
     ),
+  });
+
+  return {
+    bootstrap,
+    configControl,
+  };
+}
+
+export function usePiWorkbenchComposerState(input: {
+  sandboxInstanceId: string | null;
+  sessionState: UsePiSessionStateResult;
+}): {
+  bootstrap: UsePiSessionStateResult["bootstrap"];
+  configControl: SessionComposerConfigControl;
+} {
+  const bootstrap = input.sessionState.bootstrap;
+  const configControl = useLocalSessionComposerConfigControl({
+    bootstrap,
+    clearSessionErrorMessage: input.sessionState.sessionMessage.clearSessionErrorMessage,
+    canChangeReasoningEffort: false,
+    resetKey: [
+      "pi",
+      input.sandboxInstanceId,
+      input.sessionState.lifecycle.sessionSnapshot?.activeSessionFile ?? null,
+    ].join(":"),
   });
 
   return {

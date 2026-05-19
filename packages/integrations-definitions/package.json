@@ -91,6 +91,20 @@
       "import": "./src/agent-runtimes/opencode/title-generation.ts",
       "default": "./src/agent-runtimes/opencode/title-generation.ts"
     },
+    "./agent-runtimes/pi/client": {
+      "types": "./src/agent-runtimes/pi/client.ts",
+      "workspace-src": "./src/agent-runtimes/pi/client.ts",
+      "node": "./dist/agent-runtimes/pi/client.js",
+      "import": "./src/agent-runtimes/pi/client.ts",
+      "default": "./src/agent-runtimes/pi/client.ts"
+    },
+    "./agent-runtimes/pi/pty-launch": {
+      "types": "./src/agent-runtimes/pi/pty-launch.ts",
+      "workspace-src": "./src/agent-runtimes/pi/pty-launch.ts",
+      "node": "./dist/agent-runtimes/pi/pty-launch.js",
+      "import": "./src/agent-runtimes/pi/pty-launch.ts",
+      "default": "./src/agent-runtimes/pi/pty-launch.ts"
+    },
     "./openai": {
       "types": "./src/openai/index.ts",
       "workspace-src": "./src/openai/index.ts",

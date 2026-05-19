@@ -32,4 +32,19 @@ describe("SessionRuntimeWorkbenchCapabilities", () => {
       hasContextUsage: false,
     });
   });
+
+  it("describes the Pi workbench contract", () => {
+    expect(SessionRuntimeWorkbenchCapabilities.PI).toEqual({
+      runtimeId: "pi",
+      displayName: "Pi",
+      cliTerminalContentInset: "none",
+      composerModelSelection: {
+        required: false,
+        showControls: false,
+      },
+      supportsSteering: true,
+      preservesCliLaunchContext: true,
+      hasContextUsage: false,
+    });
+  });
 });

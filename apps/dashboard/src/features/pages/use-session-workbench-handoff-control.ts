@@ -2,6 +2,7 @@ import { useCallback, useMemo, type RefObject } from "react";
 
 import type { UseCodexSessionStateResult } from "../session-agents/codex/session-state/index.js";
 import type { UseOpenCodeSessionStateResult } from "../session-agents/opencode/session-state/index.js";
+import type { UsePiSessionStateResult } from "../session-agents/pi/session-state/index.js";
 import { SessionRuntimeWorkbenchCapabilities } from "../session-agents/session-runtime-workbench-capabilities.js";
 import {
   buildCodexHandoffRuntime,
@@ -9,6 +10,9 @@ import {
   buildOpenCodeHandoffRuntime,
   buildOpenCodeLifecycleForHandoff,
   buildOpenCodeLifecycleForWorkbench,
+  buildPiHandoffRuntime,
+  buildPiLifecycleForHandoff,
+  buildPiLifecycleForWorkbench,
   resolveSessionLifecycleForWorkbench,
 } from "../session-agents/session-workbench-handoff-runtimes.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
@@ -21,6 +25,7 @@ import type { SessionWorkbenchTransportManager } from "./use-session-workbench-t
 
 const CodexWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
 const OpenCodeWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.OPENCODE;
+const PiWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.PI;
 
 type SessionWorkbenchHandoffControlState = {
   cliPtyState: ReturnType<typeof useSandboxPtyState>;
@@ -32,12 +37,14 @@ export function useSessionWorkbenchHandoffControl(input: {
   activeHandoffRuntimeIdRef: RefObject<SessionMainPanelRuntimeId>;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
   openCodeSessionState: UseOpenCodeSessionStateResult;
+  piSessionState: UsePiSessionStateResult;
   sandboxInstanceId: string | null;
   selectedRepositoryPathRef: RefObject<string | null>;
   sessionState: UseCodexSessionStateResult;
 }): SessionWorkbenchHandoffControlState {
   const lifecycle = input.sessionState.lifecycle;
   const openCodeLifecycle = input.openCodeSessionState.lifecycle;
+  const piLifecycle = input.piSessionState.lifecycle;
   const codexLifecycleForHandoff = useMemo(
     () => buildCodexLifecycleForHandoff(lifecycle),
     [
@@ -75,14 +82,41 @@ export function useSessionWorkbenchHandoffControl(input: {
       openCodeLifecycle.sessionSnapshot,
     ],
   );
+  const piLifecycleForHandoff = useMemo(
+    () => buildPiLifecycleForHandoff(piLifecycle),
+    [
+      piLifecycle.clearLifecycleErrorMessage,
+      piLifecycle.connectSession,
+      piLifecycle.detachSessionConnection,
+      piLifecycle.lifecycleErrorMessage,
+      piLifecycle.sessionConnectionState,
+      piLifecycle.sessionSnapshot,
+    ],
+  );
+  const piLifecycleForWorkbench = useMemo(
+    () => buildPiLifecycleForWorkbench(piLifecycle),
+    [
+      piLifecycle.clearLifecycleErrorMessage,
+      piLifecycle.connectSession,
+      piLifecycle.detachSessionConnection,
+      piLifecycle.disconnectSession,
+      piLifecycle.isStartingSession,
+      piLifecycle.lifecycleErrorMessage,
+      piLifecycle.recoverSession,
+      piLifecycle.recoverableDisconnect,
+      piLifecycle.sessionConnectionState,
+      piLifecycle.sessionSnapshot,
+    ],
+  );
   const resolveLifecycleForWorkbench = useCallback(
     (agentRuntimeId: string | null) =>
       resolveSessionLifecycleForWorkbench({
         agentRuntimeId,
         codexLifecycle: lifecycle,
         openCodeLifecycle: openCodeLifecycleForWorkbench,
+        piLifecycle: piLifecycleForWorkbench,
       }),
-    [lifecycle, openCodeLifecycleForWorkbench],
+    [lifecycle, openCodeLifecycleForWorkbench, piLifecycleForWorkbench],
   );
   const cliPtyState = useSandboxPtyState({
     ensureTransportConnected: input.ensureTransportConnected,
@@ -117,12 +151,26 @@ export function useSessionWorkbenchHandoffControl(input: {
       input.openCodeSessionState.lifecycle.sessionSnapshot,
     ],
   );
+  const piHandoffRuntime = useMemo(
+    () =>
+      buildPiHandoffRuntime({
+        chat: input.piSessionState.chat,
+        lifecycle: piLifecycleForHandoff,
+        sessionSnapshot: input.piSessionState.lifecycle.sessionSnapshot,
+      }),
+    [
+      input.piSessionState.chat.hydrateChatFromConversationOrThrow,
+      input.piSessionState.lifecycle.sessionSnapshot,
+      piLifecycleForHandoff,
+    ],
+  );
   const handoffRuntimes = useMemo(
     () => ({
       [CodexWorkbenchCapabilities.runtimeId]: codexHandoffRuntime,
       [OpenCodeWorkbenchCapabilities.runtimeId]: openCodeHandoffRuntime,
+      [PiWorkbenchCapabilities.runtimeId]: piHandoffRuntime,
     }),
-    [codexHandoffRuntime, openCodeHandoffRuntime],
+    [codexHandoffRuntime, openCodeHandoffRuntime, piHandoffRuntime],
   );
   const handoff = useSessionMainPanelHandoff({
     activeRuntimeIdRef: input.activeHandoffRuntimeIdRef,

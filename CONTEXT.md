@@ -76,6 +76,10 @@ _Avoid_: Chat session when referring to runtime tools or sandbox state
 A Codex conversation that runs within a **Sandbox session**.
 _Avoid_: Session, chat tab
 
+**Pi conversation**:
+A Pi conversation that runs within a **Sandbox session**.
+_Avoid_: Pi thread, Codex thread
+
 **Active Codex thread**:
 The **Codex thread** currently selected for the chat pane within a **Sandbox session**.
 _Avoid_: Current session, selected sandbox
@@ -136,6 +140,13 @@ _Avoid_: Slash autocomplete
 - A Mistle organization may have one **Billing customer** per billing provider.
 - A Jira Cloud connection has one **Jira site name**.
 - A **Sandbox session** may contain multiple **Codex threads**.
+- A **Sandbox session** may contain **Pi conversations** when its **Agent runtime** is Pi.
+- A **Pi conversation** should remain the selected chat object when the user switches between chat and the Pi CLI.
+- A **Session workbench** URL may identify a **Pi conversation** without making the conversation a separate session.
+- A **Pi conversation** in the chat pane should expose visible conversation state rather than acting only as a hidden command bridge.
+- Pi itself exposes transcript events, message reads, model controls, thinking controls, session stats, image inputs, and runtime commands through its RPC surface.
+- The current Mistle Pi adapter may expose a narrower subset than Pi itself; chat UI behavior should follow the adapter contract it has actually wired rather than assuming every upstream Pi RPC command is available.
+- Pi composer controls should be Pi-owned controls, not Codex-owned **Composer commands** or Codex context controls.
 - A **Session workbench** keeps sandbox-scoped tools stable while the **Active Codex thread** changes.
 - Opening **Codex thread** navigation does not change the **Session bottom panel** state.
 - A **Default Codex thread** is used only when the **Session workbench** has no explicit **Active Codex thread** request.
@@ -218,6 +229,7 @@ _Avoid_: Slash autocomplete
 - "billing org" could mean a Mistle organization, a Better Auth organization, or an external billing-provider customer — resolved: use **Billing customer** for the billing-provider customer associated with an existing Mistle organization.
 - "org" could mean a Mistle organization, an Atlassian organization, or the editable Jira Cloud URL subdomain — resolved: use **Jira site name** for the editable Jira Cloud subdomain.
 - "chat session" could mean either the live sandbox environment or a Codex conversation — resolved: use **Sandbox session** for the live environment and **Codex thread** for the conversation.
+- "Pi thread" could imply Codex-style thread navigation — resolved: use **Pi conversation** for Pi's runtime-owned chat object.
 - "active thread" could imply a different sandbox — resolved: use **Active Codex thread** for the selected chat conversation inside the same **Sandbox session**.
 - Switching threads could imply changing the whole workbench — resolved: thread switching changes the **Active Codex thread** without changing the **Sandbox session**.
 - "delete session" could mean hard deletion or user-visible removal — resolved: use **Deleted session** for a session hidden from ordinary lists while retaining its historical record.

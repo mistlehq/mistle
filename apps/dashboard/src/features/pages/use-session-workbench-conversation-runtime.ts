@@ -4,18 +4,22 @@ import { useMemo } from "react";
 import { formatCodexContextUsage } from "../session-agents/codex/session-state/codex-context-usage.js";
 import type { UseCodexSessionStateResult } from "../session-agents/codex/session-state/index.js";
 import type { UseOpenCodeSessionStateResult } from "../session-agents/opencode/session-state/index.js";
+import type { UsePiSessionStateResult } from "../session-agents/pi/session-state/index.js";
 import {
   useCodexWorkbenchComposerState,
   useOpenCodeWorkbenchComposerState,
+  usePiWorkbenchComposerState,
 } from "../session-agents/session-workbench-composer-bootstrap.js";
 import {
   buildCodexConversationRuntime,
   buildOpenCodeConversationRuntime,
+  buildPiConversationRuntime,
   type SessionWorkbenchRuntimeAdapter,
 } from "../session-agents/session-workbench-conversation-runtimes.js";
 import {
   buildCodexTurnStarter,
   buildOpenCodeTurnStarter,
+  buildPiTurnStarter,
 } from "../session-agents/session-workbench-turn-starters.js";
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
 import {
@@ -55,7 +59,9 @@ type SessionWorkbenchConversationRuntimeState = {
 export function useSessionWorkbenchConversationRuntime(input: {
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
   isOpenCodeRuntime: boolean;
+  isPiRuntime: boolean;
   openCodeSessionState: UseOpenCodeSessionStateResult;
+  piSessionState: UsePiSessionStateResult;
   queryClient: QueryClient;
   repositoryStatus: SessionComposerSharedInput["repositoryStatus"];
   sandboxInstanceId: string | null;
@@ -74,6 +80,11 @@ export function useSessionWorkbenchConversationRuntime(input: {
       sandboxInstanceId: input.sandboxInstanceId,
       selectedRepositoryPath: input.selectedRepositoryPath,
       sessionState: openCodeSessionState,
+    });
+  const { bootstrap: piComposerBootstrap, configControl: piConfigControl } =
+    usePiWorkbenchComposerState({
+      sandboxInstanceId: input.sandboxInstanceId,
+      sessionState: input.piSessionState,
     });
   const { configControl } = useCodexWorkbenchComposerState({
     sessionState,
@@ -128,6 +139,13 @@ export function useSessionWorkbenchConversationRuntime(input: {
       openCodeSessionState.chat,
       openCodeSessionState.chat.chatState.messageOrder.length,
     ],
+  );
+  const startPiTurn = useMemo<SessionTurnControl["startTurn"]>(
+    () =>
+      buildPiTurnStarter({
+        chat: input.piSessionState.chat,
+      }),
+    [input.piSessionState.chat],
   );
   const codexBootstrap = useMemo(() => {
     if (
@@ -212,7 +230,39 @@ export function useSessionWorkbenchConversationRuntime(input: {
       startOpenCodeTurn,
     ],
   );
-  const activeRuntime = input.isOpenCodeRuntime ? openCodeRuntime : codexRuntime;
+  const piRuntime = useMemo<SessionWorkbenchRuntimeAdapter>(
+    () =>
+      buildPiConversationRuntime({
+        bootstrap: piComposerBootstrap,
+        chat: input.piSessionState.chat,
+        configControl: piConfigControl,
+        sessionMessage: input.piSessionState.sessionMessage,
+        sessionSnapshot: input.piSessionState.lifecycle.sessionSnapshot,
+        startTurn: startPiTurn,
+      }),
+    [
+      input.piSessionState.chat.abortConversation,
+      input.piSessionState.chat.canInterruptTurn,
+      input.piSessionState.chat.canSteerTurn,
+      input.piSessionState.chat.chatState,
+      input.piSessionState.chat.isInterruptingTurn,
+      input.piSessionState.chat.isStartingTurn,
+      input.piSessionState.chat.isSteeringTurn,
+      input.piSessionState.chat.steerTurn,
+      input.piSessionState.lifecycle.sessionSnapshot,
+      input.piSessionState.sessionMessage.clearSessionErrorMessage,
+      input.piSessionState.sessionMessage.reportSessionErrorMessage,
+      input.piSessionState.sessionMessage.sessionErrorMessage,
+      piComposerBootstrap,
+      piConfigControl,
+      startPiTurn,
+    ],
+  );
+  const activeRuntime = input.isPiRuntime
+    ? piRuntime
+    : input.isOpenCodeRuntime
+      ? openCodeRuntime
+      : codexRuntime;
   const activeConversationId = activeRuntime.conversation.activeConversationId;
   const attachmentControl = useSessionComposerAttachmentControl({
     attachmentTarget:
@@ -241,21 +291,22 @@ export function useSessionWorkbenchConversationRuntime(input: {
         attachmentControl,
         repositoryStatus: input.repositoryStatus,
       },
-      codexThreadNavigator: input.isOpenCodeRuntime
-        ? null
-        : {
-            activeThreadCwd: sessionState.lifecycle.sessionSnapshot?.activeThreadCwd ?? null,
-            activeThreadId: sessionState.lifecycle.sessionSnapshot?.activeThreadId ?? null,
-            providerThreadId: sessionState.lifecycle.sessionSnapshot?.providerThreadId ?? null,
-            availableThreads: sessionState.threads.availableThreads,
-            hasMoreAvailableThreads: sessionState.threads.hasMoreAvailableThreads,
-            originalThreadId: sessionState.threads.originalThreadId,
-            pendingThreadId: sessionState.threads.pendingThreadId,
-            isStartingNewThread: sessionState.threads.isStartingNewThread,
-            refreshThreadList: sessionState.threads.refreshThreadList,
-            resumeThread: sessionState.threads.resumeThread,
-            startNewThread: sessionState.threads.startNewThread,
-          },
+      codexThreadNavigator:
+        input.isOpenCodeRuntime || input.isPiRuntime
+          ? null
+          : {
+              activeThreadCwd: sessionState.lifecycle.sessionSnapshot?.activeThreadCwd ?? null,
+              activeThreadId: sessionState.lifecycle.sessionSnapshot?.activeThreadId ?? null,
+              providerThreadId: sessionState.lifecycle.sessionSnapshot?.providerThreadId ?? null,
+              availableThreads: sessionState.threads.availableThreads,
+              hasMoreAvailableThreads: sessionState.threads.hasMoreAvailableThreads,
+              originalThreadId: sessionState.threads.originalThreadId,
+              pendingThreadId: sessionState.threads.pendingThreadId,
+              isStartingNewThread: sessionState.threads.isStartingNewThread,
+              refreshThreadList: sessionState.threads.refreshThreadList,
+              resumeThread: sessionState.threads.resumeThread,
+              startNewThread: sessionState.threads.startNewThread,
+            },
       serverRequestsState: activeRuntime.serverRequestsState,
     },
   };

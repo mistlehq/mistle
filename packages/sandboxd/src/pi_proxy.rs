@@ -6,11 +6,13 @@
 
 use std::collections::BTreeMap;
 use std::fmt;
-use std::io::{BufRead, BufReader, Write};
+use std::fs::{File, read_dir};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{SocketAddr, TcpListener};
+use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
@@ -26,6 +28,8 @@ use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
 const PI_PROXY_ACCEPT_POLL_INTERVAL: Duration = Duration::from_millis(100);
 const PI_RPC_RESPONSE_TIMEOUT: Duration = Duration::from_secs(30);
 const PI_RPC_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(2);
+const PI_PROXY_CLIENT_READ_TIMEOUT: Duration = Duration::from_millis(100);
+const PI_SESSION_DIR_ENV: &str = "PI_CODING_AGENT_SESSION_DIR";
 
 pub const DEFAULT_PI_PROXY_LISTEN_URL: &str = "ws://127.0.0.1:4520";
 
@@ -50,6 +54,7 @@ pub enum PiProxyError {
     AcceptHandshake(String),
     InvalidRequest(String),
     MissingPiCliPath,
+    MissingSessionDir,
     SpawnPi(std::io::Error),
     MissingPiStdin,
     MissingPiStdout,
@@ -89,6 +94,12 @@ impl fmt::Display for PiProxyError {
             Self::MissingPiCliPath => {
                 write!(f, "Pi runtime client setup must define MISTLE_PI_CLI_PATH")
             }
+            Self::MissingSessionDir => {
+                write!(
+                    f,
+                    "Pi runtime client setup must define PI_CODING_AGENT_SESSION_DIR"
+                )
+            }
             Self::SpawnPi(error) => write!(f, "failed to spawn Pi RPC process: {error}"),
             Self::MissingPiStdin => write!(f, "spawned Pi RPC process did not expose stdin"),
             Self::MissingPiStdout => write!(f, "spawned Pi RPC process did not expose stdout"),
@@ -123,6 +134,7 @@ struct PiProxyState {
     config: PiProxyConfig,
     child: Mutex<Option<PiRpcChild>>,
     command_lock: Mutex<()>,
+    event_subscribers: Mutex<Vec<Sender<String>>>,
     keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     active: AtomicBool,
     next_id: AtomicU64,
@@ -133,6 +145,11 @@ struct PiRpcChild {
     stdin: ChildStdin,
     receiver: Receiver<PiRpcOutput>,
     reader_thread: JoinHandle<()>,
+}
+
+struct PiRecentSessionCandidate {
+    modified: std::time::SystemTime,
+    path: PathBuf,
 }
 
 #[derive(Debug)]
@@ -264,6 +281,8 @@ impl PiProxyState {
                     }
                     if let Some(events) = captured_events.as_deref_mut() {
                         events.push(value);
+                    } else {
+                        self.broadcast_pi_event(value);
                     }
                 }
                 Ok(PiRpcOutput::Error(error)) => return Err(PiProxyError::InvalidRequest(error)),
@@ -279,6 +298,21 @@ impl PiProxyState {
                     ));
                 }
             }
+        }
+    }
+
+    fn subscribe_pi_events(&self) -> Receiver<String> {
+        let (sender, receiver) = mpsc::channel();
+        if let Ok(mut subscribers) = self.event_subscribers.lock() {
+            subscribers.push(sender);
+        }
+        receiver
+    }
+
+    fn broadcast_pi_event(&self, event: Value) {
+        let notification = render_pi_event_json_rpc_notification(event);
+        if let Ok(mut subscribers) = self.event_subscribers.lock() {
+            subscribers.retain(|sender| sender.send(notification.clone()).is_ok());
         }
     }
 
@@ -320,6 +354,68 @@ impl PiProxyState {
         state_value["sessionFile"]
             .as_str()
             .ok_or(PiProxyError::MissingSessionFile)
+    }
+
+    fn switch_session_if_needed(
+        &self,
+        session_file: &str,
+        captured_events: &mut Vec<Value>,
+    ) -> Result<(), PiProxyError> {
+        let current_state = self.send_pi_command_with_captured_events(
+            json!({ "type": "get_state" }),
+            captured_events,
+        )?;
+        if current_state["sessionFile"].as_str() == Some(session_file) {
+            return Ok(());
+        }
+        self.send_pi_command_with_captured_events(
+            json!({ "type": "switch_session", "sessionPath": session_file }),
+            captured_events,
+        )?;
+        Ok(())
+    }
+
+    fn session_dir(&self) -> Result<&str, PiProxyError> {
+        self.config
+            .env
+            .get(PI_SESSION_DIR_ENV)
+            .map(String::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .ok_or(PiProxyError::MissingSessionDir)
+    }
+
+    fn find_recent_conversation(&self, cwd: Option<&str>) -> Result<Option<String>, PiProxyError> {
+        let session_dir = self.session_dir()?;
+        let mut candidates = Vec::new();
+        let entries = match read_dir(session_dir) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(PiProxyError::InvalidRequest(error.to_string())),
+        };
+
+        for entry_result in entries {
+            let entry =
+                entry_result.map_err(|error| PiProxyError::InvalidRequest(error.to_string()))?;
+            let path = entry.path();
+            if path.extension().and_then(|extension| extension.to_str()) != Some("jsonl") {
+                continue;
+            }
+            if !is_matching_pi_session_file(&path, cwd) {
+                continue;
+            }
+            let metadata = entry
+                .metadata()
+                .map_err(|error| PiProxyError::InvalidRequest(error.to_string()))?;
+            let modified = metadata
+                .modified()
+                .map_err(|error| PiProxyError::InvalidRequest(error.to_string()))?;
+            candidates.push(PiRecentSessionCandidate { modified, path });
+        }
+
+        candidates.sort_by(|left, right| right.modified.cmp(&left.modified));
+        Ok(candidates
+            .first()
+            .map(|candidate| candidate.path.to_string_lossy().to_string()))
     }
 
     fn shutdown_child(&self) {
@@ -424,6 +520,7 @@ pub fn start_pi_proxy_with_supervisor(
         config,
         child: Mutex::new(None),
         command_lock: Mutex::new(()),
+        event_subscribers: Mutex::new(Vec::new()),
         keepalive_manager,
         active: AtomicBool::new(false),
         next_id: AtomicU64::new(1),
@@ -497,11 +594,23 @@ fn handle_pi_proxy_client(
 ) -> Result<(), PiProxyError> {
     let mut websocket =
         accept(stream).map_err(|error| PiProxyError::AcceptHandshake(error.to_string()))?;
+    websocket
+        .get_mut()
+        .set_read_timeout(Some(PI_PROXY_CLIENT_READ_TIMEOUT))
+        .map_err(|error| PiProxyError::InvalidRequest(error.to_string()))?;
+    let event_receiver = state.subscribe_pi_events();
     loop {
+        send_queued_pi_events(&mut websocket, &event_receiver)?;
         let message = match websocket.read() {
             Ok(message) => message,
             Err(tungstenite::Error::ConnectionClosed) => return Ok(()),
             Err(tungstenite::Error::AlreadyClosed) => return Ok(()),
+            Err(tungstenite::Error::Io(error))
+                if error.kind() == std::io::ErrorKind::WouldBlock
+                    || error.kind() == std::io::ErrorKind::TimedOut =>
+            {
+                continue;
+            }
             Err(error) => return Err(PiProxyError::InvalidRequest(error.to_string())),
         };
         match message {
@@ -524,6 +633,21 @@ fn handle_pi_proxy_client(
                 return Ok(());
             }
             Message::Binary(_) | Message::Pong(_) | Message::Frame(_) => {}
+        }
+    }
+}
+
+fn send_queued_pi_events(
+    websocket: &mut tungstenite::WebSocket<std::net::TcpStream>,
+    event_receiver: &Receiver<String>,
+) -> Result<(), PiProxyError> {
+    loop {
+        match event_receiver.try_recv() {
+            Ok(notification) => websocket
+                .send(Message::Text(notification.into()))
+                .map_err(|error| PiProxyError::InvalidRequest(error.to_string()))?,
+            Err(TryRecvError::Empty) => return Ok(()),
+            Err(TryRecvError::Disconnected) => return Ok(()),
         }
     }
 }
@@ -601,6 +725,37 @@ fn read_param_string(params: &Option<Value>, key: &str) -> Option<String> {
         .map(ToString::to_string)
 }
 
+fn is_matching_pi_session_file(path: &Path, cwd: Option<&str>) -> bool {
+    let mut file = match File::open(path) {
+        Ok(file) => file,
+        Err(_) => return false,
+    };
+    let mut buffer = [0_u8; 8192];
+    let bytes_read = match file.read(&mut buffer) {
+        Ok(bytes_read) => bytes_read,
+        Err(_) => return false,
+    };
+    if bytes_read == 0 {
+        return false;
+    }
+    let first_line = String::from_utf8_lossy(&buffer[..bytes_read])
+        .lines()
+        .next()
+        .unwrap_or("")
+        .to_string();
+    let header = match serde_json::from_str::<Value>(&first_line) {
+        Ok(header) => header,
+        Err(_) => return false,
+    };
+    if header["type"].as_str() != Some("session") || header["id"].as_str().is_none() {
+        return false;
+    }
+    match cwd {
+        Some(expected_cwd) => header["cwd"].as_str() == Some(expected_cwd),
+        None => true,
+    }
+}
+
 fn require_param_string(params: &Option<Value>, key: &str) -> Result<String, PiProxyError> {
     read_param_string(params, key)
         .ok_or_else(|| PiProxyError::InvalidRequest(format!("missing required parameter '{key}'")))
@@ -626,20 +781,16 @@ fn handle_pi_method(
             let session_file = PiProxyState::read_session_file(&state_value)?;
             Ok(json!({ "providerConversationId": session_file }))
         }
+        "pi/findRecentConversation" => {
+            let cwd = read_param_string(&request.params, "cwd");
+            let provider_conversation_id = state.find_recent_conversation(cwd.as_deref())?;
+            Ok(json!({ "providerConversationId": provider_conversation_id }))
+        }
         "pi/getState" => {
             let session_file = read_param_string(&request.params, "sessionFile");
             state.ensure_child(None)?;
             if let Some(session_file) = session_file {
-                let current_state = state.send_pi_command_with_captured_events(
-                    json!({ "type": "get_state" }),
-                    captured_events,
-                )?;
-                if current_state["sessionFile"].as_str() != Some(session_file.as_str()) {
-                    state.send_pi_command_with_captured_events(
-                        json!({ "type": "switch_session", "sessionPath": session_file }),
-                        captured_events,
-                    )?;
-                }
+                state.switch_session_if_needed(&session_file, captured_events)?;
             }
             state.send_pi_command_with_captured_events(
                 json!({ "type": "get_state" }),
@@ -649,10 +800,7 @@ fn handle_pi_method(
         "pi/readMetadata" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
             state.ensure_child(None)?;
-            state.send_pi_command_with_captured_events(
-                json!({ "type": "switch_session", "sessionPath": session_file }),
-                captured_events,
-            )?;
+            state.switch_session_if_needed(&session_file, captured_events)?;
             let state_value = state.send_pi_command_with_captured_events(
                 json!({ "type": "get_state" }),
                 captured_events,
@@ -662,23 +810,27 @@ fn handle_pi_method(
                 "preview": Value::Null
             }))
         }
+        "pi/getMessages" => {
+            let session_file = require_param_string(&request.params, "sessionFile")?;
+            state.ensure_child(None)?;
+            state.switch_session_if_needed(&session_file, captured_events)?;
+            let messages_value = state.send_pi_command_with_captured_events(
+                json!({ "type": "get_messages" }),
+                captured_events,
+            )?;
+            Ok(messages_value)
+        }
         "pi/resumeConversation" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
             state.ensure_child(None)?;
-            state.send_pi_command_with_captured_events(
-                json!({ "type": "switch_session", "sessionPath": session_file }),
-                captured_events,
-            )?;
+            state.switch_session_if_needed(&session_file, captured_events)?;
             Ok(Value::Null)
         }
         "pi/setSessionName" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
             let name = require_param_string(&request.params, "name")?;
             state.ensure_child(None)?;
-            state.send_pi_command_with_captured_events(
-                json!({ "type": "switch_session", "sessionPath": session_file }),
-                captured_events,
-            )?;
+            state.switch_session_if_needed(&session_file, captured_events)?;
             state.send_pi_command_with_captured_events(
                 json!({ "type": "set_session_name", "name": name }),
                 captured_events,
@@ -688,10 +840,7 @@ fn handle_pi_method(
             let session_file = require_param_string(&request.params, "sessionFile")?;
             let message = require_param_string(&request.params, "message")?;
             state.ensure_child(None)?;
-            state.send_pi_command_with_captured_events(
-                json!({ "type": "switch_session", "sessionPath": session_file }),
-                captured_events,
-            )?;
+            state.switch_session_if_needed(&session_file, captured_events)?;
             state.set_active(true);
             let result = state.send_pi_command_with_captured_events(
                 json!({ "type": "prompt", "message": message }),
@@ -704,10 +853,7 @@ fn handle_pi_method(
             let session_file = require_param_string(&request.params, "sessionFile")?;
             let message = require_param_string(&request.params, "message")?;
             state.ensure_child(None)?;
-            state.send_pi_command_with_captured_events(
-                json!({ "type": "switch_session", "sessionPath": session_file }),
-                captured_events,
-            )?;
+            state.switch_session_if_needed(&session_file, captured_events)?;
             state.set_active(true);
             let result = state.send_pi_command_with_captured_events(
                 json!({ "type": "steer", "message": message }),
@@ -720,10 +866,7 @@ fn handle_pi_method(
             let session_file = require_param_string(&request.params, "sessionFile")?;
             let message = require_param_string(&request.params, "message")?;
             state.ensure_child(None)?;
-            state.send_pi_command_with_captured_events(
-                json!({ "type": "switch_session", "sessionPath": session_file }),
-                captured_events,
-            )?;
+            state.switch_session_if_needed(&session_file, captured_events)?;
             state.set_active(true);
             let result = state.send_pi_command_with_captured_events(
                 json!({ "type": "follow_up", "message": message }),
@@ -735,10 +878,7 @@ fn handle_pi_method(
         "pi/abort" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
             state.ensure_child(None)?;
-            state.send_pi_command_with_captured_events(
-                json!({ "type": "switch_session", "sessionPath": session_file }),
-                captured_events,
-            )?;
+            state.switch_session_if_needed(&session_file, captured_events)?;
             state.send_pi_command_with_captured_events(json!({ "type": "abort" }), captured_events)
         }
         other => Err(PiProxyError::InvalidRequest(format!(
@@ -800,6 +940,7 @@ mod tests {
             },
             child: Mutex::new(None),
             command_lock: Mutex::new(()),
+            event_subscribers: Mutex::new(Vec::new()),
             keepalive_manager: keepalive_manager.clone(),
             active: std::sync::atomic::AtomicBool::new(false),
             next_id: AtomicU64::new(1),
@@ -825,6 +966,7 @@ mod tests {
             json!(simulated_pi.session_file())
         );
 
+        let event_receiver = state.subscribe_pi_events();
         let prompt_responses = handle_json_rpc_request(
             &state,
             &json!({
@@ -871,12 +1013,95 @@ mod tests {
                 .active(),
             "activity monitor should observe agent_end/get_state and settle after client work returns"
         );
+        let broadcast_event = parse_json_rpc_message(
+            &event_receiver
+                .try_recv()
+                .expect("activity monitor should broadcast Pi completion events"),
+        );
+        assert_eq!(broadcast_event["method"], json!("pi/event"));
+        assert_eq!(broadcast_event["params"]["type"], json!("agent_end"));
 
         state.shutdown_child();
     }
 
+    #[test]
+    fn finds_recent_pi_conversation_from_configured_session_dir() {
+        let directory = tempdir().expect("temporary directory should be created");
+        let session_dir = directory.path().join("sessions");
+        fs::create_dir(&session_dir).expect("session directory should be created");
+        let old_session = session_dir.join("old.jsonl");
+        let recent_session = session_dir.join("recent.jsonl");
+        let other_cwd_session = session_dir.join("other.jsonl");
+        write_session_file(&old_session, "old", "/workspace/project");
+        thread::sleep(Duration::from_millis(10));
+        write_session_file(&recent_session, "recent", "/workspace/project");
+        thread::sleep(Duration::from_millis(10));
+        write_session_file(&other_cwd_session, "other", "/workspace/other");
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let state = Arc::new(PiProxyState {
+            config: PiProxyConfig {
+                pi_cli_path: "/bin/false".to_string(),
+                env: BTreeMap::from([(
+                    "PI_CODING_AGENT_SESSION_DIR".to_string(),
+                    session_dir
+                        .to_str()
+                        .expect("session dir should be UTF-8")
+                        .to_string(),
+                )]),
+            },
+            child: Mutex::new(None),
+            command_lock: Mutex::new(()),
+            event_subscribers: Mutex::new(Vec::new()),
+            keepalive_manager,
+            active: std::sync::atomic::AtomicBool::new(false),
+            next_id: AtomicU64::new(1),
+        });
+
+        let responses = handle_json_rpc_request(
+            &state,
+            &json!({
+                "jsonrpc": "2.0",
+                "id": "recent",
+                "method": "pi/findRecentConversation",
+                "params": { "cwd": "/workspace/project" }
+            })
+            .to_string(),
+        );
+
+        let response = parse_json_rpc_message(
+            responses
+                .last()
+                .expect("recent conversation lookup should produce a response"),
+        );
+        assert_eq!(
+            response["result"]["providerConversationId"],
+            json!(
+                recent_session
+                    .to_str()
+                    .expect("recent session path should be UTF-8")
+            )
+        );
+    }
+
     fn parse_json_rpc_message(message: &str) -> Value {
         serde_json::from_str(message).expect("JSON-RPC message should be valid JSON")
+    }
+
+    fn write_session_file(path: &std::path::Path, id: &str, cwd: &str) {
+        fs::write(
+            path,
+            format!(
+                "{}\n",
+                json!({
+                    "type": "session",
+                    "version": 1,
+                    "id": id,
+                    "timestamp": "2026-05-19T00:00:00.000Z",
+                    "cwd": cwd
+                })
+            ),
+        )
+        .expect("session file should be written");
     }
 
     struct SimulatedPiRpcProcess {
@@ -905,7 +1130,7 @@ while IFS= read -r line; do
       printf '{{"type":"response","command":"get_state","id":"%s","success":true,"data":{{"sessionFile":"{}","sessionName":"Simulated session","isStreaming":false,"isCompacting":false,"pendingMessageCount":0}}}}\n' "$id"
       ;;
     *'"type":"switch_session"'*)
-      printf '{{"type":"response","command":"switch_session","id":"%s","success":true,"data":{{}}}}\n' "$id"
+      printf '{{"type":"response","command":"switch_session","id":"%s","success":false,"error":"session file does not exist"}}\n' "$id"
       ;;
     *'"type":"prompt"'*)
       printf '{{"type":"agent_start"}}\n'
