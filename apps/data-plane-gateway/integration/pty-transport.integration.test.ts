@@ -109,6 +109,18 @@ describe.concurrent("PTY transport integration", () => {
             },
           }),
         );
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.signal",
+            streamId: 1,
+            signal: {
+              type: "pty.resize",
+              cols: 121,
+              rows: 41,
+            },
+          }),
+        );
 
         const bootstrapMessage = parsePtySessionControlMessage(
           await waitForTextMessage({
@@ -150,6 +162,23 @@ describe.concurrent("PTY transport integration", () => {
         ).toBe(bootstrapMessage.transportToken);
 
         sandboxSocket = await connectWebSocket(bootstrapMessage.transportUrl);
+        await expect(
+          withTimeout({
+            label: "waiting for queued client-side PTY resize",
+            promise: waitForWebSocketMessage(sandboxSocket),
+          }),
+        ).resolves.toMatchObject({
+          data: JSON.stringify({
+            type: "stream.signal",
+            streamId: 1,
+            signal: {
+              type: "pty.resize",
+              cols: 121,
+              rows: 41,
+            },
+          }),
+          isBinary: false,
+        });
         await sendWebSocketMessage(
           bootstrapSocket,
           JSON.stringify({

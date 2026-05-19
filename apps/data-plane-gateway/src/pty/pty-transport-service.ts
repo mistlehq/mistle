@@ -349,6 +349,7 @@ export class PtyTransportService {
       return;
     }
 
+    input.session.clientOpenRequested = true;
     const ownerResolution = await this.input.sandboxOwnerResolver.resolveOwner({
       sandboxInstanceId: input.admission.claims.sub,
     });
@@ -356,7 +357,6 @@ export class PtyTransportService {
       throw new BootstrapTunnelNotConnectedError(input.admission.claims.sub);
     }
 
-    input.session.clientOpenRequested = true;
     const sandboxToken = await mintPtyTransportToken({
       config: this.input.tokenConfig,
       claims: {

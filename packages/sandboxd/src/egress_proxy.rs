@@ -84,21 +84,12 @@ const TRANSPARENT_NFTABLES_TABLE_NAME: &str = "mistle_transparent_egress";
 const EGRESS_PROXY_HEALTHCHECK_INTERVAL: Duration = Duration::from_millis(250);
 const EGRESS_PROXY_STARTUP_HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(5);
 const EGRESS_PROXY_RESTART_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];
-const RUNTIME_NO_PROXY_DEFAULTS: [&str; 2] = ["127.0.0.1", "localhost"];
 const SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME: &str = "x-mistle-sandbox-egress-id";
 const DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME: &str = "x-mistle-egress-token";
 const DIRECT_EGRESS_HTTP_ROUTE_PATH: &str = "/_mistle/egress/http";
 const DIRECT_EGRESS_WEBSOCKET_ROUTE_PATH: &str = "/_mistle/egress/ws";
 
-const MANAGED_PROXY_ENV_KEYS: [&str; 16] = [
-    "HTTP_PROXY",
-    "HTTPS_PROXY",
-    "ALL_PROXY",
-    "NO_PROXY",
-    "http_proxy",
-    "https_proxy",
-    "all_proxy",
-    "no_proxy",
+const MANAGED_PROXY_ENV_KEYS: [&str; 8] = [
     "SSL_CERT_FILE",
     "CURL_CA_BUNDLE",
     "GIT_SSL_CAINFO",
@@ -764,20 +755,18 @@ impl EgressProxy {
             None
         };
 
-        let runtime_env = match build_managed_proxy_env(
-            listener_address,
-            proxy_ca_config.runtime_certificate_bundle_path,
-        ) {
-            Ok(runtime_env) => runtime_env,
-            Err(error) => {
-                let cleanup_suffix =
-                    cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
-                        .err()
-                        .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
-                        .unwrap_or_default();
-                return Err(EgressProxyError::new(format!("{error}{cleanup_suffix}")));
-            }
-        };
+        let runtime_env =
+            match build_managed_proxy_env(proxy_ca_config.runtime_certificate_bundle_path) {
+                Ok(runtime_env) => runtime_env,
+                Err(error) => {
+                    let cleanup_suffix =
+                        cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
+                            .err()
+                            .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
+                            .unwrap_or_default();
+                    return Err(EgressProxyError::new(format!("{error}{cleanup_suffix}")));
+                }
+            };
 
         supervisor_handle.mark_component_starting(SupervisedComponent::EgressProxy);
         let mut active_server =
@@ -1944,22 +1933,11 @@ fn run_update_ca_certificates(command_path: &Path) -> Result<(), EgressProxyErro
 }
 
 fn build_managed_proxy_env(
-    listener_address: SocketAddr,
     ca_certificate_path: &Path,
 ) -> Result<BTreeMap<String, String>, EgressProxyError> {
-    let proxy_url = format!("http://{listener_address}");
     let certificate_path = ca_certificate_path.display().to_string();
-    let no_proxy_value = RUNTIME_NO_PROXY_DEFAULTS.join(",");
 
     Ok(BTreeMap::from([
-        ("HTTP_PROXY".to_string(), proxy_url.clone()),
-        ("HTTPS_PROXY".to_string(), proxy_url.clone()),
-        ("ALL_PROXY".to_string(), proxy_url.clone()),
-        ("NO_PROXY".to_string(), no_proxy_value.clone()),
-        ("http_proxy".to_string(), proxy_url.clone()),
-        ("https_proxy".to_string(), proxy_url.clone()),
-        ("all_proxy".to_string(), proxy_url),
-        ("no_proxy".to_string(), no_proxy_value),
         ("SSL_CERT_FILE".to_string(), certificate_path.clone()),
         ("CURL_CA_BUNDLE".to_string(), certificate_path.clone()),
         ("GIT_SSL_CAINFO".to_string(), certificate_path.clone()),
@@ -3634,23 +3612,20 @@ mod tests {
     }
 
     #[test]
-    fn managed_proxy_env_includes_proxy_and_ca_variables() {
-        let env = build_managed_proxy_env(
-            "127.0.0.1:4819"
-                .parse()
-                .expect("socket address should parse"),
-            std::path::Path::new("/run/mistle/sandboxd/egress-proxy-ca-bundle.pem"),
-        )
+    fn managed_proxy_env_includes_ca_variables_without_proxy_routing() {
+        let env = build_managed_proxy_env(std::path::Path::new(
+            "/run/mistle/sandboxd/egress-proxy-ca-bundle.pem",
+        ))
         .expect("managed proxy environment should build");
 
-        assert_eq!(
-            env.get("HTTPS_PROXY"),
-            Some(&"http://127.0.0.1:4819".to_string())
-        );
-        assert_eq!(
-            env.get("NO_PROXY"),
-            Some(&"127.0.0.1,localhost".to_string())
-        );
+        assert!(!env.contains_key("HTTP_PROXY"));
+        assert!(!env.contains_key("HTTPS_PROXY"));
+        assert!(!env.contains_key("ALL_PROXY"));
+        assert!(!env.contains_key("NO_PROXY"));
+        assert!(!env.contains_key("http_proxy"));
+        assert!(!env.contains_key("https_proxy"));
+        assert!(!env.contains_key("all_proxy"));
+        assert!(!env.contains_key("no_proxy"));
         assert_eq!(
             env.get("SSL_CERT_FILE"),
             Some(&"/run/mistle/sandboxd/egress-proxy-ca-bundle.pem".to_string())
@@ -3659,25 +3634,9 @@ mod tests {
             env.get("NIX_SSL_CERT_FILE"),
             Some(&"/run/mistle/sandboxd/egress-proxy-ca-bundle.pem".to_string())
         );
-        assert!(EgressProxy::managed_env_keys().contains(&"HTTPS_PROXY"));
+        assert!(!EgressProxy::managed_env_keys().contains(&"HTTPS_PROXY"));
         assert!(EgressProxy::managed_env_keys().contains(&"NODE_EXTRA_CA_CERTS"));
         assert!(EgressProxy::managed_env_keys().contains(&"NIX_SSL_CERT_FILE"));
-    }
-
-    #[test]
-    fn managed_proxy_env_does_not_bypass_gateway_egress_host() {
-        let env = build_managed_proxy_env(
-            "127.0.0.1:4819"
-                .parse()
-                .expect("socket address should parse"),
-            std::path::Path::new("/run/mistle/sandboxd/egress-proxy-ca-bundle.pem"),
-        )
-        .expect("managed proxy environment should build");
-
-        assert_eq!(
-            env.get("NO_PROXY"),
-            Some(&"127.0.0.1,localhost".to_string())
-        );
     }
 
     #[test]
@@ -3769,12 +3728,11 @@ mod tests {
         )
         .expect("first egress proxy start should succeed")
         .expect("egress proxy should be configured");
-        let proxy_one_address = proxy_one
+        let proxy_one_ca_path = proxy_one
             .runtime_env()
-            .get("HTTPS_PROXY")
+            .get("SSL_CERT_FILE")
             .cloned()
-            .expect("proxy env should include HTTPS_PROXY");
-        assert_eq!(proxy_one_address, format!("http://{listener_address}"));
+            .expect("proxy env should include SSL_CERT_FILE");
         proxy_one
             .close()
             .expect("first egress proxy close should succeed");
@@ -3790,12 +3748,12 @@ mod tests {
         )
         .expect("second egress proxy start should succeed")
         .expect("egress proxy should still be configured");
-        let proxy_two_address = proxy_two
+        let proxy_two_ca_path = proxy_two
             .runtime_env()
-            .get("HTTPS_PROXY")
+            .get("SSL_CERT_FILE")
             .cloned()
-            .expect("proxy env should include HTTPS_PROXY");
-        assert_eq!(proxy_two_address, proxy_one_address);
+            .expect("proxy env should include SSL_CERT_FILE");
+        assert_eq!(proxy_two_ca_path, proxy_one_ca_path);
         let snapshot = supervisor_handle
             .component_snapshot(SupervisedComponent::EgressProxy)
             .expect("egress proxy should be tracked");
@@ -3836,11 +3794,11 @@ mod tests {
         )
         .expect("egress proxy start should succeed")
         .expect("egress proxy should be configured");
-        let stable_proxy_url = proxy
+        let stable_ca_path = proxy
             .runtime_env()
-            .get("HTTPS_PROXY")
+            .get("SSL_CERT_FILE")
             .cloned()
-            .expect("proxy env should include HTTPS_PROXY");
+            .expect("proxy env should include SSL_CERT_FILE");
 
         proxy
             .force_current_server_shutdown_for_test()
@@ -3852,8 +3810,8 @@ mod tests {
             Duration::from_secs(5),
         );
         assert_eq!(
-            proxy.runtime_env().get("HTTPS_PROXY"),
-            Some(&stable_proxy_url)
+            proxy.runtime_env().get("SSL_CERT_FILE"),
+            Some(&stable_ca_path)
         );
         proxy.close().expect("egress proxy close should succeed");
         let _ = fs::remove_dir_all(&proxy_ca_paths.root_directory);
