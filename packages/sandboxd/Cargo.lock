@@ -1376,7 +1376,7 @@ dependencies = [
 
 [[package]]
 name = "sandboxd"
-version = "0.18.0"
+version = "0.18.1"
 dependencies = [
  "base64",
  "bytes",
