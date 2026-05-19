@@ -202,14 +202,6 @@ impl PiProxyState {
         self.send_pi_command_with_events(command, None)
     }
 
-    fn send_pi_command_with_captured_events(
-        &self,
-        command: Value,
-        captured_events: &mut Vec<Value>,
-    ) -> Result<Value, PiProxyError> {
-        self.send_pi_command_with_events(command, Some(captured_events))
-    }
-
     fn send_pi_command_with_events(
         &self,
         mut command: Value,
@@ -218,6 +210,14 @@ impl PiProxyState {
         let _command_guard = self.command_lock.lock().map_err(|_| {
             PiProxyError::InvalidRequest("Pi command lock was poisoned".to_string())
         })?;
+        self.send_pi_command_with_events_locked(&mut command, captured_events.as_deref_mut())
+    }
+
+    fn send_pi_command_with_events_locked(
+        &self,
+        command: &mut Value,
+        mut captured_events: Option<&mut Vec<Value>>,
+    ) -> Result<Value, PiProxyError> {
         let id = self.next_pi_request_id();
         command["id"] = Value::String(id.clone());
         let line = format!("{command}\n");
@@ -281,6 +281,21 @@ impl PiProxyState {
                 }
             }
         }
+    }
+
+    fn with_pi_command_sequence<T>(
+        &self,
+        captured_events: &mut Vec<Value>,
+        run: impl FnOnce(&mut PiProxyCommandSequence<'_>) -> Result<T, PiProxyError>,
+    ) -> Result<T, PiProxyError> {
+        let _command_guard = self.command_lock.lock().map_err(|_| {
+            PiProxyError::InvalidRequest("Pi command lock was poisoned".to_string())
+        })?;
+        let mut sequence = PiProxyCommandSequence {
+            state: self,
+            captured_events,
+        };
+        run(&mut sequence)
     }
 
     fn ensure_child(&self, cwd: Option<&str>) -> Result<(), PiProxyError> {
@@ -403,6 +418,19 @@ impl PiProxyState {
                 }
             }
         });
+    }
+}
+
+struct PiProxyCommandSequence<'a> {
+    state: &'a PiProxyState,
+    captured_events: &'a mut Vec<Value>,
+}
+
+impl PiProxyCommandSequence<'_> {
+    fn send(&mut self, command: Value) -> Result<Value, PiProxyError> {
+        let mut command = command;
+        self.state
+            .send_pi_command_with_events_locked(&mut command, Some(self.captured_events))
     }
 }
 
@@ -624,18 +652,12 @@ fn handle_pi_method(
     request: &JsonRpcRequest,
     captured_events: &mut Vec<Value>,
 ) -> Result<Value, PiProxyError> {
-    match request.method.as_str() {
+    state.with_pi_command_sequence(captured_events, |sequence| match request.method.as_str() {
         "pi/createConversation" => {
             let cwd = read_param_string(&request.params, "cwd");
             state.ensure_child(cwd.as_deref())?;
-            state.send_pi_command_with_captured_events(
-                json!({ "type": "new_session" }),
-                captured_events,
-            )?;
-            let state_value = state.send_pi_command_with_captured_events(
-                json!({ "type": "get_state" }),
-                captured_events,
-            )?;
+            sequence.send(json!({ "type": "new_session" }))?;
+            let state_value = sequence.send(json!({ "type": "get_state" }))?;
             let session_file = PiProxyState::read_session_file(&state_value)?;
             Ok(json!({ "providerConversationId": session_file }))
         }
@@ -643,33 +665,19 @@ fn handle_pi_method(
             let session_file = read_param_string(&request.params, "sessionFile");
             state.ensure_child(None)?;
             if let Some(session_file) = session_file {
-                let current_state = state.send_pi_command_with_captured_events(
-                    json!({ "type": "get_state" }),
-                    captured_events,
-                )?;
+                let current_state = sequence.send(json!({ "type": "get_state" }))?;
                 if current_state["sessionFile"].as_str() != Some(session_file.as_str()) {
-                    state.send_pi_command_with_captured_events(
-                        json!({ "type": "switch_session", "sessionPath": session_file }),
-                        captured_events,
-                    )?;
+                    sequence
+                        .send(json!({ "type": "switch_session", "sessionPath": session_file }))?;
                 }
             }
-            state.send_pi_command_with_captured_events(
-                json!({ "type": "get_state" }),
-                captured_events,
-            )
+            sequence.send(json!({ "type": "get_state" }))
         }
         "pi/readMetadata" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
             state.ensure_child(None)?;
-            state.send_pi_command_with_captured_events(
-                json!({ "type": "switch_session", "sessionPath": session_file }),
-                captured_events,
-            )?;
-            let state_value = state.send_pi_command_with_captured_events(
-                json!({ "type": "get_state" }),
-                captured_events,
-            )?;
+            sequence.send(json!({ "type": "switch_session", "sessionPath": session_file }))?;
+            let state_value = sequence.send(json!({ "type": "get_state" }))?;
             Ok(json!({
                 "name": state_value.get("sessionName").cloned().unwrap_or(Value::Null),
                 "preview": Value::Null
@@ -678,38 +686,23 @@ fn handle_pi_method(
         "pi/resumeConversation" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
             state.ensure_child(None)?;
-            state.send_pi_command_with_captured_events(
-                json!({ "type": "switch_session", "sessionPath": session_file }),
-                captured_events,
-            )?;
+            sequence.send(json!({ "type": "switch_session", "sessionPath": session_file }))?;
             Ok(Value::Null)
         }
         "pi/setSessionName" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
             let name = require_param_string(&request.params, "name")?;
             state.ensure_child(None)?;
-            state.send_pi_command_with_captured_events(
-                json!({ "type": "switch_session", "sessionPath": session_file }),
-                captured_events,
-            )?;
-            state.send_pi_command_with_captured_events(
-                json!({ "type": "set_session_name", "name": name }),
-                captured_events,
-            )
+            sequence.send(json!({ "type": "switch_session", "sessionPath": session_file }))?;
+            sequence.send(json!({ "type": "set_session_name", "name": name }))
         }
         "pi/prompt" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
             let message = require_param_string(&request.params, "message")?;
             state.ensure_child(None)?;
-            state.send_pi_command_with_captured_events(
-                json!({ "type": "switch_session", "sessionPath": session_file }),
-                captured_events,
-            )?;
+            sequence.send(json!({ "type": "switch_session", "sessionPath": session_file }))?;
             state.set_active(true);
-            let result = state.send_pi_command_with_captured_events(
-                json!({ "type": "prompt", "message": message }),
-                captured_events,
-            );
+            let result = sequence.send(json!({ "type": "prompt", "message": message }));
             PiProxyState::start_activity_monitor(state.clone());
             result
         }
@@ -717,15 +710,9 @@ fn handle_pi_method(
             let session_file = require_param_string(&request.params, "sessionFile")?;
             let message = require_param_string(&request.params, "message")?;
             state.ensure_child(None)?;
-            state.send_pi_command_with_captured_events(
-                json!({ "type": "switch_session", "sessionPath": session_file }),
-                captured_events,
-            )?;
+            sequence.send(json!({ "type": "switch_session", "sessionPath": session_file }))?;
             state.set_active(true);
-            let result = state.send_pi_command_with_captured_events(
-                json!({ "type": "steer", "message": message }),
-                captured_events,
-            );
+            let result = sequence.send(json!({ "type": "steer", "message": message }));
             PiProxyState::start_activity_monitor(state.clone());
             result
         }
@@ -733,31 +720,22 @@ fn handle_pi_method(
             let session_file = require_param_string(&request.params, "sessionFile")?;
             let message = require_param_string(&request.params, "message")?;
             state.ensure_child(None)?;
-            state.send_pi_command_with_captured_events(
-                json!({ "type": "switch_session", "sessionPath": session_file }),
-                captured_events,
-            )?;
+            sequence.send(json!({ "type": "switch_session", "sessionPath": session_file }))?;
             state.set_active(true);
-            let result = state.send_pi_command_with_captured_events(
-                json!({ "type": "follow_up", "message": message }),
-                captured_events,
-            );
+            let result = sequence.send(json!({ "type": "follow_up", "message": message }));
             PiProxyState::start_activity_monitor(state.clone());
             result
         }
         "pi/abort" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
             state.ensure_child(None)?;
-            state.send_pi_command_with_captured_events(
-                json!({ "type": "switch_session", "sessionPath": session_file }),
-                captured_events,
-            )?;
-            state.send_pi_command_with_captured_events(json!({ "type": "abort" }), captured_events)
+            sequence.send(json!({ "type": "switch_session", "sessionPath": session_file }))?;
+            sequence.send(json!({ "type": "abort" }))
         }
         other => Err(PiProxyError::InvalidRequest(format!(
             "unsupported Pi proxy method '{other}'"
         ))),
-    }
+    })
 }
 
 fn spawn_pi_stdout_reader(
@@ -864,7 +842,7 @@ mod tests {
                 .expect("prompt should produce a JSON-RPC response"),
         );
         assert_eq!(prompt_response["id"], json!("prompt"));
-        assert_eq!(prompt_response["result"], json!({ "accepted": true }));
+        assert_eq!(prompt_response["result"]["accepted"], json!(true));
 
         thread::sleep(Duration::from_millis(1_300));
         assert!(
@@ -929,14 +907,129 @@ mod tests {
         state.shutdown_child();
     }
 
+    #[test]
+    fn serializes_session_switches_with_following_pi_commands() {
+        let simulated_pi = SimulatedPiRpcProcess::start();
+        let state = create_pi_proxy_state(
+            &simulated_pi,
+            Arc::new(Mutex::new(KeepaliveManager::default())),
+        );
+
+        let create_responses = handle_json_rpc_request(
+            &state,
+            &json!({
+                "jsonrpc": "2.0",
+                "id": "create",
+                "method": "pi/createConversation",
+                "params": { "cwd": simulated_pi.cwd() }
+            })
+            .to_string(),
+        );
+        let create_response = parse_json_rpc_message(
+            create_responses
+                .last()
+                .expect("create conversation should produce a response"),
+        );
+        assert_eq!(
+            create_response["result"]["providerConversationId"],
+            json!(simulated_pi.session_file())
+        );
+
+        let first_state = state.clone();
+        let first_session_file = simulated_pi.session_file().to_string();
+        let first_prompt = thread::spawn(move || {
+            handle_json_rpc_request(
+                &first_state,
+                &json!({
+                    "jsonrpc": "2.0",
+                    "id": "prompt-first",
+                    "method": "pi/prompt",
+                    "params": {
+                        "sessionFile": first_session_file,
+                        "message": "first"
+                    }
+                })
+                .to_string(),
+            )
+        });
+        let second_state = state.clone();
+        let second_session_file = simulated_pi.alternate_session_file().to_string();
+        let second_prompt = thread::spawn(move || {
+            handle_json_rpc_request(
+                &second_state,
+                &json!({
+                    "jsonrpc": "2.0",
+                    "id": "prompt-second",
+                    "method": "pi/prompt",
+                    "params": {
+                        "sessionFile": second_session_file,
+                        "message": "second"
+                    }
+                })
+                .to_string(),
+            )
+        });
+
+        let first_responses = first_prompt
+            .join()
+            .expect("first prompt thread should not panic");
+        let second_responses = second_prompt
+            .join()
+            .expect("second prompt thread should not panic");
+        let first_response = parse_json_rpc_message(
+            first_responses
+                .last()
+                .expect("first prompt should produce a response"),
+        );
+        let second_response = parse_json_rpc_message(
+            second_responses
+                .last()
+                .expect("second prompt should produce a response"),
+        );
+        assert_eq!(
+            first_response["result"]["activeSessionFile"],
+            json!(simulated_pi.session_file())
+        );
+        assert_eq!(
+            second_response["result"]["activeSessionFile"],
+            json!(simulated_pi.alternate_session_file())
+        );
+
+        let command_log = simulated_pi.command_log();
+        let session_commands: Vec<&str> = command_log
+            .lines()
+            .filter(|line| line.starts_with("switch_session ") || line.starts_with("prompt "))
+            .collect();
+        assert_eq!(session_commands.len(), 4);
+        for command_pair in session_commands.chunks_exact(2) {
+            let switch_session_file = command_pair[0]
+                .strip_prefix("switch_session ")
+                .expect("first command in pair should switch sessions");
+            let prompt_session_file = command_pair[1]
+                .strip_prefix("prompt ")
+                .expect("second command in pair should prompt the switched session")
+                .split_once(' ')
+                .expect("prompt command should include message")
+                .0;
+            assert_eq!(prompt_session_file, switch_session_file);
+        }
+
+        state.shutdown_child();
+    }
+
     fn create_pi_proxy_state(
         simulated_pi: &SimulatedPiRpcProcess,
         keepalive_manager: Arc<Mutex<KeepaliveManager>>,
     ) -> Arc<PiProxyState> {
+        let mut env = BTreeMap::new();
+        env.insert(
+            "MISTLE_PI_COMMAND_LOG".to_string(),
+            simulated_pi.command_log_path(),
+        );
         Arc::new(PiProxyState {
             config: PiProxyConfig {
                 pi_cli_path: simulated_pi.path(),
-                env: BTreeMap::new(),
+                env,
             },
             child: Mutex::new(None),
             command_lock: Mutex::new(()),
@@ -954,6 +1047,7 @@ mod tests {
         _directory: tempfile::TempDir,
         alternate_cwd: String,
         alternate_session_file: String,
+        command_log_path: String,
         script_path: String,
         cwd: String,
         session_file: String,
@@ -963,6 +1057,7 @@ mod tests {
         fn start() -> Self {
             let directory = tempdir().expect("temporary directory should be created");
             let script_path = directory.path().join("simulated-pi-rpc");
+            let command_log_path = directory.path().join("command.log");
             let cwd = directory.path().join("workspace");
             fs::create_dir(&cwd).expect("workspace directory should be created");
             let alternate_cwd = directory.path().join("alternate-workspace");
@@ -975,22 +1070,29 @@ mod tests {
                 .expect("alternate workspace directory should be canonicalizable")
                 .join("session.json");
             let script = r#"#!/bin/sh
+active_session_file="$(pwd)/session.json"
 while IFS= read -r line; do
   id="$(printf '%s' "$line" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"
-  session_file="$(pwd)/session.json"
   case "$line" in
     *'"type":"new_session"'*)
+      active_session_file="$(pwd)/session.json"
+      printf 'new_session %s\n' "$active_session_file" >> "$MISTLE_PI_COMMAND_LOG"
       printf '{"type":"response","command":"new_session","id":"%s","success":true,"data":{}}\n' "$id"
       ;;
     *'"type":"get_state"'*)
-      printf '{"type":"response","command":"get_state","id":"%s","success":true,"data":{"sessionFile":"%s","sessionName":"Simulated session","isStreaming":false,"isCompacting":false,"pendingMessageCount":0}}\n' "$id" "$session_file"
+      printf 'get_state %s\n' "$active_session_file" >> "$MISTLE_PI_COMMAND_LOG"
+      printf '{"type":"response","command":"get_state","id":"%s","success":true,"data":{"sessionFile":"%s","sessionName":"Simulated session","isStreaming":false,"isCompacting":false,"pendingMessageCount":0}}\n' "$id" "$active_session_file"
       ;;
     *'"type":"switch_session"'*)
+      active_session_file="$(printf '%s' "$line" | sed -n 's/.*"sessionPath":"\([^"]*\)".*/\1/p')"
+      printf 'switch_session %s\n' "$active_session_file" >> "$MISTLE_PI_COMMAND_LOG"
       printf '{"type":"response","command":"switch_session","id":"%s","success":true,"data":{}}\n' "$id"
       ;;
     *'"type":"prompt"'*)
+      message="$(printf '%s' "$line" | sed -n 's/.*"message":"\([^"]*\)".*/\1/p')"
+      printf 'prompt %s %s\n' "$active_session_file" "$message" >> "$MISTLE_PI_COMMAND_LOG"
       printf '{"type":"agent_start"}\n'
-      printf '{"type":"response","command":"prompt","id":"%s","success":true,"data":{"accepted":true}}\n' "$id"
+      printf '{"type":"response","command":"prompt","id":"%s","success":true,"data":{"accepted":true,"activeSessionFile":"%s"}}\n' "$id" "$active_session_file"
       sleep 0.1
       printf '{"type":"agent_end"}\n'
       ;;
@@ -1017,6 +1119,10 @@ done
                 alternate_session_file: alternate_session_file
                     .to_str()
                     .expect("alternate session path should be UTF-8")
+                    .to_string(),
+                command_log_path: command_log_path
+                    .to_str()
+                    .expect("command log path should be UTF-8")
                     .to_string(),
                 script_path: script_path
                     .to_str()
@@ -1048,6 +1154,15 @@ done
 
         fn alternate_session_file(&self) -> &str {
             &self.alternate_session_file
+        }
+
+        fn command_log_path(&self) -> String {
+            self.command_log_path.clone()
+        }
+
+        fn command_log(&self) -> String {
+            fs::read_to_string(&self.command_log_path)
+                .expect("simulated Pi command log should be readable")
         }
     }
 }
