@@ -161,11 +161,13 @@ describe("compileCodexRuntime", () => {
               fileName: "codex-x86_64-unknown-linux-musl.tar.gz",
               format: "tar.gz",
               extractedPath: "codex-x86_64-unknown-linux-musl",
+              sha256: "16779e7b7857508a768a36d7d4e084eec336ec23946ed70a9b09489b8f861190",
             },
             aarch64: {
               fileName: "codex-aarch64-unknown-linux-musl.tar.gz",
               format: "tar.gz",
               extractedPath: "codex-aarch64-unknown-linux-musl",
+              sha256: "1d7e00f2c22c3016b5bcb71c61010947b022a90e2901bc6baafe82256492c767",
             },
           },
           installPath: "/usr/local/bin/codex",

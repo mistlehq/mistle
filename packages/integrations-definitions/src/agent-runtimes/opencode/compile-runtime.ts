@@ -33,10 +33,12 @@ const OpenCodeGitHubAssets = {
   x86_64: {
     fileName: "opencode-linux-x64-baseline.tar.gz",
     binaryPath: "opencode",
+    sha256: "d7897a7814c652bc939ac56b35183f968b77e33178a7a2d7ef6e64eaf0f768e4",
   },
   aarch64: {
     fileName: "opencode-linux-arm64.tar.gz",
     binaryPath: "opencode",
+    sha256: "444179de5504ed3d68c55449e2af8ed2c92cd7d5f84ec1e8f306cac0fe49bd50",
   },
 };
 const ArtifactCommandTimeoutMs = 120_000;
@@ -338,11 +340,13 @@ export function compileOpenCodeRuntime(
                   fileName: OpenCodeGitHubAssets.x86_64.fileName,
                   format: "tar.gz",
                   extractedPath: OpenCodeGitHubAssets.x86_64.binaryPath,
+                  sha256: OpenCodeGitHubAssets.x86_64.sha256,
                 },
                 aarch64: {
                   fileName: OpenCodeGitHubAssets.aarch64.fileName,
                   format: "tar.gz",
                   extractedPath: OpenCodeGitHubAssets.aarch64.binaryPath,
+                  sha256: OpenCodeGitHubAssets.aarch64.sha256,
                 },
               },
               installPath: refs.artifactBinPath("opencode"),

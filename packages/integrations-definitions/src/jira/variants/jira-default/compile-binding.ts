@@ -25,6 +25,7 @@ const ArtifactCommandTimeoutMs = 120_000;
 // Pin exact release tags for sandbox startup to avoid live upstream version
 // resolution and the associated rate-limit / availability failures.
 const JiraCliReleaseTag = "jira/v0.5.0";
+const JiraCliLinuxAmd64Sha256 = "5913a130e47d553a72ca3a74ef33cb9dd194fb259ffc176b98a20aae28a61940";
 
 function createJiraCliArtifact(upstreamBaseUrl: string): CompileBindingResult["artifacts"][number] {
   return {
@@ -46,6 +47,7 @@ function createJiraCliArtifact(upstreamBaseUrl: string): CompileBindingResult["a
             kind: "exact",
             fileName: "jira-linux-amd64",
             format: "binary",
+            sha256: JiraCliLinuxAmd64Sha256,
           },
           installPath: refs.artifactBinPath("jira"),
           timeoutMs: ArtifactCommandTimeoutMs,

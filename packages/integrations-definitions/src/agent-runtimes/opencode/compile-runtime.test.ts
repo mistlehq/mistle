@@ -234,11 +234,13 @@ describe("compileOpenCodeRuntime", () => {
               fileName: "opencode-linux-x64-baseline.tar.gz",
               format: "tar.gz",
               extractedPath: "opencode",
+              sha256: "d7897a7814c652bc939ac56b35183f968b77e33178a7a2d7ef6e64eaf0f768e4",
             },
             aarch64: {
               fileName: "opencode-linux-arm64.tar.gz",
               format: "tar.gz",
               extractedPath: "opencode",
+              sha256: "444179de5504ed3d68c55449e2af8ed2c92cd7d5f84ec1e8f306cac0fe49bd50",
             },
           },
           installPath: "/usr/local/bin/opencode",
