@@ -301,6 +301,19 @@ describe("ProviderAppSetupPane", () => {
     });
   });
 
+  it("focuses the GitHub organization field when the organization owner option reveals it", () => {
+    renderProviderAppSetupPane({
+      connection: createGitHubConnection(),
+      methodId: "github-app-installation",
+      routeSegment: "github-app",
+    });
+
+    fireEvent.click(screen.getByRole("radio", { name: "Organization" }));
+
+    const organizationInput = getTextControlById("integration-setup-start-form-organizationSlug");
+    expect(document.activeElement).toBe(organizationInput);
+  });
+
   it("renders GitHub provider-owned existing app setup fields", () => {
     renderProviderAppSetupPane({
       connection: createGitHubConnection({

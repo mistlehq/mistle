@@ -17,7 +17,7 @@ import {
   Textarea,
   TextLink,
 } from "@mistle/ui";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   ManifestJsonEditor,
@@ -306,23 +306,37 @@ function IntegrationConnectionSetupStartForm(input: {
   values: Record<string, string>;
   onValueChange: (fieldName: string, value: string) => void;
 }): React.JSX.Element {
+  const visibleFields = input.form.fields.filter((field) =>
+    isSetupStartFormFieldVisible({ field, values: input.values }),
+  );
+  const previousVisibleFieldNamesRef = useRef<ReadonlySet<string> | null>(null);
+  const previousVisibleFieldNames = previousVisibleFieldNamesRef.current;
+  const newlyVisibleFieldName =
+    previousVisibleFieldNames === null
+      ? null
+      : (visibleFields.find((field) => !previousVisibleFieldNames.has(field.name))?.name ?? null);
+
+  useEffect(() => {
+    previousVisibleFieldNamesRef.current = new Set(visibleFields.map((field) => field.name));
+  }, [visibleFields]);
+
   return (
     <>
-      {input.form.fields
-        .filter((field) => isSetupStartFormFieldVisible({ field, values: input.values }))
-        .map((field) => (
-          <IntegrationConnectionSetupStartFormField
-            field={field}
-            key={field.name}
-            onValueChange={input.onValueChange}
-            value={input.values[field.name] ?? ""}
-          />
-        ))}
+      {visibleFields.map((field) => (
+        <IntegrationConnectionSetupStartFormField
+          autoFocus={field.name === newlyVisibleFieldName}
+          field={field}
+          key={field.name}
+          onValueChange={input.onValueChange}
+          value={input.values[field.name] ?? ""}
+        />
+      ))}
     </>
   );
 }
 
 function IntegrationConnectionSetupStartFormField(input: {
+  autoFocus: boolean;
   field: IntegrationConnectionSetupStartFormFieldMetadata;
   value: string;
   onValueChange: (fieldName: string, value: string) => void;
@@ -365,6 +379,7 @@ function IntegrationConnectionSetupStartFormField(input: {
         ) : input.field.inputType === "textarea" ? (
           <Textarea
             aria-describedby={hasDescription ? fieldDescriptionId : undefined}
+            autoFocus={input.autoFocus}
             autoComplete="off"
             id={inputId}
             onChange={(event) => input.onValueChange(input.field.name, event.target.value)}
@@ -374,6 +389,7 @@ function IntegrationConnectionSetupStartFormField(input: {
         ) : (
           <Input
             aria-describedby={hasDescription ? fieldDescriptionId : undefined}
+            autoFocus={input.autoFocus}
             autoComplete="off"
             id={inputId}
             onChange={(event) => input.onValueChange(input.field.name, event.target.value)}
