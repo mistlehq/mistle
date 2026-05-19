@@ -158,6 +158,15 @@ describe("session primary repository policy", () => {
     ).toBeNull();
   });
 
+  it("restores None when the active Codex thread cwd is outside the workspace root", () => {
+    expect(
+      resolveInitialSelectedRepositoryPath({
+        activeThreadCwd: "/",
+        runtimePrimaryRepositoryRoot: null,
+      }),
+    ).toBeNull();
+  });
+
   it("falls back to the launch primary repository when no active Codex thread cwd is available", () => {
     expect(
       resolveInitialSelectedRepositoryPath({

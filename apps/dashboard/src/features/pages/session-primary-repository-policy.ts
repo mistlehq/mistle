@@ -142,7 +142,12 @@ function resolveSelectedRepositoryPathFromCwd(input: {
   cwd: string;
   workspaceRoot?: string;
 }): string | null {
-  return input.cwd === (input.workspaceRoot ?? DefaultSandboxWorkspaceDir) ? null : input.cwd;
+  const workspaceRoot = input.workspaceRoot ?? DefaultSandboxWorkspaceDir;
+  if (input.cwd === workspaceRoot) {
+    return null;
+  }
+
+  return input.cwd.startsWith(`${workspaceRoot}/`) ? input.cwd : null;
 }
 
 export function resolveInitialSelectedRepositoryPath(input: {
