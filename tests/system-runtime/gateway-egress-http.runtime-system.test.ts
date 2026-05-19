@@ -118,16 +118,12 @@ describe("runtime system gateway egress HTTP smoke", () => {
             "-lc",
             [
               "set -e",
+              publicAccessHttpSmokeHelpers(),
               [
-                "curl",
-                "--proxy",
-                shellQuote(SANDBOXD_EGRESS_PROXY_URL),
-                "--noproxy ''",
-                "-fsS",
-                "-X POST",
-                "-H 'content-type: text/plain'",
-                `--data ${shellQuote(HTTP_REQUEST_BODY)}`,
+                "public_access_http_smoke",
+                shellQuote("POST"),
                 shellQuote(`${upstream.gatewayReachableBaseUrl}/echo?case=http`),
+                shellQuote(HTTP_REQUEST_BODY),
               ].join(" "),
               "printf '\\n'",
               [
@@ -557,6 +553,56 @@ function parseHttpEchoResponse(stdout: string): z.infer<typeof HttpEchoResponseS
 
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+function publicAccessHttpSmokeHelpers(): string {
+  return [
+    "public_access_http_smoke() {",
+    '  method="$1"',
+    '  url="$2"',
+    '  body="$3"',
+    '  output_file="$(mktemp)"',
+    '  status_file="$(mktemp)"',
+    "  attempt=1",
+    '  while [ "$attempt" -le 5 ]; do',
+    [
+      "    if curl",
+      "--proxy",
+      shellQuote(SANDBOXD_EGRESS_PROXY_URL),
+      "--noproxy ''",
+      "-sS",
+      '-X "$method"',
+      "-H 'content-type: text/plain'",
+      '--data "$body"',
+      '--output "$output_file"',
+      "--write-out '%{http_code}'",
+      '"$url" > "$status_file"; then',
+    ].join(" "),
+    '      status="$(cat "$status_file")"',
+    '      if [ "$status" -ge 200 ] && [ "$status" -lt 300 ]; then',
+    '        cat "$output_file"',
+    '        rm -f "$output_file" "$status_file"',
+    "        return 0",
+    "      fi",
+    '      if [ "$status" != 502 ] && [ "$status" != 503 ] && [ "$status" != 504 ]; then',
+    '        cat "$output_file" >&2',
+    '        printf "public access HTTP smoke got non-retryable status %s for %s\\n" "$status" "$url" >&2',
+    '        rm -f "$output_file" "$status_file"',
+    "        return 22",
+    "      fi",
+    "    fi",
+    '    if [ "$attempt" -eq 5 ]; then',
+    '      cat "$output_file" >&2',
+    '      status="$(cat "$status_file" 2>/dev/null || true)"',
+    '      printf "public access HTTP smoke exhausted retries for %s with status %s\\n" "$url" "$status" >&2',
+    '      rm -f "$output_file" "$status_file"',
+    "      return 22",
+    "    fi",
+    '    sleep "$attempt"',
+    '    attempt="$((attempt + 1))"',
+    "  done",
+    "}",
+  ].join("\n");
 }
 
 function websocketProxySmokeScript(): string {
