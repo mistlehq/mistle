@@ -80,6 +80,10 @@ _Avoid_: Session, chat tab
 A Pi conversation that runs within a **Sandbox session**.
 _Avoid_: Pi thread, Codex thread
 
+**Working agent turn**:
+An active agent turn within a runtime conversation, shown while the agent runtime reports that it is processing a user request.
+_Avoid_: Working chat group, semantic group
+
 **Active Codex thread**:
 The **Codex thread** currently selected for the chat pane within a **Sandbox session**.
 _Avoid_: Current session, selected sandbox
@@ -144,6 +148,8 @@ _Avoid_: Slash autocomplete
 - A **Pi conversation** should remain the selected chat object when the user switches between chat and the Pi CLI.
 - A **Session workbench** URL may identify a **Pi conversation** without making the conversation a separate session.
 - A **Pi conversation** in the chat pane should expose visible conversation state rather than acting only as a hidden command bridge.
+- A **Working agent turn** is a live conversation state, not a chat semantic group.
+- Chat semantic groups describe the specific visible work within a **Working agent turn**, such as thinking, exploring, running commands, or making edits.
 - Pi itself exposes transcript events, message reads, model controls, thinking controls, session stats, image inputs, and runtime commands through its RPC surface.
 - The current Mistle Pi adapter may expose a narrower subset than Pi itself; chat UI behavior should follow the adapter contract it has actually wired rather than assuming every upstream Pi RPC command is available.
 - Pi composer controls should be Pi-owned controls, not Codex-owned **Composer commands** or Codex context controls.
