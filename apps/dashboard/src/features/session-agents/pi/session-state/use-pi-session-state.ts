@@ -403,11 +403,6 @@ export function usePiSessionState(input: {
           sessionFile,
           message: prompt,
         });
-        await hydrateConnectedPiChat({
-          client,
-          dispatchChatAction,
-          sessionFile,
-        });
         setSessionErrorMessage(null);
       } catch (error) {
         setSessionErrorMessage(error instanceof Error ? error.message : "Could not steer Pi.");
