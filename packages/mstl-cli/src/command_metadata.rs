@@ -18,6 +18,11 @@ pub const WHOAMI: CommandMetadata = CommandMetadata {
     description: "Print the current Mistle identity",
 };
 
+pub const UPDATE: CommandMetadata = CommandMetadata {
+    name: "update",
+    description: "Update the Mistle CLI",
+};
+
 pub const PROFILE: CommandMetadata = CommandMetadata {
     name: "profile",
     description: "Manage sandbox profiles",

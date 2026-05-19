@@ -3,7 +3,15 @@
 set -eu
 
 repository="mistlehq/mistle"
-install_directory_path="${MISTLE_INSTALL_DIR:-/usr/local/bin}"
+
+if [ -n "${MISTLE_INSTALL_DIR:-}" ]; then
+  install_directory_path="${MISTLE_INSTALL_DIR}"
+elif [ -n "${HOME:-}" ]; then
+  install_directory_path="${HOME}/.local/bin"
+else
+  echo "HOME is required when MISTLE_INSTALL_DIR is not set" >&2
+  exit 1
+fi
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then

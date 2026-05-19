@@ -412,17 +412,23 @@ jobs:
           PY
 
           mkdir -p dist/release-assets
-          asset_name="mistle-cli-${{ matrix.target }}.tar.gz"
-          tar -C dist/mistle-cli-artifact-root -czf "dist/release-assets/${asset_name}" .
+          binary_asset_name="mistle-cli-${{ matrix.target }}"
+          archive_asset_name="${binary_asset_name}.tar.gz"
+          cp "${binary_path}" "dist/release-assets/${binary_asset_name}"
+          chmod 0755 "dist/release-assets/${binary_asset_name}"
+          tar -C dist/mistle-cli-artifact-root -czf "dist/release-assets/${archive_asset_name}" .
 
           if command -v sha256sum >/dev/null 2>&1; then
-            (cd dist/release-assets && sha256sum "${asset_name}" > "${asset_name}.sha256")
+            (cd dist/release-assets && sha256sum "${binary_asset_name}" > "${binary_asset_name}.sha256")
+            (cd dist/release-assets && sha256sum "${archive_asset_name}" > "${archive_asset_name}.sha256")
           else
-            (cd dist/release-assets && shasum -a 256 "${asset_name}" > "${asset_name}.sha256")
+            (cd dist/release-assets && shasum -a 256 "${binary_asset_name}" > "${binary_asset_name}.sha256")
+            (cd dist/release-assets && shasum -a 256 "${archive_asset_name}" > "${archive_asset_name}.sha256")
           fi
 
           mkdir -p dist/mistle-cli-artifact-check
-          tar -xzf "dist/release-assets/${asset_name}" -C dist/mistle-cli-artifact-check
+          tar -xzf "dist/release-assets/${archive_asset_name}" -C dist/mistle-cli-artifact-check
+          test "$("dist/release-assets/${binary_asset_name}" --version | awk 'NR == 1 { print $2 }')" = "${version}"
           test "$(dist/mistle-cli-artifact-check/bin/mistle --version | awk 'NR == 1 { print $2 }')" = "${version}"
         env:
           RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}

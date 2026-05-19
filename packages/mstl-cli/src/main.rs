@@ -5,6 +5,7 @@ mod error;
 mod format;
 mod profile;
 mod sandbox;
+mod update;
 mod whoami;
 
 use std::io::{self, Write};
@@ -16,7 +17,7 @@ use crate::command_metadata::{
     CODEX, CODEX_ARG, PROFILE, PROFILE_GET, PROFILE_ID, PROFILE_LIST, PROFILE_VERSION,
     PROFILE_VERSION_LIST, PROFILE_VERSION_SETUP_SCRIPT, PROFILE_VERSION_SETUP_SCRIPT_SET,
     PROFILE_VERSION_VALUE, ROOT, SANDBOX, SANDBOX_CREATE, SANDBOX_GET, SANDBOX_ID, SANDBOX_LIST,
-    SANDBOX_LIST_AFTER, SANDBOX_LIST_LIMIT, SETUP_SCRIPT_FILE, WHOAMI,
+    SANDBOX_LIST_AFTER, SANDBOX_LIST_LIMIT, SETUP_SCRIPT_FILE, UPDATE, WHOAMI,
 };
 
 #[tokio::main]
@@ -31,6 +32,7 @@ async fn main() {
 #[derive(Debug, Clone)]
 enum CliCommand {
     Whoami,
+    Update,
     ProfileList,
     ProfileGet {
         profile_id: String,
@@ -65,6 +67,11 @@ fn options() -> OptionParser<CliCommand> {
         .to_options()
         .descr(WHOAMI.description)
         .command(WHOAMI.name);
+
+    let update = pure(CliCommand::Update)
+        .to_options()
+        .descr(UPDATE.description)
+        .command(UPDATE.name);
 
     let profile_list = pure(CliCommand::ProfileList)
         .to_options()
@@ -212,7 +219,7 @@ fn options() -> OptionParser<CliCommand> {
     .descr(CODEX.description)
     .command(CODEX.name);
 
-    construct!([whoami, profile, sandbox, codex])
+    construct!([whoami, update, profile, sandbox, codex])
         .to_options()
         .descr(ROOT.description)
         .version(env!("CARGO_PKG_VERSION"))
@@ -225,6 +232,7 @@ where
 {
     match command {
         CliCommand::Whoami => whoami::run(stdout, stderr),
+        CliCommand::Update => update::run(stdout, stderr),
         CliCommand::ProfileList => profile::run_list(stdout, stderr),
         CliCommand::ProfileGet { profile_id } => profile::run_get(&profile_id, stdout, stderr),
         CliCommand::ProfileVersionList { profile_id } => {
