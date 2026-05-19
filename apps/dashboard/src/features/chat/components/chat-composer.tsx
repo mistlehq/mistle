@@ -1,3 +1,4 @@
+import type { ComposerCapability } from "@mistle/integrations-core";
 import { OpenAiReasoningEffortLabelByValue } from "@mistle/integrations-definitions/openai";
 import {
   Button,
@@ -66,6 +67,7 @@ export type ChatComposerStatusMessage = {
 };
 
 export type ChatComposerViewModel = {
+  composerCapabilities: readonly ComposerCapability[];
   composerText: string;
   gitBranchLabel: string | null;
   pullRequest: {

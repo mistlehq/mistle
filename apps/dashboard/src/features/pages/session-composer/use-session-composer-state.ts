@@ -644,6 +644,7 @@ export function useSessionComposerState(input: {
 
   return {
     composerViewModel: {
+      composerCapabilities: composerStateInput.bootstrap.composerCapabilities,
       composerText,
       pendingDiffCommentSummary:
         draftState.pendingDiffComments.length === 0

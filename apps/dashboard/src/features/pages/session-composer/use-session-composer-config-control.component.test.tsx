@@ -37,6 +37,7 @@ function createReadyBootstrap(input: {
 }): SessionComposerBootstrapResult {
   return {
     phase: { status: "ready" },
+    composerCapabilities: [],
     establishedSnapshot: {
       availableModels: input.availableModels,
       configSnapshot: {

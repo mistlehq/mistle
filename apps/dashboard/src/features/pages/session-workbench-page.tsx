@@ -588,6 +588,7 @@ function SessionWorkspaceSidebarTrigger(): React.JSX.Element | null {
 
 function createEmptyComposerViewModel(): ChatComposerViewModel {
   return {
+    composerCapabilities: [],
     composerText: "",
     gitBranchLabel: null,
     pullRequest: null,

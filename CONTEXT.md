@@ -64,6 +64,22 @@ _Avoid_: Billing org
 The Atlassian Cloud site subdomain for a Jira Cloud connection.
 _Avoid_: Jira org, Jira organization, site URL when referring only to the editable subdomain
 
+**Composer capability**:
+A special composer interaction available for a session, including how the input is represented while editing and how it is submitted, determined by the session's **Agent runtime**.
+_Avoid_: Autocomplete feature, composer shortcut
+
+**Context mention**:
+A composer input selected with `@` that references context to include with an agent response.
+_Avoid_: Path tag
+
+**Skill mention**:
+A composer input selected with `$` that asks the agent to use a named skill.
+_Avoid_: Capability mention
+
+**Composer command**:
+A composer input selected with `/` that submits a command owned by the session's **Agent runtime**.
+_Avoid_: Slash autocomplete
+
 ## Relationships
 
 - A **Sandbox profile version** may have one usable **Snapshot**.
@@ -86,6 +102,15 @@ _Avoid_: Jira org, Jira organization, site URL when referring only to the editab
 - A **Trigger** run may create or reuse one **Trigger conversation**.
 - A Mistle organization may have one **Billing customer** per billing provider.
 - A Jira Cloud connection has one **Jira site name**.
+- An **Agent runtime** determines which **Composer capabilities** are available for a session.
+- An **Agent runtime** is the source of truth for its baseline **Composer capabilities**.
+- A **Composer capability** defines both the editing representation and the submission behavior, not just whether a feature is enabled.
+- A **Context mention**, **Skill mention**, or **Composer command** may be exposed as a **Composer capability**.
+- The first **Context mention** source is a workspace path submitted as inline text.
+- The first **Skill mention** source is a runtime-discovered skill represented as inline text.
+- A runtime without native **Skill mention** support should not expose `$` through a dashboard-level translation.
+- The first **Composer commands** are runtime-owned; dashboard UI controls are not **Composer commands**.
+- A **Composer command** declares its editing representation separately from whether submission becomes inline prompt text or a typed runtime command.
 
 ## Example Dialogue
 

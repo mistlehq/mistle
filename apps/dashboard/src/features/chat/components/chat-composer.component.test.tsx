@@ -8,6 +8,7 @@ import { ChatComposer } from "./chat-composer.js";
 
 function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
   return {
+    composerCapabilities: [],
     composerText: "Ship it",
     gitBranchLabel: null,
     pullRequest: null,

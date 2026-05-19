@@ -46,6 +46,7 @@ export function mapOpenCodeChatStateForConversation(
 export function buildRefreshingOpenCodeComposerBootstrap(): SessionComposerBootstrapResult {
   return {
     phase: { status: "bootstrapping" },
+    composerCapabilities: [],
     establishedSnapshot: {
       availableModels: [],
       configSnapshot: {

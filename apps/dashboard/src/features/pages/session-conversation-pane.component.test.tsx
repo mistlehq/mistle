@@ -111,6 +111,7 @@ function RenderedComposerPaneHarness(input: {
       composerStateInput={{
         bootstrap: {
           phase: { status: "ready" },
+          composerCapabilities: [],
           establishedSnapshot: {
             availableModels: [ComposerModelFixture],
             configSnapshot: {
@@ -209,6 +210,7 @@ function QueuedPromptComposerHarness(): React.JSX.Element {
         composerStateInput={{
           bootstrap: {
             phase: { status: "ready" },
+            composerCapabilities: [],
             establishedSnapshot: {
               availableModels: [ComposerModelFixture],
               configSnapshot: {

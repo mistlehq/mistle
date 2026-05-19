@@ -57,6 +57,7 @@ export const CodexFixtureSessionEntriesWithExploringGroup: readonly ChatEntry[] 
 export const CodexFixtureSessionServerRequests: readonly CodexApprovalRequestEntry[] = [];
 
 export const SessionComposerFixtureProps: ChatComposerViewModel = {
+  composerCapabilities: [],
   composerText: "Focus on dashboard asset ownership next.",
   gitBranchLabel: null,
   pullRequest: null,

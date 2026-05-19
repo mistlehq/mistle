@@ -69,6 +69,7 @@ describe("OpenCode workbench composer adapter", () => {
   it("builds the refreshing composer bootstrap state", () => {
     expect(buildRefreshingOpenCodeComposerBootstrap()).toEqual({
       phase: { status: "bootstrapping" },
+      composerCapabilities: [],
       establishedSnapshot: {
         availableModels: [],
         configSnapshot: {
