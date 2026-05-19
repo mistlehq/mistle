@@ -507,6 +507,10 @@
                                     "format": {
                                       "type": "string",
                                       "const": "binary"
+                                    },
+                                    "sha256": {
+                                      "type": "string",
+                                      "pattern": "^[a-f0-9]{64}$"
                                     }
                                   },
                                   "required": ["kind", "fileName", "format"],
@@ -530,6 +534,10 @@
                                     "extractedPath": {
                                       "type": "string",
                                       "minLength": 1
+                                    },
+                                    "sha256": {
+                                      "type": "string",
+                                      "pattern": "^[a-f0-9]{64}$"
                                     }
                                   },
                                   "required": ["kind", "fileName", "format", "extractedPath"],
@@ -554,6 +562,10 @@
                                             "format": {
                                               "type": "string",
                                               "const": "binary"
+                                            },
+                                            "sha256": {
+                                              "type": "string",
+                                              "pattern": "^[a-f0-9]{64}$"
                                             }
                                           },
                                           "required": ["fileName", "format"],
@@ -573,6 +585,10 @@
                                             "extractedPath": {
                                               "type": "string",
                                               "minLength": 1
+                                            },
+                                            "sha256": {
+                                              "type": "string",
+                                              "pattern": "^[a-f0-9]{64}$"
                                             }
                                           },
                                           "required": ["fileName", "format", "extractedPath"],
@@ -592,6 +608,10 @@
                                             "format": {
                                               "type": "string",
                                               "const": "binary"
+                                            },
+                                            "sha256": {
+                                              "type": "string",
+                                              "pattern": "^[a-f0-9]{64}$"
                                             }
                                           },
                                           "required": ["fileName", "format"],
@@ -611,6 +631,10 @@
                                             "extractedPath": {
                                               "type": "string",
                                               "minLength": 1
+                                            },
+                                            "sha256": {
+                                              "type": "string",
+                                              "pattern": "^[a-f0-9]{64}$"
                                             }
                                           },
                                           "required": ["fileName", "format", "extractedPath"],

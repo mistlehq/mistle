@@ -10,6 +10,7 @@ export const OpenCodeRuntimeDefinition: AgentRuntimeDefinition<typeof OpenCodeRu
   {
     runtimeId: "opencode",
     displayName: "OpenCode",
+    logoKey: "opencode",
     configSchema: OpenCodeRuntimeConfigSchema,
     compileRuntime: compileOpenCodeRuntime,
     materializeMcpConfig: () => [

@@ -1266,6 +1266,8 @@ fn determine_runtime_readiness_mode(
         RuntimeReadinessMode::CodexProxyOnly
     } else if supervisor_handle.tracks_component(SupervisedComponent::OpenCodeProxy) {
         RuntimeReadinessMode::OpenCodeProxyOnly
+    } else if supervisor_handle.tracks_component(SupervisedComponent::PiProxy) {
+        RuntimeReadinessMode::PiProxyOnly
     } else {
         RuntimeReadinessMode::NoAgentRuntime
     }
@@ -1447,6 +1449,14 @@ fn collect_tracked_components(
         .any(|agent_runtime| agent_runtime.runtime_id == "opencode")
     {
         tracked_components.insert(SupervisedComponent::OpenCodeProxy);
+    }
+
+    if runtime_plan
+        .agent_runtimes
+        .iter()
+        .any(|agent_runtime| agent_runtime.runtime_id == "pi")
+    {
+        tracked_components.insert(SupervisedComponent::PiProxy);
     }
 
     tracked_components

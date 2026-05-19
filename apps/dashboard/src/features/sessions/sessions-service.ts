@@ -6,6 +6,8 @@ import { requestControlPlane } from "../api/request-control-plane.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import type { SandboxInstancesListResult, SandboxOperationEventsResult } from "./sessions-types.js";
 
+const AgentRuntimeIdSchema = z.enum(["codex", "opencode", "pi"]);
+
 const StartSandboxProfileInstanceResponseSchema = z
   .object({
     status: z.literal("accepted"),
@@ -24,7 +26,7 @@ const SandboxInstanceStatusApiResponseSchema = z
     failureMessage: z.string().min(1).nullable(),
     runtimeContext: z
       .object({
-        agentRuntimeId: z.enum(["codex", "opencode"]).nullable(),
+        agentRuntimeId: AgentRuntimeIdSchema.nullable(),
         launchCwd: z.string().min(1).nullable(),
         primaryRepositoryRoot: z.string().min(1).nullable(),
       })

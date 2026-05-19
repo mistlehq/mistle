@@ -219,6 +219,7 @@ export interface paths {
                               format: "binary";
                               /** @enum {string} */
                               kind: "exact";
+                              sha256?: string;
                             }
                           | {
                               extractedPath: string;
@@ -227,6 +228,7 @@ export interface paths {
                               format: "tar.gz";
                               /** @enum {string} */
                               kind: "exact";
+                              sha256?: string;
                             }
                           | {
                               aarch64:
@@ -234,12 +236,14 @@ export interface paths {
                                     fileName: string;
                                     /** @enum {string} */
                                     format: "binary";
+                                    sha256?: string;
                                   }
                                 | {
                                     extractedPath: string;
                                     fileName: string;
                                     /** @enum {string} */
                                     format: "tar.gz";
+                                    sha256?: string;
                                   };
                               /** @enum {string} */
                               kind: "by_arch";
@@ -248,12 +252,14 @@ export interface paths {
                                     fileName: string;
                                     /** @enum {string} */
                                     format: "binary";
+                                    sha256?: string;
                                   }
                                 | {
                                     extractedPath: string;
                                     fileName: string;
                                     /** @enum {string} */
                                     format: "tar.gz";
+                                    sha256?: string;
                                   };
                             };
                         installPath: string;
@@ -660,6 +666,7 @@ export interface paths {
                                 format: "binary";
                                 /** @enum {string} */
                                 kind: "exact";
+                                sha256?: string;
                               }
                             | {
                                 extractedPath: string;
@@ -668,6 +675,7 @@ export interface paths {
                                 format: "tar.gz";
                                 /** @enum {string} */
                                 kind: "exact";
+                                sha256?: string;
                               }
                             | {
                                 aarch64:
@@ -675,12 +683,14 @@ export interface paths {
                                       fileName: string;
                                       /** @enum {string} */
                                       format: "binary";
+                                      sha256?: string;
                                     }
                                   | {
                                       extractedPath: string;
                                       fileName: string;
                                       /** @enum {string} */
                                       format: "tar.gz";
+                                      sha256?: string;
                                     };
                                 /** @enum {string} */
                                 kind: "by_arch";
@@ -689,12 +699,14 @@ export interface paths {
                                       fileName: string;
                                       /** @enum {string} */
                                       format: "binary";
+                                      sha256?: string;
                                     }
                                   | {
                                       extractedPath: string;
                                       fileName: string;
                                       /** @enum {string} */
                                       format: "tar.gz";
+                                      sha256?: string;
                                     };
                               };
                           installPath: string;

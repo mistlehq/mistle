@@ -43,7 +43,7 @@ type OpenAiApiKeyIntegrationDefinition = IntegrationDefinition<
 >;
 
 const OpenAiApiKeyTargetSecretSchema = z.object({}).strict();
-const OpenAiAllowedRuntimeIds = ["codex", "opencode"] as const;
+const OpenAiAllowedRuntimeIds = ["codex", "opencode", "pi"] as const;
 
 type OpenAiProviderRouteConfig = {
   apiBaseUrl: string;

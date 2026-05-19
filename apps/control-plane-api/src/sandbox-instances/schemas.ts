@@ -79,7 +79,7 @@ export const sandboxInstanceStatusResponseSchema = z
     failureMessage: z.string().min(1).nullable(),
     runtimeContext: z
       .object({
-        agentRuntimeId: z.enum(["codex", "opencode"]).nullable(),
+        agentRuntimeId: z.enum(["codex", "opencode", "pi"]).nullable(),
         launchCwd: z.string().min(1).nullable(),
         primaryRepositoryRoot: z.string().min(1).nullable(),
       })

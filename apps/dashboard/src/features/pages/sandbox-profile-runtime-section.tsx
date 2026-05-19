@@ -32,6 +32,7 @@ import { SandboxProfileSectionCard } from "./sandbox-profile-section-card.js";
 
 const Definitions = createBrowserDefinitionsBundle();
 const IntegrationRegistry = Definitions.integrationRegistry;
+const AgentRuntimeRegistry = Definitions.agentRuntimeRegistry;
 
 const MissingProviderValue = "__missing_provider__";
 const MissingConnectionValue = "__missing_connection__";
@@ -268,7 +269,7 @@ export function SandboxProfileRuntimeSection(input: {
   }
 
   function updateAgentRuntime(value: string | null): void {
-    if (value !== "codex" && value !== "opencode") {
+    if (value === null || !isAgentRuntimeId(value)) {
       return;
     }
 
@@ -296,12 +297,11 @@ export function SandboxProfileRuntimeSection(input: {
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="codex">
-              <AgentRuntimeOptionLabel runtimeId="codex" />
-            </SelectItem>
-            <SelectItem value="opencode">
-              <AgentRuntimeOptionLabel runtimeId="opencode" />
-            </SelectItem>
+            {AgentRuntimeRegistry.listRuntimes().map((runtime) => (
+              <SelectItem key={runtime.runtimeId} value={runtime.runtimeId}>
+                <AgentRuntimeOptionLabel runtimeId={runtime.runtimeId} />
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </FieldContent>
@@ -800,16 +800,19 @@ function SandboxProfileAgentRuntimeReadOnlySummary(input: {
   );
 }
 
-function AgentRuntimeOptionLabel(input: { runtimeId: AgentRuntimeId }): React.JSX.Element {
-  const logoKey = input.runtimeId === "opencode" ? "opencode" : "openai";
-  const label = input.runtimeId === "opencode" ? "OpenCode" : "Codex";
+function AgentRuntimeOptionLabel(input: { runtimeId: string }): React.JSX.Element {
+  const runtime = AgentRuntimeRegistry.getRuntimeOrThrow({ runtimeId: input.runtimeId });
 
   return (
     <span className="flex items-center gap-2">
-      <IntegrationLogo alt="" className="size-4 rounded-sm" logoKey={logoKey} />
-      {label}
+      <IntegrationLogo alt="" className="size-4 rounded-sm" logoKey={runtime.logoKey} />
+      {runtime.displayName}
     </span>
   );
+}
+
+function isAgentRuntimeId(runtimeId: string): runtimeId is AgentRuntimeId {
+  return AgentRuntimeRegistry.getRuntime({ runtimeId }) !== undefined;
 }
 
 function SandboxProviderReadOnlyResourceFields(input: {

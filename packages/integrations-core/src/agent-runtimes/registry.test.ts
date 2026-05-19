@@ -16,6 +16,7 @@ describe("agent runtime registry", () => {
     registry.register({
       runtimeId: "codex",
       displayName: "Codex",
+      logoKey: "openai",
       configSchema: RuntimeConfigSchema,
       compileRuntime: () => ({
         runtimeClients: [],
@@ -31,6 +32,7 @@ describe("agent runtime registry", () => {
     const runtime = {
       runtimeId: "codex",
       displayName: "Codex",
+      logoKey: "openai",
       configSchema: RuntimeConfigSchema,
       compileRuntime: () => ({
         runtimeClients: [],
@@ -54,6 +56,7 @@ describe("agent runtime registry", () => {
     registry.register({
       runtimeId: "codex",
       displayName: "Codex",
+      logoKey: "openai",
       configSchema: RuntimeConfigSchema,
       compileRuntime: () => ({
         runtimeClients: [],

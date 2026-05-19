@@ -4,3 +4,8 @@ extend-ignore-identifiers-re = ["\\bthr_[A-Za-z0-9_]+\\b"]
 
 [default.extend-words]
 sxl = "sxl"
+
+[files]
+extend-exclude = [
+  "packages/integrations-definitions/src/agent-runtimes/pi/pi-mcp-adapter-extension.bundle.ts",
+]

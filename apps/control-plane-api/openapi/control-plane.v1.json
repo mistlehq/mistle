@@ -15364,7 +15364,7 @@
                       "properties": {
                         "agentRuntimeId": {
                           "type": ["string", "null"],
-                          "enum": ["codex", "opencode", null]
+                          "enum": ["codex", "opencode", "pi", null]
                         },
                         "launchCwd": {
                           "type": ["string", "null"],
@@ -16157,7 +16157,7 @@
                       "properties": {
                         "agentRuntimeId": {
                           "type": ["string", "null"],
-                          "enum": ["codex", "opencode", null]
+                          "enum": ["codex", "opencode", "pi", null]
                         },
                         "launchCwd": {
                           "type": ["string", "null"],
@@ -17834,7 +17834,7 @@
                     },
                     "agentRuntimeId": {
                       "type": "string",
-                      "enum": ["codex", "opencode"]
+                      "enum": ["codex", "opencode", "pi"]
                     },
                     "sandboxProvider": {
                       "type": ["string", "null"],
@@ -18150,7 +18150,7 @@
                           },
                           "agentRuntimeId": {
                             "type": "string",
-                            "enum": ["codex", "opencode"]
+                            "enum": ["codex", "opencode", "pi"]
                           },
                           "sandboxProvider": {
                             "type": ["string", "null"],
@@ -19887,7 +19887,7 @@
                   },
                   "agentRuntimeId": {
                     "type": "string",
-                    "enum": ["codex", "opencode"]
+                    "enum": ["codex", "opencode", "pi"]
                   },
                   "sandboxProvider": {
                     "type": "string",
@@ -19984,7 +19984,7 @@
                     },
                     "agentRuntimeId": {
                       "type": "string",
-                      "enum": ["codex", "opencode"]
+                      "enum": ["codex", "opencode", "pi"]
                     },
                     "sandboxProvider": {
                       "type": ["string", "null"],
@@ -20881,7 +20881,7 @@
                         },
                         "agentRuntimeId": {
                           "type": "string",
-                          "enum": ["codex", "opencode"]
+                          "enum": ["codex", "opencode", "pi"]
                         },
                         "sandboxProvider": {
                           "type": ["string", "null"],
@@ -21284,7 +21284,7 @@
                         },
                         "agentRuntimeId": {
                           "type": "string",
-                          "enum": ["codex", "opencode"]
+                          "enum": ["codex", "opencode", "pi"]
                         },
                         "sandboxProvider": {
                           "type": ["string", "null"],
@@ -21670,7 +21670,7 @@
                         },
                         "agentRuntimeId": {
                           "type": "string",
-                          "enum": ["codex", "opencode"]
+                          "enum": ["codex", "opencode", "pi"]
                         },
                         "sandboxProvider": {
                           "type": ["string", "null"],
@@ -22046,7 +22046,7 @@
                   },
                   "agentRuntimeId": {
                     "type": "string",
-                    "enum": ["codex", "opencode"]
+                    "enum": ["codex", "opencode", "pi"]
                   },
                   "sandboxProvider": {
                     "type": "string",
@@ -22304,7 +22304,7 @@
                   },
                   "agentRuntimeId": {
                     "type": "string",
-                    "enum": ["codex", "opencode"]
+                    "enum": ["codex", "opencode", "pi"]
                   },
                   "sandboxProvider": {
                     "type": "string",
