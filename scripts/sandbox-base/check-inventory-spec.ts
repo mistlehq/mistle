@@ -180,6 +180,23 @@ function hasRunContainingText(stage: ParsedDockerfileStage, text: string): boole
   );
 }
 
+function hasEnvironmentVariable(
+  stage: ParsedDockerfileStage,
+  name: string,
+  value: string,
+): boolean {
+  return stage.instructions.some((instruction) => {
+    if (instruction.kind !== "ENV") {
+      return false;
+    }
+
+    const tokens = splitShellTokens(instruction.value);
+    return tokens.some(
+      (token, index) => token === name && tokens[index + 1] === value && tokens[index + 2] === "=",
+    );
+  });
+}
+
 function hasSymlink(stage: ParsedDockerfileStage, sourcePath: string, targetPath: string): boolean {
   return stage.instructions.some((instruction) => {
     if (instruction.kind !== "RUN") {
@@ -222,6 +239,21 @@ export function findSandboxBaseInventorySpecDrift(dockerfileText: string): reado
   }
 
   return failures;
+}
+
+export function findSandboxBaseEnvironmentDrift(dockerfileText: string): readonly string[] {
+  const facts = parseDockerfileFacts(dockerfileText);
+  const stage = findStage(facts, "sandbox-base-common");
+
+  if (stage === null) {
+    return ["stage 'sandbox-base-common' does not exist"];
+  }
+
+  if (!hasEnvironmentVariable(stage, "HOME", "/root")) {
+    return ["expected environment variable HOME=/root in stage 'sandbox-base-common'"];
+  }
+
+  return [];
 }
 
 export function findSandboxBaseDockerfileDependencyDrift(input: {
@@ -328,19 +360,22 @@ function checkInventorySpec(): void {
     import.meta.url,
   );
   const dockerfileText = readFileSync(dockerfileUrl, "utf8");
-  const failures = findSandboxBaseInventorySpecDrift(dockerfileText);
+  const failures = [
+    ...findSandboxBaseInventorySpecDrift(dockerfileText),
+    ...findSandboxBaseEnvironmentDrift(dockerfileText),
+  ];
 
   if (failures.length !== 0) {
     throw new Error(
       [
-        `Sandbox base inventory spec drifted from ${SandboxBaseInventorySpec.dockerfilePath}:`,
+        `Sandbox base Dockerfile drifted from ${SandboxBaseInventorySpec.dockerfilePath}:`,
         ...failures.map((failure) => `- ${failure}`),
       ].join("\n"),
     );
   }
 
   process.stdout.write(
-    `Sandbox base inventory spec matches ${SandboxBaseInventorySpec.dockerfilePath}.\n`,
+    `Sandbox base Dockerfile checks passed for ${SandboxBaseInventorySpec.dockerfilePath}.\n`,
   );
 }
 

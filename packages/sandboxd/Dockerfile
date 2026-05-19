@@ -6,6 +6,7 @@ ARG MISE_VERSION=v2026.4.28
 
 ENV DEBIAN_FRONTEND=noninteractive \
   container=docker \
+  HOME=/root \
   PATH="/opt/mistle/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 RUN apt-get update \
