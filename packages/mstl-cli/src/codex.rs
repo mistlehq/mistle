@@ -1,12 +1,15 @@
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt::{self, Display};
-use std::process::Stdio;
-use std::time::Duration;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::{Command as StdCommand, Stdio};
+use std::time::{Duration, SystemTime};
 
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::process::Command;
+use tokio::process::Command as TokioCommand;
 use tokio::time::timeout;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, accept_async, connect_async};
@@ -37,6 +40,8 @@ pub enum CodexRunError {
     ConnectTunnel(tokio_tungstenite::tungstenite::Error),
     OpenAgentStreamTimeout,
     OpenAgentStreamRejected { code: String, message: String },
+    CreateCodexHome(std::io::Error),
+    WriteCodexConfig(std::io::Error),
     WriteTunnel(tokio_tungstenite::tungstenite::Error),
     ReadTunnel(tokio_tungstenite::tungstenite::Error),
     WriteCodex(tokio_tungstenite::tungstenite::Error),
@@ -88,6 +93,15 @@ impl Display for CodexRunError {
                     "sandbox agent stream rejected ({code}): {message}"
                 )
             }
+            Self::CreateCodexHome(error) => {
+                write!(formatter, "failed to create temporary Codex home: {error}")
+            }
+            Self::WriteCodexConfig(error) => {
+                write!(
+                    formatter,
+                    "failed to write temporary Codex config.toml: {error}"
+                )
+            }
             Self::WriteTunnel(error) => write!(formatter, "failed to write Mistle tunnel: {error}"),
             Self::ReadTunnel(error) => write!(formatter, "failed to read Mistle tunnel: {error}"),
             Self::WriteCodex(error) => {
@@ -126,6 +140,8 @@ impl Error for CodexRunError {
             Self::BindLocalProxy(error)
             | Self::LocalProxyAddress(error)
             | Self::SpawnCodex(error)
+            | Self::CreateCodexHome(error)
+            | Self::WriteCodexConfig(error)
             | Self::CodexExit(error) => Some(error),
             Self::AcceptCodex(error)
             | Self::ConnectTunnel(error)
@@ -157,10 +173,12 @@ pub async fn run_codex(config: CodexRunConfig) -> Result<(), CodexRunError> {
         .map_err(CodexRunError::LocalProxyAddress)?;
     let remote_url = format!("ws://{local_addr}");
     let codex_command_args = codex_command_args(&remote_url, &config.codex_args)?;
+    let codex_home = create_codex_home()?;
 
     eprintln!("mistle: starting local Codex proxy on {remote_url}");
-    let mut child = Command::new("codex")
+    let mut child = TokioCommand::new("codex")
         .args(codex_command_args)
+        .env("CODEX_HOME", codex_home.path())
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
@@ -239,6 +257,106 @@ fn push_mistle_codex_config_args(command_args: &mut Vec<String>) {
     ));
     command_args.push("-c".to_owned());
     command_args.push(CODEX_MISTLE_MODEL_PROVIDER_CONFIG.to_owned());
+}
+
+fn create_codex_home() -> Result<CodexTempHome, CodexRunError> {
+    let path = unique_codex_home_path()?;
+    fs::create_dir(&path).map_err(CodexRunError::CreateCodexHome)?;
+    fs::write(path.join("config.toml"), render_local_codex_config()?)
+        .map_err(CodexRunError::WriteCodexConfig)?;
+    Ok(CodexTempHome { path })
+}
+
+fn render_local_codex_config() -> Result<String, CodexRunError> {
+    let mut trusted_projects = BTreeSet::new();
+    let current_dir = std::env::current_dir().map_err(CodexRunError::CreateCodexHome)?;
+    trusted_projects.insert(current_dir.clone());
+    if let Ok(canonical_current_dir) = fs::canonicalize(&current_dir) {
+        trusted_projects.insert(canonical_current_dir);
+    }
+    if let Some(git_common_root) = git_common_project_root(&current_dir) {
+        trusted_projects.insert(git_common_root);
+    }
+
+    let mut config =
+        String::from("approval_policy = \"never\"\nsandbox_mode = \"danger-full-access\"\n");
+    for project in trusted_projects {
+        config.push_str("\n[projects.");
+        config.push_str(toml_string(project.to_string_lossy().as_ref()).as_str());
+        config.push_str("]\ntrust_level = \"trusted\"\n");
+    }
+
+    Ok(config)
+}
+
+fn git_common_project_root(current_dir: &Path) -> Option<PathBuf> {
+    let output = StdCommand::new("git")
+        .args([
+            "-C",
+            current_dir.to_string_lossy().as_ref(),
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-common-dir",
+        ])
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let git_common_dir = String::from_utf8(output.stdout).ok()?;
+    let git_common_dir = PathBuf::from(git_common_dir.trim());
+    if git_common_dir.file_name().and_then(|name| name.to_str()) != Some(".git") {
+        return None;
+    }
+
+    git_common_dir.parent().map(Path::to_path_buf)
+}
+
+fn toml_string(value: &str) -> String {
+    let mut escaped = String::from("\"");
+    for character in value.chars() {
+        match character {
+            '\\' => escaped.push_str("\\\\"),
+            '"' => escaped.push_str("\\\""),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            character => escaped.push(character),
+        }
+    }
+    escaped.push('"');
+    escaped
+}
+
+fn unique_codex_home_path() -> Result<PathBuf, CodexRunError> {
+    let timestamp = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_err(std::io::Error::other)
+        .map_err(CodexRunError::CreateCodexHome)?
+        .as_nanos();
+    Ok(std::env::temp_dir().join(format!(
+        "mistle-codex-home-{}-{timestamp}",
+        std::process::id()
+    )))
+}
+
+#[derive(Debug)]
+struct CodexTempHome {
+    path: PathBuf,
+}
+
+impl CodexTempHome {
+    fn path(&self) -> &Path {
+        self.path.as_path()
+    }
+}
+
+impl Drop for CodexTempHome {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.path);
+    }
 }
 
 async fn accept_codex(listener: &TcpListener) -> Result<WebSocketStream<TcpStream>, CodexRunError> {
@@ -619,7 +737,7 @@ enum StreamControlMessage {
 mod tests {
     use crate::codex::{
         PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT, codex_command_args,
-        decode_data_frame, encode_data_frame,
+        decode_data_frame, encode_data_frame, render_local_codex_config, toml_string,
     };
 
     #[test]
@@ -672,6 +790,23 @@ mod tests {
         assert_eq!(
             error.to_string(),
             "codex arguments must not include --remote; mistle manages the remote endpoint"
+        );
+    }
+
+    #[test]
+    fn renders_local_codex_config_with_no_auth_permissions_and_project_trust() {
+        let config = render_local_codex_config().expect("local Codex config should render");
+
+        assert!(config.contains("approval_policy = \"never\""));
+        assert!(config.contains("sandbox_mode = \"danger-full-access\""));
+        assert!(config.contains("trust_level = \"trusted\""));
+    }
+
+    #[test]
+    fn escapes_toml_string_values() {
+        assert_eq!(
+            toml_string("path\\with\"quote\nnext"),
+            "\"path\\\\with\\\"quote\\nnext\""
         );
     }
 
