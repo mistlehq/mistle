@@ -61,6 +61,19 @@ impl MistleClient {
         self.get_json(self.list_sandbox_profile_versions_url(profile_id)?.as_str())
     }
 
+    pub fn update_sandbox_profile_version_draft(
+        &self,
+        profile_id: &str,
+        version: u32,
+        request: UpdateSandboxProfileVersionDraftRequest<'_>,
+    ) -> Result<UpdateSandboxProfileVersionDraftResponse, MistleClientError> {
+        self.put_json(
+            self.update_sandbox_profile_version_draft_url(profile_id, version)?
+                .as_str(),
+            &request,
+        )
+    }
+
     pub fn start_active_sandbox_profile_instance(
         &self,
         profile_id: &str,
@@ -141,6 +154,30 @@ impl MistleClient {
         serde_json::from_str(&response_body).map_err(MistleClientError::DecodeResponse)
     }
 
+    fn put_json<TRequest, TResponse>(
+        &self,
+        url: &str,
+        body: &TRequest,
+    ) -> Result<TResponse, MistleClientError>
+    where
+        TRequest: Serialize,
+        TResponse: for<'de> Deserialize<'de>,
+    {
+        let request_body = serde_json::to_string(body).map_err(MistleClientError::EncodeRequest)?;
+        let mut response = ureq::put(url)
+            .header("authorization", format!("Bearer {}", self.api_key))
+            .content_type("application/json")
+            .send(request_body)
+            .map_err(MistleClientError::Request)?;
+
+        let response_body = response
+            .body_mut()
+            .read_to_string()
+            .map_err(MistleClientError::ReadResponse)?;
+
+        serde_json::from_str(&response_body).map_err(MistleClientError::DecodeResponse)
+    }
+
     fn post_json<TRequest, TResponse>(
         &self,
         url: &str,
@@ -197,6 +234,20 @@ impl MistleClient {
         Ok(endpoint_url(
             &self.base_url,
             &format!("/v1/sandbox/profiles/{validated_profile_id}/versions"),
+        ))
+    }
+
+    fn update_sandbox_profile_version_draft_url(
+        &self,
+        profile_id: &str,
+        version: u32,
+    ) -> Result<Url, MistleClientError> {
+        let validated_profile_id = validate_sandbox_profile_id(profile_id)?;
+        validate_sandbox_profile_version(version)?;
+
+        Ok(endpoint_url(
+            &self.base_url,
+            &format!("/v1/sandbox/profiles/{validated_profile_id}/versions/{version}/draft"),
         ))
     }
 
@@ -372,6 +423,25 @@ pub enum SandboxProfileVersionAgentRuntimeId {
 pub enum SandboxProfileVersionDefaultPersistenceMode {
     Ephemeral,
     Persistent,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSandboxProfileVersionDraftRequest<'a> {
+    #[serde(rename = "setupScript", skip_serializing_if = "Option::is_none")]
+    pub setup_script: Option<Option<&'a str>>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSandboxProfileVersionDraftResponse {
+    pub sandbox_profile_id: String,
+    pub version: u32,
+    pub setup_script: Option<String>,
+    pub default_persistence_mode: SandboxProfileVersionDefaultPersistenceMode,
+    pub agent_runtime_id: SandboxProfileVersionAgentRuntimeId,
+    pub sandbox_provider: Option<String>,
+    pub sandbox_connection_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -711,7 +781,8 @@ mod tests {
         SandboxInstanceStatus, SandboxInstanceTriggerConversation, SandboxProfileVersion,
         SandboxProfileVersionAgentRuntimeId, SandboxProfileVersionDefaultPersistenceMode,
         SandboxProfileVersionState, StartSandboxProfileInstanceResponse,
-        StartSandboxProfileInstanceStatus,
+        StartSandboxProfileInstanceStatus, UpdateSandboxProfileVersionDraftRequest,
+        UpdateSandboxProfileVersionDraftResponse,
     };
 
     #[test]
@@ -880,6 +951,44 @@ mod tests {
             .expect_err("invalid profile id should fail");
 
         assert_eq!(error.to_string(), "profile id must start with `sbp_`");
+    }
+
+    #[test]
+    fn builds_update_sandbox_profile_version_draft_url() {
+        let client = client_with_base_url("https://api.example.test");
+
+        assert_eq!(
+            client
+                .update_sandbox_profile_version_draft_url("sbp_python-dev", 4)
+                .expect("profile id and version should be valid")
+                .as_str(),
+            "https://api.example.test/v1/sandbox/profiles/sbp_python-dev/versions/4/draft"
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_sandbox_profile_id_for_draft_update_url() {
+        let client = client_with_base_url("https://api.example.test");
+
+        let error = client
+            .update_sandbox_profile_version_draft_url("sandbox/profile", 4)
+            .expect_err("invalid profile id should fail");
+
+        assert_eq!(error.to_string(), "profile id must start with `sbp_`");
+    }
+
+    #[test]
+    fn rejects_zero_sandbox_profile_version_for_draft_update_url() {
+        let client = client_with_base_url("https://api.example.test");
+
+        let error = client
+            .update_sandbox_profile_version_draft_url("sbp_python-dev", 0)
+            .expect_err("zero profile version should fail");
+
+        assert_eq!(
+            error.to_string(),
+            "profile version must be greater than zero"
+        );
     }
 
     #[test]
@@ -1207,6 +1316,109 @@ mod tests {
                         sandbox_connection_id: None,
                     },
                 ],
+            }
+        );
+    }
+
+    #[test]
+    fn encodes_update_sandbox_profile_version_draft_setup_script_request() {
+        let request = UpdateSandboxProfileVersionDraftRequest {
+            setup_script: Some(Some("#!/usr/bin/env bash\npnpm install")),
+        };
+
+        let request_body =
+            serde_json::to_string(&request).expect("setup script request should encode");
+
+        assert_eq!(
+            request_body,
+            r##"{"setupScript":"#!/usr/bin/env bash\npnpm install"}"##
+        );
+    }
+
+    #[test]
+    fn encodes_clear_sandbox_profile_version_draft_setup_script_request() {
+        let request = UpdateSandboxProfileVersionDraftRequest {
+            setup_script: Some(None),
+        };
+
+        let request_body =
+            serde_json::to_string(&request).expect("setup script request should encode");
+
+        assert_eq!(request_body, r#"{"setupScript":null}"#);
+    }
+
+    #[test]
+    fn omits_unset_sandbox_profile_version_draft_request_fields() {
+        let request = UpdateSandboxProfileVersionDraftRequest { setup_script: None };
+
+        let request_body =
+            serde_json::to_string(&request).expect("draft update request should encode");
+
+        assert_eq!(request_body, r#"{}"#);
+    }
+
+    #[test]
+    fn decodes_update_sandbox_profile_version_draft_response() {
+        let response = serde_json::from_str::<UpdateSandboxProfileVersionDraftResponse>(
+            r##"{
+                "sandboxProfileId": "sbp_python",
+                "version": 3,
+                "setupScript": "#!/usr/bin/env bash\npnpm install",
+                "defaultPersistenceMode": "persistent",
+                "agentRuntimeId": "codex",
+                "sandboxProvider": "daytona",
+                "sandboxConnectionId": "icn_daytona",
+                "sandboxResources": null,
+                "integrationBindings": {
+                    "bindings": []
+                }
+            }"##,
+        )
+        .expect("setup script update response should decode");
+
+        assert_eq!(
+            response,
+            UpdateSandboxProfileVersionDraftResponse {
+                sandbox_profile_id: "sbp_python".to_owned(),
+                version: 3,
+                setup_script: Some("#!/usr/bin/env bash\npnpm install".to_owned()),
+                default_persistence_mode: SandboxProfileVersionDefaultPersistenceMode::Persistent,
+                agent_runtime_id: SandboxProfileVersionAgentRuntimeId::Codex,
+                sandbox_provider: Some("daytona".to_owned()),
+                sandbox_connection_id: Some("icn_daytona".to_owned()),
+            }
+        );
+    }
+
+    #[test]
+    fn decodes_clear_sandbox_profile_version_draft_setup_script_response() {
+        let response = serde_json::from_str::<UpdateSandboxProfileVersionDraftResponse>(
+            r#"{
+                "sandboxProfileId": "sbp_python",
+                "version": 3,
+                "setupScript": null,
+                "defaultPersistenceMode": "ephemeral",
+                "agentRuntimeId": "opencode",
+                "sandboxProvider": null,
+                "sandboxConnectionId": null,
+                "sandboxResources": null,
+                "integrationBindings": {
+                    "bindings": []
+                }
+            }"#,
+        )
+        .expect("setup script clear response should decode");
+
+        assert_eq!(
+            response,
+            UpdateSandboxProfileVersionDraftResponse {
+                sandbox_profile_id: "sbp_python".to_owned(),
+                version: 3,
+                setup_script: None,
+                default_persistence_mode: SandboxProfileVersionDefaultPersistenceMode::Ephemeral,
+                agent_runtime_id: SandboxProfileVersionAgentRuntimeId::Opencode,
+                sandbox_provider: None,
+                sandbox_connection_id: None,
             }
         );
     }
