@@ -31,6 +31,12 @@ const ComposerCommandCapabilityFixture: React.ComponentProps<
       description: "Rewrite with constraints",
       submitAs: "inlineText",
     },
+    {
+      id: "codex.compact",
+      name: "compact",
+      description: "Compact the current context",
+      submitAs: "runtimeCommand",
+    },
   ],
 };
 
@@ -56,6 +62,7 @@ function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
     configControlsDisabled: false,
     onComposerTextChange: () => {},
     onSubmit: () => {},
+    onRuntimeCommandSubmit: () => {},
     onModelChange: () => {},
     onReasoningEffortChange: () => {},
     onPendingFilesAdded: () => {},
@@ -424,6 +431,30 @@ describe("ChatComposer", () => {
     expect(getComposerTextarea().value).toBe("/rewrite ");
   });
 
+  it("executes a runtime slash command with keyboard selection", () => {
+    const submittedRuntimeCommands: string[] = [];
+    let submitCount = 0;
+
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        composerCapabilities={[ComposerCommandCapabilityFixture]}
+        composerText="/comp"
+        onRuntimeCommandSubmit={(commandId) => {
+          submittedRuntimeCommands.push(commandId);
+        }}
+        onSubmit={() => {
+          submitCount += 1;
+        }}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
+
+    expect(submittedRuntimeCommands).toEqual(["codex.compact"]);
+    expect(submitCount).toBe(0);
+  });
+
   it("submits manually typed slash text with arguments as ordinary prompt text", () => {
     let submitCount = 0;
 
@@ -442,6 +473,32 @@ describe("ChatComposer", () => {
 
     fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
 
+    expect(submitCount).toBe(1);
+  });
+
+  it("submits a known slash command with arguments as ordinary prompt text when no suggestion is selected", () => {
+    const submittedRuntimeCommands: string[] = [];
+    let submitCount = 0;
+
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        composerCapabilities={[ComposerCommandCapabilityFixture]}
+        composerText="/compact now"
+        onRuntimeCommandSubmit={(commandId) => {
+          submittedRuntimeCommands.push(commandId);
+        }}
+        onSubmit={() => {
+          submitCount += 1;
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole("listbox", { name: "Slash commands" })).toBeNull();
+
+    fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
+
+    expect(submittedRuntimeCommands).toEqual([]);
     expect(submitCount).toBe(1);
   });
 });

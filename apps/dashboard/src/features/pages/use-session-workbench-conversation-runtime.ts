@@ -127,6 +127,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
         serverRequests,
         sessionMessage,
         startTurn: startCodexTurn,
+        compactThread: sessionState.threads.compactThread,
       }),
     [
       activeSessionThreadId,
@@ -145,8 +146,10 @@ export function useSessionWorkbenchConversationRuntime(input: {
       serverRequests.pendingServerRequests,
       serverRequests.respondToServerRequest,
       sessionMessage.clearSessionErrorMessage,
+      sessionMessage.reportSessionErrorMessage,
       sessionMessage.sessionErrorMessage,
       sessionState.bootstrap,
+      sessionState.threads.compactThread,
       startCodexTurn,
     ],
   );

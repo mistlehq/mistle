@@ -1,4 +1,4 @@
-import type { ComposerCapability } from "@mistle/integrations-core";
+import type { ComposerCapability, ComposerCommandDescriptor } from "@mistle/integrations-core";
 import { OpenAiReasoningEffortLabelByValue } from "@mistle/integrations-definitions/openai";
 import {
   Button,
@@ -36,14 +36,8 @@ import { resolveSelectableValue } from "../../shared/select-value.js";
 const REASONING_EFFORT_OPTIONS = ["low", "medium", "high", "xhigh"] as const;
 const ReasoningEffortLabels: Readonly<Record<string, string>> = OpenAiReasoningEffortLabelByValue;
 
-type SlashCommandOption = {
-  id: string;
-  name: string;
-  description: string | null;
-};
-
-function formatSlashCommandOptionLabel(command: SlashCommandOption): string {
-  if (command.description === null) {
+function formatSlashCommandOptionLabel(command: ComposerCommandDescriptor): string {
+  if (command.description === undefined) {
     return `/${command.name}`;
   }
 
@@ -128,6 +122,7 @@ export type ChatComposerViewModel = {
   showReasoningControl?: boolean;
   onComposerTextChange: (value: string) => void;
   onSubmit: () => void;
+  onRuntimeCommandSubmit: (commandId: string) => void;
   onSecondarySubmit?: () => void;
   onModelChange: (value: string) => void;
   onReasoningEffortChange: (value: string) => void;
@@ -160,6 +155,7 @@ export function ChatComposer({
   showReasoningControl = true,
   onComposerTextChange,
   onSubmit,
+  onRuntimeCommandSubmit,
   onSecondarySubmit,
   onModelChange,
   onReasoningEffortChange,
@@ -184,15 +180,7 @@ export function ChatComposer({
   const slashCommandOptions = useMemo(
     () =>
       composerCapabilities.flatMap((capability) =>
-        capability.kind === "composerCommand"
-          ? capability.commands
-              .filter((command) => command.submitAs === "inlineText")
-              .map((command) => ({
-                id: command.id,
-                name: command.name,
-                description: command.description ?? null,
-              }))
-          : [],
+        capability.kind === "composerCommand" ? capability.commands : [],
       ),
     [composerCapabilities],
   );
@@ -248,7 +236,7 @@ export function ChatComposer({
     });
   }
 
-  function insertSlashCommand(command: SlashCommandOption): void {
+  function insertSlashCommand(command: ComposerCommandDescriptor): void {
     if (activeComposerTrigger === null) {
       return;
     }
@@ -270,6 +258,15 @@ export function ChatComposer({
       textareaRef.current?.focus();
       textareaRef.current?.setSelectionRange(nextCursorIndex, nextCursorIndex);
     });
+  }
+
+  function selectSlashCommand(command: ComposerCommandDescriptor): void {
+    if (command.submitAs === "runtimeCommand") {
+      onRuntimeCommandSubmit(command.id);
+      return;
+    }
+
+    insertSlashCommand(command);
   }
 
   function moveActiveSlashCommand(delta: number): void {
@@ -375,7 +372,7 @@ export function ChatComposer({
                       key={command.id}
                       onMouseDown={(event) => {
                         event.preventDefault();
-                        insertSlashCommand(command);
+                        selectSlashCommand(command);
                       }}
                       onMouseEnter={() => {
                         setActiveSlashCommandIndex(commandIndex);
@@ -386,7 +383,7 @@ export function ChatComposer({
                       <span className="min-w-24 font-mono text-xs text-muted-foreground">
                         /{command.name}
                       </span>
-                      {command.description === null ? null : (
+                      {command.description === undefined ? null : (
                         <span className="min-w-0 flex-1 text-muted-foreground">
                           {command.description}
                         </span>
@@ -431,7 +428,7 @@ export function ChatComposer({
                 if (event.key === "Tab" || event.key === "Enter") {
                   event.preventDefault();
                   if (activeSlashCommand !== null) {
-                    insertSlashCommand(activeSlashCommand);
+                    selectSlashCommand(activeSlashCommand);
                   }
                   return;
                 }

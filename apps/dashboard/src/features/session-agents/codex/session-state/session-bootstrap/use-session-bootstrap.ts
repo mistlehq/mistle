@@ -1,4 +1,5 @@
 import type { ComposerCapability } from "@mistle/integrations-core";
+import { CodexComposerCapabilities } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import type {
   CodexJsonRpcClient,
   CodexModelSummary,
@@ -287,7 +288,7 @@ export function useSessionBootstrap(input: {
 
   return {
     phase: state,
-    composerCapabilities: [],
+    composerCapabilities: CodexComposerCapabilities,
     establishedSnapshot: {
       availableModels,
       configSnapshot,

@@ -1,3 +1,5 @@
+import { CodexRuntimeCommandIds } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
+
 import type { ChatState } from "../chat/chat-state.js";
 import type {
   SessionComposerRuntimeInput,
@@ -46,6 +48,7 @@ export function buildCodexConversationRuntime(input: {
   serverRequests: UseCodexSessionStateResult["serverRequests"];
   sessionMessage: UseCodexSessionStateResult["sessionMessage"];
   startTurn: SessionTurnControl["startTurn"];
+  compactThread: UseCodexSessionStateResult["threads"]["compactThread"];
 }): SessionWorkbenchRuntimeAdapter {
   const capabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
 
@@ -76,6 +79,24 @@ export function buildCodexConversationRuntime(input: {
       sessionErrorMessage: input.sessionMessage.sessionErrorMessage,
       clearSessionErrorMessage: input.sessionMessage.clearSessionErrorMessage,
       contextUsage: capabilities.hasContextUsage ? input.contextUsage : null,
+      executeRuntimeCommand: (commandId) => {
+        if (commandId !== CodexRuntimeCommandIds.COMPACT_THREAD) {
+          input.sessionMessage.reportSessionErrorMessage(
+            `Unsupported Codex runtime command '${commandId}'.`,
+          );
+          return false;
+        }
+
+        if (input.activeConversationId === null) {
+          input.sessionMessage.reportSessionErrorMessage(
+            "Choose a Codex thread before compacting context.",
+          );
+          return false;
+        }
+
+        input.compactThread(input.activeConversationId);
+        return true;
+      },
       modelSelection: capabilities.composerModelSelection,
     },
     serverRequestsState: {

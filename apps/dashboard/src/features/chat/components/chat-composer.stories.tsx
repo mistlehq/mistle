@@ -70,40 +70,50 @@ function InteractiveChatComposerStory(
   const [selectedReasoningEffort, setSelectedReasoningEffort] = useState(
     props.selectedReasoningEffort,
   );
+  const [runtimeCommandStatus, setRuntimeCommandStatus] = useState<string | null>(null);
   const [pendingDiffCommentSummary, setPendingDiffCommentSummary] = useState(
     props.pendingDiffCommentSummary,
   );
   const [pendingAttachments, setPendingAttachments] = useState(props.pendingAttachments);
 
   return (
-    <ChatComposer
-      {...props}
-      composerText={composerText}
-      onComposerTextChange={setComposerText}
-      onModelChange={setSelectedModel}
-      onPendingFilesAdded={(files) => {
-        setPendingAttachments((currentAttachments) => [
-          ...currentAttachments,
-          ...files.map((file, index) => ({
-            id: `${file.name}-${currentAttachments.length + index}`,
-            name: file.name,
-          })),
-        ]);
-      }}
-      onReasoningEffortChange={setSelectedReasoningEffort}
-      onClearPendingDiffComments={() => {
-        setPendingDiffCommentSummary(null);
-      }}
-      onRemovePendingAttachment={(attachmentId) => {
-        setPendingAttachments((currentAttachments) =>
-          currentAttachments.filter((attachment) => attachment.id !== attachmentId),
-        );
-      }}
-      pendingDiffCommentSummary={pendingDiffCommentSummary}
-      pendingAttachments={pendingAttachments}
-      selectedModel={selectedModel}
-      selectedReasoningEffort={selectedReasoningEffort}
-    />
+    <>
+      <ChatComposer
+        {...props}
+        composerText={composerText}
+        onComposerTextChange={setComposerText}
+        onModelChange={setSelectedModel}
+        onPendingFilesAdded={(files) => {
+          setPendingAttachments((currentAttachments) => [
+            ...currentAttachments,
+            ...files.map((file, index) => ({
+              id: `${file.name}-${currentAttachments.length + index}`,
+              name: file.name,
+            })),
+          ]);
+        }}
+        onRuntimeCommandSubmit={(commandId) => {
+          setRuntimeCommandStatus(`Executed ${commandId}`);
+          setComposerText("");
+        }}
+        onReasoningEffortChange={setSelectedReasoningEffort}
+        onClearPendingDiffComments={() => {
+          setPendingDiffCommentSummary(null);
+        }}
+        onRemovePendingAttachment={(attachmentId) => {
+          setPendingAttachments((currentAttachments) =>
+            currentAttachments.filter((attachment) => attachment.id !== attachmentId),
+          );
+        }}
+        pendingDiffCommentSummary={pendingDiffCommentSummary}
+        pendingAttachments={pendingAttachments}
+        selectedModel={selectedModel}
+        selectedReasoningEffort={selectedReasoningEffort}
+      />
+      {runtimeCommandStatus === null ? null : (
+        <div className="text-muted-foreground px-1.5 pt-2 text-sm">{runtimeCommandStatus}</div>
+      )}
+    </>
   );
 }
 
@@ -164,6 +174,12 @@ export const SlashCommandAutocomplete: Story = {
             name: "rewrite",
             description: "Rewrite with constraints",
             submitAs: "inlineText",
+          },
+          {
+            id: "codex.compact",
+            name: "compact",
+            description: "Compact the current context",
+            submitAs: "runtimeCommand",
           },
         ],
       },

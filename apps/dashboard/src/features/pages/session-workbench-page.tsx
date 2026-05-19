@@ -610,6 +610,7 @@ function createEmptyComposerViewModel(): ChatComposerViewModel {
     configControlsDisabled: true,
     onComposerTextChange: function onComposerTextChange() {},
     onSubmit: function onSubmit() {},
+    onRuntimeCommandSubmit: function onRuntimeCommandSubmit() {},
     onSecondarySubmit: function onSecondarySubmit() {},
     onModelChange: function onModelChange() {},
     onReasoningEffortChange: function onReasoningEffortChange() {},
