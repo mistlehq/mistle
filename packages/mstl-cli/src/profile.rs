@@ -460,6 +460,7 @@ fn profile_version_agent_runtime_label(
     match agent_runtime_id {
         SandboxProfileVersionAgentRuntimeId::Codex => "codex",
         SandboxProfileVersionAgentRuntimeId::Opencode => "opencode",
+        SandboxProfileVersionAgentRuntimeId::Pi => "pi",
     }
 }
 
@@ -606,6 +607,18 @@ mod tests {
                     sandbox_provider: None,
                     sandbox_connection_id: None,
                 },
+                SandboxProfileVersion {
+                    sandbox_profile_id: "sbp_python".to_owned(),
+                    version: 1,
+                    state: SandboxProfileVersionState::Published,
+                    is_active: false,
+                    usable: true,
+                    agent_runtime_id: SandboxProfileVersionAgentRuntimeId::Pi,
+                    default_persistence_mode:
+                        SandboxProfileVersionDefaultPersistenceMode::Ephemeral,
+                    sandbox_provider: None,
+                    sandbox_connection_id: None,
+                },
             ],
         };
 
@@ -615,6 +628,7 @@ mod tests {
                 "VERSION  STATE      ACTIVE  USABLE  RUNTIME   PERSISTENCE  PROVIDER  CONNECTION\n",
                 "3        draft      no      no      codex     persistent   daytona   icn_daytona\n",
                 "2        published  yes     yes     opencode  ephemeral    -         -\n",
+                "1        published  no      yes     pi        ephemeral    -         -\n",
             ),
         );
     }

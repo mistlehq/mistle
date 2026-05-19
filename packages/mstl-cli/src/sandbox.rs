@@ -469,7 +469,7 @@ mod tests {
             failure_code: None,
             failure_message: None,
             runtime_context: Some(SandboxInstanceRuntimeContext {
-                agent_runtime_id: Some(SandboxInstanceAgentRuntimeId::Codex),
+                agent_runtime_id: Some(SandboxInstanceAgentRuntimeId::Pi),
                 launch_cwd: Some("/workspace".to_owned()),
                 primary_repository_root: Some("/workspace/mistle".to_owned()),
             }),
@@ -494,7 +494,7 @@ mod tests {
                 "Connectable: yes\n",
                 "Failure code: -\n",
                 "Failure message: -\n",
-                "Runtime context: codex / /workspace / /workspace/mistle\n",
+                "Runtime context: pi / /workspace / /workspace/mistle\n",
                 "Trigger conversation: cnv_01 / - / provider_01\n",
                 "Startup operation: op_01 (start)\n",
             ),

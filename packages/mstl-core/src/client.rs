@@ -416,6 +416,7 @@ pub enum SandboxProfileVersionState {
 pub enum SandboxProfileVersionAgentRuntimeId {
     Codex,
     Opencode,
+    Pi,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -560,6 +561,7 @@ pub struct SandboxInstanceRuntimeContext {
 pub enum SandboxInstanceAgentRuntimeId {
     Codex,
     Opencode,
+    Pi,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -1281,6 +1283,21 @@ mod tests {
                         },
                         "refreshSchedule": null,
                         "latestSnapshotJob": null
+                    },
+                    {
+                        "sandboxProfileId": "sbp_python",
+                        "version": 1,
+                        "state": "published",
+                        "isActive": false,
+                        "usable": true,
+                        "agentRuntimeId": "pi",
+                        "defaultPersistenceMode": "ephemeral",
+                        "sandboxProvider": null,
+                        "sandboxConnectionId": null,
+                        "maintenanceScript": null,
+                        "sandboxResources": null,
+                        "refreshSchedule": null,
+                        "latestSnapshotJob": null
                     }
                 ]
             }"#,
@@ -1310,6 +1327,18 @@ mod tests {
                         is_active: true,
                         usable: true,
                         agent_runtime_id: SandboxProfileVersionAgentRuntimeId::Opencode,
+                        default_persistence_mode:
+                            SandboxProfileVersionDefaultPersistenceMode::Ephemeral,
+                        sandbox_provider: None,
+                        sandbox_connection_id: None,
+                    },
+                    SandboxProfileVersion {
+                        sandbox_profile_id: "sbp_python".to_owned(),
+                        version: 1,
+                        state: SandboxProfileVersionState::Published,
+                        is_active: false,
+                        usable: true,
+                        agent_runtime_id: SandboxProfileVersionAgentRuntimeId::Pi,
                         default_persistence_mode:
                             SandboxProfileVersionDefaultPersistenceMode::Ephemeral,
                         sandbox_provider: None,
@@ -1434,7 +1463,7 @@ mod tests {
                 "failureCode": null,
                 "failureMessage": null,
                 "runtimeContext": {
-                    "agentRuntimeId": "codex",
+                    "agentRuntimeId": "pi",
                     "launchCwd": "/workspace",
                     "primaryRepositoryRoot": "/workspace/mistle"
                 },
@@ -1461,7 +1490,7 @@ mod tests {
                 failure_code: None,
                 failure_message: None,
                 runtime_context: Some(SandboxInstanceRuntimeContext {
-                    agent_runtime_id: Some(SandboxInstanceAgentRuntimeId::Codex),
+                    agent_runtime_id: Some(SandboxInstanceAgentRuntimeId::Pi),
                     launch_cwd: Some("/workspace".to_owned()),
                     primary_repository_root: Some("/workspace/mistle".to_owned()),
                 }),
