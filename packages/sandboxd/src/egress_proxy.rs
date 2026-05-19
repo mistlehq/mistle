@@ -237,6 +237,11 @@ enum DirectHttpUpstreamStream {
     Tls(Box<tokio_rustls::client::TlsStream<TcpStream>>),
 }
 
+struct DirectWebsocketConnection {
+    selected_protocol: Option<HeaderValue>,
+    socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum TransparentProxyProtocol {
     Empty,
@@ -2675,24 +2680,30 @@ async fn forward_upgrade_request_direct(
         .ok_or_else(|| {
             EgressProxyError::new("websocket upgrade request is missing Sec-WebSocket-Key")
         })?;
-    let upstream_socket =
-        match connect_direct_upstream_websocket(&request_target.uri, mark_upstream_socket).await {
-            Ok(socket) => socket,
-            Err(error) => {
-                let mut fields = request_context.common_fields();
-                fields.push(("outcome", Value::String("connect_failed".to_string())));
-                fields.push(("error", Value::String(error.to_string())));
-                emit_egress_proxy_log(
-                    request_context.clock.as_ref(),
-                    &request_context.sandbox_instance_id,
-                    "egress_proxy_upgrade_failed",
-                    &fields,
-                );
-                return Err(error);
-            }
-        };
+    let upstream_connection = match connect_direct_upstream_websocket(
+        &request_target.uri,
+        &parts.headers,
+        mark_upstream_socket,
+    )
+    .await
+    {
+        Ok(socket) => socket,
+        Err(error) => {
+            let mut fields = request_context.common_fields();
+            fields.push(("outcome", Value::String("connect_failed".to_string())));
+            fields.push(("error", Value::String(error.to_string())));
+            emit_egress_proxy_log(
+                request_context.clock.as_ref(),
+                &request_context.sandbox_instance_id,
+                "egress_proxy_upgrade_failed",
+                &fields,
+            );
+            return Err(error);
+        }
+    };
 
     let tunnel_context = request_context.clone();
+    let upstream_socket = upstream_connection.socket;
     tokio::spawn(async move {
         let tunnel_result = tunnel_websocket_upgrade(downstream_upgrade, upstream_socket).await;
 
@@ -2721,7 +2732,7 @@ async fn forward_upgrade_request_direct(
         }
     });
 
-    Response::builder()
+    let mut response_builder = Response::builder()
         .status(StatusCode::SWITCHING_PROTOCOLS)
         .header("connection", "upgrade")
         .header("upgrade", "websocket")
@@ -2729,13 +2740,16 @@ async fn forward_upgrade_request_direct(
         .header(
             SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME,
             request_context.request_id.as_str(),
-        )
-        .body(empty_body())
-        .map_err(|error| {
-            EgressProxyError::new(format!(
-                "failed to build direct websocket upgrade response: {error}"
-            ))
-        })
+        );
+    if let Some(selected_protocol) = upstream_connection.selected_protocol {
+        response_builder = response_builder.header("sec-websocket-protocol", selected_protocol);
+    }
+
+    response_builder.body(empty_body()).map_err(|error| {
+        EgressProxyError::new(format!(
+            "failed to build direct websocket upgrade response: {error}"
+        ))
+    })
 }
 
 async fn forward_request_direct(
@@ -3184,8 +3198,9 @@ async fn connect_direct_http_upstream(
 
 async fn connect_direct_upstream_websocket(
     uri: &Uri,
+    request_headers: &hyper::HeaderMap<HeaderValue>,
     mark_upstream_socket: bool,
-) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, EgressProxyError> {
+) -> Result<DirectWebsocketConnection, EgressProxyError> {
     let target = websocket_target_url(uri)?;
     let target_url = Url::parse(&target).map_err(|error| {
         EgressProxyError::new(format!(
@@ -3228,14 +3243,20 @@ async fn connect_direct_upstream_websocket(
             )));
         }
     };
-    let request = target.into_client_request().map_err(|error| {
+    let mut request = target.into_client_request().map_err(|error| {
         EgressProxyError::new(format!(
             "failed to build direct upstream websocket request: {error}"
         ))
     })?;
+    for (header_name, header_value) in filter_direct_websocket_request_headers(request_headers) {
+        request.headers_mut().insert(header_name, header_value);
+    }
     client_async(request, upstream_stream)
         .await
-        .map(|(socket, _)| socket)
+        .map(|(socket, response)| DirectWebsocketConnection {
+            selected_protocol: response.headers().get("sec-websocket-protocol").cloned(),
+            socket,
+        })
         .map_err(|error| {
             EgressProxyError::new(format!(
                 "direct upstream websocket connection failed: {error}"
@@ -3632,6 +3653,24 @@ fn filter_direct_gateway_request_headers(
             !name
                 .as_str()
                 .eq_ignore_ascii_case(DIRECT_GATEWAY_EGRESS_AUTHORIZATION_HEADER_NAME)
+        })
+        .collect()
+}
+
+fn filter_direct_websocket_request_headers(
+    headers: &hyper::HeaderMap<HeaderValue>,
+) -> Vec<(HeaderName, HeaderValue)> {
+    headers
+        .iter()
+        .filter_map(|(name, value)| {
+            let blocked = matches!(
+                name.as_str().to_ascii_lowercase().as_str(),
+                "connection" | "host" | "proxy-connection" | "upgrade"
+            );
+            if blocked {
+                return None;
+            }
+            Some((name.clone(), value.clone()))
         })
         .collect()
 }
@@ -4457,6 +4496,26 @@ mod tests {
             upstream_request.starts_with("GET /unmanaged-socket HTTP/1.1\r\n"),
             "direct websocket upstream should receive an origin-form request: {upstream_request}"
         );
+        assert!(
+            response
+                .to_ascii_lowercase()
+                .contains("sec-websocket-protocol: mistle.realtime\r\n"),
+            "proxy websocket response should preserve the upstream selected protocol: {response}"
+        );
+        assert!(
+            upstream_request.contains("authorization: Bearer websocket-token\r\n"),
+            "direct websocket upstream should receive authorization: {upstream_request}"
+        );
+        assert!(
+            upstream_request.contains("cookie: mistle_session=abc123\r\n"),
+            "direct websocket upstream should receive cookie headers: {upstream_request}"
+        );
+        assert!(
+            upstream_request
+                .to_ascii_lowercase()
+                .contains("sec-websocket-protocol: mistle.realtime, other\r\n"),
+            "direct websocket upstream should receive requested subprotocols: {upstream_request}"
+        );
 
         proxy.close().expect("egress proxy close should succeed");
         upstream_server
@@ -4950,7 +5009,7 @@ mod tests {
                 .expect("test websocket upstream request should be recorded");
             write!(
                 stream,
-                "HTTP/1.1 101 Switching Protocols\r\nconnection: upgrade\r\nupgrade: websocket\r\nsec-websocket-accept: {accept_key}\r\n\r\n"
+                "HTTP/1.1 101 Switching Protocols\r\nconnection: upgrade\r\nupgrade: websocket\r\nsec-websocket-accept: {accept_key}\r\nsec-websocket-protocol: mistle.realtime\r\n\r\n"
             )
             .expect("test websocket server should write handshake response");
         });
@@ -5014,7 +5073,7 @@ mod tests {
             std::net::TcpStream::connect(proxy_address).expect("test should connect to proxy");
         write!(
             stream,
-            "GET {target_url} HTTP/1.1\r\nhost: {authority}\r\nconnection: upgrade\r\nupgrade: websocket\r\nsec-websocket-key: dGhlIHNhbXBsZSBub25jZQ==\r\nsec-websocket-version: 13\r\n\r\n"
+            "GET {target_url} HTTP/1.1\r\nhost: {authority}\r\nconnection: upgrade\r\nupgrade: websocket\r\nauthorization: Bearer websocket-token\r\ncookie: mistle_session=abc123\r\nsec-websocket-key: dGhlIHNhbXBsZSBub25jZQ==\r\nsec-websocket-protocol: mistle.realtime, other\r\nsec-websocket-version: 13\r\n\r\n"
         )
         .expect("test should write proxy websocket handshake");
 

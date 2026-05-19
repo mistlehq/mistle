@@ -6,7 +6,7 @@ import { requestControlPlane } from "../api/request-control-plane.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import type { SandboxInstancesListResult, SandboxOperationEventsResult } from "./sessions-types.js";
 
-const AgentRuntimeIdSchema = z.enum(["codex", "opencode"]);
+const AgentRuntimeIdSchema = z.enum(["codex", "opencode", "pi"]);
 
 const StartSandboxProfileInstanceResponseSchema = z
   .object({
