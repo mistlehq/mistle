@@ -130,6 +130,7 @@ struct PiProxyState {
 
 struct PiRpcChild {
     child: Child,
+    cwd: Option<String>,
     stdin: ChildStdin,
     receiver: Receiver<PiRpcOutput>,
     reader_thread: JoinHandle<()>,
@@ -287,13 +288,20 @@ impl PiProxyState {
             .child
             .lock()
             .map_err(|_| PiProxyError::InvalidRequest("Pi child lock was poisoned".to_string()))?;
-        if guard.is_some() {
-            return Ok(());
+        let requested_cwd = cwd.map(ToString::to_string);
+        if let Some(child) = guard.as_ref() {
+            if child.cwd == requested_cwd || requested_cwd.is_none() {
+                return Ok(());
+            }
+        }
+
+        if let Some(child) = guard.take() {
+            Self::stop_child(child);
         }
 
         let mut command = Command::new(&self.config.pi_cli_path);
         command.arg("--mode").arg("rpc");
-        if let Some(cwd) = cwd {
+        if let Some(cwd) = requested_cwd.as_deref() {
             command.current_dir(cwd);
         }
         command.stdin(Stdio::piped()).stdout(Stdio::piped());
@@ -309,6 +317,7 @@ impl PiProxyState {
         let reader_thread = spawn_pi_stdout_reader(stdout, sender);
         *guard = Some(PiRpcChild {
             child,
+            cwd: requested_cwd,
             stdin,
             receiver,
             reader_thread,
@@ -327,9 +336,14 @@ impl PiProxyState {
             Ok(mut guard) => guard.take(),
             Err(_) => None,
         };
-        let Some(mut child) = child else {
+        let Some(child) = child else {
             return;
         };
+        Self::stop_child(child);
+        self.set_active(false);
+    }
+
+    fn stop_child(mut child: PiRpcChild) {
         let _ = child.child.kill();
         let deadline = Instant::now() + PI_RPC_SHUTDOWN_TIMEOUT;
         while Instant::now() < deadline {
@@ -340,7 +354,6 @@ impl PiProxyState {
             }
         }
         let _ = child.reader_thread.join();
-        self.set_active(false);
     }
 
     fn update_activity_from_pi_output(&self, value: &Value) {
@@ -793,17 +806,7 @@ mod tests {
     fn fans_out_pi_events_before_json_rpc_response_and_settles_activity() {
         let simulated_pi = SimulatedPiRpcProcess::start();
         let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
-        let state = Arc::new(PiProxyState {
-            config: PiProxyConfig {
-                pi_cli_path: simulated_pi.path(),
-                env: BTreeMap::new(),
-            },
-            child: Mutex::new(None),
-            command_lock: Mutex::new(()),
-            keepalive_manager: keepalive_manager.clone(),
-            active: std::sync::atomic::AtomicBool::new(false),
-            next_id: AtomicU64::new(1),
-        });
+        let state = create_pi_proxy_state(&simulated_pi, keepalive_manager.clone());
 
         let create_responses = handle_json_rpc_request(
             &state,
@@ -875,12 +878,82 @@ mod tests {
         state.shutdown_child();
     }
 
+    #[test]
+    fn creates_later_pi_conversations_in_the_requested_cwd() {
+        let simulated_pi = SimulatedPiRpcProcess::start();
+        let state = create_pi_proxy_state(
+            &simulated_pi,
+            Arc::new(Mutex::new(KeepaliveManager::default())),
+        );
+
+        let first_create_responses = handle_json_rpc_request(
+            &state,
+            &json!({
+                "jsonrpc": "2.0",
+                "id": "create-first",
+                "method": "pi/createConversation",
+                "params": { "cwd": simulated_pi.cwd() }
+            })
+            .to_string(),
+        );
+        let first_create_response = parse_json_rpc_message(
+            first_create_responses
+                .last()
+                .expect("first create conversation should produce a response"),
+        );
+        assert_eq!(
+            first_create_response["result"]["providerConversationId"],
+            json!(simulated_pi.session_file())
+        );
+
+        let second_create_responses = handle_json_rpc_request(
+            &state,
+            &json!({
+                "jsonrpc": "2.0",
+                "id": "create-second",
+                "method": "pi/createConversation",
+                "params": { "cwd": simulated_pi.alternate_cwd() }
+            })
+            .to_string(),
+        );
+        let second_create_response = parse_json_rpc_message(
+            second_create_responses
+                .last()
+                .expect("second create conversation should produce a response"),
+        );
+        assert_eq!(
+            second_create_response["result"]["providerConversationId"],
+            json!(simulated_pi.alternate_session_file())
+        );
+
+        state.shutdown_child();
+    }
+
+    fn create_pi_proxy_state(
+        simulated_pi: &SimulatedPiRpcProcess,
+        keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    ) -> Arc<PiProxyState> {
+        Arc::new(PiProxyState {
+            config: PiProxyConfig {
+                pi_cli_path: simulated_pi.path(),
+                env: BTreeMap::new(),
+            },
+            child: Mutex::new(None),
+            command_lock: Mutex::new(()),
+            keepalive_manager,
+            active: std::sync::atomic::AtomicBool::new(false),
+            next_id: AtomicU64::new(1),
+        })
+    }
+
     fn parse_json_rpc_message(message: &str) -> Value {
         serde_json::from_str(message).expect("JSON-RPC message should be valid JSON")
     }
 
     struct SimulatedPiRpcProcess {
         _directory: tempfile::TempDir,
+        alternate_cwd: String,
+        alternate_session_file: String,
         script_path: String,
         cwd: String,
         session_file: String,
@@ -892,35 +965,41 @@ mod tests {
             let script_path = directory.path().join("simulated-pi-rpc");
             let cwd = directory.path().join("workspace");
             fs::create_dir(&cwd).expect("workspace directory should be created");
-            let session_file = directory.path().join("session.json");
-            let script = format!(
-                r#"#!/bin/sh
+            let alternate_cwd = directory.path().join("alternate-workspace");
+            fs::create_dir(&alternate_cwd)
+                .expect("alternate workspace directory should be created");
+            let session_file = fs::canonicalize(&cwd)
+                .expect("workspace directory should be canonicalizable")
+                .join("session.json");
+            let alternate_session_file = fs::canonicalize(&alternate_cwd)
+                .expect("alternate workspace directory should be canonicalizable")
+                .join("session.json");
+            let script = r#"#!/bin/sh
 while IFS= read -r line; do
   id="$(printf '%s' "$line" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"
+  session_file="$(pwd)/session.json"
   case "$line" in
     *'"type":"new_session"'*)
-      printf '{{"type":"response","command":"new_session","id":"%s","success":true,"data":{{}}}}\n' "$id"
+      printf '{"type":"response","command":"new_session","id":"%s","success":true,"data":{}}\n' "$id"
       ;;
     *'"type":"get_state"'*)
-      printf '{{"type":"response","command":"get_state","id":"%s","success":true,"data":{{"sessionFile":"{}","sessionName":"Simulated session","isStreaming":false,"isCompacting":false,"pendingMessageCount":0}}}}\n' "$id"
+      printf '{"type":"response","command":"get_state","id":"%s","success":true,"data":{"sessionFile":"%s","sessionName":"Simulated session","isStreaming":false,"isCompacting":false,"pendingMessageCount":0}}\n' "$id" "$session_file"
       ;;
     *'"type":"switch_session"'*)
-      printf '{{"type":"response","command":"switch_session","id":"%s","success":true,"data":{{}}}}\n' "$id"
+      printf '{"type":"response","command":"switch_session","id":"%s","success":true,"data":{}}\n' "$id"
       ;;
     *'"type":"prompt"'*)
-      printf '{{"type":"agent_start"}}\n'
-      printf '{{"type":"response","command":"prompt","id":"%s","success":true,"data":{{"accepted":true}}}}\n' "$id"
+      printf '{"type":"agent_start"}\n'
+      printf '{"type":"response","command":"prompt","id":"%s","success":true,"data":{"accepted":true}}\n' "$id"
       sleep 0.1
-      printf '{{"type":"agent_end"}}\n'
+      printf '{"type":"agent_end"}\n'
       ;;
     *)
-      printf '{{"type":"response","command":"unknown","id":"%s","success":false,"error":"unsupported command"}}\n' "$id"
+      printf '{"type":"response","command":"unknown","id":"%s","success":false,"error":"unsupported command"}\n' "$id"
       ;;
   esac
 done
-"#,
-                session_file.display()
-            );
+"#;
             fs::write(&script_path, script).expect("simulated Pi RPC script should be written");
             let mut permissions = fs::metadata(&script_path)
                 .expect("simulated Pi RPC script metadata should be readable")
@@ -931,6 +1010,14 @@ done
 
             Self {
                 _directory: directory,
+                alternate_cwd: alternate_cwd
+                    .to_str()
+                    .expect("alternate cwd path should be UTF-8")
+                    .to_string(),
+                alternate_session_file: alternate_session_file
+                    .to_str()
+                    .expect("alternate session path should be UTF-8")
+                    .to_string(),
                 script_path: script_path
                     .to_str()
                     .expect("script path should be UTF-8")
@@ -951,8 +1038,16 @@ done
             &self.cwd
         }
 
+        fn alternate_cwd(&self) -> &str {
+            &self.alternate_cwd
+        }
+
         fn session_file(&self) -> &str {
             &self.session_file
+        }
+
+        fn alternate_session_file(&self) -> &str {
+            &self.alternate_session_file
         }
     }
 }
