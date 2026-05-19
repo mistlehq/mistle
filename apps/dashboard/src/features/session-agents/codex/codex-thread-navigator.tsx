@@ -10,7 +10,11 @@ import {
 } from "@mistle/ui";
 import { ArrowClockwiseIcon, PlusIcon, XIcon } from "@phosphor-icons/react";
 
+import { useDelayedMinimumVisibleFlag } from "../../shared/use-delayed-minimum-visible-flag.js";
 import type { CodexThreadNavigatorRow } from "./codex-thread-navigator-model.js";
+
+const ThreadOpeningIndicatorShowDelayMs = 120;
+const ThreadOpeningIndicatorMinimumVisibleMs = 360;
 
 export type CodexThreadNavigatorProps = {
   rows: readonly CodexThreadNavigatorRow[];
@@ -45,6 +49,18 @@ export function CodexThreadNavigatorSheet(input: {
   onOpenChange: (open: boolean) => void;
   navigator: CodexThreadNavigatorProps;
 }): React.JSX.Element {
+  const sheetNavigator = {
+    ...input.navigator,
+    onSelectThread(threadId: string): void {
+      input.onOpenChange(false);
+      input.navigator.onSelectThread(threadId);
+    },
+    onStartThread(): void {
+      input.onOpenChange(false);
+      input.navigator.onStartThread();
+    },
+  } satisfies CodexThreadNavigatorProps;
+
   return (
     <Sheet onOpenChange={input.onOpenChange} open={input.isOpen}>
       <SheetContent
@@ -55,7 +71,7 @@ export function CodexThreadNavigatorSheet(input: {
         <SheetHeader className="shrink-0 border-b px-4 py-3 text-left">
           <div className="flex min-w-0 items-center gap-2">
             <SheetTitle className="min-w-0 shrink truncate">Threads</SheetTitle>
-            <CodexThreadNavigatorActions {...input.navigator} />
+            <CodexThreadNavigatorActions {...sheetNavigator} />
             <SheetClose
               render={
                 <Button
@@ -72,7 +88,7 @@ export function CodexThreadNavigatorSheet(input: {
             </SheetClose>
           </div>
         </SheetHeader>
-        <CodexThreadNavigatorContent {...input.navigator} showHeader={false} />
+        <CodexThreadNavigatorContent {...sheetNavigator} showHeader={false} />
       </SheetContent>
     </Sheet>
   );
@@ -97,10 +113,12 @@ function CodexThreadNavigatorContent(
         {hasRows ? (
           <div className="space-y-3">
             {rowSections.map((section) => (
-              <section key={section.cwd} aria-label={section.label}>
-                <div className="px-2 pb-1 text-[11px] font-medium text-muted-foreground">
-                  {section.label}
-                </div>
+              <section key={section.key} aria-label={section.accessibleLabel}>
+                {section.visibleLabel === null ? null : (
+                  <div className="px-2 pb-1 text-[11px] font-medium text-muted-foreground">
+                    {section.visibleLabel}
+                  </div>
+                )}
                 <div className="space-y-1">
                   {section.rows.map((row) => (
                     <CodexThreadNavigatorRowView
@@ -167,22 +185,39 @@ function CodexThreadNavigatorActions(input: CodexThreadNavigatorProps): React.JS
 
 function groupRowsByCwd(rows: readonly CodexThreadNavigatorRow[]): readonly {
   cwd: string;
-  label: string;
+  accessibleLabel: string;
+  key: string;
+  visibleLabel: string | null;
   rows: readonly CodexThreadNavigatorRow[];
 }[] {
   const sections: {
+    accessibleLabel: string;
     cwd: string;
-    label: string;
+    key: string;
+    visibleLabel: string | null;
     rows: CodexThreadNavigatorRow[];
   }[] = [];
   const sectionsByCwd = new Map<string, (typeof sections)[number]>();
 
   for (const row of rows) {
+    if (row.isPinnedCurrent) {
+      sections.push({
+        accessibleLabel: row.title,
+        cwd: row.cwd,
+        key: `pinned:${row.id}`,
+        visibleLabel: null,
+        rows: [row],
+      });
+      continue;
+    }
+
     const existingSection = sectionsByCwd.get(row.cwd);
     if (existingSection === undefined) {
       const section = {
+        accessibleLabel: row.cwdSectionLabel,
         cwd: row.cwd,
-        label: row.cwdSectionLabel,
+        key: row.cwd,
+        visibleLabel: row.cwdSectionLabel,
         rows: [row],
       };
       sections.push(section);
@@ -201,6 +236,11 @@ function CodexThreadNavigatorRowView(input: {
   onSelectThread: (threadId: string) => void;
 }): React.JSX.Element {
   const row = input.row;
+  const showOpeningIndicator = useDelayedMinimumVisibleFlag({
+    active: row.isOpening,
+    minimumVisibleMs: ThreadOpeningIndicatorMinimumVisibleMs,
+    showDelayMs: ThreadOpeningIndicatorShowDelayMs,
+  });
 
   return (
     <button
@@ -210,7 +250,7 @@ function CodexThreadNavigatorRowView(input: {
           ? "bg-muted text-foreground"
           : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
       }`}
-      disabled={row.isOpening}
+      disabled={row.isOpening || showOpeningIndicator}
       onClick={() => input.onSelectThread(row.id)}
       title={row.cwd}
       type="button"
@@ -219,12 +259,17 @@ function CodexThreadNavigatorRowView(input: {
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
             <OverflowTooltipText
-              className="min-w-0 text-[13px] leading-tight font-medium"
+              className={`min-w-0 text-[13px] leading-tight font-medium ${
+                row.isPinnedCurrent ? "italic" : ""
+              }`}
               text={row.title}
               tooltipSide="right"
               tooltipSideOffset={8}
             />
-            <CodexThreadNavigatorRowIndicator row={row} />
+            <CodexThreadNavigatorRowIndicator
+              row={row}
+              showOpeningIndicator={showOpeningIndicator}
+            />
           </div>
         </div>
       </div>
@@ -234,8 +279,9 @@ function CodexThreadNavigatorRowView(input: {
 
 function CodexThreadNavigatorRowIndicator(input: {
   row: CodexThreadNavigatorRow;
+  showOpeningIndicator: boolean;
 }): React.JSX.Element | null {
-  if (input.row.isOpening) {
+  if (input.showOpeningIndicator) {
     return <Spinner aria-label="Opening thread" className="size-3.5 shrink-0" />;
   }
 

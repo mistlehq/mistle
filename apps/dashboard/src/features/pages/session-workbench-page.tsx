@@ -486,14 +486,10 @@ function SessionWorkbenchPageContent(input: {
         isBottomPanelVisible={workbench.terminalPanelState.isVisible}
         isSecondaryPanelVisible={threadNavigation.secondaryPanelKind !== null}
         {...(threadNavigation.secondaryPanelKind === "threads"
-          ? {
-              secondaryPanelDefaultSize: "20%",
-              secondaryPanelLayoutKey: "threads",
-              secondaryPanelMinSize: "16rem",
-            }
-          : {
-              secondaryPanelLayoutKey: "diff",
-            })}
+          ? { secondaryPanelDefaultSize: "20%" }
+          : {})}
+        secondaryPanelLayoutKey="right-panel"
+        secondaryPanelMinSize="16rem"
         mainContentLayout={
           workbench.primaryPanelState.transitionState === "stable_cli" ||
           initialEntryStartupState !== null

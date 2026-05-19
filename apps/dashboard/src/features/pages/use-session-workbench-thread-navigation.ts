@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  projectCodexThreadNavigatorRows,
-  resolveDefaultCodexThreadId,
-} from "../session-agents/codex/codex-thread-navigator-model.js";
+import { projectCodexThreadNavigatorRows } from "../session-agents/codex/codex-thread-navigator-model.js";
 import type { CodexThreadNavigatorProps } from "../session-agents/codex/codex-thread-navigator.js";
 import type { MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import {
@@ -36,10 +33,23 @@ export type SessionWorkbenchThreadNavigationState = {
   togglePanel: () => void;
 };
 
+export function createConfirmedThreadSearchParams(input: {
+  searchParams: URLSearchParams;
+  threadId: string;
+}): URLSearchParams {
+  const nextSearchParams = new URLSearchParams(input.searchParams);
+  nextSearchParams.set("threadId", input.threadId);
+  return nextSearchParams;
+}
+
 export function useSessionWorkbenchThreadNavigation(
   input: SessionWorkbenchThreadNavigationInput,
 ): SessionWorkbenchThreadNavigationState {
   const [isPanelVisible, setPanelVisible] = useState(false);
+  const [hasManualNavigationCommitPending, setManualNavigationCommitPending] = useState(false);
+  const [manualNavigationTargetThreadId, setManualNavigationTargetThreadId] = useState<
+    string | null
+  >(null);
   const requestedThreadResumeAttemptRef = useRef<RequestedThreadResumeAttempt | null>(null);
   const threadNavigationRequestSequenceRef = useRef(0);
 
@@ -73,28 +83,16 @@ export function useSessionWorkbenchThreadNavigation(
     });
   }, [input.codexThreadNavigator, pendingThreadServerRequestThreadIds]);
 
-  const defaultThreadId = useMemo(() => {
-    if (input.codexThreadNavigator === null) {
-      return null;
-    }
-
-    return resolveDefaultCodexThreadId({
-      availableThreads: input.codexThreadNavigator.availableThreads,
-    });
-  }, [input.codexThreadNavigator]);
-
   const pushThreadSearchParams = useCallback(
     (threadId: string): void => {
-      const nextSearchParams = new URLSearchParams(input.searchParams);
-      if (threadId === defaultThreadId) {
-        nextSearchParams.delete("threadId");
-      } else {
-        nextSearchParams.set("threadId", threadId);
-      }
-
-      input.setSearchParams(nextSearchParams);
+      input.setSearchParams(
+        createConfirmedThreadSearchParams({
+          searchParams: input.searchParams,
+          threadId,
+        }),
+      );
     },
-    [defaultThreadId, input.searchParams, input.setSearchParams],
+    [input.searchParams, input.setSearchParams],
   );
 
   const handleSelectThread = useCallback(
@@ -105,6 +103,8 @@ export function useSessionWorkbenchThreadNavigation(
 
       const navigationRequestId = threadNavigationRequestSequenceRef.current + 1;
       threadNavigationRequestSequenceRef.current = navigationRequestId;
+      setManualNavigationCommitPending(true);
+      setManualNavigationTargetThreadId(threadId);
 
       if (threadId === input.codexThreadNavigator.activeThreadId) {
         pushThreadSearchParams(threadId);
@@ -118,9 +118,17 @@ export function useSessionWorkbenchThreadNavigation(
             return;
           }
 
+          setManualNavigationTargetThreadId(confirmedThreadId);
           pushThreadSearchParams(confirmedThreadId);
         })
-        .catch(() => {});
+        .catch(() => {
+          if (threadNavigationRequestSequenceRef.current !== navigationRequestId) {
+            return;
+          }
+
+          setManualNavigationCommitPending(false);
+          setManualNavigationTargetThreadId(null);
+        });
     },
     [input.codexThreadNavigator, pushThreadSearchParams],
   );
@@ -132,6 +140,8 @@ export function useSessionWorkbenchThreadNavigation(
 
     const navigationRequestId = threadNavigationRequestSequenceRef.current + 1;
     threadNavigationRequestSequenceRef.current = navigationRequestId;
+    setManualNavigationCommitPending(true);
+    setManualNavigationTargetThreadId(null);
 
     void input.codexThreadNavigator
       .startNewThread(
@@ -142,11 +152,22 @@ export function useSessionWorkbenchThreadNavigation(
           return;
         }
 
-        const nextSearchParams = new URLSearchParams(input.searchParams);
-        nextSearchParams.set("threadId", threadId);
-        input.setSearchParams(nextSearchParams);
+        setManualNavigationTargetThreadId(threadId);
+        input.setSearchParams(
+          createConfirmedThreadSearchParams({
+            searchParams: input.searchParams,
+            threadId,
+          }),
+        );
       })
-      .catch(() => {});
+      .catch(() => {
+        if (threadNavigationRequestSequenceRef.current !== navigationRequestId) {
+          return;
+        }
+
+        setManualNavigationCommitPending(false);
+        setManualNavigationTargetThreadId(null);
+      });
   }, [
     input.codexThreadNavigator,
     input.primaryRepositoryPath,
@@ -154,18 +175,17 @@ export function useSessionWorkbenchThreadNavigation(
     input.setSearchParams,
   ]);
 
-  const handleSelectThreadFromPanel = useCallback(
-    (threadId: string): void => {
-      setPanelVisible(false);
-      handleSelectThread(threadId);
-    },
-    [handleSelectThread],
-  );
+  useEffect(() => {
+    if (
+      manualNavigationTargetThreadId === null ||
+      input.requestedThreadId !== manualNavigationTargetThreadId
+    ) {
+      return;
+    }
 
-  const handleStartThreadFromPanel = useCallback((): void => {
-    setPanelVisible(false);
-    handleStartThread();
-  }, [handleStartThread]);
+    setManualNavigationCommitPending(false);
+    setManualNavigationTargetThreadId(null);
+  }, [input.requestedThreadId, manualNavigationTargetThreadId]);
 
   useEffect(() => {
     if (input.requestedThreadId === null) {
@@ -180,6 +200,10 @@ export function useSessionWorkbenchThreadNavigation(
     if (
       !shouldAttemptRequestedThreadResume({
         activeThreadId: input.codexThreadNavigator.activeThreadId,
+        hasInFlightThreadNavigation:
+          input.codexThreadNavigator.pendingThreadId !== null ||
+          input.codexThreadNavigator.isStartingNewThread ||
+          hasManualNavigationCommitPending,
         previousAttempt: requestedThreadResumeAttemptRef.current,
         providerThreadId: input.codexThreadNavigator.providerThreadId,
         requestedThreadId: input.requestedThreadId,
@@ -195,7 +219,12 @@ export function useSessionWorkbenchThreadNavigation(
     };
     threadNavigationRequestSequenceRef.current += 1;
     void input.codexThreadNavigator.resumeThread(input.requestedThreadId).catch(() => {});
-  }, [input.codexThreadNavigator, input.requestedThreadId, input.sandboxInstanceId]);
+  }, [
+    input.codexThreadNavigator,
+    input.requestedThreadId,
+    input.sandboxInstanceId,
+    hasManualNavigationCommitPending,
+  ]);
 
   const threadNavigatorProps: CodexThreadNavigatorProps | null =
     input.codexThreadNavigator !== null && input.primaryPanelTransitionState !== "stable_cli"
@@ -213,8 +242,6 @@ export function useSessionWorkbenchThreadNavigation(
       ? null
       : {
           ...threadNavigatorProps,
-          onSelectThread: handleSelectThreadFromPanel,
-          onStartThread: handleStartThreadFromPanel,
         };
   const secondaryPanelKind =
     panelThreadNavigatorProps !== null && isPanelVisible

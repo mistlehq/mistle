@@ -132,7 +132,7 @@ describe("projectCodexThreadNavigatorRows", () => {
     ).toEqual([
       {
         id: "thread_outside_latest",
-        title: "Active thread",
+        title: "New thread",
         cwdSectionLabel: "repo-c",
         isActive: true,
         isPinnedCurrent: true,

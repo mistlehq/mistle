@@ -84,6 +84,9 @@ _Avoid_: Main thread
 The dashboard workspace for a **Sandbox session**, including sandbox-scoped tools and thread-scoped chat.
 _Avoid_: Chat page when referring to the whole workspace
 
+**Session bottom panel**:
+The sandbox-scoped lower workbench area used for terminal-style tools within a **Session workbench**.
+_Avoid_: Thread panel, Codex thread panel
 ## Relationships
 
 - A **Sandbox profile version** may have one usable **Snapshot**.
@@ -108,6 +111,7 @@ _Avoid_: Chat page when referring to the whole workspace
 - A Jira Cloud connection has one **Jira site name**.
 - A **Sandbox session** may contain multiple **Codex threads**.
 - A **Session workbench** keeps sandbox-scoped tools stable while the **Active Codex thread** changes.
+- Opening **Codex thread** navigation does not change the **Session bottom panel** state.
 - A **Default Codex thread** is used only when the **Session workbench** has no explicit **Active Codex thread** request.
 - Ports, terminal access, runtime status, repository filesystem state, and sandbox-level diffs belong to the **Sandbox session**.
 - Transcript, active turn state, context usage, and Codex thread actions belong to the **Codex thread**.
@@ -124,6 +128,7 @@ _Avoid_: Chat page when referring to the whole workspace
 - A **Session workbench** URL may identify an **Active Codex thread** without making the thread a separate session.
 - User-initiated **Active Codex thread** changes are navigable history within the **Session workbench**.
 - User-initiated **Active Codex thread** URL changes represent confirmed active-thread changes.
+- After a user selects or starts a **Codex thread**, the **Session workbench** URL keeps the confirmed `threadId` explicit, including when the selected thread is the **Default Codex thread**.
 - First-pass **Codex thread** navigation does not make **Codex threads** durable Mistle records.
 - **Codex thread** navigation is ordered by recent thread activity unless the user chooses another view.
 - A loaded **Codex thread** is runtime metadata for navigation, not a separate product category.
@@ -133,6 +138,14 @@ _Avoid_: Chat page when referring to the whole workspace
 - First-pass **Codex thread** navigation is visible beside the chat pane on desktop and collapses into a drawer on narrow screens.
 - A repository-scoped **Codex thread** navigator may be empty while the chat pane still shows an **Active Codex thread** from another path.
 - When the **Active Codex thread** is outside the navigator scope, the UI should make the path mismatch visible.
+- First-pass **Codex thread** navigation shows the latest unarchived **Codex threads** returned by Codex.
+- First-pass **Codex thread** navigation is opened from the **Session workbench** header and occupies the resizable right-side workbench panel.
+- Diff review and **Codex thread** navigation share the **Session workbench** right-side panel slot.
+- Right-side panel occupants may have different preferred opening sizes, but user resizing applies to the shared right-side panel slot.
+- Switching the open right-side panel between occupants changes content without changing the panel width.
+- Opening the right-side panel uses the shared user-resized width when one exists; otherwise it uses the active occupant's preferred opening size.
+- The **Codex thread** navigator groups threads by working directory rather than filtering by repository.
+- When Codex returns another page of thread results, the **Codex thread** navigator should indicate that only the latest 20 are shown.
 - First-pass **Codex thread** navigation is Codex-specific rather than a generic runtime concept.
 - The Codex session state owns **Active Codex thread** changes for the **Session workbench**.
 - Cached **Codex thread** transcripts are ephemeral **Session workbench** state.

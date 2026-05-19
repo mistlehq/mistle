@@ -7,6 +7,7 @@ describe("shouldAttemptRequestedThreadResume", () => {
     expect(
       shouldAttemptRequestedThreadResume({
         activeThreadId: "thread_active",
+        hasInFlightThreadNavigation: false,
         previousAttempt: null,
         providerThreadId: null,
         requestedThreadId: null,
@@ -19,6 +20,7 @@ describe("shouldAttemptRequestedThreadResume", () => {
     expect(
       shouldAttemptRequestedThreadResume({
         activeThreadId: "thread_requested",
+        hasInFlightThreadNavigation: false,
         previousAttempt: null,
         providerThreadId: null,
         requestedThreadId: "thread_requested",
@@ -31,6 +33,7 @@ describe("shouldAttemptRequestedThreadResume", () => {
     expect(
       shouldAttemptRequestedThreadResume({
         activeThreadId: "thread_provider",
+        hasInFlightThreadNavigation: false,
         previousAttempt: null,
         providerThreadId: "thread_provider",
         requestedThreadId: "thread_requested",
@@ -43,6 +46,7 @@ describe("shouldAttemptRequestedThreadResume", () => {
     expect(
       shouldAttemptRequestedThreadResume({
         activeThreadId: "thread_active",
+        hasInFlightThreadNavigation: false,
         previousAttempt: null,
         providerThreadId: null,
         requestedThreadId: "thread_requested",
@@ -53,6 +57,7 @@ describe("shouldAttemptRequestedThreadResume", () => {
     expect(
       shouldAttemptRequestedThreadResume({
         activeThreadId: "thread_active",
+        hasInFlightThreadNavigation: false,
         previousAttempt: {
           sandboxInstanceId: "sbi_test",
           threadId: "thread_requested",
@@ -68,6 +73,7 @@ describe("shouldAttemptRequestedThreadResume", () => {
     expect(
       shouldAttemptRequestedThreadResume({
         activeThreadId: "thread_active",
+        hasInFlightThreadNavigation: false,
         previousAttempt: {
           sandboxInstanceId: "sbi_test",
           threadId: "thread_requested",
@@ -81,6 +87,7 @@ describe("shouldAttemptRequestedThreadResume", () => {
     expect(
       shouldAttemptRequestedThreadResume({
         activeThreadId: "thread_active",
+        hasInFlightThreadNavigation: false,
         previousAttempt: {
           sandboxInstanceId: "sbi_test",
           threadId: "thread_requested",
@@ -90,5 +97,18 @@ describe("shouldAttemptRequestedThreadResume", () => {
         sandboxInstanceId: "sbi_other",
       }),
     ).toBe(true);
+  });
+
+  it("does not resume the requested URL thread while another thread navigation is in flight", () => {
+    expect(
+      shouldAttemptRequestedThreadResume({
+        activeThreadId: "thread_newly_confirmed",
+        hasInFlightThreadNavigation: true,
+        previousAttempt: null,
+        providerThreadId: null,
+        requestedThreadId: "thread_stale_url",
+        sandboxInstanceId: "sbi_test",
+      }),
+    ).toBe(false);
   });
 });

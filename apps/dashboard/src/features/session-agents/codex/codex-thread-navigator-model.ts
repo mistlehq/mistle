@@ -80,7 +80,7 @@ function createPinnedActiveThreadRow(input: {
 
   return {
     id: input.activeThread.id,
-    title: "Active thread",
+    title: "New thread",
     cwd: input.activeThread.cwd,
     cwdSectionLabel: resolveCwdSectionLabel(input.activeThread.cwd),
     isActive: true,

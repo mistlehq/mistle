@@ -104,7 +104,7 @@ function CodexThreadNavigationWorkbenchStory(input?: {
         primaryBottomPanel={createStorySessionBottomPanel()}
         sandboxInstanceId={StorySandboxInstanceId}
         secondaryPanelDefaultSize="20%"
-        secondaryPanelLayoutKey="threads"
+        secondaryPanelLayoutKey="right-panel"
         secondaryPanelMinSize="16rem"
         secondaryPanel={<CodexThreadNavigationPanel />}
       />
@@ -186,7 +186,7 @@ function CodexThreadNavigationAppShellStory(input?: {
               primaryBottomPanel={createStorySessionBottomPanel()}
               sandboxInstanceId={StorySandboxInstanceId}
               secondaryPanelDefaultSize="20%"
-              secondaryPanelLayoutKey="threads"
+              secondaryPanelLayoutKey="right-panel"
               secondaryPanelMinSize="16rem"
               secondaryPanel={<CodexThreadNavigationPanel />}
             />
