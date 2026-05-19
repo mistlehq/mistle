@@ -1,3 +1,4 @@
+import type { ComposerCapability, ComposerCommandDescriptor } from "@mistle/integrations-core";
 import { OpenAiReasoningEffortLabelByValue } from "@mistle/integrations-definitions/openai";
 import {
   Button,
@@ -27,12 +28,24 @@ import {
   StopCircleIcon,
   XIcon,
 } from "@phosphor-icons/react";
-import { useRef } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 
+import {
+  detectActiveComposerTrigger,
+  listComposerCommands,
+} from "../../pages/session-composer/session-composer-trigger-detection.js";
 import { resolveSelectableValue } from "../../shared/select-value.js";
 
 const REASONING_EFFORT_OPTIONS = ["low", "medium", "high", "xhigh"] as const;
 const ReasoningEffortLabels: Readonly<Record<string, string>> = OpenAiReasoningEffortLabelByValue;
+
+function formatSlashCommandOptionLabel(command: ComposerCommandDescriptor): string {
+  if (command.description === undefined) {
+    return `/${command.name}`;
+  }
+
+  return `/${command.name} ${command.description}`;
+}
 
 function formatReasoningEffortLabel(value: string): string {
   return ReasoningEffortLabels[value] ?? value;
@@ -66,6 +79,7 @@ export type ChatComposerStatusMessage = {
 };
 
 export type ChatComposerViewModel = {
+  composerCapabilities: readonly ComposerCapability[];
   composerText: string;
   gitBranchLabel: string | null;
   pullRequest: {
@@ -111,6 +125,7 @@ export type ChatComposerViewModel = {
   showReasoningControl?: boolean;
   onComposerTextChange: (value: string) => void;
   onSubmit: () => void;
+  onRuntimeCommandSubmit: (commandId: string) => void;
   onSecondarySubmit?: () => void;
   onModelChange: (value: string) => void;
   onReasoningEffortChange: (value: string) => void;
@@ -120,6 +135,7 @@ export type ChatComposerViewModel = {
 };
 
 export function ChatComposer({
+  composerCapabilities,
   composerText,
   gitBranchLabel,
   pullRequest,
@@ -142,6 +158,7 @@ export function ChatComposer({
   showReasoningControl = true,
   onComposerTextChange,
   onSubmit,
+  onRuntimeCommandSubmit,
   onSecondarySubmit,
   onModelChange,
   onReasoningEffortChange,
@@ -150,6 +167,38 @@ export function ChatComposer({
   onRemovePendingAttachment,
 }: ChatComposerViewModel): React.JSX.Element {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const commandListId = useId();
+  const [composerSelection, setComposerSelection] = useState({
+    start: composerText.length,
+    end: composerText.length,
+  });
+  const [activeSlashCommandIndex, setActiveSlashCommandIndex] = useState(0);
+  const activeComposerTrigger = detectActiveComposerTrigger({
+    composerCapabilities,
+    composerText,
+    selectionStart: composerSelection.start,
+    selectionEnd: composerSelection.end,
+  });
+  const slashCommandOptions = useMemo(
+    () => listComposerCommands(composerCapabilities),
+    [composerCapabilities],
+  );
+  const filteredSlashCommandOptions =
+    activeComposerTrigger === null
+      ? []
+      : slashCommandOptions.filter((command) =>
+          command.name.startsWith(activeComposerTrigger.query),
+        );
+  const showSlashCommandMenu = activeComposerTrigger !== null;
+  const activeSlashCommandIndexWithinBounds =
+    filteredSlashCommandOptions.length === 0
+      ? null
+      : Math.min(activeSlashCommandIndex, filteredSlashCommandOptions.length - 1);
+  const activeSlashCommand =
+    activeSlashCommandIndexWithinBounds === null
+      ? null
+      : (filteredSlashCommandOptions[activeSlashCommandIndexWithinBounds] ?? null);
   const composerPlaceholder =
     submitMode === "steer" || submitMode === "interrupt"
       ? "Steer the current turn"
@@ -178,6 +227,58 @@ export function ChatComposer({
     }
 
     onPendingFilesAdded(files);
+  }
+
+  function updateComposerSelection(textarea: HTMLTextAreaElement): void {
+    setComposerSelection({
+      start: textarea.selectionStart,
+      end: textarea.selectionEnd,
+    });
+  }
+
+  function insertSlashCommand(command: ComposerCommandDescriptor): void {
+    if (activeComposerTrigger === null) {
+      return;
+    }
+
+    const insertedText = `/${command.name} `;
+    const nextComposerText = [
+      composerText.slice(0, activeComposerTrigger.range.start),
+      insertedText,
+      composerText.slice(activeComposerTrigger.range.end),
+    ].join("");
+    const nextCursorIndex = activeComposerTrigger.range.start + insertedText.length;
+
+    onComposerTextChange(nextComposerText);
+    setComposerSelection({
+      start: nextCursorIndex,
+      end: nextCursorIndex,
+    });
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(nextCursorIndex, nextCursorIndex);
+    });
+  }
+
+  function selectSlashCommand(command: ComposerCommandDescriptor): void {
+    if (command.submitAs === "runtimeCommand") {
+      onRuntimeCommandSubmit(command.id);
+      return;
+    }
+
+    insertSlashCommand(command);
+  }
+
+  function moveActiveSlashCommand(delta: number): void {
+    if (filteredSlashCommandOptions.length === 0) {
+      return;
+    }
+
+    setActiveSlashCommandIndex(
+      (currentIndex) =>
+        (currentIndex + delta + filteredSlashCommandOptions.length) %
+        filteredSlashCommandOptions.length,
+    );
   }
 
   return (
@@ -245,46 +346,135 @@ export function ChatComposer({
             ))}
           </div>
         )}
-        <Textarea
-          className="max-h-48 min-h-12 resize-none overflow-y-auto border-0 bg-transparent p-1.5 shadow-none placeholder:text-muted-foreground/60 focus-visible:border-transparent focus-visible:ring-0"
-          id="session-composer"
-          onChange={(event) => {
-            onComposerTextChange(event.target.value);
-          }}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter" || event.shiftKey) {
-              return;
-            }
+        <div className="relative">
+          {showSlashCommandMenu ? (
+            <div
+              aria-label="Slash commands"
+              className="absolute right-0 bottom-full left-0 z-20 mb-2 max-h-64 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+              id={commandListId}
+              role="listbox"
+            >
+              {filteredSlashCommandOptions.length === 0 ? (
+                <div className="px-3 py-2 text-sm text-muted-foreground">No commands</div>
+              ) : (
+                filteredSlashCommandOptions.map((command, commandIndex) => {
+                  const isActiveCommand = command.id === activeSlashCommand?.id;
 
-            event.preventDefault();
-            if ((event.metaKey || event.ctrlKey) && onSecondarySubmit !== undefined) {
-              if (secondarySubmitDisabled) {
+                  return (
+                    <button
+                      aria-label={formatSlashCommandOptionLabel(command)}
+                      aria-selected={isActiveCommand}
+                      className={[
+                        "flex w-full items-start gap-3 rounded-sm px-3 py-2 text-left text-sm outline-none",
+                        isActiveCommand ? "bg-muted text-foreground" : "hover:bg-muted/70",
+                      ].join(" ")}
+                      id={`${commandListId}-${command.id}`}
+                      key={command.id}
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        selectSlashCommand(command);
+                      }}
+                      onMouseEnter={() => {
+                        setActiveSlashCommandIndex(commandIndex);
+                      }}
+                      role="option"
+                      type="button"
+                    >
+                      <span className="min-w-24 font-mono text-xs text-muted-foreground">
+                        /{command.name}
+                      </span>
+                      {command.description === undefined ? null : (
+                        <span className="min-w-0 flex-1 text-muted-foreground">
+                          {command.description}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          ) : null}
+          <Textarea
+            aria-activedescendant={
+              activeSlashCommand === null ? undefined : `${commandListId}-${activeSlashCommand.id}`
+            }
+            aria-controls={showSlashCommandMenu ? commandListId : undefined}
+            aria-expanded={showSlashCommandMenu}
+            aria-haspopup="listbox"
+            className="max-h-48 min-h-12 resize-none overflow-y-auto border-0 bg-transparent p-1.5 shadow-none placeholder:text-muted-foreground/60 focus-visible:border-transparent focus-visible:ring-0"
+            id="session-composer"
+            onChange={(event) => {
+              onComposerTextChange(event.target.value);
+              updateComposerSelection(event.currentTarget);
+              setActiveSlashCommandIndex(0);
+            }}
+            onClick={(event) => {
+              updateComposerSelection(event.currentTarget);
+            }}
+            onKeyDown={(event) => {
+              if (showSlashCommandMenu && filteredSlashCommandOptions.length > 0) {
+                if (event.key === "ArrowDown") {
+                  event.preventDefault();
+                  moveActiveSlashCommand(1);
+                  return;
+                }
+
+                if (event.key === "ArrowUp") {
+                  event.preventDefault();
+                  moveActiveSlashCommand(-1);
+                  return;
+                }
+
+                if (event.key === "Tab" || event.key === "Enter") {
+                  event.preventDefault();
+                  if (activeSlashCommand !== null) {
+                    selectSlashCommand(activeSlashCommand);
+                  }
+                  return;
+                }
+              }
+
+              if (event.key !== "Enter" || event.shiftKey) {
                 return;
               }
 
-              onSecondarySubmit();
-              return;
-            }
+              event.preventDefault();
+              if ((event.metaKey || event.ctrlKey) && onSecondarySubmit !== undefined) {
+                if (secondarySubmitDisabled) {
+                  return;
+                }
 
-            if (submitDisabled) {
-              return;
-            }
+                onSecondarySubmit();
+                return;
+              }
 
-            onSubmit();
-          }}
-          onPaste={(event) => {
-            const clipboardFiles = Array.from(event.clipboardData.files);
-            if (clipboardFiles.length === 0) {
-              return;
-            }
+              if (submitDisabled) {
+                return;
+              }
 
-            event.preventDefault();
-            addPendingFiles(clipboardFiles);
-          }}
-          placeholder={composerPlaceholder}
-          rows={2}
-          value={composerText}
-        />
+              onSubmit();
+            }}
+            onKeyUp={(event) => {
+              updateComposerSelection(event.currentTarget);
+            }}
+            onPaste={(event) => {
+              const clipboardFiles = Array.from(event.clipboardData.files);
+              if (clipboardFiles.length === 0) {
+                return;
+              }
+
+              event.preventDefault();
+              addPendingFiles(clipboardFiles);
+            }}
+            onSelect={(event) => {
+              updateComposerSelection(event.currentTarget);
+            }}
+            placeholder={composerPlaceholder}
+            ref={textareaRef}
+            rows={2}
+            value={composerText}
+          />
+        </div>
         <div className="flex items-center gap-2">
           <div className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] items-center gap-1.5 md:flex md:flex-wrap md:items-center md:gap-2">
             <Button

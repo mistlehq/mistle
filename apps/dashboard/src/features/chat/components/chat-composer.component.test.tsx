@@ -6,8 +6,55 @@ import { describe, expect, it } from "vitest";
 
 import { ChatComposer } from "./chat-composer.js";
 
+const ComposerCommandCapabilityFixture: React.ComponentProps<
+  typeof ChatComposer
+>["composerCapabilities"][number] = {
+  kind: "composerCommand",
+  trigger: "/",
+  source: "runtimeCommand",
+  commands: [
+    {
+      id: "codex.review",
+      name: "review",
+      description: "Review the current changes",
+      submitAs: "inlineText",
+    },
+    {
+      id: "codex.explain",
+      name: "explain",
+      description: "Explain the selected code",
+      submitAs: "inlineText",
+    },
+    {
+      id: "codex.rewrite",
+      name: "rewrite",
+      description: "Rewrite with constraints",
+      submitAs: "inlineText",
+    },
+    {
+      id: "codex.plan",
+      name: "plan",
+      description: "Plan before making changes",
+      submitAs: "inlineText",
+    },
+    {
+      id: "codex.goal",
+      name: "goal",
+      description: "Set or update the current goal",
+      submitAs: "inlineText",
+    },
+    {
+      id: "codex.compact",
+      name: "compact",
+      description: "Compact the current context",
+      submitAs: "runtimeCommand",
+    },
+  ],
+};
+
 function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
   return {
+    composerCapabilities: [],
     composerText: "Ship it",
     gitBranchLabel: null,
     pullRequest: null,
@@ -27,12 +74,37 @@ function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
     configControlsDisabled: false,
     onComposerTextChange: () => {},
     onSubmit: () => {},
+    onRuntimeCommandSubmit: () => {},
     onModelChange: () => {},
     onReasoningEffortChange: () => {},
     onPendingFilesAdded: () => {},
     onClearPendingDiffComments: () => {},
     onRemovePendingAttachment: () => {},
   };
+}
+
+function ControlledChatComposer(
+  input: Partial<React.ComponentProps<typeof ChatComposer>>,
+): React.JSX.Element {
+  const [composerText, setComposerText] = useState(input.composerText ?? "");
+
+  return (
+    <ChatComposer
+      {...createBaseComposerProps()}
+      {...input}
+      composerText={composerText}
+      onComposerTextChange={setComposerText}
+    />
+  );
+}
+
+function getComposerTextarea(): HTMLTextAreaElement {
+  const textbox = screen.getByRole("textbox");
+  if (!(textbox instanceof HTMLTextAreaElement)) {
+    throw new Error("Expected composer textbox to be a textarea.");
+  }
+
+  return textbox;
 }
 
 describe("ChatComposer", () => {
@@ -306,5 +378,139 @@ describe("ChatComposer", () => {
 
     expect(secondarySubmitCount).toBe(1);
     expect(submitCount).toBe(0);
+  });
+
+  it("shows slash command suggestions from runtime composer capabilities", () => {
+    render(
+      <ControlledChatComposer
+        composerCapabilities={[ComposerCommandCapabilityFixture]}
+        composerText="/re"
+      />,
+    );
+
+    expect(screen.getByRole("listbox", { name: "Slash commands" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "/review Review the current changes" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "/rewrite Rewrite with constraints" })).toBeTruthy();
+    expect(screen.queryByRole("option", { name: "/explain Explain the selected code" })).toBeNull();
+  });
+
+  it("shows no-results slash command state without blocking normal submit", () => {
+    let submitCount = 0;
+
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        composerCapabilities={[ComposerCommandCapabilityFixture]}
+        composerText="/zz"
+        onSubmit={() => {
+          submitCount += 1;
+        }}
+      />,
+    );
+
+    expect(screen.getByText("No commands")).toBeTruthy();
+
+    fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
+
+    expect(submitCount).toBe(1);
+  });
+
+  it("inserts the active slash command with keyboard selection", () => {
+    render(
+      <ControlledChatComposer
+        composerCapabilities={[ComposerCommandCapabilityFixture]}
+        composerText="/"
+      />,
+    );
+
+    const composer = getComposerTextarea();
+    fireEvent.keyDown(composer, { key: "ArrowDown" });
+    fireEvent.keyDown(composer, { key: "Enter" });
+
+    expect(composer.value).toBe("/explain ");
+  });
+
+  it("inserts a slash command with mouse selection", () => {
+    render(
+      <ControlledChatComposer
+        composerCapabilities={[ComposerCommandCapabilityFixture]}
+        composerText="/re"
+      />,
+    );
+
+    fireEvent.mouseDown(screen.getByRole("option", { name: "/rewrite Rewrite with constraints" }));
+
+    expect(getComposerTextarea().value).toBe("/rewrite ");
+  });
+
+  it("executes a runtime slash command with keyboard selection", () => {
+    const submittedRuntimeCommands: string[] = [];
+    let submitCount = 0;
+
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        composerCapabilities={[ComposerCommandCapabilityFixture]}
+        composerText="/comp"
+        onRuntimeCommandSubmit={(commandId) => {
+          submittedRuntimeCommands.push(commandId);
+        }}
+        onSubmit={() => {
+          submitCount += 1;
+        }}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
+
+    expect(submittedRuntimeCommands).toEqual(["codex.compact"]);
+    expect(submitCount).toBe(0);
+  });
+
+  it("submits manually typed slash text with arguments as ordinary prompt text", () => {
+    let submitCount = 0;
+
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        composerCapabilities={[ComposerCommandCapabilityFixture]}
+        composerText="/does-not-exist do something"
+        onSubmit={() => {
+          submitCount += 1;
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole("listbox", { name: "Slash commands" })).toBeNull();
+
+    fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
+
+    expect(submitCount).toBe(1);
+  });
+
+  it("submits a known slash command with arguments as ordinary prompt text when no suggestion is selected", () => {
+    const submittedRuntimeCommands: string[] = [];
+    let submitCount = 0;
+
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        composerCapabilities={[ComposerCommandCapabilityFixture]}
+        composerText="/compact now"
+        onRuntimeCommandSubmit={(commandId) => {
+          submittedRuntimeCommands.push(commandId);
+        }}
+        onSubmit={() => {
+          submitCount += 1;
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole("listbox", { name: "Slash commands" })).toBeNull();
+
+    fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
+
+    expect(submittedRuntimeCommands).toEqual([]);
+    expect(submitCount).toBe(1);
   });
 });

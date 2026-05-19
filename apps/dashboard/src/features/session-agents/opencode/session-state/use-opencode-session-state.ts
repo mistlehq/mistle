@@ -675,6 +675,7 @@ export function useOpenCodeSessionState(input: {
   return {
     bootstrap: {
       phase: bootstrapPhase,
+      composerCapabilities: [],
       establishedSnapshot: {
         availableModels,
         configSnapshot: EmptyOpenCodeComposerConfig,

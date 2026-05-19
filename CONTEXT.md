@@ -88,6 +88,14 @@ _Avoid_: Chat page when referring to the whole workspace
 The sandbox-scoped lower workbench area used for terminal-style tools within a **Session workbench**.
 _Avoid_: Thread panel, Codex thread panel
 
+**Composer capability**:
+A special composer interaction available for a session, including how the input is represented while editing and how it is submitted, determined by the session's **Agent runtime**.
+_Avoid_: Autocomplete feature, composer shortcut
+
+**Composer command**:
+A composer input selected with `/` that submits a command owned by the session's **Agent runtime**.
+_Avoid_: Slash autocomplete
+
 ## Relationships
 
 - A **Sandbox profile version** may have one usable **Snapshot**.
@@ -151,6 +159,11 @@ _Avoid_: Thread panel, Codex thread panel
 - The Codex session state owns **Active Codex thread** changes for the **Session workbench**.
 - Cached **Codex thread** transcripts are ephemeral **Session workbench** state.
 - A cached **Codex thread** transcript does not become visible as active until Codex confirms the thread is resumable.
+- An **Agent runtime** determines which **Composer capabilities** are available for a session.
+- An **Agent runtime** is the source of truth for its baseline **Composer capabilities**.
+- A **Composer capability** defines both the editing representation and the submission behavior, not just whether a feature is enabled.
+- The first **Composer commands** are runtime-owned; dashboard UI controls are not **Composer commands**.
+- A **Composer command** declares its editing representation separately from whether submission becomes inline prompt text or a typed runtime command.
 
 ## Example Dialogue
 

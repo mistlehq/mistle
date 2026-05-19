@@ -57,6 +57,7 @@ export const CodexFixtureSessionEntriesWithExploringGroup: readonly ChatEntry[] 
 export const CodexFixtureSessionServerRequests: readonly CodexApprovalRequestEntry[] = [];
 
 export const SessionComposerFixtureProps: ChatComposerViewModel = {
+  composerCapabilities: [],
   composerText: "Focus on dashboard asset ownership next.",
   gitBranchLabel: null,
   pullRequest: null,
@@ -78,6 +79,7 @@ export const SessionComposerFixtureProps: ChatComposerViewModel = {
   configControlsDisabled: false,
   onComposerTextChange: function onComposerTextChange() {},
   onSubmit: function onSubmit() {},
+  onRuntimeCommandSubmit: function onRuntimeCommandSubmit() {},
   onSecondarySubmit: function onSecondarySubmit() {},
   onModelChange: function onModelChange() {},
   onReasoningEffortChange: function onReasoningEffortChange() {},

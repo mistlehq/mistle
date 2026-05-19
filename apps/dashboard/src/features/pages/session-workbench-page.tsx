@@ -688,6 +688,7 @@ function SessionWorkspaceSidebarTrigger(): React.JSX.Element | null {
 
 function createEmptyComposerViewModel(): ChatComposerViewModel {
   return {
+    composerCapabilities: [],
     composerText: "",
     gitBranchLabel: null,
     pullRequest: null,
@@ -709,6 +710,7 @@ function createEmptyComposerViewModel(): ChatComposerViewModel {
     configControlsDisabled: true,
     onComposerTextChange: function onComposerTextChange() {},
     onSubmit: function onSubmit() {},
+    onRuntimeCommandSubmit: function onRuntimeCommandSubmit() {},
     onSecondarySubmit: function onSecondarySubmit() {},
     onModelChange: function onModelChange() {},
     onReasoningEffortChange: function onReasoningEffortChange() {},

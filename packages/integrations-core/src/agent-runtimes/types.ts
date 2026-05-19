@@ -38,6 +38,42 @@ export type AgentPtyLaunchSpec = {
   resumeLaunch: AgentPtyLaunchTemplate;
 };
 
+export type ComposerCommandSubmitAs = "inlineText" | "runtimeCommand";
+
+export type ContextMentionCapability = {
+  kind: "contextMention";
+  trigger: "@";
+  source: "workspacePath";
+  insertAs: "relativePathText";
+  submitAs: "inlineText";
+};
+
+export type SkillMentionCapability = {
+  kind: "skillMention";
+  trigger: "$";
+  source: "runtimeSkill";
+  submitAs: "inlineText";
+};
+
+export type ComposerCommandDescriptor = {
+  id: string;
+  name: string;
+  description?: string;
+  submitAs: ComposerCommandSubmitAs;
+};
+
+export type ComposerCommandCapability = {
+  kind: "composerCommand";
+  trigger: "/";
+  source: "runtimeCommand";
+  commands: readonly ComposerCommandDescriptor[];
+};
+
+export type ComposerCapability =
+  | ContextMentionCapability
+  | SkillMentionCapability
+  | ComposerCommandCapability;
+
 export type CompileAgentRuntimeInput<TRuntimeConfig = Record<string, unknown>> = {
   organizationId: string;
   sandboxProfileId: string;
@@ -96,6 +132,7 @@ export type AgentRuntimeDefinition<
   compileRuntime(
     input: CompileAgentRuntimeInput<z.output<TRuntimeConfigSchema>>,
   ): CompileAgentRuntimeResult;
+  composerCapabilities?: readonly ComposerCapability[];
   createConversationProvider?(): AgentConversationProvider;
   materializeMcpConfig?(): ReadonlyArray<IntegrationMcpConfig>;
 };

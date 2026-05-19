@@ -1,5 +1,6 @@
 export * from "./codex-operations.js";
 export * from "./codex-json-rpc.js";
+export * from "./composer-capabilities.js";
 export * from "./thread-items.js";
 export { createBrowserSandboxSessionRuntime as createBrowserCodexSessionRuntime } from "@mistle/sandbox-session-client/browser";
 export {

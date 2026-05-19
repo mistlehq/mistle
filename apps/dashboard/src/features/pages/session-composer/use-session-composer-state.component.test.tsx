@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import type { ComposerCapability } from "@mistle/integrations-core";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -14,6 +15,7 @@ import { useSessionComposerState } from "./use-session-composer-state.js";
 
 const ReadyBootstrap: SessionComposerBootstrapResult = {
   phase: { status: "ready" },
+  composerCapabilities: [],
   establishedSnapshot: {
     availableModels: [
       {
@@ -68,8 +70,10 @@ const PendingDiffCommentsFixture: readonly PendingSessionDiffComment[] = [
 
 function SessionComposerStateHarness(input: {
   collaborationDeveloperInstructions?: string;
+  composerCapabilities?: readonly ComposerCapability[];
   composerText: string;
   deferSubmit?: boolean;
+  executeRuntimeCommand?: (commandId: string) => boolean;
   pendingDiffComments: readonly PendingSessionDiffComment[];
   shouldFailSubmit?: boolean;
 }): React.JSX.Element {
@@ -83,7 +87,13 @@ function SessionComposerStateHarness(input: {
 
   const composerState = useSessionComposerState({
     composerStateInput: {
-      bootstrap: ReadyBootstrap,
+      bootstrap:
+        input.composerCapabilities === undefined
+          ? ReadyBootstrap
+          : {
+              ...ReadyBootstrap,
+              composerCapabilities: input.composerCapabilities,
+            },
       clearSessionErrorMessage: () => {
         return;
       },
@@ -158,6 +168,9 @@ function SessionComposerStateHarness(input: {
           return;
         },
       },
+      ...(input.executeRuntimeCommand === undefined
+        ? {}
+        : { executeRuntimeCommand: input.executeRuntimeCommand }),
     },
     draftState: {
       composerText,
@@ -173,6 +186,14 @@ function SessionComposerStateHarness(input: {
     <div>
       <button onClick={composerState.composerViewModel.onSubmit} type="button">
         Submit
+      </button>
+      <button
+        onClick={() => {
+          composerState.composerViewModel.onRuntimeCommandSubmit("codex.compact");
+        }}
+        type="button"
+      >
+        Submit runtime command
       </button>
       <button
         onClick={() => {
@@ -192,6 +213,9 @@ function SessionComposerStateHarness(input: {
         </button>
       )}
       <div data-testid="submit-mode">{composerState.composerViewModel.submitMode}</div>
+      <div data-testid="composer-capability-count">
+        {String(composerState.composerViewModel.composerCapabilities.length)}
+      </div>
       <div data-testid="submit-disabled">
         {composerState.composerViewModel.submitDisabled ? "true" : "false"}
       </div>
@@ -215,6 +239,131 @@ function SessionComposerStateHarness(input: {
 describe("useSessionComposerState", () => {
   afterEach(() => {
     cleanup();
+  });
+
+  it("passes composer capabilities through to the composer view model", () => {
+    render(
+      <SessionComposerStateHarness
+        composerCapabilities={[
+          {
+            kind: "composerCommand",
+            trigger: "/",
+            source: "runtimeCommand",
+            commands: [
+              {
+                id: "codex.review",
+                name: "review",
+                submitAs: "inlineText",
+              },
+            ],
+          },
+        ]}
+        composerText="Review this"
+        pendingDiffComments={[]}
+      />,
+    );
+
+    expect(screen.getByTestId("composer-capability-count").textContent).toBe("1");
+  });
+
+  it("executes available runtime composer commands without submitting prompt text", () => {
+    const submittedRuntimeCommands: string[] = [];
+
+    render(
+      <SessionComposerStateHarness
+        composerCapabilities={[
+          {
+            kind: "composerCommand",
+            trigger: "/",
+            source: "runtimeCommand",
+            commands: [
+              {
+                id: "codex.compact",
+                name: "compact",
+                submitAs: "runtimeCommand",
+              },
+            ],
+          },
+        ]}
+        composerText="/compact"
+        executeRuntimeCommand={(commandId) => {
+          submittedRuntimeCommands.push(commandId);
+          return true;
+        }}
+        pendingDiffComments={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit runtime command" }));
+
+    expect(submittedRuntimeCommands).toEqual(["codex.compact"]);
+    expect(screen.getByTestId("submitted-prompt").textContent).toBe("");
+    expect(screen.getByTestId("composer-text").textContent).toBe("");
+  });
+
+  it("shows a local error when a runtime composer command has no executor", () => {
+    render(
+      <SessionComposerStateHarness
+        composerCapabilities={[
+          {
+            kind: "composerCommand",
+            trigger: "/",
+            source: "runtimeCommand",
+            commands: [
+              {
+                id: "codex.compact",
+                name: "compact",
+                submitAs: "runtimeCommand",
+              },
+            ],
+          },
+        ]}
+        composerText="/compact"
+        pendingDiffComments={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit runtime command" }));
+
+    expect(screen.getByTestId("status-message").textContent).toBe(
+      "Runtime command 'codex.compact' is not supported.",
+    );
+    expect(screen.getByTestId("composer-text").textContent).toBe("/compact");
+  });
+
+  it("preserves runtime composer command text when the executor rejects it", () => {
+    const submittedRuntimeCommands: string[] = [];
+
+    render(
+      <SessionComposerStateHarness
+        composerCapabilities={[
+          {
+            kind: "composerCommand",
+            trigger: "/",
+            source: "runtimeCommand",
+            commands: [
+              {
+                id: "codex.compact",
+                name: "compact",
+                submitAs: "runtimeCommand",
+              },
+            ],
+          },
+        ]}
+        composerText="/compact"
+        executeRuntimeCommand={(commandId) => {
+          submittedRuntimeCommands.push(commandId);
+          return false;
+        }}
+        pendingDiffComments={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit runtime command" }));
+
+    expect(submittedRuntimeCommands).toEqual(["codex.compact"]);
+    expect(screen.getByTestId("submitted-prompt").textContent).toBe("");
+    expect(screen.getByTestId("composer-text").textContent).toBe("/compact");
   });
 
   it("submits diff comments even when the composer text is blank and clears them on success", async () => {

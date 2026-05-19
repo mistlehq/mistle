@@ -1,3 +1,5 @@
+import type { ComposerCapability } from "@mistle/integrations-core";
+
 import type { ComposerConfigSnapshot } from "./session-composer-config.js";
 
 export type SessionComposerModel = {
@@ -16,6 +18,7 @@ export type SessionComposerBootstrapPhase =
 
 export type SessionComposerBootstrapResult = {
   phase: SessionComposerBootstrapPhase;
+  composerCapabilities: readonly ComposerCapability[];
   establishedSnapshot: {
     availableModels: readonly SessionComposerModel[];
     configSnapshot: ComposerConfigSnapshot;

@@ -1,4 +1,7 @@
-import type { AgentConversationCollaborationModeSettings } from "@mistle/integrations-core";
+import type {
+  AgentConversationCollaborationModeSettings,
+  ComposerCommandDescriptor,
+} from "@mistle/integrations-core";
 import type { UploadedSandboxFile } from "@mistle/sandbox-session-client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -27,6 +30,7 @@ import {
   resolveComposerStatusMessage,
   type ComposerStatusMessage,
 } from "./session-composer-status.js";
+import { listComposerCommands } from "./session-composer-trigger-detection.js";
 import type { SessionComposerAttachmentControl } from "./use-session-composer-attachment-control.js";
 import type { SessionComposerConfigControl } from "./use-session-composer-config-control.js";
 
@@ -89,6 +93,7 @@ export type SessionComposerRuntimeInput = {
   contextUsage: ChatComposerViewModel["contextUsage"];
   collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
   modelSelection: SessionComposerModelSelectionInput;
+  executeRuntimeCommand?: (commandId: string) => boolean;
   sessionErrorMessage: string | null;
   turnControl: SessionTurnControl;
 };
@@ -512,6 +517,48 @@ export function useSessionComposerState(input: {
     turnCollaborationModeSettings,
   ]);
 
+  const submitRuntimeCommand = useCallback(
+    (commandId: string): void => {
+      clearSessionErrorMessage();
+      setComposerErrorMessage(null);
+
+      const command = findRuntimeComposerCommand({
+        commandId,
+        commands: listComposerCommands(composerStateInput.bootstrap.composerCapabilities),
+      });
+      if (command === null) {
+        setComposerErrorMessage(`Runtime command '${commandId}' is not available.`);
+        return;
+      }
+
+      if (composerStateInput.bootstrap.phase.status !== "ready") {
+        if (composerStateInput.bootstrap.phase.status === "failed") {
+          setComposerErrorMessage(composerStateInput.bootstrap.phase.message);
+        }
+        return;
+      }
+
+      if (composerStateInput.executeRuntimeCommand === undefined) {
+        setComposerErrorMessage(`Runtime command '${commandId}' is not supported.`);
+        return;
+      }
+
+      const commandAccepted = composerStateInput.executeRuntimeCommand(command.id);
+      if (!commandAccepted) {
+        return;
+      }
+
+      draftState.setComposerText("");
+    },
+    [
+      clearSessionErrorMessage,
+      composerStateInput.bootstrap.composerCapabilities,
+      composerStateInput.bootstrap.phase,
+      composerStateInput.executeRuntimeCommand,
+      draftState,
+    ],
+  );
+
   const submitLabel = useMemo(() => {
     if (submitAction.submitMode === "interrupt") {
       return composerStateInput.turnControl.isInterrupting ? "Stopping..." : "Stop";
@@ -644,6 +691,7 @@ export function useSessionComposerState(input: {
 
   return {
     composerViewModel: {
+      composerCapabilities: composerStateInput.bootstrap.composerCapabilities,
       composerText,
       pendingDiffCommentSummary:
         draftState.pendingDiffComments.length === 0
@@ -691,6 +739,7 @@ export function useSessionComposerState(input: {
       showReasoningControl: composerStateInput.configControl.canChangeReasoningEffort,
       onComposerTextChange: handleComposerTextChange,
       onSubmit: submitComposer,
+      onRuntimeCommandSubmit: submitRuntimeCommand,
       onSecondarySubmit: queuePrompt,
       onModelChange: handleModelChange,
       onReasoningEffortChange: handleReasoningEffortChange,
@@ -702,4 +751,16 @@ export function useSessionComposerState(input: {
     removeQueuedPrompt,
     statusMessage: composerStatusMessage,
   };
+}
+
+function findRuntimeComposerCommand(input: {
+  commandId: string;
+  commands: readonly ComposerCommandDescriptor[];
+}): ComposerCommandDescriptor | null {
+  const command = input.commands.find(
+    (candidateCommand) =>
+      candidateCommand.id === input.commandId && candidateCommand.submitAs === "runtimeCommand",
+  );
+
+  return command ?? null;
 }

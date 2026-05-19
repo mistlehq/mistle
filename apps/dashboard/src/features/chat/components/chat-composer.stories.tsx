@@ -1,3 +1,4 @@
+import { CodexComposerCapabilities } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, userEvent, within } from "storybook/test";
@@ -70,40 +71,50 @@ function InteractiveChatComposerStory(
   const [selectedReasoningEffort, setSelectedReasoningEffort] = useState(
     props.selectedReasoningEffort,
   );
+  const [runtimeCommandStatus, setRuntimeCommandStatus] = useState<string | null>(null);
   const [pendingDiffCommentSummary, setPendingDiffCommentSummary] = useState(
     props.pendingDiffCommentSummary,
   );
   const [pendingAttachments, setPendingAttachments] = useState(props.pendingAttachments);
 
   return (
-    <ChatComposer
-      {...props}
-      composerText={composerText}
-      onComposerTextChange={setComposerText}
-      onModelChange={setSelectedModel}
-      onPendingFilesAdded={(files) => {
-        setPendingAttachments((currentAttachments) => [
-          ...currentAttachments,
-          ...files.map((file, index) => ({
-            id: `${file.name}-${currentAttachments.length + index}`,
-            name: file.name,
-          })),
-        ]);
-      }}
-      onReasoningEffortChange={setSelectedReasoningEffort}
-      onClearPendingDiffComments={() => {
-        setPendingDiffCommentSummary(null);
-      }}
-      onRemovePendingAttachment={(attachmentId) => {
-        setPendingAttachments((currentAttachments) =>
-          currentAttachments.filter((attachment) => attachment.id !== attachmentId),
-        );
-      }}
-      pendingDiffCommentSummary={pendingDiffCommentSummary}
-      pendingAttachments={pendingAttachments}
-      selectedModel={selectedModel}
-      selectedReasoningEffort={selectedReasoningEffort}
-    />
+    <>
+      <ChatComposer
+        {...props}
+        composerText={composerText}
+        onComposerTextChange={setComposerText}
+        onModelChange={setSelectedModel}
+        onPendingFilesAdded={(files) => {
+          setPendingAttachments((currentAttachments) => [
+            ...currentAttachments,
+            ...files.map((file, index) => ({
+              id: `${file.name}-${currentAttachments.length + index}`,
+              name: file.name,
+            })),
+          ]);
+        }}
+        onRuntimeCommandSubmit={(commandId) => {
+          setRuntimeCommandStatus(`Executed ${commandId}`);
+          setComposerText("");
+        }}
+        onReasoningEffortChange={setSelectedReasoningEffort}
+        onClearPendingDiffComments={() => {
+          setPendingDiffCommentSummary(null);
+        }}
+        onRemovePendingAttachment={(attachmentId) => {
+          setPendingAttachments((currentAttachments) =>
+            currentAttachments.filter((attachment) => attachment.id !== attachmentId),
+          );
+        }}
+        pendingDiffCommentSummary={pendingDiffCommentSummary}
+        pendingAttachments={pendingAttachments}
+        selectedModel={selectedModel}
+        selectedReasoningEffort={selectedReasoningEffort}
+      />
+      {runtimeCommandStatus === null ? null : (
+        <div className="text-muted-foreground px-1.5 pt-2 text-sm">{runtimeCommandStatus}</div>
+      )}
+    </>
   );
 }
 
@@ -136,6 +147,35 @@ type Story = StoryObj<typeof meta>;
 export const ReadyToSend: Story = {
   args: {
     composerText: "Summarize the config drift and propose the next patch.",
+  },
+};
+
+export const SlashCommandAutocomplete: Story = {
+  args: {
+    composerCapabilities: CodexComposerCapabilities,
+    composerText: "/",
+  },
+  render: (args) => (
+    <div className="flex min-h-[420px] items-end">
+      <PlatformAwareChatComposerStory {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByRole("listbox", { name: "Slash commands" })).toBeVisible();
+    await expect(
+      canvas.getByRole("option", { name: "/review Review the current changes" }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("option", { name: "/plan Plan before making changes" }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("option", { name: "/goal Set or update the current goal" }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("option", { name: "/compact Compact the current context" }),
+    ).toBeVisible();
   },
 };
 
