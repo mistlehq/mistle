@@ -28,8 +28,8 @@ export type SessionWorkbenchThreadNavigationState = {
   closePanel: () => void;
   isDiffPanelActive: boolean;
   isPanelVisible: boolean;
-  panelThreadNavigatorProps: CodexThreadNavigatorProps | null;
   secondaryPanelKind: "diff" | "threads" | null;
+  threadNavigatorProps: CodexThreadNavigatorProps | null;
   togglePanel: () => void;
 };
 
@@ -237,14 +237,8 @@ export function useSessionWorkbenchThreadNavigation(
           rows: threadNavigatorRows,
         }
       : null;
-  const panelThreadNavigatorProps: CodexThreadNavigatorProps | null =
-    threadNavigatorProps === null
-      ? null
-      : {
-          ...threadNavigatorProps,
-        };
   const secondaryPanelKind =
-    panelThreadNavigatorProps !== null && isPanelVisible
+    threadNavigatorProps !== null && isPanelVisible
       ? "threads"
       : input.isDiffPanelVisible
         ? "diff"
@@ -268,8 +262,8 @@ export function useSessionWorkbenchThreadNavigation(
     closePanel,
     isDiffPanelActive,
     isPanelVisible,
-    panelThreadNavigatorProps,
     secondaryPanelKind,
+    threadNavigatorProps,
     togglePanel,
   };
 }

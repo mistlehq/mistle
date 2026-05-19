@@ -1,19 +1,19 @@
 import type { CodexThreadNavigatorRow } from "./codex-thread-navigator-model.js";
 import type { CodexThreadNavigatorProps } from "./codex-thread-navigator.js";
 
-const ActiveCodexThreadNavigatorStoryRow = {
+const HistoricalCodexThreadNavigatorStoryRow = {
   id: "thread_active",
   title: "Implement thread navigation",
   cwd: "/Users/jonathanlow/mistle-projects/mistle-add-threads-handling",
   cwdSectionLabel: "mistle-add-threads-handling",
-  isActive: true,
+  isActive: false,
   isOpening: false,
   isPinnedCurrent: false,
   pendingServerRequestCount: 0,
 } satisfies CodexThreadNavigatorRow;
 
 export const CodexThreadNavigatorStoryRows = [
-  ActiveCodexThreadNavigatorStoryRow,
+  HistoricalCodexThreadNavigatorStoryRow,
   {
     id: "thread_review",
     title: "Review terminal port ownership",
@@ -35,11 +35,11 @@ export const CodexThreadNavigatorStoryRows = [
     pendingServerRequestCount: 0,
   },
   {
-    id: "thread_other_repo",
-    title: "Draft launch note",
-    cwd: "/Users/jonathanlow/mistle-projects/mistle.dev",
-    cwdSectionLabel: "mistle.dev",
-    isActive: false,
+    id: "thread_new",
+    title: "New thread",
+    cwd: "/Users/jonathanlow/mistle-projects/mistle-add-threads-handling",
+    cwdSectionLabel: "mistle-add-threads-handling",
+    isActive: true,
     isOpening: false,
     isPinnedCurrent: true,
     pendingServerRequestCount: 0,

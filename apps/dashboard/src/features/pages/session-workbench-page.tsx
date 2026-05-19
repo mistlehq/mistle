@@ -3,7 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
-import { CodexThreadNavigatorPanel } from "../session-agents/codex/codex-thread-navigator.js";
+import {
+  CodexThreadNavigatorPanel,
+  CodexThreadNavigatorSheet,
+} from "../session-agents/codex/codex-thread-navigator.js";
 import { SessionHeaderTitle } from "../sessions/session-header-title.js";
 import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
 import { shouldRenderSidebarTrigger } from "../shared/sidebar-trigger-visibility.js";
@@ -72,6 +75,7 @@ function SessionWorkbenchPageContent(input: {
   const conversationScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const previousActiveConversationIdRef = useRef<string | null>(null);
   const [composerText, setComposerText] = useState("");
+  const [isMobileThreadNavigatorOpen, setMobileThreadNavigatorOpen] = useState(false);
   const [pendingDiffComments, setPendingDiffComments] = useState<
     readonly PendingSessionDiffComment[]
   >([]);
@@ -201,6 +205,24 @@ function SessionWorkbenchPageContent(input: {
           surface: <SessionPortAccessSheet state={workbench.portAccessState} />,
           title: workbench.portAccessState.buttonDisabledReason ?? "Show running processes",
         }}
+        {...(threadNavigation.threadNavigatorProps === null
+          ? {}
+          : {
+              mobileThreadNavigatorControl: {
+                disabled: false,
+                onOpen: () => {
+                  setMobileThreadNavigatorOpen(true);
+                },
+                surface: (
+                  <CodexThreadNavigatorSheet
+                    isOpen={isMobileThreadNavigatorOpen}
+                    navigator={threadNavigation.threadNavigatorProps}
+                    onOpenChange={setMobileThreadNavigatorOpen}
+                  />
+                ),
+                title: "Show threads",
+              },
+            })}
         portAccessControl={<SessionPortAccessPopover state={workbench.portAccessState} />}
         repositoryControl={{
           ariaLabel: "Primary repository",
@@ -243,8 +265,7 @@ function SessionWorkbenchPageContent(input: {
           kind: headerStatusKind,
           label: headerStatusLabel,
         }}
-        {...(conversationPane.codexThreadNavigator !== null &&
-        workbench.primaryPanelState.transitionState !== "stable_cli"
+        {...(threadNavigation.threadNavigatorProps !== null
           ? {
               threadControl: {
                 ariaLabel: "Show threads",
@@ -286,12 +307,13 @@ function SessionWorkbenchPageContent(input: {
       diffButtonTitle,
       headerStatusKind,
       headerStatusLabel,
-      conversationPane.codexThreadNavigator,
       isDiffPanelActive,
       isThreadNavigatorPanelVisible,
+      isMobileThreadNavigatorOpen,
       toggleThreadNavigatorPanel,
       terminalButtonLabel,
       terminalButtonTitle,
+      threadNavigation.threadNavigatorProps,
       workbench.connectionReadiness.canConnect,
       workbench.diffPanelState.closePanel,
       workbench.diffPanelState.isVisible,
@@ -555,8 +577,8 @@ function SessionWorkbenchPageContent(input: {
         }
         secondaryPanel={
           threadNavigation.secondaryPanelKind === "threads" &&
-          threadNavigation.panelThreadNavigatorProps !== null ? (
-            <CodexThreadNavigatorPanel {...threadNavigation.panelThreadNavigatorProps} />
+          threadNavigation.threadNavigatorProps !== null ? (
+            <CodexThreadNavigatorPanel {...threadNavigation.threadNavigatorProps} />
           ) : (
             <SessionDiffPanel
               errorNotice={diffPanelErrorNotice}

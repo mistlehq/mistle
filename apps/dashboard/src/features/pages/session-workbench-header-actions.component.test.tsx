@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import { SessionWorkbenchHeaderActions } from "./session-workbench-header-actions.js";
@@ -145,6 +146,59 @@ describe("SessionWorkbenchHeaderActions", () => {
 
     expect(screen.queryByRole("button", { name: "Desktop processes" })).toBeNull();
     expect(screen.getByRole("region", { name: "Mobile processes" })).toBeDefined();
+  });
+
+  it("opens the mobile threads surface from the mobile tools menu", () => {
+    function HeaderHarness(): React.JSX.Element {
+      const [isOpen, setOpen] = useState(false);
+
+      return (
+        <SessionWorkbenchHeaderActions
+          cliControl={{
+            ...StoryButtonControl,
+            ariaLabel: "TUI",
+            title: "Open Codex TUI",
+          }}
+          diffControl={{
+            ...StoryButtonControl,
+            ariaLabel: "Open changes",
+            title: "Open changes",
+          }}
+          mobileThreadNavigatorControl={{
+            disabled: false,
+            onOpen: () => {
+              setOpen(true);
+            },
+            surface: isOpen ? (
+              <section aria-label="Mobile threads">Mobile threads sheet</section>
+            ) : null,
+            title: "Show threads",
+          }}
+          status={{
+            kind: "connected",
+            label: "Connected",
+          }}
+          terminalControl={{
+            ...StoryButtonControl,
+            ariaLabel: "Open terminal",
+            title: "Open terminal",
+          }}
+          threadControl={{
+            ...StoryButtonControl,
+            ariaLabel: "Show threads",
+            title: "Show threads",
+          }}
+        />
+      );
+    }
+
+    setViewportWidth(500);
+    render(<HeaderHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open session tools" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Threads" }));
+
+    expect(screen.getByRole("region", { name: "Mobile threads" })).toBeDefined();
   });
 
   it("exposes secondary workbench tools from the mobile tools menu", () => {

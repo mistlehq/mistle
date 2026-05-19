@@ -152,4 +152,31 @@ describe("CodexThreadNavigator", () => {
 
     expect(screen.queryByRole("dialog", { name: "Threads" })).toBeNull();
   });
+
+  it("closes the mobile sheet after selecting a thread", () => {
+    function SheetHarness(): React.JSX.Element {
+      const [isOpen, setOpen] = useState(true);
+
+      return (
+        <CodexThreadNavigatorSheet
+          isOpen={isOpen}
+          navigator={{
+            isThreadListLimited: false,
+            isStartingThread: false,
+            onRefreshThreads: function onRefreshThreads() {},
+            onSelectThread: function onSelectThread() {},
+            onStartThread: function onStartThread() {},
+            rows: Rows,
+          }}
+          onOpenChange={setOpen}
+        />
+      );
+    }
+
+    render(<SheetHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Active work/ }));
+
+    expect(screen.queryByRole("dialog", { name: "Threads" })).toBeNull();
+  });
 });
