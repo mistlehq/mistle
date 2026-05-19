@@ -10,13 +10,9 @@ function createThreadRow(input?: Partial<CodexThreadNavigatorRow>): CodexThreadN
   return {
     id: "thread_active",
     title: "Implement thread navigation",
-    preview: "Implement thread navigation",
     cwd: "/Users/test/project",
     cwdSectionLabel: "project",
-    updatedAt: 100,
-    createdAt: 50,
     isActive: true,
-    isLoaded: true,
     isOpening: false,
     isPinnedCurrent: false,
     pendingServerRequestCount: 0,

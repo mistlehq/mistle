@@ -16,7 +16,11 @@ import { ErrorNotice } from "../auth/error-notice.js";
 import { noop } from "../chat/components/chat-story-support.js";
 import { SessionsNavToggleItem } from "../navigation/sessions-nav-toggle-item.js";
 import { CodexThreadHeaderScope } from "../session-agents/codex/codex-thread-header-scope.js";
-import type { CodexThreadNavigatorRow } from "../session-agents/codex/codex-thread-navigator-model.js";
+import {
+  ActiveCodexThreadNavigatorStoryRow,
+  CodexThreadNavigatorWorkbenchStoryRows,
+  createCodexThreadNavigatorStoryProps,
+} from "../session-agents/codex/codex-thread-navigator-story-support.js";
 import { CodexThreadNavigatorPanel } from "../session-agents/codex/codex-thread-navigator.js";
 import {
   SessionComposerFixturePropsForLoadingModel,
@@ -59,60 +63,13 @@ function buildPageViewTerminalOutput(cwd: string): string {
 const FailedSandboxSetupMessage =
   "Failed to initialize sandbox runtime. Cause: failed to submit sandbox init request: control socket returned an error: failed to initialize sandboxd state: failed to apply startup input: runtime plan artifacts[0] lifecycle.install[0] failed (artifactKey=codex-cli op=github_release_install): github release lookup failed for openai/codex release tag match=exact tag=rust-v0.131.0: http 403";
 
-const ActiveThreadNavigatorRow = {
-  id: "thread_active",
-  title: "Implement thread navigation",
-  preview: "Implement thread navigation",
-  cwd: "/Users/jonathanlow/mistle-projects/mistle-add-threads-handling",
-  cwdSectionLabel: "mistle-add-threads-handling",
-  updatedAt: 100,
-  createdAt: 50,
-  isActive: true,
-  isLoaded: true,
-  isOpening: false,
-  isPinnedCurrent: false,
-  pendingServerRequestCount: 0,
-} satisfies CodexThreadNavigatorRow;
-
-const ThreadNavigatorRows = [
-  ActiveThreadNavigatorRow,
-  {
-    id: "thread_review",
-    title: "Review terminal port ownership",
-    preview: "Review terminal port ownership",
-    cwd: "/Users/jonathanlow/mistle-projects/mistle-add-threads-handling",
-    cwdSectionLabel: "mistle-add-threads-handling",
-    updatedAt: 80,
-    createdAt: 40,
-    isActive: false,
-    isLoaded: true,
-    isOpening: false,
-    isPinnedCurrent: false,
-    pendingServerRequestCount: 1,
-  },
-  {
-    id: "thread_other_repo",
-    title: "Draft launch note",
-    preview: "Draft launch note",
-    cwd: "/Users/jonathanlow/mistle-projects/mistle.dev",
-    cwdSectionLabel: "mistle.dev",
-    updatedAt: 60,
-    createdAt: 20,
-    isActive: false,
-    isLoaded: false,
-    isOpening: false,
-    isPinnedCurrent: true,
-    pendingServerRequestCount: 0,
-  },
-] satisfies readonly CodexThreadNavigatorRow[];
-
 function CodexThreadNavigationHeaderTitle(): React.JSX.Element {
   return (
     <div className="flex min-w-0 items-center gap-2">
       <span className="block min-w-0 shrink truncate text-sm font-medium text-foreground">
         Storybook session
       </span>
-      <CodexThreadHeaderScope row={ActiveThreadNavigatorRow} />
+      <CodexThreadHeaderScope row={ActiveCodexThreadNavigatorStoryRow} />
     </div>
   );
 }
@@ -120,12 +77,9 @@ function CodexThreadNavigationHeaderTitle(): React.JSX.Element {
 function CodexThreadNavigationPanel(): React.JSX.Element {
   return (
     <CodexThreadNavigatorPanel
-      isThreadListLimited={false}
-      isStartingThread={false}
-      onRefreshThreads={noop}
-      onSelectThread={noop}
-      onStartThread={noop}
-      rows={ThreadNavigatorRows}
+      {...createCodexThreadNavigatorStoryProps({
+        rows: CodexThreadNavigatorWorkbenchStoryRows,
+      })}
     />
   );
 }

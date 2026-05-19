@@ -38,7 +38,6 @@ type SessionWorkbenchPageViewProps = {
   isPrimaryPanelTransitioning?: boolean;
   mainContentLayout?: SessionWorkbenchMainContentLayout;
   mainContentScrollContainerRef?: React.Ref<HTMLDivElement>;
-  conversationSidebar?: React.ReactNode;
   secondaryPanelDefaultSize?: string;
   secondaryPanelLayoutKey?: string;
   secondaryPanelMinSize?: string;
@@ -62,7 +61,6 @@ export function SessionWorkbenchPageView({
   isPrimaryPanelTransitioning = false,
   mainContentLayout = { scroll: "page", width: "chat" },
   mainContentScrollContainerRef,
-  conversationSidebar,
   secondaryPanelDefaultSize,
   secondaryPanelLayoutKey = "default",
   secondaryPanelMinSize = "20%",
@@ -169,7 +167,6 @@ export function SessionWorkbenchPageView({
   );
   const mainWorkspace = (
     <div className={`flex h-full min-h-0 overflow-hidden ${primaryPanelTransitionClassName}`}>
-      {conversationSidebar}
       {mainWorkspaceContent}
     </div>
   );

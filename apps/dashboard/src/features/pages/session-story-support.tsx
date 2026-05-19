@@ -324,7 +324,6 @@ export function renderSessionWorkbenchStory(input: {
   isBottomPanelVisible?: boolean;
   mainContentLayout?: React.ComponentProps<typeof SessionWorkbenchPageView>["mainContentLayout"];
   mainContentScrollContainerRef?: React.Ref<HTMLDivElement>;
-  conversationSidebar?: React.ReactNode;
   mainContent: React.ReactNode;
   primaryBottomPanel: React.ReactNode;
   secondaryPanel?: React.ReactNode;
@@ -343,7 +342,6 @@ export function renderSessionWorkbenchStory(input: {
       bottomPanel={input.bottomPanel ?? <></>}
       isBottomPanelVisible={input.isBottomPanelVisible ?? false}
       isSecondaryPanelVisible={input.isSecondaryPanelVisible ?? false}
-      conversationSidebar={input.conversationSidebar}
       mainContent={input.mainContent}
       {...mainContentScrollContainerRefProps}
       primaryBottomPanel={input.primaryBottomPanel}
@@ -403,7 +401,6 @@ export function renderSessionWorkbenchContentStory(input: {
   headerStatusUi?: SandboxStatusBadgeUi;
   isBottomPanelVisible?: boolean;
   isSecondaryPanelVisible?: boolean;
-  conversationSidebar?: React.ReactNode;
   mainContent: React.ReactNode;
   mainContentLayout?: React.ComponentProps<typeof SessionWorkbenchPageView>["mainContentLayout"];
   mainContentScrollContainerRef?: React.Ref<HTMLDivElement>;

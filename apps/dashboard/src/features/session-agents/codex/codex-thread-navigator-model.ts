@@ -3,13 +3,9 @@ import type { CodexThreadSummary } from "@mistle/integrations-definitions/agent-
 export type CodexThreadNavigatorRow = {
   id: string;
   title: string;
-  preview: string | null;
   cwd: string;
   cwdSectionLabel: string;
-  updatedAt: number | null;
-  createdAt: number | null;
   isActive: boolean;
-  isLoaded: boolean;
   isOpening: boolean;
   isPinnedCurrent: boolean;
   pendingServerRequestCount: number;
@@ -56,7 +52,6 @@ function resolveCwdSectionLabel(cwd: string): string {
 
 function createNavigatorRow(input: {
   activeThreadId: string | null;
-  loadedThreadIds: ReadonlySet<string>;
   pendingThreadId: string | null;
   pendingServerRequestCountsByThreadId: ReadonlyMap<string, number>;
   thread: CodexThreadSummary;
@@ -65,13 +60,9 @@ function createNavigatorRow(input: {
   return {
     id: input.thread.id,
     title: resolveThreadTitle(input.thread),
-    preview: input.thread.preview,
     cwd: input.thread.cwd,
     cwdSectionLabel: resolveCwdSectionLabel(input.thread.cwd),
-    updatedAt: input.thread.updatedAt,
-    createdAt: input.thread.createdAt,
     isActive: input.thread.id === input.activeThreadId,
-    isLoaded: input.loadedThreadIds.has(input.thread.id),
     isOpening: input.thread.id === input.pendingThreadId,
     isPinnedCurrent: input.isPinnedCurrent,
     pendingServerRequestCount: input.pendingServerRequestCountsByThreadId.get(input.thread.id) ?? 0,
@@ -90,13 +81,9 @@ function createPinnedActiveThreadRow(input: {
   return {
     id: input.activeThread.id,
     title: "Active thread",
-    preview: null,
     cwd: input.activeThread.cwd,
     cwdSectionLabel: resolveCwdSectionLabel(input.activeThread.cwd),
-    updatedAt: null,
-    createdAt: null,
     isActive: true,
-    isLoaded: true,
     isOpening: input.activeThread.id === input.pendingThreadId,
     isPinnedCurrent: true,
     pendingServerRequestCount:
@@ -119,11 +106,9 @@ export function projectCodexThreadNavigatorRows(input: {
   activeThreadId: string | null;
   activeThread: CodexThreadNavigatorActiveThread | null;
   availableThreads: readonly CodexThreadSummary[];
-  loadedThreadIds: readonly string[];
   pendingThreadId: string | null;
   pendingServerRequestThreadIds: readonly string[];
 }): readonly CodexThreadNavigatorRow[] {
-  const loadedThreadIds = new Set(input.loadedThreadIds);
   const pendingServerRequestCountsByThreadId = countPendingServerRequestsByThreadId(
     input.pendingServerRequestThreadIds,
   );
@@ -132,7 +117,6 @@ export function projectCodexThreadNavigatorRows(input: {
   const rows = sortedThreads.map((thread) =>
     createNavigatorRow({
       activeThreadId: input.activeThreadId,
-      loadedThreadIds,
       pendingThreadId: input.pendingThreadId,
       pendingServerRequestCountsByThreadId,
       thread,

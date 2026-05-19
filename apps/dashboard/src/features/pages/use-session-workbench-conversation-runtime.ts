@@ -37,9 +37,7 @@ export type SessionConversationPaneState = SessionWorkbenchRuntimeAdapter["conve
     providerThreadId: string | null;
     availableThreads: UseCodexSessionStateResult["threads"]["availableThreads"];
     hasMoreAvailableThreads: boolean;
-    loadedThreadIds: readonly string[];
     pendingThreadId: string | null;
-    isRefreshingThreads: boolean;
     isStartingNewThread: boolean;
     refreshThreadList: () => void;
     resumeThread: (threadId: string) => Promise<string>;
@@ -247,9 +245,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
             providerThreadId: sessionState.lifecycle.sessionSnapshot?.providerThreadId ?? null,
             availableThreads: sessionState.threads.availableThreads,
             hasMoreAvailableThreads: sessionState.threads.hasMoreAvailableThreads,
-            loadedThreadIds: sessionState.threads.loadedThreadIds,
             pendingThreadId: sessionState.threads.pendingThreadId,
-            isRefreshingThreads: sessionState.threads.isRefreshingThreads,
             isStartingNewThread: sessionState.threads.isStartingNewThread,
             refreshThreadList: sessionState.threads.refreshThreadList,
             resumeThread: sessionState.threads.resumeThread,

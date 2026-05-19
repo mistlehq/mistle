@@ -133,28 +133,30 @@ function groupRowsByCwd(rows: readonly CodexThreadNavigatorRow[]): readonly {
   label: string;
   rows: readonly CodexThreadNavigatorRow[];
 }[] {
-  const sectionOrder: string[] = [];
-  const rowsByCwd = new Map<string, CodexThreadNavigatorRow[]>();
+  const sections: {
+    cwd: string;
+    label: string;
+    rows: CodexThreadNavigatorRow[];
+  }[] = [];
+  const sectionsByCwd = new Map<string, (typeof sections)[number]>();
 
   for (const row of rows) {
-    const existingRows = rowsByCwd.get(row.cwd);
-    if (existingRows === undefined) {
-      sectionOrder.push(row.cwd);
-      rowsByCwd.set(row.cwd, [row]);
+    const existingSection = sectionsByCwd.get(row.cwd);
+    if (existingSection === undefined) {
+      const section = {
+        cwd: row.cwd,
+        label: row.cwdSectionLabel,
+        rows: [row],
+      };
+      sections.push(section);
+      sectionsByCwd.set(row.cwd, section);
       continue;
     }
 
-    existingRows.push(row);
+    existingSection.rows.push(row);
   }
 
-  return sectionOrder.map((cwd) => {
-    const sectionRows = rowsByCwd.get(cwd) ?? [];
-    return {
-      cwd,
-      label: sectionRows[0]?.cwdSectionLabel ?? cwd,
-      rows: sectionRows,
-    };
-  });
+  return sections;
 }
 
 function CodexThreadNavigatorRowView(input: {
