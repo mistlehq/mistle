@@ -45,6 +45,7 @@ type SandboxOperationProgressDisplayMode = "both" | "timeline" | "stdio";
 
 type SandboxLifecycleTimelineItem = {
   event: SandboxOperationEvent;
+  phaseKey: string;
   startedAt: string | null;
 };
 
@@ -219,7 +220,7 @@ function SandboxOperationTimeline(input: {
   items: readonly SandboxLifecycleTimelineItem[];
 }): React.JSX.Element {
   const scrollContainerRef = useRef<HTMLOListElement | null>(null);
-  const [expandedEventIds, setExpandedEventIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [expandedItemKeys, setExpandedItemKeys] = useState<ReadonlySet<string>>(() => new Set());
 
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
@@ -229,6 +230,18 @@ function SandboxOperationTimeline(input: {
 
     scrollContainer.scrollTop = scrollContainer.scrollHeight;
   }, [input.items]);
+
+  useEffect(() => {
+    if (input.items.length === 0) {
+      setExpandedItemKeys((currentKeys) => {
+        if (currentKeys.size === 0) {
+          return currentKeys;
+        }
+
+        return new Set();
+      });
+    }
+  }, [input.items.length]);
 
   if (input.items.length === 0) {
     return (
@@ -243,13 +256,13 @@ function SandboxOperationTimeline(input: {
       className={`${resolveTimelineContainerClassName(input.isSplit)} space-y-2`}
       ref={scrollContainerRef}
     >
-      {input.items.map(({ event, startedAt }) => {
+      {input.items.map(({ event, phaseKey, startedAt }) => {
         const diagnosticMessage = resolveLifecycleDiagnosticMessage(event);
-        const isExpanded = expandedEventIds.has(event.id);
+        const isExpanded = expandedItemKeys.has(phaseKey);
         const phaseLabel = formatLifecyclePhase(event.phase);
 
         return (
-          <li className="grid grid-cols-[1rem_minmax(0,1fr)] items-start gap-2" key={event.id}>
+          <li className="grid grid-cols-[1rem_minmax(0,1fr)] items-start gap-2" key={phaseKey}>
             <span className="pt-0.5">{renderStatusIcon(event.status)}</span>
             <div className="min-w-0">
               <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -264,8 +277,8 @@ function SandboxOperationTimeline(input: {
                     aria-label={`${isExpanded ? "Hide" : "Show"} ${phaseLabel} details`}
                     className="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                     onClick={() => {
-                      setExpandedEventIds((currentIds) =>
-                        toggleExpandedTimelineEventId(currentIds, event.id),
+                      setExpandedItemKeys((currentKeys) =>
+                        toggleExpandedTimelineItemKey(currentKeys, phaseKey),
                       );
                     }}
                     type="button"
@@ -290,17 +303,17 @@ function SandboxOperationTimeline(input: {
   );
 }
 
-function toggleExpandedTimelineEventId(
-  currentIds: ReadonlySet<string>,
-  eventId: string,
+function toggleExpandedTimelineItemKey(
+  currentKeys: ReadonlySet<string>,
+  itemKey: string,
 ): ReadonlySet<string> {
-  const nextIds = new Set(currentIds);
-  if (nextIds.has(eventId)) {
-    nextIds.delete(eventId);
+  const nextKeys = new Set(currentKeys);
+  if (nextKeys.has(itemKey)) {
+    nextKeys.delete(itemKey);
   } else {
-    nextIds.add(eventId);
+    nextKeys.add(itemKey);
   }
-  return nextIds;
+  return nextKeys;
 }
 
 function SandboxOperationTranscript(input: {
@@ -441,6 +454,7 @@ function createLifecycleTimelineItems(
       itemIndexesByPhase.set(phaseKey, items.length);
       items.push({
         event,
+        phaseKey,
         startedAt: event.status === "started" ? event.observedAt : null,
       });
       continue;
@@ -454,6 +468,7 @@ function createLifecycleTimelineItems(
     const nextEvent = resolveLifecycleTimelineEvent(existingItem.event, event);
     items[existingIndex] = {
       event: nextEvent,
+      phaseKey: existingItem.phaseKey,
       startedAt: existingItem.startedAt ?? (event.status === "started" ? event.observedAt : null),
     };
   }

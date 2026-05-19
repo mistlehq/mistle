@@ -341,6 +341,103 @@ describe("SandboxOperationProgressView", () => {
     expect(screen.queryByText(/Runtime plan failed/u)).toBeNull();
   });
 
+  it("keeps phase details expanded when a newer lifecycle event replaces the row", () => {
+    const { rerender } = render(
+      <SandboxOperationProgressView
+        displayMode="timeline"
+        events={[
+          createLifecycleEvent({
+            id: "soe_sandboxd_failed_initial",
+            message: "Sandbox daemon initialization failed.",
+            phase: "sandboxd",
+            sequence: 1,
+            status: "failed",
+          }),
+        ]}
+        title="Snapshot creation progress"
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("Show Sandbox daemon details"));
+    expect(screen.getByText("Sandbox daemon initialization failed.")).toBeDefined();
+
+    rerender(
+      <SandboxOperationProgressView
+        displayMode="timeline"
+        events={[
+          createLifecycleEvent({
+            id: "soe_sandboxd_failed_initial",
+            message: "Sandbox daemon initialization failed.",
+            phase: "sandboxd",
+            sequence: 1,
+            status: "failed",
+          }),
+          createLifecycleEvent({
+            id: "soe_sandboxd_failed_updated",
+            message: "Sandbox daemon reported a newer failure.",
+            phase: "sandboxd",
+            sequence: 2,
+            status: "failed",
+          }),
+        ]}
+        title="Snapshot creation progress"
+      />,
+    );
+
+    expect(screen.getByLabelText("Hide Sandbox daemon details")).toBeDefined();
+    expect(screen.getByText("Sandbox daemon reported a newer failure.")).toBeDefined();
+    expect(screen.queryByText("Sandbox daemon initialization failed.")).toBeNull();
+  });
+
+  it("resets expanded phase details after operation events are cleared", () => {
+    const { rerender } = render(
+      <SandboxOperationProgressView
+        displayMode="timeline"
+        events={[
+          createLifecycleEvent({
+            id: "soe_sandboxd_failed_first_run",
+            message: "First run failed.",
+            phase: "sandboxd",
+            sequence: 1,
+            status: "failed",
+          }),
+        ]}
+        title="Snapshot creation progress"
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("Show Sandbox daemon details"));
+    expect(screen.getByText("First run failed.")).toBeDefined();
+
+    rerender(
+      <SandboxOperationProgressView
+        displayMode="timeline"
+        events={[]}
+        title="Snapshot creation progress"
+      />,
+    );
+
+    rerender(
+      <SandboxOperationProgressView
+        displayMode="timeline"
+        events={[
+          createLifecycleEvent({
+            id: "soe_sandboxd_failed_second_run",
+            message: "Second run failed.",
+            operationId: "owfr_operation_progress_second_run",
+            phase: "sandboxd",
+            sequence: 1,
+            status: "failed",
+          }),
+        ]}
+        title="Snapshot creation progress"
+      />,
+    );
+
+    expect(screen.getByLabelText("Show Sandbox daemon details")).toBeDefined();
+    expect(screen.queryByText("Second run failed.")).toBeNull();
+  });
+
   it("does not infer lifecycle phases when no events have been returned", () => {
     render(
       <SandboxOperationProgressView
@@ -502,6 +599,7 @@ function createLifecycleEvent(input: {
   attributes?: Record<string, unknown>;
   id: string;
   message: string;
+  operationId?: string;
   phase: NonNullable<SandboxOperationEvent["phase"]>;
   sequence: number;
   source?: SandboxOperationEvent["source"];
@@ -513,7 +611,7 @@ function createLifecycleEvent(input: {
     id: input.id,
     message: input.message,
     observedAt: "2026-05-13T10:00:00.000Z",
-    operationId: "owfr_operation_progress_test",
+    operationId: input.operationId ?? "owfr_operation_progress_test",
     operationKind: "snapshot",
     payloadBase64: null,
     phase: input.phase,
