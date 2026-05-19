@@ -46,6 +46,8 @@ describe("settings model", () => {
     for (const item of accountGroup?.items ?? []) {
       expect(typeof item.icon).toBe("function");
     }
+
+    expect(SETTINGS_NAV_GROUPS.find((group) => group.label === "Developer")).toBeUndefined();
   });
 
   it("shows sandbox storage settings only for owners and admins", () => {
@@ -121,5 +123,25 @@ describe("settings model", () => {
     expect(disabledOrganizationGroup?.items.map((item) => item.to)).not.toContain(
       "/settings/organization/billing",
     );
+  });
+
+  it("shows API key settings only for owners and admins", () => {
+    const ownerDeveloperGroup = resolveSettingsNavGroups({ organizationRole: "owner" }).find(
+      (group) => group.label === "Developer",
+    );
+    const adminDeveloperGroup = resolveSettingsNavGroups({ organizationRole: "admin" }).find(
+      (group) => group.label === "Developer",
+    );
+    const memberDeveloperGroup = resolveSettingsNavGroups({ organizationRole: "member" }).find(
+      (group) => group.label === "Developer",
+    );
+
+    expect(ownerDeveloperGroup?.items.map((item) => item.to)).toEqual([
+      "/settings/organization/api-keys",
+    ]);
+    expect(adminDeveloperGroup?.items.map((item) => item.to)).toEqual([
+      "/settings/organization/api-keys",
+    ]);
+    expect(memberDeveloperGroup).toBeUndefined();
   });
 });

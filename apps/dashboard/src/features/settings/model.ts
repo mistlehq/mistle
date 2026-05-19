@@ -1,6 +1,7 @@
 import {
   CreditCardIcon,
   HardDrivesIcon,
+  KeyIcon,
   LinkSimpleIcon,
   SlidersHorizontalIcon,
   UserIcon,
@@ -76,6 +77,20 @@ export function resolveSettingsNavGroups(input: {
           : []),
       ],
     },
+    ...(canViewApiKeySettings({ organizationRole: input.organizationRole })
+      ? [
+          {
+            label: "Developer",
+            items: [
+              {
+                to: "/settings/organization/api-keys",
+                label: "API Keys",
+                icon: ApiKeysNavIcon,
+              },
+            ],
+          },
+        ]
+      : []),
   ];
 }
 
@@ -121,6 +136,10 @@ function BillingNavIcon(props: { className?: string; "aria-hidden"?: boolean }):
   return createElement(CreditCardIcon, props);
 }
 
+function ApiKeysNavIcon(props: { className?: string; "aria-hidden"?: boolean }): React.JSX.Element {
+  return createElement(KeyIcon, props);
+}
+
 function shouldRenderSandboxStorageSettingsNavItem(input: {
   organizationRole: OrganizationRole | null;
 }): boolean {
@@ -141,4 +160,10 @@ export function canViewOrganizationBillingSettings(input: {
     input.stripeBillingEnabled &&
     (input.organizationRole === "owner" || input.organizationRole === "admin")
   );
+}
+
+export function canViewApiKeySettings(input: {
+  organizationRole: OrganizationRole | null;
+}): boolean {
+  return input.organizationRole === "owner" || input.organizationRole === "admin";
 }

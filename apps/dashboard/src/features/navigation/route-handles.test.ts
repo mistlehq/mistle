@@ -139,6 +139,15 @@ describe("route handles", () => {
       "Configure organization-wide sandbox settings.",
     );
 
+    expect(ROUTE_HANDLES.settingsOrganizationApiKeys.title).toBe("API Keys");
+    expect(ROUTE_HANDLES.settingsOrganizationApiKeys.description).toBe(
+      "Manage organization API keys.",
+    );
+    expect(ROUTE_HANDLES.settingsOrganizationApiKeysNew.title).toBe("Create API key");
+    expect(ROUTE_HANDLES.settingsOrganizationApiKeysNew.description).toBe(
+      "Create an organization API key for programmatic access.",
+    );
+
     expect(ROUTE_HANDLES.settingsOrganizationIntegrations.title).toBe("Integrations");
     expect(ROUTE_HANDLES.settingsOrganizationIntegrations.description).toBe("");
   });
@@ -350,6 +359,16 @@ const DurableAppShellLeafRoutes: DurableAppShellLeafRoute[] = [
     path: "/settings/organization/sandboxes",
     handleName: "settingsOrganizationSandboxes",
     handle: ROUTE_HANDLES.settingsOrganizationSandboxes,
+  },
+  {
+    path: "/settings/organization/api-keys",
+    handleName: "settingsOrganizationApiKeys",
+    handle: ROUTE_HANDLES.settingsOrganizationApiKeys,
+  },
+  {
+    path: "/settings/organization/api-keys/new",
+    handleName: "settingsOrganizationApiKeysNew",
+    handle: ROUTE_HANDLES.settingsOrganizationApiKeysNew,
   },
 ];
 
