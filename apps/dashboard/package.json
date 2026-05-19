@@ -59,7 +59,7 @@
     "@mistle/db": "workspace:*",
     "@rolldown/plugin-babel": "0.2.3",
     "@storybook/react-vite": "^10.3.6",
-    "@tailwindcss/vite": "^4.2.4",
+    "@tailwindcss/vite": "^4.3.0",
     "@testing-library/react": "^16.3.0",
     "@types/pg": "^8.20.0",
     "@types/ws": "^8.18.1",
