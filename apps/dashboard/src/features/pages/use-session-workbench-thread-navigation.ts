@@ -90,8 +90,7 @@ export function useSessionWorkbenchThreadNavigation(
               cwd: input.codexThreadNavigator.activeThreadCwd,
             },
       availableThreads: input.codexThreadNavigator.availableThreads,
-      originalThreadId:
-        input.codexThreadNavigator.providerThreadId ?? input.codexThreadNavigator.originalThreadId,
+      originalThreadId: input.codexThreadNavigator.originalThreadId,
       pendingThreadId: input.codexThreadNavigator.pendingThreadId,
       pendingServerRequestThreadIds: pendingThreadServerRequestThreadIds,
     });

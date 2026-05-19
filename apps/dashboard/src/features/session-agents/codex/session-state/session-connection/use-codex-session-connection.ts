@@ -504,6 +504,9 @@ export function useCodexSessionConnection(input: {
 
       const threadCollections = await input.refreshThreadCollections({
         generation,
+        ...(previousConnectedSession.providerThreadId === null
+          ? {}
+          : { originalThreadId: previousConnectedSession.providerThreadId }),
         rpcClient,
       });
       const recoveredThread = await establishCodexThread({

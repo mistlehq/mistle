@@ -185,7 +185,6 @@ function CodexThreadNavigatorActions(input: CodexThreadNavigatorProps): React.JS
 }
 
 function groupRowsByCwd(rows: readonly CodexThreadNavigatorRow[]): readonly {
-  cwd: string;
   accessibleLabel: string;
   key: string;
   visibleLabel: string | null;
@@ -193,7 +192,6 @@ function groupRowsByCwd(rows: readonly CodexThreadNavigatorRow[]): readonly {
 }[] {
   const sections: {
     accessibleLabel: string;
-    cwd: string;
     key: string;
     visibleLabel: string | null;
     rows: CodexThreadNavigatorRow[];
@@ -204,7 +202,6 @@ function groupRowsByCwd(rows: readonly CodexThreadNavigatorRow[]): readonly {
     if (row.isPinnedCurrent) {
       sections.push({
         accessibleLabel: row.title,
-        cwd: row.cwd,
         key: `pinned:${row.id}`,
         visibleLabel: null,
         rows: [row],
@@ -216,7 +213,6 @@ function groupRowsByCwd(rows: readonly CodexThreadNavigatorRow[]): readonly {
     if (existingSection === undefined) {
       const section = {
         accessibleLabel: row.cwdSectionLabel,
-        cwd: row.cwd,
         key: row.cwd,
         visibleLabel: row.cwdSectionLabel,
         rows: [row],
@@ -275,7 +271,7 @@ function CodexThreadNavigatorRowView(input: {
                 </span>
               ) : null}
               <CodexThreadNavigatorRowIndicator
-                row={row}
+                pendingServerRequestCount={row.pendingServerRequestCount}
                 showOpeningIndicator={showOpeningIndicator}
               />
             </div>
@@ -295,14 +291,14 @@ function CodexThreadNavigatorRowView(input: {
 }
 
 function CodexThreadNavigatorRowIndicator(input: {
-  row: CodexThreadNavigatorRow;
+  pendingServerRequestCount: number;
   showOpeningIndicator: boolean;
 }): React.JSX.Element | null {
   if (input.showOpeningIndicator) {
     return <Spinner aria-label="Opening thread" className="size-3.5 shrink-0" />;
   }
 
-  if (input.row.pendingServerRequestCount > 0) {
+  if (input.pendingServerRequestCount > 0) {
     return (
       <span
         aria-label="Needs input"

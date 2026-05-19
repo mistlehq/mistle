@@ -24,7 +24,6 @@ function createCodexThreadNavigator(input: {
   activeThreadId?: string | null;
   availableThreads: readonly CodexThreadSummary[];
   originalThreadId?: string | null;
-  providerThreadId?: string | null;
 }): NonNullable<SessionConversationPaneState["codexThreadNavigator"]> {
   return {
     activeThreadCwd: input.activeThreadCwd ?? "/workspace/repo",
@@ -34,7 +33,7 @@ function createCodexThreadNavigator(input: {
     isStartingNewThread: false,
     originalThreadId: input.originalThreadId ?? null,
     pendingThreadId: null,
-    providerThreadId: input.providerThreadId ?? null,
+    providerThreadId: null,
     refreshThreadList: function refreshThreadList() {
       throw new Error("Unexpected thread list refresh in thread navigation visibility test");
     },
@@ -122,7 +121,7 @@ describe("useSessionWorkbenchThreadNavigation", () => {
     expect(result.current.secondaryPanelKind).toBeNull();
   });
 
-  it("uses the provider thread as the original row for trigger-started sessions", () => {
+  it("uses the resolved original thread id for row metadata", () => {
     const sandboxInstanceId = "sbi_thread_navigation_provider_original";
 
     const { result } = renderThreadNavigation({
@@ -132,14 +131,16 @@ describe("useSessionWorkbenchThreadNavigation", () => {
           createThread({ id: "thread_earliest" }),
           createThread({ id: "thread_provider" }),
         ],
-        originalThreadId: "thread_earliest",
-        providerThreadId: "thread_provider",
+        originalThreadId: "thread_provider",
       }),
     });
 
-    const rowsById = new Map(
-      result.current.threadNavigatorProps?.rows.map((row) => [row.id, row.isOriginal]) ?? [],
-    );
+    expect(result.current.threadNavigatorProps).not.toBeNull();
+    const rows = result.current.threadNavigatorProps?.rows;
+    if (rows === undefined) {
+      throw new Error("Expected thread navigator rows.");
+    }
+    const rowsById = new Map(rows.map((row) => [row.id, row.isOriginal]));
 
     expect(rowsById.get("thread_provider")).toBe(true);
     expect(rowsById.get("thread_earliest")).toBe(false);

@@ -59,7 +59,6 @@ function createNavigatorRow(input: {
   pendingThreadId: string | null;
   pendingServerRequestCountsByThreadId: ReadonlyMap<string, number>;
   thread: CodexThreadSummary;
-  isPinnedCurrent: boolean;
   originalThreadId: string | null;
 }): CodexThreadNavigatorRow {
   return {
@@ -71,7 +70,7 @@ function createNavigatorRow(input: {
     isActive: input.thread.id === input.activeThreadId,
     isOpening: input.thread.id === input.pendingThreadId,
     isOriginal: input.thread.id === input.originalThreadId,
-    isPinnedCurrent: input.isPinnedCurrent,
+    isPinnedCurrent: false,
     pendingServerRequestCount: input.pendingServerRequestCountsByThreadId.get(input.thread.id) ?? 0,
   };
 }
@@ -131,7 +130,6 @@ export function projectCodexThreadNavigatorRows(input: {
       pendingThreadId: input.pendingThreadId,
       pendingServerRequestCountsByThreadId,
       thread,
-      isPinnedCurrent: false,
       originalThreadId: input.originalThreadId,
     }),
   );

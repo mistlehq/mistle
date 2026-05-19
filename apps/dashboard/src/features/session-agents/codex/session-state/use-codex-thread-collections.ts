@@ -9,6 +9,9 @@ import { useCallback, useRef, useState, type RefObject } from "react";
 type RefreshInput = {
   rpcClient?: CodexJsonRpcClient;
   generation?: number;
+};
+
+type ThreadCollectionsRefreshInput = RefreshInput & {
   originalThreadId?: string;
 };
 
@@ -152,46 +155,47 @@ export function useCodexThreadCollections(input: {
     [updateOriginalThreadIdSnapshot],
   );
 
-  const recordOriginalThreadIdFromSessionEntrypoint = useCallback(
-    (recordInput: { generation: number | null; threadId: string }): string => {
-      updateOriginalThreadIdSnapshot({
-        generation: recordInput.generation,
-        threadId: recordInput.threadId,
-      });
-      return recordInput.threadId;
-    },
-    [updateOriginalThreadIdSnapshot],
-  );
-
   const refreshThreadCollections = useCallback(
-    async (refreshInput?: RefreshInput) => {
+    async (refreshInput?: ThreadCollectionsRefreshInput) => {
       const requestedOriginalThreadId = refreshInput?.originalThreadId;
+      const listRefreshInput =
+        refreshInput === undefined
+          ? undefined
+          : {
+              ...(refreshInput.rpcClient === undefined
+                ? {}
+                : { rpcClient: refreshInput.rpcClient }),
+              ...(refreshInput.generation === undefined
+                ? {}
+                : { generation: refreshInput.generation }),
+            };
       const reusableOriginalThreadIdSnapshot = resolveReusableOriginalThreadIdSnapshot({
         ...(refreshInput?.generation === undefined
           ? {}
           : { refreshGeneration: refreshInput.generation }),
         snapshot: originalThreadIdSnapshotRef.current,
       });
-      const originalThreadIdPromise =
-        requestedOriginalThreadId !== undefined
-          ? Promise.resolve(
-              recordOriginalThreadIdFromSessionEntrypoint({
-                generation: refreshInput?.generation ?? null,
-                threadId: requestedOriginalThreadId,
-              }),
-            )
-          : reusableOriginalThreadIdSnapshot !== null
-            ? Promise.resolve(reusableOriginalThreadIdSnapshot.threadId)
-            : refreshOriginalThreadId(refreshInput);
+      let originalThreadIdPromise: Promise<string | null>;
+      if (requestedOriginalThreadId !== undefined) {
+        updateOriginalThreadIdSnapshot({
+          generation: refreshInput?.generation ?? null,
+          threadId: requestedOriginalThreadId,
+        });
+        originalThreadIdPromise = Promise.resolve(requestedOriginalThreadId);
+      } else if (reusableOriginalThreadIdSnapshot !== null) {
+        originalThreadIdPromise = Promise.resolve(reusableOriginalThreadIdSnapshot.threadId);
+      } else {
+        originalThreadIdPromise = refreshOriginalThreadId(listRefreshInput);
+      }
       const [
         availableThreadsResult,
         archivedThreadsResult,
         loadedThreadIdsResult,
         originalThreadIdResult,
       ] = await Promise.all([
-        refreshThreadList(refreshInput),
-        refreshArchivedThreadList(refreshInput),
-        refreshLoadedThreadList(refreshInput),
+        refreshThreadList(listRefreshInput),
+        refreshArchivedThreadList(listRefreshInput),
+        refreshLoadedThreadList(listRefreshInput),
         originalThreadIdPromise,
       ]);
 
@@ -205,19 +209,11 @@ export function useCodexThreadCollections(input: {
     [
       refreshArchivedThreadList,
       refreshLoadedThreadList,
-      recordOriginalThreadIdFromSessionEntrypoint,
       refreshOriginalThreadId,
       refreshThreadList,
+      updateOriginalThreadIdSnapshot,
     ],
   );
-
-  const resetThreadCollections = useCallback((): void => {
-    setAvailableThreads([]);
-    setHasMoreAvailableThreads(false);
-    setArchivedThreads([]);
-    setLoadedThreadIds([]);
-    updateOriginalThreadIdSnapshot(null);
-  }, [updateOriginalThreadIdSnapshot]);
 
   return {
     availableThreads,
@@ -230,7 +226,6 @@ export function useCodexThreadCollections(input: {
     refreshLoadedThreadList,
     recordStartedThreadAsOriginalAfterEmptyScan,
     refreshThreadCollections,
-    resetThreadCollections,
   };
 }
 
@@ -259,7 +254,8 @@ export function resolveReusableOriginalThreadIdSnapshot(input: {
 export function resolveOriginalCodexThreadId(
   threads: readonly CodexThreadSummary[],
 ): string | null {
-  let originalThread: CodexThreadSummary | null = null;
+  let originalThreadId: string | null = null;
+  let originalCreatedAt: number | null = null;
 
   for (const thread of threads) {
     if (thread.createdAt === null) {
@@ -267,16 +263,17 @@ export function resolveOriginalCodexThreadId(
     }
 
     if (
-      originalThread === null ||
-      originalThread.createdAt === null ||
-      thread.createdAt < originalThread.createdAt ||
-      (thread.createdAt === originalThread.createdAt && thread.id < originalThread.id)
+      originalCreatedAt === null ||
+      thread.createdAt < originalCreatedAt ||
+      (thread.createdAt === originalCreatedAt &&
+        (originalThreadId === null || thread.id < originalThreadId))
     ) {
-      originalThread = thread;
+      originalThreadId = thread.id;
+      originalCreatedAt = thread.createdAt;
     }
   }
 
-  return originalThread?.id ?? null;
+  return originalThreadId;
 }
 
 export function resolveOriginalThreadIdSnapshotAfterThreadStart(input: {
