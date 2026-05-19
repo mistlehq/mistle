@@ -356,18 +356,11 @@ impl PiProxyState {
             .ok_or(PiProxyError::MissingSessionFile)
     }
 
-    fn switch_session_if_needed(
+    fn switch_session(
         &self,
         session_file: &str,
         captured_events: &mut Vec<Value>,
     ) -> Result<(), PiProxyError> {
-        let current_state = self.send_pi_command_with_captured_events(
-            json!({ "type": "get_state" }),
-            captured_events,
-        )?;
-        if current_state["sessionFile"].as_str() == Some(session_file) {
-            return Ok(());
-        }
         self.send_pi_command_with_captured_events(
             json!({ "type": "switch_session", "sessionPath": session_file }),
             captured_events,
@@ -493,10 +486,6 @@ impl PiProxyState {
     fn start_activity_monitor(state: Arc<Self>) {
         thread::spawn(move || {
             while state.active.load(Ordering::Relaxed) {
-                thread::sleep(Duration::from_secs(1));
-                if !state.active.load(Ordering::Relaxed) {
-                    break;
-                }
                 if state
                     .send_pi_command(json!({ "type": "get_state" }))
                     .is_err()
@@ -504,6 +493,7 @@ impl PiProxyState {
                     state.set_active(false);
                     break;
                 }
+                thread::sleep(Duration::from_secs(1));
             }
         });
     }
@@ -810,7 +800,7 @@ fn handle_pi_method(
             let session_file = read_param_string(&request.params, "sessionFile");
             state.ensure_child(None)?;
             if let Some(session_file) = session_file {
-                state.switch_session_if_needed(&session_file, captured_events)?;
+                state.switch_session(&session_file, captured_events)?;
             }
             state.send_pi_command_with_captured_events(
                 json!({ "type": "get_state" }),
@@ -820,7 +810,7 @@ fn handle_pi_method(
         "pi/readMetadata" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
             state.ensure_child(None)?;
-            state.switch_session_if_needed(&session_file, captured_events)?;
+            state.switch_session(&session_file, captured_events)?;
             let state_value = state.send_pi_command_with_captured_events(
                 json!({ "type": "get_state" }),
                 captured_events,
@@ -833,7 +823,7 @@ fn handle_pi_method(
         "pi/getMessages" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
             state.ensure_child(None)?;
-            state.switch_session_if_needed(&session_file, captured_events)?;
+            state.switch_session(&session_file, captured_events)?;
             let messages_value = state.send_pi_command_with_captured_events(
                 json!({ "type": "get_messages" }),
                 captured_events,
@@ -843,7 +833,8 @@ fn handle_pi_method(
         "pi/resumeConversation" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
             state.ensure_child(None)?;
-            state.switch_session_if_needed(&session_file, captured_events)?;
+            state.switch_session(&session_file, captured_events)?;
+            state.set_active(true);
             PiProxyState::start_activity_monitor(state.clone());
             Ok(Value::Null)
         }
@@ -851,7 +842,7 @@ fn handle_pi_method(
             let session_file = require_param_string(&request.params, "sessionFile")?;
             let name = require_param_string(&request.params, "name")?;
             state.ensure_child(None)?;
-            state.switch_session_if_needed(&session_file, captured_events)?;
+            state.switch_session(&session_file, captured_events)?;
             state.send_pi_command_with_captured_events(
                 json!({ "type": "set_session_name", "name": name }),
                 captured_events,
@@ -861,7 +852,7 @@ fn handle_pi_method(
             let session_file = require_param_string(&request.params, "sessionFile")?;
             let message = require_param_string(&request.params, "message")?;
             state.ensure_child(None)?;
-            state.switch_session_if_needed(&session_file, captured_events)?;
+            state.switch_session(&session_file, captured_events)?;
             state.set_active(true);
             let result = state.send_pi_command_with_captured_events(
                 json!({ "type": "prompt", "message": message }),
@@ -874,7 +865,7 @@ fn handle_pi_method(
             let session_file = require_param_string(&request.params, "sessionFile")?;
             let message = require_param_string(&request.params, "message")?;
             state.ensure_child(None)?;
-            state.switch_session_if_needed(&session_file, captured_events)?;
+            state.switch_session(&session_file, captured_events)?;
             state.set_active(true);
             let result = state.send_pi_command_with_captured_events(
                 json!({ "type": "steer", "message": message }),
@@ -887,7 +878,7 @@ fn handle_pi_method(
             let session_file = require_param_string(&request.params, "sessionFile")?;
             let message = require_param_string(&request.params, "message")?;
             state.ensure_child(None)?;
-            state.switch_session_if_needed(&session_file, captured_events)?;
+            state.switch_session(&session_file, captured_events)?;
             state.set_active(true);
             let result = state.send_pi_command_with_captured_events(
                 json!({ "type": "follow_up", "message": message }),
@@ -899,7 +890,7 @@ fn handle_pi_method(
         "pi/abort" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
             state.ensure_child(None)?;
-            state.switch_session_if_needed(&session_file, captured_events)?;
+            state.switch_session(&session_file, captured_events)?;
             state.send_pi_command_with_captured_events(json!({ "type": "abort" }), captured_events)
         }
         other => Err(PiProxyError::InvalidRequest(format!(
@@ -1111,6 +1102,47 @@ mod tests {
     }
 
     #[test]
+    fn resume_pi_conversation_switches_without_initial_state() {
+        let simulated_pi = SimulatedPiRpcProcess::start_without_initial_session();
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let state = Arc::new(PiProxyState {
+            config: PiProxyConfig {
+                pi_cli_path: simulated_pi.path(),
+                env: BTreeMap::new(),
+            },
+            child: Mutex::new(None),
+            command_lock: Mutex::new(()),
+            event_subscribers: Mutex::new(Vec::new()),
+            keepalive_manager,
+            active: std::sync::atomic::AtomicBool::new(false),
+            next_id: AtomicU64::new(1),
+        });
+
+        let resume_responses = handle_json_rpc_request(
+            &state,
+            &json!({
+                "jsonrpc": "2.0",
+                "id": "resume",
+                "method": "pi/resumeConversation",
+                "params": {
+                    "sessionFile": simulated_pi.session_file()
+                }
+            })
+            .to_string(),
+        );
+
+        let resume_response = parse_json_rpc_message(
+            resume_responses
+                .last()
+                .expect("resume conversation should produce a response"),
+        );
+        assert_eq!(resume_response["id"], json!("resume"));
+        assert_eq!(resume_response["result"], Value::Null);
+
+        state.shutdown_child();
+    }
+
+    #[test]
     fn finds_recent_pi_conversation_from_configured_session_dir() {
         let directory = tempdir().expect("temporary directory should be created");
         let session_dir = directory.path().join("sessions");
@@ -1206,22 +1238,36 @@ mod tests {
         }
 
         fn start_active_session() -> Self {
-            Self::start_with_active_session(true)
+            Self::start_with_session_state(true, true)
+        }
+
+        fn start_without_initial_session() -> Self {
+            Self::start_with_session_state(false, false)
         }
 
         fn start_with_active_session(active_session: bool) -> Self {
+            Self::start_with_session_state(active_session, true)
+        }
+
+        fn start_with_session_state(active_session: bool, has_initial_session: bool) -> Self {
             let directory = tempdir().expect("temporary directory should be created");
             let script_path = directory.path().join("simulated-pi-rpc");
             let cwd = directory.path().join("workspace");
             fs::create_dir(&cwd).expect("workspace directory should be created");
             let session_file = directory.path().join("session.json");
             let active_marker = directory.path().join("active");
+            let no_initial_session_marker = directory.path().join("no-initial-session");
             if active_session {
                 fs::write(&active_marker, "").expect("active marker should be written");
+            }
+            if !has_initial_session {
+                fs::write(&no_initial_session_marker, "")
+                    .expect("no initial session marker should be written");
             }
             let script = format!(
                 r#"#!/bin/sh
 active_marker="{}"
+no_initial_session_marker="{}"
 while IFS= read -r line; do
   id="$(printf '%s' "$line" | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"
   case "$line" in
@@ -1229,7 +1275,9 @@ while IFS= read -r line; do
       printf '{{"type":"response","command":"new_session","id":"%s","success":true,"data":{{}}}}\n' "$id"
       ;;
     *'"type":"get_state"'*)
-      if [ -f "$active_marker" ]; then
+      if [ -f "$no_initial_session_marker" ]; then
+        printf '{{"type":"response","command":"get_state","id":"%s","success":false,"error":"no active session"}}\n' "$id"
+      elif [ -f "$active_marker" ]; then
         rm "$active_marker"
         printf '{{"type":"response","command":"get_state","id":"%s","success":true,"data":{{"sessionFile":"{}","sessionName":"Simulated session","isStreaming":true,"isCompacting":false,"pendingMessageCount":0}}}}\n' "$id"
         sleep 0.1
@@ -1239,6 +1287,7 @@ while IFS= read -r line; do
       fi
       ;;
     *'"type":"switch_session"'*)
+      rm -f "$no_initial_session_marker"
       printf '{{"type":"response","command":"switch_session","id":"%s","success":true,"data":{{}}}}\n' "$id"
       ;;
     *'"type":"prompt"'*)
@@ -1254,6 +1303,7 @@ while IFS= read -r line; do
 done
 "#,
                 active_marker.display(),
+                no_initial_session_marker.display(),
                 session_file.display(),
                 session_file.display()
             );
