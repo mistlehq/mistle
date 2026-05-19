@@ -145,6 +145,12 @@ describe("runtime system gateway egress HTTP smoke", () => {
                 "BASH",
               ].join("\n"),
               [
+                `export TRUSTED_UPSTREAM_CA_CERT_PEM=${shellQuote(secureUpstream.caCertificatePem)}`,
+                "timeout 15 bash <<'BASH'",
+                installTrustedUpstreamCaScript(),
+                "BASH",
+              ].join("\n"),
+              [
                 `export WS_PROXY=${shellQuote(SANDBOXD_EGRESS_PROXY_URL)}`,
                 `export WSS_URL=${shellQuote(`${secureUpstream.sandboxReachableBaseUrl}/socket?case=wss`)}`,
                 `export WSS_MESSAGE=${shellQuote(SECURE_WEBSOCKET_REQUEST_BODY)}`,
@@ -558,6 +564,15 @@ function parseHttpEchoResponse(stdout: string): z.infer<typeof HttpEchoResponseS
 
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+function installTrustedUpstreamCaScript(): string {
+  return [
+    "set -euo pipefail",
+    'trusted_upstream_ca_path="/usr/local/share/ca-certificates/mistle-gateway-egress-upstream-smoke-ca.crt"',
+    'printf "%s\\n" "${TRUSTED_UPSTREAM_CA_CERT_PEM}" >"${trusted_upstream_ca_path}"',
+    "update-ca-certificates >/dev/null",
+  ].join("\n");
 }
 
 function publicAccessHttpSmokeHelpers(): string {
