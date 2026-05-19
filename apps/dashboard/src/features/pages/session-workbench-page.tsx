@@ -83,6 +83,8 @@ function SessionWorkbenchPageContent(input: {
   const [isThreadNavigatorPanelVisible, setThreadNavigatorPanelVisible] = useState(false);
   const conversationScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const requestedThreadResumeAttemptRef = useRef<RequestedThreadResumeAttempt | null>(null);
+  const threadNavigationRequestSequenceRef = useRef(0);
+  const previousActiveConversationIdRef = useRef<string | null>(null);
   const [composerText, setComposerText] = useState("");
   const [pendingDiffComments, setPendingDiffComments] = useState<
     readonly PendingSessionDiffComment[]
@@ -412,11 +414,23 @@ function SessionWorkbenchPageContent(input: {
     },
     [defaultThreadId, input],
   );
+  useEffect(() => {
+    if (previousActiveConversationIdRef.current === conversationPane.activeConversationId) {
+      return;
+    }
+
+    previousActiveConversationIdRef.current = conversationPane.activeConversationId;
+    setComposerText("");
+    setPendingDiffComments([]);
+  }, [conversationPane.activeConversationId]);
   const handleSelectThread = useCallback(
     (threadId: string): void => {
       if (codexThreadNavigator === null) {
         return;
       }
+
+      const navigationRequestId = threadNavigationRequestSequenceRef.current + 1;
+      threadNavigationRequestSequenceRef.current = navigationRequestId;
 
       if (threadId === codexThreadNavigator.activeThreadId) {
         pushThreadSearchParams(threadId);
@@ -426,6 +440,10 @@ function SessionWorkbenchPageContent(input: {
       void codexThreadNavigator
         .resumeThread(threadId)
         .then((confirmedThreadId) => {
+          if (threadNavigationRequestSequenceRef.current !== navigationRequestId) {
+            return;
+          }
+
           pushThreadSearchParams(confirmedThreadId);
         })
         .catch(() => {});
@@ -437,9 +455,16 @@ function SessionWorkbenchPageContent(input: {
       return;
     }
 
+    const navigationRequestId = threadNavigationRequestSequenceRef.current + 1;
+    threadNavigationRequestSequenceRef.current = navigationRequestId;
+
     void codexThreadNavigator
       .startNewThread(primaryRepositoryPath === null ? undefined : { cwd: primaryRepositoryPath })
       .then((threadId) => {
+        if (threadNavigationRequestSequenceRef.current !== navigationRequestId) {
+          return;
+        }
+
         const nextSearchParams = new URLSearchParams(input.searchParams);
         nextSearchParams.set("threadId", threadId);
         input.setSearchParams(nextSearchParams);
@@ -482,6 +507,7 @@ function SessionWorkbenchPageContent(input: {
       sandboxInstanceId: input.sandboxInstanceId,
       threadId: input.requestedThreadId,
     };
+    threadNavigationRequestSequenceRef.current += 1;
     void codexThreadNavigator.resumeThread(input.requestedThreadId).catch(() => {});
   }, [codexThreadNavigator, input.requestedThreadId, input.sandboxInstanceId]);
   const canRenderThreadNavigation =

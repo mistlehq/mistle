@@ -86,6 +86,10 @@ type CodexSessionThreadState = {
   ensureCanSwitchPrimaryRepository: () => Promise<void>;
 };
 
+type ThreadNavigationMutationContext = {
+  requestId: number;
+};
+
 type CodexSessionChatState = {
   chatState: CodexChatState;
   isStartingTurn: boolean;
@@ -158,6 +162,7 @@ export function useCodexSessionState(input: {
   const sessionSnapshotRef = useRef<ConnectedCodexSession | null>(null);
   const threadIdRef = useRef<string | null>(null);
   const connectionGenerationRef = useRef(0);
+  const threadNavigationMutationRequestRef = useRef(0);
   const [repositoryStatusRefreshEpoch, setRepositoryStatusRefreshEpoch] = useState(0);
   const [lifecycleErrorMessage, setLifecycleErrorMessage] = useState<string | null>(null);
   const [sessionErrorMessage, setSessionErrorMessage] = useState<string | null>(null);
@@ -279,6 +284,21 @@ export function useCodexSessionState(input: {
     setLifecycleErrorMessage,
     threadIdRef,
   });
+  const startThreadNavigationMutation = useCallback(
+    (input: { pendingThreadId: string | null }): ThreadNavigationMutationContext => {
+      const requestId = threadNavigationMutationRequestRef.current + 1;
+      threadNavigationMutationRequestRef.current = requestId;
+      setPendingThreadId(input.pendingThreadId);
+      return { requestId };
+    },
+    [],
+  );
+  const isCurrentThreadNavigationMutation = useCallback(
+    (context: ThreadNavigationMutationContext): boolean => {
+      return threadNavigationMutationRequestRef.current === context.requestId;
+    },
+    [],
+  );
   sessionSnapshotRef.current = lifecycle.sessionSnapshot;
   const { sessionSnapshot } = lifecycle;
   const bootstrapConnectionCandidate = useMemo<BootstrapConnectionCandidate | null>(() => {
@@ -365,6 +385,9 @@ export function useCodexSessionState(input: {
   });
 
   const startNewThreadMutation = useMutation({
+    onMutate: (): ThreadNavigationMutationContext => {
+      return startThreadNavigationMutation({ pendingThreadId: null });
+    },
     mutationFn: async (input?: { cwd?: string }) => {
       const rpcClient = rpcClientRef.current;
       if (rpcClient === null) {
@@ -378,7 +401,11 @@ export function useCodexSessionState(input: {
       });
       return threadStart;
     },
-    onSuccess: (threadStart) => {
+    onSuccess: (threadStart, _input, context) => {
+      if (context === undefined || !isCurrentThreadNavigationMutation(context)) {
+        return;
+      }
+
       updateActiveThread({
         threadId: threadStart.threadId,
         cwd: threadStart.cwd,
@@ -387,14 +414,18 @@ export function useCodexSessionState(input: {
       setLifecycleErrorMessage(null);
       refreshThreadCollectionsWithErrorHandling();
     },
-    onError: (error) => {
+    onError: (error, _input, context) => {
+      if (context === undefined || !isCurrentThreadNavigationMutation(context)) {
+        return;
+      }
+
       handleThreadMutationFailure("Could not start a new thread.", error);
     },
   });
 
   const resumeThreadMutation = useMutation({
-    onMutate: (threadId) => {
-      setPendingThreadId(threadId);
+    onMutate: (threadId): ThreadNavigationMutationContext => {
+      return startThreadNavigationMutation({ pendingThreadId: threadId });
     },
     mutationFn: async (threadId: string) => {
       const rpcClient = rpcClientRef.current;
@@ -407,7 +438,11 @@ export function useCodexSessionState(input: {
         threadId,
       });
     },
-    onSuccess: (result) => {
+    onSuccess: (result, _threadId, context) => {
+      if (context === undefined || !isCurrentThreadNavigationMutation(context)) {
+        return;
+      }
+
       updateActiveThread({
         threadId: result.threadId,
         cwd: result.cwd,
@@ -416,10 +451,18 @@ export function useCodexSessionState(input: {
       setLifecycleErrorMessage(null);
       refreshThreadCollectionsWithErrorHandling();
     },
-    onError: (error) => {
+    onError: (error, _threadId, context) => {
+      if (context === undefined || !isCurrentThreadNavigationMutation(context)) {
+        return;
+      }
+
       handleThreadMutationFailure("Could not resume thread.", error);
     },
-    onSettled: () => {
+    onSettled: (_result, _error, _threadId, context) => {
+      if (context === undefined || !isCurrentThreadNavigationMutation(context)) {
+        return;
+      }
+
       setPendingThreadId(null);
     },
   });
