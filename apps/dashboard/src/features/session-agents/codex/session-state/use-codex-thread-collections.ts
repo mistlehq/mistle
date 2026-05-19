@@ -9,6 +9,7 @@ import { useCallback, useRef, useState, type RefObject } from "react";
 type RefreshInput = {
   rpcClient?: CodexJsonRpcClient;
   generation?: number;
+  originalThreadId?: string;
 };
 
 type OriginalThreadIdSnapshot = {
@@ -151,8 +152,20 @@ export function useCodexThreadCollections(input: {
     [updateOriginalThreadIdSnapshot],
   );
 
+  const recordOriginalThreadIdFromSessionEntrypoint = useCallback(
+    (recordInput: { generation: number | null; threadId: string }): string => {
+      updateOriginalThreadIdSnapshot({
+        generation: recordInput.generation,
+        threadId: recordInput.threadId,
+      });
+      return recordInput.threadId;
+    },
+    [updateOriginalThreadIdSnapshot],
+  );
+
   const refreshThreadCollections = useCallback(
     async (refreshInput?: RefreshInput) => {
+      const requestedOriginalThreadId = refreshInput?.originalThreadId;
       const reusableOriginalThreadIdSnapshot = resolveReusableOriginalThreadIdSnapshot({
         ...(refreshInput?.generation === undefined
           ? {}
@@ -160,9 +173,16 @@ export function useCodexThreadCollections(input: {
         snapshot: originalThreadIdSnapshotRef.current,
       });
       const originalThreadIdPromise =
-        reusableOriginalThreadIdSnapshot !== null
-          ? Promise.resolve(reusableOriginalThreadIdSnapshot.threadId)
-          : refreshOriginalThreadId(refreshInput);
+        requestedOriginalThreadId !== undefined
+          ? Promise.resolve(
+              recordOriginalThreadIdFromSessionEntrypoint({
+                generation: refreshInput?.generation ?? null,
+                threadId: requestedOriginalThreadId,
+              }),
+            )
+          : reusableOriginalThreadIdSnapshot !== null
+            ? Promise.resolve(reusableOriginalThreadIdSnapshot.threadId)
+            : refreshOriginalThreadId(refreshInput);
       const [
         availableThreadsResult,
         archivedThreadsResult,
@@ -185,6 +205,7 @@ export function useCodexThreadCollections(input: {
     [
       refreshArchivedThreadList,
       refreshLoadedThreadList,
+      recordOriginalThreadIdFromSessionEntrypoint,
       refreshOriginalThreadId,
       refreshThreadList,
     ],

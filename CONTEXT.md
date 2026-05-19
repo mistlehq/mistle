@@ -85,8 +85,8 @@ The **Codex thread** selected by a **Session workbench** when no explicit **Acti
 _Avoid_: Main thread
 
 **Original Codex thread**:
-The earliest-created **Codex thread** known for a **Sandbox session**.
-_Avoid_: Default thread, main thread, first visible thread
+The **Codex thread** that anchors how a **Session workbench** was opened. For a trigger-started **Session workbench**, this is the **Codex thread** associated with the **Trigger conversation**. For a dashboard-started **Session workbench**, this is the earliest-created **Codex thread** known for the **Sandbox session**.
+_Avoid_: Trigger thread, default thread, main thread, first visible thread
 
 **Session workbench**:
 The dashboard workspace for a **Sandbox session**, including sandbox-scoped tools and thread-scoped chat.
@@ -140,6 +140,11 @@ _Avoid_: Slash autocomplete
 - Opening **Codex thread** navigation does not change the **Session bottom panel** state.
 - A **Default Codex thread** is used only when the **Session workbench** has no explicit **Active Codex thread** request.
 - The **Original Codex thread** and **Default Codex thread** may be different **Codex threads**.
+- In a trigger-started **Session workbench**, the **Original Codex thread** may differ from the earliest-created **Codex thread** in the **Sandbox session**.
+- A trigger-started **Session workbench** resolves its **Original Codex thread** from the **Trigger conversation**, not from **Codex thread** creation order.
+- A trigger-started **Session workbench** without a known **Trigger conversation** **Codex thread** has no **Original Codex thread** inferred from creation order.
+- The **Original Codex thread** remains stable when the **Active Codex thread** changes within a **Session workbench**.
+- An explicit **Active Codex thread** request does not redefine the **Original Codex thread**.
 - Ports, terminal access, runtime status, repository filesystem state, and sandbox-level diffs belong to the **Sandbox session**.
 - Transcript, active turn state, context usage, and Codex thread actions belong to the **Codex thread**.
 - Opening a different **Codex thread** is a thread-scoped transition; the previous **Active Codex thread** remains authoritative until the next thread is ready.

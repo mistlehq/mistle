@@ -118,6 +118,7 @@ export function useCodexSessionConnection(input: {
   refreshThreadCollections: (input?: {
     rpcClient?: CodexJsonRpcClient;
     generation?: number;
+    originalThreadId?: string;
   }) => Promise<CodexThreadCollectionsRefreshResult>;
   recordStartedThreadAsOriginalAfterEmptyScan: (input: {
     generation: number;
@@ -390,6 +391,9 @@ export function useCodexSessionConnection(input: {
 
       const threadCollections = await input.refreshThreadCollections({
         generation,
+        ...(connectInput.providerThreadId === undefined || connectInput.providerThreadId === null
+          ? {}
+          : { originalThreadId: connectInput.providerThreadId }),
         rpcClient,
       });
 
