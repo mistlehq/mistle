@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { isUserStopSupportedPurpose, shouldExecuteSandboxStop } from "./stop-sandbox-instance.js";
+import {
+  isWorkflowUserStopReasonSupportedPurpose,
+  shouldExecuteSandboxStop,
+} from "./stop-sandbox-instance.js";
 
 describe("shouldExecuteSandboxStop", () => {
   it("allows an idle stop only when owner and attachment still match the expected lease", () => {
@@ -75,11 +78,11 @@ describe("shouldExecuteSandboxStop", () => {
   });
 });
 
-describe("isUserStopSupportedPurpose", () => {
-  it("allows user stops for setup sandboxes only", () => {
-    expect(isUserStopSupportedPurpose("setup_check")).toBe(true);
-    expect(isUserStopSupportedPurpose("setup_assistant")).toBe(true);
-    expect(isUserStopSupportedPurpose("session")).toBe(false);
-    expect(isUserStopSupportedPurpose("snapshot")).toBe(false);
+describe("isWorkflowUserStopReasonSupportedPurpose", () => {
+  it("allows workflow-level user stop reason for delete and setup shutdown paths", () => {
+    expect(isWorkflowUserStopReasonSupportedPurpose("setup_check")).toBe(true);
+    expect(isWorkflowUserStopReasonSupportedPurpose("setup_assistant")).toBe(true);
+    expect(isWorkflowUserStopReasonSupportedPurpose("session")).toBe(true);
+    expect(isWorkflowUserStopReasonSupportedPurpose("snapshot")).toBe(false);
   });
 });

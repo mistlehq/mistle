@@ -3,7 +3,7 @@ import {
   type DataPlaneDatabase,
   type DataPlaneTables,
 } from "@mistle/db/data-plane";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 export async function markSandboxInstanceRunning(
   ctx: {
@@ -30,6 +30,7 @@ export async function markSandboxInstanceRunning(
       and(
         eq(sandboxInstances.id, input.sandboxInstanceId),
         eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
+        isNull(sandboxInstances.deletedAt),
       ),
     )
     .returning({

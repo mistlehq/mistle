@@ -104,6 +104,14 @@ const StopSandboxInstanceResponseSchema = z
   })
   .strict();
 
+const DeleteSandboxInstanceResponseSchema = z
+  .object({
+    status: z.enum(["deleted", "already_deleted"]),
+    sandboxInstanceId: z.string().min(1),
+    workflowRunId: z.string().min(1).nullable(),
+  })
+  .strict();
+
 export type StartSandboxInstanceResult = {
   workflowRunId: string;
   sandboxInstanceId: string;
@@ -137,6 +145,7 @@ export type PatchSandboxInstanceTitleResult = {
 };
 
 export type StopSandboxInstanceResult = z.output<typeof StopSandboxInstanceResponseSchema>;
+export type DeleteSandboxInstanceResult = z.output<typeof DeleteSandboxInstanceResponseSchema>;
 
 export async function listSandboxInstances(input: {
   limit: number;
@@ -554,6 +563,42 @@ export async function stopSandboxInstance(input: {
         operation: "stopSandboxInstance",
         error,
         fallbackMessage: "Could not stop sandbox session.",
+      }),
+    );
+  }
+}
+
+export async function deleteSandboxInstance(input: {
+  instanceId: string;
+  signal?: AbortSignal;
+}): Promise<DeleteSandboxInstanceResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "deleteSandboxInstance",
+      method: "DELETE",
+      pathname: `/v1/sandbox/instances/${encodeURIComponent(input.instanceId)}`,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not delete sandbox session.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = DeleteSandboxInstanceResponseSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "deleteSandboxInstance",
+        status: 500,
+        body: responseBody,
+        message: "Delete sandbox session response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "deleteSandboxInstance",
+        error,
+        fallbackMessage: "Could not delete sandbox session.",
       }),
     );
   }

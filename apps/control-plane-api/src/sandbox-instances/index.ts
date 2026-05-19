@@ -16,6 +16,7 @@ export { route as createSandboxInstancePortAccessRoute } from "./create-sandbox-
 export { route as createSandboxInstancePtySessionRoute } from "./create-sandbox-instance-pty-session/route.js";
 export { route as listSandboxInstancesRoute } from "./list-sandbox-instances/route.js";
 export { route as getSandboxInstanceRoute } from "./get-sandbox-instance/route.js";
+export { route as deleteSandboxInstanceRoute } from "./delete-sandbox-instance/route.js";
 export { route as listOperationEventsRoute } from "./list-operation-events/route.js";
 export { route as getSandboxInstanceSessionLinkRoute } from "./get-sandbox-instance-session-link/route.js";
 export { route as patchSandboxInstanceTitleRoute } from "./patch-sandbox-instance-title/route.js";

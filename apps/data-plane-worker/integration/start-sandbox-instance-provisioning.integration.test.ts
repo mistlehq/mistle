@@ -16,6 +16,7 @@ import {
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
+import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import {
@@ -24,6 +25,7 @@ import {
   updateSandboxInstanceStorageCredential,
 } from "../openworkflow/shared/sandbox-storage/storage-persistence.js";
 import { ensureSandboxInstance } from "../openworkflow/start-sandbox-instance/ensure-sandbox-instance.js";
+import { markSandboxInstanceRunning } from "../openworkflow/start-sandbox-instance/mark-sandbox-instance-running.js";
 import { persistSandboxInstanceProvisioning } from "../openworkflow/start-sandbox-instance/persist-sandbox-instance-provisioning.js";
 
 const it = createIntegrationTest({
@@ -108,6 +110,113 @@ describe.concurrent("data-plane worker start sandbox instance provisioning", () 
         compiledFromProfileVersion: 3,
       },
     ]);
+  });
+
+  it("does not persist provider metadata for a deleted pending session", async ({ env }) => {
+    const sandboxInstanceId = "sbi_start_provisioning_deleted_pending_new";
+
+    await ensureEphemeralSandboxInstance(env, {
+      sandboxInstanceId,
+      organizationId: "org_start_provisioning_deleted_pending_new",
+      sandboxProfileId: "sbp_start_provisioning_deleted_pending_new",
+      sandboxProfileVersion: 1,
+    });
+    await env.dataPlaneDb
+      .update(env.dataPlaneTables.sandboxInstances)
+      .set({
+        deletedAt: "2026-05-19T00:00:00.000Z",
+      })
+      .where(eq(env.dataPlaneTables.sandboxInstances.id, sandboxInstanceId));
+
+    await expect(
+      persistSandboxInstanceProvisioning(
+        {
+          db: env.dataPlaneDb,
+          tables: env.dataPlaneTables,
+        },
+        {
+          sandboxInstanceId,
+          runtimePlan: createRuntimePlan({
+            sandboxProfileId: "sbp_start_provisioning_deleted_pending_new",
+            version: 1,
+          }),
+          sandboxProfileId: "sbp_start_provisioning_deleted_pending_new",
+          sandboxProfileVersion: 1,
+          providerSandboxId: "provider-runtime-deleted-pending-new",
+        },
+      ),
+    ).rejects.toThrow(
+      "Failed to persist provider sandbox id while sandbox instance was still pending.",
+    );
+
+    const persistedDeletedInstance = await env.dataPlaneDb.query.sandboxInstances.findFirst({
+      columns: {
+        providerSandboxId: true,
+        status: true,
+      },
+      where: (table, { eq }) => eq(table.id, sandboxInstanceId),
+    });
+    expect(persistedDeletedInstance).toEqual({
+      providerSandboxId: null,
+      status: SandboxInstanceStatuses.PENDING,
+    });
+  });
+
+  it("does not mark a deleted starting session as running", async ({ env }) => {
+    const sandboxInstanceId = "sbi_start_provisioning_deleted_starting_new";
+
+    await ensureEphemeralSandboxInstance(env, {
+      sandboxInstanceId,
+      organizationId: "org_start_provisioning_deleted_starting_new",
+      sandboxProfileId: "sbp_start_provisioning_deleted_starting_new",
+      sandboxProfileVersion: 1,
+    });
+    await persistSandboxInstanceProvisioning(
+      {
+        db: env.dataPlaneDb,
+        tables: env.dataPlaneTables,
+      },
+      {
+        sandboxInstanceId,
+        runtimePlan: createRuntimePlan({
+          sandboxProfileId: "sbp_start_provisioning_deleted_starting_new",
+          version: 1,
+        }),
+        sandboxProfileId: "sbp_start_provisioning_deleted_starting_new",
+        sandboxProfileVersion: 1,
+        providerSandboxId: "provider-runtime-deleted-starting-new",
+      },
+    );
+    await env.dataPlaneDb
+      .update(env.dataPlaneTables.sandboxInstances)
+      .set({
+        deletedAt: "2026-05-19T00:00:00.000Z",
+      })
+      .where(eq(env.dataPlaneTables.sandboxInstances.id, sandboxInstanceId));
+
+    await expect(
+      markSandboxInstanceRunning(
+        {
+          db: env.dataPlaneDb,
+          tables: env.dataPlaneTables,
+        },
+        {
+          sandboxInstanceId,
+        },
+      ),
+    ).rejects.toThrow("Failed to transition sandbox instance status from starting to running.");
+
+    const persistedDeletedInstance = await env.dataPlaneDb.query.sandboxInstances.findFirst({
+      columns: {
+        providerSandboxId: true,
+        status: true,
+      },
+      where: (table, { eq }) => eq(table.id, sandboxInstanceId),
+    });
+    expect(persistedDeletedInstance).toEqual({
+      providerSandboxId: "provider-runtime-deleted-starting-new",
+      status: SandboxInstanceStatuses.STARTING,
+    });
   });
 
   it("persists and updates sandbox storage metadata", async ({ env }) => {

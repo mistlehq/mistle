@@ -197,14 +197,15 @@ async function readSandboxStopPermission(ctx: {
   };
 }
 
-export function isUserStopSupportedPurpose(purpose: SandboxInstancePurpose): boolean {
+export function isWorkflowUserStopReasonSupportedPurpose(purpose: SandboxInstancePurpose): boolean {
   return (
+    purpose === SandboxInstancePurposes.SESSION ||
     purpose === SandboxInstancePurposes.SETUP_ASSISTANT ||
     purpose === SandboxInstancePurposes.SETUP_CHECK
   );
 }
 
-function assertUserStopIsScopedToUserStoppablePurpose(input: {
+function assertWorkflowUserStopReasonIsScopedToSupportedPurpose(input: {
   sandboxInstanceId: string;
   stopReason: SandboxStopReason;
   purpose: SandboxInstancePurpose;
@@ -213,9 +214,9 @@ function assertUserStopIsScopedToUserStoppablePurpose(input: {
     return;
   }
 
-  if (!isUserStopSupportedPurpose(input.purpose)) {
+  if (!isWorkflowUserStopReasonSupportedPurpose(input.purpose)) {
     throw new Error(
-      `User-requested stop is only supported for setup-check and setup-assistant sandbox instances; sandbox instance '${input.sandboxInstanceId}' has purpose '${input.purpose}'.`,
+      `Workflow stop reason 'user' is only supported for session, setup-check, and setup-assistant sandbox instances; sandbox instance '${input.sandboxInstanceId}' has purpose '${input.purpose}'.`,
     );
   }
 }
@@ -268,7 +269,7 @@ export async function stopSandboxInstance(
     };
   }
 
-  assertUserStopIsScopedToUserStoppablePurpose({
+  assertWorkflowUserStopReasonIsScopedToSupportedPurpose({
     sandboxInstanceId: input.sandboxInstanceId,
     stopReason: input.stopReason,
     purpose: sandboxInstanceState.purpose,

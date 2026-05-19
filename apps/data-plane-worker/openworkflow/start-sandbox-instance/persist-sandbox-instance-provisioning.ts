@@ -4,7 +4,7 @@ import {
   type DataPlaneTables,
 } from "@mistle/db/data-plane";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 export async function persistSandboxInstanceProvisioning(
   ctx: {
@@ -32,6 +32,7 @@ export async function persistSandboxInstanceProvisioning(
         and(
           eq(sandboxInstances.id, input.sandboxInstanceId),
           eq(sandboxInstances.status, SandboxInstanceStatuses.PENDING),
+          isNull(sandboxInstances.deletedAt),
         ),
       )
       .returning({

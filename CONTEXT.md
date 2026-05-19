@@ -44,6 +44,10 @@ _Avoid_: Detail tab, filtered results view
 A narrowed view of a **Collection landing page** based on user-entered criteria.
 _Avoid_: Empty state, local table filter
 
+**Deleted session**:
+A sandbox session intentionally removed from ordinary user-visible session lists while its history remains available for audit and debugging.
+_Avoid_: Hard-deleted session, erased session
+
 **Trigger**:
 A configured event or schedule that starts an agent response.
 _Avoid_: Automation
@@ -105,6 +109,15 @@ _Avoid_: Thread panel, Codex thread panel
 - When a new **Sandbox profile version** is published, the **Snapshot maintenance script** and **Automatic snapshot refresh** definition should be copied forward from the previous version.
 - A **Collection landing page** may list **Sandbox profile version** families, triggers, sessions, or organization members.
 - A **Filtered collection view** narrows a **Collection landing page** without changing whether the underlying collection exists.
+- A **Deleted session** is excluded from ordinary session collection views but is still part of the organization's historical record.
+- Any ordinary user-visible session may become a **Deleted session**, regardless of whether it is pending, starting, running, stopped, or failed.
+- A **Deleted session** keeps its runtime lifecycle state as historical context.
+- A **Deleted session** is not restorable through the ordinary product interface.
+- A **Deleted session** is unavailable through ordinary session detail routes.
+- A running session may become a **Deleted session** after its deletion is recorded and shutdown is accepted.
+- A pending or starting **Deleted session** must not complete startup into a hidden running sandbox.
+- Deleting a session does not delete the **Trigger** run or **Trigger conversation** that may have created or used it.
+- Deleting an existing **Deleted session** again is still considered a successful deletion request.
 - A **Trigger** may select one or more **Trigger events**.
 - A **Trigger** may start from a webhook event or a schedule.
 - A **Trigger** run may create or reuse one **Trigger conversation**.
@@ -184,3 +197,4 @@ _Avoid_: Thread panel, Codex thread panel
 - "chat session" could mean either the live sandbox environment or a Codex conversation — resolved: use **Sandbox session** for the live environment and **Codex thread** for the conversation.
 - "active thread" could imply a different sandbox — resolved: use **Active Codex thread** for the selected chat conversation inside the same **Sandbox session**.
 - Switching threads could imply changing the whole workbench — resolved: thread switching changes the **Active Codex thread** without changing the **Sandbox session**.
+- "delete session" could mean hard deletion or user-visible removal — resolved: use **Deleted session** for a session hidden from ordinary lists while retaining its historical record.

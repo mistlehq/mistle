@@ -1,6 +1,8 @@
 import {
   Badge,
   Button,
+  DropdownMenuItem,
+  MoreActionsMenu,
   Notice,
   OverflowTooltipText,
   Select,
@@ -19,8 +21,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@mistle/ui";
-import { InfoIcon, PlusIcon } from "@phosphor-icons/react";
-import { useQuery } from "@tanstack/react-query";
+import { InfoIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link as RouterLink, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -29,7 +31,7 @@ import { useLaunchableSandboxProfiles } from "../sandbox-profiles/use-launchable
 import { isSessionPageNavigableSandboxStatus } from "../sessions/session-connect-policy.js";
 import { resolveSessionTitleLabel } from "../sessions/session-title-presentation.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
-import { listSandboxInstances } from "../sessions/sessions-service.js";
+import { deleteSandboxInstance, listSandboxInstances } from "../sessions/sessions-service.js";
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
 import { CollectionEmptyState } from "../shared/collection-empty-state.js";
 import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
@@ -208,6 +210,25 @@ function SessionTitleCell(input: { href?: string; title: string }): React.JSX.El
     >
       {titleText}
     </TextLink>
+  );
+}
+
+function SessionRowActions(input: {
+  isDisabled: boolean;
+  onRequestDelete: () => void;
+  sessionTitle: string;
+}): React.JSX.Element {
+  return (
+    <MoreActionsMenu
+      disabled={input.isDisabled}
+      triggerLabel={`Session actions for ${input.sessionTitle}`}
+      triggerSize="icon-xs"
+    >
+      <DropdownMenuItem onClick={input.onRequestDelete} variant="destructive">
+        <TrashIcon aria-hidden className="size-4" />
+        Delete session
+      </DropdownMenuItem>
+    </MoreActionsMenu>
   );
 }
 
@@ -462,6 +483,7 @@ function SessionsListToolbar(input: {
 }
 
 export function SessionsPage(): React.JSX.Element {
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const sandboxInstanceListLimit = parseListLimit(searchParams.get("limit"));
   const { after: sandboxInstancesAfter, before: sandboxInstancesBefore } =
@@ -505,6 +527,29 @@ export function SessionsPage(): React.JSX.Element {
       }),
   });
   const displayedSessions = sandboxInstancesQuery.data?.items ?? [];
+  const deleteSessionMutation = useMutation({
+    mutationFn: async (session: SandboxInstanceListItem) =>
+      deleteSandboxInstance({
+        instanceId: session.id,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["sandbox-instances", "list"],
+      });
+    },
+  });
+
+  const deleteSessionErrorMessage = deleteSessionMutation.isError
+    ? resolveApiErrorMessage({
+        error: deleteSessionMutation.error,
+        fallbackMessage: "Could not delete sandbox session.",
+      })
+    : null;
+
+  function requestDeleteSession(session: SandboxInstanceListItem): void {
+    deleteSessionMutation.reset();
+    deleteSessionMutation.mutate(session);
+  }
 
   function updatePagination(input: {
     nextLimit: number;
@@ -659,6 +704,11 @@ export function SessionsPage(): React.JSX.Element {
             {listErrorMessage}
           </Notice>
         )}
+        {deleteSessionErrorMessage === null ? null : (
+          <Notice title="Delete failed" variant="alert">
+            {deleteSessionErrorMessage}
+          </Notice>
+        )}
 
         <SessionsEmptyState state={sessionsEmptyState} />
 
@@ -671,36 +721,40 @@ export function SessionsPage(): React.JSX.Element {
               triggerOptions={triggerOptionsQuery.data?.items ?? []}
             />
 
-            <Table className="min-w-[40rem] table-fixed">
+            <Table className="min-w-[44rem] table-fixed">
               <TableHeader className="bg-muted/60">
                 <TableRow className="h-9 border-b">
-                  <TableHead className="text-foreground w-[36%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                  <TableHead className="text-foreground w-[34%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
                     Sessions
                   </TableHead>
-                  <TableHead className="text-foreground w-[20%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                  <TableHead className="text-foreground w-[19%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
                     Sandbox profile
                   </TableHead>
-                  <TableHead className="text-foreground w-[18%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                  <TableHead className="text-foreground w-[17%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
                     Started by
                   </TableHead>
-                  <TableHead className="text-foreground w-[14%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
+                  <TableHead className="text-foreground w-[13%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
                     Created
                   </TableHead>
-                  <TableHead className="text-right text-foreground w-[12%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
+                  <TableHead className="text-right text-foreground w-[11%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
                     Updated
+                  </TableHead>
+                  <TableHead className="w-[6%] py-2">
+                    <span className="sr-only">Actions</span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {displayedSessions.length === 0 && hasActiveFilters ? (
                   <TableRow>
-                    <TableCell className="text-muted-foreground" colSpan={5}>
+                    <TableCell className="text-muted-foreground" colSpan={6}>
                       No sessions match these filters.
                     </TableCell>
                   </TableRow>
                 ) : null}
                 {displayedSessions.map((session) => {
                   const isNavigable = isSessionPageNavigableSandboxStatus(session.status);
+                  const sessionTitle = resolveSessionTitleLabel(session.title);
 
                   return (
                     <TableRow
@@ -715,7 +769,7 @@ export function SessionsPage(): React.JSX.Element {
                       <TableCell className="max-w-0 align-top whitespace-normal">
                         <div className="flex min-w-0">
                           <SessionTitleCell
-                            title={resolveSessionTitleLabel(session.title)}
+                            title={sessionTitle}
                             {...(isNavigable
                               ? {
                                   href: `/sessions/${encodeURIComponent(session.id)}`,
@@ -747,6 +801,20 @@ export function SessionsPage(): React.JSX.Element {
                             updatedAt: session.updatedAt,
                             failureMessage: session.failureMessage,
                           })}
+                        </div>
+                      </TableCell>
+                      <TableCell className="align-middle text-right">
+                        <div className="flex justify-end">
+                          <SessionRowActions
+                            isDisabled={
+                              deleteSessionMutation.isPending &&
+                              deleteSessionMutation.variables?.id === session.id
+                            }
+                            onRequestDelete={() => {
+                              requestDeleteSession(session);
+                            }}
+                            sessionTitle={sessionTitle}
+                          />
                         </div>
                       </TableCell>
                     </TableRow>

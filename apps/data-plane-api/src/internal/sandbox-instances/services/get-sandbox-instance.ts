@@ -15,7 +15,7 @@ import {
   SandboxInspectStates,
   type SandboxAdapter,
 } from "@mistle/sandbox";
-import { and, eq, or, sql } from "drizzle-orm";
+import { and, eq, isNull, or, sql } from "drizzle-orm";
 
 import type { AppRuntimeResources } from "../../../resources.js";
 import { assertRuntimeSandboxProvider } from "../../../sandbox/adapter.js";
@@ -782,6 +782,7 @@ export async function getSandboxInstance(
       whereAnd(
         eq(table.id, input.instanceId),
         whereEq(table.organizationId, input.organizationId),
+        isNull(table.deletedAt),
         or(
           whereEq(table.purpose, SandboxInstancePurposes.SESSION),
           whereEq(table.purpose, SandboxInstancePurposes.SETUP_ASSISTANT),

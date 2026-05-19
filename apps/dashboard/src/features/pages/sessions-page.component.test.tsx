@@ -176,7 +176,7 @@ describe("SessionsPage", () => {
     );
 
     expect(markup).toContain(
-      'data-slot="table" class="w-full caption-bottom text-sm min-w-[40rem] table-fixed"',
+      'data-slot="table" class="w-full caption-bottom text-sm min-w-[44rem] table-fixed"',
     );
     expect(markup).toContain("bg-muted/60");
     expect(markup).toContain("text-[11px] font-semibold tracking-[0.08em] uppercase");
@@ -184,6 +184,35 @@ describe("SessionsPage", () => {
     expect(markup).toContain(">Sandbox profile<");
     expect(markup).toContain(">Created<");
     expect(markup).toContain(">Updated<");
+  });
+
+  it("shows the delete row action without a confirmation dialog", () => {
+    const queryClient = createSessionsPageQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    seedSessionsList({
+      queryClient,
+      items: [
+        buildSandboxInstanceListItemFixture({
+          id: "sbi_direct_delete",
+          title: "Clean up old branch",
+        }),
+      ],
+    });
+
+    renderSessionsPage({
+      queryClient,
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Session actions for Clean up old branch",
+      }),
+    );
+    expect(screen.getByRole("menuitem", { name: "Delete session" })).toBeDefined();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Delete session?" })).toBeNull();
   });
 
   it("guides users to publish a sandbox profile when no sessions can be started yet", () => {
@@ -405,7 +434,7 @@ describe("SessionsPage", () => {
 
     expect(markup).toContain('data-slot="table-container" class="relative w-full overflow-x-auto"');
     expect(markup).toContain(
-      'data-slot="table" class="w-full caption-bottom text-sm min-w-[40rem] table-fixed"',
+      'data-slot="table" class="w-full caption-bottom text-sm min-w-[44rem] table-fixed"',
     );
     expect(markup).toContain("Finance Investigator");
     expect(markup).not.toContain('class="grid gap-3 md:hidden"');
@@ -466,7 +495,7 @@ describe("SessionsPage", () => {
     expect(markup).toContain('class="min-w-0 flex-1"');
     expect(markup).toContain('class="block truncate cursor-default font-medium');
     expect(markup).toContain(
-      'data-slot="table" class="w-full caption-bottom text-sm min-w-[40rem] table-fixed"',
+      'data-slot="table" class="w-full caption-bottom text-sm min-w-[44rem] table-fixed"',
     );
   });
 

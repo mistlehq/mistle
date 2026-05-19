@@ -117,6 +117,18 @@ const StopUserRequestedSandboxInstanceResponseSchema = z
 export type StopUserRequestedSandboxInstanceResponse = z.infer<
   typeof StopUserRequestedSandboxInstanceResponseSchema
 >;
+export type DeleteSandboxInstanceInput = {
+  organizationId: string;
+  sandboxInstanceId: string;
+};
+const DeleteSandboxInstanceResponseSchema = z
+  .object({
+    status: z.enum(["deleted", "already_deleted"]),
+    sandboxInstanceId: z.string().min(1),
+    workflowRunId: z.string().min(1).nullable(),
+  })
+  .strict();
+export type DeleteSandboxInstanceResponse = z.infer<typeof DeleteSandboxInstanceResponseSchema>;
 export type ReconcileSandboxInstanceInput = {
   sandboxInstanceId: string;
   reason: "disconnect_grace_elapsed";
@@ -245,6 +257,9 @@ export type DataPlaneSandboxInstancesClient = {
   stopUserRequestedSandboxInstance: (
     input: StopUserRequestedSandboxInstanceInput,
   ) => Promise<StopUserRequestedSandboxInstanceResponse>;
+  deleteSandboxInstance: (
+    input: DeleteSandboxInstanceInput,
+  ) => Promise<DeleteSandboxInstanceResponse>;
   reconcileSandboxInstance: (
     input: ReconcileSandboxInstanceInput,
   ) => Promise<ReconcileSandboxInstanceAcceptedResponse>;
@@ -298,6 +313,7 @@ function createClientError(input: {
     | "materialize"
     | "resume"
     | "stop"
+    | "delete"
     | "reconcile"
     | "putDeadline"
     | "deleteDeadline"
@@ -311,6 +327,7 @@ function createClientError(input: {
     materialize: "materialize",
     resume: "resume",
     stop: "stop",
+    delete: "delete",
     reconcile: "reconcile",
     putDeadline: "put deadline",
     deleteDeadline: "delete deadline",
@@ -608,6 +625,43 @@ export function createDataPlaneSandboxInstancesClient(
         status: response.status,
         error: errorBody,
         operation: "stop",
+      });
+    },
+
+    async deleteSandboxInstance(deleteInput) {
+      const response = await fetch(
+        createSandboxInstanceMemberUrl({
+          baseUrl: internalClient.baseUrl,
+          instanceId: deleteInput.sandboxInstanceId,
+          query: {
+            organizationId: deleteInput.organizationId,
+          },
+        }),
+        {
+          method: "DELETE",
+          headers: createAuthedHeaders({
+            serviceToken: internalClient.serviceToken,
+            ...(internalClient.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: internalClient.testEnvironmentId }),
+            ...(internalClient.testEnvironmentIdHeader === undefined
+              ? {}
+              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
+          }),
+          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+        },
+      );
+
+      if (response.status === 200) {
+        return DeleteSandboxInstanceResponseSchema.parse(await response.json());
+      }
+
+      const errorBody = await readResponseBody(response);
+
+      throw createClientError({
+        status: response.status,
+        error: errorBody,
+        operation: "delete",
       });
     },
 

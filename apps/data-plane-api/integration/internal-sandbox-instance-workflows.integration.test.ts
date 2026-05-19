@@ -75,6 +75,15 @@ const UserStopWorkflowIdempotencyKeySchema = z
   })
   .strict();
 
+const DeleteSessionStopWorkflowIdempotencyKeySchema = z
+  .object({
+    version: z.literal(1),
+    sandboxInstanceId: z.string().min(1),
+    action: z.literal("delete_session_stop"),
+    organizationId: z.string().min(1),
+  })
+  .strict();
+
 const ReconcileWorkflowInputSchema = z
   .object({
     sandboxInstanceId: z.string().min(1),
@@ -294,6 +303,79 @@ describe.concurrent("internal sandbox instance workflow queue integration", () =
       }),
     ).rejects.toMatchObject({
       status: 409,
+    });
+  });
+
+  it("deletes a running session and queues shutdown before hiding it from reads", async ({
+    env,
+  }) => {
+    await insertRunningSandboxInstance(env, {
+      sandboxInstanceId: "sbi_dp_api_workflow_delete_running_session",
+      organizationId: "org_dp_api_workflow_delete_running_session",
+      sandboxProfileId: "sbp_dp_api_workflow_delete_running_session",
+      purpose: SandboxInstancePurposes.SESSION,
+    });
+
+    const firstResponse = await clientFor(env).deleteSandboxInstance({
+      organizationId: "org_dp_api_workflow_delete_running_session",
+      sandboxInstanceId: "sbi_dp_api_workflow_delete_running_session",
+    });
+    const secondResponse = await clientFor(env).deleteSandboxInstance({
+      organizationId: "org_dp_api_workflow_delete_running_session",
+      sandboxInstanceId: "sbi_dp_api_workflow_delete_running_session",
+    });
+
+    expect(firstResponse).toEqual({
+      status: "deleted",
+      sandboxInstanceId: "sbi_dp_api_workflow_delete_running_session",
+      workflowRunId: expect.any(String),
+    });
+    expect(secondResponse).toEqual({
+      status: "already_deleted",
+      sandboxInstanceId: "sbi_dp_api_workflow_delete_running_session",
+      workflowRunId: null,
+    });
+
+    await expect(
+      clientFor(env).getSandboxInstance({
+        organizationId: "org_dp_api_workflow_delete_running_session",
+        instanceId: "sbi_dp_api_workflow_delete_running_session",
+      }),
+    ).resolves.toBeNull();
+
+    const persisted = await env.dataPlaneDb.query.sandboxInstances.findFirst({
+      columns: {
+        deletedAt: true,
+        status: true,
+      },
+      where: (table, { eq }) => eq(table.id, "sbi_dp_api_workflow_delete_running_session"),
+    });
+    expect(persisted?.deletedAt).not.toBeNull();
+    expect(persisted?.status).toBe(SandboxInstanceStatuses.RUNNING);
+
+    const workflowRuns = await waitForQueuedWorkflowRuns({
+      env,
+      sandboxInstanceId: "sbi_dp_api_workflow_delete_running_session",
+      workflowName: StopSandboxInstanceWorkflowName,
+    });
+
+    expect(workflowRuns).toHaveLength(1);
+    expect(workflowRuns[0]).toMatchObject({
+      id: firstResponse.workflowRunId,
+      input: {
+        sandboxInstanceId: "sbi_dp_api_workflow_delete_running_session",
+        stopReason: "user",
+      },
+    });
+    expect(
+      DeleteSessionStopWorkflowIdempotencyKeySchema.parse(
+        JSON.parse(workflowRuns[0]?.idempotency_key ?? ""),
+      ),
+    ).toEqual({
+      version: 1,
+      sandboxInstanceId: "sbi_dp_api_workflow_delete_running_session",
+      action: "delete_session_stop",
+      organizationId: "org_dp_api_workflow_delete_running_session",
     });
   });
 

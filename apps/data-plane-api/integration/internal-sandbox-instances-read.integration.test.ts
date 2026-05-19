@@ -79,6 +79,25 @@ it("returns pending sandbox instances before provider provisioning begins", asyn
   });
 });
 
+it("does not return deleted sandbox sessions from the get route", async ({ env }) => {
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values(
+    sandboxInstanceRow({
+      id: "sbi_integration_new_get_deleted_session",
+      organizationId: "org_integration_new_get_deleted_session",
+      sandboxProfileId: "sbp_integration_new_deleted_session",
+      deletedAt: "2026-05-19T00:00:00.000Z",
+      title: "Deleted session",
+    }),
+  );
+
+  await expect(
+    clientFor(env).getSandboxInstance({
+      organizationId: "org_integration_new_get_deleted_session",
+      instanceId: "sbi_integration_new_get_deleted_session",
+    }),
+  ).resolves.toBeNull();
+});
+
 it("returns the latest start or resume operation for session startup progress", async ({ env }) => {
   await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values(
     sandboxInstanceRow({
@@ -439,6 +458,15 @@ it("returns an organization-scoped paginated sandbox instance list", async ({ en
       title: "Hidden snapshot worker",
       createdAt: "2026-03-14T00:00:00.000Z",
       updatedAt: "2026-03-14T00:00:00.000Z",
+    }),
+    sandboxInstanceRow({
+      id: "sbi_integration_new_list_deleted",
+      organizationId: "org_integration_new_list_a",
+      sandboxProfileId: "sbp_integration_new_deleted",
+      title: "Deleted sandbox session",
+      deletedAt: "2026-03-14T12:00:00.000Z",
+      createdAt: "2026-03-14T12:00:00.000Z",
+      updatedAt: "2026-03-14T12:00:00.000Z",
     }),
     sandboxInstanceRow({
       id: "sbi_integration_new_list_setup_check",

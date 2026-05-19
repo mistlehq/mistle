@@ -14,7 +14,7 @@ import {
   KeysetPaginationInputErrorReasons,
   paginateKeyset,
 } from "@mistle/http/pagination";
-import { and, eq, gt, ilike, inArray, lt, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, gt, ilike, inArray, isNull, lt, ne, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 
 import type { ListSandboxInstancesInput } from "../list-sandbox-instances/schema.js";
@@ -169,6 +169,7 @@ export async function listSandboxInstances(
             const filters: SQL[] = [
               eq(table.organizationId, input.organizationId),
               eq(table.purpose, SandboxInstancePurposes.SESSION),
+              isNull(table.deletedAt),
             ];
 
             if (input.startedByKind !== undefined) {
@@ -256,6 +257,7 @@ export async function listSandboxInstances(
         const countFilters: SQL[] = [
           eq(sandboxInstances.organizationId, input.organizationId),
           eq(sandboxInstances.purpose, SandboxInstancePurposes.SESSION),
+          isNull(sandboxInstances.deletedAt),
         ];
 
         if (input.startedByKind !== undefined) {

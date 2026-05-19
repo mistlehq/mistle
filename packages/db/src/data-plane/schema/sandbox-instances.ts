@@ -109,6 +109,7 @@ export function defineSandboxInstances(schema: PgSchema) {
       failedAt: timestamp("failed_at", { withTimezone: true, mode: "string" }),
       failureCode: text("failure_code"),
       failureMessage: text("failure_message"),
+      deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "string" }),
       createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
         .notNull()
         .defaultNow(),

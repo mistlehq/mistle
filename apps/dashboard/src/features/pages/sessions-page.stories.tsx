@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { userEvent, within } from "storybook/test";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
@@ -92,6 +93,33 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const MixedStates: Story = {};
+
+export const DeleteActionMenu: Story = {
+  args: {
+    sandboxInstancesList: {
+      items: [
+        buildSandboxInstanceListItemFixture({
+          id: "sbi_delete_action_menu",
+          title: "Clean up stale release session",
+          sandboxProfileDisplayName: "Repo Maintainer",
+          status: "running",
+          updatedAt: "2026-04-01T09:00:00.000Z",
+        }),
+      ],
+      nextPage: null,
+      previousPage: null,
+      totalResults: 1,
+    },
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      canvas.getByRole("button", {
+        name: "Session actions for Clean up stale release session",
+      }),
+    );
+  },
+};
 
 export const EmptyState: Story = {
   args: {
