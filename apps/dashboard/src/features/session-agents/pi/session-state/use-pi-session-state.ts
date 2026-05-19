@@ -1,6 +1,7 @@
 import {
   createPiSessionClient,
   type PiAgentMessage,
+  type PiEvent,
   type PiEventSubscription,
   type PiSessionClient,
 } from "@mistle/integrations-definitions/agent-runtimes/pi/client";
@@ -123,6 +124,7 @@ function createUnavailablePiBootstrap(
 }
 
 async function hydrateConnectedPiChat(input: {
+  bufferedEvents?: readonly PiEvent[];
   client: PiSessionClient;
   dispatchChatAction: Dispatch<Parameters<typeof reducePiChatState>[1]>;
   sessionFile: string;
@@ -132,6 +134,7 @@ async function hydrateConnectedPiChat(input: {
   });
   input.dispatchChatAction({
     type: "hydrate_messages",
+    ...(input.bufferedEvents === undefined ? {} : { bufferedEvents: input.bufferedEvents }),
     sessionFile: input.sessionFile,
     messages,
   });
@@ -295,8 +298,14 @@ export function usePiSessionState(input: {
             client.close();
             return;
           }
+          const bufferedEvents: PiEvent[] = [];
+          let hydrationHasCompleted = false;
           eventSubscriptionRef.current = client.subscribeEvents({
             onEvent: (event) => {
+              if (!hydrationHasCompleted) {
+                bufferedEvents.push(event);
+                return;
+              }
               dispatchChatAction({
                 type: "event_received",
                 event,
@@ -304,10 +313,12 @@ export function usePiSessionState(input: {
             },
           });
           await hydrateConnectedPiChat({
+            bufferedEvents,
             client,
             dispatchChatAction,
             sessionFile: activeSessionFile,
           });
+          hydrationHasCompleted = true;
           setSessionSnapshot({
             activeDirectory: connectInput.initialCwd ?? null,
             activeSessionFile,

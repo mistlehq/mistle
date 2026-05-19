@@ -387,29 +387,49 @@ impl PiProxyState {
     fn find_recent_conversation(&self, cwd: Option<&str>) -> Result<Option<String>, PiProxyError> {
         let session_dir = self.session_dir()?;
         let mut candidates = Vec::new();
-        let entries = match read_dir(session_dir) {
-            Ok(entries) => entries,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(error) => return Err(PiProxyError::InvalidRequest(error.to_string())),
-        };
+        let mut pending_directories = vec![PathBuf::from(session_dir)];
 
-        for entry_result in entries {
-            let entry =
-                entry_result.map_err(|error| PiProxyError::InvalidRequest(error.to_string()))?;
-            let path = entry.path();
-            if path.extension().and_then(|extension| extension.to_str()) != Some("jsonl") {
-                continue;
+        while let Some(directory) = pending_directories.pop() {
+            let entries = match read_dir(&directory) {
+                Ok(entries) => entries,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    if directory == Path::new(session_dir) {
+                        return Ok(None);
+                    }
+                    continue;
+                }
+                Err(error) => return Err(PiProxyError::InvalidRequest(error.to_string())),
+            };
+
+            for entry_result in entries {
+                let entry = entry_result
+                    .map_err(|error| PiProxyError::InvalidRequest(error.to_string()))?;
+                let file_type = entry
+                    .file_type()
+                    .map_err(|error| PiProxyError::InvalidRequest(error.to_string()))?;
+                if file_type.is_dir() {
+                    pending_directories.push(entry.path());
+                    continue;
+                }
+                if !file_type.is_file() {
+                    continue;
+                }
+
+                let path = entry.path();
+                if path.extension().and_then(|extension| extension.to_str()) != Some("jsonl") {
+                    continue;
+                }
+                if !is_matching_pi_session_file(&path, cwd) {
+                    continue;
+                }
+                let metadata = entry
+                    .metadata()
+                    .map_err(|error| PiProxyError::InvalidRequest(error.to_string()))?;
+                let modified = metadata
+                    .modified()
+                    .map_err(|error| PiProxyError::InvalidRequest(error.to_string()))?;
+                candidates.push(PiRecentSessionCandidate { modified, path });
             }
-            if !is_matching_pi_session_file(&path, cwd) {
-                continue;
-            }
-            let metadata = entry
-                .metadata()
-                .map_err(|error| PiProxyError::InvalidRequest(error.to_string()))?;
-            let modified = metadata
-                .modified()
-                .map_err(|error| PiProxyError::InvalidRequest(error.to_string()))?;
-            candidates.push(PiRecentSessionCandidate { modified, path });
         }
 
         candidates.sort_by(|left, right| right.modified.cmp(&left.modified));
@@ -1094,10 +1114,13 @@ mod tests {
     fn finds_recent_pi_conversation_from_configured_session_dir() {
         let directory = tempdir().expect("temporary directory should be created");
         let session_dir = directory.path().join("sessions");
-        fs::create_dir(&session_dir).expect("session directory should be created");
-        let old_session = session_dir.join("old.jsonl");
-        let recent_session = session_dir.join("recent.jsonl");
-        let other_cwd_session = session_dir.join("other.jsonl");
+        let project_session_dir = session_dir.join("--workspace-project--");
+        let other_session_dir = session_dir.join("--workspace-other--");
+        fs::create_dir_all(&project_session_dir).expect("project session directory should exist");
+        fs::create_dir_all(&other_session_dir).expect("other session directory should exist");
+        let old_session = project_session_dir.join("old.jsonl");
+        let recent_session = project_session_dir.join("recent.jsonl");
+        let other_cwd_session = other_session_dir.join("other.jsonl");
         write_session_file(&old_session, "old", "/workspace/project");
         thread::sleep(Duration::from_millis(10));
         write_session_file(&recent_session, "recent", "/workspace/project");

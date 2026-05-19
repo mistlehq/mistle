@@ -38,6 +38,7 @@ export type PiChatState = {
 
 export type PiChatAction =
   | {
+      bufferedEvents?: readonly PiEvent[];
       messages: readonly PiAgentMessage[];
       sessionFile: string;
       type: "hydrate_messages";
@@ -678,12 +679,20 @@ export function createInitialPiChatState(): PiChatState {
 
 export function reducePiChatState(state: PiChatState, action: PiChatAction): PiChatState {
   if (action.type === "hydrate_messages") {
-    return rebuildState({
+    const hydrated = rebuildState({
       ...createInitialPiChatState(),
       messages: action.messages,
       sessionFile: action.sessionFile,
       status: "idle",
     });
+    return (action.bufferedEvents ?? []).reduce(
+      (currentState, event) =>
+        reducePiChatState(currentState, {
+          type: "event_received",
+          event,
+        }),
+      hydrated,
+    );
   }
 
   if (action.type === "prompt_submitted") {

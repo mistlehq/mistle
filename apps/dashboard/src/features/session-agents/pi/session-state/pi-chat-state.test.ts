@@ -156,6 +156,45 @@ describe("reducePiChatState", () => {
     ]);
   });
 
+  it("applies buffered Pi events after hydrated messages", () => {
+    const hydratedState = reducePiChatState(createInitialPiChatState(), {
+      type: "hydrate_messages",
+      sessionFile: "/root/.pi/agent/sessions/session.jsonl",
+      messages: [
+        {
+          role: "user",
+          content: "check the package",
+          timestamp: 1,
+        },
+      ],
+      bufferedEvents: [
+        {
+          type: "tool_execution_start",
+          toolCallId: "tool_1",
+          toolName: "bash",
+          args: {
+            command: "pnpm test",
+          },
+        },
+      ],
+    });
+
+    const group = findSemanticGroup({
+      entries: hydratedState.entries,
+      semanticKind: "running-commands",
+    });
+    expect(hydratedState.status).toBe("busy");
+    expect(group.status).toBe("streaming");
+    expect(group.items).toEqual([
+      expect.objectContaining({
+        command: "pnpm test",
+        detail: "pnpm test",
+        label: "Command",
+        status: "streaming",
+      }),
+    ]);
+  });
+
   it("rebuilds completed Pi tool semantic groups from persisted transcript messages", () => {
     const hydratedState = reducePiChatState(createInitialPiChatState(), {
       type: "hydrate_messages",
