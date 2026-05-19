@@ -26,6 +26,9 @@ enum CliCommand {
     ProfileGet {
         profile_id: String,
     },
+    ProfileVersionList {
+        profile_id: String,
+    },
     SandboxCreate {
         profile_id: String,
         version: Option<u32>,
@@ -67,7 +70,24 @@ fn options() -> OptionParser<CliCommand> {
         .descr("Get a sandbox profile")
         .command("get");
 
-    let profile = construct!([profile_list, profile_get])
+    let profile_version_profile_id = long("profile")
+        .help("Sandbox profile id")
+        .argument::<String>("profile-id")
+        .guard(
+            |value| !value.trim().is_empty(),
+            "profile id cannot be blank",
+        );
+    let profile_version_list = profile_version_profile_id
+        .map(|profile_id| CliCommand::ProfileVersionList { profile_id })
+        .to_options()
+        .descr("List sandbox profile versions")
+        .command("list");
+    let profile_version = construct!([profile_version_list])
+        .to_options()
+        .descr("Manage sandbox profile versions")
+        .command("version");
+
+    let profile = construct!([profile_list, profile_get, profile_version])
         .to_options()
         .descr("Manage sandbox profiles")
         .command("profile");
@@ -165,6 +185,9 @@ where
         CliCommand::Whoami => whoami::run(stdout, stderr),
         CliCommand::ProfileList => profile::run_list(stdout, stderr),
         CliCommand::ProfileGet { profile_id } => profile::run_get(&profile_id, stdout, stderr),
+        CliCommand::ProfileVersionList { profile_id } => {
+            profile::run_version_list(&profile_id, stdout, stderr)
+        }
         CliCommand::SandboxCreate {
             profile_id,
             version,

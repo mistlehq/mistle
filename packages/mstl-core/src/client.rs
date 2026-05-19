@@ -54,6 +54,13 @@ impl MistleClient {
         self.get_json(self.get_sandbox_profile_url(profile_id)?.as_str())
     }
 
+    pub fn list_sandbox_profile_versions(
+        &self,
+        profile_id: &str,
+    ) -> Result<ListSandboxProfileVersionsResponse, MistleClientError> {
+        self.get_json(self.list_sandbox_profile_versions_url(profile_id)?.as_str())
+    }
+
     pub fn start_active_sandbox_profile_instance(
         &self,
         profile_id: &str,
@@ -178,6 +185,18 @@ impl MistleClient {
         Ok(endpoint_url(
             &self.base_url,
             &format!("/v1/sandbox/profiles/{validated_profile_id}"),
+        ))
+    }
+
+    fn list_sandbox_profile_versions_url(
+        &self,
+        profile_id: &str,
+    ) -> Result<Url, MistleClientError> {
+        let validated_profile_id = validate_sandbox_profile_id(profile_id)?;
+
+        Ok(endpoint_url(
+            &self.base_url,
+            &format!("/v1/sandbox/profiles/{validated_profile_id}/versions"),
         ))
     }
 
@@ -312,6 +331,47 @@ pub struct SandboxProfile {
 pub enum SandboxProfileStatus {
     Active,
     Inactive,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ListSandboxProfileVersionsResponse {
+    pub versions: Vec<SandboxProfileVersion>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SandboxProfileVersion {
+    pub sandbox_profile_id: String,
+    pub version: u32,
+    pub state: SandboxProfileVersionState,
+    pub is_active: bool,
+    pub usable: bool,
+    pub agent_runtime_id: SandboxProfileVersionAgentRuntimeId,
+    pub default_persistence_mode: SandboxProfileVersionDefaultPersistenceMode,
+    pub sandbox_provider: Option<String>,
+    pub sandbox_connection_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SandboxProfileVersionState {
+    Draft,
+    Published,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SandboxProfileVersionAgentRuntimeId {
+    Codex,
+    Opencode,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SandboxProfileVersionDefaultPersistenceMode {
+    Ephemeral,
+    Persistent,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -644,11 +704,13 @@ mod tests {
     use crate::client::{
         CurrentActor, CurrentActorApiKey, CurrentActorAuthentication, CurrentActorIdentity,
         CurrentActorOrganization, ListSandboxInstancesRequest, ListSandboxInstancesResponse,
-        MistleClient, MistleClientConfig, SandboxInstance, SandboxInstanceAgentRuntimeId,
-        SandboxInstanceConnectionToken, SandboxInstanceListItem, SandboxInstanceRuntimeContext,
-        SandboxInstanceSource, SandboxInstanceStartedBy, SandboxInstanceStartupOperation,
-        SandboxInstanceStartupOperationKind, SandboxInstanceStatus,
-        SandboxInstanceTriggerConversation, StartSandboxProfileInstanceResponse,
+        ListSandboxProfileVersionsResponse, MistleClient, MistleClientConfig, SandboxInstance,
+        SandboxInstanceAgentRuntimeId, SandboxInstanceConnectionToken, SandboxInstanceListItem,
+        SandboxInstanceRuntimeContext, SandboxInstanceSource, SandboxInstanceStartedBy,
+        SandboxInstanceStartupOperation, SandboxInstanceStartupOperationKind,
+        SandboxInstanceStatus, SandboxInstanceTriggerConversation, SandboxProfileVersion,
+        SandboxProfileVersionAgentRuntimeId, SandboxProfileVersionDefaultPersistenceMode,
+        SandboxProfileVersionState, StartSandboxProfileInstanceResponse,
         StartSandboxProfileInstanceStatus,
     };
 
@@ -791,6 +853,30 @@ mod tests {
 
         let error = client
             .get_sandbox_profile_url("sandbox/profile")
+            .expect_err("invalid profile id should fail");
+
+        assert_eq!(error.to_string(), "profile id must start with `sbp_`");
+    }
+
+    #[test]
+    fn builds_list_sandbox_profile_versions_url() {
+        let client = client_with_base_url("https://api.example.test");
+
+        assert_eq!(
+            client
+                .list_sandbox_profile_versions_url("sbp_python-dev")
+                .expect("profile id should be valid")
+                .as_str(),
+            "https://api.example.test/v1/sandbox/profiles/sbp_python-dev/versions"
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_sandbox_profile_id_for_version_list_url() {
+        let client = client_with_base_url("https://api.example.test");
+
+        let error = client
+            .list_sandbox_profile_versions_url("sandbox/profile")
             .expect_err("invalid profile id should fail");
 
         assert_eq!(error.to_string(), "profile id must start with `sbp_`");
@@ -1045,6 +1131,82 @@ mod tests {
                 status: StartSandboxProfileInstanceStatus::Accepted,
                 workflow_run_id: "wfr_01".to_owned(),
                 sandbox_instance_id: "sbi_01".to_owned(),
+            }
+        );
+    }
+
+    #[test]
+    fn decodes_sandbox_profile_versions_response() {
+        let response = serde_json::from_str::<ListSandboxProfileVersionsResponse>(
+            r#"{
+                "versions": [
+                    {
+                        "sandboxProfileId": "sbp_python",
+                        "version": 3,
+                        "state": "draft",
+                        "isActive": false,
+                        "usable": false,
+                        "agentRuntimeId": "codex",
+                        "defaultPersistenceMode": "persistent",
+                        "sandboxProvider": "daytona",
+                        "sandboxConnectionId": "icn_daytona",
+                        "maintenanceScript": null,
+                        "sandboxResources": null,
+                        "refreshSchedule": null,
+                        "latestSnapshotJob": null
+                    },
+                    {
+                        "sandboxProfileId": "sbp_python",
+                        "version": 2,
+                        "state": "published",
+                        "isActive": true,
+                        "usable": true,
+                        "agentRuntimeId": "opencode",
+                        "defaultPersistenceMode": "ephemeral",
+                        "sandboxProvider": null,
+                        "sandboxConnectionId": null,
+                        "maintenanceScript": null,
+                        "sandboxResources": {
+                            "vcpuCount": 2,
+                            "memoryMb": 4096
+                        },
+                        "refreshSchedule": null,
+                        "latestSnapshotJob": null
+                    }
+                ]
+            }"#,
+        )
+        .expect("profile versions response should decode");
+
+        assert_eq!(
+            response,
+            ListSandboxProfileVersionsResponse {
+                versions: vec![
+                    SandboxProfileVersion {
+                        sandbox_profile_id: "sbp_python".to_owned(),
+                        version: 3,
+                        state: SandboxProfileVersionState::Draft,
+                        is_active: false,
+                        usable: false,
+                        agent_runtime_id: SandboxProfileVersionAgentRuntimeId::Codex,
+                        default_persistence_mode:
+                            SandboxProfileVersionDefaultPersistenceMode::Persistent,
+                        sandbox_provider: Some("daytona".to_owned()),
+                        sandbox_connection_id: Some("icn_daytona".to_owned()),
+                    },
+                    SandboxProfileVersion {
+                        sandbox_profile_id: "sbp_python".to_owned(),
+                        version: 2,
+                        state: SandboxProfileVersionState::Published,
+                        is_active: true,
+                        usable: true,
+                        agent_runtime_id: SandboxProfileVersionAgentRuntimeId::Opencode,
+                        default_persistence_mode:
+                            SandboxProfileVersionDefaultPersistenceMode::Ephemeral,
+                        sandbox_provider: None,
+                        sandbox_connection_id: None,
+                    },
+                ],
             }
         );
     }
