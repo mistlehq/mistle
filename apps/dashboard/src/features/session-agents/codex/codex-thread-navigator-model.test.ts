@@ -186,4 +186,47 @@ describe("projectCodexThreadNavigatorRows", () => {
       }),
     ).toBe("thread_other_repo");
   });
+
+  it("uses created time as activity when updated time is missing", () => {
+    const threads = [
+      {
+        id: "thread_created_recently",
+        name: "Created recently",
+        preview: null,
+        cwd: "/workspace/repo-a",
+        createdAt: 70,
+        updatedAt: null,
+      },
+      {
+        id: "thread_updated",
+        name: "Updated",
+        preview: null,
+        cwd: "/workspace/repo-a",
+        createdAt: 10,
+        updatedAt: 50,
+      },
+    ];
+    const rows = projectCodexThreadNavigatorRows({
+      activeThreadId: null,
+      activeThread: null,
+      availableThreads: threads,
+      originalThreadId: null,
+      pendingThreadId: null,
+      pendingServerRequestThreadIds: [],
+    });
+
+    expect(rows.map((row) => ({ id: row.id, lastActivityAt: row.lastActivityAt }))).toEqual([
+      {
+        id: "thread_created_recently",
+        lastActivityAt: 70,
+      },
+      {
+        id: "thread_updated",
+        lastActivityAt: 50,
+      },
+    ]);
+    expect(resolveDefaultCodexThreadId({ availableThreads: threads })).toBe(
+      "thread_created_recently",
+    );
+  });
 });

@@ -207,7 +207,6 @@ export function useCodexThreadCollections(input: {
     refreshThreadList,
     refreshArchivedThreadList,
     refreshLoadedThreadList,
-    refreshOriginalThreadId,
     recordStartedThreadAsOriginalAfterEmptyScan,
     refreshThreadCollections,
     resetThreadCollections,
