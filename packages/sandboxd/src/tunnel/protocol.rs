@@ -34,12 +34,6 @@ pub const CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST: &str = "invalid_connect_re
 pub const CONNECT_ERROR_CODE_UNSUPPORTED_CHANNEL: &str = "unsupported_channel";
 /// `stream.open.error` code for failed agent-endpoint websocket dials.
 pub const CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED: &str = "agent_endpoint_dial_failed";
-/// `stream.open.error` code for PTY create requests that collide with a live session.
-pub const CONNECT_ERROR_CODE_PTY_SESSION_EXISTS: &str = "pty_session_exists";
-/// `stream.open.error` code for PTY create requests that fail during spawn.
-pub const CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED: &str = "pty_session_create_failed";
-/// `stream.open.error` code for PTY attach requests without a live session.
-pub const CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE: &str = "pty_session_unavailable";
 /// `stream.open.error` code for one-shot exec requests that cannot be started.
 pub const CONNECT_ERROR_CODE_EXEC_COMMAND_START_FAILED: &str = "exec_command_start_failed";
 /// `stream.open.error` code for processes streams that cannot be serviced.
@@ -99,28 +93,6 @@ impl Display for TunnelProtocolError {
 
 impl std::error::Error for TunnelProtocolError {}
 
-/// PTY session selection mode carried in `stream.open`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum PtySessionMode {
-    Create,
-    Attach,
-}
-
-/// PTY channel payload accepted by `stream.open`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PtyStreamChannel {
-    pub kind: String,
-    pub session: PtySessionMode,
-    pub pty_session_id: String,
-    pub cols: Option<u16>,
-    pub rows: Option<u16>,
-    pub cwd: Option<String>,
-    pub command: Option<String>,
-    pub args: Option<Vec<String>>,
-}
-
 /// Agent channel payload accepted by `stream.open`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -157,16 +129,6 @@ pub struct ExecStreamChannel {
     pub stdin: Option<String>,
     pub timeout_ms: Option<u64>,
     pub max_output_bytes: Option<usize>,
-}
-
-/// PTY `stream.open` message accepted by the relay.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PtyStreamOpen {
-    #[serde(rename = "type")]
-    pub message_type: String,
-    pub stream_id: u32,
-    pub channel: PtyStreamChannel,
 }
 
 /// Agent `stream.open` message accepted by the relay.
@@ -253,7 +215,6 @@ pub struct StreamWindow {
 pub enum StreamControlMessage {
     OpenAgent(AgentStreamOpen),
     OpenProcesses(ProcessesStreamOpen),
-    OpenPty(PtyStreamOpen),
     OpenFileUpload(FileUploadStreamOpen),
     OpenExec(ExecStreamOpen),
     Signal(PtyStreamSignal),
@@ -487,7 +448,6 @@ pub enum PortsTransportMessage {
 /// PTY-specific control messages consumed by the PTY relay.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PtyControlMessage {
-    Open(PtyStreamOpen),
     Signal(PtyStreamSignal),
     Close(StreamClose),
     Window(StreamWindow),
@@ -931,12 +891,6 @@ pub fn parse_stream_control_message(
                     validate_processes_stream_open(&message)?;
                     Ok(StreamControlMessage::OpenProcesses(message))
                 }
-                "pty" => {
-                    let message: PtyStreamOpen = serde_json::from_value(parsed_payload)
-                        .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
-                    validate_pty_stream_open(&message)?;
-                    Ok(StreamControlMessage::OpenPty(message))
-                }
                 "fileUpload" => {
                     let message: FileUploadStreamOpen = serde_json::from_value(parsed_payload)
                         .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
@@ -981,7 +935,6 @@ pub fn parse_stream_control_message(
 /// Parses one inbound PTY control frame from a websocket text payload.
 pub fn parse_pty_control_message(payload: &str) -> Result<PtyControlMessage, TunnelProtocolError> {
     match parse_stream_control_message(payload)? {
-        StreamControlMessage::OpenPty(message) => Ok(PtyControlMessage::Open(message)),
         StreamControlMessage::Signal(message) => Ok(PtyControlMessage::Signal(message)),
         StreamControlMessage::Close(message) => Ok(PtyControlMessage::Close(message)),
         StreamControlMessage::Window(message) => Ok(PtyControlMessage::Window(message)),
@@ -1567,51 +1520,6 @@ fn validate_processes_stream_open(
     if message.channel.kind != "processes" {
         return Err(TunnelProtocolError::new(
             "processes stream.open request channel.kind must be 'processes'",
-        ));
-    }
-
-    Ok(())
-}
-
-fn validate_pty_stream_open(message: &PtyStreamOpen) -> Result<(), TunnelProtocolError> {
-    if message.message_type != "stream.open" {
-        return Err(TunnelProtocolError::new(
-            "pty stream.open request type must be 'stream.open'",
-        ));
-    }
-    validate_stream_id(message.stream_id)?;
-    if message.channel.kind != "pty" {
-        return Err(TunnelProtocolError::new(
-            "pty stream.open request channel.kind must be 'pty'",
-        ));
-    }
-    if message.channel.pty_session_id.trim().is_empty() {
-        return Err(TunnelProtocolError::new(
-            "pty stream.open request channel.ptySessionId is required",
-        ));
-    }
-    if message.channel.cols.is_some() != message.channel.rows.is_some() {
-        return Err(TunnelProtocolError::new(
-            "pty stream.open request cols and rows must both be provided when either is set",
-        ));
-    }
-    if matches!(message.channel.cols, Some(0)) || matches!(message.channel.rows, Some(0)) {
-        return Err(TunnelProtocolError::new(
-            "pty stream.open request cols and rows must be greater than or equal to 1",
-        ));
-    }
-    if let Some(command) = message.channel.command.as_ref()
-        && command.trim().is_empty()
-    {
-        return Err(TunnelProtocolError::new(
-            "pty stream.open request command must be a non-empty string",
-        ));
-    }
-    if let Some(args) = message.channel.args.as_ref()
-        && args.iter().any(|value| value.trim().is_empty())
-    {
-        return Err(TunnelProtocolError::new(
-            "pty stream.open request args must contain only non-empty strings",
         ));
     }
 
@@ -2375,12 +2283,6 @@ mod tests {
         .expect("agent stream.open should parse");
         assert!(matches!(agent, StreamControlMessage::OpenAgent(_)));
 
-        let pty = parse_stream_control_message(
-            r#"{"type":"stream.open","streamId":7,"channel":{"kind":"pty","session":"create","ptySessionId":"terminal","cols":80,"rows":24}}"#,
-        )
-        .expect("pty stream.open should parse");
-        assert!(matches!(pty, StreamControlMessage::OpenPty(_)));
-
         let processes = parse_stream_control_message(
             r#"{"type":"stream.open","streamId":11,"channel":{"kind":"processes"}}"#,
         )
@@ -2403,11 +2305,11 @@ mod tests {
     #[test]
     fn parses_valid_pty_control_messages() {
         let message = parse_pty_control_message(
-            r#"{"type":"stream.open","streamId":7,"channel":{"kind":"pty","session":"create","ptySessionId":"terminal","cols":80,"rows":24}}"#,
+            r#"{"type":"stream.signal","streamId":7,"signal":{"type":"pty.resize","cols":80,"rows":24}}"#,
         )
-        .expect("pty stream.open should parse");
+        .expect("pty stream.signal should parse");
 
-        assert!(matches!(message, PtyControlMessage::Open(_)));
+        assert!(matches!(message, PtyControlMessage::Signal(_)));
     }
 
     #[test]

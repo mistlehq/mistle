@@ -5,10 +5,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
 
-import {
-  PtyStreamClient,
-  SandboxSessionTransport,
-} from "../../../packages/sandbox-session-client/src/index.ts";
+import { PtyTransportClient } from "../../../packages/sandbox-session-client/src/index.ts";
 import { createNodeSandboxSessionRuntime } from "../../../packages/sandbox-session-client/src/node.ts";
 import { createMailpitInbox } from "../../../packages/test-harness/src/index.ts";
 import { systemClock, systemSleeper } from "../../../packages/time/src/index.ts";
@@ -74,8 +71,9 @@ type SandboxInstanceStatus = {
   failureMessage: string | null;
 };
 
-type SandboxInstanceConnectionTokenResponse = {
+type SandboxInstancePtySessionResponse = {
   instanceId: string;
+  ptySessionId: string;
   url: string;
   token: string;
   expiresAt: string;
@@ -428,15 +426,14 @@ function parseSandboxInstanceStatus(value: unknown): SandboxInstanceStatus {
   };
 }
 
-function parseSandboxInstanceConnectionTokenResponse(
-  value: unknown,
-): SandboxInstanceConnectionTokenResponse {
-  const record = expectRecord(value, "sandbox connection token response");
+function parseSandboxInstancePtySessionResponse(value: unknown): SandboxInstancePtySessionResponse {
+  const record = expectRecord(value, "sandbox PTY session response");
   return {
-    instanceId: expectStringField(record, "instanceId", "sandbox connection token response"),
-    url: expectStringField(record, "url", "sandbox connection token response"),
-    token: expectStringField(record, "token", "sandbox connection token response"),
-    expiresAt: expectStringField(record, "expiresAt", "sandbox connection token response"),
+    instanceId: expectStringField(record, "instanceId", "sandbox PTY session response"),
+    ptySessionId: expectStringField(record, "ptySessionId", "sandbox PTY session response"),
+    url: expectStringField(record, "url", "sandbox PTY session response"),
+    token: expectStringField(record, "token", "sandbox PTY session response"),
+    expiresAt: expectStringField(record, "expiresAt", "sandbox PTY session response"),
   };
 }
 
@@ -746,37 +743,33 @@ function shellQuote(value: string): string {
 }
 
 async function assertPtyRoundTrip(cookie: string, sandboxInstanceId: string): Promise<void> {
-  const connectionToken = await requestJsonOrThrow({
-    path: `/v1/sandbox/instances/${encodeURIComponent(sandboxInstanceId)}/connection-tokens`,
+  const ptySession = await requestJsonOrThrow({
+    path: `/v1/sandbox/instances/${encodeURIComponent(sandboxInstanceId)}/pty-sessions`,
     expectedStatus: 201,
-    description: "sandbox connection token minting",
-    parse: parseSandboxInstanceConnectionTokenResponse,
+    description: "sandbox PTY session minting",
+    parse: parseSandboxInstancePtySessionResponse,
     init: {
       method: "POST",
       headers: {
+        "content-type": "application/json",
         cookie,
       },
+      body: JSON.stringify({
+        ptySessionId: "terminal",
+      }),
     },
   });
-  const transport = new SandboxSessionTransport({
+  const ptyClient = new PtyTransportClient({
+    connectionUrl: resolveGatewayTunnelWebSocketUrl(ptySession.url),
     runtime: createNodeSandboxSessionRuntime(),
   });
 
-  await transport.connect({
-    connectionUrl: resolveGatewayTunnelWebSocketUrl(connectionToken.url),
-  });
-
   try {
-    const ptyClient = new PtyStreamClient({
-      transport,
-    });
     let output = "";
 
     ptyClient.onData((chunk) => {
       output += Buffer.from(chunk).toString("utf8");
     });
-
-    await ptyClient.connect();
 
     const marker = `mistle-docker-compose-${randomUUID()}`;
     let cleanupPtyListeners = (): void => {};
@@ -854,7 +847,7 @@ async function assertPtyRoundTrip(cookie: string, sandboxInstanceId: string): Pr
       throw error;
     }
   } finally {
-    transport.disconnect(1000, "docker compose smoke test cleanup");
+    await ptyClient.disconnect().catch(() => {});
   }
 }
 

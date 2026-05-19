@@ -15,7 +15,7 @@ describe("TunnelSessionRegistry", () => {
     });
     const binding = registry.bindClientStream({
       sandboxInstanceId: "sbi_test",
-      channelKind: "pty",
+      channelKind: "agent",
       clientSessionId: "conn_1",
       clientStreamId: 7,
     });

@@ -25,17 +25,6 @@ const ProcessesStreamChannelSchema = z.object({
   kind: z.literal("processes"),
 });
 
-const PTYStreamChannelSchema = z.object({
-  kind: z.literal("pty"),
-  session: z.enum(["create", "attach"]),
-  ptySessionId: NonEmptyStringSchema,
-  cols: PositiveIntegerSchema.optional(),
-  rows: PositiveIntegerSchema.optional(),
-  cwd: NonEmptyStringSchema.optional(),
-  command: NonEmptyStringSchema.optional(),
-  args: z.array(NonEmptyStringSchema).optional(),
-});
-
 const FileUploadStreamChannelSchema = z.object({
   kind: z.literal("fileUpload"),
   threadId: NonEmptyStringSchema,
@@ -57,7 +46,6 @@ const ExecStreamChannelSchema = z.object({
 const StreamChannelSchema = z.discriminatedUnion("kind", [
   AgentStreamChannelSchema,
   ProcessesStreamChannelSchema,
-  PTYStreamChannelSchema,
   FileUploadStreamChannelSchema,
   ExecStreamChannelSchema,
 ]);
@@ -553,7 +541,6 @@ const BootstrapControlMessageSchema = z.discriminatedUnion("type", [
 
 export type AgentStreamChannel = z.infer<typeof AgentStreamChannelSchema>;
 export type ProcessesStreamChannel = z.infer<typeof ProcessesStreamChannelSchema>;
-export type PTYStreamChannel = z.infer<typeof PTYStreamChannelSchema>;
 export type FileUploadStreamChannel = z.infer<typeof FileUploadStreamChannelSchema>;
 export type ExecStreamChannel = z.infer<typeof ExecStreamChannelSchema>;
 export type StreamChannel = z.infer<typeof StreamChannelSchema>;

@@ -7,19 +7,6 @@ const containerRunnerScript = path.join(scriptDirectory, "run-cargo-in-container
 
 const stressCases = [
   {
-    name: "pty-stream-relay-immediate-exit",
-    envName: "MISTLE_SANDBOXD_STRESS_COUNT_PTY_STREAM_RELAY",
-    defaultStressCount: 50,
-    arguments: [
-      "nextest",
-      "run",
-      "--locked",
-      "--test",
-      "pty_stream_relay",
-      "relays_pty_output_and_exit_over_websocket",
-    ],
-  },
-  {
     name: "codex-session-manager-release-failure-replay",
     envName: "MISTLE_SANDBOXD_STRESS_COUNT_CODEX_SESSION_MANAGER_RELEASE_FAILURE_REPLAY",
     defaultStressCount: 20,

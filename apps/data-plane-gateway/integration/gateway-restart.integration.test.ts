@@ -8,7 +8,7 @@ import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { mintConnectionToken } from "@mistle/gateway-connection-auth";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import {
-  PayloadKindRawBytes,
+  PayloadKindWebSocketText,
   decodeDataFrame,
   encodeDataFrame,
   parseStreamControlMessage,
@@ -145,11 +145,7 @@ async function exerciseSandboxTunnel(input: {
         type: "stream.open",
         streamId: clientStreamId,
         channel: {
-          kind: "pty",
-          session: "create",
-          ptySessionId: "terminal",
-          cols: 120,
-          rows: 40,
+          kind: "agent",
         },
       }),
     );
@@ -163,11 +159,7 @@ async function exerciseSandboxTunnel(input: {
       type: "stream.open",
       streamId: 1,
       channel: {
-        kind: "pty",
-        session: "create",
-        ptySessionId: "terminal",
-        cols: 120,
-        rows: 40,
+        kind: "agent",
       },
     });
 
@@ -196,7 +188,7 @@ async function exerciseSandboxTunnel(input: {
       Buffer.from(
         encodeDataFrame({
           streamId: clientStreamId,
-          payloadKind: PayloadKindRawBytes,
+          payloadKind: PayloadKindWebSocketText,
           payload: Buffer.from(input.payload, "utf8"),
         }),
       ),
@@ -208,7 +200,7 @@ async function exerciseSandboxTunnel(input: {
 
     const decodedFrame = decodeDataFrame(new Uint8Array(forwardedData.data));
     expect(forwardedData.isBinary).toBe(true);
-    expect(decodedFrame.payloadKind).toBe(PayloadKindRawBytes);
+    expect(decodedFrame.payloadKind).toBe(PayloadKindWebSocketText);
     expect(Buffer.from(decodedFrame.payload).toString("utf8")).toBe(input.payload);
   } finally {
     await closeIfOpen(clientSocket);

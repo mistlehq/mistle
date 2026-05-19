@@ -11,11 +11,8 @@ import { promisify } from "node:util";
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
 import {
-  decodeDataFrame,
-  encodeDataFrame,
-  PayloadKindRawBytes,
-  parseBootstrapControlMessage,
-  type BootstrapControlMessage,
+  parseStreamControlMessage,
+  type StreamControlMessage,
 } from "@mistle/sandbox-session-protocol";
 import { createMailpitInbox, readTestContext } from "@mistle/test-harness";
 import { systemClock, systemSleeper } from "@mistle/time";
@@ -158,8 +155,9 @@ const SandboxInstanceStatusResponseSchema = z.looseObject({
   failureMessage: z.string().nullable(),
 });
 
-const SandboxInstanceConnectionTokenResponseSchema = z.object({
+const SandboxInstancePtySessionResponseSchema = z.object({
   instanceId: z.string().min(1),
+  ptySessionId: z.string().min(1),
   url: z.url(),
   token: z.string().min(1),
   expiresAt: z.string().min(1),
@@ -201,7 +199,7 @@ type SandboxControlContext = {
 type QueuedPtyFrame =
   | {
       kind: "control";
-      payload: BootstrapControlMessage;
+      payload: StreamControlMessage;
     }
   | {
       kind: "binary";
@@ -443,8 +441,8 @@ async function websocketDataToUint8Array(data: unknown): Promise<Uint8Array> {
   throw new Error(`Unsupported websocket binary data type: ${String(typeof data)}.`);
 }
 
-function parseControlMessage(payload: string): BootstrapControlMessage {
-  const parsed = parseBootstrapControlMessage(payload);
+function parseControlMessage(payload: string): StreamControlMessage {
+  const parsed = parseStreamControlMessage(payload);
   if (parsed === undefined) {
     throw new Error(`Unexpected websocket control message: ${payload}`);
   }
@@ -491,17 +489,10 @@ function createPtyFramePump(socket: WebSocket): PtyFramePump {
           return;
         }
 
-        const dataFrame = decodeDataFrame(await websocketDataToUint8Array(event.data));
-        if (socket.readyState === WebSocket.OPEN) {
-          sendJson(socket, {
-            type: "stream.window",
-            streamId: dataFrame.streamId,
-            bytes: dataFrame.payload.length,
-          });
-        }
+        const payload = await websocketDataToUint8Array(event.data);
         enqueue({
           kind: "binary",
-          text: Buffer.from(dataFrame.payload).toString("utf8"),
+          text: Buffer.from(payload).toString("utf8"),
         });
       } catch (error) {
         enqueue({
@@ -584,74 +575,42 @@ function sendJson(socket: WebSocket, payload: unknown): void {
   socket.send(JSON.stringify(payload));
 }
 
-function sendPtyInput(input: { socket: WebSocket; streamId: number; payload: string }): void {
+function sendPtyInput(input: { socket: WebSocket; payload: string }): void {
   if (input.socket.readyState !== WebSocket.OPEN) {
     throw new Error(
       `Websocket is not open. Current readyState: ${String(input.socket.readyState)}.`,
     );
   }
 
-  input.socket.send(
-    Buffer.from(
-      encodeDataFrame({
-        streamId: input.streamId,
-        payloadKind: PayloadKindRawBytes,
-        payload: new TextEncoder().encode(input.payload),
-      }),
-    ),
-  );
+  input.socket.send(Buffer.from(new TextEncoder().encode(input.payload)));
 }
 
-async function connectPtyChannel(input: {
-  socket: WebSocket;
-  pump: PtyFramePump;
-  cwd: string;
-}): Promise<number> {
-  const streamId = 1;
+async function connectPtyChannel(input: { socket: WebSocket; cwd: string }): Promise<void> {
   sendJson(input.socket, {
-    type: "stream.open",
-    streamId,
-    channel: {
-      kind: "pty",
+    type: "pty.transport.open",
+    launch: {
       session: "create",
-      ptySessionId: "terminal",
       cols: 120,
       rows: 40,
       cwd: input.cwd,
     },
   });
-
-  while (true) {
-    const frame = await waitForNextPtyFrame(input.pump, PtyRoundTripTimeoutMs);
-    if (frame.kind !== "control") {
-      continue;
-    }
-    if (frame.payload.type === "stream.open.ok" && frame.payload.streamId === streamId) {
-      return streamId;
-    }
-    if (frame.payload.type === "stream.open.error" && frame.payload.streamId === streamId) {
-      throw new Error(
-        `PTY stream.open failed with ${frame.payload.code}: ${frame.payload.message}`,
-      );
-    }
-  }
 }
 
-async function closePtyChannel(input: { socket: WebSocket; streamId: number }): Promise<void> {
+async function closePtyChannel(input: { socket: WebSocket }): Promise<void> {
   if (input.socket.readyState !== WebSocket.OPEN) {
     return;
   }
 
   sendJson(input.socket, {
     type: "stream.close",
-    streamId: input.streamId,
+    streamId: 1,
   });
 }
 
 async function runPtyCommand(input: {
   socket: WebSocket;
   pump: PtyFramePump;
-  streamId: number;
   command: string;
   timeoutMs: number;
 }): Promise<{ exitCode: number; output: string }> {
@@ -672,7 +631,6 @@ async function runPtyCommand(input: {
 
   sendPtyInput({
     socket: input.socket,
-    streamId: input.streamId,
     payload: `${commandEnvelope}\n`,
   });
 
@@ -685,14 +643,14 @@ async function runPtyCommand(input: {
     if (frame.kind === "control") {
       if (
         frame.payload.type === "stream.event" &&
-        frame.payload.streamId === input.streamId &&
+        frame.payload.streamId === 1 &&
         frame.payload.event.type === "pty.exit"
       ) {
         throw new Error(
           `PTY exited unexpectedly with code ${String(frame.payload.event.exitCode)}.`,
         );
       }
-      if (frame.payload.type === "stream.reset" && frame.payload.streamId === input.streamId) {
+      if (frame.payload.type === "stream.reset" && frame.payload.streamId === 1) {
         throw new Error(
           `PTY stream reset unexpectedly with ${frame.payload.code}: ${frame.payload.message}`,
         );
@@ -1578,40 +1536,41 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
             timeoutMs: SandboxReadyTimeoutMs,
             evaluate: async () => {
               let websocket: WebSocket | undefined;
-              let streamId: number | undefined;
 
               try {
-                const connectionToken = await requestJsonOrThrow({
+                const ptySession = await requestJsonOrThrow({
                   request,
-                  path: `/v1/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/connection-tokens`,
+                  path: `/v1/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/pty-sessions`,
                   expectedStatus: 201,
-                  description: "sandbox connection token minting",
-                  schema: SandboxInstanceConnectionTokenResponseSchema,
+                  description: "sandbox PTY session minting",
+                  schema: SandboxInstancePtySessionResponseSchema,
                   init: {
                     method: "POST",
                     headers: {
+                      "content-type": "application/json",
                       cookie: sandboxContext.session.cookie,
                     },
+                    body: JSON.stringify({
+                      ptySessionId: "terminal",
+                    }),
                   },
                 });
                 websocket = await connectWebSocket(
                   resolveGatewayTunnelWebSocketUrl({
-                    mintedUrl: connectionToken.url,
+                    mintedUrl: ptySession.url,
                     gatewayBaseUrl: currentDataPlaneGatewayBaseUrl,
                   }),
                   WebSocketConnectTimeoutMs,
                 );
                 const pump = createPtyFramePump(websocket);
-                streamId = await connectPtyChannel({
+                await connectPtyChannel({
                   socket: websocket,
-                  pump,
                   cwd: input.cwd ?? "/root",
                 });
 
                 return await runPtyCommand({
                   socket: websocket,
                   pump,
-                  streamId,
                   command: input.command,
                   timeoutMs: commandTimeoutMs,
                 });
@@ -1623,12 +1582,9 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
                 );
               } finally {
                 if (websocket !== undefined) {
-                  if (streamId !== undefined) {
-                    await closePtyChannel({
-                      socket: websocket,
-                      streamId,
-                    }).catch(() => {});
-                  }
+                  await closePtyChannel({
+                    socket: websocket,
+                  }).catch(() => {});
                   await closeWebSocket(websocket).catch(() => {});
                 }
               }

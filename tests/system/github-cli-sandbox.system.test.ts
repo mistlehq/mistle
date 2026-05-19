@@ -5,11 +5,8 @@
 import { randomUUID } from "node:crypto";
 
 import {
-  decodeDataFrame,
-  encodeDataFrame,
-  PayloadKindRawBytes,
-  parseBootstrapControlMessage,
-  type BootstrapControlMessage,
+  parseStreamControlMessage,
+  type StreamControlMessage,
 } from "@mistle/sandbox-session-protocol";
 import { systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
@@ -26,7 +23,6 @@ const PollIntervalMs = 2_000;
 const SandboxReadyTimeoutMs = 3 * 60_000;
 const ResourceSyncTimeoutMs = 2 * 60_000;
 const WebSocketConnectTimeoutMs = 30_000;
-const WebSocketMessageTimeoutMs = 30_000;
 const PtyCommandTimeoutMs = 60_000;
 const TerminalControlSequencePattern = new RegExp(
   String.raw`\u001B(?:\][^\u0007\u001B]*(?:\u0007|\u001B\\)|\[[0-?]*[ -/]*[@-~]|[@-_])`,
@@ -85,9 +81,10 @@ const SandboxInstanceStatusResponseSchema = z.looseObject({
   triggerConversation: z.unknown().nullable().optional(),
 });
 
-const SandboxInstanceConnectionTokenResponseSchema = z
+const SandboxInstancePtySessionResponseSchema = z
   .object({
     instanceId: z.string().min(1),
+    ptySessionId: z.string().min(1),
     url: z.url(),
     token: z.string().min(1),
     expiresAt: z.string().min(1),
@@ -101,7 +98,7 @@ type PtyFrame =
     }
   | {
       kind: "control";
-      payload: BootstrapControlMessage;
+      payload: StreamControlMessage;
     };
 
 type QueuedPtyFrame =
@@ -403,8 +400,8 @@ async function websocketDataToUint8Array(data: unknown): Promise<Uint8Array> {
   throw new Error(`Unsupported websocket binary data type: ${String(typeof data)}.`);
 }
 
-function parseControlMessage(payload: string): BootstrapControlMessage {
-  const parsed = parseBootstrapControlMessage(payload);
+function parseControlMessage(payload: string): StreamControlMessage {
+  const parsed = parseStreamControlMessage(payload);
   if (parsed === undefined) {
     throw new Error(`Unexpected websocket control message: ${payload}`);
   }
@@ -434,17 +431,10 @@ function createPtyFramePump(socket: WebSocket): PtyFramePump {
           return;
         }
 
-        const dataFrame = decodeDataFrame(await websocketDataToUint8Array(event.data));
-        if (socket.readyState === WebSocket.OPEN) {
-          sendJson(socket, {
-            type: "stream.window",
-            streamId: dataFrame.streamId,
-            bytes: dataFrame.payload.length,
-          });
-        }
+        const payload = await websocketDataToUint8Array(event.data);
         enqueue({
           kind: "binary",
-          text: Buffer.from(dataFrame.payload).toString("utf8"),
+          text: Buffer.from(payload).toString("utf8"),
         });
       } catch (error) {
         enqueue({
@@ -551,50 +541,21 @@ function sendPtyInput(input: { socket: WebSocket; streamId: number; payload: str
     );
   }
 
-  input.socket.send(
-    Buffer.from(
-      encodeDataFrame({
-        streamId: input.streamId,
-        payloadKind: PayloadKindRawBytes,
-        payload: new TextEncoder().encode(input.payload),
-      }),
-    ),
-  );
+  input.socket.send(Buffer.from(new TextEncoder().encode(input.payload)));
 }
 
-async function connectPtyChannel(input: {
-  socket: WebSocket;
-  pump: PtyFramePump;
-  cwd: string;
-}): Promise<number> {
+async function connectPtyChannel(input: { socket: WebSocket; cwd: string }): Promise<number> {
   const streamId = 1;
   sendJson(input.socket, {
-    type: "stream.open",
-    streamId,
-    channel: {
-      kind: "pty",
+    type: "pty.transport.open",
+    launch: {
       session: "create",
-      ptySessionId: "terminal",
       cols: 120,
       rows: 40,
       cwd: input.cwd,
     },
   });
-
-  while (true) {
-    const frame = await waitForNextPtyFrame(input.pump, WebSocketMessageTimeoutMs);
-    if (frame.kind !== "control") {
-      continue;
-    }
-    if (frame.payload.type === "stream.open.ok" && frame.payload.streamId === streamId) {
-      return streamId;
-    }
-    if (frame.payload.type === "stream.open.error" && frame.payload.streamId === streamId) {
-      throw new Error(
-        `PTY stream.open failed with ${frame.payload.code}: ${frame.payload.message}`,
-      );
-    }
-  }
+  return streamId;
 }
 
 async function closePtyChannel(input: { socket: WebSocket; streamId: number }): Promise<void> {
@@ -977,22 +938,26 @@ describeIf("system github cli sandbox", () => {
         sandboxInstanceId: startInstance.sandboxInstanceId,
         timeoutMs: SandboxReadyTimeoutMs,
       });
-      const connectionToken = await requestJsonOrThrow({
+      const ptySession = await requestJsonOrThrow({
         request: fixture.request,
-        path: `/v1/sandbox/instances/${encodeURIComponent(startInstance.sandboxInstanceId)}/connection-tokens`,
+        path: `/v1/sandbox/instances/${encodeURIComponent(startInstance.sandboxInstanceId)}/pty-sessions`,
         expectedStatus: 201,
-        description: "sandbox connection token minting",
-        schema: SandboxInstanceConnectionTokenResponseSchema,
+        description: "sandbox PTY session minting",
+        schema: SandboxInstancePtySessionResponseSchema,
         init: {
           method: "POST",
           headers: {
+            "content-type": "application/json",
             cookie: session.cookie,
           },
+          body: JSON.stringify({
+            ptySessionId: "terminal",
+          }),
         },
       });
       const websocket = await connectWebSocket(
         resolveGatewayWebSocketUrl({
-          mintedUrl: connectionToken.url,
+          mintedUrl: ptySession.url,
           gatewayBaseUrl: dataPlaneGatewayBaseUrl,
         }),
         WebSocketConnectTimeoutMs,
@@ -1003,7 +968,6 @@ describeIf("system github cli sandbox", () => {
       try {
         streamId = await connectPtyChannel({
           socket: websocket,
-          pump,
           cwd: "/root",
         });
 

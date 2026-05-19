@@ -3,7 +3,7 @@
 //! Once the daemon has initialized the sandbox runtime, it needs one loop that
 //! owns the connected bootstrap websocket and routes multiplexed tunnel
 //! traffic: keepalive publication, telemetry negotiation, agent-runtime
-//! websocket streams, PTY streams, and file uploads.
+//! websocket streams, direct PTY control, and file uploads.
 
 use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -51,7 +51,7 @@ use crate::cgroups::{DEFAULT_CGROUP_ROOT, UserScopePaths, is_scope_populated};
 use crate::keepalive::KeepaliveManager;
 use crate::protocol::startup::{StartupInput, TransparentProxyBypassKind};
 use crate::pty::{
-    DEFAULT_PTY_TERMINATE_POLL_INTERVAL, DEFAULT_PTY_TERMINATE_TIMEOUT_MS, PtyEvent, PtySession,
+    DEFAULT_PTY_TERMINATE_POLL_INTERVAL, DEFAULT_PTY_TERMINATE_TIMEOUT_MS, PtyEvent,
     PtySpawnRequest, start_scoped_pty_session,
 };
 use crate::runtime::readiness::RuntimeReadinessManager;
@@ -66,26 +66,25 @@ use crate::tunnel::port_access_transport::{
 };
 use crate::tunnel::protocol::{
     AGENT_STREAM_WINDOW_BYTES, CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
-    CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE, CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED,
-    CONNECT_ERROR_CODE_PTY_SESSION_EXISTS, CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE,
-    EgressTokenControlMessage, EgressTokenRequest, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED,
-    FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH, FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE,
-    FileUploadCompletedEventInput, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY,
-    PAYLOAD_KIND_WEBSOCKET_TEXT, PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
+    CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE, EgressTokenControlMessage, EgressTokenRequest,
+    FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH,
+    FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE, FileUploadCompletedEventInput,
+    PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
+    PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
     PORT_ACCESS_AUTHORIZE_REASON_UNSUPPORTED_PROTOCOL, PtyControlMessage, PtySessionControlMessage,
     PtySessionLaunchMode, PtySessionOpen, STREAM_RESET_CODE_EXEC_COMMAND_FAILED,
     STREAM_RESET_CODE_INVALID_STREAM_CLOSE, STREAM_RESET_CODE_INVALID_STREAM_DATA,
     STREAM_RESET_CODE_INVALID_STREAM_SIGNAL, STREAM_RESET_CODE_INVALID_STREAM_WINDOW,
-    STREAM_RESET_CODE_PROCESSES_SNAPSHOT_FAILED, STREAM_RESET_CODE_STREAM_CLOSE_FAILED,
-    STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED, STREAM_RESET_CODE_TARGET_CLOSED,
-    SigningControlMessage, SigningRequest, StreamControlMessage, StreamSendWindow,
-    decode_stream_data_frame, egress_token_request, encode_stream_data_frame, exec_result_event,
-    file_upload_completed_event, parse_egress_token_control_message, parse_ports_control_message,
-    parse_ports_transport_message, parse_processes_stream_message, parse_pty_control_message,
-    parse_pty_session_control_message, parse_signing_control_message, parse_stream_control_message,
-    ports_target_authorize_failure_result, ports_target_authorize_success_result, pty_exit_event,
-    pty_session_error, pty_session_opened, signing_request, stream_complete, stream_open_error,
-    stream_open_ok, stream_reset, stream_window,
+    STREAM_RESET_CODE_PROCESSES_SNAPSHOT_FAILED, STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
+    STREAM_RESET_CODE_TARGET_CLOSED, SigningControlMessage, SigningRequest, StreamControlMessage,
+    StreamSendWindow, decode_stream_data_frame, egress_token_request, encode_stream_data_frame,
+    exec_result_event, file_upload_completed_event, parse_egress_token_control_message,
+    parse_ports_control_message, parse_ports_transport_message, parse_processes_stream_message,
+    parse_pty_control_message, parse_pty_session_control_message, parse_signing_control_message,
+    parse_stream_control_message, ports_target_authorize_failure_result,
+    ports_target_authorize_success_result, pty_exit_event, pty_session_error, pty_session_opened,
+    signing_request, stream_complete, stream_open_error, stream_open_ok, stream_reset,
+    stream_window,
 };
 use crate::tunnel::runtime_processes::collect_processes_snapshot;
 use crate::tunnel::telemetry::{SandboxTelemetryLogLevel, TelemetryRelay, TelemetryRelayFrame};
@@ -137,13 +136,6 @@ const AGENT_STREAM_OUTCOME_BOOTSTRAP_CLOSED: &str = "bootstrap_closed";
 const AGENT_STREAM_CLOSE_SOURCE_GATEWAY: &str = "gateway";
 const AGENT_STREAM_CLOSE_SOURCE_RUNTIME: &str = "runtime";
 const AGENT_STREAM_CLOSE_SOURCE_BOOTSTRAP: &str = "bootstrap";
-const PTY_STREAM_CHANNEL_KIND: &str = "pty";
-const PTY_EVENT_LATENCY_WARNING: &str = "pty_input_latency_warning";
-const PTY_EVENT_SUMMARY: &str = "pty_session_summary";
-const PTY_OUTCOME_CLOSED: &str = "closed";
-const PTY_OUTCOME_EXITED: &str = "exited";
-const PTY_OUTCOME_RESET: &str = "reset";
-const PTY_INPUT_LATENCY_WARNING_THRESHOLD_MS: u64 = 100;
 const DIRECT_PTY_STREAM_ID: u32 = 1;
 const PTY_SESSION_ERROR_CODE_CREATE_FAILED: &str = "pty_create_failed";
 const PTY_SESSION_ERROR_CODE_ATTACH_FAILED: &str = "pty_attach_failed";
@@ -981,14 +973,6 @@ impl TunnelSession {
     }
 }
 
-struct PtySessionState {
-    session: PtySession,
-    primary_stream_id: u32,
-    attached_stream_ids: BTreeSet<u32>,
-    send_windows_by_stream_id: BTreeMap<u32, StreamSendWindow>,
-    stats: PtySessionStats,
-}
-
 struct FileUploadState {
     attachment_id: String,
     thread_directory_path: PathBuf,
@@ -1029,7 +1013,6 @@ struct TunnelSessionLoopContext<'a> {
     sandbox_instance_id: &'a str,
     gateway_ws_url: &'a str,
     clock: &'a dyn Clock,
-    sleeper: &'a dyn Sleeper,
     supervisor_handle: &'a SandboxdSupervisorHandle,
 }
 
@@ -1062,19 +1045,12 @@ struct TunnelSessionMutableState {
     operation_stream_close_response_sender: Option<std::sync::mpsc::Sender<Result<(), String>>>,
     operation_stream_send_window: Option<StreamSendWindow>,
     pending_operation_records: VecDeque<String>,
-    pty_sessions: BTreeMap<String, PtySessionState>,
     file_uploads: BTreeMap<u32, FileUploadState>,
 }
 
 struct AgentStreamTermination {
     outcome: &'static str,
     close_source: &'static str,
-    reset_code: Option<&'static str>,
-    reason: Option<String>,
-}
-
-struct PtySessionTermination {
-    outcome: &'static str,
     reset_code: Option<&'static str>,
     reason: Option<String>,
 }
@@ -1100,101 +1076,6 @@ struct AgentStreamThresholdTelemetry {
     stream_age_ms: u64,
     stream_id: u32,
     threshold_bytes: usize,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct PendingPtyInput {
-    input_bytes: usize,
-    received_at_ms: u64,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct PtyInputLatencyTelemetry {
-    input_bytes: usize,
-    input_to_first_output_ms: u64,
-    interaction_count: u64,
-    output_bytes: usize,
-    session_age_ms: u64,
-}
-
-struct PtyOpenContext<'a> {
-    cgroup_root: &'a Path,
-    runtime_env: &'a BTreeMap<String, String>,
-    sandbox_instance_id: &'a str,
-    pty_sessions: &'a mut BTreeMap<String, PtySessionState>,
-    clock: &'a dyn Clock,
-    sleeper: &'a dyn Sleeper,
-}
-
-#[derive(Debug)]
-struct PtySessionStats {
-    avg_input_to_first_output_total_ms: u64,
-    interaction_count: u64,
-    max_input_to_first_output_ms: u64,
-    opened_at_ms: u64,
-    pending_input: Option<PendingPtyInput>,
-    warning_count: u64,
-}
-
-impl PtySessionStats {
-    fn new(opened_at_ms: u64) -> Self {
-        Self {
-            avg_input_to_first_output_total_ms: 0,
-            interaction_count: 0,
-            max_input_to_first_output_ms: 0,
-            opened_at_ms,
-            pending_input: None,
-            warning_count: 0,
-        }
-    }
-
-    fn record_input(&mut self, received_at_ms: u64, input_bytes: usize) {
-        if self.pending_input.is_none() {
-            self.pending_input = Some(PendingPtyInput {
-                input_bytes,
-                received_at_ms,
-            });
-        }
-    }
-
-    fn record_output(
-        &mut self,
-        emitted_at_ms: u64,
-        output_bytes: usize,
-    ) -> Option<PtyInputLatencyTelemetry> {
-        let pending_input = self.pending_input.take()?;
-        let input_to_first_output_ms = emitted_at_ms.saturating_sub(pending_input.received_at_ms);
-        self.interaction_count = self.interaction_count.saturating_add(1);
-        self.avg_input_to_first_output_total_ms = self
-            .avg_input_to_first_output_total_ms
-            .saturating_add(input_to_first_output_ms);
-        self.max_input_to_first_output_ms = self
-            .max_input_to_first_output_ms
-            .max(input_to_first_output_ms);
-        if input_to_first_output_ms > PTY_INPUT_LATENCY_WARNING_THRESHOLD_MS {
-            self.warning_count = self.warning_count.saturating_add(1);
-        }
-
-        Some(PtyInputLatencyTelemetry {
-            input_bytes: pending_input.input_bytes,
-            input_to_first_output_ms,
-            interaction_count: self.interaction_count,
-            output_bytes,
-            session_age_ms: self.session_age_ms(emitted_at_ms),
-        })
-    }
-
-    fn avg_input_to_first_output_ms(&self) -> Option<u64> {
-        if self.interaction_count == 0 {
-            return None;
-        }
-
-        Some(self.avg_input_to_first_output_total_ms / self.interaction_count)
-    }
-
-    fn session_age_ms(&self, now_ms: u64) -> u64 {
-        now_ms.saturating_sub(self.opened_at_ms)
-    }
 }
 
 fn agent_stream_outstanding_bytes(send_window: &StreamSendWindow) -> usize {
@@ -1336,128 +1217,6 @@ fn remove_agent_stream_and_publish_summary(
         &termination,
     );
     Some(agent_stream)
-}
-
-fn publish_pty_input_latency_warning(
-    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
-    telemetry_relay: &mut TelemetryRelay,
-    clock: &dyn Clock,
-    pty_session_id: &str,
-    primary_stream_id: u32,
-    telemetry: PtyInputLatencyTelemetry,
-) {
-    let extra_fields = vec![
-        ("ptySessionId", Value::String(pty_session_id.to_string())),
-        ("streamId", Value::from(u64::from(primary_stream_id))),
-        (
-            "channelKind",
-            Value::String(PTY_STREAM_CHANNEL_KIND.to_string()),
-        ),
-        (
-            "thresholdMs",
-            Value::from(PTY_INPUT_LATENCY_WARNING_THRESHOLD_MS),
-        ),
-        (
-            "inputToFirstOutputMs",
-            Value::from(telemetry.input_to_first_output_ms),
-        ),
-        ("inputBytes", Value::from(telemetry.input_bytes as u64)),
-        ("outputBytes", Value::from(telemetry.output_bytes as u64)),
-        ("interactionCount", Value::from(telemetry.interaction_count)),
-        ("sessionAgeMs", Value::from(telemetry.session_age_ms)),
-    ];
-
-    publish_tunnel_telemetry_log(
-        tunnel_writer_sender,
-        telemetry_relay,
-        clock,
-        SandboxTelemetryLogLevel::Warn,
-        PTY_EVENT_LATENCY_WARNING,
-        &extra_fields,
-    );
-}
-
-fn publish_pty_session_summary(
-    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
-    telemetry_relay: &mut TelemetryRelay,
-    clock: &dyn Clock,
-    pty_session_id: &str,
-    primary_stream_id: u32,
-    stats: &PtySessionStats,
-    termination: &PtySessionTermination,
-) {
-    let now_ms = clock.now_ms();
-    let extra_fields = vec![
-        ("ptySessionId", Value::String(pty_session_id.to_string())),
-        ("streamId", Value::from(u64::from(primary_stream_id))),
-        (
-            "channelKind",
-            Value::String(PTY_STREAM_CHANNEL_KIND.to_string()),
-        ),
-        ("outcome", Value::String(termination.outcome.to_string())),
-        ("durationMs", Value::from(stats.session_age_ms(now_ms))),
-        ("interactionCount", Value::from(stats.interaction_count)),
-        ("warningCount", Value::from(stats.warning_count)),
-        (
-            "avgInputToFirstOutputMs",
-            stats
-                .avg_input_to_first_output_ms()
-                .map_or(Value::Null, Value::from),
-        ),
-        (
-            "maxInputToFirstOutputMs",
-            if stats.interaction_count == 0 {
-                Value::Null
-            } else {
-                Value::from(stats.max_input_to_first_output_ms)
-            },
-        ),
-        (
-            "resetCode",
-            termination
-                .reset_code
-                .map(|reset_code| Value::String(reset_code.to_string()))
-                .unwrap_or(Value::Null),
-        ),
-        (
-            "reason",
-            termination
-                .reason
-                .as_ref()
-                .map(|reason| Value::String(reason.clone()))
-                .unwrap_or(Value::Null),
-        ),
-    ];
-
-    publish_tunnel_telemetry_log(
-        tunnel_writer_sender,
-        telemetry_relay,
-        clock,
-        SandboxTelemetryLogLevel::Info,
-        PTY_EVENT_SUMMARY,
-        &extra_fields,
-    );
-}
-
-fn remove_pty_session_and_publish_summary(
-    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
-    telemetry_relay: &mut TelemetryRelay,
-    clock: &dyn Clock,
-    pty_sessions: &mut BTreeMap<String, PtySessionState>,
-    pty_session_id: &str,
-    termination: PtySessionTermination,
-) -> Option<PtySessionState> {
-    let pty_state = pty_sessions.remove(pty_session_id)?;
-    publish_pty_session_summary(
-        tunnel_writer_sender,
-        telemetry_relay,
-        clock,
-        pty_session_id,
-        pty_state.primary_stream_id,
-        &pty_state.stats,
-        &termination,
-    );
-    Some(pty_state)
 }
 
 fn publish_agent_stream_window_exhausted(
@@ -1864,7 +1623,6 @@ async fn run_connected_tunnel_session(
         operation_stream_close_response_sender: None,
         operation_stream_send_window: None,
         pending_operation_records: VecDeque::new(),
-        pty_sessions: BTreeMap::new(),
         file_uploads: BTreeMap::new(),
     };
     let telemetry_frames = match session_state.telemetry_relay.attach_tunnel_connection() {
@@ -1952,7 +1710,6 @@ async fn run_connected_tunnel_session(
         sandbox_instance_id: &runtime.sandbox_instance_id,
         gateway_ws_url: &runtime.gateway_ws_url,
         clock: runtime.clock.as_ref(),
-        sleeper: runtime.sleeper.as_ref(),
         supervisor_handle: &runtime.supervisor_handle,
     };
 
@@ -2168,14 +1925,6 @@ async fn run_connected_tunnel_session(
                 if let Some(child_pid) = child_pid {
                     let _ = kill_exec_child_process(child_pid);
                 }
-            }
-            for pty_session in session_state.pty_sessions.values() {
-                let _ = pty_session.session.terminate(
-                    loop_context.clock,
-                    loop_context.sleeper,
-                    DEFAULT_PTY_TERMINATE_POLL_INTERVAL,
-                    DEFAULT_PTY_TERMINATE_TIMEOUT_MS,
-                );
             }
             if let Ok(frames) = session_state.telemetry_relay.detach_tunnel_connection() {
                 let _ = send_telemetry_frames(&tunnel_writer_sender, frames);
@@ -3404,173 +3153,6 @@ fn cancel_pending_exec_open(pending_exec_open: PendingExecOpenState) {
     }
 }
 
-fn poll_pty_sessions(
-    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
-    telemetry_relay: &mut TelemetryRelay,
-    pty_sessions: &mut BTreeMap<String, PtySessionState>,
-    clock: &dyn Clock,
-    sleeper: &dyn Sleeper,
-) -> Result<bool, TunnelSessionError> {
-    let session_ids: Vec<String> = pty_sessions.keys().cloned().collect();
-    let mut did_work = false;
-    let mut closed_sessions = Vec::new();
-
-    for session_id in session_ids {
-        let Some(pty_state) = pty_sessions.get_mut(&session_id) else {
-            continue;
-        };
-
-        let next_event = match pty_state
-            .session
-            .next_event_timeout(Duration::from_millis(0))
-        {
-            Ok(event) => event,
-            Err(_) => {
-                closed_sessions.push((
-                    session_id.clone(),
-                    PtySessionTermination {
-                        outcome: PTY_OUTCOME_RESET,
-                        reset_code: Some(STREAM_RESET_CODE_TARGET_CLOSED),
-                        reason: Some("PTY session stopped responding to poll events".to_string()),
-                    },
-                ));
-                continue;
-            }
-        };
-        let Some(event) = next_event else {
-            continue;
-        };
-        did_work = true;
-        match event {
-            PtyEvent::Output(chunk) => {
-                if let Some(telemetry) = pty_state.stats.record_output(clock.now_ms(), chunk.len())
-                    && telemetry.input_to_first_output_ms > PTY_INPUT_LATENCY_WARNING_THRESHOLD_MS
-                {
-                    publish_pty_input_latency_warning(
-                        tunnel_writer_sender,
-                        telemetry_relay,
-                        clock,
-                        &session_id,
-                        pty_state.primary_stream_id,
-                        telemetry,
-                    );
-                }
-                let attached_stream_ids: Vec<u32> =
-                    pty_state.attached_stream_ids.iter().copied().collect();
-                for stream_id in attached_stream_ids {
-                    let Some(send_window) = pty_state.send_windows_by_stream_id.get_mut(&stream_id)
-                    else {
-                        continue;
-                    };
-                    if !send_window.try_consume(chunk.len()) {
-                        let _ = write_tunnel_text(
-                            tunnel_writer_sender,
-                            stream_reset(
-                                stream_id,
-                                STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
-                                "pty stream send window is exhausted",
-                            ),
-                        );
-                        pty_state.attached_stream_ids.remove(&stream_id);
-                        pty_state.send_windows_by_stream_id.remove(&stream_id);
-                        if stream_id == pty_state.primary_stream_id {
-                            let _ = pty_state.session.terminate(
-                                clock,
-                                sleeper,
-                                DEFAULT_PTY_TERMINATE_POLL_INTERVAL,
-                                DEFAULT_PTY_TERMINATE_TIMEOUT_MS,
-                            );
-                            closed_sessions.push((
-                                session_id.clone(),
-                                PtySessionTermination {
-                                    outcome: PTY_OUTCOME_RESET,
-                                    reset_code: Some(STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED),
-                                    reason: Some("pty stream send window is exhausted".to_string()),
-                                },
-                            ));
-                            break;
-                        }
-                        continue;
-                    }
-
-                    let encoded =
-                        match encode_stream_data_frame(stream_id, PAYLOAD_KIND_RAW_BYTES, &chunk) {
-                            Ok(encoded) => encoded,
-                            Err(_) => continue,
-                        };
-                    let _ = write_tunnel_binary(tunnel_writer_sender, encoded);
-                }
-            }
-            PtyEvent::Exit(exit_code) => {
-                for stream_id in pty_state.attached_stream_ids.iter().copied() {
-                    let _ = write_tunnel_text(
-                        tunnel_writer_sender,
-                        pty_exit_event(stream_id, exit_code),
-                    );
-                }
-                closed_sessions.push((
-                    session_id.clone(),
-                    PtySessionTermination {
-                        outcome: PTY_OUTCOME_EXITED,
-                        reset_code: None,
-                        reason: None,
-                    },
-                ));
-            }
-            PtyEvent::Closed => {
-                if let Some(exit_code) = pty_state.session.exit_code() {
-                    for stream_id in pty_state.attached_stream_ids.iter().copied() {
-                        let _ = write_tunnel_text(
-                            tunnel_writer_sender,
-                            pty_exit_event(stream_id, exit_code),
-                        );
-                    }
-                    closed_sessions.push((
-                        session_id.clone(),
-                        PtySessionTermination {
-                            outcome: PTY_OUTCOME_EXITED,
-                            reset_code: None,
-                            reason: None,
-                        },
-                    ));
-                }
-            }
-            PtyEvent::Error(message) => {
-                let reason = message.clone();
-                let _ = write_tunnel_text(
-                    tunnel_writer_sender,
-                    stream_reset(
-                        pty_state.primary_stream_id,
-                        STREAM_RESET_CODE_TARGET_CLOSED,
-                        message,
-                    ),
-                );
-                closed_sessions.push((
-                    session_id.clone(),
-                    PtySessionTermination {
-                        outcome: PTY_OUTCOME_RESET,
-                        reset_code: Some(STREAM_RESET_CODE_TARGET_CLOSED),
-                        reason: Some(reason),
-                    },
-                ));
-            }
-        }
-    }
-
-    for (session_id, termination) in closed_sessions {
-        let _ = remove_pty_session_and_publish_summary(
-            tunnel_writer_sender,
-            telemetry_relay,
-            clock,
-            pty_sessions,
-            &session_id,
-            termination,
-        );
-    }
-
-    Ok(did_work)
-}
-
 fn sync_pty_scope_keepalive(
     keepalive_manager: &Mutex<KeepaliveManager>,
     cgroup_root: &Path,
@@ -3788,13 +3370,6 @@ async fn handle_tunnel_session_event(
             Ok(TunnelSessionControlFlow::RestartRequired)
         }
         TunnelSessionEvent::Wake => {
-            poll_pty_sessions(
-                tunnel_writer_sender,
-                &mut session_state.telemetry_relay,
-                &mut session_state.pty_sessions,
-                context.clock,
-                context.sleeper,
-            )?;
             if let Err(error) = poll_processes_streams(
                 tunnel_writer_sender,
                 &mut session_state.processes_stream_send_windows,
@@ -5094,17 +4669,6 @@ async fn handle_tunnel_control_message(
                 )?;
             }
         }
-        StreamControlMessage::OpenPty(message) => {
-            let mut pty_open_context = PtyOpenContext {
-                cgroup_root: context.cgroup_root,
-                runtime_env: &session_state.runtime_env,
-                sandbox_instance_id: context.sandbox_instance_id,
-                pty_sessions: &mut session_state.pty_sessions,
-                clock: context.clock,
-                sleeper: context.sleeper,
-            };
-            handle_pty_open(tunnel_writer_sender, message, &mut pty_open_context)?;
-        }
         StreamControlMessage::OpenFileUpload(message) => {
             let upload_state =
                 create_file_upload_state(&message, context.attachment_root, context.clock)
@@ -5134,29 +4698,14 @@ async fn handle_tunnel_control_message(
             write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
         }
         StreamControlMessage::Signal(message) => {
-            let Some(pty_state) = session_state
-                .pty_sessions
-                .values_mut()
-                .find(|pty_state| pty_state.attached_stream_ids.contains(&message.stream_id))
-            else {
-                write_tunnel_text(
-                    tunnel_writer_sender,
-                    stream_reset(
-                        message.stream_id,
-                        STREAM_RESET_CODE_INVALID_STREAM_SIGNAL,
-                        format!(
-                            "stream signal streamId {} is not attached to an active PTY session",
-                            message.stream_id
-                        ),
-                    ),
-                )?;
-                return Ok(());
-            };
-
-            pty_state
-                .session
-                .resize(message.signal.cols, message.signal.rows)
-                .map_err(|error| TunnelSessionError::Pty(error.to_string()))?;
+            write_tunnel_text(
+                tunnel_writer_sender,
+                stream_reset(
+                    message.stream_id,
+                    STREAM_RESET_CODE_INVALID_STREAM_SIGNAL,
+                    "stream.signal is not supported on bootstrap tunnel streams",
+                ),
+            )?;
         }
         StreamControlMessage::Close(message) => {
             if let Some(pending_agent_open) =
@@ -5191,23 +4740,6 @@ async fn handle_tunnel_control_message(
                 session_state.pending_exec_opens.remove(&message.stream_id)
             {
                 cancel_pending_exec_open(pending_exec_open);
-                return Ok(());
-            }
-            if let Some(pty_session_id) = session_state
-                .pty_sessions
-                .iter()
-                .find(|(_, pty_state)| pty_state.attached_stream_ids.contains(&message.stream_id))
-                .map(|(session_id, _)| session_id.clone())
-            {
-                handle_pty_close(
-                    tunnel_writer_sender,
-                    &mut session_state.telemetry_relay,
-                    &pty_session_id,
-                    message.stream_id,
-                    &mut session_state.pty_sessions,
-                    context.clock,
-                    context.sleeper,
-                )?;
                 return Ok(());
             }
             if let Some(upload_state) = session_state.file_uploads.remove(&message.stream_id) {
@@ -5269,22 +4801,6 @@ async fn handle_tunnel_control_message(
                 .pending_exec_opens
                 .contains_key(&message.stream_id)
             {
-                return Ok(());
-            }
-            if let Some(pty_state) = session_state
-                .pty_sessions
-                .values_mut()
-                .find(|pty_state| pty_state.attached_stream_ids.contains(&message.stream_id))
-            {
-                let Some(send_window) = pty_state
-                    .send_windows_by_stream_id
-                    .get_mut(&message.stream_id)
-                else {
-                    return Ok(());
-                };
-                send_window
-                    .add(message.bytes)
-                    .map_err(|error| TunnelSessionError::ParseControl(error.to_string()))?;
                 return Ok(());
             }
 
@@ -5522,10 +5038,6 @@ fn tunnel_stream_is_active(session_state: &TunnelSessionMutableState, stream_id:
             .processes_stream_send_windows
             .contains_key(&stream_id)
         || session_state.file_uploads.contains_key(&stream_id)
-        || session_state
-            .pty_sessions
-            .values()
-            .any(|pty_state| pty_state.attached_stream_ids.contains(&stream_id))
 }
 
 fn mark_port_access_tcp_direction_closed(
@@ -5712,37 +5224,6 @@ fn handle_tunnel_binary_frame(
                 bytes: frame.payload,
             })
             .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
-        return Ok(());
-    }
-
-    if let Some(pty_state) = session_state
-        .pty_sessions
-        .values_mut()
-        .find(|pty_state| pty_state.attached_stream_ids.contains(&frame.stream_id))
-    {
-        if frame.payload_kind != PAYLOAD_KIND_RAW_BYTES {
-            write_tunnel_text(
-                tunnel_writer_sender,
-                stream_reset(
-                    frame.stream_id,
-                    STREAM_RESET_CODE_INVALID_STREAM_DATA,
-                    "pty stream only accepts raw byte data frames",
-                ),
-            )?;
-            return Ok(());
-        }
-
-        pty_state
-            .session
-            .write(&frame.payload)
-            .map_err(|error| TunnelSessionError::Pty(error.to_string()))?;
-        pty_state
-            .stats
-            .record_input(clock.now_ms(), frame.payload.len());
-        write_tunnel_text(
-            tunnel_writer_sender,
-            stream_window(frame.stream_id, frame.payload.len()),
-        )?;
         return Ok(());
     }
 
@@ -5969,19 +5450,6 @@ async fn run_direct_pty_transport_async(
                                 return Ok(());
                             }
                             Ok(PtyControlMessage::Window(_)) => {}
-                            Ok(PtyControlMessage::Open(_)) => {
-                                socket_writer
-                                    .send(Message::Text(
-                                        stream_reset(
-                                            DIRECT_PTY_STREAM_ID,
-                                            STREAM_RESET_CODE_INVALID_STREAM_SIGNAL,
-                                            "direct PTY transport does not accept stream.open",
-                                        )
-                                        .into(),
-                                    ))
-                                    .await
-                                    .map_err(|error| TunnelSessionError::Pty(error.to_string()))?;
-                            }
                             Err(error) => {
                                 socket_writer
                                     .send(Message::Text(
@@ -6076,199 +5544,6 @@ async fn run_direct_pty_transport_async(
             }
         }
     }
-}
-
-fn handle_pty_open(
-    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
-    message: crate::tunnel::protocol::PtyStreamOpen,
-    context: &mut PtyOpenContext<'_>,
-) -> Result<(), TunnelSessionError> {
-    match message.channel.session {
-        crate::tunnel::protocol::PtySessionMode::Attach => {
-            let Some(pty_state) = context
-                .pty_sessions
-                .get_mut(&message.channel.pty_session_id)
-            else {
-                write_tunnel_text(
-                    tunnel_writer_sender,
-                    stream_open_error(
-                        message.stream_id,
-                        CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE,
-                        "pty session is not available",
-                    ),
-                )?;
-                return Ok(());
-            };
-
-            pty_state.attached_stream_ids.insert(message.stream_id);
-            pty_state
-                .send_windows_by_stream_id
-                .insert(message.stream_id, StreamSendWindow::default());
-            write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
-        }
-        crate::tunnel::protocol::PtySessionMode::Create => {
-            if context
-                .pty_sessions
-                .contains_key(&message.channel.pty_session_id)
-            {
-                write_tunnel_text(
-                    tunnel_writer_sender,
-                    stream_open_error(
-                        message.stream_id,
-                        CONNECT_ERROR_CODE_PTY_SESSION_EXISTS,
-                        "pty session already exists",
-                    ),
-                )?;
-                return Ok(());
-            }
-
-            let session = match start_scoped_pty_session(
-                PtySpawnRequest {
-                    cwd: message.channel.cwd.clone(),
-                    cols: message.channel.cols,
-                    rows: message.channel.rows,
-                    command: message.channel.command.clone(),
-                    args: message.channel.args.clone(),
-                    env: context.runtime_env.clone(),
-                },
-                context.cgroup_root,
-                context.sandbox_instance_id,
-                context.clock,
-                context.sleeper,
-            ) {
-                Ok(session) => session,
-                Err(error) => {
-                    write_tunnel_text(
-                        tunnel_writer_sender,
-                        stream_open_error(
-                            message.stream_id,
-                            CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED,
-                            error.to_string(),
-                        ),
-                    )?;
-                    return Ok(());
-                }
-            };
-
-            let mut attached_stream_ids = BTreeSet::new();
-            attached_stream_ids.insert(message.stream_id);
-            let mut send_windows_by_stream_id = BTreeMap::new();
-            send_windows_by_stream_id.insert(message.stream_id, StreamSendWindow::default());
-            context.pty_sessions.insert(
-                message.channel.pty_session_id.clone(),
-                PtySessionState {
-                    session,
-                    primary_stream_id: message.stream_id,
-                    attached_stream_ids,
-                    send_windows_by_stream_id,
-                    stats: PtySessionStats::new(context.clock.now_ms()),
-                },
-            );
-            write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
-        }
-    }
-
-    Ok(())
-}
-
-fn handle_pty_close(
-    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
-    telemetry_relay: &mut TelemetryRelay,
-    pty_session_id: &str,
-    stream_id: u32,
-    pty_sessions: &mut BTreeMap<String, PtySessionState>,
-    clock: &dyn Clock,
-    sleeper: &dyn Sleeper,
-) -> Result<(), TunnelSessionError> {
-    let termination_outcome = {
-        let Some(pty_state) = pty_sessions.get_mut(pty_session_id) else {
-            return Ok(());
-        };
-
-        if !pty_state.attached_stream_ids.contains(&stream_id) {
-            write_tunnel_text(
-                tunnel_writer_sender,
-                stream_reset(
-                    stream_id,
-                    STREAM_RESET_CODE_INVALID_STREAM_CLOSE,
-                    format!(
-                        "stream close streamId {stream_id} is not attached to the active PTY session"
-                    ),
-                ),
-            )?;
-            return Ok(());
-        }
-
-        if stream_id != pty_state.primary_stream_id {
-            pty_state.attached_stream_ids.remove(&stream_id);
-            pty_state.send_windows_by_stream_id.remove(&stream_id);
-            return Ok(());
-        }
-
-        (
-            pty_state.primary_stream_id,
-            pty_state
-                .attached_stream_ids
-                .iter()
-                .copied()
-                .collect::<Vec<_>>(),
-            pty_state.session.terminate(
-                clock,
-                sleeper,
-                DEFAULT_PTY_TERMINATE_POLL_INTERVAL,
-                DEFAULT_PTY_TERMINATE_TIMEOUT_MS,
-            ),
-        )
-    };
-
-    let (primary_stream_id, attached_stream_ids, termination_result) = termination_outcome;
-    match termination_result {
-        Ok(exit_code) => {
-            for attached_stream_id in attached_stream_ids {
-                write_tunnel_text(
-                    tunnel_writer_sender,
-                    pty_exit_event(attached_stream_id, exit_code),
-                )?;
-            }
-            let _ = remove_pty_session_and_publish_summary(
-                tunnel_writer_sender,
-                telemetry_relay,
-                clock,
-                pty_sessions,
-                pty_session_id,
-                PtySessionTermination {
-                    outcome: PTY_OUTCOME_CLOSED,
-                    reset_code: None,
-                    reason: None,
-                },
-            );
-        }
-        Err(error) => {
-            let error_text = error.to_string();
-            write_tunnel_text(
-                tunnel_writer_sender,
-                stream_reset(
-                    primary_stream_id,
-                    STREAM_RESET_CODE_STREAM_CLOSE_FAILED,
-                    error_text.clone(),
-                ),
-            )?;
-            let _ = remove_pty_session_and_publish_summary(
-                tunnel_writer_sender,
-                telemetry_relay,
-                clock,
-                pty_sessions,
-                pty_session_id,
-                PtySessionTermination {
-                    outcome: PTY_OUTCOME_RESET,
-                    reset_code: Some(STREAM_RESET_CODE_STREAM_CLOSE_FAILED),
-                    reason: Some(error_text),
-                },
-            );
-        }
-    }
-
-    Ok(())
 }
 
 fn create_file_upload_state(
@@ -6583,17 +5858,16 @@ fn derive_upload_thread_directory_path(
 mod tests {
     use super::{
         AgentStreamState, AgentStreamStats, ConnectedTunnelSessionOutcome, DEFAULT_ATTACHMENT_ROOT,
-        OperationStreamMessage, PTY_OUTCOME_CLOSED, PortAccessTcpStreamState, PtySessionStats,
-        PtySessionTermination, SANDBOX_OPERATION_STREAM_FORMAT, SANDBOX_OPERATION_STREAM_ID,
-        TunnelSessionError, TunnelSessionEvent, TunnelSessionLoopContext,
-        TunnelSessionMutableState, TunnelSessionRequest, TunnelSessionRuntime,
-        TunnelSessionRuntimeConnectionState, TunnelWriterMessage, connect_bootstrap_websocket,
-        handle_ports_transport_message, handle_tunnel_control_message, handle_tunnel_session_event,
-        handle_tunnel_session_request, prioritize_ipv4_socket_addresses,
-        publish_pty_input_latency_warning, publish_pty_session_summary,
-        resolve_bootstrap_tunnel_url, resolve_tunnel_exchange_url,
-        run_connected_tunnel_session_catching_panics, snapshot_runtime_connection_state,
-        startup_transparent_passthrough_socket_mark, sync_pty_scope_keepalive,
+        OperationStreamMessage, PortAccessTcpStreamState, SANDBOX_OPERATION_STREAM_FORMAT,
+        SANDBOX_OPERATION_STREAM_ID, TunnelSessionError, TunnelSessionEvent,
+        TunnelSessionLoopContext, TunnelSessionMutableState, TunnelSessionRequest,
+        TunnelSessionRuntime, TunnelSessionRuntimeConnectionState, TunnelWriterMessage,
+        connect_bootstrap_websocket, handle_ports_transport_message, handle_tunnel_control_message,
+        handle_tunnel_session_event, handle_tunnel_session_request,
+        prioritize_ipv4_socket_addresses, resolve_bootstrap_tunnel_url,
+        resolve_tunnel_exchange_url, run_connected_tunnel_session_catching_panics,
+        snapshot_runtime_connection_state, startup_transparent_passthrough_socket_mark,
+        sync_pty_scope_keepalive,
     };
 
     use std::collections::{BTreeMap, BTreeSet};
@@ -6748,7 +6022,6 @@ mod tests {
             operation_stream_close_response_sender: None,
             operation_stream_send_window: None,
             pending_operation_records: Default::default(),
-            pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         }
     }
@@ -6853,7 +6126,6 @@ mod tests {
         let (event_sender, _event_receiver) = tokio::sync::mpsc::unbounded_channel();
         let (agent_sender, _agent_receiver) = tokio::sync::mpsc::unbounded_channel();
         let clock = SystemClock;
-        let sleeper = ThreadSleeper;
         let mut session_state = TunnelSessionMutableState {
             agent_endpoint_url: None,
             runtime_env: BTreeMap::new(),
@@ -6879,7 +6151,6 @@ mod tests {
             operation_stream_close_response_sender: None,
             operation_stream_send_window: None,
             pending_operation_records: Default::default(),
-            pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
         let supervisor_handle = test_tunnel_supervisor_handle("sbi_test", Arc::new(SystemClock));
@@ -6889,7 +6160,6 @@ mod tests {
             sandbox_instance_id: "sbi_test",
             gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
             clock: &clock,
-            sleeper: &sleeper,
             supervisor_handle: &supervisor_handle,
         };
 
@@ -6931,7 +6201,6 @@ mod tests {
         let (tcp_sender, _tcp_receiver) =
             tokio::sync::mpsc::unbounded_channel::<PortAccessTcpCommand>();
         let clock = SystemClock;
-        let sleeper = ThreadSleeper;
         let mut session_state = TunnelSessionMutableState {
             agent_endpoint_url: None,
             runtime_env: BTreeMap::new(),
@@ -6958,7 +6227,6 @@ mod tests {
             operation_stream_close_response_sender: None,
             operation_stream_send_window: None,
             pending_operation_records: Default::default(),
-            pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
         let supervisor_handle = test_tunnel_supervisor_handle("sbi_test", Arc::new(SystemClock));
@@ -6968,7 +6236,6 @@ mod tests {
             sandbox_instance_id: "sbi_test",
             gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
             clock: &clock,
-            sleeper: &sleeper,
             supervisor_handle: &supervisor_handle,
         };
 
@@ -7101,7 +6368,6 @@ mod tests {
             operation_stream_close_response_sender: None,
             operation_stream_send_window: None,
             pending_operation_records: Default::default(),
-            pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
 
@@ -7156,7 +6422,6 @@ mod tests {
             operation_stream_close_response_sender: None,
             operation_stream_send_window: None,
             pending_operation_records: Default::default(),
-            pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
 
@@ -7202,7 +6467,6 @@ mod tests {
             operation_stream_close_response_sender: None,
             operation_stream_send_window: None,
             pending_operation_records: Default::default(),
-            pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
 
@@ -7265,7 +6529,6 @@ mod tests {
             operation_stream_close_response_sender: None,
             operation_stream_send_window: None,
             pending_operation_records: Default::default(),
-            pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
 
@@ -7331,7 +6594,6 @@ mod tests {
         let (tcp_sender, mut tcp_receiver) =
             tokio::sync::mpsc::unbounded_channel::<PortAccessTcpCommand>();
         let clock = SystemClock;
-        let sleeper = ThreadSleeper;
         let mut session_state = TunnelSessionMutableState {
             agent_endpoint_url: None,
             runtime_env: BTreeMap::new(),
@@ -7358,7 +6620,6 @@ mod tests {
             operation_stream_close_response_sender: None,
             operation_stream_send_window: None,
             pending_operation_records: Default::default(),
-            pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
         let supervisor_handle = test_tunnel_supervisor_handle("sbi_test", Arc::new(SystemClock));
@@ -7368,7 +6629,6 @@ mod tests {
             sandbox_instance_id: "sbi_test",
             gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
             clock: &clock,
-            sleeper: &sleeper,
             supervisor_handle: &supervisor_handle,
         };
 
@@ -7408,7 +6668,6 @@ mod tests {
         let (event_sender, _event_receiver) = tokio::sync::mpsc::unbounded_channel();
         let (agent_sender, mut agent_receiver) = tokio::sync::mpsc::unbounded_channel();
         let clock = FixedClock { now_ms: 1_500 };
-        let sleeper = ThreadSleeper;
         let mut stats = AgentStreamStats::new(500);
         stats.record_outbound_message(256, 700, 256);
         stats.record_credit_restore(256, 900);
@@ -7439,7 +6698,6 @@ mod tests {
             operation_stream_close_response_sender: None,
             operation_stream_send_window: None,
             pending_operation_records: Default::default(),
-            pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
         enable_test_telemetry(&mut session_state.telemetry_relay);
@@ -7450,7 +6708,6 @@ mod tests {
             sandbox_instance_id: "sbi_test",
             gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
             clock: &clock,
-            sleeper: &sleeper,
             supervisor_handle: &supervisor_handle,
         };
         let close_message = parse_stream_control_message(r#"{"type":"stream.close","streamId":7}"#)
@@ -7506,7 +6763,6 @@ mod tests {
         let (event_sender, _event_receiver) = tokio::sync::mpsc::unbounded_channel();
         let (agent_sender, _agent_receiver) = tokio::sync::mpsc::unbounded_channel();
         let clock = FixedClock { now_ms: 1_200 };
-        let sleeper = ThreadSleeper;
         let mut session_state = TunnelSessionMutableState {
             agent_endpoint_url: None,
             runtime_env: BTreeMap::new(),
@@ -7532,7 +6788,6 @@ mod tests {
             operation_stream_close_response_sender: None,
             operation_stream_send_window: None,
             pending_operation_records: Default::default(),
-            pty_sessions: BTreeMap::new(),
             file_uploads: BTreeMap::new(),
         };
         enable_test_telemetry(&mut session_state.telemetry_relay);
@@ -7543,7 +6798,6 @@ mod tests {
             sandbox_instance_id: "sbi_test",
             gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
             clock: &clock,
-            sleeper: &sleeper,
             supervisor_handle: &supervisor_handle,
         };
 
@@ -7625,106 +6879,6 @@ mod tests {
             })
         );
         assert!(session_state.agent_streams.is_empty());
-    }
-
-    #[test]
-    fn tracks_pty_input_to_first_output_latency_stats() {
-        let mut stats = PtySessionStats::new(1_000);
-
-        stats.record_input(1_200, 1);
-        let first_observation = stats
-            .record_output(1_320, 32)
-            .expect("first output should measure latency");
-        assert_eq!(first_observation.input_to_first_output_ms, 120);
-        assert_eq!(first_observation.interaction_count, 1);
-        assert_eq!(first_observation.output_bytes, 32);
-
-        stats.record_input(1_500, 2);
-        let second_observation = stats
-            .record_output(1_560, 12)
-            .expect("second output should measure latency");
-        assert_eq!(second_observation.input_to_first_output_ms, 60);
-        assert_eq!(second_observation.interaction_count, 2);
-
-        assert_eq!(stats.avg_input_to_first_output_ms(), Some(90));
-        assert_eq!(stats.max_input_to_first_output_ms, 120);
-        assert_eq!(stats.warning_count, 1);
-    }
-
-    #[tokio::test]
-    async fn emits_pty_latency_warning_and_summary_telemetry() {
-        let (tunnel_writer_sender, mut tunnel_writer_receiver) =
-            tokio::sync::mpsc::unbounded_channel();
-        let clock = FixedClock { now_ms: 2_000 };
-        let mut telemetry_relay = TelemetryRelay::default();
-        enable_test_telemetry(&mut telemetry_relay);
-        let mut stats = PtySessionStats::new(500);
-
-        stats.record_input(1_700, 1);
-        let latency_telemetry = stats
-            .record_output(1_845, 24)
-            .expect("output should produce a latency sample");
-        publish_pty_input_latency_warning(
-            &tunnel_writer_sender,
-            &mut telemetry_relay,
-            &clock,
-            "pty_demo",
-            11,
-            latency_telemetry,
-        );
-        publish_pty_session_summary(
-            &tunnel_writer_sender,
-            &mut telemetry_relay,
-            &clock,
-            "pty_demo",
-            11,
-            &stats,
-            &PtySessionTermination {
-                outcome: PTY_OUTCOME_CLOSED,
-                reset_code: None,
-                reason: None,
-            },
-        );
-
-        let warning_log = read_queued_telemetry_log_line(&mut tunnel_writer_receiver).await;
-        assert_eq!(
-            warning_log,
-            json!({
-                "timestamp": "1970-01-01T00:00:02Z",
-                "level": "warn",
-                "event": "pty_input_latency_warning",
-                "ptySessionId": "pty_demo",
-                "streamId": 11,
-                "channelKind": "pty",
-                "thresholdMs": 100,
-                "inputToFirstOutputMs": 145,
-                "inputBytes": 1,
-                "outputBytes": 24,
-                "interactionCount": 1,
-                "sessionAgeMs": 1345
-            })
-        );
-
-        let summary_log = read_queued_telemetry_log_line(&mut tunnel_writer_receiver).await;
-        assert_eq!(
-            summary_log,
-            json!({
-                "timestamp": "1970-01-01T00:00:02Z",
-                "level": "info",
-                "event": "pty_session_summary",
-                "ptySessionId": "pty_demo",
-                "streamId": 11,
-                "channelKind": "pty",
-                "outcome": "closed",
-                "durationMs": 1500,
-                "interactionCount": 1,
-                "warningCount": 1,
-                "avgInputToFirstOutputMs": 145,
-                "maxInputToFirstOutputMs": 145,
-                "resetCode": null,
-                "reason": null
-            })
-        );
     }
 
     #[test]

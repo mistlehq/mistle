@@ -10,11 +10,8 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import {
-  decodeDataFrame,
-  encodeDataFrame,
-  parseBootstrapControlMessage,
-  PayloadKindRawBytes,
-  type BootstrapControlMessage,
+  parseStreamControlMessage,
+  type StreamControlMessage,
 } from "@mistle/sandbox-session-protocol";
 import { systemScheduler, systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
@@ -64,8 +61,9 @@ const SandboxInstanceStatusResponseSchema = z.object({
   failureMessage: z.string().min(1).nullable(),
 });
 
-const SandboxInstanceConnectionTokenResponseSchema = z.object({
+const SandboxInstancePtySessionResponseSchema = z.object({
   instanceId: z.string().min(1),
+  ptySessionId: z.string().min(1),
   url: z.url(),
   token: z.string().min(1),
   expiresAt: z.string().min(1),
@@ -100,7 +98,7 @@ type PtyFrame =
     }
   | {
       kind: "control";
-      payload: BootstrapControlMessage;
+      payload: StreamControlMessage;
     };
 
 type QueuedPtyFrame =
@@ -370,22 +368,26 @@ async function waitForSandboxInstanceRunning(input: {
   });
 }
 
-async function mintConnectionToken(input: {
+async function mintPtySession(input: {
   fixture: Pick<SystemTestFixture, "request">;
   session: AuthenticatedSession;
   sandboxInstanceId: string;
-}): Promise<z.infer<typeof SandboxInstanceConnectionTokenResponseSchema>> {
+}): Promise<z.infer<typeof SandboxInstancePtySessionResponseSchema>> {
   return await requestJsonOrThrow({
     request: input.fixture.request,
-    path: `/v1/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/connection-tokens`,
+    path: `/v1/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/pty-sessions`,
     expectedStatus: 201,
-    description: "sandbox connection token minting",
-    schema: SandboxInstanceConnectionTokenResponseSchema,
+    description: "sandbox PTY session minting",
+    schema: SandboxInstancePtySessionResponseSchema,
     init: {
       method: "POST",
       headers: {
+        "content-type": "application/json",
         cookie: input.session.cookie,
       },
+      body: JSON.stringify({
+        ptySessionId: "terminal",
+      }),
     },
   });
 }
@@ -446,8 +448,8 @@ async function websocketDataToUint8Array(data: unknown): Promise<Uint8Array> {
   throw new Error(`Unsupported websocket binary data type: ${String(typeof data)}.`);
 }
 
-function parseControlMessage(payload: string): BootstrapControlMessage {
-  const parsed = parseBootstrapControlMessage(payload);
+function parseControlMessage(payload: string): StreamControlMessage {
+  const parsed = parseStreamControlMessage(payload);
   if (parsed === undefined) {
     throw new Error(`Unexpected websocket control message: ${payload}`);
   }
@@ -495,17 +497,10 @@ function createPtyFramePump(socket: WebSocket): PtyFramePump {
           return;
         }
 
-        const dataFrame = decodeDataFrame(await websocketDataToUint8Array(event.data));
-        if (socket.readyState === WebSocket.OPEN) {
-          sendJson(socket, {
-            type: "stream.window",
-            streamId: dataFrame.streamId,
-            bytes: dataFrame.payload.length,
-          });
-        }
+        const payload = await websocketDataToUint8Array(event.data);
         enqueue({
           kind: "binary",
-          text: Buffer.from(dataFrame.payload).toString("utf8"),
+          text: Buffer.from(payload).toString("utf8"),
         });
       } catch (error) {
         enqueue({
@@ -594,50 +589,21 @@ function sendPtyInput(input: { socket: WebSocket; streamId: number; payload: str
     );
   }
 
-  input.socket.send(
-    Buffer.from(
-      encodeDataFrame({
-        streamId: input.streamId,
-        payloadKind: PayloadKindRawBytes,
-        payload: new TextEncoder().encode(input.payload),
-      }),
-    ),
-  );
+  input.socket.send(Buffer.from(new TextEncoder().encode(input.payload)));
 }
 
-async function connectPtyChannel(input: {
-  socket: WebSocket;
-  pump: PtyFramePump;
-  cwd: string;
-}): Promise<number> {
+async function connectPtyChannel(input: { socket: WebSocket; cwd: string }): Promise<number> {
   const streamId = 1;
   sendJson(input.socket, {
-    type: "stream.open",
-    streamId,
-    channel: {
-      kind: "pty",
+    type: "pty.transport.open",
+    launch: {
       session: "create",
-      ptySessionId: "terminal",
       cols: 120,
       rows: 40,
       cwd: input.cwd,
     },
   });
-
-  while (true) {
-    const frame = await waitForNextPtyFrame(input.pump, WebSocketMessageTimeoutMs);
-    if (frame.kind !== "control") {
-      continue;
-    }
-    if (frame.payload.type === "stream.open.ok" && frame.payload.streamId === streamId) {
-      return streamId;
-    }
-    if (frame.payload.type === "stream.open.error" && frame.payload.streamId === streamId) {
-      throw new Error(
-        `PTY stream.open failed with ${frame.payload.code}: ${frame.payload.message}`,
-      );
-    }
-  }
+  return streamId;
 }
 
 async function closePtyChannel(input: { socket: WebSocket; streamId: number }): Promise<void> {
@@ -1147,7 +1113,7 @@ describe("system port access", () => {
         sandboxInstanceId,
       });
 
-      const connectionToken = await mintConnectionToken({
+      const ptySession = await mintPtySession({
         fixture,
         session,
         sandboxInstanceId,
@@ -1156,7 +1122,7 @@ describe("system port access", () => {
       const sandboxFixturePath = "/tmp/mistle-port-access-system/http-listener.js";
       const websocket = new WebSocket(
         resolveGatewayTunnelWebSocketUrl({
-          mintedUrl: connectionToken.url,
+          mintedUrl: ptySession.url,
           gatewayBaseUrl: fixture.dataPlaneGatewayBaseUrl,
         }),
       );
@@ -1167,7 +1133,6 @@ describe("system port access", () => {
         const pump = createPtyFramePump(websocket);
         ptyStreamId = await connectPtyChannel({
           socket: websocket,
-          pump,
           cwd: "/root",
         });
         await stageFixtureScript({
@@ -1274,7 +1239,7 @@ describe("system port access", () => {
         sandboxInstanceId,
       });
 
-      const connectionToken = await mintConnectionToken({
+      const ptySession = await mintPtySession({
         fixture,
         session,
         sandboxInstanceId,
@@ -1283,7 +1248,7 @@ describe("system port access", () => {
       const sandboxFixturePath = "/tmp/mistle-port-access-system/ws-listener.js";
       const tunnelWebSocket = new WebSocket(
         resolveGatewayTunnelWebSocketUrl({
-          mintedUrl: connectionToken.url,
+          mintedUrl: ptySession.url,
           gatewayBaseUrl: fixture.dataPlaneGatewayBaseUrl,
         }),
       );
@@ -1295,7 +1260,6 @@ describe("system port access", () => {
         const pump = createPtyFramePump(tunnelWebSocket);
         ptyStreamId = await connectPtyChannel({
           socket: tunnelWebSocket,
-          pump,
           cwd: "/root",
         });
         await stageFixtureScript({

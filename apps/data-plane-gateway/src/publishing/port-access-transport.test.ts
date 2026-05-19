@@ -488,7 +488,7 @@ describe("port access transport session fencing", () => {
     });
     const interactiveBinding = tunnelSessionRegistry.bindClientStream({
       sandboxInstanceId: SandboxInstanceId,
-      channelKind: "pty",
+      channelKind: "agent",
       clientSessionId: "conn_interactive",
       clientStreamId: 1,
     });
@@ -537,7 +537,7 @@ describe("port access transport session fencing", () => {
     });
     const interactiveBinding = tunnelSessionRegistry.bindClientStream({
       sandboxInstanceId: SandboxInstanceId,
-      channelKind: "pty",
+      channelKind: "agent",
       clientSessionId: "conn_interactive",
       clientStreamId: 1,
     });

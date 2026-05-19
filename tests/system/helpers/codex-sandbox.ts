@@ -11,7 +11,7 @@ import { CodexConversationProviderInitializeClientInfo } from "../../../packages
 import type { SandboxRuntimeStateSnapshot } from "../../../packages/sandbox-runtime-contract/src/runtime-state.js";
 import { ExecStreamClient } from "../../../packages/sandbox-session-client/src/exec-stream-client.js";
 import { createNodeSandboxSessionRuntime } from "../../../packages/sandbox-session-client/src/node.js";
-import { PtyStreamClient } from "../../../packages/sandbox-session-client/src/pty-stream-client.js";
+import { PtyTransportClient } from "../../../packages/sandbox-session-client/src/pty-transport-client.js";
 import type { SandboxSessionRuntime } from "../../../packages/sandbox-session-client/src/runtime.js";
 import { SandboxSessionTransport } from "../../../packages/sandbox-session-client/src/transport.js";
 
@@ -87,6 +87,16 @@ const SandboxdFaultInjectionAcceptedResponseSchema = z
 const SandboxInstanceConnectionTokenResponseSchema = z
   .object({
     instanceId: z.string().min(1),
+    url: z.url(),
+    token: z.string().min(1),
+    expiresAt: z.string().min(1),
+  })
+  .strict();
+
+const SandboxInstancePtySessionResponseSchema = z
+  .object({
+    instanceId: z.string().min(1),
+    ptySessionId: z.string().min(1),
     url: z.url(),
     token: z.string().min(1),
     expiresAt: z.string().min(1),
@@ -277,6 +287,36 @@ export async function mintSandboxConnectionUrl(input: {
 
   return resolveGatewayWebSocketUrl({
     mintedUrl: connectionToken.url,
+    gatewayBaseUrl: input.fixture.dataPlaneGatewayBaseUrl,
+  });
+}
+
+export async function mintSandboxPtySessionUrl(input: {
+  fixture: CodexSandboxFixture;
+  authenticatedSession: CodexSandboxAuthenticatedSession;
+  sandboxInstanceId: string;
+  ptySessionId: string;
+}): Promise<string> {
+  const ptySession = await requestJsonOrThrow({
+    request: input.fixture.request,
+    path: `/v1/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/pty-sessions`,
+    expectedStatus: 201,
+    description: "sandbox PTY session minting",
+    schema: SandboxInstancePtySessionResponseSchema,
+    init: {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: input.authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        ptySessionId: input.ptySessionId,
+      }),
+    },
+  });
+
+  return resolveGatewayWebSocketUrl({
+    mintedUrl: ptySession.url,
     gatewayBaseUrl: input.fixture.dataPlaneGatewayBaseUrl,
   });
 }
@@ -843,36 +883,26 @@ export async function runSandboxPtyCommand(input: {
   cwd?: string;
   timeoutMs?: number;
 }): Promise<{ exitCode: number; output: string }> {
-  const connectionUrl = await mintSandboxConnectionUrl({
+  const ptySessionId = "terminal";
+  const connectionUrl = await mintSandboxPtySessionUrl({
     fixture: input.fixture,
     authenticatedSession: input.authenticatedSession,
     sandboxInstanceId: input.sandboxInstanceId,
+    ptySessionId,
   });
-  const transport = new SandboxSessionTransport({
+  const ptyClient = new PtyTransportClient({
+    connectionUrl,
     runtime: createFixtureSessionRuntime(input.fixture),
     connectTimeoutMs: SANDBOX_SESSION_CONNECT_TIMEOUT_MS,
   });
+  const timeoutMs = input.timeoutMs ?? 30_000;
+  let output = "";
 
-  await transport.connect({
-    connectionUrl,
+  ptyClient.onData((chunk) => {
+    output += Buffer.from(chunk).toString("utf8");
   });
 
   try {
-    const timeoutMs = input.timeoutMs ?? 30_000;
-    const ptyClient = new PtyStreamClient({
-      transport,
-    });
-    let output = "";
-
-    ptyClient.onData((chunk) => {
-      output += Buffer.from(chunk).toString("utf8");
-    });
-
-    await withOperationTimeout({
-      operation: ptyClient.connect(),
-      timeoutMs,
-      description: "connecting sandbox PTY stream",
-    });
     const waitForExit = (): Promise<{ exitCode: number }> =>
       new Promise<{ exitCode: number }>((resolve, reject) => {
         const timeoutSignal = AbortSignal.timeout(timeoutMs);
@@ -910,7 +940,7 @@ export async function runSandboxPtyCommand(input: {
     try {
       await withOperationTimeout({
         operation: ptyClient.open({
-          ptySessionId: "terminal",
+          ptySessionId,
           cols: 120,
           rows: 40,
           cwd: input.cwd ?? "/root",
@@ -935,7 +965,7 @@ export async function runSandboxPtyCommand(input: {
       output,
     };
   } finally {
-    transport.disconnect(1000, "system test pty cleanup");
+    await ptyClient.disconnect().catch(() => {});
   }
 }
 

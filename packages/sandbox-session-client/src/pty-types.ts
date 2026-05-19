@@ -1,5 +1,3 @@
-import type { SandboxSessionTransport } from "./transport.js";
-
 export const SandboxPtyStates = {
   IDLE: "idle",
   CONNECTING: "connecting",
@@ -30,9 +28,4 @@ export type SandboxPtyExitInfo = {
 export type SandboxPtyResetInfo = {
   code: string;
   message: string;
-};
-
-export type PtyStreamClientInput = {
-  transport: SandboxSessionTransport;
-  closeTimeoutMs?: number;
 };

@@ -40,59 +40,6 @@ type EnabledTelemetryTracesConfig = Extract<
 const TunnelTelemetryMeter = metrics.getMeter("@mistle/data-plane-gateway/tunnel");
 
 class SandboxTunnelMetricsRecorder {
-  readonly #ptySessionDurationMs = TunnelTelemetryMeter.createHistogram(
-    "mistle.sandbox.tunnel.pty.session.duration",
-    {
-      description: "Observed lifetime of PTY sessions reported by sandboxd.",
-      unit: "ms",
-    },
-  );
-
-  readonly #ptySessionInteractionCount = TunnelTelemetryMeter.createHistogram(
-    "mistle.sandbox.tunnel.pty.session.interaction_count",
-    {
-      description: "Observed count of PTY input to first output interactions per session.",
-    },
-  );
-
-  readonly #ptySessionWarningCount = TunnelTelemetryMeter.createHistogram(
-    "mistle.sandbox.tunnel.pty.session.warning_count",
-    {
-      description: "Observed count of PTY latency warnings per session.",
-    },
-  );
-
-  readonly #ptyInputToFirstOutputAvgMs = TunnelTelemetryMeter.createHistogram(
-    "mistle.sandbox.tunnel.pty.input_to_first_output.avg",
-    {
-      description: "Average PTY input to first output latency observed per PTY session.",
-      unit: "ms",
-    },
-  );
-
-  readonly #ptyInputToFirstOutputMaxMs = TunnelTelemetryMeter.createHistogram(
-    "mistle.sandbox.tunnel.pty.input_to_first_output.max",
-    {
-      description: "Maximum PTY input to first output latency observed per PTY session.",
-      unit: "ms",
-    },
-  );
-
-  readonly #ptyInputLatencyWarningCount = TunnelTelemetryMeter.createCounter(
-    "mistle.sandbox.tunnel.pty.input_to_first_output.warning.count",
-    {
-      description: "Count of PTY input to first output latency warning events emitted by sandboxd.",
-    },
-  );
-
-  readonly #ptyInputLatencyWarningMs = TunnelTelemetryMeter.createHistogram(
-    "mistle.sandbox.tunnel.pty.input_to_first_output.warning",
-    {
-      description: "PTY input to first output latency for warning events emitted by sandboxd.",
-      unit: "ms",
-    },
-  );
-
   readonly #streamDurationMs = TunnelTelemetryMeter.createHistogram(
     "mistle.sandbox.tunnel.stream.duration",
     {
@@ -199,31 +146,6 @@ class SandboxTunnelMetricsRecorder {
       if (observation.resetCode !== null) {
         this.#streamResetCount.add(1, summaryAttributes);
       }
-      return;
-    }
-
-    if (observation.kind === "pty_session_summary") {
-      const ptyAttributes = {
-        "mistle.channel_kind": "pty",
-      } satisfies Attributes;
-      this.#ptySessionDurationMs.record(observation.durationMs, ptyAttributes);
-      this.#ptySessionInteractionCount.record(observation.interactionCount, ptyAttributes);
-      this.#ptySessionWarningCount.record(observation.warningCount, ptyAttributes);
-      if (observation.avgInputToFirstOutputMs !== null) {
-        this.#ptyInputToFirstOutputAvgMs.record(observation.avgInputToFirstOutputMs, ptyAttributes);
-      }
-      if (observation.maxInputToFirstOutputMs !== null) {
-        this.#ptyInputToFirstOutputMaxMs.record(observation.maxInputToFirstOutputMs, ptyAttributes);
-      }
-      return;
-    }
-
-    if (observation.kind === "pty_input_latency_warning") {
-      const ptyWarningAttributes = {
-        "mistle.channel_kind": "pty",
-      } satisfies Attributes;
-      this.#ptyInputLatencyWarningCount.add(1, ptyWarningAttributes);
-      this.#ptyInputLatencyWarningMs.record(observation.inputToFirstOutputMs, ptyWarningAttributes);
       return;
     }
 

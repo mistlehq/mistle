@@ -188,7 +188,7 @@ describe("InteractiveStreamRouter", () => {
     await expect(
       router.openInteractiveStream({
         sandboxInstanceId: "sbi_missing",
-        channelKind: "pty",
+        channelKind: "agent",
         clientSessionId: "conn_1",
         clientStreamId: 7,
       }),

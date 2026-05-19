@@ -345,11 +345,7 @@ describe("TunnelProtocolTranslator", () => {
           type: "stream.open",
           streamId: 41,
           channel: {
-            kind: "pty",
-            session: "create",
-            ptySessionId: "terminal",
-            cols: 80,
-            rows: 24,
+            kind: "agent",
           },
         }),
         sandboxInstanceId: SandboxInstanceId,
@@ -362,11 +358,7 @@ describe("TunnelProtocolTranslator", () => {
           type: "stream.open",
           streamId: 1,
           channel: {
-            kind: "pty",
-            session: "create",
-            ptySessionId: "terminal",
-            cols: 80,
-            rows: 24,
+            kind: "agent",
           },
         }),
         targetBootstrapSessionId: BootstrapSessionId,
@@ -384,11 +376,7 @@ describe("TunnelProtocolTranslator", () => {
           type: "stream.open",
           streamId: 41,
           channel: {
-            kind: "pty",
-            session: "create",
-            ptySessionId: "terminal",
-            cols: 80,
-            rows: 24,
+            kind: "agent",
           },
         }),
         sandboxInstanceId: SandboxInstanceId,
@@ -401,11 +389,7 @@ describe("TunnelProtocolTranslator", () => {
           type: "stream.open",
           streamId: 1,
           channel: {
-            kind: "pty",
-            session: "create",
-            ptySessionId: "terminal",
-            cols: 80,
-            rows: 24,
+            kind: "agent",
           },
         }),
         targetBootstrapSessionId: BootstrapSessionId,
@@ -480,11 +464,7 @@ describe("TunnelProtocolTranslator", () => {
         type: "stream.open",
         streamId: 41,
         channel: {
-          kind: "pty",
-          session: "create",
-          ptySessionId: "terminal",
-          cols: 80,
-          rows: 24,
+          kind: "agent",
         },
       }),
       sandboxInstanceId: SandboxInstanceId,
@@ -667,11 +647,7 @@ describe("TunnelProtocolTranslator", () => {
         type: "stream.open",
         streamId: 41,
         channel: {
-          kind: "pty",
-          session: "create",
-          ptySessionId: "terminal",
-          cols: 80,
-          rows: 24,
+          kind: "agent",
         },
       }),
       sandboxInstanceId: SandboxInstanceId,
@@ -898,127 +874,6 @@ describe("TunnelProtocolTranslator", () => {
     });
   });
 
-  it("drops late bootstrap stream.window after the binding was already released by pty.exit", async () => {
-    const { router, translator } = await createTranslatorHarness();
-
-    await translator.translateInboundMessage({
-      clientSessionId: "conn_1",
-      payload: JSON.stringify({
-        type: "stream.open",
-        streamId: 41,
-        channel: {
-          kind: "pty",
-          session: "create",
-          ptySessionId: "terminal",
-          cols: 80,
-          rows: 24,
-        },
-      }),
-      sandboxInstanceId: SandboxInstanceId,
-      sourcePeerSide: "connection",
-    });
-
-    const exitTranslation = await translator.translateInboundMessage({
-      clientSessionId: BootstrapSessionId,
-      payload: JSON.stringify({
-        type: "stream.event",
-        streamId: 1,
-        event: {
-          type: "pty.exit",
-          exitCode: 0,
-        },
-      }),
-      sandboxInstanceId: SandboxInstanceId,
-      sourcePeerSide: "bootstrap",
-    });
-    if (exitTranslation.releaseInteractiveStream === undefined) {
-      throw new Error("Expected bootstrap pty.exit to release the PTY binding.");
-    }
-    await router.closeInteractiveStream({
-      sandboxInstanceId: SandboxInstanceId,
-      clientSessionId: exitTranslation.releaseInteractiveStream.clientSessionId,
-      clientStreamId: exitTranslation.releaseInteractiveStream.clientStreamId,
-    });
-
-    await expect(
-      translator.translateInboundMessage({
-        clientSessionId: BootstrapSessionId,
-        payload: JSON.stringify({
-          type: "stream.window",
-          streamId: 1,
-          bytes: 5,
-        }),
-        sandboxInstanceId: SandboxInstanceId,
-        sourcePeerSide: "bootstrap",
-      }),
-    ).resolves.toEqual({
-      delivery: {
-        kind: "drop",
-      },
-    });
-  });
-
-  it("drops late bootstrap stream.reset after the binding was already released by pty.exit", async () => {
-    const { router, translator } = await createTranslatorHarness();
-
-    await translator.translateInboundMessage({
-      clientSessionId: "conn_1",
-      payload: JSON.stringify({
-        type: "stream.open",
-        streamId: 41,
-        channel: {
-          kind: "pty",
-          session: "create",
-          ptySessionId: "terminal",
-          cols: 80,
-          rows: 24,
-        },
-      }),
-      sandboxInstanceId: SandboxInstanceId,
-      sourcePeerSide: "connection",
-    });
-
-    const exitTranslation = await translator.translateInboundMessage({
-      clientSessionId: BootstrapSessionId,
-      payload: JSON.stringify({
-        type: "stream.event",
-        streamId: 1,
-        event: {
-          type: "pty.exit",
-          exitCode: 0,
-        },
-      }),
-      sandboxInstanceId: SandboxInstanceId,
-      sourcePeerSide: "bootstrap",
-    });
-    if (exitTranslation.releaseInteractiveStream === undefined) {
-      throw new Error("Expected bootstrap pty.exit to release the PTY binding.");
-    }
-    await router.closeInteractiveStream({
-      sandboxInstanceId: SandboxInstanceId,
-      clientSessionId: exitTranslation.releaseInteractiveStream.clientSessionId,
-      clientStreamId: exitTranslation.releaseInteractiveStream.clientStreamId,
-    });
-
-    await expect(
-      translator.translateInboundMessage({
-        clientSessionId: BootstrapSessionId,
-        payload: JSON.stringify({
-          type: "stream.reset",
-          streamId: 1,
-          code: "invalid_stream_window",
-          message: "stream.window streamId 1 is not bound to an active tunnel stream",
-        }),
-        sandboxInstanceId: SandboxInstanceId,
-        sourcePeerSide: "bootstrap",
-      }),
-    ).resolves.toEqual({
-      delivery: {
-        kind: "drop",
-      },
-    });
-  });
-
   it("keeps bootstrap keepalive state messages local to the gateway", async () => {
     const { translator } = await createTranslatorHarness();
 
@@ -1065,55 +920,6 @@ describe("TunnelProtocolTranslator", () => {
       runtimeReadyControlMessage: {
         type: "runtime.ready",
         ready: true,
-      },
-    });
-  });
-
-  it("responds with a reset and releases the binding when connection binary data is invalid for the channel", async () => {
-    const { router, translator } = await createTranslatorHarness();
-
-    await router.openInteractiveStream({
-      sandboxInstanceId: SandboxInstanceId,
-      channelKind: "pty",
-      clientSessionId: "conn_1",
-      clientStreamId: 41,
-    });
-
-    await expect(
-      translator.translateInboundMessage({
-        clientSessionId: "conn_1",
-        payload: toArrayBuffer(
-          encodeDataFrame({
-            streamId: 41,
-            payloadKind: PayloadKindWebSocketText,
-            payload: new TextEncoder().encode("invalid-pty-data"),
-          }),
-        ),
-        sandboxInstanceId: SandboxInstanceId,
-        sourcePeerSide: "connection",
-      }),
-    ).resolves.toEqual({
-      delivery: {
-        kind: "respond",
-        payload: JSON.stringify({
-          type: "stream.reset",
-          streamId: 41,
-          code: "invalid_stream_data",
-          message: "PTY streams only accept raw-bytes data frames.",
-        }),
-      },
-      notifyBootstrapPeerOfReleasedStream: {
-        binding: {
-          channelKind: "pty",
-          clientSessionId: "conn_1",
-          clientStreamId: 41,
-          tunnelStreamId: 1,
-        },
-        targetBootstrapSessionId: BootstrapSessionId,
-      },
-      releaseInteractiveStream: {
-        clientSessionId: "conn_1",
-        clientStreamId: 41,
       },
     });
   });
@@ -1251,7 +1057,7 @@ describe("TunnelProtocolTranslator", () => {
 
     await router.openInteractiveStream({
       sandboxInstanceId: SandboxInstanceId,
-      channelKind: "pty",
+      channelKind: "agent",
       clientSessionId: "conn_1",
       clientStreamId: 41,
     });
@@ -1261,7 +1067,7 @@ describe("TunnelProtocolTranslator", () => {
       payload: toArrayBuffer(
         encodeDataFrame({
           streamId: 1,
-          payloadKind: PayloadKindRawBytes,
+          payloadKind: PayloadKindWebSocketBinary,
           payload: new Uint8Array([1, 2, 3]),
         }),
       ),

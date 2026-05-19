@@ -28,7 +28,7 @@ const RelayTargetSchema = z
   })
   .strict();
 
-const StreamChannelKindSchema = z.enum(["agent", "processes", "pty", "fileUpload", "exec"]);
+const StreamChannelKindSchema = z.enum(["agent", "processes", "fileUpload", "exec"]);
 
 const ClientStreamBindingSchema = z
   .object({

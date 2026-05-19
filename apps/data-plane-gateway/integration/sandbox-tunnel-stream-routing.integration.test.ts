@@ -265,7 +265,7 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
   );
 
   it(
-    "closes PTY stream bindings on connection detach while keeping the bootstrap peer alive",
+    "closes client stream bindings on connection detach while keeping the bootstrap peer alive",
     async ({ env }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({ env, sandboxInstanceId });
@@ -285,11 +285,7 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
             type: "stream.open",
             streamId: clientStreamId,
             channel: {
-              kind: "pty",
-              session: "create",
-              ptySessionId: "terminal",
-              cols: 120,
-              rows: 40,
+              kind: "agent",
             },
           }),
         );
@@ -297,11 +293,7 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
           type: "stream.open",
           streamId: 1,
           channel: {
-            kind: "pty",
-            session: "create",
-            ptySessionId: "terminal",
-            cols: 120,
-            rows: 40,
+            kind: "agent",
           },
         });
 
@@ -602,7 +594,7 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
   );
 
   it(
-    "releases PTY stream bindings on client close and ignores late exit events",
+    "releases client stream bindings on client close and ignores late stream events",
     async ({ env }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({ env, sandboxInstanceId });
@@ -614,7 +606,7 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
         bootstrapSocket = await connectBootstrapSocket({ env, sandboxInstanceId });
         clientSocket = await connectConnectionSocket({ env, sandboxInstanceId });
 
-        await openPtyStream({
+        await openClientStream({
           bootstrapSocket,
           clientSocket,
           clientStreamId: 41,
@@ -649,7 +641,7 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
         );
         await Promise.all([bootstrapNoMessage, clientNoMessage]);
 
-        await openPtyStream({
+        await openClientStream({
           bootstrapSocket,
           clientSocket,
           clientStreamId: 42,
@@ -892,11 +884,7 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
             type: "stream.open",
             streamId: 78,
             channel: {
-              kind: "pty",
-              session: "create",
-              ptySessionId: "terminal",
-              cols: 80,
-              rows: 24,
+              kind: "agent",
             },
           }),
         );
@@ -904,11 +892,7 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
           type: "stream.open",
           streamId: 2,
           channel: {
-            kind: "pty",
-            session: "create",
-            ptySessionId: "terminal",
-            cols: 80,
-            rows: 24,
+            kind: "agent",
           },
         });
       } finally {
@@ -1101,7 +1085,7 @@ function encodeWebSocketTextDataFrame(input: { payload: string; streamId: number
   });
 }
 
-async function openPtyStream(input: {
+async function openClientStream(input: {
   bootstrapSocket: WebSocket;
   clientSocket: WebSocket;
   clientStreamId: number;
@@ -1114,11 +1098,7 @@ async function openPtyStream(input: {
       type: "stream.open",
       streamId: input.clientStreamId,
       channel: {
-        kind: "pty",
-        session: "create",
-        ptySessionId: "terminal",
-        cols: 120,
-        rows: 40,
+        kind: "agent",
       },
     }),
   );
@@ -1126,11 +1106,7 @@ async function openPtyStream(input: {
     type: "stream.open",
     streamId: input.bootstrapStreamId,
     channel: {
-      kind: "pty",
-      session: "create",
-      ptySessionId: "terminal",
-      cols: 120,
-      rows: 40,
+      kind: "agent",
     },
   });
 

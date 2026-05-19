@@ -18,7 +18,7 @@ describe("SandboxTunnelSession", () => {
     );
 
     const firstBinding = session.bindClientStream({
-      channelKind: "pty",
+      channelKind: "agent",
       clientSessionId: "conn_1",
       clientStreamId: 7,
     });
@@ -29,7 +29,7 @@ describe("SandboxTunnelSession", () => {
     });
 
     expect(firstBinding).toEqual({
-      channelKind: "pty",
+      channelKind: "agent",
       clientSessionId: "conn_1",
       clientStreamId: 7,
       tunnelStreamId: 1,
@@ -61,7 +61,7 @@ describe("SandboxTunnelSession", () => {
     );
 
     const binding = session.bindClientStream({
-      channelKind: "pty",
+      channelKind: "agent",
       clientSessionId: "conn_1",
       clientStreamId: 7,
     });
@@ -103,7 +103,7 @@ describe("SandboxTunnelSession", () => {
     );
 
     const releasedBinding = session.bindClientStream({
-      channelKind: "pty",
+      channelKind: "agent",
       clientSessionId: "conn_1",
       clientStreamId: 7,
     });
@@ -131,7 +131,7 @@ describe("SandboxTunnelSession", () => {
     });
 
     session.bindClientStream({
-      channelKind: "pty",
+      channelKind: "agent",
       clientSessionId: "conn_1",
       clientStreamId: 7,
     });
@@ -160,7 +160,7 @@ describe("SandboxTunnelSession", () => {
     });
 
     session.bindClientStream({
-      channelKind: "pty",
+      channelKind: "agent",
       clientSessionId: "conn_1",
       clientStreamId: 7,
     });
@@ -183,7 +183,7 @@ describe("SandboxTunnelSession", () => {
     });
 
     session.bindClientStream({
-      channelKind: "pty",
+      channelKind: "agent",
       clientSessionId: "conn_1",
       clientStreamId: 7,
     });
@@ -215,7 +215,7 @@ describe("SandboxTunnelSession", () => {
     );
 
     session.bindClientStream({
-      channelKind: "pty",
+      channelKind: "agent",
       clientSessionId: "conn_1",
       clientStreamId: 7,
     });
@@ -227,7 +227,7 @@ describe("SandboxTunnelSession", () => {
 
     expect(() =>
       session.bindClientStream({
-        channelKind: "pty",
+        channelKind: "agent",
         clientSessionId: "conn_3",
         clientStreamId: 9,
       }),

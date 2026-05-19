@@ -7,14 +7,13 @@ import { randomUUID } from "node:crypto";
 import { systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
 
-import { PtyStreamClient } from "../../packages/sandbox-session-client/src/pty-stream-client.js";
-import { SandboxSessionTransport } from "../../packages/sandbox-session-client/src/transport.js";
+import { PtyTransportClient } from "../../packages/sandbox-session-client/src/pty-transport-client.js";
 import type {
   CodexSandboxAuthenticatedSession,
   CodexSandboxFixture,
 } from "../system/helpers/codex-sandbox.js";
 import {
-  mintSandboxConnectionUrl,
+  mintSandboxPtySessionUrl,
   prepareCodexSandbox,
   runSandboxExecCommandInSandbox,
   waitForCondition,
@@ -247,23 +246,22 @@ async function openPersistentPtySession(input: {
   sandboxInstanceId: string;
   cwd: string;
 }): Promise<PersistentPtySession> {
-  const connectionUrl = await mintSandboxConnectionUrl({
+  const ptySessionId = `cgroup-keepalive-${randomUUID()}`;
+  const connectionUrl = await mintSandboxPtySessionUrl({
     fixture: input.fixture,
     authenticatedSession: input.authenticatedSession,
     sandboxInstanceId: input.sandboxInstanceId,
+    ptySessionId,
   });
   const runtime = input.fixture.createSessionRuntime?.();
   if (runtime === undefined) {
     throw new Error("Persistent PTY session requires a sandbox session runtime.");
   }
 
-  const transport = new SandboxSessionTransport({
+  const ptyClient = new PtyTransportClient({
+    connectionUrl,
     runtime,
     connectTimeoutMs: 120_000,
-  });
-  const ptyClient = new PtyStreamClient({
-    transport,
-    closeTimeoutMs: 3_000,
   });
   let closed = false;
   let output = "";
@@ -280,19 +278,15 @@ async function openPersistentPtySession(input: {
   });
 
   try {
-    await transport.connect({
-      connectionUrl,
-    });
-    await ptyClient.connect();
     await ptyClient.open({
-      ptySessionId: `cgroup-keepalive-${randomUUID()}`,
+      ptySessionId,
       cols: 120,
       rows: 40,
       cwd: input.cwd,
       command: "sh",
     });
   } catch (error) {
-    transport.disconnect(1000, "system test persistent PTY setup failed");
+    await ptyClient.disconnect().catch(() => {});
     throw error;
   }
 
@@ -324,7 +318,6 @@ async function openPersistentPtySession(input: {
       }
       closed = true;
       await ptyClient.disconnect();
-      transport.disconnect(1000, "system test persistent PTY cleanup");
     },
   };
 }

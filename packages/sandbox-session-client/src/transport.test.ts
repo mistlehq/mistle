@@ -287,11 +287,11 @@ describe("SandboxSessionTransport", () => {
     });
     const secondStream = await transport.openStream({
       channel: {
-        kind: "pty",
-        session: "create",
-        ptySessionId: "terminal",
-        cols: 80,
-        rows: 24,
+        kind: "fileUpload",
+        threadId: "thread_123",
+        mimeType: "text/plain",
+        originalFilename: "notes.txt",
+        sizeBytes: 3,
       },
     });
 
@@ -322,11 +322,11 @@ describe("SandboxSessionTransport", () => {
     });
     const secondStream = await transport.openStream({
       channel: {
-        kind: "pty",
-        session: "create",
-        ptySessionId: "terminal",
-        cols: 80,
-        rows: 24,
+        kind: "fileUpload",
+        threadId: "thread_124",
+        mimeType: "text/plain",
+        originalFilename: "notes.txt",
+        sizeBytes: 3,
       },
     });
 
@@ -436,11 +436,11 @@ describe("SandboxSessionTransport", () => {
     });
     const secondStream = await transport.openStream({
       channel: {
-        kind: "pty",
-        session: "create",
-        ptySessionId: "terminal",
-        cols: 80,
-        rows: 24,
+        kind: "fileUpload",
+        threadId: "thread_125",
+        mimeType: "text/plain",
+        originalFilename: "notes.txt",
+        sizeBytes: 3,
       },
     });
 

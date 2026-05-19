@@ -14,7 +14,7 @@ describe("InMemoryTunnelSessionRegistryAdapter", () => {
     });
     const firstBinding = adapter.bindClientStream({
       sandboxInstanceId: "sbi_test",
-      channelKind: "pty",
+      channelKind: "agent",
       clientSessionId: "conn_1",
       clientStreamId: 7,
     });
@@ -62,7 +62,7 @@ describe("InMemoryTunnelSessionRegistryAdapter", () => {
 
     const firstBinding = adapter.bindClientStream({
       sandboxInstanceId: "sbi_test",
-      channelKind: "pty",
+      channelKind: "agent",
       clientSessionId: "conn_1",
       clientStreamId: 7,
     });
@@ -74,7 +74,7 @@ describe("InMemoryTunnelSessionRegistryAdapter", () => {
     });
 
     expect(firstBinding).toEqual({
-      channelKind: "pty",
+      channelKind: "agent",
       clientSessionId: "conn_1",
       clientStreamId: 7,
       tunnelStreamId: 1,
@@ -119,7 +119,7 @@ describe("InMemoryTunnelSessionRegistryAdapter", () => {
     expect(() =>
       adapter.bindClientStream({
         sandboxInstanceId: "sbi_missing",
-        channelKind: "pty",
+        channelKind: "agent",
         clientSessionId: "conn_1",
         clientStreamId: 7,
       }),
@@ -136,7 +136,7 @@ describe("InMemoryTunnelSessionRegistryAdapter", () => {
     });
     const binding = adapter.bindClientStream({
       sandboxInstanceId: "sbi_test",
-      channelKind: "pty",
+      channelKind: "agent",
       clientSessionId: "conn_1",
       clientStreamId: 7,
     });
@@ -182,7 +182,7 @@ describe("InMemoryTunnelSessionRegistryAdapter", () => {
     });
     const releasedBinding = adapter.bindClientStream({
       sandboxInstanceId: "sbi_test",
-      channelKind: "pty",
+      channelKind: "agent",
       clientSessionId: "conn_1",
       clientStreamId: 7,
     });

@@ -131,15 +131,6 @@ function replaceStreamId(input: { message: StreamControlMessage; streamId: numbe
   });
 }
 
-function parsePTYStreamOpen(payload: string) {
-  const message = parseStreamControlMessage(payload);
-  if (message?.type !== "stream.open" || message.channel.kind !== "pty") {
-    return undefined;
-  }
-
-  return message;
-}
-
 function parseAgentStreamOpen(payload: string) {
   const message = parseStreamControlMessage(payload);
   if (message?.type !== "stream.open" || message.channel.kind !== "agent") {
@@ -176,10 +167,6 @@ function parseExecStreamOpen(payload: string) {
   return message;
 }
 
-function hasPTYResizeSignal(message: StreamControlMessage): boolean {
-  return message.type === "stream.signal" && message.signal.type === "pty.resize";
-}
-
 function shouldReleaseStreamOnConnectionClose(binding: ClientStreamBinding): boolean {
   return binding.channelKind !== "fileUpload";
 }
@@ -194,10 +181,6 @@ function shouldReleaseStreamOnBootstrapMessage(input: {
     input.message.type === "stream.complete"
   ) {
     return true;
-  }
-
-  if (input.binding.channelKind === "pty") {
-    return input.message.type === "stream.event" && input.message.event.type === "pty.exit";
   }
 
   return false;
@@ -250,13 +233,11 @@ function createInvalidStreamDataResetPayload(input: {
   streamId: number;
 }): string {
   const message =
-    input.channelKind === "pty"
-      ? "PTY streams only accept raw-bytes data frames."
-      : input.channelKind === "fileUpload"
-        ? "File upload streams only accept raw-bytes data frames."
-        : input.channelKind === "processes"
-          ? "Processes streams only accept websocket text data frames."
-          : "Agent streams only accept websocket text or websocket binary data frames.";
+    input.channelKind === "fileUpload"
+      ? "File upload streams only accept raw-bytes data frames."
+      : input.channelKind === "processes"
+        ? "Processes streams only accept websocket text data frames."
+        : "Agent streams only accept websocket text or websocket binary data frames.";
 
   return createStreamResetPayload({
     code: "invalid_stream_data",
@@ -395,7 +376,7 @@ function isPayloadKindAllowedForChannel(input: {
   channelKind: ClientStreamBinding["channelKind"];
   payloadKind: number;
 }): boolean {
-  if (input.channelKind === "pty" || input.channelKind === "fileUpload") {
+  if (input.channelKind === "fileUpload") {
     return input.payloadKind === PayloadKindRawBytes;
   }
 
@@ -557,16 +538,6 @@ export class TunnelProtocolTranslator {
       });
     }
 
-    const ptyStreamOpen = parsePTYStreamOpen(input.payload);
-    if (ptyStreamOpen !== undefined) {
-      return this.translateConnectionStreamOpen({
-        channelKind: "pty",
-        clientSessionId: input.clientSessionId,
-        message: ptyStreamOpen,
-        sandboxInstanceId: input.sandboxInstanceId,
-      });
-    }
-
     const agentStreamOpen = parseAgentStreamOpen(input.payload);
     if (agentStreamOpen !== undefined) {
       return this.translateConnectionStreamOpen({
@@ -646,13 +617,11 @@ export class TunnelProtocolTranslator {
     }
 
     if (controlMessage.type === "stream.signal") {
-      if (route.binding.channelKind !== "pty" || !hasPTYResizeSignal(controlMessage)) {
-        return createTranslation({
-          delivery: createRespondDelivery(
-            createInvalidStreamSignalResetPayload(controlMessage.streamId),
-          ),
-        });
-      }
+      return createTranslation({
+        delivery: createRespondDelivery(
+          createInvalidStreamSignalResetPayload(controlMessage.streamId),
+        ),
+      });
     }
 
     return createTranslation({
@@ -1103,14 +1072,9 @@ export function createStreamClosePayload(binding: ClientStreamBinding): string {
 }
 
 export function createReleasedInteractiveStreamResetPayload(binding: ClientStreamBinding): string {
-  const message =
-    binding.channelKind === "pty"
-      ? "Sandbox bootstrap tunnel reconnected and invalidated the active PTY stream."
-      : "Sandbox bootstrap tunnel reconnected and invalidated the active interactive stream.";
-
   return createStreamResetPayload({
     code: "bootstrap_reconnected",
-    message,
+    message: "Sandbox bootstrap tunnel reconnected and invalidated the active interactive stream.",
     streamId: binding.clientStreamId,
   });
 }
@@ -1118,14 +1082,9 @@ export function createReleasedInteractiveStreamResetPayload(binding: ClientStrea
 export function createBootstrapDisconnectedStreamResetPayload(
   binding: ClientStreamBinding,
 ): string {
-  const message =
-    binding.channelKind === "pty"
-      ? "Sandbox bootstrap tunnel disconnected and invalidated the active PTY stream."
-      : "Sandbox bootstrap tunnel disconnected and invalidated the active interactive stream.";
-
   return createStreamResetPayload({
     code: "bootstrap_disconnected",
-    message,
+    message: "Sandbox bootstrap tunnel disconnected and invalidated the active interactive stream.",
     streamId: binding.clientStreamId,
   });
 }

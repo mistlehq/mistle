@@ -5,11 +5,8 @@
 import { randomUUID } from "node:crypto";
 
 import {
-  decodeDataFrame,
-  encodeDataFrame,
-  parseBootstrapControlMessage,
-  PayloadKindRawBytes,
-  type BootstrapControlMessage,
+  parseStreamControlMessage,
+  type StreamControlMessage,
 } from "@mistle/sandbox-session-protocol";
 import { systemClock, systemScheduler, systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
@@ -24,7 +21,6 @@ const OPENAI_API_KEY = "sk-system-pty-cgroup-keepalive";
 const SYSTEM_TEST_TIMEOUT_MS = 8 * 60_000;
 const SANDBOX_READY_TIMEOUT_MS = 3 * 60_000;
 const WEBSOCKET_TIMEOUT_MS = 30_000;
-const PTY_MESSAGE_TIMEOUT_MS = 30_000;
 const PTY_COMMAND_TIMEOUT_MS = 60_000;
 const RUNTIME_STATE_TIMEOUT_MS = 90_000;
 const PROCESS_LIFETIME_SECONDS = 45;
@@ -64,9 +60,10 @@ const SandboxInstanceStatusResponseSchema = z.looseObject({
   failureMessage: z.string().nullable(),
 });
 
-const SandboxInstanceConnectionTokenResponseSchema = z
+const SandboxInstancePtySessionResponseSchema = z
   .object({
     instanceId: z.string().min(1),
+    ptySessionId: z.string().min(1),
     url: z.url(),
     token: z.string().min(1),
     expiresAt: z.string().min(1),
@@ -91,7 +88,7 @@ type PtyFrame =
     }
   | {
       kind: "control";
-      payload: BootstrapControlMessage;
+      payload: StreamControlMessage;
     };
 
 type QueuedPtyFrame =
@@ -350,21 +347,25 @@ async function mintSandboxConnectionUrl(input: {
   dataPlaneGatewayBaseUrl: string;
   sandboxInstanceId: string;
 }): Promise<string> {
-  const connectionToken = await requestJsonOrThrow({
+  const ptySession = await requestJsonOrThrow({
     request: input.request,
-    path: `/v1/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/connection-tokens`,
+    path: `/v1/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}/pty-sessions`,
     expectedStatus: 201,
-    description: "sandbox connection token minting",
-    schema: SandboxInstanceConnectionTokenResponseSchema,
+    description: "sandbox PTY session minting",
+    schema: SandboxInstancePtySessionResponseSchema,
     init: {
       method: "POST",
       headers: {
+        "content-type": "application/json",
         cookie: input.authenticatedSession.cookie,
       },
+      body: JSON.stringify({
+        ptySessionId: "terminal",
+      }),
     },
   });
 
-  const mintedUrl = new URL(connectionToken.url);
+  const mintedUrl = new URL(ptySession.url);
   const gatewayBaseUrl = new URL(input.dataPlaneGatewayBaseUrl);
   if (gatewayBaseUrl.protocol === "http:") {
     mintedUrl.protocol = "ws:";
@@ -459,8 +460,8 @@ async function websocketDataToUint8Array(data: unknown): Promise<Uint8Array> {
   throw new Error(`Unsupported websocket binary data type: ${String(typeof data)}.`);
 }
 
-function parseControlMessage(payload: string): BootstrapControlMessage {
-  const parsed = parseBootstrapControlMessage(payload);
+function parseControlMessage(payload: string): StreamControlMessage {
+  const parsed = parseStreamControlMessage(payload);
   if (parsed === undefined) {
     throw new Error(`Unexpected websocket control message: ${payload}`);
   }
@@ -508,17 +509,10 @@ function createPtyFramePump(socket: WebSocket): PtyFramePump {
           return;
         }
 
-        const dataFrame = decodeDataFrame(await websocketDataToUint8Array(event.data));
-        if (socket.readyState === WebSocket.OPEN) {
-          sendJson(socket, {
-            type: "stream.window",
-            streamId: dataFrame.streamId,
-            bytes: dataFrame.payload.length,
-          });
-        }
+        const payload = await websocketDataToUint8Array(event.data);
         enqueue({
           kind: "binary",
-          text: Buffer.from(dataFrame.payload).toString("utf8"),
+          text: Buffer.from(payload).toString("utf8"),
         });
       } catch (error) {
         enqueue({
@@ -607,50 +601,21 @@ function sendPtyInput(input: { socket: WebSocket; streamId: number; payload: str
     );
   }
 
-  input.socket.send(
-    Buffer.from(
-      encodeDataFrame({
-        streamId: input.streamId,
-        payloadKind: PayloadKindRawBytes,
-        payload: new TextEncoder().encode(input.payload),
-      }),
-    ),
-  );
+  input.socket.send(Buffer.from(new TextEncoder().encode(input.payload)));
 }
 
-async function connectPtyChannel(input: {
-  socket: WebSocket;
-  pump: PtyFramePump;
-  cwd: string;
-}): Promise<number> {
+async function connectPtyChannel(input: { socket: WebSocket; cwd: string }): Promise<number> {
   const streamId = 1;
   sendJson(input.socket, {
-    type: "stream.open",
-    streamId,
-    channel: {
-      kind: "pty",
+    type: "pty.transport.open",
+    launch: {
       session: "create",
-      ptySessionId: "terminal",
       cols: 120,
       rows: 40,
       cwd: input.cwd,
     },
   });
-
-  while (true) {
-    const frame = await waitForNextPtyFrame(input.pump, PTY_MESSAGE_TIMEOUT_MS);
-    if (frame.kind !== "control") {
-      continue;
-    }
-    if (frame.payload.type === "stream.open.ok" && frame.payload.streamId === streamId) {
-      return streamId;
-    }
-    if (frame.payload.type === "stream.open.error" && frame.payload.streamId === streamId) {
-      throw new Error(
-        `PTY stream.open failed with ${frame.payload.code}: ${frame.payload.message}`,
-      );
-    }
-  }
+  return streamId;
 }
 
 async function closePtyChannel(input: { socket: WebSocket; streamId: number }): Promise<void> {
@@ -765,7 +730,6 @@ async function runSandboxPtyCommand(input: {
     const pump = createPtyFramePump(websocket);
     const streamId = await connectPtyChannel({
       socket: websocket,
-      pump,
       cwd: input.cwd ?? "/root",
     });
     try {
@@ -905,7 +869,6 @@ describe("sandbox PTY cgroup keepalive", () => {
         const pump = createPtyFramePump(websocket);
         const streamId = await connectPtyChannel({
           socket: websocket,
-          pump,
           cwd: "/root",
         });
 

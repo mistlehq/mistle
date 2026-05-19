@@ -45,7 +45,7 @@ describe("LocalGatewayForwardingServerAdapter", () => {
       },
       {
         sandboxInstanceId: "sbi_test",
-        channelKind: "pty",
+        channelKind: "agent",
         clientSessionId: "conn_1",
         clientStreamId: 7,
       },
@@ -72,7 +72,7 @@ describe("LocalGatewayForwardingServerAdapter", () => {
         sessionId: "sess_bootstrap",
       },
       binding: {
-        channelKind: "pty",
+        channelKind: "agent",
         clientSessionId: "conn_1",
         clientStreamId: 7,
         tunnelStreamId: 1,
@@ -160,7 +160,7 @@ describe("LocalGatewayForwardingServerAdapter", () => {
       },
       {
         sandboxInstanceId: "sbi_test",
-        channelKind: "pty",
+        channelKind: "agent",
         clientSessionId: "conn_1",
         clientStreamId: 7,
       },
