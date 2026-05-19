@@ -1677,36 +1677,8 @@ export type RuntimeArtifactGitHubReleaseInstallStepInput = {
   timeoutMs?: number;
 };
 
-export type RuntimeArtifactGitHubReleaseInstallHelperAssetShape =
-  | {
-      fileName: string;
-      format: "binary";
-      sha256?: string;
-    }
-  | {
-      fileName: string;
-      format: "tar.gz";
-      extractedPath: string;
-      sha256?: string;
-    };
-
-export type RuntimeArtifactGitHubReleaseInstallHelperAsset =
-  | ({
-      kind: "exact";
-    } & RuntimeArtifactGitHubReleaseInstallHelperAssetShape)
-  | {
-      kind: "by_arch";
-      x86_64: RuntimeArtifactGitHubReleaseInstallHelperAssetShape;
-      aarch64: RuntimeArtifactGitHubReleaseInstallHelperAssetShape;
-    };
-
-export type RuntimeArtifactGitHubReleaseInstallHelperInput = {
-  repository: string;
-  release: RuntimeArtifactGitHubReleaseSelector;
-  asset: RuntimeArtifactGitHubReleaseInstallHelperAsset;
-  installPath: string;
-  timeoutMs?: number;
-};
+export type RuntimeArtifactGitHubReleaseInstallHelperInput =
+  RuntimeArtifactGitHubReleaseInstallStepInput;
 
 export type RuntimeArtifactInstallStep =
   | ({

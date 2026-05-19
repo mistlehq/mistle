@@ -17,6 +17,7 @@ pub(crate) fn format_agent_runtime_id(
     match agent_runtime_id {
         Some(SandboxInstanceAgentRuntimeId::Codex) => "codex",
         Some(SandboxInstanceAgentRuntimeId::Opencode) => "opencode",
+        Some(SandboxInstanceAgentRuntimeId::Pi) => "pi",
         None => "-",
     }
 }

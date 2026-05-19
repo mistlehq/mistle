@@ -1,5 +1,4 @@
 import {
-  AgentConversationStatuses,
   AgentRuntimeRegistry,
   IntegrationKinds,
   IntegrationRegistry,
@@ -71,39 +70,17 @@ function registerRuntime(
   input: {
     runtimeId: string;
     displayName: string;
-    logoKey?: string;
+    logoKey: string;
   },
 ): void {
   registry.register({
     runtimeId: input.runtimeId,
     displayName: input.displayName,
-    logoKey: input.logoKey ?? input.runtimeId,
+    logoKey: input.logoKey,
     configSchema: z.object({}),
     compileRuntime: () => ({
       runtimeClients: [],
       agentRuntimes: [],
-    }),
-    createConversationProvider: () => ({
-      connect: async () => ({
-        request: async () => ({ ok: true }),
-        close: async () => {},
-      }),
-      inspectConversation: async () => ({
-        exists: true,
-        status: AgentConversationStatuses.IDLE,
-        activeExecutionId: null,
-      }),
-      createConversation: async () => ({
-        providerConversationId: "thread_123",
-      }),
-      resumeConversation: async () => {},
-      startExecution: async () => ({
-        providerExecutionId: null,
-      }),
-      steerExecution: async () => ({
-        providerExecutionId: "turn_123",
-      }),
-      interruptExecution: async () => {},
     }),
   });
 }
@@ -117,6 +94,7 @@ describe("integration form registry", () => {
     registerRuntime(agentRuntimeRegistry, {
       runtimeId: "codex",
       displayName: "Codex",
+      logoKey: "openai",
     });
 
     const registry = createIntegrationFormRegistry({
@@ -161,7 +139,7 @@ describe("integration form registry", () => {
         {
           runtimeId: "codex",
           displayName: "Codex",
-          logoKey: "codex",
+          logoKey: "openai",
         },
       ],
     });
@@ -193,6 +171,7 @@ describe("integration form registry", () => {
     registerRuntime(agentRuntimeRegistry, {
       runtimeId: "codex",
       displayName: "Codex",
+      logoKey: "openai",
     });
 
     const registry = createIntegrationFormRegistry({

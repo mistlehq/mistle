@@ -24,6 +24,7 @@ import type {
   SandboxProviderSummary,
   SandboxProfileVersion,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { SessionRuntimeWorkbenchRuntimeIds } from "../session-agents/session-runtime-workbench-capabilities.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -33,6 +34,7 @@ import { SandboxProfileSectionCard } from "./sandbox-profile-section-card.js";
 const Definitions = createBrowserDefinitionsBundle();
 const IntegrationRegistry = Definitions.integrationRegistry;
 const AgentRuntimeRegistry = Definitions.agentRuntimeRegistry;
+const SelectableAgentRuntimeIds = new Set<AgentRuntimeId>(SessionRuntimeWorkbenchRuntimeIds);
 
 const MissingProviderValue = "__missing_provider__";
 const MissingConnectionValue = "__missing_connection__";
@@ -269,7 +271,7 @@ export function SandboxProfileRuntimeSection(input: {
   }
 
   function updateAgentRuntime(value: string | null): void {
-    if (value === null || !isAgentRuntimeId(value)) {
+    if (value === null || !isSelectableAgentRuntimeId(value)) {
       return;
     }
 
@@ -297,11 +299,13 @@ export function SandboxProfileRuntimeSection(input: {
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {AgentRuntimeRegistry.listRuntimes().map((runtime) => (
-              <SelectItem key={runtime.runtimeId} value={runtime.runtimeId}>
-                <AgentRuntimeOptionLabel runtimeId={runtime.runtimeId} />
-              </SelectItem>
-            ))}
+            {AgentRuntimeRegistry.listRuntimes()
+              .filter((runtime) => isSelectableAgentRuntimeId(runtime.runtimeId))
+              .map((runtime) => (
+                <SelectItem key={runtime.runtimeId} value={runtime.runtimeId}>
+                  <AgentRuntimeOptionLabel runtimeId={runtime.runtimeId} />
+                </SelectItem>
+              ))}
           </SelectContent>
         </Select>
       </FieldContent>
@@ -813,6 +817,10 @@ function AgentRuntimeOptionLabel(input: { runtimeId: string }): React.JSX.Elemen
 
 function isAgentRuntimeId(runtimeId: string): runtimeId is AgentRuntimeId {
   return AgentRuntimeRegistry.getRuntime({ runtimeId }) !== undefined;
+}
+
+function isSelectableAgentRuntimeId(runtimeId: string): runtimeId is AgentRuntimeId {
+  return isAgentRuntimeId(runtimeId) && SelectableAgentRuntimeIds.has(runtimeId);
 }
 
 function SandboxProviderReadOnlyResourceFields(input: {

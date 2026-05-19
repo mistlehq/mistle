@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -199,6 +199,29 @@ describe("SandboxProfileRuntimeSection", () => {
 
     expect(screen.getByRole("combobox", { name: "Agent" })).toBeTruthy();
     expect(screen.getByText("OpenCode")).toBeTruthy();
+  });
+
+  it("only offers agent runtimes supported by the session workbench", () => {
+    render(
+      <SandboxProfileRuntimeSection
+        availableConnections={[]}
+        availableTargets={[]}
+        disabled={false}
+        isDraft={true}
+        providers={[DockerProvider]}
+        version={createVersion({
+          sandboxProvider: "docker",
+          sandboxConnectionId: null,
+          sandboxResources: null,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Agent" }));
+
+    expect(screen.getByRole("option", { name: "Codex" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "OpenCode" })).toBeTruthy();
+    expect(screen.queryByRole("option", { name: "Pi" })).toBeNull();
   });
 
   it("renders the Docker provider with the Docker logo", () => {

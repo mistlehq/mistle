@@ -38,3 +38,8 @@ export const SessionRuntimeWorkbenchCapabilities = {
     hasContextUsage: false,
   },
 } satisfies Record<string, SessionRuntimeWorkbenchCapability>;
+
+export const SessionRuntimeWorkbenchRuntimeIds = [
+  SessionRuntimeWorkbenchCapabilities.CODEX.runtimeId,
+  SessionRuntimeWorkbenchCapabilities.OPENCODE.runtimeId,
+] as const;

@@ -621,6 +621,7 @@ function runtimeArtifactGitHubReleaseAssetShapeEquals(
   return (
     left.fileName === right.fileName &&
     left.format === right.format &&
+    left.sha256 === right.sha256 &&
     ("extractedPath" in left ? left.extractedPath : undefined) ===
       ("extractedPath" in right ? right.extractedPath : undefined)
   );
