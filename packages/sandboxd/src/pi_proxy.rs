@@ -205,12 +205,12 @@ impl PiProxyState {
     fn send_pi_command_with_events(
         &self,
         mut command: Value,
-        mut captured_events: Option<&mut Vec<Value>>,
+        captured_events: Option<&mut Vec<Value>>,
     ) -> Result<Value, PiProxyError> {
         let _command_guard = self.command_lock.lock().map_err(|_| {
             PiProxyError::InvalidRequest("Pi command lock was poisoned".to_string())
         })?;
-        self.send_pi_command_with_events_locked(&mut command, captured_events.as_deref_mut())
+        self.send_pi_command_with_events_locked(&mut command, captured_events)
     }
 
     fn send_pi_command_with_events_locked(
@@ -304,10 +304,10 @@ impl PiProxyState {
             .lock()
             .map_err(|_| PiProxyError::InvalidRequest("Pi child lock was poisoned".to_string()))?;
         let requested_cwd = cwd.map(ToString::to_string);
-        if let Some(child) = guard.as_ref() {
-            if child.cwd == requested_cwd || requested_cwd.is_none() {
-                return Ok(());
-            }
+        if let Some(child) = guard.as_ref()
+            && (child.cwd == requested_cwd || requested_cwd.is_none())
+        {
+            return Ok(());
         }
 
         if let Some(child) = guard.take() {
@@ -699,32 +699,17 @@ fn handle_pi_method(
         "pi/prompt" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
             let message = require_param_string(&request.params, "message")?;
-            state.ensure_child(None)?;
-            sequence.send(json!({ "type": "switch_session", "sessionPath": session_file }))?;
-            state.set_active(true);
-            let result = sequence.send(json!({ "type": "prompt", "message": message }));
-            PiProxyState::start_activity_monitor(state.clone());
-            result
+            send_pi_user_message(state, sequence, session_file, "prompt", message)
         }
         "pi/steer" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
             let message = require_param_string(&request.params, "message")?;
-            state.ensure_child(None)?;
-            sequence.send(json!({ "type": "switch_session", "sessionPath": session_file }))?;
-            state.set_active(true);
-            let result = sequence.send(json!({ "type": "steer", "message": message }));
-            PiProxyState::start_activity_monitor(state.clone());
-            result
+            send_pi_user_message(state, sequence, session_file, "steer", message)
         }
         "pi/followUp" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
             let message = require_param_string(&request.params, "message")?;
-            state.ensure_child(None)?;
-            sequence.send(json!({ "type": "switch_session", "sessionPath": session_file }))?;
-            state.set_active(true);
-            let result = sequence.send(json!({ "type": "follow_up", "message": message }));
-            PiProxyState::start_activity_monitor(state.clone());
-            result
+            send_pi_user_message(state, sequence, session_file, "follow_up", message)
         }
         "pi/abort" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
@@ -736,6 +721,21 @@ fn handle_pi_method(
             "unsupported Pi proxy method '{other}'"
         ))),
     })
+}
+
+fn send_pi_user_message(
+    state: &Arc<PiProxyState>,
+    sequence: &mut PiProxyCommandSequence<'_>,
+    session_file: String,
+    command_type: &str,
+    message: String,
+) -> Result<Value, PiProxyError> {
+    state.ensure_child(None)?;
+    sequence.send(json!({ "type": "switch_session", "sessionPath": session_file }))?;
+    state.set_active(true);
+    let result = sequence.send(json!({ "type": command_type, "message": message }));
+    PiProxyState::start_activity_monitor(state.clone());
+    result
 }
 
 fn spawn_pi_stdout_reader(

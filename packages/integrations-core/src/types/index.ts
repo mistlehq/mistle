@@ -1678,17 +1678,7 @@ export type RuntimeArtifactGitHubReleaseInstallStepInput = {
 };
 
 export type RuntimeArtifactGitHubReleaseInstallHelperAssetShape =
-  | {
-      fileName: string;
-      format: "binary";
-      sha256?: string;
-    }
-  | {
-      fileName: string;
-      format: "tar.gz";
-      extractedPath: string;
-      sha256?: string;
-    };
+  RuntimeArtifactGitHubReleaseInstallAssetShape;
 
 export type RuntimeArtifactGitHubReleaseInstallHelperAsset =
   | ({

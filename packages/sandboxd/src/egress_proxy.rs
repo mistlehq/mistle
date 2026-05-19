@@ -2565,7 +2565,7 @@ async fn forward_upgrade_request(
         &request_path_and_query,
         request_method.as_str(),
     )?;
-    if route.is_none() {
+    let Some(route) = route else {
         return forward_upgrade_request_direct(
             parts,
             state,
@@ -2575,7 +2575,7 @@ async fn forward_upgrade_request(
             mark_upstream_socket,
         )
         .await;
-    }
+    };
     match state.forwarding_mode.clone() {
         EgressProxyForwardingMode::DirectGateway { client } => {
             forward_upgrade_request_through_direct_gateway(
@@ -2583,7 +2583,7 @@ async fn forward_upgrade_request(
                 state,
                 request_target,
                 request_path_and_query,
-                route,
+                route.egress_rule_id,
                 client,
                 downstream_upgrade,
             )
@@ -2631,7 +2631,7 @@ async fn forward_request(
                 state,
                 request_target,
                 request_path_and_query,
-                Some(route),
+                route.egress_rule_id,
                 client,
             )
             .await
@@ -2816,7 +2816,7 @@ async fn forward_upgrade_request_through_direct_gateway(
     state: EgressProxyState,
     request_target: RequestTarget,
     request_path_and_query: String,
-    route: Option<EgressProxyRoute>,
+    egress_rule_id: String,
     client: Arc<DirectGatewayEgressClient>,
     downstream_upgrade: hyper::upgrade::OnUpgrade,
 ) -> Result<Response<HyperBody>, EgressProxyError> {
@@ -2832,9 +2832,7 @@ async fn forward_upgrade_request_through_direct_gateway(
         host: request_target.host.clone(),
         path_and_query: request_path_and_query,
         route_mode: "direct_gateway",
-        egress_rule_id: route
-            .as_ref()
-            .map(|matched_route| matched_route.egress_rule_id.clone()),
+        egress_rule_id: Some(egress_rule_id),
         upstream_url: request_target.uri.to_string(),
         started_at_ms: state.clock.now_ms(),
         clock: state.clock.clone(),
@@ -2943,7 +2941,7 @@ async fn forward_request_through_direct_gateway(
     state: EgressProxyState,
     request_target: RequestTarget,
     request_path_and_query: String,
-    route: Option<EgressProxyRoute>,
+    egress_rule_id: String,
     client: Arc<DirectGatewayEgressClient>,
 ) -> Result<Response<HyperBody>, EgressProxyError> {
     let request_method = parts.method.clone();
@@ -2958,9 +2956,7 @@ async fn forward_request_through_direct_gateway(
         host: request_target.host.clone(),
         path_and_query: request_path_and_query.clone(),
         route_mode: "direct_gateway",
-        egress_rule_id: route
-            .as_ref()
-            .map(|matched_route| matched_route.egress_rule_id.clone()),
+        egress_rule_id: Some(egress_rule_id),
         upstream_url: request_target.uri.to_string(),
         started_at_ms: state.clock.now_ms(),
         clock: state.clock.clone(),

@@ -71,13 +71,13 @@ function registerRuntime(
   input: {
     runtimeId: string;
     displayName: string;
-    logoKey?: string;
+    logoKey: string;
   },
 ): void {
   registry.register({
     runtimeId: input.runtimeId,
     displayName: input.displayName,
-    logoKey: input.logoKey ?? input.runtimeId,
+    logoKey: input.logoKey,
     configSchema: z.object({}),
     compileRuntime: () => ({
       runtimeClients: [],
@@ -117,6 +117,7 @@ describe("integration form registry", () => {
     registerRuntime(agentRuntimeRegistry, {
       runtimeId: "codex",
       displayName: "Codex",
+      logoKey: "openai",
     });
 
     const registry = createIntegrationFormRegistry({
@@ -161,7 +162,7 @@ describe("integration form registry", () => {
         {
           runtimeId: "codex",
           displayName: "Codex",
-          logoKey: "codex",
+          logoKey: "openai",
         },
       ],
     });
@@ -193,6 +194,7 @@ describe("integration form registry", () => {
     registerRuntime(agentRuntimeRegistry, {
       runtimeId: "codex",
       displayName: "Codex",
+      logoKey: "openai",
     });
 
     const registry = createIntegrationFormRegistry({

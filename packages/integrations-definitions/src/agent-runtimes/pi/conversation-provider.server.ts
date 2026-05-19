@@ -41,7 +41,6 @@ const PiConnections = new WeakMap<
   {
     client: PiSessionClient;
     deliveryContextNotificationParams?: PiDeliveryContextNotificationParams;
-    transport: SandboxSessionTransport;
   }
 >();
 
@@ -52,7 +51,6 @@ function createUnsupportedPiProviderRequestError(method: string): Error {
 function getPiConnection(connection: AgentConversationConnection): {
   client: PiSessionClient;
   deliveryContextNotificationParams?: PiDeliveryContextNotificationParams;
-  transport: SandboxSessionTransport;
 } {
   const piConnection = PiConnections.get(connection);
   if (piConnection === undefined) {
@@ -136,7 +134,6 @@ async function connectPiConversationProvider(input: {
 
   PiConnections.set(connection, {
     client,
-    transport,
   });
 
   return connection;

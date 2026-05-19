@@ -857,6 +857,69 @@ describe("validateCompiledRuntimePlanFragments", () => {
     ).toThrow(IntegrationCompilerError);
   });
 
+  it("fails on artifact key conflicts with different GitHub release asset checksums", () => {
+    const resultA = createCompiledRuntimePlanFragment({
+      route: createRoute({
+        egressRuleId: "egress_rule_a",
+        bindingId: "bind_a",
+        hosts: ["api.github.com"],
+      }),
+      artifactKey: "pi-cli",
+      artifactName: "Pi CLI",
+      artifactInstallCommands: [
+        {
+          op: "github_release_install",
+          repository: "mistlehq/pi",
+          release: {
+            kind: "tag",
+            match: "exact",
+            tag: "v1.0.0",
+          },
+          asset: {
+            kind: "exact",
+            fileName: "pi",
+            format: "binary",
+            sha256: "sha256-a",
+          },
+          installPath: "/usr/local/bin/pi",
+        },
+      ],
+    });
+    const resultB = createCompiledRuntimePlanFragment({
+      route: createRoute({
+        egressRuleId: "egress_rule_b",
+        bindingId: "bind_b",
+        hosts: ["api.github.com"],
+      }),
+      artifactKey: "pi-cli",
+      artifactName: "Pi CLI",
+      artifactInstallCommands: [
+        {
+          op: "github_release_install",
+          repository: "mistlehq/pi",
+          release: {
+            kind: "tag",
+            match: "exact",
+            tag: "v1.0.0",
+          },
+          asset: {
+            kind: "exact",
+            fileName: "pi",
+            format: "binary",
+            sha256: "sha256-b",
+          },
+          installPath: "/usr/local/bin/pi",
+        },
+      ],
+    });
+
+    expect(() =>
+      validateCompiledRuntimePlanFragments({
+        compiledRuntimePlanFragments: [resultA, resultB],
+      }),
+    ).toThrow(IntegrationCompilerError);
+  });
+
   it("fails on artifact key conflicts with different env specs", () => {
     const resultA = createCompiledRuntimePlanFragment({
       route: createRoute({
