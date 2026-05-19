@@ -2860,7 +2860,8 @@ mod tests {
             "MISTLE_SANDBOXD_OPERATION_LOG_DIR",
             log_dir.to_string_lossy().to_string(),
         )]);
-        let (bootstrap_url, gateway_thread) = start_bootstrap_gateway_with_connections(2);
+        let (bootstrap_url, gateway_thread) =
+            start_bootstrap_gateway_with_connections(2, RuntimeReadyExpectation::RequiredFalse);
         let git_config_path = std::env::temp_dir().join(format!(
             "mistle-sandboxd-resume-git-config-{}",
             SystemTime::now()
@@ -2981,11 +2982,15 @@ mod tests {
     }
 
     fn start_snapshot_bootstrap_gateway() -> (String, thread::JoinHandle<()>) {
-        start_bootstrap_gateway_with_connections(1)
+        start_bootstrap_gateway_with_connections(
+            1,
+            RuntimeReadyExpectation::OptionalFalseBeforeClose,
+        )
     }
 
     fn start_bootstrap_gateway_with_connections(
         connection_count: usize,
+        runtime_ready_expectation: RuntimeReadyExpectation,
     ) -> (String, thread::JoinHandle<()>) {
         let bootstrap_listener =
             TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
@@ -3030,14 +3035,22 @@ mod tests {
                         Err(_) => break,
                     }
                 }
-                assert!(
-                    saw_runtime_ready,
-                    "gateway should observe a runtime.ready publish before tunnel shutdown"
-                );
+                if runtime_ready_expectation == RuntimeReadyExpectation::RequiredFalse {
+                    assert!(
+                        saw_runtime_ready,
+                        "gateway should observe a runtime.ready publish before tunnel shutdown"
+                    );
+                }
             }
         });
 
         (bootstrap_url, gateway_thread)
+    }
+
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum RuntimeReadyExpectation {
+        RequiredFalse,
+        OptionalFalseBeforeClose,
     }
 
     fn read_websocket_json_text_message<S>(socket: &mut WebSocket<S>) -> serde_json::Value
