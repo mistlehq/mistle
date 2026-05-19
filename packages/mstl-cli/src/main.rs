@@ -1,4 +1,5 @@
 mod codex;
+mod command_metadata;
 mod config;
 mod error;
 mod format;
@@ -10,6 +11,13 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 
 use bpaf::{OptionParser, Parser, construct, long, positional, pure};
+
+use crate::command_metadata::{
+    CODEX, CODEX_ARG, PROFILE, PROFILE_GET, PROFILE_ID, PROFILE_LIST, PROFILE_VERSION,
+    PROFILE_VERSION_LIST, PROFILE_VERSION_SETUP_SCRIPT, PROFILE_VERSION_SETUP_SCRIPT_SET,
+    PROFILE_VERSION_VALUE, ROOT, SANDBOX, SANDBOX_CREATE, SANDBOX_GET, SANDBOX_ID, SANDBOX_LIST,
+    SANDBOX_LIST_AFTER, SANDBOX_LIST_LIMIT, SETUP_SCRIPT_FILE, WHOAMI,
+};
 
 #[tokio::main]
 async fn main() {
@@ -55,16 +63,16 @@ enum CliCommand {
 fn options() -> OptionParser<CliCommand> {
     let whoami = pure(CliCommand::Whoami)
         .to_options()
-        .descr("Print the current Mistle identity")
-        .command("whoami");
+        .descr(WHOAMI.description)
+        .command(WHOAMI.name);
 
     let profile_list = pure(CliCommand::ProfileList)
         .to_options()
-        .descr("List sandbox profiles")
-        .command("list");
+        .descr(PROFILE_LIST.description)
+        .command(PROFILE_LIST.name);
 
-    let profile_id = positional::<String>("profile-id")
-        .help("Sandbox profile id")
+    let profile_id = positional::<String>(PROFILE_ID.name)
+        .help(PROFILE_ID.description)
         .guard(
             |value| !value.trim().is_empty(),
             "profile id cannot be blank",
@@ -73,12 +81,12 @@ fn options() -> OptionParser<CliCommand> {
     let profile_get = profile_id
         .map(|profile_id| CliCommand::ProfileGet { profile_id })
         .to_options()
-        .descr("Get a sandbox profile")
-        .command("get");
+        .descr(PROFILE_GET.description)
+        .command(PROFILE_GET.name);
 
     let profile_version_profile_id = long("profile")
-        .help("Sandbox profile id")
-        .argument::<String>("profile-id")
+        .help(PROFILE_ID.description)
+        .argument::<String>(PROFILE_ID.name)
         .guard(
             |value| !value.trim().is_empty(),
             "profile id cannot be blank",
@@ -86,54 +94,54 @@ fn options() -> OptionParser<CliCommand> {
     let profile_version_list = profile_version_profile_id
         .map(|profile_id| CliCommand::ProfileVersionList { profile_id })
         .to_options()
-        .descr("List sandbox profile versions")
-        .command("list");
+        .descr(PROFILE_VERSION_LIST.description)
+        .command(PROFILE_VERSION_LIST.name);
     let profile_id = long("profile")
-        .help("Sandbox profile id")
-        .argument::<String>("profile-id")
+        .help(PROFILE_ID.description)
+        .argument::<String>(PROFILE_ID.name)
         .guard(
             |value| !value.trim().is_empty(),
             "profile id cannot be blank",
         );
     let version = long("version")
-        .help("Sandbox profile version")
-        .argument::<u32>("version")
+        .help(PROFILE_VERSION_VALUE.description)
+        .argument::<u32>(PROFILE_VERSION_VALUE.name)
         .guard(|value| *value > 0, "version must be greater than zero");
     let file = long("file")
-        .help("Setup script file to upload")
-        .argument::<PathBuf>("path");
+        .help(SETUP_SCRIPT_FILE.description)
+        .argument::<PathBuf>(SETUP_SCRIPT_FILE.name);
     let profile_version_setup_script_set = construct!(CliCommand::ProfileVersionSetupScriptSet {
         profile_id,
         version,
         file,
     })
     .to_options()
-    .descr("Set a sandbox profile version setup script")
-    .command("set");
+    .descr(PROFILE_VERSION_SETUP_SCRIPT_SET.description)
+    .command(PROFILE_VERSION_SETUP_SCRIPT_SET.name);
     let profile_version_setup_script = construct!([profile_version_setup_script_set])
         .to_options()
-        .descr("Manage sandbox profile version setup scripts")
-        .command("setup-script");
+        .descr(PROFILE_VERSION_SETUP_SCRIPT.description)
+        .command(PROFILE_VERSION_SETUP_SCRIPT.name);
     let profile_version = construct!([profile_version_list, profile_version_setup_script])
         .to_options()
-        .descr("Manage sandbox profile versions")
-        .command("version");
+        .descr(PROFILE_VERSION.description)
+        .command(PROFILE_VERSION.name);
 
     let profile = construct!([profile_list, profile_get, profile_version])
         .to_options()
-        .descr("Manage sandbox profiles")
-        .command("profile");
+        .descr(PROFILE.description)
+        .command(PROFILE.name);
 
     let profile_id = long("profile")
-        .help("Sandbox profile id")
-        .argument::<String>("profile-id")
+        .help(PROFILE_ID.description)
+        .argument::<String>(PROFILE_ID.name)
         .guard(
             |value| !value.trim().is_empty(),
             "profile id cannot be blank",
         );
     let version = long("version")
-        .help("Sandbox profile version")
-        .argument::<u32>("version")
+        .help(PROFILE_VERSION_VALUE.description)
+        .argument::<u32>(PROFILE_VERSION_VALUE.name)
         .guard(|value| *value > 0, "version must be greater than zero")
         .optional();
 
@@ -142,20 +150,20 @@ fn options() -> OptionParser<CliCommand> {
         version
     })
     .to_options()
-    .descr("Create a sandbox")
-    .command("create");
+    .descr(SANDBOX_CREATE.description)
+    .command(SANDBOX_CREATE.name);
 
     let limit = long("limit")
-        .help("Maximum number of sandboxes to return")
-        .argument::<u32>("limit")
+        .help(SANDBOX_LIST_LIMIT.description)
+        .argument::<u32>(SANDBOX_LIST_LIMIT.name)
         .guard(
             |value| (1..=100).contains(value),
             "limit must be between 1 and 100",
         )
         .optional();
     let after = long("after")
-        .help("List sandboxes after this cursor")
-        .argument::<String>("cursor")
+        .help(SANDBOX_LIST_AFTER.description)
+        .argument::<String>(SANDBOX_LIST_AFTER.name)
         .guard(
             |value| !value.trim().is_empty(),
             "after cursor cannot be blank",
@@ -164,47 +172,49 @@ fn options() -> OptionParser<CliCommand> {
 
     let sandbox_list = construct!(CliCommand::SandboxList { limit, after })
         .to_options()
-        .descr("List sandboxes")
-        .command("list");
+        .descr(SANDBOX_LIST.description)
+        .command(SANDBOX_LIST.name);
 
-    let sandbox_id = positional::<String>("sandbox-id").help("Sandbox id").guard(
-        |value| !value.trim().is_empty(),
-        "sandbox id cannot be blank",
-    );
-
-    let sandbox_get = sandbox_id
-        .map(|sandbox_id| CliCommand::SandboxGet { sandbox_id })
-        .to_options()
-        .descr("Get a sandbox")
-        .command("get");
-
-    let sandbox = construct!([sandbox_create, sandbox_list, sandbox_get])
-        .to_options()
-        .descr("Manage sandboxes")
-        .command("sandbox");
-
-    let sandbox_id = long("sandbox")
-        .help("Sandbox id")
-        .argument::<String>("sandbox-id")
+    let sandbox_id = positional::<String>(SANDBOX_ID.name)
+        .help(SANDBOX_ID.description)
         .guard(
             |value| !value.trim().is_empty(),
             "sandbox id cannot be blank",
         );
-    let codex_args = positional::<String>("codex-arg")
+
+    let sandbox_get = sandbox_id
+        .map(|sandbox_id| CliCommand::SandboxGet { sandbox_id })
+        .to_options()
+        .descr(SANDBOX_GET.description)
+        .command(SANDBOX_GET.name);
+
+    let sandbox = construct!([sandbox_create, sandbox_list, sandbox_get])
+        .to_options()
+        .descr(SANDBOX.description)
+        .command(SANDBOX.name);
+
+    let sandbox_id = long("sandbox")
+        .help(SANDBOX_ID.description)
+        .argument::<String>(SANDBOX_ID.name)
+        .guard(
+            |value| !value.trim().is_empty(),
+            "sandbox id cannot be blank",
+        );
+    let codex_args = positional::<String>(CODEX_ARG.name)
         .strict()
-        .help("Arguments passed to codex after --")
+        .help(CODEX_ARG.description)
         .many();
     let codex = construct!(CliCommand::Codex {
         sandbox_id,
         codex_args
     })
     .to_options()
-    .descr("Run Codex against a Mistle sandbox")
-    .command("codex");
+    .descr(CODEX.description)
+    .command(CODEX.name);
 
     construct!([whoami, profile, sandbox, codex])
         .to_options()
-        .descr("Mistle command line interface")
+        .descr(ROOT.description)
         .version(env!("CARGO_PKG_VERSION"))
 }
 
