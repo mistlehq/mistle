@@ -40,6 +40,34 @@ export type SessionWorkbenchRuntimeAdapter = {
   serverRequestsState: SessionWorkbenchServerRequestsState;
 };
 
+function resolvePiActiveTurnIdForConversation(
+  chatState: UsePiSessionStateResult["chat"]["chatState"],
+): string | null {
+  if (chatState.status !== "busy") {
+    return null;
+  }
+
+  if (
+    chatState.pendingTurnId !== null &&
+    chatState.entries.some((entry) => entry.turnId === chatState.pendingTurnId)
+  ) {
+    return chatState.pendingTurnId;
+  }
+
+  return chatState.entries.at(-1)?.turnId ?? null;
+}
+
+function mapPiChatStateForConversation(
+  chatState: UsePiSessionStateResult["chat"]["chatState"],
+): SessionConversationChatState {
+  return {
+    activeTurnId: resolvePiActiveTurnIdForConversation(chatState),
+    entries: chatState.entries,
+    pendingTurnId: chatState.pendingTurnId,
+    status: chatState.status === "busy" ? "inProgress" : chatState.status,
+  };
+}
+
 export function buildCodexConversationRuntime(input: {
   activeConversationId: string | null;
   bootstrap: UseCodexSessionStateResult["bootstrap"];
@@ -198,12 +226,7 @@ export function buildPiConversationRuntime(input: {
     cliTerminalContentInset: capabilities.cliTerminalContentInset,
     conversation: {
       activeConversationId: input.sessionSnapshot?.activeSessionFile ?? null,
-      chatState: {
-        activeTurnId: null,
-        entries: input.chat.chatState.entries,
-        pendingTurnId: input.chat.chatState.pendingTurnId,
-        status: input.chat.chatState.status,
-      },
+      chatState: mapPiChatStateForConversation(input.chat.chatState),
     },
     composerRuntimeInput: {
       bootstrap: input.bootstrap,

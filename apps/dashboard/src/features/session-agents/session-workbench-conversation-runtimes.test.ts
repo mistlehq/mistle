@@ -189,10 +189,18 @@ function createPiRuntimeInput(input: {
       canSteerTurn: true,
       chatState: {
         completedErrorMessage: null,
-        entries: [],
+        entries: [
+          {
+            id: "pi:user:1",
+            kind: "user-message",
+            status: "completed",
+            text: "hello",
+            turnId: "pi:user:1",
+          },
+        ],
         messages: [],
         pendingToolExecutions: [],
-        pendingTurnId: null,
+        pendingTurnId: "pi:user:1",
         sessionFile: "pi-session.json",
         status: "busy",
         streamingMessage: null,
@@ -311,6 +319,9 @@ describe("buildPiConversationRuntime", () => {
 
     expect(runtime.displayName).toBe("Pi");
     expect(runtime.conversation.activeConversationId).toBe("pi-session.json");
+    expect(runtime.conversation.chatState.activeTurnId).toBe("pi:user:1");
+    expect(runtime.conversation.chatState.pendingTurnId).toBe("pi:user:1");
+    expect(runtime.conversation.chatState.status).toBe("inProgress");
     expect(runtime.composerRuntimeInput.turnControl.canSteer).toBe(true);
     expect(runtime.composerRuntimeInput.modelSelection).toEqual({
       required: false,
