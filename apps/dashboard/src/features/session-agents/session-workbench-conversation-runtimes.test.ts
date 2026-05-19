@@ -205,13 +205,9 @@ function createPiRuntimeInput(input: {
         status: "busy",
         streamingMessage: null,
       },
-      hydrateChatFromConversation: async () => {
+      confirmChatRestoredAfterReconnect: async () => {
         return;
       },
-      hydrateChatFromConversationOrThrow: async () => {
-        return;
-      },
-      isHydratingChat: false,
       isInterruptingTurn: false,
       isStartingTurn: false,
       isSteeringTurn: false,

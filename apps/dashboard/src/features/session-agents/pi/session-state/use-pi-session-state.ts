@@ -57,9 +57,7 @@ export type UsePiSessionStateResult = {
     canInterruptTurn: boolean;
     canSteerTurn: boolean;
     chatState: PiChatState;
-    hydrateChatFromConversation: () => Promise<void>;
-    hydrateChatFromConversationOrThrow: () => Promise<void>;
-    isHydratingChat: boolean;
+    confirmChatRestoredAfterReconnect: () => Promise<void>;
     isInterruptingTurn: boolean;
     isStartingTurn: boolean;
     isSteeringTurn: boolean;
@@ -180,7 +178,6 @@ export function usePiSessionState(input: {
     undefined,
     createInitialPiChatState,
   );
-  const [isHydratingChat, setIsHydratingChat] = useState(false);
   const [isStartingTurn, setIsStartingTurn] = useState(false);
   const [isSteeringTurn, setIsSteeringTurn] = useState(false);
   const [isInterruptingTurn, setIsInterruptingTurn] = useState(false);
@@ -220,22 +217,14 @@ export function usePiSessionState(input: {
     };
   }, [disconnectSession]);
 
-  const hydrateChatFromConversationOrThrow = useCallback(async (): Promise<void> => {
+  const confirmChatRestoredAfterReconnect = useCallback(async (): Promise<void> => {
     const client = clientRef.current;
     const sessionFile = sessionSnapshot?.activeSessionFile ?? null;
     if (client === null || sessionFile === null) {
-      throw new Error("Connect Pi before hydrating messages.");
+      throw new Error("Connect Pi before restoring chat.");
     }
     setSessionErrorMessage(null);
   }, [sessionSnapshot?.activeSessionFile]);
-
-  const hydrateChatFromConversation = useCallback(async (): Promise<void> => {
-    try {
-      await hydrateChatFromConversationOrThrow();
-    } catch {
-      return;
-    }
-  }, [hydrateChatFromConversationOrThrow]);
 
   const connectSession = useCallback(
     (connectInput: {
@@ -470,9 +459,7 @@ export function usePiSessionState(input: {
       canInterruptTurn: chatState.status === "busy",
       canSteerTurn: chatState.status === "busy",
       chatState,
-      hydrateChatFromConversation,
-      hydrateChatFromConversationOrThrow,
-      isHydratingChat,
+      confirmChatRestoredAfterReconnect,
       isInterruptingTurn,
       isStartingTurn,
       isSteeringTurn,

@@ -251,7 +251,7 @@ export function buildPiHandoffRuntime(input: {
     buildCliPtyOpenInput: buildPiCliPtyOpenInput,
     clearActiveThreadIdAfterCliLaunch: () => {},
     displayName: SessionRuntimeWorkbenchCapabilities.PI.displayName,
-    hydrateChatFromConversation: input.chat.hydrateChatFromConversationOrThrow,
+    hydrateChatFromConversation: input.chat.confirmChatRestoredAfterReconnect,
     lifecycle: input.lifecycle,
     preserveCliLaunchForRestore: SessionRuntimeWorkbenchCapabilities.PI.preservesCliLaunchContext,
     resetServerRequests: () => {},

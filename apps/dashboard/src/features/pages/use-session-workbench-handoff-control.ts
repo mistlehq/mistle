@@ -159,7 +159,7 @@ export function useSessionWorkbenchHandoffControl(input: {
         sessionSnapshot: input.piSessionState.lifecycle.sessionSnapshot,
       }),
     [
-      input.piSessionState.chat.hydrateChatFromConversationOrThrow,
+      input.piSessionState.chat.confirmChatRestoredAfterReconnect,
       input.piSessionState.lifecycle.sessionSnapshot,
       piLifecycleForHandoff,
     ],
