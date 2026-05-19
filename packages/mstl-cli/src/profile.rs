@@ -1,9 +1,12 @@
+use std::fs;
 use std::io::{self, Write};
+use std::path::Path;
 
 use mstl_core::client::{
     ListSandboxProfileVersionsResponse, ListSandboxProfilesResponse, SandboxProfile,
     SandboxProfileStatus, SandboxProfileVersion, SandboxProfileVersionAgentRuntimeId,
     SandboxProfileVersionDefaultPersistenceMode, SandboxProfileVersionState,
+    UpdateSandboxProfileVersionDraftRequest, UpdateSandboxProfileVersionDraftResponse,
 };
 
 use crate::config::mistle_client;
@@ -70,6 +73,37 @@ where
     }
 }
 
+pub(crate) fn run_version_setup_script_set<W, E>(
+    profile_id: &str,
+    version: u32,
+    file: &Path,
+    stdout: &mut W,
+    stderr: &mut E,
+) -> i32
+where
+    W: Write,
+    E: Write,
+{
+    match set_sandbox_profile_version_setup_script(profile_id, version, file) {
+        Ok(updated_draft) => {
+            match write_updated_sandbox_profile_version_setup_script(stdout, &updated_draft) {
+                Ok(()) => 0,
+                Err(error) => {
+                    let _ = writeln!(
+                        stderr,
+                        "failed to write sandbox profile version setup script: {error}"
+                    );
+                    1
+                }
+            }
+        }
+        Err(error) => {
+            let _ = writeln!(stderr, "{error}");
+            1
+        }
+    }
+}
+
 fn list_sandbox_profiles() -> Result<ListSandboxProfilesResponse, CliError> {
     mistle_client()?
         .list_sandbox_profiles()
@@ -99,6 +133,42 @@ fn list_sandbox_profile_versions(
         })
 }
 
+fn set_sandbox_profile_version_setup_script(
+    profile_id: &str,
+    version: u32,
+    file: &Path,
+) -> Result<UpdateSandboxProfileVersionDraftResponse, CliError> {
+    let setup_script = read_setup_script_file(file)?;
+
+    mistle_client()?
+        .update_sandbox_profile_version_draft(
+            profile_id,
+            version,
+            UpdateSandboxProfileVersionDraftRequest {
+                setup_script: Some(Some(&setup_script)),
+            },
+        )
+        .map_err(|source| CliError::Client {
+            action: "update sandbox profile version setup script",
+            source,
+        })
+}
+
+fn read_setup_script_file(file: &Path) -> Result<String, CliError> {
+    let setup_script = fs::read_to_string(file).map_err(|source| CliError::ReadFile {
+        path: file.display().to_string(),
+        source,
+    })?;
+
+    if setup_script.is_empty() {
+        return Err(CliError::EmptyFile {
+            path: file.display().to_string(),
+        });
+    }
+
+    Ok(setup_script)
+}
+
 fn write_sandbox_profiles<W>(
     stdout: &mut W,
     response: &ListSandboxProfilesResponse,
@@ -124,6 +194,20 @@ where
     W: Write,
 {
     write!(stdout, "{}", render_sandbox_profile_versions(response))
+}
+
+fn write_updated_sandbox_profile_version_setup_script<W>(
+    stdout: &mut W,
+    response: &UpdateSandboxProfileVersionDraftResponse,
+) -> io::Result<()>
+where
+    W: Write,
+{
+    write!(
+        stdout,
+        "{}",
+        render_updated_sandbox_profile_version_setup_script(response)
+    )
 }
 
 fn render_sandbox_profile(profile: &SandboxProfile) -> String {
@@ -236,6 +320,15 @@ fn render_sandbox_profile_versions(response: &ListSandboxProfileVersionsResponse
     }
 
     output
+}
+
+fn render_updated_sandbox_profile_version_setup_script(
+    response: &UpdateSandboxProfileVersionDraftResponse,
+) -> String {
+    format!(
+        "Updated setup script\nProfile: {}\nVersion: {}\n",
+        response.sandbox_profile_id, response.version,
+    )
 }
 
 struct SandboxProfileRow {
@@ -392,10 +485,12 @@ mod tests {
         ListSandboxProfileVersionsResponse, ListSandboxProfilesResponse, SandboxProfile,
         SandboxProfileStatus, SandboxProfileVersion, SandboxProfileVersionAgentRuntimeId,
         SandboxProfileVersionDefaultPersistenceMode, SandboxProfileVersionState,
+        UpdateSandboxProfileVersionDraftResponse,
     };
 
     use crate::profile::{
         render_sandbox_profile, render_sandbox_profile_versions, render_sandbox_profiles,
+        render_updated_sandbox_profile_version_setup_script,
     };
 
     #[test]
@@ -521,6 +616,24 @@ mod tests {
                 "3        draft      no      no      codex     persistent   daytona   icn_daytona\n",
                 "2        published  yes     yes     opencode  ephemeral    -         -\n",
             ),
+        );
+    }
+
+    #[test]
+    fn renders_updated_setup_script_summary() {
+        let response = UpdateSandboxProfileVersionDraftResponse {
+            sandbox_profile_id: "sbp_python".to_owned(),
+            version: 3,
+            setup_script: Some("#!/usr/bin/env bash\npnpm install".to_owned()),
+            default_persistence_mode: SandboxProfileVersionDefaultPersistenceMode::Persistent,
+            agent_runtime_id: SandboxProfileVersionAgentRuntimeId::Codex,
+            sandbox_provider: Some("daytona".to_owned()),
+            sandbox_connection_id: Some("icn_daytona".to_owned()),
+        };
+
+        assert_eq!(
+            render_updated_sandbox_profile_version_setup_script(&response),
+            "Updated setup script\nProfile: sbp_python\nVersion: 3\n",
         );
     }
 }

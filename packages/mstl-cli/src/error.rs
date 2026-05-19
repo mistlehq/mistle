@@ -1,4 +1,5 @@
 use std::fmt;
+use std::io;
 
 use crate::codex::CodexRunError;
 use mstl_core::client::MistleClientError;
@@ -18,6 +19,13 @@ pub(crate) enum CliError {
         action: &'static str,
         source: MistleClientError,
     },
+    ReadFile {
+        path: String,
+        source: io::Error,
+    },
+    EmptyFile {
+        path: String,
+    },
     Codex {
         action: &'static str,
         source: CodexRunError,
@@ -36,6 +44,12 @@ impl fmt::Display for CliError {
             }
             Self::Client { action, source } => {
                 write!(formatter, "failed to {action}: {source}")
+            }
+            Self::ReadFile { path, source } => {
+                write!(formatter, "failed to read file `{path}`: {source}")
+            }
+            Self::EmptyFile { path } => {
+                write!(formatter, "file `{path}` cannot be empty")
             }
             Self::Codex { action, source } => {
                 write!(formatter, "failed to {action}: {source}")

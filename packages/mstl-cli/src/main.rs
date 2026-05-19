@@ -7,6 +7,7 @@ mod sandbox;
 mod whoami;
 
 use std::io::{self, Write};
+use std::path::PathBuf;
 
 use bpaf::{OptionParser, Parser, construct, long, positional, pure};
 
@@ -28,6 +29,11 @@ enum CliCommand {
     },
     ProfileVersionList {
         profile_id: String,
+    },
+    ProfileVersionSetupScriptSet {
+        profile_id: String,
+        version: u32,
+        file: PathBuf,
     },
     SandboxCreate {
         profile_id: String,
@@ -82,7 +88,33 @@ fn options() -> OptionParser<CliCommand> {
         .to_options()
         .descr("List sandbox profile versions")
         .command("list");
-    let profile_version = construct!([profile_version_list])
+    let profile_id = long("profile")
+        .help("Sandbox profile id")
+        .argument::<String>("profile-id")
+        .guard(
+            |value| !value.trim().is_empty(),
+            "profile id cannot be blank",
+        );
+    let version = long("version")
+        .help("Sandbox profile version")
+        .argument::<u32>("version")
+        .guard(|value| *value > 0, "version must be greater than zero");
+    let file = long("file")
+        .help("Setup script file to upload")
+        .argument::<PathBuf>("path");
+    let profile_version_setup_script_set = construct!(CliCommand::ProfileVersionSetupScriptSet {
+        profile_id,
+        version,
+        file,
+    })
+    .to_options()
+    .descr("Set a sandbox profile version setup script")
+    .command("set");
+    let profile_version_setup_script = construct!([profile_version_setup_script_set])
+        .to_options()
+        .descr("Manage sandbox profile version setup scripts")
+        .command("setup-script");
+    let profile_version = construct!([profile_version_list, profile_version_setup_script])
         .to_options()
         .descr("Manage sandbox profile versions")
         .command("version");
@@ -188,6 +220,11 @@ where
         CliCommand::ProfileVersionList { profile_id } => {
             profile::run_version_list(&profile_id, stdout, stderr)
         }
+        CliCommand::ProfileVersionSetupScriptSet {
+            profile_id,
+            version,
+            file,
+        } => profile::run_version_setup_script_set(&profile_id, version, &file, stdout, stderr),
         CliCommand::SandboxCreate {
             profile_id,
             version,
