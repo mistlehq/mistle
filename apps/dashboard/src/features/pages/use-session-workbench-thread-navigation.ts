@@ -33,6 +33,18 @@ export type SessionWorkbenchThreadNavigationState = {
   togglePanel: () => void;
 };
 
+export function resolveThreadNavigatorPanelVisibility(input: {
+  explicitPanelVisibility: boolean | null;
+  isDiffPanelVisible: boolean;
+  unarchivedThreadCount: number;
+}): boolean {
+  if (input.explicitPanelVisibility !== null) {
+    return input.explicitPanelVisibility;
+  }
+
+  return !input.isDiffPanelVisible && input.unarchivedThreadCount > 1;
+}
+
 export function createConfirmedThreadSearchParams(input: {
   searchParams: URLSearchParams;
   threadId: string;
@@ -45,7 +57,7 @@ export function createConfirmedThreadSearchParams(input: {
 export function useSessionWorkbenchThreadNavigation(
   input: SessionWorkbenchThreadNavigationInput,
 ): SessionWorkbenchThreadNavigationState {
-  const [isPanelVisible, setPanelVisible] = useState(false);
+  const [explicitPanelVisibility, setExplicitPanelVisibility] = useState<boolean | null>(null);
   const [hasManualNavigationCommitPending, setManualNavigationCommitPending] = useState(false);
   const [manualNavigationTargetThreadId, setManualNavigationTargetThreadId] = useState<
     string | null
@@ -237,26 +249,25 @@ export function useSessionWorkbenchThreadNavigation(
           rows: threadNavigatorRows,
         }
       : null;
-  const secondaryPanelKind =
-    threadNavigatorProps !== null && isPanelVisible
-      ? "threads"
-      : input.isDiffPanelVisible
-        ? "diff"
-        : null;
+  const resolvedThreadPanelVisibility = resolveThreadNavigatorPanelVisibility({
+    explicitPanelVisibility,
+    isDiffPanelVisible: input.isDiffPanelVisible,
+    unarchivedThreadCount: input.codexThreadNavigator?.availableThreads.length ?? 0,
+  });
+  const isPanelVisible = threadNavigatorProps !== null && resolvedThreadPanelVisibility;
+  const secondaryPanelKind = isPanelVisible ? "threads" : input.isDiffPanelVisible ? "diff" : null;
   const isDiffPanelActive = input.isDiffPanelVisible && !isPanelVisible;
   const closePanel = useCallback((): void => {
-    setPanelVisible(false);
+    setExplicitPanelVisibility(false);
   }, []);
   const togglePanel = useCallback((): void => {
-    setPanelVisible((currentValue) => {
-      const nextValue = !currentValue;
-      if (nextValue) {
-        input.closeDiffPanel();
-      }
+    const nextValue = !isPanelVisible;
+    if (nextValue) {
+      input.closeDiffPanel();
+    }
 
-      return nextValue;
-    });
-  }, [input.closeDiffPanel]);
+    setExplicitPanelVisibility(nextValue);
+  }, [input.closeDiffPanel, isPanelVisible]);
 
   return {
     closePanel,
