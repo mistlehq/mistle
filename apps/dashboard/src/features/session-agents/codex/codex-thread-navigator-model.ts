@@ -15,6 +15,11 @@ export type CodexThreadNavigatorRow = {
   pendingServerRequestCount: number;
 };
 
+export type CodexThreadNavigatorActiveThread = {
+  id: string;
+  cwd: string | null;
+};
+
 function resolveThreadActivityMs(thread: CodexThreadSummary): number {
   return thread.updatedAt ?? thread.createdAt ?? Number.NEGATIVE_INFINITY;
 }
@@ -73,6 +78,32 @@ function createNavigatorRow(input: {
   };
 }
 
+function createPinnedActiveThreadRow(input: {
+  activeThread: CodexThreadNavigatorActiveThread;
+  pendingThreadId: string | null;
+  pendingServerRequestCountsByThreadId: ReadonlyMap<string, number>;
+}): CodexThreadNavigatorRow | null {
+  if (input.activeThread.cwd === null) {
+    return null;
+  }
+
+  return {
+    id: input.activeThread.id,
+    title: "Active thread",
+    preview: null,
+    cwd: input.activeThread.cwd,
+    cwdSectionLabel: resolveCwdSectionLabel(input.activeThread.cwd),
+    updatedAt: null,
+    createdAt: null,
+    isActive: true,
+    isLoaded: true,
+    isOpening: input.activeThread.id === input.pendingThreadId,
+    isPinnedCurrent: true,
+    pendingServerRequestCount:
+      input.pendingServerRequestCountsByThreadId.get(input.activeThread.id) ?? 0,
+  };
+}
+
 function countPendingServerRequestsByThreadId(
   threadIds: readonly string[],
 ): ReadonlyMap<string, number> {
@@ -86,6 +117,7 @@ function countPendingServerRequestsByThreadId(
 
 export function projectCodexThreadNavigatorRows(input: {
   activeThreadId: string | null;
+  activeThread: CodexThreadNavigatorActiveThread | null;
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
   pendingThreadId: string | null;
@@ -112,22 +144,20 @@ export function projectCodexThreadNavigatorRows(input: {
     return rows;
   }
 
-  const activeThread = sortedThreads.find((thread) => thread.id === input.activeThreadId);
-  if (activeThread === undefined) {
+  if (input.activeThread === null || input.activeThread.id !== input.activeThreadId) {
     return rows;
   }
 
-  return [
-    createNavigatorRow({
-      activeThreadId: input.activeThreadId,
-      loadedThreadIds,
-      pendingThreadId: input.pendingThreadId,
-      pendingServerRequestCountsByThreadId,
-      thread: activeThread,
-      isPinnedCurrent: true,
-    }),
-    ...rows,
-  ];
+  const activeThreadRow = createPinnedActiveThreadRow({
+    activeThread: input.activeThread,
+    pendingThreadId: input.pendingThreadId,
+    pendingServerRequestCountsByThreadId,
+  });
+  if (activeThreadRow === null) {
+    return rows;
+  }
+
+  return [activeThreadRow, ...rows];
 }
 
 export function resolveDefaultCodexThreadId(input: {

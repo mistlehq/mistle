@@ -369,6 +369,13 @@ function SessionWorkbenchPageContent(input: {
 
     return projectCodexThreadNavigatorRows({
       activeThreadId: codexThreadNavigator.activeThreadId,
+      activeThread:
+        codexThreadNavigator.activeThreadId === null
+          ? null
+          : {
+              id: codexThreadNavigator.activeThreadId,
+              cwd: codexThreadNavigator.activeThreadCwd,
+            },
       availableThreads: codexThreadNavigator.availableThreads,
       loadedThreadIds: codexThreadNavigator.loadedThreadIds,
       pendingThreadId: codexThreadNavigator.pendingThreadId,
@@ -450,13 +457,15 @@ function SessionWorkbenchPageContent(input: {
       return;
     }
 
-    const targetThreadId = input.requestedThreadId ?? defaultThreadId;
-    if (targetThreadId === null || targetThreadId === codexThreadNavigator.activeThreadId) {
+    if (
+      input.requestedThreadId === null ||
+      input.requestedThreadId === codexThreadNavigator.activeThreadId
+    ) {
       return;
     }
 
-    void codexThreadNavigator.resumeThread(targetThreadId).catch(() => {});
-  }, [codexThreadNavigator, defaultThreadId, input.requestedThreadId]);
+    void codexThreadNavigator.resumeThread(input.requestedThreadId).catch(() => {});
+  }, [codexThreadNavigator, input.requestedThreadId]);
   const canRenderThreadNavigation =
     codexThreadNavigator !== null && workbench.primaryPanelState.transitionState !== "stable_cli";
   const threadNavigatorProps: CodexThreadNavigatorProps | null = canRenderThreadNavigation
