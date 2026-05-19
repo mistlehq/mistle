@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { createSystemTest } from "@mistle/test-harness/system";
+import { createDockerSandboxReachableHostUrl, createSystemTest } from "@mistle/test-harness/system";
 import { afterAll, describe, expect } from "vitest";
 import { type RawData, WebSocketServer } from "ws";
 import { z } from "zod";
@@ -106,8 +106,8 @@ describe("runtime system gateway egress HTTP smoke", () => {
           email: "runtime-gateway-egress-http-smoke@example.com",
         });
         sandboxInstanceIdForCleanup = sandboxInstanceId;
-        const upstreamUrl = new URL(upstream.gatewayReachableBaseUrl);
-        const secureUpstreamUrl = new URL(secureUpstream.gatewayReachableBaseUrl);
+        const upstreamUrl = new URL(upstream.sandboxReachableBaseUrl);
+        const secureUpstreamUrl = new URL(secureUpstream.sandboxReachableBaseUrl);
 
         const result = await runSandboxExecCommandInSandbox({
           fixture,
@@ -122,7 +122,7 @@ describe("runtime system gateway egress HTTP smoke", () => {
               [
                 "public_access_http_smoke",
                 shellQuote("POST"),
-                shellQuote(`${upstream.gatewayReachableBaseUrl}/echo?case=http`),
+                shellQuote(`${upstream.sandboxReachableBaseUrl}/echo?case=http`),
                 shellQuote(HTTP_REQUEST_BODY),
               ].join(" "),
               "printf '\\n'",
@@ -138,7 +138,7 @@ describe("runtime system gateway egress HTTP smoke", () => {
               ].join(" "),
               [
                 `export WS_PROXY=${shellQuote(SANDBOXD_EGRESS_PROXY_URL)}`,
-                `export WS_URL=${shellQuote(`${upstream.gatewayReachableBaseUrl.replace(/^http:/u, "ws:")}/socket?case=websocket`)}`,
+                `export WS_URL=${shellQuote(`${upstream.sandboxReachableBaseUrl.replace(/^http:/u, "ws:")}/socket?case=websocket`)}`,
                 `export WS_MESSAGE=${shellQuote(WEBSOCKET_REQUEST_BODY)}`,
                 "timeout 15 bash <<'BASH'",
                 websocketProxySmokeScript(),
@@ -146,7 +146,7 @@ describe("runtime system gateway egress HTTP smoke", () => {
               ].join("\n"),
               [
                 `export WS_PROXY=${shellQuote(SANDBOXD_EGRESS_PROXY_URL)}`,
-                `export WSS_URL=${shellQuote(`${secureUpstream.gatewayReachableBaseUrl}/socket?case=wss`)}`,
+                `export WSS_URL=${shellQuote(`${secureUpstream.sandboxReachableBaseUrl}/socket?case=wss`)}`,
                 `export WSS_MESSAGE=${shellQuote(SECURE_WEBSOCKET_REQUEST_BODY)}`,
                 "timeout 15 bash <<'BASH'",
                 secureWebsocketProxySmokeScript(),
@@ -155,10 +155,11 @@ describe("runtime system gateway egress HTTP smoke", () => {
               [
                 `export TRANSPARENT_PROXY_PORT=${shellQuote(String(SANDBOXD_TRANSPARENT_EGRESS_PROXY_PORT))}`,
                 `export TRANSPARENT_PROXY_CA_BUNDLE=${shellQuote(SANDBOXD_EGRESS_PROXY_CA_BUNDLE_PATH)}`,
+                `export TRANSPARENT_UPSTREAM_HOST=${shellQuote(upstreamUrl.hostname)}`,
                 `export TRANSPARENT_HTTP_PORT=${shellQuote(upstreamUrl.port)}`,
                 `export TRANSPARENT_SECURE_PORT=${shellQuote(secureUpstreamUrl.port)}`,
-                `export TRANSPARENT_HTTP_URL=${shellQuote(`${upstream.gatewayReachableBaseUrl}/echo?case=transparent-http`)}`,
-                `export TRANSPARENT_HTTPS_URL=${shellQuote(`${secureUpstream.gatewayReachableBaseUrl.replace(/^wss:/u, "https:")}/secure?case=transparent-https`)}`,
+                `export TRANSPARENT_HTTP_URL=${shellQuote(`${upstream.sandboxReachableBaseUrl}/echo?case=transparent-http`)}`,
+                `export TRANSPARENT_HTTPS_URL=${shellQuote(`${secureUpstream.sandboxReachableBaseUrl.replace(/^wss:/u, "https:")}/secure?case=transparent-https`)}`,
                 `export TRANSPARENT_WSS_PATH=${shellQuote("/socket?case=transparent-wss")}`,
                 `export TRUSTED_CA_CERT_PEM=${shellQuote(secureUpstream.caCertificatePem)}`,
                 `export TRANSPARENT_HTTP_MESSAGE=${shellQuote(TRANSPARENT_HTTP_REQUEST_BODY)}`,
@@ -257,7 +258,7 @@ describe("runtime system gateway egress HTTP smoke", () => {
 });
 
 async function startSimulatedHttpUpstream(): Promise<{
-  gatewayReachableBaseUrl: string;
+  sandboxReachableBaseUrl: string;
   requests: RecordedHttpRequest[];
   websocketExchanges: RecordedWebsocketExchange[];
   stop: () => Promise<void>;
@@ -322,7 +323,9 @@ async function startSimulatedHttpUpstream(): Promise<{
   }
 
   return {
-    gatewayReachableBaseUrl: `http://127.0.0.1:${String(address.port)}`,
+    sandboxReachableBaseUrl: createDockerSandboxReachableHostUrl(
+      `http://127.0.0.1:${String(address.port)}`,
+    ),
     requests,
     websocketExchanges,
     stop: async () => {
@@ -342,7 +345,7 @@ async function startSimulatedHttpUpstream(): Promise<{
 
 async function startSimulatedSecureWebsocketUpstream(certificates: TestTlsCertificates): Promise<{
   caCertificatePem: string;
-  gatewayReachableBaseUrl: string;
+  sandboxReachableBaseUrl: string;
   requests: RecordedHttpRequest[];
   websocketExchanges: RecordedWebsocketExchange[];
   stop: () => Promise<void>;
@@ -401,7 +404,7 @@ async function startSimulatedSecureWebsocketUpstream(certificates: TestTlsCertif
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
+    server.listen(0, "0.0.0.0", () => {
       server.off("error", reject);
       resolve();
     });
@@ -414,7 +417,9 @@ async function startSimulatedSecureWebsocketUpstream(certificates: TestTlsCertif
 
   return {
     caCertificatePem: certificates.caCertificatePem,
-    gatewayReachableBaseUrl: `wss://127.0.0.1:${String(address.port)}`,
+    sandboxReachableBaseUrl: createDockerSandboxReachableHostUrl(
+      `wss://127.0.0.1:${String(address.port)}`,
+    ),
     requests,
     websocketExchanges,
     stop: async () => {
@@ -461,7 +466,7 @@ async function createTestTlsCertificates(): Promise<TestTlsCertificates> {
       "[req_distinguished_name]",
       "CN=127.0.0.1",
       "[ext]",
-      "subjectAltName=IP:127.0.0.1,DNS:localhost",
+      "subjectAltName=IP:127.0.0.1,DNS:localhost,DNS:host.docker.internal",
       "keyUsage=digitalSignature,keyEncipherment",
       "extendedKeyUsage=serverAuth",
       "",
@@ -710,6 +715,8 @@ function transparentGatewaySmokeScript(): string {
     'printf "%s\\n" "${TRUSTED_CA_CERT_PEM}" >"${trusted_ca_file}"',
     'while [ ! -s "${tcp_port_file}" ]; do sleep 0.05; done',
     'TRANSPARENT_TCP_PORT="$(cat "${tcp_port_file}")"',
+    'TRANSPARENT_UPSTREAM_IP="$(getent ahostsv4 "${TRANSPARENT_UPSTREAM_HOST}" | awk \'NR == 1 { print $1 }\')"',
+    '[ -n "${TRANSPARENT_UPSTREAM_IP}" ] || { printf "failed to resolve transparent upstream host %s\\n" "${TRANSPARENT_UPSTREAM_HOST}" >&2; exit 1; }',
     "cleanup_transparent_rules",
     'exec 4<>"/dev/tcp/127.0.0.1/${TRANSPARENT_TCP_PORT}"',
     'printf "direct:%s" "${TRANSPARENT_TCP_MESSAGE}" >&4',
@@ -722,8 +729,8 @@ function transparentGatewaySmokeScript(): string {
     "nft add table ip mistle_transparent_smoke || { id >&2; grep Cap /proc/self/status >&2; exit 1; }",
     "nft 'add chain ip mistle_transparent_smoke output { type nat hook output priority -100; policy accept; }' || { id >&2; grep Cap /proc/self/status >&2; exit 1; }",
     'nft add rule ip mistle_transparent_smoke output meta mark "${TRANSPARENT_PROXY_PORT}" return || { id >&2; grep Cap /proc/self/status >&2; exit 1; }',
-    'nft add rule ip mistle_transparent_smoke output ip daddr 127.0.0.1 tcp dport "${TRANSPARENT_HTTP_PORT}" redirect to :"${TRANSPARENT_PROXY_PORT}" || { id >&2; grep Cap /proc/self/status >&2; exit 1; }',
-    'nft add rule ip mistle_transparent_smoke output ip daddr 127.0.0.1 tcp dport "${TRANSPARENT_SECURE_PORT}" redirect to :"${TRANSPARENT_PROXY_PORT}" || { id >&2; grep Cap /proc/self/status >&2; exit 1; }',
+    'nft add rule ip mistle_transparent_smoke output ip daddr "${TRANSPARENT_UPSTREAM_IP}" tcp dport "${TRANSPARENT_HTTP_PORT}" redirect to :"${TRANSPARENT_PROXY_PORT}" || { id >&2; grep Cap /proc/self/status >&2; exit 1; }',
+    'nft add rule ip mistle_transparent_smoke output ip daddr "${TRANSPARENT_UPSTREAM_IP}" tcp dport "${TRANSPARENT_SECURE_PORT}" redirect to :"${TRANSPARENT_PROXY_PORT}" || { id >&2; grep Cap /proc/self/status >&2; exit 1; }',
     'nft add rule ip mistle_transparent_smoke output ip daddr 127.0.0.1 tcp dport "${TRANSPARENT_TCP_PORT}" redirect to :"${TRANSPARENT_PROXY_PORT}" || { id >&2; grep Cap /proc/self/status >&2; exit 1; }',
     'ss -ltnp | grep -q ":${TRANSPARENT_PROXY_PORT} " || { printf "transparent proxy listener is not bound\\n" >&2; ss -ltnp >&2; nft list ruleset >&2; exit 1; }',
     "unset HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY http_proxy https_proxy all_proxy no_proxy",
@@ -735,10 +742,10 @@ function transparentGatewaySmokeScript(): string {
     'stderr_file="$(mktemp)"',
     "set +e",
     "{",
-    '  printf \'GET %s HTTP/1.1\\r\\nHost: 127.0.0.1:%s\\r\\nConnection: Upgrade\\r\\nUpgrade: websocket\\r\\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\\r\\nSec-WebSocket-Version: 13\\r\\n\\r\\n\' "${TRANSPARENT_WSS_PATH}" "${TRANSPARENT_SECURE_PORT}"',
+    '  printf \'GET %s HTTP/1.1\\r\\nHost: %s:%s\\r\\nConnection: Upgrade\\r\\nUpgrade: websocket\\r\\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\\r\\nSec-WebSocket-Version: 13\\r\\n\\r\\n\' "${TRANSPARENT_WSS_PATH}" "${TRANSPARENT_UPSTREAM_HOST}" "${TRANSPARENT_SECURE_PORT}"',
     "  sleep 0.2",
     '  WEBSOCKET_FRAME_MESSAGE="${TRANSPARENT_WSS_MESSAGE}" websocket_client_frame',
-    '} | openssl s_client -connect "127.0.0.1:${TRANSPARENT_SECURE_PORT}" -servername "127.0.0.1" -CAfile "${TRANSPARENT_PROXY_CA_BUNDLE}" -verify_return_error -quiet >"${output_file}" 2>"${stderr_file}"',
+    '} | openssl s_client -connect "${TRANSPARENT_UPSTREAM_HOST}:${TRANSPARENT_SECURE_PORT}" -servername "${TRANSPARENT_UPSTREAM_HOST}" -CAfile "${TRANSPARENT_PROXY_CA_BUNDLE}" -verify_return_error -quiet >"${output_file}" 2>"${stderr_file}"',
     'openssl_exit="$?"',
     "set -e",
     "dump_transparent_wss_debug() {",
