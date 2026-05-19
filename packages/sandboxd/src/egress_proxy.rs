@@ -141,7 +141,7 @@ pub struct EgressProxyError {
 #[derive(Debug, Clone)]
 struct EgressProxyRoute {
     egress_rule_id: String,
-    host: String,
+    hosts: Vec<String>,
     path_prefixes: Vec<String>,
     methods: Option<Vec<String>>,
 }
@@ -1782,16 +1782,27 @@ fn build_gateway_egress_route(
             route.egress_rule_id, route.upstream.base_url
         ))
     })?;
-    let host = upstream_url.host_str().ok_or_else(|| {
-        EgressProxyError::new(format!(
+    if upstream_url.host_str().is_none() {
+        return Err(EgressProxyError::new(format!(
             "runtime plan egress route '{}' upstream '{}' must include a host",
             route.egress_rule_id, route.upstream.base_url
-        ))
-    })?;
+        )));
+    }
+    if route.r#match.hosts.is_empty() {
+        return Err(EgressProxyError::new(format!(
+            "runtime plan egress route '{}' must include at least one match host",
+            route.egress_rule_id
+        )));
+    }
 
     Ok(EgressProxyRoute {
         egress_rule_id: route.egress_rule_id.clone(),
-        host: host.to_string(),
+        hosts: route
+            .r#match
+            .hosts
+            .iter()
+            .map(|host| normalize_match_host(host))
+            .collect(),
         path_prefixes: route
             .r#match
             .path_prefixes
@@ -2895,15 +2906,16 @@ fn box_hyper_error(error: hyper::Error) -> BoxError {
 }
 
 fn normalize_authority_host(authority: &str) -> String {
-    authority
-        .trim()
+    let normalized_authority = authority.trim().to_ascii_lowercase();
+    normalized_authority
         .strip_prefix('[')
         .and_then(|authority| authority.split_once(']'))
         .map_or_else(
             || {
-                authority
-                    .split_once(':')
-                    .map_or_else(|| authority.to_string(), |(host, _)| host.to_string())
+                normalized_authority.split_once(':').map_or_else(
+                    || normalized_authority.to_string(),
+                    |(host, _)| host.to_string(),
+                )
             },
             |(host, _)| host.to_string(),
         )
@@ -2928,10 +2940,14 @@ fn match_route<'a>(
     path: &str,
     method: &str,
 ) -> Result<Option<&'a EgressProxyRoute>, EgressProxyError> {
+    let normalized_host = normalize_authority_host(host);
     let matching_routes = routes
         .iter()
         .filter(|route| {
-            route.host == host
+            route
+                .hosts
+                .iter()
+                .any(|route_host| route_host == &normalized_host)
                 && route
                     .path_prefixes
                     .iter()
@@ -2950,6 +2966,17 @@ fn match_route<'a>(
             "multiple sandbox egress routes matched proxied request {method} {host}{path}"
         ))),
     }
+}
+
+fn normalize_match_host(host: &str) -> String {
+    let normalized_host = host.trim().to_ascii_lowercase();
+    if let Some((host, _)) = normalized_host
+        .strip_prefix('[')
+        .and_then(|host| host.split_once(']'))
+    {
+        return host.to_string();
+    }
+    normalized_host
 }
 
 fn filter_outbound_request_headers(
@@ -3258,13 +3285,13 @@ mod tests {
         let routes = vec![
             EgressProxyRoute {
                 egress_rule_id: "egress-rule-a".to_string(),
-                host: "api.github.com".to_string(),
+                hosts: vec!["api.github.com".to_string()],
                 path_prefixes: vec!["/graphql".to_string()],
                 methods: Some(vec!["POST".to_string()]),
             },
             EgressProxyRoute {
                 egress_rule_id: "egress-rule-b".to_string(),
-                host: "github.com".to_string(),
+                hosts: vec!["github.com".to_string()],
                 path_prefixes: vec!["/mistlehq/mistle.git".to_string()],
                 methods: Some(vec!["GET".to_string()]),
             },
@@ -3298,7 +3325,7 @@ mod tests {
     fn leaves_unmatched_requests_for_direct_passthrough() {
         let routes = vec![EgressProxyRoute {
             egress_rule_id: "egress-rule-a".to_string(),
-            host: "api.openai.com".to_string(),
+            hosts: vec!["api.openai.com".to_string()],
             path_prefixes: vec!["/v1/responses".to_string()],
             methods: Some(vec!["POST".to_string()]),
         }];
@@ -3681,7 +3708,25 @@ mod tests {
             .expect("gateway egress route should build");
 
         assert_eq!(route.egress_rule_id, "egress-rule-1");
-        assert_eq!(route.host, "api.openai.com");
+        assert_eq!(route.hosts, vec!["api.openai.com"]);
+    }
+
+    #[test]
+    fn gateway_egress_routes_match_declared_hosts_not_upstream_host() {
+        let mut runtime_plan = sample_runtime_plan();
+        runtime_plan.egress_routes[0].r#match.hosts = vec!["API.GITHUB.COM".to_string()];
+        runtime_plan.egress_routes[0].upstream.base_url =
+            "https://proxy.github.internal".to_string();
+
+        let route = build_gateway_egress_route(&runtime_plan.egress_routes[0])
+            .expect("gateway egress route should build");
+
+        assert_eq!(route.hosts, vec!["api.github.com"]);
+        assert!(
+            match_route(&[route], "API.GITHUB.COM", "/v1/chat/completions", "POST")
+                .expect("declared host should match")
+                .is_some()
+        );
     }
 
     #[test]
