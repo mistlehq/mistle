@@ -4,12 +4,13 @@ import { shouldRethrowDurableStepErrorForRetry } from "@mistle/workflow-registry
 import { getWorkflowContext } from "../core/context.js";
 import { defineTracedControlPlaneWorkflow } from "../core/tracing.js";
 import type { PreparedTriggerRun } from "../shared/trigger-run-types.js";
-import { prepareTriggerRun, resolveTriggerRunFailure } from "../shared/trigger-run.js";
 import {
-  isTriggerRunExecutionFailure,
+  isPermanentTriggerRunExecutionFailure,
   markTriggerRunCompleted,
   markTriggerRunFailed,
   markTriggerRunIgnored,
+  prepareTriggerRun,
+  resolveTriggerRunFailure,
 } from "../shared/trigger-run.js";
 import { acquireTriggerConnection } from "./acquire-trigger-connection.js";
 import { claimOrResumeTriggerConversationDeliveryTask } from "./claim-or-resume-trigger-conversation-delivery-task.js";
@@ -367,7 +368,12 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
           },
         });
       } catch (error) {
-        if (shouldRethrowDurableStepErrorForRetry(error) && !isTriggerRunExecutionFailure(error)) {
+        const failure = resolveTriggerRunFailure(error);
+
+        if (
+          shouldRethrowDurableStepErrorForRetry(error) &&
+          !isPermanentTriggerRunExecutionFailure(error)
+        ) {
           logTriggerConversationDeliveryEvent({
             eventName: "delivery_task.step_retry",
             message: "Retrying trigger conversation delivery after durable step failure",
@@ -381,13 +387,17 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
               webhookEventId: preparedTriggerRunForTelemetry?.webhookEventId,
               workflowRunId,
             },
+            attributes: {
+              ...failure.metadata,
+              ...resolveDurableStepRetryAttributes(error),
+              "mistle.delivery.failure_code": failure.code,
+              "mistle.delivery.failure_message": failure.message,
+            },
             err: error,
             level: "warn",
           });
           throw error;
         }
-
-        const failure = resolveTriggerRunFailure(error);
 
         await step.run(
           {
@@ -444,7 +454,9 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
             workflowRunId,
           },
           attributes: {
+            ...failure.metadata,
             "mistle.delivery.failure_code": failure.code,
+            "mistle.delivery.failure_message": failure.message,
           },
           err: error,
           level: "error",
@@ -455,3 +467,32 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
     }
   },
 );
+
+function resolveDurableStepRetryAttributes(error: unknown): Record<string, string | number> {
+  const attributes: Record<string, string | number> = {};
+  const stepName = getUnknownProperty(error, "stepName");
+  if (typeof stepName === "string") {
+    attributes["mistle.workflow.step_name"] = stepName;
+  }
+
+  const stepFailedAttempts = getUnknownProperty(error, "stepFailedAttempts");
+  if (typeof stepFailedAttempts === "number") {
+    attributes["mistle.workflow.step_failed_attempts"] = stepFailedAttempts;
+  }
+
+  const retryPolicy = getUnknownProperty(error, "retryPolicy");
+  const maximumAttempts = getUnknownProperty(retryPolicy, "maximumAttempts");
+  if (typeof maximumAttempts === "number") {
+    attributes["mistle.workflow.step_maximum_attempts"] = maximumAttempts;
+  }
+
+  return attributes;
+}
+
+function getUnknownProperty(input: unknown, key: string): unknown {
+  if (typeof input !== "object" || input === null || !(key in input)) {
+    return undefined;
+  }
+
+  return Reflect.get(input, key);
+}

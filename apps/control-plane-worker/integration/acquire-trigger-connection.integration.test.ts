@@ -67,6 +67,13 @@ describe.concurrent("control-plane worker trigger connection acquisition", () =>
     ).rejects.toMatchObject({
       code: TriggerRunFailureCodes.TRIGGER_RUN_EXECUTION_FAILED,
       message: "Sandbox startup failed before connection acquisition.",
+      metadata: {
+        "mistle.sandbox.instance_id": ensuredTriggerSandbox.sandboxInstanceId,
+        "mistle.sandbox.status": SandboxInstanceStatuses.FAILED,
+        "mistle.sandbox.failure_code": "sandbox_start_failed",
+        "mistle.sandbox.failure_message": "Sandbox startup failed before connection acquisition.",
+        "mistle.sandbox.wait_phase": "startup",
+      },
     });
   });
 });

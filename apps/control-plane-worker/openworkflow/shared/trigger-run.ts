@@ -71,19 +71,29 @@ export const TriggerRunFailureCodes = {
 
 class TriggerRunExecutionError extends Error {
   readonly code: string;
+  readonly metadata: TriggerRunFailureMetadata;
 
-  constructor(input: { code: string; message: string; cause?: unknown }) {
+  constructor(input: {
+    code: string;
+    message: string;
+    cause?: unknown;
+    metadata?: TriggerRunFailureMetadata;
+  }) {
     super(input.message, {
       cause: input.cause,
     });
     this.code = input.code;
+    this.metadata = input.metadata ?? {};
   }
 }
+
+export type TriggerRunFailureMetadata = Record<string, string | number | boolean | null>;
 
 export function createTriggerRunExecutionError(input: {
   code: string;
   message: string;
   cause?: unknown;
+  metadata?: TriggerRunFailureMetadata;
 }) {
   return new TriggerRunExecutionError(input);
 }
@@ -92,12 +102,26 @@ export function isTriggerRunExecutionFailure(input: unknown): boolean {
   return resolveTriggerRunExecutionFailure(input) !== null;
 }
 
-export function resolveTriggerRunFailure(input: unknown): { code: string; message: string } {
+export function isPermanentTriggerRunExecutionFailure(input: unknown): boolean {
+  const triggerRunExecutionFailure = resolveTriggerRunExecutionFailure(input);
+  if (triggerRunExecutionFailure === null) {
+    return false;
+  }
+
+  return triggerRunExecutionFailure.code !== TriggerRunFailureCodes.TRIGGER_RUN_EXECUTION_FAILED;
+}
+
+export function resolveTriggerRunFailure(input: unknown): {
+  code: string;
+  message: string;
+  metadata: TriggerRunFailureMetadata;
+} {
   const triggerRunExecutionFailure = resolveTriggerRunExecutionFailure(input);
   if (triggerRunExecutionFailure !== null) {
     return {
       code: triggerRunExecutionFailure.code,
       message: triggerRunExecutionFailure.message,
+      metadata: triggerRunExecutionFailure.metadata,
     };
   }
 
@@ -105,23 +129,27 @@ export function resolveTriggerRunFailure(input: unknown): { code: string; messag
     return {
       code: TriggerRunFailureCodes.TRIGGER_RUN_EXECUTION_FAILED,
       message: input.message,
+      metadata: {},
     };
   }
 
   return {
     code: TriggerRunFailureCodes.TRIGGER_RUN_EXECUTION_FAILED,
     message: "Trigger run execution failed with a non-error exception.",
+    metadata: {},
   };
 }
 
 function resolveTriggerRunExecutionFailure(input: unknown): {
   code: string;
   message: string;
+  metadata: TriggerRunFailureMetadata;
 } | null {
   if (input instanceof TriggerRunExecutionError) {
     return {
       code: input.code,
       message: input.message,
+      metadata: input.metadata,
     };
   }
 
@@ -130,6 +158,7 @@ function resolveTriggerRunExecutionFailure(input: unknown): {
     return {
       code: originalError.code,
       message: originalError.message,
+      metadata: originalError.metadata,
     };
   }
 
@@ -137,6 +166,7 @@ function resolveTriggerRunExecutionFailure(input: unknown): {
     return {
       code: originalError.code,
       message: originalError.message,
+      metadata: originalError.metadata ?? {},
     };
   }
 
@@ -146,13 +176,30 @@ function resolveTriggerRunExecutionFailure(input: unknown): {
 function isTriggerRunExecutionErrorLike(input: unknown): input is {
   code: string;
   message: string;
+  metadata?: TriggerRunFailureMetadata;
 } {
   const code = getUnknownProperty(input, "code");
   const message = getUnknownProperty(input, "message");
+  const metadata = getUnknownProperty(input, "metadata");
   return (
     typeof code === "string" &&
     Object.values(TriggerRunFailureCodes).some((candidateCode) => candidateCode === code) &&
-    typeof message === "string"
+    typeof message === "string" &&
+    (metadata === undefined || isTriggerRunFailureMetadata(metadata))
+  );
+}
+
+function isTriggerRunFailureMetadata(input: unknown): input is TriggerRunFailureMetadata {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    return false;
+  }
+
+  return Object.values(input).every(
+    (value) =>
+      value === null ||
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean",
   );
 }
 
