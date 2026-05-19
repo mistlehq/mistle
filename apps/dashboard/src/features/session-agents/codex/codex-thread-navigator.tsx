@@ -2,12 +2,13 @@ import {
   Button,
   OverflowTooltipText,
   Sheet,
+  SheetClose,
   SheetContent,
   SheetHeader,
   SheetTitle,
   Spinner,
 } from "@mistle/ui";
-import { ArrowClockwiseIcon, PlusIcon } from "@phosphor-icons/react";
+import { ArrowClockwiseIcon, PlusIcon, XIcon } from "@phosphor-icons/react";
 
 import type { CodexThreadNavigatorRow } from "./codex-thread-navigator-model.js";
 
@@ -26,7 +27,7 @@ export function CodexThreadNavigator(input: CodexThreadNavigatorProps): React.JS
       aria-label="Threads"
       className="bg-background/98 hidden h-full min-h-0 w-64 shrink-0 flex-col border-r md:flex"
     >
-      <CodexThreadNavigatorContent {...input} />
+      <CodexThreadNavigatorContent {...input} showHeader />
     </aside>
   );
 }
@@ -34,7 +35,7 @@ export function CodexThreadNavigator(input: CodexThreadNavigatorProps): React.JS
 export function CodexThreadNavigatorPanel(input: CodexThreadNavigatorProps): React.JSX.Element {
   return (
     <section aria-label="Threads" className="bg-background h-full min-h-0">
-      <CodexThreadNavigatorContent {...input} />
+      <CodexThreadNavigatorContent {...input} showHeader />
     </section>
   );
 }
@@ -43,62 +44,56 @@ export function CodexThreadNavigatorSheet(input: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   navigator: CodexThreadNavigatorProps;
-  side?: "left" | "right";
 }): React.JSX.Element {
   return (
     <Sheet onOpenChange={input.onOpenChange} open={input.isOpen}>
       <SheetContent
-        className="!h-[100dvh] max-h-[100dvh] w-80 gap-0 p-0"
-        side={input.side ?? "right"}
+        className="!h-[100dvh] max-h-[100dvh] gap-0 p-0"
+        showCloseButton={false}
+        side="bottom"
       >
-        <SheetHeader className="sr-only">
-          <SheetTitle>Threads</SheetTitle>
+        <SheetHeader className="shrink-0 border-b px-4 py-3 text-left">
+          <div className="flex min-w-0 items-center gap-2">
+            <SheetTitle className="min-w-0 shrink truncate">Threads</SheetTitle>
+            <CodexThreadNavigatorActions {...input.navigator} />
+            <SheetClose
+              render={
+                <Button
+                  aria-label="Close threads"
+                  className="ml-auto"
+                  size="icon-sm"
+                  title="Close threads"
+                  type="button"
+                  variant="ghost"
+                />
+              }
+            >
+              <XIcon aria-hidden className="size-4" />
+            </SheetClose>
+          </div>
         </SheetHeader>
-        <CodexThreadNavigatorContent {...input.navigator} />
+        <CodexThreadNavigatorContent {...input.navigator} showHeader={false} />
       </SheetContent>
     </Sheet>
   );
 }
 
-function CodexThreadNavigatorContent(input: CodexThreadNavigatorProps): React.JSX.Element {
+function CodexThreadNavigatorContent(
+  input: CodexThreadNavigatorProps & {
+    showHeader: boolean;
+  },
+): React.JSX.Element {
   const hasRows = input.rows.length > 0;
   const rowSections = groupRowsByCwd(input.rows);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 items-center justify-between border-b px-3 py-2">
-        <div className="min-w-0">
-          <h2 className="font-medium text-sm">Threads</h2>
-          {input.isThreadListLimited ? (
-            <div className="text-muted-foreground text-xs">Showing latest 20 only</div>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-1">
-          <Button
-            aria-label="Refresh threads"
-            onClick={input.onRefreshThreads}
-            size="icon-sm"
-            title="Refresh threads"
-            type="button"
-            variant="ghost"
-          >
-            <ArrowClockwiseIcon aria-hidden className="size-4" />
-          </Button>
-          <Button
-            aria-label="New thread"
-            disabled={input.isStartingThread}
-            onClick={input.onStartThread}
-            size="icon-sm"
-            title="New thread"
-            type="button"
-            variant="ghost"
-          >
-            <PlusIcon aria-hidden className="size-4" />
-          </Button>
-        </div>
-      </div>
+      {input.showHeader ? <CodexThreadNavigatorHeader {...input} /> : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+        {input.showHeader || !input.isThreadListLimited ? null : (
+          <div className="text-muted-foreground px-2 pb-2 text-xs">Showing latest 20 only</div>
+        )}
         {hasRows ? (
           <div className="space-y-3">
             {rowSections.map((section) => (
@@ -124,6 +119,48 @@ function CodexThreadNavigatorContent(input: CodexThreadNavigatorProps): React.JS
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function CodexThreadNavigatorHeader(input: CodexThreadNavigatorProps): React.JSX.Element {
+  return (
+    <div className="flex shrink-0 items-center justify-between border-b px-3 py-2">
+      <div className="min-w-0">
+        <h2 className="font-medium text-sm">Threads</h2>
+        {input.isThreadListLimited ? (
+          <div className="text-muted-foreground text-xs">Showing latest 20 only</div>
+        ) : null}
+      </div>
+      <CodexThreadNavigatorActions {...input} />
+    </div>
+  );
+}
+
+function CodexThreadNavigatorActions(input: CodexThreadNavigatorProps): React.JSX.Element {
+  return (
+    <div className="flex items-center gap-1">
+      <Button
+        aria-label="Refresh threads"
+        onClick={input.onRefreshThreads}
+        size="icon-sm"
+        title="Refresh threads"
+        type="button"
+        variant="ghost"
+      >
+        <ArrowClockwiseIcon aria-hidden className="size-4" />
+      </Button>
+      <Button
+        aria-label="New thread"
+        disabled={input.isStartingThread}
+        onClick={input.onStartThread}
+        size="icon-sm"
+        title="New thread"
+        type="button"
+        variant="ghost"
+      >
+        <PlusIcon aria-hidden className="size-4" />
+      </Button>
     </div>
   );
 }
