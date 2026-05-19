@@ -34,6 +34,7 @@ export type SessionConversationPaneState = SessionWorkbenchRuntimeAdapter["conve
   codexThreadNavigator: {
     activeThreadCwd: string | null;
     activeThreadId: string | null;
+    providerThreadId: string | null;
     availableThreads: UseCodexSessionStateResult["threads"]["availableThreads"];
     hasMoreAvailableThreads: boolean;
     loadedThreadIds: readonly string[];
@@ -243,6 +244,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
         : {
             activeThreadCwd: sessionState.lifecycle.sessionSnapshot?.activeThreadCwd ?? null,
             activeThreadId: sessionState.lifecycle.sessionSnapshot?.activeThreadId ?? null,
+            providerThreadId: sessionState.lifecycle.sessionSnapshot?.providerThreadId ?? null,
             availableThreads: sessionState.threads.availableThreads,
             hasMoreAvailableThreads: sessionState.threads.hasMoreAvailableThreads,
             loadedThreadIds: sessionState.threads.loadedThreadIds,

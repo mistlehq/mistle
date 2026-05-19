@@ -8,6 +8,7 @@ describe("shouldAttemptRequestedThreadResume", () => {
       shouldAttemptRequestedThreadResume({
         activeThreadId: "thread_active",
         previousAttempt: null,
+        providerThreadId: null,
         requestedThreadId: null,
         sandboxInstanceId: "sbi_test",
       }),
@@ -19,6 +20,19 @@ describe("shouldAttemptRequestedThreadResume", () => {
       shouldAttemptRequestedThreadResume({
         activeThreadId: "thread_requested",
         previousAttempt: null,
+        providerThreadId: null,
+        requestedThreadId: "thread_requested",
+        sandboxInstanceId: "sbi_test",
+      }),
+    ).toBe(false);
+  });
+
+  it("does not resume a requested thread when a provider thread owns the session", () => {
+    expect(
+      shouldAttemptRequestedThreadResume({
+        activeThreadId: "thread_provider",
+        previousAttempt: null,
+        providerThreadId: "thread_provider",
         requestedThreadId: "thread_requested",
         sandboxInstanceId: "sbi_test",
       }),
@@ -30,6 +44,7 @@ describe("shouldAttemptRequestedThreadResume", () => {
       shouldAttemptRequestedThreadResume({
         activeThreadId: "thread_active",
         previousAttempt: null,
+        providerThreadId: null,
         requestedThreadId: "thread_requested",
         sandboxInstanceId: "sbi_test",
       }),
@@ -42,6 +57,7 @@ describe("shouldAttemptRequestedThreadResume", () => {
           sandboxInstanceId: "sbi_test",
           threadId: "thread_requested",
         },
+        providerThreadId: null,
         requestedThreadId: "thread_requested",
         sandboxInstanceId: "sbi_test",
       }),
@@ -56,6 +72,7 @@ describe("shouldAttemptRequestedThreadResume", () => {
           sandboxInstanceId: "sbi_test",
           threadId: "thread_requested",
         },
+        providerThreadId: null,
         requestedThreadId: "thread_next",
         sandboxInstanceId: "sbi_test",
       }),
@@ -68,6 +85,7 @@ describe("shouldAttemptRequestedThreadResume", () => {
           sandboxInstanceId: "sbi_test",
           threadId: "thread_requested",
         },
+        providerThreadId: null,
         requestedThreadId: "thread_requested",
         sandboxInstanceId: "sbi_other",
       }),

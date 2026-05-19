@@ -496,6 +496,7 @@ function SessionWorkbenchPageContent(input: {
       !shouldAttemptRequestedThreadResume({
         activeThreadId: codexThreadNavigator.activeThreadId,
         previousAttempt: requestedThreadResumeAttemptRef.current,
+        providerThreadId: codexThreadNavigator.providerThreadId,
         requestedThreadId: input.requestedThreadId,
         sandboxInstanceId: input.sandboxInstanceId,
       })

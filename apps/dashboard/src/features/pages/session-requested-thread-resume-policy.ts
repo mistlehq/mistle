@@ -6,10 +6,15 @@ export type RequestedThreadResumeAttempt = {
 export function shouldAttemptRequestedThreadResume(input: {
   activeThreadId: string | null;
   previousAttempt: RequestedThreadResumeAttempt | null;
+  providerThreadId: string | null;
   requestedThreadId: string | null;
   sandboxInstanceId: string | null;
 }): boolean {
   if (input.requestedThreadId === null) {
+    return false;
+  }
+
+  if (input.providerThreadId !== null) {
     return false;
   }
 
