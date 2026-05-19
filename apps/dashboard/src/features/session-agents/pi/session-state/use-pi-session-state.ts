@@ -4,6 +4,7 @@ import {
   type PiEvent,
   type PiEventSubscription,
   type PiSessionClient,
+  type PiSessionState,
 } from "@mistle/integrations-definitions/agent-runtimes/pi/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useCallback, useEffect, useReducer, useRef, useState, type Dispatch } from "react";
@@ -128,6 +129,7 @@ async function hydrateConnectedPiChat(input: {
   client: PiSessionClient;
   dispatchChatAction: Dispatch<Parameters<typeof reducePiChatState>[1]>;
   sessionFile: string;
+  status?: "busy" | "idle";
 }): Promise<readonly PiAgentMessage[]> {
   const messages = await input.client.getMessages({
     sessionFile: input.sessionFile,
@@ -137,8 +139,17 @@ async function hydrateConnectedPiChat(input: {
     ...(input.bufferedEvents === undefined ? {} : { bufferedEvents: input.bufferedEvents }),
     sessionFile: input.sessionFile,
     messages,
+    ...(input.status === undefined ? {} : { status: input.status }),
   });
   return messages;
+}
+
+function resolvePiChatStatusFromSessionState(sessionState: PiSessionState): "busy" | "idle" {
+  return sessionState.isStreaming ||
+    sessionState.isCompacting ||
+    sessionState.pendingMessageCount > 0
+    ? "busy"
+    : "idle";
 }
 
 export function usePiSessionState(input: {
@@ -312,11 +323,15 @@ export function usePiSessionState(input: {
               });
             },
           });
+          const activeSessionState = await client.getState({
+            sessionFile: activeSessionFile,
+          });
           await hydrateConnectedPiChat({
             bufferedEvents,
             client,
             dispatchChatAction,
             sessionFile: activeSessionFile,
+            status: resolvePiChatStatusFromSessionState(activeSessionState),
           });
           hydrationHasCompleted = true;
           setSessionSnapshot({

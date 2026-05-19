@@ -195,6 +195,30 @@ describe("reducePiChatState", () => {
     ]);
   });
 
+  it("preserves active Pi state while hydrating a resumed conversation", () => {
+    const hydratedState = reducePiChatState(createInitialPiChatState(), {
+      type: "hydrate_messages",
+      sessionFile: "/root/.pi/agent/sessions/session.jsonl",
+      status: "busy",
+      messages: [
+        {
+          role: "user",
+          content: "continue the active task",
+          timestamp: 1,
+        },
+      ],
+    });
+
+    expect(hydratedState.status).toBe("busy");
+    expect(hydratedState.entries).toEqual([
+      expect.objectContaining({
+        kind: "user-message",
+        status: "completed",
+        text: "continue the active task",
+      }),
+    ]);
+  });
+
   it("rebuilds completed Pi tool semantic groups from persisted transcript messages", () => {
     const hydratedState = reducePiChatState(createInitialPiChatState(), {
       type: "hydrate_messages",

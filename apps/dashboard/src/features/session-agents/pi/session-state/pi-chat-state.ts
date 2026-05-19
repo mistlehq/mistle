@@ -41,6 +41,7 @@ export type PiChatAction =
       bufferedEvents?: readonly PiEvent[];
       messages: readonly PiAgentMessage[];
       sessionFile: string;
+      status?: "busy" | "idle";
       type: "hydrate_messages";
     }
   | {
@@ -683,7 +684,7 @@ export function reducePiChatState(state: PiChatState, action: PiChatAction): PiC
       ...createInitialPiChatState(),
       messages: action.messages,
       sessionFile: action.sessionFile,
-      status: "idle",
+      status: action.status ?? "idle",
     });
     return (action.bufferedEvents ?? []).reduce(
       (currentState, event) =>
