@@ -6,6 +6,7 @@ import { defineTracedControlPlaneWorkflow } from "../core/tracing.js";
 import type { PreparedTriggerRun } from "../shared/trigger-run-types.js";
 import { prepareTriggerRun, resolveTriggerRunFailure } from "../shared/trigger-run.js";
 import {
+  isTriggerRunExecutionFailure,
   markTriggerRunCompleted,
   markTriggerRunFailed,
   markTriggerRunIgnored,
@@ -366,7 +367,7 @@ export const HandleTriggerConversationDeliveryWorkflow = defineTracedControlPlan
           },
         });
       } catch (error) {
-        if (shouldRethrowDurableStepErrorForRetry(error)) {
+        if (shouldRethrowDurableStepErrorForRetry(error) && !isTriggerRunExecutionFailure(error)) {
           logTriggerConversationDeliveryEvent({
             eventName: "delivery_task.step_retry",
             message: "Retrying trigger conversation delivery after durable step failure",

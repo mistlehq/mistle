@@ -269,10 +269,16 @@ impl<'de> Deserialize<'de> for RuntimeArtifactGitHubReleaseAssetShape {
             file_name: String,
             format: RuntimeArtifactGitHubReleaseAssetFormatWire,
             extracted_path: Option<String>,
+            sha256: Option<String>,
         }
 
         let shape = Shape::deserialize(deserializer)?;
-        parse_github_release_asset_shape(shape.file_name, shape.format, shape.extracted_path)
+        parse_github_release_asset_shape(
+            shape.file_name,
+            shape.format,
+            shape.extracted_path,
+            shape.sha256,
+        )
     }
 }
 
@@ -283,6 +289,8 @@ pub struct RuntimeArtifactGitHubReleaseBinaryAssetShape {
     #[serde(deserialize_with = "deserialize_non_empty_string")]
     pub file_name: String,
     pub format: RuntimeArtifactGitHubReleaseBinaryAssetFormat,
+    #[serde(default)]
+    pub sha256: Option<String>,
 }
 
 /// One tarball GitHub release asset shape.
@@ -294,6 +302,8 @@ pub struct RuntimeArtifactGitHubReleaseTarGzAssetShape {
     pub format: RuntimeArtifactGitHubReleaseTarGzAssetFormat,
     #[serde(deserialize_with = "deserialize_non_empty_string")]
     pub extracted_path: String,
+    #[serde(default)]
+    pub sha256: Option<String>,
 }
 
 /// The supported binary GitHub release asset format marker.
@@ -344,6 +354,7 @@ impl<'de> Deserialize<'de> for RuntimeArtifactGitHubReleaseInstallAsset {
                 format: RuntimeArtifactGitHubReleaseAssetFormatWire,
                 #[serde(rename = "extractedPath")]
                 extracted_path: Option<String>,
+                sha256: Option<String>,
             },
             #[serde(rename = "by_arch")]
             ByArch {
@@ -359,10 +370,12 @@ impl<'de> Deserialize<'de> for RuntimeArtifactGitHubReleaseInstallAsset {
                 file_name,
                 format,
                 extracted_path,
+                sha256,
             } => Ok(Self::Exact(parse_github_release_asset_shape(
                 file_name,
                 format,
                 extracted_path,
+                sha256,
             )?)),
             Wire::ByArch { x86_64, aarch64 } => Ok(Self::ByArch { x86_64, aarch64 }),
         }
@@ -373,6 +386,7 @@ fn parse_github_release_asset_shape<E>(
     file_name: String,
     format: RuntimeArtifactGitHubReleaseAssetFormatWire,
     extracted_path: Option<String>,
+    sha256: Option<String>,
 ) -> Result<RuntimeArtifactGitHubReleaseAssetShape, E>
 where
     E: serde::de::Error,
@@ -383,6 +397,7 @@ where
                 RuntimeArtifactGitHubReleaseBinaryAssetShape {
                     file_name,
                     format: RuntimeArtifactGitHubReleaseBinaryAssetFormat::Binary,
+                    sha256,
                 },
             ))
         }
@@ -392,6 +407,7 @@ where
                     file_name,
                     format: RuntimeArtifactGitHubReleaseTarGzAssetFormat::TarGz,
                     extracted_path,
+                    sha256,
                 },
             ))
         }

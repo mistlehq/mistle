@@ -205,6 +205,19 @@ describe("integrations-definitions server", () => {
         variantId: "openai-default",
       }),
     ).toBeDefined();
-    expect(definitions.agentRuntimeRegistry.listRuntimes()).toHaveLength(2);
+    expect(definitions.agentRuntimeRegistry.listRuntimes()).toMatchObject([
+      {
+        runtimeId: "codex",
+        displayName: "Codex",
+      },
+      {
+        runtimeId: "opencode",
+        displayName: "OpenCode",
+      },
+      {
+        runtimeId: "pi",
+        displayName: "Pi",
+      },
+    ]);
   });
 });

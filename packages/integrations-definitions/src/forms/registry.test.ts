@@ -71,11 +71,13 @@ function registerRuntime(
   input: {
     runtimeId: string;
     displayName: string;
+    logoKey?: string;
   },
 ): void {
   registry.register({
     runtimeId: input.runtimeId,
     displayName: input.displayName,
+    logoKey: input.logoKey ?? input.runtimeId,
     configSchema: z.object({}),
     compileRuntime: () => ({
       runtimeClients: [],
@@ -159,6 +161,7 @@ describe("integration form registry", () => {
         {
           runtimeId: "codex",
           displayName: "Codex",
+          logoKey: "codex",
         },
       ],
     });

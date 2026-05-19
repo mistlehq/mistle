@@ -1097,7 +1097,7 @@ async function createStartableProfile(input: {
   defaultPersistenceMode?:
     | typeof SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL
     | typeof SandboxProfileVersionDefaultPersistenceModes.PERSISTENT;
-  agentRuntimeId?: "codex" | "opencode";
+  agentRuntimeId?: "codex" | "opencode" | "pi";
   snapshotImageId?: string;
   snapshotImageProvider?: "docker" | "e2b" | "tensorlake";
   runtimeColumns?: typeof DockerSandboxRuntimeColumns | typeof TensorlakeSandboxRuntimeColumns;

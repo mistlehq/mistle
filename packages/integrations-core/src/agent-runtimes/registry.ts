@@ -30,6 +30,13 @@ function validateRuntimeDefinition(input: AnyAgentRuntimeDefinition): void {
     );
   }
 
+  if (input.logoKey.trim().length === 0) {
+    throw new IntegrationDefinitionRegistryError(
+      DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+      "Agent runtime definition logoKey must be non-empty.",
+    );
+  }
+
   const composerCapabilities: unknown = input.composerCapabilities;
   if (composerCapabilities !== undefined) {
     if (!Array.isArray(composerCapabilities)) {

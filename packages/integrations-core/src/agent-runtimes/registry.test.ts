@@ -16,6 +16,7 @@ function createRuntime(
   return {
     runtimeId: "codex",
     displayName: "Codex",
+    logoKey: "openai",
     configSchema: RuntimeConfigSchema,
     compileRuntime: () => ({
       runtimeClients: [],
@@ -27,6 +28,7 @@ function createRuntime(
 
 function parseRuntimeDefinition(input: string): AgentRuntimeDefinition<typeof RuntimeConfigSchema> {
   return {
+    logoKey: "openai",
     ...JSON.parse(input),
     configSchema: RuntimeConfigSchema,
     compileRuntime: () => ({

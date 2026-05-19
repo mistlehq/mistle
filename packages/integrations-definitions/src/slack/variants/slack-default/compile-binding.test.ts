@@ -165,6 +165,7 @@ describe("compileSlackBinding", () => {
             kind: "exact",
             fileName: "slack-linux-amd64",
             format: "binary",
+            sha256: "1847b087fe7675ce4712b0a140552df51fbc8a8276d7611dbd7ab717c64946c4",
           },
           installPath: "/usr/local/bin/slack",
           timeoutMs: 120_000,

@@ -17,6 +17,7 @@ pub enum RuntimeReadinessMode {
     CodexProxyOnly,
     Codex,
     OpenCodeProxyOnly,
+    PiProxyOnly,
 }
 
 /// Derives the publishable runtime readiness bit from the supervision snapshot.
@@ -30,6 +31,9 @@ pub fn derive_runtime_ready(snapshot: &SandboxdHealthSnapshot, mode: RuntimeRead
         }
         RuntimeReadinessMode::OpenCodeProxyOnly => {
             component_is_healthy(snapshot, SupervisedComponent::OpenCodeProxy)
+        }
+        RuntimeReadinessMode::PiProxyOnly => {
+            component_is_healthy(snapshot, SupervisedComponent::PiProxy)
         }
     }
 }

@@ -88,11 +88,16 @@ export function createTriggerRunExecutionError(input: {
   return new TriggerRunExecutionError(input);
 }
 
+export function isTriggerRunExecutionFailure(input: unknown): boolean {
+  return resolveTriggerRunExecutionFailure(input) !== null;
+}
+
 export function resolveTriggerRunFailure(input: unknown): { code: string; message: string } {
-  if (input instanceof TriggerRunExecutionError) {
+  const triggerRunExecutionFailure = resolveTriggerRunExecutionFailure(input);
+  if (triggerRunExecutionFailure !== null) {
     return {
-      code: input.code,
-      message: input.message,
+      code: triggerRunExecutionFailure.code,
+      message: triggerRunExecutionFailure.message,
     };
   }
 
@@ -107,6 +112,57 @@ export function resolveTriggerRunFailure(input: unknown): { code: string; messag
     code: TriggerRunFailureCodes.TRIGGER_RUN_EXECUTION_FAILED,
     message: "Trigger run execution failed with a non-error exception.",
   };
+}
+
+function resolveTriggerRunExecutionFailure(input: unknown): {
+  code: string;
+  message: string;
+} | null {
+  if (input instanceof TriggerRunExecutionError) {
+    return {
+      code: input.code,
+      message: input.message,
+    };
+  }
+
+  const originalError = getUnknownProperty(input, "originalError");
+  if (originalError instanceof TriggerRunExecutionError) {
+    return {
+      code: originalError.code,
+      message: originalError.message,
+    };
+  }
+
+  if (isTriggerRunExecutionErrorLike(originalError)) {
+    return {
+      code: originalError.code,
+      message: originalError.message,
+    };
+  }
+
+  return null;
+}
+
+function isTriggerRunExecutionErrorLike(input: unknown): input is {
+  code: string;
+  message: string;
+} {
+  const code = getUnknownProperty(input, "code");
+  const message = getUnknownProperty(input, "message");
+  return (
+    typeof code === "string" &&
+    Object.values(TriggerRunFailureCodes).some((candidateCode) => candidateCode === code) &&
+    typeof message === "string"
+  );
+}
+
+function getUnknownProperty(input: unknown, key: string): unknown {
+  if (typeof input !== "object" || input === null || !(key in input)) {
+    return undefined;
+  }
+
+  const value: unknown = Reflect.get(input, key);
+  return value;
 }
 
 function compileTemplates(input: {

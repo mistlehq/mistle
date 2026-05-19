@@ -1650,11 +1650,13 @@ export type RuntimeArtifactGitHubReleaseInstallAssetShape =
   | {
       fileName: string;
       format: "binary";
+      sha256?: string;
     }
   | {
       fileName: string;
       format: "tar.gz";
       extractedPath: string;
+      sha256?: string;
     };
 
 export type RuntimeArtifactGitHubReleaseInstallAsset =
@@ -1679,11 +1681,13 @@ export type RuntimeArtifactGitHubReleaseInstallHelperAssetShape =
   | {
       fileName: string;
       format: "binary";
+      sha256?: string;
     }
   | {
       fileName: string;
       format: "tar.gz";
       extractedPath: string;
+      sha256?: string;
     };
 
 export type RuntimeArtifactGitHubReleaseInstallHelperAsset =

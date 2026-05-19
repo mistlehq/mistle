@@ -9,6 +9,7 @@ import type {
 export type AgentRuntimeOption = {
   runtimeId: string;
   displayName: string;
+  logoKey: string;
 };
 
 export type IntegrationFormDefinitionRecord = {
@@ -71,6 +72,7 @@ function resolveAgentRuntimeOptions(input: {
     .map((runtime) => ({
       runtimeId: runtime.runtimeId,
       displayName: runtime.displayName,
+      logoKey: runtime.logoKey,
     }));
 }
 

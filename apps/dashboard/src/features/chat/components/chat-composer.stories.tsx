@@ -1,3 +1,4 @@
+import { CodexComposerCapabilities } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, userEvent, within } from "storybook/test";
@@ -151,40 +152,8 @@ export const ReadyToSend: Story = {
 
 export const SlashCommandAutocomplete: Story = {
   args: {
-    composerCapabilities: [
-      {
-        kind: "composerCommand",
-        trigger: "/",
-        source: "runtimeCommand",
-        commands: [
-          {
-            id: "codex.review",
-            name: "review",
-            description: "Review the current changes",
-            submitAs: "inlineText",
-          },
-          {
-            id: "codex.explain",
-            name: "explain",
-            description: "Explain the selected code",
-            submitAs: "inlineText",
-          },
-          {
-            id: "codex.rewrite",
-            name: "rewrite",
-            description: "Rewrite with constraints",
-            submitAs: "inlineText",
-          },
-          {
-            id: "codex.compact",
-            name: "compact",
-            description: "Compact the current context",
-            submitAs: "runtimeCommand",
-          },
-        ],
-      },
-    ],
-    composerText: "/re",
+    composerCapabilities: CodexComposerCapabilities,
+    composerText: "/",
   },
   render: (args) => (
     <div className="flex min-h-[420px] items-end">
@@ -199,7 +168,13 @@ export const SlashCommandAutocomplete: Story = {
       canvas.getByRole("option", { name: "/review Review the current changes" }),
     ).toBeVisible();
     await expect(
-      canvas.getByRole("option", { name: "/rewrite Rewrite with constraints" }),
+      canvas.getByRole("option", { name: "/plan Plan before making changes" }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("option", { name: "/goal Set or update the current goal" }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("option", { name: "/compact Compact the current context" }),
     ).toBeVisible();
   },
 };

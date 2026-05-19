@@ -25,6 +25,7 @@ pub enum SupervisedComponent {
     CodexProxy,
     CodexAppServer,
     OpenCodeProxy,
+    PiProxy,
 }
 
 impl SupervisedComponent {
@@ -35,6 +36,7 @@ impl SupervisedComponent {
             Self::CodexProxy => "CodexProxy",
             Self::CodexAppServer => "CodexAppServer",
             Self::OpenCodeProxy => "OpenCodeProxy",
+            Self::PiProxy => "PiProxy",
         }
     }
 }
@@ -645,6 +647,15 @@ fn snapshot_detail_field_names_for_event(
             | LifecycleEventName::ComponentRestartScheduled
             | LifecycleEventName::ComponentRestartSucceeded,
         ) => &["listenAddr", "rawTarget"],
+        (
+            SupervisedComponent::PiProxy,
+            LifecycleEventName::ComponentStarting
+            | LifecycleEventName::ComponentStarted
+            | LifecycleEventName::ComponentHealthcheckFailed
+            | LifecycleEventName::ComponentExited
+            | LifecycleEventName::ComponentRestartScheduled
+            | LifecycleEventName::ComponentRestartSucceeded,
+        ) => &["listenAddr"],
         (
             SupervisedComponent::CodexAppServer,
             LifecycleEventName::ComponentStarting | LifecycleEventName::ComponentRestartScheduled,

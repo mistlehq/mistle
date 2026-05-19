@@ -10,6 +10,7 @@ import { CodexRuntimeConfigSchema } from "./runtime-config-schema.js";
 export const CodexRuntimeDefinition: AgentRuntimeDefinition<typeof CodexRuntimeConfigSchema> = {
   runtimeId: "codex",
   displayName: "Codex",
+  logoKey: "openai",
   configSchema: CodexRuntimeConfigSchema,
   composerCapabilities: CodexComposerCapabilities,
   compileRuntime: compileCodexRuntime,

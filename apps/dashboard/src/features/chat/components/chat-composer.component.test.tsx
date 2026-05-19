@@ -32,6 +32,18 @@ const ComposerCommandCapabilityFixture: React.ComponentProps<
       submitAs: "inlineText",
     },
     {
+      id: "codex.plan",
+      name: "plan",
+      description: "Plan before making changes",
+      submitAs: "inlineText",
+    },
+    {
+      id: "codex.goal",
+      name: "goal",
+      description: "Set or update the current goal",
+      submitAs: "inlineText",
+    },
+    {
       id: "codex.compact",
       name: "compact",
       description: "Compact the current context",

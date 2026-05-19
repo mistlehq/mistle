@@ -26,7 +26,7 @@ type AnthropicIntegrationDefinition = IntegrationDefinition<
 >;
 
 const AnthropicTargetSecretSchema = z.object({}).strict();
-const AnthropicAllowedRuntimeIds = ["opencode"] as const;
+const AnthropicAllowedRuntimeIds = ["opencode", "pi"] as const;
 
 export const AnthropicDefinition: AnthropicIntegrationDefinition = {
   familyId: "anthropic",

@@ -2504,6 +2504,10 @@
                                                     "format": {
                                                       "type": "string",
                                                       "enum": ["binary"]
+                                                    },
+                                                    "sha256": {
+                                                      "type": "string",
+                                                      "pattern": "^[a-f0-9]{64}$/u"
                                                     }
                                                   },
                                                   "required": ["kind", "fileName", "format"],
@@ -2527,6 +2531,10 @@
                                                     "extractedPath": {
                                                       "type": "string",
                                                       "minLength": 1
+                                                    },
+                                                    "sha256": {
+                                                      "type": "string",
+                                                      "pattern": "^[a-f0-9]{64}$/u"
                                                     }
                                                   },
                                                   "required": [
@@ -2556,6 +2564,10 @@
                                                             "format": {
                                                               "type": "string",
                                                               "enum": ["binary"]
+                                                            },
+                                                            "sha256": {
+                                                              "type": "string",
+                                                              "pattern": "^[a-f0-9]{64}$/u"
                                                             }
                                                           },
                                                           "required": ["fileName", "format"],
@@ -2575,6 +2587,10 @@
                                                             "extractedPath": {
                                                               "type": "string",
                                                               "minLength": 1
+                                                            },
+                                                            "sha256": {
+                                                              "type": "string",
+                                                              "pattern": "^[a-f0-9]{64}$/u"
                                                             }
                                                           },
                                                           "required": [
@@ -2598,6 +2614,10 @@
                                                             "format": {
                                                               "type": "string",
                                                               "enum": ["binary"]
+                                                            },
+                                                            "sha256": {
+                                                              "type": "string",
+                                                              "pattern": "^[a-f0-9]{64}$/u"
                                                             }
                                                           },
                                                           "required": ["fileName", "format"],
@@ -2617,6 +2637,10 @@
                                                             "extractedPath": {
                                                               "type": "string",
                                                               "minLength": 1
+                                                            },
+                                                            "sha256": {
+                                                              "type": "string",
+                                                              "pattern": "^[a-f0-9]{64}$/u"
                                                             }
                                                           },
                                                           "required": [

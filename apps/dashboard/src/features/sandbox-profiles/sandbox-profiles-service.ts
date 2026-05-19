@@ -30,6 +30,8 @@ import type {
   UpdateSandboxProfileInput,
 } from "./sandbox-profiles-types.js";
 
+const AgentRuntimeIdSchema = z.enum(["codex", "opencode", "pi"]);
+
 const LaunchableSandboxProfilesResultSchema = z
   .object({
     items: z.array(
@@ -430,7 +432,7 @@ const SandboxProvidersResultSchema = z
 
 const SandboxProfileVersionSchema = z
   .object({
-    agentRuntimeId: z.enum(["codex", "opencode"]),
+    agentRuntimeId: AgentRuntimeIdSchema,
     defaultPersistenceMode: z.enum(["ephemeral", "persistent"]),
     isActive: z.boolean(),
     latestSnapshotJob: z
@@ -580,7 +582,7 @@ const PutSandboxProfileVersionDraftResultSchema = z
     sandboxProfileId: z.string().min(1),
     version: z.number().int().min(1),
     setupScript: z.string().nullable(),
-    agentRuntimeId: z.enum(["codex", "opencode"]),
+    agentRuntimeId: AgentRuntimeIdSchema,
     defaultPersistenceMode: z.enum(["ephemeral", "persistent"]),
     sandboxConnectionId: z.string().min(1).nullable(),
     sandboxProvider: z.string().min(1).nullable(),

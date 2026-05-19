@@ -80,12 +80,12 @@
     "validate:changed": "tsx ./scripts/dev/validate-changed.ts"
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "^3.1033.0",
+    "@aws-sdk/client-s3": "^3.1048.0",
     "@commitlint/cli": "^20.5.3",
     "@commitlint/config-conventional": "^21.0.0",
     "@mistle/test-harness": "workspace:*",
     "@playwright/test": "^1.59.1",
-    "@types/node": "^25.6.0",
+    "@types/node": "^25.6.2",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@typescript/native-preview": "latest",
@@ -98,7 +98,7 @@
     "smol-toml": "^1.6.1",
     "tsc-alias": "^1.8.17",
     "tsx": "^4.20.6",
-    "turbo": "^2.9.9",
+    "turbo": "^2.9.12",
     "typescript": "^5.9.3",
     "vitest": "^4.1.5"
   },

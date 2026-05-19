@@ -4410,28 +4410,64 @@ fn record_egress_token_event(
     let Ok(observed_at) = crate::time::format_rfc3339_timestamp(clock.now_system_time()) else {
         return;
     };
-    let mut payload = Map::new();
-    payload.insert("event".to_string(), Value::String(event.to_string()));
-    payload.insert(
-        "component".to_string(),
-        Value::String(SupervisedComponent::TunnelSession.as_str().to_string()),
-    );
-    payload.insert(
-        "sandboxInstanceId".to_string(),
-        Value::String(sandbox_instance_id.to_string()),
-    );
-    payload.insert(
-        "requestId".to_string(),
-        Value::String(request_id.to_string()),
-    );
-    payload.insert("observedAt".to_string(), Value::String(observed_at));
-    for (field_name, field_value) in extra_fields {
-        payload.insert((*field_name).to_string(), field_value.clone());
-    }
-    if let Ok(line) = serde_json::to_string(&Value::Object(payload)) {
+    if let Ok(Some(line)) = egress_token_operation_record_line(
+        observed_at,
+        event,
+        sandbox_instance_id,
+        request_id,
+        extra_fields,
+    ) {
         enqueue_operation_record(session_state, line + "\n");
         flush_pending_operation_records(tunnel_writer_sender, session_state);
     }
+}
+
+fn egress_token_operation_record_line(
+    observed_at: String,
+    event: &str,
+    sandbox_instance_id: &str,
+    request_id: &str,
+    extra_fields: &[(&str, Value)],
+) -> Result<Option<String>, serde_json::Error> {
+    let mut attributes = Map::new();
+    attributes.insert("event".to_string(), Value::String(event.to_string()));
+    attributes.insert(
+        "component".to_string(),
+        Value::String(SupervisedComponent::TunnelSession.as_str().to_string()),
+    );
+    attributes.insert(
+        "sandboxInstanceId".to_string(),
+        Value::String(sandbox_instance_id.to_string()),
+    );
+    attributes.insert(
+        "requestId".to_string(),
+        Value::String(request_id.to_string()),
+    );
+    for (field_name, field_value) in extra_fields {
+        attributes.insert((*field_name).to_string(), field_value.clone());
+    }
+
+    let Some((status, message)) = (match event {
+        "egress_token_request_started" => Some(("started", "Gateway egress token request started")),
+        "egress_token_request_completed" => {
+            Some(("completed", "Gateway egress token request completed"))
+        }
+        "egress_token_request_failed" => Some(("failed", "Gateway egress token request failed")),
+        _ => None,
+    }) else {
+        return Ok(None);
+    };
+
+    serde_json::to_string(&serde_json::json!({
+        "kind": "lifecycle",
+        "observedAt": observed_at,
+        "phase": "egress",
+        "status": status,
+        "source": "sandboxd",
+        "message": message,
+        "attributes": attributes
+    }))
+    .map(Some)
 }
 
 fn handle_signing_control_message(
@@ -5864,7 +5900,7 @@ mod tests {
         TunnelSessionRuntime, TunnelSessionRuntimeConnectionState, TunnelWriterMessage,
         connect_bootstrap_websocket, handle_ports_transport_message, handle_tunnel_control_message,
         handle_tunnel_session_event, handle_tunnel_session_request,
-        prioritize_ipv4_socket_addresses, resolve_bootstrap_tunnel_url,
+        prioritize_ipv4_socket_addresses, record_egress_token_event, resolve_bootstrap_tunnel_url,
         resolve_tunnel_exchange_url, run_connected_tunnel_session_catching_panics,
         snapshot_runtime_connection_state, startup_transparent_passthrough_socket_mark,
         sync_pty_scope_keepalive,
@@ -6117,6 +6153,60 @@ mod tests {
             connection_state.runtime_env.get("MISTLE_RUNTIME_ENV"),
             Some(&"ready".to_string())
         );
+    }
+
+    #[tokio::test]
+    async fn egress_token_diagnostics_write_lifecycle_operation_records() {
+        let (tunnel_writer_sender, mut tunnel_writer_receiver) =
+            tokio::sync::mpsc::unbounded_channel();
+        let mut session_state = empty_tunnel_session_state();
+        session_state.operation_stream_requested = true;
+        session_state.operation_stream_send_window = Some(StreamSendWindow::new(4096));
+
+        record_egress_token_event(
+            &tunnel_writer_sender,
+            &mut session_state,
+            &FixedClock {
+                now_ms: 1_779_206_400_000,
+            },
+            "sbi_test",
+            "egress_token_request_completed",
+            "egress_token_req_1",
+            &[
+                (
+                    "expiresAt",
+                    Value::String("2100-01-01T00:00:00Z".to_string()),
+                ),
+                ("ttlMs", Value::from(300_000_u64)),
+            ],
+        );
+
+        let writer_message = tunnel_writer_receiver
+            .recv()
+            .await
+            .expect("operation record frame should be queued");
+        let TunnelWriterMessage::Binary(payload) = writer_message else {
+            panic!("expected operation record to be written as a binary frame");
+        };
+        let decoded_frame =
+            decode_stream_data_frame(payload.as_ref()).expect("operation data frame should decode");
+        assert_eq!(decoded_frame.stream_id, SANDBOX_OPERATION_STREAM_ID);
+
+        let line = std::str::from_utf8(&decoded_frame.payload)
+            .expect("operation record payload should be utf8");
+        let record: Value = serde_json::from_str(line).expect("operation record should be json");
+        assert_eq!(record["kind"], "lifecycle");
+        assert_eq!(record["phase"], "egress");
+        assert_eq!(record["status"], "completed");
+        assert_eq!(record["source"], "sandboxd");
+        assert_eq!(record["message"], "Gateway egress token request completed");
+        assert_eq!(
+            record["attributes"]["event"],
+            "egress_token_request_completed"
+        );
+        assert_eq!(record["attributes"]["requestId"], "egress_token_req_1");
+        assert_eq!(record["attributes"]["sandboxInstanceId"], "sbi_test");
+        assert_eq!(record["attributes"]["ttlMs"], 300_000);
     }
 
     #[tokio::test]

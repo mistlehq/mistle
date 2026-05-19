@@ -51,10 +51,12 @@ const CodexGitHubAssets = {
   x86_64: {
     fileName: "codex-x86_64-unknown-linux-musl.tar.gz",
     binaryPath: "codex-x86_64-unknown-linux-musl",
+    sha256: "16779e7b7857508a768a36d7d4e084eec336ec23946ed70a9b09489b8f861190",
   },
   aarch64: {
     fileName: "codex-aarch64-unknown-linux-musl.tar.gz",
     binaryPath: "codex-aarch64-unknown-linux-musl",
+    sha256: "1d7e00f2c22c3016b5bcb71c61010947b022a90e2901bc6baafe82256492c767",
   },
 };
 const ArtifactCommandTimeoutMs = 120_000;
@@ -238,11 +240,13 @@ export function compileCodexRuntime(
                   fileName: CodexGitHubAssets.x86_64.fileName,
                   format: "tar.gz",
                   extractedPath: CodexGitHubAssets.x86_64.binaryPath,
+                  sha256: CodexGitHubAssets.x86_64.sha256,
                 },
                 aarch64: {
                   fileName: CodexGitHubAssets.aarch64.fileName,
                   format: "tar.gz",
                   extractedPath: CodexGitHubAssets.aarch64.binaryPath,
+                  sha256: CodexGitHubAssets.aarch64.sha256,
                 },
               },
               installPath: refs.artifactBinPath("codex"),
