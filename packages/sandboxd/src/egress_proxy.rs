@@ -43,6 +43,7 @@ use hyper_util::rt::TokioExecutor;
 use hyper_util::rt::TokioIo;
 use rustls_pki_types::pem::PemObject;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
+use serde::Deserialize;
 use serde_json::{Map, Value};
 use tokio::io::copy_bidirectional;
 use tokio::net::{TcpListener, TcpSocket, TcpStream};
@@ -81,6 +82,7 @@ const DEFAULT_TRANSPARENT_PROXY_PORT: u16 = 38_514;
 #[cfg(target_os = "linux")]
 const TRANSPARENT_PASSTHROUGH_SOCKET_MARK: u32 = 38_514;
 const TRANSPARENT_NFTABLES_TABLE_NAME: &str = "mistle_transparent_egress";
+const STATIC_LOCAL_DESTINATION_IPV4_CIDRS: [&str; 2] = ["127.0.0.0/8", "169.254.0.0/16"];
 const EGRESS_PROXY_HEALTHCHECK_INTERVAL: Duration = Duration::from_millis(250);
 const EGRESS_PROXY_STARTUP_HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(5);
 const EGRESS_PROXY_RESTART_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];
@@ -200,6 +202,8 @@ struct ActiveEgressProxyServer {
 #[derive(Debug)]
 struct TransparentPacketRules {
     table_name: &'static str,
+    local_destination_ipv4_cidrs: Vec<String>,
+    excluded_ipv4_cidrs: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -207,6 +211,7 @@ struct NftablesRulePlan {
     table_name: &'static str,
     listener_port: u16,
     passthrough_mark: u32,
+    local_destination_ipv4_cidrs: Vec<String>,
     excluded_ipv4_cidrs: Vec<String>,
 }
 
@@ -868,10 +873,34 @@ impl EgressProxy {
                                 log_context.clock,
                                 log_context.sandbox_instance_id,
                                 "egress_proxy_transparent_packet_rules_installed",
-                                &[(
-                                    "tableName",
-                                    Value::String(TRANSPARENT_NFTABLES_TABLE_NAME.to_string()),
-                                )],
+                                &[
+                                    (
+                                        "tableName",
+                                        Value::String(TRANSPARENT_NFTABLES_TABLE_NAME.to_string()),
+                                    ),
+                                    (
+                                        "localDestinationIpv4Cidrs",
+                                        Value::Array(
+                                            packet_rules
+                                                .local_destination_ipv4_cidrs
+                                                .iter()
+                                                .cloned()
+                                                .map(Value::String)
+                                                .collect(),
+                                        ),
+                                    ),
+                                    (
+                                        "excludedIpv4Cidrs",
+                                        Value::Array(
+                                            packet_rules
+                                                .excluded_ipv4_cidrs
+                                                .iter()
+                                                .cloned()
+                                                .map(Value::String)
+                                                .collect(),
+                                        ),
+                                    ),
+                                ],
                             );
                             Some(packet_rules)
                         }
@@ -1340,6 +1369,8 @@ impl TransparentPacketRules {
         }
         Ok(Self {
             table_name: plan.table_name,
+            local_destination_ipv4_cidrs: plan.local_destination_ipv4_cidrs,
+            excluded_ipv4_cidrs: plan.excluded_ipv4_cidrs,
         })
     }
 
@@ -1351,6 +1382,19 @@ impl TransparentPacketRules {
 fn build_nftables_rule_plan(
     configuration: &TransparentProxyConfiguration,
     listener_port: u16,
+) -> Result<NftablesRulePlan, EgressProxyError> {
+    let local_destination_ipv4_cidrs = discover_local_destination_ipv4_cidrs()?;
+    build_nftables_rule_plan_with_local_destinations(
+        configuration,
+        listener_port,
+        local_destination_ipv4_cidrs,
+    )
+}
+
+fn build_nftables_rule_plan_with_local_destinations(
+    configuration: &TransparentProxyConfiguration,
+    listener_port: u16,
+    discovered_local_destination_ipv4_cidrs: Vec<String>,
 ) -> Result<NftablesRulePlan, EgressProxyError> {
     if configuration.passthrough_bypass.kind != TransparentProxyBypassKind::SocketMark {
         return Err(EgressProxyError::new(
@@ -1379,12 +1423,95 @@ fn build_nftables_rule_plan(
     excluded_ipv4_cidrs.sort();
     excluded_ipv4_cidrs.dedup();
 
+    let mut local_destination_ipv4_cidrs = STATIC_LOCAL_DESTINATION_IPV4_CIDRS
+        .iter()
+        .map(|cidr| (*cidr).to_string())
+        .collect::<Vec<_>>();
+    for cidr in discovered_local_destination_ipv4_cidrs {
+        if let Some(ipv4_cidr) = normalize_ipv4_cidr(&cidr)? {
+            local_destination_ipv4_cidrs.push(ipv4_cidr);
+        }
+    }
+    local_destination_ipv4_cidrs.sort();
+    local_destination_ipv4_cidrs.dedup();
+    excluded_ipv4_cidrs.retain(|cidr| !local_destination_ipv4_cidrs.contains(cidr));
+
     Ok(NftablesRulePlan {
         table_name: TRANSPARENT_NFTABLES_TABLE_NAME,
         listener_port,
         passthrough_mark: configuration.passthrough_bypass.mark,
+        local_destination_ipv4_cidrs,
         excluded_ipv4_cidrs,
     })
+}
+
+fn discover_local_destination_ipv4_cidrs() -> Result<Vec<String>, EgressProxyError> {
+    let output = Command::new("ip")
+        .args(["-j", "-4", "route", "show", "table", "main", "scope", "link"])
+        .output()
+        .map_err(|error| {
+            EgressProxyError::new(format!(
+                "failed to discover transparent proxy local destination routes with iproute2: {error}"
+            ))
+        })?;
+    if !output.status.success() {
+        return Err(EgressProxyError::new(format!(
+            "failed to discover transparent proxy local destination routes: ip exited with status {}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        )));
+    }
+    parse_iproute2_link_scope_ipv4_route_cidrs(&output.stdout)
+}
+
+#[derive(Deserialize)]
+struct Iproute2Route {
+    dst: Option<String>,
+}
+
+fn parse_iproute2_link_scope_ipv4_route_cidrs(
+    route_json: &[u8],
+) -> Result<Vec<String>, EgressProxyError> {
+    let routes: Vec<Iproute2Route> = serde_json::from_slice(route_json).map_err(|error| {
+        EgressProxyError::new(format!(
+            "failed to parse transparent proxy local destination routes from iproute2 JSON: {error}"
+        ))
+    })?;
+
+    let mut cidrs = Vec::new();
+    for route in routes {
+        let Some(destination) = route.dst else {
+            continue;
+        };
+        if destination == "default" {
+            continue;
+        }
+        cidrs.push(normalize_ipv4_route_destination(&destination)?);
+    }
+    cidrs.sort();
+    cidrs.dedup();
+    Ok(cidrs)
+}
+
+fn normalize_ipv4_route_destination(value: &str) -> Result<String, EgressProxyError> {
+    if value.contains('/') {
+        return normalize_ipv4_cidr(value)?.ok_or_else(|| {
+            EgressProxyError::new(format!(
+                "transparent proxy local destination route '{value}' is not IPv4"
+            ))
+        });
+    }
+
+    match value.parse::<IpAddr>().map_err(|error| {
+        EgressProxyError::new(format!(
+            "transparent proxy local destination route '{value}' has invalid IP address: {error}"
+        ))
+    })? {
+        IpAddr::V4(ipv4_address) => Ok(format!("{ipv4_address}/32")),
+        IpAddr::V6(_) => Err(EgressProxyError::new(format!(
+            "transparent proxy local destination route '{value}' is not IPv4"
+        ))),
+    }
 }
 
 fn normalize_ipv4_cidr(value: &str) -> Result<Option<String>, EgressProxyError> {
@@ -1482,9 +1609,29 @@ fn build_nftables_install_commands(plan: &NftablesRulePlan) -> Vec<Vec<String>> 
             "meta".to_string(),
             "mark".to_string(),
             plan.passthrough_mark.to_string(),
+            "log".to_string(),
+            "prefix".to_string(),
+            nft_string_literal("mistle-tproxy-bypass=mark"),
             "return".to_string(),
         ],
     ];
+
+    commands.extend(plan.local_destination_ipv4_cidrs.iter().map(|cidr| {
+        vec![
+            "add".to_string(),
+            "rule".to_string(),
+            "ip".to_string(),
+            plan.table_name.to_string(),
+            "output".to_string(),
+            "ip".to_string(),
+            "daddr".to_string(),
+            cidr.clone(),
+            "log".to_string(),
+            "prefix".to_string(),
+            nft_string_literal(&format!("mistle-tproxy-bypass=local:{cidr}")),
+            "return".to_string(),
+        ]
+    }));
 
     commands.extend(plan.excluded_ipv4_cidrs.iter().map(|cidr| {
         vec![
@@ -1496,6 +1643,9 @@ fn build_nftables_install_commands(plan: &NftablesRulePlan) -> Vec<Vec<String>> 
             "ip".to_string(),
             "daddr".to_string(),
             cidr.clone(),
+            "log".to_string(),
+            "prefix".to_string(),
+            nft_string_literal(&format!("mistle-tproxy-bypass=excluded:{cidr}")),
             "return".to_string(),
         ]
     }));
@@ -1515,6 +1665,10 @@ fn build_nftables_install_commands(plan: &NftablesRulePlan) -> Vec<Vec<String>> 
     ]);
 
     commands
+}
+
+fn nft_string_literal(value: &str) -> String {
+    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 fn run_nft_command(arguments: &[String]) -> Result<(), EgressProxyError> {
@@ -3218,12 +3372,12 @@ mod tests {
         filter_direct_gateway_request_headers, match_route, resolve_direct_gateway_route_url,
         resolve_request_target, serialize_egress_proxy_log_line, websocket_target_url,
     };
-    #[cfg(target_os = "linux")]
     use crate::egress_proxy::{
-        TRANSPARENT_NFTABLES_TABLE_NAME, build_nftables_install_commands, build_nftables_rule_plan,
+        TRANSPARENT_NFTABLES_TABLE_NAME, build_nftables_install_commands,
+        build_nftables_rule_plan_with_local_destinations,
+        parse_iproute2_link_scope_ipv4_route_cidrs,
     };
     use crate::protocol::startup::{StartupInput, StartupMode};
-    #[cfg(target_os = "linux")]
     use crate::protocol::startup::{
         TransparentProxyBypass, TransparentProxyBypassKind, TransparentProxyConfiguration,
         TransparentProxyExclusion, TransparentProxyExclusionKind,
@@ -3480,9 +3634,8 @@ mod tests {
         );
     }
 
-    #[cfg(target_os = "linux")]
     #[test]
-    fn builds_nftables_transparent_proxy_rules_with_bypass_exclusions_before_redirect() {
+    fn bypasses_nat_rewritten_bridge_destinations_before_redirect() {
         let configuration = TransparentProxyConfiguration {
             passthrough_bypass: TransparentProxyBypass {
                 kind: TransparentProxyBypassKind::SocketMark,
@@ -3502,11 +3655,24 @@ mod tests {
             ],
         };
 
-        let plan = build_nftables_rule_plan(&configuration, 38_514)
-            .expect("transparent nftables plan should build");
+        let plan = build_nftables_rule_plan_with_local_destinations(
+            &configuration,
+            38_514,
+            vec!["172.17.0.0/16".to_string(), "10.88.0.0/16".to_string()],
+        )
+        .expect("transparent nftables plan should build");
         let commands = build_nftables_install_commands(&plan);
 
         assert_eq!(plan.table_name, TRANSPARENT_NFTABLES_TABLE_NAME);
+        assert_eq!(
+            plan.local_destination_ipv4_cidrs,
+            vec![
+                "10.88.0.0/16",
+                "127.0.0.0/8",
+                "169.254.0.0/16",
+                "172.17.0.0/16"
+            ]
+        );
         assert_eq!(
             commands,
             vec![
@@ -3539,6 +3705,37 @@ mod tests {
                     "meta",
                     "mark",
                     "38514",
+                    "log",
+                    "prefix",
+                    "\"mistle-tproxy-bypass=mark\"",
+                    "return",
+                ],
+                vec![
+                    "add",
+                    "rule",
+                    "ip",
+                    "mistle_transparent_egress",
+                    "output",
+                    "ip",
+                    "daddr",
+                    "10.88.0.0/16",
+                    "log",
+                    "prefix",
+                    "\"mistle-tproxy-bypass=local:10.88.0.0/16\"",
+                    "return",
+                ],
+                vec![
+                    "add",
+                    "rule",
+                    "ip",
+                    "mistle_transparent_egress",
+                    "output",
+                    "ip",
+                    "daddr",
+                    "127.0.0.0/8",
+                    "log",
+                    "prefix",
+                    "\"mistle-tproxy-bypass=local:127.0.0.0/8\"",
                     "return",
                 ],
                 vec![
@@ -3550,6 +3747,23 @@ mod tests {
                     "ip",
                     "daddr",
                     "169.254.0.0/16",
+                    "log",
+                    "prefix",
+                    "\"mistle-tproxy-bypass=local:169.254.0.0/16\"",
+                    "return",
+                ],
+                vec![
+                    "add",
+                    "rule",
+                    "ip",
+                    "mistle_transparent_egress",
+                    "output",
+                    "ip",
+                    "daddr",
+                    "172.17.0.0/16",
+                    "log",
+                    "prefix",
+                    "\"mistle-tproxy-bypass=local:172.17.0.0/16\"",
                     "return",
                 ],
                 vec![
@@ -3561,6 +3775,9 @@ mod tests {
                     "ip",
                     "daddr",
                     "192.0.2.0/24",
+                    "log",
+                    "prefix",
+                    "\"mistle-tproxy-bypass=excluded:192.0.2.0/24\"",
                     "return",
                 ],
                 vec![
@@ -3577,6 +3794,23 @@ mod tests {
                     ":38514",
                 ],
             ]
+        );
+    }
+
+    #[test]
+    fn parses_link_scope_ipv4_routes_as_local_destination_cidrs() {
+        let cidrs = parse_iproute2_link_scope_ipv4_route_cidrs(
+            br#"[
+                {"dst":"172.17.0.0/16","dev":"docker0","protocol":"kernel","scope":"link","prefsrc":"172.17.0.1"},
+                {"dst":"10.88.0.0/16","dev":"podman0","protocol":"kernel","scope":"link","prefsrc":"10.88.0.1"},
+                {"dst":"192.0.2.12","dev":"veth0","protocol":"kernel","scope":"link","prefsrc":"192.0.2.12"}
+            ]"#,
+        )
+        .expect("iproute2 link-scope route JSON should parse");
+
+        assert_eq!(
+            cidrs,
+            vec!["10.88.0.0/16", "172.17.0.0/16", "192.0.2.12/32"]
         );
     }
 

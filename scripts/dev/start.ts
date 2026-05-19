@@ -15,6 +15,7 @@ import {
   createDockerBaseImageBuilder,
 } from "../../packages/sandbox/src/index.js";
 import { ensureDevObjectStoreBucketExists } from "./ensure-object-store-bucket.ts";
+import { publishLocalDockerImageToHttpRegistry } from "./local-registry-publisher.ts";
 import { createControlPlaneStartupCommands } from "./start-commands.ts";
 import {
   createLocalDevInfraPlan,
@@ -512,16 +513,15 @@ async function start(): Promise<void> {
       console.log("Sandbox base image is up to date.");
     }
 
-    console.log("Pushing sandbox base image to the local registry...");
+    console.log("Publishing sandbox base image to the local HTTP registry...");
     runOrThrow({
       command: "docker",
       args: ["tag", SANDBOX_BASE_IMAGE_TAG, SANDBOX_BASE_IMAGE_REGISTRY_TAG],
       env: sharedDevEnv,
     });
-    runOrThrow({
-      command: "docker",
-      args: ["push", SANDBOX_BASE_IMAGE_REGISTRY_TAG],
-      env: sharedDevEnv,
+    await publishLocalDockerImageToHttpRegistry({
+      sourceImageRef: SANDBOX_BASE_IMAGE_TAG,
+      targetImageRef: SANDBOX_BASE_IMAGE_REGISTRY_TAG,
     });
 
     if (!sandboxBaseCacheHit) {
