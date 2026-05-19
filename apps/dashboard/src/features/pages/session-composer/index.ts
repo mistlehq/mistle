@@ -12,6 +12,10 @@ export {
 export { ComposerStatusBanner } from "./composer-status-banner.js";
 export { SessionComposerActivityRow } from "./session-composer-activity-row.js";
 export { resolveComposerSubmitAction } from "./session-composer-capabilities.js";
+export {
+  detectActiveComposerTrigger,
+  type ActiveComposerTrigger,
+} from "./session-composer-trigger-detection.js";
 export { resolveComposerStatusMessage } from "./session-composer-status.js";
 export { readComposerConfigSnapshot } from "./session-composer-config.js";
 export {
