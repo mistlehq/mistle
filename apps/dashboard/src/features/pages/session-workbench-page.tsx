@@ -31,6 +31,10 @@ import { reconcilePendingSessionDiffComments } from "./session-diff-comment.js";
 import { parseSessionDiffPatch } from "./session-diff-panel-model.js";
 import { SessionDiffPanel } from "./session-diff-panel.js";
 import { SessionPortAccessPopover, SessionPortAccessSheet } from "./session-port-access-popover.js";
+import {
+  shouldAttemptRequestedThreadResume,
+  type RequestedThreadResumeAttempt,
+} from "./session-requested-thread-resume-policy.js";
 import { SessionStartupStatus } from "./session-startup-status.js";
 import type {
   SessionTerminalContentInset,
@@ -78,6 +82,7 @@ function SessionWorkbenchPageContent(input: {
   const [hasEnteredReadyWorkbench, setHasEnteredReadyWorkbench] = useState(false);
   const [isThreadNavigatorPanelVisible, setThreadNavigatorPanelVisible] = useState(false);
   const conversationScrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const requestedThreadResumeAttemptRef = useRef<RequestedThreadResumeAttempt | null>(null);
   const [composerText, setComposerText] = useState("");
   const [pendingDiffComments, setPendingDiffComments] = useState<
     readonly PendingSessionDiffComment[]
@@ -453,19 +458,32 @@ function SessionWorkbenchPageContent(input: {
     handleStartThread();
   }, [handleStartThread]);
   useEffect(() => {
+    if (input.requestedThreadId === null) {
+      requestedThreadResumeAttemptRef.current = null;
+      return;
+    }
+
     if (codexThreadNavigator === null) {
       return;
     }
 
     if (
-      input.requestedThreadId === null ||
-      input.requestedThreadId === codexThreadNavigator.activeThreadId
+      !shouldAttemptRequestedThreadResume({
+        activeThreadId: codexThreadNavigator.activeThreadId,
+        previousAttempt: requestedThreadResumeAttemptRef.current,
+        requestedThreadId: input.requestedThreadId,
+        sandboxInstanceId: input.sandboxInstanceId,
+      })
     ) {
       return;
     }
 
+    requestedThreadResumeAttemptRef.current = {
+      sandboxInstanceId: input.sandboxInstanceId,
+      threadId: input.requestedThreadId,
+    };
     void codexThreadNavigator.resumeThread(input.requestedThreadId).catch(() => {});
-  }, [codexThreadNavigator, input.requestedThreadId]);
+  }, [codexThreadNavigator, input.requestedThreadId, input.sandboxInstanceId]);
   const canRenderThreadNavigation =
     codexThreadNavigator !== null && workbench.primaryPanelState.transitionState !== "stable_cli";
   const threadNavigatorProps: CodexThreadNavigatorProps | null = canRenderThreadNavigation
