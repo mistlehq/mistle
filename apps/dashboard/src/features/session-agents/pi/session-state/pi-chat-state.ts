@@ -545,6 +545,83 @@ function readEventMessage(event: PiEvent): PiAgentMessage | null {
   };
 }
 
+function readEventMessages(event: PiEvent): readonly PiAgentMessage[] {
+  if (!Array.isArray(event.messages)) {
+    return [];
+  }
+
+  return event.messages.flatMap((message) => {
+    if (!isRecord(message)) {
+      return [];
+    }
+    const role = readStringProperty(message, "role");
+    if (role === null) {
+      return [];
+    }
+    return [
+      {
+        ...message,
+        role,
+      },
+    ];
+  });
+}
+
+function getMessageDeduplicationKey(message: PiAgentMessage): string {
+  return JSON.stringify({
+    content: message.content,
+    role: message.role,
+    timestamp: message.timestamp ?? null,
+  });
+}
+
+function appendMissingMessages(input: {
+  existingMessages: readonly PiAgentMessage[];
+  incomingMessages: readonly PiAgentMessage[];
+}): readonly PiAgentMessage[] {
+  const seenKeys = new Set(input.existingMessages.map(getMessageDeduplicationKey));
+  const nextMessages = [...input.existingMessages];
+  for (const message of input.incomingMessages) {
+    const key = getMessageDeduplicationKey(message);
+    if (seenKeys.has(key)) {
+      continue;
+    }
+    seenKeys.add(key);
+    nextMessages.push(message);
+  }
+  return nextMessages;
+}
+
+function appendFinalAgentMessages(input: {
+  incomingMessages: readonly PiAgentMessage[];
+  state: PiChatState;
+}): readonly PiAgentMessage[] {
+  if (input.incomingMessages.length === 0) {
+    return input.state.messages;
+  }
+
+  const firstIncomingMessage = input.incomingMessages[0];
+  const lastExistingMessage = input.state.messages.at(-1);
+  if (
+    input.state.pendingTurnId !== null &&
+    firstIncomingMessage !== undefined &&
+    firstIncomingMessage.role === "user" &&
+    lastExistingMessage?.role === "user" &&
+    readMessageTextContent(firstIncomingMessage.content) ===
+      readMessageTextContent(lastExistingMessage.content)
+  ) {
+    return appendMissingMessages({
+      existingMessages: [...input.state.messages.slice(0, -1), firstIncomingMessage],
+      incomingMessages: input.incomingMessages.slice(1),
+    });
+  }
+
+  return appendMissingMessages({
+    existingMessages: input.state.messages,
+    incomingMessages: input.incomingMessages,
+  });
+}
+
 function readToolResultOutput(result: unknown): string | null {
   if (!isRecord(result)) {
     return formatSemanticChatDetail({
@@ -810,8 +887,16 @@ export function reducePiChatState(state: PiChatState, action: PiChatAction): PiC
     });
   }
   if (event.type === "agent_end") {
+    const finalMessages = readEventMessages(event);
     return rebuildState({
       ...state,
+      messages:
+        finalMessages.length === 0
+          ? state.messages
+          : appendFinalAgentMessages({
+              incomingMessages: finalMessages,
+              state,
+            }),
       pendingToolExecutions: [],
       pendingTurnId: null,
       status: "idle",

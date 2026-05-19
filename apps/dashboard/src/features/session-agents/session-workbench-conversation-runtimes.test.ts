@@ -322,6 +322,7 @@ describe("buildPiConversationRuntime", () => {
     expect(runtime.conversation.chatState.activeTurnId).toBe("pi:user:1");
     expect(runtime.conversation.chatState.pendingTurnId).toBe("pi:user:1");
     expect(runtime.conversation.chatState.status).toBe("inProgress");
+    expect(runtime.composerRuntimeInput.turnControl.activeTurnState).toBe("running");
     expect(runtime.composerRuntimeInput.turnControl.canSteer).toBe(true);
     expect(runtime.composerRuntimeInput.modelSelection).toEqual({
       required: false,

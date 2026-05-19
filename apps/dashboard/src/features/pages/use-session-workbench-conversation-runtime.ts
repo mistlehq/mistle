@@ -89,9 +89,10 @@ export function useSessionWorkbenchConversationRuntime(input: {
   const { configControl } = useCodexWorkbenchComposerState({
     sessionState,
   });
-  const activeSessionThreadId = input.isOpenCodeRuntime
-    ? null
-    : (input.sessionSnapshot?.activeThreadId ?? null);
+  const activeSessionThreadId =
+    input.isOpenCodeRuntime || input.isPiRuntime
+      ? null
+      : (input.sessionSnapshot?.activeThreadId ?? null);
   const contextUsage =
     sessionState.threadTokenUsageSnapshot?.threadId ===
     sessionState.lifecycle.sessionSnapshot?.activeThreadId

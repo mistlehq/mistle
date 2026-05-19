@@ -9,10 +9,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
-import {
-  SessionWorkbenchPage,
-  shouldShowSessionWorkingIndicator,
-} from "./session-workbench-page.js";
+import { SessionWorkbenchPage } from "./session-workbench-page.js";
 
 function renderSessionWorkbenchPage(input?: {
   queryClientOptions?: Parameters<typeof createTestQueryClient>[0];
@@ -69,11 +66,6 @@ describe("SessionWorkbenchPage", () => {
       },
       writable: true,
     });
-  });
-
-  it("shows the working indicator from the runtime turn-control state", () => {
-    expect(shouldShowSessionWorkingIndicator({ activeTurnState: "running" })).toBe(true);
-    expect(shouldShowSessionWorkingIndicator({ activeTurnState: "idle" })).toBe(false);
   });
 
   it("shows the initial loading startup state before sandbox status is trusted", () => {

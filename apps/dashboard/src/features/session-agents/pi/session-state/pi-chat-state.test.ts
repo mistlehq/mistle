@@ -219,6 +219,64 @@ describe("reducePiChatState", () => {
     ]);
   });
 
+  it("merges final Pi messages from the agent-end event", () => {
+    const hydratedState = reducePiChatState(createInitialPiChatState(), {
+      type: "hydrate_messages",
+      sessionFile: "/root/.pi/agent/sessions/session.jsonl",
+      messages: [
+        {
+          role: "user",
+          content: "previous question",
+          timestamp: 1,
+        },
+      ],
+    });
+    const submittedState = reducePiChatState(hydratedState, {
+      type: "prompt_submitted",
+      sessionFile: "/root/.pi/agent/sessions/session.jsonl",
+      submittedPrompt: "hello",
+    });
+
+    const completedState = reducePiChatState(submittedState, {
+      type: "event_received",
+      event: {
+        type: "agent_end",
+        messages: [
+          {
+            role: "user",
+            content: "hello",
+            timestamp: 2,
+          },
+          {
+            role: "assistant",
+            content: [{ type: "text", text: "hi there" }],
+            timestamp: 3,
+          },
+        ],
+      },
+    });
+
+    expect(completedState.messages).toEqual([
+      {
+        role: "user",
+        content: "previous question",
+        timestamp: 1,
+      },
+      {
+        role: "user",
+        content: "hello",
+        timestamp: 2,
+      },
+      {
+        role: "assistant",
+        content: [{ type: "text", text: "hi there" }],
+        timestamp: 3,
+      },
+    ]);
+    expect(completedState.status).toBe("idle");
+    expect(completedState.pendingTurnId).toBeNull();
+  });
+
   it("rebuilds completed Pi tool semantic groups from persisted transcript messages", () => {
     const hydratedState = reducePiChatState(createInitialPiChatState(), {
       type: "hydrate_messages",

@@ -129,11 +129,15 @@ async function hydrateConnectedPiChat(input: {
   client: PiSessionClient;
   dispatchChatAction: Dispatch<Parameters<typeof reducePiChatState>[1]>;
   sessionFile: string;
+  shouldApply?: () => boolean;
   status?: "busy" | "idle";
 }): Promise<readonly PiAgentMessage[]> {
   const messages = await input.client.getMessages({
     sessionFile: input.sessionFile,
   });
+  if (input.shouldApply !== undefined && !input.shouldApply()) {
+    return messages;
+  }
   input.dispatchChatAction({
     type: "hydrate_messages",
     ...(input.bufferedEvents === undefined ? {} : { bufferedEvents: input.bufferedEvents }),
@@ -222,22 +226,7 @@ export function usePiSessionState(input: {
     if (client === null || sessionFile === null) {
       throw new Error("Connect Pi before hydrating messages.");
     }
-    setIsHydratingChat(true);
-    try {
-      await hydrateConnectedPiChat({
-        client,
-        dispatchChatAction,
-        sessionFile,
-      });
-      setSessionErrorMessage(null);
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Could not hydrate Pi messages.";
-      setSessionErrorMessage(errorMessage);
-      throw error instanceof Error ? error : new Error(errorMessage);
-    } finally {
-      setIsHydratingChat(false);
-    }
+    setSessionErrorMessage(null);
   }, [sessionSnapshot?.activeSessionFile]);
 
   const hydrateChatFromConversation = useCallback(async (): Promise<void> => {
@@ -326,13 +315,22 @@ export function usePiSessionState(input: {
           const activeSessionState = await client.getState({
             sessionFile: activeSessionFile,
           });
+          if (generationRef.current !== generation) {
+            client.close();
+            return;
+          }
           await hydrateConnectedPiChat({
             bufferedEvents,
             client,
             dispatchChatAction,
             sessionFile: activeSessionFile,
+            shouldApply: () => generationRef.current === generation,
             status: resolvePiChatStatusFromSessionState(activeSessionState),
           });
+          if (generationRef.current !== generation) {
+            client.close();
+            return;
+          }
           hydrationHasCompleted = true;
           setSessionSnapshot({
             activeDirectory: connectInput.initialCwd ?? null,
