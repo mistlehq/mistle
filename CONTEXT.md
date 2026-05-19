@@ -152,6 +152,11 @@ _Avoid_: Slash autocomplete
 - Chat semantic groups describe the specific visible work within a **Working agent turn**, such as thinking, exploring, running commands, or making edits.
 - Pi tool execution events are the source of truth for live in-progress chat semantic groups.
 - Persisted Pi transcript messages are the source of truth for rebuilding completed chat semantic groups after refresh.
+- Pi built-in `read`, `grep`, `find`, and `ls` tool activity maps to the exploring chat semantic group.
+- Pi built-in `bash` tool activity maps to the running-commands chat semantic group.
+- Pi built-in `edit` and `write` tool activity maps to the making-edits chat semantic group.
+- Pi thinking content maps to the thinking chat semantic group.
+- Pi extension tool activity maps to the generic tool-call chat semantic group unless the tool has an explicit semantic classifier.
 - Pi itself exposes transcript events, message reads, model controls, thinking controls, session stats, image inputs, and runtime commands through its RPC surface.
 - The current Mistle Pi adapter may expose a narrower subset than Pi itself; chat UI behavior should follow the adapter contract it has actually wired rather than assuming every upstream Pi RPC command is available.
 - Pi composer controls should be Pi-owned controls, not Codex-owned **Composer commands** or Codex context controls.
