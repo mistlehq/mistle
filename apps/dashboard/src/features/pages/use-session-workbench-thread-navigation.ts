@@ -4,7 +4,6 @@ import {
   projectCodexThreadNavigatorRows,
   resolveDefaultCodexThreadId,
 } from "../session-agents/codex/codex-thread-navigator-model.js";
-import type { CodexThreadNavigatorRow } from "../session-agents/codex/codex-thread-navigator-model.js";
 import type { CodexThreadNavigatorProps } from "../session-agents/codex/codex-thread-navigator.js";
 import type { MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import {
@@ -29,7 +28,6 @@ type SessionWorkbenchThreadNavigationInput = {
 };
 
 export type SessionWorkbenchThreadNavigationState = {
-  activeHeaderRow: CodexThreadNavigatorRow | null;
   closePanel: () => void;
   isDiffPanelActive: boolean;
   isPanelVisible: boolean;
@@ -84,10 +82,6 @@ export function useSessionWorkbenchThreadNavigation(
       availableThreads: input.codexThreadNavigator.availableThreads,
     });
   }, [input.codexThreadNavigator]);
-
-  const activeHeaderRow = useMemo(() => {
-    return threadNavigatorRows.find((row) => row.isActive) ?? null;
-  }, [threadNavigatorRows]);
 
   const pushThreadSearchParams = useCallback(
     (threadId: string): void => {
@@ -244,7 +238,6 @@ export function useSessionWorkbenchThreadNavigation(
   }, [input.closeDiffPanel]);
 
   return {
-    activeHeaderRow,
     closePanel,
     isDiffPanelActive,
     isPanelVisible,

@@ -15,9 +15,7 @@ import { MemoryRouter, NavLink } from "react-router";
 import { ErrorNotice } from "../auth/error-notice.js";
 import { noop } from "../chat/components/chat-story-support.js";
 import { SessionsNavToggleItem } from "../navigation/sessions-nav-toggle-item.js";
-import { CodexThreadHeaderScope } from "../session-agents/codex/codex-thread-header-scope.js";
 import {
-  ActiveCodexThreadNavigatorStoryRow,
   CodexThreadNavigatorWorkbenchStoryRows,
   createCodexThreadNavigatorStoryProps,
 } from "../session-agents/codex/codex-thread-navigator-story-support.js";
@@ -64,14 +62,7 @@ const FailedSandboxSetupMessage =
   "Failed to initialize sandbox runtime. Cause: failed to submit sandbox init request: control socket returned an error: failed to initialize sandboxd state: failed to apply startup input: runtime plan artifacts[0] lifecycle.install[0] failed (artifactKey=codex-cli op=github_release_install): github release lookup failed for openai/codex release tag match=exact tag=rust-v0.131.0: http 403";
 
 function CodexThreadNavigationHeaderTitle(): React.JSX.Element {
-  return (
-    <div className="flex min-w-0 items-center gap-2">
-      <span className="block min-w-0 shrink truncate text-sm font-medium text-foreground">
-        Storybook session
-      </span>
-      <CodexThreadHeaderScope row={ActiveCodexThreadNavigatorStoryRow} />
-    </div>
-  );
+  return <span className="block min-w-0 truncate text-sm font-medium">Storybook session</span>;
 }
 
 function CodexThreadNavigationPanel(): React.JSX.Element {

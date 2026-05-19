@@ -1,7 +1,7 @@
 import type { CodexThreadNavigatorRow } from "./codex-thread-navigator-model.js";
 import type { CodexThreadNavigatorProps } from "./codex-thread-navigator.js";
 
-export const ActiveCodexThreadNavigatorStoryRow = {
+const ActiveCodexThreadNavigatorStoryRow = {
   id: "thread_active",
   title: "Implement thread navigation",
   cwd: "/Users/jonathanlow/mistle-projects/mistle-add-threads-handling",
