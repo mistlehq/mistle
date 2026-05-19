@@ -87,6 +87,7 @@ _Avoid_: Chat page when referring to the whole workspace
 **Session bottom panel**:
 The sandbox-scoped lower workbench area used for terminal-style tools within a **Session workbench**.
 _Avoid_: Thread panel, Codex thread panel
+
 ## Relationships
 
 - A **Sandbox profile version** may have one usable **Snapshot**.
