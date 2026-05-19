@@ -1,8 +1,23 @@
-import { Button, Notice } from "@mistle/ui";
+import {
+  Button,
+  Notice,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@mistle/ui";
+import { HouseIcon, LightningIcon, PackageIcon, PuzzlePieceIcon } from "@phosphor-icons/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
+import { MemoryRouter, NavLink } from "react-router";
 
+import { ErrorNotice } from "../auth/error-notice.js";
 import { noop } from "../chat/components/chat-story-support.js";
+import { SessionsNavToggleItem } from "../navigation/sessions-nav-toggle-item.js";
+import { CodexThreadHeaderScope } from "../session-agents/codex/codex-thread-header-scope.js";
+import type { CodexThreadNavigatorRow } from "../session-agents/codex/codex-thread-navigator-model.js";
+import { CodexThreadNavigatorPanel } from "../session-agents/codex/codex-thread-navigator.js";
 import {
   SessionComposerFixturePropsForLoadingModel,
   SessionComposerFixturePropsForNonImageCapableModel,
@@ -12,6 +27,9 @@ import {
   SessionComposerFixtureStatusMessageForUnavailableModel,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
 import { ActionTile } from "../shared/action-tile.js";
+import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
+import { AppShellView } from "../shell/app-shell-view.js";
+import { AppSidebarHeader } from "../shell/app-sidebar-header.js";
 import type { SandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import {
@@ -28,6 +46,7 @@ import { SessionTerminalWorkspaceView } from "./session-terminal-workspace.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 
 type SessionWorkbenchPageViewStoryArgs = React.ComponentProps<typeof SessionWorkbenchPageView> & {
+  headerTitle?: React.ReactNode;
   headerStatusUi: SandboxStatusBadgeUi;
 };
 
@@ -39,6 +58,219 @@ function buildPageViewTerminalOutput(cwd: string): string {
 
 const FailedSandboxSetupMessage =
   "Failed to initialize sandbox runtime. Cause: failed to submit sandbox init request: control socket returned an error: failed to initialize sandboxd state: failed to apply startup input: runtime plan artifacts[0] lifecycle.install[0] failed (artifactKey=codex-cli op=github_release_install): github release lookup failed for openai/codex release tag match=exact tag=rust-v0.131.0: http 403";
+
+const ActiveThreadNavigatorRow = {
+  id: "thread_active",
+  title: "Implement thread navigation",
+  preview: "Implement thread navigation",
+  cwd: "/Users/jonathanlow/mistle-projects/mistle-add-threads-handling",
+  cwdSectionLabel: "mistle-add-threads-handling",
+  updatedAt: 100,
+  createdAt: 50,
+  isActive: true,
+  isLoaded: true,
+  isOpening: false,
+  isPinnedCurrent: false,
+  pendingServerRequestCount: 0,
+} satisfies CodexThreadNavigatorRow;
+
+const ThreadNavigatorRows = [
+  ActiveThreadNavigatorRow,
+  {
+    id: "thread_review",
+    title: "Review terminal port ownership",
+    preview: "Review terminal port ownership",
+    cwd: "/Users/jonathanlow/mistle-projects/mistle-add-threads-handling",
+    cwdSectionLabel: "mistle-add-threads-handling",
+    updatedAt: 80,
+    createdAt: 40,
+    isActive: false,
+    isLoaded: true,
+    isOpening: false,
+    isPinnedCurrent: false,
+    pendingServerRequestCount: 1,
+  },
+  {
+    id: "thread_other_repo",
+    title: "Draft launch note",
+    preview: "Draft launch note",
+    cwd: "/Users/jonathanlow/mistle-projects/mistle.dev",
+    cwdSectionLabel: "mistle.dev",
+    updatedAt: 60,
+    createdAt: 20,
+    isActive: false,
+    isLoaded: false,
+    isOpening: false,
+    isPinnedCurrent: true,
+    pendingServerRequestCount: 0,
+  },
+] satisfies readonly CodexThreadNavigatorRow[];
+
+function CodexThreadNavigationHeaderTitle(): React.JSX.Element {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <span className="block min-w-0 shrink truncate text-sm font-medium text-foreground">
+        Storybook session
+      </span>
+      <CodexThreadHeaderScope row={ActiveThreadNavigatorRow} />
+    </div>
+  );
+}
+
+function CodexThreadNavigationPanel(): React.JSX.Element {
+  return (
+    <CodexThreadNavigatorPanel
+      isThreadListLimited={false}
+      isStartingThread={false}
+      onRefreshThreads={noop}
+      onSelectThread={noop}
+      onStartThread={noop}
+      rows={ThreadNavigatorRows}
+    />
+  );
+}
+
+function CodexThreadNavigationWorkbenchStory(input?: {
+  defaultThreadNavigatorOpen?: boolean;
+}): React.JSX.Element {
+  const [isThreadNavigatorOpen, setThreadNavigatorOpen] = useState(
+    input?.defaultThreadNavigatorOpen ?? false,
+  );
+
+  return (
+    <SessionWorkbenchStoryChrome
+      headerActions={
+        <SessionWorkbenchStoryHeaderActions
+          isThreadNavigatorVisible={isThreadNavigatorOpen}
+          onThreadNavigatorToggle={() => {
+            setThreadNavigatorOpen((currentValue) => !currentValue);
+          }}
+          showThreadNavigatorControl
+        />
+      }
+      title={<CodexThreadNavigationHeaderTitle />}
+    >
+      <SessionWorkbenchPageView
+        alert={null}
+        bottomPanel={<></>}
+        isBottomPanelVisible={false}
+        isSecondaryPanelVisible={isThreadNavigatorOpen}
+        mainContent={createStorySessionMainContent()}
+        primaryBottomPanel={createStorySessionBottomPanel()}
+        sandboxInstanceId={StorySandboxInstanceId}
+        secondaryPanelDefaultSize="20%"
+        secondaryPanelLayoutKey="threads"
+        secondaryPanelMinSize="16rem"
+        secondaryPanel={<CodexThreadNavigationPanel />}
+      />
+    </SessionWorkbenchStoryChrome>
+  );
+}
+
+function StoryAppSidebarContent(): React.JSX.Element {
+  const [showSessionsSidebar, setShowSessionsSidebar] = useState(true);
+
+  return (
+    <SidebarGroup className="pt-0">
+      <SidebarGroupContent>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton render={<NavLink to="/" />}>
+              <HouseIcon aria-hidden className="size-5 shrink-0 md:size-4" />
+              <span>Home</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton render={<NavLink to="/integrations" />}>
+              <PuzzlePieceIcon aria-hidden className="size-5 shrink-0 md:size-4" />
+              <span>Integrations</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton render={<NavLink to="/sandbox-profiles" />}>
+              <PackageIcon aria-hidden className="size-5 shrink-0 md:size-4" />
+              <span>Sandbox Profiles</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton render={<NavLink to="/triggers" />}>
+              <LightningIcon aria-hidden className="size-5 shrink-0 md:size-4" />
+              <span>Triggers</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SessionsNavToggleItem
+            checked={showSessionsSidebar}
+            onCheckedChange={setShowSessionsSidebar}
+          />
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
+}
+
+function CodexThreadNavigationAppShellStory(input?: {
+  defaultThreadNavigatorOpen?: boolean;
+}): React.JSX.Element {
+  const [isThreadNavigatorOpen, setThreadNavigatorOpen] = useState(
+    input?.defaultThreadNavigatorOpen ?? false,
+  );
+
+  return (
+    <MemoryRouter initialEntries={["/sessions/sbi_storybook"]}>
+      <AppShellView
+        contentInsetOwner="child"
+        mainContent={
+          <ConversationWorkspaceFrame
+            actions={
+              <SessionWorkbenchStoryHeaderActions
+                isThreadNavigatorVisible={isThreadNavigatorOpen}
+                onThreadNavigatorToggle={() => {
+                  setThreadNavigatorOpen((currentValue) => !currentValue);
+                }}
+                showThreadNavigatorControl
+              />
+            }
+            title={<CodexThreadNavigationHeaderTitle />}
+          >
+            <SessionWorkbenchPageView
+              alert={null}
+              bottomPanel={<></>}
+              isBottomPanelVisible={false}
+              isSecondaryPanelVisible={isThreadNavigatorOpen}
+              mainContent={createStorySessionMainContent()}
+              primaryBottomPanel={createStorySessionBottomPanel()}
+              sandboxInstanceId={StorySandboxInstanceId}
+              secondaryPanelDefaultSize="20%"
+              secondaryPanelLayoutKey="threads"
+              secondaryPanelMinSize="16rem"
+              secondaryPanel={<CodexThreadNavigationPanel />}
+            />
+          </ConversationWorkspaceFrame>
+        }
+        renderSidebarTrigger
+        sidebarContent={<StoryAppSidebarContent />}
+        sidebarDefaultOpen
+        sidebarFooterContent={<ErrorNotice message={null} />}
+        sidebarHeaderContent={
+          <AppSidebarHeader
+            activeOrganizationId="org_mistle"
+            isSigningOut={false}
+            onNavigateToSettings={function onNavigateToSettings() {}}
+            onSignOut={function onSignOut() {}}
+            onSwitchOrganization={function onSwitchOrganization() {}}
+            organizationImageUrl={null}
+            organizationName="Mistle Labs"
+            organizationSummaryErrorMessage={null}
+            organizationSwitcherErrorMessage={null}
+            organizations={[{ id: "org_mistle", name: "Mistle Labs" }]}
+          />
+        }
+        topLoadingBar={<div className="h-0" />}
+        viewportMode="workspace"
+      />
+    </MemoryRouter>
+  );
+}
 
 function FailedSetupWithRestartActionStoryContent(): React.JSX.Element {
   return (
@@ -125,8 +357,15 @@ const meta = {
   },
   decorators: [
     function StoryDecorator(Story, context): React.JSX.Element {
+      if (context.parameters.sessionWorkbenchChrome === false) {
+        return <Story />;
+      }
+
       return (
-        <SessionWorkbenchStoryChrome headerStatusUi={context.args.headerStatusUi}>
+        <SessionWorkbenchStoryChrome
+          headerStatusUi={context.args.headerStatusUi}
+          title={context.args.headerTitle}
+        >
           <Story />
         </SessionWorkbenchStoryChrome>
       );
@@ -204,6 +443,29 @@ export const WithSecondaryPane: Story = {
   args: {
     isSecondaryPanelVisible: true,
   },
+};
+
+export const WithCodexThreadNavigation: Story = {
+  parameters: {
+    sessionWorkbenchChrome: false,
+  },
+  render: () => <CodexThreadNavigationWorkbenchStory />,
+};
+
+export const WithCodexThreadNavigationAppShell: Story = {
+  name: "With Codex thread navigation in app shell",
+  parameters: {
+    sessionWorkbenchChrome: false,
+  },
+  render: () => <CodexThreadNavigationAppShellStory />,
+};
+
+export const WithCodexThreadNavigationAppShellOpen: Story = {
+  name: "With Codex thread navigation panel open",
+  parameters: {
+    sessionWorkbenchChrome: false,
+  },
+  render: () => <CodexThreadNavigationAppShellStory defaultThreadNavigatorOpen />,
 };
 
 export const WithNonImageCapableModelWarning: Story = {

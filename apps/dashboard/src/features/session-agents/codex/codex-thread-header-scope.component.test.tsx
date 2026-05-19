@@ -12,7 +12,7 @@ function createThreadRow(input?: Partial<CodexThreadNavigatorRow>): CodexThreadN
     title: "Implement thread navigation",
     preview: "Implement thread navigation",
     cwd: "/Users/test/project",
-    cwdLabel: null,
+    cwdSectionLabel: "project",
     updatedAt: 100,
     createdAt: 50,
     isActive: true,
@@ -37,11 +37,5 @@ describe("CodexThreadHeaderScope", () => {
     const scope = screen.getByLabelText("Active Codex thread");
     expect(within(scope).getByText("Thread")).toBeTruthy();
     expect(within(scope).getByText("Implement thread navigation")).toBeTruthy();
-  });
-
-  it("shows the cwd label when the active thread is outside the selected repository scope", () => {
-    render(<CodexThreadHeaderScope row={createThreadRow({ cwdLabel: "other-project" })} />);
-
-    expect(screen.getByText("other-project")).toBeTruthy();
   });
 });

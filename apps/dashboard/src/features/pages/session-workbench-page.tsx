@@ -1,5 +1,4 @@
-import { Button, SidebarTrigger, useSidebar } from "@mistle/ui";
-import { ListBulletsIcon } from "@phosphor-icons/react";
+import { SidebarTrigger, useSidebar } from "@mistle/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
@@ -8,11 +7,9 @@ import { CodexThreadHeaderScope } from "../session-agents/codex/codex-thread-hea
 import {
   projectCodexThreadNavigatorRows,
   resolveDefaultCodexThreadId,
-  type CodexThreadNavigatorScope,
 } from "../session-agents/codex/codex-thread-navigator-model.js";
 import {
-  CodexThreadNavigator,
-  CodexThreadNavigatorSheet,
+  CodexThreadNavigatorPanel,
   type CodexThreadNavigatorProps,
 } from "../session-agents/codex/codex-thread-navigator.js";
 import { SessionHeaderTitle } from "../sessions/session-header-title.js";
@@ -79,9 +76,7 @@ function SessionWorkbenchPageContent(input: {
     sandboxInstanceId: input.sandboxInstanceId,
   });
   const [hasEnteredReadyWorkbench, setHasEnteredReadyWorkbench] = useState(false);
-  const [threadNavigatorScope, setThreadNavigatorScope] =
-    useState<CodexThreadNavigatorScope>("repository");
-  const [isThreadNavigatorSheetOpen, setThreadNavigatorSheetOpen] = useState(false);
+  const [isThreadNavigatorPanelVisible, setThreadNavigatorPanelVisible] = useState(false);
   const conversationScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [composerText, setComposerText] = useState("");
   const [pendingDiffComments, setPendingDiffComments] = useState<
@@ -135,6 +130,7 @@ function SessionWorkbenchPageContent(input: {
   const diffButtonTitle = isDiffOpenDisabled
     ? (workbench.stoppedSessionMessage ?? "Changes are available only when the sandbox is running.")
     : diffButtonLabel;
+  const isDiffPanelActive = workbench.diffPanelState.isVisible && !isThreadNavigatorPanelVisible;
   const cliButtonLabel = "TUI";
   const cliRuntimeDisplayName = workbench.primaryPanelState.cliRuntimeDisplayName;
   const cliButtonTitle = workbench.primaryPanelState.isCliToggleActive
@@ -171,15 +167,21 @@ function SessionWorkbenchPageContent(input: {
           title: cliButtonTitle,
         }}
         diffControl={{
-          ariaLabel: diffButtonLabel,
-          className: workbench.diffPanelState.isVisible
+          ariaLabel: isDiffPanelActive ? "Changes" : "Open changes",
+          className: isDiffPanelActive
             ? "bg-muted text-foreground shadow-none hover:bg-muted/80"
             : "bg-transparent text-foreground shadow-none hover:bg-muted/60",
           disabled: isDiffOpenDisabled,
           onClick: () => {
-            workbench.diffPanelState.togglePanel();
+            setThreadNavigatorPanelVisible(false);
+            if (workbench.diffPanelState.isVisible) {
+              workbench.diffPanelState.closePanel();
+              return;
+            }
+
+            workbench.diffPanelState.openPanel();
           },
-          pressed: workbench.diffPanelState.isVisible,
+          pressed: isDiffPanelActive,
           title: diffButtonTitle,
         }}
         mobilePortAccessControl={{
@@ -232,6 +234,30 @@ function SessionWorkbenchPageContent(input: {
           kind: headerStatusKind,
           label: headerStatusLabel,
         }}
+        {...(conversationPane.codexThreadNavigator !== null &&
+        workbench.primaryPanelState.transitionState !== "stable_cli"
+          ? {
+              threadControl: {
+                ariaLabel: "Show threads",
+                className: isThreadNavigatorPanelVisible
+                  ? "bg-muted text-foreground shadow-none hover:bg-muted/80"
+                  : "bg-transparent text-foreground shadow-none hover:bg-muted/60",
+                disabled: false,
+                onClick: () => {
+                  setThreadNavigatorPanelVisible((currentValue) => {
+                    const nextValue = !currentValue;
+                    if (nextValue) {
+                      workbench.diffPanelState.closePanel();
+                    }
+
+                    return nextValue;
+                  });
+                },
+                pressed: isThreadNavigatorPanelVisible,
+                title: "Show threads",
+              },
+            }
+          : {})}
         terminalControl={{
           ariaLabel: terminalButtonLabel,
           className: workbench.terminalPanelState.isVisible
@@ -255,16 +281,19 @@ function SessionWorkbenchPageContent(input: {
     [
       isTerminalOpenDisabled,
       isDiffOpenDisabled,
+      isDiffPanelActive,
       cliButtonTitle,
-      diffButtonLabel,
       diffButtonTitle,
       headerStatusKind,
       headerStatusLabel,
+      conversationPane.codexThreadNavigator,
+      isThreadNavigatorPanelVisible,
       terminalButtonLabel,
       terminalButtonTitle,
       workbench.connectionReadiness.canConnect,
+      workbench.diffPanelState.closePanel,
       workbench.diffPanelState.isVisible,
-      workbench.diffPanelState.togglePanel,
+      workbench.diffPanelState.openPanel,
       workbench.portAccessState,
       workbench.primaryRepositoryState.errorMessage,
       workbench.primaryRepositoryState.isInitialLoading,
@@ -280,6 +309,7 @@ function SessionWorkbenchPageContent(input: {
       workbench.primaryPanelState.enterCliMode,
       workbench.primaryPanelState.exitCliMode,
       workbench.primaryPanelState.isCliToggleActive,
+      workbench.primaryPanelState.transitionState,
       workbench.stoppedSessionMessage,
       workbench.terminalPanelState.closePanel,
       workbench.terminalPanelState.isVisible,
@@ -323,8 +353,6 @@ function SessionWorkbenchPageContent(input: {
     : "";
   const primaryRepositoryPath = workbench.primaryRepositoryState.selectedRepositoryPath;
   const codexThreadNavigator = conversationPane.codexThreadNavigator;
-  const effectiveThreadNavigatorScope =
-    primaryRepositoryPath === null ? "all" : threadNavigatorScope;
   const pendingThreadServerRequestThreadIds = useMemo(() => {
     return conversationPane.serverRequestsState.pendingServerRequests.flatMap((entry) => {
       if (entry.kind === "command-approval" || entry.kind === "file-change-approval") {
@@ -345,15 +373,8 @@ function SessionWorkbenchPageContent(input: {
       loadedThreadIds: codexThreadNavigator.loadedThreadIds,
       pendingThreadId: codexThreadNavigator.pendingThreadId,
       pendingServerRequestThreadIds: pendingThreadServerRequestThreadIds,
-      scope: effectiveThreadNavigatorScope,
-      selectedRepositoryPath: primaryRepositoryPath,
     });
-  }, [
-    codexThreadNavigator,
-    effectiveThreadNavigatorScope,
-    pendingThreadServerRequestThreadIds,
-    primaryRepositoryPath,
-  ]);
+  }, [codexThreadNavigator, pendingThreadServerRequestThreadIds]);
   const defaultThreadId = useMemo(() => {
     if (codexThreadNavigator === null) {
       return null;
@@ -415,13 +436,13 @@ function SessionWorkbenchPageContent(input: {
   }, [codexThreadNavigator, input, primaryRepositoryPath]);
   const handleSelectThreadFromSheet = useCallback(
     (threadId: string): void => {
-      setThreadNavigatorSheetOpen(false);
+      setThreadNavigatorPanelVisible(false);
       handleSelectThread(threadId);
     },
     [handleSelectThread],
   );
   const handleStartThreadFromSheet = useCallback((): void => {
-    setThreadNavigatorSheetOpen(false);
+    setThreadNavigatorPanelVisible(false);
     handleStartThread();
   }, [handleStartThread]);
   useEffect(() => {
@@ -440,17 +461,15 @@ function SessionWorkbenchPageContent(input: {
     codexThreadNavigator !== null && workbench.primaryPanelState.transitionState !== "stable_cli";
   const threadNavigatorProps: CodexThreadNavigatorProps | null = canRenderThreadNavigation
     ? {
-        canUseRepositoryScope: primaryRepositoryPath !== null,
         isStartingThread: codexThreadNavigator.isStartingNewThread,
+        isThreadListLimited: codexThreadNavigator.hasMoreAvailableThreads,
         onRefreshThreads: codexThreadNavigator.refreshThreadList,
-        onScopeChange: setThreadNavigatorScope,
         onSelectThread: handleSelectThread,
         onStartThread: handleStartThread,
         rows: threadNavigatorRows,
-        scope: effectiveThreadNavigatorScope,
       }
     : null;
-  const mobileThreadNavigatorProps: CodexThreadNavigatorProps | null =
+  const panelThreadNavigatorProps: CodexThreadNavigatorProps | null =
     threadNavigatorProps === null
       ? null
       : {
@@ -458,8 +477,12 @@ function SessionWorkbenchPageContent(input: {
           onSelectThread: handleSelectThreadFromSheet,
           onStartThread: handleStartThreadFromSheet,
         };
-  const conversationSidebar =
-    threadNavigatorProps === null ? null : <CodexThreadNavigator {...threadNavigatorProps} />;
+  const secondaryPanelKind =
+    panelThreadNavigatorProps !== null && isThreadNavigatorPanelVisible
+      ? "threads"
+      : workbench.diffPanelState.isVisible
+        ? "diff"
+        : null;
 
   useEffect(() => {
     if (!workbench.connectionReadiness.canConnect) {
@@ -557,28 +580,6 @@ function SessionWorkbenchPageContent(input: {
     <ConversationWorkspaceFrame
       title={
         <div className="flex min-w-0 items-center gap-2">
-          {mobileThreadNavigatorProps === null ? null : (
-            <>
-              <Button
-                aria-label="Show threads"
-                className="md:hidden"
-                onClick={() => {
-                  setThreadNavigatorSheetOpen(true);
-                }}
-                size="icon-sm"
-                title="Show threads"
-                type="button"
-                variant="ghost"
-              >
-                <ListBulletsIcon aria-hidden className="size-4" />
-              </Button>
-              <CodexThreadNavigatorSheet
-                isOpen={isThreadNavigatorSheetOpen}
-                navigator={mobileThreadNavigatorProps}
-                onOpenChange={setThreadNavigatorSheetOpen}
-              />
-            </>
-          )}
           <div className="min-w-0 shrink">
             <SessionHeaderTitle sandboxInstanceId={input.sandboxInstanceId} />
           </div>
@@ -611,8 +612,16 @@ function SessionWorkbenchPageContent(input: {
           />
         }
         isBottomPanelVisible={workbench.terminalPanelState.isVisible}
-        isSecondaryPanelVisible={workbench.diffPanelState.isVisible}
-        conversationSidebar={conversationSidebar}
+        isSecondaryPanelVisible={secondaryPanelKind !== null}
+        {...(secondaryPanelKind === "threads"
+          ? {
+              secondaryPanelDefaultSize: "20%",
+              secondaryPanelLayoutKey: "threads",
+              secondaryPanelMinSize: "16rem",
+            }
+          : {
+              secondaryPanelLayoutKey: "diff",
+            })}
         mainContentLayout={
           workbench.primaryPanelState.transitionState === "stable_cli" ||
           initialEntryStartupState !== null
@@ -677,20 +686,24 @@ function SessionWorkbenchPageContent(input: {
           ) : null
         }
         secondaryPanel={
-          <SessionDiffPanel
-            errorNotice={diffPanelErrorNotice}
-            isLoading={
-              workbench.connectionReadiness.canConnect && workbench.diffPanelState.isLoading
-            }
-            onAddComment={handleAddPendingDiffComment}
-            onDeleteComment={handleRemovePendingDiffComment}
-            onUpdateComment={handleUpdatePendingDiffComment}
-            pendingComments={pendingDiffComments}
-            patch={diffPanelPatch}
-            repositoryPath={primaryRepositoryPath}
-            summaryLabel={workbench.diffPanelState.compareLabel}
-            title="Current changes"
-          />
+          secondaryPanelKind === "threads" && panelThreadNavigatorProps !== null ? (
+            <CodexThreadNavigatorPanel {...panelThreadNavigatorProps} />
+          ) : (
+            <SessionDiffPanel
+              errorNotice={diffPanelErrorNotice}
+              isLoading={
+                workbench.connectionReadiness.canConnect && workbench.diffPanelState.isLoading
+              }
+              onAddComment={handleAddPendingDiffComment}
+              onDeleteComment={handleRemovePendingDiffComment}
+              onUpdateComment={handleUpdatePendingDiffComment}
+              pendingComments={pendingDiffComments}
+              patch={diffPanelPatch}
+              repositoryPath={primaryRepositoryPath}
+              summaryLabel={workbench.diffPanelState.compareLabel}
+              title="Current changes"
+            />
+          )
         }
         sandboxInstanceId={input.sandboxInstanceId}
       />

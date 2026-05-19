@@ -1,7 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import type { CodexThreadNavigatorScope } from "../session-agents/codex/codex-thread-navigator-model.js";
 import { formatCodexContextUsage } from "../session-agents/codex/session-state/codex-context-usage.js";
 import type { UseCodexSessionStateResult } from "../session-agents/codex/session-state/index.js";
 import type { UseOpenCodeSessionStateResult } from "../session-agents/opencode/session-state/index.js";
@@ -36,6 +35,7 @@ export type SessionConversationPaneState = SessionWorkbenchRuntimeAdapter["conve
     activeThreadCwd: string | null;
     activeThreadId: string | null;
     availableThreads: UseCodexSessionStateResult["threads"]["availableThreads"];
+    hasMoreAvailableThreads: boolean;
     loadedThreadIds: readonly string[];
     pendingThreadId: string | null;
     isRefreshingThreads: boolean;
@@ -43,7 +43,6 @@ export type SessionConversationPaneState = SessionWorkbenchRuntimeAdapter["conve
     refreshThreadList: () => void;
     resumeThread: (threadId: string) => Promise<string>;
     startNewThread: (input?: { cwd?: string }) => Promise<string>;
-    initialScope: CodexThreadNavigatorScope;
   } | null;
 };
 
@@ -245,6 +244,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
             activeThreadCwd: sessionState.lifecycle.sessionSnapshot?.activeThreadCwd ?? null,
             activeThreadId: sessionState.lifecycle.sessionSnapshot?.activeThreadId ?? null,
             availableThreads: sessionState.threads.availableThreads,
+            hasMoreAvailableThreads: sessionState.threads.hasMoreAvailableThreads,
             loadedThreadIds: sessionState.threads.loadedThreadIds,
             pendingThreadId: sessionState.threads.pendingThreadId,
             isRefreshingThreads: sessionState.threads.isRefreshingThreads,
@@ -252,7 +252,6 @@ export function useSessionWorkbenchConversationRuntime(input: {
             refreshThreadList: sessionState.threads.refreshThreadList,
             resumeThread: sessionState.threads.resumeThread,
             startNewThread: sessionState.threads.startNewThread,
-            initialScope: input.selectedRepositoryPath === null ? "all" : "repository",
           },
       serverRequestsState: activeRuntime.serverRequestsState,
     },

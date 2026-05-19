@@ -1,27 +1,21 @@
 import {
   Button,
-  ButtonGroup,
-  ButtonGroupText,
   OverflowTooltipText,
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
+  Spinner,
 } from "@mistle/ui";
-import { PlusIcon } from "@phosphor-icons/react";
+import { ArrowClockwiseIcon, PlusIcon } from "@phosphor-icons/react";
 
-import type {
-  CodexThreadNavigatorRow,
-  CodexThreadNavigatorScope,
-} from "./codex-thread-navigator-model.js";
+import type { CodexThreadNavigatorRow } from "./codex-thread-navigator-model.js";
 
 export type CodexThreadNavigatorProps = {
   rows: readonly CodexThreadNavigatorRow[];
-  scope: CodexThreadNavigatorScope;
-  canUseRepositoryScope: boolean;
+  isThreadListLimited: boolean;
   isStartingThread: boolean;
   onRefreshThreads: () => void;
-  onScopeChange: (scope: CodexThreadNavigatorScope) => void;
   onSelectThread: (threadId: string) => void;
   onStartThread: () => void;
 };
@@ -37,14 +31,26 @@ export function CodexThreadNavigator(input: CodexThreadNavigatorProps): React.JS
   );
 }
 
+export function CodexThreadNavigatorPanel(input: CodexThreadNavigatorProps): React.JSX.Element {
+  return (
+    <section aria-label="Threads" className="bg-background h-full min-h-0">
+      <CodexThreadNavigatorContent {...input} />
+    </section>
+  );
+}
+
 export function CodexThreadNavigatorSheet(input: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   navigator: CodexThreadNavigatorProps;
+  side?: "left" | "right";
 }): React.JSX.Element {
   return (
     <Sheet onOpenChange={input.onOpenChange} open={input.isOpen}>
-      <SheetContent className="!h-[100dvh] max-h-[100dvh] w-80 gap-0 p-0" side="left">
+      <SheetContent
+        className="!h-[100dvh] max-h-[100dvh] w-80 gap-0 p-0"
+        side={input.side ?? "right"}
+      >
         <SheetHeader className="sr-only">
           <SheetTitle>Threads</SheetTitle>
         </SheetHeader>
@@ -56,95 +62,99 @@ export function CodexThreadNavigatorSheet(input: {
 
 function CodexThreadNavigatorContent(input: CodexThreadNavigatorProps): React.JSX.Element {
   const hasRows = input.rows.length > 0;
+  const rowSections = groupRowsByCwd(input.rows);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center justify-between border-b px-3 py-2">
-        <h2 className="font-medium text-sm">Threads</h2>
-        <Button
-          aria-label="New thread"
-          disabled={input.isStartingThread}
-          onClick={input.onStartThread}
-          size="icon-sm"
-          title="New thread"
-          type="button"
-          variant="ghost"
-        >
-          <PlusIcon aria-hidden className="size-4" />
-        </Button>
-      </div>
-
-      <div className="shrink-0 border-b px-3 py-2">
-        <div aria-label="Thread scope" className="grid grid-cols-2 rounded-md border p-0.5">
-          <button
-            aria-pressed={input.canUseRepositoryScope && input.scope === "repository"}
-            className={`rounded-sm px-2 py-1 text-xs font-medium ${
-              input.canUseRepositoryScope && input.scope === "repository"
-                ? "bg-muted text-foreground"
-                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-            }`}
-            disabled={!input.canUseRepositoryScope}
-            onClick={() => input.onScopeChange("repository")}
+        <div className="min-w-0">
+          <h2 className="font-medium text-sm">Threads</h2>
+          {input.isThreadListLimited ? (
+            <div className="text-muted-foreground text-xs">Showing latest 20 only</div>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-1">
+          <Button
+            aria-label="Refresh threads"
+            onClick={input.onRefreshThreads}
+            size="icon-sm"
+            title="Refresh threads"
             type="button"
+            variant="ghost"
           >
-            Repository
-          </button>
-          <button
-            aria-pressed={!input.canUseRepositoryScope || input.scope === "all"}
-            className={`rounded-sm px-2 py-1 text-xs font-medium ${
-              !input.canUseRepositoryScope || input.scope === "all"
-                ? "bg-muted text-foreground"
-                : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-            }`}
-            onClick={() => input.onScopeChange("all")}
+            <ArrowClockwiseIcon aria-hidden className="size-4" />
+          </Button>
+          <Button
+            aria-label="New thread"
+            disabled={input.isStartingThread}
+            onClick={input.onStartThread}
+            size="icon-sm"
+            title="New thread"
             type="button"
+            variant="ghost"
           >
-            All
-          </button>
+            <PlusIcon aria-hidden className="size-4" />
+          </Button>
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
         {hasRows ? (
-          <div className="space-y-1">
-            {input.rows.map((row) => (
-              <CodexThreadNavigatorRowView
-                key={`${row.isPinnedCurrent ? "pinned:" : ""}${row.id}`}
-                onSelectThread={input.onSelectThread}
-                row={row}
-              />
+          <div className="space-y-3">
+            {rowSections.map((section) => (
+              <section key={section.cwd} aria-label={section.label}>
+                <div className="px-2 pb-1 text-[11px] font-medium text-muted-foreground">
+                  {section.label}
+                </div>
+                <div className="space-y-1">
+                  {section.rows.map((row) => (
+                    <CodexThreadNavigatorRowView
+                      key={`${row.isPinnedCurrent ? "pinned:" : ""}${row.id}`}
+                      onSelectThread={input.onSelectThread}
+                      row={row}
+                    />
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         ) : (
           <div className="px-2 py-8 text-center">
-            <p className="text-muted-foreground text-sm">No threads in this scope.</p>
-            {input.scope === "repository" ? (
-              <Button
-                className="mt-3"
-                onClick={() => input.onScopeChange("all")}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                View all threads
-              </Button>
-            ) : null}
+            <p className="text-muted-foreground text-sm">No threads.</p>
           </div>
         )}
       </div>
-
-      <div className="shrink-0 border-t p-2">
-        <ButtonGroup className="w-full">
-          <ButtonGroupText className="min-w-0 flex-1 justify-start text-muted-foreground text-xs">
-            Latest 20
-          </ButtonGroupText>
-          <Button onClick={input.onRefreshThreads} size="sm" type="button" variant="ghost">
-            Refresh
-          </Button>
-        </ButtonGroup>
-      </div>
     </div>
   );
+}
+
+function groupRowsByCwd(rows: readonly CodexThreadNavigatorRow[]): readonly {
+  cwd: string;
+  label: string;
+  rows: readonly CodexThreadNavigatorRow[];
+}[] {
+  const sectionOrder: string[] = [];
+  const rowsByCwd = new Map<string, CodexThreadNavigatorRow[]>();
+
+  for (const row of rows) {
+    const existingRows = rowsByCwd.get(row.cwd);
+    if (existingRows === undefined) {
+      sectionOrder.push(row.cwd);
+      rowsByCwd.set(row.cwd, [row]);
+      continue;
+    }
+
+    existingRows.push(row);
+  }
+
+  return sectionOrder.map((cwd) => {
+    const sectionRows = rowsByCwd.get(cwd) ?? [];
+    return {
+      cwd,
+      label: sectionRows[0]?.cwdSectionLabel ?? cwd,
+      rows: sectionRows,
+    };
+  });
 }
 
 function CodexThreadNavigatorRowView(input: {
@@ -152,13 +162,6 @@ function CodexThreadNavigatorRowView(input: {
   onSelectThread: (threadId: string) => void;
 }): React.JSX.Element {
   const row = input.row;
-  const rowStateLabel = row.isOpening
-    ? "Opening"
-    : row.isActive
-      ? "Active"
-      : row.isLoaded
-        ? "Loaded"
-        : null;
 
   return (
     <button
@@ -175,36 +178,37 @@ function CodexThreadNavigatorRowView(input: {
     >
       <div className="flex min-w-0 items-start gap-2">
         <div className="min-w-0 flex-1">
-          <OverflowTooltipText
-            className="min-w-0 text-[13px] leading-tight font-medium"
-            text={row.title}
-            tooltipSide="right"
-            tooltipSideOffset={8}
-          />
-          <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] leading-tight">
-            {row.pendingServerRequestCount === 0 ? null : (
-              <span className="shrink-0 rounded-sm bg-amber-500/10 px-1 py-0.5 font-medium text-amber-700 dark:text-amber-300">
-                Needs input
-              </span>
-            )}
-            {rowStateLabel === null ? null : (
-              <span className="shrink-0 rounded-sm bg-primary/10 px-1 py-0.5 font-medium text-primary">
-                {rowStateLabel}
-              </span>
-            )}
-            {row.isPinnedCurrent ? (
-              <span className="shrink-0 rounded-sm bg-muted px-1 py-0.5 font-medium text-muted-foreground">
-                Current
-              </span>
-            ) : null}
-            {row.cwdLabel === null ? null : (
-              <span className="min-w-0 truncate" title={row.cwd}>
-                {row.cwdLabel}
-              </span>
-            )}
+          <div className="flex min-w-0 items-center gap-2">
+            <OverflowTooltipText
+              className="min-w-0 text-[13px] leading-tight font-medium"
+              text={row.title}
+              tooltipSide="right"
+              tooltipSideOffset={8}
+            />
+            <CodexThreadNavigatorRowIndicator row={row} />
           </div>
         </div>
       </div>
     </button>
   );
+}
+
+function CodexThreadNavigatorRowIndicator(input: {
+  row: CodexThreadNavigatorRow;
+}): React.JSX.Element | null {
+  if (input.row.isOpening) {
+    return <Spinner aria-label="Opening thread" className="size-3.5 shrink-0" />;
+  }
+
+  if (input.row.pendingServerRequestCount > 0) {
+    return (
+      <span
+        aria-label="Needs input"
+        className="size-2 shrink-0 rounded-full bg-amber-500"
+        role="status"
+      />
+    );
+  }
+
+  return null;
 }

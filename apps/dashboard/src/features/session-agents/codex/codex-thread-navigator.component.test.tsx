@@ -12,7 +12,7 @@ const Rows = [
     title: "Active work",
     preview: "Active preview",
     cwd: "/workspace/repo-a",
-    cwdLabel: null,
+    cwdSectionLabel: "repo-a",
     createdAt: 10,
     updatedAt: 20,
     isActive: true,
@@ -26,7 +26,7 @@ const Rows = [
     title: "Other work",
     preview: "Other preview",
     cwd: "/workspace/repo-b",
-    cwdLabel: "repo-b",
+    cwdSectionLabel: "repo-b",
     createdAt: 30,
     updatedAt: 40,
     isActive: false,
@@ -38,30 +38,48 @@ const Rows = [
 ] satisfies readonly CodexThreadNavigatorRow[];
 
 describe("CodexThreadNavigator", () => {
-  it("renders thread rows with active and opening metadata", () => {
+  it("renders thread rows with compact status indicators", () => {
     render(
       <CodexThreadNavigator
-        canUseRepositoryScope
+        isThreadListLimited={false}
         isStartingThread={false}
         onRefreshThreads={function onRefreshThreads() {}}
-        onScopeChange={function onScopeChange() {}}
         onSelectThread={function onSelectThread() {}}
         onStartThread={function onStartThread() {}}
         rows={Rows}
-        scope="repository"
       />,
     );
 
     const navigator = screen.getByRole("complementary", { name: "Threads" });
     expect(within(navigator).getByRole("heading", { name: "Threads" })).toBeTruthy();
     expect(within(navigator).getByRole("button", { name: "New thread" })).toBeTruthy();
+    expect(within(navigator).queryByText("Showing latest 20 only")).toBeNull();
+    expect(within(navigator).getByRole("button", { name: "Refresh threads" })).toBeTruthy();
+    expect(within(navigator).getByRole("region", { name: "repo-a" })).toBeTruthy();
+    expect(within(navigator).getByRole("region", { name: "repo-b" })).toBeTruthy();
     expect(within(navigator).getByRole("button", { name: /Active work/ })).toBeTruthy();
-    expect(within(navigator).getByText("Needs input")).toBeTruthy();
-    expect(within(navigator).getByText("Active")).toBeTruthy();
+    expect(within(navigator).getByRole("status", { name: "Needs input" })).toBeTruthy();
     expect(within(navigator).getByRole("button", { name: /Other work/ })).toBeTruthy();
-    expect(within(navigator).getByText("Opening")).toBeTruthy();
-    expect(within(navigator).getByText("Current")).toBeTruthy();
-    expect(within(navigator).getByText("repo-b")).toBeTruthy();
+    expect(within(navigator).getByLabelText("Opening thread")).toBeTruthy();
+    expect(within(navigator).queryByText("Active")).toBeNull();
+    expect(within(navigator).queryByText("Loaded")).toBeNull();
+    expect(within(navigator).queryByText("Current")).toBeNull();
+  });
+
+  it("states when the thread list is limited to the latest 20", () => {
+    render(
+      <CodexThreadNavigator
+        isThreadListLimited
+        isStartingThread={false}
+        onRefreshThreads={function onRefreshThreads() {}}
+        onSelectThread={function onSelectThread() {}}
+        onStartThread={function onStartThread() {}}
+        rows={Rows}
+      />,
+    );
+
+    const navigator = screen.getByRole("complementary", { name: "Threads" });
+    expect(within(navigator).getByText("Showing latest 20 only")).toBeTruthy();
   });
 
   it("renders the same thread list inside the mobile sheet", () => {
@@ -69,14 +87,12 @@ describe("CodexThreadNavigator", () => {
       <CodexThreadNavigatorSheet
         isOpen
         navigator={{
-          canUseRepositoryScope: true,
+          isThreadListLimited: false,
           isStartingThread: false,
           onRefreshThreads: function onRefreshThreads() {},
-          onScopeChange: function onScopeChange() {},
           onSelectThread: function onSelectThread() {},
           onStartThread: function onStartThread() {},
           rows: Rows,
-          scope: "repository",
         }}
         onOpenChange={function onOpenChange() {}}
       />,

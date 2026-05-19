@@ -57,6 +57,7 @@ export type { ConnectedCodexSession, StartSessionStep };
 
 type CodexSessionThreadState = {
   availableThreads: readonly CodexThreadSummary[];
+  hasMoreAvailableThreads: boolean;
   archivedThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
   pendingThreadId: string | null;
@@ -177,6 +178,7 @@ export function useCodexSessionState(input: {
 
   const {
     availableThreads,
+    hasMoreAvailableThreads,
     archivedThreads,
     loadedThreadIds,
     refreshThreadList,
@@ -777,6 +779,7 @@ export function useCodexSessionState(input: {
   const threads = useMemo<CodexSessionThreadState>(() => {
     return {
       availableThreads,
+      hasMoreAvailableThreads,
       archivedThreads,
       loadedThreadIds,
       pendingThreadId,
@@ -808,6 +811,7 @@ export function useCodexSessionState(input: {
     archiveThread,
     archivedThreads,
     availableThreads,
+    hasMoreAvailableThreads,
     compactThread,
     forkThread,
     isArchivingThread,

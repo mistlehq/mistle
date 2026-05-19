@@ -1,13 +1,11 @@
 import type { CodexThreadSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 
-export type CodexThreadNavigatorScope = "repository" | "all";
-
 export type CodexThreadNavigatorRow = {
   id: string;
   title: string;
   preview: string | null;
   cwd: string;
-  cwdLabel: string | null;
+  cwdSectionLabel: string;
   updatedAt: number | null;
   createdAt: number | null;
   isActive: boolean;
@@ -46,16 +44,9 @@ function resolveThreadTitle(thread: CodexThreadSummary): string {
   return "Untitled thread";
 }
 
-function resolvePathLabel(input: {
-  cwd: string;
-  selectedRepositoryPath: string | null;
-}): string | null {
-  if (input.selectedRepositoryPath !== null && input.cwd === input.selectedRepositoryPath) {
-    return null;
-  }
-
-  const pathSegments = input.cwd.split("/").filter((segment) => segment.length > 0);
-  return pathSegments.at(-1) ?? input.cwd;
+function resolveCwdSectionLabel(cwd: string): string {
+  const pathSegments = cwd.split("/").filter((segment) => segment.length > 0);
+  return pathSegments.at(-1) ?? cwd;
 }
 
 function createNavigatorRow(input: {
@@ -63,7 +54,6 @@ function createNavigatorRow(input: {
   loadedThreadIds: ReadonlySet<string>;
   pendingThreadId: string | null;
   pendingServerRequestCountsByThreadId: ReadonlyMap<string, number>;
-  selectedRepositoryPath: string | null;
   thread: CodexThreadSummary;
   isPinnedCurrent: boolean;
 }): CodexThreadNavigatorRow {
@@ -72,10 +62,7 @@ function createNavigatorRow(input: {
     title: resolveThreadTitle(input.thread),
     preview: input.thread.preview,
     cwd: input.thread.cwd,
-    cwdLabel: resolvePathLabel({
-      cwd: input.thread.cwd,
-      selectedRepositoryPath: input.selectedRepositoryPath,
-    }),
+    cwdSectionLabel: resolveCwdSectionLabel(input.thread.cwd),
     updatedAt: input.thread.updatedAt,
     createdAt: input.thread.createdAt,
     isActive: input.thread.id === input.activeThreadId,
@@ -103,26 +90,19 @@ export function projectCodexThreadNavigatorRows(input: {
   loadedThreadIds: readonly string[];
   pendingThreadId: string | null;
   pendingServerRequestThreadIds: readonly string[];
-  scope: CodexThreadNavigatorScope;
-  selectedRepositoryPath: string | null;
 }): readonly CodexThreadNavigatorRow[] {
   const loadedThreadIds = new Set(input.loadedThreadIds);
   const pendingServerRequestCountsByThreadId = countPendingServerRequestsByThreadId(
     input.pendingServerRequestThreadIds,
   );
   const sortedThreads = [...input.availableThreads].sort(compareThreadActivity);
-  const scopedThreads =
-    input.scope === "repository" && input.selectedRepositoryPath !== null
-      ? sortedThreads.filter((thread) => thread.cwd === input.selectedRepositoryPath)
-      : sortedThreads;
 
-  const rows = scopedThreads.map((thread) =>
+  const rows = sortedThreads.map((thread) =>
     createNavigatorRow({
       activeThreadId: input.activeThreadId,
       loadedThreadIds,
       pendingThreadId: input.pendingThreadId,
       pendingServerRequestCountsByThreadId,
-      selectedRepositoryPath: input.selectedRepositoryPath,
       thread,
       isPinnedCurrent: false,
     }),
@@ -143,7 +123,6 @@ export function projectCodexThreadNavigatorRows(input: {
       loadedThreadIds,
       pendingThreadId: input.pendingThreadId,
       pendingServerRequestCountsByThreadId,
-      selectedRepositoryPath: input.selectedRepositoryPath,
       thread: activeThread,
       isPinnedCurrent: true,
     }),

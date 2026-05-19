@@ -22,6 +22,7 @@ import {
   DotsThreeIcon,
   GitBranchIcon,
   GitDiffIcon,
+  ListBulletsIcon,
   TerminalIcon,
 } from "@phosphor-icons/react";
 import { useState } from "react";
@@ -72,6 +73,7 @@ export function SessionWorkbenchHeaderActions(input: {
     kind: "connected" | "error" | "not_connected";
     label: string;
   };
+  threadControl?: SessionWorkbenchHeaderButtonControl;
   terminalControl: SessionWorkbenchHeaderButtonControl;
 }): React.JSX.Element {
   const isMobileHeaderLayout = useIsMobileHeaderLayout();
@@ -187,6 +189,11 @@ export function SessionWorkbenchHeaderActions(input: {
         >
           <span className="text-sm font-medium">TUI</span>
         </Button>
+        {input.threadControl === undefined ? null : (
+          <HeaderIconButton control={input.threadControl}>
+            <ListBulletsIcon className="size-4" />
+          </HeaderIconButton>
+        )}
         <HeaderIconButton control={input.diffControl}>
           <GitDiffIcon className="size-4" />
         </HeaderIconButton>
@@ -215,6 +222,11 @@ export function SessionWorkbenchHeaderActions(input: {
             <HeaderMenuItem control={input.cliControl} label="TUI">
               <IntegrationLogo alt="" className="size-4" logoKey="openai" />
             </HeaderMenuItem>
+            {input.threadControl === undefined ? null : (
+              <HeaderMenuItem control={input.threadControl} label="Threads">
+                <ListBulletsIcon className="size-4" />
+              </HeaderMenuItem>
+            )}
             <HeaderMenuItem control={input.diffControl} label="Changes">
               <GitDiffIcon className="size-4" />
             </HeaderMenuItem>

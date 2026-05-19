@@ -33,7 +33,7 @@ const Threads = [
 ];
 
 describe("projectCodexThreadNavigatorRows", () => {
-  it("orders repository-scoped threads by recent activity and marks row metadata", () => {
+  it("orders all threads by recent activity and marks row metadata", () => {
     expect(
       projectCodexThreadNavigatorRows({
         activeThreadId: "thread_new",
@@ -41,16 +41,28 @@ describe("projectCodexThreadNavigatorRows", () => {
         loadedThreadIds: ["thread_new"],
         pendingThreadId: "thread_old",
         pendingServerRequestThreadIds: ["thread_new", "thread_new"],
-        scope: "repository",
-        selectedRepositoryPath: "/workspace/repo-a",
       }),
     ).toEqual([
+      {
+        id: "thread_other_repo",
+        title: "Untitled thread",
+        preview: null,
+        cwd: "/workspace/repo-b",
+        cwdSectionLabel: "repo-b",
+        createdAt: 40,
+        updatedAt: 60,
+        isActive: false,
+        isLoaded: false,
+        isOpening: false,
+        isPinnedCurrent: false,
+        pendingServerRequestCount: 0,
+      },
       {
         id: "thread_new",
         title: "New work",
         preview: "New work\nsecond line",
         cwd: "/workspace/repo-a",
-        cwdLabel: null,
+        cwdSectionLabel: "repo-a",
         createdAt: 30,
         updatedAt: 50,
         isActive: true,
@@ -64,7 +76,7 @@ describe("projectCodexThreadNavigatorRows", () => {
         title: "Old work",
         preview: "Preview",
         cwd: "/workspace/repo-a",
-        cwdLabel: null,
+        cwdSectionLabel: "repo-a",
         createdAt: 10,
         updatedAt: 20,
         isActive: false,
@@ -76,7 +88,7 @@ describe("projectCodexThreadNavigatorRows", () => {
     ]);
   });
 
-  it("pins the active thread when it is outside the current repository scope", () => {
+  it("does not need to pin the active thread because all threads are visible", () => {
     expect(
       projectCodexThreadNavigatorRows({
         activeThreadId: "thread_other_repo",
@@ -84,27 +96,21 @@ describe("projectCodexThreadNavigatorRows", () => {
         loadedThreadIds: [],
         pendingThreadId: null,
         pendingServerRequestThreadIds: [],
-        scope: "repository",
-        selectedRepositoryPath: "/workspace/repo-a",
       }).map((row) => ({
         id: row.id,
-        cwdLabel: row.cwdLabel,
         isPinnedCurrent: row.isPinnedCurrent,
       })),
     ).toEqual([
       {
         id: "thread_other_repo",
-        cwdLabel: "repo-b",
-        isPinnedCurrent: true,
+        isPinnedCurrent: false,
       },
       {
         id: "thread_new",
-        cwdLabel: null,
         isPinnedCurrent: false,
       },
       {
         id: "thread_old",
-        cwdLabel: null,
         isPinnedCurrent: false,
       },
     ]);

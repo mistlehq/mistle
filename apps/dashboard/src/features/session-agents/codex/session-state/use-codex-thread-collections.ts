@@ -16,6 +16,7 @@ export function useCodexThreadCollections(input: {
   ensureCurrentGeneration: (generation: number) => void;
 }) {
   const [availableThreads, setAvailableThreads] = useState<readonly CodexThreadSummary[]>([]);
+  const [hasMoreAvailableThreads, setHasMoreAvailableThreads] = useState(false);
   const [archivedThreads, setArchivedThreads] = useState<readonly CodexThreadSummary[]>([]);
   const [loadedThreadIds, setLoadedThreadIds] = useState<readonly string[]>([]);
 
@@ -36,6 +37,7 @@ export function useCodexThreadCollections(input: {
       }
 
       setAvailableThreads(threadList.threads);
+      setHasMoreAvailableThreads(threadList.nextCursor !== null);
       return threadList.threads;
     },
     [input],
@@ -103,12 +105,14 @@ export function useCodexThreadCollections(input: {
 
   const resetThreadCollections = useCallback((): void => {
     setAvailableThreads([]);
+    setHasMoreAvailableThreads(false);
     setArchivedThreads([]);
     setLoadedThreadIds([]);
   }, []);
 
   return {
     availableThreads,
+    hasMoreAvailableThreads,
     archivedThreads,
     loadedThreadIds,
     refreshThreadList,

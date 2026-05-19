@@ -22,11 +22,6 @@ export function CodexThreadHeaderScope(input: {
         tooltipSide="bottom"
         tooltipSideOffset={8}
       />
-      {input.row.cwdLabel === null ? null : (
-        <span className="min-w-0 shrink truncate text-muted-foreground/80">
-          {input.row.cwdLabel}
-        </span>
-      )}
     </div>
   );
 }

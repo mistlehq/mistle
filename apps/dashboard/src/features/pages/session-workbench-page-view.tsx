@@ -39,6 +39,9 @@ type SessionWorkbenchPageViewProps = {
   mainContentLayout?: SessionWorkbenchMainContentLayout;
   mainContentScrollContainerRef?: React.Ref<HTMLDivElement>;
   conversationSidebar?: React.ReactNode;
+  secondaryPanelDefaultSize?: string;
+  secondaryPanelLayoutKey?: string;
+  secondaryPanelMinSize?: string;
   mainContent: React.ReactNode;
   primaryBottomPanel: React.ReactNode;
   bottomPanel: React.ReactNode;
@@ -60,6 +63,9 @@ export function SessionWorkbenchPageView({
   mainContentLayout = { scroll: "page", width: "chat" },
   mainContentScrollContainerRef,
   conversationSidebar,
+  secondaryPanelDefaultSize,
+  secondaryPanelLayoutKey = "default",
+  secondaryPanelMinSize = "20%",
   mainContent,
   primaryBottomPanel,
   bottomPanel,
@@ -91,7 +97,7 @@ export function SessionWorkbenchPageView({
     storage: layoutStorage,
   });
   const mainPanelLayoutPersistence = useDefaultLayout({
-    id: `${MainPanelGroupIdPrefix}:${sandboxInstanceKey}`,
+    id: `${MainPanelGroupIdPrefix}:${sandboxInstanceKey}:${secondaryPanelLayoutKey}`,
     panelIds: isSecondaryPanelVisible ? [PrimaryPanelId, SecondaryPanelId] : [PrimaryPanelId],
     storage: layoutStorage,
   });
@@ -219,17 +225,25 @@ export function SessionWorkbenchPageView({
         className="min-h-0 flex-1"
         defaultLayout={mainPanelLayoutPersistence.defaultLayout}
         id="session-workbench-main-group"
-        key={sandboxInstanceId}
+        key={`${sandboxInstanceKey}:${secondaryPanelLayoutKey}`}
         onLayoutChanged={mainPanelLayoutPersistence.onLayoutChanged}
         orientation="horizontal"
       >
-        <ResizablePanel id={PrimaryPanelId} minSize="25%">
+        <ResizablePanel
+          defaultSize={secondaryPanelDefaultSize === undefined ? undefined : "80%"}
+          id={PrimaryPanelId}
+          minSize="25%"
+        >
           {workspaceWithBottomPanel}
         </ResizablePanel>
         {!isSecondaryPanelVisible ? null : (
           <>
             <ResizableHandle id="session-workbench-secondary-handle" />
-            <ResizablePanel id={SecondaryPanelId} minSize="20%">
+            <ResizablePanel
+              defaultSize={secondaryPanelDefaultSize}
+              id={SecondaryPanelId}
+              minSize={secondaryPanelMinSize}
+            >
               <div className="bg-background/98 h-full min-h-0 overflow-hidden backdrop-blur-sm">
                 <div className="h-full w-full">{secondaryPanel}</div>
               </div>
