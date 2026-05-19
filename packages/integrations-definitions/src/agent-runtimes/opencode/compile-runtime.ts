@@ -23,7 +23,7 @@ import {
 } from "./server.js";
 
 const OpenCodeCliArtifactKey = "opencode-cli";
-const OpenCodeCliVersion = "1.14.48";
+const OpenCodeCliVersion = "1.15.1";
 const OpenCodeCliReleaseTag = `v${OpenCodeCliVersion}`;
 const OpenCodeGitHubRepository = "anomalyco/opencode";
 const OpenCodeConfigPath = "/root/.config/opencode/opencode.json";
@@ -33,10 +33,12 @@ const OpenCodeGitHubAssets = {
   x86_64: {
     fileName: "opencode-linux-x64-baseline.tar.gz",
     binaryPath: "opencode",
+    sha256: "5f457b515896df8c9b48707e8475cbd98375f76b4e81a0b97f54b9d98228bd63",
   },
   aarch64: {
     fileName: "opencode-linux-arm64.tar.gz",
     binaryPath: "opencode",
+    sha256: "58bdd72718817043f9e3328c9f78acc6c667dd26e5fd013a6cf3c03593de2374",
   },
 };
 const ArtifactCommandTimeoutMs = 120_000;
@@ -338,11 +340,13 @@ export function compileOpenCodeRuntime(
                   fileName: OpenCodeGitHubAssets.x86_64.fileName,
                   format: "tar.gz",
                   extractedPath: OpenCodeGitHubAssets.x86_64.binaryPath,
+                  sha256: OpenCodeGitHubAssets.x86_64.sha256,
                 },
                 aarch64: {
                   fileName: OpenCodeGitHubAssets.aarch64.fileName,
                   format: "tar.gz",
                   extractedPath: OpenCodeGitHubAssets.aarch64.binaryPath,
+                  sha256: OpenCodeGitHubAssets.aarch64.sha256,
                 },
               },
               installPath: refs.artifactBinPath("opencode"),

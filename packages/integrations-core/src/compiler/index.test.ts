@@ -120,6 +120,7 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
   agentRuntimeRegistry.register({
     runtimeId: "codex",
     displayName: "Codex",
+    logoKey: "openai",
     configSchema: z.object({}).strict(),
     createConversationProvider: () => NoopConversationProvider,
     materializeMcpConfig: () => [
@@ -265,6 +266,7 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
   agentRuntimeRegistry.register({
     runtimeId: "claude-code",
     displayName: "Claude Code",
+    logoKey: "anthropic",
     configSchema: z.object({}).strict(),
     createConversationProvider: () => NoopConversationProvider,
     materializeMcpConfig: () => [
@@ -672,7 +674,7 @@ function createCanonicalGithubReleaseInstallArtifactDefinition(): IntegrationDef
                 release: {
                   kind: "tag",
                   match: "exact",
-                  tag: "rust-v0.130.0",
+                  tag: "rust-v0.131.0",
                 },
                 asset: {
                   kind: "by_arch",
@@ -1004,6 +1006,7 @@ describe("compileRuntimePlan", () => {
     agentRuntimeRegistry.register({
       runtimeId: "route-aware",
       displayName: "Route Aware",
+      logoKey: "route-aware",
       configSchema: z.object({}).strict(),
       compileRuntime: () => ({
         runtimeClients: [
@@ -1475,7 +1478,7 @@ describe("compileRuntimePlan", () => {
       release: {
         kind: "tag",
         match: "exact",
-        tag: "rust-v0.130.0",
+        tag: "rust-v0.131.0",
       },
       asset: {
         kind: "by_arch",
@@ -2555,6 +2558,7 @@ describe("compileRuntimePlan", () => {
     agentRuntimeRegistry.register({
       runtimeId: "codex",
       displayName: "Codex",
+      logoKey: "openai",
       configSchema: z.object({
         approvalPolicy: z.literal("never"),
       }),
@@ -2718,6 +2722,7 @@ describe("compileRuntimePlan", () => {
     agentRuntimeRegistry.register({
       runtimeId: "codex",
       displayName: "Codex",
+      logoKey: "openai",
       configSchema: z.object({}).strict(),
       createConversationProvider: () => NoopConversationProvider,
       materializeMcpConfig: () => [

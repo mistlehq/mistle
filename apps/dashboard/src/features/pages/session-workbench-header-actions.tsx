@@ -22,6 +22,7 @@ import {
   DotsThreeIcon,
   GitBranchIcon,
   GitDiffIcon,
+  ListBulletsIcon,
   TerminalIcon,
 } from "@phosphor-icons/react";
 import { useState } from "react";
@@ -55,7 +56,7 @@ type SessionWorkbenchHeaderButtonControl = {
   title: string;
 };
 
-type SessionWorkbenchHeaderMobilePortAccessControl = {
+type SessionWorkbenchHeaderMobileSurfaceControl = {
   disabled: boolean;
   onOpen: () => void;
   surface: React.ReactNode;
@@ -65,13 +66,15 @@ type SessionWorkbenchHeaderMobilePortAccessControl = {
 export function SessionWorkbenchHeaderActions(input: {
   cliControl: SessionWorkbenchHeaderButtonControl;
   diffControl: SessionWorkbenchHeaderButtonControl;
-  mobilePortAccessControl?: SessionWorkbenchHeaderMobilePortAccessControl;
+  mobilePortAccessControl?: SessionWorkbenchHeaderMobileSurfaceControl;
+  mobileThreadNavigatorControl?: SessionWorkbenchHeaderMobileSurfaceControl;
   portAccessControl?: React.ReactNode;
   repositoryControl?: SessionWorkbenchHeaderRepositoryControl;
   status: {
     kind: "connected" | "error" | "not_connected";
     label: string;
   };
+  threadControl?: SessionWorkbenchHeaderButtonControl;
   terminalControl: SessionWorkbenchHeaderButtonControl;
 }): React.JSX.Element {
   const isMobileHeaderLayout = useIsMobileHeaderLayout();
@@ -79,6 +82,10 @@ export function SessionWorkbenchHeaderActions(input: {
   const mobilePortAccessControl =
     isMobileHeaderLayout && input.mobilePortAccessControl !== undefined
       ? input.mobilePortAccessControl
+      : null;
+  const mobileThreadNavigatorControl =
+    isMobileHeaderLayout && input.mobileThreadNavigatorControl !== undefined
+      ? input.mobileThreadNavigatorControl
       : null;
   const [isMoreActionsOpen, setMoreActionsOpen] = useState(false);
   const repositoryControl = input.repositoryControl;
@@ -187,6 +194,11 @@ export function SessionWorkbenchHeaderActions(input: {
         >
           <span className="text-sm font-medium">TUI</span>
         </Button>
+        {input.threadControl === undefined ? null : (
+          <HeaderIconButton control={input.threadControl}>
+            <ListBulletsIcon className="size-4" />
+          </HeaderIconButton>
+        )}
         <HeaderIconButton control={input.diffControl}>
           <GitDiffIcon className="size-4" />
         </HeaderIconButton>
@@ -215,6 +227,25 @@ export function SessionWorkbenchHeaderActions(input: {
             <HeaderMenuItem control={input.cliControl} label="TUI">
               <IntegrationLogo alt="" className="size-4" logoKey="openai" />
             </HeaderMenuItem>
+            {mobileThreadNavigatorControl === null && input.threadControl !== undefined ? (
+              <HeaderMenuItem control={input.threadControl} label="Threads">
+                <ListBulletsIcon className="size-4" />
+              </HeaderMenuItem>
+            ) : null}
+            {mobileThreadNavigatorControl === null ? null : (
+              <DropdownMenuItem
+                aria-label="Threads"
+                disabled={mobileThreadNavigatorControl.disabled}
+                onClick={() => {
+                  setMoreActionsOpen(false);
+                  mobileThreadNavigatorControl.onOpen();
+                }}
+                title={mobileThreadNavigatorControl.title}
+              >
+                <ListBulletsIcon className="size-4" />
+                <span className="truncate">Threads</span>
+              </DropdownMenuItem>
+            )}
             <HeaderMenuItem control={input.diffControl} label="Changes">
               <GitDiffIcon className="size-4" />
             </HeaderMenuItem>
@@ -238,6 +269,7 @@ export function SessionWorkbenchHeaderActions(input: {
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+      {mobileThreadNavigatorControl?.surface}
       {mobilePortAccessControl?.surface}
     </div>
   );

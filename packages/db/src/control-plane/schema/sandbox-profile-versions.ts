@@ -33,6 +33,7 @@ export type SandboxProfileVersionDefaultPersistenceMode =
 export const SandboxProfileVersionAgentRuntimeIds = {
   CODEX: "codex",
   OPENCODE: "opencode",
+  PI: "pi",
 } as const;
 
 export type SandboxProfileVersionAgentRuntimeId =

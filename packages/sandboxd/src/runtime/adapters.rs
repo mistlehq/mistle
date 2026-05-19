@@ -18,6 +18,7 @@ use crate::opencode_proxy::{
     OpenCodeProxy, OpenCodeProxyError, derive_opencode_raw_server_url,
     start_opencode_proxy_with_supervisor,
 };
+use crate::pi_proxy::{PiProxy, PiProxyConfig, PiProxyError, start_pi_proxy_with_supervisor};
 use crate::protocol::startup::StartupInput;
 use crate::runtime::plan::{
     CompiledAgentRuntime, CompiledRuntimePlan, RuntimeClientConnectionMode,
@@ -69,6 +70,7 @@ pub enum RuntimeAdapterRegistryError {
     },
     StartCodexProxy(CodexProxyError),
     StartOpenCodeProxy(OpenCodeProxyError),
+    StartPiProxy(PiProxyError),
 }
 
 impl fmt::Display for RuntimeAdapterRegistryError {
@@ -135,6 +137,9 @@ impl fmt::Display for RuntimeAdapterRegistryError {
             Self::StartOpenCodeProxy(error) => {
                 write!(f, "failed to start OpenCode runtime adapter: {error}")
             }
+            Self::StartPiProxy(error) => {
+                write!(f, "failed to start Pi runtime adapter: {error}")
+            }
         }
     }
 }
@@ -151,6 +156,10 @@ pub enum RuntimeAdapter {
         runtime_id: String,
         proxy: OpenCodeProxy,
     },
+    Pi {
+        runtime_id: String,
+        proxy: PiProxy,
+    },
 }
 
 impl RuntimeAdapter {
@@ -159,6 +168,7 @@ impl RuntimeAdapter {
         match self {
             Self::Codex { runtime_id, .. } => runtime_id,
             Self::OpenCode { runtime_id, .. } => runtime_id,
+            Self::Pi { runtime_id, .. } => runtime_id,
         }
     }
 
@@ -167,6 +177,7 @@ impl RuntimeAdapter {
         match self {
             Self::Codex { proxy, .. } => proxy.listen_url(),
             Self::OpenCode { proxy, .. } => proxy.listen_url(),
+            Self::Pi { proxy, .. } => proxy.listen_url(),
         }
     }
 
@@ -175,6 +186,7 @@ impl RuntimeAdapter {
         match self {
             Self::Codex { proxy, .. } => proxy.close().map_err(Self::map_codex_close_error),
             Self::OpenCode { proxy, .. } => proxy.close().map_err(Self::map_opencode_close_error),
+            Self::Pi { proxy, .. } => proxy.close().map_err(Self::map_pi_close_error),
         }
     }
 
@@ -184,6 +196,10 @@ impl RuntimeAdapter {
 
     fn map_opencode_close_error(error: OpenCodeProxyError) -> RuntimeAdapterRegistryError {
         RuntimeAdapterRegistryError::StartOpenCodeProxy(error)
+    }
+
+    fn map_pi_close_error(error: PiProxyError) -> RuntimeAdapterRegistryError {
+        RuntimeAdapterRegistryError::StartPiProxy(error)
     }
 }
 
@@ -289,6 +305,15 @@ impl RuntimeAdapterRegistry {
                     )?;
                     started_adapters.push(adapter);
                 }
+                "pi" => {
+                    let adapter = start_pi_runtime_adapter(
+                        agent_runtime,
+                        &runtime_plan,
+                        keepalive_manager.clone(),
+                        supervisor_handle.clone(),
+                    )?;
+                    started_adapters.push(adapter);
+                }
                 _ => {
                     return Err(RuntimeAdapterRegistryError::UnsupportedRuntimeId {
                         runtime_id: agent_runtime.runtime_id.clone(),
@@ -316,10 +341,70 @@ fn collect_runtime_adapter_components(
             "opencode" => {
                 components.insert(SupervisedComponent::OpenCodeProxy);
             }
+            "pi" => {
+                components.insert(SupervisedComponent::PiProxy);
+            }
             _ => {}
         }
     }
     components
+}
+
+fn start_pi_runtime_adapter(
+    agent_runtime: &CompiledAgentRuntime,
+    runtime_plan: &CompiledRuntimePlan,
+    keepalive_manager: Arc<Mutex<KeepaliveManager>>,
+    supervisor_handle: SandboxdSupervisorHandle,
+) -> Result<RuntimeAdapter, RuntimeAdapterRegistryError> {
+    let runtime_client = runtime_plan
+        .runtime_clients
+        .iter()
+        .find(|runtime_client| runtime_client.client_id == agent_runtime.client_id)
+        .ok_or_else(|| RuntimeAdapterRegistryError::MissingRuntimeClient {
+            runtime_id: agent_runtime.runtime_id.clone(),
+            client_id: agent_runtime.client_id.clone(),
+        })?;
+
+    let endpoint = runtime_client
+        .endpoints
+        .iter()
+        .find(|endpoint| endpoint.endpoint_key == agent_runtime.endpoint_key)
+        .ok_or_else(|| RuntimeAdapterRegistryError::MissingRuntimeEndpoint {
+            runtime_id: agent_runtime.runtime_id.clone(),
+            client_id: agent_runtime.client_id.clone(),
+            endpoint_key: agent_runtime.endpoint_key.clone(),
+        })?;
+    if endpoint.connection_mode != RuntimeClientConnectionMode::Dedicated {
+        return Err(RuntimeAdapterRegistryError::UnsupportedConnectionMode {
+            runtime_id: agent_runtime.runtime_id.clone(),
+            connection_mode: endpoint.connection_mode,
+        });
+    }
+
+    let RuntimeClientEndpointTransport::Ws { url: listen_url } = &endpoint.transport;
+    let pi_cli_path = runtime_client
+        .setup
+        .env
+        .get("MISTLE_PI_CLI_PATH")
+        .cloned()
+        .ok_or(RuntimeAdapterRegistryError::StartPiProxy(
+            PiProxyError::MissingPiCliPath,
+        ))?;
+    let proxy = start_pi_proxy_with_supervisor(
+        listen_url,
+        PiProxyConfig {
+            pi_cli_path,
+            env: runtime_client.setup.env.clone(),
+        },
+        keepalive_manager,
+        supervisor_handle,
+    )
+    .map_err(RuntimeAdapterRegistryError::StartPiProxy)?;
+
+    Ok(RuntimeAdapter::Pi {
+        runtime_id: agent_runtime.runtime_id.clone(),
+        proxy,
+    })
 }
 
 fn start_opencode_runtime_adapter(

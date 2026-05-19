@@ -163,9 +163,12 @@ type SessionWorkbenchStoryHeaderActionsProps = {
   headerStatusUi?: SandboxStatusBadgeUi;
   isCliVisible?: boolean;
   isDiffVisible?: boolean;
+  showThreadNavigatorControl?: boolean;
+  isThreadNavigatorVisible?: boolean;
   isTerminalVisible?: boolean;
   onCliToggle?: () => void;
   onDiffToggle?: () => void;
+  onThreadNavigatorToggle?: () => void;
   onTerminalToggle?: () => void;
 };
 
@@ -202,6 +205,7 @@ export function SessionWorkbenchStoryHeaderActions(
   };
   const isCliVisible = input.isCliVisible ?? false;
   const isDiffVisible = input.isDiffVisible ?? false;
+  const isThreadNavigatorVisible = input.isThreadNavigatorVisible ?? false;
   const isTerminalVisible = input.isTerminalVisible ?? false;
   const handleCliToggle =
     input.onCliToggle ??
@@ -210,6 +214,11 @@ export function SessionWorkbenchStoryHeaderActions(
     });
   const handleDiffToggle =
     input.onDiffToggle ??
+    (() => {
+      return;
+    });
+  const handleThreadNavigatorToggle =
+    input.onThreadNavigatorToggle ??
     (() => {
       return;
     });
@@ -267,6 +276,18 @@ export function SessionWorkbenchStoryHeaderActions(
         title: "Primary repository",
       }}
       status={createStoryHeaderStatus(headerStatusUi)}
+      {...(input.showThreadNavigatorControl === true
+        ? {
+            threadControl: {
+              ariaLabel: "Show threads",
+              className: getStoryHeaderButtonClassName(isThreadNavigatorVisible),
+              disabled: false,
+              onClick: handleThreadNavigatorToggle,
+              pressed: isThreadNavigatorVisible,
+              title: "Show threads",
+            },
+          }
+        : {})}
       terminalControl={{
         ariaLabel: isTerminalVisible ? "Terminal" : "Open terminal",
         className: getStoryHeaderButtonClassName(isTerminalVisible),

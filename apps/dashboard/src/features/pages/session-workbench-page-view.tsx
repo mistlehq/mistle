@@ -38,6 +38,9 @@ type SessionWorkbenchPageViewProps = {
   isPrimaryPanelTransitioning?: boolean;
   mainContentLayout?: SessionWorkbenchMainContentLayout;
   mainContentScrollContainerRef?: React.Ref<HTMLDivElement>;
+  secondaryPanelDefaultSize?: string;
+  secondaryPanelLayoutKey?: string;
+  secondaryPanelMinSize?: string;
   mainContent: React.ReactNode;
   primaryBottomPanel: React.ReactNode;
   bottomPanel: React.ReactNode;
@@ -58,6 +61,9 @@ export function SessionWorkbenchPageView({
   isPrimaryPanelTransitioning = false,
   mainContentLayout = { scroll: "page", width: "chat" },
   mainContentScrollContainerRef,
+  secondaryPanelDefaultSize,
+  secondaryPanelLayoutKey = "default",
+  secondaryPanelMinSize = "20%",
   mainContent,
   primaryBottomPanel,
   bottomPanel,
@@ -89,7 +95,7 @@ export function SessionWorkbenchPageView({
     storage: layoutStorage,
   });
   const mainPanelLayoutPersistence = useDefaultLayout({
-    id: `${MainPanelGroupIdPrefix}:${sandboxInstanceKey}`,
+    id: `${MainPanelGroupIdPrefix}:${sandboxInstanceKey}:${secondaryPanelLayoutKey}`,
     panelIds: isSecondaryPanelVisible ? [PrimaryPanelId, SecondaryPanelId] : [PrimaryPanelId],
     storage: layoutStorage,
   });
@@ -140,10 +146,8 @@ export function SessionWorkbenchPageView({
   const primaryPanelTransitionClassName = isPrimaryPanelTransitioning
     ? "opacity-0 transition-opacity duration-200 ease-out"
     : "opacity-100 transition-opacity duration-200 ease-in";
-  const mainWorkspace = (
-    <div
-      className={`flex h-full min-h-0 flex-col overflow-hidden ${primaryPanelTransitionClassName}`}
-    >
+  const mainWorkspaceContent = (
+    <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
       <div
         aria-label="Conversation chat"
         className={mainContentRegionClassName}
@@ -159,6 +163,11 @@ export function SessionWorkbenchPageView({
           <div className="mx-auto w-full max-w-3xl px-4">{primaryBottomPanel}</div>
         </div>
       )}
+    </div>
+  );
+  const mainWorkspace = (
+    <div className={`flex h-full min-h-0 overflow-hidden ${primaryPanelTransitionClassName}`}>
+      {mainWorkspaceContent}
     </div>
   );
   const workspaceWithBottomPanel = (
@@ -213,17 +222,25 @@ export function SessionWorkbenchPageView({
         className="min-h-0 flex-1"
         defaultLayout={mainPanelLayoutPersistence.defaultLayout}
         id="session-workbench-main-group"
-        key={sandboxInstanceId}
+        key={`${sandboxInstanceKey}:${secondaryPanelLayoutKey}`}
         onLayoutChanged={mainPanelLayoutPersistence.onLayoutChanged}
         orientation="horizontal"
       >
-        <ResizablePanel id={PrimaryPanelId} minSize="25%">
+        <ResizablePanel
+          defaultSize={secondaryPanelDefaultSize === undefined ? undefined : "80%"}
+          id={PrimaryPanelId}
+          minSize="25%"
+        >
           {workspaceWithBottomPanel}
         </ResizablePanel>
         {!isSecondaryPanelVisible ? null : (
           <>
             <ResizableHandle id="session-workbench-secondary-handle" />
-            <ResizablePanel id={SecondaryPanelId} minSize="20%">
+            <ResizablePanel
+              defaultSize={secondaryPanelDefaultSize}
+              id={SecondaryPanelId}
+              minSize={secondaryPanelMinSize}
+            >
               <div className="bg-background/98 h-full min-h-0 overflow-hidden backdrop-blur-sm">
                 <div className="h-full w-full">{secondaryPanel}</div>
               </div>

@@ -25,7 +25,7 @@ import {
 import { CodexPtyLaunchSpec } from "./pty-launch.js";
 
 const CodexCliArtifactKey = "codex-cli";
-const CodexCliVersion = "0.130.0";
+const CodexCliVersion = "0.131.0";
 const CodexCliReleaseTag = `rust-v${CodexCliVersion}`;
 const ProxyModelProviderKey = "proxy";
 const ProxyModelProviderName = "OpenAI";
@@ -51,10 +51,12 @@ const CodexGitHubAssets = {
   x86_64: {
     fileName: "codex-x86_64-unknown-linux-musl.tar.gz",
     binaryPath: "codex-x86_64-unknown-linux-musl",
+    sha256: "f5b26732b76c9543742f7937a7c88f879e00c0a73b673008043a5cee63e8361d",
   },
   aarch64: {
     fileName: "codex-aarch64-unknown-linux-musl.tar.gz",
     binaryPath: "codex-aarch64-unknown-linux-musl",
+    sha256: "dfef7c98b67bd1cc857ef5c505b6eee78872610e6bcdc19dc174d695a56082b6",
   },
 };
 const ArtifactCommandTimeoutMs = 120_000;
@@ -238,11 +240,13 @@ export function compileCodexRuntime(
                   fileName: CodexGitHubAssets.x86_64.fileName,
                   format: "tar.gz",
                   extractedPath: CodexGitHubAssets.x86_64.binaryPath,
+                  sha256: CodexGitHubAssets.x86_64.sha256,
                 },
                 aarch64: {
                   fileName: CodexGitHubAssets.aarch64.fileName,
                   format: "tar.gz",
                   extractedPath: CodexGitHubAssets.aarch64.binaryPath,
+                  sha256: CodexGitHubAssets.aarch64.sha256,
                 },
               },
               installPath: refs.artifactBinPath("codex"),

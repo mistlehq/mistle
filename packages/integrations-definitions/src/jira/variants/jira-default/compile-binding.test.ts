@@ -158,6 +158,7 @@ describe("compileJiraBinding", () => {
             kind: "exact",
             fileName: "jira-linux-amd64",
             format: "binary",
+            sha256: "5913a130e47d553a72ca3a74ef33cb9dd194fb259ffc176b98a20aae28a61940",
           },
           installPath: "/usr/local/bin/jira",
           timeoutMs: 120_000,

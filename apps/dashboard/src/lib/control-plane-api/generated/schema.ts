@@ -6682,7 +6682,7 @@ export interface paths {
               id: string;
               runtimeContext: {
                 /** @enum {string|null} */
-                agentRuntimeId: "codex" | "opencode" | null;
+                agentRuntimeId: "codex" | "opencode" | "pi" | null;
                 launchCwd: string | null;
                 primaryRepositoryRoot: string | null;
               } | null;
@@ -7310,7 +7310,7 @@ export interface paths {
               id: string;
               runtimeContext: {
                 /** @enum {string|null} */
-                agentRuntimeId: "codex" | "opencode" | null;
+                agentRuntimeId: "codex" | "opencode" | "pi" | null;
                 launchCwd: string | null;
                 primaryRepositoryRoot: string | null;
               } | null;
@@ -8402,7 +8402,7 @@ export interface paths {
             "application/json": {
               versions: {
                 /** @enum {string} */
-                agentRuntimeId: "codex" | "opencode";
+                agentRuntimeId: "codex" | "opencode" | "pi";
                 /** @enum {string} */
                 defaultPersistenceMode: "ephemeral" | "persistent";
                 isActive: boolean;
@@ -8527,7 +8527,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              agentRuntimeId: "codex" | "opencode";
+              agentRuntimeId: "codex" | "opencode" | "pi";
               /** @enum {string} */
               defaultPersistenceMode: "ephemeral" | "persistent";
               isActive: boolean;
@@ -8790,7 +8790,7 @@ export interface paths {
         content: {
           "application/json": {
             /** @enum {string} */
-            agentRuntimeId?: "codex" | "opencode";
+            agentRuntimeId?: "codex" | "opencode" | "pi";
             /** @enum {string} */
             defaultPersistenceMode?: "ephemeral" | "persistent";
             integrationBindings?: {
@@ -8825,7 +8825,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              agentRuntimeId: "codex" | "opencode";
+              agentRuntimeId: "codex" | "opencode" | "pi";
               /** @enum {string} */
               defaultPersistenceMode: "ephemeral" | "persistent";
               integrationBindings: {
@@ -9372,7 +9372,7 @@ export interface paths {
         content: {
           "application/json": {
             /** @enum {string} */
-            agentRuntimeId?: "codex" | "opencode";
+            agentRuntimeId?: "codex" | "opencode" | "pi";
             idempotencyKey?: string;
             maintenanceScript: string;
             sandboxConnectionId?: string | null;
@@ -9553,7 +9553,7 @@ export interface paths {
               };
               version: {
                 /** @enum {string} */
-                agentRuntimeId: "codex" | "opencode";
+                agentRuntimeId: "codex" | "opencode" | "pi";
                 /** @enum {string} */
                 defaultPersistenceMode: "ephemeral" | "persistent";
                 isActive: boolean;
@@ -9850,7 +9850,7 @@ export interface paths {
               };
               version: {
                 /** @enum {string} */
-                agentRuntimeId: "codex" | "opencode";
+                agentRuntimeId: "codex" | "opencode" | "pi";
                 /** @enum {string} */
                 defaultPersistenceMode: "ephemeral" | "persistent";
                 isActive: boolean;
@@ -10228,7 +10228,7 @@ export interface paths {
               };
               version: {
                 /** @enum {string} */
-                agentRuntimeId: "codex" | "opencode";
+                agentRuntimeId: "codex" | "opencode" | "pi";
                 /** @enum {string} */
                 defaultPersistenceMode: "ephemeral" | "persistent";
                 isActive: boolean;
@@ -10630,7 +10630,7 @@ export interface paths {
         content: {
           "application/json": {
             /** @enum {string} */
-            agentRuntimeId?: "codex" | "opencode";
+            agentRuntimeId?: "codex" | "opencode" | "pi";
             idempotencyKey?: string;
             sandboxConnectionId?: string | null;
             sandboxProvider?: string;

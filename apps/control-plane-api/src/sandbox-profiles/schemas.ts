@@ -44,6 +44,7 @@ const sandboxProfileVersionDefaultPersistenceModeSchema = z.enum([
 const sandboxProfileVersionAgentRuntimeIdSchema = z.enum([
   SandboxProfileVersionAgentRuntimeIds.CODEX,
   SandboxProfileVersionAgentRuntimeIds.OPENCODE,
+  SandboxProfileVersionAgentRuntimeIds.PI,
 ]);
 const sandboxProfileVersionSnapshotJobTriggerSchema = z.enum([
   SandboxProfileVersionSnapshotJobTriggers.PUBLISH,

@@ -31,6 +31,7 @@ describe("resolveIntegrationLogoPath", () => {
     expect(resolveIntegrationLogoPath({ logoKey: "opencode" })).toBe(
       "/integration-logos/opencode.svg",
     );
+    expect(resolveIntegrationLogoPath({ logoKey: "pi" })).toBe("/integration-logos/pi.svg");
     expect(resolveIntegrationLogoPath({ logoKey: "tensorlake" })).toBe(
       "/integration-logos/tensorlake.svg",
     );

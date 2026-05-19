@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { render, screen, within } from "@testing-library/react";
+import { useState } from "react";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
@@ -94,5 +95,50 @@ describe("SessionWorkbenchPageView", () => {
 
     expect(within(container).queryAllByTestId("session-workbench-main-group")).toHaveLength(1);
     expect(within(container).queryByTestId("session-workbench-secondary-panel")).toBeNull();
+  });
+
+  it("does not remount the bottom panel when the shared right panel opens", () => {
+    let nextMountId = 1;
+
+    function BottomPanelContent(): React.JSX.Element {
+      const [mountId] = useState(() => nextMountId++);
+
+      return <div>Terminal mount {mountId}</div>;
+    }
+
+    const { rerender } = render(
+      <SessionWorkbenchPageView
+        alert={null}
+        bottomPanel={<BottomPanelContent />}
+        isBottomPanelVisible={false}
+        isSecondaryPanelVisible={false}
+        mainContent={<div>Conversation body</div>}
+        primaryBottomPanel={<div>Composer</div>}
+        sandboxInstanceId="sbi_test"
+        secondaryPanel={<div>Threads panel</div>}
+        secondaryPanelLayoutKey="right-panel"
+      />,
+    );
+
+    expect(screen.getByText("Terminal mount 1")).toBeTruthy();
+
+    rerender(
+      <SessionWorkbenchPageView
+        alert={null}
+        bottomPanel={<BottomPanelContent />}
+        isBottomPanelVisible={false}
+        isSecondaryPanelVisible
+        mainContent={<div>Conversation body</div>}
+        primaryBottomPanel={<div>Composer</div>}
+        sandboxInstanceId="sbi_test"
+        secondaryPanel={<div>Threads panel</div>}
+        secondaryPanelDefaultSize="20%"
+        secondaryPanelLayoutKey="right-panel"
+        secondaryPanelMinSize="16rem"
+      />,
+    );
+
+    expect(screen.getByText("Terminal mount 1")).toBeTruthy();
+    expect(screen.getByText("Threads panel")).toBeTruthy();
   });
 });

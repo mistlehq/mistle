@@ -90,6 +90,7 @@ export type AgentRuntimeDefinition<
 > = {
   runtimeId: string;
   displayName: string;
+  logoKey: string;
   configSchema: TRuntimeConfigSchema;
   configForm?: IntegrationFormDefinition;
   compileRuntime(

@@ -1,15 +1,9 @@
-import {
-  systemClock,
-  systemScheduler,
-  type Clock,
-  type Scheduler,
-  type TimerHandle,
-} from "@mistle/time";
+import { systemScheduler, type Scheduler } from "@mistle/time";
 import { SpinnerGapIcon } from "@phosphor-icons/react";
 import { useIsMutating } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
 
 import { LoadingIndicators, resolveLoadingIndicator } from "./loading-indicator-meta.js";
+import { useDelayedMinimumVisibleFlag } from "./use-delayed-minimum-visible-flag.js";
 
 const AutosaveIndicatorShowDelayMs = 200;
 const AutosaveIndicatorMinimumVisibleMs = 500;
@@ -41,52 +35,10 @@ export function useAutosaveIndicator(input?: {
   const showDelayMs = input?.showDelayMs ?? AutosaveIndicatorShowDelayMs;
   const showAutosaveIndicator = useDelayedMinimumVisibleFlag({
     active: activeAutosaveMutationCount > 0,
-    clock: systemClock,
     minimumVisibleMs,
     scheduler,
     showDelayMs,
   });
 
   return showAutosaveIndicator ? <AutosaveIndicator /> : null;
-}
-
-function useDelayedMinimumVisibleFlag(input: {
-  active: boolean;
-  clock: Clock;
-  minimumVisibleMs: number;
-  scheduler: Scheduler;
-  showDelayMs: number;
-}): boolean {
-  const [visible, setVisible] = useState(false);
-  const visibleSinceRef = useRef<number | null>(null);
-  const { active, clock, minimumVisibleMs, scheduler, showDelayMs } = input;
-
-  useEffect(() => {
-    let timeoutId: TimerHandle | null = null;
-
-    if (active && !visible) {
-      timeoutId = scheduler.schedule(() => {
-        visibleSinceRef.current = clock.nowMs();
-        setVisible(true);
-      }, showDelayMs);
-    } else if (!active && visible) {
-      const visibleSince = visibleSinceRef.current;
-      const elapsedVisibleMs =
-        visibleSince === null ? minimumVisibleMs : clock.nowMs() - visibleSince;
-      const remainingVisibleMs = Math.max(minimumVisibleMs - elapsedVisibleMs, 0);
-
-      timeoutId = scheduler.schedule(() => {
-        visibleSinceRef.current = null;
-        setVisible(false);
-      }, remainingVisibleMs);
-    }
-
-    return () => {
-      if (timeoutId !== null) {
-        scheduler.cancel(timeoutId);
-      }
-    };
-  }, [active, clock, minimumVisibleMs, scheduler, showDelayMs, visible]);
-
-  return visible;
 }

@@ -22,6 +22,13 @@ function validateRuntimeDefinition(input: AnyAgentRuntimeDefinition): void {
       "Agent runtime definition displayName must be non-empty.",
     );
   }
+
+  if (input.logoKey.trim().length === 0) {
+    throw new IntegrationDefinitionRegistryError(
+      DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+      "Agent runtime definition logoKey must be non-empty.",
+    );
+  }
 }
 
 export class AgentRuntimeRegistry implements AgentRuntimeResolver {

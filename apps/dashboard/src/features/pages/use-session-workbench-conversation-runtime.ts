@@ -31,6 +31,18 @@ import type { SessionWorkbenchTransportManager } from "./use-session-workbench-t
 export type SessionConversationPaneState = SessionWorkbenchRuntimeAdapter["conversation"] & {
   composerStateInput: SessionComposerStateInput;
   serverRequestsState: SessionWorkbenchRuntimeAdapter["serverRequestsState"];
+  codexThreadNavigator: {
+    activeThreadCwd: string | null;
+    activeThreadId: string | null;
+    providerThreadId: string | null;
+    availableThreads: UseCodexSessionStateResult["threads"]["availableThreads"];
+    hasMoreAvailableThreads: boolean;
+    pendingThreadId: string | null;
+    isStartingNewThread: boolean;
+    refreshThreadList: () => void;
+    resumeThread: (threadId: string) => Promise<string>;
+    startNewThread: (input?: { cwd?: string }) => Promise<string>;
+  } | null;
 };
 
 type SessionWorkbenchConversationRuntimeState = {
@@ -116,11 +128,30 @@ export function useSessionWorkbenchConversationRuntime(input: {
       openCodeSessionState.chat.chatState.messageOrder.length,
     ],
   );
+  const codexBootstrap = useMemo(() => {
+    if (
+      sessionState.threads.pendingThreadId === null &&
+      !sessionState.threads.isStartingNewThread
+    ) {
+      return sessionState.bootstrap;
+    }
+
+    return {
+      ...sessionState.bootstrap,
+      phase: {
+        status: "bootstrapping" as const,
+      },
+    };
+  }, [
+    sessionState.bootstrap,
+    sessionState.threads.isStartingNewThread,
+    sessionState.threads.pendingThreadId,
+  ]);
   const codexRuntime = useMemo<SessionWorkbenchRuntimeAdapter>(
     () =>
       buildCodexConversationRuntime({
         activeConversationId: activeSessionThreadId,
-        bootstrap: sessionState.bootstrap,
+        bootstrap: codexBootstrap,
         chat,
         configControl,
         contextUsage,
@@ -146,7 +177,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
       serverRequests.respondToServerRequest,
       sessionMessage.clearSessionErrorMessage,
       sessionMessage.sessionErrorMessage,
-      sessionState.bootstrap,
+      codexBootstrap,
       startCodexTurn,
     ],
   );
@@ -206,6 +237,20 @@ export function useSessionWorkbenchConversationRuntime(input: {
         attachmentControl,
         repositoryStatus: input.repositoryStatus,
       },
+      codexThreadNavigator: input.isOpenCodeRuntime
+        ? null
+        : {
+            activeThreadCwd: sessionState.lifecycle.sessionSnapshot?.activeThreadCwd ?? null,
+            activeThreadId: sessionState.lifecycle.sessionSnapshot?.activeThreadId ?? null,
+            providerThreadId: sessionState.lifecycle.sessionSnapshot?.providerThreadId ?? null,
+            availableThreads: sessionState.threads.availableThreads,
+            hasMoreAvailableThreads: sessionState.threads.hasMoreAvailableThreads,
+            pendingThreadId: sessionState.threads.pendingThreadId,
+            isStartingNewThread: sessionState.threads.isStartingNewThread,
+            refreshThreadList: sessionState.threads.refreshThreadList,
+            resumeThread: sessionState.threads.resumeThread,
+            startNewThread: sessionState.threads.startNewThread,
+          },
       serverRequestsState: activeRuntime.serverRequestsState,
     },
   };

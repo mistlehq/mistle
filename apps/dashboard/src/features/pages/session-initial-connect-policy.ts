@@ -9,10 +9,12 @@ export type InitialSessionConnectInput =
       providerThreadId?: string | null;
       sandboxInstanceId: string;
       targetThreadId: string;
+      selectionPolicy?: never;
     }
   | {
       initialCwd?: string | null;
       providerThreadId?: never;
+      selectionPolicy?: "most_recently_updated";
       sandboxInstanceId: string;
       targetThreadId: null;
     };
@@ -20,6 +22,7 @@ export type InitialSessionConnectInput =
 export function resolveInitialSessionConnectInput(input: {
   connectable: boolean | null;
   providerThreadId: string | null;
+  requestedThreadId?: string | null;
   runtimeContext: SandboxInstanceRuntimeContext | null;
   sandboxInstanceId: string;
 }): InitialSessionConnectInput {
@@ -39,11 +42,19 @@ export function resolveInitialSessionConnectInput(input: {
     };
   }
 
+  if (input.requestedThreadId !== undefined && input.requestedThreadId !== null) {
+    return {
+      sandboxInstanceId: input.sandboxInstanceId,
+      targetThreadId: input.requestedThreadId,
+    };
+  }
+
   const initialCwd = input.runtimeContext.launchCwd;
 
   return {
     sandboxInstanceId: input.sandboxInstanceId,
     targetThreadId: null,
+    selectionPolicy: "most_recently_updated",
     ...(initialCwd === undefined || initialCwd === null ? {} : { initialCwd }),
   };
 }

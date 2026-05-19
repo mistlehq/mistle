@@ -95,6 +95,7 @@ export function resolveSandboxStatusRefetchInterval(
 export function useSessionWorkbenchLifecycleState(input: {
   sandboxInstanceId: string | null;
   mainPanelTransitionState: MainPanelTransitionState;
+  requestedThreadId?: string | null;
   resolveLifecycle: (agentRuntimeId: string | null) => SessionLifecycleForWorkbench;
   queryClient: QueryClient;
 }) {
@@ -279,6 +280,10 @@ export function useSessionWorkbenchLifecycleState(input: {
   }, [input.mainPanelTransitionState]);
 
   useEffect(() => {
+    setHasAttemptedAutoConnect(false);
+  }, [input.requestedThreadId]);
+
+  useEffect(() => {
     if (!shouldAttemptAutoResume || input.sandboxInstanceId === null) {
       return;
     }
@@ -421,6 +426,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     const connectInput = resolveInitialSessionConnectInput({
       connectable: sandboxStatus?.connectable ?? null,
       providerThreadId,
+      requestedThreadId: input.requestedThreadId ?? null,
       runtimeContext: sandboxStatus?.runtimeContext ?? null,
       sandboxInstanceId: input.sandboxInstanceId,
     });
@@ -433,6 +439,7 @@ export function useSessionWorkbenchLifecycleState(input: {
     connectionReadiness.canConnect,
     hasAttemptedAutoConnect,
     input.sandboxInstanceId,
+    input.requestedThreadId,
     isStartingSession,
     isWaitingForTriggerThread,
     resolvedLifecycleErrorMessage,

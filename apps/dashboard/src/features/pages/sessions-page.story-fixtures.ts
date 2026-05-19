@@ -124,7 +124,7 @@ export function createSessionsPageStoryQueryClient(input?: {
     status: "pending" | "starting" | "running" | "stopped" | "failed";
     connectable: boolean;
     runtimeContext?: {
-      agentRuntimeId: "codex" | "opencode" | null;
+      agentRuntimeId: "codex" | "opencode" | "pi" | null;
       launchCwd: string | null;
       primaryRepositoryRoot: string | null;
     } | null;

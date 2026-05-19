@@ -110,6 +110,15 @@ export async function acquireTriggerConnection(
             message:
               sandboxInstance.failureMessage ??
               `Sandbox instance '${sandboxInstance.id}' entered terminal status '${sandboxInstance.status}' before it became ready.`,
+            metadata: {
+              "mistle.sandbox.instance_id": sandboxInstance.id,
+              "mistle.sandbox.status": sandboxInstance.status,
+              "mistle.sandbox.failure_code": sandboxInstance.failureCode,
+              "mistle.sandbox.failure_message": sandboxInstance.failureMessage,
+              "mistle.sandbox.poll_count": pollCount,
+              "mistle.sandbox.wait_phase": didRequestResume ? "resume" : "startup",
+              "mistle.sandbox.wait_ms": Date.now() - waitStartedAt,
+            },
           });
         }
 
@@ -200,6 +209,13 @@ export async function acquireTriggerConnection(
         throw createTriggerRunExecutionError({
           code: TriggerRunFailureCodes.TRIGGER_RUN_EXECUTION_FAILED,
           message: `Sandbox instance '${input.ensuredTriggerSandbox.sandboxInstanceId}' did not become ready before the trigger timeout elapsed.`,
+          metadata: {
+            "mistle.sandbox.instance_id": input.ensuredTriggerSandbox.sandboxInstanceId,
+            "mistle.sandbox.poll_count": pollCount,
+            "mistle.sandbox.wait_phase": didRequestResume ? "resume" : "startup",
+            "mistle.sandbox.wait_ms": Date.now() - waitStartedAt,
+            "mistle.sandbox.wait_timeout_ms": SandboxStartTimeoutMs,
+          },
         });
       }
 

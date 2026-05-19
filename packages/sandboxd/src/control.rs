@@ -1286,6 +1286,7 @@ fn component_name(component: SupervisedComponent) -> &'static str {
         SupervisedComponent::CodexProxy => "codex_proxy",
         SupervisedComponent::CodexAppServer => "codex_app_server",
         SupervisedComponent::OpenCodeProxy => "opencode_proxy",
+        SupervisedComponent::PiProxy => "pi_proxy",
     }
 }
 

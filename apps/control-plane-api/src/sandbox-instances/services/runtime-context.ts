@@ -1,6 +1,6 @@
 import type { CompiledRuntimePlan } from "@mistle/integrations-core";
 
-export type SandboxInstanceAgentRuntimeId = "codex" | "opencode";
+export type SandboxInstanceAgentRuntimeId = "codex" | "opencode" | "pi";
 
 function normalizePath(path: string): string {
   return path.replace(/\/+$/, "");
@@ -53,7 +53,11 @@ function resolveAgentRuntimeId(
   if (agentRuntime === undefined) {
     return null;
   }
-  if (agentRuntime.runtimeId !== "codex" && agentRuntime.runtimeId !== "opencode") {
+  if (
+    agentRuntime.runtimeId !== "codex" &&
+    agentRuntime.runtimeId !== "opencode" &&
+    agentRuntime.runtimeId !== "pi"
+  ) {
     throw new Error(`Unsupported sandbox instance agent runtime '${agentRuntime.runtimeId}'.`);
   }
   return agentRuntime.runtimeId;

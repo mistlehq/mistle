@@ -11,6 +11,7 @@ import type {
   TestServiceStartInput,
 } from "../../environment/index.js";
 import { TestEnvironmentIdHeader } from "../../environment/test-isolation.js";
+import { createGatewayWsUrl } from "./data-plane-gateway-sandbox-url.js";
 import type {
   IntegrationDataPlaneGatewayRelayOptions,
   IntegrationServiceOptions,
@@ -316,20 +317,4 @@ function readSandboxBaseImageRef(input: {
   }
 
   return getLocalDevDockerRegistrySandboxBaseImageRef();
-}
-
-function createGatewayWsUrl(input: {
-  sandbox: IntegrationSandboxOptions | undefined;
-  peer: ReturnType<typeof peers>;
-}): string {
-  const publicGatewayBaseUrl = input.sandbox?.publicServiceBaseUrls?.get(
-    ServiceIds.DATA_PLANE_GATEWAY,
-  );
-  if (publicGatewayBaseUrl === undefined) {
-    return input.peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox");
-  }
-
-  const url = new URL("/tunnel/sandbox", publicGatewayBaseUrl);
-  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  return url.toString();
 }

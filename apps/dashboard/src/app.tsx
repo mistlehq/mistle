@@ -21,6 +21,8 @@ import { IntegrationConnectionEditPage } from "./features/pages/integration-conn
 import { IntegrationConnectionSetupPage } from "./features/pages/integration-connection-setup-page.js";
 import { InvitationAcceptPage } from "./features/pages/invitation-accept-page.js";
 import { NewSessionPage } from "./features/pages/new-session-page.js";
+import { OrganizationApiKeyCreatePage } from "./features/pages/organization-api-key-create-page.js";
+import { OrganizationApiKeysSettingsPage } from "./features/pages/organization-api-keys-settings-page.js";
 import { OrganizationBillingSettingsPage } from "./features/pages/organization-billing-settings-page.js";
 import { OrganizationGeneralSettingsPage } from "./features/pages/organization-general-settings-page.js";
 import { OrganizationIdentityLinkingSettingsPage } from "./features/pages/organization-identity-linking-settings-page.js";
@@ -186,6 +188,18 @@ export const APP_ROUTES = createRoutesFromElements(
               handle={ROUTE_HANDLES.settingsOrganizationBilling}
               path="billing"
             />
+            <Route
+              element={<RouteOutlet />}
+              handle={ROUTE_HANDLES.settingsOrganizationApiKeys}
+              path="api-keys"
+            >
+              <Route element={<OrganizationApiKeysSettingsPage />} index />
+              <Route
+                element={<OrganizationApiKeyCreatePage />}
+                handle={ROUTE_HANDLES.settingsOrganizationApiKeysNew}
+                path="new"
+              />
+            </Route>
           </Route>
         </Route>
       </Route>

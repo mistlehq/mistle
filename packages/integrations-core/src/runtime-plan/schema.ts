@@ -146,6 +146,10 @@ const RuntimeArtifactGitHubReleaseAssetBinarySchema = z
   .object({
     fileName: z.string().min(1),
     format: z.literal("binary"),
+    sha256: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/u)
+      .optional(),
   })
   .strict();
 
@@ -154,6 +158,10 @@ const RuntimeArtifactGitHubReleaseAssetTarGzSchema = z
     fileName: z.string().min(1),
     format: z.literal("tar.gz"),
     extractedPath: z.string().min(1),
+    sha256: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/u)
+      .optional(),
   })
   .strict();
 
@@ -168,6 +176,10 @@ const RuntimeArtifactGitHubReleaseInstallAssetSchema = z.union([
       kind: z.literal("exact"),
       fileName: z.string().min(1),
       format: z.literal("binary"),
+      sha256: z
+        .string()
+        .regex(/^[a-f0-9]{64}$/u)
+        .optional(),
     })
     .strict(),
   z
@@ -176,6 +188,10 @@ const RuntimeArtifactGitHubReleaseInstallAssetSchema = z.union([
       fileName: z.string().min(1),
       format: z.literal("tar.gz"),
       extractedPath: z.string().min(1),
+      sha256: z
+        .string()
+        .regex(/^[a-f0-9]{64}$/u)
+        .optional(),
     })
     .strict(),
   z
@@ -587,12 +603,14 @@ function normalizeGitHubReleaseAssetShape(
       fileName: asset.fileName,
       format: "tar.gz" as const,
       extractedPath: asset.extractedPath,
+      ...(asset.sha256 === undefined ? {} : { sha256: asset.sha256 }),
     };
   }
 
   return {
     fileName: asset.fileName,
     ...(asset.format === undefined ? {} : { format: asset.format }),
+    ...(asset.sha256 === undefined ? {} : { sha256: asset.sha256 }),
   };
 }
 

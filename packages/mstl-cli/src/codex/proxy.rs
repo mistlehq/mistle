@@ -24,13 +24,13 @@ const CODEX_MISTLE_MODEL_PROVIDER_ID: &str = "mistle-remote";
 const CODEX_MISTLE_MODEL_PROVIDER_CONFIG: &str = "model_providers.mistle-remote={ name = \"Mistle Remote\", base_url = \"http://127.0.0.1:1/v1\", wire_api = \"responses\", requires_openai_auth = false, supports_websockets = true }";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CodexRunConfig {
+pub(crate) struct CodexRunConfig {
     pub tunnel_url: String,
     pub codex_args: Vec<String>,
 }
 
 #[derive(Debug)]
-pub enum CodexRunError {
+pub(crate) enum CodexRunError {
     InvalidCodexArgs(&'static str),
     BindLocalProxy(std::io::Error),
     LocalProxyAddress(std::io::Error),
@@ -162,7 +162,7 @@ impl Error for CodexRunError {
     }
 }
 
-pub async fn run_codex(config: CodexRunConfig) -> Result<(), CodexRunError> {
+pub(crate) async fn run_codex(config: CodexRunConfig) -> Result<(), CodexRunError> {
     validate_codex_args(&config.codex_args)?;
 
     let listener = TcpListener::bind("127.0.0.1:0")
@@ -211,7 +211,7 @@ pub async fn run_codex(config: CodexRunConfig) -> Result<(), CodexRunError> {
     Ok(())
 }
 
-pub fn validate_codex_args(codex_args: &[String]) -> Result<(), CodexRunError> {
+pub(crate) fn validate_codex_args(codex_args: &[String]) -> Result<(), CodexRunError> {
     if codex_args
         .iter()
         .any(|arg| arg == "--remote" || arg.starts_with("--remote="))
@@ -735,7 +735,7 @@ enum StreamControlMessage {
 
 #[cfg(test)]
 mod tests {
-    use crate::codex::{
+    use crate::codex::proxy::{
         PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT, codex_command_args,
         decode_data_frame, encode_data_frame, render_local_codex_config, toml_string,
     };

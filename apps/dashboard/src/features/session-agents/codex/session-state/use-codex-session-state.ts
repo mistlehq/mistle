@@ -57,8 +57,10 @@ export type { ConnectedCodexSession, StartSessionStep };
 
 type CodexSessionThreadState = {
   availableThreads: readonly CodexThreadSummary[];
+  hasMoreAvailableThreads: boolean;
   archivedThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
+  pendingThreadId: string | null;
   isRefreshingThreads: boolean;
   isRefreshingLoadedThreads: boolean;
   isRefreshingArchivedThreads: boolean;
@@ -73,7 +75,7 @@ type CodexSessionThreadState = {
   refreshThreadList: () => void;
   refreshLoadedThreadList: () => void;
   refreshArchivedThreadList: () => void;
-  startNewThread: () => Promise<string>;
+  startNewThread: (input?: { cwd?: string }) => Promise<string>;
   resumeThread: (threadId: string) => Promise<string>;
   forkThread: (threadId: string) => void;
   archiveThread: (threadId: string) => void;
@@ -82,6 +84,10 @@ type CodexSessionThreadState = {
   compactThread: (threadId: string) => void;
   rollbackThread: (threadId: string, numTurns: number) => void;
   ensureCanSwitchPrimaryRepository: () => Promise<void>;
+};
+
+type ThreadNavigationMutationContext = {
+  requestId: number;
 };
 
 type CodexSessionChatState = {
@@ -156,9 +162,11 @@ export function useCodexSessionState(input: {
   const sessionSnapshotRef = useRef<ConnectedCodexSession | null>(null);
   const threadIdRef = useRef<string | null>(null);
   const connectionGenerationRef = useRef(0);
+  const threadNavigationMutationRequestRef = useRef(0);
   const [repositoryStatusRefreshEpoch, setRepositoryStatusRefreshEpoch] = useState(0);
   const [lifecycleErrorMessage, setLifecycleErrorMessage] = useState<string | null>(null);
   const [sessionErrorMessage, setSessionErrorMessage] = useState<string | null>(null);
+  const [pendingThreadId, setPendingThreadId] = useState<string | null>(null);
   const [threadTokenUsageSnapshot, setThreadTokenUsageSnapshot] =
     useState<CodexThreadTokenUsageSnapshot | null>(null);
 
@@ -175,6 +183,7 @@ export function useCodexSessionState(input: {
 
   const {
     availableThreads,
+    hasMoreAvailableThreads,
     archivedThreads,
     loadedThreadIds,
     refreshThreadList,
@@ -275,6 +284,21 @@ export function useCodexSessionState(input: {
     setLifecycleErrorMessage,
     threadIdRef,
   });
+  const startThreadNavigationMutation = useCallback(
+    (input: { pendingThreadId: string | null }): ThreadNavigationMutationContext => {
+      const requestId = threadNavigationMutationRequestRef.current + 1;
+      threadNavigationMutationRequestRef.current = requestId;
+      setPendingThreadId(input.pendingThreadId);
+      return { requestId };
+    },
+    [],
+  );
+  const isCurrentThreadNavigationMutation = useCallback(
+    (context: ThreadNavigationMutationContext): boolean => {
+      return threadNavigationMutationRequestRef.current === context.requestId;
+    },
+    [],
+  );
   sessionSnapshotRef.current = lifecycle.sessionSnapshot;
   const { sessionSnapshot } = lifecycle;
   const bootstrapConnectionCandidate = useMemo<BootstrapConnectionCandidate | null>(() => {
@@ -361,6 +385,9 @@ export function useCodexSessionState(input: {
   });
 
   const startNewThreadMutation = useMutation({
+    onMutate: (): ThreadNavigationMutationContext => {
+      return startThreadNavigationMutation({ pendingThreadId: null });
+    },
     mutationFn: async (input?: { cwd?: string }) => {
       const rpcClient = rpcClientRef.current;
       if (rpcClient === null) {
@@ -374,7 +401,11 @@ export function useCodexSessionState(input: {
       });
       return threadStart;
     },
-    onSuccess: (threadStart) => {
+    onSuccess: (threadStart, _input, context) => {
+      if (context === undefined || !isCurrentThreadNavigationMutation(context)) {
+        return;
+      }
+
       updateActiveThread({
         threadId: threadStart.threadId,
         cwd: threadStart.cwd,
@@ -383,12 +414,19 @@ export function useCodexSessionState(input: {
       setLifecycleErrorMessage(null);
       refreshThreadCollectionsWithErrorHandling();
     },
-    onError: (error) => {
+    onError: (error, _input, context) => {
+      if (context === undefined || !isCurrentThreadNavigationMutation(context)) {
+        return;
+      }
+
       handleThreadMutationFailure("Could not start a new thread.", error);
     },
   });
 
   const resumeThreadMutation = useMutation({
+    onMutate: (threadId): ThreadNavigationMutationContext => {
+      return startThreadNavigationMutation({ pendingThreadId: threadId });
+    },
     mutationFn: async (threadId: string) => {
       const rpcClient = rpcClientRef.current;
       if (rpcClient === null) {
@@ -400,18 +438,32 @@ export function useCodexSessionState(input: {
         threadId,
       });
     },
-    onSuccess: (result) => {
+    onSuccess: (result, _threadId, context) => {
+      if (context === undefined || !isCurrentThreadNavigationMutation(context)) {
+        return;
+      }
+
       updateActiveThread({
         threadId: result.threadId,
         cwd: result.cwd,
       });
       resetChat();
       setLifecycleErrorMessage(null);
-      void hydrateChatFromThread();
       refreshThreadCollectionsWithErrorHandling();
     },
-    onError: (error) => {
+    onError: (error, _threadId, context) => {
+      if (context === undefined || !isCurrentThreadNavigationMutation(context)) {
+        return;
+      }
+
       handleThreadMutationFailure("Could not resume thread.", error);
+    },
+    onSettled: (_result, _error, _threadId, context) => {
+      if (context === undefined || !isCurrentThreadNavigationMutation(context)) {
+        return;
+      }
+
+      setPendingThreadId(null);
     },
   });
 
@@ -621,10 +673,13 @@ export function useCodexSessionState(input: {
     refreshArchivedThreadListMutate();
   }, [refreshArchivedThreadListMutate]);
 
-  const startNewThread = useCallback(async (): Promise<string> => {
-    const result = await startNewThreadMutateAsync(undefined);
-    return result.threadId;
-  }, [startNewThreadMutateAsync]);
+  const startNewThread = useCallback(
+    async (input?: { cwd?: string }): Promise<string> => {
+      const result = await startNewThreadMutateAsync(input);
+      return result.threadId;
+    },
+    [startNewThreadMutateAsync],
+  );
 
   const resumeThread = useCallback(
     async (threadId: string): Promise<string> => {
@@ -767,8 +822,10 @@ export function useCodexSessionState(input: {
   const threads = useMemo<CodexSessionThreadState>(() => {
     return {
       availableThreads,
+      hasMoreAvailableThreads,
       archivedThreads,
       loadedThreadIds,
+      pendingThreadId,
       isRefreshingThreads,
       isRefreshingLoadedThreads,
       isRefreshingArchivedThreads,
@@ -797,6 +854,7 @@ export function useCodexSessionState(input: {
     archiveThread,
     archivedThreads,
     availableThreads,
+    hasMoreAvailableThreads,
     compactThread,
     forkThread,
     isArchivingThread,
@@ -811,6 +869,7 @@ export function useCodexSessionState(input: {
     isUnarchivingThread,
     isUnsubscribingThread,
     loadedThreadIds,
+    pendingThreadId,
     refreshAvailableThreads,
     refreshLoadedThreads,
     refreshArchivedThreads,
