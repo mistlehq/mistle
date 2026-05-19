@@ -10,6 +10,7 @@ import {
 } from "@mistle/ui";
 import { ArrowClockwiseIcon, PlusIcon, XIcon } from "@phosphor-icons/react";
 
+import { formatCompactRelativeOrDate, formatDateTime } from "../../shared/date-formatters.js";
 import { useDelayedMinimumVisibleFlag } from "../../shared/use-delayed-minimum-visible-flag.js";
 import type { CodexThreadNavigatorRow } from "./codex-thread-navigator-model.js";
 
@@ -236,6 +237,7 @@ function CodexThreadNavigatorRowView(input: {
   onSelectThread: (threadId: string) => void;
 }): React.JSX.Element {
   const row = input.row;
+  const activity = resolveThreadActivityDisplay(row.lastActivityAt);
   const showOpeningIndicator = useDelayedMinimumVisibleFlag({
     active: row.isOpening,
     minimumVisibleMs: ThreadOpeningIndicatorMinimumVisibleMs,
@@ -257,19 +259,34 @@ function CodexThreadNavigatorRowView(input: {
     >
       <div className="flex min-w-0 items-start gap-2">
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <OverflowTooltipText
-              className={`min-w-0 text-[13px] leading-tight font-medium ${
-                row.isPinnedCurrent ? "italic" : ""
-              }`}
-              text={row.title}
-              tooltipSide="right"
-              tooltipSideOffset={8}
-            />
-            <CodexThreadNavigatorRowIndicator
-              row={row}
-              showOpeningIndicator={showOpeningIndicator}
-            />
+          <div className="flex min-w-0 items-start gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+              <OverflowTooltipText
+                className={`min-w-0 text-[13px] leading-tight font-medium ${
+                  row.isPinnedCurrent ? "italic" : ""
+                }`}
+                text={row.title}
+                tooltipSide="right"
+                tooltipSideOffset={8}
+              />
+              {row.isOriginal ? (
+                <span className="shrink-0 text-[11px] leading-tight text-muted-foreground">
+                  (original)
+                </span>
+              ) : null}
+              <CodexThreadNavigatorRowIndicator
+                row={row}
+                showOpeningIndicator={showOpeningIndicator}
+              />
+            </div>
+            {activity === null ? null : (
+              <span
+                className="shrink-0 pt-px text-[11px] leading-tight text-muted-foreground"
+                title={activity.title}
+              >
+                {activity.label}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -296,4 +313,18 @@ function CodexThreadNavigatorRowIndicator(input: {
   }
 
   return null;
+}
+
+function resolveThreadActivityDisplay(
+  lastActivityAt: number | null,
+): { label: string; title: string } | null {
+  if (lastActivityAt === null) {
+    return null;
+  }
+
+  const isoDateTime = new Date(lastActivityAt).toISOString();
+  return {
+    label: formatCompactRelativeOrDate(isoDateTime),
+    title: `Last activity ${formatDateTime(isoDateTime)}`,
+  };
 }

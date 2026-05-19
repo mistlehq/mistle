@@ -5,8 +5,10 @@ export type CodexThreadNavigatorRow = {
   title: string;
   cwd: string;
   cwdSectionLabel: string;
+  lastActivityAt: number | null;
   isActive: boolean;
   isOpening: boolean;
+  isOriginal: boolean;
   isPinnedCurrent: boolean;
   pendingServerRequestCount: number;
 };
@@ -16,12 +18,14 @@ export type CodexThreadNavigatorActiveThread = {
   cwd: string | null;
 };
 
-function resolveThreadActivityMs(thread: CodexThreadSummary): number {
-  return thread.updatedAt ?? thread.createdAt ?? Number.NEGATIVE_INFINITY;
+function resolveThreadActivityMs(thread: CodexThreadSummary): number | null {
+  return thread.updatedAt ?? thread.createdAt ?? null;
 }
 
 function compareThreadActivity(left: CodexThreadSummary, right: CodexThreadSummary): number {
-  const activityDifference = resolveThreadActivityMs(right) - resolveThreadActivityMs(left);
+  const leftActivityMs = resolveThreadActivityMs(left) ?? Number.NEGATIVE_INFINITY;
+  const rightActivityMs = resolveThreadActivityMs(right) ?? Number.NEGATIVE_INFINITY;
+  const activityDifference = rightActivityMs - leftActivityMs;
   if (activityDifference !== 0) {
     return activityDifference;
   }
@@ -56,14 +60,17 @@ function createNavigatorRow(input: {
   pendingServerRequestCountsByThreadId: ReadonlyMap<string, number>;
   thread: CodexThreadSummary;
   isPinnedCurrent: boolean;
+  originalThreadId: string | null;
 }): CodexThreadNavigatorRow {
   return {
     id: input.thread.id,
     title: resolveThreadTitle(input.thread),
     cwd: input.thread.cwd,
     cwdSectionLabel: resolveCwdSectionLabel(input.thread.cwd),
+    lastActivityAt: resolveThreadActivityMs(input.thread),
     isActive: input.thread.id === input.activeThreadId,
     isOpening: input.thread.id === input.pendingThreadId,
+    isOriginal: input.thread.id === input.originalThreadId,
     isPinnedCurrent: input.isPinnedCurrent,
     pendingServerRequestCount: input.pendingServerRequestCountsByThreadId.get(input.thread.id) ?? 0,
   };
@@ -73,6 +80,7 @@ function createPinnedActiveThreadRow(input: {
   activeThread: CodexThreadNavigatorActiveThread;
   pendingThreadId: string | null;
   pendingServerRequestCountsByThreadId: ReadonlyMap<string, number>;
+  originalThreadId: string | null;
 }): CodexThreadNavigatorRow | null {
   if (input.activeThread.cwd === null) {
     return null;
@@ -83,8 +91,10 @@ function createPinnedActiveThreadRow(input: {
     title: "New thread",
     cwd: input.activeThread.cwd,
     cwdSectionLabel: resolveCwdSectionLabel(input.activeThread.cwd),
+    lastActivityAt: null,
     isActive: true,
     isOpening: input.activeThread.id === input.pendingThreadId,
+    isOriginal: input.activeThread.id === input.originalThreadId,
     isPinnedCurrent: true,
     pendingServerRequestCount:
       input.pendingServerRequestCountsByThreadId.get(input.activeThread.id) ?? 0,
@@ -106,6 +116,7 @@ export function projectCodexThreadNavigatorRows(input: {
   activeThreadId: string | null;
   activeThread: CodexThreadNavigatorActiveThread | null;
   availableThreads: readonly CodexThreadSummary[];
+  originalThreadId: string | null;
   pendingThreadId: string | null;
   pendingServerRequestThreadIds: readonly string[];
 }): readonly CodexThreadNavigatorRow[] {
@@ -121,6 +132,7 @@ export function projectCodexThreadNavigatorRows(input: {
       pendingServerRequestCountsByThreadId,
       thread,
       isPinnedCurrent: false,
+      originalThreadId: input.originalThreadId,
     }),
   );
 
@@ -136,6 +148,7 @@ export function projectCodexThreadNavigatorRows(input: {
     activeThread: input.activeThread,
     pendingThreadId: input.pendingThreadId,
     pendingServerRequestCountsByThreadId,
+    originalThreadId: input.originalThreadId,
   });
   if (activeThreadRow === null) {
     return rows;

@@ -31,6 +31,7 @@ type CodexThreadCollectionsRefreshResult = {
   availableThreads: readonly CodexThreadSummary[];
   archivedThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
+  originalThreadId: string | null;
 };
 
 export type CodexConnectionThreadSelectionPolicy = "oldest" | "most_recently_updated";
@@ -118,6 +119,10 @@ export function useCodexSessionConnection(input: {
     rpcClient?: CodexJsonRpcClient;
     generation?: number;
   }) => Promise<CodexThreadCollectionsRefreshResult>;
+  recordStartedThreadAsOriginalAfterEmptyScan: (input: {
+    generation: number;
+    threadId: string;
+  }) => void;
   ensureTransportConnected: (input: { sandboxInstanceId: string }) => Promise<{
     sandboxInstanceId: string;
     transport: SandboxSessionTransport;
@@ -404,6 +409,15 @@ export function useCodexSessionConnection(input: {
         ensureCurrentGeneration: input.ensureCurrentGeneration,
       });
       reconnectTargetThreadIdRef.current = establishedThread.resolvedThreadId;
+      if (
+        threadCollections.originalThreadId === null &&
+        establishedThread.resolvedThreadId === null
+      ) {
+        input.recordStartedThreadAsOriginalAfterEmptyScan({
+          generation,
+          threadId: establishedThread.threadId,
+        });
+      }
 
       return {
         ...establishedThread,

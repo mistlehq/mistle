@@ -4,12 +4,19 @@ import {
   type CodexJsonRpcClient,
   type CodexThreadSummary,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
-import { useCallback, useState, type RefObject } from "react";
+import { useCallback, useRef, useState, type RefObject } from "react";
 
 type RefreshInput = {
   rpcClient?: CodexJsonRpcClient;
   generation?: number;
 };
+
+type OriginalThreadIdSnapshot = {
+  generation: number | null;
+  threadId: string | null;
+};
+
+const OriginalThreadListPageSize = 100;
 
 export function useCodexThreadCollections(input: {
   rpcClientRef: RefObject<CodexJsonRpcClient | null>;
@@ -19,6 +26,18 @@ export function useCodexThreadCollections(input: {
   const [hasMoreAvailableThreads, setHasMoreAvailableThreads] = useState(false);
   const [archivedThreads, setArchivedThreads] = useState<readonly CodexThreadSummary[]>([]);
   const [loadedThreadIds, setLoadedThreadIds] = useState<readonly string[]>([]);
+  const [originalThreadIdSnapshot, setOriginalThreadIdSnapshot] =
+    useState<OriginalThreadIdSnapshot | null>(null);
+  const originalThreadIdSnapshotRef = useRef<OriginalThreadIdSnapshot | null>(null);
+  const originalThreadId = originalThreadIdSnapshot?.threadId ?? null;
+
+  const updateOriginalThreadIdSnapshot = useCallback(
+    (snapshot: OriginalThreadIdSnapshot | null): void => {
+      originalThreadIdSnapshotRef.current = snapshot;
+      setOriginalThreadIdSnapshot(snapshot);
+    },
+    [],
+  );
 
   const refreshThreadList = useCallback(
     async (refreshInput?: RefreshInput): Promise<readonly CodexThreadSummary[]> => {
@@ -85,22 +104,90 @@ export function useCodexThreadCollections(input: {
     [input],
   );
 
+  const refreshOriginalThreadId = useCallback(
+    async (refreshInput?: RefreshInput): Promise<string | null> => {
+      const rpcClient = refreshInput?.rpcClient ?? input.rpcClientRef.current;
+      if (rpcClient === null) {
+        return null;
+      }
+
+      const availableOriginalThreadCandidates = await listOriginalThreadCandidates({
+        rpcClient,
+        ensureCurrentGeneration: input.ensureCurrentGeneration,
+        ...(refreshInput?.generation === undefined ? {} : { generation: refreshInput.generation }),
+      });
+      const archivedOriginalThreadCandidates = await listOriginalThreadCandidates({
+        rpcClient,
+        archived: true,
+        ensureCurrentGeneration: input.ensureCurrentGeneration,
+        ...(refreshInput?.generation === undefined ? {} : { generation: refreshInput.generation }),
+      });
+      const nextOriginalThreadId = resolveOriginalCodexThreadId([
+        ...availableOriginalThreadCandidates,
+        ...archivedOriginalThreadCandidates,
+      ]);
+      updateOriginalThreadIdSnapshot({
+        generation: refreshInput?.generation ?? null,
+        threadId: nextOriginalThreadId,
+      });
+      return nextOriginalThreadId;
+    },
+    [input, updateOriginalThreadIdSnapshot],
+  );
+
+  const recordStartedThreadAsOriginalAfterEmptyScan = useCallback(
+    (recordInput: { generation: number; threadId: string }): void => {
+      const nextSnapshot = resolveOriginalThreadIdSnapshotAfterThreadStart({
+        generation: recordInput.generation,
+        snapshot: originalThreadIdSnapshotRef.current,
+        startedThreadId: recordInput.threadId,
+      });
+      if (nextSnapshot === originalThreadIdSnapshotRef.current) {
+        return;
+      }
+
+      updateOriginalThreadIdSnapshot(nextSnapshot);
+    },
+    [updateOriginalThreadIdSnapshot],
+  );
+
   const refreshThreadCollections = useCallback(
     async (refreshInput?: RefreshInput) => {
-      const [availableThreadsResult, archivedThreadsResult, loadedThreadIdsResult] =
-        await Promise.all([
-          refreshThreadList(refreshInput),
-          refreshArchivedThreadList(refreshInput),
-          refreshLoadedThreadList(refreshInput),
-        ]);
+      const reusableOriginalThreadIdSnapshot = resolveReusableOriginalThreadIdSnapshot({
+        ...(refreshInput?.generation === undefined
+          ? {}
+          : { refreshGeneration: refreshInput.generation }),
+        snapshot: originalThreadIdSnapshotRef.current,
+      });
+      const originalThreadIdPromise =
+        reusableOriginalThreadIdSnapshot !== null
+          ? Promise.resolve(reusableOriginalThreadIdSnapshot.threadId)
+          : refreshOriginalThreadId(refreshInput);
+      const [
+        availableThreadsResult,
+        archivedThreadsResult,
+        loadedThreadIdsResult,
+        originalThreadIdResult,
+      ] = await Promise.all([
+        refreshThreadList(refreshInput),
+        refreshArchivedThreadList(refreshInput),
+        refreshLoadedThreadList(refreshInput),
+        originalThreadIdPromise,
+      ]);
 
       return {
         availableThreads: availableThreadsResult,
         archivedThreads: archivedThreadsResult,
         loadedThreadIds: loadedThreadIdsResult,
+        originalThreadId: originalThreadIdResult,
       };
     },
-    [refreshArchivedThreadList, refreshLoadedThreadList, refreshThreadList],
+    [
+      refreshArchivedThreadList,
+      refreshLoadedThreadList,
+      refreshOriginalThreadId,
+      refreshThreadList,
+    ],
   );
 
   const resetThreadCollections = useCallback((): void => {
@@ -108,17 +195,117 @@ export function useCodexThreadCollections(input: {
     setHasMoreAvailableThreads(false);
     setArchivedThreads([]);
     setLoadedThreadIds([]);
-  }, []);
+    updateOriginalThreadIdSnapshot(null);
+  }, [updateOriginalThreadIdSnapshot]);
 
   return {
     availableThreads,
     hasMoreAvailableThreads,
     archivedThreads,
     loadedThreadIds,
+    originalThreadId,
     refreshThreadList,
     refreshArchivedThreadList,
     refreshLoadedThreadList,
+    refreshOriginalThreadId,
+    recordStartedThreadAsOriginalAfterEmptyScan,
     refreshThreadCollections,
     resetThreadCollections,
   };
+}
+
+export function resolveReusableOriginalThreadIdSnapshot(input: {
+  refreshGeneration?: number;
+  snapshot: OriginalThreadIdSnapshot | null;
+}): OriginalThreadIdSnapshot | null {
+  if (input.snapshot === null) {
+    return null;
+  }
+
+  if (input.snapshot.threadId === null) {
+    return null;
+  }
+
+  if (
+    input.refreshGeneration !== undefined &&
+    input.snapshot.generation !== input.refreshGeneration
+  ) {
+    return null;
+  }
+
+  return input.snapshot;
+}
+
+export function resolveOriginalCodexThreadId(
+  threads: readonly CodexThreadSummary[],
+): string | null {
+  let originalThread: CodexThreadSummary | null = null;
+
+  for (const thread of threads) {
+    if (thread.createdAt === null) {
+      continue;
+    }
+
+    if (
+      originalThread === null ||
+      originalThread.createdAt === null ||
+      thread.createdAt < originalThread.createdAt ||
+      (thread.createdAt === originalThread.createdAt && thread.id < originalThread.id)
+    ) {
+      originalThread = thread;
+    }
+  }
+
+  return originalThread?.id ?? null;
+}
+
+export function resolveOriginalThreadIdSnapshotAfterThreadStart(input: {
+  generation: number;
+  snapshot: OriginalThreadIdSnapshot | null;
+  startedThreadId: string;
+}): OriginalThreadIdSnapshot | null {
+  if (input.snapshot === null) {
+    return input.snapshot;
+  }
+
+  if (input.snapshot.generation !== input.generation) {
+    return input.snapshot;
+  }
+
+  if (input.snapshot.threadId !== null) {
+    return input.snapshot;
+  }
+
+  return {
+    generation: input.generation,
+    threadId: input.startedThreadId,
+  };
+}
+
+async function listOriginalThreadCandidates(input: {
+  rpcClient: CodexJsonRpcClient;
+  archived?: boolean;
+  ensureCurrentGeneration: (generation: number) => void;
+  generation?: number;
+}): Promise<readonly CodexThreadSummary[]> {
+  let cursor: string | null = null;
+  const threads: CodexThreadSummary[] = [];
+
+  do {
+    const threadList = await listCodexThreads({
+      rpcClient: input.rpcClient,
+      limit: OriginalThreadListPageSize,
+      cursor,
+      ...(input.archived === undefined ? {} : { archived: input.archived }),
+      sortKey: "created_at",
+    });
+    if (input.generation !== undefined) {
+      input.ensureCurrentGeneration(input.generation);
+    }
+
+    threads.push(...threadList.threads);
+    cursor = threadList.nextCursor;
+  } while (cursor !== null);
+
+  return threads;
 }

@@ -60,6 +60,7 @@ type CodexSessionThreadState = {
   hasMoreAvailableThreads: boolean;
   archivedThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
+  originalThreadId: string | null;
   pendingThreadId: string | null;
   isRefreshingThreads: boolean;
   isRefreshingLoadedThreads: boolean;
@@ -186,10 +187,12 @@ export function useCodexSessionState(input: {
     hasMoreAvailableThreads,
     archivedThreads,
     loadedThreadIds,
+    originalThreadId,
     refreshThreadList,
     refreshArchivedThreadList,
     refreshLoadedThreadList,
     refreshThreadCollections,
+    recordStartedThreadAsOriginalAfterEmptyScan,
   } = useCodexThreadCollections({
     rpcClientRef: input.rpcClientRef,
     ensureCurrentGeneration,
@@ -276,6 +279,7 @@ export function useCodexSessionState(input: {
     onServerRequestNotification: handleServerRequestNotification,
     onServerRequestReceived: handleServerRequestReceived,
     refreshThreadCollections,
+    recordStartedThreadAsOriginalAfterEmptyScan,
     ensureTransportConnected: input.ensureTransportConnected,
     rpcClientRef: input.rpcClientRef,
     sessionClientRef: input.sessionClientRef,
@@ -825,6 +829,7 @@ export function useCodexSessionState(input: {
       hasMoreAvailableThreads,
       archivedThreads,
       loadedThreadIds,
+      originalThreadId,
       pendingThreadId,
       isRefreshingThreads,
       isRefreshingLoadedThreads,
@@ -869,6 +874,7 @@ export function useCodexSessionState(input: {
     isUnarchivingThread,
     isUnsubscribingThread,
     loadedThreadIds,
+    originalThreadId,
     pendingThreadId,
     refreshAvailableThreads,
     refreshLoadedThreads,

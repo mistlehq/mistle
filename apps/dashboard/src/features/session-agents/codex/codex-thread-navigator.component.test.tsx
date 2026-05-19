@@ -13,8 +13,10 @@ const Rows = [
     title: "Active work",
     cwd: "/workspace/repo-a",
     cwdSectionLabel: "repo-a",
+    lastActivityAt: Date.now() - 2 * 86_400_000,
     isActive: true,
     isOpening: false,
+    isOriginal: true,
     isPinnedCurrent: false,
     pendingServerRequestCount: 1,
   },
@@ -23,8 +25,10 @@ const Rows = [
     title: "Other work",
     cwd: "/workspace/repo-b",
     cwdSectionLabel: "repo-b",
+    lastActivityAt: Date.now() - 3 * 3_600_000,
     isActive: false,
     isOpening: true,
+    isOriginal: false,
     isPinnedCurrent: false,
     pendingServerRequestCount: 0,
   },
@@ -51,6 +55,9 @@ describe("CodexThreadNavigator", () => {
     expect(within(navigator).getByRole("region", { name: "repo-a" })).toBeTruthy();
     expect(within(navigator).getByRole("region", { name: "repo-b" })).toBeTruthy();
     expect(within(navigator).getByRole("button", { name: /Active work/ })).toBeTruthy();
+    expect(within(navigator).getByRole("button", { name: /original/ })).toBeTruthy();
+    expect(within(navigator).getByText("2d")).toBeTruthy();
+    expect(within(navigator).getByText("3h")).toBeTruthy();
     expect(within(navigator).getByRole("status", { name: "Needs input" })).toBeTruthy();
     expect(within(navigator).getByRole("button", { name: /Other work/ })).toBeTruthy();
     expect(within(navigator).queryByLabelText("Opening thread")).toBeNull();
@@ -73,8 +80,10 @@ describe("CodexThreadNavigator", () => {
             title: "New thread",
             cwd: "/root",
             cwdSectionLabel: "root",
+            lastActivityAt: null,
             isActive: true,
             isOpening: false,
+            isOriginal: false,
             isPinnedCurrent: true,
             pendingServerRequestCount: 0,
           },

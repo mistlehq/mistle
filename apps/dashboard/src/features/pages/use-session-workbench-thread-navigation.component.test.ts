@@ -30,6 +30,7 @@ function createCodexThreadNavigator(input: {
     availableThreads: input.availableThreads,
     hasMoreAvailableThreads: false,
     isStartingNewThread: false,
+    originalThreadId: null,
     pendingThreadId: null,
     providerThreadId: null,
     refreshThreadList: function refreshThreadList() {
