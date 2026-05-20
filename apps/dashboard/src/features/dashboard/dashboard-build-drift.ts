@@ -30,7 +30,7 @@ function createUnknownStatus(): DashboardBuildDriftStatus {
   };
 }
 
-let currentStatus: DashboardBuildDriftStatus | null = null;
+let currentStatus: DashboardBuildDriftStatus = createUnknownStatus();
 
 function emitDashboardBuildDriftChange(): void {
   for (const listener of DashboardBuildDriftListeners) {
@@ -41,7 +41,6 @@ function emitDashboardBuildDriftChange(): void {
 function setDashboardBuildDriftStatus(nextStatus: DashboardBuildDriftStatus): void {
   const previousStatus = currentStatus;
   const changed =
-    previousStatus === null ||
     previousStatus.kind !== nextStatus.kind ||
     previousStatus.clientReleaseVersion !== nextStatus.clientReleaseVersion ||
     ("serverReleaseVersion" in previousStatus ? previousStatus.serverReleaseVersion : null) !==
@@ -63,7 +62,7 @@ export function subscribeDashboardBuildDrift(listener: DashboardBuildDriftListen
 }
 
 export function getDashboardBuildDriftStatus(): DashboardBuildDriftStatus {
-  return currentStatus ?? createUnknownStatus();
+  return currentStatus;
 }
 
 export function useDashboardBuildDriftStatus(): DashboardBuildDriftStatus {
@@ -109,7 +108,7 @@ export async function checkDashboardBuildDrift(input?: {
 }
 
 export function resetDashboardBuildDriftForTest(): void {
-  currentStatus = null;
+  currentStatus = createUnknownStatus();
   emitDashboardBuildDriftChange();
 }
 

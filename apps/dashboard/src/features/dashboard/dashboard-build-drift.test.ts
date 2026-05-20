@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveDashboardBuildDriftStatus } from "./dashboard-build-drift.js";
+import {
+  getDashboardBuildDriftStatus,
+  resetDashboardBuildDriftForTest,
+  resolveDashboardBuildDriftStatus,
+} from "./dashboard-build-drift.js";
+
+describe("getDashboardBuildDriftStatus", () => {
+  it("returns a stable unknown status before a build drift check completes", () => {
+    resetDashboardBuildDriftForTest();
+
+    expect(getDashboardBuildDriftStatus()).toBe(getDashboardBuildDriftStatus());
+  });
+});
 
 describe("resolveDashboardBuildDriftStatus", () => {
   it("reports current when dashboard and server release versions match", () => {
