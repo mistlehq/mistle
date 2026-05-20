@@ -61,6 +61,7 @@ export type UsePiSessionStateResult = {
     isInterruptingTurn: boolean;
     isStartingTurn: boolean;
     isSteeringTurn: boolean;
+    followUpTurn: (input: { submittedPrompt: string }) => Promise<void>;
     sendPrompt: (input: { submittedPrompt: string }) => Promise<void>;
     steerTurn: (input: { submittedPrompt: string }) => Promise<void>;
   };
@@ -416,6 +417,33 @@ export function usePiSessionState(input: {
     [sessionSnapshot?.activeSessionFile],
   );
 
+  const followUpTurn = useCallback(
+    async (followUpInput: { submittedPrompt: string }): Promise<void> => {
+      const client = clientRef.current;
+      const sessionFile = sessionSnapshot?.activeSessionFile ?? null;
+      if (client === null || sessionFile === null) {
+        throw new Error("Connect Pi before queueing a follow-up.");
+      }
+      const prompt = followUpInput.submittedPrompt.trim();
+      if (prompt.length === 0) {
+        throw new Error("Pi follow-up prompt must not be empty.");
+      }
+      try {
+        await client.followUp({
+          sessionFile,
+          message: prompt,
+        });
+        setSessionErrorMessage(null);
+      } catch (error) {
+        setSessionErrorMessage(
+          error instanceof Error ? error.message : "Could not queue Pi follow-up.",
+        );
+        throw error;
+      }
+    },
+    [sessionSnapshot?.activeSessionFile],
+  );
+
   const abortConversation = useCallback(async (): Promise<void> => {
     const client = clientRef.current;
     const sessionFile = sessionSnapshot?.activeSessionFile ?? null;
@@ -463,6 +491,7 @@ export function usePiSessionState(input: {
       isInterruptingTurn,
       isStartingTurn,
       isSteeringTurn,
+      followUpTurn,
       sendPrompt,
       steerTurn,
     },

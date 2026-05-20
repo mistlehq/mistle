@@ -176,6 +176,7 @@ function createOpenCodeRuntimeInput(reportedMessages: string[]): OpenCodeRuntime
 }
 
 function createPiRuntimeInput(input: {
+  queuedPrompts?: string[];
   reportedMessages: string[];
   steeredPrompts: string[];
 }): PiRuntimeInput {
@@ -214,6 +215,9 @@ function createPiRuntimeInput(input: {
       sendPrompt: async () => {
         return;
       },
+      followUpTurn: async (turnInput) => {
+        input.queuedPrompts?.push(turnInput.submittedPrompt);
+      },
       steerTurn: async (turnInput) => {
         input.steeredPrompts.push(turnInput.submittedPrompt);
       },
@@ -228,6 +232,9 @@ function createPiRuntimeInput(input: {
       },
       sessionErrorMessage: null,
     },
+    queueTurn: async (turnInput) => {
+      input.queuedPrompts?.push(turnInput.transcriptPrompt ?? turnInput.submittedPrompt);
+    },
     sessionSnapshot: {
       activeDirectory: null,
       activeSessionFile: "pi-session.json",
@@ -236,6 +243,9 @@ function createPiRuntimeInput(input: {
     },
     startTurn: async () => {
       return;
+    },
+    steerTurn: async (turnInput) => {
+      input.steeredPrompts.push(turnInput.transcriptPrompt ?? turnInput.submittedPrompt);
     },
   };
 }
@@ -342,5 +352,24 @@ describe("buildPiConversationRuntime", () => {
     });
 
     expect(steeredPrompts).toEqual(["prompt with attachments"]);
+  });
+
+  it("exposes Pi follow-up as a runtime-native queue turn", async () => {
+    const queuedPrompts: string[] = [];
+    const runtime = buildPiConversationRuntime(
+      createPiRuntimeInput({
+        queuedPrompts,
+        reportedMessages: [],
+        steeredPrompts: [],
+      }),
+    );
+
+    await runtime.composerRuntimeInput.turnControl.queueTurn?.({
+      submittedPrompt: "queued prompt",
+      transcriptPrompt: "queued transcript",
+      uploadedAttachments: [],
+    });
+
+    expect(queuedPrompts).toEqual(["queued transcript"]);
   });
 });

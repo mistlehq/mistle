@@ -19,7 +19,9 @@ import {
 import {
   buildCodexTurnStarter,
   buildOpenCodeTurnStarter,
+  buildPiTurnQueuer,
   buildPiTurnStarter,
+  buildPiTurnSteerer,
 } from "../session-agents/session-workbench-turn-starters.js";
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
 import {
@@ -148,6 +150,20 @@ export function useSessionWorkbenchConversationRuntime(input: {
       }),
     [input.piSessionState.chat],
   );
+  const steerPiTurn = useMemo<SessionTurnControl["steerTurn"]>(
+    () =>
+      buildPiTurnSteerer({
+        chat: input.piSessionState.chat,
+      }),
+    [input.piSessionState.chat],
+  );
+  const queuePiTurn = useMemo<NonNullable<SessionTurnControl["queueTurn"]>>(
+    () =>
+      buildPiTurnQueuer({
+        chat: input.piSessionState.chat,
+      }),
+    [input.piSessionState.chat],
+  );
   const codexBootstrap = useMemo(() => {
     if (
       sessionState.threads.pendingThreadId === null &&
@@ -239,7 +255,9 @@ export function useSessionWorkbenchConversationRuntime(input: {
         configControl: piConfigControl,
         sessionMessage: input.piSessionState.sessionMessage,
         sessionSnapshot: input.piSessionState.lifecycle.sessionSnapshot,
+        queueTurn: queuePiTurn,
         startTurn: startPiTurn,
+        steerTurn: steerPiTurn,
       }),
     [
       input.piSessionState.chat.abortConversation,
@@ -249,14 +267,16 @@ export function useSessionWorkbenchConversationRuntime(input: {
       input.piSessionState.chat.isInterruptingTurn,
       input.piSessionState.chat.isStartingTurn,
       input.piSessionState.chat.isSteeringTurn,
-      input.piSessionState.chat.steerTurn,
+      input.piSessionState.chat.followUpTurn,
       input.piSessionState.lifecycle.sessionSnapshot,
       input.piSessionState.sessionMessage.clearSessionErrorMessage,
       input.piSessionState.sessionMessage.reportSessionErrorMessage,
       input.piSessionState.sessionMessage.sessionErrorMessage,
       piComposerBootstrap,
       piConfigControl,
+      queuePiTurn,
       startPiTurn,
+      steerPiTurn,
     ],
   );
   const activeRuntime = input.isPiRuntime

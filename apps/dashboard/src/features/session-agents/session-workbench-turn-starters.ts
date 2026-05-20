@@ -128,17 +128,41 @@ export function buildOpenCodeTurnStarter(input: {
 }
 
 export function buildPiTurnStarter(input: {
-  chat: UsePiSessionStateResult["chat"];
+  chat: Pick<UsePiSessionStateResult["chat"], "sendPrompt">;
 }): SessionTurnControl["startTurn"] {
   return async (turnInput): Promise<void> => {
-    const messagePayload = turnInput.transcriptPrompt ?? turnInput.submittedPrompt;
     await input.chat.sendPrompt({
-      submittedPrompt: buildPiSourceReferencePrompt({
-        prompt: messagePayload,
-        uploadedAttachments: turnInput.uploadedAttachments ?? [],
-      }),
+      submittedPrompt: buildPiSubmittedPrompt(turnInput),
     });
   };
+}
+
+export function buildPiTurnSteerer(input: {
+  chat: Pick<UsePiSessionStateResult["chat"], "steerTurn">;
+}): SessionTurnControl["steerTurn"] {
+  return async (turnInput): Promise<void> => {
+    await input.chat.steerTurn({
+      submittedPrompt: buildPiSubmittedPrompt(turnInput),
+    });
+  };
+}
+
+export function buildPiTurnQueuer(input: {
+  chat: Pick<UsePiSessionStateResult["chat"], "followUpTurn">;
+}): NonNullable<SessionTurnControl["queueTurn"]> {
+  return async (turnInput): Promise<void> => {
+    await input.chat.followUpTurn({
+      submittedPrompt: buildPiSubmittedPrompt(turnInput),
+    });
+  };
+}
+
+function buildPiSubmittedPrompt(turnInput: Parameters<SessionTurnControl["startTurn"]>[0]): string {
+  const messagePayload = turnInput.transcriptPrompt ?? turnInput.submittedPrompt;
+  return buildPiSourceReferencePrompt({
+    prompt: messagePayload,
+    uploadedAttachments: turnInput.uploadedAttachments ?? [],
+  });
 }
 
 function applyGeneratedSessionTitlePatch(input: {

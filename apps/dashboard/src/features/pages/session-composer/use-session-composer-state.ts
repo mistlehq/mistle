@@ -78,6 +78,13 @@ export type SessionTurnControl = {
     transcriptPrompt?: string;
     displayAttachments?: readonly ChatAttachment[];
   }) => Promise<void>;
+  queueTurn?: (input: {
+    submittedPrompt: string;
+    submittedAttachments?: readonly SessionComposerSubmittedLocalImageAttachment[];
+    uploadedAttachments?: readonly UploadedSandboxFile[];
+    transcriptPrompt?: string;
+    displayAttachments?: readonly ChatAttachment[];
+  }) => Promise<void>;
   interruptTurn: () => void;
 };
 
@@ -275,6 +282,67 @@ export function useSessionComposerState(input: {
 
     clearSessionErrorMessage();
     setComposerErrorMessage(null);
+    const queueTurn = composerStateInput.turnControl.queueTurn;
+    if (composerStateInput.turnControl.activeTurnState === "running" && queueTurn !== undefined) {
+      void (async (): Promise<void> => {
+        if (composerStateInput.bootstrap.phase.status !== "ready") {
+          if (composerStateInput.bootstrap.phase.status === "failed") {
+            setComposerErrorMessage(composerStateInput.bootstrap.phase.message);
+          }
+          return;
+        }
+
+        if (requiresModelSelection && activeComposerModel === null) {
+          const missingModelMessage =
+            composerStateInput.configControl.selectedModel === null
+              ? buildModelSelectionRequiredMessage()
+              : buildUnavailableModelErrorMessage(composerStateInput.configControl.selectedModel);
+          setComposerErrorMessage(missingModelMessage);
+          return;
+        }
+
+        const submittedPrompt = buildSessionComposerPrompt({
+          composerText: trimmedComposerText,
+          pendingDiffComments: draftState.pendingDiffComments,
+        });
+
+        let preparedAttachments;
+        try {
+          preparedAttachments = await composerStateInput.attachmentControl.prepareAttachments({
+            files: pendingComposerAttachments.map((attachment) => attachment.file),
+            prompt: submittedPrompt,
+            supportsImageInspection:
+              activeComposerModel !== null && supportsImageInspection(activeComposerModel),
+          });
+        } catch (error) {
+          setComposerErrorMessage(
+            error instanceof Error ? error.message : "Could not upload attachments.",
+          );
+          return;
+        }
+
+        try {
+          await queueTurn({
+            submittedPrompt: preparedAttachments.prompt,
+            submittedAttachments: preparedAttachments.submittedAttachments,
+            uploadedAttachments: preparedAttachments.uploadedAttachments,
+            displayAttachments: preparedAttachments.displayAttachments,
+            transcriptPrompt: submittedPrompt,
+          });
+        } catch (error) {
+          setComposerErrorMessage(
+            error instanceof Error ? error.message : "Could not queue chat message.",
+          );
+          return;
+        }
+
+        draftState.setComposerText("");
+        draftState.clearPendingDiffComments();
+        setPendingComposerAttachments([]);
+      })();
+      return;
+    }
+
     setQueuedPrompts((currentQueuedPrompts) => [
       ...currentQueuedPrompts,
       {
@@ -288,7 +356,18 @@ export function useSessionComposerState(input: {
     draftState.setComposerText("");
     draftState.clearPendingDiffComments();
     setPendingComposerAttachments([]);
-  }, [clearSessionErrorMessage, composerText, draftState, pendingComposerAttachments]);
+  }, [
+    activeComposerModel,
+    clearSessionErrorMessage,
+    composerStateInput.attachmentControl,
+    composerStateInput.bootstrap.phase,
+    composerStateInput.configControl.selectedModel,
+    composerStateInput.turnControl,
+    composerText,
+    draftState,
+    pendingComposerAttachments,
+    requiresModelSelection,
+  ]);
 
   const removeQueuedPrompt = useCallback((queuedPromptId: string): void => {
     setQueuedPrompts((currentQueuedPrompts) =>

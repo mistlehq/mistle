@@ -216,7 +216,9 @@ export function buildPiConversationRuntime(input: {
   configControl: SessionComposerRuntimeInput["configControl"];
   sessionMessage: UsePiSessionStateResult["sessionMessage"];
   sessionSnapshot: UsePiSessionStateResult["lifecycle"]["sessionSnapshot"];
+  queueTurn: NonNullable<SessionTurnControl["queueTurn"]>;
   startTurn: SessionTurnControl["startTurn"];
+  steerTurn: SessionTurnControl["steerTurn"];
 }): SessionWorkbenchRuntimeAdapter {
   const capabilities = SessionRuntimeWorkbenchCapabilities.PI;
   const isTurnRunning = input.chat.chatState.status === "busy";
@@ -242,12 +244,9 @@ export function buildPiConversationRuntime(input: {
         isInterrupting: input.chat.isInterruptingTurn,
         isStarting: input.chat.isStartingTurn,
         isSteering: input.chat.isSteeringTurn,
+        queueTurn: input.queueTurn,
         startTurn: input.startTurn,
-        steerTurn: async (turnInput): Promise<void> => {
-          await input.chat.steerTurn({
-            submittedPrompt: turnInput.transcriptPrompt ?? turnInput.submittedPrompt,
-          });
-        },
+        steerTurn: input.steerTurn,
       },
       sessionErrorMessage: input.sessionMessage.sessionErrorMessage,
       clearSessionErrorMessage: input.sessionMessage.clearSessionErrorMessage,
