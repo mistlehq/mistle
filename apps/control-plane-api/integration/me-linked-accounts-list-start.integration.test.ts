@@ -103,6 +103,8 @@ describe.concurrent("me linked accounts list and start integration", () => {
     expect(payload.linkedAccounts).toHaveLength(2);
     expect(payload.linkedAccounts[0]).toMatchObject({
       providerFamily: "github",
+      organizationProviderConfigId: "ilp_me_linked_accounts_github",
+      integrationConnectionId: "icn_me_linked_accounts_github_identity",
       displayName: "GitHub",
       logoKey: "github",
       configurationStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
@@ -123,6 +125,8 @@ describe.concurrent("me linked accounts list and start integration", () => {
     });
     expect(payload.linkedAccounts[1]).toMatchObject({
       providerFamily: "slack",
+      organizationProviderConfigId: "ilp_me_linked_accounts_slack",
+      integrationConnectionId: "icn_me_linked_accounts_slack_identity",
       displayName: "Slack",
       logoKey: "slack",
       configurationStatus: OrganizationIdentityLinkProviderConfigStatus.DISABLED,

@@ -37,6 +37,8 @@ export const LinkedAccountCommitSigningSchema = z
 export const LinkedAccountSchema = z
   .object({
     providerFamily: z.string().min(1),
+    organizationProviderConfigId: z.string().min(1),
+    integrationConnectionId: z.string().min(1),
     displayName: z.string().min(1),
     logoKey: z.string().min(1),
     configurationStatus: z.enum(["active", "disabled"]),

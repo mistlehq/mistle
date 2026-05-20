@@ -153,6 +153,8 @@ export const OrganizationIdentityLinkProviderConnectionSummarySchema = z
 export const OrganizationIdentityLinkProviderSchema = z
   .object({
     providerFamily: z.string().min(1),
+    organizationProviderConfigId: z.string().min(1).nullable(),
+    integrationConnectionId: z.string().min(1).nullable(),
     displayName: z.string().min(1),
     logoKey: z.string().min(1),
     eligibleTargetKeys: z.array(z.string().min(1)),

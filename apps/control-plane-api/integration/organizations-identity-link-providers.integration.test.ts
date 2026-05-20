@@ -54,6 +54,8 @@ describe.concurrent("organization identity-linking providers integration", () =>
     expect(payload.providers).toEqual([
       {
         providerFamily: "github",
+        organizationProviderConfigId: null,
+        integrationConnectionId: null,
         displayName: "GitHub",
         logoKey: "github",
         eligibleTargetKeys: ["github-cloud"],
@@ -66,6 +68,8 @@ describe.concurrent("organization identity-linking providers integration", () =>
       },
       {
         providerFamily: "slack",
+        organizationProviderConfigId: null,
+        integrationConnectionId: null,
         displayName: "Slack",
         logoKey: "slack",
         eligibleTargetKeys: ["slack-default"],
@@ -106,6 +110,8 @@ describe.concurrent("organization identity-linking providers integration", () =>
 
     const payload = OrganizationIdentityLinkProviderSchema.parse(await response.json());
     expect(payload.configurationStatus).toBe(OrganizationIdentityLinkProviderConfigStatus.DISABLED);
+    expect(payload.organizationProviderConfigId).toBeTruthy();
+    expect(payload.integrationConnectionId).toBe(connectionId);
     expect(payload.selectedConnection?.id).toBe(connectionId);
     expect(payload.eligibleConnections.map((connection) => connection.id)).toEqual([connectionId]);
 
@@ -123,6 +129,7 @@ describe.concurrent("organization identity-linking providers integration", () =>
       createdByUserId: session.userId,
       updatedByUserId: session.userId,
     });
+    expect(payload.organizationProviderConfigId).toBe(persistedConfig?.id);
   });
 
   it("enables and disables a saved identity-linking provider without deleting the row", async ({
@@ -163,6 +170,7 @@ describe.concurrent("organization identity-linking providers integration", () =>
     expect(enabledProvider.configurationStatus).toBe(
       OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
     );
+    expect(enabledProvider.integrationConnectionId).toBe(connectionId);
 
     const disableResponse = await env.controlPlaneApi.http.fetch(
       "/v1/organization/identity-linking/providers/github",
@@ -180,6 +188,8 @@ describe.concurrent("organization identity-linking providers integration", () =>
     expect(disabledProvider.configurationStatus).toBe(
       OrganizationIdentityLinkProviderConfigStatus.DISABLED,
     );
+    expect(disabledProvider.organizationProviderConfigId).toBeTruthy();
+    expect(disabledProvider.integrationConnectionId).toBe(connectionId);
     expect(disabledProvider.selectedConnection?.id).toBe(connectionId);
 
     const persistedConfig =

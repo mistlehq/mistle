@@ -36,6 +36,8 @@ export type IdentityLinkProviderConnectionSummary = {
 
 export type OrganizationIdentityLinkProvider = {
   providerFamily: string;
+  organizationProviderConfigId: string | null;
+  integrationConnectionId: string | null;
   displayName: string;
   logoKey: string;
   eligibleTargetKeys: string[];
@@ -62,6 +64,7 @@ export async function listOrganizationIdentityLinkProviders(
     listIdentityLinkProviderMetadata(ctx),
     ctx.db.query.organizationIdentityLinkProviderConfigs.findMany({
       columns: {
+        id: true,
         providerFamily: true,
         status: true,
         integrationConnectionId: true,
@@ -241,6 +244,8 @@ export async function listOrganizationIdentityLinkProviders(
       if (config === undefined) {
         return {
           providerFamily: provider.providerFamily,
+          organizationProviderConfigId: null,
+          integrationConnectionId: null,
           displayName: provider.displayName,
           logoKey: provider.logoKey,
           eligibleTargetKeys: provider.eligibleTargetKeys,
@@ -287,6 +292,8 @@ export async function listOrganizationIdentityLinkProviders(
 
       return {
         providerFamily: provider.providerFamily,
+        organizationProviderConfigId: config.id,
+        integrationConnectionId: config.integrationConnectionId,
         displayName: provider.displayName,
         logoKey: provider.logoKey,
         eligibleTargetKeys: provider.eligibleTargetKeys,

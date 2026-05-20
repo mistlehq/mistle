@@ -12,6 +12,8 @@ import type { LinkedAccount } from "./linked-accounts-service.js";
 function createGitHubLinkedAccount(overrides?: Partial<LinkedAccount>): LinkedAccount {
   return {
     providerFamily: "github",
+    organizationProviderConfigId: "ilp_github",
+    integrationConnectionId: "icn_github",
     displayName: "GitHub",
     logoKey: "github",
     configurationStatus: "active",
@@ -42,6 +44,8 @@ function createGitHubLinkedAccount(overrides?: Partial<LinkedAccount>): LinkedAc
 function createSlackLinkedAccount(overrides?: Partial<LinkedAccount>): LinkedAccount {
   return {
     providerFamily: "slack",
+    organizationProviderConfigId: "ilp_slack",
+    integrationConnectionId: "icn_slack",
     displayName: "Slack",
     logoKey: "slack",
     configurationStatus: "active",

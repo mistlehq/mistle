@@ -11082,6 +11082,14 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "organizationProviderConfigId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "integrationConnectionId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
                           "displayName": {
                             "type": "string",
                             "minLength": 1
@@ -11197,6 +11205,8 @@
                         },
                         "required": [
                           "providerFamily",
+                          "organizationProviderConfigId",
+                          "integrationConnectionId",
                           "displayName",
                           "logoKey",
                           "configurationStatus",
@@ -12779,6 +12789,14 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "organizationProviderConfigId": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          },
+                          "integrationConnectionId": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          },
                           "displayName": {
                             "type": "string",
                             "minLength": 1
@@ -12911,6 +12929,8 @@
                         },
                         "required": [
                           "providerFamily",
+                          "organizationProviderConfigId",
+                          "integrationConnectionId",
                           "displayName",
                           "logoKey",
                           "eligibleTargetKeys",
@@ -14120,6 +14140,14 @@
                       "type": "string",
                       "minLength": 1
                     },
+                    "organizationProviderConfigId": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "integrationConnectionId": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
                     "displayName": {
                       "type": "string",
                       "minLength": 1
@@ -14252,6 +14280,8 @@
                   },
                   "required": [
                     "providerFamily",
+                    "organizationProviderConfigId",
+                    "integrationConnectionId",
                     "displayName",
                     "logoKey",
                     "eligibleTargetKeys",
@@ -14412,6 +14442,14 @@
                       "type": "string",
                       "minLength": 1
                     },
+                    "organizationProviderConfigId": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "integrationConnectionId": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
                     "displayName": {
                       "type": "string",
                       "minLength": 1
@@ -14544,6 +14582,8 @@
                   },
                   "required": [
                     "providerFamily",
+                    "organizationProviderConfigId",
+                    "integrationConnectionId",
                     "displayName",
                     "logoKey",
                     "eligibleTargetKeys",
@@ -14683,6 +14723,14 @@
                       "type": "string",
                       "minLength": 1
                     },
+                    "organizationProviderConfigId": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "integrationConnectionId": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
                     "displayName": {
                       "type": "string",
                       "minLength": 1
@@ -14815,6 +14863,8 @@
                   },
                   "required": [
                     "providerFamily",
+                    "organizationProviderConfigId",
+                    "integrationConnectionId",
                     "displayName",
                     "logoKey",
                     "eligibleTargetKeys",

@@ -4059,7 +4059,9 @@ export interface paths {
                   updatedAt: string;
                 } | null;
                 displayName: string;
+                integrationConnectionId: string;
                 logoKey: string;
+                organizationProviderConfigId: string;
                 principal: {
                   id: string;
                   linkedAt: string;
@@ -5076,7 +5078,9 @@ export interface paths {
                   updatedAt: string;
                 }[];
                 eligibleTargetKeys: string[];
+                integrationConnectionId: string | null;
                 logoKey: string;
+                organizationProviderConfigId: string | null;
                 providerFamily: string;
                 selectedConnection: {
                   connectionMethodId?: string;
@@ -5188,7 +5192,9 @@ export interface paths {
                 updatedAt: string;
               }[];
               eligibleTargetKeys: string[];
+              integrationConnectionId: string | null;
               logoKey: string;
+              organizationProviderConfigId: string | null;
               providerFamily: string;
               selectedConnection: {
                 connectionMethodId?: string;
@@ -5310,7 +5316,9 @@ export interface paths {
                 updatedAt: string;
               }[];
               eligibleTargetKeys: string[];
+              integrationConnectionId: string | null;
               logoKey: string;
+              organizationProviderConfigId: string | null;
               providerFamily: string;
               selectedConnection: {
                 connectionMethodId?: string;
@@ -5520,7 +5528,9 @@ export interface paths {
                 updatedAt: string;
               }[];
               eligibleTargetKeys: string[];
+              integrationConnectionId: string | null;
               logoKey: string;
+              organizationProviderConfigId: string | null;
               providerFamily: string;
               selectedConnection: {
                 connectionMethodId?: string;

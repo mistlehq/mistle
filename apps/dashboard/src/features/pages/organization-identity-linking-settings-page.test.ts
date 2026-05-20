@@ -12,6 +12,8 @@ describe("buildProviderRow", () => {
       statusUpdatingProviderFamily: null,
       provider: {
         providerFamily: "github",
+        organizationProviderConfigId: "ilp_github_saved",
+        integrationConnectionId: "icn_github_saved",
         displayName: "GitHub",
         logoKey: "github",
         eligibleTargetKeys: ["github-cloud"],
@@ -108,6 +110,8 @@ describe("buildProviderRow", () => {
       statusUpdatingProviderFamily: null,
       provider: {
         providerFamily: "slack",
+        organizationProviderConfigId: null,
+        integrationConnectionId: null,
         displayName: "Slack",
         logoKey: "slack",
         eligibleTargetKeys: ["slack-default"],
@@ -168,6 +172,8 @@ describe("buildProviderStatusUpdatePlan", () => {
       providers: [
         {
           providerFamily: "github",
+          organizationProviderConfigId: null,
+          integrationConnectionId: null,
           displayName: "GitHub",
           logoKey: "github",
           eligibleTargetKeys: ["github-cloud"],
@@ -206,6 +212,8 @@ describe("buildProviderStatusUpdatePlan", () => {
       providers: [
         {
           providerFamily: "github",
+          organizationProviderConfigId: "ilp_github_engineering",
+          integrationConnectionId: "icn_github_engineering",
           displayName: "GitHub",
           logoKey: "github",
           eligibleTargetKeys: ["github-cloud"],

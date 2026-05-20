@@ -94,6 +94,8 @@ export type LinkedAccountCredentialSummary = {
 
 export type LinkedAccount = {
   providerFamily: string;
+  organizationProviderConfigId: string;
+  integrationConnectionId: string;
   displayName: string;
   logoKey: string;
   configurationStatus: Exclude<
@@ -267,6 +269,15 @@ export async function listLinkedAccounts(
   }
 
   return configuredProviders.map((provider) => {
+    if (
+      provider.organizationProviderConfigId === null ||
+      provider.integrationConnectionId === null
+    ) {
+      throw new Error(
+        `Configured identity-link provider '${provider.providerFamily}' is missing config identity.`,
+      );
+    }
+
     const principal = principalsByProviderFamily.get(provider.providerFamily);
     const credential =
       principal === undefined ? undefined : credentialsByPrincipalId.get(principal.id);
@@ -275,6 +286,8 @@ export async function listLinkedAccounts(
 
     return {
       providerFamily: provider.providerFamily,
+      organizationProviderConfigId: provider.organizationProviderConfigId,
+      integrationConnectionId: provider.integrationConnectionId,
       displayName: provider.displayName,
       logoKey: provider.logoKey,
       configurationStatus:

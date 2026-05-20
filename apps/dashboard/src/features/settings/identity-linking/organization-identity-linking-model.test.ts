@@ -23,6 +23,8 @@ describe("organization identity linking model", () => {
     const connections = listEligibleIdentityLinkConnections({
       provider: {
         providerFamily: "github",
+        organizationProviderConfigId: null,
+        integrationConnectionId: null,
         displayName: "GitHub",
         logoKey: "github",
         eligibleTargetKeys: ["github-cloud"],
@@ -120,6 +122,8 @@ describe("organization identity linking model", () => {
         providers: [
           {
             providerFamily: "github",
+            organizationProviderConfigId: "ilp_github",
+            integrationConnectionId: "icn_1",
             displayName: "GitHub",
             logoKey: "github",
             eligibleTargetKeys: ["github-cloud"],
@@ -154,6 +158,8 @@ describe("organization identity linking model", () => {
         providers: [
           {
             providerFamily: "github",
+            organizationProviderConfigId: null,
+            integrationConnectionId: null,
             displayName: "GitHub",
             logoKey: "github",
             eligibleTargetKeys: ["github-cloud"],
