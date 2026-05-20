@@ -875,11 +875,10 @@ fn handle_pi_method(
             state.ensure_child(None)?;
             state.switch_session(&session_file, captured_events)?;
             PiProxyState::mark_active_and_start_activity_monitor(state);
-            let result = state.send_pi_command_with_captured_events(
+            state.send_pi_command_with_captured_events(
                 json!({ "type": "prompt", "message": message }),
                 captured_events,
-            );
-            result
+            )
         }
         "pi/steer" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
@@ -887,11 +886,10 @@ fn handle_pi_method(
             state.ensure_child(None)?;
             state.switch_session(&session_file, captured_events)?;
             PiProxyState::mark_active_and_start_activity_monitor(state);
-            let result = state.send_pi_command_with_captured_events(
+            state.send_pi_command_with_captured_events(
                 json!({ "type": "steer", "message": message }),
                 captured_events,
-            );
-            result
+            )
         }
         "pi/followUp" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
@@ -899,11 +897,10 @@ fn handle_pi_method(
             state.ensure_child(None)?;
             state.switch_session(&session_file, captured_events)?;
             PiProxyState::mark_active_and_start_activity_monitor(state);
-            let result = state.send_pi_command_with_captured_events(
+            state.send_pi_command_with_captured_events(
                 json!({ "type": "follow_up", "message": message }),
                 captured_events,
-            );
-            result
+            )
         }
         "pi/abort" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
@@ -1286,7 +1283,7 @@ mod tests {
 
     impl SimulatedPiRpcProcess {
         fn start() -> Self {
-            Self::start_with_active_session(false)
+            Self::start_with_session_state(false, true)
         }
 
         fn start_active_session() -> Self {
@@ -1295,10 +1292,6 @@ mod tests {
 
         fn start_without_initial_session() -> Self {
             Self::start_with_session_state(false, false)
-        }
-
-        fn start_with_active_session(active_session: bool) -> Self {
-            Self::start_with_session_state(active_session, true)
         }
 
         fn start_with_session_state(active_session: bool, has_initial_session: bool) -> Self {
