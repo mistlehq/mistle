@@ -285,14 +285,15 @@ export function useSessionWorkbenchConversationRuntime(input: {
       ? openCodeRuntime
       : codexRuntime;
   const activeConversationId = activeRuntime.conversation.activeConversationId;
+  const attachmentTargetId = activeRuntime.conversation.attachmentTargetId;
   const attachmentControl = useSessionComposerAttachmentControl({
     attachmentTarget:
       input.sandboxInstanceId !== null &&
       input.sessionSnapshot !== null &&
-      activeConversationId !== null
+      attachmentTargetId !== null
         ? {
             sandboxInstanceId: input.sandboxInstanceId,
-            threadId: activeConversationId,
+            threadId: attachmentTargetId,
           }
         : null,
     ensureTransportConnected: input.ensureTransportConnected,
@@ -303,6 +304,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
     cliTerminalContentInset: activeRuntime.cliTerminalContentInset,
     conversationPane: {
       activeConversationId: activeRuntime.conversation.activeConversationId,
+      attachmentTargetId: activeRuntime.conversation.attachmentTargetId,
       chatState: activeRuntime.conversation.chatState,
       ...(activeRuntime.conversation.dismissUserMessageAction === undefined
         ? {}

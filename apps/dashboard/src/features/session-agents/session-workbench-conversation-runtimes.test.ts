@@ -5,6 +5,7 @@ import {
   buildCodexConversationRuntime,
   buildOpenCodeConversationRuntime,
   buildPiConversationRuntime,
+  resolvePiAttachmentTargetId,
 } from "./session-workbench-conversation-runtimes.js";
 
 type CodexRuntimeInput = Parameters<typeof buildCodexConversationRuntime>[0];
@@ -325,6 +326,10 @@ describe("buildPiConversationRuntime", () => {
 
     expect(runtime.displayName).toBe("Pi");
     expect(runtime.conversation.activeConversationId).toBe("pi-session.json");
+    expect(runtime.conversation.attachmentTargetId).toBe(
+      resolvePiAttachmentTargetId("pi-session.json"),
+    );
+    expect(runtime.conversation.attachmentTargetId).toMatch(/^pi_[a-z0-9]+_\d+$/);
     expect(runtime.conversation.chatState.activeTurnId).toBe("pi:user:1");
     expect(runtime.conversation.chatState.pendingTurnId).toBe("pi:user:1");
     expect(runtime.conversation.chatState.status).toBe("inProgress");
@@ -334,6 +339,12 @@ describe("buildPiConversationRuntime", () => {
       required: false,
       showControls: false,
     });
+  });
+
+  it("uses a safe Pi attachment target for session file paths", () => {
+    expect(resolvePiAttachmentTargetId("/root/.pi/agent/sessions/session.jsonl")).toMatch(
+      /^pi_[a-z0-9]+_\d+$/,
+    );
   });
 
   it("steers Pi with the submitted transcript prompt", async () => {
