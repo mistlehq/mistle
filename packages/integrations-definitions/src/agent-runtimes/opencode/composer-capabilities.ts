@@ -5,16 +5,24 @@ import type { OpenCodeCommandSummary } from "./client.js";
 const OpenCodePromptCommandIdPrefix = "opencode.prompt.";
 const HiddenOpenCodePromptCommandNames = new Set(["customize-opencode"]);
 
+type OpenCodePromptCommandDescriptor = Pick<OpenCodeCommandSummary, "description" | "name">;
+
 export function buildOpenCodePromptCommandId(commandName: string): string {
   return `${OpenCodePromptCommandIdPrefix}${commandName}`;
 }
 
-export function shouldExposeOpenCodePromptCommand(command: OpenCodeCommandSummary): boolean {
+export function isOpenCodePromptCommandId(commandId: string): boolean {
+  return commandId.startsWith(OpenCodePromptCommandIdPrefix);
+}
+
+export function shouldExposeOpenCodePromptCommand(
+  command: Pick<OpenCodeCommandSummary, "name">,
+): boolean {
   return !HiddenOpenCodePromptCommandNames.has(command.name);
 }
 
 export function mapOpenCodePromptCommandsToComposerCapabilities(
-  commands: readonly OpenCodeCommandSummary[],
+  commands: readonly OpenCodePromptCommandDescriptor[],
 ): readonly ComposerCapability[] {
   const visibleCommands = commands.filter(shouldExposeOpenCodePromptCommand);
   if (visibleCommands.length === 0) {

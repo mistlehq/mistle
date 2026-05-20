@@ -88,23 +88,14 @@ const OpenCodePromptCommandCapabilities = mapOpenCodePromptCommandsToComposerCap
   {
     name: "review",
     description: "review changes",
-    source: "command",
-    template: "Review $ARGUMENTS",
-    hints: ["$ARGUMENTS"],
   },
   {
     name: "explain",
     description: "explain the selected code",
-    source: "command",
-    template: "Explain $ARGUMENTS",
-    hints: ["$ARGUMENTS"],
   },
   {
     name: "tests",
     description: "write targeted tests",
-    source: "command",
-    template: "Write tests for $ARGUMENTS",
-    hints: ["$ARGUMENTS"],
   },
 ]);
 

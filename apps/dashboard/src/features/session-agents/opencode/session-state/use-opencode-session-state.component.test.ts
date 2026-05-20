@@ -10,6 +10,7 @@ import {
   PayloadKindWebSocketText,
   type StreamDataFrame,
 } from "@mistle/sandbox-session-protocol";
+import { systemSleeper } from "@mistle/time";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { type RawData, type WebSocket, WebSocketServer } from "ws";
@@ -84,9 +85,7 @@ async function expectNoOpenCodeRequest(
   const noRequest = Symbol("no request");
   const result = await Promise.race([
     server.nextRequest(),
-    new Promise<typeof noRequest>((resolve) => {
-      setTimeout(() => resolve(noRequest), durationMs);
-    }),
+    systemSleeper.sleep(durationMs).then(() => noRequest),
   ]);
   expect(result).toBe(noRequest);
 }

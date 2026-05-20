@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildOpenCodePromptCommandId,
+  isOpenCodePromptCommandId,
   mapOpenCodePromptCommandsToComposerCapabilities,
   shouldExposeOpenCodePromptCommand,
 } from "./composer-capabilities.js";
@@ -9,20 +10,16 @@ import {
 describe("OpenCode composer capabilities", () => {
   it("maps visible OpenCode prompt commands to typed runtime composer commands", () => {
     expect(buildOpenCodePromptCommandId("review")).toBe("opencode.prompt.review");
+    expect(isOpenCodePromptCommandId("opencode.prompt.review")).toBe(true);
+    expect(isOpenCodePromptCommandId("codex.review")).toBe(false);
     expect(
       mapOpenCodePromptCommandsToComposerCapabilities([
         {
           name: "review",
           description: "review changes",
-          source: "command",
-          template: "Review $ARGUMENTS",
-          hints: ["$ARGUMENTS"],
         },
         {
           name: "mcp-prompt",
-          source: "mcp",
-          template: "Run MCP prompt",
-          hints: [],
         },
       ]),
     ).toEqual([
@@ -54,15 +51,9 @@ describe("OpenCode composer capabilities", () => {
   });
 
   it("omits the built-in customize-opencode skill from Mistle composer commands", () => {
-    const hiddenCommand = {
-      name: "customize-opencode",
-      description: "customize opencode config",
-      source: "skill" as const,
-      template: "Customize opencode",
-      hints: [],
-    };
-
-    expect(shouldExposeOpenCodePromptCommand(hiddenCommand)).toBe(false);
-    expect(mapOpenCodePromptCommandsToComposerCapabilities([hiddenCommand])).toEqual([]);
+    expect(shouldExposeOpenCodePromptCommand({ name: "customize-opencode" })).toBe(false);
+    expect(
+      mapOpenCodePromptCommandsToComposerCapabilities([{ name: "customize-opencode" }]),
+    ).toEqual([]);
   });
 });

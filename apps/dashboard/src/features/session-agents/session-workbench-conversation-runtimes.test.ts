@@ -481,6 +481,25 @@ describe("buildOpenCodeConversationRuntime", () => {
     expect(accepted).toBe(true);
     expect(executedCommands).toEqual(["/review check this"]);
   });
+
+  it("rejects typed runtime commands outside the OpenCode prompt command namespace", () => {
+    const reportedMessages: string[] = [];
+    const executedCommands: string[] = [];
+    const input = createOpenCodeRuntimeInput(reportedMessages);
+    input.executePromptCommand = async (commandInput) => {
+      executedCommands.push(commandInput.text);
+    };
+    const runtime = buildOpenCodeConversationRuntime(input);
+
+    const accepted = runtime.composerRuntimeInput.executeTypedRuntimeCommand?.({
+      commandId: "codex.review",
+      text: "/review check this",
+    });
+
+    expect(accepted).toBe(false);
+    expect(executedCommands).toEqual([]);
+    expect(reportedMessages).toEqual(["Unsupported OpenCode runtime command 'codex.review'."]);
+  });
 });
 
 describe("buildPiConversationRuntime", () => {

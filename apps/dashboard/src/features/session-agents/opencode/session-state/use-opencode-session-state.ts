@@ -983,6 +983,7 @@ export function useOpenCodeSessionState(input: {
 
       const navigationRequestId = sessionNavigationRequestSequenceRef.current + 1;
       sessionNavigationRequestSequenceRef.current = navigationRequestId;
+      promptCommandsGenerationRef.current += 1;
       const directory = resumeInput?.directory ?? connectedSession.activeDirectory ?? undefined;
       setPendingSessionId(sessionId);
       try {
@@ -996,6 +997,10 @@ export function useOpenCodeSessionState(input: {
         const pendingPermissions = await client.listPermissions({
           ...(directory === undefined ? {} : { directory }),
         });
+        if (sessionNavigationRequestSequenceRef.current !== navigationRequestId) {
+          return session.id;
+        }
+        await refreshPromptCommands(directory === undefined ? {} : { directory });
         if (sessionNavigationRequestSequenceRef.current !== navigationRequestId) {
           return session.id;
         }
@@ -1013,7 +1018,6 @@ export function useOpenCodeSessionState(input: {
           providerSessionId: connectedSession.providerSessionId,
           sandboxInstanceId: connectedSession.sandboxInstanceId,
         });
-        await refreshPromptCommands(directory === undefined ? {} : { directory });
         setSessionErrorMessage(null);
         return session.id;
       } catch (error) {
@@ -1040,13 +1044,20 @@ export function useOpenCodeSessionState(input: {
 
       const navigationRequestId = sessionNavigationRequestSequenceRef.current + 1;
       sessionNavigationRequestSequenceRef.current = navigationRequestId;
+      promptCommandsGenerationRef.current += 1;
       const directory = startInput?.directory ?? connectedSession.activeDirectory ?? undefined;
       setIsStartingNewSession(true);
       try {
         await refreshModelCatalog(
           directory === undefined ? { force: true } : { directory, force: true },
         );
+        if (sessionNavigationRequestSequenceRef.current !== navigationRequestId) {
+          return connectedSession.activeSessionId;
+        }
         await refreshPromptCommands(directory === undefined ? {} : { directory });
+        if (sessionNavigationRequestSequenceRef.current !== navigationRequestId) {
+          return connectedSession.activeSessionId;
+        }
         const session = await client.createSession({
           ...(directory === undefined ? {} : { directory }),
         });

@@ -2,6 +2,7 @@ import {
   CodexComposerCommandIds,
   CodexRuntimeCommandIds,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
+import { isOpenCodePromptCommandId } from "@mistle/integrations-definitions/agent-runtimes/opencode/composer-capabilities";
 
 import type { ChatState } from "../chat/chat-state.js";
 import type { ChatComposerCommandPanel } from "../chat/components/chat-composer.js";
@@ -316,6 +317,13 @@ export function buildOpenCodeConversationRuntime(input: {
       clearSessionErrorMessage: input.sessionMessage.clearSessionErrorMessage,
       contextUsage: null,
       executeTypedRuntimeCommand: (commandInput) => {
+        if (!isOpenCodePromptCommandId(commandInput.commandId)) {
+          input.sessionMessage.reportSessionErrorMessage(
+            `Unsupported OpenCode runtime command '${commandInput.commandId}'.`,
+          );
+          return false;
+        }
+
         void input
           .executePromptCommand({
             text: commandInput.text,
