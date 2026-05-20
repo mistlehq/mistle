@@ -15,11 +15,12 @@ const HttpErrorSchema = z
     code: z.string().optional(),
     body: z.unknown().optional(),
     data: z.unknown().optional(),
-    error: NestedHttpErrorSchema.optional(),
+    error: z.unknown().optional(),
   })
   .catchall(z.unknown());
 
 type HttpErrorRecord = z.infer<typeof HttpErrorSchema>;
+type NestedHttpErrorRecord = z.infer<typeof NestedHttpErrorSchema>;
 
 function parseHttpErrorRecord(value: unknown): HttpErrorRecord | null {
   const parsed = HttpErrorSchema.safeParse(value);
@@ -30,13 +31,13 @@ function parseHttpErrorRecord(value: unknown): HttpErrorRecord | null {
   return parsed.data;
 }
 
-function readPropertyUnknown(value: unknown, key: "body" | "data"): unknown {
-  const record = parseHttpErrorRecord(value);
-  if (record === null) {
+function parseNestedHttpErrorRecord(value: unknown): NestedHttpErrorRecord | null {
+  const parsed = NestedHttpErrorSchema.safeParse(value);
+  if (!parsed.success) {
     return null;
   }
 
-  return record[key];
+  return parsed.data;
 }
 
 export function readApiErrorMessage(value: unknown): string | null {
@@ -53,8 +54,9 @@ export function readApiErrorMessage(value: unknown): string | null {
     return record.message;
   }
 
-  if (record.error !== undefined && record.error.message !== undefined) {
-    const message = record.error.message;
+  const nestedError = parseNestedHttpErrorRecord(record.error);
+  if (nestedError !== null && nestedError.message !== undefined) {
+    const message = nestedError.message;
     return message;
   }
   return null;
@@ -79,11 +81,17 @@ export function readHttpErrorCode(value: unknown): string | null {
     return record.code;
   }
 
-  return record.error?.code ?? null;
+  const nestedError = parseNestedHttpErrorRecord(record.error);
+  return nestedError?.code ?? null;
 }
 
 export function readHttpErrorBody(value: unknown): unknown {
-  return readPropertyUnknown(value, "body") ?? readPropertyUnknown(value, "data");
+  const record = parseHttpErrorRecord(value);
+  if (record === null) {
+    return null;
+  }
+
+  return record.body ?? record.data ?? record.error;
 }
 
 export type HttpApiErrorInput = {

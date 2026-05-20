@@ -55,6 +55,21 @@ describe("members api errors", () => {
     });
   });
 
+  it("preserves status and text payloads from auth client errors", () => {
+    const authClientError = Object.assign(new Error("Bad Gateway"), {
+      status: 502,
+      statusText: "Bad Gateway",
+      error: "upstream unavailable",
+    });
+
+    const error = toMembersApiError("inviteMember", authClientError);
+
+    expect(error).toBeInstanceOf(MembersApiError);
+    expect(error.status).toBe(502);
+    expect(error.message).toBe("Bad Gateway");
+    expect(error.body).toBe("upstream unavailable");
+  });
+
   it("wraps failing operations with MembersApiError", async () => {
     await expect(
       executeMembersOperation("removeMember", async () => {

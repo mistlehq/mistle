@@ -9,6 +9,7 @@ import {
   parseInviteTokens,
   summarizeInviteOutcomes,
 } from "./member-invite-state.js";
+import { toMembersApiError } from "./members-api-errors.js";
 
 describe("member invite state", () => {
   it("parses mixed delimiters into invite tokens", () => {
@@ -175,6 +176,34 @@ describe("member invite state", () => {
     ).toEqual({
       status: "already_member",
       message: "User is already in this organization",
+      roleError: null,
+    });
+  });
+
+  it("maps duplicate invitation errors from the auth client to already invited", () => {
+    const thrownAuthClientError = Object.assign(new Error("Bad Request"), {
+      status: 400,
+      statusText: "Bad Request",
+      error: {
+        message: "User is already invited to this organization",
+      },
+    });
+    const membersApiError = toMembersApiError("inviteMember", thrownAuthClientError);
+
+    expect(
+      mapInviteAttemptResult({
+        httpStatus: membersApiError.status,
+        response: {
+          code: null,
+          message: membersApiError.message,
+          raw: membersApiError.body,
+          status: null,
+        },
+        selectedRole: "member",
+      }),
+    ).toEqual({
+      status: "already_invited",
+      message: "An invitation already exists",
       roleError: null,
     });
   });
