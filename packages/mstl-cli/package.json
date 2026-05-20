@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "build": "rm -rf dist && cargo build --locked --bin mistle && mkdir -p dist && cp target/debug/mistle dist/mistle",
+    "dev": "cargo run --locked --bin mistle -- mcp serve --host 127.0.0.1 --port ${MISTLE_SERVICES_MCP_PORT:-5106}",
     "lint": "cargo clippy --locked --all-targets -- -D warnings",
     "typecheck": "cargo check --locked --all-targets",
     "test": "cargo test --locked",

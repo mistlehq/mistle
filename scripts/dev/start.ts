@@ -33,6 +33,8 @@ const DEV_CLOUDFLARED_CONFIG_PATH = resolve(DEV_CLOUDFLARED_CONFIG_DIR, "cloudfl
 const TUNNEL_SERVICE_NAME = "tunnel";
 const LOCAL_REGISTRY_HOST = "127.0.0.1:5001";
 const DISTRIBUTED_GATEWAY_PORTS = [5203, 5204] as const;
+const MCP_LOCAL_HOST = "127.0.0.1";
+const MCP_LOCAL_PORT = 5106;
 const SANDBOX_BASE_IMAGE_TAG = getLocalPreparedRuntimeSandboxBaseImageRef();
 const SANDBOX_BASE_IMAGE_REGISTRY_TAG = getLocalDevDockerRegistrySandboxBaseImageRef();
 const SANDBOX_BASE_DOCKERFILE_PATH = "packages/sandboxd/Dockerfile";
@@ -461,6 +463,7 @@ async function start(): Promise<void> {
   console.log(`Starting local infra dependencies (${infraPlan.summary})...`);
   const controlPlaneApiLocalPort = readControlPlaneApiLocalPort(DEV_CONFIG_PATH);
   const dataPlaneGatewayLocalPort = readDataPlaneGatewayLocalPort(DEV_CONFIG_PATH);
+  const mcpLocalUrl = `http://${MCP_LOCAL_HOST}:${String(MCP_LOCAL_PORT)}/mcp`;
   const modeConfig = createDevModeConfig({
     controlPlaneApiLocalPort,
     dataPlaneGatewayLocalPort,
@@ -471,6 +474,8 @@ async function start(): Promise<void> {
     MISTLE_CONFIG_PATH: DEV_CONFIG_PATH,
     CONTROL_PLANE_API_LOCAL_PORT: String(controlPlaneApiLocalPort),
     DEV_DATA_PLANE_GATEWAY_LB_PORT: String(dataPlaneGatewayLocalPort),
+    MISTLE_SERVICES_MCP_PORT: String(MCP_LOCAL_PORT),
+    MISTLE_SERVICES_MCP_PUBLIC_URL: mcpLocalUrl,
     ...modeConfig.env,
   };
   localInfraEnv = sharedDevEnv;
@@ -590,6 +595,7 @@ async function start(): Promise<void> {
     console.log("- dashboard: http://localhost:5173");
     console.log(`- control-plane-api: ${modeConfig.controlPlaneApiLocalUrl}`);
   }
+  console.log(`- mcp: ${mcpLocalUrl}`);
   console.log("- mailpit ui: http://127.0.0.1:8025");
   console.log("- grafana (otel-lgtm): http://127.0.0.1:3000");
   if (dockerSandboxProviderEnabled) {
