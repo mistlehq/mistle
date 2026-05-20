@@ -710,12 +710,18 @@ describe("ChatComposer", () => {
 
   it("keeps keyboard-selected context mention results scrolled into view", () => {
     const scrolledElementIds: string[] = [];
-    const originalScrollIntoView = Element.prototype.scrollIntoView;
-    Element.prototype.scrollIntoView = function scrollIntoView(): void {
-      if (this.id.length > 0) {
-        scrolledElementIds.push(this.id);
-      }
-    };
+    const originalScrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(
+      Element.prototype,
+      "scrollIntoView",
+    );
+    Object.defineProperty(Element.prototype, "scrollIntoView", {
+      configurable: true,
+      value(this: Element): void {
+        if (this.id.length > 0) {
+          scrolledElementIds.push(this.id);
+        }
+      },
+    });
 
     try {
       render(
@@ -740,7 +746,15 @@ describe("ChatComposer", () => {
 
       expect(scrolledElementIds.some((elementId) => elementId.endsWith("-1"))).toBe(true);
     } finally {
-      Element.prototype.scrollIntoView = originalScrollIntoView;
+      if (originalScrollIntoViewDescriptor === undefined) {
+        delete Element.prototype.scrollIntoView;
+      } else {
+        Object.defineProperty(
+          Element.prototype,
+          "scrollIntoView",
+          originalScrollIntoViewDescriptor,
+        );
+      }
     }
   });
 
