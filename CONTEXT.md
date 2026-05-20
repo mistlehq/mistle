@@ -80,6 +80,18 @@ _Avoid_: Session, chat tab
 A Pi conversation that runs within a **Sandbox session**.
 _Avoid_: Pi thread, Codex thread
 
+**Pi image content**:
+An image carried as first-class content in a **Pi conversation** message.
+_Avoid_: Pi image attachment, Pi uploaded image
+
+**Pi source file reference**:
+A file path preserved in a **Pi conversation** message so Pi and the user can identify the source file behind submitted content.
+_Avoid_: Pi file content, Pi file attachment
+
+**Pi follow-up message**:
+A user message queued for a **Pi conversation** after the current **Working agent turn** finishes.
+_Avoid_: Pi steer, Codex queued steer
+
 **Working agent turn**:
 An active agent turn within a runtime conversation, shown while the agent runtime reports that it is processing a user request.
 _Avoid_: Working chat group, semantic group
@@ -111,6 +123,10 @@ _Avoid_: Autocomplete feature, composer shortcut
 **Composer command**:
 A composer input selected with `/` that submits a command owned by the session's **Agent runtime**.
 _Avoid_: Slash autocomplete
+
+**Runtime queued message**:
+A composer-submitted user message accepted by an **Agent runtime** for delivery after the current **Working agent turn**.
+_Avoid_: Local queued prompt, deferred start turn
 
 ## Relationships
 
@@ -148,6 +164,13 @@ _Avoid_: Slash autocomplete
 - A **Pi conversation** should remain the selected chat object when the user switches between chat and the Pi CLI.
 - A **Session workbench** URL may identify a **Pi conversation** without making the conversation a separate session.
 - A **Pi conversation** in the chat pane should expose visible conversation state rather than acting only as a hidden command bridge.
+- **Pi image content** belongs to **Pi conversation** messages rather than to a separate Pi upload object.
+- A **Pi source file reference** may accompany **Pi image content** to preserve the sandbox path that produced the image.
+- Mistle should preserve uploaded Pi images as **Pi source file references** unless Pi itself returns **Pi image content** through its own tools or transcript.
+- A non-image uploaded file for Pi should remain a **Pi source file reference** because Pi has no first-class non-image file content API in the current Mistle integration.
+- A **Pi source file reference** should use Pi's file-marker language rather than the generic attached-files prompt text.
+- Mistle-managed Pi runtimes may require the current Pi conversation contract rather than supporting older Pi builds.
+- A **Pi follow-up message** is the Pi runtime equivalent of the composer queue action while a **Working agent turn** is active.
 - A **Working agent turn** is a live conversation state, not a chat semantic group.
 - Chat semantic groups describe the specific visible work within a **Working agent turn**, such as thinking, exploring, running commands, or making edits.
 - Pi tool execution events are the source of truth for live in-progress chat semantic groups.
@@ -209,6 +232,8 @@ _Avoid_: Slash autocomplete
 - An **Agent runtime** determines which **Composer capabilities** are available for a session.
 - An **Agent runtime** is the source of truth for its baseline **Composer capabilities**.
 - A **Composer capability** defines both the editing representation and the submission behavior, not just whether a feature is enabled.
+- A **Runtime queued message** is available only when the **Agent runtime** exposes native queue submission.
+- A **Pi follow-up message** is a **Runtime queued message**.
 - The first **Composer commands** are runtime-owned; dashboard UI controls are not **Composer commands**.
 - A **Composer command** declares its editing representation separately from whether submission becomes inline prompt text or a typed runtime command.
 
