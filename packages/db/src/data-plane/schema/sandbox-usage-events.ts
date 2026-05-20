@@ -19,6 +19,7 @@ import {
 
 export const SandboxUsageEventTypes = {
   SANDBOX_ALLOCATED: "sandbox_allocated",
+  SANDBOX_RESUMED: "sandbox_resumed",
   SANDBOX_READY: "sandbox_ready",
   SANDBOX_STOPPED: "sandbox_stopped",
   SANDBOX_FAILED: "sandbox_failed",
