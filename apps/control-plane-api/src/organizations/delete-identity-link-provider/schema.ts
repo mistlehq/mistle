@@ -1,7 +1,13 @@
 import { z } from "@hono/zod-openapi";
-import { createCodeMessageErrorSchema } from "@mistle/http/errors.js";
+import {
+  createCodeMessageErrorSchema,
+  ValidationErrorResponseSchema,
+} from "@mistle/http/errors.js";
 
-import { IdentityLinkingNotFoundCodes } from "../../identity-linking/constants.js";
+import {
+  IdentityLinkingBadRequestCodes,
+  IdentityLinkingNotFoundCodes,
+} from "../../identity-linking/constants.js";
 
 export const DeleteIdentityLinkProviderParamsSchema = z
   .object({
@@ -15,3 +21,8 @@ export const DeleteIdentityLinkProviderNotFoundResponseSchema = createCodeMessag
     IdentityLinkingNotFoundCodes.PROVIDER_CONFIG_NOT_FOUND,
   ]),
 );
+
+export const DeleteIdentityLinkProviderBadRequestResponseSchema = z.union([
+  createCodeMessageErrorSchema(z.literal(IdentityLinkingBadRequestCodes.PROVIDER_CONFIG_AMBIGUOUS)),
+  ValidationErrorResponseSchema,
+]);

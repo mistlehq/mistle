@@ -150,6 +150,20 @@ export const OrganizationIdentityLinkProviderConnectionSummarySchema = z
   })
   .strict();
 
+export const OrganizationIdentityLinkProviderConfigSchema = z
+  .object({
+    organizationProviderConfigId: z.string().min(1),
+    integrationConnectionId: z.string().min(1),
+    configurationStatus: z.enum([
+      OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      OrganizationIdentityLinkProviderConfigStatus.DISABLED,
+    ]),
+    selectedConnection: OrganizationIdentityLinkProviderConnectionSummarySchema,
+    configuredAt: z.string().min(1),
+    updatedAt: z.string().min(1),
+  })
+  .strict();
+
 export const OrganizationIdentityLinkProviderSchema = z
   .object({
     providerFamily: z.string().min(1),
@@ -168,6 +182,7 @@ export const OrganizationIdentityLinkProviderSchema = z
     selectedConnection: OrganizationIdentityLinkProviderConnectionSummarySchema.nullable(),
     configuredAt: z.string().min(1).nullable(),
     updatedAt: z.string().min(1).nullable(),
+    configs: z.array(OrganizationIdentityLinkProviderConfigSchema),
   })
   .strict();
 

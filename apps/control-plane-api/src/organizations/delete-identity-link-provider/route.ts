@@ -3,6 +3,7 @@ import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/htt
 
 import { OrganizationIdentityLinkProviderSchema } from "../schemas.js";
 import {
+  DeleteIdentityLinkProviderBadRequestResponseSchema,
   DeleteIdentityLinkProviderNotFoundResponseSchema,
   DeleteIdentityLinkProviderParamsSchema,
 } from "./schema.js";
@@ -20,6 +21,14 @@ export const route = createRoute({
       content: {
         "application/json": {
           schema: OrganizationIdentityLinkProviderSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request.",
+      content: {
+        "application/json": {
+          schema: DeleteIdentityLinkProviderBadRequestResponseSchema,
         },
       },
     },

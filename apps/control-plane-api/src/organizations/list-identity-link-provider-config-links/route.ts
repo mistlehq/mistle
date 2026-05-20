@@ -3,21 +3,21 @@ import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/htt
 
 import { OrganizationIdentityLinkProviderLinksResponseSchema } from "../schemas.js";
 import {
-  ListIdentityLinkProviderLinksBadRequestResponseSchema,
-  ListIdentityLinkProviderLinksNotFoundResponseSchema,
-  ListIdentityLinkProviderLinksParamsSchema,
+  ListIdentityLinkProviderConfigLinksBadRequestResponseSchema,
+  ListIdentityLinkProviderConfigLinksNotFoundResponseSchema,
+  ListIdentityLinkProviderConfigLinksParamsSchema,
 } from "./schema.js";
 
 export const route = createRoute({
   method: "get",
-  path: "/identity-linking/providers/:providerFamily/links",
+  path: "/identity-linking/provider-configs/:organizationProviderConfigId/links",
   tags: ["Organizations"],
   request: {
-    params: ListIdentityLinkProviderLinksParamsSchema,
+    params: ListIdentityLinkProviderConfigLinksParamsSchema,
   },
   responses: {
     200: {
-      description: "Organization member identity-linking visibility for a provider family.",
+      description: "Organization member identity-linking visibility for a provider config.",
       content: {
         "application/json": {
           schema: OrganizationIdentityLinkProviderLinksResponseSchema,
@@ -28,7 +28,7 @@ export const route = createRoute({
       description: "Invalid request.",
       content: {
         "application/json": {
-          schema: ListIdentityLinkProviderLinksBadRequestResponseSchema,
+          schema: ListIdentityLinkProviderConfigLinksBadRequestResponseSchema,
         },
       },
     },
@@ -52,7 +52,7 @@ export const route = createRoute({
       description: "Identity-linking provider config was not found.",
       content: {
         "application/json": {
-          schema: ListIdentityLinkProviderLinksNotFoundResponseSchema,
+          schema: ListIdentityLinkProviderConfigLinksNotFoundResponseSchema,
         },
       },
     },

@@ -3,13 +3,15 @@ import {
   type ControlPlaneDatabase,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
-import { NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
-import { and, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
-import { IdentityLinkingNotFoundCodes } from "../constants.js";
 import { listOrganizationIdentityLinkProviders } from "./list-organization-identity-link-providers.js";
-import { listIdentityLinkProviderMetadata } from "./provider-metadata.js";
+import {
+  resolveExactOneOrganizationIdentityLinkProviderConfigForFamilyOrThrow,
+  resolveIdentityLinkProviderMetadataOrThrow,
+  resolveOrganizationIdentityLinkProviderConfigByIdOrThrow,
+} from "./resolve-organization-identity-link-provider-config.js";
 import { resolveValidatedProviderConnectionOrThrow } from "./resolve-validated-provider-connection.js";
 
 export async function putOrganizationIdentityLinkProviderStatus(
@@ -26,36 +28,69 @@ export async function putOrganizationIdentityLinkProviderStatus(
       | typeof OrganizationIdentityLinkProviderConfigStatus.DISABLED;
   },
 ) {
-  const tables = getControlPlaneDatabaseSchema(ctx.db);
-
-  const providers = await listIdentityLinkProviderMetadata(ctx);
-  const provider = providers.find((entry) => entry.providerFamily === input.providerFamily);
-
-  if (provider === undefined) {
-    throw new NotFoundError(
-      IdentityLinkingNotFoundCodes.PROVIDER_NOT_FOUND,
-      `Identity-linking provider '${input.providerFamily}' was not found.`,
+  await resolveIdentityLinkProviderMetadataOrThrow(ctx, {
+    providerFamily: input.providerFamily,
+  });
+  const existingConfig =
+    await resolveExactOneOrganizationIdentityLinkProviderConfigForFamilyOrThrow(
+      {
+        db: ctx.db,
+      },
+      {
+        organizationId: input.organizationId,
+        providerFamily: input.providerFamily,
+      },
     );
-  }
 
-  const existingConfig = await ctx.db.query.organizationIdentityLinkProviderConfigs.findFirst({
-    columns: {
-      providerFamily: true,
-      integrationConnectionId: true,
-    },
-    where: (table, { and, eq }) =>
-      and(
-        eq(table.organizationId, input.organizationId),
-        eq(table.providerFamily, input.providerFamily),
-      ),
+  await putOrganizationIdentityLinkProviderConfigStatus(ctx, {
+    organizationId: input.organizationId,
+    actorUserId: input.actorUserId,
+    organizationProviderConfigId: existingConfig.id,
+    status: input.status,
   });
 
-  if (existingConfig === undefined) {
-    throw new NotFoundError(
-      IdentityLinkingNotFoundCodes.PROVIDER_CONFIG_NOT_FOUND,
-      `Identity-linking provider '${input.providerFamily}' is not configured for this organization.`,
+  const configuredProvider = (
+    await listOrganizationIdentityLinkProviders(ctx, {
+      organizationId: input.organizationId,
+    })
+  ).find((entry) => entry.providerFamily === input.providerFamily);
+
+  if (configuredProvider === undefined) {
+    throw new Error(
+      `Failed to load organization identity-link provider '${input.providerFamily}' after status update.`,
     );
   }
+
+  return configuredProvider;
+}
+
+export async function putOrganizationIdentityLinkProviderConfigStatus(
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+  },
+  input: {
+    organizationId: string;
+    actorUserId: string;
+    organizationProviderConfigId: string;
+    status:
+      | typeof OrganizationIdentityLinkProviderConfigStatus.ACTIVE
+      | typeof OrganizationIdentityLinkProviderConfigStatus.DISABLED;
+  },
+) {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+  const existingConfig = await resolveOrganizationIdentityLinkProviderConfigByIdOrThrow(
+    {
+      db: ctx.db,
+    },
+    {
+      organizationId: input.organizationId,
+      organizationProviderConfigId: input.organizationProviderConfigId,
+    },
+  );
+  const provider = await resolveIdentityLinkProviderMetadataOrThrow(ctx, {
+    providerFamily: existingConfig.providerFamily,
+  });
 
   if (input.status === OrganizationIdentityLinkProviderConfigStatus.ACTIVE) {
     await resolveValidatedProviderConnectionOrThrow(
@@ -71,31 +106,26 @@ export async function putOrganizationIdentityLinkProviderStatus(
     );
   }
 
-  await ctx.db
+  const [config] = await ctx.db
     .update(tables.organizationIdentityLinkProviderConfigs)
     .set({
       status: input.status,
       updatedByUserId: input.actorUserId,
       updatedAt: sql`now()`,
     })
-    .where(
-      and(
-        eq(tables.organizationIdentityLinkProviderConfigs.organizationId, input.organizationId),
-        eq(tables.organizationIdentityLinkProviderConfigs.providerFamily, input.providerFamily),
-      ),
-    );
+    .where(eq(tables.organizationIdentityLinkProviderConfigs.id, existingConfig.id))
+    .returning({
+      id: tables.organizationIdentityLinkProviderConfigs.id,
+      providerFamily: tables.organizationIdentityLinkProviderConfigs.providerFamily,
+      status: tables.organizationIdentityLinkProviderConfigs.status,
+      integrationTargetKey: tables.organizationIdentityLinkProviderConfigs.integrationTargetKey,
+      integrationConnectionId:
+        tables.organizationIdentityLinkProviderConfigs.integrationConnectionId,
+    });
 
-  const configuredProvider = (
-    await listOrganizationIdentityLinkProviders(ctx, {
-      organizationId: input.organizationId,
-    })
-  ).find((entry) => entry.providerFamily === input.providerFamily);
-
-  if (configuredProvider === undefined) {
-    throw new Error(
-      `Failed to load organization identity-link provider '${input.providerFamily}' after status update.`,
-    );
+  if (config === undefined) {
+    throw new Error(`Failed to update identity-link provider config '${existingConfig.id}'.`);
   }
 
-  return configuredProvider;
+  return config;
 }

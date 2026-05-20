@@ -5,12 +5,16 @@
 import {
   IntegrationConnectionStatuses,
   type IntegrationConnectionStatus,
+  IntegrationCredentialSecretKinds,
   MemberRoles,
   OrganizationIdentityLinkProviderConfigStatus,
   UserExternalPrincipalStatuses,
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { SlackConnectionMethodIds } from "@mistle/integrations-definitions";
+import {
+  SlackConnectionMethodIds,
+  SlackCredentialSlotKeys,
+} from "@mistle/integrations-definitions";
 import {
   createIntegrationTest,
   type IntegrationAuthenticatedSession,
@@ -65,6 +69,7 @@ describe.concurrent("organization identity-linking providers integration", () =>
         selectedConnection: null,
         configuredAt: null,
         updatedAt: null,
+        configs: [],
       },
       {
         providerFamily: "slack",
@@ -79,6 +84,7 @@ describe.concurrent("organization identity-linking providers integration", () =>
         selectedConnection: null,
         configuredAt: null,
         updatedAt: null,
+        configs: [],
       },
     ]);
   });
@@ -130,6 +136,126 @@ describe.concurrent("organization identity-linking providers integration", () =>
       updatedByUserId: session.userId,
     });
     expect(payload.organizationProviderConfigId).toBe(persistedConfig?.id);
+  });
+
+  it("creates and manages multiple Slack identity-linking configs independently", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-identity-link-providers-multi-slack@example.com",
+    });
+    await upsertSlackTarget(env, "slack-default");
+    await seedSlackIdentityLinkReadyConnection(env, {
+      connectionId: "icn_identity_link_slack_workspace_a",
+      displayName: "Slack Workspace A",
+      organizationId: session.organizationId,
+      teamId: "T_WORKSPACE_A",
+    });
+    await seedSlackIdentityLinkReadyConnection(env, {
+      connectionId: "icn_identity_link_slack_workspace_b",
+      displayName: "Slack Workspace B",
+      organizationId: session.organizationId,
+      teamId: "T_WORKSPACE_B",
+    });
+
+    const firstCreateResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/identity-linking/providers/slack/configs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          integrationConnectionId: "icn_identity_link_slack_workspace_a",
+        }),
+      },
+    );
+    expect(firstCreateResponse.status).toBe(201);
+    const firstConfig = OrganizationIdentityLinkProviderSchema.shape.configs.element.parse(
+      await firstCreateResponse.json(),
+    );
+
+    const secondCreateResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/identity-linking/providers/slack/configs",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          integrationConnectionId: "icn_identity_link_slack_workspace_b",
+        }),
+      },
+    );
+    expect(secondCreateResponse.status).toBe(201);
+    const secondConfig = OrganizationIdentityLinkProviderSchema.shape.configs.element.parse(
+      await secondCreateResponse.json(),
+    );
+
+    const enableSecondResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/organization/identity-linking/provider-configs/${secondConfig.organizationProviderConfigId}/status`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+        }),
+      },
+    );
+    expect(enableSecondResponse.status).toBe(200);
+
+    const listResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/identity-linking/providers",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+    expect(listResponse.status).toBe(200);
+    const payload = OrganizationIdentityLinkProvidersResponseSchema.parse(
+      await listResponse.json(),
+    );
+    const slackProvider = payload.providers.find((provider) => provider.providerFamily === "slack");
+    expect(slackProvider?.configs.map((config) => config.integrationConnectionId).sort()).toEqual([
+      "icn_identity_link_slack_workspace_a",
+      "icn_identity_link_slack_workspace_b",
+    ]);
+    expect(
+      slackProvider?.configs.find(
+        (config) =>
+          config.organizationProviderConfigId === firstConfig.organizationProviderConfigId,
+      )?.configurationStatus,
+    ).toBe(OrganizationIdentityLinkProviderConfigStatus.DISABLED);
+    expect(
+      slackProvider?.configs.find(
+        (config) =>
+          config.organizationProviderConfigId === secondConfig.organizationProviderConfigId,
+      )?.configurationStatus,
+    ).toBe(OrganizationIdentityLinkProviderConfigStatus.ACTIVE);
+
+    const legacyStatusResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/identity-linking/providers/slack/status",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          status: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
+        }),
+      },
+    );
+    expect(legacyStatusResponse.status).toBe(400);
+    await expect(legacyStatusResponse.json()).resolves.toMatchObject({
+      code: "PROVIDER_CONFIG_AMBIGUOUS",
+    });
   });
 
   it("enables and disables a saved identity-linking provider without deleting the row", async ({
@@ -668,6 +794,42 @@ async function seedConnection(
     displayName: input.displayName,
     status: input.status,
     config: input.config,
+  });
+}
+
+async function seedSlackIdentityLinkReadyConnection(
+  env: IntegrationTestEnvironment,
+  input: {
+    connectionId: string;
+    displayName: string;
+    organizationId: string;
+    teamId: string;
+  },
+): Promise<void> {
+  await seedConnection(env, {
+    config: {
+      connection_method: SlackConnectionMethodIds.SLACK_APP,
+      client_id: `client-${input.teamId}`,
+    },
+    connectionId: input.connectionId,
+    displayName: input.displayName,
+    organizationId: input.organizationId,
+    status: IntegrationConnectionStatuses.ACTIVE,
+    targetKey: "slack-default",
+  });
+  await env.controlPlaneDb.insert(env.controlPlaneTables.integrationCredentials).values({
+    id: `icr_${input.connectionId}`,
+    organizationId: input.organizationId,
+    secretKind: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+    ciphertext: `ciphertext-${input.connectionId}`,
+    nonce: `nonce-${input.connectionId}`,
+    organizationCredentialKeyVersion: 1,
+    intendedFamilyId: "slack",
+  });
+  await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnectionCredentials).values({
+    connectionId: input.connectionId,
+    credentialId: `icr_${input.connectionId}`,
+    slotKey: SlackCredentialSlotKeys.CLIENT_SECRET,
   });
 }
 

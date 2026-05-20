@@ -3,13 +3,15 @@ import {
   type ControlPlaneDatabase,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
-import { NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { sql } from "drizzle-orm";
 
-import { IdentityLinkingNotFoundCodes } from "../constants.js";
 import { listOrganizationIdentityLinkProviders } from "./list-organization-identity-link-providers.js";
-import { listIdentityLinkProviderMetadata } from "./provider-metadata.js";
+import {
+  resolveExactOneOrganizationIdentityLinkProviderConfigForFamilyOrThrow,
+  resolveIdentityLinkProviderMetadataOrThrow,
+  resolveOrganizationIdentityLinkProviderConfigByIdOrThrow,
+} from "./resolve-organization-identity-link-provider-config.js";
 import { resolveValidatedProviderConnectionOrThrow } from "./resolve-validated-provider-connection.js";
 
 export async function putOrganizationIdentityLinkProvider(
@@ -24,69 +26,32 @@ export async function putOrganizationIdentityLinkProvider(
     integrationConnectionId: string;
   },
 ) {
-  const tables = getControlPlaneDatabaseSchema(ctx.db);
-
-  const providers = await listIdentityLinkProviderMetadata(ctx);
-  const provider = providers.find((entry) => entry.providerFamily === input.providerFamily);
-
-  if (provider === undefined) {
-    throw new NotFoundError(
-      IdentityLinkingNotFoundCodes.PROVIDER_NOT_FOUND,
-      `Identity-linking provider '${input.providerFamily}' was not found.`,
-    );
-  }
-
-  const connection = await resolveValidatedProviderConnectionOrThrow(
-    {
-      db: ctx.db,
-      integrationRegistry: ctx.integrationRegistry,
-    },
-    {
-      organizationId: input.organizationId,
-      integrationConnectionId: input.integrationConnectionId,
-      provider,
-    },
-  );
-
-  const existingConfig = await ctx.db.query.organizationIdentityLinkProviderConfigs.findFirst({
+  const existingConfigs = await ctx.db.query.organizationIdentityLinkProviderConfigs.findMany({
     columns: {
       id: true,
-      status: true,
     },
     where: (table, { and, eq }) =>
       and(
         eq(table.organizationId, input.organizationId),
         eq(table.providerFamily, input.providerFamily),
       ),
+    limit: 2,
   });
 
-  const nextStatus =
-    existingConfig?.status ?? OrganizationIdentityLinkProviderConfigStatus.DISABLED;
-
-  // Temporary compatibility for the legacy provider-family route. PR 3 moves writes to
-  // config-level routes, at which point this path should be removed or kept only as an
-  // exact-one legacy shim.
-  if (existingConfig === undefined) {
-    await ctx.db.insert(tables.organizationIdentityLinkProviderConfigs).values({
-      organizationId: input.organizationId,
-      providerFamily: provider.providerFamily,
-      status: nextStatus,
-      integrationTargetKey: connection.targetKey,
-      integrationConnectionId: input.integrationConnectionId,
-      createdByUserId: input.actorUserId,
-      updatedByUserId: input.actorUserId,
-    });
+  if (existingConfigs.length === 0) {
+    await createOrganizationIdentityLinkProviderConfig(ctx, input);
   } else {
-    await ctx.db
-      .update(tables.organizationIdentityLinkProviderConfigs)
-      .set({
-        status: nextStatus,
-        integrationTargetKey: connection.targetKey,
-        integrationConnectionId: input.integrationConnectionId,
-        updatedByUserId: input.actorUserId,
-        updatedAt: sql`now()`,
-      })
-      .where(sql`${tables.organizationIdentityLinkProviderConfigs.id} = ${existingConfig.id}`);
+    const existingConfig =
+      await resolveExactOneOrganizationIdentityLinkProviderConfigForFamilyOrThrow(ctx, {
+        organizationId: input.organizationId,
+        providerFamily: input.providerFamily,
+      });
+    await updateOrganizationIdentityLinkProviderConfigConnection(ctx, {
+      organizationId: input.organizationId,
+      actorUserId: input.actorUserId,
+      organizationProviderConfigId: existingConfig.id,
+      integrationConnectionId: input.integrationConnectionId,
+    });
   }
 
   const configuredProvider = (
@@ -102,4 +67,122 @@ export async function putOrganizationIdentityLinkProvider(
   }
 
   return configuredProvider;
+}
+
+export async function createOrganizationIdentityLinkProviderConfig(
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+  },
+  input: {
+    organizationId: string;
+    actorUserId: string;
+    providerFamily: string;
+    integrationConnectionId: string;
+  },
+) {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+  const provider = await resolveIdentityLinkProviderMetadataOrThrow(ctx, {
+    providerFamily: input.providerFamily,
+  });
+
+  const connection = await resolveValidatedProviderConnectionOrThrow(
+    {
+      db: ctx.db,
+      integrationRegistry: ctx.integrationRegistry,
+    },
+    {
+      organizationId: input.organizationId,
+      integrationConnectionId: input.integrationConnectionId,
+      provider,
+    },
+  );
+
+  const [config] = await ctx.db
+    .insert(tables.organizationIdentityLinkProviderConfigs)
+    .values({
+      organizationId: input.organizationId,
+      providerFamily: provider.providerFamily,
+      status: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
+      integrationTargetKey: connection.targetKey,
+      integrationConnectionId: input.integrationConnectionId,
+      createdByUserId: input.actorUserId,
+      updatedByUserId: input.actorUserId,
+    })
+    .returning({
+      id: tables.organizationIdentityLinkProviderConfigs.id,
+      providerFamily: tables.organizationIdentityLinkProviderConfigs.providerFamily,
+      status: tables.organizationIdentityLinkProviderConfigs.status,
+      integrationTargetKey: tables.organizationIdentityLinkProviderConfigs.integrationTargetKey,
+      integrationConnectionId:
+        tables.organizationIdentityLinkProviderConfigs.integrationConnectionId,
+    });
+
+  if (config === undefined) {
+    throw new Error("Failed to create identity-link provider config.");
+  }
+
+  return config;
+}
+
+export async function updateOrganizationIdentityLinkProviderConfigConnection(
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+  },
+  input: {
+    organizationId: string;
+    actorUserId: string;
+    organizationProviderConfigId: string;
+    integrationConnectionId: string;
+  },
+) {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+  const existingConfig = await resolveOrganizationIdentityLinkProviderConfigByIdOrThrow(
+    {
+      db: ctx.db,
+    },
+    {
+      organizationId: input.organizationId,
+      organizationProviderConfigId: input.organizationProviderConfigId,
+    },
+  );
+  const provider = await resolveIdentityLinkProviderMetadataOrThrow(ctx, {
+    providerFamily: existingConfig.providerFamily,
+  });
+  const connection = await resolveValidatedProviderConnectionOrThrow(
+    {
+      db: ctx.db,
+      integrationRegistry: ctx.integrationRegistry,
+    },
+    {
+      organizationId: input.organizationId,
+      integrationConnectionId: input.integrationConnectionId,
+      provider,
+    },
+  );
+
+  const [config] = await ctx.db
+    .update(tables.organizationIdentityLinkProviderConfigs)
+    .set({
+      integrationTargetKey: connection.targetKey,
+      integrationConnectionId: input.integrationConnectionId,
+      updatedByUserId: input.actorUserId,
+      updatedAt: sql`now()`,
+    })
+    .where(sql`${tables.organizationIdentityLinkProviderConfigs.id} = ${existingConfig.id}`)
+    .returning({
+      id: tables.organizationIdentityLinkProviderConfigs.id,
+      providerFamily: tables.organizationIdentityLinkProviderConfigs.providerFamily,
+      status: tables.organizationIdentityLinkProviderConfigs.status,
+      integrationTargetKey: tables.organizationIdentityLinkProviderConfigs.integrationTargetKey,
+      integrationConnectionId:
+        tables.organizationIdentityLinkProviderConfigs.integrationConnectionId,
+    });
+
+  if (config === undefined) {
+    throw new Error(`Failed to update identity-link provider config '${existingConfig.id}'.`);
+  }
+
+  return config;
 }

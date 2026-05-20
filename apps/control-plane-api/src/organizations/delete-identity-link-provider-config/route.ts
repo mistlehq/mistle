@@ -1,26 +1,26 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
-import { OrganizationIdentityLinkProviderLinksResponseSchema } from "../schemas.js";
+import { OrganizationIdentityLinkProviderConfigSchema } from "../schemas.js";
 import {
-  ListIdentityLinkProviderLinksBadRequestResponseSchema,
-  ListIdentityLinkProviderLinksNotFoundResponseSchema,
-  ListIdentityLinkProviderLinksParamsSchema,
+  DeleteIdentityLinkProviderConfigBadRequestResponseSchema,
+  DeleteIdentityLinkProviderConfigNotFoundResponseSchema,
+  DeleteIdentityLinkProviderConfigParamsSchema,
 } from "./schema.js";
 
 export const route = createRoute({
-  method: "get",
-  path: "/identity-linking/providers/:providerFamily/links",
+  method: "delete",
+  path: "/identity-linking/provider-configs/:organizationProviderConfigId",
   tags: ["Organizations"],
   request: {
-    params: ListIdentityLinkProviderLinksParamsSchema,
+    params: DeleteIdentityLinkProviderConfigParamsSchema,
   },
   responses: {
     200: {
-      description: "Organization member identity-linking visibility for a provider family.",
+      description: "Disable an identity-linking provider config.",
       content: {
         "application/json": {
-          schema: OrganizationIdentityLinkProviderLinksResponseSchema,
+          schema: OrganizationIdentityLinkProviderConfigSchema,
         },
       },
     },
@@ -28,7 +28,7 @@ export const route = createRoute({
       description: "Invalid request.",
       content: {
         "application/json": {
-          schema: ListIdentityLinkProviderLinksBadRequestResponseSchema,
+          schema: DeleteIdentityLinkProviderConfigBadRequestResponseSchema,
         },
       },
     },
@@ -52,7 +52,7 @@ export const route = createRoute({
       description: "Identity-linking provider config was not found.",
       content: {
         "application/json": {
-          schema: ListIdentityLinkProviderLinksNotFoundResponseSchema,
+          schema: DeleteIdentityLinkProviderConfigNotFoundResponseSchema,
         },
       },
     },

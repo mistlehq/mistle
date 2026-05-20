@@ -1,26 +1,35 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
-import { OrganizationIdentityLinkProviderLinksResponseSchema } from "../schemas.js";
+import { OrganizationIdentityLinkProviderConfigSchema } from "../schemas.js";
 import {
-  ListIdentityLinkProviderLinksBadRequestResponseSchema,
-  ListIdentityLinkProviderLinksNotFoundResponseSchema,
-  ListIdentityLinkProviderLinksParamsSchema,
+  PutIdentityLinkProviderConfigStatusBadRequestResponseSchema,
+  PutIdentityLinkProviderConfigStatusBodySchema,
+  PutIdentityLinkProviderConfigStatusNotFoundResponseSchema,
+  PutIdentityLinkProviderConfigStatusParamsSchema,
 } from "./schema.js";
 
 export const route = createRoute({
-  method: "get",
-  path: "/identity-linking/providers/:providerFamily/links",
+  method: "put",
+  path: "/identity-linking/provider-configs/:organizationProviderConfigId/status",
   tags: ["Organizations"],
   request: {
-    params: ListIdentityLinkProviderLinksParamsSchema,
+    params: PutIdentityLinkProviderConfigStatusParamsSchema,
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: PutIdentityLinkProviderConfigStatusBodySchema,
+        },
+      },
+    },
   },
   responses: {
     200: {
-      description: "Organization member identity-linking visibility for a provider family.",
+      description: "Update an identity-linking provider config status.",
       content: {
         "application/json": {
-          schema: OrganizationIdentityLinkProviderLinksResponseSchema,
+          schema: OrganizationIdentityLinkProviderConfigSchema,
         },
       },
     },
@@ -28,7 +37,7 @@ export const route = createRoute({
       description: "Invalid request.",
       content: {
         "application/json": {
-          schema: ListIdentityLinkProviderLinksBadRequestResponseSchema,
+          schema: PutIdentityLinkProviderConfigStatusBadRequestResponseSchema,
         },
       },
     },
@@ -52,7 +61,7 @@ export const route = createRoute({
       description: "Identity-linking provider config was not found.",
       content: {
         "application/json": {
-          schema: ListIdentityLinkProviderLinksNotFoundResponseSchema,
+          schema: PutIdentityLinkProviderConfigStatusNotFoundResponseSchema,
         },
       },
     },

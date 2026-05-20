@@ -14,7 +14,9 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
         onProviderConnectionChange={async () => {}}
         providers={[
           {
+            rowKey: "ilp_github",
             providerFamily: "github",
+            organizationProviderConfigId: "ilp_github",
             displayName: "GitHub",
             logoKey: "github",
             connectionOptions: [
@@ -41,7 +43,9 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
             ],
           },
           {
+            rowKey: "draft:linear",
             providerFamily: "linear",
+            organizationProviderConfigId: null,
             displayName: "Linear",
             logoKey: "linear",
             connectionOptions: [],
@@ -81,7 +85,9 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
         onProviderConnectionChange={async () => {}}
         providers={[
           {
+            rowKey: "draft:slack",
             providerFamily: "slack",
+            organizationProviderConfigId: null,
             displayName: "Slack",
             logoKey: "slack",
             connectionOptions: [
@@ -117,7 +123,9 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
         onProviderConnectionChange={async () => {}}
         providers={[
           {
+            rowKey: "ilp_github",
             providerFamily: "github",
+            organizationProviderConfigId: "ilp_github",
             displayName: "GitHub",
             logoKey: "github",
             connectionOptions: [],
@@ -146,7 +154,9 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
         onProviderConnectionChange={async () => {}}
         providers={[
           {
+            rowKey: "ilp_github",
             providerFamily: "github",
+            organizationProviderConfigId: "ilp_github",
             displayName: "GitHub",
             logoKey: "github",
             connectionOptions: [],

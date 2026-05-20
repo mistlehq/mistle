@@ -17,6 +17,18 @@ export type ReturnedIdentityLinkConnectionSelection = {
   integrationConnectionId: string;
 };
 
+type ProviderWithEligibleConnections = Pick<
+  OrganizationIdentityLinkProvider,
+  "eligibleConnections"
+> &
+  Record<string, unknown>;
+
+type ProviderWithFamilyAndEligibleConnections = Pick<
+  OrganizationIdentityLinkProvider,
+  "providerFamily" | "eligibleConnections"
+> &
+  Record<string, unknown>;
+
 export function canManageOrganizationIdentityLinking(input: {
   actorRole: OrganizationRole;
 }): boolean {
@@ -54,7 +66,7 @@ export function resolveIdentityLinkStatusActionLabel(input: {
 }
 
 export function listEligibleIdentityLinkConnections(input: {
-  provider: OrganizationIdentityLinkProvider;
+  provider: ProviderWithEligibleConnections;
 }): readonly IdentityLinkEligibleConnection[] {
   return input.provider.eligibleConnections
     .map((connection) => ({
@@ -90,7 +102,7 @@ export function formatIdentityLinkEligibleConnectionLabel(
 
 export function resolveReturnedIdentityLinkConnectionSelection(input: {
   connectionId: string;
-  providers: readonly OrganizationIdentityLinkProvider[];
+  providers: readonly ProviderWithFamilyAndEligibleConnections[];
 }): ReturnedIdentityLinkConnectionSelection | null {
   for (const provider of input.providers) {
     const eligibleConnections = listEligibleIdentityLinkConnections({ provider });

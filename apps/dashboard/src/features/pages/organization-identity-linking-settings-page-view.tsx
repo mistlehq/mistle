@@ -27,7 +27,9 @@ import {
 } from "../shared/responsive-field-list.js";
 
 export type OrganizationIdentityLinkingProviderRow = {
+  rowKey: string;
   providerFamily: string;
+  organizationProviderConfigId: string | null;
   displayName: string;
   logoKey: string;
   connectionOptions: readonly {
@@ -54,10 +56,10 @@ export type OrganizationIdentityLinkingSettingsPageViewProps = {
   loadErrorMessage: string | null;
   providers: readonly OrganizationIdentityLinkingProviderRow[];
   onProviderConnectionChange: (input: {
-    providerFamily: string;
+    rowKey: string;
     integrationConnectionId: string;
   }) => Promise<void> | void;
-  onEnabledChange: (input: { providerFamily: string; enabled: boolean }) => Promise<void> | void;
+  onEnabledChange: (input: { rowKey: string; enabled: boolean }) => Promise<void> | void;
 };
 
 const IdentityLinkingProviderColumns = [
@@ -70,16 +72,12 @@ const IdentityLinkingProviderColumns = [
 export function OrganizationIdentityLinkingSettingsPageView(
   props: OrganizationIdentityLinkingSettingsPageViewProps,
 ): React.JSX.Element {
-  const [linkedUsersDialogProviderFamily, setLinkedUsersDialogProviderFamily] = useState<
-    string | null
-  >(null);
+  const [linkedUsersDialogRowKey, setLinkedUsersDialogRowKey] = useState<string | null>(null);
 
   const linkedUsersDialogProvider =
-    linkedUsersDialogProviderFamily === null
+    linkedUsersDialogRowKey === null
       ? null
-      : (props.providers.find(
-          (provider) => provider.providerFamily === linkedUsersDialogProviderFamily,
-        ) ?? null);
+      : (props.providers.find((provider) => provider.rowKey === linkedUsersDialogRowKey) ?? null);
 
   if (props.loadErrorMessage !== null) {
     return (
@@ -113,11 +111,11 @@ export function OrganizationIdentityLinkingSettingsPageView(
         >
           {props.providers.map((provider, index) => (
             <IdentityLinkingProviderRowView
-              key={provider.providerFamily}
+              key={provider.rowKey}
               isLastRow={index === props.providers.length - 1}
               onEnabledChange={props.onEnabledChange}
               onOpenLinkedUsers={() => {
-                setLinkedUsersDialogProviderFamily(provider.providerFamily);
+                setLinkedUsersDialogRowKey(provider.rowKey);
               }}
               onProviderConnectionChange={props.onProviderConnectionChange}
               provider={provider}
@@ -129,7 +127,7 @@ export function OrganizationIdentityLinkingSettingsPageView(
       <LinkedUsersDialog
         onOpenChange={(open) => {
           if (!open) {
-            setLinkedUsersDialogProviderFamily(null);
+            setLinkedUsersDialogRowKey(null);
           }
         }}
         provider={linkedUsersDialogProvider}
@@ -179,7 +177,7 @@ function IdentityLinkingProviderRowView(input: {
               }
 
               void input.onProviderConnectionChange({
-                providerFamily: provider.providerFamily,
+                rowKey: provider.rowKey,
                 integrationConnectionId,
               });
             }}
@@ -237,7 +235,7 @@ function IdentityLinkingProviderRowView(input: {
           }
           onCheckedChange={(enabled) => {
             void input.onEnabledChange({
-              providerFamily: provider.providerFamily,
+              rowKey: provider.rowKey,
               enabled,
             });
           }}

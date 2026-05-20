@@ -6,6 +6,10 @@ import {
 import { and, asc, eq, sql } from "drizzle-orm";
 
 import { resolveDirectoryMemberName } from "../../organizations/services/directory-shared.js";
+import {
+  resolveExactOneOrganizationIdentityLinkProviderConfigForFamilyOrThrow,
+  resolveOrganizationIdentityLinkProviderConfigByIdOrThrow,
+} from "./resolve-organization-identity-link-provider-config.js";
 
 export type OrganizationIdentityLinkProviderPrincipalSummary = {
   providerSubjectId: string | null;
@@ -52,7 +56,31 @@ export async function listOrganizationIdentityLinkProviderLinks(
     providerFamily: string;
   },
 ): Promise<OrganizationIdentityLinkProviderLink[]> {
+  const config = await resolveExactOneOrganizationIdentityLinkProviderConfigForFamilyOrThrow(ctx, {
+    organizationId: input.organizationId,
+    providerFamily: input.providerFamily,
+  });
+
+  return listOrganizationIdentityLinkProviderConfigLinks(ctx, {
+    organizationId: input.organizationId,
+    organizationProviderConfigId: config.id,
+  });
+}
+
+export async function listOrganizationIdentityLinkProviderConfigLinks(
+  ctx: {
+    db: ControlPlaneDatabase;
+  },
+  input: {
+    organizationId: string;
+    organizationProviderConfigId: string;
+  },
+): Promise<OrganizationIdentityLinkProviderLink[]> {
   const tables = getControlPlaneDatabaseSchema(ctx.db);
+  const config = await resolveOrganizationIdentityLinkProviderConfigByIdOrThrow(ctx, {
+    organizationId: input.organizationId,
+    organizationProviderConfigId: input.organizationProviderConfigId,
+  });
 
   const directoryMemberSortName = buildDirectoryMemberSortName(tables);
   const rows = await ctx.db
@@ -71,7 +99,7 @@ export async function listOrganizationIdentityLinkProviderLinks(
       and(
         eq(tables.userExternalPrincipals.organizationId, tables.members.organizationId),
         eq(tables.userExternalPrincipals.userId, tables.members.userId),
-        eq(tables.userExternalPrincipals.providerFamily, input.providerFamily),
+        eq(tables.userExternalPrincipals.organizationProviderConfigId, config.id),
         eq(tables.userExternalPrincipals.status, UserExternalPrincipalStatuses.ACTIVE),
       ),
     )

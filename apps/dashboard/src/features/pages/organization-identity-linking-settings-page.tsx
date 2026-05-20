@@ -1,6 +1,6 @@
 import { toast } from "@mistle/ui";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { data, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -14,14 +14,16 @@ import {
   resolveReturnedIdentityLinkConnectionSelection,
 } from "../settings/identity-linking/organization-identity-linking-model.js";
 import {
-  configureOrganizationIdentityLinkProvider,
+  createOrganizationIdentityLinkProviderConfig,
   listOrganizationIdentityLinkProviderLinks,
   listOrganizationIdentityLinkProviders,
   organizationIdentityLinkProviderLinksQueryKey,
   organizationIdentityLinkProvidersQueryKey,
+  type OrganizationIdentityLinkProviderConfig,
   type OrganizationIdentityLinkProviderLink,
   putOrganizationIdentityLinkProviderStatus,
   type OrganizationIdentityLinkProvider,
+  updateOrganizationIdentityLinkProviderConfig,
 } from "../settings/identity-linking/organization-identity-linking-service.js";
 import {
   getMembershipCapabilities,
@@ -34,19 +36,25 @@ import {
   OrganizationIdentityLinkingSettingsPageView,
 } from "./organization-identity-linking-settings-page-view.js";
 
+const DraftConfigIdPrefix = "draft:";
+
+type ProviderConfigRow = {
+  rowKey: string;
+  provider: OrganizationIdentityLinkProvider;
+  config: OrganizationIdentityLinkProviderConfig | null;
+};
+
 export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   const queryClient = useQueryClient();
   const activeOrganizationId = useRequiredOrganizationId();
   const [searchParams, setSearchParams] = useSearchParams();
   const { title, description } = resolvePageFrameText(pageMeta, "Identity Linking");
-  const [selectedConnectionIdByProviderFamily, setSelectedConnectionIdByProviderFamily] = useState<
+  const [selectedConnectionIdByRowKey, setSelectedConnectionIdByRowKey] = useState<
     Readonly<Record<string, string | undefined>>
   >({});
-  const [configuringProviderFamily, setConfiguringProviderFamily] = useState<string | null>(null);
-  const [statusUpdatingProviderFamily, setStatusUpdatingProviderFamily] = useState<string | null>(
-    null,
-  );
+  const [configuringRowKey, setConfiguringRowKey] = useState<string | null>(null);
+  const [statusUpdatingRowKey, setStatusUpdatingRowKey] = useState<string | null>(null);
 
   const membershipCapabilitiesQuery = useQuery({
     queryKey: membershipCapabilitiesQueryKey(activeOrganizationId),
@@ -66,18 +74,27 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
     queryFn: async ({ signal }) => listOrganizationIdentityLinkProviders({ signal }),
   });
 
-  const configureMutation = useMutation({
-    mutationFn: async (input: { providerFamily: string; integrationConnectionId: string }) =>
-      configureOrganizationIdentityLinkProvider(input),
+  const invalidateProviders = async () => {
+    await queryClient.invalidateQueries({
+      queryKey: organizationIdentityLinkProvidersQueryKey(activeOrganizationId),
+    });
+  };
+
+  const createConfigMutation = useMutation({
+    mutationFn: async (input: {
+      rowKey: string;
+      providerFamily: string;
+      integrationConnectionId: string;
+    }) =>
+      createOrganizationIdentityLinkProviderConfig({
+        providerFamily: input.providerFamily,
+        integrationConnectionId: input.integrationConnectionId,
+      }),
     onMutate: async (input) => {
-      setConfiguringProviderFamily(input.providerFamily);
+      setConfiguringRowKey(input.rowKey);
     },
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: organizationIdentityLinkProvidersQueryKey(activeOrganizationId),
-        }),
-      ]);
+      await invalidateProviders();
     },
     onError: (error) => {
       toast.error(
@@ -88,20 +105,54 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
       );
     },
     onSettled: () => {
-      setConfiguringProviderFamily(null);
+      setConfiguringRowKey(null);
+    },
+  });
+
+  const updateConfigMutation = useMutation({
+    mutationFn: async (input: {
+      rowKey: string;
+      organizationProviderConfigId: string;
+      integrationConnectionId: string;
+    }) =>
+      updateOrganizationIdentityLinkProviderConfig({
+        organizationProviderConfigId: input.organizationProviderConfigId,
+        integrationConnectionId: input.integrationConnectionId,
+      }),
+    onMutate: async (input) => {
+      setConfiguringRowKey(input.rowKey);
+    },
+    onSuccess: async () => {
+      await invalidateProviders();
+    },
+    onError: (error) => {
+      toast.error(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not save identity-linking provider configuration.",
+        }),
+      );
+    },
+    onSettled: () => {
+      setConfiguringRowKey(null);
     },
   });
 
   const statusMutation = useMutation({
-    mutationFn: async (input: { providerFamily: string; status: "active" | "disabled" }) =>
-      putOrganizationIdentityLinkProviderStatus(input),
+    mutationFn: async (input: {
+      rowKey: string;
+      organizationProviderConfigId: string;
+      status: "active" | "disabled";
+    }) =>
+      putOrganizationIdentityLinkProviderStatus({
+        organizationProviderConfigId: input.organizationProviderConfigId,
+        status: input.status,
+      }),
     onMutate: async (input) => {
-      setStatusUpdatingProviderFamily(input.providerFamily);
+      setStatusUpdatingRowKey(input.rowKey);
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: organizationIdentityLinkProvidersQueryKey(activeOrganizationId),
-      });
+      await invalidateProviders();
     },
     onError: (error) => {
       toast.error(
@@ -112,26 +163,28 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
       );
     },
     onSettled: () => {
-      setStatusUpdatingProviderFamily(null);
+      setStatusUpdatingRowKey(null);
     },
   });
 
   const providers = providersQuery.data ?? [];
+  const providerConfigRows = useMemo(() => buildProviderConfigRows(providers), [providers]);
+  const configuredRows = providerConfigRows.filter((row) => row.config !== null);
   const providerLinksQueries = useQueries({
-    queries: providers.map((provider) => ({
-      enabled: canManage && !providersQuery.isPending,
+    queries: configuredRows.map((row) => ({
+      enabled: canManage && !providersQuery.isPending && row.config !== null,
       queryKey: organizationIdentityLinkProviderLinksQueryKey({
         activeOrganizationId,
-        providerFamily: provider.providerFamily,
+        organizationProviderConfigId: row.config?.organizationProviderConfigId ?? row.rowKey,
       }),
       queryFn: async ({ signal }: { signal: AbortSignal }) =>
         listOrganizationIdentityLinkProviderLinks({
-          providerFamily: provider.providerFamily,
+          organizationProviderConfigId: row.config?.organizationProviderConfigId ?? row.rowKey,
           signal,
         }),
     })),
   });
-  const providerLinksByProviderFamily = new Map<
+  const providerLinksByConfigId = new Map<
     string,
     {
       data: readonly OrganizationIdentityLinkProviderLink[] | undefined;
@@ -140,8 +193,8 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
       error: unknown;
     }
   >(
-    providers.map((provider, index) => [
-      provider.providerFamily,
+    configuredRows.map((row, index) => [
+      row.config?.organizationProviderConfigId ?? row.rowKey,
       {
         data: providerLinksQueries[index]?.data,
         isPending: providerLinksQueries[index]?.isPending ?? false,
@@ -153,26 +206,20 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
   const createdConnectionId = searchParams.get("createdConnectionId");
 
   useEffect(() => {
-    if (createdConnectionId === null) {
+    if (createdConnectionId === null || providersQuery.data === undefined) {
       return;
     }
 
-    if (providersQuery.data === undefined) {
-      return;
-    }
+    const selection = resolveReturnedIdentityLinkConnectionSelection({
+      connectionId: createdConnectionId,
+      providers: providersQuery.data,
+    });
 
-    if (createdConnectionId !== null) {
-      const selection = resolveReturnedIdentityLinkConnectionSelection({
-        connectionId: createdConnectionId,
-        providers: providersQuery.data,
-      });
-
-      if (selection !== null) {
-        setSelectedConnectionIdByProviderFamily((current) => ({
-          ...current,
-          [selection.providerFamily]: selection.integrationConnectionId,
-        }));
-      }
+    if (selection !== null) {
+      setSelectedConnectionIdByRowKey((current) => ({
+        ...current,
+        [buildDraftRowKey(selection.providerFamily)]: selection.integrationConnectionId,
+      }));
     }
 
     const nextSearchParams = new URLSearchParams(searchParams);
@@ -213,48 +260,68 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
           canManage,
           providersError: providersQuery.isError ? providersQuery.error : null,
         })}
-        onEnabledChange={async ({ providerFamily, enabled }) => {
-          const updatePlan = buildProviderStatusUpdatePlan({
-            enabled,
-            providerFamily,
-            providers,
-            selectedConnectionIdByProviderFamily,
+        onEnabledChange={async ({ rowKey, enabled }) => {
+          const row = findProviderConfigRowOrThrow({
+            rowKey,
+            rows: providerConfigRows,
           });
-
-          if (updatePlan.configureIntegrationConnectionId !== null) {
-            await configureMutation.mutateAsync({
-              providerFamily,
-              integrationConnectionId: updatePlan.configureIntegrationConnectionId,
-            });
-          }
+          const status = enabled ? "active" : "disabled";
+          const organizationProviderConfigId =
+            row.config?.organizationProviderConfigId ??
+            (await createConfigForDraftRow({
+              row,
+              createConfigMutation,
+              selectedConnectionIdByRowKey,
+            }));
 
           await statusMutation.mutateAsync({
-            providerFamily,
-            status: updatePlan.status,
+            rowKey,
+            organizationProviderConfigId,
+            status,
           });
         }}
-        onProviderConnectionChange={async ({ providerFamily, integrationConnectionId }) => {
-          const previousDisplayedConnectionId = resolveProviderDisplayedConnectionId({
-            provider:
-              providers.find((candidate) => candidate.providerFamily === providerFamily) ?? null,
-            selectedConnectionIdByProviderFamily,
+        onProviderConnectionChange={async ({ rowKey, integrationConnectionId }) => {
+          const row = findProviderConfigRowOrThrow({
+            rowKey,
+            rows: providerConfigRows,
+          });
+          const previousDisplayedConnectionId = resolveRowDisplayedConnectionId({
+            row,
+            selectedConnectionIdByRowKey,
           });
 
-          setSelectedConnectionIdByProviderFamily((current) => ({
+          setSelectedConnectionIdByRowKey((current) => ({
             ...current,
-            [providerFamily]: integrationConnectionId,
+            [rowKey]: integrationConnectionId,
           }));
 
           try {
-            await configureMutation.mutateAsync({
-              providerFamily,
+            if (row.config === null) {
+              await createConfigMutation.mutateAsync({
+                rowKey,
+                providerFamily: row.provider.providerFamily,
+                integrationConnectionId,
+              });
+              setSelectedConnectionIdByRowKey((current) =>
+                restoreSelectedConnectionDraft({
+                  current,
+                  rowKey,
+                  selectedConnectionId: null,
+                }),
+              );
+              return;
+            }
+
+            await updateConfigMutation.mutateAsync({
+              rowKey,
+              organizationProviderConfigId: row.config.organizationProviderConfigId,
               integrationConnectionId,
             });
           } catch (error) {
-            setSelectedConnectionIdByProviderFamily((current) =>
+            setSelectedConnectionIdByRowKey((current) =>
               restoreSelectedConnectionDraft({
                 current,
-                providerFamily,
+                rowKey,
                 selectedConnectionId: previousDisplayedConnectionId,
               }),
             );
@@ -262,18 +329,42 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
             throw error;
           }
         }}
-        providers={providers.map((provider) =>
+        providers={providerConfigRows.map((row) =>
           buildProviderRow({
-            configuringProviderFamily,
-            statusUpdatingProviderFamily,
-            provider,
-            providerLinksQuery: providerLinksByProviderFamily.get(provider.providerFamily) ?? null,
-            selectedConnectionIdByProviderFamily,
+            configuringRowKey,
+            statusUpdatingRowKey,
+            row,
+            providerLinksQuery:
+              row.config === null
+                ? null
+                : (providerLinksByConfigId.get(row.config.organizationProviderConfigId) ?? null),
+            selectedConnectionIdByRowKey,
           }),
         )}
       />
     </PageFrame>
   );
+}
+
+function buildProviderConfigRows(
+  providers: readonly OrganizationIdentityLinkProvider[],
+): ProviderConfigRow[] {
+  return providers.flatMap((provider) => [
+    ...provider.configs.map((config) => ({
+      rowKey: config.organizationProviderConfigId,
+      provider,
+      config,
+    })),
+    {
+      rowKey: buildDraftRowKey(provider.providerFamily),
+      provider,
+      config: null,
+    },
+  ]);
+}
+
+function buildDraftRowKey(providerFamily: string): string {
+  return `${DraftConfigIdPrefix}${providerFamily}`;
 }
 
 function resolveLoadErrorMessage(input: {
@@ -295,39 +386,39 @@ function resolveLoadErrorMessage(input: {
 }
 
 export function buildProviderRow(input: {
-  configuringProviderFamily: string | null;
-  statusUpdatingProviderFamily: string | null;
-  provider: OrganizationIdentityLinkProvider;
+  configuringRowKey: string | null;
+  statusUpdatingRowKey: string | null;
+  row: ProviderConfigRow;
   providerLinksQuery: {
     data: readonly OrganizationIdentityLinkProviderLink[] | undefined;
     isPending: boolean;
     isError: boolean;
     error: unknown;
   } | null;
-  selectedConnectionIdByProviderFamily: Readonly<Record<string, string | undefined>>;
+  selectedConnectionIdByRowKey: Readonly<Record<string, string | undefined>>;
 }): OrganizationIdentityLinkingProviderRow {
   const eligibleConnections = listEligibleIdentityLinkConnections({
-    provider: input.provider,
+    provider: input.row.provider,
   });
-  const draftSelectedConnectionId =
-    input.selectedConnectionIdByProviderFamily[input.provider.providerFamily];
-  const selectedConnectionId = resolveSelectedConnectionId({
-    draftSelectedConnectionId,
-    eligibleConnections,
-    selectedConnectionId: input.provider.selectedConnection?.id ?? null,
+  const selectedConnectionId = resolveRowDisplayedConnectionId({
+    row: input.row,
+    selectedConnectionIdByRowKey: input.selectedConnectionIdByRowKey,
   });
+
   return {
-    providerFamily: input.provider.providerFamily,
-    displayName: input.provider.displayName,
-    logoKey: input.provider.logoKey,
+    rowKey: input.row.rowKey,
+    providerFamily: input.row.provider.providerFamily,
+    organizationProviderConfigId: input.row.config?.organizationProviderConfigId ?? null,
+    displayName: input.row.provider.displayName,
+    logoKey: input.row.provider.logoKey,
     connectionOptions: eligibleConnections.map((connection) => ({
       id: connection.id,
       label: formatIdentityLinkEligibleConnectionLabel(connection),
     })),
     selectedConnectionId,
-    connectionPending: input.configuringProviderFamily === input.provider.providerFamily,
-    enablePending: input.statusUpdatingProviderFamily === input.provider.providerFamily,
-    enabled: input.provider.configurationStatus === "active",
+    connectionPending: input.configuringRowKey === input.row.rowKey,
+    enablePending: input.statusUpdatingRowKey === input.row.rowKey,
+    enabled: input.row.config?.configurationStatus === "active",
     linkedUsersCount: input.providerLinksQuery?.data?.length ?? null,
     memberLinksErrorMessage:
       input.providerLinksQuery !== null && input.providerLinksQuery.isError
@@ -352,82 +443,82 @@ export function buildProviderRow(input: {
   };
 }
 
-export function buildProviderStatusUpdatePlan(input: {
-  providerFamily: string;
-  enabled: boolean;
-  providers: readonly OrganizationIdentityLinkProvider[];
-  selectedConnectionIdByProviderFamily: Readonly<Record<string, string | undefined>>;
-}): {
-  status: "active" | "disabled";
-  configureIntegrationConnectionId: string | null;
-} {
-  const provider =
-    input.providers.find((candidate) => candidate.providerFamily === input.providerFamily) ?? null;
-
-  if (provider === null) {
-    throw new Error(`Identity-linking provider '${input.providerFamily}' was not loaded.`);
+function findProviderConfigRowOrThrow(input: {
+  rowKey: string;
+  rows: readonly ProviderConfigRow[];
+}): ProviderConfigRow {
+  const row = input.rows.find((candidate) => candidate.rowKey === input.rowKey) ?? null;
+  if (row === null) {
+    throw new Error(`Identity-linking provider row '${input.rowKey}' was not loaded.`);
   }
 
-  const status = input.enabled ? "active" : "disabled";
+  return row;
+}
 
-  if (!input.enabled || provider.configurationStatus !== "unconfigured") {
-    return {
-      status,
-      configureIntegrationConnectionId: null,
-    };
+async function createConfigForDraftRow(input: {
+  row: ProviderConfigRow;
+  createConfigMutation: {
+    mutateAsync: (input: {
+      rowKey: string;
+      providerFamily: string;
+      integrationConnectionId: string;
+    }) => Promise<OrganizationIdentityLinkProviderConfig>;
+  };
+  selectedConnectionIdByRowKey: Readonly<Record<string, string | undefined>>;
+}): Promise<string> {
+  if (input.row.config !== null) {
+    return input.row.config.organizationProviderConfigId;
   }
 
-  const integrationConnectionId = resolveProviderDisplayedConnectionId({
-    provider,
-    selectedConnectionIdByProviderFamily: input.selectedConnectionIdByProviderFamily,
+  const integrationConnectionId = resolveRowDisplayedConnectionId({
+    row: input.row,
+    selectedConnectionIdByRowKey: input.selectedConnectionIdByRowKey,
   });
 
   if (integrationConnectionId === null) {
     throw new Error(
-      `Identity-linking provider '${input.providerFamily}' cannot be enabled without a selected connection.`,
+      `Identity-linking provider '${input.row.provider.providerFamily}' cannot be enabled without a selected connection.`,
     );
   }
 
-  return {
-    status,
-    configureIntegrationConnectionId: integrationConnectionId,
-  };
+  const config = await input.createConfigMutation.mutateAsync({
+    rowKey: input.row.rowKey,
+    providerFamily: input.row.provider.providerFamily,
+    integrationConnectionId,
+  });
+
+  return config.organizationProviderConfigId;
 }
 
-function resolveProviderDisplayedConnectionId(input: {
-  provider: OrganizationIdentityLinkProvider | null;
-  selectedConnectionIdByProviderFamily: Readonly<Record<string, string | undefined>>;
+function resolveRowDisplayedConnectionId(input: {
+  row: ProviderConfigRow;
+  selectedConnectionIdByRowKey: Readonly<Record<string, string | undefined>>;
 }): string | null {
-  if (input.provider === null) {
-    return null;
-  }
-
   const eligibleConnections = listEligibleIdentityLinkConnections({
-    provider: input.provider,
+    provider: input.row.provider,
   });
 
   return resolveSelectedConnectionId({
-    draftSelectedConnectionId:
-      input.selectedConnectionIdByProviderFamily[input.provider.providerFamily],
+    draftSelectedConnectionId: input.selectedConnectionIdByRowKey[input.row.rowKey],
     eligibleConnections,
-    selectedConnectionId: input.provider.selectedConnection?.id ?? null,
+    selectedConnectionId: input.row.config?.selectedConnection.id ?? null,
   });
 }
 
 function restoreSelectedConnectionDraft(input: {
   current: Readonly<Record<string, string | undefined>>;
-  providerFamily: string;
+  rowKey: string;
   selectedConnectionId: string | null;
 }): Readonly<Record<string, string | undefined>> {
   if (input.selectedConnectionId === null) {
     const next = { ...input.current };
-    delete next[input.providerFamily];
+    delete next[input.rowKey];
     return next;
   }
 
   return {
     ...input.current,
-    [input.providerFamily]: input.selectedConnectionId,
+    [input.rowKey]: input.selectedConnectionId,
   };
 }
 

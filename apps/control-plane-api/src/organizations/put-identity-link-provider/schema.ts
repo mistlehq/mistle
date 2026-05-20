@@ -23,7 +23,10 @@ export const PutIdentityLinkProviderBodySchema = z
 
 export const PutIdentityLinkProviderBadRequestResponseSchema = z.union([
   createCodeMessageErrorSchema(
-    z.enum([IdentityLinkingBadRequestCodes.INVALID_PROVIDER_CONFIG_INPUT]),
+    z.enum([
+      IdentityLinkingBadRequestCodes.INVALID_PROVIDER_CONFIG_INPUT,
+      IdentityLinkingBadRequestCodes.PROVIDER_CONFIG_AMBIGUOUS,
+    ]),
   ),
   ValidationErrorResponseSchema,
 ]);

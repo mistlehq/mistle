@@ -16,6 +16,17 @@ const OrganizationIdentityLinkProviderConnectionSummarySchema = z
   })
   .strict();
 
+const OrganizationIdentityLinkProviderConfigSchema = z
+  .object({
+    organizationProviderConfigId: z.string().min(1),
+    integrationConnectionId: z.string().min(1),
+    configurationStatus: z.enum(["active", "disabled"]),
+    selectedConnection: OrganizationIdentityLinkProviderConnectionSummarySchema,
+    configuredAt: z.string().min(1),
+    updatedAt: z.string().min(1),
+  })
+  .strict();
+
 const OrganizationIdentityLinkProviderSchema = z
   .object({
     providerFamily: z.string().min(1),
@@ -30,6 +41,7 @@ const OrganizationIdentityLinkProviderSchema = z
     selectedConnection: OrganizationIdentityLinkProviderConnectionSummarySchema.nullable(),
     configuredAt: z.string().min(1).nullable(),
     updatedAt: z.string().min(1).nullable(),
+    configs: z.array(OrganizationIdentityLinkProviderConfigSchema),
   })
   .strict();
 
@@ -68,6 +80,9 @@ const OrganizationIdentityLinkProviderLinksResponseSchema = z
 export type OrganizationIdentityLinkProvider = z.infer<
   typeof OrganizationIdentityLinkProviderSchema
 >;
+export type OrganizationIdentityLinkProviderConfig = z.infer<
+  typeof OrganizationIdentityLinkProviderConfigSchema
+>;
 export type OrganizationIdentityLinkProviderLink = z.infer<
   typeof OrganizationIdentityLinkProviderLinkSchema
 >;
@@ -80,13 +95,13 @@ export function organizationIdentityLinkProvidersQueryKey(
 
 export function organizationIdentityLinkProviderLinksQueryKey(input: {
   activeOrganizationId: string;
-  providerFamily: string;
+  organizationProviderConfigId: string;
 }): readonly ["settings", "organization-identity-linking-links", string, string] {
   return [
     "settings",
     "organization-identity-linking-links",
     input.activeOrganizationId,
-    input.providerFamily,
+    input.organizationProviderConfigId,
   ];
 }
 
@@ -172,15 +187,15 @@ export async function listOrganizationIdentityLinkProviders(input: {
   }
 }
 
-export async function configureOrganizationIdentityLinkProvider(input: {
+export async function createOrganizationIdentityLinkProviderConfig(input: {
   providerFamily: string;
   integrationConnectionId: string;
-}): Promise<OrganizationIdentityLinkProvider> {
+}): Promise<OrganizationIdentityLinkProviderConfig> {
   try {
     const response = await requestControlPlane({
-      operation: "configureOrganizationIdentityLinkProvider",
-      method: "PUT",
-      pathname: `/v1/organization/identity-linking/providers/${encodeURIComponent(input.providerFamily)}`,
+      operation: "createOrganizationIdentityLinkProviderConfig",
+      method: "POST",
+      pathname: `/v1/organization/identity-linking/providers/${encodeURIComponent(input.providerFamily)}/configs`,
       body: {
         integrationConnectionId: input.integrationConnectionId,
       },
@@ -189,12 +204,41 @@ export async function configureOrganizationIdentityLinkProvider(input: {
 
     return readJsonWithSchema({
       response,
-      schema: OrganizationIdentityLinkProviderSchema,
-      operation: "configureOrganizationIdentityLinkProvider",
+      schema: OrganizationIdentityLinkProviderConfigSchema,
+      operation: "createOrganizationIdentityLinkProviderConfig",
     });
   } catch (error) {
     throw wrapOrganizationIdentityLinkingApiError({
-      operation: "configureOrganizationIdentityLinkProvider",
+      operation: "createOrganizationIdentityLinkProviderConfig",
+      error,
+      fallbackMessage: "Could not save identity-linking provider configuration.",
+    });
+  }
+}
+
+export async function updateOrganizationIdentityLinkProviderConfig(input: {
+  organizationProviderConfigId: string;
+  integrationConnectionId: string;
+}): Promise<OrganizationIdentityLinkProviderConfig> {
+  try {
+    const response = await requestControlPlane({
+      operation: "updateOrganizationIdentityLinkProviderConfig",
+      method: "PUT",
+      pathname: `/v1/organization/identity-linking/provider-configs/${encodeURIComponent(input.organizationProviderConfigId)}`,
+      body: {
+        integrationConnectionId: input.integrationConnectionId,
+      },
+      fallbackMessage: "Could not save identity-linking provider configuration.",
+    });
+
+    return readJsonWithSchema({
+      response,
+      schema: OrganizationIdentityLinkProviderConfigSchema,
+      operation: "updateOrganizationIdentityLinkProviderConfig",
+    });
+  } catch (error) {
+    throw wrapOrganizationIdentityLinkingApiError({
+      operation: "updateOrganizationIdentityLinkProviderConfig",
       error,
       fallbackMessage: "Could not save identity-linking provider configuration.",
     });
@@ -202,14 +246,14 @@ export async function configureOrganizationIdentityLinkProvider(input: {
 }
 
 export async function listOrganizationIdentityLinkProviderLinks(input: {
-  providerFamily: string;
+  organizationProviderConfigId: string;
   signal?: AbortSignal;
 }): Promise<readonly OrganizationIdentityLinkProviderLink[]> {
   try {
     const response = await requestControlPlane({
       operation: "listOrganizationIdentityLinkProviderLinks",
       method: "GET",
-      pathname: `/v1/organization/identity-linking/providers/${encodeURIComponent(input.providerFamily)}/links`,
+      pathname: `/v1/organization/identity-linking/provider-configs/${encodeURIComponent(input.organizationProviderConfigId)}/links`,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not load linked-provider visibility.",
     });
@@ -231,14 +275,14 @@ export async function listOrganizationIdentityLinkProviderLinks(input: {
 }
 
 export async function putOrganizationIdentityLinkProviderStatus(input: {
-  providerFamily: string;
+  organizationProviderConfigId: string;
   status: "active" | "disabled";
-}): Promise<OrganizationIdentityLinkProvider> {
+}): Promise<OrganizationIdentityLinkProviderConfig> {
   try {
     const response = await requestControlPlane({
       operation: "putOrganizationIdentityLinkProviderStatus",
       method: "PUT",
-      pathname: `/v1/organization/identity-linking/providers/${encodeURIComponent(input.providerFamily)}/status`,
+      pathname: `/v1/organization/identity-linking/provider-configs/${encodeURIComponent(input.organizationProviderConfigId)}/status`,
       body: {
         status: input.status,
       },
@@ -247,7 +291,7 @@ export async function putOrganizationIdentityLinkProviderStatus(input: {
 
     return readJsonWithSchema({
       response,
-      schema: OrganizationIdentityLinkProviderSchema,
+      schema: OrganizationIdentityLinkProviderConfigSchema,
       operation: "putOrganizationIdentityLinkProviderStatus",
     });
   } catch (error) {
@@ -260,19 +304,19 @@ export async function putOrganizationIdentityLinkProviderStatus(input: {
 }
 
 export async function disableOrganizationIdentityLinkProvider(input: {
-  providerFamily: string;
-}): Promise<OrganizationIdentityLinkProvider> {
+  organizationProviderConfigId: string;
+}): Promise<OrganizationIdentityLinkProviderConfig> {
   try {
     const response = await requestControlPlane({
       operation: "disableOrganizationIdentityLinkProvider",
       method: "DELETE",
-      pathname: `/v1/organization/identity-linking/providers/${encodeURIComponent(input.providerFamily)}`,
+      pathname: `/v1/organization/identity-linking/provider-configs/${encodeURIComponent(input.organizationProviderConfigId)}`,
       fallbackMessage: "Could not disable identity-linking provider configuration.",
     });
 
     return readJsonWithSchema({
       response,
-      schema: OrganizationIdentityLinkProviderSchema,
+      schema: OrganizationIdentityLinkProviderConfigSchema,
       operation: "disableOrganizationIdentityLinkProvider",
     });
   } catch (error) {

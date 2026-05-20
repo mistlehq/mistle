@@ -5037,6 +5037,489 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/organization/identity-linking/provider-configs/:organizationProviderConfigId": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          organizationProviderConfigId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            integrationConnectionId: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Update the integration connection used for an identity-linking provider config. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              configurationStatus: "active" | "disabled";
+              configuredAt: string;
+              integrationConnectionId: string;
+              organizationProviderConfigId: string;
+              selectedConnection: {
+                connectionMethodId?: string;
+                connectionMethodLabel?: string;
+                createdAt: string;
+                displayName: string;
+                id: string;
+                /** @enum {string} */
+                status: "active" | "error" | "revoked";
+                targetKey: string;
+                updatedAt: string;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_PROVIDER_CONFIG_INPUT" | "PROVIDER_CONFIG_AMBIGUOUS";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Forbidden request. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Identity-linking provider config or connection was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROVIDER_NOT_FOUND" | "PROVIDER_CONFIG_NOT_FOUND" | "CONNECTION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          organizationProviderConfigId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Disable an identity-linking provider config. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              configurationStatus: "active" | "disabled";
+              configuredAt: string;
+              integrationConnectionId: string;
+              organizationProviderConfigId: string;
+              selectedConnection: {
+                connectionMethodId?: string;
+                connectionMethodLabel?: string;
+                createdAt: string;
+                displayName: string;
+                id: string;
+                /** @enum {string} */
+                status: "active" | "error" | "revoked";
+                targetKey: string;
+                updatedAt: string;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "PROVIDER_CONFIG_AMBIGUOUS";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Forbidden request. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Identity-linking provider config was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROVIDER_NOT_FOUND" | "PROVIDER_CONFIG_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organization/identity-linking/provider-configs/:organizationProviderConfigId/links": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          organizationProviderConfigId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Organization member identity-linking visibility for a provider config. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              links: {
+                /** Format: email */
+                email: string;
+                linked: boolean;
+                name: string;
+                principalSummary: {
+                  displayName: string | null;
+                  /** Format: email */
+                  email: string | null;
+                  login: string | null;
+                  providerSubjectId: string | null;
+                } | null;
+                updatedAt: string | null;
+                userId: string;
+              }[];
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "PROVIDER_CONFIG_AMBIGUOUS";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Forbidden request. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Identity-linking provider config was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROVIDER_CONFIG_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organization/identity-linking/provider-configs/:organizationProviderConfigId/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          organizationProviderConfigId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            status: "active" | "disabled";
+          };
+        };
+      };
+      responses: {
+        /** @description Update an identity-linking provider config status. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              configurationStatus: "active" | "disabled";
+              configuredAt: string;
+              integrationConnectionId: string;
+              organizationProviderConfigId: string;
+              selectedConnection: {
+                connectionMethodId?: string;
+                connectionMethodLabel?: string;
+                createdAt: string;
+                displayName: string;
+                id: string;
+                /** @enum {string} */
+                status: "active" | "error" | "revoked";
+                targetKey: string;
+                updatedAt: string;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_PROVIDER_CONFIG_INPUT" | "PROVIDER_CONFIG_AMBIGUOUS";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Forbidden request. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Identity-linking provider config was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROVIDER_NOT_FOUND" | "PROVIDER_CONFIG_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/organization/identity-linking/providers": {
     parameters: {
       query?: never;
@@ -5061,6 +5544,25 @@ export interface paths {
           content: {
             "application/json": {
               providers: {
+                configs: {
+                  /** @enum {string} */
+                  configurationStatus: "active" | "disabled";
+                  configuredAt: string;
+                  integrationConnectionId: string;
+                  organizationProviderConfigId: string;
+                  selectedConnection: {
+                    connectionMethodId?: string;
+                    connectionMethodLabel?: string;
+                    createdAt: string;
+                    displayName: string;
+                    id: string;
+                    /** @enum {string} */
+                    status: "active" | "error" | "revoked";
+                    targetKey: string;
+                    updatedAt: string;
+                  };
+                  updatedAt: string;
+                }[];
                 /** @enum {string} */
                 configurationStatus: "unconfigured" | "active" | "disabled";
                 configuredAt: string | null;
@@ -5175,6 +5677,25 @@ export interface paths {
           };
           content: {
             "application/json": {
+              configs: {
+                /** @enum {string} */
+                configurationStatus: "active" | "disabled";
+                configuredAt: string;
+                integrationConnectionId: string;
+                organizationProviderConfigId: string;
+                selectedConnection: {
+                  connectionMethodId?: string;
+                  connectionMethodLabel?: string;
+                  createdAt: string;
+                  displayName: string;
+                  id: string;
+                  /** @enum {string} */
+                  status: "active" | "error" | "revoked";
+                  targetKey: string;
+                  updatedAt: string;
+                };
+                updatedAt: string;
+              }[];
               /** @enum {string} */
               configurationStatus: "unconfigured" | "active" | "disabled";
               configuredAt: string | null;
@@ -5220,7 +5741,7 @@ export interface paths {
             "application/json":
               | {
                   /** @enum {string} */
-                  code: "INVALID_PROVIDER_CONFIG_INPUT";
+                  code: "INVALID_PROVIDER_CONFIG_INPUT" | "PROVIDER_CONFIG_AMBIGUOUS";
                   message: string;
                 }
               | {
@@ -5299,6 +5820,25 @@ export interface paths {
           };
           content: {
             "application/json": {
+              configs: {
+                /** @enum {string} */
+                configurationStatus: "active" | "disabled";
+                configuredAt: string;
+                integrationConnectionId: string;
+                organizationProviderConfigId: string;
+                selectedConnection: {
+                  connectionMethodId?: string;
+                  connectionMethodLabel?: string;
+                  createdAt: string;
+                  displayName: string;
+                  id: string;
+                  /** @enum {string} */
+                  status: "active" | "error" | "revoked";
+                  targetKey: string;
+                  updatedAt: string;
+                };
+                updatedAt: string;
+              }[];
               /** @enum {string} */
               configurationStatus: "unconfigured" | "active" | "disabled";
               configuredAt: string | null;
@@ -5333,6 +5873,25 @@ export interface paths {
               } | null;
               updatedAt: string | null;
             };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "PROVIDER_CONFIG_AMBIGUOUS";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
           };
         };
         /** @description Authentication is required. */
@@ -5390,6 +5949,134 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/organization/identity-linking/providers/:providerFamily/configs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          providerFamily: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            integrationConnectionId: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Create an identity-linking provider config. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              configurationStatus: "active" | "disabled";
+              configuredAt: string;
+              integrationConnectionId: string;
+              organizationProviderConfigId: string;
+              selectedConnection: {
+                connectionMethodId?: string;
+                connectionMethodLabel?: string;
+                createdAt: string;
+                displayName: string;
+                id: string;
+                /** @enum {string} */
+                status: "active" | "error" | "revoked";
+                targetKey: string;
+                updatedAt: string;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_PROVIDER_CONFIG_INPUT" | "PROVIDER_CONFIG_AMBIGUOUS";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Forbidden request. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Identity-linking provider or connection was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROVIDER_NOT_FOUND" | "CONNECTION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/organization/identity-linking/providers/:providerFamily/links": {
     parameters: {
       query?: never;
@@ -5433,6 +6120,25 @@ export interface paths {
             };
           };
         };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "PROVIDER_CONFIG_AMBIGUOUS";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
         /** @description Authentication is required. */
         401: {
           headers: {
@@ -5455,6 +6161,19 @@ export interface paths {
             "application/json": {
               /** @enum {string} */
               code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Identity-linking provider config was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROVIDER_CONFIG_NOT_FOUND";
               message: string;
             };
           };
@@ -5511,6 +6230,25 @@ export interface paths {
           };
           content: {
             "application/json": {
+              configs: {
+                /** @enum {string} */
+                configurationStatus: "active" | "disabled";
+                configuredAt: string;
+                integrationConnectionId: string;
+                organizationProviderConfigId: string;
+                selectedConnection: {
+                  connectionMethodId?: string;
+                  connectionMethodLabel?: string;
+                  createdAt: string;
+                  displayName: string;
+                  id: string;
+                  /** @enum {string} */
+                  status: "active" | "error" | "revoked";
+                  targetKey: string;
+                  updatedAt: string;
+                };
+                updatedAt: string;
+              }[];
               /** @enum {string} */
               configurationStatus: "unconfigured" | "active" | "disabled";
               configuredAt: string | null;
@@ -5556,7 +6294,7 @@ export interface paths {
             "application/json":
               | {
                   /** @enum {string} */
-                  code: "INVALID_PROVIDER_CONFIG_INPUT";
+                  code: "INVALID_PROVIDER_CONFIG_INPUT" | "PROVIDER_CONFIG_AMBIGUOUS";
                   message: string;
                 }
               | {

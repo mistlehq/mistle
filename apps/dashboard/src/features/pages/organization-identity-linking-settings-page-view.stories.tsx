@@ -13,6 +13,8 @@ import {
 
 const BaseProviders = [
   {
+    rowKey: "ilp_github",
+    organizationProviderConfigId: "ilp_github",
     providerFamily: "github",
     displayName: "GitHub",
     logoKey: "github",
@@ -52,6 +54,8 @@ const BaseProviders = [
     ],
   },
   {
+    rowKey: "ilp_slack",
+    organizationProviderConfigId: "ilp_slack",
     providerFamily: "slack",
     displayName: "Slack",
     logoKey: "slack",
@@ -79,6 +83,8 @@ const BaseProviders = [
     ],
   },
   {
+    rowKey: "draft:linear",
+    organizationProviderConfigId: null,
     providerFamily: "linear",
     displayName: "Linear",
     logoKey: "linear",
@@ -108,10 +114,10 @@ function StatefulPrototype(
   return (
     <OrganizationIdentityLinkingSettingsPageView
       {...args}
-      onEnabledChange={async ({ providerFamily, enabled }) => {
+      onEnabledChange={async ({ rowKey, enabled }) => {
         setProviders((currentProviders) =>
           currentProviders.map((provider) =>
-            provider.providerFamily !== providerFamily
+            provider.rowKey !== rowKey
               ? provider
               : {
                   ...provider,
@@ -124,7 +130,7 @@ function StatefulPrototype(
 
         setProviders((currentProviders) =>
           currentProviders.map((provider) =>
-            provider.providerFamily !== providerFamily
+            provider.rowKey !== rowKey
               ? provider
               : {
                   ...provider,
@@ -134,10 +140,10 @@ function StatefulPrototype(
           ),
         );
       }}
-      onProviderConnectionChange={async ({ providerFamily, integrationConnectionId }) => {
+      onProviderConnectionChange={async ({ rowKey, integrationConnectionId }) => {
         setProviders((currentProviders) =>
           currentProviders.map((provider) =>
-            provider.providerFamily !== providerFamily
+            provider.rowKey !== rowKey
               ? provider
               : {
                   ...provider,
@@ -151,7 +157,7 @@ function StatefulPrototype(
 
         setProviders((currentProviders) =>
           currentProviders.map((provider) =>
-            provider.providerFamily !== providerFamily
+            provider.rowKey !== rowKey
               ? provider
               : {
                   ...provider,
@@ -204,6 +210,8 @@ export const UnconfiguredProviderWithDisplayedConnection: Story = {
   args: {
     providers: [
       {
+        rowKey: "ilp_github",
+        organizationProviderConfigId: "ilp_github",
         providerFamily: "github",
         displayName: "GitHub",
         logoKey: "github",
@@ -267,10 +275,10 @@ export const ConnectionSaveErrorToast: Story = {
       return (
         <OrganizationIdentityLinkingSettingsPageView
           {...args}
-          onEnabledChange={async ({ providerFamily, enabled }) => {
+          onEnabledChange={async ({ rowKey, enabled }) => {
             setProviders((currentProviders) =>
               currentProviders.map((provider) =>
-                provider.providerFamily !== providerFamily
+                provider.rowKey !== rowKey
                   ? provider
                   : {
                       ...provider,
@@ -283,7 +291,7 @@ export const ConnectionSaveErrorToast: Story = {
 
             setProviders((currentProviders) =>
               currentProviders.map((provider) =>
-                provider.providerFamily !== providerFamily
+                provider.rowKey !== rowKey
                   ? provider
                   : {
                       ...provider,
@@ -293,14 +301,14 @@ export const ConnectionSaveErrorToast: Story = {
               ),
             );
           }}
-          onProviderConnectionChange={async ({ providerFamily, integrationConnectionId }) => {
+          onProviderConnectionChange={async ({ rowKey, integrationConnectionId }) => {
             const previousSelection =
-              providers.find((provider) => provider.providerFamily === providerFamily)
-                ?.selectedConnectionId ?? null;
+              providers.find((provider) => provider.rowKey === rowKey)?.selectedConnectionId ??
+              null;
 
             setProviders((currentProviders) =>
               currentProviders.map((provider) =>
-                provider.providerFamily !== providerFamily
+                provider.rowKey !== rowKey
                   ? provider
                   : {
                       ...provider,
@@ -314,7 +322,7 @@ export const ConnectionSaveErrorToast: Story = {
 
             setProviders((currentProviders) =>
               currentProviders.map((provider) =>
-                provider.providerFamily !== providerFamily
+                provider.rowKey !== rowKey
                   ? provider
                   : {
                       ...provider,
