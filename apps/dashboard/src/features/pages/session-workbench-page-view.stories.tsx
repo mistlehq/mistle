@@ -16,11 +16,6 @@ import { ErrorNotice } from "../auth/error-notice.js";
 import { noop } from "../chat/components/chat-story-support.js";
 import { SessionsNavToggleItem } from "../navigation/sessions-nav-toggle-item.js";
 import {
-  CodexThreadNavigatorWorkbenchStoryRows,
-  createCodexThreadNavigatorStoryProps,
-} from "../session-agents/codex/codex-thread-navigator-story-support.js";
-import { CodexThreadNavigatorPanel } from "../session-agents/codex/codex-thread-navigator.js";
-import {
   SessionComposerFixturePropsForLoadingModel,
   SessionComposerFixturePropsForNonImageCapableModel,
   SessionComposerFixturePropsForUnavailableModel,
@@ -28,6 +23,8 @@ import {
   SessionComposerFixtureStatusMessageForNonImageCapableModel,
   SessionComposerFixtureStatusMessageForUnavailableModel,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
+import { RuntimeConversationNavigatorWorkbenchStoryRows } from "../session-agents/runtime-conversations/runtime-conversation-navigator-story-support.js";
+import { RuntimeConversationNavigatorPanel } from "../session-agents/runtime-conversations/runtime-conversation-navigator.js";
 import { ActionTile } from "../shared/action-tile.js";
 import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
 import { AppShellView } from "../shell/app-shell-view.js";
@@ -67,10 +64,13 @@ function CodexThreadNavigationHeaderTitle(): React.JSX.Element {
 
 function CodexThreadNavigationPanel(): React.JSX.Element {
   return (
-    <CodexThreadNavigatorPanel
-      {...createCodexThreadNavigatorStoryProps({
-        rows: CodexThreadNavigatorWorkbenchStoryRows,
-      })}
+    <RuntimeConversationNavigatorPanel
+      isConversationListLimited={false}
+      isStartingConversation={false}
+      onRefreshConversations={noop}
+      onSelectConversation={noop}
+      onStartConversation={noop}
+      rows={RuntimeConversationNavigatorWorkbenchStoryRows}
     />
   );
 }

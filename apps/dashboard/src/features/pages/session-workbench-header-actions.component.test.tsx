@@ -148,7 +148,7 @@ describe("SessionWorkbenchHeaderActions", () => {
     expect(screen.getByRole("region", { name: "Mobile processes" })).toBeDefined();
   });
 
-  it("opens the mobile threads surface from the mobile tools menu", () => {
+  it("opens the mobile conversations surface from the mobile tools menu", () => {
     function HeaderHarness(): React.JSX.Element {
       const [isOpen, setOpen] = useState(false);
 
@@ -164,15 +164,15 @@ describe("SessionWorkbenchHeaderActions", () => {
             ariaLabel: "Open changes",
             title: "Open changes",
           }}
-          mobileThreadNavigatorControl={{
+          mobileConversationNavigatorControl={{
             disabled: false,
             onOpen: () => {
               setOpen(true);
             },
             surface: isOpen ? (
-              <section aria-label="Mobile threads">Mobile threads sheet</section>
+              <section aria-label="Mobile conversations">Mobile conversations sheet</section>
             ) : null,
-            title: "Show threads",
+            title: "Show conversations",
           }}
           status={{
             kind: "connected",
@@ -183,10 +183,10 @@ describe("SessionWorkbenchHeaderActions", () => {
             ariaLabel: "Open terminal",
             title: "Open terminal",
           }}
-          threadControl={{
+          conversationControl={{
             ...StoryButtonControl,
-            ariaLabel: "Show threads",
-            title: "Show threads",
+            ariaLabel: "Show conversations",
+            title: "Show conversations",
           }}
         />
       );
@@ -196,9 +196,9 @@ describe("SessionWorkbenchHeaderActions", () => {
     render(<HeaderHarness />);
 
     fireEvent.click(screen.getByRole("button", { name: "Open session tools" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Threads" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Conversations" }));
 
-    expect(screen.getByRole("region", { name: "Mobile threads" })).toBeDefined();
+    expect(screen.getByRole("region", { name: "Mobile conversations" })).toBeDefined();
   });
 
   it("exposes secondary workbench tools from the mobile tools menu", () => {

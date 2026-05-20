@@ -1,55 +1,52 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  projectCodexThreadNavigatorRows,
-  resolveDefaultCodexThreadId,
-} from "./codex-thread-navigator-model.js";
+  projectRuntimeConversationNavigatorRows,
+  resolveDefaultRuntimeConversationId,
+} from "./runtime-conversation-navigator-model.js";
 
-const Threads = [
+const Conversations = [
   {
-    id: "thread_old",
-    name: "Old work",
-    preview: "Preview",
+    id: "conversation_old",
+    title: "Old work",
     cwd: "/workspace/repo-a",
     createdAt: 10,
     updatedAt: 20,
   },
   {
-    id: "thread_new",
-    name: null,
-    preview: "New work\nsecond line",
+    id: "conversation_new",
+    title: "New work",
     cwd: "/workspace/repo-a",
     createdAt: 30,
     updatedAt: 50,
   },
   {
-    id: "thread_other_repo",
-    name: null,
-    preview: null,
+    id: "conversation_other_repo",
+    title: "",
     cwd: "/workspace/repo-b",
     createdAt: 40,
     updatedAt: 60,
   },
 ];
 
-describe("projectCodexThreadNavigatorRows", () => {
-  it("orders all threads by recent activity and marks row metadata", () => {
+describe("projectRuntimeConversationNavigatorRows", () => {
+  it("orders all conversations by recent activity and marks row metadata", () => {
     expect(
-      projectCodexThreadNavigatorRows({
-        activeThreadId: "thread_new",
-        activeThread: {
-          id: "thread_new",
+      projectRuntimeConversationNavigatorRows({
+        activeConversationId: "conversation_new",
+        activeConversation: {
+          id: "conversation_new",
           cwd: "/workspace/repo-a",
         },
-        availableThreads: Threads,
-        originalThreadId: "thread_old",
-        pendingThreadId: "thread_old",
-        pendingServerRequestThreadIds: ["thread_new", "thread_new"],
+        availableConversations: Conversations,
+        originalConversationId: "conversation_old",
+        pendingConversationId: "conversation_old",
+        pendingServerRequestConversationIds: ["conversation_new", "conversation_new"],
       }),
     ).toEqual([
       {
-        id: "thread_other_repo",
-        title: "Untitled thread",
+        id: "conversation_other_repo",
+        title: "Untitled conversation",
         cwd: "/workspace/repo-b",
         cwdSectionLabel: "repo-b",
         lastActivityAt: 60,
@@ -60,7 +57,7 @@ describe("projectCodexThreadNavigatorRows", () => {
         pendingServerRequestCount: 0,
       },
       {
-        id: "thread_new",
+        id: "conversation_new",
         title: "New work",
         cwd: "/workspace/repo-a",
         cwdSectionLabel: "repo-a",
@@ -72,7 +69,7 @@ describe("projectCodexThreadNavigatorRows", () => {
         pendingServerRequestCount: 2,
       },
       {
-        id: "thread_old",
+        id: "conversation_old",
         title: "Old work",
         cwd: "/workspace/repo-a",
         cwdSectionLabel: "repo-a",
@@ -86,50 +83,50 @@ describe("projectCodexThreadNavigatorRows", () => {
     ]);
   });
 
-  it("does not need to pin the active thread because all threads are visible", () => {
+  it("does not need to pin the active conversation because all conversations are visible", () => {
     expect(
-      projectCodexThreadNavigatorRows({
-        activeThreadId: "thread_other_repo",
-        activeThread: {
-          id: "thread_other_repo",
+      projectRuntimeConversationNavigatorRows({
+        activeConversationId: "conversation_other_repo",
+        activeConversation: {
+          id: "conversation_other_repo",
           cwd: "/workspace/repo-b",
         },
-        availableThreads: Threads,
-        originalThreadId: null,
-        pendingThreadId: null,
-        pendingServerRequestThreadIds: [],
+        availableConversations: Conversations,
+        originalConversationId: null,
+        pendingConversationId: null,
+        pendingServerRequestConversationIds: [],
       }).map((row) => ({
         id: row.id,
         isPinnedCurrent: row.isPinnedCurrent,
       })),
     ).toEqual([
       {
-        id: "thread_other_repo",
+        id: "conversation_other_repo",
         isPinnedCurrent: false,
       },
       {
-        id: "thread_new",
+        id: "conversation_new",
         isPinnedCurrent: false,
       },
       {
-        id: "thread_old",
+        id: "conversation_old",
         isPinnedCurrent: false,
       },
     ]);
   });
 
-  it("pins the active thread when it is outside the latest page", () => {
+  it("pins the active conversation when it is outside the latest page", () => {
     expect(
-      projectCodexThreadNavigatorRows({
-        activeThreadId: "thread_outside_latest",
-        activeThread: {
-          id: "thread_outside_latest",
+      projectRuntimeConversationNavigatorRows({
+        activeConversationId: "conversation_outside_latest",
+        activeConversation: {
+          id: "conversation_outside_latest",
           cwd: "/workspace/repo-c",
         },
-        availableThreads: Threads,
-        originalThreadId: "thread_outside_latest",
-        pendingThreadId: null,
-        pendingServerRequestThreadIds: ["thread_outside_latest"],
+        availableConversations: Conversations,
+        originalConversationId: "conversation_outside_latest",
+        pendingConversationId: null,
+        pendingServerRequestConversationIds: ["conversation_outside_latest"],
       }).map((row) => ({
         id: row.id,
         title: row.title,
@@ -141,8 +138,8 @@ describe("projectCodexThreadNavigatorRows", () => {
       })),
     ).toEqual([
       {
-        id: "thread_outside_latest",
-        title: "New thread",
+        id: "conversation_outside_latest",
+        title: "New conversation",
         cwdSectionLabel: "repo-c",
         isActive: true,
         isOriginal: true,
@@ -150,8 +147,8 @@ describe("projectCodexThreadNavigatorRows", () => {
         pendingServerRequestCount: 1,
       },
       {
-        id: "thread_other_repo",
-        title: "Untitled thread",
+        id: "conversation_other_repo",
+        title: "Untitled conversation",
         cwdSectionLabel: "repo-b",
         isActive: false,
         isOriginal: false,
@@ -159,7 +156,7 @@ describe("projectCodexThreadNavigatorRows", () => {
         pendingServerRequestCount: 0,
       },
       {
-        id: "thread_new",
+        id: "conversation_new",
         title: "New work",
         cwdSectionLabel: "repo-a",
         isActive: false,
@@ -168,7 +165,7 @@ describe("projectCodexThreadNavigatorRows", () => {
         pendingServerRequestCount: 0,
       },
       {
-        id: "thread_old",
+        id: "conversation_old",
         title: "Old work",
         cwdSectionLabel: "repo-a",
         isActive: false,
@@ -179,54 +176,52 @@ describe("projectCodexThreadNavigatorRows", () => {
     ]);
   });
 
-  it("resolves the default thread from recent activity", () => {
+  it("resolves the default conversation from recent activity", () => {
     expect(
-      resolveDefaultCodexThreadId({
-        availableThreads: Threads,
+      resolveDefaultRuntimeConversationId({
+        availableConversations: Conversations,
       }),
-    ).toBe("thread_other_repo");
+    ).toBe("conversation_other_repo");
   });
 
   it("uses created time as activity when updated time is missing", () => {
-    const threads = [
+    const conversations = [
       {
-        id: "thread_created_recently",
-        name: "Created recently",
-        preview: null,
+        id: "conversation_created_recently",
+        title: "Created recently",
         cwd: "/workspace/repo-a",
         createdAt: 70,
         updatedAt: null,
       },
       {
-        id: "thread_updated",
-        name: "Updated",
-        preview: null,
+        id: "conversation_updated",
+        title: "Updated",
         cwd: "/workspace/repo-a",
         createdAt: 10,
         updatedAt: 50,
       },
     ];
-    const rows = projectCodexThreadNavigatorRows({
-      activeThreadId: null,
-      activeThread: null,
-      availableThreads: threads,
-      originalThreadId: null,
-      pendingThreadId: null,
-      pendingServerRequestThreadIds: [],
+    const rows = projectRuntimeConversationNavigatorRows({
+      activeConversationId: null,
+      activeConversation: null,
+      availableConversations: conversations,
+      originalConversationId: null,
+      pendingConversationId: null,
+      pendingServerRequestConversationIds: [],
     });
 
     expect(rows.map((row) => ({ id: row.id, lastActivityAt: row.lastActivityAt }))).toEqual([
       {
-        id: "thread_created_recently",
+        id: "conversation_created_recently",
         lastActivityAt: 70,
       },
       {
-        id: "thread_updated",
+        id: "conversation_updated",
         lastActivityAt: 50,
       },
     ]);
-    expect(resolveDefaultCodexThreadId({ availableThreads: threads })).toBe(
-      "thread_created_recently",
+    expect(resolveDefaultRuntimeConversationId({ availableConversations: conversations })).toBe(
+      "conversation_created_recently",
     );
   });
 });

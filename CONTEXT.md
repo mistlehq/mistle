@@ -76,6 +76,10 @@ _Avoid_: Bare thread, bare session
 The **Runtime conversation** currently selected for the chat pane within a **Sandbox session**.
 _Avoid_: Active thread when speaking across providers
 
+**Runtime conversation navigator**:
+The **Session workbench** side panel for listing, selecting, and starting **Runtime conversations**.
+_Avoid_: Thread navigator when speaking across providers
+
 **Billing customer**:
 The external billing-provider customer associated with a Mistle organization.
 _Avoid_: Billing org
@@ -91,6 +95,10 @@ _Avoid_: Chat session when referring to runtime tools or sandbox state
 **Codex thread**:
 A Codex **Runtime conversation**.
 _Avoid_: Session, chat tab
+
+**OpenCode session**:
+An OpenCode **Runtime conversation**.
+_Avoid_: OpenCode thread, sandbox session
 
 **Pi conversation**:
 A Pi **Runtime conversation**.
@@ -183,6 +191,7 @@ _Avoid_: Local queued prompt, deferred start turn
 - A Mistle organization may have one **Billing customer** per billing provider.
 - A Jira Cloud connection has one **Jira site name**.
 - A **Sandbox session** may contain multiple **Codex threads**.
+- A **Sandbox session** may contain multiple **OpenCode sessions** when its **Agent runtime** is OpenCode.
 - A **Sandbox session** may contain **Pi conversations** when its **Agent runtime** is Pi.
 - A **Pi conversation** should remain the selected chat object when the user switches between chat and the Pi CLI.
 - A **Session workbench** URL may identify a **Pi conversation** without making the conversation a separate session.
@@ -216,7 +225,7 @@ _Avoid_: Local queued prompt, deferred start turn
 - In Mistle's composer, the default marker for Pi model options means the model is the current **Pi active model selection**.
 - **Pi active model selection** should not change while the **Pi conversation** has a **Working agent turn**.
 - Pi thinking controls are separate from **Pi active model selection** and should not be represented as Codex reasoning effort.
-- A **Session workbench** keeps sandbox-scoped tools stable while the **Active Codex thread** changes.
+- Opening the **Runtime conversation navigator** does not change the **Session bottom panel** state.
 - Opening **Codex thread** navigation does not change the **Session bottom panel** state.
 - A **Default Codex thread** is used only when the **Session workbench** has no explicit **Active Codex thread** request.
 - The **Original Codex thread** and **Default Codex thread** may be different **Codex threads**.
@@ -246,6 +255,15 @@ _Avoid_: Local queued prompt, deferred start turn
 - User-initiated **Active runtime conversation** changes are navigable history within the **Session workbench**.
 - User-initiated **Active runtime conversation** URL changes represent confirmed active-conversation changes.
 - After a user selects or starts a **Runtime conversation**, the **Session workbench** URL keeps the confirmed `conversationId` explicit, including when the selected conversation is the one selected by default.
+- Starting a new **Runtime conversation** creates the provider-owned conversation object before the **Session workbench** URL changes to its `conversationId`.
+- A **Runtime conversation navigator** uses provider-neutral product language while preserving provider-owned object names in source-specific code and metadata.
+- A **Runtime conversation navigator** is labeled as conversations in shared user-facing workbench controls.
+- The default **Runtime conversation navigator** scope is the selected primary repository path when one is selected.
+- First-pass **Runtime conversation** navigation is ordered by recent conversation activity unless the user chooses another view.
+- First-pass **Runtime conversation** navigation is flat even when a provider exposes parent-child conversation relationships.
+- A repository-scoped **Runtime conversation navigator** may be empty while the chat pane still shows an **Active runtime conversation** from another path.
+- When the **Active runtime conversation** is outside the **Runtime conversation navigator** scope, the UI should make the path mismatch visible.
+- Approval requests for non-active **Runtime conversations** may be indicated in navigation when the request has explicit runtime-conversation attribution, but responses happen only after the conversation becomes the **Active runtime conversation**.
 - First-pass **Codex thread** navigation does not make **Codex threads** durable Mistle records.
 - **Codex thread** navigation is ordered by recent thread activity unless the user chooses another view.
 - A loaded **Codex thread** is runtime metadata for navigation, not a separate product category.

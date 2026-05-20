@@ -2,21 +2,26 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 
 import { withDashboardWorkspaceStory } from "../../../storybook/decorators.js";
-import { createCodexThreadNavigatorStoryProps } from "./codex-thread-navigator-story-support.js";
-import { CodexThreadNavigator, CodexThreadNavigatorSheet } from "./codex-thread-navigator.js";
+import { createRuntimeConversationNavigatorStoryProps } from "./runtime-conversation-navigator-story-support.js";
+import {
+  RuntimeConversationNavigator,
+  RuntimeConversationNavigatorSheet,
+} from "./runtime-conversation-navigator.js";
 
 function NavigatorRailStory(): React.JSX.Element {
   return (
     <div className="h-screen bg-background">
-      <CodexThreadNavigator {...createCodexThreadNavigatorStoryProps()} />
+      <RuntimeConversationNavigator {...createRuntimeConversationNavigatorStoryProps()} />
     </div>
   );
 }
 
-function EmptyThreadListStory(): React.JSX.Element {
+function EmptyConversationListStory(): React.JSX.Element {
   return (
     <div className="h-screen bg-background">
-      <CodexThreadNavigator {...createCodexThreadNavigatorStoryProps({ rows: [] })} />
+      <RuntimeConversationNavigator
+        {...createRuntimeConversationNavigatorStoryProps({ rows: [] })}
+      />
     </div>
   );
 }
@@ -24,8 +29,8 @@ function EmptyThreadListStory(): React.JSX.Element {
 function LimitedToLatest20Story(): React.JSX.Element {
   return (
     <div className="h-screen bg-background">
-      <CodexThreadNavigator
-        {...createCodexThreadNavigatorStoryProps({ isThreadListLimited: true })}
+      <RuntimeConversationNavigator
+        {...createRuntimeConversationNavigatorStoryProps({ isConversationListLimited: true })}
       />
     </div>
   );
@@ -36,9 +41,9 @@ function MobileSheetStory(): React.JSX.Element {
 
   return (
     <div className="h-screen bg-background">
-      <CodexThreadNavigatorSheet
+      <RuntimeConversationNavigatorSheet
         isOpen={isOpen}
-        navigator={createCodexThreadNavigatorStoryProps()}
+        navigator={createRuntimeConversationNavigatorStoryProps()}
         onOpenChange={setOpen}
       />
     </div>
@@ -46,14 +51,14 @@ function MobileSheetStory(): React.JSX.Element {
 }
 
 const meta = {
-  title: "Dashboard/Sessions/SessionWorkbench/CodexThreadNavigator",
-  component: CodexThreadNavigator,
+  title: "Dashboard/Sessions/SessionWorkbench/RuntimeConversationNavigator",
+  component: RuntimeConversationNavigator,
   parameters: {
     layout: "fullscreen",
   },
-  args: createCodexThreadNavigatorStoryProps(),
+  args: createRuntimeConversationNavigatorStoryProps(),
   decorators: [withDashboardWorkspaceStory],
-} satisfies Meta<typeof CodexThreadNavigator>;
+} satisfies Meta<typeof RuntimeConversationNavigator>;
 
 export default meta;
 
@@ -63,8 +68,8 @@ export const DesktopRail: Story = {
   render: () => <NavigatorRailStory />,
 };
 
-export const EmptyThreadList: Story = {
-  render: () => <EmptyThreadListStory />,
+export const EmptyConversationList: Story = {
+  render: () => <EmptyConversationListStory />,
 };
 
 export const LimitedToLatest20: Story = {

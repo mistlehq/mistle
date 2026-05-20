@@ -5,6 +5,10 @@ import { formatCodexContextUsage } from "../session-agents/codex/session-state/c
 import type { UseCodexSessionStateResult } from "../session-agents/codex/session-state/index.js";
 import type { UseOpenCodeSessionStateResult } from "../session-agents/opencode/session-state/index.js";
 import type { UsePiSessionStateResult } from "../session-agents/pi/session-state/index.js";
+import type {
+  RuntimeConversationNavigatorState,
+  RuntimeConversationSummary,
+} from "../session-agents/runtime-conversations/runtime-conversation-navigator-model.js";
 import {
   useCodexWorkbenchComposerState,
   useOpenCodeWorkbenchComposerState,
@@ -37,19 +41,7 @@ import type { SessionWorkbenchTransportManager } from "./use-session-workbench-t
 export type SessionConversationPaneState = SessionWorkbenchRuntimeAdapter["conversation"] & {
   composerStateInput: SessionComposerStateInput;
   serverRequestsState: SessionWorkbenchRuntimeAdapter["serverRequestsState"];
-  codexThreadNavigator: {
-    activeThreadCwd: string | null;
-    activeThreadId: string | null;
-    providerThreadId: string | null;
-    availableThreads: UseCodexSessionStateResult["threads"]["availableThreads"];
-    hasMoreAvailableThreads: boolean;
-    originalThreadId: string | null;
-    pendingThreadId: string | null;
-    isStartingNewThread: boolean;
-    refreshThreadList: () => void;
-    resumeThread: (threadId: string) => Promise<string>;
-    startNewThread: (input?: { cwd?: string }) => Promise<string>;
-  } | null;
+  runtimeConversationNavigator: RuntimeConversationNavigatorState | null;
 };
 
 type SessionWorkbenchConversationRuntimeState = {
@@ -57,6 +49,48 @@ type SessionWorkbenchConversationRuntimeState = {
   cliTerminalContentInset: SessionTerminalContentInset;
   conversationPane: SessionConversationPaneState;
 };
+
+function resolveCodexConversationTitle(
+  thread: UseCodexSessionStateResult["threads"]["availableThreads"][number],
+): string {
+  if (thread.name !== null && thread.name.trim().length > 0) {
+    return thread.name.trim();
+  }
+
+  const previewTitle = thread.preview
+    ?.split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.length > 0);
+  if (previewTitle !== undefined) {
+    return previewTitle;
+  }
+
+  return "Untitled conversation";
+}
+
+function mapCodexThreadToRuntimeConversationSummary(
+  thread: UseCodexSessionStateResult["threads"]["availableThreads"][number],
+): RuntimeConversationSummary {
+  return {
+    id: thread.id,
+    title: resolveCodexConversationTitle(thread),
+    cwd: thread.cwd,
+    createdAt: thread.createdAt,
+    updatedAt: thread.updatedAt,
+  };
+}
+
+function mapOpenCodeSessionToRuntimeConversationSummary(
+  session: UseOpenCodeSessionStateResult["sessions"]["availableSessions"][number],
+): RuntimeConversationSummary {
+  return {
+    id: session.id,
+    title: session.title,
+    cwd: session.directory,
+    createdAt: session.time.created,
+    updatedAt: session.time.updated,
+  };
+}
 
 export function useSessionWorkbenchConversationRuntime(input: {
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
@@ -315,21 +349,58 @@ export function useSessionWorkbenchConversationRuntime(input: {
         attachmentControl,
         repositoryStatus: input.repositoryStatus,
       },
-      codexThreadNavigator:
-        input.isOpenCodeRuntime || input.isPiRuntime
-          ? null
+      runtimeConversationNavigator: input.isPiRuntime
+        ? null
+        : input.isOpenCodeRuntime
+          ? {
+              activeConversationCwd: openCodeSessionState.sessions.activeSessionDirectory,
+              activeConversationId: openCodeSessionState.sessions.activeSessionId,
+              providerConversationId: null,
+              availableConversations: openCodeSessionState.sessions.availableSessions.map(
+                mapOpenCodeSessionToRuntimeConversationSummary,
+              ),
+              hasMoreAvailableConversations: openCodeSessionState.sessions.hasMoreAvailableSessions,
+              originalConversationId: null,
+              pendingConversationId: openCodeSessionState.sessions.pendingSessionId,
+              isStartingNewConversation: openCodeSessionState.sessions.isStartingNewSession,
+              refreshConversationList: async (refreshInput) => {
+                const sessions = await openCodeSessionState.sessions.refreshSessionList(
+                  refreshInput?.cwd === undefined ? {} : { directory: refreshInput.cwd },
+                );
+                return sessions.map(mapOpenCodeSessionToRuntimeConversationSummary);
+              },
+              resumeConversation: async (conversationId, resumeInput) =>
+                await openCodeSessionState.sessions.resumeSession(conversationId, {
+                  ...(resumeInput?.cwd === undefined ? {} : { directory: resumeInput.cwd }),
+                }),
+              startNewConversation: async (startInput) =>
+                await openCodeSessionState.sessions.startNewSession({
+                  ...(startInput?.cwd === undefined ? {} : { directory: startInput.cwd }),
+                }),
+            }
           : {
-              activeThreadCwd: sessionState.lifecycle.sessionSnapshot?.activeThreadCwd ?? null,
-              activeThreadId: sessionState.lifecycle.sessionSnapshot?.activeThreadId ?? null,
-              providerThreadId: sessionState.lifecycle.sessionSnapshot?.providerThreadId ?? null,
-              availableThreads: sessionState.threads.availableThreads,
-              hasMoreAvailableThreads: sessionState.threads.hasMoreAvailableThreads,
-              originalThreadId: sessionState.threads.originalThreadId,
-              pendingThreadId: sessionState.threads.pendingThreadId,
-              isStartingNewThread: sessionState.threads.isStartingNewThread,
-              refreshThreadList: sessionState.threads.refreshThreadList,
-              resumeThread: sessionState.threads.resumeThread,
-              startNewThread: sessionState.threads.startNewThread,
+              activeConversationCwd:
+                sessionState.lifecycle.sessionSnapshot?.activeThreadCwd ?? null,
+              activeConversationId: sessionState.lifecycle.sessionSnapshot?.activeThreadId ?? null,
+              providerConversationId:
+                sessionState.lifecycle.sessionSnapshot?.providerThreadId ?? null,
+              availableConversations: sessionState.threads.availableThreads.map(
+                mapCodexThreadToRuntimeConversationSummary,
+              ),
+              hasMoreAvailableConversations: sessionState.threads.hasMoreAvailableThreads,
+              originalConversationId: sessionState.threads.originalThreadId,
+              pendingConversationId: sessionState.threads.pendingThreadId,
+              isStartingNewConversation: sessionState.threads.isStartingNewThread,
+              refreshConversationList: () => {
+                sessionState.threads.refreshThreadList();
+                return Promise.resolve(
+                  sessionState.threads.availableThreads.map(
+                    mapCodexThreadToRuntimeConversationSummary,
+                  ),
+                );
+              },
+              resumeConversation: sessionState.threads.resumeThread,
+              startNewConversation: sessionState.threads.startNewThread,
             },
       serverRequestsState: activeRuntime.serverRequestsState,
     },

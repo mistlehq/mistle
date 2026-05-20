@@ -278,13 +278,13 @@ export function SessionWorkbenchStoryHeaderActions(
       status={createStoryHeaderStatus(headerStatusUi)}
       {...(input.showThreadNavigatorControl === true
         ? {
-            threadControl: {
-              ariaLabel: "Show threads",
+            conversationControl: {
+              ariaLabel: "Show conversations",
               className: getStoryHeaderButtonClassName(isThreadNavigatorVisible),
               disabled: false,
               onClick: handleThreadNavigatorToggle,
               pressed: isThreadNavigatorVisible,
-              title: "Show threads",
+              title: "Show conversations",
             },
           }
         : {})}

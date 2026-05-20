@@ -12,55 +12,59 @@ import { ArrowClockwiseIcon, PlusIcon, XIcon } from "@phosphor-icons/react";
 
 import { formatCompactRelativeOrDate, formatDateTime } from "../../shared/date-formatters.js";
 import { useDelayedMinimumVisibleFlag } from "../../shared/use-delayed-minimum-visible-flag.js";
-import type { CodexThreadNavigatorRow } from "./codex-thread-navigator-model.js";
+import type { RuntimeConversationNavigatorRow } from "./runtime-conversation-navigator-model.js";
 
-const ThreadOpeningIndicatorShowDelayMs = 120;
-const ThreadOpeningIndicatorMinimumVisibleMs = 360;
+const ConversationOpeningIndicatorShowDelayMs = 120;
+const ConversationOpeningIndicatorMinimumVisibleMs = 360;
 
-export type CodexThreadNavigatorProps = {
-  rows: readonly CodexThreadNavigatorRow[];
-  isThreadListLimited: boolean;
-  isStartingThread: boolean;
-  onRefreshThreads: () => void;
-  onSelectThread: (threadId: string) => void;
-  onStartThread: () => void;
+export type RuntimeConversationNavigatorProps = {
+  rows: readonly RuntimeConversationNavigatorRow[];
+  isConversationListLimited: boolean;
+  isStartingConversation: boolean;
+  onRefreshConversations: () => void;
+  onSelectConversation: (conversationId: string) => void;
+  onStartConversation: () => void;
 };
 
-export function CodexThreadNavigator(input: CodexThreadNavigatorProps): React.JSX.Element {
+export function RuntimeConversationNavigator(
+  input: RuntimeConversationNavigatorProps,
+): React.JSX.Element {
   return (
     <aside
-      aria-label="Threads"
+      aria-label="Conversations"
       className="bg-background/98 hidden h-full min-h-0 w-64 shrink-0 flex-col border-r md:flex"
     >
-      <CodexThreadNavigatorContent {...input} showHeader />
+      <RuntimeConversationNavigatorContent {...input} showHeader />
     </aside>
   );
 }
 
-export function CodexThreadNavigatorPanel(input: CodexThreadNavigatorProps): React.JSX.Element {
+export function RuntimeConversationNavigatorPanel(
+  input: RuntimeConversationNavigatorProps,
+): React.JSX.Element {
   return (
-    <section aria-label="Threads" className="bg-background h-full min-h-0">
-      <CodexThreadNavigatorContent {...input} showHeader />
+    <section aria-label="Conversations" className="bg-background h-full min-h-0">
+      <RuntimeConversationNavigatorContent {...input} showHeader />
     </section>
   );
 }
 
-export function CodexThreadNavigatorSheet(input: {
+export function RuntimeConversationNavigatorSheet(input: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  navigator: CodexThreadNavigatorProps;
+  navigator: RuntimeConversationNavigatorProps;
 }): React.JSX.Element {
   const sheetNavigator = {
     ...input.navigator,
-    onSelectThread(threadId: string): void {
+    onSelectConversation(conversationId: string): void {
       input.onOpenChange(false);
-      input.navigator.onSelectThread(threadId);
+      input.navigator.onSelectConversation(conversationId);
     },
-    onStartThread(): void {
+    onStartConversation(): void {
       input.onOpenChange(false);
-      input.navigator.onStartThread();
+      input.navigator.onStartConversation();
     },
-  } satisfies CodexThreadNavigatorProps;
+  } satisfies RuntimeConversationNavigatorProps;
 
   return (
     <Sheet onOpenChange={input.onOpenChange} open={input.isOpen}>
@@ -71,15 +75,15 @@ export function CodexThreadNavigatorSheet(input: {
       >
         <SheetHeader className="shrink-0 border-b px-4 py-3 text-left">
           <div className="flex min-w-0 items-center gap-2">
-            <SheetTitle className="min-w-0 shrink truncate">Threads</SheetTitle>
-            <CodexThreadNavigatorActions {...sheetNavigator} />
+            <SheetTitle className="min-w-0 shrink truncate">Conversations</SheetTitle>
+            <RuntimeConversationNavigatorActions {...sheetNavigator} />
             <SheetClose
               render={
                 <Button
-                  aria-label="Close threads"
+                  aria-label="Close conversations"
                   className="ml-auto"
                   size="icon-sm"
-                  title="Close threads"
+                  title="Close conversations"
                   type="button"
                   variant="ghost"
                 />
@@ -89,14 +93,14 @@ export function CodexThreadNavigatorSheet(input: {
             </SheetClose>
           </div>
         </SheetHeader>
-        <CodexThreadNavigatorContent {...sheetNavigator} showHeader={false} />
+        <RuntimeConversationNavigatorContent {...sheetNavigator} showHeader={false} />
       </SheetContent>
     </Sheet>
   );
 }
 
-function CodexThreadNavigatorContent(
-  input: CodexThreadNavigatorProps & {
+function RuntimeConversationNavigatorContent(
+  input: RuntimeConversationNavigatorProps & {
     showHeader: boolean;
   },
 ): React.JSX.Element {
@@ -105,10 +109,10 @@ function CodexThreadNavigatorContent(
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {input.showHeader ? <CodexThreadNavigatorHeader {...input} /> : null}
+      {input.showHeader ? <RuntimeConversationNavigatorHeader {...input} /> : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-        {input.showHeader || !input.isThreadListLimited ? null : (
+        {input.showHeader || !input.isConversationListLimited ? null : (
           <div className="text-muted-foreground px-2 pb-2 text-xs">Showing latest 20 only</div>
         )}
         {hasRows ? (
@@ -122,9 +126,9 @@ function CodexThreadNavigatorContent(
                 )}
                 <div className="space-y-1">
                   {section.rows.map((row) => (
-                    <CodexThreadNavigatorRowView
+                    <RuntimeConversationNavigatorRowView
                       key={`${row.isPinnedCurrent ? "pinned:" : ""}${row.id}`}
-                      onSelectThread={input.onSelectThread}
+                      onSelectConversation={input.onSelectConversation}
                       row={row}
                     />
                   ))}
@@ -134,7 +138,7 @@ function CodexThreadNavigatorContent(
           </div>
         ) : (
           <div className="px-2 py-8 text-center">
-            <p className="text-muted-foreground text-sm">No threads.</p>
+            <p className="text-muted-foreground text-sm">No conversations.</p>
           </div>
         )}
       </div>
@@ -142,39 +146,43 @@ function CodexThreadNavigatorContent(
   );
 }
 
-function CodexThreadNavigatorHeader(input: CodexThreadNavigatorProps): React.JSX.Element {
+function RuntimeConversationNavigatorHeader(
+  input: RuntimeConversationNavigatorProps,
+): React.JSX.Element {
   return (
     <div className="flex shrink-0 items-center justify-between border-b px-3 py-2">
       <div className="min-w-0">
-        <h2 className="font-medium text-sm">Threads</h2>
-        {input.isThreadListLimited ? (
+        <h2 className="font-medium text-sm">Conversations</h2>
+        {input.isConversationListLimited ? (
           <div className="text-muted-foreground text-xs">Showing latest 20 only</div>
         ) : null}
       </div>
-      <CodexThreadNavigatorActions {...input} />
+      <RuntimeConversationNavigatorActions {...input} />
     </div>
   );
 }
 
-function CodexThreadNavigatorActions(input: CodexThreadNavigatorProps): React.JSX.Element {
+function RuntimeConversationNavigatorActions(
+  input: RuntimeConversationNavigatorProps,
+): React.JSX.Element {
   return (
     <div className="flex items-center gap-1">
       <Button
-        aria-label="Refresh threads"
-        onClick={input.onRefreshThreads}
+        aria-label="Refresh conversations"
+        onClick={input.onRefreshConversations}
         size="icon-sm"
-        title="Refresh threads"
+        title="Refresh conversations"
         type="button"
         variant="ghost"
       >
         <ArrowClockwiseIcon aria-hidden className="size-4" />
       </Button>
       <Button
-        aria-label="New thread"
-        disabled={input.isStartingThread}
-        onClick={input.onStartThread}
+        aria-label="New conversation"
+        disabled={input.isStartingConversation}
+        onClick={input.onStartConversation}
         size="icon-sm"
-        title="New thread"
+        title="New conversation"
         type="button"
         variant="ghost"
       >
@@ -184,17 +192,17 @@ function CodexThreadNavigatorActions(input: CodexThreadNavigatorProps): React.JS
   );
 }
 
-function groupRowsByCwd(rows: readonly CodexThreadNavigatorRow[]): readonly {
+function groupRowsByCwd(rows: readonly RuntimeConversationNavigatorRow[]): readonly {
   accessibleLabel: string;
   key: string;
   visibleLabel: string | null;
-  rows: readonly CodexThreadNavigatorRow[];
+  rows: readonly RuntimeConversationNavigatorRow[];
 }[] {
   const sections: {
     accessibleLabel: string;
     key: string;
     visibleLabel: string | null;
-    rows: CodexThreadNavigatorRow[];
+    rows: RuntimeConversationNavigatorRow[];
   }[] = [];
   const sectionsByCwd = new Map<string, (typeof sections)[number]>();
 
@@ -228,16 +236,16 @@ function groupRowsByCwd(rows: readonly CodexThreadNavigatorRow[]): readonly {
   return sections;
 }
 
-function CodexThreadNavigatorRowView(input: {
-  row: CodexThreadNavigatorRow;
-  onSelectThread: (threadId: string) => void;
+function RuntimeConversationNavigatorRowView(input: {
+  row: RuntimeConversationNavigatorRow;
+  onSelectConversation: (conversationId: string) => void;
 }): React.JSX.Element {
   const row = input.row;
-  const activity = resolveThreadActivityDisplay(row.lastActivityAt);
+  const activity = resolveConversationActivityDisplay(row.lastActivityAt);
   const showOpeningIndicator = useDelayedMinimumVisibleFlag({
     active: row.isOpening,
-    minimumVisibleMs: ThreadOpeningIndicatorMinimumVisibleMs,
-    showDelayMs: ThreadOpeningIndicatorShowDelayMs,
+    minimumVisibleMs: ConversationOpeningIndicatorMinimumVisibleMs,
+    showDelayMs: ConversationOpeningIndicatorShowDelayMs,
   });
 
   return (
@@ -249,7 +257,7 @@ function CodexThreadNavigatorRowView(input: {
           : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
       }`}
       disabled={row.isOpening || showOpeningIndicator}
-      onClick={() => input.onSelectThread(row.id)}
+      onClick={() => input.onSelectConversation(row.id)}
       title={row.cwd}
       type="button"
     >
@@ -270,7 +278,7 @@ function CodexThreadNavigatorRowView(input: {
                   (original)
                 </span>
               ) : null}
-              <CodexThreadNavigatorRowIndicator
+              <RuntimeConversationNavigatorRowIndicator
                 pendingServerRequestCount={row.pendingServerRequestCount}
                 showOpeningIndicator={showOpeningIndicator}
               />
@@ -290,12 +298,12 @@ function CodexThreadNavigatorRowView(input: {
   );
 }
 
-function CodexThreadNavigatorRowIndicator(input: {
+function RuntimeConversationNavigatorRowIndicator(input: {
   pendingServerRequestCount: number;
   showOpeningIndicator: boolean;
 }): React.JSX.Element | null {
   if (input.showOpeningIndicator) {
-    return <Spinner aria-label="Opening thread" className="size-3.5 shrink-0" />;
+    return <Spinner aria-label="Opening conversation" className="size-3.5 shrink-0" />;
   }
 
   if (input.pendingServerRequestCount > 0) {
@@ -311,7 +319,7 @@ function CodexThreadNavigatorRowIndicator(input: {
   return null;
 }
 
-function resolveThreadActivityDisplay(
+function resolveConversationActivityDisplay(
   lastActivityAt: number | null,
 ): { label: string; title: string } | null {
   if (lastActivityAt === null) {

@@ -67,14 +67,14 @@ export function SessionWorkbenchHeaderActions(input: {
   cliControl: SessionWorkbenchHeaderButtonControl;
   diffControl: SessionWorkbenchHeaderButtonControl;
   mobilePortAccessControl?: SessionWorkbenchHeaderMobileSurfaceControl;
-  mobileThreadNavigatorControl?: SessionWorkbenchHeaderMobileSurfaceControl;
+  mobileConversationNavigatorControl?: SessionWorkbenchHeaderMobileSurfaceControl;
   portAccessControl?: React.ReactNode;
   repositoryControl?: SessionWorkbenchHeaderRepositoryControl;
   status: {
     kind: "connected" | "error" | "not_connected";
     label: string;
   };
-  threadControl?: SessionWorkbenchHeaderButtonControl;
+  conversationControl?: SessionWorkbenchHeaderButtonControl;
   terminalControl: SessionWorkbenchHeaderButtonControl;
 }): React.JSX.Element {
   const isMobileHeaderLayout = useIsMobileHeaderLayout();
@@ -83,9 +83,9 @@ export function SessionWorkbenchHeaderActions(input: {
     isMobileHeaderLayout && input.mobilePortAccessControl !== undefined
       ? input.mobilePortAccessControl
       : null;
-  const mobileThreadNavigatorControl =
-    isMobileHeaderLayout && input.mobileThreadNavigatorControl !== undefined
-      ? input.mobileThreadNavigatorControl
+  const mobileConversationNavigatorControl =
+    isMobileHeaderLayout && input.mobileConversationNavigatorControl !== undefined
+      ? input.mobileConversationNavigatorControl
       : null;
   const [isMoreActionsOpen, setMoreActionsOpen] = useState(false);
   const repositoryControl = input.repositoryControl;
@@ -194,8 +194,8 @@ export function SessionWorkbenchHeaderActions(input: {
         >
           <span className="text-sm font-medium">TUI</span>
         </Button>
-        {input.threadControl === undefined ? null : (
-          <HeaderIconButton control={input.threadControl}>
+        {input.conversationControl === undefined ? null : (
+          <HeaderIconButton control={input.conversationControl}>
             <ListBulletsIcon className="size-4" />
           </HeaderIconButton>
         )}
@@ -227,23 +227,24 @@ export function SessionWorkbenchHeaderActions(input: {
             <HeaderMenuItem control={input.cliControl} label="TUI">
               <IntegrationLogo alt="" className="size-4" logoKey="openai" />
             </HeaderMenuItem>
-            {mobileThreadNavigatorControl === null && input.threadControl !== undefined ? (
-              <HeaderMenuItem control={input.threadControl} label="Threads">
+            {mobileConversationNavigatorControl === null &&
+            input.conversationControl !== undefined ? (
+              <HeaderMenuItem control={input.conversationControl} label="Conversations">
                 <ListBulletsIcon className="size-4" />
               </HeaderMenuItem>
             ) : null}
-            {mobileThreadNavigatorControl === null ? null : (
+            {mobileConversationNavigatorControl === null ? null : (
               <DropdownMenuItem
-                aria-label="Threads"
-                disabled={mobileThreadNavigatorControl.disabled}
+                aria-label="Conversations"
+                disabled={mobileConversationNavigatorControl.disabled}
                 onClick={() => {
                   setMoreActionsOpen(false);
-                  mobileThreadNavigatorControl.onOpen();
+                  mobileConversationNavigatorControl.onOpen();
                 }}
-                title={mobileThreadNavigatorControl.title}
+                title={mobileConversationNavigatorControl.title}
               >
                 <ListBulletsIcon className="size-4" />
-                <span className="truncate">Threads</span>
+                <span className="truncate">Conversations</span>
               </DropdownMenuItem>
             )}
             <HeaderMenuItem control={input.diffControl} label="Changes">
@@ -269,7 +270,7 @@ export function SessionWorkbenchHeaderActions(input: {
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-      {mobileThreadNavigatorControl?.surface}
+      {mobileConversationNavigatorControl?.surface}
       {mobilePortAccessControl?.surface}
     </div>
   );

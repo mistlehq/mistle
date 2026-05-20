@@ -396,6 +396,7 @@ function closeTransport(transport: SandboxSessionTransport): void {
 
 async function connectOpenCodeSessionForTest(input: {
   initialCwd?: string;
+  listSessionsBody?: readonly ReturnType<typeof createSessionResponse>[];
   result: { current: ReturnType<typeof useOpenCodeSessionState> };
   sandboxInstanceId: string;
   server: OpenCodeProxyTransportServer;
@@ -434,6 +435,20 @@ async function connectOpenCodeSessionForTest(input: {
   input.server.sendJsonResponse({
     request: providersRequest,
     body: createOpenCodeProviderCatalogResponse(),
+  });
+
+  const listSessionsRequest = await input.server.nextRequest();
+  const listSessionsPath =
+    input.initialCwd === undefined
+      ? "/session?limit=21"
+      : `/session?directory=${encodeURIComponent(input.initialCwd)}&limit=21`;
+  expect(listSessionsRequest.request).toMatchObject({
+    method: "GET",
+    path: listSessionsPath,
+  });
+  input.server.sendJsonResponse({
+    request: listSessionsRequest,
+    body: input.listSessionsBody ?? [],
   });
 
   const getSessionRequest = await input.server.nextRequest();
@@ -531,6 +546,9 @@ describe("useOpenCodeSessionState", () => {
     const disconnectSession = result.current.lifecycle.disconnectSession;
     const recoverSession = result.current.lifecycle.recoverSession;
     const refreshModelCatalog = result.current.lifecycle.refreshModelCatalog;
+    const refreshSessionList = result.current.sessions.refreshSessionList;
+    const resumeSession = result.current.sessions.resumeSession;
+    const startNewSession = result.current.sessions.startNewSession;
 
     rerender();
 
@@ -539,6 +557,9 @@ describe("useOpenCodeSessionState", () => {
     expect(result.current.lifecycle.disconnectSession).toBe(disconnectSession);
     expect(result.current.lifecycle.recoverSession).toBe(recoverSession);
     expect(result.current.lifecycle.refreshModelCatalog).toBe(refreshModelCatalog);
+    expect(result.current.sessions.refreshSessionList).toBe(refreshSessionList);
+    expect(result.current.sessions.resumeSession).toBe(resumeSession);
+    expect(result.current.sessions.startNewSession).toBe(startNewSession);
   });
 
   it("does not keep a connected session snapshot after hydration fails", async () => {
@@ -975,6 +996,16 @@ describe("useOpenCodeSessionState", () => {
     server.sendJsonResponse({
       request: providersRequest,
       body: createOpenCodeProviderCatalogResponse(),
+    });
+
+    const listSessionsRequest = await server.nextRequest();
+    expect(listSessionsRequest.request).toMatchObject({
+      method: "GET",
+      path: "/session?directory=%2Fworkspace%2Frepo&limit=21",
+    });
+    server.sendJsonResponse({
+      request: listSessionsRequest,
+      body: [],
     });
 
     const getSessionRequest = await server.nextRequest();

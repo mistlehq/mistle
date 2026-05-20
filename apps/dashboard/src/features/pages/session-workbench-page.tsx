@@ -4,9 +4,9 @@ import { useParams, useSearchParams } from "react-router";
 
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
 import {
-  CodexThreadNavigatorPanel,
-  CodexThreadNavigatorSheet,
-} from "../session-agents/codex/codex-thread-navigator.js";
+  RuntimeConversationNavigatorPanel,
+  RuntimeConversationNavigatorSheet,
+} from "../session-agents/runtime-conversations/runtime-conversation-navigator.js";
 import { SessionHeaderTitle } from "../sessions/session-header-title.js";
 import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
 import { shouldRenderSidebarTrigger } from "../shared/sidebar-trigger-visibility.js";
@@ -42,7 +42,7 @@ import {
 } from "./session-workbench-page-view.js";
 import { SessionRepositoryNoneValue } from "./use-session-primary-repository-state.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
-import { useSessionWorkbenchThreadNavigation } from "./use-session-workbench-thread-navigation.js";
+import { useSessionWorkbenchRuntimeConversationNavigation } from "./use-session-workbench-runtime-conversation-navigation.js";
 
 export function SessionWorkbenchPage(): React.JSX.Element {
   const params = useParams();
@@ -75,7 +75,7 @@ function SessionWorkbenchPageContent(input: {
   const conversationScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const previousActiveConversationIdRef = useRef<string | null>(null);
   const [composerText, setComposerText] = useState("");
-  const [isMobileThreadNavigatorOpen, setMobileThreadNavigatorOpen] = useState(false);
+  const [isMobileConversationNavigatorOpen, setMobileConversationNavigatorOpen] = useState(false);
   const [pendingDiffComments, setPendingDiffComments] = useState<
     readonly PendingSessionDiffComment[]
   >([]);
@@ -141,8 +141,8 @@ function SessionWorkbenchPageContent(input: {
     workbench.primaryRepositoryState.errorMessage ??
     workbench.primaryRepositoryControlState.disabledReason;
   const primaryRepositoryPath = workbench.primaryRepositoryState.selectedRepositoryPath;
-  const threadNavigation = useSessionWorkbenchThreadNavigation({
-    codexThreadNavigator: conversationPane.codexThreadNavigator,
+  const conversationNavigation = useSessionWorkbenchRuntimeConversationNavigation({
+    runtimeConversationNavigator: conversationPane.runtimeConversationNavigator,
     closeDiffPanel: workbench.diffPanelState.closePanel,
     isDiffPanelVisible: workbench.diffPanelState.isVisible,
     pendingServerRequests: conversationPane.serverRequestsState.pendingServerRequests,
@@ -153,10 +153,10 @@ function SessionWorkbenchPageContent(input: {
     searchParams: input.searchParams,
     setSearchParams: input.setSearchParams,
   });
-  const closeThreadNavigatorPanel = threadNavigation.closePanel;
-  const isDiffPanelActive = threadNavigation.isDiffPanelActive;
-  const isThreadNavigatorPanelVisible = threadNavigation.isPanelVisible;
-  const toggleThreadNavigatorPanel = threadNavigation.togglePanel;
+  const closeConversationNavigatorPanel = conversationNavigation.closePanel;
+  const isDiffPanelActive = conversationNavigation.isDiffPanelActive;
+  const isConversationNavigatorPanelVisible = conversationNavigation.isPanelVisible;
+  const toggleConversationNavigatorPanel = conversationNavigation.togglePanel;
   const headerActions = useMemo(
     () => (
       <SessionWorkbenchHeaderActions
@@ -186,7 +186,7 @@ function SessionWorkbenchPageContent(input: {
             : "bg-transparent text-foreground shadow-none hover:bg-muted/60",
           disabled: isDiffOpenDisabled,
           onClick: () => {
-            closeThreadNavigatorPanel();
+            closeConversationNavigatorPanel();
             if (workbench.diffPanelState.isVisible) {
               workbench.diffPanelState.closePanel();
               return;
@@ -205,22 +205,22 @@ function SessionWorkbenchPageContent(input: {
           surface: <SessionPortAccessSheet state={workbench.portAccessState} />,
           title: workbench.portAccessState.buttonDisabledReason ?? "Show running processes",
         }}
-        {...(threadNavigation.threadNavigatorProps === null
+        {...(conversationNavigation.runtimeConversationNavigatorProps === null
           ? {}
           : {
-              mobileThreadNavigatorControl: {
+              mobileConversationNavigatorControl: {
                 disabled: false,
                 onOpen: () => {
-                  setMobileThreadNavigatorOpen(true);
+                  setMobileConversationNavigatorOpen(true);
                 },
                 surface: (
-                  <CodexThreadNavigatorSheet
-                    isOpen={isMobileThreadNavigatorOpen}
-                    navigator={threadNavigation.threadNavigatorProps}
-                    onOpenChange={setMobileThreadNavigatorOpen}
+                  <RuntimeConversationNavigatorSheet
+                    isOpen={isMobileConversationNavigatorOpen}
+                    navigator={conversationNavigation.runtimeConversationNavigatorProps}
+                    onOpenChange={setMobileConversationNavigatorOpen}
                   />
                 ),
-                title: "Show threads",
+                title: "Show conversations",
               },
             })}
         portAccessControl={<SessionPortAccessPopover state={workbench.portAccessState} />}
@@ -265,17 +265,17 @@ function SessionWorkbenchPageContent(input: {
           kind: headerStatusKind,
           label: headerStatusLabel,
         }}
-        {...(threadNavigation.threadNavigatorProps !== null
+        {...(conversationNavigation.runtimeConversationNavigatorProps !== null
           ? {
-              threadControl: {
-                ariaLabel: "Show threads",
-                className: isThreadNavigatorPanelVisible
+              conversationControl: {
+                ariaLabel: "Show conversations",
+                className: isConversationNavigatorPanelVisible
                   ? "bg-muted text-foreground shadow-none hover:bg-muted/80"
                   : "bg-transparent text-foreground shadow-none hover:bg-muted/60",
                 disabled: false,
-                onClick: toggleThreadNavigatorPanel,
-                pressed: isThreadNavigatorPanelVisible,
-                title: "Show threads",
+                onClick: toggleConversationNavigatorPanel,
+                pressed: isConversationNavigatorPanelVisible,
+                title: "Show conversations",
               },
             }
           : {})}
@@ -303,17 +303,17 @@ function SessionWorkbenchPageContent(input: {
       isTerminalOpenDisabled,
       isDiffOpenDisabled,
       cliButtonTitle,
-      closeThreadNavigatorPanel,
+      closeConversationNavigatorPanel,
       diffButtonTitle,
       headerStatusKind,
       headerStatusLabel,
       isDiffPanelActive,
-      isThreadNavigatorPanelVisible,
-      isMobileThreadNavigatorOpen,
-      toggleThreadNavigatorPanel,
+      isConversationNavigatorPanelVisible,
+      isMobileConversationNavigatorOpen,
+      toggleConversationNavigatorPanel,
       terminalButtonLabel,
       terminalButtonTitle,
-      threadNavigation.threadNavigatorProps,
+      conversationNavigation.runtimeConversationNavigatorProps,
       workbench.connectionReadiness.canConnect,
       workbench.diffPanelState.closePanel,
       workbench.diffPanelState.isVisible,
@@ -508,8 +508,8 @@ function SessionWorkbenchPageContent(input: {
           />
         }
         isBottomPanelVisible={workbench.terminalPanelState.isVisible}
-        isSecondaryPanelVisible={threadNavigation.secondaryPanelKind !== null}
-        {...(threadNavigation.secondaryPanelKind === "threads"
+        isSecondaryPanelVisible={conversationNavigation.secondaryPanelKind !== null}
+        {...(conversationNavigation.secondaryPanelKind === "conversations"
           ? { secondaryPanelDefaultSize: "20%" }
           : {})}
         secondaryPanelLayoutKey="right-panel"
@@ -575,9 +575,11 @@ function SessionWorkbenchPageContent(input: {
           ) : null
         }
         secondaryPanel={
-          threadNavigation.secondaryPanelKind === "threads" &&
-          threadNavigation.threadNavigatorProps !== null ? (
-            <CodexThreadNavigatorPanel {...threadNavigation.threadNavigatorProps} />
+          conversationNavigation.secondaryPanelKind === "conversations" &&
+          conversationNavigation.runtimeConversationNavigatorProps !== null ? (
+            <RuntimeConversationNavigatorPanel
+              {...conversationNavigation.runtimeConversationNavigatorProps}
+            />
           ) : (
             <SessionDiffPanel
               errorNotice={diffPanelErrorNotice}
