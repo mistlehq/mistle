@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   bigint,
+  boolean,
   check,
   foreignKey,
   primaryKey,
@@ -10,6 +11,7 @@ import {
   type PgSchema,
 } from "drizzle-orm/pg-core";
 
+import { apiKeys } from "./api-keys.js";
 import { integrationConnections } from "./integration-connections.js";
 import { controlPlaneSchema } from "./namespace.js";
 import { sandboxProfiles } from "./sandbox-profiles.js";
@@ -69,6 +71,8 @@ export function defineSandboxProfileVersions(schema: PgSchema) {
         .notNull()
         .$type<SandboxProfileVersionAgentRuntimeId>()
         .default(SandboxProfileVersionAgentRuntimeIds.CODEX),
+      mistleMcpEnabled: boolean("mistle_mcp_enabled").notNull().default(false),
+      mistleMcpApiKeyId: text("mistle_mcp_api_key_id"),
     },
     (table) => [
       primaryKey({
@@ -79,9 +83,18 @@ export function defineSandboxProfileVersions(schema: PgSchema) {
         columns: [table.sandboxConnectionId],
         foreignColumns: [integrationConnections.id],
       }).onDelete("restrict"),
+      foreignKey({
+        name: "sandbox_profile_versions_mistle_mcp_api_key_id_fkey",
+        columns: [table.mistleMcpApiKeyId],
+        foreignColumns: [apiKeys.id],
+      }).onDelete("restrict"),
       check(
         "sandbox_profile_versions_snapshot_image_handle_check",
         sql`(${table.snapshotImageProvider} is null and ${table.snapshotImageId} is null) or (${table.snapshotImageProvider} is not null and ${table.snapshotImageId} is not null)`,
+      ),
+      check(
+        "sandbox_profile_versions_mistle_mcp_api_key_required_check",
+        sql`${table.mistleMcpEnabled} = false or ${table.mistleMcpApiKeyId} is not null`,
       ),
       uniqueIndex("sandbox_profile_versions_one_draft_per_profile_uidx")
         .on(table.sandboxProfileId)

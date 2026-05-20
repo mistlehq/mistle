@@ -1,0 +1,4 @@
+ALTER TABLE "control_plane"."sandbox_profile_versions" ADD COLUMN "mistle_mcp_enabled" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "control_plane"."sandbox_profile_versions" ADD COLUMN "mistle_mcp_api_key_id" text;--> statement-breakpoint
+ALTER TABLE "control_plane"."sandbox_profile_versions" ADD CONSTRAINT "sandbox_profile_versions_mistle_mcp_api_key_id_fkey" FOREIGN KEY ("mistle_mcp_api_key_id") REFERENCES "control_plane"."api_keys"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "control_plane"."sandbox_profile_versions" ADD CONSTRAINT "sandbox_profile_versions_mistle_mcp_api_key_required_check" CHECK ("control_plane"."sandbox_profile_versions"."mistle_mcp_enabled" = false or "control_plane"."sandbox_profile_versions"."mistle_mcp_api_key_id" is not null);

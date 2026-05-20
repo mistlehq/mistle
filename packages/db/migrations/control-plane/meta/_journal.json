@@ -232,6 +232,13 @@
       "when": 1779073991773,
       "tag": "0032_rename-automation-to-trigger",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1779264808107,
+      "tag": "0033_add-sandbox-profile-version-mistle-mcp",
+      "breakpoints": true
     }
   ]
 }
