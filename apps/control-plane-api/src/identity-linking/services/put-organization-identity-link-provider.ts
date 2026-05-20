@@ -50,6 +50,7 @@ export async function putOrganizationIdentityLinkProvider(
 
   const existingConfig = await ctx.db.query.organizationIdentityLinkProviderConfigs.findFirst({
     columns: {
+      id: true,
       status: true,
     },
     where: (table, { and, eq }) =>
@@ -62,9 +63,11 @@ export async function putOrganizationIdentityLinkProvider(
   const nextStatus =
     existingConfig?.status ?? OrganizationIdentityLinkProviderConfigStatus.DISABLED;
 
-  await ctx.db
-    .insert(tables.organizationIdentityLinkProviderConfigs)
-    .values({
+  // Temporary compatibility for the legacy provider-family route. PR 3 moves writes to
+  // config-level routes, at which point this path should be removed or kept only as an
+  // exact-one legacy shim.
+  if (existingConfig === undefined) {
+    await ctx.db.insert(tables.organizationIdentityLinkProviderConfigs).values({
       organizationId: input.organizationId,
       providerFamily: provider.providerFamily,
       status: nextStatus,
@@ -72,20 +75,19 @@ export async function putOrganizationIdentityLinkProvider(
       integrationConnectionId: input.integrationConnectionId,
       createdByUserId: input.actorUserId,
       updatedByUserId: input.actorUserId,
-    })
-    .onConflictDoUpdate({
-      target: [
-        tables.organizationIdentityLinkProviderConfigs.organizationId,
-        tables.organizationIdentityLinkProviderConfigs.providerFamily,
-      ],
-      set: {
+    });
+  } else {
+    await ctx.db
+      .update(tables.organizationIdentityLinkProviderConfigs)
+      .set({
         status: nextStatus,
         integrationTargetKey: connection.targetKey,
         integrationConnectionId: input.integrationConnectionId,
         updatedByUserId: input.actorUserId,
         updatedAt: sql`now()`,
-      },
-    });
+      })
+      .where(sql`${tables.organizationIdentityLinkProviderConfigs.id} = ${existingConfig.id}`);
+  }
 
   const configuredProvider = (
     await listOrganizationIdentityLinkProviders(ctx, {

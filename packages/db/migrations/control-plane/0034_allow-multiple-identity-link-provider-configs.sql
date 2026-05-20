@@ -1,0 +1,9 @@
+DROP INDEX "control_plane"."org_identity_link_provider_cfgs_org_provider_uidx";--> statement-breakpoint
+DROP INDEX "control_plane"."user_external_principal_keys_active_uidx";--> statement-breakpoint
+DROP INDEX "control_plane"."user_external_principals_active_user_uidx";--> statement-breakpoint
+DROP INDEX "control_plane"."user_external_principals_active_subject_uidx";--> statement-breakpoint
+CREATE UNIQUE INDEX "org_identity_link_provider_cfgs_org_connection_uidx" ON "control_plane"."organization_identity_link_provider_configs" USING btree ("organization_id","integration_connection_id");--> statement-breakpoint
+CREATE INDEX "user_external_principals_org_provider_config_idx" ON "control_plane"."user_external_principals" USING btree ("organization_id","organization_provider_config_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "user_external_principal_keys_active_uidx" ON "control_plane"."user_external_principal_keys" USING btree ("organization_id","principal_id","key_type","key_value") WHERE "control_plane"."user_external_principal_keys"."status" = 'active';--> statement-breakpoint
+CREATE UNIQUE INDEX "user_external_principals_active_user_uidx" ON "control_plane"."user_external_principals" USING btree ("organization_id","organization_provider_config_id","user_id") WHERE "control_plane"."user_external_principals"."status" = 'active';--> statement-breakpoint
+CREATE UNIQUE INDEX "user_external_principals_active_subject_uidx" ON "control_plane"."user_external_principals" USING btree ("organization_id","organization_provider_config_id","provider_subject_id") WHERE "control_plane"."user_external_principals"."status" = 'active' and "control_plane"."user_external_principals"."provider_subject_id" is not null;

@@ -79,10 +79,10 @@ export function defineUserExternalPrincipals(schema: PgSchema) {
         ],
       }).onDelete("restrict"),
       uniqueIndex("user_external_principals_active_user_uidx")
-        .on(table.organizationId, table.providerFamily, table.userId)
+        .on(table.organizationId, table.organizationProviderConfigId, table.userId)
         .where(sql`${table.status} = 'active'`),
       uniqueIndex("user_external_principals_active_subject_uidx")
-        .on(table.organizationId, table.providerFamily, table.providerSubjectId)
+        .on(table.organizationId, table.organizationProviderConfigId, table.providerSubjectId)
         .where(sql`${table.status} = 'active' and ${table.providerSubjectId} is not null`),
       uniqueIndex("user_external_principals_org_provider_id_uidx").on(
         table.organizationId,
@@ -93,6 +93,10 @@ export function defineUserExternalPrincipals(schema: PgSchema) {
         table.organizationId,
         table.userId,
         table.providerFamily,
+      ),
+      index("user_external_principals_org_provider_config_idx").on(
+        table.organizationId,
+        table.organizationProviderConfigId,
       ),
       index("user_external_principals_provider_config_idx").on(table.organizationProviderConfigId),
       index("user_external_principals_connection_id_idx").on(table.integrationConnectionId),

@@ -68,9 +68,9 @@ export function defineOrganizationIdentityLinkProviderConfigs(schema: PgSchema) 
           integrationConnections.id,
         ],
       }).onDelete("restrict"),
-      uniqueIndex("org_identity_link_provider_cfgs_org_provider_uidx").on(
+      uniqueIndex("org_identity_link_provider_cfgs_org_connection_uidx").on(
         table.organizationId,
-        table.providerFamily,
+        table.integrationConnectionId,
       ),
       uniqueIndex("org_id_link_provider_cfgs_org_provider_conn_id_uidx").on(
         table.organizationId,

@@ -57,7 +57,7 @@ export function defineUserExternalPrincipalKeys(schema: PgSchema) {
         ],
       }).onDelete("cascade"),
       uniqueIndex("user_external_principal_keys_active_uidx")
-        .on(table.organizationId, table.providerFamily, table.keyType, table.keyValue)
+        .on(table.organizationId, table.principalId, table.keyType, table.keyValue)
         .where(sql`${table.status} = 'active'`),
       index("user_external_principal_keys_principal_id_idx").on(table.principalId),
       index("user_external_principal_keys_org_provider_idx").on(
