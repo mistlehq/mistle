@@ -28,13 +28,12 @@ export type PiSessionLifecycleState = {
     initialCwd?: string | null;
     sandboxInstanceId: string;
     targetSessionFile?: string | null;
-    targetThreadId?: string | null;
   }) => void;
   detachSessionConnection: () => void;
   disconnectSession: () => void;
   isStartingSession: boolean;
   lifecycleErrorMessage: string | null;
-  recoverSession: (input: { sandboxInstanceId: string; targetThreadId: string | null }) => void;
+  recoverSession: (input: { sandboxInstanceId: string; targetSessionFile: string | null }) => void;
   recoverableDisconnect: null;
   sessionConnectionState: "connected" | "connecting" | "detached";
   sessionSnapshot: ConnectedPiConversation | null;
@@ -231,7 +230,6 @@ export function usePiSessionState(input: {
       initialCwd?: string | null;
       sandboxInstanceId: string;
       targetSessionFile?: string | null;
-      targetThreadId?: string | null;
     }): void => {
       const generation = generationRef.current + 1;
       generationRef.current = generation;
@@ -257,8 +255,7 @@ export function usePiSessionState(input: {
           });
           clientRef.current = client;
           await client.connect();
-          const targetSessionFile =
-            connectInput.targetSessionFile ?? connectInput.targetThreadId ?? null;
+          const targetSessionFile = connectInput.targetSessionFile ?? null;
           const recentConversation =
             targetSessionFile === null
               ? await client.findRecentConversation({
@@ -433,7 +430,7 @@ export function usePiSessionState(input: {
   }, [sessionSnapshot?.activeSessionFile]);
 
   const recoverSession = useCallback(
-    (recoverInput: { sandboxInstanceId: string; targetThreadId: string | null }): void => {
+    (recoverInput: { sandboxInstanceId: string; targetSessionFile: string | null }): void => {
       connectSession(recoverInput);
     },
     [connectSession],

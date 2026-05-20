@@ -15,31 +15,72 @@ import {
 import { buildPiCliPtyOpenInput, type UsePiSessionStateResult } from "./pi/session-state/index.js";
 import { SessionRuntimeWorkbenchCapabilities } from "./session-runtime-workbench-capabilities.js";
 
+type RuntimeConversationConnectInput =
+  | InitialSessionConnectInput
+  | Parameters<SessionMainPanelHandoffLifecycle["connectSession"]>[0];
+
+type CodexConnectSessionInput = Parameters<
+  UseCodexSessionStateResult["lifecycle"]["connectSession"]
+>[0];
+type OpenCodeConnectSessionInput = Parameters<
+  UseOpenCodeSessionStateResult["lifecycle"]["connectSession"]
+>[0];
+type PiConnectSessionInput = Parameters<UsePiSessionStateResult["lifecycle"]["connectSession"]>[0];
+
+function toCodexConnectSessionInput(
+  connectInput: RuntimeConversationConnectInput,
+): CodexConnectSessionInput {
+  if (connectInput.targetRuntimeConversationId === null) {
+    return {
+      ...(connectInput.initialCwd === undefined ? {} : { initialCwd: connectInput.initialCwd }),
+      sandboxInstanceId: connectInput.sandboxInstanceId,
+      ...(connectInput.selectionPolicy === undefined
+        ? {}
+        : { selectionPolicy: connectInput.selectionPolicy }),
+      targetThreadId: null,
+    };
+  }
+
+  return {
+    ...(connectInput.providerConversationId === undefined
+      ? {}
+      : { providerThreadId: connectInput.providerConversationId }),
+    sandboxInstanceId: connectInput.sandboxInstanceId,
+    targetThreadId: connectInput.targetRuntimeConversationId,
+  };
+}
+
+function toOpenCodeConnectSessionInput(
+  connectInput: RuntimeConversationConnectInput,
+): OpenCodeConnectSessionInput {
+  return {
+    ...(connectInput.initialCwd === undefined ? {} : { initialCwd: connectInput.initialCwd }),
+    sandboxInstanceId: connectInput.sandboxInstanceId,
+    ...(connectInput.targetRuntimeConversationId === null
+      ? {}
+      : { targetSessionId: connectInput.targetRuntimeConversationId }),
+  };
+}
+
+function toPiConnectSessionInput(
+  connectInput: RuntimeConversationConnectInput,
+): PiConnectSessionInput {
+  return {
+    ...(connectInput.initialCwd === undefined ? {} : { initialCwd: connectInput.initialCwd }),
+    sandboxInstanceId: connectInput.sandboxInstanceId,
+    ...(connectInput.targetRuntimeConversationId === null
+      ? {}
+      : { targetSessionFile: connectInput.targetRuntimeConversationId }),
+  };
+}
+
 export function buildCodexLifecycleForHandoff(
   lifecycle: UseCodexSessionStateResult["lifecycle"],
 ): SessionMainPanelHandoffLifecycle {
   return {
     clearLifecycleErrorMessage: lifecycle.clearLifecycleErrorMessage,
     connectSession: (connectInput): void => {
-      if (connectInput.targetThreadId === null) {
-        lifecycle.connectSession({
-          ...(connectInput.initialCwd === undefined ? {} : { initialCwd: connectInput.initialCwd }),
-          sandboxInstanceId: connectInput.sandboxInstanceId,
-          ...(connectInput.selectionPolicy === undefined
-            ? {}
-            : { selectionPolicy: connectInput.selectionPolicy }),
-          targetThreadId: null,
-        });
-        return;
-      }
-
-      lifecycle.connectSession({
-        ...(connectInput.providerThreadId === undefined
-          ? {}
-          : { providerThreadId: connectInput.providerThreadId }),
-        sandboxInstanceId: connectInput.sandboxInstanceId,
-        targetThreadId: connectInput.targetThreadId,
-      });
+      lifecycle.connectSession(toCodexConnectSessionInput(connectInput));
     },
     detachSessionConnection: lifecycle.detachSessionConnection,
     lifecycleErrorMessage: lifecycle.lifecycleErrorMessage,
@@ -59,13 +100,7 @@ export function buildOpenCodeLifecycleForHandoff(
   return {
     clearLifecycleErrorMessage: lifecycle.clearLifecycleErrorMessage,
     connectSession: (connectInput): void => {
-      lifecycle.connectSession({
-        ...(connectInput.initialCwd === undefined ? {} : { initialCwd: connectInput.initialCwd }),
-        sandboxInstanceId: connectInput.sandboxInstanceId,
-        ...(connectInput.targetThreadId === null
-          ? {}
-          : { targetSessionId: connectInput.targetThreadId }),
-      });
+      lifecycle.connectSession(toOpenCodeConnectSessionInput(connectInput));
     },
     detachSessionConnection: lifecycle.detachSessionConnection,
     lifecycleErrorMessage: lifecycle.lifecycleErrorMessage,
@@ -85,32 +120,67 @@ export function buildOpenCodeLifecycleForWorkbench(
   return {
     clearLifecycleErrorMessage: lifecycle.clearLifecycleErrorMessage,
     connectSession: (connectInput: InitialSessionConnectInput): void => {
-      if (connectInput.targetThreadId === null) {
-        lifecycle.connectSession({
-          ...(connectInput.initialCwd === undefined ? {} : { initialCwd: connectInput.initialCwd }),
-          sandboxInstanceId: connectInput.sandboxInstanceId,
-        });
-        return;
-      }
-
-      lifecycle.connectSession({
-        sandboxInstanceId: connectInput.sandboxInstanceId,
-        targetThreadId: connectInput.targetThreadId,
-      });
+      lifecycle.connectSession(toOpenCodeConnectSessionInput(connectInput));
     },
     detachSessionConnection: lifecycle.detachSessionConnection,
     disconnectSession: lifecycle.disconnectSession,
     isStartingSession: lifecycle.isStartingSession,
     lifecycleErrorMessage: lifecycle.lifecycleErrorMessage,
-    recoverSession: lifecycle.recoverSession,
+    recoverSession: (recoverInput): void => {
+      lifecycle.recoverSession({
+        sandboxInstanceId: recoverInput.sandboxInstanceId,
+        targetSessionId: recoverInput.targetRuntimeConversationId,
+      });
+    },
     recoverableDisconnect: lifecycle.recoverableDisconnect,
     sessionConnectionState: lifecycle.sessionConnectionState,
     sessionSnapshot:
       lifecycle.sessionSnapshot === null
         ? null
         : {
-            activeThreadId: lifecycle.sessionSnapshot.activeSessionId,
+            activeRuntimeConversationId: lifecycle.sessionSnapshot.activeSessionId,
             connectedAtIso: lifecycle.sessionSnapshot.connectedAtIso,
+            sandboxInstanceId: lifecycle.sessionSnapshot.sandboxInstanceId,
+          },
+  };
+}
+
+export function buildCodexLifecycleForWorkbench(
+  lifecycle: UseCodexSessionStateResult["lifecycle"],
+): SessionLifecycleForWorkbench {
+  return {
+    clearLifecycleErrorMessage: lifecycle.clearLifecycleErrorMessage,
+    connectSession: (connectInput: InitialSessionConnectInput): void => {
+      lifecycle.connectSession(toCodexConnectSessionInput(connectInput));
+    },
+    detachSessionConnection: lifecycle.detachSessionConnection,
+    disconnectSession: lifecycle.disconnectSession,
+    isStartingSession: lifecycle.isStartingSession,
+    lifecycleErrorMessage: lifecycle.lifecycleErrorMessage,
+    recoverSession: (recoverInput): void => {
+      lifecycle.recoverSession({
+        sandboxInstanceId: recoverInput.sandboxInstanceId,
+        targetThreadId: recoverInput.targetRuntimeConversationId,
+      });
+    },
+    recoverableDisconnect:
+      lifecycle.recoverableDisconnect === null
+        ? null
+        : {
+            id: lifecycle.recoverableDisconnect.id,
+            message: lifecycle.recoverableDisconnect.message,
+            targetRuntimeConversationId: lifecycle.recoverableDisconnect.targetThreadId,
+            recoveryStrategy: lifecycle.recoverableDisconnect.recoveryStrategy,
+          },
+    sessionConnectionState: lifecycle.sessionConnectionState,
+    sessionSnapshot:
+      lifecycle.sessionSnapshot === null
+        ? null
+        : {
+            activeRuntimeConversationCwd: lifecycle.sessionSnapshot.activeThreadCwd,
+            activeRuntimeConversationId: lifecycle.sessionSnapshot.activeThreadId,
+            connectedAtIso: lifecycle.sessionSnapshot.connectedAtIso,
+            providerConversationId: lifecycle.sessionSnapshot.providerThreadId,
             sandboxInstanceId: lifecycle.sessionSnapshot.sandboxInstanceId,
           },
   };
@@ -122,13 +192,7 @@ export function buildPiLifecycleForHandoff(
   return {
     clearLifecycleErrorMessage: lifecycle.clearLifecycleErrorMessage,
     connectSession: (connectInput): void => {
-      lifecycle.connectSession({
-        ...(connectInput.initialCwd === undefined ? {} : { initialCwd: connectInput.initialCwd }),
-        sandboxInstanceId: connectInput.sandboxInstanceId,
-        ...(connectInput.targetThreadId === null
-          ? {}
-          : { targetSessionFile: connectInput.targetThreadId }),
-      });
+      lifecycle.connectSession(toPiConnectSessionInput(connectInput));
     },
     detachSessionConnection: lifecycle.detachSessionConnection,
     lifecycleErrorMessage: lifecycle.lifecycleErrorMessage,
@@ -148,26 +212,25 @@ export function buildPiLifecycleForWorkbench(
   return {
     clearLifecycleErrorMessage: lifecycle.clearLifecycleErrorMessage,
     connectSession: (connectInput: InitialSessionConnectInput): void => {
-      lifecycle.connectSession({
-        ...(connectInput.initialCwd === undefined ? {} : { initialCwd: connectInput.initialCwd }),
-        sandboxInstanceId: connectInput.sandboxInstanceId,
-        ...(connectInput.targetThreadId === null
-          ? {}
-          : { targetThreadId: connectInput.targetThreadId }),
-      });
+      lifecycle.connectSession(toPiConnectSessionInput(connectInput));
     },
     detachSessionConnection: lifecycle.detachSessionConnection,
     disconnectSession: lifecycle.disconnectSession,
     isStartingSession: lifecycle.isStartingSession,
     lifecycleErrorMessage: lifecycle.lifecycleErrorMessage,
-    recoverSession: lifecycle.recoverSession,
+    recoverSession: (recoverInput): void => {
+      lifecycle.recoverSession({
+        sandboxInstanceId: recoverInput.sandboxInstanceId,
+        targetSessionFile: recoverInput.targetRuntimeConversationId,
+      });
+    },
     recoverableDisconnect: lifecycle.recoverableDisconnect,
     sessionConnectionState: lifecycle.sessionConnectionState,
     sessionSnapshot:
       lifecycle.sessionSnapshot === null
         ? null
         : {
-            activeThreadId: lifecycle.sessionSnapshot.activeSessionFile,
+            activeRuntimeConversationId: lifecycle.sessionSnapshot.activeSessionFile,
             connectedAtIso: lifecycle.sessionSnapshot.connectedAtIso,
             sandboxInstanceId: lifecycle.sessionSnapshot.sandboxInstanceId,
           },

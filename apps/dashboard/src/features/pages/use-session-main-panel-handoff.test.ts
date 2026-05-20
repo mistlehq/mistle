@@ -18,7 +18,7 @@ describe("resolveCliRestoreContext", () => {
         preserveLaunchContext: true,
       }),
     ).toEqual({
-      conversationId: "ses_launched",
+      runtimeConversationId: "ses_launched",
       initialCwd: "/root/acme/repo-2",
     });
   });
@@ -35,7 +35,7 @@ describe("resolveCliRestoreContext", () => {
         preserveLaunchContext: false,
       }),
     ).toEqual({
-      conversationId: null,
+      runtimeConversationId: null,
       initialCwd: null,
     });
   });
@@ -52,25 +52,25 @@ describe("resolveCliRestoreContext", () => {
         preserveLaunchContext: true,
       }),
     ).toEqual({
-      conversationId: "thread_fallback",
+      runtimeConversationId: "thread_fallback",
       initialCwd: "/root/acme/repo-2",
     });
   });
 });
 
 describe("resolveChatRestoreConnectionInput", () => {
-  it("preserves durable provider thread authority without a selection policy", () => {
+  it("preserves durable provider conversation authority without a selection policy", () => {
     expect(
       resolveChatRestoreConnectionInput({
         initialCwd: "/root/acme/repo-2",
         sandboxInstanceId: "sandbox_123",
-        durableThreadId: "thread_provider",
+        durableRuntimeConversationId: "thread_provider",
       }),
     ).toEqual({
       initialCwd: "/root/acme/repo-2",
       sandboxInstanceId: "sandbox_123",
-      targetThreadId: "thread_provider",
-      providerThreadId: "thread_provider",
+      targetRuntimeConversationId: "thread_provider",
+      providerConversationId: "thread_provider",
     });
   });
 
@@ -79,12 +79,12 @@ describe("resolveChatRestoreConnectionInput", () => {
       resolveChatRestoreConnectionInput({
         initialCwd: null,
         sandboxInstanceId: "sandbox_123",
-        durableThreadId: null,
+        durableRuntimeConversationId: null,
       }),
     ).toEqual({
       initialCwd: null,
       sandboxInstanceId: "sandbox_123",
-      targetThreadId: null,
+      targetRuntimeConversationId: null,
       selectionPolicy: "most_recently_updated",
     });
   });

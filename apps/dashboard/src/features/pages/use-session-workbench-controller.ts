@@ -106,7 +106,7 @@ export type {
 };
 
 export function useSessionWorkbenchController(input: {
-  requestedThreadId?: string | null;
+  requestedRuntimeConversationId?: string | null;
   sandboxInstanceId: string | null;
 }): UseSessionWorkbenchControllerResult {
   const queryClient = useQueryClient();
@@ -144,7 +144,7 @@ export function useSessionWorkbenchController(input: {
   const workbenchLifecycleState = useSessionWorkbenchLifecycleState({
     sandboxInstanceId: input.sandboxInstanceId,
     mainPanelTransitionState: handoff.transitionState,
-    requestedThreadId: input.requestedThreadId ?? null,
+    requestedRuntimeConversationId: input.requestedRuntimeConversationId ?? null,
     resolveLifecycle: resolveLifecycleForWorkbench,
     queryClient,
   });

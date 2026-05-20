@@ -57,8 +57,24 @@ A provider event that can be selected as the event source for a **Trigger**.
 _Avoid_: Webhook event when naming product-facing trigger-builder concepts
 
 **Trigger conversation**:
-A conversation created or reused while handling a **Trigger** run.
+A Mistle-owned **Conversation** created or reused while handling a **Trigger** run.
 _Avoid_: Automation conversation
+
+**Conversation**:
+A logical agent dialogue.
+_Avoid_: Bare conversation when ownership matters
+
+**Provider conversation**:
+A provider-owned **Conversation** object that implements an agent dialogue in an **Agent runtime**.
+_Avoid_: Session when referring generically across providers
+
+**Runtime conversation**:
+A **Provider conversation** running within a **Sandbox session**.
+_Avoid_: Bare thread, bare session
+
+**Active runtime conversation**:
+The **Runtime conversation** currently selected for the chat pane within a **Sandbox session**.
+_Avoid_: Active thread when speaking across providers
 
 **Billing customer**:
 The external billing-provider customer associated with a Mistle organization.
@@ -73,11 +89,11 @@ A live sandbox execution environment for an agent session.
 _Avoid_: Chat session when referring to runtime tools or sandbox state
 
 **Codex thread**:
-A Codex conversation that runs within a **Sandbox session**.
+A Codex **Runtime conversation**.
 _Avoid_: Session, chat tab
 
 **Pi conversation**:
-A Pi conversation that runs within a **Sandbox session**.
+A Pi **Runtime conversation**.
 _Avoid_: Pi thread, Codex thread
 
 **Working agent turn**:
@@ -85,7 +101,7 @@ An active agent turn within a runtime conversation, shown while the agent runtim
 _Avoid_: Working chat group, semantic group
 
 **Active Codex thread**:
-The **Codex thread** currently selected for the chat pane within a **Sandbox session**.
+The **Codex thread** selected as the **Active runtime conversation**.
 _Avoid_: Current session, selected sandbox
 
 **Default Codex thread**:
@@ -97,7 +113,7 @@ The **Codex thread** that anchors how a **Session workbench** was opened. For a 
 _Avoid_: Trigger thread, default thread, main thread, first visible thread
 
 **Session workbench**:
-The dashboard workspace for a **Sandbox session**, including sandbox-scoped tools and thread-scoped chat.
+The dashboard workspace for a **Sandbox session**, including sandbox-scoped tools and runtime-conversation-scoped chat.
 _Avoid_: Chat page when referring to the whole workspace
 
 **Session bottom panel**:
@@ -141,6 +157,9 @@ _Avoid_: Slash autocomplete
 - A **Trigger** may select one or more **Trigger events**.
 - A **Trigger** may start from a webhook event or a schedule.
 - A **Trigger** run may create or reuse one **Trigger conversation**.
+- A **Trigger conversation** is owned by Mistle, not by an agent runtime provider.
+- A **Provider conversation** is owned by an agent runtime provider.
+- A **Runtime conversation** is a provider-owned conversation visible inside a **Sandbox session**.
 - A Mistle organization may have one **Billing customer** per billing provider.
 - A Jira Cloud connection has one **Jira site name**.
 - A **Sandbox session** may contain multiple **Codex threads**.
@@ -160,7 +179,7 @@ _Avoid_: Slash autocomplete
 - Pi itself exposes transcript events, message reads, model controls, thinking controls, session stats, image inputs, and runtime commands through its RPC surface.
 - The current Mistle Pi adapter may expose a narrower subset than Pi itself; chat UI behavior should follow the adapter contract it has actually wired rather than assuming every upstream Pi RPC command is available.
 - Pi composer controls should be Pi-owned controls, not Codex-owned **Composer commands** or Codex context controls.
-- A **Session workbench** keeps sandbox-scoped tools stable while the **Active Codex thread** changes.
+- A **Session workbench** keeps sandbox-scoped tools stable while the **Active runtime conversation** changes.
 - Opening **Codex thread** navigation does not change the **Session bottom panel** state.
 - A **Default Codex thread** is used only when the **Session workbench** has no explicit **Active Codex thread** request.
 - The **Original Codex thread** and **Default Codex thread** may be different **Codex threads**.
@@ -181,10 +200,14 @@ _Avoid_: Slash autocomplete
 - Non-active **Codex threads** may show activity summaries in navigation without rendering full live transcripts.
 - Non-active **Codex thread** activity indicators require explicit thread attribution.
 - Approval requests for non-active **Codex threads** may be indicated in navigation, but responses happen only after the thread becomes the **Active Codex thread**.
-- A **Session workbench** URL may identify an **Active Codex thread** without making the thread a separate session.
-- User-initiated **Active Codex thread** changes are navigable history within the **Session workbench**.
-- User-initiated **Active Codex thread** URL changes represent confirmed active-thread changes.
-- After a user selects or starts a **Codex thread**, the **Session workbench** URL keeps the confirmed `threadId` explicit, including when the selected thread is the **Default Codex thread**.
+- A **Session workbench** URL may identify an **Active runtime conversation** without making the conversation a separate session.
+- A **Session workbench** URL should identify the **Active runtime conversation** with provider-neutral language.
+- **Session workbench** URLs should not keep Codex-specific active-conversation parameters as compatibility aliases after migrating to provider-neutral language.
+- Within a **Session workbench** URL, `conversationId` identifies the requested **Active runtime conversation**.
+- In shared dashboard code, use runtime-conversation language for active-conversation identifiers so they are not confused with Mistle-owned **Trigger conversation** identifiers.
+- User-initiated **Active runtime conversation** changes are navigable history within the **Session workbench**.
+- User-initiated **Active runtime conversation** URL changes represent confirmed active-conversation changes.
+- After a user selects or starts a **Runtime conversation**, the **Session workbench** URL keeps the confirmed `conversationId` explicit, including when the selected conversation is the one selected by default.
 - First-pass **Codex thread** navigation does not make **Codex threads** durable Mistle records.
 - **Codex thread** navigation is ordered by recent thread activity unless the user chooses another view.
 - A loaded **Codex thread** is runtime metadata for navigation, not a separate product category.

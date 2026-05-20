@@ -6,23 +6,23 @@ export const MissingConnectableRuntimeContextMessage =
 export type InitialSessionConnectInput =
   | {
       initialCwd?: never;
-      providerThreadId?: string | null;
+      providerConversationId?: string | null;
       sandboxInstanceId: string;
-      targetThreadId: string;
+      targetRuntimeConversationId: string;
       selectionPolicy?: never;
     }
   | {
       initialCwd?: string | null;
-      providerThreadId?: never;
+      providerConversationId?: never;
       selectionPolicy?: "most_recently_updated";
       sandboxInstanceId: string;
-      targetThreadId: null;
+      targetRuntimeConversationId: null;
     };
 
 export function resolveInitialSessionConnectInput(input: {
   connectable: boolean | null;
-  providerThreadId: string | null;
-  requestedThreadId?: string | null;
+  providerConversationId: string | null;
+  requestedRuntimeConversationId?: string | null;
   runtimeContext: SandboxInstanceRuntimeContext | null;
   sandboxInstanceId: string;
 }): InitialSessionConnectInput {
@@ -34,18 +34,21 @@ export function resolveInitialSessionConnectInput(input: {
     throw new Error("Runtime context is required to connect a session.");
   }
 
-  if (input.providerThreadId !== null) {
+  if (input.providerConversationId !== null) {
     return {
-      providerThreadId: input.providerThreadId,
+      providerConversationId: input.providerConversationId,
       sandboxInstanceId: input.sandboxInstanceId,
-      targetThreadId: input.providerThreadId,
+      targetRuntimeConversationId: input.providerConversationId,
     };
   }
 
-  if (input.requestedThreadId !== undefined && input.requestedThreadId !== null) {
+  if (
+    input.requestedRuntimeConversationId !== undefined &&
+    input.requestedRuntimeConversationId !== null
+  ) {
     return {
       sandboxInstanceId: input.sandboxInstanceId,
-      targetThreadId: input.requestedThreadId,
+      targetRuntimeConversationId: input.requestedRuntimeConversationId,
     };
   }
 
@@ -53,7 +56,7 @@ export function resolveInitialSessionConnectInput(input: {
 
   return {
     sandboxInstanceId: input.sandboxInstanceId,
-    targetThreadId: null,
+    targetRuntimeConversationId: null,
     selectionPolicy: "most_recently_updated",
     ...(initialCwd === undefined || initialCwd === null ? {} : { initialCwd }),
   };

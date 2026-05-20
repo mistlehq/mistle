@@ -7,6 +7,7 @@ import { SessionRuntimeWorkbenchCapabilities } from "../session-agents/session-r
 import {
   buildCodexHandoffRuntime,
   buildCodexLifecycleForHandoff,
+  buildCodexLifecycleForWorkbench,
   buildOpenCodeHandoffRuntime,
   buildOpenCodeLifecycleForHandoff,
   buildOpenCodeLifecycleForWorkbench,
@@ -52,6 +53,21 @@ export function useSessionWorkbenchHandoffControl(input: {
       lifecycle.connectSession,
       lifecycle.detachSessionConnection,
       lifecycle.lifecycleErrorMessage,
+      lifecycle.sessionConnectionState,
+      lifecycle.sessionSnapshot,
+    ],
+  );
+  const codexLifecycleForWorkbench = useMemo(
+    () => buildCodexLifecycleForWorkbench(lifecycle),
+    [
+      lifecycle.clearLifecycleErrorMessage,
+      lifecycle.connectSession,
+      lifecycle.detachSessionConnection,
+      lifecycle.disconnectSession,
+      lifecycle.isStartingSession,
+      lifecycle.lifecycleErrorMessage,
+      lifecycle.recoverSession,
+      lifecycle.recoverableDisconnect,
       lifecycle.sessionConnectionState,
       lifecycle.sessionSnapshot,
     ],
@@ -112,11 +128,11 @@ export function useSessionWorkbenchHandoffControl(input: {
     (agentRuntimeId: string | null) =>
       resolveSessionLifecycleForWorkbench({
         agentRuntimeId,
-        codexLifecycle: lifecycle,
+        codexLifecycle: codexLifecycleForWorkbench,
         openCodeLifecycle: openCodeLifecycleForWorkbench,
         piLifecycle: piLifecycleForWorkbench,
       }),
-    [lifecycle, openCodeLifecycleForWorkbench, piLifecycleForWorkbench],
+    [codexLifecycleForWorkbench, openCodeLifecycleForWorkbench, piLifecycleForWorkbench],
   );
   const cliPtyState = useSandboxPtyState({
     ensureTransportConnected: input.ensureTransportConnected,

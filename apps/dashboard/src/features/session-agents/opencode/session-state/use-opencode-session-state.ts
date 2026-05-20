@@ -54,13 +54,12 @@ export type OpenCodeSessionLifecycleState = {
     initialCwd?: string | null;
     sandboxInstanceId: string;
     targetSessionId?: string | null;
-    targetThreadId?: string | null;
   }) => void;
   detachSessionConnection: () => void;
   disconnectSession: () => void;
   isStartingSession: boolean;
   lifecycleErrorMessage: string | null;
-  recoverSession: (input: { sandboxInstanceId: string; targetThreadId: string | null }) => void;
+  recoverSession: (input: { sandboxInstanceId: string; targetSessionId: string | null }) => void;
   recoverableDisconnect: null;
   refreshModelCatalog: (input: { directory?: string | null; force?: boolean }) => Promise<void>;
   sessionConnectionState: "connected" | "connecting" | "detached";
@@ -426,7 +425,6 @@ export function useOpenCodeSessionState(input: {
       initialCwd?: string | null;
       sandboxInstanceId: string;
       targetSessionId?: string | null;
-      targetThreadId?: string | null;
     }): void => {
       const generation = generationRef.current + 1;
       generationRef.current = generation;
@@ -452,8 +450,7 @@ export function useOpenCodeSessionState(input: {
           });
           clientRef.current = client;
           await client.health();
-          const targetSessionId =
-            connectInput.targetSessionId ?? connectInput.targetThreadId ?? null;
+          const targetSessionId = connectInput.targetSessionId ?? null;
           const directory = connectInput.initialCwd ?? undefined;
           await refreshModelCatalog(
             directory === undefined ? { force: true } : { directory, force: true },
@@ -666,7 +663,7 @@ export function useOpenCodeSessionState(input: {
   );
 
   const recoverSession = useCallback(
-    (recoverInput: { sandboxInstanceId: string; targetThreadId: string | null }): void => {
+    (recoverInput: { sandboxInstanceId: string; targetSessionId: string | null }): void => {
       connectSession(recoverInput);
     },
     [connectSession],

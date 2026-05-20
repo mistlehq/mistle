@@ -10,7 +10,7 @@ const SessionReconnectLimitMessage = `Could not reconnect session after ${String
 type RecoverableSessionDisconnect = {
   id: number;
   message: string;
-  targetThreadId: string | null;
+  targetRuntimeConversationId: string | null;
   recoveryStrategy: "reconnect_transport" | "reopen_stream";
 };
 
@@ -39,7 +39,7 @@ export type SessionWorkbenchRecoveryState =
       kind: "recovering";
       baseMessage: string;
       errorMessage: string | null;
-      targetThreadId: string | null;
+      targetRuntimeConversationId: string | null;
       recoveryStrategy: "reconnect_transport" | "reopen_stream";
       reconnectAttemptCount: number;
       reconnectCommand: SessionRecoveryReconnectCommand;
@@ -72,7 +72,7 @@ function createSessionWorkbenchRecoveryStateFromDisconnect(
     kind: "recovering",
     baseMessage: disconnect.message,
     errorMessage: null,
-    targetThreadId: disconnect.targetThreadId,
+    targetRuntimeConversationId: disconnect.targetRuntimeConversationId,
     recoveryStrategy: disconnect.recoveryStrategy,
     reconnectAttemptCount: 0,
     reconnectCommand: "none",
@@ -100,7 +100,7 @@ export function reduceSessionWorkbenchRecoveryState(
             return {
               ...state,
               baseMessage: event.disconnect.message,
-              targetThreadId: event.disconnect.targetThreadId,
+              targetRuntimeConversationId: event.disconnect.targetRuntimeConversationId,
               recoveryStrategy: event.disconnect.recoveryStrategy,
             };
           }
@@ -350,7 +350,7 @@ export function useSessionWorkbenchRecovery(input: {
     });
     const recoveryInput = {
       sandboxInstanceId: input.sandboxInstanceId,
-      targetThreadId: sessionRecoveryState.targetThreadId,
+      targetRuntimeConversationId: sessionRecoveryState.targetRuntimeConversationId,
     };
 
     if (sessionRecoveryState.reconnectCommand === "reopen_stream") {
@@ -359,11 +359,11 @@ export function useSessionWorkbenchRecovery(input: {
     }
 
     input.connectSession(
-      recoveryInput.targetThreadId === null
+      recoveryInput.targetRuntimeConversationId === null
         ? recoveryInput
         : {
             sandboxInstanceId: recoveryInput.sandboxInstanceId,
-            targetThreadId: recoveryInput.targetThreadId,
+            targetRuntimeConversationId: recoveryInput.targetRuntimeConversationId,
           },
     );
   }, [

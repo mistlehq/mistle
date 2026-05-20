@@ -48,12 +48,12 @@ export function SessionWorkbenchPage(): React.JSX.Element {
   const params = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const sandboxInstanceId = params["sandboxInstanceId"] ?? null;
-  const requestedThreadId = searchParams.get("threadId");
+  const requestedRuntimeConversationId = searchParams.get("conversationId");
 
   return (
     <SessionWorkbenchPageContent
       key={sandboxInstanceId ?? "missing-session"}
-      requestedThreadId={requestedThreadId}
+      requestedRuntimeConversationId={requestedRuntimeConversationId}
       sandboxInstanceId={sandboxInstanceId}
       searchParams={searchParams}
       setSearchParams={setSearchParams}
@@ -62,13 +62,13 @@ export function SessionWorkbenchPage(): React.JSX.Element {
 }
 
 function SessionWorkbenchPageContent(input: {
-  requestedThreadId: string | null;
+  requestedRuntimeConversationId: string | null;
   searchParams: URLSearchParams;
   setSearchParams: ReturnType<typeof useSearchParams>[1];
   sandboxInstanceId: string | null;
 }): React.JSX.Element {
   const { conversationPane, workbench } = useSessionWorkbenchController({
-    requestedThreadId: input.requestedThreadId,
+    requestedRuntimeConversationId: input.requestedRuntimeConversationId,
     sandboxInstanceId: input.sandboxInstanceId,
   });
   const [hasEnteredReadyWorkbench, setHasEnteredReadyWorkbench] = useState(false);
@@ -148,7 +148,7 @@ function SessionWorkbenchPageContent(input: {
     pendingServerRequests: conversationPane.serverRequestsState.pendingServerRequests,
     primaryPanelTransitionState: workbench.primaryPanelState.transitionState,
     primaryRepositoryPath,
-    requestedThreadId: input.requestedThreadId,
+    requestedRuntimeConversationId: input.requestedRuntimeConversationId,
     sandboxInstanceId: input.sandboxInstanceId,
     searchParams: input.searchParams,
     setSearchParams: input.setSearchParams,

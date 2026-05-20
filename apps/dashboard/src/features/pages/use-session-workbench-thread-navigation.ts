@@ -18,7 +18,7 @@ type SessionWorkbenchThreadNavigationInput = {
   pendingServerRequests: SessionConversationPaneState["serverRequestsState"]["pendingServerRequests"];
   primaryPanelTransitionState: MainPanelTransitionState;
   primaryRepositoryPath: string | null;
-  requestedThreadId: string | null;
+  requestedRuntimeConversationId: string | null;
   sandboxInstanceId: string | null;
   searchParams: URLSearchParams;
   setSearchParams: SetSearchParams;
@@ -45,12 +45,13 @@ export function resolveThreadNavigatorPanelVisibility(input: {
   return !input.isDiffPanelVisible && input.unarchivedThreadCount > 1;
 }
 
-export function createConfirmedThreadSearchParams(input: {
+export function createConfirmedRuntimeConversationSearchParams(input: {
   searchParams: URLSearchParams;
-  threadId: string;
+  runtimeConversationId: string;
 }): URLSearchParams {
   const nextSearchParams = new URLSearchParams(input.searchParams);
-  nextSearchParams.set("threadId", input.threadId);
+  nextSearchParams.delete("threadId");
+  nextSearchParams.set("conversationId", input.runtimeConversationId);
   return nextSearchParams;
 }
 
@@ -99,9 +100,9 @@ export function useSessionWorkbenchThreadNavigation(
   const pushThreadSearchParams = useCallback(
     (threadId: string): void => {
       input.setSearchParams(
-        createConfirmedThreadSearchParams({
+        createConfirmedRuntimeConversationSearchParams({
           searchParams: input.searchParams,
-          threadId,
+          runtimeConversationId: threadId,
         }),
       );
     },
@@ -167,9 +168,9 @@ export function useSessionWorkbenchThreadNavigation(
 
         setManualNavigationTargetThreadId(threadId);
         input.setSearchParams(
-          createConfirmedThreadSearchParams({
+          createConfirmedRuntimeConversationSearchParams({
             searchParams: input.searchParams,
-            threadId,
+            runtimeConversationId: threadId,
           }),
         );
       })
@@ -191,17 +192,17 @@ export function useSessionWorkbenchThreadNavigation(
   useEffect(() => {
     if (
       manualNavigationTargetThreadId === null ||
-      input.requestedThreadId !== manualNavigationTargetThreadId
+      input.requestedRuntimeConversationId !== manualNavigationTargetThreadId
     ) {
       return;
     }
 
     setManualNavigationCommitPending(false);
     setManualNavigationTargetThreadId(null);
-  }, [input.requestedThreadId, manualNavigationTargetThreadId]);
+  }, [input.requestedRuntimeConversationId, manualNavigationTargetThreadId]);
 
   useEffect(() => {
-    if (input.requestedThreadId === null) {
+    if (input.requestedRuntimeConversationId === null) {
       requestedThreadResumeAttemptRef.current = null;
       return;
     }
@@ -219,7 +220,7 @@ export function useSessionWorkbenchThreadNavigation(
           hasManualNavigationCommitPending,
         previousAttempt: requestedThreadResumeAttemptRef.current,
         providerThreadId: input.codexThreadNavigator.providerThreadId,
-        requestedThreadId: input.requestedThreadId,
+        requestedThreadId: input.requestedRuntimeConversationId,
         sandboxInstanceId: input.sandboxInstanceId,
       })
     ) {
@@ -228,13 +229,15 @@ export function useSessionWorkbenchThreadNavigation(
 
     requestedThreadResumeAttemptRef.current = {
       sandboxInstanceId: input.sandboxInstanceId,
-      threadId: input.requestedThreadId,
+      threadId: input.requestedRuntimeConversationId,
     };
     threadNavigationRequestSequenceRef.current += 1;
-    void input.codexThreadNavigator.resumeThread(input.requestedThreadId).catch(() => {});
+    void input.codexThreadNavigator
+      .resumeThread(input.requestedRuntimeConversationId)
+      .catch(() => {});
   }, [
     input.codexThreadNavigator,
-    input.requestedThreadId,
+    input.requestedRuntimeConversationId,
     input.sandboxInstanceId,
     hasManualNavigationCommitPending,
   ]);

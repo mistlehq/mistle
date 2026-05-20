@@ -17,17 +17,17 @@ type SessionMainPanelRuntimeId = "codex" | "opencode" | "pi";
 type ChatRestoreConnectionInput =
   | {
       initialCwd?: string | null;
-      providerThreadId?: string;
+      providerConversationId?: string;
       sandboxInstanceId: string;
       selectionPolicy?: never;
-      targetThreadId: string;
+      targetRuntimeConversationId: string;
     }
   | {
       initialCwd?: string | null;
-      providerThreadId?: never;
+      providerConversationId?: never;
       sandboxInstanceId: string;
       selectionPolicy?: "most_recently_updated";
-      targetThreadId: null;
+      targetRuntimeConversationId: null;
     };
 
 type SessionMainPanelHandoffLifecycleSnapshot = {
@@ -89,13 +89,13 @@ async function closeAndDisconnectCliPty(
 export function resolveChatRestoreConnectionInput(input: {
   initialCwd: string | null;
   sandboxInstanceId: string;
-  durableThreadId: string | null;
+  durableRuntimeConversationId: string | null;
 }): ChatRestoreConnectionInput {
-  if (input.durableThreadId === null) {
+  if (input.durableRuntimeConversationId === null) {
     return {
       initialCwd: input.initialCwd,
       sandboxInstanceId: input.sandboxInstanceId,
-      targetThreadId: null,
+      targetRuntimeConversationId: null,
       selectionPolicy: "most_recently_updated",
     };
   }
@@ -103,18 +103,18 @@ export function resolveChatRestoreConnectionInput(input: {
   return {
     initialCwd: input.initialCwd,
     sandboxInstanceId: input.sandboxInstanceId,
-    targetThreadId: input.durableThreadId,
-    providerThreadId: input.durableThreadId,
+    targetRuntimeConversationId: input.durableRuntimeConversationId,
+    providerConversationId: input.durableRuntimeConversationId,
   };
 }
 
 type CliRestoreContext = {
-  conversationId: string | null;
+  runtimeConversationId: string | null;
   initialCwd: string | null;
 };
 
 const EmptyCliRestoreContext: CliRestoreContext = {
-  conversationId: null,
+  runtimeConversationId: null,
   initialCwd: null,
 };
 
@@ -125,7 +125,7 @@ export function resolveCliRestoreContext(input: {
   preserveLaunchContext: boolean;
 }): CliRestoreContext {
   return {
-    conversationId:
+    runtimeConversationId:
       input.preserveLaunchContext && input.launchTarget.type === "resume"
         ? input.launchTarget.threadId
         : input.fallbackConversationId,
@@ -206,8 +206,8 @@ export function useSessionMainPanelHandoff(
   const startChatRestore = useCallback((): void => {
     const generation = nextGeneration();
     const activeRuntime = getActiveRuntime();
-    const durableThreadId =
-      cliRestoreContextRef.current.conversationId ?? activeRuntime.restoreConversationId;
+    const durableRuntimeConversationId =
+      cliRestoreContextRef.current.runtimeConversationId ?? activeRuntime.restoreConversationId;
 
     restoreGenerationRef.current = generation;
     restoreExecutionGenerationRef.current = null;
@@ -228,18 +228,20 @@ export function useSessionMainPanelHandoff(
     void closeAndDisconnectCliPty(input.cliPtyState);
 
     if (input.sandboxInstanceId === null) {
-      failRestore("Could not restore chat because the current session thread is unavailable.");
+      failRestore(
+        "Could not restore chat because the current runtime conversation is unavailable.",
+      );
       return;
     }
 
     // Restore honors the exact conversation launched into the CLI when known.
     // Otherwise local sessions intentionally reconnect using the most recently
-    // updated thread.
+    // updated runtime conversation.
     activeRuntime.lifecycle.connectSession(
       resolveChatRestoreConnectionInput({
         initialCwd: cliRestoreContextRef.current.initialCwd,
         sandboxInstanceId: input.sandboxInstanceId,
-        durableThreadId,
+        durableRuntimeConversationId,
       }),
     );
   }, [

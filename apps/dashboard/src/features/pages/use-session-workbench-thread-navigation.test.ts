@@ -1,32 +1,45 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  createConfirmedThreadSearchParams,
+  createConfirmedRuntimeConversationSearchParams,
   resolveThreadNavigatorPanelVisibility,
 } from "./use-session-workbench-thread-navigation.js";
 
-describe("createConfirmedThreadSearchParams", () => {
-  it("writes the selected thread id explicitly when a user confirms thread navigation", () => {
+describe("createConfirmedRuntimeConversationSearchParams", () => {
+  it("writes the selected conversation id explicitly when a user confirms conversation navigation", () => {
     const searchParams = new URLSearchParams("panel=threads");
 
-    const nextSearchParams = createConfirmedThreadSearchParams({
+    const nextSearchParams = createConfirmedRuntimeConversationSearchParams({
       searchParams,
-      threadId: "thread_default",
+      runtimeConversationId: "thread_default",
     });
 
-    expect(nextSearchParams.get("threadId")).toBe("thread_default");
+    expect(nextSearchParams.get("conversationId")).toBe("thread_default");
     expect(nextSearchParams.get("panel")).toBe("threads");
   });
 
-  it("replaces a previous thread id with the newly confirmed thread id", () => {
-    const searchParams = new URLSearchParams("threadId=thread_previous");
+  it("replaces a previous conversation id with the newly confirmed conversation id", () => {
+    const searchParams = new URLSearchParams("conversationId=thread_previous");
 
-    const nextSearchParams = createConfirmedThreadSearchParams({
+    const nextSearchParams = createConfirmedRuntimeConversationSearchParams({
       searchParams,
-      threadId: "thread_selected",
+      runtimeConversationId: "thread_selected",
     });
 
-    expect(nextSearchParams.get("threadId")).toBe("thread_selected");
+    expect(nextSearchParams.get("conversationId")).toBe("thread_selected");
+  });
+
+  it("removes the legacy thread id parameter when confirming provider-neutral conversation navigation", () => {
+    const searchParams = new URLSearchParams("threadId=thread_legacy&panel=threads");
+
+    const nextSearchParams = createConfirmedRuntimeConversationSearchParams({
+      searchParams,
+      runtimeConversationId: "thread_selected",
+    });
+
+    expect(nextSearchParams.get("conversationId")).toBe("thread_selected");
+    expect(nextSearchParams.has("threadId")).toBe(false);
+    expect(nextSearchParams.get("panel")).toBe("threads");
   });
 });
 

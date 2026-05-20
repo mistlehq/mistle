@@ -7,7 +7,6 @@ import { describe, expect, it } from "vitest";
 import { createTestQueryClient, flushScheduledReactWork } from "../../test-support/query-client.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
-import { resolveInitialSessionConnectInput } from "./session-initial-connect-policy.js";
 import {
   hasTriggerSessionPreparationTimedOut,
   hasFreshSandboxStatusRead,
@@ -148,7 +147,7 @@ describe("useSessionWorkbenchController", () => {
         disconnect: {
           id: 1,
           message: "Sandbox session stream reset.",
-          targetThreadId: "thread_123",
+          targetRuntimeConversationId: "thread_123",
           recoveryStrategy: "reopen_stream",
         },
       },
@@ -158,7 +157,7 @@ describe("useSessionWorkbenchController", () => {
       kind: "recovering",
       baseMessage: "Sandbox session stream reset.",
       errorMessage: null,
-      targetThreadId: "thread_123",
+      targetRuntimeConversationId: "thread_123",
       recoveryStrategy: "reopen_stream",
       reconnectAttemptCount: 0,
       reconnectCommand: "none",
@@ -185,7 +184,7 @@ describe("useSessionWorkbenchController", () => {
       kind: "recovering",
       baseMessage: "Sandbox session stream reset.",
       errorMessage: null,
-      targetThreadId: "thread_123",
+      targetRuntimeConversationId: "thread_123",
       recoveryStrategy: "reopen_stream",
       reconnectAttemptCount: 1,
       reconnectCommand: "none",
@@ -198,7 +197,7 @@ describe("useSessionWorkbenchController", () => {
         disconnect: {
           id: 1,
           message: "Sandbox session stream reset. Reconnect failed once; retrying.",
-          targetThreadId: "thread_123",
+          targetRuntimeConversationId: "thread_123",
           recoveryStrategy: "reopen_stream",
         },
       }),
@@ -206,7 +205,7 @@ describe("useSessionWorkbenchController", () => {
       kind: "recovering",
       baseMessage: "Sandbox session stream reset. Reconnect failed once; retrying.",
       errorMessage: null,
-      targetThreadId: "thread_123",
+      targetRuntimeConversationId: "thread_123",
       recoveryStrategy: "reopen_stream",
       reconnectAttemptCount: 1,
       reconnectCommand: "none",
@@ -219,7 +218,7 @@ describe("useSessionWorkbenchController", () => {
       kind: "recovering" as const,
       baseMessage: "Sandbox session stream reset.",
       errorMessage: null,
-      targetThreadId: "thread_123",
+      targetRuntimeConversationId: "thread_123",
       recoveryStrategy: "reopen_stream" as const,
       reconnectAttemptCount: 0,
       reconnectCommand: "none" as const,
@@ -292,7 +291,7 @@ describe("useSessionWorkbenchController", () => {
           kind: "recovering",
           baseMessage: "Sandbox session stream reset.",
           errorMessage: null,
-          targetThreadId: "thread_old",
+          targetRuntimeConversationId: "thread_old",
           recoveryStrategy: "reopen_stream",
           reconnectAttemptCount: 0,
           reconnectCommand: "reopen_stream",
@@ -317,7 +316,7 @@ describe("useSessionWorkbenchController", () => {
       kind: "recovering" as const,
       baseMessage: "Sandbox session stream reset.",
       errorMessage: null,
-      targetThreadId: "thread_123",
+      targetRuntimeConversationId: "thread_123",
       recoveryStrategy: "reopen_stream" as const,
       reconnectAttemptCount: 3,
       reconnectCommand: "none" as const,
@@ -346,7 +345,7 @@ describe("useSessionWorkbenchController", () => {
       kind: "recovering" as const,
       baseMessage: "Sandbox session stream reset.",
       errorMessage: null,
-      targetThreadId: "thread_123",
+      targetRuntimeConversationId: "thread_123",
       recoveryStrategy: "reopen_stream" as const,
       reconnectAttemptCount: 1,
       reconnectCommand: "none" as const,
@@ -796,34 +795,6 @@ describe("useSessionWorkbenchController", () => {
         status: "running",
       }),
     ).toBe(false);
-  });
-
-  it("throws when a connectable session is missing runtime context", () => {
-    expect(() =>
-      resolveInitialSessionConnectInput({
-        connectable: true,
-        providerThreadId: null,
-        sandboxInstanceId: "sbi_123",
-        runtimeContext: null,
-      }),
-    ).toThrow("Expected a connectable sandbox session to include runtime context.");
-
-    expect(
-      resolveInitialSessionConnectInput({
-        connectable: true,
-        providerThreadId: "thread_123",
-        sandboxInstanceId: "sbi_123",
-        runtimeContext: {
-          agentRuntimeId: "codex",
-          launchCwd: null,
-          primaryRepositoryRoot: null,
-        },
-      }),
-    ).toEqual({
-      providerThreadId: "thread_123",
-      sandboxInstanceId: "sbi_123",
-      targetThreadId: "thread_123",
-    });
   });
 
   it("shows the stopped-session message once a stopped sandbox status is trusted", () => {

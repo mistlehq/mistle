@@ -60,7 +60,7 @@ function renderThreadNavigation(input: {
       pendingServerRequests: [],
       primaryPanelTransitionState: "stable_chat" satisfies MainPanelTransitionState,
       primaryRepositoryPath: "/workspace/repo",
-      requestedThreadId: null,
+      requestedRuntimeConversationId: null,
       sandboxInstanceId: input.sandboxInstanceId,
       searchParams: new URLSearchParams(),
       setSearchParams: function setSearchParams() {

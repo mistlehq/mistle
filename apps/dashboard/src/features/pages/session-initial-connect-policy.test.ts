@@ -10,18 +10,18 @@ describe("session initial connect policy", () => {
     expect(() =>
       resolveInitialSessionConnectInput({
         connectable: true,
-        providerThreadId: null,
+        providerConversationId: null,
         sandboxInstanceId: "sbi_123",
         runtimeContext: null,
       }),
     ).toThrow(MissingConnectableRuntimeContextMessage);
   });
 
-  it("prefers the provider thread when trigger state exposes one", () => {
+  it("prefers the provider conversation when trigger state exposes one", () => {
     expect(
       resolveInitialSessionConnectInput({
         connectable: true,
-        providerThreadId: "thread_123",
+        providerConversationId: "thread_123",
         sandboxInstanceId: "sbi_123",
         runtimeContext: {
           agentRuntimeId: "codex",
@@ -30,17 +30,17 @@ describe("session initial connect policy", () => {
         },
       }),
     ).toEqual({
-      providerThreadId: "thread_123",
+      providerConversationId: "thread_123",
       sandboxInstanceId: "sbi_123",
-      targetThreadId: "thread_123",
+      targetRuntimeConversationId: "thread_123",
     });
   });
 
-  it("starts a new thread in the runtime context launch cwd", () => {
+  it("starts a new runtime conversation in the runtime context launch cwd", () => {
     expect(
       resolveInitialSessionConnectInput({
         connectable: true,
-        providerThreadId: null,
+        providerConversationId: null,
         sandboxInstanceId: "sbi_123",
         runtimeContext: {
           agentRuntimeId: "codex",
@@ -52,15 +52,15 @@ describe("session initial connect policy", () => {
       initialCwd: "/root/acme/repo-1/packages/app",
       selectionPolicy: "most_recently_updated",
       sandboxInstanceId: "sbi_123",
-      targetThreadId: null,
+      targetRuntimeConversationId: null,
     });
   });
 
-  it("starts a new thread without a cwd when runtime context has no launch cwd", () => {
+  it("starts a new runtime conversation without a cwd when runtime context has no launch cwd", () => {
     expect(
       resolveInitialSessionConnectInput({
         connectable: false,
-        providerThreadId: null,
+        providerConversationId: null,
         sandboxInstanceId: "sbi_123",
         runtimeContext: {
           agentRuntimeId: "codex",
@@ -71,16 +71,16 @@ describe("session initial connect policy", () => {
     ).toEqual({
       selectionPolicy: "most_recently_updated",
       sandboxInstanceId: "sbi_123",
-      targetThreadId: null,
+      targetRuntimeConversationId: null,
     });
   });
 
-  it("uses a requested thread when no provider thread is present", () => {
+  it("uses a requested runtime conversation when no provider conversation is present", () => {
     expect(
       resolveInitialSessionConnectInput({
         connectable: true,
-        providerThreadId: null,
-        requestedThreadId: "thread_requested",
+        providerConversationId: null,
+        requestedRuntimeConversationId: "thread_requested",
         sandboxInstanceId: "sbi_123",
         runtimeContext: {
           agentRuntimeId: "codex",
@@ -90,16 +90,16 @@ describe("session initial connect policy", () => {
       }),
     ).toEqual({
       sandboxInstanceId: "sbi_123",
-      targetThreadId: "thread_requested",
+      targetRuntimeConversationId: "thread_requested",
     });
   });
 
-  it("keeps provider thread authority over a requested thread", () => {
+  it("keeps provider conversation authority over a requested runtime conversation", () => {
     expect(
       resolveInitialSessionConnectInput({
         connectable: true,
-        providerThreadId: "thread_provider",
-        requestedThreadId: "thread_requested",
+        providerConversationId: "thread_provider",
+        requestedRuntimeConversationId: "thread_requested",
         sandboxInstanceId: "sbi_123",
         runtimeContext: {
           agentRuntimeId: "codex",
@@ -108,9 +108,9 @@ describe("session initial connect policy", () => {
         },
       }),
     ).toEqual({
-      providerThreadId: "thread_provider",
+      providerConversationId: "thread_provider",
       sandboxInstanceId: "sbi_123",
-      targetThreadId: "thread_provider",
+      targetRuntimeConversationId: "thread_provider",
     });
   });
 });

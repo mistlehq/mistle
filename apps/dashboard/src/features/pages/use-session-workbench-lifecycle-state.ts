@@ -42,10 +42,10 @@ type SessionWorkbenchSandboxStatusSnapshot = {
 };
 
 type SessionSnapshotForWorkbench = {
-  activeThreadCwd?: string | null;
-  activeThreadId?: string | null;
+  activeRuntimeConversationCwd?: string | null;
+  activeRuntimeConversationId?: string | null;
   connectedAtIso: string;
-  providerThreadId?: string | null;
+  providerConversationId?: string | null;
   sandboxInstanceId?: string;
 };
 
@@ -56,11 +56,14 @@ export type SessionLifecycleForWorkbench = {
   disconnectSession: () => void;
   isStartingSession: boolean;
   lifecycleErrorMessage: string | null;
-  recoverSession: (input: { sandboxInstanceId: string; targetThreadId: string | null }) => void;
+  recoverSession: (input: {
+    sandboxInstanceId: string;
+    targetRuntimeConversationId: string | null;
+  }) => void;
   recoverableDisconnect: {
     id: number;
     message: string;
-    targetThreadId: string | null;
+    targetRuntimeConversationId: string | null;
     recoveryStrategy: "reconnect_transport" | "reopen_stream";
   } | null;
   sessionConnectionState: "connected" | "connecting" | "detached" | "recovering";
@@ -95,7 +98,7 @@ export function resolveSandboxStatusRefetchInterval(
 export function useSessionWorkbenchLifecycleState(input: {
   sandboxInstanceId: string | null;
   mainPanelTransitionState: MainPanelTransitionState;
-  requestedThreadId?: string | null;
+  requestedRuntimeConversationId?: string | null;
   resolveLifecycle: (agentRuntimeId: string | null) => SessionLifecycleForWorkbench;
   queryClient: QueryClient;
 }) {
@@ -225,7 +228,7 @@ export function useSessionWorkbenchLifecycleState(input: {
   const displaySandboxLifecycleStatus =
     resolveSandboxLifecycleStatusForWorkbenchEntryPhase(workbenchEntryPhase);
   const triggerConversation = sandboxStatus?.triggerConversation ?? null;
-  const providerThreadId = triggerConversation?.providerConversationId ?? null;
+  const providerConversationId = triggerConversation?.providerConversationId ?? null;
   const isWaitingForTriggerThread = shouldWaitForTriggerSessionThread({
     sandboxStatus: displaySandboxLifecycleStatus,
     triggerConversation,
@@ -281,7 +284,7 @@ export function useSessionWorkbenchLifecycleState(input: {
 
   useEffect(() => {
     setHasAttemptedAutoConnect(false);
-  }, [input.requestedThreadId]);
+  }, [input.requestedRuntimeConversationId]);
 
   useEffect(() => {
     if (!shouldAttemptAutoResume || input.sandboxInstanceId === null) {
@@ -425,8 +428,8 @@ export function useSessionWorkbenchLifecycleState(input: {
 
     const connectInput = resolveInitialSessionConnectInput({
       connectable: sandboxStatus?.connectable ?? null,
-      providerThreadId,
-      requestedThreadId: input.requestedThreadId ?? null,
+      providerConversationId,
+      requestedRuntimeConversationId: input.requestedRuntimeConversationId ?? null,
       runtimeContext: sandboxStatus?.runtimeContext ?? null,
       sandboxInstanceId: input.sandboxInstanceId,
     });
@@ -439,11 +442,11 @@ export function useSessionWorkbenchLifecycleState(input: {
     connectionReadiness.canConnect,
     hasAttemptedAutoConnect,
     input.sandboxInstanceId,
-    input.requestedThreadId,
+    input.requestedRuntimeConversationId,
     isStartingSession,
     isWaitingForTriggerThread,
     resolvedLifecycleErrorMessage,
-    providerThreadId,
+    providerConversationId,
     sandboxStatus?.runtimeContext,
     sandboxStatus?.connectable,
     sessionConnectionState,

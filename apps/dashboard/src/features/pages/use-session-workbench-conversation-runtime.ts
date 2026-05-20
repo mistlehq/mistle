@@ -89,10 +89,10 @@ export function useSessionWorkbenchConversationRuntime(input: {
   const { configControl } = useCodexWorkbenchComposerState({
     sessionState,
   });
-  const activeSessionThreadId =
+  const activeRuntimeConversationId =
     input.isOpenCodeRuntime || input.isPiRuntime
       ? null
-      : (input.sessionSnapshot?.activeThreadId ?? null);
+      : (input.sessionSnapshot?.activeRuntimeConversationId ?? null);
   const contextUsage =
     sessionState.threadTokenUsageSnapshot?.threadId ===
     sessionState.lifecycle.sessionSnapshot?.activeThreadId
@@ -170,7 +170,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
   const codexRuntime = useMemo<SessionWorkbenchRuntimeAdapter>(
     () =>
       buildCodexConversationRuntime({
-        activeConversationId: activeSessionThreadId,
+        activeConversationId: activeRuntimeConversationId,
         bootstrap: codexBootstrap,
         chat,
         configControl,
@@ -181,7 +181,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
         compactThread: sessionState.threads.compactThread,
       }),
     [
-      activeSessionThreadId,
+      activeRuntimeConversationId,
       chat.canInterruptTurn,
       chat.canSteerTurn,
       chat.chatState,
