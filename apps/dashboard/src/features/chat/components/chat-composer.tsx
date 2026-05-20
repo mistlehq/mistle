@@ -37,6 +37,7 @@ import {
   listComposerCommands,
 } from "../../pages/session-composer/session-composer-trigger-detection.js";
 import { resolveSelectableValue } from "../../shared/select-value.js";
+import { ContextMentionSearchMenu } from "./context-mention-search-menu.js";
 
 function formatSlashCommandOptionLabel(command: ComposerCommandDescriptor): string {
   if (command.description === undefined) {
@@ -48,10 +49,10 @@ function formatSlashCommandOptionLabel(command: ComposerCommandDescriptor): stri
 
 function formatContextMentionInsertion(path: string): string {
   if (!/\s/.test(path)) {
-    return path;
+    return `${path} `;
   }
 
-  return `"${path.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
+  return `"${path.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}" `;
 }
 
 function isApplePlatform(): boolean {
@@ -810,54 +811,17 @@ export function ChatComposer({
         )}
         <div className="relative">
           {showContextMentionMenu ? (
-            <div
-              aria-label="Search files"
-              className="absolute right-0 bottom-full left-0 z-20 mb-2 max-h-64 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+            <ContextMentionSearchMenu
+              activePath={activeContextMention?.path ?? null}
               id={contextMentionListId}
-              role="listbox"
-            >
-              {contextMentionControl?.status === "unavailable" ? (
-                <div className="px-3 py-2 text-sm text-muted-foreground">
-                  File search is unavailable
-                </div>
-              ) : activeContextMentionQuery === "" ? (
-                <div className="px-3 py-2 text-sm text-muted-foreground">Search files</div>
-              ) : contextMentionResults.length === 0 ? (
-                <div className="px-3 py-2 text-sm text-muted-foreground">
-                  {contextMentionControl?.status === "loading"
-                    ? "Searching..."
-                    : "No matching paths"}
-                </div>
-              ) : (
-                contextMentionResults.map((result, resultIndex) => {
-                  const isActiveResult = result.path === activeContextMention?.path;
-
-                  return (
-                    <button
-                      aria-label={result.path}
-                      aria-selected={isActiveResult}
-                      className={[
-                        "flex w-full rounded-sm px-3 py-2 text-left font-mono text-xs leading-5 outline-none",
-                        isActiveResult ? "bg-muted text-foreground" : "hover:bg-muted/70",
-                      ].join(" ")}
-                      id={`${contextMentionListId}-${String(resultIndex)}`}
-                      key={result.path}
-                      onMouseDown={(event) => {
-                        event.preventDefault();
-                        insertContextMentionPath(result.path, activeContextMentionQuery ?? "");
-                      }}
-                      onMouseEnter={() => {
-                        setActiveContextMentionIndex(resultIndex);
-                      }}
-                      role="option"
-                      type="button"
-                    >
-                      <span className="min-w-0 whitespace-normal break-all">{result.path}</span>
-                    </button>
-                  );
-                })
-              )}
-            </div>
+              onResultMouseEnter={setActiveContextMentionIndex}
+              onResultSelect={(result) => {
+                insertContextMentionPath(result.path, activeContextMentionQuery ?? "");
+              }}
+              query={activeContextMentionQuery ?? ""}
+              results={contextMentionResults}
+              status={contextMentionControl?.status ?? "idle"}
+            />
           ) : null}
           {showSlashCommandMenu ? (
             <div

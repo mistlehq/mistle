@@ -704,7 +704,7 @@ describe("ChatComposer", () => {
     fireEvent.keyDown(composer, { key: "ArrowDown" });
     fireEvent.keyDown(composer, { key: "Enter" });
 
-    expect(composer.value).toBe('/review "src/file with space.ts"');
+    expect(composer.value).toBe('/review "src/file with space.ts" ');
     expect(selectedPaths).toEqual(["src/file with space.ts"]);
   });
 
