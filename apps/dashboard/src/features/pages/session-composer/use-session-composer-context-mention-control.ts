@@ -145,6 +145,7 @@ export function useSessionComposerContextMentionControl(input: {
         cwd,
         query: trimmedQuery,
       };
+      latestRequestRef.current = null;
 
       setState({
         results: [],
