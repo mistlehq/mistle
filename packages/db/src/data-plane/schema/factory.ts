@@ -6,6 +6,7 @@ import { defineSandboxInstanceStorages } from "./sandbox-instance-storages.js";
 import { defineSandboxInstances } from "./sandbox-instances.js";
 import { defineSandboxOperationEvents } from "./sandbox-operation-events.js";
 import { defineSandboxTunnelTokenRedemptions } from "./sandbox-tunnel-token-redemptions.js";
+import { defineSandboxUsageEvents } from "./sandbox-usage-events.js";
 
 /**
  * Creates data-plane table objects bound to a specific Postgres schema.
@@ -37,6 +38,10 @@ export function createDataPlaneDbSchema(schemaName: string) {
       sandboxInstances,
     }),
     sandboxTunnelTokenRedemptions: defineSandboxTunnelTokenRedemptions(schema),
+    sandboxUsageEvents: defineSandboxUsageEvents({
+      schema,
+      sandboxInstances,
+    }),
   };
 }
 

@@ -64,6 +64,12 @@ export type {
   InsertSandboxTunnelTokenRedemption,
   SandboxTunnelTokenRedemption,
 } from "./sandbox-tunnel-token-redemptions.js";
+export { sandboxUsageEvents, SandboxUsageEventTypes } from "./sandbox-usage-events.js";
+export type {
+  InsertSandboxUsageEvent,
+  SandboxUsageEvent,
+  SandboxUsageEventType,
+} from "./sandbox-usage-events.js";
 export {
   sandboxInstanceDeadlines,
   SandboxInstanceDeadlineKinds,
