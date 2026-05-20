@@ -14,10 +14,12 @@ import type { AppAuthContext } from "../../types.js";
 
 const ApiKeyTokenPrefix = "mstl_apk_";
 
+type ApiKeyAuthContext = Extract<AppAuthContext, { kind: "api_key" }>;
+
 export async function authenticateApiKeyToken(input: {
   db: ControlPlaneDatabase;
   token: string;
-}): Promise<Extract<AppAuthContext, { kind: "api_key" }>> {
+}): Promise<ApiKeyAuthContext> {
   const secretPrefix = parseApiKeySecretPrefix(input.token);
   if (secretPrefix === null) {
     throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
@@ -56,11 +58,68 @@ export async function authenticateApiKeyToken(input: {
     throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
   }
 
+  return buildApiKeyAuthContext({
+    db: input.db,
+    apiKey: {
+      id: apiKey.id,
+      name: apiKey.name,
+      organizationId: apiKey.organizationId,
+    },
+  });
+}
+
+export async function authenticateApiKeyReference(input: {
+  db: ControlPlaneDatabase;
+  apiKeyId: string;
+  organizationId: string;
+}): Promise<ApiKeyAuthContext> {
+  const apiKey = await input.db.query.apiKeys.findFirst({
+    columns: {
+      id: true,
+      name: true,
+      organizationId: true,
+      revokedAt: true,
+      expiresAt: true,
+    },
+    where: (table, { and, eq }) =>
+      and(eq(table.id, input.apiKeyId), eq(table.organizationId, input.organizationId)),
+  });
+
+  if (apiKey === undefined) {
+    throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
+  }
+
+  if (apiKey.revokedAt !== null) {
+    throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
+  }
+
+  if (apiKey.expiresAt !== null && new Date(apiKey.expiresAt) <= new Date()) {
+    throw new UnauthorizedError("UNAUTHORIZED", "Unauthorized API request.");
+  }
+
+  return buildApiKeyAuthContext({
+    db: input.db,
+    apiKey: {
+      id: apiKey.id,
+      name: apiKey.name,
+      organizationId: apiKey.organizationId,
+    },
+  });
+}
+
+async function buildApiKeyAuthContext(input: {
+  db: ControlPlaneDatabase;
+  apiKey: {
+    id: string;
+    name: string;
+    organizationId: string;
+  };
+}): Promise<ApiKeyAuthContext> {
   const permissions = await input.db.query.apiKeyPermissions.findMany({
     columns: {
       permission: true,
     },
-    where: (table, { eq }) => eq(table.apiKeyId, apiKey.id),
+    where: (table, { eq }) => eq(table.apiKeyId, input.apiKey.id),
   });
 
   const tables = getControlPlaneDatabaseSchema(input.db);
@@ -70,14 +129,14 @@ export async function authenticateApiKeyToken(input: {
       lastUsedAt: sql`now()`,
       updatedAt: sql`now()`,
     })
-    .where(eq(tables.apiKeys.id, apiKey.id));
+    .where(eq(tables.apiKeys.id, input.apiKey.id));
 
   return {
     kind: "api_key",
     apiKey: {
-      id: apiKey.id,
-      name: apiKey.name,
-      organizationId: apiKey.organizationId,
+      id: input.apiKey.id,
+      name: input.apiKey.name,
+      organizationId: input.apiKey.organizationId,
     },
     permissions: parseApiKeyPermissions(permissions.map((permission) => permission.permission)),
   };
@@ -94,6 +153,10 @@ export function parseBearerToken(authorization: string | null): string | null {
   }
 
   return token;
+}
+
+export function isApiKeyToken(token: string): boolean {
+  return parseApiKeySecretPrefix(token) !== null;
 }
 
 function parseApiKeySecretPrefix(token: string): string | null {

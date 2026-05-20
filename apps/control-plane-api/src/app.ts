@@ -30,6 +30,7 @@ import { createCorsMiddleware } from "./middleware/cors.js";
 import { withActiveOrganizationAccess } from "./middleware/with-active-organization-access.js";
 import { withAuthSession } from "./middleware/with-auth-session.js";
 import { withAuthenticatedRequest } from "./middleware/with-authenticated-request.js";
+import { withMcpOrganizationAccess } from "./middleware/with-mcp-organization-access.js";
 import { withOrganizationAccess } from "./middleware/with-organization-access.js";
 import { createOrganizationRoutes } from "./organizations/index.js";
 import { createPublicSessionLinksRoutes } from "./public-session-links/index.js";
@@ -174,7 +175,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const integrationWebhooksRoutes = createIntegrationWebhooksRoutes();
   const currentActorMeRoutes = withAuthenticatedRequest(createCurrentActorMeRoutes());
   const meRoutes = withAuthSession(createMeRoutes());
-  const mcpRoutes = withOrganizationAccess(createMcpRoutes());
+  const mcpRoutes = withMcpOrganizationAccess(createMcpRoutes());
   const organizationRoutes = withActiveOrganizationAccess(createOrganizationRoutes());
   const publicSessionLinksRoutes = createPublicSessionLinksRoutes();
   const sandboxInstancesRoutes = withOrganizationAccess(createSandboxInstancesRoutes());

@@ -3,6 +3,7 @@
  */
 
 import { SandboxProfileStatuses } from "@mistle/db/control-plane";
+import { mintMcpToken } from "@mistle/gateway-tunnel-auth";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
@@ -15,11 +16,17 @@ import {
   ListSandboxProfilesResponseSchema,
   SandboxProfileSchema,
 } from "../src/sandbox-profiles/index.js";
-import { createApiKeyToken } from "./helpers/api-keys.js";
+import { createApiKeyCredential, createApiKeyToken } from "./helpers/api-keys.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
+
+const McpTokenConfig = {
+  tokenSecret: "integration-new-mcp-auth-secret",
+  tokenIssuer: "integration-new-control-plane-api",
+  tokenAudience: "integration-new-mistle-mcp",
+};
 
 const JsonRpcToolResponseSchema = z
   .object({
@@ -119,6 +126,53 @@ describe.concurrent("MCP profile tools integration", () => {
     expect(profile.id).toBe("sbp_mcp_get");
     expect(profile.organizationId).toBe(session.organizationId);
     expect(profile.displayName).toBe("MCP Get Profile");
+  });
+
+  it("authorizes profile tools with a gateway-injected MCP token referencing an API key", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-mcp-token-profile-list@example.com",
+    });
+    const apiKeyCredential = await createApiKeyCredential({
+      cookie: session.cookie,
+      env,
+      name: "MCP token profile reader",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_READ],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values({
+      id: "sbp_mcp_token_list",
+      organizationId: session.organizationId,
+      displayName: "MCP Token List Profile",
+      status: SandboxProfileStatuses.ACTIVE,
+      createdAt: "2026-04-01T00:00:00.000Z",
+      updatedAt: "2026-04-01T00:00:00.000Z",
+    });
+
+    const mcpToken = await mintMcpToken({
+      config: McpTokenConfig,
+      claims: {
+        sub: "sbi_mcp_token_list",
+        organizationId: session.organizationId,
+        apiKeyId: apiKeyCredential.apiKey.id,
+      },
+      ttlSeconds: 300,
+    });
+
+    const result = await callMcpTool({
+      env,
+      token: mcpToken.token,
+      name: "profile_list",
+      arguments: {
+        limit: 10,
+      },
+    });
+
+    expect(result.isError).toBeUndefined();
+    const profileList = ListSandboxProfilesResponseSchema.parse(result.structuredContent);
+    expect(profileList.totalResults).toBe(1);
+    expect(profileList.items.map((profile) => profile.id)).toEqual(["sbp_mcp_token_list"]);
   });
 
   it("returns a tool error when the API key lacks sandbox profile read permission", async ({
