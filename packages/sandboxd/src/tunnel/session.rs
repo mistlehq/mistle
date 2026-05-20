@@ -5585,18 +5585,26 @@ fn close_port_access_tcp_streams(session_state: &mut TunnelSessionMutableState) 
     }
 }
 
+fn discard_file_upload_state(upload_state: FileUploadState) {
+    let _ = fs::remove_file(&upload_state.temp_path);
+}
+
 fn handle_tunnel_binary_frame(
     tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     frame: crate::tunnel::protocol::StreamDataFrame,
     session_state: &mut TunnelSessionMutableState,
     clock: &dyn Clock,
 ) -> Result<(), TunnelSessionError> {
-    if let Some(agent_stream) = session_state.agent_streams.get_mut(&frame.stream_id) {
+    if session_state.agent_streams.contains_key(&frame.stream_id) {
         let payload_bytes = frame.payload.len();
         match frame.payload_kind {
             PAYLOAD_KIND_WEBSOCKET_TEXT => {
                 let payload = String::from_utf8(frame.payload)
                     .map_err(|error| TunnelSessionError::AgentWrite(error.to_string()))?;
+                let Some(agent_stream) = session_state.agent_streams.get_mut(&frame.stream_id)
+                else {
+                    return Ok(());
+                };
                 agent_stream
                     .sender
                     .send(Message::Text(payload.into()))
@@ -5604,6 +5612,10 @@ fn handle_tunnel_binary_frame(
                 agent_stream.stats.record_inbound_message(payload_bytes);
             }
             PAYLOAD_KIND_WEBSOCKET_BINARY => {
+                let Some(agent_stream) = session_state.agent_streams.get_mut(&frame.stream_id)
+                else {
+                    return Ok(());
+                };
                 agent_stream
                     .sender
                     .send(Message::Binary(frame.payload.into()))
@@ -5611,12 +5623,27 @@ fn handle_tunnel_binary_frame(
                 agent_stream.stats.record_inbound_message(payload_bytes);
             }
             _ => {
+                let reason = "agent stream only accepts websocket text or binary payload kinds";
+                if let Some(agent_stream) = remove_agent_stream_and_publish_summary(
+                    tunnel_writer_sender,
+                    session_state,
+                    clock,
+                    frame.stream_id,
+                    AgentStreamTermination {
+                        outcome: AGENT_STREAM_OUTCOME_RESET,
+                        close_source: AGENT_STREAM_CLOSE_SOURCE_GATEWAY,
+                        reset_code: Some(STREAM_RESET_CODE_INVALID_STREAM_DATA),
+                        reason: Some(reason.to_string()),
+                    },
+                ) {
+                    let _ = agent_stream.sender.send(Message::Close(None));
+                }
                 write_tunnel_text(
                     tunnel_writer_sender,
                     stream_reset(
                         frame.stream_id,
                         STREAM_RESET_CODE_INVALID_STREAM_DATA,
-                        "agent stream only accepts websocket text or binary payload kinds",
+                        reason,
                     ),
                 )?;
             }
@@ -5841,11 +5868,12 @@ fn handle_tunnel_binary_frame(
                     "port access tcp request stream window is exhausted",
                 ),
             )?;
-            let stream_state = session_state
+            if let Some(stream_state) = session_state
                 .port_access_tcp_streams
                 .remove(&frame.stream_id)
-                .expect("tcp stream state should exist after failed window consume");
-            let _ = stream_state.sender.send(PortAccessTcpCommand::Terminate);
+            {
+                let _ = stream_state.sender.send(PortAccessTcpCommand::Terminate);
+            }
             return Ok(());
         }
         stream_state
@@ -5857,8 +5885,11 @@ fn handle_tunnel_binary_frame(
         return Ok(());
     }
 
-    if let Some(upload_state) = session_state.file_uploads.get_mut(&frame.stream_id) {
+    if session_state.file_uploads.contains_key(&frame.stream_id) {
         if frame.payload_kind != PAYLOAD_KIND_RAW_BYTES {
+            if let Some(upload_state) = session_state.file_uploads.remove(&frame.stream_id) {
+                discard_file_upload_state(upload_state);
+            }
             write_tunnel_text(
                 tunnel_writer_sender,
                 stream_reset(
@@ -5870,10 +5901,16 @@ fn handle_tunnel_binary_frame(
             return Ok(());
         }
 
+        let Some(upload_state) = session_state.file_uploads.get_mut(&frame.stream_id) else {
+            return Ok(());
+        };
         upload_state.received_bytes = upload_state
             .received_bytes
             .saturating_add(frame.payload.len());
         if upload_state.received_bytes > upload_state.size_bytes {
+            if let Some(upload_state) = session_state.file_uploads.remove(&frame.stream_id) {
+                discard_file_upload_state(upload_state);
+            }
             write_tunnel_text(
                 tunnel_writer_sender,
                 stream_reset(
@@ -5882,7 +5919,6 @@ fn handle_tunnel_binary_frame(
                     "received more bytes than declared by the upload metadata",
                 ),
             )?;
-            session_state.file_uploads.remove(&frame.stream_id);
             return Ok(());
         }
 
@@ -6488,16 +6524,17 @@ fn derive_upload_thread_directory_path(
 mod tests {
     use super::{
         AgentStreamState, AgentStreamStats, ConnectedTunnelSessionOutcome, DEFAULT_ATTACHMENT_ROOT,
-        OperationStreamMessage, PortAccessTcpStreamState, SANDBOX_OPERATION_STREAM_FORMAT,
-        SANDBOX_OPERATION_STREAM_ID, TunnelSessionError, TunnelSessionEvent,
-        TunnelSessionLoopContext, TunnelSessionMutableState, TunnelSessionRequest,
-        TunnelSessionRuntime, TunnelSessionRuntimeConnectionState, TunnelWriterMessage,
-        connect_bootstrap_websocket, handle_ports_transport_message, handle_tunnel_binary_frame,
-        handle_tunnel_control_message, handle_tunnel_session_event, handle_tunnel_session_request,
-        prioritize_ipv4_socket_addresses, record_egress_token_event, resolve_bootstrap_tunnel_url,
-        resolve_tunnel_exchange_url, run_connected_tunnel_session_catching_panics,
-        snapshot_runtime_connection_state, startup_transparent_passthrough_socket_mark,
-        sync_pty_scope_keepalive, terminate_file_search_stream,
+        FileUploadState, OperationStreamMessage, PortAccessTcpStreamState,
+        SANDBOX_OPERATION_STREAM_FORMAT, SANDBOX_OPERATION_STREAM_ID, TunnelSessionError,
+        TunnelSessionEvent, TunnelSessionLoopContext, TunnelSessionMutableState,
+        TunnelSessionRequest, TunnelSessionRuntime, TunnelSessionRuntimeConnectionState,
+        TunnelWriterMessage, connect_bootstrap_websocket, handle_ports_transport_message,
+        handle_tunnel_binary_frame, handle_tunnel_control_message, handle_tunnel_session_event,
+        handle_tunnel_session_request, prioritize_ipv4_socket_addresses, record_egress_token_event,
+        resolve_bootstrap_tunnel_url, resolve_tunnel_exchange_url,
+        run_connected_tunnel_session_catching_panics, snapshot_runtime_connection_state,
+        startup_transparent_passthrough_socket_mark, sync_pty_scope_keepalive,
+        terminate_file_search_stream,
     };
 
     use std::collections::{BTreeMap, BTreeSet};
@@ -6532,10 +6569,10 @@ mod tests {
     use crate::time::{Clock, SystemClock, ThreadSleeper};
     use crate::tunnel::port_access_transport::{PortAccessTcpCommand, PortAccessTransportEvent};
     use crate::tunnel::protocol::{
-        AGENT_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT,
-        PortAccessTarget, PortsTcpClose, PortsTcpConnected, PortsTcpOpen, PortsTransportMessage,
-        StreamDataFrame, StreamSendWindow, decode_stream_data_frame, encode_stream_data_frame,
-        parse_stream_control_message,
+        AGENT_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY,
+        PAYLOAD_KIND_WEBSOCKET_TEXT, PortAccessTarget, PortsTcpClose, PortsTcpConnected,
+        PortsTcpOpen, PortsTransportMessage, StreamDataFrame, StreamSendWindow,
+        decode_stream_data_frame, encode_stream_data_frame, parse_stream_control_message,
     };
     use crate::tunnel::session::{
         GatewayEgressTokenProvider, TunnelSession, TunnelSigningRequest, TunnelSigningResponse,
@@ -7794,6 +7831,78 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn resets_and_releases_agent_stream_after_invalid_gateway_payload_kind() {
+        let (tunnel_writer_sender, mut tunnel_writer_receiver) =
+            tokio::sync::mpsc::unbounded_channel();
+        let (agent_sender, mut agent_receiver) = tokio::sync::mpsc::unbounded_channel();
+        let clock = FixedClock { now_ms: 1_200 };
+        let mut session_state = empty_tunnel_session_state();
+        session_state.agent_streams.insert(
+            74,
+            AgentStreamState {
+                sender: agent_sender,
+                send_window: StreamSendWindow::new(AGENT_STREAM_WINDOW_BYTES),
+                stats: AgentStreamStats::new(1_000),
+            },
+        );
+        enable_test_telemetry(&mut session_state.telemetry_relay);
+
+        handle_tunnel_binary_frame(
+            &tunnel_writer_sender,
+            StreamDataFrame {
+                stream_id: 74,
+                payload_kind: PAYLOAD_KIND_RAW_BYTES,
+                payload: b"not websocket data".to_vec(),
+            },
+            &mut session_state,
+            &clock,
+        )
+        .expect("invalid agent stream payload should reset without failing the tunnel");
+
+        assert_eq!(
+            read_queued_telemetry_log_line(&mut tunnel_writer_receiver).await,
+            json!({
+                "timestamp": "1970-01-01T00:00:01.2Z",
+                "level": "info",
+                "event": "agent_stream_summary",
+                "streamId": 74,
+                "channelKind": "agent",
+                "outcome": "reset",
+                "closeSource": "gateway",
+                "durationMs": 200,
+                "messageCountOut": 0,
+                "messageCountIn": 0,
+                "totalBytesOut": 0,
+                "totalBytesIn": 0,
+                "maxMessageBytesOut": 0,
+                "maxMessageBytesIn": 0,
+                "maxOutstandingBytes": 0,
+                "avgCreditReturnMs": null,
+                "creditReturnCount": 0,
+                "resetCode": "invalid_stream_data",
+                "reason": "agent stream only accepts websocket text or binary payload kinds"
+            })
+        );
+        assert_eq!(
+            read_writer_text_json(&mut tunnel_writer_receiver).await,
+            json!({
+                "type": "stream.reset",
+                "streamId": 74,
+                "code": "invalid_stream_data",
+                "message": "agent stream only accepts websocket text or binary payload kinds"
+            })
+        );
+        assert!(session_state.agent_streams.is_empty());
+        assert_eq!(
+            agent_receiver
+                .recv()
+                .await
+                .expect("runtime stream should receive close after gateway reset"),
+            Message::Close(None)
+        );
+    }
+
+    #[tokio::test]
     async fn emits_window_exhausted_and_summary_telemetry_for_agent_stream() {
         let (tunnel_writer_sender, mut tunnel_writer_receiver) =
             tokio::sync::mpsc::unbounded_channel();
@@ -7917,6 +8026,109 @@ mod tests {
             })
         );
         assert!(session_state.agent_streams.is_empty());
+    }
+
+    fn insert_test_file_upload_stream(
+        session_state: &mut TunnelSessionMutableState,
+        stream_id: u32,
+        directory_path: &std::path::Path,
+        size_bytes: usize,
+    ) -> PathBuf {
+        let temp_path = directory_path.join(format!(".att_test_{stream_id}.part"));
+        let file = fs::File::create(&temp_path).expect("temporary upload file should be created");
+        session_state.file_uploads.insert(
+            stream_id,
+            FileUploadState {
+                attachment_id: format!("att_test_{stream_id}"),
+                thread_directory_path: directory_path.to_path_buf(),
+                thread_id: "thread_test".to_string(),
+                mime_type: "application/octet-stream".to_string(),
+                original_filename: "upload.bin".to_string(),
+                size_bytes,
+                temp_path: temp_path.clone(),
+                file,
+                received_bytes: 0,
+            },
+        );
+        temp_path
+    }
+
+    #[tokio::test]
+    async fn invalid_file_upload_payload_resets_and_removes_partial_file() {
+        let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
+        let (tunnel_writer_sender, mut tunnel_writer_receiver) =
+            tokio::sync::mpsc::unbounded_channel();
+        let mut session_state = empty_tunnel_session_state();
+        let temp_path = insert_test_file_upload_stream(&mut session_state, 75, temp_dir.path(), 4);
+
+        handle_tunnel_binary_frame(
+            &tunnel_writer_sender,
+            StreamDataFrame {
+                stream_id: 75,
+                payload_kind: PAYLOAD_KIND_WEBSOCKET_BINARY,
+                payload: b"pong".to_vec(),
+            },
+            &mut session_state,
+            &SystemClock,
+        )
+        .expect("invalid upload payload kind should reset without failing the tunnel");
+
+        assert_eq!(
+            read_writer_text_json(&mut tunnel_writer_receiver).await,
+            json!({
+                "type": "stream.reset",
+                "streamId": 75,
+                "code": "invalid_stream_data",
+                "message": "file upload stream only accepts raw byte payloads"
+            })
+        );
+        assert!(
+            !session_state.file_uploads.contains_key(&75),
+            "invalid upload payloads should release upload state",
+        );
+        assert!(
+            !temp_path.exists(),
+            "invalid upload payloads should remove the partial file",
+        );
+    }
+
+    #[tokio::test]
+    async fn oversized_file_upload_payload_resets_and_removes_partial_file() {
+        let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
+        let (tunnel_writer_sender, mut tunnel_writer_receiver) =
+            tokio::sync::mpsc::unbounded_channel();
+        let mut session_state = empty_tunnel_session_state();
+        let temp_path = insert_test_file_upload_stream(&mut session_state, 76, temp_dir.path(), 4);
+
+        handle_tunnel_binary_frame(
+            &tunnel_writer_sender,
+            StreamDataFrame {
+                stream_id: 76,
+                payload_kind: PAYLOAD_KIND_RAW_BYTES,
+                payload: b"hello".to_vec(),
+            },
+            &mut session_state,
+            &SystemClock,
+        )
+        .expect("oversized upload payload should reset without failing the tunnel");
+
+        assert_eq!(
+            read_writer_text_json(&mut tunnel_writer_receiver).await,
+            json!({
+                "type": "stream.reset",
+                "streamId": 76,
+                "code": "byte_count_exceeded",
+                "message": "received more bytes than declared by the upload metadata"
+            })
+        );
+        assert!(
+            !session_state.file_uploads.contains_key(&76),
+            "oversized upload payloads should release upload state",
+        );
+        assert!(
+            !temp_path.exists(),
+            "oversized upload payloads should remove the partial file",
+        );
     }
 
     #[test]
