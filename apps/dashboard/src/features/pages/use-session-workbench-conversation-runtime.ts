@@ -3,7 +3,11 @@ import { useMemo } from "react";
 
 import { formatCodexContextUsage } from "../session-agents/codex/session-state/codex-context-usage.js";
 import type { UseCodexSessionStateResult } from "../session-agents/codex/session-state/index.js";
-import type { UseOpenCodeSessionStateResult } from "../session-agents/opencode/session-state/index.js";
+import {
+  resolveOpenCodePromptModelOverride,
+  resolveOpenCodePromptVariantOverride,
+  type UseOpenCodeSessionStateResult,
+} from "../session-agents/opencode/session-state/index.js";
 import type { UsePiSessionStateResult } from "../session-agents/pi/session-state/index.js";
 import type {
   RuntimeConversationNavigatorState,
@@ -309,6 +313,34 @@ export function useSessionWorkbenchConversationRuntime(input: {
       openCodeSessionState.chat.chatState.messageOrder.length,
     ],
   );
+  const executeOpenCodePromptCommand = useMemo(
+    () =>
+      async (commandInput: { text: string }): Promise<void> => {
+        const selectedOpenCodeModel = resolveOpenCodePromptModelOverride(
+          openCodeConfigControl.hasExplicitModelSelection,
+          openCodeConfigControl.selectedModel,
+        );
+        const selectedOpenCodeVariant = resolveOpenCodePromptVariantOverride(
+          openCodeConfigControl.selectedReasoningEffort,
+        );
+
+        await openCodeSessionState.commands.sendPromptCommand({
+          ...(input.selectedRepositoryPath === null
+            ? {}
+            : { directory: input.selectedRepositoryPath }),
+          ...(selectedOpenCodeModel === undefined ? {} : { model: selectedOpenCodeModel }),
+          ...(selectedOpenCodeVariant === undefined ? {} : { variant: selectedOpenCodeVariant }),
+          text: commandInput.text,
+        });
+      },
+    [
+      input.selectedRepositoryPath,
+      openCodeConfigControl.hasExplicitModelSelection,
+      openCodeConfigControl.selectedModel,
+      openCodeConfigControl.selectedReasoningEffort,
+      openCodeSessionState.commands.sendPromptCommand,
+    ],
+  );
   const startPiTurn = useMemo<SessionTurnControl["startTurn"]>(
     () =>
       buildPiTurnStarter({
@@ -398,6 +430,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
         bootstrap: openCodeComposerBootstrap,
         chat: openCodeSessionState.chat,
         configControl: openCodeConfigControl,
+        executePromptCommand: executeOpenCodePromptCommand,
         sessionMessage: openCodeSessionState.sessionMessage,
         sessionSnapshot: openCodeSessionState.lifecycle.sessionSnapshot,
         startTurn: startOpenCodeTurn,
@@ -412,6 +445,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
       openCodeSessionState.chat.isRespondingToPermission,
       openCodeSessionState.chat.isStartingTurn,
       openCodeSessionState.chat.respondToPermission,
+      executeOpenCodePromptCommand,
       openCodeSessionState.lifecycle.sessionSnapshot,
       openCodeSessionState.sessionMessage.clearSessionErrorMessage,
       openCodeSessionState.sessionMessage.reportSessionErrorMessage,

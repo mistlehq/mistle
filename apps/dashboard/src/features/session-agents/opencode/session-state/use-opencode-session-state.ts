@@ -1,5 +1,6 @@
 import {
   createOpenCodeSessionClient,
+  type OpenCodeCommandSummary,
   type OpenCodeEvent,
   type OpenCodeEventSubscription,
   type OpenCodeMessageWithParts,
@@ -10,6 +11,10 @@ import {
   type OpenCodeSessionClient,
   type OpenCodeSessionSummary,
 } from "@mistle/integrations-definitions/agent-runtimes/opencode/client";
+import {
+  mapOpenCodePromptCommandsToComposerCapabilities,
+  shouldExposeOpenCodePromptCommand,
+} from "@mistle/integrations-definitions/agent-runtimes/opencode/composer-capabilities";
 import { waitForGeneratedOpenCodeConversationTitle } from "@mistle/integrations-definitions/agent-runtimes/opencode/title-generation";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useCallback, useEffect, useReducer, useRef, useState, type Dispatch } from "react";
@@ -64,6 +69,9 @@ export type OpenCodeSessionLifecycleState = {
   recoverSession: (input: { sandboxInstanceId: string; targetSessionId: string | null }) => void;
   recoverableDisconnect: null;
   refreshModelCatalog: (input: { directory?: string | null; force?: boolean }) => Promise<void>;
+  refreshPromptCommands: (input: {
+    directory?: string | null;
+  }) => Promise<readonly OpenCodeCommandSummary[]>;
   sessionConnectionState: "connected" | "connecting" | "detached";
   sessionSnapshot: ConnectedOpenCodeSession | null;
   step: "connected" | "connecting" | "idle" | "securing";
@@ -86,6 +94,7 @@ export type OpenCodeSessionNavigatorState = {
 
 export type UseOpenCodeSessionStateResult = {
   bootstrap: SessionComposerBootstrapResult;
+  commandCatalogDirectory: string | null;
   modelCatalogDirectory: string | null;
   chat: {
     abortSession: () => Promise<void>;
@@ -106,6 +115,15 @@ export type UseOpenCodeSessionStateResult = {
       model?: OpenCodePromptModelSelection;
       submittedAttachments?: readonly OpenCodePromptPartInput[];
       submittedPrompt: string;
+      variant?: string;
+    }) => Promise<void>;
+  };
+  commands: {
+    promptCommands: readonly OpenCodeCommandSummary[];
+    sendPromptCommand: (input: {
+      directory?: string;
+      model?: OpenCodePromptModelSelection;
+      text: string;
       variant?: string;
     }) => Promise<void>;
   };
@@ -177,6 +195,29 @@ export function resolveOriginalOpenCodeSessionId(input: {
 
 function normalizeOpenCodeCatalogDirectory(directory: string | null | undefined): string | null {
   return directory === undefined || directory === null ? null : directory;
+}
+
+function parseOpenCodePromptCommandInput(input: {
+  commands: readonly OpenCodeCommandSummary[];
+  text: string;
+}): { arguments: string; command: OpenCodeCommandSummary } {
+  const trimmedText = input.text.trimStart();
+  if (!trimmedText.startsWith("/")) {
+    throw new Error("OpenCode prompt command must start with '/'.");
+  }
+
+  const commandTokenEnd = trimmedText.search(/\s/);
+  const commandName =
+    commandTokenEnd === -1 ? trimmedText.slice(1) : trimmedText.slice(1, commandTokenEnd);
+  const command = input.commands.find((candidateCommand) => candidateCommand.name === commandName);
+  if (command === undefined) {
+    throw new Error(`OpenCode prompt command '/${commandName}' is not available.`);
+  }
+
+  return {
+    command,
+    arguments: commandTokenEnd === -1 ? "" : trimmedText.slice(commandTokenEnd + 1),
+  };
 }
 
 export function resolveOpenCodeSessionSelection(input: {
@@ -313,6 +354,7 @@ export function useOpenCodeSessionState(input: {
   const generationRef = useRef(0);
   const sessionNavigationRequestSequenceRef = useRef(0);
   const modelCatalogGenerationRef = useRef(0);
+  const promptCommandsGenerationRef = useRef(0);
   const modelCatalogStateRef = useRef<{
     directory: string | null;
     phase: SessionComposerBootstrapPhase;
@@ -327,6 +369,8 @@ export function useOpenCodeSessionState(input: {
   const [lifecycleErrorMessage, setLifecycleErrorMessage] = useState<string | null>(null);
   const [sessionErrorMessage, setSessionErrorMessage] = useState<string | null>(null);
   const [availableModels, setAvailableModels] = useState<readonly SessionComposerModel[]>([]);
+  const [promptCommands, setPromptCommands] = useState<readonly OpenCodeCommandSummary[]>([]);
+  const [commandCatalogDirectory, setCommandCatalogDirectory] = useState<string | null>(null);
   const [availableSessions, setAvailableSessions] = useState<readonly OpenCodeSessionSummary[]>([]);
   const [hasMoreAvailableSessions, setHasMoreAvailableSessions] = useState(false);
   const [originalSessionId, setOriginalSessionId] = useState<string | null>(null);
@@ -386,11 +430,14 @@ export function useOpenCodeSessionState(input: {
 
   const disconnectSession = useCallback((): void => {
     generationRef.current += 1;
+    promptCommandsGenerationRef.current += 1;
     clearEventSubscription();
     clientRef.current?.close();
     clientRef.current = null;
     resetModelCatalog({ status: "unavailable" });
     setAvailableSessions([]);
+    setPromptCommands([]);
+    setCommandCatalogDirectory(null);
     setHasMoreAvailableSessions(false);
     setOriginalSessionId(null);
     setPendingSessionId(null);
@@ -522,6 +569,41 @@ export function useOpenCodeSessionState(input: {
     [],
   );
 
+  const refreshPromptCommands = useCallback(
+    async (refreshInput: {
+      directory?: string | null;
+    }): Promise<readonly OpenCodeCommandSummary[]> => {
+      const client = clientRef.current;
+      if (client === null) {
+        throw new Error("Connect OpenCode before refreshing prompt commands.");
+      }
+
+      const directory = normalizeOpenCodeCatalogDirectory(refreshInput.directory);
+      const generation = promptCommandsGenerationRef.current + 1;
+      promptCommandsGenerationRef.current = generation;
+      setPromptCommands([]);
+      setCommandCatalogDirectory(null);
+      try {
+        const commands = (
+          await client.listCommands(directory === null ? {} : { directory })
+        ).filter(shouldExposeOpenCodePromptCommand);
+        if (promptCommandsGenerationRef.current !== generation) {
+          return [];
+        }
+        setPromptCommands(commands);
+        setCommandCatalogDirectory(directory);
+        return commands;
+      } catch (error) {
+        if (promptCommandsGenerationRef.current === generation) {
+          setPromptCommands([]);
+          setCommandCatalogDirectory(null);
+        }
+        throw error;
+      }
+    },
+    [],
+  );
+
   const refreshSessionList = useCallback(
     async (refreshInput?: {
       directory?: string | null;
@@ -559,6 +641,9 @@ export function useOpenCodeSessionState(input: {
       clientRef.current?.close();
       clientRef.current = null;
       resetModelCatalog({ status: "bootstrapping" });
+      promptCommandsGenerationRef.current += 1;
+      setPromptCommands([]);
+      setCommandCatalogDirectory(null);
       setStep("securing");
       setSessionConnectionState("connecting");
       setLifecycleErrorMessage(null);
@@ -582,6 +667,15 @@ export function useOpenCodeSessionState(input: {
           await refreshModelCatalog(
             directory === undefined ? { force: true } : { directory, force: true },
           );
+          if (generationRef.current !== generation) {
+            client.close();
+            return;
+          }
+          await refreshPromptCommands(directory === undefined ? {} : { directory });
+          if (generationRef.current !== generation) {
+            client.close();
+            return;
+          }
           const sessionPage = await listOpenCodeSessionPage({
             client,
             ...(directory === undefined ? {} : { directory }),
@@ -707,6 +801,8 @@ export function useOpenCodeSessionState(input: {
           };
           resetModelCatalog(failedPhase);
           setAvailableSessions([]);
+          setPromptCommands([]);
+          setCommandCatalogDirectory(null);
           setHasMoreAvailableSessions(false);
           setOriginalSessionId(null);
           setPendingSessionId(null);
@@ -720,7 +816,13 @@ export function useOpenCodeSessionState(input: {
         }
       })();
     },
-    [clearEventSubscription, ensureTransportConnected, refreshModelCatalog, resetModelCatalog],
+    [
+      clearEventSubscription,
+      ensureTransportConnected,
+      refreshModelCatalog,
+      refreshPromptCommands,
+      resetModelCatalog,
+    ],
   );
 
   const sendPrompt = useCallback(
@@ -770,6 +872,48 @@ export function useOpenCodeSessionState(input: {
       }
     },
     [sessionSnapshot?.activeSessionId],
+  );
+
+  const sendPromptCommand = useCallback(
+    async (commandInput: {
+      directory?: string;
+      model?: OpenCodePromptModelSelection;
+      text: string;
+      variant?: string;
+    }): Promise<void> => {
+      const client = clientRef.current;
+      const sessionId = sessionSnapshot?.activeSessionId ?? null;
+      if (client === null || sessionId === null) {
+        throw new Error("Connect OpenCode before sending a prompt command.");
+      }
+
+      const parsedCommand = parseOpenCodePromptCommandInput({
+        commands: promptCommands,
+        text: commandInput.text,
+      });
+      setIsStartingTurn(true);
+      try {
+        await client.sendCommand({
+          sessionId,
+          command: parsedCommand.command.name,
+          arguments: parsedCommand.arguments,
+          ...(commandInput.directory === undefined ? {} : { directory: commandInput.directory }),
+          ...(commandInput.model === undefined
+            ? {}
+            : { model: `${commandInput.model.providerID}/${commandInput.model.modelID}` }),
+          ...(commandInput.variant === undefined ? {} : { variant: commandInput.variant }),
+        });
+        setSessionErrorMessage(null);
+      } catch (error) {
+        setSessionErrorMessage(
+          error instanceof Error ? error.message : "Could not send OpenCode prompt command.",
+        );
+        throw error;
+      } finally {
+        setIsStartingTurn(false);
+      }
+    },
+    [promptCommands, sessionSnapshot?.activeSessionId],
   );
 
   const waitForGeneratedSessionTitle = useCallback(async (): Promise<string> => {
@@ -869,6 +1013,7 @@ export function useOpenCodeSessionState(input: {
           providerSessionId: connectedSession.providerSessionId,
           sandboxInstanceId: connectedSession.sandboxInstanceId,
         });
+        await refreshPromptCommands(directory === undefined ? {} : { directory });
         setSessionErrorMessage(null);
         return session.id;
       } catch (error) {
@@ -882,7 +1027,7 @@ export function useOpenCodeSessionState(input: {
         }
       }
     },
-    [sessionSnapshot],
+    [refreshPromptCommands, sessionSnapshot],
   );
 
   const startNewSession = useCallback(
@@ -901,6 +1046,7 @@ export function useOpenCodeSessionState(input: {
         await refreshModelCatalog(
           directory === undefined ? { force: true } : { directory, force: true },
         );
+        await refreshPromptCommands(directory === undefined ? {} : { directory });
         const session = await client.createSession({
           ...(directory === undefined ? {} : { directory }),
         });
@@ -946,7 +1092,7 @@ export function useOpenCodeSessionState(input: {
         }
       }
     },
-    [refreshModelCatalog, sessionSnapshot],
+    [refreshModelCatalog, refreshPromptCommands, sessionSnapshot],
   );
 
   const recoverSession = useCallback(
@@ -962,13 +1108,18 @@ export function useOpenCodeSessionState(input: {
   return {
     bootstrap: {
       phase: bootstrapPhase,
-      composerCapabilities: [],
+      composerCapabilities: mapOpenCodePromptCommandsToComposerCapabilities(promptCommands),
       establishedSnapshot: {
         availableModels,
         configSnapshot: EmptyOpenCodeComposerConfig,
       },
     },
+    commandCatalogDirectory,
     modelCatalogDirectory,
+    commands: {
+      promptCommands,
+      sendPromptCommand,
+    },
     lifecycle: {
       clearLifecycleErrorMessage,
       connectSession,
@@ -979,6 +1130,7 @@ export function useOpenCodeSessionState(input: {
       recoverSession,
       recoverableDisconnect: null,
       refreshModelCatalog,
+      refreshPromptCommands,
       sessionConnectionState,
       sessionSnapshot,
       step,

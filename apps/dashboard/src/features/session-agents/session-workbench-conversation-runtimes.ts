@@ -255,6 +255,7 @@ export function buildOpenCodeConversationRuntime(input: {
   bootstrap: SessionComposerRuntimeInput["bootstrap"];
   chat: UseOpenCodeSessionStateResult["chat"];
   configControl: SessionComposerRuntimeInput["configControl"];
+  executePromptCommand: (input: { text: string }) => Promise<void>;
   sessionMessage: UseOpenCodeSessionStateResult["sessionMessage"];
   sessionSnapshot: UseOpenCodeSessionStateResult["lifecycle"]["sessionSnapshot"];
   startTurn: SessionTurnControl["startTurn"];
@@ -314,6 +315,18 @@ export function buildOpenCodeConversationRuntime(input: {
       sessionErrorMessage: input.sessionMessage.sessionErrorMessage,
       clearSessionErrorMessage: input.sessionMessage.clearSessionErrorMessage,
       contextUsage: null,
+      executeTypedRuntimeCommand: (commandInput) => {
+        void input
+          .executePromptCommand({
+            text: commandInput.text,
+          })
+          .catch((error: unknown) => {
+            input.sessionMessage.reportSessionErrorMessage(
+              error instanceof Error ? error.message : "Could not send OpenCode prompt command.",
+            );
+          });
+        return true;
+      },
       modelSelection: capabilities.composerModelSelection,
     },
     serverRequestsState: {

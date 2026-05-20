@@ -1,4 +1,5 @@
 import { CodexComposerCapabilities } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
+import { mapOpenCodePromptCommandsToComposerCapabilities } from "@mistle/integrations-definitions/agent-runtimes/opencode/composer-capabilities";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, userEvent, within } from "storybook/test";
@@ -82,6 +83,30 @@ const ReviewCommitPickerPanel: ChatComposerCommandPanel = {
     },
   ],
 };
+
+const OpenCodePromptCommandCapabilities = mapOpenCodePromptCommandsToComposerCapabilities([
+  {
+    name: "review",
+    description: "review changes",
+    source: "command",
+    template: "Review $ARGUMENTS",
+    hints: ["$ARGUMENTS"],
+  },
+  {
+    name: "explain",
+    description: "explain the selected code",
+    source: "command",
+    template: "Explain $ARGUMENTS",
+    hints: ["$ARGUMENTS"],
+  },
+  {
+    name: "tests",
+    description: "write targeted tests",
+    source: "command",
+    template: "Write tests for $ARGUMENTS",
+    hints: ["$ARGUMENTS"],
+  },
+]);
 
 function detectShortcutPreviewPlatform(): ShortcutPreviewPlatform {
   if (typeof navigator === "undefined") {
@@ -412,6 +437,41 @@ export const OpenCodeDefaultModel: Story = {
     selectedModel: "openai/gpt-5.3-codex",
     selectedReasoningEffort: null,
     showReasoningControl: false,
+  },
+};
+
+export const OpenCodePromptCommands: Story = {
+  args: {
+    composerCapabilities: OpenCodePromptCommandCapabilities,
+    composerText: "/",
+    modelOptions: [
+      {
+        value: "openai/gpt-5.3-codex",
+        label: "OpenAI / GPT-5.3 Codex (default)",
+      },
+      {
+        value: "anthropic/claude-sonnet-4-5",
+        label: "Anthropic / Claude Sonnet 4.5",
+      },
+    ],
+    selectedModel: "openai/gpt-5.3-codex",
+    selectedReasoningEffort: null,
+    showReasoningControl: false,
+  },
+  render: (args) => (
+    <div className="flex min-h-[420px] items-end">
+      <PlatformAwareChatComposerStory {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByRole("listbox", { name: "Slash commands" })).toBeVisible();
+    await expect(canvas.getByRole("option", { name: "/review review changes" })).toBeVisible();
+    await expect(
+      canvas.getByRole("option", { name: "/explain explain the selected code" }),
+    ).toBeVisible();
+    await expect(canvas.getByRole("option", { name: "/tests write targeted tests" })).toBeVisible();
   },
 };
 

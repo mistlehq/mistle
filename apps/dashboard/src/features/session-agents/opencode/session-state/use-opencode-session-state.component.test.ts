@@ -77,6 +77,20 @@ function createDeferred<T>(): {
   };
 }
 
+async function expectNoOpenCodeRequest(
+  server: OpenCodeProxyTransportServer,
+  durationMs = 25,
+): Promise<void> {
+  const noRequest = Symbol("no request");
+  const result = await Promise.race([
+    server.nextRequest(),
+    new Promise<typeof noRequest>((resolve) => {
+      setTimeout(() => resolve(noRequest), durationMs);
+    }),
+  ]);
+  expect(result).toBe(noRequest);
+}
+
 function toUint8Array(data: RawData): Uint8Array {
   if (typeof data === "string") {
     return new TextEncoder().encode(data);
@@ -414,6 +428,13 @@ function closeTransport(transport: SandboxSessionTransport): void {
 }
 
 async function connectOpenCodeSessionForTest(input: {
+  commandsBody?: readonly {
+    description?: string;
+    hints: readonly string[];
+    name: string;
+    source?: "command" | "mcp" | "skill";
+    template: string;
+  }[];
   initialCwd?: string;
   navigatorSessionListBody?: readonly ReturnType<typeof createSessionResponse>[];
   providerSessionId?: string;
@@ -459,6 +480,20 @@ async function connectOpenCodeSessionForTest(input: {
   input.server.sendJsonResponse({
     request: providersRequest,
     body: createOpenCodeProviderCatalogResponse(),
+  });
+
+  const commandsRequest = await input.server.nextRequest();
+  const commandsPath =
+    input.initialCwd === undefined
+      ? "/command"
+      : `/command?directory=${encodeURIComponent(input.initialCwd)}`;
+  expect(commandsRequest.request).toMatchObject({
+    method: "GET",
+    path: commandsPath,
+  });
+  input.server.sendJsonResponse({
+    request: commandsRequest,
+    body: input.commandsBody ?? [],
   });
 
   const listSessionsRequest = await input.server.nextRequest();
@@ -644,6 +679,330 @@ describe("useOpenCodeSessionState", () => {
     expect(result.current.sessions.refreshSessionList).toBe(refreshSessionList);
   });
 
+  it("loads OpenCode prompt commands when connecting a session", async () => {
+    const server = await startOpenCodeProxyTransportServer();
+    const transport = await connectTransport(server);
+    const { result } = renderHook(() =>
+      useOpenCodeSessionState({
+        ensureTransportConnected: async () => {
+          return {
+            sandboxInstanceId: "sbi_123",
+            transport,
+          };
+        },
+      }),
+    );
+
+    const permissionsRequest = await connectOpenCodeSessionForTest({
+      commandsBody: [
+        {
+          name: "review",
+          description: "review changes",
+          source: "command",
+          template: "Review $ARGUMENTS",
+          hints: ["$ARGUMENTS"],
+        },
+        {
+          name: "customize-opencode",
+          description: "customize opencode config",
+          source: "skill",
+          template: "Customize opencode",
+          hints: [],
+        },
+      ],
+      result,
+      sandboxInstanceId: "sbi_123",
+      server,
+      sessionId: "ses_test",
+    });
+    server.sendJsonResponse({
+      request: permissionsRequest,
+      body: [],
+    });
+
+    await waitFor(() => {
+      expect(result.current.lifecycle.sessionConnectionState).toBe("connected");
+    });
+
+    expect(result.current.commands.promptCommands.map((command) => command.name)).toEqual([
+      "review",
+    ]);
+    expect(result.current.commandCatalogDirectory).toBeNull();
+    expect(result.current.bootstrap.composerCapabilities).toEqual([
+      {
+        kind: "composerCommand",
+        trigger: "/",
+        source: "runtimeCommand",
+        commands: [
+          {
+            id: "opencode.prompt.review",
+            name: "review",
+            description: "review changes",
+            availability: {
+              duringActiveTurn: "disabled",
+            },
+            submitAs: "typedRuntimeCommand",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("ignores stale OpenCode prompt command refreshes after reconnecting to another directory", async () => {
+    const server = await startOpenCodeProxyTransportServer();
+    const transport = await connectTransport(server);
+    const { result } = renderHook(() =>
+      useOpenCodeSessionState({
+        ensureTransportConnected: async () => {
+          return {
+            sandboxInstanceId: "sbi_123",
+            transport,
+          };
+        },
+      }),
+    );
+
+    act(() => {
+      result.current.lifecycle.connectSession({
+        initialCwd: "/workspace/old",
+        sandboxInstanceId: "sbi_123",
+        targetSessionId: "ses_old",
+      });
+    });
+
+    const oldHealthRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: oldHealthRequest,
+      body: {
+        healthy: true,
+        version: "1.14.41",
+      },
+    });
+    const oldProvidersRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: oldProvidersRequest,
+      body: createOpenCodeProviderCatalogResponse(),
+    });
+    const staleCommandsRequest = await server.nextRequest();
+    expect(staleCommandsRequest.request).toMatchObject({
+      method: "GET",
+      path: "/command?directory=%2Fworkspace%2Fold",
+    });
+
+    act(() => {
+      result.current.lifecycle.connectSession({
+        initialCwd: "/workspace/new",
+        sandboxInstanceId: "sbi_123",
+        targetSessionId: "ses_new",
+      });
+    });
+
+    const newHealthRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: newHealthRequest,
+      body: {
+        healthy: true,
+        version: "1.14.41",
+      },
+    });
+    const newProvidersRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: newProvidersRequest,
+      body: createOpenCodeProviderCatalogResponse(),
+    });
+    const newCommandsRequest = await server.nextRequest();
+    expect(newCommandsRequest.request).toMatchObject({
+      method: "GET",
+      path: "/command?directory=%2Fworkspace%2Fnew",
+    });
+    server.sendJsonResponse({
+      request: newCommandsRequest,
+      body: [
+        {
+          name: "review",
+          description: "review changes",
+          source: "command",
+          template: "Review $ARGUMENTS",
+          hints: ["$ARGUMENTS"],
+        },
+      ],
+    });
+    const newSessionsRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: newSessionsRequest,
+      body: [createSessionResponse("ses_new")],
+    });
+    const newSandboxSessionsRequest = await server.nextRequest();
+    expectOpenCodeSandboxSessionsRequest(newSandboxSessionsRequest);
+    server.sendJsonResponse({
+      request: newSandboxSessionsRequest,
+      body: [createSessionResponse("ses_new")],
+    });
+    const newSessionRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: newSessionRequest,
+      body: createSessionResponse("ses_new"),
+    });
+    const newEventRequest = await server.nextRequest();
+    server.sendSseOpenResponse({
+      request: newEventRequest,
+    });
+    const newMessagesRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: newMessagesRequest,
+      body: [],
+    });
+    const newPermissionsRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: newPermissionsRequest,
+      body: [],
+    });
+
+    await waitFor(() => {
+      expect(result.current.lifecycle.sessionSnapshot?.activeDirectory).toBe("/workspace/new");
+    });
+    expect(result.current.commandCatalogDirectory).toBe("/workspace/new");
+    expect(result.current.commands.promptCommands.map((command) => command.name)).toEqual([
+      "review",
+    ]);
+
+    server.sendJsonResponse({
+      request: staleCommandsRequest,
+      body: [
+        {
+          name: "old-only",
+          description: "old directory command",
+          source: "command",
+          template: "Old $ARGUMENTS",
+          hints: ["$ARGUMENTS"],
+        },
+      ],
+    });
+
+    await waitFor(() => {
+      expect(result.current.commands.promptCommands.map((command) => command.name)).toEqual([
+        "review",
+      ]);
+    });
+  });
+
+  it("does not refresh prompt commands from a superseded connection after model catalog loading completes", async () => {
+    const server = await startOpenCodeProxyTransportServer();
+    const transport = await connectTransport(server);
+    const { result } = renderHook(() =>
+      useOpenCodeSessionState({
+        ensureTransportConnected: async () => {
+          return {
+            sandboxInstanceId: "sbi_123",
+            transport,
+          };
+        },
+      }),
+    );
+
+    act(() => {
+      result.current.lifecycle.connectSession({
+        initialCwd: "/workspace/old",
+        sandboxInstanceId: "sbi_123",
+        targetSessionId: "ses_old",
+      });
+    });
+
+    const oldHealthRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: oldHealthRequest,
+      body: {
+        healthy: true,
+        version: "1.14.41",
+      },
+    });
+    const oldProvidersRequest = await server.nextRequest();
+    expect(oldProvidersRequest.request).toMatchObject({
+      method: "GET",
+      path: "/config/providers?directory=%2Fworkspace%2Fold",
+    });
+
+    act(() => {
+      result.current.lifecycle.connectSession({
+        initialCwd: "/workspace/new",
+        sandboxInstanceId: "sbi_123",
+        targetSessionId: "ses_new",
+      });
+    });
+
+    const newHealthRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: newHealthRequest,
+      body: {
+        healthy: true,
+        version: "1.14.41",
+      },
+    });
+    const newProvidersRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: newProvidersRequest,
+      body: createOpenCodeProviderCatalogResponse(),
+    });
+    const newCommandsRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: newCommandsRequest,
+      body: [
+        {
+          name: "review",
+          description: "review changes",
+          source: "command",
+          template: "Review $ARGUMENTS",
+          hints: ["$ARGUMENTS"],
+        },
+      ],
+    });
+    const newSessionsRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: newSessionsRequest,
+      body: [createSessionResponse("ses_new")],
+    });
+    const newSandboxSessionsRequest = await server.nextRequest();
+    expectOpenCodeSandboxSessionsRequest(newSandboxSessionsRequest);
+    server.sendJsonResponse({
+      request: newSandboxSessionsRequest,
+      body: [createSessionResponse("ses_new")],
+    });
+    const newSessionRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: newSessionRequest,
+      body: createSessionResponse("ses_new"),
+    });
+    const newEventRequest = await server.nextRequest();
+    server.sendSseOpenResponse({
+      request: newEventRequest,
+    });
+    const newMessagesRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: newMessagesRequest,
+      body: [],
+    });
+    const newPermissionsRequest = await server.nextRequest();
+    server.sendJsonResponse({
+      request: newPermissionsRequest,
+      body: [],
+    });
+
+    await waitFor(() => {
+      expect(result.current.lifecycle.sessionSnapshot?.activeDirectory).toBe("/workspace/new");
+    });
+
+    server.sendJsonResponse({
+      request: oldProvidersRequest,
+      body: createOpenCodeProviderCatalogResponse(),
+    });
+
+    await expectNoOpenCodeRequest(server);
+    expect(result.current.commandCatalogDirectory).toBe("/workspace/new");
+    expect(result.current.commands.promptCommands.map((command) => command.name)).toEqual([
+      "review",
+    ]);
+  });
+
   it("does not keep a connected session snapshot after hydration fails", async () => {
     const server = await startOpenCodeProxyTransportServer();
     const transport = await connectTransport(server);
@@ -757,6 +1116,16 @@ describe("useOpenCodeSessionState", () => {
     });
     server.sendJsonResponse({
       request: permissionsAfterResumeRequest,
+      body: [],
+    });
+
+    const commandsAfterResumeRequest = await server.nextRequest();
+    expect(commandsAfterResumeRequest.request).toMatchObject({
+      method: "GET",
+      path: "/command",
+    });
+    server.sendJsonResponse({
+      request: commandsAfterResumeRequest,
       body: [],
     });
 
@@ -980,6 +1349,90 @@ describe("useOpenCodeSessionState", () => {
       request: promptRequest,
     });
     await expect(promptPromise).resolves.toBeUndefined();
+  });
+
+  it("sends OpenCode prompt commands through the session command endpoint", async () => {
+    const server = await startOpenCodeProxyTransportServer();
+    const transport = await connectTransport(server);
+    const { result } = renderHook(() =>
+      useOpenCodeSessionState({
+        ensureTransportConnected: async () => {
+          return {
+            sandboxInstanceId: "sbi_123",
+            transport,
+          };
+        },
+      }),
+    );
+
+    const permissionsRequest = await connectOpenCodeSessionForTest({
+      commandsBody: [
+        {
+          name: "review",
+          description: "review changes",
+          source: "command",
+          template: "Review $ARGUMENTS",
+          hints: ["$ARGUMENTS"],
+        },
+      ],
+      result,
+      sandboxInstanceId: "sbi_123",
+      server,
+      sessionId: "ses_test",
+    });
+    server.sendJsonResponse({
+      request: permissionsRequest,
+      body: [],
+    });
+
+    await waitFor(() => {
+      expect(result.current.lifecycle.sessionConnectionState).toBe("connected");
+    });
+
+    let commandPromise: Promise<void> | undefined;
+    act(() => {
+      commandPromise = result.current.commands.sendPromptCommand({
+        directory: "/workspace/selected-repo",
+        model: {
+          modelID: "gpt-5",
+          providerID: "openai",
+        },
+        variant: "high",
+        text: "/review check auth",
+      });
+    });
+
+    const commandRequest = await server.nextRequest();
+    expect(commandRequest.request).toMatchObject({
+      method: "POST",
+      path: "/session/ses_test/command?directory=%2Fworkspace%2Fselected-repo",
+      body: {
+        command: "review",
+        arguments: "check auth",
+        model: "openai/gpt-5",
+        variant: "high",
+      },
+    });
+    server.sendJsonResponse({
+      request: commandRequest,
+      body: {
+        info: {
+          id: "msg_user",
+          sessionID: "ses_test",
+          role: "user",
+          time: {
+            created: 1,
+          },
+          agent: "build",
+          model: {
+            providerID: "openai",
+            modelID: "gpt-5",
+          },
+        },
+        parts: [],
+      },
+    });
+    await expect(commandPromise).resolves.toBeUndefined();
   });
 
   it("waits for OpenCode to update the session title before returning it", async () => {
@@ -1302,6 +1755,16 @@ describe("useOpenCodeSessionState", () => {
     server.sendJsonResponse({
       request: providersRequest,
       body: createOpenCodeProviderCatalogResponse(),
+    });
+
+    const commandsRequest = await server.nextRequest();
+    expect(commandsRequest.request).toMatchObject({
+      method: "GET",
+      path: "/command?directory=%2Fworkspace%2Frepo",
+    });
+    server.sendJsonResponse({
+      request: commandsRequest,
+      body: [],
     });
 
     const listSessionsRequest = await server.nextRequest();

@@ -1,6 +1,7 @@
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import type {
   AgentPartInput,
+  Command as OpenCodeSdkCommand,
   FilePartInput,
   GlobalEvent,
   GlobalHealthResponse,
@@ -27,6 +28,7 @@ export type OpenCodeConfigProvidersResult = {
 };
 export type OpenCodeSessionSummary = Session;
 export type OpenCodeSessionStatus = SessionStatus;
+export type OpenCodeCommandSummary = OpenCodeSdkCommand;
 export type OpenCodeEvent = GlobalEvent;
 export type OpenCodeMessage = Message;
 export type OpenCodeMessagePart = Part;
@@ -86,6 +88,18 @@ export type OpenCodeSendPromptInput = {
   workspace?: string;
 };
 
+export type OpenCodeSendCommandInput = {
+  agent?: string;
+  arguments: string;
+  command: string;
+  directory?: string;
+  model?: string;
+  parts?: readonly FilePartInput[];
+  sessionId: string;
+  variant?: string;
+  workspace?: string;
+};
+
 export type OpenCodePermissionResponseInput = {
   directory?: string;
   message?: string;
@@ -116,6 +130,10 @@ export type OpenCodeSessionClient = {
     directory?: string;
     workspace?: string;
   }): Promise<OpenCodeConfigProvidersResult>;
+  listCommands(input?: {
+    directory?: string;
+    workspace?: string;
+  }): Promise<readonly OpenCodeCommandSummary[]>;
   listMessages(input: {
     before?: string;
     directory?: string;
@@ -133,6 +151,7 @@ export type OpenCodeSessionClient = {
     workspace?: string;
   }): Promise<Readonly<Record<string, OpenCodeSessionStatus>>>;
   respondToPermission(input: OpenCodePermissionResponseInput): Promise<void>;
+  sendCommand(input: OpenCodeSendCommandInput): Promise<void>;
   sendPrompt(input: OpenCodeSendPromptInput): Promise<void>;
   subscribeEvents(input?: OpenCodeSubscribeEventsInput): Promise<OpenCodeEventSubscription>;
 };
@@ -241,6 +260,18 @@ export function createOpenCodeSessionClient(
       );
       return result.data;
     },
+    async listCommands(listInput = {}) {
+      const result = await sdkClient.command.list(
+        {
+          ...(listInput.directory !== undefined ? { directory: listInput.directory } : {}),
+          ...(listInput.workspace !== undefined ? { workspace: listInput.workspace } : {}),
+        },
+        {
+          throwOnError: true,
+        },
+      );
+      return result.data;
+    },
     async listMessages(listInput) {
       assertNonEmptyString(listInput.sessionId, "session id");
       const result = await sdkClient.session.messages(
@@ -288,6 +319,26 @@ export function createOpenCodeSessionClient(
           ...(permissionInput.workspace !== undefined
             ? { workspace: permissionInput.workspace }
             : {}),
+        },
+        {
+          throwOnError: true,
+        },
+      );
+    },
+    async sendCommand(commandInput) {
+      assertNonEmptyString(commandInput.sessionId, "session id");
+      assertNonEmptyString(commandInput.command, "command");
+      await sdkClient.session.command(
+        {
+          sessionID: commandInput.sessionId,
+          command: commandInput.command,
+          arguments: commandInput.arguments,
+          ...(commandInput.agent !== undefined ? { agent: commandInput.agent } : {}),
+          ...(commandInput.directory !== undefined ? { directory: commandInput.directory } : {}),
+          ...(commandInput.model !== undefined ? { model: commandInput.model } : {}),
+          ...(commandInput.parts !== undefined ? { parts: [...commandInput.parts] } : {}),
+          ...(commandInput.variant !== undefined ? { variant: commandInput.variant } : {}),
+          ...(commandInput.workspace !== undefined ? { workspace: commandInput.workspace } : {}),
         },
         {
           throwOnError: true,

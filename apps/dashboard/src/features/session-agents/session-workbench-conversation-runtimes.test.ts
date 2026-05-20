@@ -207,6 +207,9 @@ function createOpenCodeRuntimeInput(reportedMessages: string[]): OpenCodeRuntime
       },
     },
     configControl: ComposerConfigControl,
+    executePromptCommand: async () => {
+      return;
+    },
     sessionMessage: {
       clearSessionErrorMessage: () => {
         return;
@@ -460,6 +463,23 @@ describe("buildOpenCodeConversationRuntime", () => {
     const runtime = buildOpenCodeConversationRuntime(createOpenCodeRuntimeInput([]));
 
     expect("executeRuntimeCommand" in runtime.composerRuntimeInput).toBe(false);
+  });
+
+  it("routes typed OpenCode prompt commands to the OpenCode command executor", () => {
+    const executedCommands: string[] = [];
+    const input = createOpenCodeRuntimeInput([]);
+    input.executePromptCommand = async (commandInput) => {
+      executedCommands.push(commandInput.text);
+    };
+    const runtime = buildOpenCodeConversationRuntime(input);
+
+    const accepted = runtime.composerRuntimeInput.executeTypedRuntimeCommand?.({
+      commandId: "opencode.prompt.review",
+      text: "/review check this",
+    });
+
+    expect(accepted).toBe(true);
+    expect(executedCommands).toEqual(["/review check this"]);
   });
 });
 

@@ -70,6 +70,13 @@
       "import": "./src/agent-runtimes/opencode/client.ts",
       "default": "./src/agent-runtimes/opencode/client.ts"
     },
+    "./agent-runtimes/opencode/composer-capabilities": {
+      "types": "./src/agent-runtimes/opencode/composer-capabilities.ts",
+      "workspace-src": "./src/agent-runtimes/opencode/composer-capabilities.ts",
+      "node": "./dist/agent-runtimes/opencode/composer-capabilities.js",
+      "import": "./src/agent-runtimes/opencode/composer-capabilities.ts",
+      "default": "./src/agent-runtimes/opencode/composer-capabilities.ts"
+    },
     "./agent-runtimes/opencode/server": {
       "types": "./src/agent-runtimes/opencode/server.ts",
       "workspace-src": "./src/agent-runtimes/opencode/server.ts",

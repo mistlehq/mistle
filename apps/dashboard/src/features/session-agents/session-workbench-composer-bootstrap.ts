@@ -74,6 +74,7 @@ export function useOpenCodeWorkbenchComposerState(input: {
   configControl: SessionComposerConfigControl;
 } {
   const refreshModelCatalog = input.sessionState.lifecycle.refreshModelCatalog;
+  const refreshPromptCommands = input.sessionState.lifecycle.refreshPromptCommands;
   const sessionConnectionState = input.sessionState.lifecycle.sessionConnectionState;
   const reportSessionErrorMessage = input.sessionState.sessionMessage.reportSessionErrorMessage;
 
@@ -82,16 +83,22 @@ export function useOpenCodeWorkbenchComposerState(input: {
       return;
     }
 
-    void refreshModelCatalog({
-      directory: input.selectedRepositoryPath,
-    }).catch((error: unknown) => {
+    void Promise.all([
+      refreshModelCatalog({
+        directory: input.selectedRepositoryPath,
+      }),
+      refreshPromptCommands({
+        directory: input.selectedRepositoryPath,
+      }),
+    ]).catch((error: unknown) => {
       reportSessionErrorMessage(
-        error instanceof Error ? error.message : "Could not refresh OpenCode model providers.",
+        error instanceof Error ? error.message : "Could not refresh OpenCode composer data.",
       );
     });
   }, [
     input.enabled,
     refreshModelCatalog,
+    refreshPromptCommands,
     reportSessionErrorMessage,
     sessionConnectionState,
     input.selectedRepositoryPath,
@@ -100,7 +107,8 @@ export function useOpenCodeWorkbenchComposerState(input: {
   const bootstrap = useMemo(() => {
     if (
       sessionConnectionState === "connected" &&
-      input.sessionState.modelCatalogDirectory !== input.selectedRepositoryPath
+      (input.sessionState.modelCatalogDirectory !== input.selectedRepositoryPath ||
+        input.sessionState.commandCatalogDirectory !== input.selectedRepositoryPath)
     ) {
       return buildRefreshingOpenCodeComposerBootstrap();
     }
@@ -108,6 +116,7 @@ export function useOpenCodeWorkbenchComposerState(input: {
     return input.sessionState.bootstrap;
   }, [
     input.sessionState.bootstrap,
+    input.sessionState.commandCatalogDirectory,
     input.sessionState.modelCatalogDirectory,
     sessionConnectionState,
     input.selectedRepositoryPath,
