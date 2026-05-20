@@ -65,23 +65,24 @@ use crate::tunnel::port_access_transport::{
     PortAccessHttpCommand, PortAccessTcpCommand, PortAccessTransportEvent,
 };
 use crate::tunnel::protocol::{
-    AGENT_STREAM_WINDOW_BYTES, CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
-    CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED,
-    PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
-    PtyControlMessage, PtySessionControlMessage, PtySessionLaunchMode, PtySessionOpen,
-    STREAM_RESET_CODE_EXEC_COMMAND_FAILED, STREAM_RESET_CODE_INVALID_STREAM_CLOSE,
+    CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED, CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST,
+    FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED, PAYLOAD_KIND_RAW_BYTES,
+    PAYLOAD_KIND_WEBSOCKET_TEXT, PtyControlMessage, PtySessionControlMessage, PtySessionLaunchMode,
+    PtySessionOpen, STREAM_RESET_CODE_EXEC_COMMAND_FAILED, STREAM_RESET_CODE_INVALID_STREAM_CLOSE,
     STREAM_RESET_CODE_INVALID_STREAM_DATA, STREAM_RESET_CODE_INVALID_STREAM_SIGNAL,
-    STREAM_RESET_CODE_INVALID_STREAM_WINDOW, STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
-    STREAM_RESET_CODE_TARGET_CLOSED, StreamControlMessage, StreamSendWindow,
-    decode_stream_data_frame, encode_stream_data_frame, exec_result_event,
+    STREAM_RESET_CODE_INVALID_STREAM_WINDOW, STREAM_RESET_CODE_TARGET_CLOSED, StreamControlMessage,
+    StreamSendWindow, decode_stream_data_frame, exec_result_event,
     parse_egress_token_control_message, parse_file_search_stream_message,
     parse_ports_control_message, parse_ports_transport_message, parse_pty_control_message,
     parse_pty_session_control_message, parse_signing_control_message, parse_stream_control_message,
     pty_exit_event, pty_session_error, pty_session_opened, stream_complete, stream_open_error,
     stream_open_ok, stream_reset, stream_window,
 };
-use crate::tunnel::session::agent_stream::{
-    AgentStreamState, AgentStreamStats, agent_stream_outstanding_bytes, websocket_payload_kind_name,
+#[cfg(test)]
+use crate::tunnel::session::agent::AgentStreamStats;
+use crate::tunnel::session::agent::{
+    AgentStreamState, add_agent_stream_window_credit, create_agent_stream,
+    forward_gateway_frame_to_agent, handle_agent_runtime_message,
 };
 use crate::tunnel::session::file_search::{
     FILE_SEARCH_CLOSE_SOURCE_GATEWAY, FILE_SEARCH_CLOSE_SOURCE_SANDBOXD,
@@ -123,14 +124,12 @@ use crate::tunnel::session::process::{
 use crate::tunnel::session::telemetry::{
     AGENT_STREAM_CLOSE_SOURCE_GATEWAY, AGENT_STREAM_CLOSE_SOURCE_RUNTIME,
     AGENT_STREAM_OUTCOME_CLOSED, AGENT_STREAM_OUTCOME_RESET, AgentStreamTermination,
-    AgentStreamThresholdTelemetry, AgentStreamWindowExhaustedTelemetry,
-    publish_agent_stream_threshold_crossed, publish_agent_stream_window_exhausted,
     publish_bootstrap_closed_agent_stream_summaries, publish_tunnel_telemetry_log,
     remove_agent_stream_and_publish_summary,
 };
 use crate::tunnel::telemetry::{SandboxTelemetryLogLevel, TelemetryRelay, TelemetryRelayFrame};
 
-mod agent_stream;
+mod agent;
 mod file_search;
 mod file_upload;
 mod gateway_requests;
@@ -2873,11 +2872,7 @@ async fn handle_tunnel_session_event(
                         spawn_agent_stream_task(stream_id, runtime_socket, event_sender.clone());
                     session_state.agent_streams.insert(
                         stream_id,
-                        AgentStreamState {
-                            sender,
-                            send_window: StreamSendWindow::new(AGENT_STREAM_WINDOW_BYTES),
-                            stats: AgentStreamStats::new(context.clock.now_ms()),
-                        },
+                        create_agent_stream(sender, context.clock.now_ms()),
                     );
                     continue_with(write_tunnel_text(
                         tunnel_writer_sender,
@@ -3078,285 +3073,15 @@ async fn handle_tunnel_session_event(
             Message::Close(_) => Ok(TunnelSessionControlFlow::RestartRequired),
             _ => Ok(TunnelSessionControlFlow::Continue),
         },
-        TunnelSessionEvent::AgentMessage { stream_id, message } => match message {
-            Message::Text(payload) => {
-                let now_ms = context.clock.now_ms();
-                let payload_bytes = payload.len();
-                let mut threshold_crossings = Vec::new();
-                let send_outcome = {
-                    let Some(agent_stream) = session_state.agent_streams.get_mut(&stream_id) else {
-                        return Ok(TunnelSessionControlFlow::Continue);
-                    };
-                    let available_bytes = agent_stream.send_window.available_bytes();
-                    if !agent_stream.send_window.try_consume(payload_bytes) {
-                        Err((
-                            available_bytes,
-                            agent_stream_outstanding_bytes(&agent_stream.send_window),
-                            agent_stream.stats.message_count_out,
-                            agent_stream.stats.stream_age_ms(now_ms),
-                            agent_stream.stats.oldest_unacked_age_ms(now_ms),
-                        ))
-                    } else {
-                        let available_after = agent_stream.send_window.available_bytes();
-                        let outstanding_bytes =
-                            agent_stream_outstanding_bytes(&agent_stream.send_window);
-                        agent_stream.stats.record_outbound_message(
-                            payload_bytes,
-                            now_ms,
-                            outstanding_bytes,
-                        );
-                        let message_count_out = agent_stream.stats.message_count_out;
-                        let stream_age_ms = agent_stream.stats.stream_age_ms(now_ms);
-                        let oldest_unacked_ms = agent_stream.stats.oldest_unacked_age_ms(now_ms);
-                        threshold_crossings = agent_stream
-                            .stats
-                            .take_new_threshold_crossings(outstanding_bytes);
-                        Ok((
-                            available_after,
-                            outstanding_bytes,
-                            message_count_out,
-                            stream_age_ms,
-                            oldest_unacked_ms,
-                        ))
-                    }
-                };
-                let (
-                    available_bytes,
-                    outstanding_bytes,
-                    message_count_out,
-                    stream_age_ms,
-                    oldest_unacked_ms,
-                ) = match send_outcome {
-                    Ok(values) => values,
-                    Err((
-                        available_bytes,
-                        outstanding_bytes,
-                        message_count_out,
-                        stream_age_ms,
-                        oldest_unacked_ms,
-                    )) => {
-                        publish_agent_stream_window_exhausted(
-                            tunnel_writer_sender,
-                            &mut session_state.telemetry_relay,
-                            context.clock,
-                            AgentStreamWindowExhaustedTelemetry {
-                                stream_id,
-                                payload_kind: websocket_payload_kind_name(
-                                    PAYLOAD_KIND_WEBSOCKET_TEXT,
-                                ),
-                                payload_bytes,
-                                available_bytes,
-                                outstanding_bytes,
-                                message_count_out,
-                                stream_age_ms,
-                                oldest_unacked_ms,
-                            },
-                        );
-                        remove_agent_stream_and_publish_summary(
-                            tunnel_writer_sender,
-                            session_state,
-                            context.clock,
-                            stream_id,
-                            AgentStreamTermination {
-                                outcome: AGENT_STREAM_OUTCOME_RESET,
-                                close_source: AGENT_STREAM_CLOSE_SOURCE_RUNTIME,
-                                reset_code: Some(STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED),
-                                reason: Some("agent stream send window is exhausted".to_string()),
-                            },
-                        );
-                        return continue_with(write_tunnel_text(
-                            tunnel_writer_sender,
-                            stream_reset(
-                                stream_id,
-                                STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
-                                "agent stream send window is exhausted",
-                            ),
-                        ));
-                    }
-                };
-                for threshold_bytes in threshold_crossings {
-                    publish_agent_stream_threshold_crossed(
-                        tunnel_writer_sender,
-                        &mut session_state.telemetry_relay,
-                        context.clock,
-                        AgentStreamThresholdTelemetry {
-                            stream_id,
-                            payload_kind: websocket_payload_kind_name(PAYLOAD_KIND_WEBSOCKET_TEXT),
-                            payload_bytes,
-                            available_bytes,
-                            outstanding_bytes,
-                            threshold_bytes,
-                            message_count_out,
-                            stream_age_ms,
-                            oldest_unacked_ms,
-                        },
-                    );
-                }
-                let encoded = encode_stream_data_frame(
-                    stream_id,
-                    PAYLOAD_KIND_WEBSOCKET_TEXT,
-                    payload.as_bytes(),
-                )
-                .map_err(|error| TunnelSessionError::AgentRead(error.to_string()))?;
-                continue_with(write_tunnel_binary(tunnel_writer_sender, encoded))
-            }
-            Message::Binary(payload) => {
-                let now_ms = context.clock.now_ms();
-                let payload_bytes = payload.len();
-                let mut threshold_crossings = Vec::new();
-                let send_outcome = {
-                    let Some(agent_stream) = session_state.agent_streams.get_mut(&stream_id) else {
-                        return Ok(TunnelSessionControlFlow::Continue);
-                    };
-                    let available_bytes = agent_stream.send_window.available_bytes();
-                    if !agent_stream.send_window.try_consume(payload_bytes) {
-                        Err((
-                            available_bytes,
-                            agent_stream_outstanding_bytes(&agent_stream.send_window),
-                            agent_stream.stats.message_count_out,
-                            agent_stream.stats.stream_age_ms(now_ms),
-                            agent_stream.stats.oldest_unacked_age_ms(now_ms),
-                        ))
-                    } else {
-                        let available_after = agent_stream.send_window.available_bytes();
-                        let outstanding_bytes =
-                            agent_stream_outstanding_bytes(&agent_stream.send_window);
-                        agent_stream.stats.record_outbound_message(
-                            payload_bytes,
-                            now_ms,
-                            outstanding_bytes,
-                        );
-                        let message_count_out = agent_stream.stats.message_count_out;
-                        let stream_age_ms = agent_stream.stats.stream_age_ms(now_ms);
-                        let oldest_unacked_ms = agent_stream.stats.oldest_unacked_age_ms(now_ms);
-                        threshold_crossings = agent_stream
-                            .stats
-                            .take_new_threshold_crossings(outstanding_bytes);
-                        Ok((
-                            available_after,
-                            outstanding_bytes,
-                            message_count_out,
-                            stream_age_ms,
-                            oldest_unacked_ms,
-                        ))
-                    }
-                };
-                let (
-                    available_bytes,
-                    outstanding_bytes,
-                    message_count_out,
-                    stream_age_ms,
-                    oldest_unacked_ms,
-                ) = match send_outcome {
-                    Ok(values) => values,
-                    Err((
-                        available_bytes,
-                        outstanding_bytes,
-                        message_count_out,
-                        stream_age_ms,
-                        oldest_unacked_ms,
-                    )) => {
-                        publish_agent_stream_window_exhausted(
-                            tunnel_writer_sender,
-                            &mut session_state.telemetry_relay,
-                            context.clock,
-                            AgentStreamWindowExhaustedTelemetry {
-                                stream_id,
-                                payload_kind: websocket_payload_kind_name(
-                                    PAYLOAD_KIND_WEBSOCKET_BINARY,
-                                ),
-                                payload_bytes,
-                                available_bytes,
-                                outstanding_bytes,
-                                message_count_out,
-                                stream_age_ms,
-                                oldest_unacked_ms,
-                            },
-                        );
-                        remove_agent_stream_and_publish_summary(
-                            tunnel_writer_sender,
-                            session_state,
-                            context.clock,
-                            stream_id,
-                            AgentStreamTermination {
-                                outcome: AGENT_STREAM_OUTCOME_RESET,
-                                close_source: AGENT_STREAM_CLOSE_SOURCE_RUNTIME,
-                                reset_code: Some(STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED),
-                                reason: Some("agent stream send window is exhausted".to_string()),
-                            },
-                        );
-                        return continue_with(write_tunnel_text(
-                            tunnel_writer_sender,
-                            stream_reset(
-                                stream_id,
-                                STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
-                                "agent stream send window is exhausted",
-                            ),
-                        ));
-                    }
-                };
-                for threshold_bytes in threshold_crossings {
-                    publish_agent_stream_threshold_crossed(
-                        tunnel_writer_sender,
-                        &mut session_state.telemetry_relay,
-                        context.clock,
-                        AgentStreamThresholdTelemetry {
-                            stream_id,
-                            payload_kind: websocket_payload_kind_name(
-                                PAYLOAD_KIND_WEBSOCKET_BINARY,
-                            ),
-                            payload_bytes,
-                            available_bytes,
-                            outstanding_bytes,
-                            threshold_bytes,
-                            message_count_out,
-                            stream_age_ms,
-                            oldest_unacked_ms,
-                        },
-                    );
-                }
-                let encoded = encode_stream_data_frame(
-                    stream_id,
-                    PAYLOAD_KIND_WEBSOCKET_BINARY,
-                    payload.as_ref(),
-                )
-                .map_err(|error| TunnelSessionError::AgentRead(error.to_string()))?;
-                continue_with(write_tunnel_binary(tunnel_writer_sender, encoded))
-            }
-            Message::Ping(payload) => {
-                if let Some(agent_stream) = session_state.agent_streams.get(&stream_id) {
-                    agent_stream
-                        .sender
-                        .send(Message::Pong(payload))
-                        .map_err(|error| TunnelSessionError::AgentWrite(error.to_string()))?;
-                }
-                Ok(TunnelSessionControlFlow::Continue)
-            }
-            Message::Pong(_) => Ok(TunnelSessionControlFlow::Continue),
-            Message::Close(_) => {
-                remove_agent_stream_and_publish_summary(
-                    tunnel_writer_sender,
-                    session_state,
-                    context.clock,
-                    stream_id,
-                    AgentStreamTermination {
-                        outcome: AGENT_STREAM_OUTCOME_RESET,
-                        close_source: AGENT_STREAM_CLOSE_SOURCE_RUNTIME,
-                        reset_code: Some(STREAM_RESET_CODE_TARGET_CLOSED),
-                        reason: Some("agent runtime websocket closed".to_string()),
-                    },
-                );
-                continue_with(write_tunnel_text(
-                    tunnel_writer_sender,
-                    stream_reset(
-                        stream_id,
-                        STREAM_RESET_CODE_TARGET_CLOSED,
-                        "agent runtime websocket closed",
-                    ),
-                ))
-            }
-            _ => Ok(TunnelSessionControlFlow::Continue),
-        },
+        TunnelSessionEvent::AgentMessage { stream_id, message } => {
+            continue_with(handle_agent_runtime_message(
+                tunnel_writer_sender,
+                session_state,
+                context.clock,
+                stream_id,
+                message,
+            ))
+        }
         TunnelSessionEvent::AgentWriteCompleted { stream_id, bytes } => {
             if !session_state.agent_streams.contains_key(&stream_id) {
                 return Ok(TunnelSessionControlFlow::Continue);
@@ -3822,14 +3547,12 @@ async fn handle_tunnel_control_message(
             )?;
         }
         StreamControlMessage::Window(message) => {
-            if let Some(agent_stream) = session_state.agent_streams.get_mut(&message.stream_id) {
-                agent_stream
-                    .send_window
-                    .add(message.bytes)
-                    .map_err(|error| TunnelSessionError::ParseControl(error.to_string()))?;
-                agent_stream
-                    .stats
-                    .record_credit_restore(message.bytes, context.clock.now_ms());
+            if add_agent_stream_window_credit(
+                session_state,
+                message.stream_id,
+                message.bytes,
+                context.clock.now_ms(),
+            )? {
                 return Ok(());
             }
             if add_process_stream_window(
@@ -3927,58 +3650,7 @@ fn handle_tunnel_binary_frame(
     clock: &dyn Clock,
 ) -> Result<(), TunnelSessionError> {
     if session_state.agent_streams.contains_key(&frame.stream_id) {
-        let payload_bytes = frame.payload.len();
-        match frame.payload_kind {
-            PAYLOAD_KIND_WEBSOCKET_TEXT => {
-                let payload = String::from_utf8(frame.payload)
-                    .map_err(|error| TunnelSessionError::AgentWrite(error.to_string()))?;
-                let Some(agent_stream) = session_state.agent_streams.get_mut(&frame.stream_id)
-                else {
-                    return Ok(());
-                };
-                agent_stream
-                    .sender
-                    .send(Message::Text(payload.into()))
-                    .map_err(|error| TunnelSessionError::AgentWrite(error.to_string()))?;
-                agent_stream.stats.record_inbound_message(payload_bytes);
-            }
-            PAYLOAD_KIND_WEBSOCKET_BINARY => {
-                let Some(agent_stream) = session_state.agent_streams.get_mut(&frame.stream_id)
-                else {
-                    return Ok(());
-                };
-                agent_stream
-                    .sender
-                    .send(Message::Binary(frame.payload.into()))
-                    .map_err(|error| TunnelSessionError::AgentWrite(error.to_string()))?;
-                agent_stream.stats.record_inbound_message(payload_bytes);
-            }
-            _ => {
-                let reason = "agent stream only accepts websocket text or binary payload kinds";
-                if let Some(agent_stream) = remove_agent_stream_and_publish_summary(
-                    tunnel_writer_sender,
-                    session_state,
-                    clock,
-                    frame.stream_id,
-                    AgentStreamTermination {
-                        outcome: AGENT_STREAM_OUTCOME_RESET,
-                        close_source: AGENT_STREAM_CLOSE_SOURCE_GATEWAY,
-                        reset_code: Some(STREAM_RESET_CODE_INVALID_STREAM_DATA),
-                        reason: Some(reason.to_string()),
-                    },
-                ) {
-                    let _ = agent_stream.sender.send(Message::Close(None));
-                }
-                write_tunnel_text(
-                    tunnel_writer_sender,
-                    stream_reset(
-                        frame.stream_id,
-                        STREAM_RESET_CODE_INVALID_STREAM_DATA,
-                        reason,
-                    ),
-                )?;
-            }
-        }
+        forward_gateway_frame_to_agent(tunnel_writer_sender, session_state, clock, frame)?;
         return Ok(());
     }
 

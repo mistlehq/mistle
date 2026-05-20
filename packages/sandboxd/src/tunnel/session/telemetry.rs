@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 
 use crate::time::Clock;
 use crate::tunnel::protocol::AGENT_STREAM_WINDOW_BYTES;
-use crate::tunnel::session::agent_stream::AgentStreamState;
+use crate::tunnel::session::agent::AgentStreamState;
 use crate::tunnel::session::{
     TunnelSessionMutableState, TunnelWriterMessage, send_telemetry_frames,
 };
