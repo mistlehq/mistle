@@ -43,6 +43,11 @@ type LatestFileSearchRequest = {
   requestId: string;
 };
 
+type ActiveFileSearchQuery = {
+  cwd: string;
+  query: string;
+};
+
 export function useSessionComposerContextMentionControl(input: {
   cwd: string | null;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
@@ -52,6 +57,7 @@ export function useSessionComposerContextMentionControl(input: {
   const fileSearchSessionRef = useRef<FileSearchSessionRecord | null>(null);
   const fileSearchSessionGenerationRef = useRef(0);
   const pendingFileSearchSessionRef = useRef<PendingFileSearchSessionRecord | null>(null);
+  const activeQueryRef = useRef<ActiveFileSearchQuery | null>(null);
   const latestRequestRef = useRef<LatestFileSearchRequest | null>(null);
   const [state, setState] = useState<{
     results: readonly FileSearchResultItem[];
@@ -64,6 +70,7 @@ export function useSessionComposerContextMentionControl(input: {
   const disposeFileSearchSession = useCallback((): void => {
     fileSearchSessionGenerationRef.current += 1;
     pendingFileSearchSessionRef.current = null;
+    activeQueryRef.current = null;
     const fileSearchSession = fileSearchSessionRef.current;
     fileSearchSessionRef.current = null;
     latestRequestRef.current = null;
@@ -100,6 +107,7 @@ export function useSessionComposerContextMentionControl(input: {
   const onQueryChange = useCallback(
     (query: string): void => {
       if (!input.enabled) {
+        activeQueryRef.current = null;
         setState({
           results: [],
           status: "idle",
@@ -109,6 +117,7 @@ export function useSessionComposerContextMentionControl(input: {
 
       const trimmedQuery = query.trim();
       if (trimmedQuery.length === 0) {
+        activeQueryRef.current = null;
         latestRequestRef.current = null;
         setState({
           results: [],
@@ -120,12 +129,22 @@ export function useSessionComposerContextMentionControl(input: {
       const cwd = input.cwd;
       const sandboxInstanceId = input.sandboxInstanceId;
       if (cwd === null || sandboxInstanceId === null) {
+        activeQueryRef.current = null;
         setState({
           results: [],
           status: "unavailable",
         });
         return;
       }
+
+      const activeQuery = activeQueryRef.current;
+      if (activeQuery !== null && activeQuery.cwd === cwd && activeQuery.query === trimmedQuery) {
+        return;
+      }
+      activeQueryRef.current = {
+        cwd,
+        query: trimmedQuery,
+      };
 
       setState((currentState) => ({
         results: currentState.results,

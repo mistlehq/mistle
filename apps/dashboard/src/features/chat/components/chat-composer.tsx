@@ -379,6 +379,8 @@ export function ChatComposer({
       : (contextMentionResults[activeContextMentionIndexWithinBounds] ?? null);
   const activeContextMentionQuery =
     activeComposerTrigger?.capabilityKind === "contextMention" ? activeComposerTrigger.query : null;
+  const contextMentionOnDismiss = contextMentionControl?.onDismiss;
+  const contextMentionOnQueryChange = contextMentionControl?.onQueryChange;
   const filteredCommandPanelOptions = useMemo(() => {
     if (commandPanel?.kind !== "picker") {
       return [];
@@ -428,13 +430,13 @@ export function ChatComposer({
   )?.label;
 
   useEffect(() => {
-    if (contextMentionControl === null || activeContextMentionQuery === null) {
-      contextMentionControl?.onDismiss();
+    if (activeContextMentionQuery === null) {
+      contextMentionOnDismiss?.();
       return;
     }
 
-    contextMentionControl.onQueryChange(activeContextMentionQuery);
-  }, [activeContextMentionQuery, contextMentionControl]);
+    contextMentionOnQueryChange?.(activeContextMentionQuery);
+  }, [activeContextMentionQuery, contextMentionOnDismiss, contextMentionOnQueryChange]);
 
   useEffect(() => {
     if (!showContextMentionMenu || activeContextMentionIndexWithinBounds === null) {

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import { ChatComposer } from "./chat-composer.js";
@@ -631,6 +631,50 @@ describe("ChatComposer", () => {
     expect(screen.getByRole("listbox", { name: "Search files" })).toBeTruthy();
     expect(screen.getByRole("option", { name: "src/features" })).toBeTruthy();
     expect(screen.getByRole("option", { name: "src/index.ts" })).toBeTruthy();
+    expect(observedQueries).toEqual(["src"]);
+  });
+
+  it("does not repeat context mention queries when result state changes", () => {
+    const observedQueries: string[] = [];
+
+    function ResultChangingComposer(): React.JSX.Element {
+      const [results, setResults] = useState([{ kind: "file" as const, path: "src/alpha.ts" }]);
+      const recordQuery = useCallback((query: string): void => {
+        observedQueries.push(query);
+      }, []);
+      const ignoreContextMentionEvent = useCallback((): void => {
+        return;
+      }, []);
+
+      return (
+        <>
+          <ControlledChatComposer
+            composerCapabilities={[ContextMentionCapabilityFixture]}
+            composerText="@src"
+            contextMentionControl={{
+              status: "ready",
+              results,
+              onQueryChange: recordQuery,
+              onSelect: ignoreContextMentionEvent,
+              onDismiss: ignoreContextMentionEvent,
+            }}
+          />
+          <button
+            onClick={() => {
+              setResults([{ kind: "file", path: "src/beta.ts" }]);
+            }}
+            type="button"
+          >
+            Replace results
+          </button>
+        </>
+      );
+    }
+
+    render(<ResultChangingComposer />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Replace results" }));
+
     expect(observedQueries).toEqual(["src"]);
   });
 
