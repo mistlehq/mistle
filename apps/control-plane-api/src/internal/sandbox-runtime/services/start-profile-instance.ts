@@ -21,11 +21,13 @@ export async function startProfileInstance(
   {
     db,
     integrationsConfig,
+    mcpConfig,
     dataPlaneClient,
     defaultBaseImage,
   }: {
     db: AppContext["var"]["db"];
     integrationsConfig: AppContext["var"]["config"]["integrations"];
+    mcpConfig: AppContext["var"]["config"]["mcp"];
     dataPlaneClient: AppContext["var"]["dataPlaneClient"];
     defaultBaseImage: string;
   },
@@ -39,6 +41,7 @@ export async function startProfileInstance(
     {
       db,
       integrationsConfig,
+      mcpConfig,
       dataPlaneClient,
       defaultBaseImage,
     },

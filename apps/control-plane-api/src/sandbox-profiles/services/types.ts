@@ -16,7 +16,7 @@ import type {
 } from "@mistle/integrations-core";
 
 import type { createControlPlaneOpenWorkflow } from "../../openworkflow.js";
-import type { ControlPlaneApiSandboxRuntimeConfig } from "../../types.js";
+import type { ControlPlaneApiMcpConfig, ControlPlaneApiSandboxRuntimeConfig } from "../../types.js";
 import type { ListProfilesInput } from "./list-profiles.js";
 import type { SandboxProfileVersionResources } from "./profile-version-runtime-config.js";
 
@@ -31,6 +31,7 @@ export type CreateSandboxProfilesServiceInput = {
     activeMasterEncryptionKeyVersion: number;
     masterEncryptionKeys: Record<string, string>;
   };
+  mcpConfig: ControlPlaneApiMcpConfig;
   dataPlaneClient: Pick<
     DataPlaneSandboxInstancesClient,
     "materializeSandboxProfileVersionSnapshotJob" | "startSandboxInstance"

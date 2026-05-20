@@ -55,6 +55,9 @@ describe.concurrent("sandbox profile internal runtime plan compiler integration"
       db: env.controlPlaneDb,
       integrationDefinitions: Definitions,
       resolveTargetSecrets: async () => [],
+      mcpConfig: {
+        url: "https://mcp.example.test/mcp",
+      },
       organizationId: session.organizationId,
       profileId: "sbp_compile_internal_maintenance_script",
       profileVersion: 1,
@@ -124,6 +127,9 @@ describe.concurrent("sandbox profile internal runtime plan compiler integration"
         db: env.controlPlaneDb,
         integrationDefinitions: Definitions,
         resolveTargetSecrets: async () => [],
+        mcpConfig: {
+          url: "https://mcp.example.test/mcp",
+        },
         organizationId: session.organizationId,
         profileId: "sbp_compile_internal_missing_target_secrets_entry",
         profileVersion: 1,

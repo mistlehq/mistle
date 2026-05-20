@@ -13,6 +13,7 @@ import {
   type CompiledRuntimePlanFragment,
   type CompiledRuntimeArtifactSpec,
   type IntegrationBindingMcpServer,
+  type IntegrationBindingMcpServerSource,
   type IntegrationMcpDefinitionValue,
   type IntegrationMcpServer,
   type IntegrationMcpValue,
@@ -320,7 +321,8 @@ function collectResolvedMcpServers(input: {
     );
 
     for (const server of rawServers) {
-      const source = {
+      const source: IntegrationBindingMcpServerSource = {
+        kind: "integration",
         bindingId: preparedBinding.compileBindingInput.binding.id,
         connectionId: preparedBinding.compileBindingInput.connection.id,
         targetKey: preparedBinding.compileBindingInput.targetKey,
@@ -405,8 +407,13 @@ function collectResolvedMcpServers(input: {
   }
 
   return [...resolvedServers].sort((left, right) => {
-    if (left.source.bindingId !== right.source.bindingId) {
-      return left.source.bindingId.localeCompare(right.source.bindingId);
+    const leftSortKey =
+      left.source.kind === "integration" ? left.source.bindingId : left.source.kind;
+    const rightSortKey =
+      right.source.kind === "integration" ? right.source.bindingId : right.source.kind;
+
+    if (leftSortKey !== rightSortKey) {
+      return leftSortKey.localeCompare(rightSortKey);
     }
 
     return left.server.serverId.localeCompare(right.server.serverId);
@@ -763,6 +770,9 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
     bindings: input.bindings,
     enforceRuntimeEligibility: true,
   });
+  const resolvedMcpServers = [...compiledBindings.mcpServers, ...(input.mcpServers ?? [])].sort(
+    (left, right) => left.server.serverName.localeCompare(right.server.serverName),
+  );
   const compiledRuntimePlanFragments = [
     ...compiledBindings.compiledRuntimePlanFragments,
     compileProfileAgentRuntimeFragment({
@@ -774,7 +784,7 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
       egressRoutes: compiledBindings.compiledRuntimePlanFragments.flatMap(
         (compiledRuntimePlanFragment) => compiledRuntimePlanFragment.egressRoutes,
       ),
-      mcpServers: compiledBindings.mcpServers,
+      mcpServers: resolvedMcpServers,
     }),
   ];
 

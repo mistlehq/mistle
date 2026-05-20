@@ -283,6 +283,7 @@ export const ConfigSchema = z
           auth: ControlPlaneApiAuthSchema,
           mcp: z
             .object({
+              url: UrlSchema,
               auth: ControlPlaneApiMcpAuthSchema,
             })
             .strict(),

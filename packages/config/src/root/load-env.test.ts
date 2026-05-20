@@ -64,6 +64,7 @@ describe("loadRootConfigFromEnv", () => {
       MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_OTP_ALLOWED_ATTEMPTS: "3",
       MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID: "google-client-id",
       MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET: "google-client-secret",
+      MISTLE_SERVICES_CONTROL_PLANE_API_MCP_URL: "https://mcp.example.com/mcp",
       MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_SECRET: "mcp-auth-secret",
       MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_ISSUER: "control-plane-api",
       MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_AUDIENCE: "mistle-mcp",
@@ -232,6 +233,7 @@ describe("loadRootConfigFromEnv", () => {
             },
           },
           mcp: {
+            url: "https://mcp.example.com/mcp",
             auth: {
               secret: "mcp-auth-secret",
               issuer: "control-plane-api",

@@ -451,6 +451,10 @@ const ControlPlaneApiEnvDescriptors = [
     path: ["auth", "google", "clientSecret"],
   },
   {
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_URL",
+    path: ["mcp", "url"],
+  },
+  {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_SECRET",
     path: ["mcp", "auth", "secret"],
   },

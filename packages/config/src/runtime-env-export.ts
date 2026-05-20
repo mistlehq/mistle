@@ -170,6 +170,10 @@ const ControlPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET",
   },
   {
+    path: ["mcp", "url"],
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_URL",
+  },
+  {
     path: ["mcp", "auth", "secret"],
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_SECRET",
   },

@@ -72,13 +72,18 @@ function mapCompilerErrorCodeToSandboxProfilesCompileErrorCode(
 }
 
 export async function compileProfileVersionRuntimePlan(
-  { db, integrationsConfig }: Pick<CreateSandboxProfilesServiceInput, "db" | "integrationsConfig">,
+  {
+    db,
+    integrationsConfig,
+    mcpConfig,
+  }: Pick<CreateSandboxProfilesServiceInput, "db" | "integrationsConfig" | "mcpConfig">,
   input: CompileProfileVersionRuntimePlanInput,
 ): Promise<CompiledRuntimePlan> {
   try {
     return await compileSandboxRuntimePlan({
       db,
       integrationDefinitions: Definitions,
+      mcpConfig,
       resolveTargetSecrets: async ({ targets }) => {
         return targets.map((target) => {
           try {

@@ -235,6 +235,7 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
           },
         },
         mcp: {
+          url: `${controlPlaneApiUrl}/mcp`,
           auth: {
             secret: createSecret(),
             issuer: "control-plane-api",

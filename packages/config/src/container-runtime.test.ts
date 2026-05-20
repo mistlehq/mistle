@@ -19,6 +19,7 @@ function buildCommonEnv(): NodeJS.ProcessEnv {
   return {
     MISTLE_SERVICES_DASHBOARD_PUBLIC_URL: "https://dashboard.example.test",
     MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: "https://api.example.test",
+    MISTLE_SERVICES_CONTROL_PLANE_API_MCP_URL: "https://mcp.example.test/mcp",
     MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL:
       "wss://gateway.example.test/tunnel/sandbox",
     MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL:

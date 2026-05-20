@@ -32,6 +32,7 @@ const sandboxPublishSessionCookieSigningSecret = "fixture-publish-cookie-secret"
 const mcpAuthSecret = "fixture-mcp-auth-secret";
 const mcpAuthIssuer = "control-plane-api";
 const mcpAuthAudience = "mistle-mcp";
+const mcpUrl = "https://mcp.example.test/mcp";
 const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
 
 const globalDevelopmentConfig = {
@@ -188,6 +189,7 @@ const controlPlaneApiEnvConfig = {
     otpAllowedAttempts: 3,
   },
   mcp: {
+    url: mcpUrl,
     auth: {
       secret: mcpAuthSecret,
       issuer: mcpAuthIssuer,

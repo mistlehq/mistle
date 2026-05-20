@@ -29,6 +29,7 @@ const GeneratedSecretEnvVars = [
 const CommonRequiredEnvVars = [
   "MISTLE_SERVICES_DASHBOARD_PUBLIC_URL",
   "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL",
+  "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_URL",
   "MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL",
   "MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL",
   "MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL",
@@ -246,6 +247,7 @@ function buildCommonBaseConfig(env: NodeJS.ProcessEnv): ConfigRecord {
           },
         },
         mcp: {
+          url: readRequiredEnv(env, "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_URL"),
           auth: {
             issuer: "control-plane-api",
             audience: "mistle-mcp",

@@ -428,6 +428,7 @@ describe("compilePiRuntime", () => {
     const mcpServers: ResolvedIntegrationMcpServer[] = [
       {
         source: {
+          kind: "integration",
           bindingId: "bind_remote",
           connectionId: "conn_remote",
           targetKey: "remote",
@@ -483,6 +484,7 @@ describe("compilePiRuntime", () => {
         mcpServers: [
           {
             source: {
+              kind: "integration",
               bindingId: "bind_remote",
               connectionId: "conn_remote",
               targetKey: "remote",

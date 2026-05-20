@@ -117,10 +117,14 @@ export async function startProfileSetupSandbox(
     db,
     integrationRegistry,
     integrationsConfig,
+    mcpConfig,
     sandboxConfig,
     dataPlaneClient,
     defaultBaseImage,
-  }: Pick<CreateSandboxProfilesServiceInput, "db" | "integrationsConfig" | "dataPlaneClient"> & {
+  }: Pick<
+    CreateSandboxProfilesServiceInput,
+    "db" | "integrationsConfig" | "mcpConfig" | "dataPlaneClient"
+  > & {
     integrationRegistry: CreateSandboxProfilesServiceInput["integrationRegistry"];
     sandboxConfig: CreateSandboxProfilesServiceInput["sandboxConfig"];
     defaultBaseImage: string;
@@ -168,6 +172,7 @@ export async function startProfileSetupSandbox(
     {
       db,
       integrationsConfig,
+      mcpConfig,
     },
     {
       organizationId: input.organizationId,

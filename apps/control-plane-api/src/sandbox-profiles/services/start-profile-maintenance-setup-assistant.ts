@@ -6,7 +6,7 @@ import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type StartProfileMaintenanceSetupAssistantServiceInput = Pick<
   CreateSandboxProfilesServiceInput,
-  "db" | "integrationsConfig" | "dataPlaneClient"
+  "db" | "integrationsConfig" | "mcpConfig" | "dataPlaneClient"
 > & {
   integrationRegistry: CreateSandboxProfilesServiceInput["integrationRegistry"];
   sandboxConfig: CreateSandboxProfilesServiceInput["sandboxConfig"];

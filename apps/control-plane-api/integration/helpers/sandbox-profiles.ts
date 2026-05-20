@@ -41,6 +41,8 @@ export function sandboxProfileVersionRow(input: {
   sandboxVcpuCount?: number | null;
   sandboxMemoryMb?: number | null;
   sandboxStorageMb?: number | null;
+  mistleMcpEnabled?: boolean;
+  mistleMcpApiKeyId?: string | null;
 }) {
   return {
     sandboxProfileId: input.sandboxProfileId,
@@ -66,6 +68,10 @@ export function sandboxProfileVersionRow(input: {
     ...(input.sandboxVcpuCount === undefined ? {} : { sandboxVcpuCount: input.sandboxVcpuCount }),
     ...(input.sandboxMemoryMb === undefined ? {} : { sandboxMemoryMb: input.sandboxMemoryMb }),
     ...(input.sandboxStorageMb === undefined ? {} : { sandboxStorageMb: input.sandboxStorageMb }),
+    ...(input.mistleMcpEnabled === undefined ? {} : { mistleMcpEnabled: input.mistleMcpEnabled }),
+    ...(input.mistleMcpApiKeyId === undefined
+      ? {}
+      : { mistleMcpApiKeyId: input.mistleMcpApiKeyId }),
   };
 }
 

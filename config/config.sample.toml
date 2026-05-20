@@ -56,6 +56,9 @@ allowed_attempts = 3
 #client_id = "replace-with-google-client-id"
 #client_secret = "replace-with-google-client-secret"
 
+[services.control_plane_api.mcp]
+url = "https://mcp.mistle.example/mcp"
+
 [services.control_plane_api.mcp.auth]
 secret = "replace-with-mcp-runtime-token-secret"
 issuer = "control-plane-api"

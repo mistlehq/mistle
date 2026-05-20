@@ -31,6 +31,7 @@ function createRuntimeClient(input: {
 function createLinearMcpServer(): ResolvedIntegrationMcpServer {
   return {
     source: {
+      kind: "integration",
       bindingId: "bind_linear_connector",
       connectionId: "conn_linear_org_123",
       targetKey: "linear-default",

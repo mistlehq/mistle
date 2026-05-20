@@ -5,9 +5,11 @@ import type {
 import {
   CompilerErrorCodes,
   IntegrationCompilerError,
+  IntegrationMcpTransports,
   compileRuntimePlan,
   type CompiledRuntimePlan,
   type IntegrationDefinitionsBundle,
+  type ResolvedIntegrationMcpServer,
   type ResolvedSandboxImage,
 } from "@mistle/integrations-core";
 
@@ -76,6 +78,9 @@ export type CompileSandboxRuntimePlanInput = {
   db: ControlPlaneDatabase;
   integrationDefinitions: IntegrationDefinitionsBundle;
   resolveTargetSecrets: ResolveIntegrationTargetSecrets;
+  mcpConfig: {
+    url: string;
+  };
   organizationId: string;
   profileId: string;
   profileVersion: number;
@@ -90,6 +95,37 @@ function normalizeSnapshotPreparationScript(script: string | null): string | und
   }
 
   return script;
+}
+
+function resolveMistleMcpServers(input: {
+  enabled: boolean;
+  apiKeyId: string | null;
+  url: string;
+}): ReadonlyArray<ResolvedIntegrationMcpServer> {
+  if (!input.enabled) {
+    return [];
+  }
+
+  if (input.apiKeyId === null) {
+    throw new SandboxRuntimePlanCompilerError({
+      code: SandboxRuntimePlanCompilerErrorCodes.INVALID_AGENT_RUNTIME_CONFIG,
+      message: "Mistle MCP is enabled but no API key is configured.",
+    });
+  }
+
+  return [
+    {
+      source: {
+        kind: "mistle",
+      },
+      server: {
+        serverId: "mistle",
+        serverName: "mistle",
+        transport: IntegrationMcpTransports.STREAMABLE_HTTP,
+        url: input.url,
+      },
+    },
+  ];
 }
 
 function mapCompilerErrorCodeToSandboxRuntimePlanCompilerErrorCode(
@@ -291,6 +327,8 @@ export async function compileSandboxRuntimePlan(
     columns: {
       sandboxProfileId: true,
       agentRuntimeId: true,
+      mistleMcpEnabled: true,
+      mistleMcpApiKeyId: true,
       setupScript: true,
       maintenanceScript: true,
     },
@@ -322,6 +360,11 @@ export async function compileSandboxRuntimePlan(
       agentRuntimeId: input.agentRuntimeId ?? sandboxProfileVersion.agentRuntimeId,
       bindings: compileBindings,
       definitions: input.integrationDefinitions,
+      mcpServers: resolveMistleMcpServers({
+        enabled: sandboxProfileVersion.mistleMcpEnabled,
+        apiKeyId: sandboxProfileVersion.mistleMcpApiKeyId,
+        url: input.mcpConfig.url,
+      }),
     });
 
     const snapshotPreparationScriptKind = input.snapshotPreparationScriptKind ?? "setup";

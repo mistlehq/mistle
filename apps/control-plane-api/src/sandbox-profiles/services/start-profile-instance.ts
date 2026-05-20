@@ -289,9 +289,13 @@ export async function startProfileInstance(
   {
     db,
     integrationsConfig,
+    mcpConfig,
     dataPlaneClient,
     defaultBaseImage,
-  }: Pick<CreateSandboxProfilesServiceInput, "db" | "integrationsConfig" | "dataPlaneClient"> & {
+  }: Pick<
+    CreateSandboxProfilesServiceInput,
+    "db" | "integrationsConfig" | "mcpConfig" | "dataPlaneClient"
+  > & {
     defaultBaseImage: string;
   },
   serviceInput: StartProfileInstanceInput,
@@ -312,6 +316,7 @@ export async function startProfileInstance(
     {
       db,
       integrationsConfig,
+      mcpConfig,
     },
     {
       organizationId: serviceInput.organizationId,
@@ -381,7 +386,7 @@ export async function startProfileInstance(
 export async function startActiveProfileInstance(
   context: Pick<
     CreateSandboxProfilesServiceInput,
-    "db" | "integrationsConfig" | "dataPlaneClient"
+    "db" | "integrationsConfig" | "mcpConfig" | "dataPlaneClient"
   > & {
     defaultBaseImage: string;
   },

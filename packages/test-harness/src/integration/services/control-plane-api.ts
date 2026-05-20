@@ -327,6 +327,7 @@ function config(input: {
         : {}),
     },
     mcp: {
+      url: `${input.controlPlaneBaseUrl}/mcp`,
       auth: {
         secret: "integration-new-mcp-auth-secret",
         issuer: "integration-new-control-plane-api",

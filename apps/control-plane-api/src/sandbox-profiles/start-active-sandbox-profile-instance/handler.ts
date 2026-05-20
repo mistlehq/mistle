@@ -13,7 +13,7 @@ const routeHandler = async (
 ) => {
   const db = ctx.get("db");
   const dataPlaneClient = ctx.get("dataPlaneClient");
-  const integrationsConfig = ctx.get("config").integrations;
+  const { integrations: integrationsConfig, mcp: mcpConfig } = ctx.get("config");
   const sandboxConfig = ctx.get("sandboxConfig");
   const { profileId } = ctx.req.valid("param");
   const body = ctx.req.valid("json");
@@ -22,6 +22,7 @@ const routeHandler = async (
     {
       db,
       integrationsConfig,
+      mcpConfig,
       dataPlaneClient,
       defaultBaseImage: sandboxConfig.defaultBaseImage,
     },

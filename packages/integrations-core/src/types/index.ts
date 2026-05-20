@@ -994,6 +994,7 @@ export type IntegrationMcpServer = {
 };
 
 export type IntegrationBindingMcpServerSource = {
+  kind: "integration";
   bindingId: string;
   connectionId: string;
   targetKey: string;
@@ -1001,13 +1002,21 @@ export type IntegrationBindingMcpServerSource = {
   variantId: string;
 };
 
+export type MistleMcpServerSource = {
+  kind: "mistle";
+};
+
+export type ResolvedIntegrationMcpServerSource =
+  | IntegrationBindingMcpServerSource
+  | MistleMcpServerSource;
+
 export type IntegrationBindingMcpServer = {
   source: IntegrationBindingMcpServerSource;
   server: IntegrationMcpServer;
 };
 
 export type ResolvedIntegrationMcpServer = {
-  source: IntegrationBindingMcpServerSource;
+  source: ResolvedIntegrationMcpServerSource;
   server: Omit<IntegrationMcpServer, "url" | "env" | "httpHeaders"> & {
     url?: string;
     env?: Readonly<Record<string, string>>;
@@ -2594,5 +2603,6 @@ export type CompileRuntimePlanInput = {
   image: ResolvedSandboxImage;
   agentRuntimeId: string;
   bindings: ReadonlyArray<CompileRuntimePlanBindingInput>;
+  mcpServers?: ReadonlyArray<ResolvedIntegrationMcpServer>;
   definitions: IntegrationDefinitionsBundle;
 };

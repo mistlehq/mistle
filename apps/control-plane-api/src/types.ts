@@ -24,6 +24,7 @@ export type ControlPlaneApiConfig = LoadControlPlaneApiConfigResult["app"] & {
 };
 export type ControlPlaneApiGlobalConfig = NonNullable<LoadControlPlaneApiConfigResult["global"]>;
 export type ControlPlaneApiConnectionTokenConfig = ControlPlaneApiConfig["connectionToken"];
+export type ControlPlaneApiMcpConfig = ControlPlaneApiConfig["mcp"];
 export type ControlPlaneApiPortAccessConfig = ControlPlaneApiConfig["portAccess"];
 export type ControlPlaneApiPtyTransportConfig = ControlPlaneApiConfig["ptyTransport"];
 export type ControlPlaneApiSandboxRuntimeConfig = ControlPlaneApiConfig["sandbox"];

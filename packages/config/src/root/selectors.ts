@@ -217,6 +217,7 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
           }),
     },
     mcp: {
+      url: config.services.control_plane_api.mcp.url,
       auth: {
         secret: config.services.control_plane_api.mcp.auth.secret,
         issuer: config.services.control_plane_api.mcp.auth.issuer,

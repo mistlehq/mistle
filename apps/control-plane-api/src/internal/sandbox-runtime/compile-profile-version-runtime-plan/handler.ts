@@ -7,13 +7,14 @@ import { route } from "./route.js";
 
 const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
   const db = ctx.get("db");
-  const integrationsConfig = ctx.get("config").integrations;
+  const { integrations: integrationsConfig, mcp: mcpConfig } = ctx.get("config");
   const body = ctx.req.valid("json");
 
   const runtimePlan = await compileProfileVersionRuntimePlan(
     {
       db,
       integrationsConfig,
+      mcpConfig,
     },
     {
       organizationId: body.organizationId,

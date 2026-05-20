@@ -54,6 +54,7 @@ function createRootConfig(input: {
           ...(input.google === undefined ? {} : { google: input.google }),
         },
         mcp: {
+          url: "https://mcp.example.com/mcp",
           auth: {
             secret: "mcp-auth-secret",
             issuer: "control-plane-api",
@@ -248,9 +249,10 @@ describe("selectControlPlaneApiConfig", () => {
     expect(config.auth.allowSignups).toBe(false);
   });
 
-  it("selects MCP auth config for runtime credential validation", () => {
+  it("selects MCP config for runtime credential validation", () => {
     const config = selectControlPlaneApiConfig(createRootConfig({}));
 
+    expect(config.mcp.url).toBe("https://mcp.example.com/mcp");
     expect(config.mcp.auth).toEqual({
       secret: "mcp-auth-secret",
       issuer: "control-plane-api",

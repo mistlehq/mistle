@@ -36,6 +36,9 @@ length = 6
 expires_in_seconds = 300
 allowed_attempts = 3
 
+[services.control_plane_api.mcp]
+url = "https://mcp.example.test/mcp"
+
 [services.control_plane_api.mcp.auth]
 secret = "fixture-mcp-auth-secret"
 issuer = "control-plane-api"

@@ -37,7 +37,7 @@ type StartProfileMaintenanceScriptTestRunOutput = {
 
 type StartProfileMaintenanceScriptServiceInput = Pick<
   CreateSandboxProfilesServiceInput,
-  "db" | "integrationsConfig" | "dataPlaneClient"
+  "db" | "integrationsConfig" | "mcpConfig" | "dataPlaneClient"
 > & {
   integrationRegistry: CreateSandboxProfilesServiceInput["integrationRegistry"];
   sandboxConfig: CreateSandboxProfilesServiceInput["sandboxConfig"];

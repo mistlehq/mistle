@@ -3,7 +3,13 @@
  */
 
 import { getLocalPreparedRuntimeSandboxBaseImageRef } from "@mistle/config";
-import { IntegrationBindingKinds, IntegrationConnectionStatuses } from "@mistle/db/control-plane";
+import {
+  ApiKeyActorKinds,
+  IntegrationBindingKinds,
+  IntegrationConnectionStatuses,
+  SandboxProfileVersionAgentRuntimeIds,
+  type SandboxProfileVersionAgentRuntimeId,
+} from "@mistle/db/control-plane";
 import {
   IntegrationConnectionMethodIds,
   type RuntimeArtifactInstallStep,
@@ -151,6 +157,7 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
     expect(configContent).toContain('[projects."/"]');
     expect(configContent).toContain("[features]");
     expect(configContent).toContain("tool_search = true");
+    expect(configContent).not.toContain("[mcp_servers.mistle]");
     expect(configContent).not.toContain("model =");
     expect(configContent).not.toContain("developer_instructions");
     expect(agentsContent).toContain("Mistle-managed sandbox context:");
@@ -480,6 +487,113 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
     );
   });
 
+  it("includes Mistle MCP config for Codex when enabled on the profile version", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-compile-mistle-mcp-codex@example.com",
+    });
+    const apiKeyId = "apk_compile_mistle_mcp_codex";
+
+    await seedMistleMcpApiKey(env, {
+      organizationId: session.organizationId,
+      apiKeyId,
+      secretPrefix: "compile_mistle_mcp_codex",
+    });
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_mistle_mcp_codex",
+      mistleMcpApiKeyId: apiKeyId,
+    });
+    await seedOpenAiAgentBinding(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_mistle_mcp_codex",
+      targetKey: "openai-default-compile-mistle-mcp-codex",
+      connectionId: "icn_compile_mistle_mcp_codex_openai",
+      bindingId: "ibd_compile_mistle_mcp_codex_openai",
+    });
+
+    const runtimePlan = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_mistle_mcp_codex",
+    });
+
+    const configContent = readSetupFileContent(runtimePlan, "codex_config");
+    expect(configContent).toContain("[mcp_servers.mistle]");
+    expect(configContent).toContain('url = "https://mcp.example.test/mcp"');
+  });
+
+  it("includes Mistle MCP config for OpenCode when enabled on the profile version", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-compile-mistle-mcp-opencode@example.com",
+    });
+    const apiKeyId = "apk_compile_mistle_mcp_opencode";
+
+    await seedMistleMcpApiKey(env, {
+      organizationId: session.organizationId,
+      apiKeyId,
+      secretPrefix: "compile_mistle_mcp_opencode",
+    });
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_mistle_mcp_opencode",
+      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.OPENCODE,
+      mistleMcpApiKeyId: apiKeyId,
+    });
+
+    const runtimePlan = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_mistle_mcp_opencode",
+    });
+
+    expect(JSON.parse(readSetupFileContent(runtimePlan, "opencode_config"))).toMatchObject({
+      mcp: {
+        mistle: {
+          url: "https://mcp.example.test/mcp",
+        },
+      },
+    });
+  });
+
+  it("includes Mistle MCP config for Pi when enabled on the profile version", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-compile-mistle-mcp-pi@example.com",
+    });
+    const apiKeyId = "apk_compile_mistle_mcp_pi";
+
+    await seedMistleMcpApiKey(env, {
+      organizationId: session.organizationId,
+      apiKeyId,
+      secretPrefix: "compile_mistle_mcp_pi",
+    });
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_mistle_mcp_pi",
+      agentRuntimeId: SandboxProfileVersionAgentRuntimeIds.PI,
+      mistleMcpApiKeyId: apiKeyId,
+    });
+
+    const runtimePlan = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_mistle_mcp_pi",
+    });
+
+    expect(JSON.parse(readSetupFileContent(runtimePlan, "pi_mcp_config"))).toEqual({
+      settings: {
+        disableProxyTool: false,
+      },
+      mcpServers: {
+        mistle: {
+          url: "https://mcp.example.test/mcp",
+          lifecycle: "lazy",
+          directTools: false,
+        },
+      },
+    });
+  });
+
   it("returns profile not found when the sandbox profile does not exist", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-sandbox-profile-compile-missing-profile@example.com",
@@ -663,6 +777,14 @@ async function compilePlan(
     {
       db: env.controlPlaneDb,
       integrationsConfig: IntegrationIntegrationsConfig,
+      mcpConfig: {
+        url: "https://mcp.example.test/mcp",
+        auth: {
+          secret: "mcp-runtime-token-secret",
+          issuer: "control-plane-api",
+          audience: "mistle-mcp",
+        },
+      },
     },
     {
       organizationId: input.organizationId,
@@ -682,6 +804,8 @@ async function createProfileVersion(
     organizationId: string;
     profileId: string;
     setupScript?: string;
+    agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
+    mistleMcpApiKeyId?: string;
   },
 ): Promise<void> {
   await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
@@ -697,8 +821,32 @@ async function createProfileVersion(
       sandboxProfileId: input.profileId,
       version: 1,
       ...(input.setupScript === undefined ? {} : { setupScript: input.setupScript }),
+      ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
+      ...(input.mistleMcpApiKeyId === undefined
+        ? {}
+        : { mistleMcpEnabled: true, mistleMcpApiKeyId: input.mistleMcpApiKeyId }),
     }),
   );
+}
+
+async function seedMistleMcpApiKey(
+  env: IntegrationTestEnvironment,
+  input: {
+    organizationId: string;
+    apiKeyId: string;
+    secretPrefix: string;
+  },
+): Promise<void> {
+  await env.controlPlaneDb.insert(env.controlPlaneTables.apiKeys).values({
+    id: input.apiKeyId,
+    name: "Compile Mistle MCP API Key",
+    organizationId: input.organizationId,
+    secretPrefix: input.secretPrefix,
+    secretHash: "sha256-test-hash",
+    secretHashAlgorithm: "sha256-v1",
+    createdByActorKind: ApiKeyActorKinds.USER,
+    createdByActorId: "usr_compile_mistle_mcp",
+  });
 }
 
 async function seedOpenAiAgentBinding(

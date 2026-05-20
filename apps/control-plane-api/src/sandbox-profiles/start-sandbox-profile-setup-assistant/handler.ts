@@ -15,7 +15,7 @@ const routeHandler = async (
   const db = ctx.get("db");
   const dataPlaneClient = ctx.get("dataPlaneClient");
   const integrationRegistry = ctx.get("integrationRegistry");
-  const integrationsConfig = ctx.get("config").integrations;
+  const { integrations: integrationsConfig, mcp: mcpConfig } = ctx.get("config");
   const sandboxConfig = ctx.get("sandboxConfig");
   const { profileId, version } = ctx.req.valid("param");
   const body = ctx.req.valid("json");
@@ -24,6 +24,7 @@ const routeHandler = async (
     db,
     integrationRegistry,
     integrationsConfig,
+    mcpConfig,
     sandboxConfig,
     dataPlaneClient,
     defaultBaseImage: sandboxConfig.defaultBaseImage,
