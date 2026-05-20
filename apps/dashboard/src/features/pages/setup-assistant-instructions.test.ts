@@ -47,8 +47,27 @@ describe("buildSetupAssistantCollaborationModeSettings", () => {
       "starts from the current usable snapshot",
     );
     expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
-      "Do not rewrite it as a full setup script from the base image",
+      "If requested work requires rebuilding from the base image",
     );
+  });
+
+  it("preserves the maintenance assistant behavior contract", () => {
+    expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
+      "Snapshot maintenance script editor",
+    );
+    expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain("temporary artifacts");
+    expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
+      "may prompt for input, require confirmation, or change behavior outside CI",
+    );
+    expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain("maintenance intent");
+    expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain("snapshot filesystem");
+    expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
+      "right maintenance approach is unclear",
+    );
+    expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain(
+      "exact candidate script body",
+    );
+    expect(SnapshotMaintenanceAssistantDeveloperInstructions).toContain("complete script text");
   });
 });
 

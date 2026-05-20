@@ -201,6 +201,19 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - **Setup Assistant** requires the **Latest saved draft** to have a saved agent integration.
 - A **Snapshot maintenance script** prepares a replacement **Snapshot** from an existing usable **Snapshot**.
 - A **Snapshot maintenance script** belongs to one **Sandbox profile version** but may be edited without publishing a new version.
+- A **Snapshot maintenance script** is the script text saved for the **Sandbox profile version**, not a script file created inside a Setup Assistant sandbox.
+- A Setup Assistant sandbox may use temporary script files to validate a **Snapshot maintenance script**, but those files are not the saved **Snapshot maintenance script**.
+- Setup Assistant authors and validates a **Snapshot maintenance script**; applying the script happens through the sandbox profile editor.
+- A **Snapshot maintenance script** should match the user's stated maintenance intent; repository refresh and dependency or cache warming are separate intents.
+- Dependency installs, toolchain installs, package lifecycle scripts, cache warming, and generated asset builds are additional maintenance scopes beyond repository refresh.
+- When the user narrows the intended **Snapshot maintenance script** behavior, later fixes should preserve that narrowed maintenance scope.
+- A repository-refresh **Snapshot maintenance script** should fail fast when a target repository has uncommitted changes.
+- A repository-refresh **Snapshot maintenance script** should update repositories with non-interactive fast-forward-only pulls.
+- A repository-refresh **Snapshot maintenance script** should target repositories discovered in the snapshot or named by the user, not repository paths invented from memory.
+- When a Setup Assistant finishes authoring or changing a **Snapshot maintenance script**, the final response should include the complete script text that the user can apply.
+- A Setup Assistant should validate a runnable **Snapshot maintenance script** by running it when practical; syntax checks alone do not prove the maintenance behavior works.
+- Validation should run the exact candidate **Snapshot maintenance script** body, not manually equivalent commands.
+- Running a **Snapshot maintenance script** is practical when it exercises the intended maintenance behavior without destructive side effects, secret-dependent prompts, disproportionate runtime, or known environment mismatch.
 - **Automatic snapshot refresh** uses the latest saved **Snapshot maintenance script** at execution time when one is present; otherwise it uses the **Setup script**.
 - Unsaved **Snapshot maintenance script** edits do not affect **Automatic snapshot refresh**.
 - Saving **Automatic snapshot refresh** also saves **Snapshot maintenance script** edits.
@@ -356,6 +369,8 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - "full refresh" was considered for the setup-based refresh path — resolved: use **Setup script** / `setup` when contrasting with **Snapshot maintenance script** / `maintenance`.
 - **Snapshot maintenance script** was initially discussed as ordinary versioned profile-version data — resolved: it is scoped to a **Sandbox profile version** but can be updated without publishing a new version or rebuilding from the **Setup script**.
 - "Maintenance script" collides with backend maintenance commands — resolved: use **Snapshot maintenance script** in product language.
+- "Update repos" was expanded into dependency and cache warming — resolved: keep repository refresh distinct unless the user explicitly asks to warm dependencies, caches, generated assets, or build outputs.
+- "Update modules" may mean git submodules, package dependency installs, dependency upgrades, Go modules, cached tool modules, generated assets, or cache warming — unresolved until clarified; do not silently add any of these to a repository-refresh script.
 - A queued maintenance refresh was considered as a script-capturing job — resolved for the first implementation: scheduled refresh uses the latest saved **Snapshot maintenance script** at execution time.
 - Copied refresh schedules should keep their definition but recompute their next occurrence for the newly published **Sandbox profile version**.
 - "empty state" could mean first-use creation guidance, filtered no-results copy, or unavailable dependency copy — resolved: for collection pages, use it to mean the zero-object state before the first item exists.
