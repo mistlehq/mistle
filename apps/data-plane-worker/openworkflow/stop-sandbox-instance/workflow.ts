@@ -1,3 +1,4 @@
+import { SandboxUsageEventTypes } from "@mistle/db/data-plane";
 import {
   StopSandboxInstanceWorkflowSpec,
   type StopSandboxInstanceWorkflowInput,
@@ -13,6 +14,10 @@ import {
 import { getWorkflowContext } from "../core/context.js";
 import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
 import { createWorkerSandboxLifecycleEventRecorder } from "../shared/sandbox-operation-events.js";
+import {
+  createSandboxUsageEventIdempotencyKey,
+  recordWorkerSandboxUsageEvent,
+} from "../shared/sandbox-usage-events.js";
 import { stopSandboxInstance, type StopSandboxInstanceResult } from "./stop-sandbox-instance.js";
 
 function resolveExpectedOwnerLeaseId(input: StopSandboxInstanceWorkflowInput): {
@@ -158,6 +163,44 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         status: "failed",
       });
       throw error;
+    }
+
+    if (result.executed && result.usageEventState !== undefined) {
+      const usageEventState = result.usageEventState;
+      await step.run({ name: "record-sandbox-stopped-usage-event" }, async () => {
+        await recordWorkerSandboxUsageEvent(
+          {
+            clock: ctx.clock,
+            db: ctx.db,
+            tables: ctx.tables,
+          },
+          {
+            idempotencyKey: createSandboxUsageEventIdempotencyKey({
+              sandboxInstanceId: input.sandboxInstanceId,
+              computeGeneration: usageEventState.computeGeneration,
+              eventType: SandboxUsageEventTypes.SANDBOX_STOPPED,
+              operationId: run.id,
+            }),
+            organizationId: usageEventState.organizationId,
+            sandboxInstanceId: input.sandboxInstanceId,
+            computeGeneration: usageEventState.computeGeneration,
+            eventType: SandboxUsageEventTypes.SANDBOX_STOPPED,
+            runtimeProvider: usageEventState.runtimeProvider,
+            providerSandboxId: usageEventState.providerSandboxId,
+            storageProvider: null,
+            providerStorageId: null,
+            vcpuCount: usageEventState.vcpuCount,
+            memoryMb: usageEventState.memoryMb,
+            storageMb: usageEventState.storageMb,
+            payload: {
+              workflowRunId: run.id,
+              operationKind: "stop",
+              stopReason: input.stopReason,
+              outcome: result.outcome,
+            },
+          },
+        );
+      });
     }
 
     const terminationResult = await terminateBootstrapAttachmentStep(result);

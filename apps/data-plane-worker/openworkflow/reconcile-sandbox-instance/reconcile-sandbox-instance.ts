@@ -36,6 +36,7 @@ import {
 type ActiveSandboxInstance = {
   id: string;
   organizationId: string;
+  computeGeneration: number;
   persistenceMode: SandboxInstancePersistenceMode;
   runtimeProvider: SandboxInstanceProvider;
   sandboxConnectionId: string | null;
@@ -62,10 +63,21 @@ export type ReconcileBootstrapAttachmentTerminationTarget = {
   expectedSessionId?: string;
 };
 
+export type ReconcileSandboxUsageEventState = {
+  organizationId: string;
+  runtimeProvider: SandboxInstanceProvider;
+  providerSandboxId: string;
+  computeGeneration: number;
+  vcpuCount: number | null;
+  memoryMb: number | null;
+  storageMb: number | null;
+};
+
 export type ReconcileSandboxInstanceResult = {
   executed: boolean;
   outcome: ReconcileSandboxInstanceOutcome;
   bootstrapAttachmentTerminationTarget?: ReconcileBootstrapAttachmentTerminationTarget;
+  usageEventState?: ReconcileSandboxUsageEventState;
 };
 
 function withBootstrapAttachmentTerminationTarget(input: {
@@ -80,6 +92,24 @@ function withBootstrapAttachmentTerminationTarget(input: {
       ...(input.expectedSessionId === undefined
         ? {}
         : { expectedSessionId: input.expectedSessionId }),
+    },
+  };
+}
+
+function withUsageEventState(input: {
+  result: ReconcileSandboxInstanceResult;
+  sandboxInstance: ActiveSandboxInstance;
+}): ReconcileSandboxInstanceResult {
+  return {
+    ...input.result,
+    usageEventState: {
+      organizationId: input.sandboxInstance.organizationId,
+      runtimeProvider: input.sandboxInstance.runtimeProvider,
+      providerSandboxId: input.sandboxInstance.providerSandboxId,
+      computeGeneration: input.sandboxInstance.computeGeneration,
+      vcpuCount: input.sandboxInstance.sandboxVcpuCount,
+      memoryMb: input.sandboxInstance.sandboxMemoryMb,
+      storageMb: input.sandboxInstance.sandboxStorageMb,
     },
   };
 }
@@ -159,6 +189,7 @@ async function resolveActiveSandboxInstance(input: {
     columns: {
       id: true,
       organizationId: true,
+      computeGeneration: true,
       persistenceMode: true,
       runtimeProvider: true,
       sandboxConnectionId: true,
@@ -194,6 +225,7 @@ async function resolveActiveSandboxInstance(input: {
       return {
         id: sandboxInstance.id,
         organizationId: sandboxInstance.organizationId,
+        computeGeneration: sandboxInstance.computeGeneration,
         persistenceMode: sandboxInstance.persistenceMode,
         runtimeProvider: sandboxInstance.runtimeProvider,
         sandboxConnectionId: sandboxInstance.sandboxConnectionId,
@@ -316,13 +348,16 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
         };
       }
 
-      return {
-        executed: true,
-        outcome: "failed",
-        bootstrapAttachmentTerminationTarget: {
-          expectedOwnerLeaseId: ctx.expectedOwnerLeaseId,
+      return withUsageEventState({
+        result: {
+          executed: true,
+          outcome: "failed",
+          bootstrapAttachmentTerminationTarget: {
+            expectedOwnerLeaseId: ctx.expectedOwnerLeaseId,
+          },
         },
-      };
+        sandboxInstance: ctx.sandboxInstance,
+      });
     }
 
     const markStoppedOutcome = await markSandboxInstanceStopped({
@@ -353,13 +388,16 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
       };
     }
 
-    return {
-      executed: true,
-      outcome: "stopped",
-      bootstrapAttachmentTerminationTarget: {
-        expectedOwnerLeaseId: ctx.expectedOwnerLeaseId,
+    return withUsageEventState({
+      result: {
+        executed: true,
+        outcome: "stopped",
+        bootstrapAttachmentTerminationTarget: {
+          expectedOwnerLeaseId: ctx.expectedOwnerLeaseId,
+        },
       },
-    };
+      sandboxInstance: ctx.sandboxInstance,
+    });
   }
 
   const markStoppedOutcome = await markSandboxInstanceStopped({
@@ -392,13 +430,16 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
     };
   }
 
-  return {
-    executed: true,
-    outcome: "stopped",
-    bootstrapAttachmentTerminationTarget: {
-      expectedOwnerLeaseId: ctx.expectedOwnerLeaseId,
+  return withUsageEventState({
+    result: {
+      executed: true,
+      outcome: "stopped",
+      bootstrapAttachmentTerminationTarget: {
+        expectedOwnerLeaseId: ctx.expectedOwnerLeaseId,
+      },
     },
-  };
+    sandboxInstance: ctx.sandboxInstance,
+  });
 }
 
 /**
@@ -539,12 +580,15 @@ export async function reconcileSandboxInstance(
         };
       }
 
-      return withBootstrapAttachmentTerminationTarget({
-        result: {
-          executed: true,
-          outcome: "failed",
-        },
-        expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+      return withUsageEventState({
+        result: withBootstrapAttachmentTerminationTarget({
+          result: {
+            executed: true,
+            outcome: "failed",
+          },
+          expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+        }),
+        sandboxInstance,
       });
     }
     case "mark_stopped": {
@@ -579,12 +623,15 @@ export async function reconcileSandboxInstance(
         };
       }
 
-      return withBootstrapAttachmentTerminationTarget({
-        result: {
-          executed: true,
-          outcome: "stopped",
-        },
-        expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+      return withUsageEventState({
+        result: withBootstrapAttachmentTerminationTarget({
+          result: {
+            executed: true,
+            outcome: "stopped",
+          },
+          expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+        }),
+        sandboxInstance,
       });
     }
     case "stop_then_mark_stopped":

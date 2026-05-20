@@ -4,6 +4,7 @@ import {
   SandboxUsageEventTypes,
   type DataPlaneDatabase,
   type DataPlaneTables,
+  type SandboxUsageEventType,
 } from "@mistle/db/data-plane";
 import type { Clock } from "@mistle/time";
 import { z } from "zod";
@@ -31,6 +32,23 @@ export type WorkerSandboxUsageEventInput = z.input<typeof WorkerSandboxUsageEven
 export type WorkerSandboxUsageEventWriteResult = {
   inserted: boolean;
 };
+
+export function createSandboxUsageEventIdempotencyKey(input: {
+  sandboxInstanceId: string;
+  computeGeneration: number;
+  eventType: SandboxUsageEventType;
+  operationId: string;
+  discriminator?: string;
+}): string {
+  return [
+    "usage",
+    input.sandboxInstanceId,
+    String(input.computeGeneration),
+    input.eventType,
+    input.operationId,
+    ...(input.discriminator === undefined ? [] : [input.discriminator]),
+  ].join(":");
+}
 
 export async function recordWorkerSandboxUsageEvent(
   ctx: {

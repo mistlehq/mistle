@@ -34,6 +34,7 @@ type RunningSandboxInstanceStopState = {
   sandboxMemoryMb: number | null;
   sandboxStorageMb: number | null;
   providerSandboxId: string;
+  computeGeneration: number;
 };
 
 export type BootstrapAttachmentTerminationTarget = {
@@ -52,6 +53,15 @@ export type StopSandboxInstanceResult = {
   executed: boolean;
   outcome: StopSandboxInstanceOutcome;
   bootstrapAttachmentTerminationTarget?: BootstrapAttachmentTerminationTarget;
+  usageEventState?: {
+    organizationId: string;
+    runtimeProvider: SandboxInstanceProvider;
+    providerSandboxId: string;
+    computeGeneration: number;
+    vcpuCount: number | null;
+    memoryMb: number | null;
+    storageMb: number | null;
+  };
 };
 
 function includeExpectedOwnerLeaseId(input: { expectedOwnerLeaseId: string | undefined }): {
@@ -102,6 +112,7 @@ async function resolveRunningSandboxInstanceStopState(input: {
       sandboxMemoryMb: true,
       sandboxStorageMb: true,
       providerSandboxId: true,
+      computeGeneration: true,
       status: true,
     },
     where: (table, { eq }) => eq(table.id, input.sandboxInstanceId),
@@ -137,6 +148,7 @@ async function resolveRunningSandboxInstanceStopState(input: {
     sandboxMemoryMb: sandboxInstance.sandboxMemoryMb,
     sandboxStorageMb: sandboxInstance.sandboxStorageMb,
     providerSandboxId: sandboxInstance.providerSandboxId,
+    computeGeneration: sandboxInstance.computeGeneration,
   };
 }
 
@@ -353,6 +365,15 @@ export async function stopSandboxInstance(
   return {
     executed: true,
     outcome: "stopped",
+    usageEventState: {
+      organizationId: sandboxInstanceState.organizationId,
+      runtimeProvider: sandboxInstanceState.runtimeProvider,
+      providerSandboxId: sandboxInstanceState.providerSandboxId,
+      computeGeneration: sandboxInstanceState.computeGeneration,
+      vcpuCount: sandboxInstanceState.sandboxVcpuCount,
+      memoryMb: sandboxInstanceState.sandboxMemoryMb,
+      storageMb: sandboxInstanceState.sandboxStorageMb,
+    },
     ...(bootstrapAttachmentTerminationTarget === undefined
       ? {}
       : { bootstrapAttachmentTerminationTarget }),

@@ -1,3 +1,4 @@
+import { SandboxUsageEventTypes, type SandboxUsageEventType } from "@mistle/db/data-plane";
 import {
   ReconcileSandboxInstanceWorkflowSpec,
   type ReconcileSandboxInstanceWorkflowOutput,
@@ -12,13 +13,18 @@ import {
 import { getWorkflowContext } from "../core/context.js";
 import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
 import {
+  createSandboxUsageEventIdempotencyKey,
+  recordWorkerSandboxUsageEvent,
+} from "../shared/sandbox-usage-events.js";
+import {
   reconcileSandboxInstance,
   type ReconcileSandboxInstanceResult,
+  type ReconcileSandboxUsageEventState,
 } from "./reconcile-sandbox-instance.js";
 
 export const ReconcileSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
   ReconcileSandboxInstanceWorkflowSpec,
-  async ({ input, step }): Promise<ReconcileSandboxInstanceWorkflowOutput> => {
+  async ({ input, run, step }): Promise<ReconcileSandboxInstanceWorkflowOutput> => {
     const ctx = await getWorkflowContext();
 
     function rethrowReconcileDurableStepErrorForRetry(error: unknown): void {
@@ -92,6 +98,39 @@ export const ReconcileSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       }
     }
 
+    async function recordReconcileSandboxUsageEvent(inputState: {
+      eventType: SandboxUsageEventType;
+      outcome: ReconcileSandboxInstanceResult["outcome"];
+      usageEventState: ReconcileSandboxUsageEventState;
+    }): Promise<void> {
+      await recordWorkerSandboxUsageEvent(ctx, {
+        idempotencyKey: createSandboxUsageEventIdempotencyKey({
+          sandboxInstanceId: input.sandboxInstanceId,
+          computeGeneration: inputState.usageEventState.computeGeneration,
+          eventType: inputState.eventType,
+          operationId: run.id,
+          discriminator: input.reason,
+        }),
+        organizationId: inputState.usageEventState.organizationId,
+        sandboxInstanceId: input.sandboxInstanceId,
+        runtimeProvider: inputState.usageEventState.runtimeProvider,
+        providerSandboxId: inputState.usageEventState.providerSandboxId,
+        storageProvider: null,
+        providerStorageId: null,
+        computeGeneration: inputState.usageEventState.computeGeneration,
+        eventType: inputState.eventType,
+        vcpuCount: inputState.usageEventState.vcpuCount,
+        memoryMb: inputState.usageEventState.memoryMb,
+        storageMb: inputState.usageEventState.storageMb,
+        payload: {
+          workflowRunId: run.id,
+          operationKind: "reconcile",
+          reason: input.reason,
+          outcome: inputState.outcome,
+        },
+      });
+    }
+
     let result: ReconcileSandboxInstanceResult;
     try {
       result = await step.run({ name: "reconcile-sandbox-instance" }, async () => {
@@ -115,6 +154,25 @@ export const ReconcileSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
     } catch (error) {
       rethrowReconcileDurableStepErrorForRetry(error);
       throw error;
+    }
+
+    const usageEventState = result.usageEventState;
+    if (usageEventState !== undefined) {
+      try {
+        await step.run({ name: "record-reconcile-sandbox-usage-event" }, async () => {
+          await recordReconcileSandboxUsageEvent({
+            eventType:
+              result.outcome === "failed"
+                ? SandboxUsageEventTypes.SANDBOX_FAILED
+                : SandboxUsageEventTypes.SANDBOX_STOPPED,
+            outcome: result.outcome,
+            usageEventState,
+          });
+        });
+      } catch (error) {
+        rethrowReconcileDurableStepErrorForRetry(error);
+        throw error;
+      }
     }
 
     const terminationResult = await terminateBootstrapAttachmentStep(result);

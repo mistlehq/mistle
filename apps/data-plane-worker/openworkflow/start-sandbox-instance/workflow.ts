@@ -2,6 +2,8 @@ import {
   SandboxInstancePersistenceModes,
   SandboxInstancePurposes,
   SandboxOperationKinds,
+  SandboxUsageEventTypes,
+  type SandboxUsageEventType,
 } from "@mistle/db/data-plane";
 import {
   SandboxProvider,
@@ -31,6 +33,10 @@ import {
 } from "../shared/sandbox-operation-events.js";
 import { emitSandboxStartupDiagnostics } from "../shared/sandbox-startup-diagnostics.js";
 import { createSandboxStorageBackendAdapter } from "../shared/sandbox-storage/create-sandbox-storage-backend-adapter.js";
+import {
+  createSandboxUsageEventIdempotencyKey,
+  recordWorkerSandboxUsageEvent,
+} from "../shared/sandbox-usage-events.js";
 import { stopSandbox } from "../shared/stop-sandbox.js";
 import { markSandboxInstanceStopped } from "../stop-sandbox-instance/mark-sandbox-instance-stopped.js";
 import { ensureSandboxInstance } from "./ensure-sandbox-instance.js";
@@ -127,6 +133,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       providerSandboxId?: string;
       failureCode: string;
       failureMessage: string;
+      recordUsageFailureEvent?: boolean;
     }): Promise<void> {
       let destroySandboxError: unknown;
       if (input.runtimeProvider !== undefined && input.providerSandboxId !== undefined) {
@@ -300,6 +307,25 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           cause: updateFailedStatusError,
         });
       }
+
+      if (
+        input.recordUsageFailureEvent !== false &&
+        input.runtimeProvider !== undefined &&
+        input.providerSandboxId !== undefined
+      ) {
+        const providerSandboxId = input.providerSandboxId;
+        await step.run({ name: "record-sandbox-failed-usage-event" }, async () => {
+          await recordSandboxUsageEvent({
+            eventType: SandboxUsageEventTypes.SANDBOX_FAILED,
+            providerSandboxId,
+            computeGeneration: 1,
+            discriminator: input.failureCode,
+            payload: {
+              failureCode: input.failureCode,
+            },
+          });
+        });
+      }
     }
 
     async function emitStartupDiagnostics(input: {
@@ -330,6 +356,49 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           "Failed to resolve sandbox runtime for startup diagnostics before cleanup.",
         );
       }
+    }
+
+    async function recordSandboxUsageEvent(input: {
+      eventType: SandboxUsageEventType;
+      providerSandboxId: string;
+      computeGeneration: number;
+      discriminator?: string;
+      payload?: Record<string, unknown>;
+    }): Promise<void> {
+      await recordWorkerSandboxUsageEvent(
+        {
+          clock: ctx.clock,
+          db: ctx.db,
+          tables: ctx.tables,
+        },
+        {
+          idempotencyKey: createSandboxUsageEventIdempotencyKey({
+            sandboxInstanceId: workflowInput.sandboxInstanceId,
+            computeGeneration: input.computeGeneration,
+            eventType: input.eventType,
+            operationId: run.id,
+            ...(input.discriminator === undefined ? {} : { discriminator: input.discriminator }),
+          }),
+          organizationId: workflowInput.organizationId,
+          sandboxInstanceId: workflowInput.sandboxInstanceId,
+          computeGeneration: input.computeGeneration,
+          eventType: input.eventType,
+          runtimeProvider,
+          providerSandboxId: input.providerSandboxId,
+          storageProvider: null,
+          providerStorageId: null,
+          vcpuCount: workflowInput.sandboxRuntime.resources?.vcpuCount ?? null,
+          memoryMb: workflowInput.sandboxRuntime.resources?.memoryMb ?? null,
+          storageMb: workflowInput.sandboxRuntime.resources?.storageMb ?? null,
+          payload: {
+            workflowRunId: run.id,
+            operationKind,
+            purpose: workflowInput.purpose,
+            persistenceMode: workflowInput.persistenceMode,
+            ...(input.payload ?? {}),
+          },
+        },
+      );
     }
 
     async function cleanupSetupCheckSandbox(input: {
@@ -382,6 +451,20 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             stopReason: "system",
           }),
         );
+        if (markOutcome === "stopped") {
+          await step.run({ name: "record-setup-check-sandbox-stopped-usage-event" }, async () => {
+            await recordSandboxUsageEvent({
+              eventType: SandboxUsageEventTypes.SANDBOX_STOPPED,
+              providerSandboxId: input.providerSandboxId,
+              computeGeneration: 1,
+              discriminator: "setup-check-cleanup",
+              payload: {
+                stopReason: "system",
+                markOutcome,
+              },
+            });
+          });
+        }
 
         await operationEvents.record({
           attributes: {
@@ -722,6 +805,13 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           },
         );
       });
+      await step.run({ name: "record-sandbox-allocated-usage-event" }, async () => {
+        await recordSandboxUsageEvent({
+          eventType: SandboxUsageEventTypes.SANDBOX_ALLOCATED,
+          providerSandboxId: startedSandbox.providerSandboxId,
+          computeGeneration: 1,
+        });
+      });
       logger.info(
         {
           providerSandboxId: startedSandbox.providerSandboxId,
@@ -745,13 +835,15 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           providerSandboxId: startedSandbox.providerSandboxId,
           failureCode: StartSandboxFailureCodes.PERSIST_PROVISIONING_METADATA_FAILED,
           failureMessage: formatPersistedFailureMessage({
-            summary: "Failed to persist sandbox runtime plan and provider sandbox metadata.",
+            summary:
+              "Failed to persist sandbox runtime plan, provider sandbox metadata, or sandbox allocation usage event.",
             error,
           }),
+          recordUsageFailureEvent: false,
         });
       } catch (cleanupError) {
         throw new Error(
-          "Failed to persist sandbox provisioning metadata and failed cleanup after startup failure.",
+          "Failed to persist sandbox provisioning metadata or allocation usage event and failed cleanup after startup failure.",
           {
             cause: {
               persistProvisioningError: error,
@@ -762,7 +854,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       }
 
       throw new Error(
-        "Failed to persist sandbox provisioning metadata. Sandbox was stopped and sandbox instance was marked as failed.",
+        "Failed to persist sandbox provisioning metadata or allocation usage event. Sandbox was stopped and sandbox instance was marked as failed.",
         {
           cause: error,
         },
@@ -1381,6 +1473,14 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         },
       );
     }
+
+    await step.run({ name: "record-sandbox-ready-usage-event" }, async () => {
+      await recordSandboxUsageEvent({
+        eventType: SandboxUsageEventTypes.SANDBOX_READY,
+        providerSandboxId: startedSandbox.providerSandboxId,
+        computeGeneration: 1,
+      });
+    });
 
     if (workflowInput.purpose === SandboxInstancePurposes.SETUP_CHECK) {
       await cleanupSetupCheckSandbox({

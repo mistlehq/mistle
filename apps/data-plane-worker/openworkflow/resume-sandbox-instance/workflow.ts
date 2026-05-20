@@ -1,3 +1,4 @@
+import { SandboxUsageEventTypes, type SandboxUsageEventType } from "@mistle/db/data-plane";
 import { isSandboxResourceNotFoundError, type SandboxProvider } from "@mistle/sandbox";
 import {
   type ResumeSandboxInstanceWorkflowOutput,
@@ -19,6 +20,10 @@ import {
   recordWorkerSandboxLifecyclePhase,
 } from "../shared/sandbox-operation-events.js";
 import { emitSandboxStartupDiagnostics } from "../shared/sandbox-startup-diagnostics.js";
+import {
+  createSandboxUsageEventIdempotencyKey,
+  recordWorkerSandboxUsageEvent,
+} from "../shared/sandbox-usage-events.js";
 import { stopSandbox } from "../shared/stop-sandbox.js";
 import { initializeSandboxRuntime } from "../start-sandbox-instance/initialize-sandbox-runtime.js";
 import { markSandboxInstanceFailed } from "../start-sandbox-instance/mark-sandbox-instance-failed.js";
@@ -93,6 +98,48 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         logger,
         message: "Retrying sandbox resume workflow after durable step failure.",
       });
+    }
+
+    async function recordResumeSandboxUsageEvent(input: {
+      eventType: SandboxUsageEventType;
+      providerSandboxId: string;
+      computeGeneration: number;
+      discriminator?: string;
+      payload?: Record<string, unknown>;
+    }): Promise<void> {
+      await recordWorkerSandboxUsageEvent(
+        {
+          clock: ctx.clock,
+          db: ctx.db,
+          tables: ctx.tables,
+        },
+        {
+          idempotencyKey: createSandboxUsageEventIdempotencyKey({
+            sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
+            computeGeneration: input.computeGeneration,
+            eventType: input.eventType,
+            operationId: run.id,
+            ...(input.discriminator === undefined ? {} : { discriminator: input.discriminator }),
+          }),
+          organizationId: resumableSandboxState.organizationId,
+          sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
+          computeGeneration: input.computeGeneration,
+          eventType: input.eventType,
+          runtimeProvider: resumableSandboxState.runtimeProvider,
+          providerSandboxId: input.providerSandboxId,
+          storageProvider: null,
+          providerStorageId: null,
+          vcpuCount: resumableSandboxState.sandboxVcpuCount,
+          memoryMb: resumableSandboxState.sandboxMemoryMb,
+          storageMb: resumableSandboxState.sandboxStorageMb,
+          payload: {
+            workflowRunId: run.id,
+            operationKind: "resume",
+            persistenceMode: resumableSandboxState.persistenceMode,
+            ...(input.payload ?? {}),
+          },
+        },
+      );
     }
 
     logger.info(
@@ -255,6 +302,19 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         );
 
         if (resumedRuntime !== null) {
+          try {
+            await step.run({ name: "record-sandbox-resumed-usage-event" }, async () => {
+              await recordResumeSandboxUsageEvent({
+                eventType: SandboxUsageEventTypes.SANDBOX_RESUMED,
+                providerSandboxId: resumedRuntime.providerSandboxId,
+                computeGeneration: resumableSandboxState.computeGeneration,
+              });
+            });
+          } catch (error) {
+            existingResumeFailureHandled = true;
+            throw error;
+          }
+
           try {
             logger.info(
               createResumeWorkflowLogFields({
@@ -868,6 +928,20 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             throw error;
           }
 
+          try {
+            await step.run({ name: "record-resumed-sandbox-ready-usage-event" }, async () => {
+              await recordResumeSandboxUsageEvent({
+                eventType: SandboxUsageEventTypes.SANDBOX_READY,
+                providerSandboxId: resumedRuntime.providerSandboxId,
+                computeGeneration: resumableSandboxState.computeGeneration,
+                discriminator: "existing-provider",
+              });
+            });
+          } catch (error) {
+            existingResumeFailureHandled = true;
+            throw error;
+          }
+
           return {
             sandboxInstanceId: input.sandboxInstanceId,
           };
@@ -1084,6 +1158,17 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         },
       );
       const replacementComputeGeneration = persistedReplacement.computeGeneration;
+      await step.run({ name: "record-sandbox-replaced-usage-event" }, async () => {
+        await recordResumeSandboxUsageEvent({
+          eventType: SandboxUsageEventTypes.SANDBOX_REPLACED,
+          providerSandboxId: replacementProviderSandboxId,
+          computeGeneration: replacementComputeGeneration,
+          payload: {
+            previousComputeGeneration: resumableSandboxState.computeGeneration,
+            previousProviderSandboxId: resumableSandboxState.providerSandboxId,
+          },
+        });
+      });
 
       try {
         await step.run({ name: "attach-replacement-sandbox-storage" }, async () => {
@@ -1881,6 +1966,17 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         });
       }
       throw error;
+    }
+
+    if (replacementSandbox !== undefined && persistedReplacement !== undefined) {
+      await step.run({ name: "record-replacement-sandbox-ready-usage-event" }, async () => {
+        await recordResumeSandboxUsageEvent({
+          eventType: SandboxUsageEventTypes.SANDBOX_READY,
+          providerSandboxId: replacementSandbox.providerSandboxId,
+          computeGeneration: persistedReplacement.computeGeneration,
+          discriminator: "replacement-provider",
+        });
+      });
     }
 
     if (resumableSandboxState.providerSandboxId !== null) {
