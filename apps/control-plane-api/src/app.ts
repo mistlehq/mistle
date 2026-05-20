@@ -23,6 +23,7 @@ import { createInternalSandboxProfileVersionSnapshotJobRoutes } from "./internal
 import { createInternalSandboxRuntimeRoutes } from "./internal/sandbox-runtime/index.js";
 import { createInternalSandboxStorageRoutes } from "./internal/sandbox-storage/index.js";
 import { createInternalSchedulesRoutes } from "./internal/schedules/index.js";
+import { createMcpRoutes } from "./mcp/index.js";
 import { createCurrentActorMeRoutes, createMeRoutes } from "./me/index.js";
 import { createAppContextMiddleware } from "./middleware/app-context.js";
 import { createCorsMiddleware } from "./middleware/cors.js";
@@ -173,6 +174,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const integrationWebhooksRoutes = createIntegrationWebhooksRoutes();
   const currentActorMeRoutes = withAuthenticatedRequest(createCurrentActorMeRoutes());
   const meRoutes = withAuthSession(createMeRoutes());
+  const mcpRoutes = withOrganizationAccess(createMcpRoutes());
   const organizationRoutes = withActiveOrganizationAccess(createOrganizationRoutes());
   const publicSessionLinksRoutes = createPublicSessionLinksRoutes();
   const sandboxInstancesRoutes = withOrganizationAccess(createSandboxInstancesRoutes());
@@ -193,6 +195,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   app.route(integrationWebhooksRoutes.basePath, integrationWebhooksRoutes.routes);
   app.route(currentActorMeRoutes.basePath, currentActorMeRoutes.routes);
   app.route(meRoutes.basePath, meRoutes.routes);
+  app.route(mcpRoutes.basePath, mcpRoutes.routes);
   app.route(organizationRoutes.basePath, organizationRoutes.routes);
   app.route(publicSessionLinksRoutes.basePath, publicSessionLinksRoutes.routes);
   app.route(sandboxInstancesRoutes.basePath, sandboxInstancesRoutes.routes);

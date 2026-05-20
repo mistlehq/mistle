@@ -22,9 +22,15 @@ export function createCorsMiddleware(
       }
       return "";
     },
-    allowHeaders: ["Content-Type", "Authorization"],
+    allowHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Last-Event-ID",
+      "mcp-protocol-version",
+      "mcp-session-id",
+    ],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    exposeHeaders: ["Content-Length"],
+    exposeHeaders: ["Content-Length", "mcp-protocol-version", "mcp-session-id"],
     maxAge: 600,
     credentials: true,
   });
