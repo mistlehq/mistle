@@ -3,6 +3,7 @@ mod command_metadata;
 mod config;
 mod error;
 mod format;
+mod mcp;
 mod profile;
 mod sandbox;
 mod update;
@@ -14,10 +15,11 @@ use std::path::PathBuf;
 use bpaf::{OptionParser, Parser, construct, long, positional, pure};
 
 use crate::command_metadata::{
-    CODEX, CODEX_ARG, PROFILE, PROFILE_GET, PROFILE_ID, PROFILE_LIST, PROFILE_VERSION,
-    PROFILE_VERSION_LIST, PROFILE_VERSION_SETUP_SCRIPT, PROFILE_VERSION_SETUP_SCRIPT_SET,
-    PROFILE_VERSION_VALUE, ROOT, SANDBOX, SANDBOX_CREATE, SANDBOX_GET, SANDBOX_ID, SANDBOX_LIST,
-    SANDBOX_LIST_AFTER, SANDBOX_LIST_LIMIT, SETUP_SCRIPT_FILE, UPDATE, WHOAMI,
+    CODEX, CODEX_ARG, MCP, MCP_HOST, MCP_PORT, MCP_SERVE, PROFILE, PROFILE_GET, PROFILE_ID,
+    PROFILE_LIST, PROFILE_VERSION, PROFILE_VERSION_LIST, PROFILE_VERSION_SETUP_SCRIPT,
+    PROFILE_VERSION_SETUP_SCRIPT_SET, PROFILE_VERSION_VALUE, ROOT, SANDBOX, SANDBOX_CREATE,
+    SANDBOX_GET, SANDBOX_ID, SANDBOX_LIST, SANDBOX_LIST_AFTER, SANDBOX_LIST_LIMIT,
+    SETUP_SCRIPT_FILE, UPDATE, WHOAMI,
 };
 
 #[tokio::main]
@@ -59,6 +61,10 @@ enum CliCommand {
     Codex {
         sandbox_id: String,
         codex_args: Vec<String>,
+    },
+    McpServe {
+        host: String,
+        port: u16,
     },
 }
 
@@ -219,7 +225,24 @@ fn options() -> OptionParser<CliCommand> {
     .descr(CODEX.description)
     .command(CODEX.name);
 
-    construct!([whoami, update, profile, sandbox, codex])
+    let host = long("host")
+        .help(MCP_HOST.description)
+        .argument::<String>(MCP_HOST.name)
+        .fallback("127.0.0.1".to_owned());
+    let port = long("port")
+        .help(MCP_PORT.description)
+        .argument::<u16>(MCP_PORT.name)
+        .fallback(3000);
+    let mcp_serve = construct!(CliCommand::McpServe { host, port })
+        .to_options()
+        .descr(MCP_SERVE.description)
+        .command(MCP_SERVE.name);
+    let mcp = construct!([mcp_serve])
+        .to_options()
+        .descr(MCP.description)
+        .command(MCP.name);
+
+    construct!([whoami, update, profile, sandbox, codex, mcp])
         .to_options()
         .descr(ROOT.description)
         .version(env!("CARGO_PKG_VERSION"))
@@ -253,5 +276,6 @@ where
             sandbox_id,
             codex_args,
         } => codex::run(&sandbox_id, codex_args, stderr).await,
+        CliCommand::McpServe { host, port } => mcp::run_serve(&host, port, stdout, stderr).await,
     }
 }

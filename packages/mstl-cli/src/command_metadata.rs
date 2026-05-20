@@ -23,6 +23,16 @@ pub const UPDATE: CommandMetadata = CommandMetadata {
     description: "Update the Mistle CLI",
 };
 
+pub const MCP: CommandMetadata = CommandMetadata {
+    name: "mcp",
+    description: "Run Mistle MCP interfaces",
+};
+
+pub const MCP_SERVE: CommandMetadata = CommandMetadata {
+    name: "serve",
+    description: "Serve the Mistle MCP server over Streamable HTTP",
+};
+
 pub const PROFILE: CommandMetadata = CommandMetadata {
     name: "profile",
     description: "Manage sandbox profiles",
@@ -116,4 +126,14 @@ pub const SANDBOX_LIST_AFTER: ArgumentMetadata = ArgumentMetadata {
 pub const CODEX_ARG: ArgumentMetadata = ArgumentMetadata {
     name: "codex-arg",
     description: "Arguments passed to codex after --",
+};
+
+pub const MCP_HOST: ArgumentMetadata = ArgumentMetadata {
+    name: "host",
+    description: "MCP server host to bind",
+};
+
+pub const MCP_PORT: ArgumentMetadata = ArgumentMetadata {
+    name: "port",
+    description: "MCP server port to bind",
 };
