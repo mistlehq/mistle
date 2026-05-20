@@ -222,6 +222,8 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Sandbox session** may contain multiple **OpenCode sessions** when its **Agent runtime** is OpenCode.
 - A **Sandbox session** may contain **Pi conversations** when its **Agent runtime** is Pi.
 - A **Pi conversation** should remain the selected chat object when the user switches between chat and the Pi CLI.
+- A **Pi conversation** is identified in Mistle by the provider session file Pi uses to resume that conversation.
+- A listed **Pi conversation** should come from Pi session file metadata rather than from switching the active Pi runtime into that conversation.
 - A **Session workbench** URL may identify a **Pi conversation** without making the conversation a separate session.
 - A **Pi conversation** in the chat pane should expose visible conversation state rather than acting only as a hidden command bridge.
 - **Pi image content** belongs to **Pi conversation** messages rather than to a separate Pi upload object.
@@ -284,11 +286,15 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - User-initiated **Active runtime conversation** URL changes represent confirmed active-conversation changes.
 - After a user selects or starts a **Runtime conversation**, the **Session workbench** URL keeps the confirmed `conversationId` explicit, including when the selected conversation is the one selected by default.
 - Starting a new **OpenCode session** creates the provider-owned **Runtime conversation** before the **Session workbench** URL changes to its `conversationId`.
+- Starting a new **Pi conversation** creates the provider-owned **Runtime conversation** before the **Session workbench** URL changes to its `conversationId`.
 - Starting a new **Codex thread** does not create a new **Active runtime conversation** until Codex confirms the thread exists.
 - The **Original runtime conversation** remains stable when the **Active runtime conversation** changes within a **Session workbench**.
+- The **Original runtime conversation** may be omitted when the current runtime conversation list is incomplete and no explicit provider conversation was supplied.
 - A **Runtime conversation navigator** uses provider-neutral product language while preserving provider-owned object names in source-specific code and metadata.
 - A **Runtime conversation navigator** is labeled as conversations in shared user-facing workbench controls.
+- A **Runtime conversation navigator** should list real **Runtime conversations** from the active **Agent runtime** rather than presenting a partial active-only placeholder.
 - The default **Runtime conversation navigator** scope is the selected primary repository path when one is selected.
+- **Original runtime conversation** detection is scoped to the **Sandbox session**, not to the current **Runtime conversation navigator** filter.
 - First-pass **Runtime conversation** navigation is ordered by recent conversation activity unless the user chooses another view.
 - First-pass **Runtime conversation** navigation is flat even when a provider exposes parent-child conversation relationships.
 - A repository-scoped **Runtime conversation navigator** may be empty while the chat pane still shows an **Active runtime conversation** from another path.

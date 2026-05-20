@@ -278,6 +278,7 @@ function createPiRuntimeInput(input: {
       activeDirectory: null,
       activeSessionFile: "pi-session.json",
       connectedAtIso: "2026-05-19T00:00:00.000Z",
+      providerConversationId: null,
       sandboxInstanceId: "sandbox_123",
     },
     startTurn: async () => {

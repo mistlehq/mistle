@@ -71,6 +71,10 @@ function toPiConnectSessionInput(
 ): PiConnectSessionInput {
   return {
     ...(connectInput.initialCwd === undefined ? {} : { initialCwd: connectInput.initialCwd }),
+    ...(connectInput.providerConversationId === undefined ||
+    connectInput.providerConversationId === null
+      ? {}
+      : { providerConversationId: connectInput.providerConversationId }),
     sandboxInstanceId: connectInput.sandboxInstanceId,
     ...(connectInput.targetRuntimeConversationId === null
       ? {}
@@ -237,6 +241,7 @@ export function buildPiLifecycleForWorkbench(
         : {
             activeRuntimeConversationId: lifecycle.sessionSnapshot.activeSessionFile,
             connectedAtIso: lifecycle.sessionSnapshot.connectedAtIso,
+            providerConversationId: lifecycle.sessionSnapshot.providerConversationId,
             sandboxInstanceId: lifecycle.sessionSnapshot.sandboxInstanceId,
           },
   };
@@ -326,7 +331,7 @@ export function buildPiHandoffRuntime(input: {
     preserveCliLaunchForRestore: SessionRuntimeWorkbenchCapabilities.PI.preservesCliLaunchContext,
     resetServerRequests: () => {},
     restoreConversationId: input.sessionSnapshot?.activeSessionFile ?? null,
-    restoreProviderConversationId: null,
+    restoreProviderConversationId: input.sessionSnapshot?.providerConversationId ?? null,
     resolveCliLaunchTarget: async () => {
       const activeSessionFile = input.sessionSnapshot?.activeSessionFile ?? null;
 

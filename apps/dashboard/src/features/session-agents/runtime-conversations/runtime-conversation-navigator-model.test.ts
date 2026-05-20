@@ -173,6 +173,38 @@ describe("projectRuntimeConversationNavigatorRows", () => {
     ]);
   });
 
+  it("pins the active conversation when the runtime has no cwd for an empty conversation", () => {
+    expect(
+      projectRuntimeConversationNavigatorRows({
+        activeConversationId: "conversation_empty",
+        activeConversation: {
+          id: "conversation_empty",
+          cwd: null,
+        },
+        availableConversations: [],
+        originalConversationId: null,
+        pendingConversationId: null,
+        pendingServerRequestConversationIds: [],
+      }).map((row) => ({
+        id: row.id,
+        title: row.title,
+        cwd: row.cwd,
+        cwdSectionLabel: row.cwdSectionLabel,
+        isActive: row.isActive,
+        isPinnedCurrent: row.isPinnedCurrent,
+      })),
+    ).toEqual([
+      {
+        id: "conversation_empty",
+        title: "New conversation",
+        cwd: "",
+        cwdSectionLabel: "Current conversation",
+        isActive: true,
+        isPinnedCurrent: true,
+      },
+    ]);
+  });
+
   it("uses created time as activity when updated time is missing", () => {
     const conversations = [
       {

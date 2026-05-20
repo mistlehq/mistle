@@ -45,6 +45,19 @@ const PiRecentConversationResultSchema = z.object({
   providerConversationId: z.string().nullable(),
 });
 
+const PiConversationSummarySchema = z.object({
+  sessionFile: z.string(),
+  cwd: z.string(),
+  title: z.string().nullable(),
+  createdAt: z.string().nullable(),
+  updatedAt: z.number().nullable(),
+});
+
+const PiListConversationsResultSchema = z.object({
+  conversations: z.array(PiConversationSummarySchema),
+  hasMore: z.boolean(),
+});
+
 const PiReadMetadataResultSchema = z.object({
   name: z.string().nullable(),
   preview: z.string().nullable(),
@@ -54,6 +67,8 @@ export type PiSessionState = z.output<typeof PiSessionStateSchema>;
 export type PiModel = z.output<typeof PiModelSchema>;
 export type PiAgentMessage = z.output<typeof PiAgentMessageSchema>;
 export type PiEvent = z.output<typeof PiEventSchema>;
+export type PiConversationSummary = z.output<typeof PiConversationSummarySchema>;
+export type PiListConversationsResult = z.output<typeof PiListConversationsResultSchema>;
 
 export type PiEventSubscription = {
   close(): void;
@@ -66,6 +81,10 @@ export type PiSessionClient = {
   findRecentConversation(input?: { cwd?: string | null }): Promise<{
     providerConversationId: string | null;
   }>;
+  listConversations(input: {
+    cwd?: string | null;
+    limit: number;
+  }): Promise<PiListConversationsResult>;
   getAvailableModels(input: { sessionFile: string }): Promise<readonly PiModel[]>;
   getState(input?: { sessionFile?: string }): Promise<PiSessionState>;
   getMessages(input: { sessionFile: string }): Promise<readonly PiAgentMessage[]>;
@@ -205,6 +224,13 @@ export function createPiSessionClient(input: PiSessionClientInput): PiSessionCli
       return {
         providerConversationId: recent.providerConversationId,
       };
+    },
+    async listConversations(listInput) {
+      const result = await request({
+        method: "pi/listConversations",
+        params: listInput,
+      });
+      return PiListConversationsResultSchema.parse(result);
     },
     async getState(getStateInput = {}) {
       const result = await request({

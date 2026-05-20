@@ -92,6 +92,27 @@ function mapOpenCodeSessionToRuntimeConversationSummary(
   };
 }
 
+function parseOptionalIsoDateTimeMs(value: string | null): number | null {
+  if (value === null) {
+    return null;
+  }
+
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function mapPiConversationToRuntimeConversationSummary(
+  conversation: UsePiSessionStateResult["conversations"]["availableConversations"][number],
+): RuntimeConversationSummary {
+  return {
+    id: conversation.sessionFile,
+    title: conversation.title ?? "",
+    cwd: conversation.cwd,
+    createdAt: parseOptionalIsoDateTimeMs(conversation.createdAt),
+    updatedAt: conversation.updatedAt,
+  };
+}
+
 export function useSessionWorkbenchConversationRuntime(input: {
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
   isOpenCodeRuntime: boolean;
@@ -352,7 +373,33 @@ export function useSessionWorkbenchConversationRuntime(input: {
         repositoryStatus: input.repositoryStatus,
       },
       runtimeConversationNavigator: input.isPiRuntime
-        ? null
+        ? {
+            activeConversationCwd: input.piSessionState.conversations.activeConversationDirectory,
+            activeConversationId: input.piSessionState.conversations.activeSessionFile,
+            providerConversationId:
+              input.piSessionState.lifecycle.sessionSnapshot?.providerConversationId ?? null,
+            availableConversations: input.piSessionState.conversations.availableConversations.map(
+              mapPiConversationToRuntimeConversationSummary,
+            ),
+            hasMoreAvailableConversations:
+              input.piSessionState.conversations.hasMoreAvailableConversations,
+            originalConversationId: input.piSessionState.conversations.originalConversationId,
+            pendingConversationId: input.piSessionState.conversations.pendingConversationId,
+            isStartingNewConversation: input.piSessionState.conversations.isStartingNewConversation,
+            refreshConversationList: async (refreshInput) => {
+              await input.piSessionState.conversations.refreshConversationList(
+                refreshInput?.cwd === undefined ? {} : { directory: refreshInput.cwd },
+              );
+            },
+            resumeConversation: async (conversationId, resumeInput) =>
+              await input.piSessionState.conversations.resumeConversation(conversationId, {
+                ...(resumeInput?.cwd === undefined ? {} : { directory: resumeInput.cwd }),
+              }),
+            startNewConversation: async (startInput) =>
+              await input.piSessionState.conversations.startNewConversation({
+                ...(startInput?.cwd === undefined ? {} : { directory: startInput.cwd }),
+              }),
+          }
         : input.isOpenCodeRuntime
           ? {
               activeConversationCwd: openCodeSessionState.sessions.activeSessionDirectory,

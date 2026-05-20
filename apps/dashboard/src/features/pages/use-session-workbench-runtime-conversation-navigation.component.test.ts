@@ -191,6 +191,25 @@ describe("useSessionWorkbenchRuntimeConversationNavigation", () => {
     await expect.poll(() => resumedConversationIds).toEqual(["conversation_requested"]);
   });
 
+  it("waits for the runtime to establish an active conversation before URL conversation navigation", async () => {
+    const resumedConversationIds: string[] = [];
+    renderConversationNavigation({
+      requestedRuntimeConversationId: "conversation_requested",
+      sandboxInstanceId: "sbi_conversation_navigation_wait_for_active",
+      runtimeConversationNavigator: createRuntimeConversationNavigator({
+        activeConversationId: null,
+        availableConversations: [],
+        resumedConversationIds,
+      }),
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(resumedConversationIds).toEqual([]);
+  });
+
   it("does not refresh again only because the navigator adapter callback identity changed", async () => {
     const refreshedConversationCwds: Array<string | null> = [];
     const createNavigator = () =>

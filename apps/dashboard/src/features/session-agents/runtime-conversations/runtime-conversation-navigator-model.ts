@@ -68,6 +68,10 @@ function resolveConversationTitle(conversation: RuntimeConversationSummary): str
 }
 
 function resolveCwdSectionLabel(cwd: string): string {
+  if (cwd.length === 0) {
+    return "Current conversation";
+  }
+
   const pathSegments = cwd.split("/").filter((segment) => segment.length > 0);
   return pathSegments.at(-1) ?? cwd;
 }
@@ -99,16 +103,12 @@ function createPinnedActiveConversationRow(input: {
   pendingConversationId: string | null;
   pendingServerRequestCountsByConversationId: ReadonlyMap<string, number>;
   originalConversationId: string | null;
-}): RuntimeConversationNavigatorRow | null {
-  if (input.activeConversation.cwd === null) {
-    return null;
-  }
-
+}): RuntimeConversationNavigatorRow {
   return {
     id: input.activeConversation.id,
     title: "New conversation",
-    cwd: input.activeConversation.cwd,
-    cwdSectionLabel: resolveCwdSectionLabel(input.activeConversation.cwd),
+    cwd: input.activeConversation.cwd ?? "",
+    cwdSectionLabel: resolveCwdSectionLabel(input.activeConversation.cwd ?? ""),
     lastActivityAt: null,
     isActive: true,
     isOpening: input.activeConversation.id === input.pendingConversationId,
@@ -170,15 +170,13 @@ export function projectRuntimeConversationNavigatorRows(input: {
     return rows;
   }
 
-  const activeConversationRow = createPinnedActiveConversationRow({
-    activeConversation: input.activeConversation,
-    pendingConversationId: input.pendingConversationId,
-    pendingServerRequestCountsByConversationId,
-    originalConversationId: input.originalConversationId,
-  });
-  if (activeConversationRow === null) {
-    return rows;
-  }
-
-  return [activeConversationRow, ...rows];
+  return [
+    createPinnedActiveConversationRow({
+      activeConversation: input.activeConversation,
+      pendingConversationId: input.pendingConversationId,
+      pendingServerRequestCountsByConversationId,
+      originalConversationId: input.originalConversationId,
+    }),
+    ...rows,
+  ];
 }

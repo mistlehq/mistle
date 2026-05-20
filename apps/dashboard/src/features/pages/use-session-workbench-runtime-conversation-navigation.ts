@@ -73,6 +73,10 @@ function shouldAttemptRequestedRuntimeConversationResume(input: {
     return false;
   }
 
+  if (input.activeConversationId === null) {
+    return false;
+  }
+
   if (input.requestedRuntimeConversationId === input.activeConversationId) {
     return false;
   }
