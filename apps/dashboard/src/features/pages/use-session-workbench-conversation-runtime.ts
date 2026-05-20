@@ -40,6 +40,7 @@ import {
   type SessionComposerStateInput,
   type SessionTurnControl,
 } from "./session-composer/index.js";
+import { resolvePrimaryRepositoryTurnStartCwd } from "./session-primary-repository-policy.js";
 import type { SessionTerminalContentInset } from "./session-terminal-surface.js";
 import type { useSessionWorkbenchLifecycleState } from "./use-session-workbench-lifecycle-state.js";
 import type { SessionWorkbenchTransportManager } from "./use-session-workbench-transport.js";
@@ -529,7 +530,8 @@ export function useSessionWorkbenchConversationRuntime(input: {
     ensureTransportConnected: input.ensureTransportConnected,
   });
   const activeContextMentionCwd =
-    runtimeConversationNavigator.activeConversationCwd ?? input.selectedRepositoryPath;
+    runtimeConversationNavigator.activeConversationCwd ??
+    resolvePrimaryRepositoryTurnStartCwd(input.selectedRepositoryPath);
   const contextMentionControl = useSessionComposerContextMentionControl({
     cwd: activeContextMentionCwd,
     enabled: input.sandboxInstanceId !== null,
