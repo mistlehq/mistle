@@ -203,14 +203,19 @@ function readThinkingContent(content: unknown): string {
   });
 }
 
+function isToolCallPart(part: unknown): part is Record<string, unknown> {
+  return isRecord(part) && readStringProperty(part, "type") === "toolCall";
+}
+
 function readToolCallParts(content: unknown): readonly Record<string, unknown>[] {
   if (!Array.isArray(content)) {
     return [];
   }
-  return content.filter(
-    (part): part is Record<string, unknown> =>
-      isRecord(part) && readStringProperty(part, "type") === "toolCall",
-  );
+  return content.filter(isToolCallPart);
+}
+
+function isToolCallOnlyContent(content: unknown): boolean {
+  return Array.isArray(content) && content.length > 0 && content.every(isToolCallPart);
 }
 
 function createMessageId(input: {
@@ -449,6 +454,10 @@ function buildMessageProjectionItems(input: {
           turnId: input.messageId,
         },
       });
+    }
+
+    if (entries.length === 0 && isToolCallOnlyContent(input.message.content)) {
+      return [];
     }
 
     return entries.length === 0

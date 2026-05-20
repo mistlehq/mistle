@@ -156,6 +156,160 @@ describe("reducePiChatState", () => {
     ]);
   });
 
+  it("suppresses Pi assistant messages that only request tool calls", () => {
+    const hydratedState = reducePiChatState(createInitialPiChatState(), {
+      type: "hydrate_messages",
+      sessionFile: "/root/.pi/agent/sessions/session.jsonl",
+      messages: [
+        {
+          role: "assistant",
+          api: "openai-codex-responses",
+          content: [
+            {
+              type: "toolCall",
+              id: "tool_1",
+              name: "bash",
+              arguments: {
+                command: "ls -a",
+              },
+            },
+          ],
+          timestamp: 1,
+        },
+        {
+          role: "toolResult",
+          toolCallId: "tool_1",
+          toolName: "bash",
+          content: [{ type: "text", text: ".\n..\npackage.json" }],
+          timestamp: 2,
+        },
+      ],
+    });
+
+    expect(
+      hydratedState.entries.some(
+        (entry) =>
+          entry.id === "pi:assistant:1:0" ||
+          entry.turnId === "pi:assistant:1:0" ||
+          (entry.kind === "generic-item" && entry.itemType === "pi-message"),
+      ),
+    ).toBe(false);
+    const group = findSemanticGroup({
+      entries: hydratedState.entries,
+      semanticKind: "running-commands",
+    });
+    expect(group.items).toEqual([
+      expect.objectContaining({
+        command: "ls -a",
+        detail: "ls -a",
+        label: "Command",
+        output: ".\n..\npackage.json",
+      }),
+    ]);
+  });
+
+  it("keeps visible assistant content when a Pi assistant message also requests tool calls", () => {
+    const hydratedState = reducePiChatState(createInitialPiChatState(), {
+      type: "hydrate_messages",
+      sessionFile: "/root/.pi/agent/sessions/session.jsonl",
+      messages: [
+        {
+          role: "assistant",
+          content: [
+            { type: "text", text: "I will inspect the package." },
+            {
+              type: "toolCall",
+              id: "tool_1",
+              name: "bash",
+              arguments: {
+                command: "ls -a",
+              },
+            },
+          ],
+          timestamp: 1,
+        },
+      ],
+    });
+
+    expect(hydratedState.entries).toEqual([
+      expect.objectContaining({
+        kind: "assistant-message",
+        text: "I will inspect the package.",
+      }),
+    ]);
+  });
+
+  it("keeps visible thinking when a Pi assistant message also requests tool calls", () => {
+    const hydratedState = reducePiChatState(createInitialPiChatState(), {
+      type: "hydrate_messages",
+      sessionFile: "/root/.pi/agent/sessions/session.jsonl",
+      messages: [
+        {
+          role: "assistant",
+          content: [
+            { type: "thinking", thinking: "Inspect package metadata before answering." },
+            {
+              type: "toolCall",
+              id: "tool_1",
+              name: "bash",
+              arguments: {
+                command: "ls -a",
+              },
+            },
+          ],
+          timestamp: 1,
+        },
+      ],
+    });
+
+    const group = findSemanticGroup({
+      entries: hydratedState.entries,
+      semanticKind: "thinking",
+    });
+    expect(group.items).toEqual([
+      expect.objectContaining({
+        label: "Thought",
+        output: "Inspect package metadata before answering.",
+      }),
+    ]);
+  });
+
+  it("keeps generic diagnostics when a Pi assistant tool call includes unsupported content", () => {
+    const hydratedState = reducePiChatState(createInitialPiChatState(), {
+      type: "hydrate_messages",
+      sessionFile: "/root/.pi/agent/sessions/session.jsonl",
+      messages: [
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "toolCall",
+              id: "tool_1",
+              name: "bash",
+              arguments: {
+                command: "ls -a",
+              },
+            },
+            {
+              type: "unsupported",
+              value: "keep this visible as a diagnostic",
+            },
+          ],
+          timestamp: 1,
+        },
+      ],
+    });
+
+    expect(hydratedState.entries).toEqual([
+      expect.objectContaining({
+        id: "pi:assistant:1:0",
+        kind: "generic-item",
+        itemType: "pi-message",
+        turnId: "pi:assistant:1:0",
+      }),
+    ]);
+  });
+
   it("applies buffered Pi events after hydrated messages", () => {
     const hydratedState = reducePiChatState(createInitialPiChatState(), {
       type: "hydrate_messages",
