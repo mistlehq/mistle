@@ -5,9 +5,9 @@ use tokio::sync::mpsc;
 
 use crate::time::Clock;
 use crate::tunnel::protocol::AGENT_STREAM_WINDOW_BYTES;
-use crate::tunnel::session::TunnelSessionMutableState;
 use crate::tunnel::session::agent::AgentStreamState;
 use crate::tunnel::session::bootstrap::{TunnelWriterMessage, send_telemetry_frames};
+use crate::tunnel::session::state::TunnelSessionMutableState;
 use crate::tunnel::telemetry::{SandboxTelemetryLogLevel, TelemetryRelay};
 
 pub(super) const AGENT_STREAM_OUTCOME_CLOSED: &str = "closed";

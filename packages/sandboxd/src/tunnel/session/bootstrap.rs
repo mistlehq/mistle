@@ -31,11 +31,14 @@ use crate::supervision::SupervisedComponent;
 use crate::time::{Duration, Sleeper};
 use crate::tunnel::telemetry::TelemetryRelayFrame;
 
+use crate::tunnel::session::lifecycle::{
+    mark_tunnel_disconnected, update_tunnel_supervision_details,
+};
+use crate::tunnel::session::state::{TunnelSessionEvent, TunnelSessionRuntime};
 use crate::tunnel::session::{
     DEFAULT_BOOTSTRAP_TUNNEL_CONNECT_TIMEOUT, DEFAULT_BOOTSTRAP_TUNNEL_HANDSHAKE_TIMEOUT,
     DEFAULT_BOOTSTRAP_TUNNEL_LOOKUP_TIMEOUT, DEFAULT_TUNNEL_SESSION_POLL_INTERVAL,
-    TUNNEL_RECONNECT_BACKOFF_MS, TunnelSessionError, TunnelSessionEvent, TunnelSessionRuntime,
-    mark_tunnel_disconnected, prioritize_ipv4_socket_addresses, update_tunnel_supervision_details,
+    TUNNEL_RECONNECT_BACKOFF_MS, TunnelSessionError,
 };
 
 pub(super) type TunnelWebSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
@@ -84,6 +87,13 @@ pub(super) fn build_tunnel_exchange_http_client() -> TunnelExchangeHttpClientRes
         .enable_http1()
         .wrap_connector(http_connector);
     Ok(Client::builder(TokioExecutor::new()).build(https_connector))
+}
+
+pub(in crate::tunnel::session) fn prioritize_ipv4_socket_addresses(
+    mut addresses: Vec<SocketAddr>,
+) -> Vec<SocketAddr> {
+    addresses.sort_by_key(|address| if address.is_ipv4() { 0 } else { 1 });
+    addresses
 }
 
 pub(super) async fn reconnect_bootstrap_tunnel(

@@ -16,7 +16,7 @@ use nix::unistd::Pid;
 use tokio::sync::mpsc;
 
 use crate::tunnel::protocol::ExecStreamOpen;
-use crate::tunnel::session::TunnelSessionEvent;
+use crate::tunnel::session::state::TunnelSessionEvent;
 
 const DEFAULT_EXEC_TIMEOUT_MS: u64 = 15_000;
 const DEFAULT_EXEC_MAX_OUTPUT_BYTES: usize = 16 * 1024 * 1024;

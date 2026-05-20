@@ -4,9 +4,34 @@ use tokio::sync::mpsc;
 
 use crate::tunnel::protocol::{SigningControlMessage, SigningRequest, signing_request};
 use crate::tunnel::session::bootstrap::{TunnelWriterMessage, write_tunnel_text};
-use crate::tunnel::session::{
-    TunnelSessionError, TunnelSessionMutableState, TunnelSigningRequest, TunnelSigningResponse,
-};
+use crate::tunnel::session::error::TunnelSessionError;
+use crate::tunnel::session::state::TunnelSessionMutableState;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TunnelSigningRequest {
+    pub request_id: String,
+    pub organization_id: String,
+    pub sandbox_instance_id: String,
+    pub acting_user_id: String,
+    pub provider_family: String,
+    pub format: String,
+    pub key_ref: String,
+    pub grant: String,
+    pub payload_base64: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TunnelSigningResponse {
+    Success {
+        request_id: String,
+        signature_base64: String,
+    },
+    Failure {
+        request_id: String,
+        code: String,
+        message: String,
+    },
+}
 
 pub(super) fn fail_pending_signing_requests(
     session_state: &mut TunnelSessionMutableState,

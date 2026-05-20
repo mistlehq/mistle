@@ -7,16 +7,23 @@ use tracing::{info, warn};
 use crate::supervision::SupervisedComponent;
 use crate::time::Clock;
 use crate::tunnel::protocol::{PAYLOAD_KIND_RAW_BYTES, StreamSendWindow, encode_stream_data_frame};
+use crate::tunnel::session::SANDBOX_OPERATION_STREAM_ID;
 use crate::tunnel::session::bootstrap::{
     TunnelWriterMessage, write_tunnel_binary, write_tunnel_flush, write_tunnel_text,
 };
-use crate::tunnel::session::{
-    SANDBOX_OPERATION_STREAM_ID, TunnelSessionError, TunnelSessionMutableState,
-};
+use crate::tunnel::session::error::TunnelSessionError;
+use crate::tunnel::session::state::TunnelSessionMutableState;
 
 pub(super) const OPERATION_RECORD_CHANNEL_CAPACITY: usize = 1024;
 const PENDING_OPERATION_RECORD_CAPACITY: usize = 1024;
 pub(super) const SANDBOX_OPERATION_STREAM_FORMAT: &str = "mistle.sandbox-operation.v1+jsonl";
+
+pub enum OperationStreamMessage {
+    Record(String),
+    Close {
+        response_sender: std::sync::mpsc::Sender<Result<(), String>>,
+    },
+}
 
 pub(super) fn operation_open(operation_id: &str, operation_kind: &str) -> String {
     serde_json::json!({
