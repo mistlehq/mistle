@@ -66,22 +66,20 @@ use crate::tunnel::port_access_transport::{
 };
 use crate::tunnel::protocol::{
     AGENT_STREAM_WINDOW_BYTES, CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
-    CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST, CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE,
-    FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED, PAYLOAD_KIND_RAW_BYTES,
-    PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT, PtyControlMessage,
-    PtySessionControlMessage, PtySessionLaunchMode, PtySessionOpen,
+    CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED,
+    PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
+    PtyControlMessage, PtySessionControlMessage, PtySessionLaunchMode, PtySessionOpen,
     STREAM_RESET_CODE_EXEC_COMMAND_FAILED, STREAM_RESET_CODE_INVALID_STREAM_CLOSE,
     STREAM_RESET_CODE_INVALID_STREAM_DATA, STREAM_RESET_CODE_INVALID_STREAM_SIGNAL,
-    STREAM_RESET_CODE_INVALID_STREAM_WINDOW, STREAM_RESET_CODE_PROCESSES_SNAPSHOT_FAILED,
-    STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED, STREAM_RESET_CODE_TARGET_CLOSED,
-    StreamControlMessage, StreamSendWindow, decode_stream_data_frame, encode_stream_data_frame,
-    exec_result_event, parse_egress_token_control_message, parse_file_search_stream_message,
-    parse_ports_control_message, parse_ports_transport_message, parse_processes_stream_message,
-    parse_pty_control_message, parse_pty_session_control_message, parse_signing_control_message,
-    parse_stream_control_message, pty_exit_event, pty_session_error, pty_session_opened,
-    stream_complete, stream_open_error, stream_open_ok, stream_reset, stream_window,
+    STREAM_RESET_CODE_INVALID_STREAM_WINDOW, STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
+    STREAM_RESET_CODE_TARGET_CLOSED, StreamControlMessage, StreamSendWindow,
+    decode_stream_data_frame, encode_stream_data_frame, exec_result_event,
+    parse_egress_token_control_message, parse_file_search_stream_message,
+    parse_ports_control_message, parse_ports_transport_message, parse_pty_control_message,
+    parse_pty_session_control_message, parse_signing_control_message, parse_stream_control_message,
+    pty_exit_event, pty_session_error, pty_session_opened, stream_complete, stream_open_error,
+    stream_open_ok, stream_reset, stream_window,
 };
-use crate::tunnel::runtime_processes::collect_processes_snapshot;
 use crate::tunnel::session::agent_stream::{
     AgentStreamState, AgentStreamStats, agent_stream_outstanding_bytes, websocket_payload_kind_name,
 };
@@ -118,6 +116,10 @@ use crate::tunnel::session::port_access::{
     handle_port_access_transport_event, handle_ports_control_message,
     handle_ports_transport_message, port_access_stream_is_active,
 };
+use crate::tunnel::session::process::{
+    ProcessStreamState, add_process_stream_window, close_process_stream,
+    handle_process_stream_frame, open_process_stream, poll_process_streams, reset_process_streams,
+};
 use crate::tunnel::session::telemetry::{
     AGENT_STREAM_CLOSE_SOURCE_GATEWAY, AGENT_STREAM_CLOSE_SOURCE_RUNTIME,
     AGENT_STREAM_OUTCOME_CLOSED, AGENT_STREAM_OUTCOME_RESET, AgentStreamTermination,
@@ -134,6 +136,7 @@ mod file_upload;
 mod gateway_requests;
 mod operation;
 mod port_access;
+mod process;
 mod telemetry;
 
 /// Default attachment root for file uploads received over the bootstrap tunnel.
@@ -156,7 +159,6 @@ const DEFAULT_SIGNING_REQUEST_TIMEOUT: StdDuration = StdDuration::from_secs(120)
 const DEFAULT_EGRESS_TOKEN_REQUEST_TIMEOUT: StdDuration = StdDuration::from_secs(10);
 const EGRESS_TOKEN_REFRESH_SKEW_MS: u64 = 30_000;
 const EXEC_OUTPUT_READ_BUFFER_BYTES: usize = 8192;
-const DEFAULT_PROCESSES_SNAPSHOT_INTERVAL: Duration = Duration::from_millis(500);
 const DEFAULT_RUNTIME_ENV_UPDATE_TIMEOUT: StdDuration = StdDuration::from_secs(10);
 const TUNNEL_RECONNECT_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];
 const DIRECT_PTY_STREAM_ID: u32 = 1;
@@ -923,9 +925,8 @@ struct TunnelSessionMutableState {
     agent_streams: BTreeMap<u32, AgentStreamState>,
     port_access_http_streams: BTreeMap<u32, mpsc::UnboundedSender<PortAccessHttpCommand>>,
     port_access_tcp_streams: BTreeMap<u32, PortAccessTcpStreamState>,
-    processes_stream_send_windows: BTreeMap<u32, StreamSendWindow>,
+    process_streams: ProcessStreamState,
     file_search_streams: BTreeMap<u32, FileSearchStreamState>,
-    last_processes_snapshot_at_ms: Option<u64>,
     operation_stream_requested: bool,
     operation_stream_close_requested: bool,
     operation_stream_close_response_sender: Option<std::sync::mpsc::Sender<Result<(), String>>>,
@@ -1183,9 +1184,8 @@ async fn run_connected_tunnel_session(
         agent_streams: BTreeMap::new(),
         port_access_http_streams: BTreeMap::new(),
         port_access_tcp_streams: BTreeMap::new(),
-        processes_stream_send_windows: BTreeMap::new(),
+        process_streams: ProcessStreamState::default(),
         file_search_streams: BTreeMap::new(),
-        last_processes_snapshot_at_ms: None,
         operation_stream_requested: false,
         operation_stream_close_requested: false,
         operation_stream_close_response_sender: None,
@@ -2795,112 +2795,6 @@ fn any_populated_sandbox_user_scope(
 
     Ok(false)
 }
-fn send_processes_snapshot(
-    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
-    session_state: &mut TunnelSessionMutableState,
-    clock: &dyn Clock,
-) -> Result<(), TunnelSessionError> {
-    send_processes_snapshot_to_streams(
-        tunnel_writer_sender,
-        &mut session_state.processes_stream_send_windows,
-        clock,
-    )?;
-    session_state.last_processes_snapshot_at_ms = Some(clock.now_ms());
-    Ok(())
-}
-
-fn poll_processes_streams(
-    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
-    processes_stream_send_windows: &mut BTreeMap<u32, StreamSendWindow>,
-    last_processes_snapshot_at_ms: &mut Option<u64>,
-    clock: &dyn Clock,
-) -> Result<(), TunnelSessionError> {
-    if processes_stream_send_windows.is_empty() {
-        *last_processes_snapshot_at_ms = None;
-        return Ok(());
-    }
-
-    let now_ms = clock.now_ms();
-    let should_send = last_processes_snapshot_at_ms.is_none_or(|last_snapshot_at_ms| {
-        now_ms.saturating_sub(last_snapshot_at_ms)
-            >= DEFAULT_PROCESSES_SNAPSHOT_INTERVAL.as_millis() as u64
-    });
-    if !should_send {
-        return Ok(());
-    }
-
-    send_processes_snapshot_to_streams(tunnel_writer_sender, processes_stream_send_windows, clock)?;
-    *last_processes_snapshot_at_ms = Some(now_ms);
-    Ok(())
-}
-
-fn send_processes_snapshot_to_streams(
-    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
-    processes_stream_send_windows: &mut BTreeMap<u32, StreamSendWindow>,
-    clock: &dyn Clock,
-) -> Result<(), TunnelSessionError> {
-    if processes_stream_send_windows.is_empty() {
-        return Ok(());
-    }
-
-    let snapshot = collect_processes_snapshot(clock)
-        .map_err(|error| TunnelSessionError::Processes(error.to_string()))?;
-    let payload = serde_json::to_string(&snapshot)
-        .map_err(|error| TunnelSessionError::Processes(error.to_string()))?;
-    let mut exhausted_stream_ids = Vec::new();
-
-    for (stream_id, send_window) in processes_stream_send_windows.iter_mut() {
-        if !send_window.try_consume(payload.len()) {
-            exhausted_stream_ids.push(*stream_id);
-            continue;
-        }
-
-        let encoded =
-            encode_stream_data_frame(*stream_id, PAYLOAD_KIND_WEBSOCKET_TEXT, payload.as_bytes())
-                .map_err(|error| TunnelSessionError::ParseDataFrame(error.to_string()))?;
-        write_tunnel_binary(tunnel_writer_sender, encoded)?;
-    }
-
-    for stream_id in exhausted_stream_ids {
-        write_tunnel_text(
-            tunnel_writer_sender,
-            stream_reset(
-                stream_id,
-                STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
-                "processes stream send window is exhausted",
-            ),
-        )?;
-        processes_stream_send_windows.remove(&stream_id);
-    }
-
-    Ok(())
-}
-
-fn reset_processes_streams(
-    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
-    processes_stream_send_windows: &mut BTreeMap<u32, StreamSendWindow>,
-    message: String,
-) -> Result<(), TunnelSessionError> {
-    let stream_ids = processes_stream_send_windows
-        .keys()
-        .copied()
-        .collect::<Vec<_>>();
-    processes_stream_send_windows.clear();
-
-    for stream_id in stream_ids {
-        write_tunnel_text(
-            tunnel_writer_sender,
-            stream_reset(
-                stream_id,
-                STREAM_RESET_CODE_PROCESSES_SNAPSHOT_FAILED,
-                message.clone(),
-            ),
-        )?;
-    }
-
-    Ok(())
-}
-
 async fn handle_tunnel_session_event(
     event: TunnelSessionEvent,
     tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
@@ -2938,15 +2832,14 @@ async fn handle_tunnel_session_event(
             Ok(TunnelSessionControlFlow::RestartRequired)
         }
         TunnelSessionEvent::Wake => {
-            if let Err(error) = poll_processes_streams(
+            if let Err(error) = poll_process_streams(
                 tunnel_writer_sender,
-                &mut session_state.processes_stream_send_windows,
-                &mut session_state.last_processes_snapshot_at_ms,
+                &mut session_state.process_streams,
                 context.clock,
             ) {
-                reset_processes_streams(
+                reset_process_streams(
                     tunnel_writer_sender,
-                    &mut session_state.processes_stream_send_windows,
+                    &mut session_state.process_streams,
                     error.to_string(),
                 )?;
             }
@@ -3737,30 +3630,12 @@ async fn handle_tunnel_control_message(
             )? {
                 return Ok(());
             }
-            if let Err(error) = collect_processes_snapshot(context.clock) {
-                write_tunnel_text(
-                    tunnel_writer_sender,
-                    stream_open_error(
-                        message.stream_id,
-                        CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE,
-                        error.to_string(),
-                    ),
-                )?;
-                return Ok(());
-            }
-            session_state
-                .processes_stream_send_windows
-                .insert(message.stream_id, StreamSendWindow::default());
-            write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
-            if let Err(error) =
-                send_processes_snapshot(tunnel_writer_sender, session_state, context.clock)
-            {
-                reset_processes_streams(
-                    tunnel_writer_sender,
-                    &mut session_state.processes_stream_send_windows,
-                    error.to_string(),
-                )?;
-            }
+            open_process_stream(
+                tunnel_writer_sender,
+                &mut session_state.process_streams,
+                message.stream_id,
+                context.clock,
+            )?;
         }
         StreamControlMessage::OpenFileUpload(message) => {
             if reject_duplicate_tunnel_stream_open(
@@ -3903,11 +3778,7 @@ async fn handle_tunnel_control_message(
                 let _ = agent_stream.sender.send(Message::Close(None));
                 return Ok(());
             }
-            if session_state
-                .processes_stream_send_windows
-                .remove(&message.stream_id)
-                .is_some()
-            {
+            if close_process_stream(&mut session_state.process_streams, message.stream_id) {
                 return Ok(());
             }
             if session_state
@@ -3961,13 +3832,11 @@ async fn handle_tunnel_control_message(
                     .record_credit_restore(message.bytes, context.clock.now_ms());
                 return Ok(());
             }
-            if let Some(send_window) = session_state
-                .processes_stream_send_windows
-                .get_mut(&message.stream_id)
-            {
-                send_window
-                    .add(message.bytes)
-                    .map_err(|error| TunnelSessionError::ParseControl(error.to_string()))?;
+            if add_process_stream_window(
+                &mut session_state.process_streams,
+                message.stream_id,
+                message.bytes,
+            )? {
                 return Ok(());
             }
             if let Some(stream_state) = session_state
@@ -4046,9 +3915,7 @@ fn tunnel_stream_is_active(session_state: &TunnelSessionMutableState, stream_id:
     session_state.agent_streams.contains_key(&stream_id)
         || session_state.pending_agent_opens.contains_key(&stream_id)
         || session_state.pending_exec_opens.contains_key(&stream_id)
-        || session_state
-            .processes_stream_send_windows
-            .contains_key(&stream_id)
+        || session_state.process_streams.is_active(stream_id)
         || session_state.file_search_streams.contains_key(&stream_id)
         || session_state.file_uploads.contains_key(&stream_id)
 }
@@ -4115,74 +3982,13 @@ fn handle_tunnel_binary_frame(
         return Ok(());
     }
 
-    if session_state
-        .processes_stream_send_windows
-        .contains_key(&frame.stream_id)
-    {
-        if frame.payload_kind != PAYLOAD_KIND_WEBSOCKET_TEXT {
-            write_tunnel_text(
-                tunnel_writer_sender,
-                stream_reset(
-                    frame.stream_id,
-                    STREAM_RESET_CODE_INVALID_STREAM_DATA,
-                    "processes stream only accepts websocket text payloads",
-                ),
-            )?;
-            session_state
-                .processes_stream_send_windows
-                .remove(&frame.stream_id);
-            return Ok(());
-        }
-
-        let payload = String::from_utf8(frame.payload)
-            .map_err(|error| TunnelSessionError::ParseDataFrame(error.to_string()))?;
-        match parse_processes_stream_message(&payload) {
-            Ok(crate::tunnel::protocol::ProcessesStreamMessage::Refresh(_)) => {
-                write_tunnel_text(
-                    tunnel_writer_sender,
-                    stream_window(frame.stream_id, payload.len()),
-                )?;
-                if let Err(error) = send_processes_snapshot_to_streams(
-                    tunnel_writer_sender,
-                    &mut session_state.processes_stream_send_windows,
-                    clock,
-                ) {
-                    reset_processes_streams(
-                        tunnel_writer_sender,
-                        &mut session_state.processes_stream_send_windows,
-                        error.to_string(),
-                    )?;
-                } else {
-                    session_state.last_processes_snapshot_at_ms = Some(clock.now_ms());
-                }
-            }
-            Ok(crate::tunnel::protocol::ProcessesStreamMessage::Snapshot(_)) => {
-                write_tunnel_text(
-                    tunnel_writer_sender,
-                    stream_reset(
-                        frame.stream_id,
-                        STREAM_RESET_CODE_INVALID_STREAM_DATA,
-                        "processes stream does not accept processes.snapshot payloads from the gateway",
-                    ),
-                )?;
-                session_state
-                    .processes_stream_send_windows
-                    .remove(&frame.stream_id);
-            }
-            Err(error) => {
-                write_tunnel_text(
-                    tunnel_writer_sender,
-                    stream_reset(
-                        frame.stream_id,
-                        STREAM_RESET_CODE_INVALID_STREAM_DATA,
-                        error.to_string(),
-                    ),
-                )?;
-                session_state
-                    .processes_stream_send_windows
-                    .remove(&frame.stream_id);
-            }
-        }
+    if session_state.process_streams.is_active(frame.stream_id) {
+        handle_process_stream_frame(
+            tunnel_writer_sender,
+            &mut session_state.process_streams,
+            frame,
+            clock,
+        )?;
         return Ok(());
     }
 
@@ -4779,7 +4585,7 @@ fn write_tunnel_close(
 mod tests {
     use super::{
         AgentStreamState, AgentStreamStats, ConnectedTunnelSessionOutcome, DEFAULT_ATTACHMENT_ROOT,
-        FileUploadState, OperationStreamMessage, PortAccessTcpStreamState,
+        FileUploadState, OperationStreamMessage, PortAccessTcpStreamState, ProcessStreamState,
         SANDBOX_OPERATION_STREAM_FORMAT, SANDBOX_OPERATION_STREAM_ID, TunnelSessionError,
         TunnelSessionEvent, TunnelSessionLoopContext, TunnelSessionMutableState,
         TunnelSessionRequest, TunnelSessionRuntime, TunnelSessionRuntimeConnectionState,
@@ -4951,9 +4757,8 @@ mod tests {
             agent_streams: BTreeMap::new(),
             port_access_http_streams: BTreeMap::new(),
             port_access_tcp_streams: BTreeMap::new(),
-            processes_stream_send_windows: BTreeMap::new(),
+            process_streams: ProcessStreamState::default(),
             file_search_streams: BTreeMap::new(),
-            last_processes_snapshot_at_ms: None,
             operation_stream_requested: false,
             operation_stream_close_requested: false,
             operation_stream_close_response_sender: None,
@@ -5287,9 +5092,8 @@ mod tests {
             )]),
             port_access_http_streams: BTreeMap::new(),
             port_access_tcp_streams: BTreeMap::new(),
-            processes_stream_send_windows: BTreeMap::new(),
+            process_streams: ProcessStreamState::default(),
             file_search_streams: BTreeMap::new(),
-            last_processes_snapshot_at_ms: None,
             operation_stream_requested: false,
             operation_stream_close_requested: false,
             operation_stream_close_response_sender: None,
@@ -5364,9 +5168,8 @@ mod tests {
                     response_closed: false,
                 },
             )]),
-            processes_stream_send_windows: BTreeMap::new(),
+            process_streams: ProcessStreamState::default(),
             file_search_streams: BTreeMap::new(),
-            last_processes_snapshot_at_ms: None,
             operation_stream_requested: false,
             operation_stream_close_requested: false,
             operation_stream_close_response_sender: None,
@@ -5506,9 +5309,8 @@ mod tests {
                     response_closed: false,
                 },
             )]),
-            processes_stream_send_windows: BTreeMap::new(),
+            process_streams: ProcessStreamState::default(),
             file_search_streams: BTreeMap::new(),
-            last_processes_snapshot_at_ms: None,
             operation_stream_requested: false,
             operation_stream_close_requested: false,
             operation_stream_close_response_sender: None,
@@ -5561,9 +5363,8 @@ mod tests {
                     response_closed: false,
                 },
             )]),
-            processes_stream_send_windows: BTreeMap::new(),
+            process_streams: ProcessStreamState::default(),
             file_search_streams: BTreeMap::new(),
-            last_processes_snapshot_at_ms: None,
             operation_stream_requested: false,
             operation_stream_close_requested: false,
             operation_stream_close_response_sender: None,
@@ -5607,9 +5408,8 @@ mod tests {
             )]),
             port_access_http_streams: BTreeMap::new(),
             port_access_tcp_streams: BTreeMap::new(),
-            processes_stream_send_windows: BTreeMap::new(),
+            process_streams: ProcessStreamState::default(),
             file_search_streams: BTreeMap::new(),
-            last_processes_snapshot_at_ms: None,
             operation_stream_requested: false,
             operation_stream_close_requested: false,
             operation_stream_close_response_sender: None,
@@ -5750,7 +5550,7 @@ mod tests {
             assert!(
                 session_state.pending_agent_opens.is_empty()
                     && session_state.pending_exec_opens.is_empty()
-                    && session_state.processes_stream_send_windows.is_empty()
+                    && session_state.process_streams.is_empty()
                     && session_state.file_uploads.is_empty()
                     && session_state.file_search_streams.is_empty(),
                 "duplicate stream.open must not create new stream state",
@@ -5818,7 +5618,7 @@ mod tests {
             "duplicate stream.open must leave existing port access state intact",
         );
         assert!(
-            session_state.processes_stream_send_windows.is_empty(),
+            session_state.process_streams.is_empty(),
             "duplicate stream.open must not create processes stream state",
         );
     }
@@ -5848,9 +5648,8 @@ mod tests {
                     response_closed: false,
                 },
             )]),
-            processes_stream_send_windows: BTreeMap::new(),
+            process_streams: ProcessStreamState::default(),
             file_search_streams: BTreeMap::new(),
-            last_processes_snapshot_at_ms: None,
             operation_stream_requested: false,
             operation_stream_close_requested: false,
             operation_stream_close_response_sender: None,
@@ -5940,9 +5739,8 @@ mod tests {
                     response_closed: false,
                 },
             )]),
-            processes_stream_send_windows: BTreeMap::new(),
+            process_streams: ProcessStreamState::default(),
             file_search_streams: BTreeMap::new(),
-            last_processes_snapshot_at_ms: None,
             operation_stream_requested: false,
             operation_stream_close_requested: false,
             operation_stream_close_response_sender: None,
@@ -6019,9 +5817,8 @@ mod tests {
             )]),
             port_access_http_streams: BTreeMap::new(),
             port_access_tcp_streams: BTreeMap::new(),
-            processes_stream_send_windows: BTreeMap::new(),
+            process_streams: ProcessStreamState::default(),
             file_search_streams: BTreeMap::new(),
-            last_processes_snapshot_at_ms: None,
             operation_stream_requested: false,
             operation_stream_close_requested: false,
             operation_stream_close_response_sender: None,
@@ -6182,9 +5979,8 @@ mod tests {
             )]),
             port_access_http_streams: BTreeMap::new(),
             port_access_tcp_streams: BTreeMap::new(),
-            processes_stream_send_windows: BTreeMap::new(),
+            process_streams: ProcessStreamState::default(),
             file_search_streams: BTreeMap::new(),
-            last_processes_snapshot_at_ms: None,
             operation_stream_requested: false,
             operation_stream_close_requested: false,
             operation_stream_close_response_sender: None,
