@@ -95,21 +95,21 @@ impl std::error::Error for TunnelProtocolError {}
 
 /// Agent channel payload accepted by `stream.open`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct AgentStreamChannel {
     pub kind: String,
 }
 
 /// Processes channel payload accepted by `stream.open`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct ProcessesStreamChannel {
     pub kind: String,
 }
 
 /// File-upload channel payload accepted by `stream.open`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct FileUploadStreamChannel {
     pub kind: String,
     pub thread_id: String,
@@ -120,7 +120,7 @@ pub struct FileUploadStreamChannel {
 
 /// Exec channel payload accepted by `stream.open`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct ExecStreamChannel {
     pub kind: String,
     pub command: String,
@@ -133,7 +133,7 @@ pub struct ExecStreamChannel {
 
 /// Agent `stream.open` message accepted by the relay.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct AgentStreamOpen {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -143,7 +143,7 @@ pub struct AgentStreamOpen {
 
 /// Processes `stream.open` message accepted by the relay.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct ProcessesStreamOpen {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -153,7 +153,7 @@ pub struct ProcessesStreamOpen {
 
 /// File-upload `stream.open` message accepted by the relay.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct FileUploadStreamOpen {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -163,7 +163,7 @@ pub struct FileUploadStreamOpen {
 
 /// Exec `stream.open` message accepted by the relay.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct ExecStreamOpen {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -173,7 +173,7 @@ pub struct ExecStreamOpen {
 
 /// PTY resize payload carried in `stream.signal`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PtyResizeSignal {
     #[serde(rename = "type")]
     pub signal_type: String,
@@ -183,7 +183,7 @@ pub struct PtyResizeSignal {
 
 /// PTY `stream.signal` message accepted by the relay.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PtyStreamSignal {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -193,7 +193,7 @@ pub struct PtyStreamSignal {
 
 /// `stream.close` message accepted by the tunnel.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct StreamClose {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -202,7 +202,7 @@ pub struct StreamClose {
 
 /// `stream.window` message accepted by the tunnel.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct StreamWindow {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -224,7 +224,7 @@ pub enum StreamControlMessage {
 
 /// One loopback listener attached to a running process.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct ProcessListener {
     pub port: u16,
     pub bind_address: String,
@@ -232,7 +232,7 @@ pub struct ProcessListener {
 
 /// One running process plus any discovered loopback listeners.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct ProcessEntry {
     pub pid: u32,
     pub command: Option<String>,
@@ -241,7 +241,7 @@ pub struct ProcessEntry {
 
 /// Inbound refresh request accepted on a `processes` stream.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct ProcessesRefresh {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -249,7 +249,7 @@ pub struct ProcessesRefresh {
 
 /// Outbound snapshot payload sent on a `processes` stream.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct ProcessesSnapshot {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -266,7 +266,7 @@ pub enum ProcessesStreamMessage {
 
 /// Exact port target carried by `ports.*` control and transport messages.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PortAccessTarget {
     pub kind: String,
     pub port: u16,
@@ -274,7 +274,7 @@ pub struct PortAccessTarget {
 
 /// Inbound `ports.target.authorize` request from the gateway.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PortsTargetAuthorize {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -284,7 +284,7 @@ pub struct PortsTargetAuthorize {
 
 /// Outbound successful `ports.target.authorize.result`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PortsTargetAuthorizeSuccessResult {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -296,7 +296,7 @@ pub struct PortsTargetAuthorizeSuccessResult {
 
 /// Outbound failed `ports.target.authorize.result`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PortsTargetAuthorizeFailureResult {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -310,7 +310,7 @@ pub type RepeatedHeaderValues = BTreeMap<String, Vec<String>>;
 
 /// Inbound `ports.tcp.open` request from the gateway.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PortsTcpOpen {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -321,7 +321,7 @@ pub struct PortsTcpOpen {
 
 /// Outbound `ports.tcp.connected` sent after the target connection is ready.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PortsTcpConnected {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -330,7 +330,7 @@ pub struct PortsTcpConnected {
 
 /// Directional TCP write close.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PortsTcpClose {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -340,7 +340,7 @@ pub struct PortsTcpClose {
 
 /// TCP stream error message.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PortsTcpError {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -351,7 +351,7 @@ pub struct PortsTcpError {
 
 /// Inbound `ports.http.open` request from the gateway.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PortsHttpOpen {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -363,7 +363,7 @@ pub struct PortsHttpOpen {
 
 /// Request metadata carried by `ports.http.open`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PortsHttpRequest {
     pub method: String,
     pub path: String,
@@ -373,7 +373,7 @@ pub struct PortsHttpRequest {
 
 /// Outbound `ports.http.response.start` payload sent by sandboxd.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PortsHttpResponseStart {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -384,7 +384,7 @@ pub struct PortsHttpResponseStart {
 
 /// One base64-encoded HTTP body chunk.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PortsHttpBodyChunk {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -396,7 +396,7 @@ pub struct PortsHttpBodyChunk {
 
 /// One HTTP body completion signal.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PortsHttpBodyEnd {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -406,7 +406,7 @@ pub struct PortsHttpBodyEnd {
 
 /// One semantic HTTP transport-close signal.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PortsStreamClose {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -415,7 +415,7 @@ pub struct PortsStreamClose {
 
 /// One semantic HTTP transport error message.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PortsStreamError {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -455,7 +455,7 @@ pub enum PtyControlMessage {
 
 /// `telemetry.open` message sent when a tunnel connection starts accepting log traffic.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct TelemetryOpen {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -466,7 +466,7 @@ pub struct TelemetryOpen {
 
 /// `telemetry.open.ok` response from the gateway.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct TelemetryOpenOk {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -476,7 +476,7 @@ pub struct TelemetryOpenOk {
 
 /// `telemetry.open.error` response from the gateway.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct TelemetryOpenError {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -487,7 +487,7 @@ pub struct TelemetryOpenError {
 
 /// `telemetry.window` response from the gateway.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct TelemetryWindow {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -497,7 +497,7 @@ pub struct TelemetryWindow {
 
 /// `telemetry.close` message sent when a tunnel connection stops accepting log traffic.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct TelemetryClose {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -506,7 +506,7 @@ pub struct TelemetryClose {
 
 /// `telemetry.reset` response from the gateway.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct TelemetryReset {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -517,7 +517,7 @@ pub struct TelemetryReset {
 
 /// Outbound `signing.request` payload sent from sandboxd to the gateway.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct SigningRequest {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -535,7 +535,7 @@ pub struct SigningRequest {
 
 /// Successful `signing.result` payload sent by the gateway.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct SigningSuccessResult {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -547,7 +547,7 @@ pub struct SigningSuccessResult {
 
 /// Failed `signing.result` payload sent by the gateway.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct SigningFailureResult {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -559,7 +559,7 @@ pub struct SigningFailureResult {
 
 /// Outbound `egress.token.request` payload sent from sandboxd to the gateway.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct EgressTokenRequest {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -568,7 +568,7 @@ pub struct EgressTokenRequest {
 
 /// Successful `egress.token.response` payload sent by the gateway.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct EgressTokenResponse {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -580,7 +580,7 @@ pub struct EgressTokenResponse {
 
 /// Failed `egress.token.error` payload sent by the gateway.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct EgressTokenError {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -607,7 +607,7 @@ pub enum PtySessionLaunchMode {
 
 /// Direct PTY launch parameters sent over the bootstrap tunnel.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PtySessionLaunch {
     pub session: PtySessionLaunchMode,
     pub cols: Option<u16>,
@@ -619,7 +619,7 @@ pub struct PtySessionLaunch {
 
 /// Gateway command asking sandboxd to open a dedicated PTY transport websocket.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PtySessionOpen {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -632,7 +632,7 @@ pub struct PtySessionOpen {
 
 /// Sandboxd acknowledgement that the PTY transport websocket has opened.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PtySessionOpened {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -642,7 +642,7 @@ pub struct PtySessionOpened {
 
 /// Sandboxd failure response for a direct PTY session open command.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct PtySessionError {
     #[serde(rename = "type")]
     pub message_type: String,
@@ -653,7 +653,7 @@ pub struct PtySessionError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 struct PtySessionOpenedResponse<'a> {
     #[serde(rename = "type")]
     message_type: &'a str,
@@ -662,7 +662,7 @@ struct PtySessionOpenedResponse<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 struct PtySessionErrorResponse<'a> {
     #[serde(rename = "type")]
     message_type: &'a str,
@@ -698,7 +698,7 @@ pub enum BootstrapTelemetryControlMessage {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 struct StreamOpenOk<'a> {
     #[serde(rename = "type")]
     message_type: &'a str,
@@ -706,7 +706,7 @@ struct StreamOpenOk<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 struct StreamOpenError<'a> {
     #[serde(rename = "type")]
     message_type: &'a str,
@@ -716,7 +716,7 @@ struct StreamOpenError<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 struct StreamReset<'a> {
     #[serde(rename = "type")]
     message_type: &'a str,
@@ -726,7 +726,7 @@ struct StreamReset<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 struct StreamWindowResponse<'a> {
     #[serde(rename = "type")]
     message_type: &'a str,
@@ -735,7 +735,7 @@ struct StreamWindowResponse<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 struct StreamComplete<'a> {
     #[serde(rename = "type")]
     message_type: &'a str,
@@ -743,7 +743,7 @@ struct StreamComplete<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 struct PtyExitEvent<'a> {
     #[serde(rename = "type")]
     message_type: &'a str,
@@ -751,7 +751,7 @@ struct PtyExitEvent<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 struct FileUploadCompletedEvent<'a> {
     #[serde(rename = "type")]
     message_type: &'a str,
@@ -776,7 +776,7 @@ pub struct FileUploadCompletedEventInput<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 struct ExecResultEvent<'a> {
     #[serde(rename = "type")]
     message_type: &'a str,
@@ -787,7 +787,7 @@ struct ExecResultEvent<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 struct StreamEvent<'a, T> {
     #[serde(rename = "type")]
     message_type: &'a str,
@@ -2300,6 +2300,57 @@ mod tests {
         )
         .expect("exec stream.open should parse");
         assert!(matches!(exec, StreamControlMessage::OpenExec(_)));
+    }
+
+    #[test]
+    fn ignores_unknown_fields_while_parsing_protocol_messages() {
+        let stream_open = parse_stream_control_message(
+            r#"{"type":"stream.open","streamId":8,"ignored":true,"channel":{"kind":"exec","command":"git","args":["status"],"cwd":"/workspace/repo","ignored":true}}"#,
+        )
+        .expect("stream.open should parse with unknown fields");
+        let StreamControlMessage::OpenExec(exec) = stream_open else {
+            panic!("expected exec stream.open");
+        };
+        assert_eq!(exec.stream_id, 8);
+        assert_eq!(exec.channel.command, "git");
+        assert_eq!(exec.channel.cwd.as_deref(), Some("/workspace/repo"));
+
+        let stream_signal = parse_stream_control_message(
+            r#"{"type":"stream.signal","streamId":9,"ignored":true,"signal":{"type":"pty.resize","cols":120,"rows":40,"ignored":true}}"#,
+        )
+        .expect("stream.signal should parse with unknown fields");
+        let StreamControlMessage::Signal(signal) = stream_signal else {
+            panic!("expected pty stream.signal");
+        };
+        assert_eq!(signal.signal.cols, 120);
+        assert_eq!(signal.signal.rows, 40);
+
+        let processes_snapshot = parse_processes_stream_message(
+            r#"{"type":"processes.snapshot","observedAt":"2026-04-10T00:00:00Z","ignored":true,"processes":[{"pid":7,"command":"node server","ignored":true,"listeners":[{"port":5173,"bindAddress":"127.0.0.1","ignored":true}]}]}"#,
+        )
+        .expect("processes.snapshot should parse with unknown fields");
+        let ProcessesStreamMessage::Snapshot(snapshot) = processes_snapshot else {
+            panic!("expected processes snapshot");
+        };
+        assert_eq!(snapshot.processes[0].pid, 7);
+        assert_eq!(snapshot.processes[0].listeners[0].port, 5173);
+
+        let ports_open = parse_ports_transport_message(
+            r#"{"type":"ports.http.open","streamId":41,"ignored":true,"target":{"kind":"port","port":5173,"ignored":true},"upstreamProtocol":"https","request":{"method":"GET","path":"/src/main.ts","query":"import=1","headers":{"accept":["text/plain"]},"ignored":true}}"#,
+        )
+        .expect("ports.http.open should parse with unknown fields");
+        let Some(crate::tunnel::protocol::PortsTransportMessage::HttpOpen(http_open)) = ports_open
+        else {
+            panic!("expected ports.http.open");
+        };
+        assert_eq!(http_open.stream_id, 41);
+        assert_eq!(http_open.request.path, "/src/main.ts");
+
+        let pty_open = parse_pty_session_control_message(
+            r#"{"type":"pty.session.open","requestId":"pty_open_req_123","ptySessionId":"pty_123","transportUrl":"wss://gateway.example.com/pty","transportToken":"jwt-token","ignored":true,"launch":{"session":"create","cols":120,"rows":40,"cwd":"/workspace/repo","command":"codex","args":["resume","thread_123"],"ignored":true}}"#,
+        )
+        .expect("pty.session.open should parse with unknown fields");
+        assert!(matches!(pty_open, Some(PtySessionControlMessage::Open(_))));
     }
 
     #[test]
