@@ -416,6 +416,37 @@ describe("ChatComposer", () => {
     expect(selectedChoices).toEqual(["branch"]);
   });
 
+  it("cancels a command panel picker with Escape", () => {
+    const selectedChoices: string[] = [];
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        commandPanel={{
+          kind: "picker",
+          title: "Review target",
+          searchPlaceholder: "Search",
+          onCancel: () => {
+            selectedChoices.push("cancel");
+          },
+          options: [
+            {
+              label: "Review uncommitted changes",
+              onSelect: () => {
+                selectedChoices.push("uncommitted");
+              },
+            },
+          ],
+        }}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Review target search" }), {
+      key: "Escape",
+    });
+
+    expect(selectedChoices).toEqual(["cancel"]);
+  });
+
   it("accepts dropped files on the git branch footer row", () => {
     const droppedFiles: File[][] = [];
     render(

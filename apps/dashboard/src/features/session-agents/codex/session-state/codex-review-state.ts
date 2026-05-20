@@ -21,6 +21,10 @@ export type CodexReviewPanel =
   | { kind: "branchPicker"; branches: readonly string[] | null }
   | { kind: "commitPicker"; commits: readonly CodexReviewCommitOption[] | null };
 
+export function codexReviewStartIsBlockedByTurnStatus(status: string | null): boolean {
+  return status === "inProgress";
+}
+
 export function parseCodexReviewCommand(input: string): CodexReviewCommandParseResult {
   const trimmedInput = input.trim();
   if (!trimmedInput.startsWith("/review")) {

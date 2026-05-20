@@ -53,6 +53,7 @@ import {
   type CodexGoalPanel,
 } from "./codex-goal-state.js";
 import {
+  codexReviewStartIsBlockedByTurnStatus,
   loadCodexReviewBranches,
   loadCodexReviewCommits,
   parseCodexReviewCommand,
@@ -1041,6 +1042,12 @@ export function useCodexSessionState(input: {
     const activeThreadId = lifecycle.sessionSnapshot?.activeThreadId ?? null;
     return activeThreadId !== null && planModeThreadIds.has(activeThreadId) ? "plan" : "default";
   }, [lifecycle.sessionSnapshot?.activeThreadId, planModeThreadIds]);
+  const activeCodexTurnIsRunning = codexReviewStartIsBlockedByTurnStatus(chatState.status);
+
+  const cancelReviewTargetLoad = useCallback((): void => {
+    reviewTargetLoadRequestRef.current += 1;
+    setReviewCommandPanel(null);
+  }, []);
 
   const switchThreadToPlanMode = useCallback((threadId: string): void => {
     setPlanModeThreadIds((currentThreadIds) => {
@@ -1130,8 +1137,14 @@ export function useCodexSessionState(input: {
   }, [goalCommandPanel, lifecycle.sessionSnapshot?.activeThreadId]);
 
   useEffect(() => {
-    setReviewCommandPanel(null);
-  }, [lifecycle.sessionSnapshot?.activeThreadId]);
+    cancelReviewTargetLoad();
+  }, [cancelReviewTargetLoad, lifecycle.sessionSnapshot?.activeThreadId]);
+
+  useEffect(() => {
+    if (activeCodexTurnIsRunning) {
+      cancelReviewTargetLoad();
+    }
+  }, [activeCodexTurnIsRunning, cancelReviewTargetLoad]);
 
   useEffect(() => {
     if (planImplementationPrompt === null) {
@@ -1275,20 +1288,24 @@ export function useCodexSessionState(input: {
   ]);
 
   const startReviewForActiveThread = useCallback(
-    (target: CodexReviewTarget): void => {
+    (target: CodexReviewTarget): boolean => {
       const activeThreadId = lifecycle.sessionSnapshot?.activeThreadId ?? null;
       const rpcClient = rpcClientRef.current;
       if (activeThreadId === null) {
         setSessionErrorMessage("Choose a Codex thread before starting a review.");
-        return;
+        return false;
       }
       if (rpcClient === null) {
         setSessionErrorMessage("Connect to a sandbox session before starting a review.");
-        return;
+        return false;
+      }
+      if (activeCodexTurnIsRunning) {
+        setSessionErrorMessage("/review is disabled while a task is in progress.");
+        cancelReviewTargetLoad();
+        return false;
       }
 
-      reviewTargetLoadRequestRef.current += 1;
-      setReviewCommandPanel(null);
+      cancelReviewTargetLoad();
       void startCodexReview({
         rpcClient,
         threadId: activeThreadId,
@@ -1296,8 +1313,14 @@ export function useCodexSessionState(input: {
       }).catch((error: unknown) => {
         setSessionErrorMessage(error instanceof Error ? error.message : "Could not start review.");
       });
+      return true;
     },
-    [lifecycle.sessionSnapshot?.activeThreadId, rpcClientRef],
+    [
+      activeCodexTurnIsRunning,
+      cancelReviewTargetLoad,
+      lifecycle.sessionSnapshot?.activeThreadId,
+      rpcClientRef,
+    ],
   );
 
   const ensureReviewTransport = useCallback(async (): Promise<{
@@ -1442,18 +1465,22 @@ export function useCodexSessionState(input: {
       }
 
       if (parsedCommand.command.kind === "showTargetPicker") {
-        reviewTargetLoadRequestRef.current += 1;
+        if (activeCodexTurnIsRunning) {
+          setSessionErrorMessage("/review is disabled while a task is in progress.");
+          cancelReviewTargetLoad();
+          return false;
+        }
+        cancelReviewTargetLoad();
         setReviewCommandPanel({ kind: "targetPicker" });
         return true;
       }
 
-      startReviewForActiveThread({
+      return startReviewForActiveThread({
         type: "custom",
         instructions: parsedCommand.command.instructions,
       });
-      return true;
     },
-    [startReviewForActiveThread],
+    [activeCodexTurnIsRunning, cancelReviewTargetLoad, startReviewForActiveThread],
   );
 
   const reviewCommandPanelView = useMemo<ChatComposerCommandPanel | null>(() => {
@@ -1468,8 +1495,7 @@ export function useCodexSessionState(input: {
         searchPlaceholder: "Search",
         emptyLabel: "No review targets found",
         onCancel: () => {
-          reviewTargetLoadRequestRef.current += 1;
-          setReviewCommandPanel(null);
+          cancelReviewTargetLoad();
         },
         options: [
           {
@@ -1504,7 +1530,7 @@ export function useCodexSessionState(input: {
         emptyLabel:
           reviewCommandPanel.branches === null ? "Loading branches..." : "No matching branches",
         onCancel: () => {
-          reviewTargetLoadRequestRef.current += 1;
+          cancelReviewTargetLoad();
           setReviewCommandPanel({ kind: "targetPicker" });
         },
         options: branches.map((branch) => ({
@@ -1532,7 +1558,7 @@ export function useCodexSessionState(input: {
       emptyLabel:
         reviewCommandPanel.commits === null ? "Loading commits..." : "No matching commits",
       onCancel: () => {
-        reviewTargetLoadRequestRef.current += 1;
+        cancelReviewTargetLoad();
         setReviewCommandPanel({ kind: "targetPicker" });
       },
       options: commits.map((commit: CodexReviewCommitOption) => ({
@@ -1547,6 +1573,7 @@ export function useCodexSessionState(input: {
       })),
     };
   }, [
+    cancelReviewTargetLoad,
     openReviewBranchPicker,
     openReviewCommitPicker,
     reviewCommandPanel,
@@ -2082,12 +2109,10 @@ export function useCodexSessionState(input: {
   const reviews = useMemo<CodexSessionReviewState>(() => {
     return {
       commandPanel: reviewCommandPanelView,
-      clearCommandPanel: () => {
-        setReviewCommandPanel(null);
-      },
+      clearCommandPanel: cancelReviewTargetLoad,
       executeTypedComposerCommand: executeReviewTypedComposerCommand,
     };
-  }, [executeReviewTypedComposerCommand, reviewCommandPanelView]);
+  }, [cancelReviewTargetLoad, executeReviewTypedComposerCommand, reviewCommandPanelView]);
 
   return {
     lifecycle,

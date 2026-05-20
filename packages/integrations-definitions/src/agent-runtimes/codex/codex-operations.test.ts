@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildCodexReviewStartRequest,
   buildCodexTurnInputItems,
   buildCodexTurnStartRequest,
   parseCodexThreadSessionResponse,
@@ -174,6 +175,27 @@ describe("buildCodexTurnStartRequest", () => {
           text: "Explain the repo",
         },
       ],
+    });
+  });
+});
+
+describe("buildCodexReviewStartRequest", () => {
+  it("preserves structured review targets and requests inline delivery", () => {
+    expect(
+      buildCodexReviewStartRequest({
+        threadId: "thread_123",
+        target: {
+          type: "baseBranch",
+          branch: "origin/main",
+        },
+      }),
+    ).toEqual({
+      threadId: "thread_123",
+      target: {
+        type: "baseBranch",
+        branch: "origin/main",
+      },
+      delivery: "inline",
     });
   });
 });

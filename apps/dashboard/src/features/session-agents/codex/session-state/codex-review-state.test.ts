@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { parseCodexReviewBranchList, parseCodexReviewCommand } from "./codex-review-state.js";
+import {
+  codexReviewStartIsBlockedByTurnStatus,
+  parseCodexReviewBranchList,
+  parseCodexReviewCommand,
+} from "./codex-review-state.js";
 
 describe("parseCodexReviewCommand", () => {
   it("opens the target picker for a bare review command", () => {
@@ -24,6 +28,14 @@ describe("parseCodexReviewCommand", () => {
     expect(parseCodexReviewCommand("/reviewer")).toEqual({
       status: "notReviewCommand",
     });
+  });
+});
+
+describe("codexReviewStartIsBlockedByTurnStatus", () => {
+  it("blocks review starts while the active Codex turn is in progress", () => {
+    expect(codexReviewStartIsBlockedByTurnStatus("inProgress")).toBe(true);
+    expect(codexReviewStartIsBlockedByTurnStatus("completed")).toBe(false);
+    expect(codexReviewStartIsBlockedByTurnStatus(null)).toBe(false);
   });
 });
 

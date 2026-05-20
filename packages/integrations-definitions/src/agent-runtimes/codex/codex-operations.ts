@@ -375,11 +375,7 @@ export async function startCodexReview(input: {
   threadId: string;
   target: CodexReviewTarget;
 }): Promise<{ turnId: string; status: string; reviewThreadId: string; response: unknown }> {
-  const response = await input.rpcClient.call("review/start", {
-    threadId: input.threadId,
-    target: input.target,
-    delivery: "inline",
-  });
+  const response = await input.rpcClient.call("review/start", buildCodexReviewStartRequest(input));
 
   const parsedResponse = ReviewStartResponseSchema.safeParse(response);
   if (!parsedResponse.success) {
@@ -393,6 +389,21 @@ export async function startCodexReview(input: {
     status: parsedResponse.data.turn.status,
     reviewThreadId: parsedResponse.data.reviewThreadId,
     response,
+  };
+}
+
+export function buildCodexReviewStartRequest(input: {
+  threadId: string;
+  target: CodexReviewTarget;
+}): {
+  threadId: string;
+  target: CodexReviewTarget;
+  delivery: "inline";
+} {
+  return {
+    threadId: input.threadId,
+    target: input.target,
+    delivery: "inline",
   };
 }
 

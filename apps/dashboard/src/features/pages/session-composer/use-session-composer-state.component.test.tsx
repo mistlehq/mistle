@@ -492,6 +492,49 @@ describe("useSessionComposerState", () => {
     expect(screen.getByTestId("composer-text").textContent).toBe("");
   });
 
+  it("keeps typed runtime command text when the runtime rejects it", () => {
+    const submittedRuntimeCommands: { commandId: string; text: string }[] = [];
+
+    render(
+      <SessionComposerStateHarness
+        composerCapabilities={[
+          {
+            kind: "composerCommand",
+            trigger: "/",
+            source: "runtimeCommand",
+            commands: [
+              {
+                id: "codex.review",
+                name: "review",
+                availability: {
+                  duringActiveTurn: "disabled",
+                },
+                submitAs: "typedRuntimeCommand",
+              },
+            ],
+          },
+        ]}
+        composerText="/review check auth"
+        executeTypedRuntimeCommand={(command) => {
+          submittedRuntimeCommands.push(command);
+          return false;
+        }}
+        pendingDiffComments={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(submittedRuntimeCommands).toEqual([
+      {
+        commandId: "codex.review",
+        text: "/review check auth",
+      },
+    ]);
+    expect(screen.getByTestId("submitted-prompt").textContent).toBe("");
+    expect(screen.getByTestId("composer-text").textContent).toBe("/review check auth");
+  });
+
   it("switches to Plan mode for a bare plan command", () => {
     let switchedToPlan = false;
 
