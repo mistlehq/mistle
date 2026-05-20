@@ -207,11 +207,6 @@ describe("createSandboxStartupInput", () => {
           value: "host.docker.internal",
           reason: "Docker host gateway traffic must not be redirected away from the host bridge",
         },
-        {
-          kind: "host",
-          value: "gateway",
-          reason: "gateway tunnel traffic must not be redirected into sandboxd",
-        },
       ],
     });
   });

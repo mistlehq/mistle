@@ -20,7 +20,6 @@ export function createTensorlakeTransparentProxyConfiguration(): SandboxTranspar
     smokeRequirements: [
       "nftables must be available in the Tensorlake base image",
       "socket-mark bypass rule must be installed before redirect rules",
-      "gateway tunnel traffic must be excluded from transparent redirection",
     ],
   });
 }

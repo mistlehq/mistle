@@ -54,11 +54,10 @@ describe("createTransparentProxyConfiguration", () => {
 });
 
 describe("createRuntimeDestinationTransparentProxyExclusions", () => {
-  it("derives host exclusions from gateway runtime URLs", () => {
+  it("derives DNS server exclusions", () => {
     expect(
       createRuntimeDestinationTransparentProxyExclusions({
         dnsServerIps: ["8.8.8.8", "1.1.1.1"],
-        gatewayTunnelUrl: "wss://gateway.mistlestag.ing/tunnel/sandbox",
       }),
     ).toEqual([
       {
@@ -71,26 +70,14 @@ describe("createRuntimeDestinationTransparentProxyExclusions", () => {
         value: "1.1.1.1/32",
         reason: "DNS server traffic must remain direct until DNS interception has its own design",
       },
-      {
-        kind: SandboxTransparentProxyExclusionKinds.HOST,
-        value: "gateway.mistlestag.ing",
-        reason: "gateway tunnel traffic must not be redirected into sandboxd",
-      },
     ]);
   });
 
-  it("supports local gateway URLs", () => {
+  it("does not add host exclusions for runtime destinations", () => {
     expect(
       createRuntimeDestinationTransparentProxyExclusions({
         dnsServerIps: [],
-        gatewayTunnelUrl: "ws://localhost:5202/tunnel/sandbox",
       }),
-    ).toEqual([
-      {
-        kind: SandboxTransparentProxyExclusionKinds.HOST,
-        value: "localhost",
-        reason: "gateway tunnel traffic must not be redirected into sandboxd",
-      },
-    ]);
+    ).toEqual([]);
   });
 });

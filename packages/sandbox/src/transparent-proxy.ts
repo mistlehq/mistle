@@ -33,15 +33,8 @@ const GenericTransparentProxyCidrExclusions = [
 
 export function createRuntimeDestinationTransparentProxyExclusions(input: {
   dnsServerIps: readonly string[];
-  gatewayTunnelUrl: string;
 }): readonly SandboxTransparentProxyExclusion[] {
-  return [
-    ...input.dnsServerIps.map(createDnsServerExclusion),
-    createRuntimeUrlHostExclusion({
-      reason: "gateway tunnel traffic must not be redirected into sandboxd",
-      url: input.gatewayTunnelUrl,
-    }),
-  ];
+  return input.dnsServerIps.map(createDnsServerExclusion);
 }
 
 export function createTransparentProxyConfiguration(input: {
@@ -67,17 +60,5 @@ function createDnsServerExclusion(ipAddress: string): SandboxTransparentProxyExc
     kind: SandboxTransparentProxyExclusionKinds.CIDR,
     value: `${ipAddress}/32`,
     reason: "DNS server traffic must remain direct until DNS interception has its own design",
-  };
-}
-
-function createRuntimeUrlHostExclusion(input: {
-  reason: string;
-  url: string;
-}): SandboxTransparentProxyExclusion {
-  const url = new URL(input.url);
-  return {
-    kind: SandboxTransparentProxyExclusionKinds.HOST,
-    value: url.hostname,
-    reason: input.reason,
   };
 }

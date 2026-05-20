@@ -2,11 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { mintBootstrapToken, mintTunnelExchangeToken } from "@mistle/gateway-tunnel-auth";
 import type { MistleLogger } from "@mistle/logging";
-import {
-  createRuntimeDestinationTransparentProxyExclusions,
-  type SandboxAdapter,
-  type SandboxRuntimeControl,
-} from "@mistle/sandbox";
+import { type SandboxAdapter, type SandboxRuntimeControl } from "@mistle/sandbox";
 import {
   SandboxdTransparentProxyBypassKinds,
   type SandboxdTransparentProxyConfiguration,
@@ -103,9 +99,7 @@ export async function createSandboxStartupInput(input: {
     input.sandboxAdapter === undefined
       ? undefined
       : createTransparentProxyStartupConfiguration({
-          config: input.config,
           sandboxAdapter: input.sandboxAdapter,
-          tunnelGatewayWsUrl,
         });
   const startupActingUserId = transparentProxy === undefined ? undefined : input.actingUserId;
 
@@ -238,9 +232,7 @@ function isSandboxdAlreadySubmittedError(error: unknown): boolean {
 }
 
 function createTransparentProxyStartupConfiguration(input: {
-  config: DataPlaneWorkerRuntimeConfig;
   sandboxAdapter: SandboxAdapter;
-  tunnelGatewayWsUrl: string;
 }): SandboxdTransparentProxyConfiguration | undefined {
   const providerConfiguration = input.sandboxAdapter.getTransparentProxyConfiguration();
   if (!providerConfiguration.supported) {
@@ -254,12 +246,6 @@ function createTransparentProxyStartupConfiguration(input: {
       kind: SandboxdTransparentProxyBypassKinds.SOCKET_MARK,
       mark: providerConfiguration.passthroughBypass.mark,
     },
-    exclusions: [
-      ...providerConfiguration.exclusions,
-      ...createRuntimeDestinationTransparentProxyExclusions({
-        dnsServerIps: [],
-        gatewayTunnelUrl: input.tunnelGatewayWsUrl,
-      }),
-    ],
+    exclusions: [...providerConfiguration.exclusions],
   };
 }
