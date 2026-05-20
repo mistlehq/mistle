@@ -3,14 +3,19 @@
 use base64::Engine;
 use tokio::sync::mpsc;
 
+use crate::time::Clock;
+use crate::tunnel::port_access::{PortAccessAuthorizeDecision, authorize_target_port};
 use crate::tunnel::port_access_transport::{
     PortAccessHttpCommand, PortAccessTcpCommand, PortAccessTransportEvent, spawn_http_transport,
     spawn_tcp_transport,
 };
 use crate::tunnel::protocol::{
-    PAYLOAD_KIND_RAW_BYTES, STREAM_RESET_CODE_INVALID_STREAM_DATA,
-    STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED, StreamDataFrame, StreamSendWindow,
-    encode_stream_data_frame, stream_reset, stream_window,
+    PAYLOAD_KIND_RAW_BYTES, PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
+    PORT_ACCESS_AUTHORIZE_REASON_UNSUPPORTED_PROTOCOL, PortsTargetAuthorize,
+    STREAM_RESET_CODE_INVALID_STREAM_DATA, STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
+    StreamDataFrame, StreamSendWindow, encode_stream_data_frame,
+    ports_target_authorize_failure_result, ports_target_authorize_success_result, stream_reset,
+    stream_window,
 };
 use crate::tunnel::session::{
     TunnelSessionError, TunnelSessionEvent, TunnelSessionMutableState, TunnelWriterMessage,
@@ -70,6 +75,49 @@ pub(super) fn mark_port_access_tcp_direction_closed(
 pub(super) fn close_port_access_tcp_streams(session_state: &mut TunnelSessionMutableState) {
     for (_, stream_state) in std::mem::take(&mut session_state.port_access_tcp_streams) {
         let _ = stream_state.sender.send(PortAccessTcpCommand::Terminate);
+    }
+}
+
+pub(super) async fn handle_ports_control_message(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    message: PortsTargetAuthorize,
+    clock: &dyn Clock,
+) -> Result<(), TunnelSessionError> {
+    let decision = authorize_target_port(clock, &message.target)
+        .await
+        .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
+
+    match decision {
+        PortAccessAuthorizeDecision::Authorized {
+            upstream_protocol,
+            websocket_capable,
+        } => write_tunnel_text(
+            tunnel_writer_sender,
+            ports_target_authorize_success_result(
+                &message.request_id,
+                upstream_protocol,
+                websocket_capable,
+            ),
+        ),
+        PortAccessAuthorizeDecision::Rejected { reason } => {
+            let reason = match reason {
+                PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE => {
+                    PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE
+                }
+                PORT_ACCESS_AUTHORIZE_REASON_UNSUPPORTED_PROTOCOL => {
+                    PORT_ACCESS_AUTHORIZE_REASON_UNSUPPORTED_PROTOCOL
+                }
+                _ => {
+                    return Err(TunnelSessionError::PortAccess(format!(
+                        "unknown port access authorize rejection reason: {reason}"
+                    )));
+                }
+            };
+            write_tunnel_text(
+                tunnel_writer_sender,
+                ports_target_authorize_failure_result(&message.request_id, reason),
+            )
+        }
     }
 }
 

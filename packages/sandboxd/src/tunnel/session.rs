@@ -61,7 +61,6 @@ use crate::time::{Clock, Duration, Sleeper};
 use crate::tunnel::file_search::{
     FileSearchWorkerCommand, FileSearchWorkerEvent, spawn_file_search_worker,
 };
-use crate::tunnel::port_access::{PortAccessAuthorizeDecision, authorize_target_port};
 use crate::tunnel::port_access_transport::{
     PortAccessHttpCommand, PortAccessTcpCommand, PortAccessTransportEvent,
 };
@@ -70,19 +69,17 @@ use crate::tunnel::protocol::{
     CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST, CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE,
     EgressTokenControlMessage, EgressTokenRequest, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED,
     PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
-    PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
-    PORT_ACCESS_AUTHORIZE_REASON_UNSUPPORTED_PROTOCOL, PtyControlMessage, PtySessionControlMessage,
-    PtySessionLaunchMode, PtySessionOpen, STREAM_RESET_CODE_EXEC_COMMAND_FAILED,
-    STREAM_RESET_CODE_INVALID_STREAM_CLOSE, STREAM_RESET_CODE_INVALID_STREAM_DATA,
-    STREAM_RESET_CODE_INVALID_STREAM_SIGNAL, STREAM_RESET_CODE_INVALID_STREAM_WINDOW,
-    STREAM_RESET_CODE_PROCESSES_SNAPSHOT_FAILED, STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
-    STREAM_RESET_CODE_TARGET_CLOSED, SigningControlMessage, SigningRequest, StreamControlMessage,
-    StreamSendWindow, decode_stream_data_frame, egress_token_request, encode_stream_data_frame,
-    exec_result_event, parse_egress_token_control_message, parse_file_search_stream_message,
+    PtyControlMessage, PtySessionControlMessage, PtySessionLaunchMode, PtySessionOpen,
+    STREAM_RESET_CODE_EXEC_COMMAND_FAILED, STREAM_RESET_CODE_INVALID_STREAM_CLOSE,
+    STREAM_RESET_CODE_INVALID_STREAM_DATA, STREAM_RESET_CODE_INVALID_STREAM_SIGNAL,
+    STREAM_RESET_CODE_INVALID_STREAM_WINDOW, STREAM_RESET_CODE_PROCESSES_SNAPSHOT_FAILED,
+    STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED, STREAM_RESET_CODE_TARGET_CLOSED,
+    SigningControlMessage, SigningRequest, StreamControlMessage, StreamSendWindow,
+    decode_stream_data_frame, egress_token_request, encode_stream_data_frame, exec_result_event,
+    parse_egress_token_control_message, parse_file_search_stream_message,
     parse_ports_control_message, parse_ports_transport_message, parse_processes_stream_message,
     parse_pty_control_message, parse_pty_session_control_message, parse_signing_control_message,
-    parse_stream_control_message, ports_target_authorize_failure_result,
-    ports_target_authorize_success_result, pty_exit_event, pty_session_error, pty_session_opened,
+    parse_stream_control_message, pty_exit_event, pty_session_error, pty_session_opened,
     signing_request, stream_complete, stream_open_error, stream_open_ok, stream_reset,
     stream_window,
 };
@@ -107,8 +104,8 @@ use crate::tunnel::session::file_upload::{
 use crate::tunnel::session::port_access::mark_port_access_tcp_direction_closed;
 use crate::tunnel::session::port_access::{
     PortAccessTcpStreamState, close_port_access_tcp_streams, handle_port_access_tcp_data_frame,
-    handle_port_access_transport_event, handle_ports_transport_message,
-    port_access_stream_is_active,
+    handle_port_access_transport_event, handle_ports_control_message,
+    handle_ports_transport_message, port_access_stream_is_active,
 };
 use crate::tunnel::session::telemetry::{
     AGENT_STREAM_CLOSE_SOURCE_GATEWAY, AGENT_STREAM_CLOSE_SOURCE_RUNTIME,
@@ -4500,49 +4497,6 @@ async fn handle_tunnel_control_message(
     }
 
     Ok(())
-}
-
-async fn handle_ports_control_message(
-    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
-    message: crate::tunnel::protocol::PortsTargetAuthorize,
-    clock: &dyn Clock,
-) -> Result<(), TunnelSessionError> {
-    let decision = authorize_target_port(clock, &message.target)
-        .await
-        .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
-
-    match decision {
-        PortAccessAuthorizeDecision::Authorized {
-            upstream_protocol,
-            websocket_capable,
-        } => write_tunnel_text(
-            tunnel_writer_sender,
-            ports_target_authorize_success_result(
-                &message.request_id,
-                upstream_protocol,
-                websocket_capable,
-            ),
-        ),
-        PortAccessAuthorizeDecision::Rejected { reason } => {
-            let reason = match reason {
-                PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE => {
-                    PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE
-                }
-                PORT_ACCESS_AUTHORIZE_REASON_UNSUPPORTED_PROTOCOL => {
-                    PORT_ACCESS_AUTHORIZE_REASON_UNSUPPORTED_PROTOCOL
-                }
-                _ => {
-                    return Err(TunnelSessionError::PortAccess(format!(
-                        "unknown port access authorize rejection reason: {reason}"
-                    )));
-                }
-            };
-            write_tunnel_text(
-                tunnel_writer_sender,
-                ports_target_authorize_failure_result(&message.request_id, reason),
-            )
-        }
-    }
 }
 
 fn reject_duplicate_tunnel_stream_open(
