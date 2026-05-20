@@ -100,6 +100,7 @@ export function buildCodexConversationRuntime(input: {
   compactThread: UseCodexSessionStateResult["threads"]["compactThread"];
   goals: UseCodexSessionStateResult["goals"];
   plans: UseCodexSessionStateResult["plans"];
+  reviews: UseCodexSessionStateResult["reviews"];
 }): SessionWorkbenchRuntimeAdapter {
   const capabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
 
@@ -132,7 +133,8 @@ export function buildCodexConversationRuntime(input: {
       clearSessionErrorMessage: input.sessionMessage.clearSessionErrorMessage,
       contextUsage: capabilities.hasContextUsage ? input.contextUsage : null,
       goalStatus: input.goals.activeGoalStatus,
-      commandPanel: input.plans.commandPanel ?? mapCodexGoalPanel(input.goals),
+      commandPanel:
+        input.reviews.commandPanel ?? input.plans.commandPanel ?? mapCodexGoalPanel(input.goals),
       collaborationMode: {
         mode: input.plans.activeMode,
         onSwitchToPlan: () => {
@@ -144,6 +146,17 @@ export function buildCodexConversationRuntime(input: {
         onSwitchToDefault: input.plans.switchActiveThreadToDefault,
       },
       unavailableTypedRuntimeCommands: [
+        ...(hasComposerCommand({
+          composerCapabilities: input.bootstrap.composerCapabilities,
+          commandId: CodexComposerCommandIds.REVIEW,
+        })
+          ? []
+          : [
+              {
+                name: "review",
+                message: "/review is not enabled for this Codex runtime.",
+              },
+            ]),
         ...(hasComposerCommand({
           composerCapabilities: input.bootstrap.composerCapabilities,
           commandId: CodexComposerCommandIds.PLAN,
@@ -188,6 +201,10 @@ export function buildCodexConversationRuntime(input: {
       executeTypedRuntimeCommand: (commandInput) => {
         if (commandInput.commandId === CodexComposerCommandIds.PLAN) {
           return input.plans.executeTypedComposerCommand(commandInput);
+        }
+
+        if (commandInput.commandId === CodexComposerCommandIds.REVIEW) {
+          return input.reviews.executeTypedComposerCommand(commandInput);
         }
 
         return input.goals.executeTypedComposerCommand(commandInput);

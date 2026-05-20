@@ -9,12 +9,78 @@ import {
   SessionComposerFixturePropsWithPendingAttachments,
   CodexFixtureSessionModelOptions,
 } from "../../session-agents/codex/fixtures/session-fixtures.js";
-import { ChatComposer } from "./chat-composer.js";
+import { ChatComposer, type ChatComposerCommandPanel } from "./chat-composer.js";
 import { noop } from "./chat-story-support.js";
 
 type ShortcutPreviewPlatform = "linux" | "macos" | "windows";
 type ChatComposerStoryArgs = React.ComponentProps<typeof ChatComposer> & {
   shortcutPreviewPlatform: ShortcutPreviewPlatform;
+};
+
+const ReviewTargetPickerPanel: ChatComposerCommandPanel = {
+  kind: "picker",
+  title: "Review target",
+  searchPlaceholder: "Search",
+  emptyLabel: "No review targets found",
+  onCancel: noop,
+  options: [
+    {
+      label: "Review against a base branch (PR Style)",
+      onSelect: noop,
+    },
+    {
+      label: "Review uncommitted changes",
+      onSelect: noop,
+    },
+    {
+      label: "Review a commit",
+      onSelect: noop,
+    },
+  ],
+};
+
+const ReviewBranchPickerPanel: ChatComposerCommandPanel = {
+  kind: "picker",
+  title: "Review against a base branch",
+  searchPlaceholder: "Search branches",
+  emptyLabel: "No matching branches",
+  onCancel: noop,
+  options: [
+    {
+      label: "Review against main",
+      onSelect: noop,
+    },
+    {
+      label: "Review against origin/main",
+      onSelect: noop,
+    },
+    {
+      label: "Review against release/2026-05",
+      onSelect: noop,
+    },
+  ],
+};
+
+const ReviewCommitPickerPanel: ChatComposerCommandPanel = {
+  kind: "picker",
+  title: "Review commit",
+  searchPlaceholder: "Search commits",
+  emptyLabel: "No matching commits",
+  onCancel: noop,
+  options: [
+    {
+      label: "ad92f4a Add review command panel",
+      onSelect: noop,
+    },
+    {
+      label: "b8192cd Wire typed review command",
+      onSelect: noop,
+    },
+    {
+      label: "f3182e1 Document Codex review behavior",
+      onSelect: noop,
+    },
+  ],
 };
 
 function detectShortcutPreviewPlatform(): ShortcutPreviewPlatform {
@@ -118,6 +184,10 @@ function InteractiveChatComposerStory(
   );
 }
 
+/**
+ * Use these stories to review the session composer across ordinary prompt entry,
+ * slash command discovery, runtime command panels, attachments, and active-turn controls.
+ */
 const meta = {
   title: "Dashboard/Chat/Composer",
   component: PlatformAwareChatComposerStory,
@@ -267,6 +337,58 @@ export const PlanImplementationConfirmation: Story = {
     await expect(canvas.getByText("Implement this plan?")).toBeVisible();
     await expect(canvas.getByRole("button", { name: "Implement" })).toBeVisible();
     await expect(canvas.getByRole("button", { name: "More actions" })).toBeVisible();
+  },
+};
+
+export const ReviewTargetPicker: Story = {
+  args: {
+    commandPanel: ReviewTargetPickerPanel,
+    composerCapabilities: CodexComposerCapabilities,
+    composerText: "",
+    gitBranchLabel: "handle-codex-review-command",
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByRole("textbox", { name: "Review target search" })).toBeVisible();
+    await expect(
+      canvas.getByRole("option", { name: "Review against a base branch (PR Style)" }),
+    ).toBeVisible();
+    await expect(canvas.getByRole("option", { name: "Review uncommitted changes" })).toBeVisible();
+  },
+};
+
+export const ReviewBranchPicker: Story = {
+  args: {
+    commandPanel: ReviewBranchPickerPanel,
+    composerCapabilities: CodexComposerCapabilities,
+    composerText: "",
+    gitBranchLabel: "handle-codex-review-command",
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(
+      canvas.getByRole("textbox", { name: "Review against a base branch search" }),
+    ).toBeVisible();
+    await expect(canvas.getByRole("option", { name: "Review against main" })).toBeVisible();
+  },
+};
+
+export const ReviewCommitPicker: Story = {
+  args: {
+    commandPanel: ReviewCommitPickerPanel,
+    composerCapabilities: CodexComposerCapabilities,
+    composerText: "",
+    gitBranchLabel: "handle-codex-review-command",
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByRole("textbox", { name: "Review commit search" })).toBeVisible();
+    await expect(
+      canvas.getByRole("option", { name: "ad92f4a Add review command panel" }),
+    ).toBeVisible();
   },
 };
 

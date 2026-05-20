@@ -20,7 +20,10 @@ export const CodexComposerCapabilities = [
         id: CodexComposerCommandIds.REVIEW,
         name: "review",
         description: "Review the current changes",
-        submitAs: "inlineText",
+        availability: {
+          duringActiveTurn: "disabled",
+        },
+        submitAs: "typedRuntimeCommand",
       },
       {
         id: CodexComposerCommandIds.PLAN,

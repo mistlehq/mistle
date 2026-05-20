@@ -333,7 +333,10 @@ describe("useSessionComposerState", () => {
               {
                 id: "codex.review",
                 name: "review",
-                submitAs: "inlineText",
+                availability: {
+                  duringActiveTurn: "disabled",
+                },
+                submitAs: "typedRuntimeCommand",
               },
             ],
           },

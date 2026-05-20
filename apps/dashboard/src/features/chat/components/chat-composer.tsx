@@ -103,6 +103,19 @@ export type ChatComposerCommandPanel =
         onSelect: () => void;
         variant?: "default" | "secondary" | "ghost";
       }[];
+    }
+  | {
+      kind: "picker";
+      title: string;
+      searchPlaceholder: string;
+      emptyLabel?: string;
+      initialSearch?: string;
+      onCancel: () => void;
+      options: readonly {
+        label: string;
+        description?: string;
+        onSelect: () => void;
+      }[];
     };
 
 export type ChatComposerViewModel = {
@@ -266,13 +279,19 @@ export function ChatComposer({
   onRemovePendingAttachment,
 }: ChatComposerViewModel): React.JSX.Element {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const commandPanelSearchInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const commandListId = useId();
+  const commandPanelListId = useId();
   const [composerSelection, setComposerSelection] = useState({
     start: composerText.length,
     end: composerText.length,
   });
   const [activeSlashCommandIndex, setActiveSlashCommandIndex] = useState(0);
+  const [activeCommandPanelOptionIndex, setActiveCommandPanelOptionIndex] = useState(0);
+  const [commandPanelSearchText, setCommandPanelSearchText] = useState(
+    commandPanel?.kind === "picker" ? (commandPanel.initialSearch ?? "") : "",
+  );
   const [commandPanelText, setCommandPanelText] = useState(
     commandPanel?.kind === "textInput" ? commandPanel.initialValue : "",
   );
@@ -281,6 +300,21 @@ export function ChatComposer({
       setCommandPanelText(commandPanel.initialValue);
     }
   }, [commandPanel?.kind, commandPanel?.kind === "textInput" ? commandPanel.initialValue : null]);
+  useEffect(() => {
+    if (commandPanel?.kind !== "picker") {
+      return;
+    }
+
+    setCommandPanelSearchText(commandPanel.initialSearch ?? "");
+    setActiveCommandPanelOptionIndex(0);
+    requestAnimationFrame(() => {
+      commandPanelSearchInputRef.current?.focus();
+    });
+  }, [
+    commandPanel?.kind,
+    commandPanel?.kind === "picker" ? commandPanel.title : null,
+    commandPanel?.kind === "picker" ? commandPanel.initialSearch : null,
+  ]);
   const activeComposerTrigger = detectActiveComposerTrigger({
     composerCapabilities,
     composerText,
@@ -306,6 +340,29 @@ export function ChatComposer({
     activeSlashCommandIndexWithinBounds === null
       ? null
       : (filteredSlashCommandOptions[activeSlashCommandIndexWithinBounds] ?? null);
+  const filteredCommandPanelOptions = useMemo(() => {
+    if (commandPanel?.kind !== "picker") {
+      return [];
+    }
+
+    const query = commandPanelSearchText.trim().toLowerCase();
+    if (query.length === 0) {
+      return commandPanel.options;
+    }
+
+    return commandPanel.options.filter((option) => {
+      const searchableText = [option.label, option.description ?? ""].join(" ").toLowerCase();
+      return searchableText.includes(query);
+    });
+  }, [commandPanel, commandPanelSearchText]);
+  const activeCommandPanelOptionIndexWithinBounds =
+    filteredCommandPanelOptions.length === 0
+      ? null
+      : Math.min(activeCommandPanelOptionIndex, filteredCommandPanelOptions.length - 1);
+  const activeCommandPanelOption =
+    activeCommandPanelOptionIndexWithinBounds === null
+      ? null
+      : (filteredCommandPanelOptions[activeCommandPanelOptionIndexWithinBounds] ?? null);
   const composerPlaceholder =
     submitMode === "steer" || submitMode === "interrupt"
       ? "Steer the current turn"
@@ -402,6 +459,184 @@ export function ChatComposer({
     );
   }
 
+  function moveActiveCommandPanelOption(delta: number): void {
+    if (filteredCommandPanelOptions.length === 0) {
+      return;
+    }
+
+    setActiveCommandPanelOptionIndex(
+      (currentIndex) =>
+        (currentIndex + delta + filteredCommandPanelOptions.length) %
+        filteredCommandPanelOptions.length,
+    );
+  }
+
+  function selectActiveCommandPanelOption(): void {
+    activeCommandPanelOption?.onSelect();
+  }
+
+  function renderCommandPanel(): React.JSX.Element | null {
+    if (commandPanel === null) {
+      return null;
+    }
+
+    if (commandPanel.kind === "picker") {
+      return (
+        <div className="mb-2 rounded-md border bg-popover p-1 text-sm text-popover-foreground shadow-md">
+          <input
+            aria-activedescendant={
+              activeCommandPanelOptionIndexWithinBounds === null
+                ? undefined
+                : `${commandPanelListId}-option-${String(activeCommandPanelOptionIndexWithinBounds)}`
+            }
+            aria-controls={commandPanelListId}
+            aria-expanded={true}
+            aria-haspopup="listbox"
+            aria-label={`${commandPanel.title} search`}
+            className="h-9 w-full rounded-sm border-0 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground/70"
+            onChange={(event) => {
+              setCommandPanelSearchText(event.target.value);
+              setActiveCommandPanelOptionIndex(0);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowDown") {
+                event.preventDefault();
+                moveActiveCommandPanelOption(1);
+                return;
+              }
+
+              if (event.key === "ArrowUp") {
+                event.preventDefault();
+                moveActiveCommandPanelOption(-1);
+                return;
+              }
+
+              if (event.key === "Enter") {
+                event.preventDefault();
+                selectActiveCommandPanelOption();
+                return;
+              }
+
+              if (event.key === "Escape") {
+                event.preventDefault();
+                commandPanel.onCancel();
+              }
+            }}
+            placeholder={commandPanel.searchPlaceholder}
+            ref={commandPanelSearchInputRef}
+            type="text"
+            value={commandPanelSearchText}
+          />
+          <div
+            aria-label={commandPanel.title}
+            className="max-h-64 overflow-y-auto pt-1"
+            id={commandPanelListId}
+            role="listbox"
+          >
+            {filteredCommandPanelOptions.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-muted-foreground">
+                {commandPanel.emptyLabel ?? "No matching options"}
+              </div>
+            ) : (
+              filteredCommandPanelOptions.map((option, optionIndex) => {
+                const isActiveOption = option.label === activeCommandPanelOption?.label;
+
+                return (
+                  <button
+                    aria-selected={isActiveOption}
+                    className={[
+                      "flex w-full flex-col rounded-sm px-3 py-2 text-left outline-none",
+                      isActiveOption ? "bg-muted text-foreground" : "hover:bg-muted/70",
+                    ].join(" ")}
+                    id={`${commandPanelListId}-option-${String(optionIndex)}`}
+                    key={option.label}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      option.onSelect();
+                    }}
+                    onMouseEnter={() => {
+                      setActiveCommandPanelOptionIndex(optionIndex);
+                    }}
+                    role="option"
+                    type="button"
+                  >
+                    <span>{option.label}</span>
+                    {option.description === undefined ? null : (
+                      <span className="text-sm text-muted-foreground">{option.description}</span>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mb-2 rounded-md border bg-card px-3 py-2 text-sm shadow-xs">
+        {commandPanel.kind === "confirm" ? (
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <p className="font-medium text-foreground">{commandPanel.title}</p>
+              {commandPanel.description === undefined ? null : (
+                <p className="text-muted-foreground">{commandPanel.description}</p>
+              )}
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button onClick={commandPanel.onCancel} size="sm" type="button" variant="ghost">
+                {commandPanel.cancelLabel}
+              </Button>
+              <Button onClick={commandPanel.onConfirm} size="sm" type="button">
+                {commandPanel.confirmLabel}
+              </Button>
+            </div>
+          </div>
+        ) : commandPanel.kind === "textInput" ? (
+          <div className="flex flex-col gap-2">
+            <div>
+              <p className="font-medium text-foreground">{commandPanel.title}</p>
+              {commandPanel.description === undefined ? null : (
+                <p className="text-muted-foreground">{commandPanel.description}</p>
+              )}
+            </div>
+            <Textarea
+              className="min-h-20 resize-none"
+              onChange={(event) => {
+                setCommandPanelText(event.target.value);
+              }}
+              value={commandPanelText}
+            />
+            <div className="flex justify-end gap-2">
+              <Button onClick={commandPanel.onCancel} size="sm" type="button" variant="ghost">
+                {commandPanel.cancelLabel}
+              </Button>
+              <Button
+                onClick={() => {
+                  commandPanel.onSubmit(commandPanelText);
+                }}
+                size="sm"
+                type="button"
+              >
+                {commandPanel.submitLabel}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <p className="font-medium text-foreground">{commandPanel.title}</p>
+              {commandPanel.description === undefined ? null : (
+                <p className="text-muted-foreground">{commandPanel.description}</p>
+              )}
+            </div>
+            <ChoiceCommandPanelActions choices={commandPanel.choices} title={commandPanel.title} />
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       className="flex flex-col"
@@ -413,71 +648,7 @@ export function ChatComposer({
         addPendingFiles(Array.from(event.dataTransfer.files));
       }}
     >
-      {commandPanel === null ? null : (
-        <div className="mb-2 rounded-md border bg-card px-3 py-2 text-sm shadow-xs">
-          {commandPanel.kind === "confirm" ? (
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <div className="min-w-0">
-                <p className="font-medium text-foreground">{commandPanel.title}</p>
-                {commandPanel.description === undefined ? null : (
-                  <p className="text-muted-foreground">{commandPanel.description}</p>
-                )}
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <Button onClick={commandPanel.onCancel} size="sm" type="button" variant="ghost">
-                  {commandPanel.cancelLabel}
-                </Button>
-                <Button onClick={commandPanel.onConfirm} size="sm" type="button">
-                  {commandPanel.confirmLabel}
-                </Button>
-              </div>
-            </div>
-          ) : commandPanel.kind === "textInput" ? (
-            <div className="flex flex-col gap-2">
-              <div>
-                <p className="font-medium text-foreground">{commandPanel.title}</p>
-                {commandPanel.description === undefined ? null : (
-                  <p className="text-muted-foreground">{commandPanel.description}</p>
-                )}
-              </div>
-              <Textarea
-                className="min-h-20 resize-none"
-                onChange={(event) => {
-                  setCommandPanelText(event.target.value);
-                }}
-                value={commandPanelText}
-              />
-              <div className="flex justify-end gap-2">
-                <Button onClick={commandPanel.onCancel} size="sm" type="button" variant="ghost">
-                  {commandPanel.cancelLabel}
-                </Button>
-                <Button
-                  onClick={() => {
-                    commandPanel.onSubmit(commandPanelText);
-                  }}
-                  size="sm"
-                  type="button"
-                >
-                  {commandPanel.submitLabel}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <div className="min-w-0">
-                <p className="font-medium text-foreground">{commandPanel.title}</p>
-                {commandPanel.description === undefined ? null : (
-                  <p className="text-muted-foreground">{commandPanel.description}</p>
-                )}
-              </div>
-              <ChoiceCommandPanelActions
-                choices={commandPanel.choices}
-                title={commandPanel.title}
-              />
-            </div>
-          )}
-        </div>
-      )}
+      {renderCommandPanel()}
       <div className="bg-card flex flex-col gap-3 rounded-md border p-1.5 shadow-xs">
         <input
           className="hidden"

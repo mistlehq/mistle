@@ -113,6 +113,13 @@ function createCodexRuntimeInput(input: {
       },
       executeTypedComposerCommand: () => false,
     },
+    reviews: {
+      commandPanel: null,
+      clearCommandPanel: () => {
+        return;
+      },
+      executeTypedComposerCommand: () => false,
+    },
     plans: {
       activeMode: "default",
       clearContextImplementationThreadId: null,
@@ -359,6 +366,10 @@ describe("buildCodexConversationRuntime", () => {
 
     expect(runtime.composerRuntimeInput.unavailableTypedRuntimeCommands).toEqual([
       {
+        name: "review",
+        message: "/review is not enabled for this Codex runtime.",
+      },
+      {
         name: "plan",
         message: "/plan is not enabled for this Codex runtime.",
       },
@@ -369,7 +380,7 @@ describe("buildCodexConversationRuntime", () => {
     ]);
   });
 
-  it("does not reserve the goal typed runtime command when the command is available", () => {
+  it("does not reserve typed runtime commands when the commands are available", () => {
     const runtime = buildCodexConversationRuntime(
       createCodexRuntimeInput({
         activeConversationId: "thread_123",
@@ -379,6 +390,14 @@ describe("buildCodexConversationRuntime", () => {
             trigger: "/",
             source: "runtimeCommand",
             commands: [
+              {
+                id: "codex.review",
+                name: "review",
+                availability: {
+                  duringActiveTurn: "disabled",
+                },
+                submitAs: "typedRuntimeCommand",
+              },
               {
                 id: "codex.plan",
                 name: "plan",
@@ -404,6 +423,35 @@ describe("buildCodexConversationRuntime", () => {
     );
 
     expect(runtime.composerRuntimeInput.unavailableTypedRuntimeCommands).toEqual([]);
+  });
+
+  it("renders a review picker ahead of a pending plan prompt", () => {
+    const reviewPanel: NonNullable<CodexRuntimeInput["reviews"]["commandPanel"]> = {
+      kind: "picker",
+      title: "Review target",
+      searchPlaceholder: "Search",
+      onCancel: () => {
+        return;
+      },
+      options: [],
+    };
+    const planPanel: NonNullable<CodexRuntimeInput["plans"]["commandPanel"]> = {
+      kind: "choice",
+      title: "Implement this plan?",
+      suppressWhenQueuedPrompts: true,
+      choices: [],
+    };
+    const input = createCodexRuntimeInput({
+      activeConversationId: "thread_123",
+      compactedThreadIds: [],
+      reportedMessages: [],
+    });
+    input.reviews.commandPanel = reviewPanel;
+    input.plans.commandPanel = planPanel;
+
+    const runtime = buildCodexConversationRuntime(input);
+
+    expect(runtime.composerRuntimeInput.commandPanel).toBe(reviewPanel);
   });
 });
 

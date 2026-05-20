@@ -17,7 +17,10 @@ const ComposerCommandCapabilityFixture: React.ComponentProps<
       id: "codex.review",
       name: "review",
       description: "Review the current changes",
-      submitAs: "inlineText",
+      availability: {
+        duringActiveTurn: "disabled",
+      },
+      submitAs: "typedRuntimeCommand",
     },
     {
       id: "codex.explain",
@@ -370,6 +373,47 @@ describe("ChatComposer", () => {
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(selectedChoices).toEqual(["dismiss"]);
+  });
+
+  it("renders a searchable command panel picker with keyboard selection", () => {
+    const selectedChoices: string[] = [];
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        commandPanel={{
+          kind: "picker",
+          title: "Review target",
+          searchPlaceholder: "Search",
+          onCancel: () => {
+            selectedChoices.push("cancel");
+          },
+          options: [
+            {
+              label: "Review against a base branch (PR Style)",
+              onSelect: () => {
+                selectedChoices.push("branch");
+              },
+            },
+            {
+              label: "Review uncommitted changes",
+              onSelect: () => {
+                selectedChoices.push("uncommitted");
+              },
+            },
+          ],
+        }}
+      />,
+    );
+
+    const searchInput = screen.getByRole("textbox", { name: "Review target search" });
+    fireEvent.change(searchInput, { target: { value: "branch" } });
+    fireEvent.keyDown(searchInput, { key: "Enter" });
+
+    expect(screen.queryByRole("option", { name: "Review uncommitted changes" })).toBeNull();
+    expect(
+      screen.getByRole("option", { name: "Review against a base branch (PR Style)" }),
+    ).toBeTruthy();
+    expect(selectedChoices).toEqual(["branch"]);
   });
 
   it("accepts dropped files on the git branch footer row", () => {

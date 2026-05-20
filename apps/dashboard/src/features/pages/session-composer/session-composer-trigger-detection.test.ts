@@ -11,7 +11,10 @@ const ComposerCommandCapabilityFixture: ComposerCapability = {
     {
       id: "codex.review",
       name: "review",
-      submitAs: "inlineText",
+      availability: {
+        duringActiveTurn: "disabled",
+      },
+      submitAs: "typedRuntimeCommand",
     },
     {
       id: "codex.explain",

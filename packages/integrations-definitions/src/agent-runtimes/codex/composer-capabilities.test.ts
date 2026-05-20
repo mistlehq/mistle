@@ -17,7 +17,10 @@ describe("Codex composer capabilities", () => {
         id: "codex.review",
         name: "review",
         description: "Review the current changes",
-        submitAs: "inlineText",
+        availability: {
+          duringActiveTurn: "disabled",
+        },
+        submitAs: "typedRuntimeCommand",
       },
       {
         id: "codex.plan",

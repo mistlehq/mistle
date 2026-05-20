@@ -120,6 +120,10 @@ _Avoid_: compact, same-thread implementation turn, reusing prior model context
 A live, thread-scoped prompt shown after a **Codex Plan mode** turn completes with a proposed plan. It is not shown for hydrated history, for `turn/plan/updated` checklist snapshots, or when queued/pending follow-up work has already superseded the proposed plan.
 _Avoid_: replay prompt, checklist approval, cross-thread implementation prompt
 
+**Codex review command**:
+A typed Codex **Composer command** that starts a Codex code-review turn. Bare `/review` opens a review-target picker; `/review <instructions>` starts a custom review using those instructions.
+_Avoid_: ordinary prompt text, slash autocomplete
+
 **OpenCode session**:
 An OpenCode **Runtime conversation**.
 _Avoid_: OpenCode thread, sandbox session
@@ -356,6 +360,12 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Composer command** entered before an **Active Codex thread** exists remains a command action until the **Agent runtime** can handle it; it does not become ordinary prompt text.
 - Replacing an existing Codex goal is a confirmed **Composer command** action.
 - Editing an existing Codex goal preserves goal state unless the current goal has already reached a terminal state.
+- Bare `/review` for the **Codex review command** opens a picker for what to review, not for review style.
+- Exec-backed **Codex review command** target pickers use the active **Codex thread** working directory because `review/start` is scoped to a thread.
+- The **Codex review command** submits a structured review target to Codex app-server; it does not turn the review target into ordinary prompt text.
+- Codex review output uses ordinary chat rendering unless Codex review-mode events are required to keep progress or final output visible.
+- The **Codex review command** is unavailable during an active Codex turn.
+- Non-empty text after `/review` is custom review instructions, not a structured review-target subcommand.
 
 ## Example Dialogue
 

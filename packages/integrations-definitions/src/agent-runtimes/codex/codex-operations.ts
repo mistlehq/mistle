@@ -32,6 +32,10 @@ const TurnStartResponseSchema = z.looseObject({
   }),
 });
 
+const ReviewStartResponseSchema = TurnStartResponseSchema.extend({
+  reviewThreadId: z.string().min(1),
+});
+
 const ThreadReadResponseSchema = z.looseObject({
   thread: z.looseObject({
     id: z.string().min(1),
@@ -224,6 +228,12 @@ export type CodexTurnCollaborationModeSettings = {
 
 export type CodexTurnCollaborationModeKind = "default" | "plan";
 
+export type CodexReviewTarget =
+  | { type: "uncommittedChanges" }
+  | { type: "baseBranch"; branch: string }
+  | { type: "commit"; sha: string; title: string | null }
+  | { type: "custom"; instructions: string };
+
 export type CodexThreadSessionResult = {
   threadId: string;
   cwd: string;
@@ -356,6 +366,32 @@ export async function startCodexTurn(input: {
   return {
     turnId: parsedResponse.data.turn.id,
     status: parsedResponse.data.turn.status,
+    response,
+  };
+}
+
+export async function startCodexReview(input: {
+  rpcClient: CodexJsonRpcClient;
+  threadId: string;
+  target: CodexReviewTarget;
+}): Promise<{ turnId: string; status: string; reviewThreadId: string; response: unknown }> {
+  const response = await input.rpcClient.call("review/start", {
+    threadId: input.threadId,
+    target: input.target,
+    delivery: "inline",
+  });
+
+  const parsedResponse = ReviewStartResponseSchema.safeParse(response);
+  if (!parsedResponse.success) {
+    throw new Error(
+      `review/start response payload is invalid. Payload: ${JSON.stringify(response)}`,
+    );
+  }
+
+  return {
+    turnId: parsedResponse.data.turn.id,
+    status: parsedResponse.data.turn.status,
+    reviewThreadId: parsedResponse.data.reviewThreadId,
     response,
   };
 }

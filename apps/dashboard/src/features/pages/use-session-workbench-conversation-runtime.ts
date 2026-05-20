@@ -363,6 +363,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
         compactThread: sessionState.threads.compactThread,
         goals: sessionState.goals,
         plans: sessionState.plans,
+        reviews: sessionState.reviews,
       }),
     [
       activeRuntimeConversationId,
@@ -387,6 +388,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
       sessionState.threads.compactThread,
       sessionState.goals,
       sessionState.plans,
+      sessionState.reviews,
       startCodexTurn,
     ],
   );
