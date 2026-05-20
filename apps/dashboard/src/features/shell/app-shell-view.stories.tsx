@@ -282,7 +282,7 @@ function DriftSidebarFooter(): React.JSX.Element {
 
 export const Default: Story = {};
 
-export const WithUpdateAvailable: Story = {
+export const WithRefreshRequiredSidebarAction: Story = {
   args: {
     sidebarFooterContent: <DriftSidebarFooter />,
   },

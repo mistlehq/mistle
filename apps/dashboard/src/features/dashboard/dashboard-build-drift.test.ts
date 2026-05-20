@@ -1,13 +1,6 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import {
-  resetDashboardBuildDriftForTest,
-  resolveDashboardBuildDriftStatus,
-} from "./dashboard-build-drift.js";
-
-afterEach(() => {
-  resetDashboardBuildDriftForTest();
-});
+import { resolveDashboardBuildDriftStatus } from "./dashboard-build-drift.js";
 
 describe("resolveDashboardBuildDriftStatus", () => {
   it("reports current when dashboard and server release versions match", () => {

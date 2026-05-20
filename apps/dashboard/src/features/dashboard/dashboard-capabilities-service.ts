@@ -19,9 +19,7 @@ export const DashboardCapabilitiesResponseSchema = z
   })
   .strict();
 
-export type DashboardCapabilitiesResponse = z.infer<typeof DashboardCapabilitiesResponseSchema> & {
-  releaseVersion: string | null;
-};
+export type DashboardCapabilitiesResponse = z.infer<typeof DashboardCapabilitiesResponseSchema>;
 
 function readDashboardCapabilitiesReleaseVersion(response: Response): string | null {
   return response.headers.get(DashboardReleaseVersionHeaderName);
@@ -48,10 +46,7 @@ export async function getDashboardCapabilities(input?: {
     throw new Error("Dashboard capabilities response payload is invalid.");
   }
 
-  return {
-    ...parsedResponse.data,
-    releaseVersion: readDashboardCapabilitiesReleaseVersion(response),
-  };
+  return parsedResponse.data;
 }
 
 export async function getDashboardCapabilitiesReleaseVersion(input?: {
