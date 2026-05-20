@@ -18,6 +18,7 @@ import {
   type UseOpenCodeSessionStateResult,
 } from "./opencode/session-state/index.js";
 import type { UsePiSessionStateResult } from "./pi/session-state/index.js";
+import { buildPiSourceReferencePrompt } from "./pi/session-state/pi-attachment-presentation.js";
 
 type EnsureSessionTransportConnected = Parameters<
   typeof generateSessionTitleWithSandboxCodexExec
@@ -130,8 +131,12 @@ export function buildPiTurnStarter(input: {
   chat: UsePiSessionStateResult["chat"];
 }): SessionTurnControl["startTurn"] {
   return async (turnInput): Promise<void> => {
+    const messagePayload = turnInput.transcriptPrompt ?? turnInput.submittedPrompt;
     await input.chat.sendPrompt({
-      submittedPrompt: turnInput.transcriptPrompt ?? turnInput.submittedPrompt,
+      submittedPrompt: buildPiSourceReferencePrompt({
+        prompt: messagePayload,
+        uploadedAttachments: turnInput.uploadedAttachments ?? [],
+      }),
     });
   };
 }

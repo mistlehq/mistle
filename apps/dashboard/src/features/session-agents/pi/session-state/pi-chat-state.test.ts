@@ -219,6 +219,61 @@ describe("reducePiChatState", () => {
     ]);
   });
 
+  it("projects empty Pi file markers as user message attachments", () => {
+    const hydratedState = reducePiChatState(createInitialPiChatState(), {
+      type: "hydrate_messages",
+      sessionFile: "/root/.pi/agent/sessions/session.jsonl",
+      messages: [
+        {
+          role: "user",
+          content:
+            'Review these\n\n<file name="/root/.local/attachments/ses_test/screen shot.png"></file>\n<file name="/root/.local/attachments/ses_test/requirements.pdf"></file>',
+          timestamp: 1,
+        },
+      ],
+    });
+
+    expect(hydratedState.entries).toEqual([
+      expect.objectContaining({
+        kind: "user-message",
+        text: "Review these",
+        attachments: [
+          {
+            kind: "image",
+            name: "screen shot.png",
+            path: "/root/.local/attachments/ses_test/screen shot.png",
+          },
+          {
+            kind: "file",
+            name: "requirements.pdf",
+            path: "/root/.local/attachments/ses_test/requirements.pdf",
+          },
+        ],
+      }),
+    ]);
+  });
+
+  it("keeps non-empty Pi file marker content visible", () => {
+    const hydratedState = reducePiChatState(createInitialPiChatState(), {
+      type: "hydrate_messages",
+      sessionFile: "/root/.pi/agent/sessions/session.jsonl",
+      messages: [
+        {
+          role: "user",
+          content: '<file name="/workspace/notes.txt">Important note</file>',
+          timestamp: 1,
+        },
+      ],
+    });
+
+    expect(hydratedState.entries).toEqual([
+      expect.objectContaining({
+        kind: "user-message",
+        text: '<file name="/workspace/notes.txt">Important note</file>',
+      }),
+    ]);
+  });
+
   it("merges final Pi messages from the agent-end event", () => {
     const hydratedState = reducePiChatState(createInitialPiChatState(), {
       type: "hydrate_messages",

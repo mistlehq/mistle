@@ -9,7 +9,11 @@ import {
   shouldSuppressChatReasoningText,
   type SemanticChatProjectionItem,
 } from "../../../chat/chat-semantic-projection.js";
-import type { ChatEntry, ChatSemanticGroupEntry } from "../../../chat/chat-types.js";
+import type {
+  ChatAttachment,
+  ChatEntry,
+  ChatSemanticGroupEntry,
+} from "../../../chat/chat-types.js";
 
 type PiToolCall = {
   args: unknown;
@@ -24,6 +28,14 @@ type PiToolExecution = {
   toolCallId: string;
   toolName: string;
 };
+
+type PiUserMessagePresentation = {
+  attachments: readonly ChatAttachment[];
+  text: string;
+};
+
+const EmptyPiFileMarkerPattern = /<file\s+name="([^"]*)">\s*<\/file>/g;
+const ImageFileExtensionPattern = /\.(?:avif|gif|heic|jpeg|jpg|png|webp)$/i;
 
 export type PiChatState = {
   completedErrorMessage: string | null;
@@ -137,6 +149,44 @@ function readMessageTextContent(content: unknown): string {
     content,
     partTypes: ["text", "thinking"],
   });
+}
+
+function decodePiFileMarkerAttribute(value: string): string {
+  return value
+    .replaceAll("&quot;", '"')
+    .replaceAll("&gt;", ">")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&amp;", "&");
+}
+
+function getFileNameFromPath(path: string): string {
+  const segments = path.split("/");
+  return segments.at(-1) ?? path;
+}
+
+function buildChatAttachmentFromPiFileMarker(path: string): ChatAttachment {
+  return {
+    kind: ImageFileExtensionPattern.test(path) ? "image" : "file",
+    path,
+    name: getFileNameFromPath(path),
+  };
+}
+
+function buildPiUserMessagePresentation(content: unknown): PiUserMessagePresentation {
+  const textContent = readMessageTextContent(content);
+  const attachments: ChatAttachment[] = [];
+  const text = textContent
+    .replaceAll(EmptyPiFileMarkerPattern, (_match, encodedPath: string) => {
+      const path = decodePiFileMarkerAttribute(encodedPath);
+      attachments.push(buildChatAttachmentFromPiFileMarker(path));
+      return "";
+    })
+    .trim();
+
+  return {
+    attachments,
+    text,
+  };
 }
 
 function readAssistantTextContent(content: unknown): string {
@@ -343,13 +393,17 @@ function buildMessageProjectionItems(input: {
   status: "completed" | "streaming";
 }): readonly SemanticChatProjectionItem[] {
   if (input.message.role === "user") {
+    const presentation = buildPiUserMessagePresentation(input.message.content);
     return [
       {
         kind: "standalone",
         entry: {
           id: input.messageId,
           kind: "user-message",
-          text: readMessageTextContent(input.message.content),
+          text: presentation.text,
+          ...(presentation.attachments.length === 0
+            ? {}
+            : { attachments: presentation.attachments }),
           turnId: input.messageId,
           status: "completed",
         },
