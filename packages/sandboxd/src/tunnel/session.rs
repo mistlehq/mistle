@@ -91,20 +91,24 @@ use crate::tunnel::protocol::{
 };
 use crate::tunnel::runtime_processes::collect_processes_snapshot;
 use crate::tunnel::session::agent_stream::{
-    AGENT_STREAM_CLOSE_SOURCE_GATEWAY, AGENT_STREAM_CLOSE_SOURCE_RUNTIME,
-    AGENT_STREAM_OUTCOME_CLOSED, AGENT_STREAM_OUTCOME_RESET, AgentStreamState, AgentStreamStats,
-    AgentStreamTermination, AgentStreamThresholdTelemetry, AgentStreamWindowExhaustedTelemetry,
-    agent_stream_outstanding_bytes, publish_agent_stream_threshold_crossed,
-    publish_agent_stream_window_exhausted, publish_bootstrap_closed_agent_stream_summaries,
-    remove_agent_stream_and_publish_summary, websocket_payload_kind_name,
+    AgentStreamState, AgentStreamStats, agent_stream_outstanding_bytes, websocket_payload_kind_name,
 };
 use crate::tunnel::session::file_upload::{
     FileUploadState, create_file_upload_state, finalize_file_upload,
+};
+use crate::tunnel::session::telemetry::{
+    AGENT_STREAM_CLOSE_SOURCE_GATEWAY, AGENT_STREAM_CLOSE_SOURCE_RUNTIME,
+    AGENT_STREAM_OUTCOME_CLOSED, AGENT_STREAM_OUTCOME_RESET, AgentStreamTermination,
+    AgentStreamThresholdTelemetry, AgentStreamWindowExhaustedTelemetry,
+    publish_agent_stream_threshold_crossed, publish_agent_stream_window_exhausted,
+    publish_bootstrap_closed_agent_stream_summaries, publish_tunnel_telemetry_log,
+    remove_agent_stream_and_publish_summary,
 };
 use crate::tunnel::telemetry::{SandboxTelemetryLogLevel, TelemetryRelay, TelemetryRelayFrame};
 
 mod agent_stream;
 mod file_upload;
+mod telemetry;
 
 /// Default attachment root for file uploads received over the bootstrap tunnel.
 pub const DEFAULT_ATTACHMENT_ROOT: &str = "/root/.local/attachments";
@@ -939,26 +943,6 @@ struct TunnelSessionMutableState {
     operation_stream_send_window: Option<StreamSendWindow>,
     pending_operation_records: VecDeque<String>,
     file_uploads: BTreeMap<u32, FileUploadState>,
-}
-
-fn publish_tunnel_telemetry_log(
-    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
-    telemetry_relay: &mut TelemetryRelay,
-    clock: &dyn Clock,
-    level: SandboxTelemetryLogLevel,
-    event: &str,
-    extra_fields: &[(&str, Value)],
-) {
-    match telemetry_relay.enqueue_log_record(clock, level, event, extra_fields) {
-        Ok(frames) => {
-            if let Err(error) = send_telemetry_frames(tunnel_writer_sender, frames) {
-                eprintln!("sandboxd failed to publish telemetry event '{event}': {error}");
-            }
-        }
-        Err(error) => {
-            eprintln!("sandboxd failed to queue telemetry event '{event}': {error}");
-        }
-    }
 }
 
 fn fail_pending_signing_requests(session_state: &mut TunnelSessionMutableState, message: &str) {
