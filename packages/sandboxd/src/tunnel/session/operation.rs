@@ -7,9 +7,11 @@ use tracing::{info, warn};
 use crate::supervision::SupervisedComponent;
 use crate::time::Clock;
 use crate::tunnel::protocol::{PAYLOAD_KIND_RAW_BYTES, StreamSendWindow, encode_stream_data_frame};
+use crate::tunnel::session::bootstrap::{
+    TunnelWriterMessage, write_tunnel_binary, write_tunnel_flush, write_tunnel_text,
+};
 use crate::tunnel::session::{
     SANDBOX_OPERATION_STREAM_ID, TunnelSessionError, TunnelSessionMutableState,
-    TunnelWriterMessage, write_tunnel_binary, write_tunnel_flush, write_tunnel_text,
 };
 
 pub(super) const OPERATION_RECORD_CHANNEL_CAPACITY: usize = 1024;

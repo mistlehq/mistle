@@ -12,11 +12,11 @@ use crate::tunnel::protocol::{
     STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED, STREAM_RESET_CODE_TARGET_CLOSED, StreamSendWindow,
     encode_stream_data_frame, stream_reset,
 };
-use crate::tunnel::session::telemetry::publish_tunnel_telemetry_log;
-use crate::tunnel::session::{
-    TunnelSessionError, TunnelSessionMutableState, TunnelWriterMessage, write_tunnel_binary,
-    write_tunnel_text,
+use crate::tunnel::session::bootstrap::{
+    TunnelWriterMessage, write_tunnel_binary, write_tunnel_text,
 };
+use crate::tunnel::session::telemetry::publish_tunnel_telemetry_log;
+use crate::tunnel::session::{TunnelSessionError, TunnelSessionMutableState};
 use crate::tunnel::telemetry::{SandboxTelemetryLogLevel, TelemetryRelay};
 
 pub(super) const FILE_SEARCH_STREAM_CHANNEL_KIND: &str = "fileSearch";

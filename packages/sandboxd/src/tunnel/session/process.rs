@@ -13,8 +13,9 @@ use crate::tunnel::protocol::{
     stream_open_error, stream_open_ok, stream_reset, stream_window,
 };
 use crate::tunnel::runtime_processes::collect_processes_snapshot;
-use crate::tunnel::session::{
-    TunnelSessionError, TunnelWriterMessage, write_tunnel_binary, write_tunnel_text,
+use crate::tunnel::session::TunnelSessionError;
+use crate::tunnel::session::bootstrap::{
+    TunnelWriterMessage, write_tunnel_binary, write_tunnel_text,
 };
 
 const DEFAULT_PROCESSES_SNAPSHOT_INTERVAL_MS: u64 = 500;
@@ -258,7 +259,7 @@ mod tests {
         PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT, decode_stream_data_frame,
         encode_stream_data_frame,
     };
-    use crate::tunnel::session::TunnelWriterMessage;
+    use crate::tunnel::session::bootstrap::TunnelWriterMessage;
     use crate::tunnel::session::process::{
         ProcessStreamState, add_process_stream_window, close_process_stream,
         handle_process_stream_frame,

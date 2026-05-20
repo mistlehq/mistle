@@ -17,10 +17,12 @@ use crate::tunnel::protocol::{
     ports_target_authorize_failure_result, ports_target_authorize_success_result, stream_reset,
     stream_window,
 };
+use crate::tunnel::session::bootstrap::{
+    TunnelWriterMessage, write_tunnel_binary, write_tunnel_text,
+};
 use crate::tunnel::session::{
-    TunnelSessionError, TunnelSessionEvent, TunnelSessionMutableState, TunnelWriterMessage,
-    spawn_port_access_transport_event_sender, tunnel_stream_is_active, write_tunnel_binary,
-    write_tunnel_text,
+    TunnelSessionError, TunnelSessionEvent, TunnelSessionMutableState,
+    spawn_port_access_transport_event_sender, tunnel_stream_is_active,
 };
 
 pub(super) struct PortAccessTcpStreamState {

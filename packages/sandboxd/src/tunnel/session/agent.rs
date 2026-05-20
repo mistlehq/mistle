@@ -12,16 +12,16 @@ use crate::tunnel::protocol::{
     STREAM_RESET_CODE_TARGET_CLOSED, StreamDataFrame, StreamSendWindow, encode_stream_data_frame,
     stream_reset,
 };
+use crate::tunnel::session::bootstrap::{
+    TunnelWriterMessage, write_tunnel_binary, write_tunnel_text,
+};
 use crate::tunnel::session::telemetry::{
     AGENT_STREAM_CLOSE_SOURCE_GATEWAY, AGENT_STREAM_CLOSE_SOURCE_RUNTIME,
     AGENT_STREAM_OUTCOME_RESET, AgentStreamTermination, AgentStreamThresholdTelemetry,
     AgentStreamWindowExhaustedTelemetry, publish_agent_stream_threshold_crossed,
     publish_agent_stream_window_exhausted, remove_agent_stream_and_publish_summary,
 };
-use crate::tunnel::session::{
-    TunnelSessionError, TunnelSessionMutableState, TunnelWriterMessage, write_tunnel_binary,
-    write_tunnel_text,
-};
+use crate::tunnel::session::{TunnelSessionError, TunnelSessionMutableState};
 
 const AGENT_STREAM_WINDOW_THRESHOLD_BYTES: [usize; 5] = [
     1024 * 1024,

@@ -20,9 +20,8 @@ use crate::tunnel::protocol::{
     STREAM_RESET_CODE_INVALID_STREAM_SIGNAL, STREAM_RESET_CODE_TARGET_CLOSED,
     parse_pty_control_message, pty_exit_event, pty_session_error, pty_session_opened, stream_reset,
 };
-use crate::tunnel::session::{
-    DEFAULT_PTY_EVENT_POLL_INTERVAL, TunnelSessionError, TunnelWriterMessage, write_tunnel_text,
-};
+use crate::tunnel::session::bootstrap::{TunnelWriterMessage, write_tunnel_text};
+use crate::tunnel::session::{DEFAULT_PTY_EVENT_POLL_INTERVAL, TunnelSessionError};
 
 const DIRECT_PTY_STREAM_ID: u32 = 1;
 const PTY_SESSION_ERROR_CODE_CREATE_FAILED: &str = "pty_create_failed";

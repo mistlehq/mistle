@@ -11,7 +11,8 @@ use crate::tunnel::protocol::{
     FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH, FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE,
     FileUploadCompletedEventInput, file_upload_completed_event, stream_complete, stream_reset,
 };
-use crate::tunnel::session::{TunnelSessionError, TunnelWriterMessage, write_tunnel_text};
+use crate::tunnel::session::TunnelSessionError;
+use crate::tunnel::session::bootstrap::{TunnelWriterMessage, write_tunnel_text};
 use crate::tunnel::upload_classification::{UploadClassificationError, classify_uploaded_file};
 
 static UPLOAD_ID_COUNTER: AtomicU64 = AtomicU64::new(1);

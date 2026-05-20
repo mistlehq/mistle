@@ -7,11 +7,9 @@ use crate::time::Clock;
 use crate::tunnel::protocol::{
     EgressTokenControlMessage, EgressTokenRequest, egress_token_request,
 };
+use crate::tunnel::session::bootstrap::{TunnelWriterMessage, write_tunnel_text};
 use crate::tunnel::session::operation::record_egress_token_event;
-use crate::tunnel::session::{
-    TunnelEgressToken, TunnelSessionError, TunnelSessionMutableState, TunnelWriterMessage,
-    write_tunnel_text,
-};
+use crate::tunnel::session::{TunnelEgressToken, TunnelSessionError, TunnelSessionMutableState};
 
 pub(super) fn fail_pending_egress_token_requests(
     session_state: &mut TunnelSessionMutableState,

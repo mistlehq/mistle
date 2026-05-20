@@ -3,9 +3,9 @@
 use tokio::sync::mpsc;
 
 use crate::tunnel::protocol::{SigningControlMessage, SigningRequest, signing_request};
+use crate::tunnel::session::bootstrap::{TunnelWriterMessage, write_tunnel_text};
 use crate::tunnel::session::{
     TunnelSessionError, TunnelSessionMutableState, TunnelSigningRequest, TunnelSigningResponse,
-    TunnelWriterMessage, write_tunnel_text,
 };
 
 pub(super) fn fail_pending_signing_requests(
