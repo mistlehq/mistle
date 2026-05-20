@@ -14,6 +14,7 @@ export const badRequestResponseSchema = z
       SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONNECTION_REFERENCE,
       SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONFIG_REFERENCE,
       SandboxProfilesBadRequestCodes.INVALID_SANDBOX_RUNTIME_CONFIG,
+      SandboxProfilesBadRequestCodes.INVALID_MISTLE_MCP_CONFIG,
     ]),
     message: z.string().min(1),
     details: z

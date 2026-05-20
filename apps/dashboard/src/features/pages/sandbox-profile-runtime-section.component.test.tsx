@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -8,6 +8,7 @@ import type {
   SandboxProviderSummary,
   SandboxProfileVersion,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
+import type { ApiKey } from "../settings/api-keys/api-keys-service.js";
 import { SandboxProfileRuntimeSection } from "./sandbox-profile-runtime-section.js";
 
 afterEach(() => {
@@ -123,12 +124,25 @@ const E2BRuntimeTarget = {
   },
 } as const;
 
+const MistleApiKey = {
+  id: "apk_runtime_section_mistle",
+  name: "Mistle MCP key",
+  secretPrefix: "prefix",
+  permissions: ["sandboxProfile:read"],
+  expiresAt: null,
+  lastUsedAt: null,
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+} satisfies ApiKey;
+
 function createVersion(
   input: Pick<
     SandboxProfileVersion,
     "sandboxProvider" | "sandboxConnectionId" | "sandboxResources"
   > & {
     agentRuntimeId?: SandboxProfileVersion["agentRuntimeId"];
+    mistleMcpEnabled?: boolean;
+    mistleMcpApiKeyId?: string | null;
   },
 ): SandboxProfileVersion {
   return {
@@ -136,6 +150,8 @@ function createVersion(
     version: 1,
     state: "draft",
     agentRuntimeId: input.agentRuntimeId ?? "codex",
+    mistleMcpEnabled: input.mistleMcpEnabled ?? false,
+    mistleMcpApiKeyId: input.mistleMcpApiKeyId ?? null,
     defaultPersistenceMode: "ephemeral",
     sandboxProvider: input.sandboxProvider,
     sandboxConnectionId: input.sandboxConnectionId,
@@ -152,6 +168,7 @@ describe("SandboxProfileRuntimeSection", () => {
   it("renders managed E2B as a provider with default credentials selected", () => {
     render(
       <SandboxProfileRuntimeSection
+        apiKeys={[]}
         availableConnections={[]}
         availableTargets={[]}
         disabled={false}
@@ -183,6 +200,7 @@ describe("SandboxProfileRuntimeSection", () => {
   it("renders OpenCode as the selected profile agent runtime", () => {
     render(
       <SandboxProfileRuntimeSection
+        apiKeys={[]}
         availableConnections={[]}
         availableTargets={[]}
         disabled={false}
@@ -201,9 +219,148 @@ describe("SandboxProfileRuntimeSection", () => {
     expect(screen.getByText("OpenCode")).toBeTruthy();
   });
 
+  it("renders Mistle resource access controls in the Agent section", () => {
+    render(
+      <SandboxProfileRuntimeSection
+        apiKeys={[MistleApiKey]}
+        availableConnections={[]}
+        availableTargets={[]}
+        disabled={false}
+        isDraft={true}
+        providers={[DockerProvider]}
+        version={createVersion({
+          sandboxProvider: "docker",
+          sandboxConnectionId: null,
+          sandboxResources: null,
+        })}
+      />,
+    );
+
+    const toggle = screen.getByRole("switch", {
+      name: "Allow agent to interact with Mistle resources",
+    });
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    expect(
+      screen.queryByText("Expose Mistle profile tools to the sandbox agent through MCP."),
+    ).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Mistle API key" })).toBeNull();
+
+    fireEvent.click(toggle);
+
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("combobox", { name: "Mistle API key" })).toBeTruthy();
+  });
+
+  it("disables Mistle API key selection when no API keys exist", () => {
+    render(
+      <SandboxProfileRuntimeSection
+        apiKeys={[]}
+        availableConnections={[]}
+        availableTargets={[]}
+        disabled={false}
+        isDraft={true}
+        providers={[DockerProvider]}
+        version={createVersion({
+          sandboxProvider: "docker",
+          sandboxConnectionId: null,
+          sandboxResources: null,
+        })}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("switch", {
+        name: "Allow agent to interact with Mistle resources",
+      }),
+    );
+
+    expect(screen.getByRole("combobox", { name: "Mistle API key" }).hasAttribute("disabled")).toBe(
+      true,
+    );
+    expect(screen.getByRole("button", { name: "Create new API key" })).toBeTruthy();
+  });
+
+  it("shows permissions for the selected Mistle API key", () => {
+    render(
+      <SandboxProfileRuntimeSection
+        apiKeys={[MistleApiKey]}
+        availableConnections={[]}
+        availableTargets={[]}
+        disabled={false}
+        isDraft={true}
+        providers={[DockerProvider]}
+        version={createVersion({
+          sandboxProvider: "docker",
+          sandboxConnectionId: null,
+          sandboxResources: null,
+          mistleMcpEnabled: true,
+          mistleMcpApiKeyId: MistleApiKey.id,
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Permissions")).toBeTruthy();
+    expect(screen.getByText("sandboxProfile:read")).toBeTruthy();
+  });
+
+  it("opens API key creation in a dialog", () => {
+    render(
+      <SandboxProfileRuntimeSection
+        apiKeys={[]}
+        availableConnections={[]}
+        availableTargets={[]}
+        disabled={false}
+        isDraft={true}
+        onCreateApiKey={async () => ({
+          apiKey: MistleApiKey,
+          token: "mstl_apk_test",
+        })}
+        providers={[DockerProvider]}
+        version={createVersion({
+          sandboxProvider: "docker",
+          sandboxConnectionId: null,
+          sandboxResources: null,
+          mistleMcpEnabled: true,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Create new API key" }));
+
+    expect(screen.getByRole("dialog", { name: "Create new API key" })).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Name" })).toBeTruthy();
+    expect(screen.getByText("Read sandbox profiles")).toBeTruthy();
+  });
+
+  it("renders saved Mistle resource access in read-only mode", () => {
+    render(
+      <SandboxProfileRuntimeSection
+        apiKeys={[MistleApiKey]}
+        availableConnections={[]}
+        availableTargets={[]}
+        disabled={false}
+        isDraft={false}
+        providers={[DockerProvider]}
+        version={createVersion({
+          sandboxProvider: "docker",
+          sandboxConnectionId: null,
+          sandboxResources: null,
+          mistleMcpEnabled: true,
+          mistleMcpApiKeyId: MistleApiKey.id,
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Allow agent to interact with Mistle resources")).toBeTruthy();
+    expect(screen.getByText("Yes")).toBeTruthy();
+    expect(screen.getByText("Mistle API key")).toBeTruthy();
+    expect(screen.getByText("Mistle MCP key")).toBeTruthy();
+  });
+
   it("renders the Docker provider with the Docker logo", () => {
     render(
       <SandboxProfileRuntimeSection
+        apiKeys={[]}
         availableConnections={[]}
         availableTargets={[]}
         disabled={false}
@@ -227,6 +384,7 @@ describe("SandboxProfileRuntimeSection", () => {
   it("prompts for provider selection when no sandbox provider is configured", () => {
     render(
       <SandboxProfileRuntimeSection
+        apiKeys={[]}
         availableConnections={[]}
         availableTargets={[]}
         disabled={false}
@@ -248,6 +406,7 @@ describe("SandboxProfileRuntimeSection", () => {
   it("marks a saved sandbox provider as unavailable when it is no longer listed", () => {
     render(
       <SandboxProfileRuntimeSection
+        apiKeys={[]}
         availableConnections={[]}
         availableTargets={[]}
         disabled={false}
@@ -271,6 +430,7 @@ describe("SandboxProfileRuntimeSection", () => {
   it("renders organization-owned E2B as BYOK credentials for the selected provider", () => {
     render(
       <SandboxProfileRuntimeSection
+        apiKeys={[]}
         availableConnections={[E2BRuntimeConnection]}
         availableTargets={[E2BRuntimeTarget]}
         disabled={false}
@@ -298,6 +458,7 @@ describe("SandboxProfileRuntimeSection", () => {
   it("renders read-only inline runtime settings with the same row labels as the draft view", () => {
     render(
       <SandboxProfileRuntimeSection
+        apiKeys={[]}
         availableConnections={[E2BRuntimeConnection]}
         availableTargets={[E2BRuntimeTarget]}
         disabled={false}
@@ -337,6 +498,7 @@ describe("SandboxProfileRuntimeSection", () => {
     render(
       <MemoryRouter>
         <SandboxProfileRuntimeSection
+          apiKeys={[]}
           availableConnections={[]}
           availableTargets={[
             {
@@ -377,6 +539,7 @@ describe("SandboxProfileRuntimeSection", () => {
   it("renders provider resource controls only for supported resource fields", () => {
     render(
       <SandboxProfileRuntimeSection
+        apiKeys={[]}
         availableConnections={[]}
         availableTargets={[]}
         disabled={false}
@@ -403,6 +566,7 @@ describe("SandboxProfileRuntimeSection", () => {
   it("scales per-vCPU memory controls for providers with ratio-based memory limits", () => {
     render(
       <SandboxProfileRuntimeSection
+        apiKeys={[]}
         availableConnections={[]}
         availableTargets={[]}
         disabled={false}
@@ -427,6 +591,7 @@ describe("SandboxProfileRuntimeSection", () => {
   it("renders storage when the selected provider advertises storage capabilities", () => {
     render(
       <SandboxProfileRuntimeSection
+        apiKeys={[]}
         availableConnections={[]}
         availableTargets={[]}
         disabled={false}

@@ -44,6 +44,8 @@ type PublishProfileVersionOutput = {
     state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
     defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+    mistleMcpEnabled: boolean;
+    mistleMcpApiKeyId: string | null;
     sandboxProvider: string | null;
     sandboxConnectionId: string | null;
     maintenanceScript: string | null;
@@ -345,6 +347,8 @@ export async function publishProfileVersion(
         state: tables.sandboxProfileVersions.state,
         defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
         agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
+        mistleMcpEnabled: tables.sandboxProfileVersions.mistleMcpEnabled,
+        mistleMcpApiKeyId: tables.sandboxProfileVersions.mistleMcpApiKeyId,
         sandboxProvider: tables.sandboxProfileVersions.sandboxProvider,
         sandboxConnectionId: tables.sandboxProfileVersions.sandboxConnectionId,
         sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
@@ -409,6 +413,8 @@ export async function publishProfileVersion(
         state: publishedVersion.state,
         defaultPersistenceMode: publishedVersion.defaultPersistenceMode,
         agentRuntimeId: publishedVersion.agentRuntimeId,
+        mistleMcpEnabled: publishedVersion.mistleMcpEnabled,
+        mistleMcpApiKeyId: publishedVersion.mistleMcpApiKeyId,
         maintenanceScript: publishedVersion.maintenanceScript,
         ...mapProfileVersionRuntimeConfig(publishedVersion),
         isActive: false,

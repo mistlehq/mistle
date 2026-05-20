@@ -30,6 +30,8 @@ type ListProfileVersionsOutput = {
     state: SandboxProfileVersionState;
     defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+    mistleMcpEnabled: boolean;
+    mistleMcpApiKeyId: string | null;
     sandboxProvider: string | null;
     sandboxConnectionId: string | null;
     maintenanceScript: string | null;
@@ -78,6 +80,8 @@ export async function listProfileVersions(
       state: true,
       defaultPersistenceMode: true,
       agentRuntimeId: true,
+      mistleMcpEnabled: true,
+      mistleMcpApiKeyId: true,
       snapshotImageProvider: true,
       snapshotImageId: true,
       maintenanceScript: true,
@@ -132,6 +136,8 @@ export async function listProfileVersions(
         state: version.state,
         defaultPersistenceMode: version.defaultPersistenceMode,
         agentRuntimeId: version.agentRuntimeId,
+        mistleMcpEnabled: version.mistleMcpEnabled,
+        mistleMcpApiKeyId: version.mistleMcpApiKeyId,
         maintenanceScript: version.maintenanceScript,
         ...mapProfileVersionRuntimeConfig(version),
         isActive: version.version === sandboxProfile.activeVersion,

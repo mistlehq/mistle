@@ -23,7 +23,7 @@ import {
   PutSandboxProfileVersionDraftConflictResponseSchema,
   PutSandboxProfileVersionDraftResponseSchema,
 } from "../src/sandbox-profiles/index.js";
-import { createApiKeyToken } from "./helpers/api-keys.js";
+import { createApiKeyCredential, createApiKeyToken } from "./helpers/api-keys.js";
 import {
   integrationConnectionRow,
   integrationTargetRow,
@@ -49,6 +49,8 @@ const itManagedE2BDeployment = createIntegrationTest({
 });
 
 const EmptySandboxRuntimeConfig = {
+  mistleMcpEnabled: false,
+  mistleMcpApiKeyId: null,
   sandboxConnectionId: null,
   sandboxProvider: SandboxProvider.DOCKER,
   sandboxResources: null,
@@ -297,6 +299,114 @@ describe.concurrent("sandbox profile version draft put integration", () => {
     expect(persistedVersion).toEqual({
       setupScript: "pnpm install\npnpm test",
       defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
+    });
+  });
+
+  it("updates Mistle MCP access settings with an active organization API key", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-draft-put-mistle-mcp@example.com",
+    });
+    const mcpCredential = await createApiKeyCredential({
+      env,
+      cookie: session.cookie,
+      name: "Mistle MCP profile key",
+      permissions: [OrganizationPermissions.SANDBOX_PROFILE_READ],
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_draft_put_mistle_mcp_001",
+        organizationId: session.organizationId,
+        displayName: "Mistle MCP Draft Put Profile",
+        createdAt: "2026-05-09T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_draft_put_mistle_mcp_001",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_draft_put_mistle_mcp_001/versions/1/draft",
+      {
+        method: "PUT",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          mistleMcpEnabled: true,
+          mistleMcpApiKeyId: mcpCredential.apiKey.id,
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = PutSandboxProfileVersionDraftResponseSchema.parse(await response.json());
+    expect(responseBody.mistleMcpEnabled).toBe(true);
+    expect(responseBody.mistleMcpApiKeyId).toBe(mcpCredential.apiKey.id);
+
+    const persistedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
+      columns: {
+        mistleMcpEnabled: true,
+        mistleMcpApiKeyId: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, "sbp_draft_put_mistle_mcp_001"), eq(table.version, 1)),
+    });
+    expect(persistedVersion).toEqual({
+      mistleMcpEnabled: true,
+      mistleMcpApiKeyId: mcpCredential.apiKey.id,
+    });
+  });
+
+  it("rejects enabling Mistle MCP without an API key", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-sandbox-profile-draft-put-mistle-mcp-missing-key@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_draft_put_mistle_mcp_missing_key_001",
+        organizationId: session.organizationId,
+        displayName: "Mistle MCP Missing Key Draft Put Profile",
+        createdAt: "2026-05-09T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_draft_put_mistle_mcp_missing_key_001",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        sandboxProvider: SandboxProvider.DOCKER,
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_draft_put_mistle_mcp_missing_key_001/versions/1/draft",
+      {
+        method: "PUT",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          mistleMcpEnabled: true,
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const responseBody = PutSandboxProfileVersionDraftBadRequestResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody).toEqual({
+      code: "INVALID_MISTLE_MCP_CONFIG",
+      message: "Select an API key before allowing the agent to interact with Mistle resources.",
     });
   });
 

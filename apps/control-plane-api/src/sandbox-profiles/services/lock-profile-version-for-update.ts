@@ -15,6 +15,8 @@ export async function lockProfileVersionForUpdateOrThrow(input: {
       sandboxProfileId: sandboxProfileVersions.sandboxProfileId,
       version: sandboxProfileVersions.version,
       state: sandboxProfileVersions.state,
+      mistleMcpEnabled: sandboxProfileVersions.mistleMcpEnabled,
+      mistleMcpApiKeyId: sandboxProfileVersions.mistleMcpApiKeyId,
       sandboxProvider: sandboxProfileVersions.sandboxProvider,
       sandboxConnectionId: sandboxProfileVersions.sandboxConnectionId,
       sandboxVcpuCount: sandboxProfileVersions.sandboxVcpuCount,

@@ -9,6 +9,7 @@ import {
   StoryGithubConnection,
   StoryIntegrationConnections,
   StoryIntegrationTargets,
+  StoryMistleApiKey,
   StoryOpenCodeGoConnection,
   StorySlackConnection,
 } from "./sandbox-profile-editor-story-support.js";
@@ -50,6 +51,20 @@ export const RuntimeAndConnectionsLoadError: Story = {
       bindingsErrorMessage: "Could not load sandbox profile integration bindings.",
       directoryErrorMessage: "Could not load integration connections.",
     },
+  },
+};
+
+export const MistleMcpEnabled: Story = {
+  args: {
+    mistleMcpEnabled: true,
+    mistleMcpApiKeyId: StoryMistleApiKey.id,
+  },
+};
+
+export const MistleMcpNoApiKeys: Story = {
+  args: {
+    apiKeys: [],
+    mistleMcpEnabled: true,
   },
 };
 

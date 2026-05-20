@@ -1,7 +1,18 @@
 import { createBrowserDefinitionsBundle } from "@mistle/integrations-definitions/browser";
 import {
+  Badge,
+  Button,
+  Checkbox,
+  CopyableValue,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Field,
   FieldContent,
+  FieldGroup,
   FieldHeader,
   FieldLabel,
   Input,
@@ -13,8 +24,10 @@ import {
   SelectTrigger,
   SelectValue,
   Slider,
+  Switch,
   TextLink,
 } from "@mistle/ui";
+import { PlusIcon } from "@phosphor-icons/react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link as RouterLink } from "react-router";
 
@@ -24,6 +37,11 @@ import type {
   SandboxProviderSummary,
   SandboxProfileVersion,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
+import {
+  ApiKeyPermissionOptions,
+  DefaultApiKeyPermissions,
+} from "../settings/api-keys/api-key-permissions.js";
+import type { ApiKey, CreatedApiKey } from "../settings/api-keys/api-keys-service.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -43,6 +61,8 @@ type AgentRuntimeId = SandboxProfileVersion["agentRuntimeId"];
 
 export type SandboxProfileRuntimeDraftChanges = {
   agentRuntimeId: AgentRuntimeId;
+  mistleMcpEnabled: boolean;
+  mistleMcpApiKeyId: string | null;
   sandboxProvider: string;
   sandboxConnectionId: string | null;
   sandboxResources: SandboxProfileVersion["sandboxResources"];
@@ -60,6 +80,8 @@ export type SandboxProfileRuntimeDraftState = {
 type RuntimeConfigState = {
   agentRuntimeId: AgentRuntimeId;
   credentialSource: SandboxCredentialSource;
+  mistleMcpEnabled: boolean;
+  mistleMcpApiKeyId: string | null;
   sandboxProvider: string | null;
   sandboxConnectionId: string | null;
   sandboxResources: SandboxProfileVersion["sandboxResources"];
@@ -74,10 +96,16 @@ export function createRuntimeDraftSourceVersionKey(
 }
 
 export function SandboxProfileRuntimeSection(input: {
+  apiKeys: readonly ApiKey[];
+  apiKeysAreLoading?: boolean | undefined;
+  apiKeysLoadErrorMessage?: string | null | undefined;
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
   disabled: boolean;
   isDraft: boolean;
+  onCreateApiKey?:
+    | ((input: { name: string; permissions: readonly string[] }) => Promise<CreatedApiKey>)
+    | undefined;
   onDraftStateChange?: (state: SandboxProfileRuntimeDraftState) => void;
   providers: readonly SandboxProviderSummary[];
   sectionChrome?: boolean;
@@ -122,13 +150,32 @@ export function SandboxProfileRuntimeSection(input: {
       throw new Error("Sandbox runtime credentials are missing.");
     }
 
+    if (runtime.mistleMcpEnabled && runtime.mistleMcpApiKeyId === null) {
+      if (input.apiKeysAreLoading === true) {
+        setSaveErrorMessage("Wait for API keys to finish loading before saving.");
+        throw new Error("Mistle MCP API keys are loading.");
+      }
+
+      if (input.apiKeysLoadErrorMessage !== null && input.apiKeysLoadErrorMessage !== undefined) {
+        setSaveErrorMessage(input.apiKeysLoadErrorMessage);
+        throw new Error("Mistle MCP API keys could not be loaded.");
+      }
+
+      setSaveErrorMessage(
+        "Select an API key before allowing the agent to interact with Mistle resources.",
+      );
+      throw new Error("Mistle MCP API key is missing.");
+    }
+
     return {
       agentRuntimeId: runtime.agentRuntimeId,
+      mistleMcpEnabled: runtime.mistleMcpEnabled,
+      mistleMcpApiKeyId: runtime.mistleMcpEnabled ? runtime.mistleMcpApiKeyId : null,
       sandboxProvider: provider,
       sandboxConnectionId: runtime.sandboxConnectionId,
       sandboxResources: runtime.sandboxResources,
     };
-  }, []);
+  }, [input.apiKeysAreLoading, input.apiKeysLoadErrorMessage]);
 
   const applySavedRuntimeConfig = useCallback(
     (runtimeConfig: SandboxProfileRuntimeDraftChanges): void => {
@@ -142,6 +189,8 @@ export function SandboxProfileRuntimeSection(input: {
           provider,
         }),
         agentRuntimeId: runtimeConfig.agentRuntimeId,
+        mistleMcpEnabled: runtimeConfig.mistleMcpEnabled,
+        mistleMcpApiKeyId: runtimeConfig.mistleMcpApiKeyId,
         sandboxProvider: runtimeConfig.sandboxProvider,
         sandboxConnectionId: runtimeConfig.sandboxConnectionId,
         sandboxResources: runtimeConfig.sandboxResources,
@@ -173,6 +222,8 @@ export function SandboxProfileRuntimeSection(input: {
   }, [
     input.providers,
     input.version.agentRuntimeId,
+    input.version.mistleMcpApiKeyId,
+    input.version.mistleMcpEnabled,
     input.version.sandboxConnectionId,
     input.version.sandboxProvider,
     input.version.sandboxResources,
@@ -210,6 +261,8 @@ export function SandboxProfileRuntimeSection(input: {
     setDraftRuntime({
       agentRuntimeId: draftRuntimeRef.current.agentRuntimeId,
       credentialSource: resolveDefaultCredentialSourceForProvider(provider),
+      mistleMcpEnabled: draftRuntimeRef.current.mistleMcpEnabled,
+      mistleMcpApiKeyId: draftRuntimeRef.current.mistleMcpApiKeyId,
       sandboxProvider: provider.id,
       sandboxConnectionId: null,
       sandboxResources: createDefaultResources(provider),
@@ -280,6 +333,27 @@ export function SandboxProfileRuntimeSection(input: {
     setSaveErrorMessage(null);
   }
 
+  function updateMistleMcpEnabled(checked: boolean): void {
+    setDraftRuntime((currentRuntime) => ({
+      ...currentRuntime,
+      mistleMcpEnabled: checked,
+      mistleMcpApiKeyId: checked ? currentRuntime.mistleMcpApiKeyId : null,
+    }));
+    setSaveErrorMessage(null);
+  }
+
+  function updateMistleMcpApiKey(value: string | null): void {
+    if (value === null || value === MissingConnectionValue) {
+      return;
+    }
+
+    setDraftRuntime((currentRuntime) => ({
+      ...currentRuntime,
+      mistleMcpApiKeyId: value,
+    }));
+    setSaveErrorMessage(null);
+  }
+
   const providerFieldLabel = inlineRuntimeFields ? "Sandbox Runtime" : "Provider";
   const agentRuntimeField = (
     <Field
@@ -307,13 +381,34 @@ export function SandboxProfileRuntimeSection(input: {
       </FieldContent>
     </Field>
   );
-  const agentRuntimeContent = fieldIsReadOnly ? (
-    <SandboxProfileAgentRuntimeReadOnlySummary
+  const mistleMcpAccessContent = (
+    <MistleMcpAccessField
+      apiKeyId={draftRuntime.mistleMcpApiKeyId}
+      apiKeys={input.apiKeys}
+      apiKeysAreLoading={input.apiKeysAreLoading === true}
+      apiKeysLoadErrorMessage={input.apiKeysLoadErrorMessage ?? null}
+      disabled={fieldIsReadOnly}
+      enabled={draftRuntime.mistleMcpEnabled}
       horizontal={inlineRuntimeFields}
-      runtimeId={draftRuntime.agentRuntimeId}
+      onApiKeyChange={updateMistleMcpApiKey}
+      onCreateApiKey={input.onCreateApiKey}
+      onEnabledChange={updateMistleMcpEnabled}
+      readOnly={fieldIsReadOnly}
     />
+  );
+  const agentRuntimeContent = fieldIsReadOnly ? (
+    <div className="grid gap-3">
+      <SandboxProfileAgentRuntimeReadOnlySummary
+        horizontal={inlineRuntimeFields}
+        runtimeId={draftRuntime.agentRuntimeId}
+      />
+      {mistleMcpAccessContent}
+    </div>
   ) : (
-    agentRuntimeField
+    <div className="grid gap-4">
+      {agentRuntimeField}
+      {mistleMcpAccessContent}
+    </div>
   );
   const providerField = (
     <Field
@@ -800,6 +895,435 @@ function SandboxProfileAgentRuntimeReadOnlySummary(input: {
   );
 }
 
+function MistleMcpAccessField(input: {
+  apiKeyId: string | null;
+  apiKeys: readonly ApiKey[];
+  apiKeysAreLoading: boolean;
+  apiKeysLoadErrorMessage: string | null;
+  disabled: boolean;
+  enabled: boolean;
+  horizontal: boolean;
+  onApiKeyChange: (value: string | null) => void;
+  onCreateApiKey:
+    | ((input: { name: string; permissions: readonly string[] }) => Promise<CreatedApiKey>)
+    | undefined;
+  onEnabledChange: (checked: boolean) => void;
+  readOnly: boolean;
+}): React.JSX.Element {
+  const selectedApiKey = resolveApiKey({
+    apiKeyId: input.apiKeyId,
+    apiKeys: input.apiKeys,
+  });
+
+  if (input.readOnly) {
+    return (
+      <div className="grid gap-3">
+        <ReadOnlyRuntimeField
+          horizontal={input.horizontal}
+          labelClassName="md:!w-auto md:!shrink-0 [&_[data-slot=field-label]]:whitespace-nowrap"
+          label="Allow agent to interact with Mistle resources"
+        >
+          {input.enabled ? "Yes" : "No"}
+        </ReadOnlyRuntimeField>
+        {input.enabled ? (
+          <ReadOnlyRuntimeField horizontal={input.horizontal} label="Mistle API key">
+            {selectedApiKey?.name ?? input.apiKeyId ?? "Missing API key"}
+          </ReadOnlyRuntimeField>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-3">
+      <MistleMcpSwitchField
+        checked={input.enabled}
+        disabled={input.disabled}
+        onCheckedChange={input.onEnabledChange}
+      />
+      {input.enabled ? (
+        <MistleMcpApiKeyField
+          apiKeyId={input.apiKeyId}
+          apiKeys={input.apiKeys}
+          apiKeysAreLoading={input.apiKeysAreLoading}
+          apiKeysLoadErrorMessage={input.apiKeysLoadErrorMessage}
+          disabled={input.disabled}
+          onApiKeyChange={input.onApiKeyChange}
+          onCreateApiKey={input.onCreateApiKey}
+          selectedApiKey={selectedApiKey}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function MistleMcpSwitchField(input: {
+  checked: boolean;
+  disabled: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}): React.JSX.Element {
+  return (
+    <div className="flex min-h-10 items-center gap-4">
+      <FieldLabel className="whitespace-nowrap" htmlFor="sandbox-profile-mistle-mcp-enabled">
+        Allow agent to interact with Mistle resources
+      </FieldLabel>
+      <Switch
+        checked={input.checked}
+        disabled={input.disabled}
+        id="sandbox-profile-mistle-mcp-enabled"
+        onCheckedChange={input.onCheckedChange}
+      />
+    </div>
+  );
+}
+
+function MistleMcpApiKeyField(input: {
+  apiKeyId: string | null;
+  apiKeys: readonly ApiKey[];
+  apiKeysAreLoading: boolean;
+  apiKeysLoadErrorMessage: string | null;
+  disabled: boolean;
+  onApiKeyChange: (value: string | null) => void;
+  onCreateApiKey:
+    | ((input: { name: string; permissions: readonly string[] }) => Promise<CreatedApiKey>)
+    | undefined;
+  selectedApiKey: ApiKey | null;
+}): React.JSX.Element {
+  const apiKeyValue = input.apiKeyId ?? MissingConnectionValue;
+
+  if (input.apiKeysAreLoading) {
+    return <Notice title="Loading API keys">API keys are still loading.</Notice>;
+  }
+
+  if (input.apiKeysLoadErrorMessage !== null) {
+    return (
+      <div className="grid gap-3">
+        <Notice title="Could not load API keys" variant="alert">
+          {input.apiKeysLoadErrorMessage}
+        </Notice>
+        <CreateApiKeyDialogButton
+          disabled={input.disabled}
+          onApiKeyChange={input.onApiKeyChange}
+          onCreateApiKey={input.onCreateApiKey}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <Field contentWidth="fit" orientation="vertical">
+      <FieldHeader>
+        <FieldLabel htmlFor="sandbox-profile-mistle-mcp-api-key">Mistle API key</FieldLabel>
+      </FieldHeader>
+      <FieldContent>
+        <Select
+          disabled={input.disabled || input.apiKeys.length === 0}
+          onValueChange={input.onApiKeyChange}
+          value={apiKeyValue}
+        >
+          <SelectTrigger id="sandbox-profile-mistle-mcp-api-key">
+            <SelectValue placeholder="Select API key">
+              {input.selectedApiKey === null ? (
+                <span className="text-muted-foreground">
+                  {input.apiKeys.length === 0 ? "No API keys" : "Select API key"}
+                </span>
+              ) : (
+                input.selectedApiKey.name
+              )}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {input.apiKeyId !== null && input.selectedApiKey === null ? (
+              <SelectItem disabled value={input.apiKeyId}>
+                Missing API key
+              </SelectItem>
+            ) : null}
+            {input.apiKeyId === null ? (
+              <SelectItem disabled value={MissingConnectionValue}>
+                Select API key
+              </SelectItem>
+            ) : null}
+            {input.apiKeys.map((apiKey) => (
+              <SelectItem key={apiKey.id} value={apiKey.id}>
+                {apiKey.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {input.selectedApiKey === null ? null : (
+          <ApiKeyPermissionsSummary permissions={input.selectedApiKey.permissions} />
+        )}
+        <CreateApiKeyDialogButton
+          disabled={input.disabled}
+          onApiKeyChange={input.onApiKeyChange}
+          onCreateApiKey={input.onCreateApiKey}
+        />
+      </FieldContent>
+    </Field>
+  );
+}
+
+function ApiKeyPermissionsSummary(input: { permissions: readonly string[] }): React.JSX.Element {
+  const visiblePermissions = input.permissions.slice(0, 3);
+  const hiddenCount = input.permissions.length - visiblePermissions.length;
+
+  return (
+    <div className="mt-3 grid gap-2">
+      <div className="text-muted-foreground text-xs font-medium uppercase">Permissions</div>
+      <div className="flex max-w-xl flex-wrap gap-1.5">
+        {visiblePermissions.map((permission) => (
+          <Badge key={permission} variant="outline">
+            {permission}
+          </Badge>
+        ))}
+        {hiddenCount > 0 ? <Badge variant="secondary">+ {String(hiddenCount)} more</Badge> : null}
+      </div>
+    </div>
+  );
+}
+
+function CreateApiKeyDialogButton(input: {
+  disabled: boolean;
+  onApiKeyChange: (value: string | null) => void;
+  onCreateApiKey:
+    | ((input: { name: string; permissions: readonly string[] }) => Promise<CreatedApiKey>)
+    | undefined;
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button
+        className="mt-2 w-fit"
+        disabled={input.disabled || input.onCreateApiKey === undefined}
+        onClick={() => {
+          setOpen(true);
+        }}
+        size="sm"
+        type="button"
+        variant="outline"
+      >
+        <PlusIcon aria-hidden />
+        Create new API key
+      </Button>
+      {input.onCreateApiKey === undefined ? null : (
+        <CreateApiKeyDialog
+          onApiKeyChange={input.onApiKeyChange}
+          onCreateApiKey={input.onCreateApiKey}
+          onOpenChange={setOpen}
+          open={open}
+        />
+      )}
+    </>
+  );
+}
+
+function CreateApiKeyDialog(input: {
+  onApiKeyChange: (value: string | null) => void;
+  onCreateApiKey: (input: {
+    name: string;
+    permissions: readonly string[];
+  }) => Promise<CreatedApiKey>;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+}): React.JSX.Element {
+  const [name, setName] = useState("");
+  const [selectedPermissions, setSelectedPermissions] =
+    useState<readonly string[]>(DefaultApiKeyPermissions);
+  const [createErrorMessage, setCreateErrorMessage] = useState<string | null>(null);
+  const [createdApiKey, setCreatedApiKey] = useState<CreatedApiKey | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const trimmedName = name.trim();
+  const canCreate = trimmedName.length > 0 && selectedPermissions.length > 0 && !isCreating;
+
+  function closeDialog(): void {
+    if (isCreating) {
+      return;
+    }
+
+    input.onOpenChange(false);
+    setName("");
+    setSelectedPermissions(DefaultApiKeyPermissions);
+    setCreateErrorMessage(null);
+    setCreatedApiKey(null);
+  }
+
+  async function submitApiKeyCreate(): Promise<void> {
+    if (!canCreate) {
+      return;
+    }
+
+    setIsCreating(true);
+    setCreateErrorMessage(null);
+    try {
+      const created = await input.onCreateApiKey({
+        name: trimmedName,
+        permissions: selectedPermissions,
+      });
+      setCreatedApiKey(created);
+      input.onApiKeyChange(created.apiKey.id);
+    } catch (error) {
+      setCreateErrorMessage(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not create API key.",
+        }),
+      );
+    } finally {
+      setIsCreating(false);
+    }
+  }
+
+  return (
+    <Dialog
+      isBusy={isCreating}
+      isDismissible={!isCreating}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) {
+          input.onOpenChange(true);
+          return;
+        }
+
+        closeDialog();
+      }}
+      open={input.open}
+    >
+      <DialogContent
+        formProps={{
+          onSubmit: (event) => {
+            event.preventDefault();
+            void submitApiKeyCreate();
+          },
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>Create new API key</DialogTitle>
+          <DialogDescription>
+            Create an organization API key for programmatic access.
+          </DialogDescription>
+        </DialogHeader>
+
+        {createdApiKey === null ? (
+          <CreateApiKeyDialogForm
+            createErrorMessage={createErrorMessage}
+            isCreating={isCreating}
+            name={name}
+            onNameChange={setName}
+            onPermissionChange={setSelectedPermissions}
+            selectedPermissions={selectedPermissions}
+          />
+        ) : (
+          <CreatedApiKeyTokenNotice createdApiKey={createdApiKey} />
+        )}
+
+        <DialogFooter>
+          {createdApiKey === null ? (
+            <>
+              <Button disabled={isCreating} onClick={closeDialog} type="button" variant="outline">
+                Cancel
+              </Button>
+              <Button disabled={!canCreate} type="submit">
+                <PlusIcon aria-hidden />
+                {isCreating ? "Creating..." : "Create API key"}
+              </Button>
+            </>
+          ) : (
+            <Button onClick={closeDialog} type="button">
+              Done
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CreateApiKeyDialogForm(input: {
+  createErrorMessage: string | null;
+  isCreating: boolean;
+  name: string;
+  onNameChange: (name: string) => void;
+  onPermissionChange: (permissions: readonly string[]) => void;
+  selectedPermissions: readonly string[];
+}): React.JSX.Element {
+  return (
+    <div className="grid gap-4">
+      {input.createErrorMessage === null ? null : (
+        <Notice variant="alert">{input.createErrorMessage}</Notice>
+      )}
+      <FieldGroup>
+        <Field>
+          <FieldLabel htmlFor="sandbox-profile-create-api-key-name">Name</FieldLabel>
+          <FieldContent>
+            <Input
+              autoComplete="off"
+              disabled={input.isCreating}
+              id="sandbox-profile-create-api-key-name"
+              onChange={(event) => {
+                input.onNameChange(event.currentTarget.value);
+              }}
+              placeholder="Sandbox agent key"
+              value={input.name}
+            />
+          </FieldContent>
+        </Field>
+        <Field>
+          <FieldLabel>Permissions</FieldLabel>
+          <FieldContent>
+            <div className="grid max-h-72 gap-2 overflow-y-auto pr-1">
+              {ApiKeyPermissionOptions.map((option) => (
+                <label
+                  className="flex gap-3 rounded-md border bg-background p-3 text-sm"
+                  key={option.value}
+                >
+                  <Checkbox
+                    aria-label={option.label}
+                    checked={input.selectedPermissions.includes(option.value)}
+                    disabled={input.isCreating}
+                    onCheckedChange={(checked) => {
+                      input.onPermissionChange(
+                        checked === true
+                          ? [...input.selectedPermissions, option.value]
+                          : input.selectedPermissions.filter(
+                              (permission) => permission !== option.value,
+                            ),
+                      );
+                    }}
+                  />
+                  <span className="flex min-w-0 flex-col gap-1">
+                    <span className="font-medium">{option.label}</span>
+                    <span className="text-muted-foreground">{option.description}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </FieldContent>
+        </Field>
+      </FieldGroup>
+    </div>
+  );
+}
+
+function CreatedApiKeyTokenNotice(input: { createdApiKey: CreatedApiKey }): React.JSX.Element {
+  return (
+    <Notice variant="success">
+      <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="text-base font-medium">API key created</div>
+          <p>
+            Copy the token for {input.createdApiKey.apiKey.name} now. It will not be shown again.
+          </p>
+        </div>
+        <CopyableValue
+          copyAriaLabel="Copy API key token"
+          label="Token"
+          value={input.createdApiKey.token}
+        />
+      </div>
+    </Notice>
+  );
+}
+
 function AgentRuntimeOptionLabel(input: { runtimeId: string }): React.JSX.Element {
   const runtime = AgentRuntimeRegistry.getRuntimeOrThrow({ runtimeId: input.runtimeId });
 
@@ -850,13 +1374,14 @@ function ReadOnlyRuntimeField(input: {
   children: ReactNode;
   horizontal: boolean;
   label: string;
+  labelClassName?: string | undefined;
 }): React.JSX.Element {
   return (
     <Field
       contentWidth={input.horizontal ? "fill" : "fit"}
       orientation={input.horizontal ? "horizontal" : "vertical"}
     >
-      <FieldHeader>
+      <FieldHeader className={input.labelClassName}>
         <FieldLabel>{input.label}</FieldLabel>
       </FieldHeader>
       <FieldContent>
@@ -951,6 +1476,8 @@ function createRuntimeConfigState(input: {
       connectionId: input.version.sandboxConnectionId,
       provider,
     }),
+    mistleMcpEnabled: input.version.mistleMcpEnabled,
+    mistleMcpApiKeyId: input.version.mistleMcpApiKeyId,
     sandboxProvider: input.version.sandboxProvider,
     sandboxConnectionId: input.version.sandboxConnectionId,
     sandboxResources: input.version.sandboxResources,
@@ -1017,6 +1544,17 @@ function resolveConnection(input: {
   return input.connections.find((connection) => connection.id === input.connectionId) ?? null;
 }
 
+function resolveApiKey(input: {
+  apiKeyId: string | null;
+  apiKeys: readonly ApiKey[];
+}): ApiKey | null {
+  if (input.apiKeyId === null) {
+    return null;
+  }
+
+  return input.apiKeys.find((apiKey) => apiKey.id === input.apiKeyId) ?? null;
+}
+
 function resolveConnectionsForProvider(input: {
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
@@ -1047,6 +1585,8 @@ function resolveSandboxProviderIdFromTarget(target: IntegrationTargetSummary): s
 function runtimeConfigStatesAreEqual(left: RuntimeConfigState, right: RuntimeConfigState): boolean {
   return (
     left.agentRuntimeId === right.agentRuntimeId &&
+    left.mistleMcpEnabled === right.mistleMcpEnabled &&
+    left.mistleMcpApiKeyId === right.mistleMcpApiKeyId &&
     left.sandboxProvider === right.sandboxProvider &&
     left.sandboxConnectionId === right.sandboxConnectionId &&
     resourcesAreEqual(left.sandboxResources, right.sandboxResources)

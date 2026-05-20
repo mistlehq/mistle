@@ -32,6 +32,8 @@ const it = createIntegrationTest({
 });
 
 const EmptySandboxRuntimeConfig = {
+  mistleMcpEnabled: false,
+  mistleMcpApiKeyId: null,
   sandboxConnectionId: null,
   sandboxProvider: null,
   sandboxResources: null,

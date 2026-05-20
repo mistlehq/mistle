@@ -18037,6 +18037,12 @@
                       "type": "string",
                       "enum": ["codex", "opencode", "pi"]
                     },
+                    "mistleMcpEnabled": {
+                      "type": "boolean"
+                    },
+                    "mistleMcpApiKeyId": {
+                      "type": ["string", "null"]
+                    },
                     "sandboxProvider": {
                       "type": ["string", "null"],
                       "minLength": 1
@@ -18170,6 +18176,8 @@
                     "state",
                     "defaultPersistenceMode",
                     "agentRuntimeId",
+                    "mistleMcpEnabled",
+                    "mistleMcpApiKeyId",
                     "sandboxProvider",
                     "sandboxConnectionId",
                     "maintenanceScript",
@@ -18353,6 +18361,12 @@
                             "type": "string",
                             "enum": ["codex", "opencode", "pi"]
                           },
+                          "mistleMcpEnabled": {
+                            "type": "boolean"
+                          },
+                          "mistleMcpApiKeyId": {
+                            "type": ["string", "null"]
+                          },
                           "sandboxProvider": {
                             "type": ["string", "null"],
                             "minLength": 1
@@ -18486,6 +18500,8 @@
                           "state",
                           "defaultPersistenceMode",
                           "agentRuntimeId",
+                          "mistleMcpEnabled",
+                          "mistleMcpApiKeyId",
                           "sandboxProvider",
                           "sandboxConnectionId",
                           "maintenanceScript",
@@ -20090,6 +20106,13 @@
                     "type": "string",
                     "enum": ["codex", "opencode", "pi"]
                   },
+                  "mistleMcpEnabled": {
+                    "type": "boolean"
+                  },
+                  "mistleMcpApiKeyId": {
+                    "type": ["string", "null"],
+                    "minLength": 1
+                  },
                   "sandboxProvider": {
                     "type": "string",
                     "minLength": 1
@@ -20187,6 +20210,13 @@
                       "type": "string",
                       "enum": ["codex", "opencode", "pi"]
                     },
+                    "mistleMcpEnabled": {
+                      "type": "boolean"
+                    },
+                    "mistleMcpApiKeyId": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
                     "sandboxProvider": {
                       "type": ["string", "null"],
                       "minLength": 1
@@ -20277,6 +20307,8 @@
                     "setupScript",
                     "defaultPersistenceMode",
                     "agentRuntimeId",
+                    "mistleMcpEnabled",
+                    "mistleMcpApiKeyId",
                     "sandboxProvider",
                     "sandboxConnectionId",
                     "sandboxResources",
@@ -20317,7 +20349,8 @@
                             "INVALID_BINDING_REFERENCE",
                             "INVALID_BINDING_CONNECTION_REFERENCE",
                             "INVALID_BINDING_CONFIG_REFERENCE",
-                            "INVALID_SANDBOX_RUNTIME_CONFIG"
+                            "INVALID_SANDBOX_RUNTIME_CONFIG",
+                            "INVALID_MISTLE_MCP_CONFIG"
                           ]
                         },
                         "message": {
@@ -21084,6 +21117,12 @@
                           "type": "string",
                           "enum": ["codex", "opencode", "pi"]
                         },
+                        "mistleMcpEnabled": {
+                          "type": "boolean"
+                        },
+                        "mistleMcpApiKeyId": {
+                          "type": ["string", "null"]
+                        },
                         "sandboxProvider": {
                           "type": ["string", "null"],
                           "minLength": 1
@@ -21217,6 +21256,8 @@
                         "state",
                         "defaultPersistenceMode",
                         "agentRuntimeId",
+                        "mistleMcpEnabled",
+                        "mistleMcpApiKeyId",
                         "sandboxProvider",
                         "sandboxConnectionId",
                         "maintenanceScript",
@@ -21487,6 +21528,12 @@
                           "type": "string",
                           "enum": ["codex", "opencode", "pi"]
                         },
+                        "mistleMcpEnabled": {
+                          "type": "boolean"
+                        },
+                        "mistleMcpApiKeyId": {
+                          "type": ["string", "null"]
+                        },
                         "sandboxProvider": {
                           "type": ["string", "null"],
                           "minLength": 1
@@ -21620,6 +21667,8 @@
                         "state",
                         "defaultPersistenceMode",
                         "agentRuntimeId",
+                        "mistleMcpEnabled",
+                        "mistleMcpApiKeyId",
                         "sandboxProvider",
                         "sandboxConnectionId",
                         "maintenanceScript",
@@ -21873,6 +21922,12 @@
                           "type": "string",
                           "enum": ["codex", "opencode", "pi"]
                         },
+                        "mistleMcpEnabled": {
+                          "type": "boolean"
+                        },
+                        "mistleMcpApiKeyId": {
+                          "type": ["string", "null"]
+                        },
                         "sandboxProvider": {
                           "type": ["string", "null"],
                           "minLength": 1
@@ -22006,6 +22061,8 @@
                         "state",
                         "defaultPersistenceMode",
                         "agentRuntimeId",
+                        "mistleMcpEnabled",
+                        "mistleMcpApiKeyId",
                         "sandboxProvider",
                         "sandboxConnectionId",
                         "maintenanceScript",

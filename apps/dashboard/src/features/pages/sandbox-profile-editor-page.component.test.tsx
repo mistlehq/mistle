@@ -111,6 +111,8 @@ function createSandboxProfileVersionFixture(input: {
     version: input.version,
     state: input.state,
     agentRuntimeId: input.agentRuntimeId ?? "codex",
+    mistleMcpEnabled: false,
+    mistleMcpApiKeyId: null,
     defaultPersistenceMode: input.defaultPersistenceMode ?? "ephemeral",
     sandboxConnectionId: null,
     sandboxProvider: "docker",

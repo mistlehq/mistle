@@ -8518,6 +8518,8 @@ export interface paths {
                   trigger: "publish" | "manual_refresh" | "scheduled_refresh";
                 } | null;
                 maintenanceScript: string | null;
+                mistleMcpApiKeyId: string | null;
+                mistleMcpEnabled: boolean;
                 refreshSchedule: {
                   cronExpression: string;
                   enabled: boolean;
@@ -8643,6 +8645,8 @@ export interface paths {
                 trigger: "publish" | "manual_refresh" | "scheduled_refresh";
               } | null;
               maintenanceScript: string | null;
+              mistleMcpApiKeyId: string | null;
+              mistleMcpEnabled: boolean;
               refreshSchedule: {
                 cronExpression: string;
                 enabled: boolean;
@@ -8903,6 +8907,8 @@ export interface paths {
                 kind: "agent" | "git" | "connector" | "sandbox";
               }[];
             };
+            mistleMcpApiKeyId?: string | null;
+            mistleMcpEnabled?: boolean;
             sandboxConnectionId?: string | null;
             sandboxProvider?: string;
             sandboxResources?: {
@@ -8941,6 +8947,8 @@ export interface paths {
                   updatedAt: string;
                 }[];
               };
+              mistleMcpApiKeyId: string | null;
+              mistleMcpEnabled: boolean;
               sandboxConnectionId: string | null;
               sandboxProfileId: string;
               sandboxProvider: string | null;
@@ -8972,7 +8980,8 @@ export interface paths {
                     | "INVALID_BINDING_REFERENCE"
                     | "INVALID_BINDING_CONNECTION_REFERENCE"
                     | "INVALID_BINDING_CONFIG_REFERENCE"
-                    | "INVALID_SANDBOX_RUNTIME_CONFIG";
+                    | "INVALID_SANDBOX_RUNTIME_CONFIG"
+                    | "INVALID_MISTLE_MCP_CONFIG";
                   details?: {
                     issues: {
                       bindingIdOrDraftIndex: string;
@@ -9669,6 +9678,8 @@ export interface paths {
                   trigger: "publish" | "manual_refresh" | "scheduled_refresh";
                 } | null;
                 maintenanceScript: string | null;
+                mistleMcpApiKeyId: string | null;
+                mistleMcpEnabled: boolean;
                 refreshSchedule: {
                   cronExpression: string;
                   enabled: boolean;
@@ -9966,6 +9977,8 @@ export interface paths {
                   trigger: "publish" | "manual_refresh" | "scheduled_refresh";
                 } | null;
                 maintenanceScript: string | null;
+                mistleMcpApiKeyId: string | null;
+                mistleMcpEnabled: boolean;
                 refreshSchedule: {
                   cronExpression: string;
                   enabled: boolean;
@@ -10344,6 +10357,8 @@ export interface paths {
                   trigger: "publish" | "manual_refresh" | "scheduled_refresh";
                 } | null;
                 maintenanceScript: string | null;
+                mistleMcpApiKeyId: string | null;
+                mistleMcpEnabled: boolean;
                 refreshSchedule: {
                   cronExpression: string;
                   enabled: boolean;

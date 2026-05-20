@@ -50,6 +50,8 @@ export type SandboxProfilesService = {
     state: SandboxProfileVersionState;
     defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+    mistleMcpEnabled: boolean;
+    mistleMcpApiKeyId: string | null;
     sandboxProvider: string | null;
     sandboxConnectionId: string | null;
     sandboxResources: SandboxProfileVersionResources | null;
@@ -71,6 +73,8 @@ export type SandboxProfilesService = {
       state: SandboxProfileVersionState;
       defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
       agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+      mistleMcpEnabled: boolean;
+      mistleMcpApiKeyId: string | null;
       sandboxProvider: string | null;
       sandboxConnectionId: string | null;
       sandboxResources: SandboxProfileVersionResources | null;
@@ -130,6 +134,8 @@ export type SandboxProfilesService = {
       state: SandboxProfileVersionState;
       defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
       agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+      mistleMcpEnabled: boolean;
+      mistleMcpApiKeyId: string | null;
       sandboxProvider: string | null;
       sandboxConnectionId: string | null;
       sandboxResources: SandboxProfileVersionResources | null;

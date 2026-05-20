@@ -451,6 +451,8 @@ const SandboxProfileVersionSchema = z
       .nullable(),
     refreshSchedule: SandboxProfileVersionRefreshScheduleSummarySchema.nullable(),
     maintenanceScript: z.string().nullable(),
+    mistleMcpEnabled: z.boolean(),
+    mistleMcpApiKeyId: z.string().min(1).nullable(),
     sandboxConnectionId: z.string().min(1).nullable(),
     sandboxProfileId: z.string().min(1),
     sandboxProvider: z.string().min(1).nullable(),
@@ -583,6 +585,8 @@ const PutSandboxProfileVersionDraftResultSchema = z
     version: z.number().int().min(1),
     setupScript: z.string().nullable(),
     agentRuntimeId: AgentRuntimeIdSchema,
+    mistleMcpEnabled: z.boolean(),
+    mistleMcpApiKeyId: z.string().min(1).nullable(),
     defaultPersistenceMode: z.enum(["ephemeral", "persistent"]),
     sandboxConnectionId: z.string().min(1).nullable(),
     sandboxProvider: z.string().min(1).nullable(),
@@ -1166,6 +1170,12 @@ export async function putSandboxProfileVersionDraft(
           ? {}
           : { defaultPersistenceMode: input.defaultPersistenceMode }),
         ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
+        ...(input.mistleMcpEnabled === undefined
+          ? {}
+          : { mistleMcpEnabled: input.mistleMcpEnabled }),
+        ...(input.mistleMcpApiKeyId === undefined
+          ? {}
+          : { mistleMcpApiKeyId: input.mistleMcpApiKeyId }),
         ...(input.sandboxProvider === undefined ? {} : { sandboxProvider: input.sandboxProvider }),
         ...(input.sandboxConnectionId === undefined
           ? {}

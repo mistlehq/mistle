@@ -58,6 +58,8 @@ type RefreshProfileVersionSnapshotOutput = {
     state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
     defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+    mistleMcpEnabled: boolean;
+    mistleMcpApiKeyId: string | null;
     sandboxProvider: string | null;
     sandboxConnectionId: string | null;
     maintenanceScript: string | null;
@@ -171,6 +173,8 @@ async function queueProfileVersionSnapshot(
           state: tables.sandboxProfileVersions.state,
           defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
           agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
+          mistleMcpEnabled: tables.sandboxProfileVersions.mistleMcpEnabled,
+          mistleMcpApiKeyId: tables.sandboxProfileVersions.mistleMcpApiKeyId,
           snapshotImageProvider: tables.sandboxProfileVersions.snapshotImageProvider,
           snapshotImageId: tables.sandboxProfileVersions.snapshotImageId,
           maintenanceScript: tables.sandboxProfileVersions.maintenanceScript,
@@ -213,6 +217,8 @@ async function queueProfileVersionSnapshot(
       const resolvedSandboxProfileVersion = sandboxProfileVersion.version;
       const resolvedDefaultPersistenceMode = sandboxProfileVersion.defaultPersistenceMode;
       const resolvedAgentRuntimeId = sandboxProfileVersion.agentRuntimeId;
+      const resolvedMistleMcpEnabled = sandboxProfileVersion.mistleMcpEnabled;
+      const resolvedMistleMcpApiKeyId = sandboxProfileVersion.mistleMcpApiKeyId;
       const resolvedSandboxProvider = sandboxProfileVersion.sandboxProvider;
       const resolvedSandboxConnectionId = sandboxProfileVersion.sandboxConnectionId;
       const resolvedSandboxVcpuCount = sandboxProfileVersion.sandboxVcpuCount;
@@ -226,6 +232,9 @@ async function queueProfileVersionSnapshot(
       }
       if (resolvedAgentRuntimeId === null) {
         throw new Error("Expected joined sandbox profile agent runtime id to be present.");
+      }
+      if (resolvedMistleMcpEnabled === null) {
+        throw new Error("Expected joined sandbox profile Mistle MCP enabled state to be present.");
       }
 
       if (sandboxProfileVersion.state !== SandboxProfileVersionStates.PUBLISHED) {
@@ -301,6 +310,8 @@ async function queueProfileVersionSnapshot(
           state: sandboxProfileVersion.state,
           defaultPersistenceMode: resolvedDefaultPersistenceMode,
           agentRuntimeId: resolvedAgentRuntimeId,
+          mistleMcpEnabled: resolvedMistleMcpEnabled,
+          mistleMcpApiKeyId: resolvedMistleMcpApiKeyId,
           maintenanceScript: sandboxProfileVersion.maintenanceScript,
           ...mapProfileVersionRuntimeConfig({
             sandboxProvider: resolvedSandboxProvider,

@@ -90,6 +90,12 @@ import type {
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { stopSandboxInstance } from "../sessions/sessions-service.js";
 import {
+  apiKeysQueryKey,
+  createApiKey,
+  listApiKeys,
+  type ApiKeysPage,
+} from "../settings/api-keys/api-keys-service.js";
+import {
   getOrganizationSandboxStorageSettings,
   organizationSandboxStorageSettingsQueryKey,
 } from "../settings/organization/sandbox-storage-service.js";
@@ -1689,6 +1695,8 @@ function ReadySandboxProfileEditorPage(input: {
           ? {}
           : {
               agentRuntimeId: runtimeChanges.agentRuntimeId,
+              mistleMcpEnabled: runtimeChanges.mistleMcpEnabled,
+              mistleMcpApiKeyId: runtimeChanges.mistleMcpApiKeyId,
               sandboxProvider: runtimeChanges.sandboxProvider,
               sandboxConnectionId: runtimeChanges.sandboxConnectionId,
               sandboxResources: runtimeChanges.sandboxResources,
@@ -1723,6 +1731,8 @@ function ReadySandboxProfileEditorPage(input: {
 
         runtimeDraftState.applySavedRuntimeConfig?.({
           agentRuntimeId: savedDraft.agentRuntimeId,
+          mistleMcpEnabled: savedDraft.mistleMcpEnabled,
+          mistleMcpApiKeyId: savedDraft.mistleMcpApiKeyId,
           sandboxProvider: savedDraft.sandboxProvider,
           sandboxConnectionId: savedDraft.sandboxConnectionId,
           sandboxResources: savedDraft.sandboxResources,
@@ -2553,10 +2563,40 @@ function LoadedSandboxProfileRuntimeSection(input: {
   sectionChrome?: boolean;
   version: SandboxProfileVersion;
 }): React.JSX.Element | null {
+  const activeOrganizationId = useRequiredOrganizationId();
+  const queryClient = useQueryClient();
   const sandboxProvidersQuery = useQuery({
     queryKey: sandboxProvidersQueryKey(),
     queryFn: async ({ signal }) => listSandboxProviders({ signal }),
     retry: false,
+  });
+  const apiKeysQuery = useQuery({
+    queryKey: apiKeysQueryKey(activeOrganizationId),
+    queryFn: async ({ signal }) => listApiKeys({ signal }),
+    retry: false,
+  });
+  const createApiKeyMutation = useMutation({
+    mutationFn: createApiKey,
+    onSuccess: (createdApiKey) => {
+      queryClient.setQueryData<ApiKeysPage>(
+        apiKeysQueryKey(activeOrganizationId),
+        (currentApiKeys) => {
+          if (currentApiKeys === undefined) {
+            return currentApiKeys;
+          }
+
+          return {
+            ...currentApiKeys,
+            items: [
+              createdApiKey.apiKey,
+              ...currentApiKeys.items.filter((apiKey) => apiKey.id !== createdApiKey.apiKey.id),
+            ],
+            totalResults: currentApiKeys.totalResults + 1,
+          };
+        },
+      );
+      void queryClient.invalidateQueries({ queryKey: apiKeysQueryKey(activeOrganizationId) });
+    },
   });
 
   if (sandboxProvidersQuery.isPending) {
@@ -2574,12 +2614,24 @@ function LoadedSandboxProfileRuntimeSection(input: {
     );
   }
 
+  const apiKeysLoadErrorMessage = apiKeysQuery.isError
+    ? resolveApiErrorMessage({
+        error: apiKeysQuery.error,
+        fallbackMessage: "Could not load API keys.",
+      })
+    : null;
+  const apiKeys = apiKeysQuery.isSuccess ? apiKeysQuery.data.items : [];
+
   return (
     <SandboxProfileRuntimeSection
+      apiKeys={apiKeys}
+      apiKeysAreLoading={apiKeysQuery.isPending}
+      apiKeysLoadErrorMessage={apiKeysLoadErrorMessage}
       availableConnections={input.availableConnections}
       availableTargets={input.availableTargets}
       disabled={input.disabled}
       isDraft={input.isDraft}
+      onCreateApiKey={(createInput) => createApiKeyMutation.mutateAsync(createInput)}
       onDraftStateChange={input.onDraftStateChange}
       providers={sandboxProvidersQuery.data.items}
       version={input.version}

@@ -1,6 +1,7 @@
 import {
   getControlPlaneDatabaseSchema,
   type IntegrationBindingKind,
+  type ControlPlaneTransaction,
   type SandboxProfileVersionAgentRuntimeId,
   type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionStates,
@@ -34,6 +35,8 @@ type PutProfileVersionDraftInput = {
   setupScript?: string | null;
   defaultPersistenceMode?: SandboxProfileVersionDefaultPersistenceMode;
   agentRuntimeId?: SandboxProfileVersionAgentRuntimeId;
+  mistleMcpEnabled?: boolean;
+  mistleMcpApiKeyId?: string | null;
   sandboxProvider?: string;
   sandboxConnectionId?: string | null;
   sandboxResources?: SandboxProfileVersionResources | null;
@@ -54,6 +57,8 @@ type PutProfileVersionDraftOutput = {
   setupScript: string | null;
   defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
   agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+  mistleMcpEnabled: boolean;
+  mistleMcpApiKeyId: string | null;
   sandboxProvider: string | null;
   sandboxConnectionId: string | null;
   sandboxResources: SandboxProfileVersionResources | null;
@@ -155,10 +160,23 @@ export async function putProfileVersionDraft(
       );
     }
 
+    const nextMistleMcpEnabled = input.mistleMcpEnabled ?? lockedVersion.mistleMcpEnabled;
+    const nextMistleMcpApiKeyId =
+      input.mistleMcpApiKeyId === undefined
+        ? lockedVersion.mistleMcpApiKeyId
+        : input.mistleMcpApiKeyId;
+    await validateMistleMcpDraftConfig(tx, {
+      apiKeyId: nextMistleMcpApiKeyId,
+      enabled: nextMistleMcpEnabled,
+      organizationId: input.organizationId,
+    });
+
     const hasVersionFieldUpdate =
       input.setupScript !== undefined ||
       input.defaultPersistenceMode !== undefined ||
       input.agentRuntimeId !== undefined ||
+      input.mistleMcpEnabled !== undefined ||
+      input.mistleMcpApiKeyId !== undefined ||
       input.sandboxProvider !== undefined ||
       input.sandboxConnectionId !== undefined ||
       input.sandboxResources !== undefined;
@@ -172,6 +190,12 @@ export async function putProfileVersionDraft(
             ? {}
             : { defaultPersistenceMode: input.defaultPersistenceMode }),
           ...(input.agentRuntimeId === undefined ? {} : { agentRuntimeId: input.agentRuntimeId }),
+          ...(input.mistleMcpEnabled === undefined
+            ? {}
+            : { mistleMcpEnabled: input.mistleMcpEnabled }),
+          ...(input.mistleMcpApiKeyId === undefined
+            ? {}
+            : { mistleMcpApiKeyId: input.mistleMcpApiKeyId }),
           ...(input.sandboxProvider === undefined
             ? {}
             : { sandboxProvider: input.sandboxProvider }),
@@ -204,6 +228,8 @@ export async function putProfileVersionDraft(
           setupScript: tables.sandboxProfileVersions.setupScript,
           defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
           agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
+          mistleMcpEnabled: tables.sandboxProfileVersions.mistleMcpEnabled,
+          mistleMcpApiKeyId: tables.sandboxProfileVersions.mistleMcpApiKeyId,
         });
 
       if (updatedVersion === undefined) {
@@ -240,6 +266,8 @@ export async function putProfileVersionDraft(
         setupScript: true,
         defaultPersistenceMode: true,
         agentRuntimeId: true,
+        mistleMcpEnabled: true,
+        mistleMcpApiKeyId: true,
         sandboxProvider: true,
         sandboxConnectionId: true,
         sandboxVcpuCount: true,
@@ -266,10 +294,53 @@ export async function putProfileVersionDraft(
       setupScript: persistedVersion.setupScript,
       defaultPersistenceMode: persistedVersion.defaultPersistenceMode,
       agentRuntimeId: persistedVersion.agentRuntimeId,
+      mistleMcpEnabled: persistedVersion.mistleMcpEnabled,
+      mistleMcpApiKeyId: persistedVersion.mistleMcpApiKeyId,
       ...mapProfileVersionRuntimeConfig(persistedVersion),
       integrationBindings,
     };
   });
+}
+
+async function validateMistleMcpDraftConfig(
+  db: ControlPlaneTransaction,
+  input: {
+    enabled: boolean;
+    apiKeyId: string | null;
+    organizationId: string;
+  },
+): Promise<void> {
+  if (!input.enabled) {
+    return;
+  }
+
+  if (input.apiKeyId === null) {
+    throw new SandboxProfilesBadRequestError(
+      SandboxProfilesBadRequestCodes.INVALID_MISTLE_MCP_CONFIG,
+      "Select an API key before allowing the agent to interact with Mistle resources.",
+    );
+  }
+
+  const apiKeyId = input.apiKeyId;
+  const apiKey = await db.query.apiKeys.findFirst({
+    columns: {
+      id: true,
+    },
+    where: (table, { and: whereAnd, eq: whereEq, gt, isNull, or }) =>
+      whereAnd(
+        whereEq(table.id, apiKeyId),
+        whereEq(table.organizationId, input.organizationId),
+        isNull(table.revokedAt),
+        or(isNull(table.expiresAt), gt(table.expiresAt, new Date().toISOString())),
+      ),
+  });
+
+  if (apiKey === undefined) {
+    throw new SandboxProfilesBadRequestError(
+      SandboxProfilesBadRequestCodes.INVALID_MISTLE_MCP_CONFIG,
+      "Selected Mistle MCP API key is not available.",
+    );
+  }
 }
 
 export type { PutProfileVersionDraftInput, PutProfileVersionDraftOutput };

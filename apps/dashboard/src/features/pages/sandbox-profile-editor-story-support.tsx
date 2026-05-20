@@ -15,6 +15,7 @@ import type {
 import { SessionComposerFixtureProps } from "../session-agents/codex/fixtures/session-fixtures.js";
 import { sandboxOperationEventsQueryKey } from "../sessions/sessions-query-keys.js";
 import type { SandboxOperationEvent } from "../sessions/sessions-types.js";
+import type { ApiKey, CreatedApiKey } from "../settings/api-keys/api-keys-service.js";
 import {
   createIntegrationsEditorSectionStoryQueryClient,
   seedStoryIntegrationResources,
@@ -125,6 +126,9 @@ export type SandboxProfileEditorPageStoryArgs = {
   setupAssistantState?: "available" | "starting" | "disabled";
   setupScriptTestStatus?: SetupScriptTestStatus;
   runtimeState?: "docker" | "e2b-managed" | "e2b-connection" | "e2b-missing-connection";
+  apiKeys?: readonly ApiKey[];
+  mistleMcpEnabled?: boolean;
+  mistleMcpApiKeyId?: string | null;
 };
 
 type IntegrationsSectionState = NonNullable<
@@ -151,6 +155,19 @@ const StorySetupAssistantOperationId = "owfr_story_setup_assistant";
 const StorySetupAssistantSandboxInstanceId = "sbi_story_setup_assistant";
 const StorySnapshotOperationId = "ssj_story_creating_snapshot";
 const StorySnapshotSandboxInstanceId = "sbi_story_creating_snapshot";
+
+export const StoryMistleApiKey = {
+  id: "apk_story_mistle_agent",
+  name: "Sandbox agent key",
+  secretPrefix: "mstl_apk_story",
+  permissions: ["sandboxProfile:read", "sandboxProfile:update", "sandboxSession:read"],
+  expiresAt: null,
+  lastUsedAt: "2026-05-13T10:00:00.000Z",
+  createdAt: "2026-05-01T10:00:00.000Z",
+  updatedAt: "2026-05-01T10:00:00.000Z",
+} satisfies ApiKey;
+
+export const StoryMistleApiKeys = [StoryMistleApiKey] satisfies readonly ApiKey[];
 
 export const StoryBindings = [
   {
@@ -407,6 +424,8 @@ function createSnapshotRefreshScheduleInitialDraft(
 
 function createRuntimeStoryVersion(input: {
   agentRuntimeId: SandboxProfileVersion["agentRuntimeId"];
+  mistleMcpApiKeyId: string | null;
+  mistleMcpEnabled: boolean;
   runtimeState: SandboxProfileEditorPageStoryArgs["runtimeState"];
   version: number;
 }): SandboxProfileVersion {
@@ -416,6 +435,8 @@ function createRuntimeStoryVersion(input: {
     version: input.version,
     state: "draft",
     agentRuntimeId: input.agentRuntimeId,
+    mistleMcpEnabled: input.mistleMcpEnabled,
+    mistleMcpApiKeyId: input.mistleMcpApiKeyId,
     defaultPersistenceMode: "ephemeral",
     sandboxProvider: runtimeState === "docker" ? "docker" : "e2b",
     sandboxConnectionId: runtimeState === "e2b-connection" ? StoryE2BSandboxConnection.id : null,
@@ -734,6 +755,7 @@ function SandboxProfileEditorPageStoryView(
   const [integrationRows, setIntegrationRows] = useState<readonly SandboxProfileBindingEditorRow[]>(
     () => mapBindingsToEditorRows(input.initialBindings ?? StoryBindings),
   );
+  const [apiKeys, setApiKeys] = useState<readonly ApiKey[]>(input.apiKeys ?? StoryMistleApiKeys);
   const [setupScriptDraft, setSetupScriptDraft] = useState(
     input.setupScriptDraft ?? input.setupScript ?? "",
   );
@@ -831,6 +853,30 @@ function SandboxProfileEditorPageStoryView(
     setSetupAssistantPanelOpen(true);
   }
 
+  async function handleCreateApiKey(createInput: {
+    name: string;
+    permissions: readonly string[];
+  }): Promise<CreatedApiKey> {
+    const now = "2026-05-20T10:00:00.000Z";
+    const createdApiKey = {
+      id: `apk_story_${String(apiKeys.length + 1)}`,
+      name: createInput.name,
+      secretPrefix: "mstl_apk_new_story",
+      permissions: [...createInput.permissions],
+      expiresAt: null,
+      lastUsedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    } satisfies ApiKey;
+
+    setApiKeys((currentApiKeys) => [createdApiKey, ...currentApiKeys]);
+
+    return {
+      apiKey: createdApiKey,
+      token: "mstl_apk_story_created_token",
+    };
+  }
+
   const editorView = (
     <SandboxProfileEditorView
       activeSectionId={activeSectionId}
@@ -886,16 +932,21 @@ function SandboxProfileEditorPageStoryView(
                     integrationSaveError={null}
                     runtimeSettings={
                       <SandboxProfileRuntimeSection
+                        apiKeys={apiKeys}
                         availableConnections={storyConnections}
                         availableTargets={storyTargets}
                         disabled={!isEditable}
                         isDraft={mode.kind === "draft"}
+                        onCreateApiKey={handleCreateApiKey}
                         providers={createStorySandboxProviders({
                           runtimeState: input.runtimeState,
                         })}
                         sectionChrome={false}
                         version={createRuntimeStoryVersion({
                           agentRuntimeId,
+                          mistleMcpApiKeyId:
+                            input.mistleMcpApiKeyId === undefined ? null : input.mistleMcpApiKeyId,
+                          mistleMcpEnabled: input.mistleMcpEnabled === true,
                           runtimeState: input.runtimeState,
                           version: mode.version,
                         })}

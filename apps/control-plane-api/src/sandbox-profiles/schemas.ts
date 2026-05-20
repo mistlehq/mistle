@@ -144,6 +144,8 @@ export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVers
     state: true,
     defaultPersistenceMode: true,
     agentRuntimeId: true,
+    mistleMcpEnabled: true,
+    mistleMcpApiKeyId: true,
     sandboxProvider: true,
     sandboxConnectionId: true,
     maintenanceScript: true,
@@ -325,6 +327,8 @@ export const putSandboxProfileVersionDraftBodySchema = z
     setupScript: z.string().min(1).nullable().optional(),
     defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema.optional(),
     agentRuntimeId: sandboxProfileVersionAgentRuntimeIdSchema.optional(),
+    mistleMcpEnabled: z.boolean().optional(),
+    mistleMcpApiKeyId: z.string().min(1).nullable().optional(),
     sandboxProvider: z.string().min(1).optional(),
     sandboxConnectionId: z.string().min(1).nullable().optional(),
     sandboxResources: sandboxProfileVersionResourcesSchema.nullable().optional(),
@@ -336,6 +340,8 @@ export const putSandboxProfileVersionDraftBodySchema = z
       value.setupScript !== undefined ||
       value.defaultPersistenceMode !== undefined ||
       value.agentRuntimeId !== undefined ||
+      value.mistleMcpEnabled !== undefined ||
+      value.mistleMcpApiKeyId !== undefined ||
       value.sandboxProvider !== undefined ||
       value.sandboxConnectionId !== undefined ||
       value.sandboxResources !== undefined ||
@@ -352,6 +358,8 @@ export const putSandboxProfileVersionDraftResponseSchema = z
     setupScript: z.string().nullable(),
     defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema,
     agentRuntimeId: sandboxProfileVersionAgentRuntimeIdSchema,
+    mistleMcpEnabled: z.boolean(),
+    mistleMcpApiKeyId: z.string().min(1).nullable(),
     sandboxProvider: z.string().min(1).nullable(),
     sandboxConnectionId: z.string().min(1).nullable(),
     sandboxResources: sandboxProfileVersionResourcesSchema.nullable(),

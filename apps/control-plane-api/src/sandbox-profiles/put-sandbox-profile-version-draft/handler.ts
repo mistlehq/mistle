@@ -37,6 +37,10 @@ const routeHandler = async (
           ? {}
           : { defaultPersistenceMode: body.defaultPersistenceMode }),
         ...(body.agentRuntimeId === undefined ? {} : { agentRuntimeId: body.agentRuntimeId }),
+        ...(body.mistleMcpEnabled === undefined ? {} : { mistleMcpEnabled: body.mistleMcpEnabled }),
+        ...(body.mistleMcpApiKeyId === undefined
+          ? {}
+          : { mistleMcpApiKeyId: body.mistleMcpApiKeyId }),
         ...(body.sandboxProvider === undefined ? {} : { sandboxProvider: body.sandboxProvider }),
         ...(body.sandboxConnectionId === undefined
           ? {}
@@ -96,8 +100,15 @@ const routeHandler = async (
     }
 
     if (error instanceof SandboxProfilesBadRequestError) {
+      if (
+        error.code !== SandboxProfilesBadRequestCodes.INVALID_SANDBOX_RUNTIME_CONFIG &&
+        error.code !== SandboxProfilesBadRequestCodes.INVALID_MISTLE_MCP_CONFIG
+      ) {
+        throw error;
+      }
+
       const responseBody: z.infer<typeof badRequestResponseSchema> = {
-        code: SandboxProfilesBadRequestCodes.INVALID_SANDBOX_RUNTIME_CONFIG,
+        code: error.code,
         message: error.message,
       };
 

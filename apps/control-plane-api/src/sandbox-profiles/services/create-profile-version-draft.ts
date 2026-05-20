@@ -31,6 +31,8 @@ type CreateProfileVersionDraftOutput = {
   state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
   defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
   agentRuntimeId: SandboxProfileVersionAgentRuntimeId;
+  mistleMcpEnabled: boolean;
+  mistleMcpApiKeyId: string | null;
   sandboxProvider: string | null;
   sandboxConnectionId: string | null;
   maintenanceScript: string | null;
@@ -89,6 +91,8 @@ export async function createProfileVersionDraft(
           maintenanceScript: true,
           defaultPersistenceMode: true,
           agentRuntimeId: true,
+          mistleMcpEnabled: true,
+          mistleMcpApiKeyId: true,
           sandboxProvider: true,
           sandboxConnectionId: true,
           sandboxVcpuCount: true,
@@ -131,6 +135,8 @@ export async function createProfileVersionDraft(
           maintenanceScript: latestVersion.maintenanceScript,
           defaultPersistenceMode: latestVersion.defaultPersistenceMode,
           agentRuntimeId: latestVersion.agentRuntimeId,
+          mistleMcpEnabled: latestVersion.mistleMcpEnabled,
+          mistleMcpApiKeyId: latestVersion.mistleMcpApiKeyId,
           sandboxProvider: latestVersion.sandboxProvider,
           sandboxConnectionId: latestVersion.sandboxConnectionId,
           sandboxVcpuCount: latestVersion.sandboxVcpuCount,
@@ -143,6 +149,8 @@ export async function createProfileVersionDraft(
           state: tables.sandboxProfileVersions.state,
           defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
           agentRuntimeId: tables.sandboxProfileVersions.agentRuntimeId,
+          mistleMcpEnabled: tables.sandboxProfileVersions.mistleMcpEnabled,
+          mistleMcpApiKeyId: tables.sandboxProfileVersions.mistleMcpApiKeyId,
           sandboxProvider: tables.sandboxProfileVersions.sandboxProvider,
           sandboxConnectionId: tables.sandboxProfileVersions.sandboxConnectionId,
           sandboxVcpuCount: tables.sandboxProfileVersions.sandboxVcpuCount,
@@ -174,6 +182,8 @@ export async function createProfileVersionDraft(
         state: createdDraftVersion.state,
         defaultPersistenceMode: createdDraftVersion.defaultPersistenceMode,
         agentRuntimeId: createdDraftVersion.agentRuntimeId,
+        mistleMcpEnabled: createdDraftVersion.mistleMcpEnabled,
+        mistleMcpApiKeyId: createdDraftVersion.mistleMcpApiKeyId,
         ...mapProfileVersionRuntimeConfig(createdDraftVersion),
         maintenanceScript: latestVersion.maintenanceScript,
         isActive: false,
