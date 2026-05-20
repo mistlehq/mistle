@@ -163,12 +163,12 @@ type SessionWorkbenchStoryHeaderActionsProps = {
   headerStatusUi?: SandboxStatusBadgeUi;
   isCliVisible?: boolean;
   isDiffVisible?: boolean;
-  showThreadNavigatorControl?: boolean;
-  isThreadNavigatorVisible?: boolean;
+  showConversationNavigatorControl?: boolean;
+  isConversationNavigatorVisible?: boolean;
   isTerminalVisible?: boolean;
   onCliToggle?: () => void;
   onDiffToggle?: () => void;
-  onThreadNavigatorToggle?: () => void;
+  onConversationNavigatorToggle?: () => void;
   onTerminalToggle?: () => void;
 };
 
@@ -205,7 +205,7 @@ export function SessionWorkbenchStoryHeaderActions(
   };
   const isCliVisible = input.isCliVisible ?? false;
   const isDiffVisible = input.isDiffVisible ?? false;
-  const isThreadNavigatorVisible = input.isThreadNavigatorVisible ?? false;
+  const isConversationNavigatorVisible = input.isConversationNavigatorVisible ?? false;
   const isTerminalVisible = input.isTerminalVisible ?? false;
   const handleCliToggle =
     input.onCliToggle ??
@@ -217,8 +217,8 @@ export function SessionWorkbenchStoryHeaderActions(
     (() => {
       return;
     });
-  const handleThreadNavigatorToggle =
-    input.onThreadNavigatorToggle ??
+  const handleConversationNavigatorToggle =
+    input.onConversationNavigatorToggle ??
     (() => {
       return;
     });
@@ -276,14 +276,14 @@ export function SessionWorkbenchStoryHeaderActions(
         title: "Primary repository",
       }}
       status={createStoryHeaderStatus(headerStatusUi)}
-      {...(input.showThreadNavigatorControl === true
+      {...(input.showConversationNavigatorControl === true
         ? {
             conversationControl: {
               ariaLabel: "Show conversations",
-              className: getStoryHeaderButtonClassName(isThreadNavigatorVisible),
+              className: getStoryHeaderButtonClassName(isConversationNavigatorVisible),
               disabled: false,
-              onClick: handleThreadNavigatorToggle,
-              pressed: isThreadNavigatorVisible,
+              onClick: handleConversationNavigatorToggle,
+              pressed: isConversationNavigatorVisible,
               title: "Show conversations",
             },
           }

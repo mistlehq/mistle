@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  projectRuntimeConversationNavigatorRows,
-  resolveDefaultRuntimeConversationId,
-} from "./runtime-conversation-navigator-model.js";
+import { projectRuntimeConversationNavigatorRows } from "./runtime-conversation-navigator-model.js";
 
 const Conversations = [
   {
@@ -176,14 +173,6 @@ describe("projectRuntimeConversationNavigatorRows", () => {
     ]);
   });
 
-  it("resolves the default conversation from recent activity", () => {
-    expect(
-      resolveDefaultRuntimeConversationId({
-        availableConversations: Conversations,
-      }),
-    ).toBe("conversation_other_repo");
-  });
-
   it("uses created time as activity when updated time is missing", () => {
     const conversations = [
       {
@@ -220,8 +209,5 @@ describe("projectRuntimeConversationNavigatorRows", () => {
         lastActivityAt: 50,
       },
     ]);
-    expect(resolveDefaultRuntimeConversationId({ availableConversations: conversations })).toBe(
-      "conversation_created_recently",
-    );
   });
 });

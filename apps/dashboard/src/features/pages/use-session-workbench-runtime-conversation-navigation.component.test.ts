@@ -24,6 +24,7 @@ function createRuntimeConversationNavigator(input: {
   availableConversations: readonly RuntimeConversationSummary[];
   originalConversationId?: string | null;
   providerConversationId?: string | null;
+  refreshedConversationCwds?: Array<string | null>;
   resumedConversationIds?: string[];
 }): NonNullable<SessionConversationPaneState["runtimeConversationNavigator"]> {
   return {
@@ -35,8 +36,9 @@ function createRuntimeConversationNavigator(input: {
     originalConversationId: input.originalConversationId ?? null,
     pendingConversationId: null,
     providerConversationId: input.providerConversationId ?? null,
-    refreshConversationList: function refreshConversationList() {
-      return Promise.resolve(input.availableConversations);
+    refreshConversationList: function refreshConversationList(refreshInput) {
+      input.refreshedConversationCwds?.push(refreshInput?.cwd ?? null);
+      return;
     },
     resumeConversation: async function resumeConversation(conversationId) {
       if (input.resumedConversationIds === undefined) {
@@ -81,7 +83,7 @@ function renderConversationNavigation(input: {
 }
 
 describe("useSessionWorkbenchRuntimeConversationNavigation", () => {
-  it("opens Codex conversation navigation by default when multiple unarchived conversations are available", () => {
+  it("opens runtime conversation navigation by default when multiple unarchived conversations are available", () => {
     const sandboxInstanceId = "sbi_conversation_navigation_default_open";
 
     const { result } = renderConversationNavigation({
@@ -98,7 +100,7 @@ describe("useSessionWorkbenchRuntimeConversationNavigation", () => {
     expect(result.current.secondaryPanelKind).toBe("conversations");
   });
 
-  it("lets the user close auto-opened Codex conversation navigation in the current workbench", () => {
+  it("lets the user close auto-opened runtime conversation navigation in the current workbench", () => {
     const sandboxInstanceId = "sbi_conversation_navigation_close_auto_open";
 
     const { result } = renderConversationNavigation({
@@ -180,5 +182,55 @@ describe("useSessionWorkbenchRuntimeConversationNavigation", () => {
     });
 
     await expect.poll(() => resumedConversationIds).toEqual(["conversation_requested"]);
+  });
+
+  it("does not refresh again only because the navigator adapter callback identity changed", async () => {
+    const refreshedConversationCwds: Array<string | null> = [];
+    const createNavigator = () =>
+      createRuntimeConversationNavigator({
+        availableConversations: [
+          createConversation({ id: "conversation_one" }),
+          createConversation({ id: "conversation_two" }),
+        ],
+        refreshedConversationCwds,
+      });
+
+    const { rerender } = renderHook(
+      (input: {
+        runtimeConversationNavigator: SessionConversationPaneState["runtimeConversationNavigator"];
+      }) =>
+        useSessionWorkbenchRuntimeConversationNavigation({
+          runtimeConversationNavigator: input.runtimeConversationNavigator,
+          closeDiffPanel: function closeDiffPanel() {
+            throw new Error("Unexpected diff panel close in refresh loop regression test");
+          },
+          isDiffPanelVisible: false,
+          pendingServerRequests: [],
+          primaryPanelTransitionState: "stable_chat" satisfies MainPanelTransitionState,
+          primaryRepositoryPath: "/workspace/repo",
+          requestedRuntimeConversationId: null,
+          sandboxInstanceId: "sbi_conversation_navigation_refresh_loop",
+          searchParams: new URLSearchParams(),
+          setSearchParams: function setSearchParams() {
+            throw new Error("Unexpected search param update in refresh loop regression test");
+          },
+        }),
+      {
+        initialProps: {
+          runtimeConversationNavigator: createNavigator(),
+        },
+      },
+    );
+
+    await expect.poll(() => refreshedConversationCwds).toEqual(["/workspace/repo"]);
+
+    rerender({
+      runtimeConversationNavigator: createNavigator(),
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(refreshedConversationCwds).toEqual(["/workspace/repo"]);
   });
 });

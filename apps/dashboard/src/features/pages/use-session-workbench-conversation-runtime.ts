@@ -365,10 +365,9 @@ export function useSessionWorkbenchConversationRuntime(input: {
               pendingConversationId: openCodeSessionState.sessions.pendingSessionId,
               isStartingNewConversation: openCodeSessionState.sessions.isStartingNewSession,
               refreshConversationList: async (refreshInput) => {
-                const sessions = await openCodeSessionState.sessions.refreshSessionList(
+                await openCodeSessionState.sessions.refreshSessionList(
                   refreshInput?.cwd === undefined ? {} : { directory: refreshInput.cwd },
                 );
-                return sessions.map(mapOpenCodeSessionToRuntimeConversationSummary);
               },
               resumeConversation: async (conversationId, resumeInput) =>
                 await openCodeSessionState.sessions.resumeSession(conversationId, {
@@ -394,11 +393,6 @@ export function useSessionWorkbenchConversationRuntime(input: {
               isStartingNewConversation: sessionState.threads.isStartingNewThread,
               refreshConversationList: () => {
                 sessionState.threads.refreshThreadList();
-                return Promise.resolve(
-                  sessionState.threads.availableThreads.map(
-                    mapCodexThreadToRuntimeConversationSummary,
-                  ),
-                );
               },
               resumeConversation: sessionState.threads.resumeThread,
               startNewConversation: sessionState.threads.startNewThread,

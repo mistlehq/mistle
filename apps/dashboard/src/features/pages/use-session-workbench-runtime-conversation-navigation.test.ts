@@ -44,7 +44,7 @@ describe("createConfirmedRuntimeConversationSearchParams", () => {
 });
 
 describe("resolveRuntimeConversationNavigatorPanelVisibility", () => {
-  it("opens Codex conversation navigation by default when more than one unarchived conversation is available", () => {
+  it("opens runtime conversation navigation by default when more than one unarchived conversation is available", () => {
     expect(
       resolveRuntimeConversationNavigatorPanelVisibility({
         explicitPanelVisibility: null,
@@ -54,7 +54,7 @@ describe("resolveRuntimeConversationNavigatorPanelVisibility", () => {
     ).toBe(true);
   });
 
-  it("keeps Codex conversation navigation closed by default for one unarchived conversation", () => {
+  it("keeps runtime conversation navigation closed by default for one unarchived conversation", () => {
     expect(
       resolveRuntimeConversationNavigatorPanelVisibility({
         explicitPanelVisibility: null,
@@ -64,7 +64,7 @@ describe("resolveRuntimeConversationNavigatorPanelVisibility", () => {
     ).toBe(false);
   });
 
-  it("does not auto-open Codex conversation navigation over a visible diff panel", () => {
+  it("does not auto-open runtime conversation navigation over a visible diff panel", () => {
     expect(
       resolveRuntimeConversationNavigatorPanelVisibility({
         explicitPanelVisibility: null,
@@ -74,7 +74,7 @@ describe("resolveRuntimeConversationNavigatorPanelVisibility", () => {
     ).toBe(false);
   });
 
-  it("keeps Codex conversation navigation closed when the user explicitly closed it", () => {
+  it("keeps runtime conversation navigation closed when the user explicitly closed it", () => {
     expect(
       resolveRuntimeConversationNavigatorPanelVisibility({
         explicitPanelVisibility: false,
@@ -84,7 +84,7 @@ describe("resolveRuntimeConversationNavigatorPanelVisibility", () => {
     ).toBe(false);
   });
 
-  it("keeps Codex conversation navigation open when the user explicitly opened it", () => {
+  it("keeps runtime conversation navigation open when the user explicitly opened it", () => {
     expect(
       resolveRuntimeConversationNavigatorPanelVisibility({
         explicitPanelVisibility: true,

@@ -270,24 +270,18 @@ _Avoid_: Local queued prompt, deferred start turn
 - A repository-scoped **Runtime conversation navigator** may be empty while the chat pane still shows an **Active runtime conversation** from another path.
 - When the **Active runtime conversation** is outside the **Runtime conversation navigator** scope, the UI should make the path mismatch visible.
 - Approval requests for non-active **Runtime conversations** may be indicated in navigation when the request has explicit runtime-conversation attribution, but responses happen only after the conversation becomes the **Active runtime conversation**.
+- First-pass **Runtime conversation** navigation is visible beside the chat pane on desktop and collapses into a drawer on narrow screens.
+- First-pass **Runtime conversation** navigation is opened from the **Session workbench** header and occupies the resizable right-side workbench panel.
+- Diff review and **Runtime conversation** navigation share the **Session workbench** right-side panel slot.
+- When a runtime returns another page of conversation results, the **Runtime conversation navigator** should indicate that only the latest 20 are shown.
 - First-pass **Codex thread** navigation does not make **Codex threads** durable Mistle records.
-- **Codex thread** navigation is ordered by recent thread activity unless the user chooses another view.
 - A loaded **Codex thread** is runtime metadata for navigation, not a separate product category.
 - A new **Codex thread** starts from the selected primary repository path when one is selected.
-- First-pass **Codex thread** navigation supports reading, selecting, and starting threads without managing thread lifecycle actions.
 - Archived **Codex threads** are outside first-pass **Codex thread** navigation.
-- First-pass **Codex thread** navigation is visible beside the chat pane on desktop and collapses into a drawer on narrow screens.
-- A repository-scoped **Codex thread** navigator may be empty while the chat pane still shows an **Active Codex thread** from another path.
-- When the **Active Codex thread** is outside the navigator scope, the UI should make the path mismatch visible.
 - First-pass **Codex thread** navigation shows the latest unarchived **Codex threads** returned by Codex.
-- First-pass **Codex thread** navigation is opened from the **Session workbench** header and occupies the resizable right-side workbench panel.
-- Diff review and **Codex thread** navigation share the **Session workbench** right-side panel slot.
 - Right-side panel occupants may have different preferred opening sizes, but user resizing applies to the shared right-side panel slot.
 - Switching the open right-side panel between occupants changes content without changing the panel width.
 - Opening the right-side panel uses the shared user-resized width when one exists; otherwise it uses the active occupant's preferred opening size.
-- The **Codex thread** navigator groups threads by working directory rather than filtering by repository.
-- When Codex returns another page of thread results, the **Codex thread** navigator should indicate that only the latest 20 are shown.
-- First-pass **Codex thread** navigation is Codex-specific rather than a generic runtime concept.
 - The Codex session state owns **Active Codex thread** changes for the **Session workbench**.
 - Cached **Codex thread** transcripts are ephemeral **Session workbench** state.
 - A cached **Codex thread** transcript does not become visible as active until Codex confirms the thread is resumable.

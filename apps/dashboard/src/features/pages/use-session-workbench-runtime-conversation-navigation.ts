@@ -147,6 +147,12 @@ export function useSessionWorkbenchRuntimeConversationNavigation(
   }, [input.runtimeConversationNavigator, pendingServerRequestConversationIds]);
   const refreshConversationList =
     input.runtimeConversationNavigator?.refreshConversationList ?? null;
+  const refreshConversationListRef = useRef(refreshConversationList);
+  const hasRuntimeConversationNavigator = input.runtimeConversationNavigator !== null;
+
+  useEffect(() => {
+    refreshConversationListRef.current = refreshConversationList;
+  }, [refreshConversationList]);
 
   const pushConversationSearchParams = useCallback(
     (conversationId: string): void => {
@@ -292,14 +298,15 @@ export function useSessionWorkbenchRuntimeConversationNavigation(
   ]);
 
   useEffect(() => {
-    if (refreshConversationList === null) {
+    const currentRefreshConversationList = refreshConversationListRef.current;
+    if (currentRefreshConversationList === null) {
       return;
     }
 
-    void refreshConversationList({
+    void currentRefreshConversationList({
       cwd: input.primaryRepositoryPath,
     });
-  }, [input.primaryRepositoryPath, refreshConversationList]);
+  }, [input.primaryRepositoryPath, hasRuntimeConversationNavigator]);
 
   const runtimeConversationNavigatorProps: RuntimeConversationNavigatorProps | null =
     input.runtimeConversationNavigator !== null &&

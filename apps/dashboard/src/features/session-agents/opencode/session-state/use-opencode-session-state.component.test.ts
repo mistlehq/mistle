@@ -411,9 +411,10 @@ function closeTransport(transport: SandboxSessionTransport): void {
 
 async function connectOpenCodeSessionForTest(input: {
   initialCwd?: string;
-  listSessionsBody?: readonly ReturnType<typeof createSessionResponse>[];
+  navigatorSessionListBody?: readonly ReturnType<typeof createSessionResponse>[];
   providerSessionId?: string;
   result: { current: ReturnType<typeof useOpenCodeSessionState> };
+  sandboxSessionListBody?: readonly ReturnType<typeof createSessionResponse>[];
   sandboxInstanceId: string;
   server: OpenCodeProxyTransportServer;
   sessionId: string;
@@ -467,7 +468,7 @@ async function connectOpenCodeSessionForTest(input: {
   });
   input.server.sendJsonResponse({
     request: listSessionsRequest,
-    body: input.listSessionsBody ?? [],
+    body: input.navigatorSessionListBody ?? [],
   });
 
   if (input.initialCwd !== undefined) {
@@ -475,7 +476,7 @@ async function connectOpenCodeSessionForTest(input: {
     expectOpenCodeSandboxSessionsRequest(sandboxSessionsRequest);
     input.server.sendJsonResponse({
       request: sandboxSessionsRequest,
-      body: input.listSessionsBody ?? [],
+      body: input.sandboxSessionListBody ?? [],
     });
   }
 
@@ -623,8 +624,6 @@ describe("useOpenCodeSessionState", () => {
     const recoverSession = result.current.lifecycle.recoverSession;
     const refreshModelCatalog = result.current.lifecycle.refreshModelCatalog;
     const refreshSessionList = result.current.sessions.refreshSessionList;
-    const resumeSession = result.current.sessions.resumeSession;
-    const startNewSession = result.current.sessions.startNewSession;
 
     rerender();
 
@@ -634,8 +633,6 @@ describe("useOpenCodeSessionState", () => {
     expect(result.current.lifecycle.recoverSession).toBe(recoverSession);
     expect(result.current.lifecycle.refreshModelCatalog).toBe(refreshModelCatalog);
     expect(result.current.sessions.refreshSessionList).toBe(refreshSessionList);
-    expect(result.current.sessions.resumeSession).toBe(resumeSession);
-    expect(result.current.sessions.startNewSession).toBe(startNewSession);
   });
 
   it("does not keep a connected session snapshot after hydration fails", async () => {
@@ -689,7 +686,7 @@ describe("useOpenCodeSessionState", () => {
     );
 
     const permissionsRequest = await connectOpenCodeSessionForTest({
-      listSessionsBody: [
+      navigatorSessionListBody: [
         createSessionResponse("ses_recent", {
           createdAt: 30,
           updatedAt: 50,
@@ -773,7 +770,7 @@ describe("useOpenCodeSessionState", () => {
     );
 
     const permissionsRequest = await connectOpenCodeSessionForTest({
-      listSessionsBody: [
+      navigatorSessionListBody: [
         createSessionResponse("ses_oldest", {
           createdAt: 1,
         }),
@@ -812,7 +809,7 @@ describe("useOpenCodeSessionState", () => {
     );
 
     const permissionsRequest = await connectOpenCodeSessionForTest({
-      listSessionsBody: [
+      navigatorSessionListBody: [
         createSessionResponse("ses_original", {
           createdAt: 1,
         }),
@@ -878,7 +875,7 @@ describe("useOpenCodeSessionState", () => {
       }),
     );
     const permissionsRequest = await connectOpenCodeSessionForTest({
-      listSessionsBody: cappedSessions,
+      navigatorSessionListBody: cappedSessions,
       result,
       sandboxInstanceId: "sbi_123",
       server,

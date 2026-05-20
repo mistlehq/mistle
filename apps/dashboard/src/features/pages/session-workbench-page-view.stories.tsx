@@ -58,11 +58,11 @@ function buildPageViewTerminalOutput(cwd: string): string {
 const FailedSandboxSetupMessage =
   "Failed to initialize sandbox runtime. Cause: failed to submit sandbox init request: control socket returned an error: failed to initialize sandboxd state: failed to apply startup input: runtime plan artifacts[0] lifecycle.install[0] failed (artifactKey=codex-cli op=github_release_install): github release lookup failed for openai/codex release tag match=exact tag=rust-v0.132.0: http 403";
 
-function CodexThreadNavigationHeaderTitle(): React.JSX.Element {
+function RuntimeConversationNavigationHeaderTitle(): React.JSX.Element {
   return <span className="block min-w-0 truncate text-sm font-medium">Storybook session</span>;
 }
 
-function CodexThreadNavigationPanel(): React.JSX.Element {
+function RuntimeConversationNavigationPanel(): React.JSX.Element {
   return (
     <RuntimeConversationNavigatorPanel
       isConversationListLimited={false}
@@ -75,38 +75,38 @@ function CodexThreadNavigationPanel(): React.JSX.Element {
   );
 }
 
-function CodexThreadNavigationWorkbenchStory(input?: {
-  defaultThreadNavigatorOpen?: boolean;
+function RuntimeConversationNavigationWorkbenchStory(input?: {
+  defaultConversationNavigatorOpen?: boolean;
 }): React.JSX.Element {
-  const [isThreadNavigatorOpen, setThreadNavigatorOpen] = useState(
-    input?.defaultThreadNavigatorOpen ?? false,
+  const [isConversationNavigatorOpen, setConversationNavigatorOpen] = useState(
+    input?.defaultConversationNavigatorOpen ?? false,
   );
 
   return (
     <SessionWorkbenchStoryChrome
       headerActions={
         <SessionWorkbenchStoryHeaderActions
-          isThreadNavigatorVisible={isThreadNavigatorOpen}
-          onThreadNavigatorToggle={() => {
-            setThreadNavigatorOpen((currentValue) => !currentValue);
+          isConversationNavigatorVisible={isConversationNavigatorOpen}
+          onConversationNavigatorToggle={() => {
+            setConversationNavigatorOpen((currentValue) => !currentValue);
           }}
-          showThreadNavigatorControl
+          showConversationNavigatorControl
         />
       }
-      title={<CodexThreadNavigationHeaderTitle />}
+      title={<RuntimeConversationNavigationHeaderTitle />}
     >
       <SessionWorkbenchPageView
         alert={null}
         bottomPanel={<></>}
         isBottomPanelVisible={false}
-        isSecondaryPanelVisible={isThreadNavigatorOpen}
+        isSecondaryPanelVisible={isConversationNavigatorOpen}
         mainContent={createStorySessionMainContent()}
         primaryBottomPanel={createStorySessionBottomPanel()}
         sandboxInstanceId={StorySandboxInstanceId}
         secondaryPanelDefaultSize="20%"
         secondaryPanelLayoutKey="right-panel"
         secondaryPanelMinSize="16rem"
-        secondaryPanel={<CodexThreadNavigationPanel />}
+        secondaryPanel={<RuntimeConversationNavigationPanel />}
       />
     </SessionWorkbenchStoryChrome>
   );
@@ -153,11 +153,11 @@ function StoryAppSidebarContent(): React.JSX.Element {
   );
 }
 
-function CodexThreadNavigationAppShellStory(input?: {
-  defaultThreadNavigatorOpen?: boolean;
+function RuntimeConversationNavigationAppShellStory(input?: {
+  defaultConversationNavigatorOpen?: boolean;
 }): React.JSX.Element {
-  const [isThreadNavigatorOpen, setThreadNavigatorOpen] = useState(
-    input?.defaultThreadNavigatorOpen ?? false,
+  const [isConversationNavigatorOpen, setConversationNavigatorOpen] = useState(
+    input?.defaultConversationNavigatorOpen ?? false,
   );
 
   return (
@@ -168,27 +168,27 @@ function CodexThreadNavigationAppShellStory(input?: {
           <ConversationWorkspaceFrame
             actions={
               <SessionWorkbenchStoryHeaderActions
-                isThreadNavigatorVisible={isThreadNavigatorOpen}
-                onThreadNavigatorToggle={() => {
-                  setThreadNavigatorOpen((currentValue) => !currentValue);
+                isConversationNavigatorVisible={isConversationNavigatorOpen}
+                onConversationNavigatorToggle={() => {
+                  setConversationNavigatorOpen((currentValue) => !currentValue);
                 }}
-                showThreadNavigatorControl
+                showConversationNavigatorControl
               />
             }
-            title={<CodexThreadNavigationHeaderTitle />}
+            title={<RuntimeConversationNavigationHeaderTitle />}
           >
             <SessionWorkbenchPageView
               alert={null}
               bottomPanel={<></>}
               isBottomPanelVisible={false}
-              isSecondaryPanelVisible={isThreadNavigatorOpen}
+              isSecondaryPanelVisible={isConversationNavigatorOpen}
               mainContent={createStorySessionMainContent()}
               primaryBottomPanel={createStorySessionBottomPanel()}
               sandboxInstanceId={StorySandboxInstanceId}
               secondaryPanelDefaultSize="20%"
               secondaryPanelLayoutKey="right-panel"
               secondaryPanelMinSize="16rem"
-              secondaryPanel={<CodexThreadNavigationPanel />}
+              secondaryPanel={<RuntimeConversationNavigationPanel />}
             />
           </ConversationWorkspaceFrame>
         }
@@ -390,27 +390,28 @@ export const WithSecondaryPane: Story = {
   },
 };
 
-export const WithCodexThreadNavigation: Story = {
+export const WithRuntimeConversationNavigation: Story = {
+  name: "With runtime conversation navigation",
   parameters: {
     sessionWorkbenchChrome: false,
   },
-  render: () => <CodexThreadNavigationWorkbenchStory />,
+  render: () => <RuntimeConversationNavigationWorkbenchStory />,
 };
 
-export const WithCodexThreadNavigationAppShell: Story = {
-  name: "With Codex thread navigation in app shell",
+export const WithRuntimeConversationNavigationAppShell: Story = {
+  name: "With runtime conversation navigation in app shell",
   parameters: {
     sessionWorkbenchChrome: false,
   },
-  render: () => <CodexThreadNavigationAppShellStory />,
+  render: () => <RuntimeConversationNavigationAppShellStory />,
 };
 
-export const WithCodexThreadNavigationAppShellOpen: Story = {
-  name: "With Codex thread navigation panel open",
+export const WithRuntimeConversationNavigationAppShellOpen: Story = {
+  name: "With runtime conversation navigation panel open",
   parameters: {
     sessionWorkbenchChrome: false,
   },
-  render: () => <CodexThreadNavigationAppShellStory defaultThreadNavigatorOpen />,
+  render: () => <RuntimeConversationNavigationAppShellStory defaultConversationNavigatorOpen />,
 };
 
 export const WithNonImageCapableModelWarning: Story = {

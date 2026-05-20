@@ -143,13 +143,6 @@ async function listOpenCodeSessionPage(input: {
   };
 }
 
-async function listOpenCodeNavigatorSessions(input: {
-  client: OpenCodeSessionClient;
-  directory?: string;
-}): Promise<OpenCodeSessionPage> {
-  return await listOpenCodeSessionPage(input);
-}
-
 export function resolveOriginalOpenCodeSessionId(input: {
   explicitProviderSessionId: string | null;
   hasMoreSandboxSessions: boolean;
@@ -521,7 +514,7 @@ export function useOpenCodeSessionState(input: {
         refreshInput !== undefined && "directory" in refreshInput
           ? (refreshInput.directory ?? null)
           : (sessionSnapshot?.activeDirectory ?? null);
-      const sessionPage = await listOpenCodeNavigatorSessions({
+      const sessionPage = await listOpenCodeSessionPage({
         client,
         ...(directory === null ? {} : { directory }),
       });
@@ -568,7 +561,7 @@ export function useOpenCodeSessionState(input: {
           await refreshModelCatalog(
             directory === undefined ? { force: true } : { directory, force: true },
           );
-          const sessionPage = await listOpenCodeNavigatorSessions({
+          const sessionPage = await listOpenCodeSessionPage({
             client,
             ...(directory === undefined ? {} : { directory }),
           });
@@ -593,7 +586,7 @@ export function useOpenCodeSessionState(input: {
                 });
           const confirmedSessionPage =
             sessionSelection.kind === "create"
-              ? await listOpenCodeNavigatorSessions({
+              ? await listOpenCodeSessionPage({
                   client,
                   ...(directory === undefined ? {} : { directory }),
                 })
@@ -894,7 +887,7 @@ export function useOpenCodeSessionState(input: {
         const pendingPermissions = await client.listPermissions({
           ...(directory === undefined ? {} : { directory }),
         });
-        const sessionPage = await listOpenCodeNavigatorSessions({
+        const sessionPage = await listOpenCodeSessionPage({
           client,
           ...(directory === undefined ? {} : { directory }),
         });

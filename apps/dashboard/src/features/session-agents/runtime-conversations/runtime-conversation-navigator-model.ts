@@ -15,9 +15,7 @@ export type RuntimeConversationNavigatorState = {
   originalConversationId: string | null;
   pendingConversationId: string | null;
   isStartingNewConversation: boolean;
-  refreshConversationList: (input?: {
-    cwd?: string | null;
-  }) => Promise<readonly RuntimeConversationSummary[]>;
+  refreshConversationList: (input?: { cwd?: string | null }) => void | Promise<void>;
   resumeConversation: (conversationId: string, input?: { cwd?: string }) => Promise<string>;
   startNewConversation: (input?: { cwd?: string }) => Promise<string>;
 };
@@ -181,13 +179,4 @@ export function projectRuntimeConversationNavigatorRows(input: {
   }
 
   return [activeConversationRow, ...rows];
-}
-
-export function resolveDefaultRuntimeConversationId(input: {
-  availableConversations: readonly RuntimeConversationSummary[];
-}): string | null {
-  const defaultConversation = [...input.availableConversations].sort(
-    compareConversationActivity,
-  )[0];
-  return defaultConversation?.id ?? null;
 }
