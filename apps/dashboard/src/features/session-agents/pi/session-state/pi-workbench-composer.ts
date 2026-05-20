@@ -1,6 +1,7 @@
 import type { PiModel } from "@mistle/integrations-definitions/agent-runtimes/pi/client";
 import { useCallback, useMemo, useState } from "react";
 
+import { buildSessionComposerModelOptions } from "../../../pages/session-composer/session-composer-model-options.js";
 import type {
   SessionComposerBootstrapResult,
   SessionComposerModel,
@@ -101,15 +102,6 @@ export function buildUnavailablePiComposerBootstrap(
   };
 }
 
-function buildModelOptions(
-  availableModels: SessionComposerBootstrapResult["establishedSnapshot"]["availableModels"],
-): SessionComposerConfigControl["modelOptions"] {
-  return availableModels.map((model) => ({
-    value: model.model,
-    label: model.isDefault ? `${model.displayName} (default)` : model.displayName,
-  }));
-}
-
 export function usePiSessionComposerConfigControl(input: {
   bootstrap: SessionComposerBootstrapResult;
   clearSessionErrorMessage: () => void;
@@ -122,7 +114,10 @@ export function usePiSessionComposerConfigControl(input: {
   const { availableModels, configSnapshot } = bootstrap.establishedSnapshot;
   const [isUpdatingModel, setIsUpdatingModel] = useState(false);
 
-  const modelOptions = useMemo(() => buildModelOptions(availableModels), [availableModels]);
+  const modelOptions = useMemo(
+    () => buildSessionComposerModelOptions(availableModels, true),
+    [availableModels],
+  );
 
   const setModel = useCallback(
     (nextModel: string): void => {

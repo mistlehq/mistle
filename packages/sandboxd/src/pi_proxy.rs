@@ -1424,7 +1424,21 @@ while IFS= read -r line; do
       printf '{{"type":"response","command":"get_available_models","id":"%s","success":true,"data":{{"models":[{{"provider":"openai","id":"gpt-5","name":"GPT-5","input":["text","image"]}}]}}}}\n' "$id"
       ;;
     *'"type":"set_model"'*)
-      printf '{{"type":"response","command":"set_model","id":"%s","success":true,"data":{{"provider":"openai","id":"gpt-5","name":"GPT-5","input":["text","image"]}}}}\n' "$id"
+      case "$line" in
+        *'"provider":"openai"'*)
+          case "$line" in
+            *'"modelId":"gpt-5"'*)
+              printf '{{"type":"response","command":"set_model","id":"%s","success":true,"data":{{"provider":"openai","id":"gpt-5","name":"GPT-5","input":["text","image"]}}}}\n' "$id"
+              ;;
+            *)
+              printf '{{"type":"response","command":"set_model","id":"%s","success":false,"error":"unexpected model selection"}}\n' "$id"
+              ;;
+          esac
+          ;;
+        *)
+          printf '{{"type":"response","command":"set_model","id":"%s","success":false,"error":"unexpected model selection"}}\n' "$id"
+          ;;
+      esac
       ;;
     *'"type":"prompt"'*)
       printf '{{"type":"agent_start"}}\n'

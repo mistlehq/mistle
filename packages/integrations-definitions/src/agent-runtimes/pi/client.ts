@@ -1,29 +1,22 @@
 import { AgentStreamClient, type SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { z } from "zod";
 
-const PiSessionStateSchema = z.looseObject({
-  isStreaming: z.boolean(),
-  isCompacting: z.boolean(),
-  model: z
-    .looseObject({
-      id: z.string(),
-      input: z.array(z.string()),
-      name: z.string(),
-      provider: z.string(),
-    })
-    .optional(),
-  sessionFile: z.string().optional(),
-  sessionId: z.string(),
-  sessionName: z.string().optional(),
-  messageCount: z.number(),
-  pendingMessageCount: z.number(),
-});
-
 const PiModelSchema = z.looseObject({
   id: z.string(),
   input: z.array(z.string()),
   name: z.string(),
   provider: z.string(),
+});
+
+const PiSessionStateSchema = z.looseObject({
+  isStreaming: z.boolean(),
+  isCompacting: z.boolean(),
+  model: PiModelSchema.optional(),
+  sessionFile: z.string().optional(),
+  sessionId: z.string(),
+  sessionName: z.string().optional(),
+  messageCount: z.number(),
+  pendingMessageCount: z.number(),
 });
 
 const PiAgentMessageSchema = z.looseObject({

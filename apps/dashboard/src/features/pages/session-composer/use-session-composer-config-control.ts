@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ComposerConfigSnapshot } from "./session-composer-config.js";
+import { buildSessionComposerModelOptions } from "./session-composer-model-options.js";
 import { resolveActiveComposerModel } from "./session-composer-model-readiness.js";
 import type { SessionComposerBootstrapResult } from "./session-composer-runtime-contracts.js";
 
@@ -45,19 +46,6 @@ function resolveSelectedReasoningEffort(input: {
   );
 }
 
-function buildModelOptions(
-  availableModels: SessionComposerBootstrapResult["establishedSnapshot"]["availableModels"],
-  includeDefaultMarker: boolean,
-): SessionComposerConfigControl["modelOptions"] {
-  return availableModels.map((model) => ({
-    value: model.model,
-    label:
-      includeDefaultMarker && model.isDefault
-        ? `${model.displayName} (default)`
-        : model.displayName,
-  }));
-}
-
 export function usePersistedSessionComposerConfigControl(input: {
   bootstrap: SessionComposerBootstrapResult;
   clearSessionErrorMessage: () => void;
@@ -99,7 +87,10 @@ export function usePersistedSessionComposerConfigControl(input: {
     ],
   );
 
-  const modelOptions = useMemo(() => buildModelOptions(availableModels, false), [availableModels]);
+  const modelOptions = useMemo(
+    () => buildSessionComposerModelOptions(availableModels, false),
+    [availableModels],
+  );
 
   const setModel = useCallback(
     (nextModel: string): void => {
@@ -196,7 +187,10 @@ export function useLocalSessionComposerConfigControl(input: {
     ],
   );
 
-  const modelOptions = useMemo(() => buildModelOptions(availableModels, true), [availableModels]);
+  const modelOptions = useMemo(
+    () => buildSessionComposerModelOptions(availableModels, true),
+    [availableModels],
+  );
 
   const setModel = useCallback(
     (nextModel: string): void => {

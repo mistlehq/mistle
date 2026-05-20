@@ -456,11 +456,7 @@ export function useSessionComposerState(input: {
     draftState.clearPendingDiffComments();
     setPendingComposerAttachments([]);
   }, [
-    activeComposerModel,
     clearSessionErrorMessage,
-    composerStateInput.attachmentControl,
-    composerStateInput.bootstrap.phase,
-    composerStateInput.configControl.selectedModel,
     composerStateInput.turnControl,
     composerText,
     draftState,
