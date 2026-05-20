@@ -8,7 +8,7 @@
 use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt::{self, Display};
-use std::fs::{self, File, OpenOptions};
+use std::fs;
 use std::io::{ErrorKind, Read, Write};
 use std::net::SocketAddr;
 use std::os::fd::AsFd;
@@ -72,10 +72,8 @@ use crate::tunnel::protocol::{
     AGENT_STREAM_WINDOW_BYTES, CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
     CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST, CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE,
     EgressTokenControlMessage, EgressTokenRequest, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED,
-    FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH, FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE,
-    FileSearchError, FileSearchResults, FileUploadCompletedEventInput, PAYLOAD_KIND_RAW_BYTES,
-    PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
-    PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
+    FileSearchError, FileSearchResults, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY,
+    PAYLOAD_KIND_WEBSOCKET_TEXT, PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
     PORT_ACCESS_AUTHORIZE_REASON_UNSUPPORTED_PROTOCOL, PtyControlMessage, PtySessionControlMessage,
     PtySessionLaunchMode, PtySessionOpen, STREAM_RESET_CODE_EXEC_COMMAND_FAILED,
     STREAM_RESET_CODE_INVALID_STREAM_CLOSE, STREAM_RESET_CODE_INVALID_STREAM_DATA,
@@ -83,17 +81,21 @@ use crate::tunnel::protocol::{
     STREAM_RESET_CODE_PROCESSES_SNAPSHOT_FAILED, STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
     STREAM_RESET_CODE_TARGET_CLOSED, SigningControlMessage, SigningRequest, StreamControlMessage,
     StreamSendWindow, decode_stream_data_frame, egress_token_request, encode_stream_data_frame,
-    exec_result_event, file_upload_completed_event, parse_egress_token_control_message,
-    parse_file_search_stream_message, parse_ports_control_message, parse_ports_transport_message,
-    parse_processes_stream_message, parse_pty_control_message, parse_pty_session_control_message,
-    parse_signing_control_message, parse_stream_control_message,
-    ports_target_authorize_failure_result, ports_target_authorize_success_result, pty_exit_event,
-    pty_session_error, pty_session_opened, signing_request, stream_complete, stream_open_error,
-    stream_open_ok, stream_reset, stream_window,
+    exec_result_event, parse_egress_token_control_message, parse_file_search_stream_message,
+    parse_ports_control_message, parse_ports_transport_message, parse_processes_stream_message,
+    parse_pty_control_message, parse_pty_session_control_message, parse_signing_control_message,
+    parse_stream_control_message, ports_target_authorize_failure_result,
+    ports_target_authorize_success_result, pty_exit_event, pty_session_error, pty_session_opened,
+    signing_request, stream_complete, stream_open_error, stream_open_ok, stream_reset,
+    stream_window,
 };
 use crate::tunnel::runtime_processes::collect_processes_snapshot;
+use crate::tunnel::session::file_upload::{
+    FileUploadState, create_file_upload_state, finalize_file_upload,
+};
 use crate::tunnel::telemetry::{SandboxTelemetryLogLevel, TelemetryRelay, TelemetryRelayFrame};
-use crate::tunnel::upload_classification::{UploadClassificationError, classify_uploaded_file};
+
+mod file_upload;
 
 /// Default attachment root for file uploads received over the bootstrap tunnel.
 pub const DEFAULT_ATTACHMENT_ROOT: &str = "/root/.local/attachments";
@@ -108,9 +110,6 @@ pub const DEFAULT_BOOTSTRAP_TUNNEL_LOOKUP_TIMEOUT: Duration = Duration::from_sec
 pub const DEFAULT_BOOTSTRAP_TUNNEL_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// Maximum time to wait for the bootstrap websocket handshake.
 pub const DEFAULT_BOOTSTRAP_TUNNEL_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
-const MAX_UPLOAD_SIZE_BYTES: usize = 16 * 1024 * 1024;
-const MAX_UPLOAD_THREAD_ID_LENGTH: usize = 128;
-static UPLOAD_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 const DEFAULT_EXEC_TIMEOUT_MS: u64 = 15_000;
 const OPERATION_RECORD_CHANNEL_CAPACITY: usize = 1024;
 const PENDING_OPERATION_RECORD_CAPACITY: usize = 1024;
@@ -992,18 +991,6 @@ impl TunnelSession {
         self.supervisor_handle
             .mark_component_stopped(SupervisedComponent::TunnelSession);
     }
-}
-
-struct FileUploadState {
-    attachment_id: String,
-    thread_directory_path: PathBuf,
-    thread_id: String,
-    mime_type: String,
-    original_filename: String,
-    size_bytes: usize,
-    temp_path: PathBuf,
-    file: File,
-    received_bytes: usize,
 }
 
 struct TunnelSessionRuntime {
@@ -5585,10 +5572,6 @@ fn close_port_access_tcp_streams(session_state: &mut TunnelSessionMutableState) 
     }
 }
 
-fn discard_file_upload_state(upload_state: FileUploadState) {
-    let _ = fs::remove_file(&upload_state.temp_path);
-}
-
 fn handle_tunnel_binary_frame(
     tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     frame: crate::tunnel::protocol::StreamDataFrame,
@@ -5888,7 +5871,7 @@ fn handle_tunnel_binary_frame(
     if session_state.file_uploads.contains_key(&frame.stream_id) {
         if frame.payload_kind != PAYLOAD_KIND_RAW_BYTES {
             if let Some(upload_state) = session_state.file_uploads.remove(&frame.stream_id) {
-                discard_file_upload_state(upload_state);
+                let _ = fs::remove_file(&upload_state.temp_path);
             }
             write_tunnel_text(
                 tunnel_writer_sender,
@@ -5909,7 +5892,7 @@ fn handle_tunnel_binary_frame(
             .saturating_add(frame.payload.len());
         if upload_state.received_bytes > upload_state.size_bytes {
             if let Some(upload_state) = session_state.file_uploads.remove(&frame.stream_id) {
-                discard_file_upload_state(upload_state);
+                let _ = fs::remove_file(&upload_state.temp_path);
             }
             write_tunnel_text(
                 tunnel_writer_sender,
@@ -6212,123 +6195,6 @@ async fn run_direct_pty_transport_async(
     }
 }
 
-fn create_file_upload_state(
-    message: &crate::tunnel::protocol::FileUploadStreamOpen,
-    attachment_root: &Path,
-    clock: &dyn Clock,
-) -> Result<FileUploadState, String> {
-    assert_upload_metadata(
-        &message.channel.thread_id,
-        &message.channel.mime_type,
-        message.channel.size_bytes,
-    )?;
-    let thread_directory_path =
-        derive_upload_thread_directory_path(attachment_root, &message.channel.thread_id)?;
-    fs::create_dir_all(&thread_directory_path).map_err(|error| {
-        format!(
-            "failed to create upload thread directory {}: {error}",
-            thread_directory_path.display()
-        )
-    })?;
-
-    let attachment_id = format!(
-        "att_{}_{}",
-        clock.now_ms(),
-        UPLOAD_ID_COUNTER.fetch_add(1, Ordering::Relaxed)
-    );
-    let temp_path = thread_directory_path.join(format!(".{attachment_id}.part"));
-    let file = OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(&temp_path)
-        .map_err(|error| {
-            format!(
-                "failed to create temporary upload file {}: {error}",
-                temp_path.display()
-            )
-        })?;
-
-    Ok(FileUploadState {
-        attachment_id,
-        thread_directory_path,
-        thread_id: message.channel.thread_id.clone(),
-        mime_type: message.channel.mime_type.clone(),
-        original_filename: message.channel.original_filename.clone(),
-        size_bytes: message.channel.size_bytes,
-        temp_path,
-        file,
-        received_bytes: 0,
-    })
-}
-
-fn finalize_file_upload(
-    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
-    stream_id: u32,
-    upload_state: FileUploadState,
-) -> Result<(), TunnelSessionError> {
-    if upload_state.received_bytes != upload_state.size_bytes {
-        write_tunnel_text(
-            tunnel_writer_sender,
-            stream_reset(
-                stream_id,
-                FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH,
-                "uploaded byte count did not match declared size",
-            ),
-        )?;
-        let _ = fs::remove_file(&upload_state.temp_path);
-        return Ok(());
-    }
-
-    upload_state
-        .file
-        .sync_all()
-        .map_err(|error| TunnelSessionError::FileUpload(error.to_string()))?;
-    let classification = match classify_uploaded_file(
-        &upload_state.mime_type,
-        &upload_state.temp_path,
-        &upload_state.original_filename,
-    ) {
-        Ok(classification) => classification,
-        Err(UploadClassificationError::Io(message)) => {
-            write_tunnel_text(
-                tunnel_writer_sender,
-                stream_reset(stream_id, FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE, message),
-            )?;
-            let _ = fs::remove_file(&upload_state.temp_path);
-            return Ok(());
-        }
-        Err(UploadClassificationError::Reset { code, message }) => {
-            write_tunnel_text(tunnel_writer_sender, stream_reset(stream_id, code, message))?;
-            let _ = fs::remove_file(&upload_state.temp_path);
-            return Ok(());
-        }
-    };
-
-    let final_path = upload_state.thread_directory_path.join(format!(
-        "{}.{}",
-        upload_state.attachment_id, classification.extension
-    ));
-    fs::rename(&upload_state.temp_path, &final_path)
-        .map_err(|error| TunnelSessionError::FileUpload(error.to_string()))?;
-    let final_path_text = final_path.to_string_lossy();
-    write_tunnel_text(
-        tunnel_writer_sender,
-        file_upload_completed_event(FileUploadCompletedEventInput {
-            stream_id,
-            kind: classification.kind,
-            attachment_id: &upload_state.attachment_id,
-            thread_id: &upload_state.thread_id,
-            original_filename: &upload_state.original_filename,
-            mime_type: &upload_state.mime_type,
-            size_bytes: upload_state.size_bytes,
-            path: &final_path_text,
-        }),
-    )?;
-    write_tunnel_text(tunnel_writer_sender, stream_complete(stream_id))?;
-
-    Ok(())
-}
-
 pub(crate) fn derive_sandbox_instance_id(
     gateway_ws_url: &str,
 ) -> Result<String, TunnelSessionError> {
@@ -6472,52 +6338,6 @@ fn write_tunnel_close(
 ) -> Result<(), TunnelSessionError> {
     let _ = tunnel_writer_sender.send(TunnelWriterMessage::Close);
     Ok(())
-}
-
-fn assert_upload_metadata(
-    thread_id: &str,
-    mime_type: &str,
-    size_bytes: usize,
-) -> Result<(), String> {
-    assert_safe_upload_thread_id(thread_id)?;
-    if mime_type.trim().is_empty() {
-        return Err("mimeType is required.".to_string());
-    }
-    if size_bytes == 0 {
-        return Err("sizeBytes must be greater than 0.".to_string());
-    }
-    if size_bytes > MAX_UPLOAD_SIZE_BYTES {
-        return Err("sizeBytes exceeds the configured upload limit.".to_string());
-    }
-    Ok(())
-}
-
-fn assert_safe_upload_thread_id(thread_id: &str) -> Result<(), String> {
-    let trimmed_thread_id = thread_id.trim();
-    if trimmed_thread_id.is_empty() {
-        return Err("threadId is required.".to_string());
-    }
-    if trimmed_thread_id != thread_id {
-        return Err("threadId must not include leading or trailing whitespace.".to_string());
-    }
-    if thread_id.len() > MAX_UPLOAD_THREAD_ID_LENGTH {
-        return Err("threadId exceeds the configured length limit.".to_string());
-    }
-    if !thread_id
-        .bytes()
-        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-')
-    {
-        return Err("threadId must use only ASCII letters, digits, '_' or '-'.".to_string());
-    }
-    Ok(())
-}
-
-fn derive_upload_thread_directory_path(
-    attachment_root_path: &Path,
-    thread_id: &str,
-) -> Result<PathBuf, String> {
-    assert_safe_upload_thread_id(thread_id)?;
-    Ok(attachment_root_path.join(thread_id))
 }
 
 #[cfg(test)]
