@@ -8,14 +8,9 @@ name = "mistle"
 path = "src/main.rs"
 
 [dependencies]
-axum = "0.8.9"
 bpaf = "0.9.26"
 futures-util = "0.3.31"
 mstl-core = { path = "../mstl-core" }
-rmcp = { version = "1.7.0", default-features = false, features = [
-  "server",
-  "transport-streamable-http-server",
-] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 sha2 = "0.10.9"
