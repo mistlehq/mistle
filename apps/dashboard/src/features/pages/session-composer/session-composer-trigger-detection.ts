@@ -148,6 +148,9 @@ function findWhitespaceDelimitedTokenRange(input: {
   if (input.cursorIndex < 1 || input.cursorIndex > input.composerText.length) {
     return null;
   }
+  if (WhitespacePattern.test(input.composerText.charAt(input.cursorIndex - 1))) {
+    return null;
+  }
 
   let start = input.cursorIndex - 1;
   while (start > 0 && !WhitespacePattern.test(input.composerText.charAt(start - 1))) {

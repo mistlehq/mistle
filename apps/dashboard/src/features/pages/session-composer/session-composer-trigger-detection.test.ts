@@ -227,6 +227,23 @@ describe("detectActiveComposerTrigger", () => {
     });
   });
 
+  it("does not keep completed context mention tokens active after whitespace", () => {
+    expect(
+      detect({
+        composerCapabilities: [ContextMentionCapabilityFixture],
+        composerText: "@src ",
+      }),
+    ).toBeNull();
+
+    expect(
+      detect({
+        composerCapabilities: [ContextMentionCapabilityFixture],
+        composerText: "review @src please",
+        selectionStart: 12,
+      }),
+    ).toBeNull();
+  });
+
   it("does not detect unsupported trigger families", () => {
     expect(
       detect({
