@@ -107,6 +107,11 @@ export class FileSearchStreamSession {
   }
 
   dispose(): void {
+    if (this.#stream.state === "open") {
+      void this.#stream.sendControl({ type: "stream.close" }).catch(() => {
+        return;
+      });
+    }
     this.#unsubscribeStreamEvents();
     this.#listeners.clear();
     this.#stream.dispose();

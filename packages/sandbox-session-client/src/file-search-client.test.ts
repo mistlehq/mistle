@@ -210,6 +210,14 @@ describe("FileSearchStreamClient", () => {
     });
 
     session.dispose();
+    await waitForCondition({
+      description: "file search stream close control message",
+      evaluate: () =>
+        server.receivedControlMessages.some(
+          (message) => message.type === "stream.close" && message.streamId === 1,
+        ),
+      timeoutMs: 1_000,
+    });
     transport.disconnect(1000, "Test complete.");
   });
 

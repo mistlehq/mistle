@@ -312,6 +312,7 @@ export function ChatComposer({
   });
   const [activeSlashCommandIndex, setActiveSlashCommandIndex] = useState(0);
   const [activeContextMentionIndex, setActiveContextMentionIndex] = useState(0);
+  const [dismissedContextMentionKey, setDismissedContextMentionKey] = useState<string | null>(null);
   const [activeCommandPanelOptionIndex, setActiveCommandPanelOptionIndex] = useState(0);
   const [commandPanelSearchText, setCommandPanelSearchText] = useState(
     commandPanel?.kind === "picker" ? (commandPanel.initialSearch ?? "") : "",
@@ -366,10 +367,21 @@ export function ChatComposer({
       ? null
       : (filteredSlashCommandOptions[activeSlashCommandIndexWithinBounds] ?? null);
   const contextMentionResults = contextMentionControl?.results ?? [];
+  const activeContextMentionKey =
+    activeComposerTrigger?.capabilityKind === "contextMention"
+      ? [
+          String(activeComposerTrigger.range.start),
+          String(activeComposerTrigger.range.end),
+          activeComposerTrigger.query,
+        ].join(":")
+      : null;
+  const isContextMentionDismissed =
+    activeContextMentionKey !== null && activeContextMentionKey === dismissedContextMentionKey;
   const showContextMentionMenu =
     activeComposerTrigger !== null &&
     activeComposerTrigger.capabilityKind === "contextMention" &&
-    contextMentionControl !== null;
+    contextMentionControl !== null &&
+    !isContextMentionDismissed;
   const activeContextMentionIndexWithinBounds =
     contextMentionResults.length === 0
       ? null
@@ -432,12 +444,22 @@ export function ChatComposer({
 
   useEffect(() => {
     if (activeContextMentionQuery === null) {
+      setDismissedContextMentionKey(null);
       contextMentionOnDismiss?.();
       return;
     }
 
+    if (isContextMentionDismissed) {
+      return;
+    }
+
     contextMentionOnQueryChange?.(activeContextMentionQuery);
-  }, [activeContextMentionQuery, contextMentionOnDismiss, contextMentionOnQueryChange]);
+  }, [
+    activeContextMentionQuery,
+    contextMentionOnDismiss,
+    contextMentionOnQueryChange,
+    isContextMentionDismissed,
+  ]);
 
   useEffect(() => {
     if (!showContextMentionMenu || activeContextMentionIndexWithinBounds === null) {
@@ -897,6 +919,7 @@ export function ChatComposer({
               updateComposerSelection(event.currentTarget);
               setActiveSlashCommandIndex(0);
               setActiveContextMentionIndex(0);
+              setDismissedContextMentionKey(null);
             }}
             onClick={(event) => {
               updateComposerSelection(event.currentTarget);
@@ -905,6 +928,7 @@ export function ChatComposer({
               if (showContextMentionMenu) {
                 if (event.key === "Escape") {
                   event.preventDefault();
+                  setDismissedContextMentionKey(activeContextMentionKey);
                   contextMentionControl?.onDismiss();
                   return;
                 }

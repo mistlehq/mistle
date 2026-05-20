@@ -762,6 +762,28 @@ describe("ChatComposer", () => {
     expect(screen.getByText("File search is unavailable")).toBeTruthy();
   });
 
+  it("hides the active context mention menu when Escape is pressed", () => {
+    render(
+      <ControlledChatComposer
+        composerCapabilities={[ContextMentionCapabilityFixture]}
+        composerText="@src"
+        contextMentionControl={{
+          status: "ready",
+          results: [{ kind: "file", path: "src/index.ts" }],
+          onQueryChange: () => {},
+          onSelect: () => {},
+          onDismiss: () => {},
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("listbox", { name: "Search files" })).toBeTruthy();
+
+    fireEvent.keyDown(getComposerTextarea(), { key: "Escape" });
+
+    expect(screen.queryByRole("listbox", { name: "Search files" })).toBeNull();
+  });
+
   it("executes a runtime slash command with keyboard selection", () => {
     const submittedRuntimeCommands: string[] = [];
     let submitCount = 0;
