@@ -167,6 +167,15 @@ function parseExecStreamOpen(payload: string) {
   return message;
 }
 
+function parseFileSearchStreamOpen(payload: string) {
+  const message = parseStreamControlMessage(payload);
+  if (message?.type !== "stream.open" || message.channel.kind !== "fileSearch") {
+    return undefined;
+  }
+
+  return message;
+}
+
 function shouldReleaseStreamOnConnectionClose(binding: ClientStreamBinding): boolean {
   return binding.channelKind !== "fileUpload";
 }
@@ -237,7 +246,9 @@ function createInvalidStreamDataResetPayload(input: {
       ? "File upload streams only accept raw-bytes data frames."
       : input.channelKind === "processes"
         ? "Processes streams only accept websocket text data frames."
-        : "Agent streams only accept websocket text or websocket binary data frames.";
+        : input.channelKind === "fileSearch"
+          ? "File search streams only accept websocket text data frames."
+          : "Agent streams only accept websocket text or websocket binary data frames.";
 
   return createStreamResetPayload({
     code: "invalid_stream_data",
@@ -380,7 +391,7 @@ function isPayloadKindAllowedForChannel(input: {
     return input.payloadKind === PayloadKindRawBytes;
   }
 
-  if (input.channelKind === "processes") {
+  if (input.channelKind === "processes" || input.channelKind === "fileSearch") {
     return input.payloadKind === PayloadKindWebSocketText;
   }
 
@@ -574,6 +585,16 @@ export class TunnelProtocolTranslator {
         channelKind: "exec",
         clientSessionId: input.clientSessionId,
         message: execStreamOpen,
+        sandboxInstanceId: input.sandboxInstanceId,
+      });
+    }
+
+    const fileSearchStreamOpen = parseFileSearchStreamOpen(input.payload);
+    if (fileSearchStreamOpen !== undefined) {
+      return this.translateConnectionStreamOpen({
+        channelKind: "fileSearch",
+        clientSessionId: input.clientSessionId,
+        message: fileSearchStreamOpen,
         sandboxInstanceId: input.sandboxInstanceId,
       });
     }

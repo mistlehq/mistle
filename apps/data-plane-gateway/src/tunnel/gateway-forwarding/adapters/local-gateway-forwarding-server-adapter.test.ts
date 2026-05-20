@@ -142,6 +142,46 @@ describe("LocalGatewayForwardingServerAdapter", () => {
     });
   });
 
+  it("opens file search streams against the local memory registry", async () => {
+    const registry = new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter(1));
+    registry.attachBootstrapSession({
+      sandboxInstanceId: "sbi_test",
+      side: "bootstrap",
+      nodeId: "dpg_test",
+      sessionId: "sess_bootstrap",
+    });
+    const adapter = new LocalGatewayForwardingServerAdapter(registry);
+
+    await expect(
+      adapter.openInteractiveStream(
+        {
+          sourceNodeId: "dpg_test",
+          targetNodeId: "dpg_test",
+          targetBootstrapSessionId: "sess_bootstrap",
+        },
+        {
+          sandboxInstanceId: "sbi_test",
+          channelKind: "fileSearch",
+          clientSessionId: "conn_1",
+          clientStreamId: 31,
+        },
+      ),
+    ).resolves.toEqual({
+      bootstrapTarget: {
+        sandboxInstanceId: "sbi_test",
+        side: "bootstrap",
+        nodeId: "dpg_test",
+        sessionId: "sess_bootstrap",
+      },
+      binding: {
+        channelKind: "fileSearch",
+        clientSessionId: "conn_1",
+        clientStreamId: 31,
+        tunnelStreamId: 1,
+      },
+    });
+  });
+
   it("allows opening multiple active streams for the same client session", async () => {
     const registry = new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter(2));
     registry.attachBootstrapSession({

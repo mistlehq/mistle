@@ -113,6 +113,37 @@ describe("InMemoryTunnelSessionRegistryAdapter", () => {
     ).toBeUndefined();
   });
 
+  it("binds file search streams in the local memory registry", () => {
+    const adapter = new InMemoryTunnelSessionRegistryAdapter(1);
+    adapter.attachBootstrapSession({
+      sandboxInstanceId: "sbi_test",
+      side: "bootstrap",
+      nodeId: "dpg_test",
+      sessionId: "sess_bootstrap",
+    });
+
+    const binding = adapter.bindClientStream({
+      sandboxInstanceId: "sbi_test",
+      channelKind: "fileSearch",
+      clientSessionId: "conn_1",
+      clientStreamId: 31,
+    });
+
+    expect(binding).toEqual({
+      channelKind: "fileSearch",
+      clientSessionId: "conn_1",
+      clientStreamId: 31,
+      tunnelStreamId: 1,
+    });
+    expect(
+      adapter.getBindingByClientStream({
+        sandboxInstanceId: "sbi_test",
+        clientSessionId: "conn_1",
+        clientStreamId: 31,
+      }),
+    ).toEqual(binding);
+  });
+
   it("fails fast when binding a client stream without a live bootstrap session", () => {
     const adapter = new InMemoryTunnelSessionRegistryAdapter();
 

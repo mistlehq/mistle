@@ -1017,6 +1017,55 @@ describe("TunnelProtocolTranslator", () => {
     });
   });
 
+  it("responds with a reset and releases the binding when fileSearch data is not websocket text", async () => {
+    const { router, translator } = await createTranslatorHarness();
+
+    await router.openInteractiveStream({
+      sandboxInstanceId: SandboxInstanceId,
+      channelKind: "fileSearch",
+      clientSessionId: "conn_1",
+      clientStreamId: 72,
+    });
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: "conn_1",
+        payload: toArrayBuffer(
+          encodeDataFrame({
+            streamId: 72,
+            payloadKind: PayloadKindWebSocketBinary,
+            payload: new Uint8Array([1, 2, 3]),
+          }),
+        ),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "connection",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "respond",
+        payload: JSON.stringify({
+          type: "stream.reset",
+          streamId: 72,
+          code: "invalid_stream_data",
+          message: "File search streams only accept websocket text data frames.",
+        }),
+      },
+      notifyBootstrapPeerOfReleasedStream: {
+        binding: {
+          channelKind: "fileSearch",
+          clientSessionId: "conn_1",
+          clientStreamId: 72,
+          tunnelStreamId: 1,
+        },
+        targetBootstrapSessionId: BootstrapSessionId,
+      },
+      releaseInteractiveStream: {
+        clientSessionId: "conn_1",
+        clientStreamId: 72,
+      },
+    });
+  });
+
   it("forwards exec stream.open messages to the bootstrap peer", async () => {
     const { translator } = await createTranslatorHarness();
 
@@ -1045,6 +1094,39 @@ describe("TunnelProtocolTranslator", () => {
             kind: "exec",
             command: "pwd",
             stdin: "input",
+          },
+        }),
+        targetBootstrapSessionId: BootstrapSessionId,
+      },
+    });
+  });
+
+  it("forwards fileSearch stream.open messages to the bootstrap peer", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: "conn_1",
+        payload: JSON.stringify({
+          type: "stream.open",
+          streamId: 72,
+          channel: {
+            kind: "fileSearch",
+            cwd: "/workspace/repo",
+          },
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "connection",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "forward",
+        payload: JSON.stringify({
+          type: "stream.open",
+          streamId: 1,
+          channel: {
+            kind: "fileSearch",
+            cwd: "/workspace/repo",
           },
         }),
         targetBootstrapSessionId: BootstrapSessionId,

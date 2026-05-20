@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   parseBootstrapControlMessage,
   parseEgressTokenControlMessage,
+  parseFileSearchStreamMessage,
   parsePortsControlMessage,
   parsePortsTransportMessage,
   parseProcessesStreamMessage,
@@ -94,6 +95,29 @@ describe("stream control message parser", () => {
     });
   });
 
+  it("parses file search stream opens", () => {
+    expect(
+      parseStreamControlMessage(
+        JSON.stringify({
+          type: "stream.open",
+          streamId: 31,
+          channel: {
+            kind: "fileSearch",
+            cwd: "/workspace/repo",
+            ignored: true,
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "stream.open",
+      streamId: 31,
+      channel: {
+        kind: "fileSearch",
+        cwd: "/workspace/repo",
+      },
+    });
+  });
+
   it("rejects malformed exec stream opens", () => {
     expect(
       parseStreamControlMessage(
@@ -121,6 +145,21 @@ describe("stream control message parser", () => {
             mimeType: "image/png",
             originalFilename: "screenshot.png",
             sizeBytes: "1024",
+          },
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
+  it("rejects malformed file search stream opens", () => {
+    expect(
+      parseStreamControlMessage(
+        JSON.stringify({
+          type: "stream.open",
+          streamId: 31,
+          channel: {
+            kind: "fileSearch",
+            cwd: "",
           },
         }),
       ),
@@ -787,6 +826,145 @@ describe("signing control message parser", () => {
           grant: "grant-token",
           payload: "c2lnbi1tZQ==",
           encoding: "base64",
+        }),
+      ),
+    ).toBeUndefined();
+  });
+});
+
+describe("file search stream message parser", () => {
+  it("parses query requests", () => {
+    expect(
+      parseFileSearchStreamMessage(
+        JSON.stringify({
+          type: "fileSearch.query",
+          requestId: "file_search_req_123",
+          query: "src tunnel",
+          limit: 20,
+          ignored: true,
+        }),
+      ),
+    ).toEqual({
+      type: "fileSearch.query",
+      requestId: "file_search_req_123",
+      query: "src tunnel",
+      limit: 20,
+    });
+  });
+
+  it("parses empty query requests", () => {
+    expect(
+      parseFileSearchStreamMessage(
+        JSON.stringify({
+          type: "fileSearch.query",
+          requestId: "file_search_req_123",
+          query: "",
+        }),
+      ),
+    ).toEqual({
+      type: "fileSearch.query",
+      requestId: "file_search_req_123",
+      query: "",
+    });
+  });
+
+  it("parses results", () => {
+    expect(
+      parseFileSearchStreamMessage(
+        JSON.stringify({
+          type: "fileSearch.results",
+          requestId: "file_search_req_123",
+          query: "protocol",
+          items: [
+            {
+              path: "packages/sandbox-session-protocol/src/stream-protocol.ts",
+              kind: "file",
+              ignored: true,
+            },
+            {
+              path: "packages/sandboxd/src/tunnel",
+              kind: "directory",
+            },
+          ],
+        }),
+      ),
+    ).toEqual({
+      type: "fileSearch.results",
+      requestId: "file_search_req_123",
+      query: "protocol",
+      items: [
+        {
+          path: "packages/sandbox-session-protocol/src/stream-protocol.ts",
+          kind: "file",
+        },
+        {
+          path: "packages/sandboxd/src/tunnel",
+          kind: "directory",
+        },
+      ],
+    });
+  });
+
+  it("parses errors", () => {
+    expect(
+      parseFileSearchStreamMessage(
+        JSON.stringify({
+          type: "fileSearch.error",
+          requestId: "file_search_req_123",
+          code: "search_failed",
+          message: "file search failed",
+        }),
+      ),
+    ).toEqual({
+      type: "fileSearch.error",
+      requestId: "file_search_req_123",
+      code: "search_failed",
+      message: "file search failed",
+    });
+  });
+
+  it("parses selections", () => {
+    expect(
+      parseFileSearchStreamMessage(
+        JSON.stringify({
+          type: "fileSearch.select",
+          query: "protocol",
+          path: "packages/sandbox-session-protocol/src/stream-protocol.ts",
+        }),
+      ),
+    ).toEqual({
+      type: "fileSearch.select",
+      query: "protocol",
+      path: "packages/sandbox-session-protocol/src/stream-protocol.ts",
+    });
+  });
+
+  it("rejects malformed query requests", () => {
+    expect(
+      parseFileSearchStreamMessage(
+        JSON.stringify({
+          type: "fileSearch.query",
+          requestId: "file_search_req_123",
+          query: "protocol",
+          limit: 0,
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
+  it("rejects malformed result items", () => {
+    expect(
+      parseFileSearchStreamMessage(
+        JSON.stringify({
+          type: "fileSearch.results",
+          requestId: "file_search_req_123",
+          query: "protocol",
+          items: [
+            {
+              path: "packages/sandbox-session-protocol/src/stream-protocol.ts",
+              kind: "symlink",
+            },
+          ],
         }),
       ),
     ).toBeUndefined();

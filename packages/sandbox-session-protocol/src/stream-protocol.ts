@@ -43,11 +43,17 @@ const ExecStreamChannelSchema = z.object({
   maxOutputBytes: PositiveIntegerSchema.optional(),
 });
 
+const FileSearchStreamChannelSchema = z.object({
+  kind: z.literal("fileSearch"),
+  cwd: NonEmptyStringSchema,
+});
+
 const StreamChannelSchema = z.discriminatedUnion("kind", [
   AgentStreamChannelSchema,
   ProcessesStreamChannelSchema,
   FileUploadStreamChannelSchema,
   ExecStreamChannelSchema,
+  FileSearchStreamChannelSchema,
 ]);
 
 const PTYResizeSignalSchema = z.object({
@@ -112,6 +118,47 @@ const ProcessesSnapshotSchema = z.object({
 const ProcessesStreamMessageSchema = z.discriminatedUnion("type", [
   ProcessesRefreshSchema,
   ProcessesSnapshotSchema,
+]);
+
+const FileSearchQuerySchema = z.object({
+  type: z.literal("fileSearch.query"),
+  requestId: NonEmptyStringSchema,
+  query: z.string(),
+  limit: PositiveIntegerSchema.optional(),
+});
+
+const FileSearchResultKindSchema = z.enum(["file", "directory"]);
+
+const FileSearchResultItemSchema = z.object({
+  path: NonEmptyStringSchema,
+  kind: FileSearchResultKindSchema,
+});
+
+const FileSearchResultsSchema = z.object({
+  type: z.literal("fileSearch.results"),
+  requestId: NonEmptyStringSchema,
+  query: z.string(),
+  items: z.array(FileSearchResultItemSchema),
+});
+
+const FileSearchErrorSchema = z.object({
+  type: z.literal("fileSearch.error"),
+  requestId: NonEmptyStringSchema,
+  code: NonEmptyStringSchema,
+  message: NonEmptyStringSchema,
+});
+
+const FileSearchSelectSchema = z.object({
+  type: z.literal("fileSearch.select"),
+  query: z.string(),
+  path: NonEmptyStringSchema,
+});
+
+const FileSearchStreamMessageSchema = z.discriminatedUnion("type", [
+  FileSearchQuerySchema,
+  FileSearchResultsSchema,
+  FileSearchErrorSchema,
+  FileSearchSelectSchema,
 ]);
 
 const RepeatedHeaderValuesSchema = z.record(NonEmptyStringSchema, z.array(z.string()));
@@ -543,6 +590,7 @@ export type AgentStreamChannel = z.infer<typeof AgentStreamChannelSchema>;
 export type ProcessesStreamChannel = z.infer<typeof ProcessesStreamChannelSchema>;
 export type FileUploadStreamChannel = z.infer<typeof FileUploadStreamChannelSchema>;
 export type ExecStreamChannel = z.infer<typeof ExecStreamChannelSchema>;
+export type FileSearchStreamChannel = z.infer<typeof FileSearchStreamChannelSchema>;
 export type StreamChannel = z.infer<typeof StreamChannelSchema>;
 
 export type PTYResizeSignal = z.infer<typeof PTYResizeSignalSchema>;
@@ -557,6 +605,13 @@ export type ProcessEntry = z.infer<typeof ProcessEntrySchema>;
 export type ProcessesRefresh = z.infer<typeof ProcessesRefreshSchema>;
 export type ProcessesSnapshot = z.infer<typeof ProcessesSnapshotSchema>;
 export type ProcessesStreamMessage = z.infer<typeof ProcessesStreamMessageSchema>;
+export type FileSearchQuery = z.infer<typeof FileSearchQuerySchema>;
+export type FileSearchResultKind = z.infer<typeof FileSearchResultKindSchema>;
+export type FileSearchResultItem = z.infer<typeof FileSearchResultItemSchema>;
+export type FileSearchResults = z.infer<typeof FileSearchResultsSchema>;
+export type FileSearchError = z.infer<typeof FileSearchErrorSchema>;
+export type FileSearchSelect = z.infer<typeof FileSearchSelectSchema>;
+export type FileSearchStreamMessage = z.infer<typeof FileSearchStreamMessageSchema>;
 export type PortAccessTarget = z.infer<typeof PortAccessTargetSchema>;
 export type PortsTargetAuthorize = z.infer<typeof PortsTargetAuthorizeSchema>;
 export type PortsTargetAuthorizeSuccessResult = z.infer<
@@ -697,6 +752,16 @@ export function parseProcessesStreamMessage(payload: string): ProcessesStreamMes
   }
 
   const result = ProcessesStreamMessageSchema.safeParse(parsedPayload);
+  return result.success ? result.data : undefined;
+}
+
+export function parseFileSearchStreamMessage(payload: string): FileSearchStreamMessage | undefined {
+  const parsedPayload = parseJSON(payload);
+  if (parsedPayload === undefined) {
+    return undefined;
+  }
+
+  const result = FileSearchStreamMessageSchema.safeParse(parsedPayload);
   return result.success ? result.data : undefined;
 }
 
