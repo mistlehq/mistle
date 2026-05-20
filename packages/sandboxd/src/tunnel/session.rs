@@ -70,11 +70,12 @@ use crate::tunnel::port_access_transport::{
 };
 use crate::tunnel::protocol::{
     AGENT_STREAM_WINDOW_BYTES, CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
-    CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE, EgressTokenControlMessage, EgressTokenRequest,
-    FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH,
-    FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE, FileSearchError, FileSearchResults,
-    FileUploadCompletedEventInput, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY,
-    PAYLOAD_KIND_WEBSOCKET_TEXT, PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
+    CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST, CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE,
+    EgressTokenControlMessage, EgressTokenRequest, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED,
+    FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH, FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE,
+    FileSearchError, FileSearchResults, FileUploadCompletedEventInput, PAYLOAD_KIND_RAW_BYTES,
+    PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
+    PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
     PORT_ACCESS_AUTHORIZE_REASON_UNSUPPORTED_PROTOCOL, PtyControlMessage, PtySessionControlMessage,
     PtySessionLaunchMode, PtySessionOpen, STREAM_RESET_CODE_EXEC_COMMAND_FAILED,
     STREAM_RESET_CODE_INVALID_STREAM_CLOSE, STREAM_RESET_CODE_INVALID_STREAM_DATA,
@@ -4988,6 +4989,13 @@ async fn handle_tunnel_control_message(
 ) -> Result<(), TunnelSessionError> {
     match control_message {
         StreamControlMessage::OpenAgent(message) => {
+            if reject_duplicate_tunnel_stream_open(
+                tunnel_writer_sender,
+                session_state,
+                message.stream_id,
+            )? {
+                return Ok(());
+            }
             let Some(runtime_endpoint_url) = session_state.agent_endpoint_url.as_deref() else {
                 write_tunnel_text(
                     tunnel_writer_sender,
@@ -5011,6 +5019,13 @@ async fn handle_tunnel_control_message(
             );
         }
         StreamControlMessage::OpenProcesses(message) => {
+            if reject_duplicate_tunnel_stream_open(
+                tunnel_writer_sender,
+                session_state,
+                message.stream_id,
+            )? {
+                return Ok(());
+            }
             if let Err(error) = collect_processes_snapshot(context.clock) {
                 write_tunnel_text(
                     tunnel_writer_sender,
@@ -5037,6 +5052,13 @@ async fn handle_tunnel_control_message(
             }
         }
         StreamControlMessage::OpenFileUpload(message) => {
+            if reject_duplicate_tunnel_stream_open(
+                tunnel_writer_sender,
+                session_state,
+                message.stream_id,
+            )? {
+                return Ok(());
+            }
             let upload_state =
                 create_file_upload_state(&message, context.attachment_root, context.clock)
                     .map_err(TunnelSessionError::FileUpload)?;
@@ -5046,6 +5068,13 @@ async fn handle_tunnel_control_message(
             write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
         }
         StreamControlMessage::OpenExec(message) => {
+            if reject_duplicate_tunnel_stream_open(
+                tunnel_writer_sender,
+                session_state,
+                message.stream_id,
+            )? {
+                return Ok(());
+            }
             let cancel_requested = Arc::new(AtomicBool::new(false));
             let child_pid = Arc::new(Mutex::new(None));
             session_state.pending_exec_opens.insert(
@@ -5065,6 +5094,13 @@ async fn handle_tunnel_control_message(
             write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
         }
         StreamControlMessage::OpenFileSearch(message) => {
+            if reject_duplicate_tunnel_stream_open(
+                tunnel_writer_sender,
+                session_state,
+                message.stream_id,
+            )? {
+                return Ok(());
+            }
             let event_sender = event_sender.clone();
             let stream_id = message.stream_id;
             let open_started_at = Instant::now();
@@ -5492,6 +5528,26 @@ fn port_access_stream_is_active(session_state: &TunnelSessionMutableState, strea
             .port_access_tcp_streams
             .contains_key(&stream_id)
         || tunnel_stream_is_active(session_state, stream_id)
+}
+
+fn reject_duplicate_tunnel_stream_open(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    session_state: &TunnelSessionMutableState,
+    stream_id: u32,
+) -> Result<bool, TunnelSessionError> {
+    if !port_access_stream_is_active(session_state, stream_id) {
+        return Ok(false);
+    }
+
+    write_tunnel_text(
+        tunnel_writer_sender,
+        stream_open_error(
+            stream_id,
+            CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST,
+            format!("stream.open streamId {stream_id} already exists"),
+        ),
+    )?;
+    Ok(true)
 }
 
 fn tunnel_stream_is_active(session_state: &TunnelSessionMutableState, stream_id: u32) -> bool {
@@ -7294,6 +7350,184 @@ mod tests {
         assert!(
             session_state.port_access_tcp_streams.is_empty(),
             "rejected tcp opens must not create tcp stream state",
+        );
+    }
+
+    #[tokio::test]
+    async fn rejects_generic_stream_open_when_stream_id_belongs_to_tunnel_stream() {
+        let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
+        let clock = SystemClock;
+        let supervisor_handle = test_tunnel_supervisor_handle("sbi_test", Arc::new(SystemClock));
+        let context = TunnelSessionLoopContext {
+            attachment_root: temp_dir.path(),
+            cgroup_root: std::path::Path::new("/tmp"),
+            sandbox_instance_id: "sbi_test",
+            gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
+            clock: &clock,
+            supervisor_handle: &supervisor_handle,
+        };
+
+        let duplicate_open_payloads = [
+            json!({
+                "type": "stream.open",
+                "streamId": 72,
+                "channel": {
+                    "kind": "agent",
+                },
+            }),
+            json!({
+                "type": "stream.open",
+                "streamId": 72,
+                "channel": {
+                    "kind": "processes",
+                },
+            }),
+            json!({
+                "type": "stream.open",
+                "streamId": 72,
+                "channel": {
+                    "kind": "fileUpload",
+                    "threadId": "thread_72",
+                    "mimeType": "image/png",
+                    "originalFilename": "image.png",
+                    "sizeBytes": 1,
+                },
+            }),
+            json!({
+                "type": "stream.open",
+                "streamId": 72,
+                "channel": {
+                    "kind": "exec",
+                    "command": "true",
+                },
+            }),
+            json!({
+                "type": "stream.open",
+                "streamId": 72,
+                "channel": {
+                    "kind": "fileSearch",
+                    "cwd": temp_dir.path(),
+                },
+            }),
+        ];
+
+        for open_payload in duplicate_open_payloads {
+            let (tunnel_writer_sender, mut tunnel_writer_receiver) =
+                tokio::sync::mpsc::unbounded_channel();
+            let (event_sender, _event_receiver) = tokio::sync::mpsc::unbounded_channel();
+            let (agent_sender, _agent_receiver) = tokio::sync::mpsc::unbounded_channel();
+            let mut session_state = empty_tunnel_session_state();
+            session_state.agent_endpoint_url = Some("ws://127.0.0.1:12345/agent".to_string());
+            session_state.agent_streams.insert(
+                72,
+                AgentStreamState {
+                    sender: agent_sender,
+                    send_window: StreamSendWindow::new(AGENT_STREAM_WINDOW_BYTES),
+                    stats: AgentStreamStats::new(0),
+                },
+            );
+
+            handle_tunnel_control_message(
+                &tunnel_writer_sender,
+                &event_sender,
+                parse_stream_control_message(&open_payload.to_string())
+                    .expect("duplicate stream.open should parse"),
+                &context,
+                &mut session_state,
+            )
+            .await
+            .expect("duplicate stream.open should be rejected without failing the tunnel");
+
+            assert_eq!(
+                read_writer_text_json(&mut tunnel_writer_receiver).await,
+                json!({
+                    "type": "stream.open.error",
+                    "streamId": 72,
+                    "code": "invalid_connect_request",
+                    "message": "stream.open streamId 72 already exists",
+                }),
+            );
+            assert!(
+                tunnel_writer_receiver.try_recv().is_err(),
+                "duplicate stream.open should emit exactly one rejection frame",
+            );
+            assert!(
+                session_state.agent_streams.contains_key(&72),
+                "duplicate stream.open must leave existing stream state intact",
+            );
+            assert!(
+                session_state.pending_agent_opens.is_empty()
+                    && session_state.pending_exec_opens.is_empty()
+                    && session_state.processes_stream_send_windows.is_empty()
+                    && session_state.file_uploads.is_empty()
+                    && session_state.file_search_streams.is_empty(),
+                "duplicate stream.open must not create new stream state",
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn rejects_generic_stream_open_when_stream_id_belongs_to_port_access_stream() {
+        let (tunnel_writer_sender, mut tunnel_writer_receiver) =
+            tokio::sync::mpsc::unbounded_channel();
+        let (event_sender, _event_receiver) = tokio::sync::mpsc::unbounded_channel();
+        let (tcp_sender, _tcp_receiver) =
+            tokio::sync::mpsc::unbounded_channel::<PortAccessTcpCommand>();
+        let clock = SystemClock;
+        let supervisor_handle = test_tunnel_supervisor_handle("sbi_test", Arc::new(SystemClock));
+        let context = TunnelSessionLoopContext {
+            attachment_root: std::path::Path::new("/tmp"),
+            cgroup_root: std::path::Path::new("/tmp"),
+            sandbox_instance_id: "sbi_test",
+            gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
+            clock: &clock,
+            supervisor_handle: &supervisor_handle,
+        };
+        let mut session_state = empty_tunnel_session_state();
+        session_state.port_access_tcp_streams.insert(
+            73,
+            PortAccessTcpStreamState {
+                sender: tcp_sender,
+                request_window: StreamSendWindow::default(),
+                request_closed: false,
+                response_closed: false,
+            },
+        );
+
+        let open_payload = json!({
+            "type": "stream.open",
+            "streamId": 73,
+            "channel": {
+                "kind": "processes",
+            },
+        });
+        handle_tunnel_control_message(
+            &tunnel_writer_sender,
+            &event_sender,
+            parse_stream_control_message(&open_payload.to_string())
+                .expect("duplicate stream.open should parse"),
+            &context,
+            &mut session_state,
+        )
+        .await
+        .expect("duplicate stream.open should be rejected without failing the tunnel");
+
+        assert_eq!(
+            read_writer_text_json(&mut tunnel_writer_receiver).await,
+            json!({
+                "type": "stream.open.error",
+                "streamId": 73,
+                "code": "invalid_connect_request",
+                "message": "stream.open streamId 73 already exists",
+            }),
+        );
+        assert!(
+            session_state.port_access_tcp_streams.contains_key(&73),
+            "duplicate stream.open must leave existing port access state intact",
+        );
+        assert!(
+            session_state.processes_stream_send_windows.is_empty(),
+            "duplicate stream.open must not create processes stream state",
         );
     }
 
