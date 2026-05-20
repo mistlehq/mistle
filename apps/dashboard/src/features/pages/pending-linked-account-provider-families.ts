@@ -1,33 +1,33 @@
-export function incrementPendingLinkedAccountProviderFamilyCount(
+export function incrementPendingLinkedAccountConfigCount(
   currentCounts: Readonly<Record<string, number>>,
-  providerFamily: string,
+  organizationProviderConfigId: string,
 ): Record<string, number> {
   return {
     ...currentCounts,
-    [providerFamily]: (currentCounts[providerFamily] ?? 0) + 1,
+    [organizationProviderConfigId]: (currentCounts[organizationProviderConfigId] ?? 0) + 1,
   };
 }
 
-export function decrementPendingLinkedAccountProviderFamilyCount(
+export function decrementPendingLinkedAccountConfigCount(
   currentCounts: Readonly<Record<string, number>>,
-  providerFamily: string,
+  organizationProviderConfigId: string,
 ): Record<string, number> {
-  const nextCount = (currentCounts[providerFamily] ?? 0) - 1;
+  const nextCount = (currentCounts[organizationProviderConfigId] ?? 0) - 1;
   if (nextCount > 0) {
     return {
       ...currentCounts,
-      [providerFamily]: nextCount,
+      [organizationProviderConfigId]: nextCount,
     };
   }
 
-  const { [providerFamily]: _removedProviderFamily, ...remainingCounts } = currentCounts;
+  const { [organizationProviderConfigId]: _removedConfigId, ...remainingCounts } = currentCounts;
   return remainingCounts;
 }
 
-export function resolvePendingLinkedAccountProviderFamilies(
-  providerFamilyCounts: Readonly<Record<string, number>>,
+export function resolvePendingLinkedAccountConfigIds(
+  configCounts: Readonly<Record<string, number>>,
 ): string[] {
-  return Object.entries(providerFamilyCounts)
+  return Object.entries(configCounts)
     .filter(([, count]) => count > 0)
-    .map(([providerFamily]) => providerFamily);
+    .map(([organizationProviderConfigId]) => organizationProviderConfigId);
 }

@@ -11316,8 +11316,16 @@
                   "type": "object",
                   "properties": {
                     "code": {
-                      "type": "string",
-                      "enum": ["INVALID_LINKED_ACCOUNT_SIGNING_KEY_INPUT"]
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["INVALID_LINKED_ACCOUNT_SIGNING_KEY_INPUT"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["PROVIDER_CONFIG_AMBIGUOUS"]
+                        }
+                      ]
                     },
                     "message": {
                       "type": "string",
@@ -11432,8 +11440,16 @@
                   "type": "object",
                   "properties": {
                     "code": {
-                      "type": "string",
-                      "enum": ["INVALID_LINKED_ACCOUNT_SIGNING_KEY_INPUT"]
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["INVALID_LINKED_ACCOUNT_SIGNING_KEY_INPUT"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["PROVIDER_CONFIG_AMBIGUOUS"]
+                        }
+                      ]
                     },
                     "message": {
                       "type": "string",
@@ -11519,6 +11535,28 @@
         "responses": {
           "204": {
             "description": "Remove the authenticated user's GitHub SSH signing key."
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROVIDER_CONFIG_AMBIGUOUS"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "401": {
             "description": "Authentication is required.",
@@ -11608,8 +11646,16 @@
                   "type": "object",
                   "properties": {
                     "code": {
-                      "type": "string",
-                      "enum": ["INVALID_LINKED_ACCOUNT_PREFERRED_EMAIL_INPUT"]
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["INVALID_LINKED_ACCOUNT_PREFERRED_EMAIL_INPUT"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["PROVIDER_CONFIG_AMBIGUOUS"]
+                        }
+                      ]
                     },
                     "message": {
                       "type": "string",
@@ -11691,7 +11737,7 @@
         }
       }
     },
-    "/v1/me/linked-accounts/:providerFamily": {
+    "/v1/me/linked-accounts/provider-configs/:organizationProviderConfigId/authorizations": {
       "post": {
         "tags": ["Me"],
         "parameters": [
@@ -11701,13 +11747,13 @@
               "minLength": 1
             },
             "required": true,
-            "name": "providerFamily",
+            "name": "organizationProviderConfigId",
             "in": "path"
           }
         ],
         "responses": {
           "200": {
-            "description": "Start linked-account authorization for the authenticated user.",
+            "description": "Start linked-account authorization for the authenticated user and provider config.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11841,6 +11887,249 @@
             }
           }
         }
+      }
+    },
+    "/v1/me/linked-accounts/provider-configs/:organizationProviderConfigId": {
+      "delete": {
+        "tags": ["Me"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "organizationProviderConfigId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Unlink the authenticated user's linked account for the given provider config."
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Provider config was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROVIDER_CONFIG_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/linked-accounts/:providerFamily": {
+      "post": {
+        "tags": ["Me"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "providerFamily",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Start linked-account authorization for the authenticated user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "authorizationUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["authorizationUrl", "expiresAt"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["INVALID_PROVIDER_CONFIG_INPUT"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["INVALID_LINKED_ACCOUNT_START_INPUT"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["PROVIDER_ADAPTER_NOT_IMPLEMENTED"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["PROVIDER_CONFIG_AMBIGUOUS"]
+                        }
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Provider configuration was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["PROVIDER_NOT_FOUND"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["PROVIDER_CONFIG_NOT_FOUND"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["CONNECTION_NOT_FOUND"]
+                        }
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
       },
       "delete": {
         "tags": ["Me"],
@@ -11858,6 +12147,47 @@
         "responses": {
           "204": {
             "description": "Unlink the authenticated user's linked account for the given provider."
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["PROVIDER_CONFIG_AMBIGUOUS"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
           },
           "401": {
             "description": "Authentication is required.",
@@ -13326,9 +13656,13 @@
                   "integrationConnectionId": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["active", "disabled"]
                   }
                 },
-                "required": ["integrationConnectionId"],
+                "required": ["integrationConnectionId", "status"],
                 "additionalProperties": false
               }
             }

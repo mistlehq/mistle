@@ -132,6 +132,49 @@ describe.concurrent("me linked accounts update and unlink integration", () => {
     });
   });
 
+  it("rejects preferred email updates when multiple GitHub configs are present", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-me-linked-accounts-preferred-email-ambiguous@example.com",
+    });
+    await seedGitHubLinkedAccount(env, {
+      organizationId: session.organizationId,
+      userId: session.userId,
+      providerConfigId: "ilp_me_linked_accounts_preferred_email_ambiguous_a",
+      connectionId: "icn_me_linked_accounts_preferred_email_ambiguous_a",
+      principalId: "uep_me_linked_accounts_preferred_email_ambiguous_a",
+      providerSubjectId: "github-subject-a",
+    });
+    await seedGitHubLinkedAccount(env, {
+      organizationId: session.organizationId,
+      userId: session.userId,
+      providerConfigId: "ilp_me_linked_accounts_preferred_email_ambiguous_b",
+      connectionId: "icn_me_linked_accounts_preferred_email_ambiguous_b",
+      principalId: "uep_me_linked_accounts_preferred_email_ambiguous_b",
+      providerSubjectId: "github-subject-b",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/me/linked-accounts/github/preferred-email",
+      {
+        method: "PUT",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          preferredEmail: "engineering@example.com",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "PROVIDER_CONFIG_AMBIGUOUS",
+    });
+  });
+
   it("unlinks a linked account by retiring keys and revoking credentials", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-me-linked-accounts-unlink@example.com",
@@ -152,12 +195,15 @@ describe.concurrent("me linked accounts update and unlink integration", () => {
       credentialKind: "github_app_user_access_token",
     });
 
-    const response = await env.controlPlaneApi.http.fetch("/v1/me/linked-accounts/github", {
-      method: "DELETE",
-      headers: {
-        cookie: session.cookie,
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/me/linked-accounts/provider-configs/ilp_me_linked_accounts_unlink",
+      {
+        method: "DELETE",
+        headers: {
+          cookie: session.cookie,
+        },
       },
-    });
+    );
 
     expect(response.status).toBe(204);
     const principal = await env.controlPlaneDb.query.userExternalPrincipals.findFirst({
@@ -174,6 +220,40 @@ describe.concurrent("me linked accounts update and unlink integration", () => {
     expect(key?.status).toBe(UserExternalPrincipalKeyStatuses.RETIRED);
     expect(key?.retiredAt).toBeTruthy();
     expect(credential?.status).toBe(UserExternalPrincipalCredentialStatuses.REVOKED);
+  });
+
+  it("rejects legacy provider-family unlink when multiple configs exist", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-me-linked-accounts-unlink-ambiguous@example.com",
+    });
+    await seedGitHubLinkedAccount(env, {
+      organizationId: session.organizationId,
+      userId: session.userId,
+      providerConfigId: "ilp_me_linked_accounts_unlink_ambiguous_a",
+      connectionId: "icn_me_linked_accounts_unlink_ambiguous_a",
+      principalId: "uep_me_linked_accounts_unlink_ambiguous_a",
+      providerSubjectId: "github-subject-a",
+    });
+    await seedGitHubLinkedAccount(env, {
+      organizationId: session.organizationId,
+      userId: session.userId,
+      providerConfigId: "ilp_me_linked_accounts_unlink_ambiguous_b",
+      connectionId: "icn_me_linked_accounts_unlink_ambiguous_b",
+      principalId: "uep_me_linked_accounts_unlink_ambiguous_b",
+      providerSubjectId: "github-subject-b",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/me/linked-accounts/github", {
+      method: "DELETE",
+      headers: {
+        cookie: session.cookie,
+      },
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "PROVIDER_CONFIG_AMBIGUOUS",
+    });
   });
 });
 

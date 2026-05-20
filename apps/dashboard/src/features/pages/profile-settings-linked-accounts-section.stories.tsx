@@ -87,7 +87,7 @@ export const OperationError: Story = {
 
 export const ActionPending: Story = {
   args: {
-    pendingLinkedAccountProviderFamilies: ["github"],
+    pendingLinkedAccountConfigIds: ["ilp_story_github"],
     linkedAccountCards: [GitHubLinkedWithSigningNotConfiguredCard],
   },
 };

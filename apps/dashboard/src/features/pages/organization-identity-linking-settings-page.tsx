@@ -85,10 +85,12 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
       rowKey: string;
       providerFamily: string;
       integrationConnectionId: string;
+      status: "active" | "disabled";
     }) =>
       createOrganizationIdentityLinkProviderConfig({
         providerFamily: input.providerFamily,
         integrationConnectionId: input.integrationConnectionId,
+        status: input.status,
       }),
     onMutate: async (input) => {
       setConfiguringRowKey(input.rowKey);
@@ -265,18 +267,26 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
             rowKey,
             rows: providerConfigRows,
           });
+
+          if (row.config === null && !enabled) {
+            return;
+          }
+
           const status = enabled ? "active" : "disabled";
-          const organizationProviderConfigId =
-            row.config?.organizationProviderConfigId ??
-            (await createConfigForDraftRow({
+
+          if (row.config === null) {
+            await createConfigForDraftRow({
               row,
               createConfigMutation,
               selectedConnectionIdByRowKey,
-            }));
+              status,
+            });
+            return;
+          }
 
           await statusMutation.mutateAsync({
             rowKey,
-            organizationProviderConfigId,
+            organizationProviderConfigId: row.config.organizationProviderConfigId,
             status,
           });
         }}
@@ -297,18 +307,6 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
 
           try {
             if (row.config === null) {
-              await createConfigMutation.mutateAsync({
-                rowKey,
-                providerFamily: row.provider.providerFamily,
-                integrationConnectionId,
-              });
-              setSelectedConnectionIdByRowKey((current) =>
-                restoreSelectedConnectionDraft({
-                  current,
-                  rowKey,
-                  selectedConnectionId: null,
-                }),
-              );
               return;
             }
 
@@ -346,21 +344,35 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
   );
 }
 
-function buildProviderConfigRows(
+export function buildProviderConfigRows(
   providers: readonly OrganizationIdentityLinkProvider[],
 ): ProviderConfigRow[] {
-  return providers.flatMap((provider) => [
-    ...provider.configs.map((config) => ({
+  return providers.flatMap((provider) => {
+    const configuredRows = provider.configs.map((config) => ({
       rowKey: config.organizationProviderConfigId,
       provider,
       config,
-    })),
-    {
-      rowKey: buildDraftRowKey(provider.providerFamily),
-      provider,
-      config: null,
-    },
-  ]);
+    }));
+    const shouldShowDraftRow =
+      provider.configs.length === 0 ||
+      listUnusedEligibleIdentityLinkConnections({
+        provider,
+        currentConfig: null,
+      }).length > 0;
+
+    if (!shouldShowDraftRow) {
+      return configuredRows;
+    }
+
+    return [
+      ...configuredRows,
+      {
+        rowKey: buildDraftRowKey(provider.providerFamily),
+        provider,
+        config: null,
+      },
+    ];
+  });
 }
 
 function buildDraftRowKey(providerFamily: string): string {
@@ -397,8 +409,9 @@ export function buildProviderRow(input: {
   } | null;
   selectedConnectionIdByRowKey: Readonly<Record<string, string | undefined>>;
 }): OrganizationIdentityLinkingProviderRow {
-  const eligibleConnections = listEligibleIdentityLinkConnections({
+  const connectionOptions = listUnusedEligibleIdentityLinkConnections({
     provider: input.row.provider,
+    currentConfig: input.row.config,
   });
   const selectedConnectionId = resolveRowDisplayedConnectionId({
     row: input.row,
@@ -411,7 +424,7 @@ export function buildProviderRow(input: {
     organizationProviderConfigId: input.row.config?.organizationProviderConfigId ?? null,
     displayName: input.row.provider.displayName,
     logoKey: input.row.provider.logoKey,
-    connectionOptions: eligibleConnections.map((connection) => ({
+    connectionOptions: connectionOptions.map((connection) => ({
       id: connection.id,
       label: formatIdentityLinkEligibleConnectionLabel(connection),
     })),
@@ -462,9 +475,11 @@ async function createConfigForDraftRow(input: {
       rowKey: string;
       providerFamily: string;
       integrationConnectionId: string;
+      status: "active" | "disabled";
     }) => Promise<OrganizationIdentityLinkProviderConfig>;
   };
   selectedConnectionIdByRowKey: Readonly<Record<string, string | undefined>>;
+  status: "active" | "disabled";
 }): Promise<string> {
   if (input.row.config !== null) {
     return input.row.config.organizationProviderConfigId;
@@ -485,6 +500,7 @@ async function createConfigForDraftRow(input: {
     rowKey: input.row.rowKey,
     providerFamily: input.row.provider.providerFamily,
     integrationConnectionId,
+    status: input.status,
   });
 
   return config.organizationProviderConfigId;
@@ -494,8 +510,9 @@ function resolveRowDisplayedConnectionId(input: {
   row: ProviderConfigRow;
   selectedConnectionIdByRowKey: Readonly<Record<string, string | undefined>>;
 }): string | null {
-  const eligibleConnections = listEligibleIdentityLinkConnections({
+  const eligibleConnections = listUnusedEligibleIdentityLinkConnections({
     provider: input.row.provider,
+    currentConfig: input.row.config,
   });
 
   return resolveSelectedConnectionId({
@@ -503,6 +520,24 @@ function resolveRowDisplayedConnectionId(input: {
     eligibleConnections,
     selectedConnectionId: input.row.config?.selectedConnection.id ?? null,
   });
+}
+
+function listUnusedEligibleIdentityLinkConnections(input: {
+  provider: OrganizationIdentityLinkProvider;
+  currentConfig: OrganizationIdentityLinkProviderConfig | null;
+}): ReturnType<typeof listEligibleIdentityLinkConnections> {
+  const configuredConnectionIds = new Set(
+    input.provider.configs
+      .filter(
+        (config) =>
+          config.organizationProviderConfigId !== input.currentConfig?.organizationProviderConfigId,
+      )
+      .map((config) => config.integrationConnectionId),
+  );
+
+  return listEligibleIdentityLinkConnections({
+    provider: input.provider,
+  }).filter((connection) => !configuredConnectionIds.has(connection.id));
 }
 
 function restoreSelectedConnectionDraft(input: {

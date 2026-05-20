@@ -15,7 +15,7 @@ const routeHandler = async (
 ) => {
   const db = ctx.get("db");
   const { providerFamily } = ctx.req.valid("param");
-  const { integrationConnectionId } = ctx.req.valid("json");
+  const { integrationConnectionId, status } = ctx.req.valid("json");
 
   await requireActiveOrganizationPermission({
     db,
@@ -34,6 +34,7 @@ const routeHandler = async (
       actorUserId: session.user.id,
       providerFamily,
       integrationConnectionId,
+      status,
     },
   );
 

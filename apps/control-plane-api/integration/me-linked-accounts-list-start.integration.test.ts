@@ -136,6 +136,99 @@ describe.concurrent("me linked accounts list and start integration", () => {
     });
   });
 
+  it("lists one linked account per configured Slack provider config", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-me-linked-accounts-list-two-slack@example.com",
+    });
+    await upsertSlackIdentityTarget(env);
+    await seedIdentityConnection(env, {
+      connectionId: "icn_me_linked_accounts_slack_workspace_a",
+      displayName: "Slack Workspace A",
+      methodId: SlackConnectionMethodIds.SLACK_APP,
+      organizationId: session.organizationId,
+      targetKey: "slack-default",
+    });
+    await seedIdentityConnection(env, {
+      connectionId: "icn_me_linked_accounts_slack_workspace_b",
+      displayName: "Slack Workspace B",
+      methodId: SlackConnectionMethodIds.SLACK_APP,
+      organizationId: session.organizationId,
+      targetKey: "slack-default",
+    });
+    await seedIdentityProviderConfig(env, {
+      configId: "ilp_me_linked_accounts_slack_workspace_a",
+      connectionId: "icn_me_linked_accounts_slack_workspace_a",
+      organizationId: session.organizationId,
+      providerFamily: "slack",
+      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      targetKey: "slack-default",
+      userId: session.userId,
+    });
+    await seedIdentityProviderConfig(env, {
+      configId: "ilp_me_linked_accounts_slack_workspace_b",
+      connectionId: "icn_me_linked_accounts_slack_workspace_b",
+      organizationId: session.organizationId,
+      providerFamily: "slack",
+      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      targetKey: "slack-default",
+      userId: session.userId,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.userExternalPrincipals).values([
+      {
+        id: "uep_me_linked_accounts_slack_workspace_a",
+        organizationId: session.organizationId,
+        userId: session.userId,
+        providerFamily: "slack",
+        providerSubjectId: "T_WORKSPACE_A:U_SHARED",
+        organizationProviderConfigId: "ilp_me_linked_accounts_slack_workspace_a",
+        integrationConnectionId: "icn_me_linked_accounts_slack_workspace_a",
+        status: UserExternalPrincipalStatuses.ACTIVE,
+        profile: {
+          workspaceId: "T_WORKSPACE_A",
+          workspaceName: "Workspace A",
+        },
+      },
+      {
+        id: "uep_me_linked_accounts_slack_workspace_b",
+        organizationId: session.organizationId,
+        userId: session.userId,
+        providerFamily: "slack",
+        providerSubjectId: "T_WORKSPACE_B:U_SHARED",
+        organizationProviderConfigId: "ilp_me_linked_accounts_slack_workspace_b",
+        integrationConnectionId: "icn_me_linked_accounts_slack_workspace_b",
+        status: UserExternalPrincipalStatuses.ACTIVE,
+        profile: {
+          workspaceId: "T_WORKSPACE_B",
+          workspaceName: "Workspace B",
+        },
+      },
+    ]);
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/me/linked-accounts", {
+      headers: {
+        cookie: session.cookie,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const payload = LinkedAccountsResponseSchema.parse(await response.json());
+    expect(
+      payload.linkedAccounts.map((linkedAccount) => ({
+        organizationProviderConfigId: linkedAccount.organizationProviderConfigId,
+        providerSubjectId: linkedAccount.principal?.providerSubjectId,
+      })),
+    ).toEqual([
+      {
+        organizationProviderConfigId: "ilp_me_linked_accounts_slack_workspace_a",
+        providerSubjectId: "T_WORKSPACE_A:U_SHARED",
+      },
+      {
+        organizationProviderConfigId: "ilp_me_linked_accounts_slack_workspace_b",
+        providerSubjectId: "T_WORKSPACE_B:U_SHARED",
+      },
+    ]);
+  });
+
   it("starts GitHub linked-account authorization and persists encrypted redirect state", async ({
     env,
   }) => {
@@ -237,6 +330,65 @@ describe.concurrent("me linked accounts list and start integration", () => {
     expect(persistedRedirectSession?.providerFamily).toBe("slack");
     expect(persistedRedirectSession?.integrationConnectionId).toBe(connectionId);
     expect(persistedRedirectSession?.pkceVerifierEncrypted).toBeNull();
+  });
+
+  it("rejects legacy provider-family start when multiple configs exist", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-me-linked-accounts-start-ambiguous-slack@example.com",
+    });
+    await upsertSlackIdentityTarget(env);
+    await seedIdentityConnection(env, {
+      connectionId: "icn_me_linked_accounts_start_ambiguous_slack_a",
+      displayName: "Slack Workspace A",
+      methodId: SlackConnectionMethodIds.SLACK_APP,
+      organizationId: session.organizationId,
+      targetKey: "slack-default",
+      config: {
+        app_id: "A0123456789",
+        client_id: "123.456",
+      },
+    });
+    await seedIdentityConnection(env, {
+      connectionId: "icn_me_linked_accounts_start_ambiguous_slack_b",
+      displayName: "Slack Workspace B",
+      methodId: SlackConnectionMethodIds.SLACK_APP,
+      organizationId: session.organizationId,
+      targetKey: "slack-default",
+      config: {
+        app_id: "A0123456789",
+        client_id: "123.456",
+      },
+    });
+    await seedIdentityProviderConfig(env, {
+      configId: "ilp_me_linked_accounts_start_ambiguous_slack_a",
+      connectionId: "icn_me_linked_accounts_start_ambiguous_slack_a",
+      organizationId: session.organizationId,
+      providerFamily: "slack",
+      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      targetKey: "slack-default",
+      userId: session.userId,
+    });
+    await seedIdentityProviderConfig(env, {
+      configId: "ilp_me_linked_accounts_start_ambiguous_slack_b",
+      connectionId: "icn_me_linked_accounts_start_ambiguous_slack_b",
+      organizationId: session.organizationId,
+      providerFamily: "slack",
+      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      targetKey: "slack-default",
+      userId: session.userId,
+    });
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/me/linked-accounts/slack", {
+      method: "POST",
+      headers: {
+        cookie: session.cookie,
+      },
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "PROVIDER_CONFIG_AMBIGUOUS",
+    });
   });
 
   it("rejects starting authorization when no active provider config exists", async ({ env }) => {

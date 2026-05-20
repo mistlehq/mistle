@@ -1,5 +1,4 @@
 import {
-  OrganizationIdentityLinkProviderConfigStatus,
   UserExternalPrincipalCredentialSecretKinds,
   UserExternalPrincipalCredentialStatuses,
   type UserExternalPrincipalCredentialStatus,
@@ -125,20 +124,32 @@ export async function listLinkedAccounts(
 ): Promise<LinkedAccount[]> {
   const tables = getControlPlaneDatabaseSchema(ctx.db);
 
-  const configuredProviders = (await listOrganizationIdentityLinkProviders(ctx, input)).filter(
-    (provider) =>
-      provider.configurationStatus !== IdentityLinkProviderConfigurationStatus.UNCONFIGURED,
-  );
+  const configuredProviderConfigs = (await listOrganizationIdentityLinkProviders(ctx, input))
+    .filter(
+      (provider) =>
+        provider.configurationStatus !== IdentityLinkProviderConfigurationStatus.UNCONFIGURED,
+    )
+    .flatMap((provider) =>
+      provider.configs.map((config) => ({
+        providerFamily: provider.providerFamily,
+        displayName: provider.displayName,
+        logoKey: provider.logoKey,
+        config,
+      })),
+    );
 
-  if (configuredProviders.length === 0) {
+  if (configuredProviderConfigs.length === 0) {
     return [];
   }
 
-  const providerFamilies = configuredProviders.map((provider) => provider.providerFamily);
+  const organizationProviderConfigIds = configuredProviderConfigs.map(
+    (providerConfig) => providerConfig.config.organizationProviderConfigId,
+  );
   const candidatePrincipals = await ctx.db.query.userExternalPrincipals.findMany({
     columns: {
       id: true,
       providerFamily: true,
+      organizationProviderConfigId: true,
       status: true,
       providerSubjectId: true,
       profile: true,
@@ -149,23 +160,23 @@ export async function listLinkedAccounts(
       and(
         eq(table.organizationId, input.organizationId),
         eq(table.userId, input.userId),
-        inArray(table.providerFamily, providerFamilies),
+        inArray(table.organizationProviderConfigId, organizationProviderConfigIds),
         ne(table.status, UserExternalPrincipalStatuses.UNLINKED),
       ),
   });
 
-  const principalsByProviderFamily = new Map<string, (typeof candidatePrincipals)[number]>();
+  const principalsByProviderConfigId = new Map<string, (typeof candidatePrincipals)[number]>();
   for (const principal of candidatePrincipals) {
-    const existing = principalsByProviderFamily.get(principal.providerFamily);
+    const existing = principalsByProviderConfigId.get(principal.organizationProviderConfigId);
     if (
       existing === undefined ||
       rankPrincipalStatus(principal.status) > rankPrincipalStatus(existing.status)
     ) {
-      principalsByProviderFamily.set(principal.providerFamily, principal);
+      principalsByProviderConfigId.set(principal.organizationProviderConfigId, principal);
     }
   }
 
-  const selectedPrincipalIds = [...principalsByProviderFamily.values()].map(
+  const selectedPrincipalIds = [...principalsByProviderConfigId.values()].map(
     (principal) => principal.id,
   );
   const candidateCredentials =
@@ -268,32 +279,22 @@ export async function listLinkedAccounts(
     });
   }
 
-  return configuredProviders.map((provider) => {
-    if (
-      provider.organizationProviderConfigId === null ||
-      provider.integrationConnectionId === null
-    ) {
-      throw new Error(
-        `Configured identity-link provider '${provider.providerFamily}' is missing config identity.`,
-      );
-    }
-
-    const principal = principalsByProviderFamily.get(provider.providerFamily);
+  return configuredProviderConfigs.map((providerConfig) => {
+    const principal = principalsByProviderConfigId.get(
+      providerConfig.config.organizationProviderConfigId,
+    );
     const credential =
       principal === undefined ? undefined : credentialsByPrincipalId.get(principal.id);
     const commitSigning =
       principal === undefined ? undefined : commitSigningByPrincipalId.get(principal.id);
 
     return {
-      providerFamily: provider.providerFamily,
-      organizationProviderConfigId: provider.organizationProviderConfigId,
-      integrationConnectionId: provider.integrationConnectionId,
-      displayName: provider.displayName,
-      logoKey: provider.logoKey,
-      configurationStatus:
-        provider.configurationStatus === OrganizationIdentityLinkProviderConfigStatus.ACTIVE
-          ? OrganizationIdentityLinkProviderConfigStatus.ACTIVE
-          : OrganizationIdentityLinkProviderConfigStatus.DISABLED,
+      providerFamily: providerConfig.providerFamily,
+      organizationProviderConfigId: providerConfig.config.organizationProviderConfigId,
+      integrationConnectionId: providerConfig.config.integrationConnectionId,
+      displayName: providerConfig.displayName,
+      logoKey: providerConfig.logoKey,
+      configurationStatus: providerConfig.config.configurationStatus,
       principal:
         principal === undefined
           ? null

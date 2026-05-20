@@ -1,8 +1,55 @@
 import { describe, expect, it } from "vitest";
 
-import { buildProviderRow } from "./organization-identity-linking-settings-page.js";
+import type {
+  OrganizationIdentityLinkProvider,
+  OrganizationIdentityLinkProviderConfig,
+} from "../settings/identity-linking/organization-identity-linking-service.js";
+import {
+  buildProviderConfigRows,
+  buildProviderRow,
+} from "./organization-identity-linking-settings-page.js";
 
 describe("buildProviderRow", () => {
+  it("does not add a draft row when every eligible connection is already configured", () => {
+    const rows = buildProviderConfigRows([
+      createProvider({
+        configs: [
+          createConfig({
+            organizationProviderConfigId: "ilp_github_saved",
+            integrationConnectionId: "icn_github_saved",
+          }),
+        ],
+      }),
+    ]);
+
+    expect(rows.map((row) => row.rowKey)).toEqual(["ilp_github_saved"]);
+  });
+
+  it("adds a draft row when another eligible connection remains unused", () => {
+    const rows = buildProviderConfigRows([
+      createProvider({
+        eligibleConnections: [
+          createConnection({
+            id: "icn_github_saved",
+            displayName: "GitHub Saved",
+          }),
+          createConnection({
+            id: "icn_github_next",
+            displayName: "GitHub Next",
+          }),
+        ],
+        configs: [
+          createConfig({
+            organizationProviderConfigId: "ilp_github_saved",
+            integrationConnectionId: "icn_github_saved",
+          }),
+        ],
+      }),
+    ]);
+
+    expect(rows.map((row) => row.rowKey)).toEqual(["ilp_github_saved", "draft:github"]);
+  });
+
   it("returns a config-scoped row model when the selected connection differs from the saved config", () => {
     const providerRow = buildProviderRow({
       configuringRowKey: null,
@@ -149,3 +196,69 @@ describe("buildProviderRow", () => {
     expect(providerRow.linkedUsersCount).toBeNull();
   });
 });
+
+function createProvider(
+  overrides: Partial<OrganizationIdentityLinkProvider> = {},
+): OrganizationIdentityLinkProvider {
+  const selectedConnection = createConnection({
+    id: "icn_github_saved",
+    displayName: "GitHub Saved",
+  });
+
+  return {
+    providerFamily: "github",
+    organizationProviderConfigId: "ilp_github_saved",
+    integrationConnectionId: "icn_github_saved",
+    displayName: "GitHub",
+    logoKey: "github",
+    eligibleTargetKeys: ["github-cloud"],
+    eligibleConnectionMethodIds: ["github-app-installation"],
+    eligibleConnections: [selectedConnection],
+    configurationStatus: "active",
+    selectedConnection,
+    configuredAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    configs: [
+      createConfig({
+        organizationProviderConfigId: "ilp_github_saved",
+        integrationConnectionId: "icn_github_saved",
+      }),
+    ],
+    ...overrides,
+  };
+}
+
+function createConfig(
+  overrides: Partial<OrganizationIdentityLinkProviderConfig> = {},
+): OrganizationIdentityLinkProviderConfig {
+  const selectedConnection = createConnection({
+    id: overrides.integrationConnectionId ?? "icn_github_saved",
+    displayName: "GitHub Saved",
+  });
+
+  return {
+    organizationProviderConfigId: "ilp_github_saved",
+    integrationConnectionId: "icn_github_saved",
+    configurationStatus: "active",
+    selectedConnection,
+    configuredAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function createConnection(input: {
+  id: string;
+  displayName: string;
+}): OrganizationIdentityLinkProvider["eligibleConnections"][number] {
+  return {
+    id: input.id,
+    targetKey: "github-cloud",
+    displayName: input.displayName,
+    status: "active",
+    connectionMethodId: "github-app-installation",
+    connectionMethodLabel: "GitHub App installation",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  };
+}

@@ -1,43 +1,40 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  decrementPendingLinkedAccountProviderFamilyCount,
-  incrementPendingLinkedAccountProviderFamilyCount,
-  resolvePendingLinkedAccountProviderFamilies,
+  decrementPendingLinkedAccountConfigCount,
+  incrementPendingLinkedAccountConfigCount,
+  resolvePendingLinkedAccountConfigIds,
 } from "./pending-linked-account-provider-families.js";
 
-describe("profile-settings pending linked-account providers", () => {
-  it("keeps multiple providers pending when overlapping actions are in flight", () => {
-    const afterGitHubStart = incrementPendingLinkedAccountProviderFamilyCount({}, "github");
-    const afterSlackStart = incrementPendingLinkedAccountProviderFamilyCount(
-      afterGitHubStart,
-      "slack",
-    );
+describe("profile-settings pending linked-account configs", () => {
+  it("keeps multiple configs pending when overlapping actions are in flight", () => {
+    const afterGitHubStart = incrementPendingLinkedAccountConfigCount({}, "ilp_github");
+    const afterSlackStart = incrementPendingLinkedAccountConfigCount(afterGitHubStart, "ilp_slack");
 
-    expect(resolvePendingLinkedAccountProviderFamilies(afterSlackStart).sort()).toEqual([
-      "github",
-      "slack",
+    expect(resolvePendingLinkedAccountConfigIds(afterSlackStart).sort()).toEqual([
+      "ilp_github",
+      "ilp_slack",
     ]);
   });
 
-  it("keeps one provider pending until all overlapping actions for that provider settle", () => {
-    const afterFirstStart = incrementPendingLinkedAccountProviderFamilyCount({}, "github");
-    const afterSecondStart = incrementPendingLinkedAccountProviderFamilyCount(
+  it("keeps one config pending until all overlapping actions for that config settle", () => {
+    const afterFirstStart = incrementPendingLinkedAccountConfigCount({}, "ilp_github");
+    const afterSecondStart = incrementPendingLinkedAccountConfigCount(
       afterFirstStart,
-      "github",
+      "ilp_github",
     );
-    const afterFirstFinish = decrementPendingLinkedAccountProviderFamilyCount(
+    const afterFirstFinish = decrementPendingLinkedAccountConfigCount(
       afterSecondStart,
-      "github",
+      "ilp_github",
     );
 
-    expect(resolvePendingLinkedAccountProviderFamilies(afterFirstFinish)).toEqual(["github"]);
+    expect(resolvePendingLinkedAccountConfigIds(afterFirstFinish)).toEqual(["ilp_github"]);
 
-    const afterSecondFinish = decrementPendingLinkedAccountProviderFamilyCount(
+    const afterSecondFinish = decrementPendingLinkedAccountConfigCount(
       afterFirstFinish,
-      "github",
+      "ilp_github",
     );
 
-    expect(resolvePendingLinkedAccountProviderFamilies(afterSecondFinish)).toEqual([]);
+    expect(resolvePendingLinkedAccountConfigIds(afterSecondFinish)).toEqual([]);
   });
 });

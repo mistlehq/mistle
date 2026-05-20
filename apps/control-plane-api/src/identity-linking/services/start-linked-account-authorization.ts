@@ -15,6 +15,10 @@ import {
   persistIdentityLinkRedirectSession,
 } from "./redirect-flow.js";
 import { resolveIdentityLinkProviderContextOrThrow } from "./resolve-identity-link-provider-context.js";
+import {
+  resolveExactOneOrganizationIdentityLinkProviderConfigForFamilyOrThrow,
+  resolveOrganizationIdentityLinkProviderConfigByIdOrThrow,
+} from "./resolve-organization-identity-link-provider-config.js";
 
 export type StartedLinkedAccountAuthorization = {
   authorizationUrl: string;
@@ -42,13 +46,23 @@ export async function startLinkedAccountAuthorization(
   input: {
     organizationId: string;
     userId: string;
-    providerFamily: string;
+    organizationProviderConfigId: string;
     controlPlaneBaseUrl: string;
   },
 ): Promise<StartedLinkedAccountAuthorization> {
+  const config = await resolveOrganizationIdentityLinkProviderConfigByIdOrThrow(
+    {
+      db: ctx.db,
+    },
+    {
+      organizationId: input.organizationId,
+      organizationProviderConfigId: input.organizationProviderConfigId,
+    },
+  );
   const providerContext = await resolveIdentityLinkProviderContextOrThrow(ctx, {
     organizationId: input.organizationId,
-    providerFamily: input.providerFamily,
+    providerFamily: config.providerFamily,
+    organizationProviderConfigId: config.id,
     requiredConfigStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
   });
 
@@ -67,21 +81,21 @@ export async function startLinkedAccountAuthorization(
   if (identityLinkingRuntime.identityLinking.startAuthorization === undefined) {
     throw new BadRequestError(
       IdentityLinkingBadRequestCodes.PROVIDER_ADAPTER_NOT_IMPLEMENTED,
-      `Identity-linking provider '${input.providerFamily}' does not yet support linked-account authorization.`,
+      `Identity-linking provider '${config.providerFamily}' does not yet support linked-account authorization.`,
     );
   }
 
   const state = createRedirectState();
   const redirectUrl = buildIdentityLinkCallbackUrl({
     controlPlaneBaseUrl: input.controlPlaneBaseUrl,
-    providerFamily: input.providerFamily,
+    providerFamily: config.providerFamily,
   });
   let startedAuthorization;
   try {
     startedAuthorization = await identityLinkingRuntime.identityLinking.startAuthorization({
       organizationId: input.organizationId,
       userId: input.userId,
-      providerFamily: input.providerFamily,
+      providerFamily: config.providerFamily,
       target: identityLinkingRuntime.target,
       connection: identityLinkingRuntime.connection,
       state,
@@ -109,7 +123,7 @@ export async function startLinkedAccountAuthorization(
     db: ctx.db,
     organizationId: input.organizationId,
     userId: input.userId,
-    providerFamily: input.providerFamily,
+    providerFamily: config.providerFamily,
     organizationProviderConfigId: providerContext.organizationProviderConfig.id,
     integrationConnectionId: providerContext.integrationConnection.id,
     state,
@@ -128,4 +142,31 @@ export async function startLinkedAccountAuthorization(
     authorizationUrl: startedAuthorization.authorizationUrl,
     expiresAt,
   };
+}
+
+export async function startLinkedAccountAuthorizationForProviderFamily(
+  ctx: Parameters<typeof startLinkedAccountAuthorization>[0],
+  input: {
+    organizationId: string;
+    userId: string;
+    providerFamily: string;
+    controlPlaneBaseUrl: string;
+  },
+): Promise<StartedLinkedAccountAuthorization> {
+  const config = await resolveExactOneOrganizationIdentityLinkProviderConfigForFamilyOrThrow(
+    {
+      db: ctx.db,
+    },
+    {
+      organizationId: input.organizationId,
+      providerFamily: input.providerFamily,
+    },
+  );
+
+  return startLinkedAccountAuthorization(ctx, {
+    organizationId: input.organizationId,
+    userId: input.userId,
+    organizationProviderConfigId: config.id,
+    controlPlaneBaseUrl: input.controlPlaneBaseUrl,
+  });
 }

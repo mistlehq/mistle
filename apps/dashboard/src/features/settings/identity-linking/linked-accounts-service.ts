@@ -172,13 +172,13 @@ export async function listLinkedAccounts(input: {
 }
 
 export async function startLinkedAccountAuthorization(input: {
-  providerFamily: string;
+  organizationProviderConfigId: string;
 }): Promise<StartLinkedAccountAuthorizationResult> {
   try {
     const response = await requestControlPlane({
       operation: "startLinkedAccountAuthorization",
       method: "POST",
-      pathname: `/v1/me/linked-accounts/${encodeURIComponent(input.providerFamily)}`,
+      pathname: `/v1/me/linked-accounts/provider-configs/${encodeURIComponent(input.organizationProviderConfigId)}/authorizations`,
       fallbackMessage: "Could not start linked-account authorization.",
     });
 
@@ -196,12 +196,14 @@ export async function startLinkedAccountAuthorization(input: {
   }
 }
 
-export async function unlinkLinkedAccount(input: { providerFamily: string }): Promise<void> {
+export async function unlinkLinkedAccount(input: {
+  organizationProviderConfigId: string;
+}): Promise<void> {
   try {
     const response = await requestControlPlane({
       operation: "unlinkLinkedAccount",
       method: "DELETE",
-      pathname: `/v1/me/linked-accounts/${encodeURIComponent(input.providerFamily)}`,
+      pathname: `/v1/me/linked-accounts/provider-configs/${encodeURIComponent(input.organizationProviderConfigId)}`,
       fallbackMessage: "Could not unlink linked account.",
     });
 

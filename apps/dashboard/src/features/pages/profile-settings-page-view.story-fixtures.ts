@@ -8,6 +8,7 @@ type LinkedAccountCard = NonNullable<ProfileSettingsPageViewProps["linkedAccount
 
 function createGitHubCard(overrides: Partial<LinkedAccountCard> = {}): LinkedAccountCard {
   return {
+    organizationProviderConfigId: "ilp_story_github",
     providerFamily: "github",
     displayName: "GitHub",
     logoKey: "github",
@@ -25,6 +26,7 @@ function createGitHubCard(overrides: Partial<LinkedAccountCard> = {}): LinkedAcc
 
 function createSlackCard(overrides: Partial<LinkedAccountCard> = {}): LinkedAccountCard {
   return {
+    organizationProviderConfigId: "ilp_story_slack",
     providerFamily: "slack",
     displayName: "Slack",
     logoKey: "slack",
@@ -132,7 +134,7 @@ export const DefaultProfileSettingsPageViewProps: ProfileSettingsPageViewProps =
   displayName: "Mistle Developer",
   email: "developer@mistle.so",
   imageUrl: null,
-  pendingLinkedAccountProviderFamilies: [],
+  pendingLinkedAccountConfigIds: [],
   linkedAccountCallbackNotice: null,
   linkedAccountCards: [],
   linkedAccountErrorMessage: null,

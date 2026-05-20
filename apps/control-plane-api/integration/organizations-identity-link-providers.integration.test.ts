@@ -168,6 +168,7 @@ describe.concurrent("organization identity-linking providers integration", () =>
         },
         body: JSON.stringify({
           integrationConnectionId: "icn_identity_link_slack_workspace_a",
+          status: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
         }),
       },
     );
@@ -186,6 +187,7 @@ describe.concurrent("organization identity-linking providers integration", () =>
         },
         body: JSON.stringify({
           integrationConnectionId: "icn_identity_link_slack_workspace_b",
+          status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
         }),
       },
     );
@@ -193,21 +195,6 @@ describe.concurrent("organization identity-linking providers integration", () =>
     const secondConfig = OrganizationIdentityLinkProviderSchema.shape.configs.element.parse(
       await secondCreateResponse.json(),
     );
-
-    const enableSecondResponse = await env.controlPlaneApi.http.fetch(
-      `/v1/organization/identity-linking/provider-configs/${secondConfig.organizationProviderConfigId}/status`,
-      {
-        method: "PUT",
-        headers: {
-          "content-type": "application/json",
-          cookie: session.cookie,
-        },
-        body: JSON.stringify({
-          status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
-        }),
-      },
-    );
-    expect(enableSecondResponse.status).toBe(200);
 
     const listResponse = await env.controlPlaneApi.http.fetch(
       "/v1/organization/identity-linking/providers",

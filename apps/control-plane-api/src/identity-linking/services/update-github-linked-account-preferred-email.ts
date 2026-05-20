@@ -9,9 +9,7 @@ import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { IdentityLinkingBadRequestCodes, IdentityLinkingNotFoundCodes } from "../constants.js";
-import { listLinkedAccounts } from "./list-linked-accounts.js";
-
-const GitHubProviderFamily = "github";
+import { resolveExactOneGitHubLinkedAccountOrThrow } from "./resolve-github-linked-account.js";
 
 const GitHubAvailableEmailSchema = z
   .object({
@@ -44,12 +42,10 @@ export async function updateGitHubLinkedAccountPreferredEmail(
 ): Promise<void> {
   const tables = getControlPlaneDatabaseSchema(ctx.db);
 
-  const githubLinkedAccount = (
-    await listLinkedAccounts(ctx, {
-      organizationId: input.organizationId,
-      userId: input.userId,
-    })
-  ).find((linkedAccount) => linkedAccount.providerFamily === GitHubProviderFamily);
+  const githubLinkedAccount = await resolveExactOneGitHubLinkedAccountOrThrow(ctx, {
+    organizationId: input.organizationId,
+    userId: input.userId,
+  });
 
   if (githubLinkedAccount?.principal === null || githubLinkedAccount?.principal === undefined) {
     throw new NotFoundError(

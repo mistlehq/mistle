@@ -176,8 +176,37 @@ describe("OrganizationIdentityLinkingSettingsPageView", () => {
 
     expect(screen.getByText("GitHub linked users")).toBeTruthy();
     expect(screen.queryByText("0")).toBeNull();
-    expect(
-      screen.queryByText("No organization members are linked for this integration yet."),
-    ).toBeNull();
+    expect(screen.queryByText("No linked users.")).toBeNull();
+  });
+
+  it("shows an empty state when there are no linked users", () => {
+    render(
+      <OrganizationIdentityLinkingSettingsPageView
+        loadErrorMessage={null}
+        onEnabledChange={async () => {}}
+        onProviderConnectionChange={async () => {}}
+        providers={[
+          {
+            rowKey: "ilp_slack",
+            providerFamily: "slack",
+            organizationProviderConfigId: "ilp_slack",
+            displayName: "Slack",
+            logoKey: "slack",
+            connectionOptions: [],
+            selectedConnectionId: null,
+            connectionPending: false,
+            enablePending: false,
+            enabled: false,
+            linkedUsersCount: 0,
+            memberLinksErrorMessage: null,
+            memberLinks: [],
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "View Slack linked users" }));
+
+    expect(screen.getByText("No linked users.")).toBeTruthy();
   });
 });

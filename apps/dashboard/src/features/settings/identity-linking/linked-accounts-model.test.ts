@@ -75,7 +75,7 @@ function createSlackLinkedAccount(overrides?: Partial<LinkedAccount>): LinkedAcc
 }
 
 describe("linked-accounts-model", () => {
-  it("finds the linked account for a provider family", () => {
+  it("finds the linked account for a provider config", () => {
     const github = createGitHubLinkedAccount();
     const slack = createSlackLinkedAccount({
       configurationStatus: "disabled",
@@ -86,13 +86,13 @@ describe("linked-accounts-model", () => {
     expect(
       findLinkedAccount({
         linkedAccounts: [slack, github],
-        providerFamily: "github",
+        organizationProviderConfigId: "ilp_github",
       }),
     ).toEqual(github);
     expect(
       findLinkedAccount({
         linkedAccounts: [slack, github],
-        providerFamily: "linear",
+        organizationProviderConfigId: "ilp_linear",
       }),
     ).toBeNull();
   });
@@ -101,6 +101,7 @@ describe("linked-accounts-model", () => {
     const linkedAccount = createGitHubLinkedAccount();
 
     expect(resolveLinkedAccountCardViewModel(linkedAccount)).toEqual({
+      organizationProviderConfigId: "ilp_github",
       providerFamily: "github",
       displayName: "GitHub",
       logoKey: "github",
@@ -127,6 +128,7 @@ describe("linked-accounts-model", () => {
     });
 
     expect(resolveLinkedAccountCardViewModel(linkedAccount)).toEqual({
+      organizationProviderConfigId: "ilp_github",
       providerFamily: "github",
       displayName: "GitHub",
       logoKey: "github",
@@ -171,6 +173,7 @@ describe("linked-accounts-model", () => {
     });
 
     expect(resolveLinkedAccountCardViewModel(linkedAccount)).toEqual({
+      organizationProviderConfigId: "ilp_github",
       providerFamily: "github",
       displayName: "GitHub",
       logoKey: "github",
@@ -252,6 +255,7 @@ describe("linked-accounts-model", () => {
     expect(
       resolveLinkedAccountCallbackNotice({
         providerFamily: "github",
+        organizationProviderConfigId: "ilp_github",
         result: "success",
         code: null,
       }),
@@ -266,6 +270,7 @@ describe("linked-accounts-model", () => {
     expect(
       resolveLinkedAccountCallbackNotice({
         providerFamily: "github",
+        organizationProviderConfigId: "ilp_github",
         result: "failure",
         code: "REDIRECT_STATE_EXPIRED",
       }),
@@ -280,6 +285,7 @@ describe("linked-accounts-model", () => {
     expect(
       resolveLinkedAccountCallbackNotice({
         providerFamily: "slack",
+        organizationProviderConfigId: "ilp_slack",
         result: "success",
         code: null,
       }),
@@ -360,6 +366,7 @@ describe("linked-accounts-model", () => {
   it("clears linked-account callback params while preserving unrelated search params", () => {
     const searchParams = new URLSearchParams({
       linkedAccountProvider: "github",
+      organizationProviderConfigId: "ilp_github",
       linkedAccountResult: "success",
       linkedAccountCode: "REDIRECT_STATE_EXPIRED",
       view: "security",

@@ -11,7 +11,10 @@ import {
 
 export const PutGitHubLinkedAccountSigningKeyBadRequestResponseSchema =
   createCodeMessageErrorSchema(
-    z.literal(IdentityLinkingBadRequestCodes.INVALID_LINKED_ACCOUNT_SIGNING_KEY_INPUT),
+    z.union([
+      z.literal(IdentityLinkingBadRequestCodes.INVALID_LINKED_ACCOUNT_SIGNING_KEY_INPUT),
+      z.literal(IdentityLinkingBadRequestCodes.PROVIDER_CONFIG_AMBIGUOUS),
+    ]),
   );
 
 export const PutGitHubLinkedAccountSigningKeyNotFoundResponseSchema = createCodeMessageErrorSchema(

@@ -26,6 +26,7 @@ export type LinkedAccountCommitSigningViewModel = {
 };
 
 export type LinkedAccountCardViewModel = {
+  organizationProviderConfigId: string;
   providerFamily: string;
   displayName: string;
   logoKey: string;
@@ -52,17 +53,19 @@ function resolveProviderDisplayName(providerFamily: string | null): string | nul
 
 const LinkedAccountCallbackSearchParamKeys = [
   "linkedAccountProvider",
+  "organizationProviderConfigId",
   "linkedAccountResult",
   "linkedAccountCode",
 ] as const;
 
 export function findLinkedAccount(input: {
   linkedAccounts: readonly LinkedAccount[];
-  providerFamily: string;
+  organizationProviderConfigId: string;
 }): LinkedAccount | null {
   return (
     input.linkedAccounts.find(
-      (linkedAccount) => linkedAccount.providerFamily === input.providerFamily,
+      (linkedAccount) =>
+        linkedAccount.organizationProviderConfigId === input.organizationProviderConfigId,
     ) ?? null
   );
 }
@@ -80,6 +83,7 @@ export function resolveLinkedAccountCardViewModel(
 
   if (linkedAccount.configurationStatus === "disabled") {
     return {
+      organizationProviderConfigId: linkedAccount.organizationProviderConfigId,
       providerFamily: linkedAccount.providerFamily,
       displayName: linkedAccount.displayName,
       logoKey: linkedAccount.logoKey,
@@ -99,6 +103,7 @@ export function resolveLinkedAccountCardViewModel(
 
   if (linkedAccount.principal === null) {
     return {
+      organizationProviderConfigId: linkedAccount.organizationProviderConfigId,
       providerFamily: linkedAccount.providerFamily,
       displayName: linkedAccount.displayName,
       logoKey: linkedAccount.logoKey,
@@ -115,6 +120,7 @@ export function resolveLinkedAccountCardViewModel(
 
   if (requiresRelink) {
     return {
+      organizationProviderConfigId: linkedAccount.organizationProviderConfigId,
       providerFamily: linkedAccount.providerFamily,
       displayName: linkedAccount.displayName,
       logoKey: linkedAccount.logoKey,
@@ -130,6 +136,7 @@ export function resolveLinkedAccountCardViewModel(
   }
 
   return {
+    organizationProviderConfigId: linkedAccount.organizationProviderConfigId,
     providerFamily: linkedAccount.providerFamily,
     displayName: linkedAccount.displayName,
     logoKey: linkedAccount.logoKey,
@@ -283,6 +290,7 @@ function resolveLinkedAccountEmailPreferenceViewModel(
 
 export function resolveLinkedAccountCallbackNotice(input: {
   providerFamily: string | null;
+  organizationProviderConfigId: string | null;
   result: string | null;
   code: string | null;
 }): LinkedAccountCallbackNotice | null {
@@ -292,6 +300,10 @@ export function resolveLinkedAccountCallbackNotice(input: {
   }
 
   if (input.result === "success") {
+    if (input.organizationProviderConfigId === null) {
+      return null;
+    }
+
     return {
       title: `${providerDisplayName} linked successfully`,
       message: `Your ${providerDisplayName} account is now linked on Mistle.`,

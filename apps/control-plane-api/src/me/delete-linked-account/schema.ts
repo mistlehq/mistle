@@ -1,5 +1,10 @@
 import { z } from "@hono/zod-openapi";
-import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
+import {
+  createCodeMessageErrorSchema,
+  ValidationErrorResponseSchema,
+} from "@mistle/http/errors.js";
+
+import { IdentityLinkingBadRequestCodes } from "../../identity-linking/constants.js";
 
 export const DeleteLinkedAccountParamsSchema = z
   .object({
@@ -8,3 +13,8 @@ export const DeleteLinkedAccountParamsSchema = z
   .strict();
 
 export const DeleteLinkedAccountValidationErrorResponseSchema = ValidationErrorResponseSchema;
+
+export const DeleteLinkedAccountBadRequestResponseSchema = z.union([
+  createCodeMessageErrorSchema(z.literal(IdentityLinkingBadRequestCodes.PROVIDER_CONFIG_AMBIGUOUS)),
+  ValidationErrorResponseSchema,
+]);

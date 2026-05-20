@@ -150,14 +150,16 @@ export const OrganizationIdentityLinkProviderConnectionSummarySchema = z
   })
   .strict();
 
+export const OrganizationIdentityLinkProviderConfigStatusSchema = z.enum([
+  OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+  OrganizationIdentityLinkProviderConfigStatus.DISABLED,
+]);
+
 export const OrganizationIdentityLinkProviderConfigSchema = z
   .object({
     organizationProviderConfigId: z.string().min(1),
     integrationConnectionId: z.string().min(1),
-    configurationStatus: z.enum([
-      OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
-      OrganizationIdentityLinkProviderConfigStatus.DISABLED,
-    ]),
+    configurationStatus: OrganizationIdentityLinkProviderConfigStatusSchema,
     selectedConnection: OrganizationIdentityLinkProviderConnectionSummarySchema,
     configuredAt: z.string().min(1),
     updatedAt: z.string().min(1),

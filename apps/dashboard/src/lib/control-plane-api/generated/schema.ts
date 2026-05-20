@@ -4153,7 +4153,8 @@ export interface paths {
               code:
                 | "INVALID_PROVIDER_CONFIG_INPUT"
                 | "INVALID_LINKED_ACCOUNT_START_INPUT"
-                | "PROVIDER_ADAPTER_NOT_IMPLEMENTED";
+                | "PROVIDER_ADAPTER_NOT_IMPLEMENTED"
+                | "PROVIDER_CONFIG_AMBIGUOUS";
               message: string;
             };
           };
@@ -4215,6 +4216,25 @@ export interface paths {
             [name: string]: unknown;
           };
           content?: never;
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "PROVIDER_CONFIG_AMBIGUOUS";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
         };
         /** @description Authentication is required. */
         401: {
@@ -4287,8 +4307,7 @@ export interface paths {
           };
           content: {
             "application/json": {
-              /** @enum {string} */
-              code: "INVALID_LINKED_ACCOUNT_PREFERRED_EMAIL_INPUT";
+              code: "INVALID_LINKED_ACCOUNT_PREFERRED_EMAIL_INPUT" | "PROVIDER_CONFIG_AMBIGUOUS";
               message: string;
             };
           };
@@ -4379,8 +4398,7 @@ export interface paths {
           };
           content: {
             "application/json": {
-              /** @enum {string} */
-              code: "INVALID_LINKED_ACCOUNT_SIGNING_KEY_INPUT";
+              code: "INVALID_LINKED_ACCOUNT_SIGNING_KEY_INPUT" | "PROVIDER_CONFIG_AMBIGUOUS";
               message: string;
             };
           };
@@ -4442,6 +4460,19 @@ export interface paths {
             [name: string]: unknown;
           };
           content?: never;
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROVIDER_CONFIG_AMBIGUOUS";
+              message: string;
+            };
+          };
         };
         /** @description Authentication is required. */
         401: {
@@ -4521,8 +4552,7 @@ export interface paths {
           };
           content: {
             "application/json": {
-              /** @enum {string} */
-              code: "INVALID_LINKED_ACCOUNT_SIGNING_KEY_INPUT";
+              code: "INVALID_LINKED_ACCOUNT_SIGNING_KEY_INPUT" | "PROVIDER_CONFIG_AMBIGUOUS";
               message: string;
             };
           };
@@ -4549,6 +4579,174 @@ export interface paths {
             "application/json": {
               /** @enum {string} */
               code: "LINKED_ACCOUNT_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Validation error. */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/linked-accounts/provider-configs/:organizationProviderConfigId": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          organizationProviderConfigId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Unlink the authenticated user's linked account for the given provider config. */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Provider config was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROVIDER_CONFIG_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Validation error. */
+        422: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/linked-accounts/provider-configs/:organizationProviderConfigId/authorizations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          organizationProviderConfigId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Start linked-account authorization for the authenticated user and provider config. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** Format: uri */
+              authorizationUrl: string;
+              expiresAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              code:
+                | "INVALID_PROVIDER_CONFIG_INPUT"
+                | "INVALID_LINKED_ACCOUNT_START_INPUT"
+                | "PROVIDER_ADAPTER_NOT_IMPLEMENTED";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Provider configuration was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              code: "PROVIDER_NOT_FOUND" | "PROVIDER_CONFIG_NOT_FOUND" | "CONNECTION_NOT_FOUND";
               message: string;
             };
           };
@@ -5971,6 +6169,8 @@ export interface paths {
         content: {
           "application/json": {
             integrationConnectionId: string;
+            /** @enum {string} */
+            status: "active" | "disabled";
           };
         };
       };

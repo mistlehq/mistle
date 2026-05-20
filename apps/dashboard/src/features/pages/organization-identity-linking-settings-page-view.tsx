@@ -15,7 +15,7 @@ import {
   Switch,
 } from "@mistle/ui";
 import { EyeIcon } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { IntegrationLogo } from "../integrations/integration-logo.js";
 import { FormPageStack } from "../shared/form-page.js";
@@ -249,10 +249,19 @@ function LinkedUsersDialog(input: {
   provider: OrganizationIdentityLinkingProviderRow | null;
   onOpenChange: (open: boolean) => void;
 }): React.JSX.Element {
-  const provider = input.provider;
+  const [lastProvider, setLastProvider] = useState<OrganizationIdentityLinkingProviderRow | null>(
+    null,
+  );
+  const provider = input.provider ?? lastProvider;
+
+  useEffect(() => {
+    if (input.provider !== null) {
+      setLastProvider(input.provider);
+    }
+  }, [input.provider]);
 
   return (
-    <Dialog onOpenChange={input.onOpenChange} open={provider !== null}>
+    <Dialog onOpenChange={input.onOpenChange} open={input.provider !== null}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader variant="sectioned">
           <DialogTitle>
@@ -262,8 +271,10 @@ function LinkedUsersDialog(input: {
 
         {provider === null ? null : provider.memberLinksErrorMessage !== null ? (
           <Notice variant="alert">{provider.memberLinksErrorMessage}</Notice>
+        ) : provider.organizationProviderConfigId === null ? (
+          <Notice>No linked users.</Notice>
         ) : provider.linkedUsersCount === null ? null : provider.memberLinks.length === 0 ? (
-          <Notice>No organization members are linked for this integration yet.</Notice>
+          <Notice>No linked users.</Notice>
         ) : (
           <ScrollArea className="max-h-96 rounded-md border">
             <div className="flex flex-col divide-y">

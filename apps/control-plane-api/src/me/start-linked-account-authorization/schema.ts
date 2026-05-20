@@ -20,6 +20,7 @@ export const StartLinkedAccountAuthorizationBadRequestResponseSchema = createCod
     z.literal(IdentityLinkingBadRequestCodes.INVALID_PROVIDER_CONFIG_INPUT),
     z.literal(IdentityLinkingBadRequestCodes.INVALID_LINKED_ACCOUNT_START_INPUT),
     z.literal(IdentityLinkingBadRequestCodes.PROVIDER_ADAPTER_NOT_IMPLEMENTED),
+    z.literal(IdentityLinkingBadRequestCodes.PROVIDER_CONFIG_AMBIGUOUS),
   ]),
 );
 

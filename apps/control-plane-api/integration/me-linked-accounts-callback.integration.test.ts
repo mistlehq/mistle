@@ -14,6 +14,7 @@ import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
+import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import { StartLinkedAccountAuthorizationResponseSchema } from "../src/me/index.js";
@@ -92,7 +93,7 @@ describe.concurrent("me linked accounts callback integration", () => {
 
       expect(callbackResponse.status).toBe(302);
       expect(callbackResponse.headers.get("location")).toBe(
-        "http://localhost:5173/settings/account/profile?linkedAccountProvider=github&linkedAccountResult=success",
+        "http://localhost:5173/settings/account/profile?linkedAccountProvider=github&organizationProviderConfigId=ilp_me_linked_accounts_callback_github&linkedAccountResult=success",
       );
 
       const tokenRequest = readProviderRequest(
@@ -277,7 +278,7 @@ describe.concurrent("me linked accounts callback integration", () => {
 
       expect(callbackResponse.status).toBe(302);
       expect(callbackResponse.headers.get("location")).toBe(
-        "http://localhost:5173/settings/account/profile?linkedAccountProvider=slack&linkedAccountResult=success",
+        "http://localhost:5173/settings/account/profile?linkedAccountProvider=slack&organizationProviderConfigId=ilp_me_linked_accounts_callback_slack&linkedAccountResult=success",
       );
 
       const tokenRequest = readProviderRequest(simulatedSlack.requests, "/api/oauth.v2.access");
@@ -369,6 +370,246 @@ describe.concurrent("me linked accounts callback integration", () => {
           secretKind: UserExternalPrincipalCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
         }),
       ).resolves.toBe("xoxe.xoxp-slack-user-token");
+    } finally {
+      await simulatedSlack.stop();
+    }
+  });
+
+  it("links the same Slack user id under two provider configs without superseding either", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-me-linked-accounts-callback-two-slack@example.com",
+    });
+    const simulatedSlackA = await startSimulatedSlackIdentityProvider({
+      tokenResponse: {
+        ok: true,
+        team: {
+          id: "T_WORKSPACE_A",
+          name: "Workspace A",
+        },
+        authed_user: {
+          id: "U_SHARED",
+          scope: "users.profile:read,users:read,users:read.email",
+          access_token: "xoxe.workspace-a-user-token",
+          expires_in: 43_200,
+          token_type: "user",
+        },
+      },
+      profileResponse: {
+        ok: true,
+        profile: {
+          display_name: "Shared Slack User A",
+          real_name: "Shared Slack User A",
+          image_192: "https://avatars.slack-edge.com/workspace-a.png",
+          email: "workspace-a@example.com",
+        },
+      },
+    });
+    const simulatedSlackB = await startSimulatedSlackIdentityProvider({
+      tokenResponse: {
+        ok: true,
+        team: {
+          id: "T_WORKSPACE_B",
+          name: "Workspace B",
+        },
+        authed_user: {
+          id: "U_SHARED",
+          scope: "users.profile:read,users:read,users:read.email",
+          access_token: "xoxe.workspace-b-user-token",
+          expires_in: 43_200,
+          token_type: "user",
+        },
+      },
+      profileResponse: {
+        ok: true,
+        profile: {
+          display_name: "Shared Slack User B",
+          real_name: "Shared Slack User B",
+          image_192: "https://avatars.slack-edge.com/workspace-b.png",
+          email: "workspace-b@example.com",
+        },
+      },
+    });
+
+    try {
+      await upsertSlackIdentityTarget(env, {
+        targetKey: "slack-callback-workspace-a",
+        apiBaseUrl: `${simulatedSlackA.baseUrl}/api`,
+      });
+      await upsertSlackIdentityTarget(env, {
+        targetKey: "slack-callback-workspace-b",
+        apiBaseUrl: `${simulatedSlackB.baseUrl}/api`,
+      });
+      const connectionAId = await createSlackIdentityConnection(env, {
+        displayName: "Slack Workspace A",
+        session,
+        targetKey: "slack-callback-workspace-a",
+      });
+      const connectionBId = await createSlackIdentityConnection(env, {
+        displayName: "Slack Workspace B",
+        session,
+        targetKey: "slack-callback-workspace-b",
+      });
+      await env.controlPlaneDb
+        .update(env.controlPlaneTables.integrationConnections)
+        .set({ externalSubjectId: "T_WORKSPACE_A" })
+        .where(eq(env.controlPlaneTables.integrationConnections.id, connectionAId));
+      await env.controlPlaneDb
+        .update(env.controlPlaneTables.integrationConnections)
+        .set({ externalSubjectId: "T_WORKSPACE_B" })
+        .where(eq(env.controlPlaneTables.integrationConnections.id, connectionBId));
+      await seedIdentityProviderConfig(env, {
+        configId: "ilp_me_linked_accounts_callback_slack_a",
+        connectionId: connectionAId,
+        organizationId: session.organizationId,
+        providerFamily: "slack",
+        status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+        targetKey: "slack-callback-workspace-a",
+        userId: session.userId,
+      });
+      await seedIdentityProviderConfig(env, {
+        configId: "ilp_me_linked_accounts_callback_slack_b",
+        connectionId: connectionBId,
+        organizationId: session.organizationId,
+        providerFamily: "slack",
+        status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+        targetKey: "slack-callback-workspace-b",
+        userId: session.userId,
+      });
+
+      for (const configId of [
+        "ilp_me_linked_accounts_callback_slack_a",
+        "ilp_me_linked_accounts_callback_slack_b",
+      ]) {
+        const startResponse = await env.controlPlaneApi.http.fetch(
+          `/v1/me/linked-accounts/provider-configs/${configId}/authorizations`,
+          {
+            method: "POST",
+            headers: {
+              cookie: session.cookie,
+            },
+          },
+        );
+        expect(startResponse.status).toBe(200);
+        const startPayload = StartLinkedAccountAuthorizationResponseSchema.parse(
+          await startResponse.json(),
+        );
+        const authorizationUrl = new URL(startPayload.authorizationUrl);
+        const state = authorizationUrl.searchParams.get("state");
+        expect(state).toBeTruthy();
+
+        const callbackResponse = await env.controlPlaneApi.http.fetch(
+          `/p/identity-linking/callbacks/slack?state=${encodeURIComponent(state ?? "__missing__")}&code=code_${configId}`,
+          {
+            redirect: "manual",
+          },
+        );
+        expect(callbackResponse.status).toBe(302);
+      }
+
+      const principals = await env.controlPlaneDb.query.userExternalPrincipals.findMany({
+        columns: {
+          organizationProviderConfigId: true,
+          providerSubjectId: true,
+          status: true,
+          profile: true,
+        },
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.organizationId, session.organizationId),
+            eq(table.userId, session.userId),
+            eq(table.providerFamily, "slack"),
+          ),
+        orderBy: (table, { asc }) => [asc(table.organizationProviderConfigId)],
+      });
+
+      expect(principals).toMatchObject([
+        {
+          organizationProviderConfigId: "ilp_me_linked_accounts_callback_slack_a",
+          providerSubjectId: "T_WORKSPACE_A:U_SHARED",
+          status: UserExternalPrincipalStatuses.ACTIVE,
+          profile: {
+            workspaceId: "T_WORKSPACE_A",
+            workspaceName: "Workspace A",
+          },
+        },
+        {
+          organizationProviderConfigId: "ilp_me_linked_accounts_callback_slack_b",
+          providerSubjectId: "T_WORKSPACE_B:U_SHARED",
+          status: UserExternalPrincipalStatuses.ACTIVE,
+          profile: {
+            workspaceId: "T_WORKSPACE_B",
+            workspaceName: "Workspace B",
+          },
+        },
+      ]);
+    } finally {
+      await simulatedSlackA.stop();
+      await simulatedSlackB.stop();
+    }
+  });
+
+  it("rejects Slack callbacks that return a workspace outside the selected connection", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-me-linked-accounts-callback-slack-workspace-mismatch@example.com",
+    });
+    const simulatedSlack = await startSimulatedSlackIdentityProvider();
+    const targetKey = "slack-callback-workspace-mismatch";
+
+    try {
+      await upsertSlackIdentityTarget(env, {
+        targetKey,
+        apiBaseUrl: `${simulatedSlack.baseUrl}/api`,
+      });
+      const connectionId = await createSlackIdentityConnection(env, {
+        displayName: "Slack Identity",
+        session,
+        targetKey,
+      });
+      await env.controlPlaneDb
+        .update(env.controlPlaneTables.integrationConnections)
+        .set({ externalSubjectId: "T_OTHER" })
+        .where(eq(env.controlPlaneTables.integrationConnections.id, connectionId));
+      await seedIdentityProviderConfig(env, {
+        configId: "ilp_me_linked_accounts_callback_slack_mismatch",
+        connectionId,
+        organizationId: session.organizationId,
+        providerFamily: "slack",
+        status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+        targetKey,
+        userId: session.userId,
+      });
+
+      const startResponse = await env.controlPlaneApi.http.fetch(
+        "/v1/me/linked-accounts/provider-configs/ilp_me_linked_accounts_callback_slack_mismatch/authorizations",
+        {
+          method: "POST",
+          headers: {
+            cookie: session.cookie,
+          },
+        },
+      );
+      expect(startResponse.status).toBe(200);
+      const startPayload = StartLinkedAccountAuthorizationResponseSchema.parse(
+        await startResponse.json(),
+      );
+      const authorizationUrl = new URL(startPayload.authorizationUrl);
+      const state = authorizationUrl.searchParams.get("state");
+
+      const callbackResponse = await env.controlPlaneApi.http.fetch(
+        `/p/identity-linking/callbacks/slack?state=${encodeURIComponent(state ?? "__missing__")}&code=code_123`,
+        {
+          redirect: "manual",
+        },
+      );
+
+      expect(callbackResponse.status).toBe(302);
+      expect(callbackResponse.headers.get("location")).toBe(
+        "http://localhost:5173/settings/account/profile?linkedAccountProvider=slack&linkedAccountResult=failure&linkedAccountCode=INVALID_LINKED_ACCOUNT_CALLBACK_INPUT",
+      );
     } finally {
       await simulatedSlack.stop();
     }

@@ -1,7 +1,13 @@
 import { z } from "@hono/zod-openapi";
 import { createCodeMessageErrorSchema } from "@mistle/http/errors.js";
 
-import { IdentityLinkingNotFoundCodes } from "../../identity-linking/constants.js";
+import {
+  IdentityLinkingBadRequestCodes,
+  IdentityLinkingNotFoundCodes,
+} from "../../identity-linking/constants.js";
+
+export const DeleteGitHubLinkedAccountSigningKeyBadRequestResponseSchema =
+  createCodeMessageErrorSchema(z.literal(IdentityLinkingBadRequestCodes.PROVIDER_CONFIG_AMBIGUOUS));
 
 export const DeleteGitHubLinkedAccountSigningKeyNotFoundResponseSchema =
   createCodeMessageErrorSchema(

@@ -1,7 +1,7 @@
 import type { RouteHandler } from "@hono/zod-openapi";
 import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
-import { startLinkedAccountAuthorizationForProviderFamily } from "../../identity-linking/services/start-linked-account-authorization.js";
+import { unlinkLinkedAccountForProviderConfig } from "../../identity-linking/services/unlink-linked-account.js";
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
 import { route } from "./route.js";
@@ -10,22 +10,22 @@ const routeHandler = async (
   ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
   session: AppSession,
 ) => {
-  const { providerFamily } = ctx.req.valid("param");
-  const startedAuthorization = await startLinkedAccountAuthorizationForProviderFamily(
+  const { organizationProviderConfigId } = ctx.req.valid("param");
+
+  await unlinkLinkedAccountForProviderConfig(
     {
       db: ctx.get("db"),
-      integrationRegistry: ctx.get("integrationRegistry"),
-      integrationsConfig: ctx.get("config").integrations,
     },
     {
       organizationId: session.activeOrganizationId,
       userId: session.user.id,
-      providerFamily,
-      controlPlaneBaseUrl: ctx.get("config").auth.baseUrl,
+      organizationProviderConfigId,
     },
   );
 
-  return ctx.json(startedAuthorization, 200);
+  return new Response(null, {
+    status: 204,
+  });
 };
 
 export const handler: RouteHandler<typeof route, AppContextBindings> = withHttpErrorHandler(

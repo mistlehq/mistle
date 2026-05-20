@@ -29,11 +29,15 @@ export function buildIdentityLinkCallbackUrl(input: {
 export function buildIdentityLinkResultDashboardUrl(input: {
   dashboardBaseUrl: string;
   providerFamily: string;
+  organizationProviderConfigId?: string;
   result: "success" | "failure";
   code?: string;
 }): string {
   const url = new URL(buildDashboardUrl(input.dashboardBaseUrl, "/settings/account/profile"));
   url.searchParams.set("linkedAccountProvider", input.providerFamily);
+  if (input.organizationProviderConfigId !== undefined) {
+    url.searchParams.set("organizationProviderConfigId", input.organizationProviderConfigId);
+  }
   url.searchParams.set("linkedAccountResult", input.result);
   if (input.code !== undefined) {
     url.searchParams.set("linkedAccountCode", input.code);

@@ -1,7 +1,10 @@
 import { createRoute } from "@hono/zod-openapi";
 import { UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
-import { DeleteGitHubLinkedAccountSigningKeyNotFoundResponseSchema } from "./schema.js";
+import {
+  DeleteGitHubLinkedAccountSigningKeyBadRequestResponseSchema,
+  DeleteGitHubLinkedAccountSigningKeyNotFoundResponseSchema,
+} from "./schema.js";
 
 export const route = createRoute({
   method: "delete",
@@ -10,6 +13,14 @@ export const route = createRoute({
   responses: {
     204: {
       description: "Remove the authenticated user's GitHub SSH signing key.",
+    },
+    400: {
+      description: "Invalid request.",
+      content: {
+        "application/json": {
+          schema: DeleteGitHubLinkedAccountSigningKeyBadRequestResponseSchema,
+        },
+      },
     },
     401: {
       description: "Authentication is required.",

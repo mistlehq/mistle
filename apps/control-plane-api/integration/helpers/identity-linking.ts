@@ -218,6 +218,7 @@ export async function seedIdentityConnection(
     organizationId: string;
     targetKey: string;
     methodId: string;
+    externalSubjectId?: string;
     config?: Record<string, unknown>;
   },
 ): Promise<void> {
@@ -227,6 +228,9 @@ export async function seedIdentityConnection(
     targetKey: input.targetKey,
     displayName: input.displayName,
     status: IntegrationConnectionStatuses.ACTIVE,
+    ...(input.externalSubjectId === undefined
+      ? {}
+      : { externalSubjectId: input.externalSubjectId }),
     config: {
       connection_method: input.methodId,
       ...input.config,

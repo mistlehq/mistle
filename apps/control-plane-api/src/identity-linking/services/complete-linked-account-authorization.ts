@@ -289,7 +289,7 @@ async function persistLinkedAccountAuthorization(input: {
       and(
         eq(table.organizationId, input.organizationId),
         eq(table.userId, input.userId),
-        eq(table.providerFamily, input.providerFamily),
+        eq(table.organizationProviderConfigId, input.organizationProviderConfigId),
         ne(table.status, UserExternalPrincipalStatuses.UNLINKED),
       ),
     orderBy: (table, { desc }) => [desc(table.linkedAt)],
@@ -303,7 +303,7 @@ async function persistLinkedAccountAuthorization(input: {
     where: (table, { and, eq, ne }) =>
       and(
         eq(table.organizationId, input.organizationId),
-        eq(table.providerFamily, input.providerFamily),
+        eq(table.organizationProviderConfigId, input.organizationProviderConfigId),
         eq(table.providerSubjectId, providerSubjectId),
         ne(table.status, UserExternalPrincipalStatuses.UNLINKED),
         ne(table.userId, input.userId),
@@ -475,6 +475,24 @@ async function persistLinkedAccountAuthorization(input: {
   }
 }
 
+function assertCompletedAuthorizationMatchesProviderConfig(input: {
+  providerFamily: string;
+  integrationConnectionExternalSubjectId: string | null;
+  completedAuthorization: CompletedIdentityLinkingAuthorization;
+}): void {
+  if (input.providerFamily !== "slack" || input.integrationConnectionExternalSubjectId === null) {
+    return;
+  }
+
+  const workspaceId = input.completedAuthorization.profile?.["workspaceId"];
+  if (workspaceId !== input.integrationConnectionExternalSubjectId) {
+    throw new BadRequestError(
+      IdentityLinkingBadRequestCodes.INVALID_LINKED_ACCOUNT_CALLBACK_INPUT,
+      `Slack linked account belongs to workspace '${typeof workspaceId === "string" ? workspaceId : "<missing>"}', but the selected integration connection is installed in workspace '${input.integrationConnectionExternalSubjectId}'.`,
+    );
+  }
+}
+
 export async function completeLinkedAccountAuthorization(
   ctx: {
     db: ControlPlaneDatabase;
@@ -601,6 +619,12 @@ export async function completeLinkedAccountAuthorization(
     throw error;
   }
 
+  assertCompletedAuthorizationMatchesProviderConfig({
+    providerFamily: input.providerFamily,
+    integrationConnectionExternalSubjectId: providerContext.integrationConnection.externalSubjectId,
+    completedAuthorization,
+  });
+
   await ctx.db.transaction(async (tx) => {
     await markIdentityLinkRedirectSessionUsedOrThrow({
       db: tx,
@@ -622,6 +646,7 @@ export async function completeLinkedAccountAuthorization(
   return buildIdentityLinkResultDashboardUrl({
     dashboardBaseUrl: ctx.dashboardBaseUrl,
     providerFamily: input.providerFamily,
+    organizationProviderConfigId: providerContext.organizationProviderConfig.id,
     result: "success",
   });
 }

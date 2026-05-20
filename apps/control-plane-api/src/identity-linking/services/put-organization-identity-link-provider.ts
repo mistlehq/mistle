@@ -39,7 +39,10 @@ export async function putOrganizationIdentityLinkProvider(
   });
 
   if (existingConfigs.length === 0) {
-    await createOrganizationIdentityLinkProviderConfig(ctx, input);
+    await createOrganizationIdentityLinkProviderConfig(ctx, {
+      ...input,
+      status: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
+    });
   } else {
     const existingConfig =
       await resolveExactOneOrganizationIdentityLinkProviderConfigForFamilyOrThrow(ctx, {
@@ -79,6 +82,7 @@ export async function createOrganizationIdentityLinkProviderConfig(
     actorUserId: string;
     providerFamily: string;
     integrationConnectionId: string;
+    status: OrganizationIdentityLinkProviderConfigStatus;
   },
 ) {
   const tables = getControlPlaneDatabaseSchema(ctx.db);
@@ -103,7 +107,7 @@ export async function createOrganizationIdentityLinkProviderConfig(
     .values({
       organizationId: input.organizationId,
       providerFamily: provider.providerFamily,
-      status: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
+      status: input.status,
       integrationTargetKey: connection.targetKey,
       integrationConnectionId: input.integrationConnectionId,
       createdByUserId: input.actorUserId,

@@ -12,7 +12,7 @@ const baseProps = {
   displayName: "Mistle Developer",
   email: "developer@mistle.so",
   imageUrl: null,
-  pendingLinkedAccountProviderFamilies: [],
+  pendingLinkedAccountConfigIds: [],
   linkedAccountCallbackNotice: null,
   linkedAccountCards: [],
   linkedAccountErrorMessage: null,
@@ -45,6 +45,7 @@ type LinkedAccountCard = NonNullable<
 
 function createGitHubLinkedCard(overrides: Partial<LinkedAccountCard> = {}): LinkedAccountCard {
   return {
+    organizationProviderConfigId: "ilp_component_github",
     providerFamily: "github",
     displayName: "GitHub",
     logoKey: "github",
@@ -205,6 +206,7 @@ describe("ProfileSettingsPageView", () => {
         {...baseProps}
         linkedAccountCards={[
           {
+            organizationProviderConfigId: "ilp_component_github",
             providerFamily: "github",
             displayName: "GitHub",
             logoKey: "github",
@@ -312,6 +314,7 @@ describe("ProfileSettingsPageView", () => {
         {...baseProps}
         linkedAccountCards={[
           {
+            organizationProviderConfigId: "ilp_component_github",
             providerFamily: "github",
             displayName: "GitHub",
             logoKey: "github",
@@ -330,6 +333,7 @@ describe("ProfileSettingsPageView", () => {
             secondaryActionLabel: "Unlink",
           },
           {
+            organizationProviderConfigId: "ilp_component_slack",
             providerFamily: "slack",
             displayName: "Slack",
             logoKey: "slack",
@@ -358,6 +362,7 @@ describe("ProfileSettingsPageView", () => {
         {...baseProps}
         linkedAccountCards={[
           {
+            organizationProviderConfigId: "ilp_component_github",
             providerFamily: "github",
             displayName: "GitHub",
             logoKey: "github",
@@ -371,6 +376,7 @@ describe("ProfileSettingsPageView", () => {
             secondaryActionLabel: null,
           },
           {
+            organizationProviderConfigId: "ilp_component_slack",
             providerFamily: "slack",
             displayName: "Slack",
             logoKey: "slack",
@@ -384,7 +390,7 @@ describe("ProfileSettingsPageView", () => {
             secondaryActionLabel: null,
           },
         ]}
-        pendingLinkedAccountProviderFamilies={["github"]}
+        pendingLinkedAccountConfigIds={["ilp_component_github"]}
       />,
     );
 
@@ -412,6 +418,7 @@ describe("ProfileSettingsPageView", () => {
         {...baseProps}
         linkedAccountCards={[
           {
+            organizationProviderConfigId: "ilp_component_github",
             providerFamily: "github",
             displayName: "GitHub",
             logoKey: "github",
@@ -449,6 +456,7 @@ describe("ProfileSettingsPageView", () => {
         {...baseProps}
         linkedAccountCards={[
           {
+            organizationProviderConfigId: "ilp_component_github",
             providerFamily: "github",
             displayName: "GitHub",
             logoKey: "github",
@@ -480,6 +488,7 @@ describe("ProfileSettingsPageView", () => {
         {...baseProps}
         linkedAccountCards={[
           {
+            organizationProviderConfigId: "ilp_component_github",
             providerFamily: "github",
             displayName: "GitHub",
             logoKey: "github",
@@ -527,9 +536,10 @@ describe("ProfileSettingsPageView", () => {
     render(
       <ProfileSettingsPageView
         {...baseProps}
-        pendingLinkedAccountProviderFamilies={["github"]}
+        pendingLinkedAccountConfigIds={["ilp_component_github"]}
         linkedAccountCards={[
           {
+            organizationProviderConfigId: "ilp_component_github",
             providerFamily: "github",
             displayName: "GitHub",
             logoKey: "github",

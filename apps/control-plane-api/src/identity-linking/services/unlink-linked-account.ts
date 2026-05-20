@@ -7,6 +7,11 @@ import {
 } from "@mistle/db/control-plane";
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
 
+import {
+  resolveExactOneOrganizationIdentityLinkProviderConfigForFamilyOrThrow,
+  resolveOrganizationIdentityLinkProviderConfigByIdOrThrow,
+} from "./resolve-organization-identity-link-provider-config.js";
+
 export async function unlinkLinkedAccount(
   ctx: {
     db: ControlPlaneDatabase;
@@ -17,6 +22,33 @@ export async function unlinkLinkedAccount(
     providerFamily: string;
   },
 ): Promise<void> {
+  const config = await resolveExactOneOrganizationIdentityLinkProviderConfigForFamilyOrThrow(ctx, {
+    organizationId: input.organizationId,
+    providerFamily: input.providerFamily,
+  });
+
+  return unlinkLinkedAccountForProviderConfig(ctx, {
+    organizationId: input.organizationId,
+    userId: input.userId,
+    organizationProviderConfigId: config.id,
+  });
+}
+
+export async function unlinkLinkedAccountForProviderConfig(
+  ctx: {
+    db: ControlPlaneDatabase;
+  },
+  input: {
+    organizationId: string;
+    userId: string;
+    organizationProviderConfigId: string;
+  },
+): Promise<void> {
+  await resolveOrganizationIdentityLinkProviderConfigByIdOrThrow(ctx, {
+    organizationId: input.organizationId,
+    organizationProviderConfigId: input.organizationProviderConfigId,
+  });
+
   await ctx.db.transaction(async (tx) => {
     const tables = getControlPlaneDatabaseSchema(tx);
 
@@ -31,7 +63,10 @@ export async function unlinkLinkedAccount(
         and(
           eq(tables.userExternalPrincipals.organizationId, input.organizationId),
           eq(tables.userExternalPrincipals.userId, input.userId),
-          eq(tables.userExternalPrincipals.providerFamily, input.providerFamily),
+          eq(
+            tables.userExternalPrincipals.organizationProviderConfigId,
+            input.organizationProviderConfigId,
+          ),
           ne(tables.userExternalPrincipals.status, UserExternalPrincipalStatuses.UNLINKED),
         ),
       )

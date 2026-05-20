@@ -17,7 +17,10 @@ export const PutGitHubLinkedAccountPreferredEmailBodySchema = z
 
 export const PutGitHubLinkedAccountPreferredEmailBadRequestResponseSchema =
   createCodeMessageErrorSchema(
-    z.literal(IdentityLinkingBadRequestCodes.INVALID_LINKED_ACCOUNT_PREFERRED_EMAIL_INPUT),
+    z.union([
+      z.literal(IdentityLinkingBadRequestCodes.INVALID_LINKED_ACCOUNT_PREFERRED_EMAIL_INPUT),
+      z.literal(IdentityLinkingBadRequestCodes.PROVIDER_CONFIG_AMBIGUOUS),
+    ]),
   );
 
 export const PutGitHubLinkedAccountPreferredEmailNotFoundResponseSchema =

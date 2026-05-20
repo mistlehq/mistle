@@ -190,6 +190,7 @@ export async function listOrganizationIdentityLinkProviders(input: {
 export async function createOrganizationIdentityLinkProviderConfig(input: {
   providerFamily: string;
   integrationConnectionId: string;
+  status: "active" | "disabled";
 }): Promise<OrganizationIdentityLinkProviderConfig> {
   try {
     const response = await requestControlPlane({
@@ -198,6 +199,7 @@ export async function createOrganizationIdentityLinkProviderConfig(input: {
       pathname: `/v1/organization/identity-linking/providers/${encodeURIComponent(input.providerFamily)}/configs`,
       body: {
         integrationConnectionId: input.integrationConnectionId,
+        status: input.status,
       },
       fallbackMessage: "Could not save identity-linking provider configuration.",
     });

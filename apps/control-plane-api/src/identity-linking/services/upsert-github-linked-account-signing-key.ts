@@ -16,7 +16,7 @@ import {
   GitSshSigningCredentialKind,
   parseGitSshSigningPrivateKeyOrThrow,
 } from "../github-signing.js";
-import { listLinkedAccounts } from "./list-linked-accounts.js";
+import { resolveExactOneGitHubLinkedAccountOrThrow } from "./resolve-github-linked-account.js";
 
 function createInvalidSigningKeyInputError(message: string): BadRequestError {
   return new BadRequestError(
@@ -35,12 +35,10 @@ export async function resolveActiveGitHubLinkedPrincipalOrThrow(
     userId: string;
   },
 ): Promise<string> {
-  const githubLinkedAccount = (
-    await listLinkedAccounts(ctx, {
-      organizationId: input.organizationId,
-      userId: input.userId,
-    })
-  ).find((linkedAccount) => linkedAccount.providerFamily === GitHubProviderFamily);
+  const githubLinkedAccount = await resolveExactOneGitHubLinkedAccountOrThrow(ctx, {
+    organizationId: input.organizationId,
+    userId: input.userId,
+  });
 
   if (githubLinkedAccount?.principal === null || githubLinkedAccount?.principal === undefined) {
     throw new NotFoundError(

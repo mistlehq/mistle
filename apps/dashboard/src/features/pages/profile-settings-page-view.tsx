@@ -45,7 +45,7 @@ export type ProfileSettingsPageViewProps = {
   displayName: string;
   email: string;
   imageUrl: string | null;
-  pendingLinkedAccountProviderFamilies: readonly string[];
+  pendingLinkedAccountConfigIds: readonly string[];
   linkedAccountCallbackNotice: LinkedAccountCallbackNotice | null;
   linkedAccountCards: readonly LinkedAccountCardViewModel[];
   linkedAccountErrorMessage: string | null;
@@ -53,20 +53,23 @@ export type ProfileSettingsPageViewProps = {
   linkedAccountsLoading: boolean;
   linkedAccountsLoadErrorMessage: string | null;
   onDeleteProfileImage: () => Promise<void>;
-  onLinkLinkedAccount: (providerFamily: string) => Promise<void>;
+  onLinkLinkedAccount: (organizationProviderConfigId: string) => Promise<void>;
   onSaveAppearance: (appearance: UserAppearance) => Promise<void>;
   onSaveChanges: (displayName: string) => Promise<void>;
   onCheckLinkedAccountCommitSigningKey: (
-    providerFamily: string,
+    organizationProviderConfigId: string,
     file: File,
   ) => Promise<CheckGitHubLinkedAccountSigningKeyResult>;
-  onDeleteLinkedAccountCommitSigningKey: (providerFamily: string) => Promise<void>;
-  onUnlinkLinkedAccount: (providerFamily: string) => Promise<void>;
+  onDeleteLinkedAccountCommitSigningKey: (organizationProviderConfigId: string) => Promise<void>;
+  onUnlinkLinkedAccount: (organizationProviderConfigId: string) => Promise<void>;
   onUpdateLinkedAccountPreferredEmail: (
-    providerFamily: string,
+    organizationProviderConfigId: string,
     preferredEmail: string,
   ) => Promise<void>;
-  onUploadLinkedAccountCommitSigningKey: (providerFamily: string, file: File) => Promise<void>;
+  onUploadLinkedAccountCommitSigningKey: (
+    organizationProviderConfigId: string,
+    file: File,
+  ) => Promise<void>;
   onUploadProfileImage: (file: File) => Promise<void>;
   profileImageBusy: boolean;
   profileImageErrorMessage: string | null;
@@ -119,7 +122,7 @@ export type ProfileSettingsLinkedAccountsSectionProps = Pick<
   | "onUnlinkLinkedAccount"
   | "onUpdateLinkedAccountPreferredEmail"
   | "onUploadLinkedAccountCommitSigningKey"
-  | "pendingLinkedAccountProviderFamilies"
+  | "pendingLinkedAccountConfigIds"
 >;
 
 export function ProfileSettingsPageView(props: ProfileSettingsPageViewProps): React.JSX.Element {
@@ -213,7 +216,7 @@ export function ProfileSettingsLinkedAccountsSection(
         ? null
         : props.linkedAccountCards.map((linkedAccountCard) => (
             <LinkedAccountCard
-              key={linkedAccountCard.providerFamily}
+              key={linkedAccountCard.organizationProviderConfigId}
               linkedAccountCard={linkedAccountCard}
               onCheckLinkedAccountCommitSigningKey={props.onCheckLinkedAccountCommitSigningKey}
               onDeleteLinkedAccountCommitSigningKey={props.onDeleteLinkedAccountCommitSigningKey}
@@ -221,7 +224,7 @@ export function ProfileSettingsLinkedAccountsSection(
               onUnlinkLinkedAccount={props.onUnlinkLinkedAccount}
               onUpdateLinkedAccountPreferredEmail={props.onUpdateLinkedAccountPreferredEmail}
               onUploadLinkedAccountCommitSigningKey={props.onUploadLinkedAccountCommitSigningKey}
-              pendingLinkedAccountProviderFamilies={props.pendingLinkedAccountProviderFamilies}
+              pendingLinkedAccountConfigIds={props.pendingLinkedAccountConfigIds}
             />
           ))}
     </div>
@@ -279,24 +282,27 @@ function LinkedAccountsFeedbackStack(
 
 function LinkedAccountCard(input: {
   linkedAccountCard: LinkedAccountCardViewModel;
-  onDeleteLinkedAccountCommitSigningKey: (providerFamily: string) => Promise<void>;
+  onDeleteLinkedAccountCommitSigningKey: (organizationProviderConfigId: string) => Promise<void>;
   onCheckLinkedAccountCommitSigningKey: (
-    providerFamily: string,
+    organizationProviderConfigId: string,
     file: File,
   ) => Promise<CheckGitHubLinkedAccountSigningKeyResult>;
-  onLinkLinkedAccount: (providerFamily: string) => Promise<void>;
-  onUnlinkLinkedAccount: (providerFamily: string) => Promise<void>;
+  onLinkLinkedAccount: (organizationProviderConfigId: string) => Promise<void>;
+  onUnlinkLinkedAccount: (organizationProviderConfigId: string) => Promise<void>;
   onUpdateLinkedAccountPreferredEmail: (
-    providerFamily: string,
+    organizationProviderConfigId: string,
     preferredEmail: string,
   ) => Promise<void>;
-  onUploadLinkedAccountCommitSigningKey: (providerFamily: string, file: File) => Promise<void>;
-  pendingLinkedAccountProviderFamilies: readonly string[];
+  onUploadLinkedAccountCommitSigningKey: (
+    organizationProviderConfigId: string,
+    file: File,
+  ) => Promise<void>;
+  pendingLinkedAccountConfigIds: readonly string[];
 }): React.JSX.Element {
   const emailPreference = input.linkedAccountCard.emailPreference;
   const commitSigning = input.linkedAccountCard.commitSigning;
-  const linkedAccountActionPending = input.pendingLinkedAccountProviderFamilies.includes(
-    input.linkedAccountCard.providerFamily,
+  const linkedAccountActionPending = input.pendingLinkedAccountConfigIds.includes(
+    input.linkedAccountCard.organizationProviderConfigId,
   );
   const commitSigningUploadInputRef = useRef<HTMLInputElement | null>(null);
   const [isCommitSigningDialogOpen, setIsCommitSigningDialogOpen] = useState(false);
@@ -335,7 +341,7 @@ function LinkedAccountCard(input: {
   async function checkCommitSigningKey(draft: CommitSigningKeyDraft): Promise<void> {
     try {
       const result = await input.onCheckLinkedAccountCommitSigningKey(
-        input.linkedAccountCard.providerFamily,
+        input.linkedAccountCard.organizationProviderConfigId,
         draft.file,
       );
       setCheckedCommitSigningKey({
@@ -352,7 +358,7 @@ function LinkedAccountCard(input: {
   async function uploadCommitSigningKey(draft: CommitSigningKeyDraft): Promise<void> {
     try {
       await input.onUploadLinkedAccountCommitSigningKey(
-        input.linkedAccountCard.providerFamily,
+        input.linkedAccountCard.organizationProviderConfigId,
         draft.file,
       );
       setIsCommitSigningDialogOpen(false);
@@ -424,7 +430,9 @@ function LinkedAccountCard(input: {
               aria-label={input.linkedAccountCard.primaryActionLabel}
               disabled={linkedAccountActionPending}
               onClick={() => {
-                void input.onLinkLinkedAccount(input.linkedAccountCard.providerFamily);
+                void input.onLinkLinkedAccount(
+                  input.linkedAccountCard.organizationProviderConfigId,
+                );
               }}
               type="button"
             >
@@ -440,7 +448,9 @@ function LinkedAccountCard(input: {
               aria-label={input.linkedAccountCard.secondaryActionLabel}
               disabled={linkedAccountActionPending}
               onClick={() => {
-                void input.onUnlinkLinkedAccount(input.linkedAccountCard.providerFamily);
+                void input.onUnlinkLinkedAccount(
+                  input.linkedAccountCard.organizationProviderConfigId,
+                );
               }}
               type="button"
               variant="outline"
@@ -459,12 +469,12 @@ function LinkedAccountCard(input: {
         <div className="mt-4">
           <AutoSaveSelectField
             disabled={linkedAccountActionPending}
-            id={`linked-account-preferred-email-${input.linkedAccountCard.providerFamily}`}
+            id={`linked-account-preferred-email-${input.linkedAccountCard.organizationProviderConfigId}`}
             label="Commit email"
             noneLabel="None"
             onSave={async (nextValue) => {
               await input.onUpdateLinkedAccountPreferredEmail(
-                input.linkedAccountCard.providerFamily,
+                input.linkedAccountCard.organizationProviderConfigId,
                 nextValue,
               );
             }}
@@ -538,7 +548,7 @@ function LinkedAccountCard(input: {
                       disabled={linkedAccountActionPending}
                       onClick={() => {
                         void input.onDeleteLinkedAccountCommitSigningKey(
-                          input.linkedAccountCard.providerFamily,
+                          input.linkedAccountCard.organizationProviderConfigId,
                         );
                       }}
                       size="icon-sm"

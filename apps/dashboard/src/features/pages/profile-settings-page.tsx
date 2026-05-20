@@ -37,9 +37,9 @@ import { resolveUserDisplayName } from "../shared/user-display-name.js";
 import { useRequiredOrganizationId, useRequiredSession } from "../shell/require-auth.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query-key.js";
 import {
-  decrementPendingLinkedAccountProviderFamilyCount,
-  incrementPendingLinkedAccountProviderFamilyCount,
-  resolvePendingLinkedAccountProviderFamilies,
+  decrementPendingLinkedAccountConfigCount,
+  incrementPendingLinkedAccountConfigCount,
+  resolvePendingLinkedAccountConfigIds,
 } from "./pending-linked-account-provider-families.js";
 import { ProfileSettingsPageView } from "./profile-settings-page-view.js";
 
@@ -60,8 +60,9 @@ export function ProfileSettingsPage(): React.JSX.Element {
   const [linkedAccountOperationErrorMessage, setLinkedAccountOperationErrorMessage] = useState<
     string | null
   >(null);
-  const [pendingLinkedAccountProviderFamilyCounts, setPendingLinkedAccountProviderFamilyCounts] =
-    useState<Record<string, number>>({});
+  const [pendingLinkedAccountConfigCounts, setPendingLinkedAccountConfigCounts] = useState<
+    Record<string, number>
+  >({});
   const [callbackNotice, setCallbackNotice] = useState<LinkedAccountCallbackNotice | null>(null);
   const { title, description } = resolvePageFrameText(pageMeta, "My Profile");
   const profileImageQuery = useQuery({
@@ -136,8 +137,8 @@ export function ProfileSettingsPage(): React.JSX.Element {
     },
   });
   const startLinkedAccountAuthorizationMutation = useMutation({
-    mutationFn: async (providerFamily: string) =>
-      startLinkedAccountAuthorization({ providerFamily }),
+    mutationFn: async (organizationProviderConfigId: string) =>
+      startLinkedAccountAuthorization({ organizationProviderConfigId }),
     onMutate: async () => {
       setLinkedAccountOperationErrorMessage(null);
     },
@@ -154,7 +155,8 @@ export function ProfileSettingsPage(): React.JSX.Element {
     },
   });
   const unlinkLinkedAccountMutation = useMutation({
-    mutationFn: async (providerFamily: string) => unlinkLinkedAccount({ providerFamily }),
+    mutationFn: async (organizationProviderConfigId: string) =>
+      unlinkLinkedAccount({ organizationProviderConfigId }),
     onMutate: async () => {
       setLinkedAccountOperationErrorMessage(null);
     },
@@ -233,6 +235,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
   useEffect(() => {
     const resolvedNotice = resolveLinkedAccountCallbackNotice({
       providerFamily: searchParams.get("linkedAccountProvider"),
+      organizationProviderConfigId: searchParams.get("organizationProviderConfigId"),
       result: searchParams.get("linkedAccountResult"),
       code: searchParams.get("linkedAccountCode"),
     });
@@ -276,23 +279,23 @@ export function ProfileSettingsPage(): React.JSX.Element {
     linkedAccountCards.length === 0
       ? "Your organization has not enabled any linked account providers right now."
       : null;
-  const pendingLinkedAccountProviderFamilies = resolvePendingLinkedAccountProviderFamilies(
-    pendingLinkedAccountProviderFamilyCounts,
+  const pendingLinkedAccountConfigIds = resolvePendingLinkedAccountConfigIds(
+    pendingLinkedAccountConfigCounts,
   );
 
   async function runLinkedAccountAction<T>(
-    providerFamily: string,
+    organizationProviderConfigId: string,
     action: () => Promise<T>,
   ): Promise<T> {
-    setPendingLinkedAccountProviderFamilyCounts((currentCounts) =>
-      incrementPendingLinkedAccountProviderFamilyCount(currentCounts, providerFamily),
+    setPendingLinkedAccountConfigCounts((currentCounts) =>
+      incrementPendingLinkedAccountConfigCount(currentCounts, organizationProviderConfigId),
     );
 
     try {
       return await action();
     } finally {
-      setPendingLinkedAccountProviderFamilyCounts((currentCounts) =>
-        decrementPendingLinkedAccountProviderFamilyCount(currentCounts, providerFamily),
+      setPendingLinkedAccountConfigCounts((currentCounts) =>
+        decrementPendingLinkedAccountConfigCount(currentCounts, organizationProviderConfigId),
       );
     }
   }
@@ -320,43 +323,46 @@ export function ProfileSettingsPage(): React.JSX.Element {
         onSaveAppearance={async (appearance) => {
           await updateAppearanceMutation.mutateAsync({ appearance });
         }}
-        onLinkLinkedAccount={async (providerFamily) => {
-          await runLinkedAccountAction(providerFamily, async () =>
-            startLinkedAccountAuthorizationMutation.mutateAsync(providerFamily),
+        onLinkLinkedAccount={async (organizationProviderConfigId) => {
+          await runLinkedAccountAction(organizationProviderConfigId, async () =>
+            startLinkedAccountAuthorizationMutation.mutateAsync(organizationProviderConfigId),
           );
         }}
-        onCheckLinkedAccountCommitSigningKey={async (providerFamily, file) =>
-          await runLinkedAccountAction(providerFamily, async () =>
+        onCheckLinkedAccountCommitSigningKey={async (organizationProviderConfigId, file) =>
+          await runLinkedAccountAction(organizationProviderConfigId, async () =>
             checkGitHubLinkedAccountSigningKeyMutation.mutateAsync(file),
           )
         }
-        onDeleteLinkedAccountCommitSigningKey={async (providerFamily) => {
-          await runLinkedAccountAction(providerFamily, async () =>
+        onDeleteLinkedAccountCommitSigningKey={async (organizationProviderConfigId) => {
+          await runLinkedAccountAction(organizationProviderConfigId, async () =>
             deleteGitHubLinkedAccountSigningKeyMutation.mutateAsync(),
           );
         }}
         onSaveChanges={async (displayNameDraft) => {
           await saveMutation.mutateAsync(displayNameDraft.trim());
         }}
-        onUnlinkLinkedAccount={async (providerFamily) => {
-          await runLinkedAccountAction(providerFamily, async () =>
-            unlinkLinkedAccountMutation.mutateAsync(providerFamily),
+        onUnlinkLinkedAccount={async (organizationProviderConfigId) => {
+          await runLinkedAccountAction(organizationProviderConfigId, async () =>
+            unlinkLinkedAccountMutation.mutateAsync(organizationProviderConfigId),
           );
         }}
-        onUpdateLinkedAccountPreferredEmail={async (providerFamily, preferredEmail) => {
-          await runLinkedAccountAction(providerFamily, async () =>
+        onUpdateLinkedAccountPreferredEmail={async (
+          organizationProviderConfigId,
+          preferredEmail,
+        ) => {
+          await runLinkedAccountAction(organizationProviderConfigId, async () =>
             updateGitHubLinkedAccountPreferredEmailMutation.mutateAsync(preferredEmail),
           );
         }}
-        onUploadLinkedAccountCommitSigningKey={async (providerFamily, file) => {
-          await runLinkedAccountAction(providerFamily, async () =>
+        onUploadLinkedAccountCommitSigningKey={async (organizationProviderConfigId, file) => {
+          await runLinkedAccountAction(organizationProviderConfigId, async () =>
             uploadGitHubLinkedAccountSigningKeyMutation.mutateAsync(file),
           );
         }}
         onUploadProfileImage={async (file) => {
           await uploadProfileImageMutation.mutateAsync(file);
         }}
-        pendingLinkedAccountProviderFamilies={pendingLinkedAccountProviderFamilies}
+        pendingLinkedAccountConfigIds={pendingLinkedAccountConfigIds}
         saving={saveMutation.isPending}
         updatingAppearance={updateAppearanceMutation.isPending}
       />
