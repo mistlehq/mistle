@@ -84,6 +84,10 @@ use crate::tunnel::session::agent::{
     AgentStreamState, add_agent_stream_window_credit, create_agent_stream,
     forward_gateway_frame_to_agent, handle_agent_runtime_message,
 };
+use crate::tunnel::session::egress::{
+    fail_pending_egress_token_requests, handle_egress_token_control_message,
+    handle_egress_token_session_request,
+};
 use crate::tunnel::session::file_search::{
     FILE_SEARCH_CLOSE_SOURCE_GATEWAY, FILE_SEARCH_CLOSE_SOURCE_SANDBOXD,
     FILE_SEARCH_EVENT_STREAM_OPENED, FILE_SEARCH_OUTCOME_CLOSED, FILE_SEARCH_OUTCOME_RESET,
@@ -96,11 +100,6 @@ use crate::tunnel::session::file_search::{
 };
 use crate::tunnel::session::file_upload::{
     FileUploadState, create_file_upload_state, finalize_file_upload,
-};
-use crate::tunnel::session::gateway_requests::{
-    fail_pending_egress_token_requests, fail_pending_signing_requests,
-    handle_egress_token_control_message, handle_egress_token_session_request,
-    handle_signing_control_message, handle_signing_session_request,
 };
 #[cfg(test)]
 use crate::tunnel::session::operation::SANDBOX_OPERATION_STREAM_FORMAT;
@@ -121,6 +120,9 @@ use crate::tunnel::session::process::{
     ProcessStreamState, add_process_stream_window, close_process_stream,
     handle_process_stream_frame, open_process_stream, poll_process_streams, reset_process_streams,
 };
+use crate::tunnel::session::signing::{
+    fail_pending_signing_requests, handle_signing_control_message, handle_signing_session_request,
+};
 use crate::tunnel::session::telemetry::{
     AGENT_STREAM_CLOSE_SOURCE_GATEWAY, AGENT_STREAM_CLOSE_SOURCE_RUNTIME,
     AGENT_STREAM_OUTCOME_CLOSED, AGENT_STREAM_OUTCOME_RESET, AgentStreamTermination,
@@ -130,12 +132,13 @@ use crate::tunnel::session::telemetry::{
 use crate::tunnel::telemetry::{SandboxTelemetryLogLevel, TelemetryRelay, TelemetryRelayFrame};
 
 mod agent;
+mod egress;
 mod file_search;
 mod file_upload;
-mod gateway_requests;
 mod operation;
 mod port_access;
 mod process;
+mod signing;
 mod telemetry;
 
 /// Default attachment root for file uploads received over the bootstrap tunnel.
