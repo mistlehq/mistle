@@ -538,6 +538,23 @@ describe("IntegrationConnectionEditorPage", () => {
       methodId: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
       currentValue: {},
     });
+    expect(configForm).toMatchObject({
+      mode: "form",
+      schema: {
+        properties: {
+          region: {
+            description:
+              "In SigNoz, open Settings > Ingestion to find your ingestion region. Choose US for us or us2 endpoints, and EU for eu endpoints.",
+            enum: ["us", "eu"],
+          },
+        },
+      },
+      uiSchema: {
+        region: {
+          "ui:enumNames": ["US", "EU"],
+        },
+      },
+    });
 
     renderEditorPage({
       configForm,
@@ -546,7 +563,10 @@ describe("IntegrationConnectionEditorPage", () => {
       methodId: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
     });
 
-    expect(screen.getByLabelText("Region")).toBeTruthy();
+    const regionSelect = screen.getByRole("combobox", { name: "Region" });
+    fireEvent.click(regionSelect);
+    expect(screen.getByRole("option", { name: "US" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "EU" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Connect SigNoz" })).toBeTruthy();
   });
 

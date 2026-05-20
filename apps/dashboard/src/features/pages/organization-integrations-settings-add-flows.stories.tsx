@@ -32,3 +32,10 @@ export const Linear: Story = {
     return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.Linear} />;
   },
 };
+
+export const SigNoz: Story = {
+  name: "SigNoz",
+  render: function RenderStory() {
+    return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.SigNoz} />;
+  },
+};

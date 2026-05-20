@@ -9,6 +9,7 @@ import {
   type SignozConnectionConfig,
   SignozConnectionConfigSchema,
   SignozConnectionStartConfigSchema,
+  SignozRegionLabels,
   resolveSignozMcpUrl,
 } from "./auth.js";
 import { resolveSignozBindingConfigForm } from "./binding-config-form.js";
@@ -51,14 +52,15 @@ export const SignozMcpBaseDefinition: SignozMcpBaseIntegrationDefinition = {
               type: "string",
               title: "Region",
               description:
-                "SigNoz Cloud region shown in Settings > Ingestion. This is used to build the hosted MCP URL.",
+                "In SigNoz, open Settings > Ingestion to find your ingestion region. Choose US for us or us2 endpoints, and EU for eu endpoints.",
+              enum: ["us", "eu"],
             },
           },
           required: ["region"],
         },
         uiSchema: {
           region: {
-            "ui:placeholder": "us",
+            "ui:enumNames": [SignozRegionLabels.us, SignozRegionLabels.eu],
           },
         },
       }),

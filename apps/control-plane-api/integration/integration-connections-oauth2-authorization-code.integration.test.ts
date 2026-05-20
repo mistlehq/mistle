@@ -32,7 +32,7 @@ import {
 
 const SimulatedProviderHost = "0.0.0.0";
 const SimulatedProviderRequestHost = "127.0.0.1";
-const TestRegion = "local";
+const TestRegion = "us";
 
 const it = createIntegrationTest({
   services: ["control-plane-api"],

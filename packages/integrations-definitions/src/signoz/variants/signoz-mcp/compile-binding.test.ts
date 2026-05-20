@@ -96,7 +96,7 @@ describe("compileSignozBinding", () => {
         status: "active",
         config: {
           connection_method: "oauth2-authorization-code",
-          region: "self-hosted",
+          region: "us",
           client_id: "signoz_client_123",
         },
       },

@@ -31,7 +31,8 @@ type BuiltInIntegrationVariantId =
   | "github-enterprise-server"
   | "jira-default"
   | "linear-default"
-  | "openai-default";
+  | "openai-default"
+  | "signoz-mcp";
 type DeviceAuthorizationExpiryScenario = "active" | "expired" | "expiringSoon";
 
 type StoryIntegrationSpec = {
@@ -90,6 +91,13 @@ function getStoryDefinitionOrThrow(
   if (variantId === "linear-default") {
     return getDefinitionOrThrow({
       familyId: "linear",
+      variantId,
+    });
+  }
+
+  if (variantId === "signoz-mcp") {
+    return getDefinitionOrThrow({
+      familyId: "signoz",
       variantId,
     });
   }
@@ -431,6 +439,10 @@ export const AddFlowStorySpecs = {
   },
   Linear: {
     variantId: "linear-default",
+  },
+  SigNoz: {
+    initialConnectionDisplayNameValue: "SigNoz Cloud",
+    variantId: "signoz-mcp",
   },
   OpenAI: {
     variantId: "openai-default",

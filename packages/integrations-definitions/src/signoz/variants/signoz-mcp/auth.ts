@@ -18,11 +18,16 @@ export const SignozCredentialSlotKeys = createOAuth2AuthorizationCodeCredentialS
   variantId: SignozMcpVariantId,
 });
 
-export const SignozRegionSchema = z
-  .string()
-  .trim()
-  .min(1, "Region is required.")
-  .regex(/^[a-z0-9-]+$/u, "Region must use lowercase letters, numbers, or hyphens.");
+export const SignozRegionLabels: Record<SignozRegion, string> = {
+  us: "US",
+  eu: "EU",
+};
+
+export const SignozRegionSchema = z.enum(["us", "eu"], {
+  error: "Region must be US or EU.",
+});
+
+export type SignozRegion = z.output<typeof SignozRegionSchema>;
 
 export const SignozConnectionStartConfigSchema = z
   .object({
