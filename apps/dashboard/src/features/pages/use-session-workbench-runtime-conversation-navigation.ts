@@ -73,11 +73,15 @@ function shouldAttemptRequestedRuntimeConversationResume(input: {
     return false;
   }
 
-  if (input.providerConversationId !== null) {
+  if (input.requestedRuntimeConversationId === input.activeConversationId) {
     return false;
   }
 
-  if (input.requestedRuntimeConversationId === input.activeConversationId) {
+  if (
+    input.providerConversationId !== null &&
+    (input.activeConversationId === null ||
+      input.activeConversationId === input.providerConversationId)
+  ) {
     return false;
   }
 

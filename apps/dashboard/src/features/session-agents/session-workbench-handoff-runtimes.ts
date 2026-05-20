@@ -55,6 +55,10 @@ function toOpenCodeConnectSessionInput(
 ): OpenCodeConnectSessionInput {
   return {
     ...(connectInput.initialCwd === undefined ? {} : { initialCwd: connectInput.initialCwd }),
+    ...(connectInput.providerConversationId === undefined ||
+    connectInput.providerConversationId === null
+      ? {}
+      : { providerSessionId: connectInput.providerConversationId }),
     sandboxInstanceId: connectInput.sandboxInstanceId,
     ...(connectInput.targetRuntimeConversationId === null
       ? {}
@@ -140,6 +144,7 @@ export function buildOpenCodeLifecycleForWorkbench(
         : {
             activeRuntimeConversationId: lifecycle.sessionSnapshot.activeSessionId,
             connectedAtIso: lifecycle.sessionSnapshot.connectedAtIso,
+            providerConversationId: lifecycle.sessionSnapshot.providerSessionId,
             sandboxInstanceId: lifecycle.sessionSnapshot.sandboxInstanceId,
           },
   };
@@ -268,6 +273,7 @@ export function buildCodexHandoffRuntime(input: {
       SessionRuntimeWorkbenchCapabilities.CODEX.preservesCliLaunchContext,
     resetServerRequests: input.serverRequests.resetServerRequests,
     restoreConversationId: input.threadAuthority.providerThreadId,
+    restoreProviderConversationId: input.threadAuthority.providerThreadId,
     resolveCliLaunchTarget: input.threadAuthority.resolveCliLaunchTarget,
   };
 }
@@ -287,6 +293,7 @@ export function buildOpenCodeHandoffRuntime(input: {
       SessionRuntimeWorkbenchCapabilities.OPENCODE.preservesCliLaunchContext,
     resetServerRequests: () => {},
     restoreConversationId: input.sessionSnapshot?.activeSessionId ?? null,
+    restoreProviderConversationId: input.sessionSnapshot?.providerSessionId ?? null,
     resolveCliLaunchTarget: async () => {
       const activeSessionId = input.sessionSnapshot?.activeSessionId ?? null;
 
@@ -319,6 +326,7 @@ export function buildPiHandoffRuntime(input: {
     preserveCliLaunchForRestore: SessionRuntimeWorkbenchCapabilities.PI.preservesCliLaunchContext,
     resetServerRequests: () => {},
     restoreConversationId: input.sessionSnapshot?.activeSessionFile ?? null,
+    restoreProviderConversationId: null,
     resolveCliLaunchTarget: async () => {
       const activeSessionFile = input.sessionSnapshot?.activeSessionFile ?? null;
 

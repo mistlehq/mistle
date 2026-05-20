@@ -52,6 +52,7 @@ type SessionMainPanelHandoffRuntime = {
   preserveCliLaunchForRestore: boolean;
   resetServerRequests: () => void;
   restoreConversationId: string | null;
+  restoreProviderConversationId: string | null;
   resolveCliLaunchTarget: () => Promise<SessionCliLaunchTarget>;
 };
 
@@ -90,6 +91,7 @@ export function resolveChatRestoreConnectionInput(input: {
   initialCwd: string | null;
   sandboxInstanceId: string;
   durableRuntimeConversationId: string | null;
+  explicitProviderConversationId: string | null;
 }): ChatRestoreConnectionInput {
   if (input.durableRuntimeConversationId === null) {
     return {
@@ -104,22 +106,27 @@ export function resolveChatRestoreConnectionInput(input: {
     initialCwd: input.initialCwd,
     sandboxInstanceId: input.sandboxInstanceId,
     targetRuntimeConversationId: input.durableRuntimeConversationId,
-    providerConversationId: input.durableRuntimeConversationId,
+    ...(input.explicitProviderConversationId === null
+      ? {}
+      : { providerConversationId: input.explicitProviderConversationId }),
   };
 }
 
 type CliRestoreContext = {
   runtimeConversationId: string | null;
+  providerConversationId: string | null;
   initialCwd: string | null;
 };
 
 const EmptyCliRestoreContext: CliRestoreContext = {
   runtimeConversationId: null,
+  providerConversationId: null,
   initialCwd: null,
 };
 
 export function resolveCliRestoreContext(input: {
   fallbackConversationId: string | null;
+  fallbackProviderConversationId: string | null;
   launchDirectory: string | null;
   launchTarget: SessionCliLaunchTarget;
   preserveLaunchContext: boolean;
@@ -129,6 +136,7 @@ export function resolveCliRestoreContext(input: {
       input.preserveLaunchContext && input.launchTarget.type === "resume"
         ? input.launchTarget.threadId
         : input.fallbackConversationId,
+    providerConversationId: input.fallbackProviderConversationId,
     initialCwd: input.preserveLaunchContext ? input.launchDirectory : null,
   };
 }
@@ -242,6 +250,7 @@ export function useSessionMainPanelHandoff(
         initialCwd: cliRestoreContextRef.current.initialCwd,
         sandboxInstanceId: input.sandboxInstanceId,
         durableRuntimeConversationId,
+        explicitProviderConversationId: cliRestoreContextRef.current.providerConversationId,
       }),
     );
   }, [
@@ -278,6 +287,7 @@ export function useSessionMainPanelHandoff(
       const selectedRepositoryPath = input.selectedRepositoryPathRef.current;
       cliRestoreContextRef.current = resolveCliRestoreContext({
         fallbackConversationId: activeRuntime.restoreConversationId,
+        fallbackProviderConversationId: activeRuntime.restoreProviderConversationId,
         launchDirectory: selectedRepositoryPath,
         launchTarget,
         preserveLaunchContext: activeRuntime.preserveCliLaunchForRestore,

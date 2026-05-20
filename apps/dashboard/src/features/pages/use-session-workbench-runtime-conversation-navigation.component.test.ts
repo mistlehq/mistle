@@ -23,6 +23,8 @@ function createRuntimeConversationNavigator(input: {
   activeConversationId?: string | null;
   availableConversations: readonly RuntimeConversationSummary[];
   originalConversationId?: string | null;
+  providerConversationId?: string | null;
+  resumedConversationIds?: string[];
 }): NonNullable<SessionConversationPaneState["runtimeConversationNavigator"]> {
   return {
     activeConversationCwd: input.activeConversationCwd ?? "/workspace/repo",
@@ -32,12 +34,18 @@ function createRuntimeConversationNavigator(input: {
     isStartingNewConversation: false,
     originalConversationId: input.originalConversationId ?? null,
     pendingConversationId: null,
-    providerConversationId: null,
+    providerConversationId: input.providerConversationId ?? null,
     refreshConversationList: function refreshConversationList() {
       return Promise.resolve(input.availableConversations);
     },
-    resumeConversation: async function resumeConversation() {
-      throw new Error("Unexpected conversation resume in conversation navigation visibility test");
+    resumeConversation: async function resumeConversation(conversationId) {
+      if (input.resumedConversationIds === undefined) {
+        throw new Error(
+          "Unexpected conversation resume in conversation navigation visibility test",
+        );
+      }
+      input.resumedConversationIds.push(conversationId);
+      return conversationId;
     },
     startNewConversation: async function startNewConversation() {
       throw new Error("Unexpected conversation start in conversation navigation visibility test");
@@ -46,6 +54,7 @@ function createRuntimeConversationNavigator(input: {
 }
 
 function renderConversationNavigation(input: {
+  requestedRuntimeConversationId?: string | null;
   runtimeConversationNavigator: SessionConversationPaneState["runtimeConversationNavigator"];
   sandboxInstanceId: string;
 }) {
@@ -59,7 +68,7 @@ function renderConversationNavigation(input: {
       pendingServerRequests: [],
       primaryPanelTransitionState: "stable_chat" satisfies MainPanelTransitionState,
       primaryRepositoryPath: "/workspace/repo",
-      requestedRuntimeConversationId: null,
+      requestedRuntimeConversationId: input.requestedRuntimeConversationId ?? null,
       sandboxInstanceId: input.sandboxInstanceId,
       searchParams: new URLSearchParams(),
       setSearchParams: function setSearchParams() {
@@ -151,5 +160,25 @@ describe("useSessionWorkbenchRuntimeConversationNavigation", () => {
 
     expect(rowsById.get("conversation_provider")).toBe(true);
     expect(rowsById.get("conversation_earliest")).toBe(false);
+  });
+
+  it("keeps URL conversation navigation available after leaving the provider original", async () => {
+    const resumedConversationIds: string[] = [];
+    renderConversationNavigation({
+      requestedRuntimeConversationId: "conversation_requested",
+      sandboxInstanceId: "sbi_conversation_navigation_provider_restore",
+      runtimeConversationNavigator: createRuntimeConversationNavigator({
+        activeConversationId: "conversation_active",
+        availableConversations: [
+          createConversation({ id: "conversation_active" }),
+          createConversation({ id: "conversation_requested" }),
+        ],
+        originalConversationId: "conversation_provider",
+        providerConversationId: "conversation_provider",
+        resumedConversationIds,
+      }),
+    });
+
+    await expect.poll(() => resumedConversationIds).toEqual(["conversation_requested"]);
   });
 });

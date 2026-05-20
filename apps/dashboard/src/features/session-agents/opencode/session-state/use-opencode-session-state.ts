@@ -31,6 +31,7 @@ export type ConnectedOpenCodeSession = {
   activeSessionId: string;
   activeTitle: string;
   connectedAtIso: string;
+  providerSessionId: string | null;
   sandboxInstanceId: string;
 };
 
@@ -52,6 +53,7 @@ export type OpenCodeSessionLifecycleState = {
   clearLifecycleErrorMessage: () => void;
   connectSession: (input: {
     initialCwd?: string | null;
+    providerSessionId?: string | null;
     sandboxInstanceId: string;
     targetSessionId?: string | null;
   }) => void;
@@ -72,6 +74,7 @@ export type OpenCodeSessionNavigatorState = {
   activeSessionId: string | null;
   availableSessions: readonly OpenCodeSessionSummary[];
   hasMoreAvailableSessions: boolean;
+  originalSessionId: string | null;
   isStartingNewSession: boolean;
   pendingSessionId: string | null;
   refreshSessionList: (input?: {
@@ -120,13 +123,15 @@ const EmptyOpenCodeComposerConfig = {
 };
 const OpenCodeNavigatorSessionLimit = 20;
 
-async function listOpenCodeNavigatorSessions(input: {
-  client: OpenCodeSessionClient;
-  directory?: string;
-}): Promise<{
+type OpenCodeSessionPage = {
   hasMore: boolean;
   sessions: readonly OpenCodeSessionSummary[];
-}> {
+};
+
+async function listOpenCodeSessionPage(input: {
+  client: OpenCodeSessionClient;
+  directory?: string;
+}): Promise<OpenCodeSessionPage> {
   const sessions = await input.client.listSessions({
     ...(input.directory === undefined ? {} : { directory: input.directory }),
     limit: OpenCodeNavigatorSessionLimit + 1,
@@ -136,6 +141,44 @@ async function listOpenCodeNavigatorSessions(input: {
     hasMore: sessions.length > OpenCodeNavigatorSessionLimit,
     sessions: sessions.slice(0, OpenCodeNavigatorSessionLimit),
   };
+}
+
+async function listOpenCodeNavigatorSessions(input: {
+  client: OpenCodeSessionClient;
+  directory?: string;
+}): Promise<OpenCodeSessionPage> {
+  return await listOpenCodeSessionPage(input);
+}
+
+export function resolveOriginalOpenCodeSessionId(input: {
+  explicitProviderSessionId: string | null;
+  hasMoreSandboxSessions: boolean;
+  sandboxSessions: readonly OpenCodeSessionSummary[];
+}): string | null {
+  if (input.explicitProviderSessionId !== null) {
+    return input.explicitProviderSessionId;
+  }
+
+  if (input.hasMoreSandboxSessions) {
+    return null;
+  }
+
+  let originalSessionId: string | null = null;
+  let originalCreatedAt: number | null = null;
+  for (const session of input.sandboxSessions) {
+    const createdAt = session.time.created;
+    if (
+      originalCreatedAt === null ||
+      createdAt < originalCreatedAt ||
+      (createdAt === originalCreatedAt &&
+        (originalSessionId === null || session.id < originalSessionId))
+    ) {
+      originalSessionId = session.id;
+      originalCreatedAt = createdAt;
+    }
+  }
+
+  return originalSessionId;
 }
 
 function normalizeOpenCodeCatalogDirectory(directory: string | null | undefined): string | null {
@@ -272,6 +315,7 @@ export function useOpenCodeSessionState(input: {
   const [availableModels, setAvailableModels] = useState<readonly SessionComposerModel[]>([]);
   const [availableSessions, setAvailableSessions] = useState<readonly OpenCodeSessionSummary[]>([]);
   const [hasMoreAvailableSessions, setHasMoreAvailableSessions] = useState(false);
+  const [originalSessionId, setOriginalSessionId] = useState<string | null>(null);
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   const [isStartingNewSession, setIsStartingNewSession] = useState(false);
   const [modelCatalogDirectory, setModelCatalogDirectory] = useState<string | null>(null);
@@ -334,6 +378,7 @@ export function useOpenCodeSessionState(input: {
     resetModelCatalog({ status: "unavailable" });
     setAvailableSessions([]);
     setHasMoreAvailableSessions(false);
+    setOriginalSessionId(null);
     setPendingSessionId(null);
     setIsStartingNewSession(false);
     setSessionSnapshot(null);
@@ -490,6 +535,7 @@ export function useOpenCodeSessionState(input: {
   const connectSession = useCallback(
     (connectInput: {
       initialCwd?: string | null;
+      providerSessionId?: string | null;
       sandboxInstanceId: string;
       targetSessionId?: string | null;
     }): void => {
@@ -526,6 +572,12 @@ export function useOpenCodeSessionState(input: {
             client,
             ...(directory === undefined ? {} : { directory }),
           });
+          const sandboxSessionPage =
+            directory === undefined
+              ? sessionPage
+              : await listOpenCodeSessionPage({
+                  client,
+                });
           const sessionSelection = resolveOpenCodeSessionSelection({
             targetSessionId,
             listedSessions: targetSessionId === null ? sessionPage.sessions : [],
@@ -546,12 +598,31 @@ export function useOpenCodeSessionState(input: {
                   ...(directory === undefined ? {} : { directory }),
                 })
               : sessionPage;
+          const confirmedSandboxSessionPage =
+            sessionSelection.kind === "create" && directory !== undefined
+              ? await listOpenCodeSessionPage({
+                  client,
+                })
+              : sandboxSessionPage;
           if (generationRef.current !== generation) {
             client.close();
             return;
           }
           setAvailableSessions(confirmedSessionPage.sessions);
           setHasMoreAvailableSessions(confirmedSessionPage.hasMore);
+          setOriginalSessionId(
+            resolveOriginalOpenCodeSessionId({
+              explicitProviderSessionId: connectInput.providerSessionId ?? null,
+              hasMoreSandboxSessions:
+                sessionSelection.kind === "create" && directory === undefined
+                  ? confirmedSessionPage.hasMore
+                  : confirmedSandboxSessionPage.hasMore,
+              sandboxSessions:
+                sessionSelection.kind === "create" && directory === undefined
+                  ? confirmedSessionPage.sessions
+                  : confirmedSandboxSessionPage.sessions,
+            }),
+          );
           const eventSubscription = await client.subscribeEvents({
             onError: (error) => {
               setSessionErrorMessage(
@@ -604,6 +675,7 @@ export function useOpenCodeSessionState(input: {
             activeSessionId: session.id,
             activeTitle: session.title,
             connectedAtIso: new Date().toISOString(),
+            providerSessionId: connectInput.providerSessionId ?? null,
             sandboxInstanceId: connectInput.sandboxInstanceId,
           });
           setStep("connected");
@@ -622,6 +694,7 @@ export function useOpenCodeSessionState(input: {
           resetModelCatalog(failedPhase);
           setAvailableSessions([]);
           setHasMoreAvailableSessions(false);
+          setOriginalSessionId(null);
           setPendingSessionId(null);
           setIsStartingNewSession(false);
           setSessionSnapshot(null);
@@ -777,6 +850,7 @@ export function useOpenCodeSessionState(input: {
           activeSessionId: session.id,
           activeTitle: session.title,
           connectedAtIso: new Date().toISOString(),
+          providerSessionId: connectedSession.providerSessionId,
           sandboxInstanceId: connectedSession.sandboxInstanceId,
         });
         setSessionErrorMessage(null);
@@ -840,6 +914,7 @@ export function useOpenCodeSessionState(input: {
           activeSessionId: session.id,
           activeTitle: session.title,
           connectedAtIso: new Date().toISOString(),
+          providerSessionId: connectedSession.providerSessionId,
           sandboxInstanceId: connectedSession.sandboxInstanceId,
         });
         setSessionErrorMessage(null);
@@ -860,9 +935,12 @@ export function useOpenCodeSessionState(input: {
 
   const recoverSession = useCallback(
     (recoverInput: { sandboxInstanceId: string; targetSessionId: string | null }): void => {
-      connectSession(recoverInput);
+      connectSession({
+        ...recoverInput,
+        providerSessionId: sessionSnapshot?.providerSessionId ?? null,
+      });
     },
-    [connectSession],
+    [connectSession, sessionSnapshot?.providerSessionId],
   );
 
   return {
@@ -894,6 +972,7 @@ export function useOpenCodeSessionState(input: {
       activeSessionId: sessionSnapshot?.activeSessionId ?? null,
       availableSessions,
       hasMoreAvailableSessions,
+      originalSessionId,
       isStartingNewSession,
       pendingSessionId,
       refreshSessionList,

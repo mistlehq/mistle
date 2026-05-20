@@ -355,12 +355,13 @@ export function useSessionWorkbenchConversationRuntime(input: {
           ? {
               activeConversationCwd: openCodeSessionState.sessions.activeSessionDirectory,
               activeConversationId: openCodeSessionState.sessions.activeSessionId,
-              providerConversationId: null,
+              providerConversationId:
+                openCodeSessionState.lifecycle.sessionSnapshot?.providerSessionId ?? null,
               availableConversations: openCodeSessionState.sessions.availableSessions.map(
                 mapOpenCodeSessionToRuntimeConversationSummary,
               ),
               hasMoreAvailableConversations: openCodeSessionState.sessions.hasMoreAvailableSessions,
-              originalConversationId: null,
+              originalConversationId: openCodeSessionState.sessions.originalSessionId,
               pendingConversationId: openCodeSessionState.sessions.pendingSessionId,
               isStartingNewConversation: openCodeSessionState.sessions.isStartingNewSession,
               refreshConversationList: async (refreshInput) => {

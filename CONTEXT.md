@@ -76,6 +76,10 @@ _Avoid_: Bare thread, bare session
 The **Runtime conversation** currently selected for the chat pane within a **Sandbox session**.
 _Avoid_: Active thread when speaking across providers
 
+**Original runtime conversation**:
+The earliest-created **Runtime conversation** in the **Sandbox session**, unless a provider conversation is explicitly supplied by a triggering system.
+_Avoid_: Default conversation, currently active conversation, most recently updated conversation
+
 **Runtime conversation navigator**:
 The **Session workbench** side panel for listing, selecting, and starting **Runtime conversations**.
 _Avoid_: Thread navigator when speaking across providers
@@ -255,7 +259,9 @@ _Avoid_: Local queued prompt, deferred start turn
 - User-initiated **Active runtime conversation** changes are navigable history within the **Session workbench**.
 - User-initiated **Active runtime conversation** URL changes represent confirmed active-conversation changes.
 - After a user selects or starts a **Runtime conversation**, the **Session workbench** URL keeps the confirmed `conversationId` explicit, including when the selected conversation is the one selected by default.
-- Starting a new **Runtime conversation** creates the provider-owned conversation object before the **Session workbench** URL changes to its `conversationId`.
+- Starting a new **OpenCode session** creates the provider-owned **Runtime conversation** before the **Session workbench** URL changes to its `conversationId`.
+- Starting a new **Codex thread** does not create a new **Active runtime conversation** until Codex confirms the thread exists.
+- The **Original runtime conversation** remains stable when the **Active runtime conversation** changes within a **Session workbench**.
 - A **Runtime conversation navigator** uses provider-neutral product language while preserving provider-owned object names in source-specific code and metadata.
 - A **Runtime conversation navigator** is labeled as conversations in shared user-facing workbench controls.
 - The default **Runtime conversation navigator** scope is the selected primary repository path when one is selected.

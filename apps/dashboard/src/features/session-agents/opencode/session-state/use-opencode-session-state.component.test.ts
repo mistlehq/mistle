@@ -17,6 +17,7 @@ import { type RawData, type WebSocket, WebSocketServer } from "ws";
 import {
   mapOpenCodeProvidersToComposerModels,
   parseOpenCodePromptModelSelection,
+  resolveOriginalOpenCodeSessionId,
   useOpenCodeSessionState,
 } from "./use-opencode-session-state.js";
 
@@ -306,15 +307,22 @@ async function connectTransport(
   return transport;
 }
 
-function createSessionResponse(id: string) {
+function createSessionResponse(
+  id: string,
+  input?: {
+    createdAt?: number;
+    directory?: string;
+    updatedAt?: number;
+  },
+) {
   return {
-    directory: "/workspace",
+    directory: input?.directory ?? "/workspace",
     id,
     projectID: "project",
     slug: id,
     time: {
-      created: 1,
-      updated: 2,
+      created: input?.createdAt ?? 1,
+      updated: input?.updatedAt ?? 2,
     },
     title: "Dashboard session",
     version: "1.14.41",
@@ -390,6 +398,13 @@ function createOpenCodeProviderCatalogResponse(): {
   };
 }
 
+function expectOpenCodeSandboxSessionsRequest(request: ObservedOpenCodeProxyRequest): void {
+  expect(request.request).toMatchObject({
+    method: "GET",
+    path: "/session?limit=21",
+  });
+}
+
 function closeTransport(transport: SandboxSessionTransport): void {
   transport.disconnect();
 }
@@ -397,6 +412,7 @@ function closeTransport(transport: SandboxSessionTransport): void {
 async function connectOpenCodeSessionForTest(input: {
   initialCwd?: string;
   listSessionsBody?: readonly ReturnType<typeof createSessionResponse>[];
+  providerSessionId?: string;
   result: { current: ReturnType<typeof useOpenCodeSessionState> };
   sandboxInstanceId: string;
   server: OpenCodeProxyTransportServer;
@@ -405,6 +421,9 @@ async function connectOpenCodeSessionForTest(input: {
   act(() => {
     input.result.current.lifecycle.connectSession({
       ...(input.initialCwd === undefined ? {} : { initialCwd: input.initialCwd }),
+      ...(input.providerSessionId === undefined
+        ? {}
+        : { providerSessionId: input.providerSessionId }),
       sandboxInstanceId: input.sandboxInstanceId,
       targetSessionId: input.sessionId,
     });
@@ -450,6 +469,15 @@ async function connectOpenCodeSessionForTest(input: {
     request: listSessionsRequest,
     body: input.listSessionsBody ?? [],
   });
+
+  if (input.initialCwd !== undefined) {
+    const sandboxSessionsRequest = await input.server.nextRequest();
+    expectOpenCodeSandboxSessionsRequest(sandboxSessionsRequest);
+    input.server.sendJsonResponse({
+      request: sandboxSessionsRequest,
+      body: input.listSessionsBody ?? [],
+    });
+  }
 
   const getSessionRequest = await input.server.nextRequest();
   const getSessionPath =
@@ -535,6 +563,54 @@ describe("useOpenCodeSessionState", () => {
     ]);
   });
 
+  it("resolves the original OpenCode session from explicit provider identity before creation order", () => {
+    expect(
+      resolveOriginalOpenCodeSessionId({
+        explicitProviderSessionId: "ses_provider",
+        hasMoreSandboxSessions: true,
+        sandboxSessions: [
+          createSessionResponse("ses_oldest", {
+            createdAt: 1,
+          }),
+        ],
+      }),
+    ).toBe("ses_provider");
+  });
+
+  it("resolves the original OpenCode session from earliest created loaded sandbox session", () => {
+    expect(
+      resolveOriginalOpenCodeSessionId({
+        explicitProviderSessionId: null,
+        hasMoreSandboxSessions: false,
+        sandboxSessions: [
+          createSessionResponse("ses_recent", {
+            createdAt: 30,
+          }),
+          createSessionResponse("ses_old", {
+            createdAt: 10,
+          }),
+          createSessionResponse("ses_same_time_a", {
+            createdAt: 10,
+          }),
+        ],
+      }),
+    ).toBe("ses_old");
+  });
+
+  it("does not infer the original OpenCode session from a capped sandbox page", () => {
+    expect(
+      resolveOriginalOpenCodeSessionId({
+        explicitProviderSessionId: null,
+        hasMoreSandboxSessions: true,
+        sandboxSessions: [
+          createSessionResponse("ses_loaded", {
+            createdAt: 1,
+          }),
+        ],
+      }),
+    ).toBeNull();
+  });
+
   it("keeps lifecycle callbacks stable across rerenders", () => {
     const { result, rerender } = renderHook(() =>
       useOpenCodeSessionState({
@@ -596,6 +672,228 @@ describe("useOpenCodeSessionState", () => {
     expect(result.current.lifecycle.sessionConnectionState).toBe("detached");
     expect(result.current.lifecycle.step).toBe("idle");
     expect(result.current.lifecycle.sessionSnapshot).toBeNull();
+  });
+
+  it("keeps the original OpenCode session stable after selecting another session", async () => {
+    const server = await startOpenCodeProxyTransportServer();
+    const transport = await connectTransport(server);
+    const { result } = renderHook(() =>
+      useOpenCodeSessionState({
+        ensureTransportConnected: async () => {
+          return {
+            sandboxInstanceId: "sbi_123",
+            transport,
+          };
+        },
+      }),
+    );
+
+    const permissionsRequest = await connectOpenCodeSessionForTest({
+      listSessionsBody: [
+        createSessionResponse("ses_recent", {
+          createdAt: 30,
+          updatedAt: 50,
+        }),
+        createSessionResponse("ses_original", {
+          createdAt: 10,
+          updatedAt: 20,
+        }),
+      ],
+      result,
+      sandboxInstanceId: "sbi_123",
+      server,
+      sessionId: "ses_recent",
+    });
+    server.sendJsonResponse({
+      request: permissionsRequest,
+      body: [],
+    });
+
+    await waitFor(() => {
+      expect(result.current.sessions.originalSessionId).toBe("ses_original");
+    });
+    await waitFor(() => {
+      expect(result.current.lifecycle.sessionConnectionState).toBe("connected");
+    });
+
+    let resumePromise: Promise<string> | undefined;
+    act(() => {
+      resumePromise = result.current.sessions.resumeSession("ses_newer");
+    });
+
+    const getSessionRequest = await server.nextRequest();
+    expect(getSessionRequest.request).toMatchObject({
+      method: "GET",
+      path: "/session/ses_newer",
+    });
+    server.sendJsonResponse({
+      request: getSessionRequest,
+      body: createSessionResponse("ses_newer", {
+        createdAt: 40,
+        updatedAt: 60,
+      }),
+    });
+
+    const messagesRequest = await server.nextRequest();
+    expect(messagesRequest.request).toMatchObject({
+      method: "GET",
+      path: "/session/ses_newer/message",
+    });
+    server.sendJsonResponse({
+      request: messagesRequest,
+      body: [],
+    });
+
+    const permissionsAfterResumeRequest = await server.nextRequest();
+    expect(permissionsAfterResumeRequest.request).toMatchObject({
+      method: "GET",
+      path: "/permission",
+    });
+    server.sendJsonResponse({
+      request: permissionsAfterResumeRequest,
+      body: [],
+    });
+
+    await expect(resumePromise).resolves.toBe("ses_newer");
+    expect(result.current.sessions.originalSessionId).toBe("ses_original");
+  });
+
+  it("uses the provider OpenCode session as original when the sandbox supplies one", async () => {
+    const server = await startOpenCodeProxyTransportServer();
+    const transport = await connectTransport(server);
+    const { result } = renderHook(() =>
+      useOpenCodeSessionState({
+        ensureTransportConnected: async () => {
+          return {
+            sandboxInstanceId: "sbi_123",
+            transport,
+          };
+        },
+      }),
+    );
+
+    const permissionsRequest = await connectOpenCodeSessionForTest({
+      listSessionsBody: [
+        createSessionResponse("ses_oldest", {
+          createdAt: 1,
+        }),
+      ],
+      providerSessionId: "ses_provider",
+      result,
+      sandboxInstanceId: "sbi_123",
+      server,
+      sessionId: "ses_provider",
+    });
+    server.sendJsonResponse({
+      request: permissionsRequest,
+      body: [],
+    });
+
+    await waitFor(() => {
+      expect(result.current.sessions.originalSessionId).toBe("ses_provider");
+    });
+    await waitFor(() => {
+      expect(result.current.lifecycle.sessionSnapshot?.providerSessionId).toBe("ses_provider");
+    });
+  });
+
+  it("clears the original OpenCode session after a failed reconnect", async () => {
+    const server = await startOpenCodeProxyTransportServer();
+    const transport = await connectTransport(server);
+    const { result } = renderHook(() =>
+      useOpenCodeSessionState({
+        ensureTransportConnected: async () => {
+          return {
+            sandboxInstanceId: "sbi_123",
+            transport,
+          };
+        },
+      }),
+    );
+
+    const permissionsRequest = await connectOpenCodeSessionForTest({
+      listSessionsBody: [
+        createSessionResponse("ses_original", {
+          createdAt: 1,
+        }),
+      ],
+      result,
+      sandboxInstanceId: "sbi_123",
+      server,
+      sessionId: "ses_original",
+    });
+    server.sendJsonResponse({
+      request: permissionsRequest,
+      body: [],
+    });
+
+    await waitFor(() => {
+      expect(result.current.sessions.originalSessionId).toBe("ses_original");
+    });
+
+    act(() => {
+      result.current.lifecycle.connectSession({
+        sandboxInstanceId: "sbi_123",
+        targetSessionId: "ses_original",
+      });
+    });
+
+    const healthRequest = await server.nextRequest();
+    expect(healthRequest.request).toMatchObject({
+      method: "GET",
+      path: "/global/health",
+    });
+    server.sendJsonError({
+      request: healthRequest,
+      status: 500,
+      body: {
+        message: "health check failed",
+      },
+    });
+
+    await waitFor(() => {
+      expect(result.current.lifecycle.sessionConnectionState).toBe("detached");
+    });
+    expect(result.current.sessions.originalSessionId).toBeNull();
+  });
+
+  it("does not expose an inferred original OpenCode session when the sandbox session list is capped", async () => {
+    const server = await startOpenCodeProxyTransportServer();
+    const transport = await connectTransport(server);
+    const { result } = renderHook(() =>
+      useOpenCodeSessionState({
+        ensureTransportConnected: async () => {
+          return {
+            sandboxInstanceId: "sbi_123",
+            transport,
+          };
+        },
+      }),
+    );
+
+    const cappedSessions = Array.from({ length: 21 }, (_, index) =>
+      createSessionResponse(`ses_${String(index).padStart(2, "0")}`, {
+        createdAt: index + 1,
+        updatedAt: 100 - index,
+      }),
+    );
+    const permissionsRequest = await connectOpenCodeSessionForTest({
+      listSessionsBody: cappedSessions,
+      result,
+      sandboxInstanceId: "sbi_123",
+      server,
+      sessionId: "ses_00",
+    });
+    server.sendJsonResponse({
+      request: permissionsRequest,
+      body: [],
+    });
+
+    await waitFor(() => {
+      expect(result.current.lifecycle.sessionConnectionState).toBe("connected");
+    });
+    expect(result.current.sessions.originalSessionId).toBeNull();
+    expect(result.current.sessions.availableSessions).toHaveLength(20);
   });
 
   it("sends prompts with the selected repository directory", async () => {
@@ -1005,6 +1303,16 @@ describe("useOpenCodeSessionState", () => {
     });
     server.sendJsonResponse({
       request: listSessionsRequest,
+      body: [],
+    });
+
+    const sandboxSessionsRequest = await server.nextRequest();
+    expect(sandboxSessionsRequest.request).toMatchObject({
+      method: "GET",
+      path: "/session?limit=21",
+    });
+    server.sendJsonResponse({
+      request: sandboxSessionsRequest,
       body: [],
     });
 
