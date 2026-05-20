@@ -897,7 +897,7 @@ export function ChatComposer({
           ) : null}
           <Textarea
             aria-activedescendant={
-              activeContextMentionIndexWithinBounds !== null
+              showContextMentionMenu && activeContextMentionIndexWithinBounds !== null
                 ? `${contextMentionListId}-${String(activeContextMentionIndexWithinBounds)}`
                 : activeSlashCommand === null
                   ? undefined

@@ -146,10 +146,10 @@ export function useSessionComposerContextMentionControl(input: {
         query: trimmedQuery,
       };
 
-      setState((currentState) => ({
-        results: currentState.results,
+      setState({
+        results: [],
         status: "loading",
-      }));
+      });
 
       void (async (): Promise<void> => {
         try {
