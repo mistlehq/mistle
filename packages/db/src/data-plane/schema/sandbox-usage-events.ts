@@ -18,11 +18,11 @@ import {
 } from "./sandbox-instances.js";
 
 export const SandboxUsageEventTypes = {
-  COMPUTE_ALLOCATED: "compute_allocated",
-  COMPUTE_READY: "compute_ready",
-  COMPUTE_STOPPED: "compute_stopped",
-  COMPUTE_FAILED: "compute_failed",
-  COMPUTE_REPLACED: "compute_replaced",
+  SANDBOX_ALLOCATED: "sandbox_allocated",
+  SANDBOX_READY: "sandbox_ready",
+  SANDBOX_STOPPED: "sandbox_stopped",
+  SANDBOX_FAILED: "sandbox_failed",
+  SANDBOX_REPLACED: "sandbox_replaced",
   STORAGE_PROVISIONED: "storage_provisioned",
   STORAGE_DEPROVISIONED: "storage_deprovisioned",
 } as const;
