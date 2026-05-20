@@ -73,6 +73,7 @@ function SessionComposerStateHarness(input: {
   collaborationDeveloperInstructions?: string;
   composerCapabilities?: readonly ComposerCapability[];
   composerText: string;
+  deferNativeQueue?: boolean;
   deferSubmit?: boolean;
   enableNativeQueueTurn?: boolean;
   executeRuntimeCommand?: (commandId: string) => boolean;
@@ -83,10 +84,12 @@ function SessionComposerStateHarness(input: {
   const [pendingDiffComments, setPendingDiffComments] = useState(input.pendingDiffComments);
   const [submittedPrompt, setSubmittedPrompt] = useState<string | null>(null);
   const [queuedPrompt, setQueuedPrompt] = useState<string | null>(null);
+  const [nativeQueueSubmissionCount, setNativeQueueSubmissionCount] = useState(0);
   const [transcriptPrompt, setTranscriptPrompt] = useState<string | null>(null);
   const [collaborationModeSettings, setCollaborationModeSettings] =
     useState<SessionComposerCollaborationModeSettings | null>(null);
   const [resolveSubmit, setResolveSubmit] = useState<(() => void) | null>(null);
+  const [resolveNativeQueue, setResolveNativeQueue] = useState<(() => void) | null>(null);
 
   const composerState = useSessionComposerState({
     composerStateInput: {
@@ -170,8 +173,14 @@ function SessionComposerStateHarness(input: {
         ...(input.enableNativeQueueTurn === true
           ? {
               queueTurn: async ({ submittedPrompt, transcriptPrompt }) => {
+                setNativeQueueSubmissionCount((currentCount) => currentCount + 1);
                 setQueuedPrompt(submittedPrompt);
                 setTranscriptPrompt(transcriptPrompt ?? null);
+                if (input.deferNativeQueue) {
+                  await new Promise<void>((resolve) => {
+                    setResolveNativeQueue(() => resolve);
+                  });
+                }
               },
             }
           : {}),
@@ -226,6 +235,11 @@ function SessionComposerStateHarness(input: {
           Resolve submit
         </button>
       )}
+      {resolveNativeQueue === null ? null : (
+        <button onClick={resolveNativeQueue} type="button">
+          Resolve queue
+        </button>
+      )}
       <div data-testid="submit-mode">{composerState.composerViewModel.submitMode}</div>
       <div data-testid="composer-capability-count">
         {String(composerState.composerViewModel.composerCapabilities.length)}
@@ -235,6 +249,7 @@ function SessionComposerStateHarness(input: {
       </div>
       <div data-testid="submitted-prompt">{submittedPrompt ?? ""}</div>
       <div data-testid="queued-prompt">{queuedPrompt ?? ""}</div>
+      <div data-testid="native-queue-submission-count">{String(nativeQueueSubmissionCount)}</div>
       <div data-testid="transcript-prompt">{transcriptPrompt ?? ""}</div>
       <div data-testid="collaboration-mode-settings">
         {collaborationModeSettings === null ? "" : JSON.stringify(collaborationModeSettings)}
@@ -475,6 +490,35 @@ describe("useSessionComposerState", () => {
     expect(screen.getByTestId("submitted-prompt").textContent).toBe("");
     expect(screen.getByTestId("composer-text").textContent).toBe("");
     expect(screen.getByTestId("queued-prompt-count").textContent).toBe("0");
+  });
+
+  it("guards runtime-native queued turns while queue submission is pending", async () => {
+    render(
+      <SessionComposerStateHarness
+        activeTurnState="running"
+        composerText="Follow up once"
+        deferNativeQueue
+        enableNativeQueueTurn
+        pendingDiffComments={[]}
+      />,
+    );
+
+    const queueButton = screen.getByRole("button", { name: "Queue" });
+    fireEvent.click(queueButton);
+    fireEvent.click(queueButton);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("native-queue-submission-count").textContent).toBe("1");
+    });
+    expect(screen.getByTestId("composer-text").textContent).toBe("Follow up once");
+    expect(screen.getByTestId("queued-prompt-count").textContent).toBe("0");
+
+    fireEvent.click(screen.getByRole("button", { name: "Resolve queue" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("composer-text").textContent).toBe("");
+    });
+    expect(screen.getByTestId("native-queue-submission-count").textContent).toBe("1");
   });
 
   it("submits developer instructions with the selected model for scoped conversations", async () => {
