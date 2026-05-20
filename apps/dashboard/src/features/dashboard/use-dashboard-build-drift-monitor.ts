@@ -14,12 +14,20 @@ export function useDashboardBuildDriftMonitor() {
       void checkDashboardBuildDrift({ signal: abortController.signal }).catch(() => {});
     }
 
+    function checkVisibleBuild(): void {
+      if (document.visibilityState === "visible") {
+        checkCurrentBuild();
+      }
+    }
+
     checkCurrentBuild();
     globalThis.addEventListener("focus", checkCurrentBuild);
+    document.addEventListener("visibilitychange", checkVisibleBuild);
 
     return () => {
       abortController.abort();
       globalThis.removeEventListener("focus", checkCurrentBuild);
+      document.removeEventListener("visibilitychange", checkVisibleBuild);
     };
   }, []);
 

@@ -156,6 +156,10 @@ _Avoid_: Build/version drift, asset drift
 A sidebar action shown when **Dashboard build drift** is known.
 _Avoid_: Refresh prompt, update modal
 
+**Dashboard drift notice**:
+A dismissible dialog shown when **Dashboard build drift** is first detected.
+_Avoid_: Schema mismatch prompt, refresh modal
+
 ## Relationships
 
 - A **Sandbox profile version** may have one usable **Snapshot**.
@@ -281,6 +285,8 @@ _Avoid_: Refresh prompt, update modal
 - A **Runtime queued message** is available only when the **Agent runtime** exposes native queue submission.
 - A **Pi follow-up message** is a **Runtime queued message**.
 - **Dashboard build drift** can occur while a user keeps the dashboard open across a Mistle deployment.
+- **Dashboard build drift** includes cases where the control-plane API does not report its release version.
+- A **Dashboard drift notice** can be dismissed for the detected control-plane API release while the **Dashboard update affordance** remains available.
 - A **Dashboard update affordance** reloads the dashboard into the current Mistle release.
 - The first **Composer commands** are runtime-owned; dashboard UI controls are not **Composer commands**.
 - A **Composer command** declares its editing representation separately from whether submission becomes inline prompt text or a typed runtime command.

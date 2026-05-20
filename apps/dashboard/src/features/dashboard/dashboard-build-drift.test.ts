@@ -1,8 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
-  getDashboardBuildDriftSchemaMismatchPromptRevision,
-  requestDashboardBuildDriftSchemaMismatchPrompt,
   resetDashboardBuildDriftForTest,
   resolveDashboardBuildDriftStatus,
 } from "./dashboard-build-drift.js";
@@ -49,15 +47,5 @@ describe("resolveDashboardBuildDriftStatus", () => {
       clientReleaseVersion: "0.18.1",
       serverReleaseVersion: null,
     });
-  });
-});
-
-describe("dashboard build drift schema mismatch prompt", () => {
-  it("advances the prompt revision when a schema mismatch should be shown again", () => {
-    const previousRevision = getDashboardBuildDriftSchemaMismatchPromptRevision();
-
-    requestDashboardBuildDriftSchemaMismatchPrompt();
-
-    expect(getDashboardBuildDriftSchemaMismatchPromptRevision()).toBe(previousRevision + 1);
   });
 });

@@ -12,32 +12,74 @@ const DriftStatus = {
 } as const;
 
 describe("DashboardBuildDriftDialog", () => {
-  it("does not render before a schema mismatch prompt is requested", () => {
-    render(<DashboardBuildDriftDialog schemaMismatchPromptRevision={0} status={DriftStatus} />);
+  it("does not render when dashboard build drift is not known", () => {
+    render(
+      <DashboardBuildDriftDialog
+        status={{ kind: "current", clientReleaseVersion: "0.18.1", serverReleaseVersion: "0.18.1" }}
+      />,
+    );
 
     expect(screen.queryByRole("alertdialog", { name: "Refresh required" })).toBeNull();
   });
 
-  it("renders the refresh prompt when schema mismatch confirms dashboard build drift", () => {
-    render(<DashboardBuildDriftDialog schemaMismatchPromptRevision={1} status={DriftStatus} />);
+  it("renders the refresh prompt when dashboard build drift is detected", () => {
+    render(<DashboardBuildDriftDialog status={DriftStatus} />);
 
     expect(screen.getByRole("alertdialog", { name: "Refresh required" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Refresh now" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Dismiss" })).toBeTruthy();
   });
 
-  it("stays dismissed for the same prompt revision and reopens for a later schema mismatch", () => {
-    const { rerender } = render(
-      <DashboardBuildDriftDialog schemaMismatchPromptRevision={1} status={DriftStatus} />,
-    );
+  it("stays dismissed for the same detected release and reopens for a later release", () => {
+    const { rerender } = render(<DashboardBuildDriftDialog status={DriftStatus} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     expect(screen.queryByRole("alertdialog", { name: "Refresh required" })).toBeNull();
 
-    rerender(<DashboardBuildDriftDialog schemaMismatchPromptRevision={1} status={DriftStatus} />);
+    rerender(<DashboardBuildDriftDialog status={DriftStatus} />);
     expect(screen.queryByRole("alertdialog", { name: "Refresh required" })).toBeNull();
 
-    rerender(<DashboardBuildDriftDialog schemaMismatchPromptRevision={2} status={DriftStatus} />);
+    rerender(
+      <DashboardBuildDriftDialog
+        status={{
+          kind: "drift",
+          clientReleaseVersion: "0.18.1",
+          serverReleaseVersion: "0.18.3",
+        }}
+      />,
+    );
+    expect(screen.getByRole("alertdialog", { name: "Refresh required" })).toBeTruthy();
+  });
+
+  it("keeps the same release dismissed after status returns to current", () => {
+    const { rerender } = render(<DashboardBuildDriftDialog status={DriftStatus} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    rerender(
+      <DashboardBuildDriftDialog
+        status={{
+          kind: "current",
+          clientReleaseVersion: "0.18.2",
+          serverReleaseVersion: "0.18.2",
+        }}
+      />,
+    );
+    rerender(<DashboardBuildDriftDialog status={DriftStatus} />);
+
+    expect(screen.queryByRole("alertdialog", { name: "Refresh required" })).toBeNull();
+  });
+
+  it("renders the refresh prompt when the server release version is missing", () => {
+    render(
+      <DashboardBuildDriftDialog
+        status={{
+          kind: "drift",
+          clientReleaseVersion: "0.18.1",
+          serverReleaseVersion: null,
+        }}
+      />,
+    );
+
     expect(screen.getByRole("alertdialog", { name: "Refresh required" })).toBeTruthy();
   });
 });

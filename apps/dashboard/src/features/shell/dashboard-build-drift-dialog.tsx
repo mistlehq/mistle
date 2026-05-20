@@ -8,34 +8,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@mistle/ui";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import type { DashboardBuildDriftStatus } from "../dashboard/dashboard-build-drift.js";
 import { reloadDashboardForCurrentRelease } from "../dashboard/dashboard-build-drift.js";
 
 export function DashboardBuildDriftDialog(input: {
-  schemaMismatchPromptRevision: number;
   status: DashboardBuildDriftStatus;
 }): React.JSX.Element | null {
-  const [dismissedPromptRevision, setDismissedPromptRevision] = useState(0);
-  const shouldOpen =
-    input.status.kind === "drift" &&
-    input.schemaMismatchPromptRevision > 0 &&
-    dismissedPromptRevision < input.schemaMismatchPromptRevision;
+  const driftNoticeId = resolveDashboardDriftNoticeId(input.status);
+  const [dismissedNoticeId, setDismissedNoticeId] = useState<string | null>(null);
+  const shouldOpen = driftNoticeId !== null && dismissedNoticeId !== driftNoticeId;
 
-  useEffect(() => {
-    if (input.status.kind !== "drift") {
-      setDismissedPromptRevision(input.schemaMismatchPromptRevision);
-    }
-  }, [input.schemaMismatchPromptRevision, input.status.kind]);
-
-  if (input.status.kind !== "drift" || input.schemaMismatchPromptRevision === 0) {
+  if (driftNoticeId === null) {
     return null;
   }
 
   function handleOpenChange(open: boolean): void {
     if (!open) {
-      setDismissedPromptRevision(input.schemaMismatchPromptRevision);
+      setDismissedNoticeId(driftNoticeId);
     }
   }
 
@@ -58,4 +49,12 @@ export function DashboardBuildDriftDialog(input: {
       </AlertDialogContent>
     </AlertDialog>
   );
+}
+
+function resolveDashboardDriftNoticeId(status: DashboardBuildDriftStatus): string | null {
+  if (status.kind !== "drift") {
+    return null;
+  }
+
+  return status.serverReleaseVersion ?? "missing-server-release-version";
 }

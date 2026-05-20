@@ -5,7 +5,6 @@ import { Outlet, useLocation, useNavigate } from "react-router";
 import { authClient } from "../../lib/auth/client.js";
 import { AUTH_SWITCH_ORGANIZATION_PATH } from "../auth/auth-switch-organization-page.js";
 import { resolveErrorMessage } from "../auth/messages.js";
-import { useDashboardBuildDriftSchemaMismatchPromptRevision } from "../dashboard/dashboard-build-drift.js";
 import { useDashboardBuildDriftMonitor } from "../dashboard/use-dashboard-build-drift-monitor.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { useOrganizationLogoQuery } from "../organizations/organization-logo-query.js";
@@ -36,8 +35,6 @@ import { useOrganizationSummary } from "./use-organization-summary.js";
 export function AppShell(): React.JSX.Element {
   const organizationSummary = useOrganizationSummary();
   const dashboardBuildDriftStatus = useDashboardBuildDriftMonitor();
-  const dashboardBuildDriftSchemaMismatchPromptRevision =
-    useDashboardBuildDriftSchemaMismatchPromptRevision();
   const organizationLogoQuery = useOrganizationLogoQuery(organizationSummary.activeOrganizationId);
   const pageMeta = useAppPageMeta();
   const queryClient = useQueryClient();
@@ -235,10 +232,7 @@ export function AppShell(): React.JSX.Element {
   return (
     <>
       <AppShellView mainContent={<Outlet />} {...appShellFrame} />
-      <DashboardBuildDriftDialog
-        schemaMismatchPromptRevision={dashboardBuildDriftSchemaMismatchPromptRevision}
-        status={dashboardBuildDriftStatus}
-      />
+      <DashboardBuildDriftDialog status={dashboardBuildDriftStatus} />
     </>
   );
 }

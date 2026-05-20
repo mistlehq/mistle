@@ -295,11 +295,10 @@ export const WithRefreshRequiredDialog: Story = {
         <div className="rounded-xl border bg-card p-6 shadow-xs">
           <h2 className="font-semibold text-lg">Storybook shell preview</h2>
           <p className="mt-2 text-muted-foreground text-sm">
-            This state shows the schema-mismatch refresh prompt after dashboard build drift is
-            confirmed.
+            This state shows the refresh notice after dashboard build drift is detected.
           </p>
         </div>
-        <DashboardBuildDriftDialog schemaMismatchPromptRevision={1} status={DriftStatus} />
+        <DashboardBuildDriftDialog status={DriftStatus} />
       </>
     ),
     sidebarFooterContent: <DriftSidebarFooter />,

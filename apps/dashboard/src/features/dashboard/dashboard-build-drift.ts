@@ -20,11 +20,8 @@ export type DashboardBuildDriftStatus =
     };
 
 type DashboardBuildDriftListener = () => void;
-type DashboardBuildDriftSchemaMismatchPromptListener = () => void;
 
 const DashboardBuildDriftListeners = new Set<DashboardBuildDriftListener>();
-const DashboardBuildDriftSchemaMismatchPromptListeners =
-  new Set<DashboardBuildDriftSchemaMismatchPromptListener>();
 
 function createUnknownStatus(): DashboardBuildDriftStatus {
   return {
@@ -34,16 +31,9 @@ function createUnknownStatus(): DashboardBuildDriftStatus {
 }
 
 let currentStatus: DashboardBuildDriftStatus | null = null;
-let currentSchemaMismatchPromptRevision = 0;
 
 function emitDashboardBuildDriftChange(): void {
   for (const listener of DashboardBuildDriftListeners) {
-    listener();
-  }
-}
-
-function emitDashboardBuildDriftSchemaMismatchPromptChange(): void {
-  for (const listener of DashboardBuildDriftSchemaMismatchPromptListeners) {
     listener();
   }
 }
@@ -72,22 +62,8 @@ export function subscribeDashboardBuildDrift(listener: DashboardBuildDriftListen
   };
 }
 
-export function subscribeDashboardBuildDriftSchemaMismatchPrompt(
-  listener: DashboardBuildDriftSchemaMismatchPromptListener,
-): () => void {
-  DashboardBuildDriftSchemaMismatchPromptListeners.add(listener);
-
-  return () => {
-    DashboardBuildDriftSchemaMismatchPromptListeners.delete(listener);
-  };
-}
-
 export function getDashboardBuildDriftStatus(): DashboardBuildDriftStatus {
   return currentStatus ?? createUnknownStatus();
-}
-
-export function getDashboardBuildDriftSchemaMismatchPromptRevision(): number {
-  return currentSchemaMismatchPromptRevision;
 }
 
 export function useDashboardBuildDriftStatus(): DashboardBuildDriftStatus {
@@ -95,14 +71,6 @@ export function useDashboardBuildDriftStatus(): DashboardBuildDriftStatus {
     subscribeDashboardBuildDrift,
     getDashboardBuildDriftStatus,
     getDashboardBuildDriftStatus,
-  );
-}
-
-export function useDashboardBuildDriftSchemaMismatchPromptRevision(): number {
-  return useSyncExternalStore(
-    subscribeDashboardBuildDriftSchemaMismatchPrompt,
-    getDashboardBuildDriftSchemaMismatchPromptRevision,
-    getDashboardBuildDriftSchemaMismatchPromptRevision,
   );
 }
 
@@ -140,16 +108,9 @@ export async function checkDashboardBuildDrift(input?: {
   return nextStatus;
 }
 
-export function requestDashboardBuildDriftSchemaMismatchPrompt(): void {
-  currentSchemaMismatchPromptRevision += 1;
-  emitDashboardBuildDriftSchemaMismatchPromptChange();
-}
-
 export function resetDashboardBuildDriftForTest(): void {
   currentStatus = null;
-  currentSchemaMismatchPromptRevision = 0;
   emitDashboardBuildDriftChange();
-  emitDashboardBuildDriftSchemaMismatchPromptChange();
 }
 
 export function reloadDashboardForCurrentRelease(): void {
