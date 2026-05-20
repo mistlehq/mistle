@@ -2,10 +2,16 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
+import { readRepositoryVersion } from "@mistle/config";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
-import { dashboardCapabilitiesResponseSchema } from "../src/dashboard/get-capabilities/index.js";
+import {
+  DashboardReleaseVersionHeaderName,
+  dashboardCapabilitiesResponseSchema,
+} from "../src/dashboard/get-capabilities/index.js";
+
+const ReleaseVersion = readRepositoryVersion(import.meta.url);
 
 const it = createIntegrationTest({
   services: ["control-plane-api"],
@@ -16,6 +22,7 @@ describe.concurrent("dashboard capabilities integration", () => {
     const response = await env.controlPlaneApi.http.fetch("/v1/dashboard/capabilities");
 
     expect(response.status).toBe(200);
+    expect(response.headers.get(DashboardReleaseVersionHeaderName)).toBe(ReleaseVersion);
     expect(dashboardCapabilitiesResponseSchema.parse(await response.json())).toStrictEqual({});
   });
 });
@@ -36,6 +43,7 @@ describe.concurrent("dashboard capabilities with Stripe billing integration", ()
       const response = await env.controlPlaneApi.http.fetch("/v1/dashboard/capabilities");
 
       expect(response.status).toBe(200);
+      expect(response.headers.get(DashboardReleaseVersionHeaderName)).toBe(ReleaseVersion);
       expect(dashboardCapabilitiesResponseSchema.parse(await response.json())).toStrictEqual({
         billing: {
           stripe: {

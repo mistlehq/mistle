@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 
-import { loadDashboardBuildConfig } from "@mistle/config";
+import { loadDashboardBuildConfig, readRepositoryVersion } from "@mistle/config";
 
 const supportedCommands = new Set(["dev", "build", "preview"]);
 
@@ -28,12 +28,14 @@ function main(): void {
     throw new Error("Unsupported vite command.");
   }
   const config = loadDashboardBuildConfig(process.env, resolveBuildEnvironment(command));
+  const releaseVersion = readRepositoryVersion(import.meta.url);
 
   const child = spawn("pnpm", ["exec", "vite", command, ...passthroughArgs], {
     stdio: "inherit",
     env: {
       ...process.env,
       VITE_CONTROL_PLANE_API_ORIGIN: config.controlPlaneApiOrigin,
+      VITE_MISTLE_RELEASE_VERSION: releaseVersion,
       VITE_POSTHOG_ENABLED: config.posthog.enabled ? "true" : "false",
       ...(config.posthog.enabled
         ? {

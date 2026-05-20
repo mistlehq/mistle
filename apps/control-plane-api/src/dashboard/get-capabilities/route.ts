@@ -1,6 +1,9 @@
 import { createRoute } from "@hono/zod-openapi";
 
-import { dashboardCapabilitiesResponseSchema } from "./schema.js";
+import {
+  dashboardCapabilitiesResponseHeadersSchema,
+  dashboardCapabilitiesResponseSchema,
+} from "./schema.js";
 
 export const route = createRoute({
   method: "get",
@@ -9,6 +12,7 @@ export const route = createRoute({
   responses: {
     200: {
       description: "Deployment capabilities exposed to the dashboard.",
+      headers: dashboardCapabilitiesResponseHeadersSchema,
       content: {
         "application/json": {
           schema: dashboardCapabilitiesResponseSchema,

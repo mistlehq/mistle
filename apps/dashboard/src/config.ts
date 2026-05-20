@@ -1,5 +1,8 @@
+/// <reference types="vite/client" />
+
 type DashboardEnv = {
   readonly VITE_CONTROL_PLANE_API_ORIGIN?: string;
+  readonly VITE_MISTLE_RELEASE_VERSION?: string;
   readonly VITE_POSTHOG_ENABLED?: string;
   readonly VITE_POSTHOG_PROJECT_API_KEY?: string;
   readonly VITE_POSTHOG_HOST?: string;
@@ -17,6 +20,7 @@ export type DashboardPostHogConfig =
 
 export type DashboardConfig = {
   controlPlaneApiOrigin: string;
+  releaseVersion: string;
   authBasePath: "/v1/auth";
   posthog: DashboardPostHogConfig;
 };
@@ -91,12 +95,17 @@ export function buildDashboardConfig(env: DashboardEnv): DashboardConfig {
   if (!configuredOrigin || configuredOrigin.trim().length === 0) {
     throw new Error("VITE_CONTROL_PLANE_API_ORIGIN is required.");
   }
+  const releaseVersion = env.VITE_MISTLE_RELEASE_VERSION;
+  if (releaseVersion === undefined || releaseVersion.trim().length === 0) {
+    throw new Error("VITE_MISTLE_RELEASE_VERSION is required.");
+  }
 
   return {
     controlPlaneApiOrigin: parseRequiredUrlOrigin(
       configuredOrigin,
       "VITE_CONTROL_PLANE_API_ORIGIN",
     ),
+    releaseVersion,
     authBasePath: "/v1/auth",
     posthog: parseDashboardPostHogConfig(env),
   };
@@ -107,6 +116,7 @@ let cachedDashboardConfig: DashboardConfig | undefined;
 function readDashboardEnvironment(): DashboardEnv {
   return {
     VITE_CONTROL_PLANE_API_ORIGIN: import.meta.env.VITE_CONTROL_PLANE_API_ORIGIN,
+    VITE_MISTLE_RELEASE_VERSION: import.meta.env.VITE_MISTLE_RELEASE_VERSION,
     VITE_POSTHOG_ENABLED: import.meta.env.VITE_POSTHOG_ENABLED,
     VITE_POSTHOG_PROJECT_API_KEY: import.meta.env.VITE_POSTHOG_PROJECT_API_KEY,
     VITE_POSTHOG_HOST: import.meta.env.VITE_POSTHOG_HOST,

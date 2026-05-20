@@ -759,6 +759,7 @@ export interface paths {
         /** @description Deployment capabilities exposed to the dashboard. */
         200: {
           headers: {
+            "x-mistle-release-version": string;
             [name: string]: unknown;
           };
           content: {

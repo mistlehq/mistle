@@ -5,6 +5,7 @@ import { buildDashboardConfig, getDashboardConfig, resetDashboardConfigForTest }
 function setDashboardControlPlaneApiOrigin(value: string): void {
   Object.assign(import.meta.env, {
     VITE_CONTROL_PLANE_API_ORIGIN: value,
+    VITE_MISTLE_RELEASE_VERSION: "0.18.1",
   });
 }
 
@@ -25,9 +26,11 @@ describe("dashboard config", () => {
   it("accepts a valid control-plane API origin", () => {
     const config = buildDashboardConfig({
       VITE_CONTROL_PLANE_API_ORIGIN: "http://localhost:3000",
+      VITE_MISTLE_RELEASE_VERSION: "0.18.1",
     });
 
     expect(config.controlPlaneApiOrigin).toBe("http://localhost:3000");
+    expect(config.releaseVersion).toBe("0.18.1");
     expect(config.posthog).toEqual({ enabled: false });
   });
 
@@ -41,6 +44,7 @@ describe("dashboard config", () => {
 
     const config = buildDashboardConfig({
       VITE_CONTROL_PLANE_API_ORIGIN: "same-origin",
+      VITE_MISTLE_RELEASE_VERSION: "0.18.1",
     });
 
     expect(config.controlPlaneApiOrigin).toBe("https://dashboard.example.test");
@@ -50,12 +54,25 @@ describe("dashboard config", () => {
     expect(() =>
       buildDashboardConfig({
         VITE_CONTROL_PLANE_API_ORIGIN: "localhost:3000",
+        VITE_MISTLE_RELEASE_VERSION: "0.18.1",
       }),
     ).toThrow("VITE_CONTROL_PLANE_API_ORIGIN must be a valid absolute URL origin.");
   });
 
   it("requires control-plane API origin", () => {
-    expect(() => buildDashboardConfig({})).toThrow("VITE_CONTROL_PLANE_API_ORIGIN is required.");
+    expect(() =>
+      buildDashboardConfig({
+        VITE_MISTLE_RELEASE_VERSION: "0.18.1",
+      }),
+    ).toThrow("VITE_CONTROL_PLANE_API_ORIGIN is required.");
+  });
+
+  it("requires release version", () => {
+    expect(() =>
+      buildDashboardConfig({
+        VITE_CONTROL_PLANE_API_ORIGIN: "http://localhost:3000",
+      }),
+    ).toThrow("VITE_MISTLE_RELEASE_VERSION is required.");
   });
 
   it("reads control-plane API origin from build-time env", () => {
@@ -67,6 +84,7 @@ describe("dashboard config", () => {
   it("keeps PostHog disabled when no PostHog env is provided", () => {
     const config = buildDashboardConfig({
       VITE_CONTROL_PLANE_API_ORIGIN: "http://localhost:3000",
+      VITE_MISTLE_RELEASE_VERSION: "0.18.1",
     });
 
     expect(config.posthog).toEqual({ enabled: false });
@@ -75,6 +93,7 @@ describe("dashboard config", () => {
   it("loads enabled PostHog config from build-time env", () => {
     const config = buildDashboardConfig({
       VITE_CONTROL_PLANE_API_ORIGIN: "http://localhost:3000",
+      VITE_MISTLE_RELEASE_VERSION: "0.18.1",
       VITE_POSTHOG_ENABLED: "true",
       VITE_POSTHOG_PROJECT_API_KEY: "phc_example",
       VITE_POSTHOG_HOST: "https://us.i.posthog.com",
@@ -91,6 +110,7 @@ describe("dashboard config", () => {
     expect(() =>
       buildDashboardConfig({
         VITE_CONTROL_PLANE_API_ORIGIN: "http://localhost:3000",
+        VITE_MISTLE_RELEASE_VERSION: "0.18.1",
         VITE_POSTHOG_ENABLED: "true",
         VITE_POSTHOG_HOST: "https://us.i.posthog.com",
       }),
@@ -101,6 +121,7 @@ describe("dashboard config", () => {
     expect(() =>
       buildDashboardConfig({
         VITE_CONTROL_PLANE_API_ORIGIN: "http://localhost:3000",
+        VITE_MISTLE_RELEASE_VERSION: "0.18.1",
         VITE_POSTHOG_ENABLED: "true",
         VITE_POSTHOG_PROJECT_API_KEY: "phc_example",
       }),
@@ -111,6 +132,7 @@ describe("dashboard config", () => {
     expect(() =>
       buildDashboardConfig({
         VITE_CONTROL_PLANE_API_ORIGIN: "http://localhost:3000",
+        VITE_MISTLE_RELEASE_VERSION: "0.18.1",
         VITE_POSTHOG_ENABLED: "yes",
       }),
     ).toThrow('VITE_POSTHOG_ENABLED must be either "true" or "false".');

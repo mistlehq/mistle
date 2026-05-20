@@ -148,6 +148,14 @@ _Avoid_: Slash autocomplete
 A composer-submitted user message accepted by an **Agent runtime** for delivery after the current **Working agent turn**.
 _Avoid_: Local queued prompt, deferred start turn
 
+**Dashboard build drift**:
+A mismatch between the loaded dashboard bundle's release version and the control-plane API release version.
+_Avoid_: Build/version drift, asset drift
+
+**Dashboard update affordance**:
+A sidebar action shown when **Dashboard build drift** is known.
+_Avoid_: Refresh prompt, update modal
+
 ## Relationships
 
 - A **Sandbox profile version** may have one usable **Snapshot**.
@@ -272,6 +280,8 @@ _Avoid_: Local queued prompt, deferred start turn
 - A **Composer capability** defines both the editing representation and the submission behavior, not just whether a feature is enabled.
 - A **Runtime queued message** is available only when the **Agent runtime** exposes native queue submission.
 - A **Pi follow-up message** is a **Runtime queued message**.
+- **Dashboard build drift** can occur while a user keeps the dashboard open across a Mistle deployment.
+- A **Dashboard update affordance** reloads the dashboard into the current Mistle release.
 - The first **Composer commands** are runtime-owned; dashboard UI controls are not **Composer commands**.
 - A **Composer command** declares its editing representation separately from whether submission becomes inline prompt text or a typed runtime command.
 - A **Composer command** that depends on an optional runtime feature is available only when the **Agent runtime** confirms that feature is enabled.

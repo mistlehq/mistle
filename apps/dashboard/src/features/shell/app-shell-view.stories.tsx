@@ -14,6 +14,8 @@ import { ErrorNotice } from "../auth/error-notice.js";
 import { SessionsNavToggleItem } from "../navigation/sessions-nav-toggle-item.js";
 import { AppShellView } from "./app-shell-view.js";
 import { AppSidebarHeader } from "./app-sidebar-header.js";
+import { DashboardBuildDriftDialog } from "./dashboard-build-drift-dialog.js";
+import { DashboardUpdateAffordance } from "./dashboard-update-affordance.js";
 
 type AppShellViewStoryArgs = React.ComponentProps<typeof AppShellView> & {
   locationPathname: string;
@@ -263,4 +265,43 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+const DriftStatus = {
+  kind: "drift",
+  clientReleaseVersion: "0.18.1",
+  serverReleaseVersion: "0.18.2",
+} as const;
+
+function DriftSidebarFooter(): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-2">
+      <DashboardUpdateAffordance status={DriftStatus} />
+      <ErrorNotice message={null} />
+    </div>
+  );
+}
+
 export const Default: Story = {};
+
+export const WithUpdateAvailable: Story = {
+  args: {
+    sidebarFooterContent: <DriftSidebarFooter />,
+  },
+};
+
+export const WithRefreshRequiredDialog: Story = {
+  args: {
+    mainContent: (
+      <>
+        <div className="rounded-xl border bg-card p-6 shadow-xs">
+          <h2 className="font-semibold text-lg">Storybook shell preview</h2>
+          <p className="mt-2 text-muted-foreground text-sm">
+            This state shows the schema-mismatch refresh prompt after dashboard build drift is
+            confirmed.
+          </p>
+        </div>
+        <DashboardBuildDriftDialog schemaMismatchPromptRevision={1} status={DriftStatus} />
+      </>
+    ),
+    sidebarFooterContent: <DriftSidebarFooter />,
+  },
+};

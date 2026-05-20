@@ -164,6 +164,11 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
     organizationSwitcherErrorMessage: null,
     organizationImageUrl: null,
     activeOrganizationId: "org_123",
+    dashboardBuildDriftStatus: {
+      kind: "current",
+      clientReleaseVersion: "0.18.1",
+      serverReleaseVersion: "0.18.1",
+    },
     organizationName: "Mistle Labs",
     pageMeta,
     signOutError: null,

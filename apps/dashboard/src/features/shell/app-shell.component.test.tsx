@@ -6,6 +6,12 @@ import { resolveAppShellFrame } from "./app-shell-frame.js";
 import { resolveAppShellRouteState } from "./app-shell-route-state.js";
 import { AppSidebarHeader } from "./app-sidebar-header.js";
 
+const CurrentDashboardBuildDriftStatus = {
+  kind: "current",
+  clientReleaseVersion: "0.18.1",
+  serverReleaseVersion: "0.18.1",
+} as const;
+
 describe("resolveAppShellFrame", () => {
   it("uses the dedicated sessions sidebar only when the toggle is enabled on sessions routes", () => {
     const locationPathname = "/sessions/sbi_123";
@@ -29,6 +35,7 @@ describe("resolveAppShellFrame", () => {
       organizationSwitcherErrorMessage: null,
       organizationImageUrl: null,
       activeOrganizationId: "org_123",
+      dashboardBuildDriftStatus: CurrentDashboardBuildDriftStatus,
       organizationName: "Acme",
       pageMeta: {
         appShellInsetOwner: "app-shell",
@@ -83,6 +90,7 @@ describe("resolveAppShellFrame", () => {
       organizationSwitcherErrorMessage: null,
       organizationImageUrl: null,
       activeOrganizationId: "org_123",
+      dashboardBuildDriftStatus: CurrentDashboardBuildDriftStatus,
       organizationName: "Acme",
       pageMeta: {
         appShellInsetOwner: "app-shell",
@@ -131,6 +139,7 @@ describe("resolveAppShellFrame", () => {
       organizationSwitcherErrorMessage: null,
       organizationImageUrl: null,
       activeOrganizationId: "org_123",
+      dashboardBuildDriftStatus: CurrentDashboardBuildDriftStatus,
       organizationName: "Acme",
       pageMeta: {
         appShellInsetOwner: "child",

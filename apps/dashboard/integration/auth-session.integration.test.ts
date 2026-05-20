@@ -38,6 +38,7 @@ it("resolves the dashboard session from the real control-plane API", async ({ en
 
   Object.assign(import.meta.env, {
     VITE_CONTROL_PLANE_API_ORIGIN: env.controlPlaneApi.hostBaseUrl,
+    VITE_MISTLE_RELEASE_VERSION: "0.18.1",
   });
   resetDashboardConfigForTest();
   resetAuthClientForTest();

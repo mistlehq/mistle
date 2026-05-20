@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import type { StorybookConfig } from "@storybook/react-vite";
@@ -5,6 +6,10 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { mergeConfig } from "vite";
 
+const StorybookReleaseVersion = readFileSync(
+  fileURLToPath(new URL("../../../VERSION", import.meta.url)),
+  "utf8",
+).trim();
 const SandboxSessionClientIndexPath = fileURLToPath(
   new URL("../../sandbox-session-client/src/index.ts", import.meta.url),
 );
@@ -35,6 +40,7 @@ const config: StorybookConfig = {
         "import.meta.env.VITE_CONTROL_PLANE_API_ORIGIN": JSON.stringify(
           StorybookControlPlaneApiOrigin,
         ),
+        "import.meta.env.VITE_MISTLE_RELEASE_VERSION": JSON.stringify(StorybookReleaseVersion),
       },
       plugins: [react(), tailwindcss()],
       resolve: {

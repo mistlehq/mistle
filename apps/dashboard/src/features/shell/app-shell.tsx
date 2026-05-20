@@ -5,6 +5,8 @@ import { Outlet, useLocation, useNavigate } from "react-router";
 import { authClient } from "../../lib/auth/client.js";
 import { AUTH_SWITCH_ORGANIZATION_PATH } from "../auth/auth-switch-organization-page.js";
 import { resolveErrorMessage } from "../auth/messages.js";
+import { useDashboardBuildDriftSchemaMismatchPromptRevision } from "../dashboard/dashboard-build-drift.js";
+import { useDashboardBuildDriftMonitor } from "../dashboard/use-dashboard-build-drift-monitor.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { useOrganizationLogoQuery } from "../organizations/organization-logo-query.js";
 import { resolveSettingsBackDestination, SETTINGS_DEFAULT_PATH } from "../settings/model.js";
@@ -22,6 +24,7 @@ import {
   resolveSessionsSidebarModeEnabled,
 } from "./app-shell-sessions-sidebar-mode.js";
 import { AppShellView } from "./app-shell-view.js";
+import { DashboardBuildDriftDialog } from "./dashboard-build-drift-dialog.js";
 import {
   fetchOrganizationSwitcherOptions,
   ORGANIZATION_SWITCHER_QUERY_KEY,
@@ -32,6 +35,9 @@ import { useOrganizationSummary } from "./use-organization-summary.js";
 
 export function AppShell(): React.JSX.Element {
   const organizationSummary = useOrganizationSummary();
+  const dashboardBuildDriftStatus = useDashboardBuildDriftMonitor();
+  const dashboardBuildDriftSchemaMismatchPromptRevision =
+    useDashboardBuildDriftSchemaMismatchPromptRevision();
   const organizationLogoQuery = useOrganizationLogoQuery(organizationSummary.activeOrganizationId);
   const pageMeta = useAppPageMeta();
   const queryClient = useQueryClient();
@@ -216,6 +222,7 @@ export function AppShell(): React.JSX.Element {
       image: organizationLogoQuery.data,
     }),
     activeOrganizationId: organizationSummary.activeOrganizationId,
+    dashboardBuildDriftStatus,
     organizationName: organizationSummary.organizationName ?? "",
     pageMeta,
     signOutError,
@@ -225,5 +232,13 @@ export function AppShell(): React.JSX.Element {
     },
   });
 
-  return <AppShellView mainContent={<Outlet />} {...appShellFrame} />;
+  return (
+    <>
+      <AppShellView mainContent={<Outlet />} {...appShellFrame} />
+      <DashboardBuildDriftDialog
+        schemaMismatchPromptRevision={dashboardBuildDriftSchemaMismatchPromptRevision}
+        status={dashboardBuildDriftStatus}
+      />
+    </>
+  );
 }

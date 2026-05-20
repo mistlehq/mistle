@@ -7,6 +7,7 @@ import {
 import { z } from "zod";
 
 import { normalizeHttpApiError } from "../api/http-api-error.js";
+import { checkDashboardBuildDriftAfterSchemaValidationFailure } from "../dashboard/dashboard-build-drift-schema-failure.js";
 
 export const KeysetPageSchema = z
   .object({
@@ -593,6 +594,7 @@ export async function readJsonWithSchema<T>(input: {
   const json = await input.response.json().catch((): unknown => null);
   const parsed = input.schema.safeParse(json);
   if (!parsed.success) {
+    await checkDashboardBuildDriftAfterSchemaValidationFailure();
     throw new IntegrationsApiError({
       operation: input.operation,
       status: 500,

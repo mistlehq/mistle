@@ -624,6 +624,15 @@
         "responses": {
           "200": {
             "description": "Deployment capabilities exposed to the dashboard.",
+            "headers": {
+              "x-mistle-release-version": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "required": true
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {

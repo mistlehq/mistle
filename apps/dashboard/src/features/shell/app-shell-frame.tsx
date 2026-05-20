@@ -9,6 +9,7 @@ import { HouseIcon, LightningIcon, PackageIcon, PuzzlePieceIcon } from "@phospho
 import { NavLink } from "react-router";
 
 import { ErrorNotice } from "../auth/error-notice.js";
+import type { DashboardBuildDriftStatus } from "../dashboard/dashboard-build-drift.js";
 import type { AppPageMeta } from "../navigation/route-meta.js";
 import { SessionsNavToggleItem } from "../navigation/sessions-nav-toggle-item.js";
 import { SessionsShellSidebar } from "../navigation/sessions-shell-sidebar.js";
@@ -17,6 +18,7 @@ import { SettingsBackButton } from "../settings/settings-back-button.js";
 import { SettingsSectionNav } from "../settings/settings-section-nav.js";
 import { AppShellView } from "./app-shell-view.js";
 import { AppSidebarHeader } from "./app-sidebar-header.js";
+import { DashboardUpdateAffordance } from "./dashboard-update-affordance.js";
 import type { OrganizationSwitcherOption } from "./organization-switcher.js";
 import { TopLoadingBar } from "./top-loading-bar.js";
 
@@ -76,6 +78,7 @@ export function resolveAppShellFrame(input: {
   organizationSwitcherErrorMessage: string | null;
   organizationImageUrl: string | null;
   activeOrganizationId: string;
+  dashboardBuildDriftStatus: DashboardBuildDriftStatus;
   organizationName: string;
   pageMeta: AppPageMeta;
   signOutError: string | null;
@@ -89,7 +92,12 @@ export function resolveAppShellFrame(input: {
       contentInsetOwner: "child",
       renderSidebarTrigger: true,
       sidebarContent: <SettingsSectionNav />,
-      sidebarFooterContent: <ErrorNotice message={input.signOutError} />,
+      sidebarFooterContent: (
+        <SidebarFooterContent
+          dashboardBuildDriftStatus={input.dashboardBuildDriftStatus}
+          signOutError={input.signOutError}
+        />
+      ),
       sidebarHeaderClassName: "pb-0",
       sidebarHeaderContent: <SettingsBackButton onBack={input.handleBackToApp} />,
       topLoadingBar: <TopLoadingBar />,
@@ -115,7 +123,12 @@ export function resolveAppShellFrame(input: {
         onShowSessionsSidebarChange={input.onShowSessionsSidebarChange}
       />
     ),
-    sidebarFooterContent: <ErrorNotice message={input.signOutError} />,
+    sidebarFooterContent: (
+      <SidebarFooterContent
+        dashboardBuildDriftStatus={input.dashboardBuildDriftStatus}
+        signOutError={input.signOutError}
+      />
+    ),
     sidebarHeaderContent: showDedicatedSessionsSidebar ? null : (
       <AppSidebarHeader
         activeOrganizationId={input.activeOrganizationId}
@@ -134,6 +147,18 @@ export function resolveAppShellFrame(input: {
     topLoadingBar: <TopLoadingBar />,
     viewportMode: input.inSessionDetail ? "workspace" : input.pageMeta.appShellViewportMode,
   };
+}
+
+function SidebarFooterContent(input: {
+  dashboardBuildDriftStatus: DashboardBuildDriftStatus;
+  signOutError: string | null;
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-2">
+      <DashboardUpdateAffordance status={input.dashboardBuildDriftStatus} />
+      <ErrorNotice message={input.signOutError} />
+    </div>
+  );
 }
 
 function MainSidebarContent(input: {

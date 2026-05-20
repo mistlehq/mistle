@@ -5,6 +5,8 @@
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
+import { DashboardReleaseVersionHeaderName } from "../src/dashboard/get-capabilities/index.js";
+
 const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
@@ -21,6 +23,10 @@ describe.concurrent("cors integration", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("access-control-allow-origin")).toBe(trustedOrigin);
     expect(response.headers.get("access-control-allow-credentials")).toBe("true");
+
+    const exposeHeaders = response.headers.get("access-control-expose-headers");
+    expect(exposeHeaders).toContain("Content-Length");
+    expect(exposeHeaders).toContain(DashboardReleaseVersionHeaderName);
   });
 
   it("does not allow untrusted origins on standard requests", async ({ env }) => {

@@ -1,6 +1,7 @@
 import type { MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 
+import { ReleaseVersionHeaderName } from "../release-version-header.js";
 import type { AppContextBindings } from "../types.js";
 
 type CreateCorsMiddlewareInput = {
@@ -30,7 +31,12 @@ export function createCorsMiddleware(
       "mcp-session-id",
     ],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    exposeHeaders: ["Content-Length", "mcp-protocol-version", "mcp-session-id"],
+    exposeHeaders: [
+      "Content-Length",
+      "mcp-protocol-version",
+      "mcp-session-id",
+      ReleaseVersionHeaderName,
+    ],
     maxAge: 600,
     credentials: true,
   });
