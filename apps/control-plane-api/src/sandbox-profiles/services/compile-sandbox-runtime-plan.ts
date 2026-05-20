@@ -8,6 +8,7 @@ import {
   IntegrationMcpTransports,
   compileRuntimePlan,
   type CompiledRuntimePlan,
+  type EgressCredentialRoute,
   type IntegrationDefinitionsBundle,
   type ResolvedIntegrationMcpServer,
   type ResolvedSandboxImage,
@@ -18,6 +19,11 @@ type IntegrationTargetEncryptedSecretsInput = {
   nonce: string;
   masterKeyVersion: number;
 };
+
+const MistleMcpEgressRuleId = "egress_rule_platform_mistle_mcp";
+const MistleMcpBindingId = "platform-mistle-mcp";
+const MistleMcpFamilyId = "mistle";
+const MistleMcpVariantId = "mistle-mcp";
 
 export const SandboxRuntimePlanCompilerErrorCodes = {
   PROFILE_NOT_FOUND: "PROFILE_NOT_FOUND",
@@ -123,6 +129,63 @@ function resolveMistleMcpServers(input: {
         serverName: "mistle",
         transport: IntegrationMcpTransports.STREAMABLE_HTTP,
         url: input.url,
+      },
+    },
+  ];
+}
+
+function normalizeMcpPathPrefix(pathname: string): string {
+  if (pathname.trim().length === 0) {
+    return "/";
+  }
+
+  return pathname.startsWith("/") ? pathname : `/${pathname}`;
+}
+
+function resolveMistleMcpEgressRoutes(input: {
+  enabled: boolean;
+  apiKeyId: string | null;
+  url: string;
+}): ReadonlyArray<EgressCredentialRoute> {
+  if (!input.enabled) {
+    return [];
+  }
+
+  if (input.apiKeyId === null) {
+    throw new SandboxRuntimePlanCompilerError({
+      code: SandboxRuntimePlanCompilerErrorCodes.INVALID_AGENT_RUNTIME_CONFIG,
+      message: "Mistle MCP is enabled but no API key is configured.",
+    });
+  }
+
+  const mcpUrl = new URL(input.url);
+  if (mcpUrl.protocol !== "http:" && mcpUrl.protocol !== "https:") {
+    throw new SandboxRuntimePlanCompilerError({
+      code: SandboxRuntimePlanCompilerErrorCodes.INVALID_AGENT_RUNTIME_CONFIG,
+      message: "Mistle MCP URL must use http or https.",
+    });
+  }
+
+  return [
+    {
+      egressRuleId: MistleMcpEgressRuleId,
+      bindingId: MistleMcpBindingId,
+      familyId: MistleMcpFamilyId,
+      variantId: MistleMcpVariantId,
+      match: {
+        hosts: [mcpUrl.hostname],
+        pathPrefixes: [normalizeMcpPathPrefix(mcpUrl.pathname)],
+      },
+      upstream: {
+        baseUrl: input.url,
+      },
+      authInjection: {
+        type: "bearer",
+        target: "authorization",
+      },
+      credentialResolver: {
+        kind: "mistle_mcp_token",
+        apiKeyId: input.apiKeyId,
       },
     },
   ];
@@ -360,6 +423,11 @@ export async function compileSandboxRuntimePlan(
       agentRuntimeId: input.agentRuntimeId ?? sandboxProfileVersion.agentRuntimeId,
       bindings: compileBindings,
       definitions: input.integrationDefinitions,
+      egressRoutes: resolveMistleMcpEgressRoutes({
+        enabled: sandboxProfileVersion.mistleMcpEnabled,
+        apiKeyId: sandboxProfileVersion.mistleMcpApiKeyId,
+        url: input.mcpConfig.url,
+      }),
       mcpServers: resolveMistleMcpServers({
         enabled: sandboxProfileVersion.mistleMcpEnabled,
         apiKeyId: sandboxProfileVersion.mistleMcpApiKeyId,

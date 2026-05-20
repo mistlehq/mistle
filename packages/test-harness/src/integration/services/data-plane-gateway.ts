@@ -208,6 +208,13 @@ function config(input: {
     controlPlaneApi: {
       baseUrl: input.controlPlaneBaseUrl,
       publicBaseUrl: input.controlPlaneBaseUrl,
+      mcp: {
+        auth: {
+          secret: "fixture-mcp-auth-secret",
+          issuer: "control-plane-api",
+          audience: "mistle-mcp",
+        },
+      },
     },
     internalAuth: {
       serviceToken: "integration-new-internal-service-token",

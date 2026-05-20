@@ -40,6 +40,12 @@ const EgressCredentialResolverSchema = z.discriminatedUnion("kind", [
       resolutionMode: z.enum(["required", "preferred"]),
     })
     .strict(),
+  z
+    .object({
+      kind: z.literal("mistle_mcp_token"),
+      apiKeyId: z.string().min(1),
+    })
+    .strict(),
 ]);
 
 const EgressCredentialRouteSchema = z
@@ -532,6 +538,13 @@ function normalizeCredentialResolver(
     };
   }
 
+  if (resolver.kind === "mistle_mcp_token") {
+    return {
+      kind: "mistle_mcp_token",
+      apiKeyId: resolver.apiKeyId,
+    };
+  }
+
   return {
     kind: "linked_principal",
     providerFamily: resolver.providerFamily,
@@ -563,6 +576,10 @@ function compareCredentialResolvers(
     }
 
     return (left.resolverKey ?? "").localeCompare(right.resolverKey ?? "");
+  }
+
+  if (left.kind === "mistle_mcp_token" && right.kind === "mistle_mcp_token") {
+    return left.apiKeyId.localeCompare(right.apiKeyId);
   }
 
   if (left.kind !== "linked_principal" || right.kind !== "linked_principal") {

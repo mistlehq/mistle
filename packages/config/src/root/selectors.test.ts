@@ -350,6 +350,11 @@ describe("selectDataPlaneGatewayConfig", () => {
     expect(config.gatewayRelay).toEqual({
       backend: "memory",
     });
+    expect(config.controlPlaneApi.mcp.auth).toEqual({
+      secret: "mcp-auth-secret",
+      issuer: "control-plane-api",
+      audience: "mistle-mcp",
+    });
   });
 
   it("projects NATS gateway relay config", () => {

@@ -120,6 +120,37 @@ export const DataPlaneGatewayControlPlaneApiConfigSchema = z
   .object({
     baseUrl: HttpBaseUrlSchema,
     publicBaseUrl: HttpBaseUrlSchema,
+    mcp: z
+      .object({
+        auth: z
+          .object({
+            secret: z.string().trim().min(1),
+            issuer: z.string().trim().min(1),
+            audience: z.string().trim().min(1),
+          })
+          .strict(),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const PartialDataPlaneGatewayControlPlaneApiConfigSchema = z
+  .object({
+    baseUrl: HttpBaseUrlSchema.optional(),
+    publicBaseUrl: HttpBaseUrlSchema.optional(),
+    mcp: z
+      .object({
+        auth: z
+          .object({
+            secret: z.string().trim().min(1).optional(),
+            issuer: z.string().trim().min(1).optional(),
+            audience: z.string().trim().min(1).optional(),
+          })
+          .strict()
+          .optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -150,7 +181,7 @@ export const PartialDataPlaneGatewayConfigSchema = z
     runtimeState: PartialDataPlaneGatewayRuntimeStateConfigSchema.optional(),
     gatewayRelay: PartialDataPlaneGatewayRelayConfigSchema.optional(),
     dataPlaneApi: DataPlaneGatewayDataPlaneApiConfigSchema.partial().optional(),
-    controlPlaneApi: DataPlaneGatewayControlPlaneApiConfigSchema.partial().optional(),
+    controlPlaneApi: PartialDataPlaneGatewayControlPlaneApiConfigSchema.optional(),
     internalAuth: DataPlaneGatewayInternalAuthConfigSchema.partial().optional(),
     sandbox: PartialGlobalSandboxConfigSchema.optional(),
     telemetry: PartialGlobalTelemetryConfigSchema.optional(),

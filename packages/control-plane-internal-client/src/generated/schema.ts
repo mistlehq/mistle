@@ -725,6 +725,11 @@ export interface paths {
                           providerFamily: string;
                           /** @enum {string} */
                           resolutionMode: "required" | "preferred";
+                        }
+                      | {
+                          apiKeyId: string;
+                          /** @enum {string} */
+                          kind: "mistle_mcp_token";
                         };
                     header: string;
                   }[];
@@ -777,6 +782,11 @@ export interface paths {
                         providerFamily: string;
                         /** @enum {string} */
                         resolutionMode: "required" | "preferred";
+                      }
+                    | {
+                        apiKeyId: string;
+                        /** @enum {string} */
+                        kind: "mistle_mcp_token";
                       };
                   egressRuleId: string;
                   familyId: string;

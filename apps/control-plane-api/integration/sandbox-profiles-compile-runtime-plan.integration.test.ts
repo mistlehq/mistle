@@ -521,6 +521,27 @@ describe.concurrent("sandbox profile compile runtime plan integration", () => {
     const configContent = readSetupFileContent(runtimePlan, "codex_config");
     expect(configContent).toContain("[mcp_servers.mistle]");
     expect(configContent).toContain('url = "https://mcp.example.test/mcp"');
+    expect(runtimePlan.egressRoutes).toContainEqual({
+      egressRuleId: "egress_rule_platform_mistle_mcp",
+      bindingId: "platform-mistle-mcp",
+      familyId: "mistle",
+      variantId: "mistle-mcp",
+      match: {
+        hosts: ["mcp.example.test"],
+        pathPrefixes: ["/mcp"],
+      },
+      upstream: {
+        baseUrl: "https://mcp.example.test/mcp",
+      },
+      authInjection: {
+        type: "bearer",
+        target: "authorization",
+      },
+      credentialResolver: {
+        kind: "mistle_mcp_token",
+        apiKeyId,
+      },
+    });
   });
 
   it("includes Mistle MCP config for OpenCode when enabled on the profile version", async ({

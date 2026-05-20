@@ -276,6 +276,18 @@ const DataPlaneGatewayResourceRuntimeEnvExports: readonly RuntimeEnvExportDescri
     path: ["controlPlaneApi", "publicBaseUrl"],
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL",
   },
+  {
+    path: ["controlPlaneApi", "mcp", "auth", "secret"],
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_SECRET",
+  },
+  {
+    path: ["controlPlaneApi", "mcp", "auth", "issuer"],
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_ISSUER",
+  },
+  {
+    path: ["controlPlaneApi", "mcp", "auth", "audience"],
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_AUDIENCE",
+  },
 ];
 
 function readFirstArchilMountField(root: unknown, field: string): unknown {

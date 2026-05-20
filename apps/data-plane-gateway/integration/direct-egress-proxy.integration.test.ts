@@ -7,7 +7,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 
 import { IntegrationBindingKinds } from "@mistle/db/control-plane";
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
-import { mintEgressToken } from "@mistle/gateway-tunnel-auth";
+import { mintEgressToken, verifyMcpToken } from "@mistle/gateway-tunnel-auth";
 import type { CompiledRuntimePlan } from "@mistle/sandbox-runtime-contract";
 import {
   TestEnvironmentIdHeader,
@@ -36,6 +36,9 @@ const TestTimeoutMs = 45_000;
 const EgressTokenSecret = "integration-new-egress-token-secret";
 const EgressTokenIssuer = "integration-new-data-plane-gateway";
 const EgressTokenAudience = "integration-new-gateway-egress";
+const McpTokenSecret = "fixture-mcp-auth-secret";
+const McpTokenIssuer = "control-plane-api";
+const McpTokenAudience = "mistle-mcp";
 
 const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api", "data-plane-gateway"],
@@ -200,6 +203,91 @@ describe.concurrent("direct egress proxy integration", () => {
         expect(request.headers["dd_application_key"]).toBe("datadog-application-key");
         expect(request.headers["x-sandbox-header"]).toBe("preserved");
         expect(request.headers.authorization).toBeUndefined();
+      } finally {
+        await upstream.close();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "mints Mistle MCP tokens for matched managed HTTP routes before forwarding upstream",
+    async ({ env }) => {
+      const organizationId = "org_integration_direct_egress_mistle_mcp";
+      const sandboxInstanceId = typeid("sbi").toString();
+      const apiKeyId = "apk_direct_egress_mistle_mcp";
+      const upstream = await startSimulatedHttpUpstream();
+      const upstreamUrl = new URL("/mcp", upstream.baseUrl);
+      await insertSandboxInstanceRow({
+        env,
+        organizationId,
+        sandboxInstanceId,
+        runtimePlan: createRuntimePlan({
+          egressRoutes: [
+            createRoute({
+              authInjection: {
+                type: "bearer",
+                target: "authorization",
+              },
+              bindingId: "platform-mistle-mcp",
+              credentialResolver: {
+                kind: "mistle_mcp_token",
+                apiKeyId,
+              },
+              egressRuleId: "egress_rule_platform_mistle_mcp",
+              familyId: "mistle",
+              hosts: [upstreamUrl.hostname],
+              methods: ["POST"],
+              pathPrefixes: ["/mcp"],
+              upstreamBaseUrl: upstream.baseUrl,
+              variantId: "mistle-mcp",
+            }),
+          ],
+        }),
+      });
+
+      try {
+        const response = await env.dataPlaneGateway.http.fetch(
+          `${DirectEgressHttpRoutePath}?target=${encodeURIComponent(upstreamUrl.toString())}`,
+          {
+            method: "POST",
+            headers: {
+              [DirectEgressTokenHeaderName]: `Bearer ${await mintDirectEgressToken({
+                organizationId,
+                sandboxInstanceId,
+              })}`,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+          },
+        );
+
+        expect(response.status).toBe(202);
+        await expect(response.text()).resolves.toBe("hello from upstream");
+
+        const request = await withTimeout({
+          label: "waiting for managed Mistle MCP upstream request",
+          promise: upstream.nextRequest(),
+        });
+        const authorizationHeader = request.headers.authorization;
+        expect(request.method).toBe("POST");
+        expect(request.url).toBe("/mcp");
+        expect(authorizationHeader).toMatch(/^Bearer /u);
+        if (typeof authorizationHeader !== "string") {
+          throw new Error("Expected Mistle MCP authorization header to be a string.");
+        }
+
+        const verifiedToken = await verifyMcpToken({
+          config: {
+            tokenSecret: McpTokenSecret,
+            tokenIssuer: McpTokenIssuer,
+            tokenAudience: McpTokenAudience,
+          },
+          token: authorizationHeader.slice("Bearer ".length),
+        });
+        expect(verifiedToken.sub).toBe(sandboxInstanceId);
+        expect(verifiedToken.organizationId).toBe(organizationId);
+        expect(verifiedToken.apiKeyId).toBe(apiKeyId);
       } finally {
         await upstream.close();
       }

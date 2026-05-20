@@ -1,4 +1,5 @@
 import type { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
+import { mintMcpToken, type McpTokenConfig } from "@mistle/gateway-tunnel-auth";
 import {
   resolveIntegrationEgressCredentialResolver,
   resolveIntegrationEgressRequestMiddleware,
@@ -21,6 +22,8 @@ import type { GatewayEgressHttpRequest } from "./gateway-egress-request.js";
 type RuntimePlanEgressRoute = CompiledRuntimePlan["egressRoutes"][number];
 type RuntimePlanEgressCredentialResolver = RuntimePlanEgressRoute["credentialResolver"];
 type AwsSessionCredential = Extract<CachedCredential, { kind: "aws_session" }>;
+const MistleMcpTokenTtlSeconds = 300;
+
 type MutableManagedEgressRequest = {
   body: Uint8Array | undefined;
   headers: Headers;
@@ -43,6 +46,12 @@ type CredentialResolverInput =
       resolutionMode: "required" | "preferred";
       actingUserId?: string;
       credentialKind?: string;
+    }
+  | {
+      credentialResolverKind: "mistle_mcp_token";
+      organizationId: string;
+      sandboxInstanceId: string;
+      apiKeyId: string;
     };
 type CredentialResolverRef =
   | {
@@ -59,6 +68,10 @@ type CredentialResolverRef =
       resolutionMode: "required" | "preferred";
       actingUserId?: string;
       credentialKind?: string;
+    }
+  | {
+      kind: "mistle_mcp_token";
+      apiKeyId: string;
     };
 
 export class GatewayManagedEgressUnsupportedRouteError extends Error {
@@ -79,6 +92,7 @@ export async function buildManagedEgressRequest(input: {
   controlPlanePublicBaseUrl: string;
   controlPlaneInternalClient: ControlPlaneInternalClient;
   credentialCache: CredentialCache;
+  mcpTokenConfig: McpTokenConfig;
   organizationId: string;
   request: GatewayEgressHttpRequest;
   route: RuntimePlanEgressRoute;
@@ -114,11 +128,13 @@ export async function buildManagedEgressRequest(input: {
     ...(input.request.actingUserId === undefined
       ? {}
       : { actingUserId: input.request.actingUserId }),
+    sandboxInstanceId: input.sandboxInstanceId,
   });
   const credential = await resolveCredentialWithFallback({
     bindingId: input.route.bindingId,
     controlPlaneInternalClient: input.controlPlaneInternalClient,
     credentialCache: input.credentialCache,
+    mcpTokenConfig: input.mcpTokenConfig,
     primaryResolver,
     route: input.route,
     ...(fallbackResolver === undefined ? {} : { fallbackResolver }),
@@ -142,11 +158,13 @@ export async function buildManagedEgressRequest(input: {
         credentialCache: input.credentialCache,
         resolver: toCredentialResolverInputFromRef({
           organizationId: input.organizationId,
+          sandboxInstanceId: input.sandboxInstanceId,
           ...(input.request.actingUserId === undefined
             ? {}
             : { actingUserId: input.request.actingUserId }),
           credentialResolver: header.credentialResolver,
         }),
+        mcpTokenConfig: input.mcpTokenConfig,
         ...(input.testEnvironmentId === undefined
           ? {}
           : { testEnvironmentId: input.testEnvironmentId }),
@@ -435,6 +453,13 @@ function toCredentialResolverRef(input: {
     };
   }
 
+  if (input.resolver.kind === "mistle_mcp_token") {
+    return {
+      kind: "mistle_mcp_token",
+      apiKeyId: input.resolver.apiKeyId,
+    };
+  }
+
   return {
     kind: "linked_principal",
     providerFamily: input.resolver.providerFamily,
@@ -448,6 +473,7 @@ function toCredentialResolverRef(input: {
 
 function toCredentialResolverInputFromRef(input: {
   organizationId: string;
+  sandboxInstanceId: string;
   actingUserId?: string;
   credentialResolver: CredentialResolverRef;
 }): CredentialResolverInput {
@@ -462,6 +488,15 @@ function toCredentialResolverInputFromRef(input: {
       ...(input.credentialResolver.resolverKey === undefined
         ? {}
         : { resolverKey: input.credentialResolver.resolverKey }),
+    };
+  }
+
+  if (input.credentialResolver.kind === "mistle_mcp_token") {
+    return {
+      credentialResolverKind: "mistle_mcp_token",
+      organizationId: input.organizationId,
+      sandboxInstanceId: input.sandboxInstanceId,
+      apiKeyId: input.credentialResolver.apiKeyId,
     };
   }
 
@@ -485,11 +520,45 @@ function toCredentialResolverInputFromRef(input: {
   };
 }
 
+function normalizeSelectedCredentialResolver(
+  credentialResolver: RuntimePlanEgressCredentialResolver,
+): CredentialResolverRef {
+  if (credentialResolver.kind === "integration_connection") {
+    return {
+      kind: "integration_connection",
+      connectionId: credentialResolver.connectionId,
+      secretType: credentialResolver.secretType,
+      ...(credentialResolver.slotKey === undefined ? {} : { slotKey: credentialResolver.slotKey }),
+      ...(credentialResolver.resolverKey === undefined
+        ? {}
+        : { resolverKey: credentialResolver.resolverKey }),
+    };
+  }
+
+  if (credentialResolver.kind === "mistle_mcp_token") {
+    return {
+      kind: "mistle_mcp_token",
+      apiKeyId: credentialResolver.apiKeyId,
+    };
+  }
+
+  return {
+    kind: "linked_principal",
+    providerFamily: credentialResolver.providerFamily,
+    actingUserRequired: credentialResolver.actingUserRequired,
+    resolutionMode: credentialResolver.resolutionMode,
+    ...(credentialResolver.credentialKind === undefined
+      ? {}
+      : { credentialKind: credentialResolver.credentialKind }),
+  };
+}
+
 async function selectCredentialResolverForRequest(input: {
   actingUserId?: string;
   organizationId: string;
   request: MutableManagedEgressRequest;
   route: RuntimePlanEgressRoute;
+  sandboxInstanceId: string;
 }): Promise<{
   primaryResolver: CredentialResolverInput;
   fallbackResolver?: CredentialResolverInput;
@@ -507,34 +576,14 @@ async function selectCredentialResolverForRequest(input: {
       defaultCredentialResolver,
     },
   });
-  const selectedResolver: CredentialResolverRef =
-    selectedCredentialResolver.kind === "integration_connection"
-      ? {
-          kind: "integration_connection",
-          connectionId: selectedCredentialResolver.connectionId,
-          secretType: selectedCredentialResolver.secretType,
-          ...(selectedCredentialResolver.slotKey === undefined
-            ? {}
-            : { slotKey: selectedCredentialResolver.slotKey }),
-          ...(selectedCredentialResolver.resolverKey === undefined
-            ? {}
-            : { resolverKey: selectedCredentialResolver.resolverKey }),
-        }
-      : {
-          kind: "linked_principal",
-          providerFamily: selectedCredentialResolver.providerFamily,
-          actingUserRequired: selectedCredentialResolver.actingUserRequired,
-          resolutionMode: selectedCredentialResolver.resolutionMode,
-          ...(selectedCredentialResolver.credentialKind === undefined
-            ? {}
-            : { credentialKind: selectedCredentialResolver.credentialKind }),
-        };
+  const selectedResolver = normalizeSelectedCredentialResolver(selectedCredentialResolver);
 
   const defaultIntegrationConnectionFallback =
     defaultCredentialResolver.kind !== "integration_connection"
       ? undefined
       : toCredentialResolverInputFromRef({
           organizationId: input.organizationId,
+          sandboxInstanceId: input.sandboxInstanceId,
           ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
           credentialResolver: defaultCredentialResolver,
         });
@@ -548,6 +597,7 @@ async function selectCredentialResolverForRequest(input: {
       return {
         primaryResolver: toCredentialResolverInputFromRef({
           organizationId: input.organizationId,
+          sandboxInstanceId: input.sandboxInstanceId,
           ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
           credentialResolver: selectedResolver,
         }),
@@ -570,6 +620,7 @@ async function selectCredentialResolverForRequest(input: {
   return {
     primaryResolver: toCredentialResolverInputFromRef({
       organizationId: input.organizationId,
+      sandboxInstanceId: input.sandboxInstanceId,
       ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
       credentialResolver: selectedResolver,
     }),
@@ -597,6 +648,19 @@ function createCredentialCacheKey(input: {
     };
   }
 
+  if (input.resolver.credentialResolverKind === "mistle_mcp_token") {
+    return {
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
+      bindingId: input.bindingId,
+      credentialResolverKind: "mistle_mcp_token",
+      organizationId: input.resolver.organizationId,
+      sandboxInstanceId: input.resolver.sandboxInstanceId,
+      apiKeyId: input.resolver.apiKeyId,
+    };
+  }
+
   return {
     ...(input.testEnvironmentId === undefined
       ? {}
@@ -619,6 +683,7 @@ async function resolveCredentialWithCache(input: {
   bindingId: string;
   controlPlaneInternalClient: ControlPlaneInternalClient;
   credentialCache: CredentialCache;
+  mcpTokenConfig: McpTokenConfig;
   resolver: CredentialResolverInput;
   testEnvironmentId?: string;
 }): Promise<CachedCredential> {
@@ -634,46 +699,65 @@ async function resolveCredentialWithCache(input: {
     return cacheLookup.credential;
   }
 
-  const resolvedCredential =
-    input.resolver.credentialResolverKind === "integration_connection"
-      ? await input.controlPlaneInternalClient.resolveIntegrationCredential(
-          {
-            bindingId: input.bindingId,
-            connectionId: input.resolver.connectionId,
-            secretType: input.resolver.secretType,
-            ...(input.resolver.slotKey === undefined ? {} : { slotKey: input.resolver.slotKey }),
-            ...(input.resolver.resolverKey === undefined
-              ? {}
-              : { resolverKey: input.resolver.resolverKey }),
-          },
-          {
-            ...(input.testEnvironmentId === undefined
-              ? {}
-              : { testEnvironmentId: input.testEnvironmentId }),
-          },
-        )
-      : await input.controlPlaneInternalClient.resolveIdentityLinkPrincipalCredential(
-          {
-            organizationId: input.resolver.organizationId,
-            actingUserId:
-              input.resolver.actingUserId ??
-              (() => {
-                throw new GatewayManagedEgressUnsupportedRouteError(
-                  "Linked-principal credential resolver is missing actingUserId.",
-                  "credential_resolution_failed",
-                );
-              })(),
-            providerFamily: input.resolver.providerFamily,
-            ...(input.resolver.credentialKind === undefined
-              ? {}
-              : { credentialKind: input.resolver.credentialKind }),
-          },
-          {
-            ...(input.testEnvironmentId === undefined
-              ? {}
-              : { testEnvironmentId: input.testEnvironmentId }),
-          },
-        );
+  let resolvedCredential: CachedCredential;
+  if (input.resolver.credentialResolverKind === "integration_connection") {
+    resolvedCredential = await input.controlPlaneInternalClient.resolveIntegrationCredential(
+      {
+        bindingId: input.bindingId,
+        connectionId: input.resolver.connectionId,
+        secretType: input.resolver.secretType,
+        ...(input.resolver.slotKey === undefined ? {} : { slotKey: input.resolver.slotKey }),
+        ...(input.resolver.resolverKey === undefined
+          ? {}
+          : { resolverKey: input.resolver.resolverKey }),
+      },
+      {
+        ...(input.testEnvironmentId === undefined
+          ? {}
+          : { testEnvironmentId: input.testEnvironmentId }),
+      },
+    );
+  } else if (input.resolver.credentialResolverKind === "mistle_mcp_token") {
+    const mintedToken = await mintMcpToken({
+      claims: {
+        sub: input.resolver.sandboxInstanceId,
+        organizationId: input.resolver.organizationId,
+        apiKeyId: input.resolver.apiKeyId,
+      },
+      config: input.mcpTokenConfig,
+      ttlSeconds: MistleMcpTokenTtlSeconds,
+    });
+
+    resolvedCredential = {
+      kind: "value",
+      value: mintedToken.token,
+      expiresAt: mintedToken.expiresAt.toISOString(),
+    };
+  } else {
+    resolvedCredential =
+      await input.controlPlaneInternalClient.resolveIdentityLinkPrincipalCredential(
+        {
+          organizationId: input.resolver.organizationId,
+          actingUserId:
+            input.resolver.actingUserId ??
+            (() => {
+              throw new GatewayManagedEgressUnsupportedRouteError(
+                "Linked-principal credential resolver is missing actingUserId.",
+                "credential_resolution_failed",
+              );
+            })(),
+          providerFamily: input.resolver.providerFamily,
+          ...(input.resolver.credentialKind === undefined
+            ? {}
+            : { credentialKind: input.resolver.credentialKind }),
+        },
+        {
+          ...(input.testEnvironmentId === undefined
+            ? {}
+            : { testEnvironmentId: input.testEnvironmentId }),
+        },
+      );
+  }
 
   await input.credentialCache.set(cacheKey, resolvedCredential);
   return resolvedCredential;
@@ -684,6 +768,7 @@ async function resolveCredentialWithFallback(input: {
   controlPlaneInternalClient: ControlPlaneInternalClient;
   credentialCache: CredentialCache;
   fallbackResolver?: CredentialResolverInput;
+  mcpTokenConfig: McpTokenConfig;
   primaryResolver: CredentialResolverInput;
   route: RuntimePlanEgressRoute;
   testEnvironmentId?: string;
@@ -693,6 +778,7 @@ async function resolveCredentialWithFallback(input: {
       bindingId: input.bindingId,
       controlPlaneInternalClient: input.controlPlaneInternalClient,
       credentialCache: input.credentialCache,
+      mcpTokenConfig: input.mcpTokenConfig,
       resolver: input.primaryResolver,
       ...(input.testEnvironmentId === undefined
         ? {}
@@ -715,6 +801,7 @@ async function resolveCredentialWithFallback(input: {
       bindingId: input.bindingId,
       controlPlaneInternalClient: input.controlPlaneInternalClient,
       credentialCache: input.credentialCache,
+      mcpTokenConfig: input.mcpTokenConfig,
       resolver: input.fallbackResolver,
       ...(input.testEnvironmentId === undefined
         ? {}

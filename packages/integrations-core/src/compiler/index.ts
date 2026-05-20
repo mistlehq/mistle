@@ -773,15 +773,26 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
   const resolvedMcpServers = [...compiledBindings.mcpServers, ...(input.mcpServers ?? [])].sort(
     (left, right) => left.server.serverName.localeCompare(right.server.serverName),
   );
-  const compiledRuntimePlanFragments = [
+  const platformRuntimePlanFragment: CompiledRuntimePlanFragment = {
+    egressRoutes: input.egressRoutes ?? [],
+    artifacts: [],
+    runtimeClients: [],
+    workspaceSources: [],
+    agentRuntimes: [],
+  };
+  const compiledBindingAndPlatformFragments = [
     ...compiledBindings.compiledRuntimePlanFragments,
+    platformRuntimePlanFragment,
+  ];
+  const compiledRuntimePlanFragments = [
+    ...compiledBindingAndPlatformFragments,
     compileProfileAgentRuntimeFragment({
       organizationId: input.organizationId,
       sandboxProfileId: input.sandboxProfileId,
       version: input.version,
       definitions: input.definitions,
       agentRuntimeId: input.agentRuntimeId,
-      egressRoutes: compiledBindings.compiledRuntimePlanFragments.flatMap(
+      egressRoutes: compiledBindingAndPlatformFragments.flatMap(
         (compiledRuntimePlanFragment) => compiledRuntimePlanFragment.egressRoutes,
       ),
       mcpServers: resolvedMcpServers,

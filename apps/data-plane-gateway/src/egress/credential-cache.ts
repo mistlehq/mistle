@@ -20,6 +20,14 @@ export type CredentialCacheKeyInput =
       actingUserRequired: boolean;
       actingUserId?: string;
       credentialKind?: string;
+    }
+  | {
+      testEnvironmentId?: string;
+      bindingId: string;
+      credentialResolverKind: "mistle_mcp_token";
+      organizationId: string;
+      sandboxInstanceId: string;
+      apiKeyId: string;
     };
 
 export type CachedCredential =
@@ -98,6 +106,17 @@ function toCacheKey(input: CredentialCacheKeyInput): string {
       input.secretType,
       input.slotKey ?? "",
       input.resolverKey ?? "",
+    ].join(":")}`;
+  }
+
+  if (input.credentialResolverKind === "mistle_mcp_token") {
+    return `gateway-egress-credential:${[
+      input.testEnvironmentId ?? "",
+      input.bindingId,
+      input.credentialResolverKind,
+      input.organizationId,
+      input.sandboxInstanceId,
+      input.apiKeyId,
     ].join(":")}`;
   }
 

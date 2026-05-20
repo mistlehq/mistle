@@ -685,6 +685,18 @@ const DataPlaneGatewayEnvDescriptors = [
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL",
     path: ["controlPlaneApi", "publicBaseUrl"],
   },
+  {
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_SECRET",
+    path: ["controlPlaneApi", "mcp", "auth", "secret"],
+  },
+  {
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_ISSUER",
+    path: ["controlPlaneApi", "mcp", "auth", "issuer"],
+  },
+  {
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_AUDIENCE",
+    path: ["controlPlaneApi", "mcp", "auth", "audience"],
+  },
   { envVar: "MISTLE_INTERNAL_AUTH_SHARED_TOKEN", path: ["internalAuth", "serviceToken"] },
 ] satisfies readonly EnvDescriptor[];
 

@@ -1520,6 +1520,7 @@ function createRuntimePlanStartupLogFields(
     upstreamPath: string;
     credentialResolverKind: string;
     credentialConnectionId?: string;
+    credentialMistleMcpApiKeyId?: string;
     credentialProviderFamily?: string;
   }[];
 } {
@@ -1552,7 +1553,9 @@ function createRuntimePlanStartupLogFields(
         credentialResolverKind: egressRoute.credentialResolver.kind,
         ...(egressRoute.credentialResolver.kind === "integration_connection"
           ? { credentialConnectionId: egressRoute.credentialResolver.connectionId }
-          : { credentialProviderFamily: egressRoute.credentialResolver.providerFamily }),
+          : egressRoute.credentialResolver.kind === "mistle_mcp_token"
+            ? { credentialMistleMcpApiKeyId: egressRoute.credentialResolver.apiKeyId }
+            : { credentialProviderFamily: egressRoute.credentialResolver.providerFamily }),
       };
     }),
   };

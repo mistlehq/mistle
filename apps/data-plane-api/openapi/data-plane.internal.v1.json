@@ -499,6 +499,21 @@
                                           "resolutionMode"
                                         ],
                                         "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["mistle_mcp_token"]
+                                          },
+                                          "apiKeyId": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": ["kind", "apiKeyId"],
+                                        "additionalProperties": false
                                       }
                                     ]
                                   }
@@ -565,6 +580,21 @@
                                     "actingUserRequired",
                                     "resolutionMode"
                                   ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": ["mistle_mcp_token"]
+                                    },
+                                    "apiKeyId": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "required": ["kind", "apiKeyId"],
                                   "additionalProperties": false
                                 }
                               ]
@@ -2616,6 +2646,21 @@
                                             "resolutionMode"
                                           ],
                                           "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["mistle_mcp_token"]
+                                            },
+                                            "apiKeyId": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "required": ["kind", "apiKeyId"],
+                                          "additionalProperties": false
                                         }
                                       ]
                                     }
@@ -2682,6 +2727,21 @@
                                       "actingUserRequired",
                                       "resolutionMode"
                                     ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": ["mistle_mcp_token"]
+                                      },
+                                      "apiKeyId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": ["kind", "apiKeyId"],
                                     "additionalProperties": false
                                   }
                                 ]

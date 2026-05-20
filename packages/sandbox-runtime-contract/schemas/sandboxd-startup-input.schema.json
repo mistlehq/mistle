@@ -305,6 +305,21 @@
                             "resolutionMode"
                           ],
                           "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "mistle_mcp_token"
+                            },
+                            "apiKeyId": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["kind", "apiKeyId"],
+                          "additionalProperties": false
                         }
                       ]
                     }
@@ -366,6 +381,21 @@
                       }
                     },
                     "required": ["kind", "providerFamily", "actingUserRequired", "resolutionMode"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "const": "mistle_mcp_token"
+                      },
+                      "apiKeyId": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["kind", "apiKeyId"],
                     "additionalProperties": false
                   }
                 ]

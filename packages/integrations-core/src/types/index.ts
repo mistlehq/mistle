@@ -1564,9 +1564,15 @@ export type LinkedPrincipalEgressCredentialResolverRef = {
   resolutionMode: LinkedPrincipalEgressCredentialResolutionMode;
 };
 
+export type MistleMcpTokenEgressCredentialResolverRef = {
+  kind: "mistle_mcp_token";
+  apiKeyId: string;
+};
+
 export type EgressCredentialResolverRef =
   | IntegrationConnectionEgressCredentialResolverRef
-  | LinkedPrincipalEgressCredentialResolverRef;
+  | LinkedPrincipalEgressCredentialResolverRef
+  | MistleMcpTokenEgressCredentialResolverRef;
 
 export type IntegrationEgressCredentialResolverSelectionInput = {
   organizationId: string;
@@ -2603,6 +2609,7 @@ export type CompileRuntimePlanInput = {
   image: ResolvedSandboxImage;
   agentRuntimeId: string;
   bindings: ReadonlyArray<CompileRuntimePlanBindingInput>;
+  egressRoutes?: ReadonlyArray<EgressCredentialRoute>;
   mcpServers?: ReadonlyArray<ResolvedIntegrationMcpServer>;
   definitions: IntegrationDefinitionsBundle;
 };

@@ -12,6 +12,7 @@ import {
   EgressTokenError,
   verifyEgressToken,
   type EgressTokenConfig,
+  type McpTokenConfig,
   type VerifiedEgressToken,
 } from "@mistle/gateway-tunnel-auth";
 
@@ -118,6 +119,7 @@ export class DirectEgressProxyService {
     private readonly controlPlaneInternalClient: ControlPlaneInternalClient,
     private readonly credentialCache: CredentialCache,
     private readonly egressTokenConfig: EgressTokenConfig,
+    private readonly mcpTokenConfig: McpTokenConfig,
     private readonly trustedUpstreamCaCertificates: readonly string[] | undefined,
   ) {}
 
@@ -349,6 +351,7 @@ export class DirectEgressProxyService {
         controlPlanePublicBaseUrl: this.controlPlanePublicBaseUrl,
         controlPlaneInternalClient: this.controlPlaneInternalClient,
         credentialCache: this.credentialCache,
+        mcpTokenConfig: this.mcpTokenConfig,
         organizationId: input.admission.activeRuntimePlan.organizationId,
         request: input.admission.request,
         route: input.admission.classification.route,

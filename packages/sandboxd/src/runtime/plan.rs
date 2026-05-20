@@ -127,6 +127,10 @@ pub enum CompiledEgressRouteCredentialResolver {
         #[serde(rename = "resolutionMode")]
         resolution_mode: CompiledLinkedPrincipalEgressCredentialResolutionMode,
     },
+    MistleMcpToken {
+        #[serde(rename = "apiKeyId")]
+        api_key_id: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -870,6 +874,39 @@ mod tests {
                 );
             }
             other => panic!("expected linked principal resolver, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn decodes_mistle_mcp_token_credential_resolver_shape() {
+        let route = serde_json::from_value::<CompiledEgressRoute>(serde_json::json!({
+          "egressRuleId": "egress_rule_platform_mistle_mcp",
+          "bindingId": "platform-mistle-mcp",
+          "familyId": "mistle",
+          "variantId": "mistle-mcp",
+          "match": {
+            "hosts": ["mcp.mistle.test"],
+            "pathPrefixes": ["/mcp"]
+          },
+          "upstream": {
+            "baseUrl": "https://mcp.mistle.test/mcp"
+          },
+          "authInjection": {
+            "type": "bearer",
+            "target": "authorization"
+          },
+          "credentialResolver": {
+            "kind": "mistle_mcp_token",
+            "apiKeyId": "apk_01k00000000000000000000000"
+          }
+        }))
+        .expect("mistle mcp egress route should decode");
+
+        match route.credential_resolver {
+            CompiledEgressRouteCredentialResolver::MistleMcpToken { api_key_id } => {
+                assert_eq!(api_key_id, "apk_01k00000000000000000000000");
+            }
+            other => panic!("expected mistle mcp token resolver, got {other:?}"),
         }
     }
 }

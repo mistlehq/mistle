@@ -452,6 +452,13 @@ export function selectDataPlaneGatewayConfig(config: Config): DataPlaneGatewayCo
     controlPlaneApi: {
       baseUrl: config.services.control_plane_api.internal_url,
       publicBaseUrl: config.services.control_plane_api.public_url,
+      mcp: {
+        auth: {
+          secret: config.services.control_plane_api.mcp.auth.secret,
+          issuer: config.services.control_plane_api.mcp.auth.issuer,
+          audience: config.services.control_plane_api.mcp.auth.audience,
+        },
+      },
     },
     internalAuth: {
       serviceToken: config.internal_auth.shared_token.token,
