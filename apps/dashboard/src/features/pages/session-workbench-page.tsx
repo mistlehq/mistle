@@ -700,6 +700,7 @@ function createEmptyComposerViewModel(): ChatComposerViewModel {
     isSubmitPending: false,
     pendingAttachments: [],
     modelOptions: [],
+    reasoningEffortOptions: [],
     selectedModel: null,
     selectedReasoningEffort: null,
     submitMode: "start",

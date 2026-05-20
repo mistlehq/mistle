@@ -6,6 +6,7 @@ import {
   buildRefreshingOpenCodeComposerBootstrap,
   mapOpenCodeChatStateForConversation,
   resolveOpenCodePromptModelOverride,
+  resolveOpenCodePromptVariantOverride,
 } from "./opencode-workbench-composer.js";
 
 function createOpenCodeChatState(input: {
@@ -27,6 +28,12 @@ describe("OpenCode workbench composer adapter", () => {
       providerID: "openai",
       modelID: "gpt-5",
     });
+  });
+
+  it("uses selected reasoning effort as the OpenCode prompt variant", () => {
+    expect(resolveOpenCodePromptVariantOverride(null)).toBeUndefined();
+    expect(resolveOpenCodePromptVariantOverride("default")).toBeUndefined();
+    expect(resolveOpenCodePromptVariantOverride("high")).toBe("high");
   });
 
   it("keys composer model overrides by sandbox and session", () => {

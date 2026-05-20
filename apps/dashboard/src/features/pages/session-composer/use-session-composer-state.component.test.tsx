@@ -75,6 +75,8 @@ function SessionComposerStateHarness(input: {
   collaborationDeveloperInstructions?: string;
   composerCapabilities?: readonly ComposerCapability[];
   composerText: string;
+  configControlsDisabled?: boolean;
+  configUpdating?: boolean;
   deferNativeQueue?: boolean;
   deferSubmit?: boolean;
   enableNativeQueueTurn?: boolean;
@@ -120,8 +122,10 @@ function SessionComposerStateHarness(input: {
         selectedReasoningEffort: "medium",
         hasExplicitModelSelection: true,
         modelOptions: [{ value: "gpt-5.4", label: "GPT-5.4" }],
+        reasoningEffortOptions: [{ value: "medium", label: "Medium" }],
         canChangeReasoningEffort: true,
-        isUpdating: false,
+        controlsDisabled: input.configControlsDisabled ?? input.configUpdating === true,
+        isUpdating: input.configUpdating === true,
         setModel: () => {
           return;
         },
@@ -284,6 +288,9 @@ function SessionComposerStateHarness(input: {
       </div>
       <div data-testid="secondary-submit-disabled">
         {composerState.composerViewModel.secondarySubmitDisabled ? "true" : "false"}
+      </div>
+      <div data-testid="config-controls-disabled">
+        {composerState.composerViewModel.configControlsDisabled ? "true" : "false"}
       </div>
       <div data-testid="submitted-prompt">{submittedPrompt ?? ""}</div>
       <div data-testid="queued-prompt">{queuedPrompt ?? ""}</div>
@@ -792,6 +799,104 @@ describe("useSessionComposerState", () => {
       expect(screen.getByTestId("composer-text").textContent).toBe("");
     });
     expect(screen.getByTestId("native-queue-submission-count").textContent).toBe("1");
+  });
+
+  it("blocks prompt submission while composer config is updating", () => {
+    render(
+      <SessionComposerStateHarness
+        composerText="Submit after model switch"
+        configUpdating
+        pendingDiffComments={[]}
+      />,
+    );
+
+    expect(screen.getByTestId("submit-disabled").textContent).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(screen.getByTestId("submitted-prompt").textContent).toBe("");
+    expect(screen.getByTestId("composer-text").textContent).toBe("Submit after model switch");
+  });
+
+  it("blocks queued prompts while composer config is updating", () => {
+    render(
+      <SessionComposerStateHarness
+        activeTurnState="running"
+        composerText="Queue after model switch"
+        configUpdating
+        enableNativeQueueTurn
+        pendingDiffComments={[]}
+      />,
+    );
+
+    expect(screen.getByTestId("secondary-submit-disabled").textContent).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+
+    expect(screen.getByTestId("queued-prompt").textContent).toBe("");
+    expect(screen.getByTestId("composer-text").textContent).toBe("Queue after model switch");
+  });
+
+  it("keeps native queue available when only composer config controls are disabled", async () => {
+    render(
+      <SessionComposerStateHarness
+        activeTurnState="running"
+        composerText="Queue while controls are disabled"
+        configControlsDisabled
+        enableNativeQueueTurn
+        pendingDiffComments={[]}
+      />,
+    );
+
+    expect(screen.getByTestId("config-controls-disabled").textContent).toBe("true");
+    expect(screen.getByTestId("secondary-submit-disabled").textContent).toBe("false");
+
+    fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("queued-prompt").textContent).toBe(
+        "Queue while controls are disabled",
+      );
+    });
+  });
+
+  it("does not drain local queued prompts while composer config is updating", async () => {
+    const { rerender } = render(
+      <SessionComposerStateHarness
+        activeTurnState="running"
+        composerText="Queue after current task"
+        pendingDiffComments={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+
+    expect(screen.getByTestId("queued-prompt-count").textContent).toBe("1");
+
+    rerender(
+      <SessionComposerStateHarness
+        activeTurnState="idle"
+        composerText=""
+        configUpdating
+        pendingDiffComments={[]}
+      />,
+    );
+
+    expect(screen.getByTestId("queued-prompt-count").textContent).toBe("1");
+    expect(screen.getByTestId("submitted-prompt").textContent).toBe("");
+
+    rerender(
+      <SessionComposerStateHarness
+        activeTurnState="idle"
+        composerText=""
+        pendingDiffComments={[]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("submitted-prompt").textContent).toBe("Queue after current task");
+    });
+    expect(screen.getByTestId("queued-prompt-count").textContent).toBe("0");
   });
 
   it("submits developer instructions with the selected model for scoped conversations", async () => {

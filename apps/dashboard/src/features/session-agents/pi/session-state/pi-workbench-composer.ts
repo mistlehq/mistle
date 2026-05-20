@@ -1,10 +1,15 @@
-import type { PiModel } from "@mistle/integrations-definitions/agent-runtimes/pi/client";
+import type {
+  PiModel,
+  PiThinkingLevel,
+} from "@mistle/integrations-definitions/agent-runtimes/pi/client";
 import { useCallback, useMemo, useState } from "react";
 
 import { buildSessionComposerModelOptions } from "../../../pages/session-composer/session-composer-model-options.js";
+import { resolveActiveComposerModel } from "../../../pages/session-composer/session-composer-model-readiness.js";
 import type {
   SessionComposerBootstrapResult,
   SessionComposerModel,
+  SessionComposerReasoningEffortOption,
 } from "../../../pages/session-composer/session-composer-runtime-contracts.js";
 import type { SessionComposerConfigControl } from "../../../pages/session-composer/use-session-composer-config-control.js";
 
@@ -19,7 +24,25 @@ export type PiModelSelection = {
 };
 
 export type PiModelWriter = {
-  setModel: (selection: PiModelSelection) => Promise<PiModel>;
+  setModel: (selection: PiModelSelection) => Promise<void>;
+  setThinkingLevel: (level: PiThinkingLevel) => Promise<void>;
+};
+
+const PiThinkingLevels: readonly PiThinkingLevel[] = [
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+];
+const PiThinkingLevelLabels: Readonly<Record<PiThinkingLevel, string>> = {
+  off: "Off",
+  minimal: "Minimal",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  xhigh: "Extra high",
 };
 
 export function buildPiModelSelectionValue(input: PiModelSelection): string {
@@ -38,12 +61,43 @@ export function parsePiModelSelectionValue(value: string): PiModelSelection {
   };
 }
 
-export function modelsAreSamePiSelection(left: PiModelSelection, right: PiModelSelection): boolean {
-  return left.provider === right.provider && left.modelId === right.modelId;
+function mapPiThinkingLevelsToReasoningEffortOptions(
+  model: PiModel,
+): readonly SessionComposerReasoningEffortOption[] {
+  if (model.reasoning !== true) {
+    return [];
+  }
+
+  return PiThinkingLevels.filter((level) => {
+    if (model.thinkingLevelMap === undefined) {
+      return true;
+    }
+    const mappedLevel = model.thinkingLevelMap?.[level];
+    if (mappedLevel === null) {
+      return false;
+    }
+    return level !== "xhigh" || mappedLevel !== undefined;
+  }).map((level) => ({
+    value: level,
+    label: PiThinkingLevelLabels[level],
+  }));
+}
+
+function parsePiThinkingLevel(value: string): PiThinkingLevel {
+  switch (value) {
+    case "off":
+    case "minimal":
+    case "low":
+    case "medium":
+    case "high":
+    case "xhigh":
+      return value;
+    default:
+      throw new Error(`Invalid Pi thinking level '${value}'.`);
+  }
 }
 
 export function mapPiModelsToComposerModels(input: {
-  activeModel: PiModel | null;
   availableModels: readonly PiModel[];
 }): readonly SessionComposerModel[] {
   return input.availableModels.map((model) => {
@@ -55,13 +109,9 @@ export function mapPiModelsToComposerModels(input: {
       model: buildPiModelSelectionValue(selection),
       displayName: `${model.provider} / ${model.name}`,
       defaultReasoningEffort: null,
+      reasoningEffortOptions: mapPiThinkingLevelsToReasoningEffortOptions(model),
       inputModalities: model.input,
-      isDefault:
-        input.activeModel !== null &&
-        modelsAreSamePiSelection(selection, {
-          provider: input.activeModel.provider,
-          modelId: input.activeModel.id,
-        }),
+      isDefault: false,
     };
   });
 }
@@ -69,12 +119,13 @@ export function mapPiModelsToComposerModels(input: {
 export function buildReadyPiComposerBootstrap(input: {
   activeModel: PiModel | null;
   availableModels: readonly PiModel[];
+  thinkingLevel: PiThinkingLevel;
 }): SessionComposerBootstrapResult {
   return {
     phase: { status: "ready" },
     composerCapabilities: [],
     establishedSnapshot: {
-      availableModels: mapPiModelsToComposerModels(input),
+      availableModels: mapPiModelsToComposerModels({ availableModels: input.availableModels }),
       configSnapshot: {
         model:
           input.activeModel === null
@@ -83,7 +134,7 @@ export function buildReadyPiComposerBootstrap(input: {
                 provider: input.activeModel.provider,
                 modelId: input.activeModel.id,
               }),
-        modelReasoningEffort: null,
+        modelReasoningEffort: input.thinkingLevel,
       },
     },
   };
@@ -113,9 +164,10 @@ export function usePiSessionComposerConfigControl(input: {
     input;
   const { availableModels, configSnapshot } = bootstrap.establishedSnapshot;
   const [isUpdatingModel, setIsUpdatingModel] = useState(false);
+  const [isUpdatingThinkingLevel, setIsUpdatingThinkingLevel] = useState(false);
 
   const modelOptions = useMemo(
-    () => buildSessionComposerModelOptions(availableModels, true),
+    () => buildSessionComposerModelOptions(availableModels, false),
     [availableModels],
   );
 
@@ -154,17 +206,62 @@ export function usePiSessionComposerConfigControl(input: {
     [clearSessionErrorMessage, isTurnRunning, reportSessionErrorMessage, writer],
   );
 
-  const setReasoningEffort = useCallback((): void => {
-    reportSessionErrorMessage("Pi thinking controls are not available in this composer.");
-  }, [reportSessionErrorMessage]);
+  const activeComposerModel = useMemo(
+    () =>
+      resolveActiveComposerModel({
+        availableModels,
+        selectedModel: configSnapshot.model,
+      }),
+    [availableModels, configSnapshot.model],
+  );
+
+  const canChangeReasoningEffort =
+    activeComposerModel !== null && (activeComposerModel.reasoningEffortOptions?.length ?? 0) > 1;
+
+  const setReasoningEffort = useCallback(
+    (nextReasoningEffort: string): void => {
+      clearSessionErrorMessage();
+      if (isTurnRunning) {
+        reportSessionErrorMessage("Pi thinking level cannot be changed while Pi is working.");
+        return;
+      }
+
+      let thinkingLevel: PiThinkingLevel;
+      try {
+        thinkingLevel = parsePiThinkingLevel(nextReasoningEffort);
+      } catch (error) {
+        reportSessionErrorMessage(
+          error instanceof Error ? error.message : "Invalid Pi thinking level.",
+        );
+        return;
+      }
+
+      setIsUpdatingThinkingLevel(true);
+      void (async (): Promise<void> => {
+        try {
+          await writer.setThinkingLevel(thinkingLevel);
+          clearSessionErrorMessage();
+        } catch (error) {
+          reportSessionErrorMessage(
+            error instanceof Error ? error.message : "Could not change Pi thinking level.",
+          );
+        } finally {
+          setIsUpdatingThinkingLevel(false);
+        }
+      })();
+    },
+    [clearSessionErrorMessage, isTurnRunning, reportSessionErrorMessage, writer],
+  );
 
   return {
     selectedModel: configSnapshot.model,
-    selectedReasoningEffort: null,
+    selectedReasoningEffort: configSnapshot.modelReasoningEffort,
     hasExplicitModelSelection: configSnapshot.model !== null,
     modelOptions,
-    canChangeReasoningEffort: false,
-    isUpdating: isUpdatingModel || isTurnRunning,
+    reasoningEffortOptions: activeComposerModel?.reasoningEffortOptions ?? [],
+    canChangeReasoningEffort,
+    controlsDisabled: isUpdatingModel || isUpdatingThinkingLevel || isTurnRunning,
+    isUpdating: isUpdatingModel || isUpdatingThinkingLevel,
     setModel,
     setReasoningEffort,
   };

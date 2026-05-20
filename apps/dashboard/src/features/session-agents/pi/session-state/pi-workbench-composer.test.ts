@@ -33,27 +33,26 @@ describe("Pi workbench composer adapter", () => {
     ).toBe("openrouter/openai/gpt-5");
   });
 
-  it("maps Pi models into composer models and marks the active model as default", () => {
+  it("maps Pi models into composer models without treating the active model as a default", () => {
     expect(
       mapPiModelsToComposerModels({
-        activeModel: {
-          provider: "openai",
-          id: "gpt-5",
-          name: "GPT-5",
-          input: ["text", "image"],
-        },
         availableModels: [
           {
             provider: "anthropic",
             id: "claude-sonnet-4.5",
             name: "Claude Sonnet 4.5",
             input: ["text"],
+            reasoning: false,
           },
           {
             provider: "openai",
             id: "gpt-5",
             name: "GPT-5",
             input: ["text", "image"],
+            reasoning: true,
+            thinkingLevelMap: {
+              xhigh: "xhigh",
+            },
           },
         ],
       }),
@@ -62,6 +61,7 @@ describe("Pi workbench composer adapter", () => {
         model: "anthropic/claude-sonnet-4.5",
         displayName: "anthropic / Claude Sonnet 4.5",
         defaultReasoningEffort: null,
+        reasoningEffortOptions: [],
         inputModalities: ["text"],
         isDefault: false,
       },
@@ -69,8 +69,16 @@ describe("Pi workbench composer adapter", () => {
         model: "openai/gpt-5",
         displayName: "openai / GPT-5",
         defaultReasoningEffort: null,
+        reasoningEffortOptions: [
+          { value: "off", label: "Off" },
+          { value: "minimal", label: "Minimal" },
+          { value: "low", label: "Low" },
+          { value: "medium", label: "Medium" },
+          { value: "high", label: "High" },
+          { value: "xhigh", label: "Extra high" },
+        ],
         inputModalities: ["text", "image"],
-        isDefault: true,
+        isDefault: false,
       },
     ]);
   });
@@ -83,6 +91,7 @@ describe("Pi workbench composer adapter", () => {
           id: "openai/gpt-5",
           name: "GPT-5",
           input: ["text", "image"],
+          reasoning: true,
         },
         availableModels: [
           {
@@ -90,8 +99,10 @@ describe("Pi workbench composer adapter", () => {
             id: "openai/gpt-5",
             name: "GPT-5",
             input: ["text", "image"],
+            reasoning: true,
           },
         ],
+        thinkingLevel: "high",
       }),
     ).toEqual({
       phase: { status: "ready" },
@@ -102,15 +113,71 @@ describe("Pi workbench composer adapter", () => {
             model: "openrouter/openai/gpt-5",
             displayName: "openrouter / GPT-5",
             defaultReasoningEffort: null,
+            reasoningEffortOptions: [
+              { value: "off", label: "Off" },
+              { value: "minimal", label: "Minimal" },
+              { value: "low", label: "Low" },
+              { value: "medium", label: "Medium" },
+              { value: "high", label: "High" },
+              { value: "xhigh", label: "Extra high" },
+            ],
             inputModalities: ["text", "image"],
-            isDefault: true,
+            isDefault: false,
           },
         ],
         configSnapshot: {
           model: "openrouter/openai/gpt-5",
-          modelReasoningEffort: null,
+          modelReasoningEffort: "high",
         },
       },
     });
+  });
+
+  it("uses every standard Pi thinking level when the model does not provide a level map", () => {
+    expect(
+      mapPiModelsToComposerModels({
+        availableModels: [
+          {
+            provider: "openai-codex",
+            id: "gpt-5.2-codex",
+            name: "GPT-5.2 Codex",
+            input: ["text", "image"],
+            reasoning: true,
+          },
+        ],
+      })[0]?.reasoningEffortOptions,
+    ).toEqual([
+      { value: "off", label: "Off" },
+      { value: "minimal", label: "Minimal" },
+      { value: "low", label: "Low" },
+      { value: "medium", label: "Medium" },
+      { value: "high", label: "High" },
+      { value: "xhigh", label: "Extra high" },
+    ]);
+  });
+
+  it("removes Pi thinking levels that the model explicitly disables", () => {
+    expect(
+      mapPiModelsToComposerModels({
+        availableModels: [
+          {
+            provider: "example",
+            id: "model",
+            name: "Model",
+            input: ["text"],
+            reasoning: true,
+            thinkingLevelMap: {
+              xhigh: null,
+            },
+          },
+        ],
+      })[0]?.reasoningEffortOptions,
+    ).toEqual([
+      { value: "off", label: "Off" },
+      { value: "minimal", label: "Minimal" },
+      { value: "low", label: "Low" },
+      { value: "medium", label: "Medium" },
+      { value: "high", label: "High" },
+    ]);
   });
 });

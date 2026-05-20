@@ -6,12 +6,17 @@ const PiModelSchema = z.looseObject({
   input: z.array(z.string()),
   name: z.string(),
   provider: z.string(),
+  reasoning: z.boolean(),
+  thinkingLevelMap: z.record(z.string(), z.union([z.string(), z.null()])).optional(),
 });
+
+const PiThinkingLevelSchema = z.enum(["off", "minimal", "low", "medium", "high", "xhigh"]);
 
 const PiSessionStateSchema = z.looseObject({
   isStreaming: z.boolean(),
   isCompacting: z.boolean(),
-  model: PiModelSchema.optional(),
+  model: PiModelSchema.nullable(),
+  thinkingLevel: PiThinkingLevelSchema,
   sessionFile: z.string().optional(),
   sessionId: z.string(),
   sessionName: z.string().optional(),
@@ -71,10 +76,15 @@ const PiReadMetadataResultSchema = z.object({
 
 export type PiSessionState = z.output<typeof PiSessionStateSchema>;
 export type PiModel = z.output<typeof PiModelSchema>;
+export type PiThinkingLevel = z.output<typeof PiThinkingLevelSchema>;
 export type PiAgentMessage = z.output<typeof PiAgentMessageSchema>;
 export type PiEvent = z.output<typeof PiEventSchema>;
 export type PiConversationSummary = z.output<typeof PiConversationSummarySchema>;
 export type PiListConversationsResult = z.output<typeof PiListConversationsResultSchema>;
+
+export function parsePiSessionState(input: unknown): PiSessionState {
+  return PiSessionStateSchema.parse(input);
+}
 
 export type PiEventSubscription = {
   close(): void;
@@ -102,7 +112,8 @@ export type PiSessionClient = {
   }): Promise<{ name: string | null; preview: string | null }>;
   resolveConversation(input: { providerConversationId: string }): Promise<{ sessionFile: string }>;
   resumeConversation(input: { providerConversationId: string }): Promise<{ sessionFile: string }>;
-  setModel(input: { modelId: string; provider: string; sessionFile: string }): Promise<PiModel>;
+  setModel(input: { modelId: string; provider: string; sessionFile: string }): Promise<void>;
+  setThinkingLevel(input: { level: PiThinkingLevel; sessionFile: string }): Promise<void>;
   setSessionName(input: { name: string; sessionFile: string }): Promise<void>;
   prompt(input: { message: string; sessionFile: string }): Promise<void>;
   steer(input: { message: string; sessionFile: string }): Promise<void>;
@@ -248,7 +259,7 @@ export function createPiSessionClient(input: PiSessionClientInput): PiSessionCli
         method: "pi/getState",
         params: getStateInput,
       });
-      return PiSessionStateSchema.parse(result);
+      return parsePiSessionState(result);
     },
     async getAvailableModels(getAvailableModelsInput) {
       const result = await request({
@@ -286,11 +297,16 @@ export function createPiSessionClient(input: PiSessionClientInput): PiSessionCli
       return PiSessionFileResultSchema.parse(result);
     },
     async setModel(setModelInput) {
-      const result = await request({
+      await request({
         method: "pi/setModel",
         params: setModelInput,
       });
-      return PiModelSchema.parse(result);
+    },
+    async setThinkingLevel(setThinkingLevelInput) {
+      await request({
+        method: "pi/setThinkingLevel",
+        params: setThinkingLevelInput,
+      });
     },
     async setSessionName(setSessionNameInput) {
       await request({

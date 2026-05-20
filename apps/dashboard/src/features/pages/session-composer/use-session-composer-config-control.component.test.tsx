@@ -123,6 +123,12 @@ function LocalSessionComposerConfigControlHarness(input: {
       <div data-testid="model-options">
         {configControl.modelOptions.map((option) => option.label).join(",")}
       </div>
+      <div data-testid="can-change-reasoning-effort">
+        {configControl.canChangeReasoningEffort ? "true" : "false"}
+      </div>
+      <div data-testid="reasoning-effort-options">
+        {configControl.reasoningEffortOptions.map((option) => option.label).join(",")}
+      </div>
       <button
         type="button"
         onClick={() => {
@@ -254,6 +260,35 @@ describe("usePersistedSessionComposerConfigControl", () => {
     expect(screen.getByTestId("selected-model").textContent).toBe("gpt-5.3-codex-spark");
     expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("high");
     expect(screen.getByTestId("has-explicit-model-selection").textContent).toBe("true");
+  });
+
+  it("uses selected local runtime model reasoning options", () => {
+    render(
+      <LocalSessionComposerConfigControlHarness
+        bootstrap={createReadyBootstrap({
+          availableModels: [
+            {
+              model: "openai/gpt-5",
+              displayName: "OpenAI / GPT-5",
+              defaultReasoningEffort: "default",
+              reasoningEffortOptions: [
+                { value: "default", label: "Default" },
+                { value: "high", label: "high" },
+                { value: "low", label: "low" },
+              ],
+              inputModalities: ["text", "image"],
+              isDefault: true,
+            },
+          ],
+          model: "openai/gpt-5",
+          modelReasoningEffort: null,
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId("can-change-reasoning-effort").textContent).toBe("true");
+    expect(screen.getByTestId("selected-reasoning-effort").textContent).toBe("default");
+    expect(screen.getByTestId("reasoning-effort-options").textContent).toBe("Default,high,low");
   });
 
   it("ignores local runtime model selections that are missing from the current catalog", () => {

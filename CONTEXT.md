@@ -252,9 +252,11 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - The Pi model catalog shown by Mistle should come from Pi's live model controls, not from Mistle's runtime setup files.
 - Mistle requests the Pi model catalog for the active **Pi conversation**, not as a workspace-global catalog.
 - A **Pi active model selection** is identified by its provider and model id using Pi's canonical provider/model reference.
-- In Mistle's composer, the default marker for Pi model options means the model is the current **Pi active model selection**.
+- Mistle should not show a default marker for Pi model options unless Pi exposes a real default-model concept.
 - **Pi active model selection** should not change while the **Pi conversation** has a **Working agent turn**.
-- Pi thinking controls are separate from **Pi active model selection** and should not be represented as Codex reasoning effort.
+- **Pi thinking level** is the Pi-owned control for how much reasoning a thinking-capable Pi model should use.
+- **Pi thinking level** is separate from **Pi active model selection** and should not be represented as Codex reasoning effort.
+- An **OpenCode model variant** is the OpenCode-owned control for a model-specific reasoning or behavior variant used when starting an OpenCode turn.
 - Opening the **Runtime conversation navigator** does not change the **Session bottom panel** state.
 - Opening **Codex thread** navigation does not change the **Session bottom panel** state.
 - A **Default Codex thread** is used only when the **Session workbench** has no explicit **Active Codex thread** request.

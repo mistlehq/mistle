@@ -133,7 +133,9 @@ function RenderedComposerPaneHarness(input: {
               label: ComposerModelFixture.displayName,
             },
           ],
+          reasoningEffortOptions: [{ value: "medium", label: "Medium" }],
           canChangeReasoningEffort: true,
+          controlsDisabled: false,
           isUpdating: false,
           setModel: () => {
             return;
@@ -232,7 +234,9 @@ function QueuedPromptComposerHarness(): React.JSX.Element {
                 label: ComposerModelFixture.displayName,
               },
             ],
+            reasoningEffortOptions: [{ value: "medium", label: "Medium" }],
             canChangeReasoningEffort: true,
+            controlsDisabled: false,
             isUpdating: false,
             setModel: () => {
               return;

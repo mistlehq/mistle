@@ -7,6 +7,7 @@ import {
   type PiModel,
   type PiSessionClient,
   type PiSessionState,
+  type PiThinkingLevel,
 } from "@mistle/integrations-definitions/agent-runtimes/pi/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { systemScheduler } from "@mistle/time";
@@ -92,7 +93,8 @@ export type UsePiSessionStateResult = {
     steerTurn: (input: { submittedPrompt: string }) => Promise<void>;
   };
   modelControl: {
-    setActiveModel: (selection: PiModelSelection) => Promise<PiModel>;
+    setActiveModel: (selection: PiModelSelection) => Promise<void>;
+    setThinkingLevel: (level: PiThinkingLevel) => Promise<void>;
   };
   lifecycle: PiSessionLifecycleState;
   conversations: PiConversationNavigatorState;
@@ -258,8 +260,9 @@ async function loadConnectedPiComposerBootstrap(input: {
   return {
     availableModels,
     bootstrap: buildReadyPiComposerBootstrap({
-      activeModel: input.activeSessionState.model ?? null,
+      activeModel: input.activeSessionState.model,
       availableModels,
+      thinkingLevel: input.activeSessionState.thinkingLevel,
     }),
   };
 }
@@ -284,6 +287,7 @@ export function usePiSessionState(input: {
   const availablePiModelsRef = useRef<readonly PiModel[]>([]);
   const generationRef = useRef(0);
   const previousChatStatusRef = useRef<PiChatState["status"]>(null);
+  const sessionSnapshotRef = useRef<ConnectedPiConversation | null>(null);
   const [step, setStep] = useState<PiSessionLifecycleState["step"]>("idle");
   const [sessionSnapshot, setSessionSnapshot] = useState<ConnectedPiConversation | null>(null);
   const [sessionConnectionState, setSessionConnectionState] =
@@ -308,6 +312,10 @@ export function usePiSessionState(input: {
   const [originalConversationId, setOriginalConversationId] = useState<string | null>(null);
   const [isStartingNewConversation, setIsStartingNewConversation] = useState(false);
   const [pendingConversationId, setPendingConversationId] = useState<string | null>(null);
+
+  useEffect(() => {
+    sessionSnapshotRef.current = sessionSnapshot;
+  }, [sessionSnapshot]);
 
   const clearLifecycleErrorMessage = useCallback((): void => {
     setLifecycleErrorMessage(null);
@@ -755,28 +763,90 @@ export function usePiSessionState(input: {
     }
   }, [sessionSnapshot?.activeSessionFile]);
 
+  const isCurrentPiSession = useCallback(
+    (check: { client: PiSessionClient; generation: number; sessionFile: string }): boolean =>
+      generationRef.current === check.generation &&
+      clientRef.current === check.client &&
+      sessionSnapshotRef.current?.activeSessionFile === check.sessionFile,
+    [],
+  );
+
+  const refreshPiComposerBootstrapAfterWrite = useCallback(
+    async (input: {
+      client: PiSessionClient;
+      generation: number;
+      sessionFile: string;
+    }): Promise<boolean> => {
+      if (!isCurrentPiSession(input)) {
+        return false;
+      }
+      const activeSessionState = await input.client.getState({
+        sessionFile: input.sessionFile,
+      });
+      if (!isCurrentPiSession(input)) {
+        return false;
+      }
+      setBootstrap(
+        buildReadyPiComposerBootstrap({
+          activeModel: activeSessionState.model,
+          availableModels: availablePiModelsRef.current,
+          thinkingLevel: activeSessionState.thinkingLevel,
+        }),
+      );
+      return true;
+    },
+    [isCurrentPiSession],
+  );
+
   const setActiveModel = useCallback(
-    async (selection: PiModelSelection): Promise<PiModel> => {
+    async (selection: PiModelSelection): Promise<void> => {
       const client = clientRef.current;
       const sessionFile = sessionSnapshot?.activeSessionFile ?? null;
       if (client === null || sessionFile === null) {
         throw new Error("Connect Pi before changing models.");
       }
-      const selectedModel = await client.setModel({
+      const generation = generationRef.current;
+      await client.setModel({
         sessionFile,
         provider: selection.provider,
         modelId: selection.modelId,
       });
-      setBootstrap(
-        buildReadyPiComposerBootstrap({
-          activeModel: selectedModel,
-          availableModels: availablePiModelsRef.current,
-        }),
-      );
+      const refreshApplied = await refreshPiComposerBootstrapAfterWrite({
+        client,
+        generation,
+        sessionFile,
+      });
+      if (!refreshApplied) {
+        return;
+      }
       setSessionErrorMessage(null);
-      return selectedModel;
     },
-    [sessionSnapshot?.activeSessionFile],
+    [refreshPiComposerBootstrapAfterWrite, sessionSnapshot?.activeSessionFile],
+  );
+
+  const setThinkingLevel = useCallback(
+    async (level: PiThinkingLevel): Promise<void> => {
+      const client = clientRef.current;
+      const sessionFile = sessionSnapshot?.activeSessionFile ?? null;
+      if (client === null || sessionFile === null) {
+        throw new Error("Connect Pi before changing thinking level.");
+      }
+      const generation = generationRef.current;
+      await client.setThinkingLevel({
+        sessionFile,
+        level,
+      });
+      const refreshApplied = await refreshPiComposerBootstrapAfterWrite({
+        client,
+        generation,
+        sessionFile,
+      });
+      if (!refreshApplied) {
+        return;
+      }
+      setSessionErrorMessage(null);
+    },
+    [refreshPiComposerBootstrapAfterWrite, sessionSnapshot?.activeSessionFile],
   );
 
   const activateConversation = useCallback(
@@ -923,6 +993,7 @@ export function usePiSessionState(input: {
     },
     modelControl: {
       setActiveModel,
+      setThinkingLevel,
     },
     conversations: {
       activeConversationDirectory: sessionSnapshot?.activeDirectory ?? null,

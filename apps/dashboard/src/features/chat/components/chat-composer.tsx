@@ -1,5 +1,4 @@
 import type { ComposerCapability, ComposerCommandDescriptor } from "@mistle/integrations-core";
-import { OpenAiReasoningEffortLabelByValue } from "@mistle/integrations-definitions/openai";
 import {
   Button,
   ButtonGroup,
@@ -39,19 +38,12 @@ import {
 } from "../../pages/session-composer/session-composer-trigger-detection.js";
 import { resolveSelectableValue } from "../../shared/select-value.js";
 
-const REASONING_EFFORT_OPTIONS = ["low", "medium", "high", "xhigh"] as const;
-const ReasoningEffortLabels: Readonly<Record<string, string>> = OpenAiReasoningEffortLabelByValue;
-
 function formatSlashCommandOptionLabel(command: ComposerCommandDescriptor): string {
   if (command.description === undefined) {
     return `/${command.name}`;
   }
 
   return `/${command.name} ${command.description}`;
-}
-
-function formatReasoningEffortLabel(value: string): string {
-  return ReasoningEffortLabels[value] ?? value;
 }
 
 function isApplePlatform(): boolean {
@@ -151,6 +143,10 @@ export type ChatComposerViewModel = {
     value: string;
     label: string;
   }[];
+  reasoningEffortOptions: readonly {
+    value: string;
+    label: string;
+  }[];
   selectedModel: string | null;
   selectedReasoningEffort: string | null;
   isSubmitPending: boolean;
@@ -245,6 +241,7 @@ export function ChatComposer({
   pendingDiffCommentSummary,
   pendingAttachments,
   modelOptions,
+  reasoningEffortOptions,
   selectedModel,
   selectedReasoningEffort,
   isSubmitPending,
@@ -328,8 +325,11 @@ export function ChatComposer({
   const selectedModelLabel = modelOptions.find((option) => option.value === selectedModel)?.label;
   const selectedReasoningEffortValue = resolveSelectableValue({
     selectedValue: selectedReasoningEffort,
-    optionValues: REASONING_EFFORT_OPTIONS,
+    optionValues: reasoningEffortOptions.map((option) => option.value),
   });
+  const selectedReasoningEffortLabel = reasoningEffortOptions.find(
+    (option) => option.value === selectedReasoningEffortValue,
+  )?.label;
 
   function addPendingFiles(files: readonly File[]): void {
     if (files.length === 0) {
@@ -728,13 +728,13 @@ export function ChatComposer({
                       <SelectValue className="text-muted-foreground" placeholder="Reasoning">
                         {selectedReasoningEffortValue === null
                           ? "Reasoning"
-                          : formatReasoningEffortLabel(selectedReasoningEffortValue)}
+                          : (selectedReasoningEffortLabel ?? selectedReasoningEffortValue)}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {REASONING_EFFORT_OPTIONS.map((reasoningOption) => (
-                        <SelectItem key={reasoningOption} value={reasoningOption}>
-                          {formatReasoningEffortLabel(reasoningOption)}
+                      {reasoningEffortOptions.map((reasoningOption) => (
+                        <SelectItem key={reasoningOption.value} value={reasoningOption.value}>
+                          {reasoningOption.label}
                         </SelectItem>
                       ))}
                     </SelectContent>

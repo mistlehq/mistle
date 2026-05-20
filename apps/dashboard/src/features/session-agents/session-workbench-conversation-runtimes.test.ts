@@ -29,7 +29,9 @@ const ComposerConfigControl: CodexRuntimeInput["configControl"] = {
   selectedReasoningEffort: null,
   hasExplicitModelSelection: false,
   modelOptions: [],
+  reasoningEffortOptions: [],
   canChangeReasoningEffort: false,
+  controlsDisabled: false,
   isUpdating: false,
   setModel: () => {
     return;

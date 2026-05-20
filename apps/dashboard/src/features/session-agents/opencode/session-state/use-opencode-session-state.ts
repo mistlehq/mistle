@@ -106,6 +106,7 @@ export type UseOpenCodeSessionStateResult = {
       model?: OpenCodePromptModelSelection;
       submittedAttachments?: readonly OpenCodePromptPartInput[];
       submittedPrompt: string;
+      variant?: string;
     }) => Promise<void>;
   };
   lifecycle: OpenCodeSessionLifecycleState;
@@ -237,6 +238,22 @@ function resolveOpenCodeModelInputModalities(
   return modalities;
 }
 
+function mapOpenCodeReasoningEffortOptions(
+  model: OpenCodeProviderSummary["models"][string],
+): readonly { value: string; label: string }[] {
+  const variantOptions = Object.keys(model.variants ?? {})
+    .filter((variant) => variant !== "default")
+    .sort((left, right) => left.localeCompare(right))
+    .map((variant) => ({
+      value: variant,
+      label: variant,
+    }));
+
+  return variantOptions.length === 0
+    ? []
+    : [{ value: "default", label: "Default" }, ...variantOptions];
+}
+
 export function mapOpenCodeProvidersToComposerModels(input: {
   defaultModelByProvider: Record<string, string>;
   providers: readonly OpenCodeProviderSummary[];
@@ -244,13 +261,17 @@ export function mapOpenCodeProvidersToComposerModels(input: {
   return input.providers.flatMap((provider) =>
     Object.entries(provider.models)
       .sort(([leftModelId], [rightModelId]) => leftModelId.localeCompare(rightModelId))
-      .map(([modelId, model]) => ({
-        model: `${provider.id}/${modelId}`,
-        displayName: `${provider.name} / ${model.name}`,
-        defaultReasoningEffort: null,
-        inputModalities: resolveOpenCodeModelInputModalities(model),
-        isDefault: input.defaultModelByProvider[provider.id] === modelId,
-      })),
+      .map(([modelId, model]) => {
+        const reasoningEffortOptions = mapOpenCodeReasoningEffortOptions(model);
+        return {
+          model: `${provider.id}/${modelId}`,
+          displayName: `${provider.name} / ${model.name}`,
+          defaultReasoningEffort: reasoningEffortOptions.length === 0 ? null : "default",
+          reasoningEffortOptions,
+          inputModalities: resolveOpenCodeModelInputModalities(model),
+          isDefault: input.defaultModelByProvider[provider.id] === modelId,
+        };
+      }),
   );
 }
 
@@ -708,6 +729,7 @@ export function useOpenCodeSessionState(input: {
       model?: OpenCodePromptModelSelection;
       submittedAttachments?: readonly OpenCodePromptPartInput[];
       submittedPrompt: string;
+      variant?: string;
     }): Promise<void> => {
       const client = clientRef.current;
       const sessionId = sessionSnapshot?.activeSessionId ?? null;
@@ -735,6 +757,7 @@ export function useOpenCodeSessionState(input: {
           ...(promptInput.directory === undefined ? {} : { directory: promptInput.directory }),
           ...(promptInput.model === undefined ? {} : { model: promptInput.model }),
           parts: [...submittedAttachments, ...textParts],
+          ...(promptInput.variant === undefined ? {} : { variant: promptInput.variant }),
         });
         setSessionErrorMessage(null);
       } catch (error) {

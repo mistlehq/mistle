@@ -391,6 +391,10 @@ export function useSessionComposerState(input: {
       return;
     }
 
+    if (composerStateInput.configControl.isUpdating) {
+      return;
+    }
+
     const trimmedComposerText = composerText.trim();
     const hasSubmissionContent =
       trimmedComposerText.length > 0 ||
@@ -465,6 +469,7 @@ export function useSessionComposerState(input: {
     setPendingComposerAttachments([]);
   }, [
     clearSessionErrorMessage,
+    composerStateInput.configControl.isUpdating,
     composerStateInput.turnControl,
     composerText,
     draftState,
@@ -639,6 +644,10 @@ export function useSessionComposerState(input: {
       clearSessionErrorMessage();
       setComposerErrorMessage(null);
 
+      if (submitAction.type !== "interrupt_turn" && composerStateInput.configControl.isUpdating) {
+        return;
+      }
+
       if (typedRuntimeCommand !== null) {
         if (
           composerStateInput.turnControl.activeTurnState === "running" &&
@@ -744,6 +753,8 @@ export function useSessionComposerState(input: {
     })();
   }, [
     clearSessionErrorMessage,
+    composerStateInput.bootstrap.phase,
+    composerStateInput.configControl.isUpdating,
     composerStateInput.executeTypedRuntimeCommand,
     composerStateInput.turnControl,
     composerText,
@@ -825,6 +836,7 @@ export function useSessionComposerState(input: {
     if (typedRuntimeCommand !== null || unavailableTypedRuntimeCommand !== null) {
       return (
         composerStateInput.attachmentControl.isUploadingAttachments ||
+        composerStateInput.configControl.isUpdating ||
         composerStateInput.bootstrap.phase.status !== "ready"
       );
     }
@@ -834,6 +846,10 @@ export function useSessionComposerState(input: {
     }
 
     if (composerStateInput.attachmentControl.isUploadingAttachments) {
+      return true;
+    }
+
+    if (composerStateInput.configControl.isUpdating) {
       return true;
     }
 
@@ -858,6 +874,7 @@ export function useSessionComposerState(input: {
     composerText,
     composerStateInput.attachmentControl.isUploadingAttachments,
     composerStateInput.bootstrap.phase.status,
+    composerStateInput.configControl.isUpdating,
     composerStateInput.turnControl.canInterrupt,
     composerStateInput.turnControl.canSteer,
     composerStateInput.turnControl.isStarting,
@@ -873,6 +890,7 @@ export function useSessionComposerState(input: {
     () =>
       composerStateInput.turnControl.activeTurnState !== "running" ||
       composerStateInput.attachmentControl.isUploadingAttachments ||
+      composerStateInput.configControl.isUpdating ||
       isSubmittingNativeQueuedPrompt ||
       composerStateInput.bootstrap.phase.status !== "ready" ||
       typedRuntimeCommand !== null ||
@@ -886,6 +904,7 @@ export function useSessionComposerState(input: {
       composerText,
       composerStateInput.attachmentControl.isUploadingAttachments,
       composerStateInput.bootstrap.phase.status,
+      composerStateInput.configControl.isUpdating,
       composerStateInput.turnControl.activeTurnState,
       draftState.pendingDiffComments.length,
       isSubmittingNativeQueuedPrompt,
@@ -917,6 +936,7 @@ export function useSessionComposerState(input: {
   useEffect(() => {
     if (
       composerStateInput.turnControl.activeTurnState === "running" ||
+      composerStateInput.configControl.isUpdating ||
       composerStateInput.turnControl.isStarting ||
       isSubmittingQueuedPrompt
     ) {
@@ -937,6 +957,7 @@ export function useSessionComposerState(input: {
       }
     })();
   }, [
+    composerStateInput.configControl.isUpdating,
     composerStateInput.turnControl.activeTurnState,
     composerStateInput.turnControl.isStarting,
     isSubmittingQueuedPrompt,
@@ -964,6 +985,7 @@ export function useSessionComposerState(input: {
         name: attachment.name,
       })),
       modelOptions: composerStateInput.configControl.modelOptions,
+      reasoningEffortOptions: composerStateInput.configControl.reasoningEffortOptions,
       selectedModel: composerStateInput.configControl.selectedModel,
       selectedReasoningEffort: composerStateInput.configControl.selectedReasoningEffort,
       isSubmitPending: composerStateInput.turnControl.isStarting,
@@ -990,7 +1012,7 @@ export function useSessionComposerState(input: {
       secondarySubmitDisabled: queuePromptDisabled,
       configControlsDisabled:
         composerStateInput.bootstrap.phase.status !== "ready" ||
-        composerStateInput.configControl.isUpdating ||
+        composerStateInput.configControl.controlsDisabled ||
         composerStateInput.attachmentControl.isUploadingAttachments,
       showConfigControls,
       showReasoningControl: composerStateInput.configControl.canChangeReasoningEffort,

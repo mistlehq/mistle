@@ -15,6 +15,7 @@ import type { UseCodexSessionStateResult } from "./codex/session-state/index.js"
 import {
   buildOpenCodeAttachmentParts,
   resolveOpenCodePromptModelOverride,
+  resolveOpenCodePromptVariantOverride,
   type UseOpenCodeSessionStateResult,
 } from "./opencode/session-state/index.js";
 import type { UsePiSessionStateResult } from "./pi/session-state/index.js";
@@ -26,7 +27,7 @@ type EnsureSessionTransportConnected = Parameters<
 
 type OpenCodeTurnStarterModelSelection = Pick<
   SessionComposerConfigControl,
-  "hasExplicitModelSelection" | "selectedModel"
+  "hasExplicitModelSelection" | "selectedModel" | "selectedReasoningEffort"
 >;
 
 export function shouldGenerateInitialSessionTitle(input: {
@@ -100,11 +101,15 @@ export function buildOpenCodeTurnStarter(input: {
       input.modelSelection.hasExplicitModelSelection,
       input.modelSelection.selectedModel,
     );
+    const selectedOpenCodeVariant = resolveOpenCodePromptVariantOverride(
+      input.modelSelection.selectedReasoningEffort,
+    );
     const attachmentParts = buildOpenCodeAttachmentParts(turnInput.uploadedAttachments ?? []);
 
     await input.chat.sendPrompt({
       ...(input.selectedRepositoryPath === null ? {} : { directory: input.selectedRepositoryPath }),
       ...(selectedOpenCodeModel === undefined ? {} : { model: selectedOpenCodeModel }),
+      ...(selectedOpenCodeVariant === undefined ? {} : { variant: selectedOpenCodeVariant }),
       submittedAttachments: attachmentParts,
       submittedPrompt: messagePayload,
     });

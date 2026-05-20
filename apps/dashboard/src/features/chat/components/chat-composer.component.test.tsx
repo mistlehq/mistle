@@ -62,6 +62,12 @@ function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
     pendingDiffCommentSummary: null,
     pendingAttachments: [],
     modelOptions: [{ value: "gpt-5.4-codex", label: "GPT-5.4" }],
+    reasoningEffortOptions: [
+      { value: "low", label: "Low" },
+      { value: "medium", label: "Medium" },
+      { value: "high", label: "High" },
+      { value: "xhigh", label: "Extra high" },
+    ],
     selectedModel: "gpt-5.4-codex",
     selectedReasoningEffort: "medium",
     isSubmitPending: false,

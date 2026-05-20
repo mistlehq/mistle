@@ -1022,6 +1022,16 @@ fn handle_pi_method(
                 captured_events,
             )
         }
+        "pi/setThinkingLevel" => {
+            let session_file = require_param_string(&request.params, "sessionFile")?;
+            let level = require_param_string(&request.params, "level")?;
+            state.ensure_child(None)?;
+            state.switch_session(&session_file, captured_events)?;
+            state.send_pi_command_with_captured_events(
+                json!({ "type": "set_thinking_level", "level": level }),
+                captured_events,
+            )
+        }
         "pi/setSessionName" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
             let name = require_param_string(&request.params, "name")?;
@@ -1425,6 +1435,26 @@ mod tests {
         assert_eq!(set_model_response["result"]["provider"], json!("openai"));
         assert_eq!(set_model_response["result"]["id"], json!("gpt-5"));
 
+        let set_thinking_level_responses = handle_json_rpc_request(
+            &state,
+            &json!({
+                "jsonrpc": "2.0",
+                "id": "set-thinking-level",
+                "method": "pi/setThinkingLevel",
+                "params": {
+                    "sessionFile": simulated_pi.session_file(),
+                    "level": "high"
+                }
+            })
+            .to_string(),
+        );
+        let set_thinking_level_response = parse_json_rpc_message(
+            set_thinking_level_responses
+                .last()
+                .expect("set thinking level request should produce a response"),
+        );
+        assert_eq!(set_thinking_level_response["result"], json!({}));
+
         state.shutdown_child();
     }
 
@@ -1671,11 +1701,11 @@ while IFS= read -r line; do
         printf '{{"type":"response","command":"get_state","id":"%s","success":false,"error":"no active session"}}\n' "$id"
       elif [ -f "$active_marker" ]; then
         rm "$active_marker"
-        printf '{{"type":"response","command":"get_state","id":"%s","success":true,"data":{{"sessionFile":"{}","sessionId":"{}","sessionName":"Simulated session","isStreaming":true,"isCompacting":false,"pendingMessageCount":0}}}}\n' "$id"
+        printf '{{"type":"response","command":"get_state","id":"%s","success":true,"data":{{"sessionFile":"{}","sessionId":"{}","sessionName":"Simulated session","isStreaming":true,"isCompacting":false,"model":null,"messageCount":0,"pendingMessageCount":0,"thinkingLevel":"high"}}}}\n' "$id"
         sleep 0.1
         printf '{{"type":"agent_end"}}\n'
       else
-        printf '{{"type":"response","command":"get_state","id":"%s","success":true,"data":{{"sessionFile":"{}","sessionId":"{}","sessionName":"Simulated session","isStreaming":false,"isCompacting":false,"pendingMessageCount":0}}}}\n' "$id"
+        printf '{{"type":"response","command":"get_state","id":"%s","success":true,"data":{{"sessionFile":"{}","sessionId":"{}","sessionName":"Simulated session","isStreaming":false,"isCompacting":false,"model":null,"messageCount":0,"pendingMessageCount":0,"thinkingLevel":"high"}}}}\n' "$id"
       fi
       ;;
     *'"type":"switch_session"'*)
@@ -1683,14 +1713,14 @@ while IFS= read -r line; do
       printf '{{"type":"response","command":"switch_session","id":"%s","success":true,"data":{{}}}}\n' "$id"
       ;;
     *'"type":"get_available_models"'*)
-      printf '{{"type":"response","command":"get_available_models","id":"%s","success":true,"data":{{"models":[{{"provider":"openai","id":"gpt-5","name":"GPT-5","input":["text","image"]}}]}}}}\n' "$id"
+      printf '{{"type":"response","command":"get_available_models","id":"%s","success":true,"data":{{"models":[{{"provider":"openai","id":"gpt-5","name":"GPT-5","reasoning":true,"input":["text","image"]}}]}}}}\n' "$id"
       ;;
     *'"type":"set_model"'*)
       case "$line" in
         *'"provider":"openai"'*)
           case "$line" in
             *'"modelId":"gpt-5"'*)
-              printf '{{"type":"response","command":"set_model","id":"%s","success":true,"data":{{"provider":"openai","id":"gpt-5","name":"GPT-5","input":["text","image"]}}}}\n' "$id"
+              printf '{{"type":"response","command":"set_model","id":"%s","success":true,"data":{{"provider":"openai","id":"gpt-5","name":"GPT-5","reasoning":true,"input":["text","image"]}}}}\n' "$id"
               ;;
             *)
               printf '{{"type":"response","command":"set_model","id":"%s","success":false,"error":"unexpected model selection"}}\n' "$id"
@@ -1699,6 +1729,16 @@ while IFS= read -r line; do
           ;;
         *)
           printf '{{"type":"response","command":"set_model","id":"%s","success":false,"error":"unexpected model selection"}}\n' "$id"
+          ;;
+      esac
+      ;;
+    *'"type":"set_thinking_level"'*)
+      case "$line" in
+        *'"level":"high"'*)
+          printf '{{"type":"response","command":"set_thinking_level","id":"%s","success":true,"data":{{}}}}\n' "$id"
+          ;;
+        *)
+          printf '{{"type":"response","command":"set_thinking_level","id":"%s","success":false,"error":"unexpected thinking level"}}\n' "$id"
           ;;
       esac
       ;;

@@ -388,6 +388,10 @@ function createOpenCodeProviderCatalogResponse(): {
             options: {},
             headers: {},
             release_date: "2026-01-01",
+            variants: {
+              high: { reasoningEffort: "high" },
+              low: { reasoningEffort: "low" },
+            },
           },
         },
       },
@@ -557,7 +561,12 @@ describe("useOpenCodeSessionState", () => {
       {
         model: "openai/gpt-5",
         displayName: "OpenAI / GPT-5",
-        defaultReasoningEffort: null,
+        defaultReasoningEffort: "default",
+        reasoningEffortOptions: [
+          { value: "default", label: "Default" },
+          { value: "high", label: "high" },
+          { value: "low", label: "low" },
+        ],
         inputModalities: ["text", "image"],
         isDefault: true,
       },
@@ -930,6 +939,7 @@ describe("useOpenCodeSessionState", () => {
           modelID: "gpt-5",
           providerID: "openai",
         },
+        variant: "high",
         submittedAttachments: [
           {
             type: "file",
@@ -951,6 +961,7 @@ describe("useOpenCodeSessionState", () => {
           modelID: "gpt-5",
           providerID: "openai",
         },
+        variant: "high",
         parts: [
           {
             filename: "screenshot.png",

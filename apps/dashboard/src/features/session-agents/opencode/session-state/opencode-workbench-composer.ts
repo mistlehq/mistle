@@ -22,6 +22,16 @@ export function resolveOpenCodePromptModelOverride(
   return parseOpenCodePromptModelSelection(selectedModel);
 }
 
+export function resolveOpenCodePromptVariantOverride(
+  selectedReasoningEffort: string | null,
+): string | undefined {
+  if (selectedReasoningEffort === "default") {
+    return undefined;
+  }
+
+  return selectedReasoningEffort ?? undefined;
+}
+
 export function buildOpenCodeComposerConfigResetKey(
   sandboxInstanceId: string | null,
   sessionId: string | null,

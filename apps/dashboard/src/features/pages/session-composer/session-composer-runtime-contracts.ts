@@ -6,8 +6,14 @@ export type SessionComposerModel = {
   model: string;
   displayName: string;
   defaultReasoningEffort: string | null;
+  reasoningEffortOptions?: readonly SessionComposerReasoningEffortOption[];
   inputModalities: readonly string[];
   isDefault: boolean;
+};
+
+export type SessionComposerReasoningEffortOption = {
+  value: string;
+  label: string;
 };
 
 export type SessionComposerBootstrapPhase =

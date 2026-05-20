@@ -3,7 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComposerConfigSnapshot } from "./session-composer-config.js";
 import { buildSessionComposerModelOptions } from "./session-composer-model-options.js";
 import { resolveActiveComposerModel } from "./session-composer-model-readiness.js";
-import type { SessionComposerBootstrapResult } from "./session-composer-runtime-contracts.js";
+import type {
+  SessionComposerBootstrapResult,
+  SessionComposerReasoningEffortOption,
+} from "./session-composer-runtime-contracts.js";
 
 export type SessionComposerConfigControl = {
   selectedModel: string | null;
@@ -13,7 +16,9 @@ export type SessionComposerConfigControl = {
     value: string;
     label: string;
   }[];
+  reasoningEffortOptions: readonly SessionComposerReasoningEffortOption[];
   canChangeReasoningEffort: boolean;
+  controlsDisabled: boolean;
   isUpdating: boolean;
   setModel: (value: string) => void;
   setReasoningEffort: (value: string) => void;
@@ -25,25 +30,56 @@ export type SessionComposerConfigWriter = {
   writeReasoningEffort: (reasoningEffort: string) => void;
 };
 
-function resolveSelectedReasoningEffort(input: {
-  availableModels: SessionComposerBootstrapResult["establishedSnapshot"]["availableModels"];
-  configuredReasoningEffort: string | null;
-  selectedModel: string | null;
-}): string | null {
-  if (input.selectedModel === null) {
-    return null;
-  }
+const DefaultReasoningEffortOptions: readonly SessionComposerReasoningEffortOption[] = [
+  { value: "low", label: "Low" },
+  { value: "medium", label: "Medium" },
+  { value: "high", label: "High" },
+  { value: "xhigh", label: "Extra high" },
+];
 
-  if (input.configuredReasoningEffort !== null) {
-    return input.configuredReasoningEffort;
+function resolveReasoningEffortOptions(input: {
+  availableModels: SessionComposerBootstrapResult["establishedSnapshot"]["availableModels"];
+  selectedModel: string | null;
+}): readonly SessionComposerReasoningEffortOption[] {
+  if (input.selectedModel === null) {
+    return [];
   }
 
   return (
     resolveActiveComposerModel({
       availableModels: input.availableModels,
       selectedModel: input.selectedModel,
-    })?.defaultReasoningEffort ?? null
+    })?.reasoningEffortOptions ?? DefaultReasoningEffortOptions
   );
+}
+
+function resolveSelectedReasoningEffort(input: {
+  availableModels: SessionComposerBootstrapResult["establishedSnapshot"]["availableModels"];
+  configuredReasoningEffort: string | null;
+  reasoningEffortOptions: readonly SessionComposerReasoningEffortOption[];
+  selectedModel: string | null;
+}): string | null {
+  if (input.selectedModel === null) {
+    return null;
+  }
+
+  if (
+    input.configuredReasoningEffort !== null &&
+    input.reasoningEffortOptions.some((option) => option.value === input.configuredReasoningEffort)
+  ) {
+    return input.configuredReasoningEffort;
+  }
+
+  const defaultReasoningEffort =
+    resolveActiveComposerModel({
+      availableModels: input.availableModels,
+      selectedModel: input.selectedModel,
+    })?.defaultReasoningEffort ?? null;
+
+  return defaultReasoningEffort !== null &&
+    input.reasoningEffortOptions.some((option) => option.value === defaultReasoningEffort)
+    ? defaultReasoningEffort
+    : null;
 }
 
 export function usePersistedSessionComposerConfigControl(input: {
@@ -71,18 +107,25 @@ export function usePersistedSessionComposerConfigControl(input: {
     [availableModels, composerConfigOverrides.model, configSnapshot.model],
   );
 
+  const reasoningEffortOptions = useMemo(
+    () => resolveReasoningEffortOptions({ availableModels, selectedModel }),
+    [availableModels, selectedModel],
+  );
+
   const selectedReasoningEffort = useMemo(
     () =>
       resolveSelectedReasoningEffort({
         availableModels,
         configuredReasoningEffort:
           composerConfigOverrides.modelReasoningEffort ?? configSnapshot.modelReasoningEffort,
+        reasoningEffortOptions,
         selectedModel,
       }),
     [
       availableModels,
       composerConfigOverrides.modelReasoningEffort,
       configSnapshot.modelReasoningEffort,
+      reasoningEffortOptions,
       selectedModel,
     ],
   );
@@ -121,7 +164,9 @@ export function usePersistedSessionComposerConfigControl(input: {
     selectedReasoningEffort,
     hasExplicitModelSelection: selectedModel !== null,
     modelOptions,
-    canChangeReasoningEffort: true,
+    reasoningEffortOptions,
+    canChangeReasoningEffort: reasoningEffortOptions.length > 0,
+    controlsDisabled: isUpdating,
     isUpdating,
     setModel,
     setReasoningEffort,
@@ -171,18 +216,25 @@ export function useLocalSessionComposerConfigControl(input: {
       : null;
   }, [availableModels, configuredModel]);
 
+  const reasoningEffortOptions = useMemo(
+    () => resolveReasoningEffortOptions({ availableModels, selectedModel }),
+    [availableModels, selectedModel],
+  );
+
   const selectedReasoningEffort = useMemo(
     () =>
       resolveSelectedReasoningEffort({
         availableModels,
         configuredReasoningEffort:
           composerConfigOverrides.modelReasoningEffort ?? configSnapshot.modelReasoningEffort,
+        reasoningEffortOptions,
         selectedModel,
       }),
     [
       availableModels,
       composerConfigOverrides.modelReasoningEffort,
       configSnapshot.modelReasoningEffort,
+      reasoningEffortOptions,
       selectedModel,
     ],
   );
@@ -219,7 +271,10 @@ export function useLocalSessionComposerConfigControl(input: {
     selectedReasoningEffort,
     hasExplicitModelSelection: configuredModel !== null && selectedModel !== null,
     modelOptions,
-    canChangeReasoningEffort: input.canChangeReasoningEffort ?? true,
+    reasoningEffortOptions,
+    canChangeReasoningEffort:
+      (input.canChangeReasoningEffort ?? true) && reasoningEffortOptions.length > 0,
+    controlsDisabled: false,
     isUpdating: false,
     setModel,
     setReasoningEffort,

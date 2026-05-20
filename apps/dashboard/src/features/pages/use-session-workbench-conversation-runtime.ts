@@ -250,7 +250,6 @@ export function useSessionWorkbenchConversationRuntime(input: {
     });
   const { bootstrap: piComposerBootstrap, configControl: piConfigControl } =
     usePiWorkbenchComposerState({
-      sandboxInstanceId: input.sandboxInstanceId,
       sessionState: input.piSessionState,
     });
   const { configControl } = useCodexWorkbenchComposerState({
@@ -292,6 +291,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
         modelSelection: {
           hasExplicitModelSelection: openCodeConfigControl.hasExplicitModelSelection,
           selectedModel: openCodeConfigControl.selectedModel,
+          selectedReasoningEffort: openCodeConfigControl.selectedReasoningEffort,
         },
         queryClient: input.queryClient,
         sandboxInstanceId: input.sandboxInstanceId,
@@ -304,6 +304,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
       input.selectedRepositoryPath,
       openCodeConfigControl.hasExplicitModelSelection,
       openCodeConfigControl.selectedModel,
+      openCodeConfigControl.selectedReasoningEffort,
       openCodeSessionState.chat,
       openCodeSessionState.chat.chatState.messageOrder.length,
     ],

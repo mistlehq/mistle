@@ -116,7 +116,6 @@ export function useOpenCodeWorkbenchComposerState(input: {
   const configControl = useLocalSessionComposerConfigControl({
     bootstrap,
     clearSessionErrorMessage: input.sessionState.sessionMessage.clearSessionErrorMessage,
-    canChangeReasoningEffort: false,
     resetKey: buildOpenCodeComposerConfigResetKey(
       input.sandboxInstanceId,
       input.sessionState.lifecycle.sessionSnapshot?.activeSessionId ?? null,
@@ -129,10 +128,7 @@ export function useOpenCodeWorkbenchComposerState(input: {
   };
 }
 
-export function usePiWorkbenchComposerState(input: {
-  sandboxInstanceId: string | null;
-  sessionState: UsePiSessionStateResult;
-}): {
+export function usePiWorkbenchComposerState(input: { sessionState: UsePiSessionStateResult }): {
   bootstrap: UsePiSessionStateResult["bootstrap"];
   configControl: SessionComposerConfigControl;
 } {
@@ -140,8 +136,12 @@ export function usePiWorkbenchComposerState(input: {
   const modelWriter = useMemo(
     () => ({
       setModel: input.sessionState.modelControl.setActiveModel,
+      setThinkingLevel: input.sessionState.modelControl.setThinkingLevel,
     }),
-    [input.sessionState.modelControl.setActiveModel],
+    [
+      input.sessionState.modelControl.setActiveModel,
+      input.sessionState.modelControl.setThinkingLevel,
+    ],
   );
   const configControl = usePiSessionComposerConfigControl({
     bootstrap,

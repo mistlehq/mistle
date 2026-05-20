@@ -67,6 +67,12 @@ export const SessionComposerFixtureProps: ChatComposerViewModel = {
   pendingDiffCommentSummary: null,
   pendingAttachments: [],
   modelOptions: CodexFixtureSessionModelOptions,
+  reasoningEffortOptions: [
+    { value: "low", label: "Low" },
+    { value: "medium", label: "Medium" },
+    { value: "high", label: "High" },
+    { value: "xhigh", label: "Extra high" },
+  ],
   selectedModel: "gpt-5.4",
   selectedReasoningEffort: "medium",
   isSubmitPending: false,
