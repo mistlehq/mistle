@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
+import { listIntegrationDefinitions } from "@mistle/integrations-definitions/server";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -12,7 +12,6 @@ import {
   loadIntegrationTargetsManifest,
   parseIntegrationTargetsManifest,
 } from "./seed-integration-targets.js";
-import { SyncIntegrationTargetsForTests } from "./sync-integration-targets.js";
 
 describe("seed-integration-targets", () => {
   it("parses a valid integration target manifest", () => {
@@ -279,11 +278,8 @@ describe("seed-integration-targets", () => {
       "utf8",
     );
     const parsedManifest = parseIntegrationTargetsManifest(rawManifest);
-    const integrationRegistry = createIntegrationRegistry();
-    const expectedTargetKeys = SyncIntegrationTargetsForTests.buildSyncIntegrationTargets(
-      integrationRegistry,
-    )
-      .map((target) => target.targetKey)
+    const expectedTargetKeys = listIntegrationDefinitions()
+      .map((definition) => definition.variantId)
       .sort();
 
     const actualTargetKeys = parsedManifest.targets.map((target) => target.targetKey).sort();
