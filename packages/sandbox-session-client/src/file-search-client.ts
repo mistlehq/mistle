@@ -2,8 +2,11 @@ import {
   parseFileSearchStreamMessage,
   PayloadKindWebSocketText,
   type FileSearchError,
+  type FileSearchQuery,
   type FileSearchResultItem,
   type FileSearchResults,
+  type FileSearchSelect,
+  type StreamDataFrame,
 } from "@mistle/sandbox-session-protocol";
 
 import { SandboxSessionSocketReadyStates } from "./runtime.js";
@@ -117,14 +120,14 @@ export class FileSearchStreamSession {
     this.#stream.dispose();
   }
 
-  async #sendJson(payload: unknown): Promise<void> {
+  async #sendJson(payload: FileSearchQuery | FileSearchSelect): Promise<void> {
     await this.#stream.sendDataFrame({
       payload: TextEncoderInstance.encode(JSON.stringify(payload)),
       payloadKind: PayloadKindWebSocketText,
     });
   }
 
-  #handleDataFrame(frame: { payload: Uint8Array; payloadKind: number }): void {
+  #handleDataFrame(frame: StreamDataFrame): void {
     if (frame.payloadKind !== PayloadKindWebSocketText) {
       return;
     }

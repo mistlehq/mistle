@@ -37,7 +37,11 @@ import {
   listComposerCommands,
 } from "../../pages/session-composer/session-composer-trigger-detection.js";
 import { resolveSelectableValue } from "../../shared/select-value.js";
-import { ContextMentionSearchMenu } from "./context-mention-search-menu.js";
+import {
+  ContextMentionSearchMenu,
+  type ContextMentionSearchMenuStatus,
+  type ContextMentionSearchResult,
+} from "./context-mention-search-menu.js";
 
 function formatSlashCommandOptionLabel(command: ComposerCommandDescriptor): string {
   if (command.description === undefined) {
@@ -128,11 +132,8 @@ export type ChatComposerCommandPanel =
     };
 
 export type ChatComposerContextMentionControl = {
-  status: "idle" | "loading" | "ready" | "unavailable";
-  results: readonly {
-    kind: "file" | "directory";
-    path: string;
-  }[];
+  status: ContextMentionSearchMenuStatus;
+  results: readonly ContextMentionSearchResult[];
   onQueryChange: (query: string) => void;
   onSelect: (input: { path: string; query: string }) => void;
   onDismiss: () => void;

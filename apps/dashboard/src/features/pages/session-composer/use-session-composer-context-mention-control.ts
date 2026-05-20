@@ -32,10 +32,15 @@ type FileSearchSessionRecord = {
   unsubscribe: () => void;
 };
 
+type FileSearchSessionConnection = {
+  cwd: string;
+  session: FileSearchStreamSession;
+};
+
 type PendingFileSearchSessionRecord = {
   cwd: string;
   generation: number;
-  promise: Promise<FileSearchSessionRecord>;
+  promise: Promise<FileSearchSessionConnection>;
 };
 
 type LatestFileSearchRequest = {
@@ -158,15 +163,15 @@ export function useSessionComposerContextMentionControl(input: {
           if (fileSearchSession === null || fileSearchSession.cwd !== cwd) {
             const pendingFileSearchSession = pendingFileSearchSessionRef.current;
             let generation = pendingFileSearchSession?.generation ?? null;
-            let sessionRecordPromise =
+            let sessionConnectionPromise =
               pendingFileSearchSession !== null && pendingFileSearchSession.cwd === cwd
                 ? pendingFileSearchSession.promise
                 : null;
 
-            if (sessionRecordPromise === null) {
+            if (sessionConnectionPromise === null) {
               disposeFileSearchSession();
               generation = fileSearchSessionGenerationRef.current;
-              sessionRecordPromise = openFileSearchSession({
+              sessionConnectionPromise = openFileSearchSession({
                 cwd,
                 ensureTransportConnected: input.ensureTransportConnected,
                 sandboxInstanceId,
@@ -174,28 +179,34 @@ export function useSessionComposerContextMentionControl(input: {
               pendingFileSearchSessionRef.current = {
                 cwd,
                 generation,
-                promise: sessionRecordPromise,
+                promise: sessionConnectionPromise,
               };
             }
 
-            fileSearchSession = await sessionRecordPromise;
+            const sessionConnection = await sessionConnectionPromise;
             if (generation === null || fileSearchSessionGenerationRef.current !== generation) {
-              fileSearchSession.unsubscribe();
-              fileSearchSession.session.dispose();
+              sessionConnection.session.dispose();
               return;
             }
 
-            if (pendingFileSearchSessionRef.current?.promise === sessionRecordPromise) {
+            if (pendingFileSearchSessionRef.current?.promise === sessionConnectionPromise) {
               pendingFileSearchSessionRef.current = null;
             }
 
-            if (fileSearchSessionRef.current !== fileSearchSession) {
-              attachFileSearchSessionResultHandler({
+            const currentSessionRecord = fileSearchSessionRef.current;
+            if (currentSessionRecord?.session === sessionConnection.session) {
+              fileSearchSession = currentSessionRecord;
+            } else {
+              const unsubscribe = attachFileSearchSessionResultHandler({
                 cwd,
-                sessionRecord: fileSearchSession,
+                session: sessionConnection.session,
                 setState,
                 latestRequestRef,
               });
+              fileSearchSession = {
+                ...sessionConnection,
+                unsubscribe,
+              };
               fileSearchSessionRef.current = fileSearchSession;
             }
           }
@@ -209,6 +220,15 @@ export function useSessionComposerContextMentionControl(input: {
             requestId,
           };
         } catch {
+          const activeQuery = activeQueryRef.current;
+          if (
+            activeQuery === null ||
+            activeQuery.cwd !== cwd ||
+            activeQuery.query !== trimmedQuery
+          ) {
+            return;
+          }
+
           pendingFileSearchSessionRef.current = null;
           setState({
             results: [],
@@ -248,7 +268,7 @@ async function openFileSearchSession(input: {
   cwd: string;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
   sandboxInstanceId: string;
-}): Promise<FileSearchSessionRecord> {
+}): Promise<FileSearchSessionConnection> {
   const { transport } = await input.ensureTransportConnected({
     sandboxInstanceId: input.sandboxInstanceId,
   });
@@ -257,24 +277,21 @@ async function openFileSearchSession(input: {
   return {
     cwd: input.cwd,
     session,
-    unsubscribe: () => {
-      return;
-    },
   };
 }
 
 function attachFileSearchSessionResultHandler(input: {
   cwd: string;
   latestRequestRef: RefObject<LatestFileSearchRequest | null>;
-  sessionRecord: FileSearchSessionRecord;
+  session: FileSearchStreamSession;
   setState: Dispatch<
     SetStateAction<{
       results: readonly FileSearchResultItem[];
       status: SessionComposerContextMentionControl["status"];
     }>
   >;
-}): void {
-  const unsubscribe = input.sessionRecord.session.onEvent((event) => {
+}): () => void {
+  return input.session.onEvent((event) => {
     if (event.type === "closed") {
       input.setState({
         results: [],
@@ -314,6 +331,4 @@ function attachFileSearchSessionResultHandler(input: {
       status: "ready",
     });
   });
-
-  input.sessionRecord.unsubscribe = unsubscribe;
 }
