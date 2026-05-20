@@ -9,12 +9,10 @@ use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt::{self, Display};
 use std::fs;
-use std::io::{ErrorKind, Read, Write};
+use std::io::Write;
 use std::net::SocketAddr;
-use std::os::fd::AsFd;
 use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread::{self, JoinHandle};
@@ -29,10 +27,6 @@ use hyper_rustls::{HttpsConnector, HttpsConnectorBuilder};
 use hyper_util::client::legacy::Client;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::TokioExecutor;
-use nix::errno::Errno;
-use nix::fcntl::{FcntlArg, OFlag, fcntl};
-use nix::sys::signal::{Signal, kill};
-use nix::unistd::Pid;
 use serde::Deserialize;
 use serde_json::Value;
 use tokio::net::{TcpSocket, TcpStream, lookup_host};
@@ -49,10 +43,6 @@ use url::Url;
 use crate::cgroups::{DEFAULT_CGROUP_ROOT, UserScopePaths, is_scope_populated};
 use crate::keepalive::KeepaliveManager;
 use crate::protocol::startup::{StartupInput, TransparentProxyBypassKind};
-use crate::pty::{
-    DEFAULT_PTY_TERMINATE_POLL_INTERVAL, DEFAULT_PTY_TERMINATE_TIMEOUT_MS, PtyEvent,
-    PtySpawnRequest, start_scoped_pty_session,
-};
 use crate::runtime::readiness::RuntimeReadinessManager;
 use crate::supervision::{
     SandboxdSupervisorHandle, SupervisedComponent, encode_forwarded_lifecycle_event_log_line,
@@ -67,16 +57,14 @@ use crate::tunnel::port_access_transport::{
 use crate::tunnel::protocol::{
     CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED, CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST,
     FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED, PAYLOAD_KIND_RAW_BYTES,
-    PAYLOAD_KIND_WEBSOCKET_TEXT, PtyControlMessage, PtySessionControlMessage, PtySessionLaunchMode,
-    PtySessionOpen, STREAM_RESET_CODE_EXEC_COMMAND_FAILED, STREAM_RESET_CODE_INVALID_STREAM_CLOSE,
-    STREAM_RESET_CODE_INVALID_STREAM_DATA, STREAM_RESET_CODE_INVALID_STREAM_SIGNAL,
-    STREAM_RESET_CODE_INVALID_STREAM_WINDOW, STREAM_RESET_CODE_TARGET_CLOSED, StreamControlMessage,
-    StreamSendWindow, decode_stream_data_frame, exec_result_event,
-    parse_egress_token_control_message, parse_file_search_stream_message,
-    parse_ports_control_message, parse_ports_transport_message, parse_pty_control_message,
+    PAYLOAD_KIND_WEBSOCKET_TEXT, STREAM_RESET_CODE_EXEC_COMMAND_FAILED,
+    STREAM_RESET_CODE_INVALID_STREAM_CLOSE, STREAM_RESET_CODE_INVALID_STREAM_DATA,
+    STREAM_RESET_CODE_INVALID_STREAM_SIGNAL, STREAM_RESET_CODE_INVALID_STREAM_WINDOW,
+    STREAM_RESET_CODE_TARGET_CLOSED, StreamControlMessage, StreamSendWindow,
+    decode_stream_data_frame, exec_result_event, parse_egress_token_control_message,
+    parse_file_search_stream_message, parse_ports_control_message, parse_ports_transport_message,
     parse_pty_session_control_message, parse_signing_control_message, parse_stream_control_message,
-    pty_exit_event, pty_session_error, pty_session_opened, stream_complete, stream_open_error,
-    stream_open_ok, stream_reset, stream_window,
+    stream_complete, stream_open_error, stream_open_ok, stream_reset, stream_window,
 };
 #[cfg(test)]
 use crate::tunnel::session::agent::AgentStreamStats;
@@ -87,6 +75,9 @@ use crate::tunnel::session::agent::{
 use crate::tunnel::session::egress::{
     fail_pending_egress_token_requests, handle_egress_token_control_message,
     handle_egress_token_session_request,
+};
+use crate::tunnel::session::exec::{
+    ExecCommandResult, PendingExecOpenState, cancel_pending_exec_open, spawn_exec_task,
 };
 use crate::tunnel::session::file_search::{
     FILE_SEARCH_CLOSE_SOURCE_GATEWAY, FILE_SEARCH_CLOSE_SOURCE_SANDBOXD,
@@ -120,6 +111,7 @@ use crate::tunnel::session::process::{
     ProcessStreamState, add_process_stream_window, close_process_stream,
     handle_process_stream_frame, open_process_stream, poll_process_streams, reset_process_streams,
 };
+use crate::tunnel::session::pty::handle_pty_session_control_message;
 use crate::tunnel::session::signing::{
     fail_pending_signing_requests, handle_signing_control_message, handle_signing_session_request,
 };
@@ -133,11 +125,13 @@ use crate::tunnel::telemetry::{SandboxTelemetryLogLevel, TelemetryRelay, Telemet
 
 mod agent;
 mod egress;
+mod exec;
 mod file_search;
 mod file_upload;
 mod operation;
 mod port_access;
 mod process;
+mod pty;
 mod signing;
 mod telemetry;
 
@@ -154,18 +148,12 @@ pub const DEFAULT_BOOTSTRAP_TUNNEL_LOOKUP_TIMEOUT: Duration = Duration::from_sec
 pub const DEFAULT_BOOTSTRAP_TUNNEL_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// Maximum time to wait for the bootstrap websocket handshake.
 pub const DEFAULT_BOOTSTRAP_TUNNEL_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
-const DEFAULT_EXEC_TIMEOUT_MS: u64 = 15_000;
-const DEFAULT_EXEC_MAX_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
 const DEFAULT_AGENT_ENDPOINT_UPDATE_TIMEOUT: StdDuration = StdDuration::from_secs(10);
 const DEFAULT_SIGNING_REQUEST_TIMEOUT: StdDuration = StdDuration::from_secs(120);
 const DEFAULT_EGRESS_TOKEN_REQUEST_TIMEOUT: StdDuration = StdDuration::from_secs(10);
 const EGRESS_TOKEN_REFRESH_SKEW_MS: u64 = 30_000;
-const EXEC_OUTPUT_READ_BUFFER_BYTES: usize = 8192;
 const DEFAULT_RUNTIME_ENV_UPDATE_TIMEOUT: StdDuration = StdDuration::from_secs(10);
 const TUNNEL_RECONNECT_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];
-const DIRECT_PTY_STREAM_ID: u32 = 1;
-const PTY_SESSION_ERROR_CODE_CREATE_FAILED: &str = "pty_create_failed";
-const PTY_SESSION_ERROR_CODE_ATTACH_FAILED: &str = "pty_attach_failed";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TunnelSigningRequest {
     pub request_id: String,
@@ -566,23 +554,11 @@ struct PendingAgentOpenState {
     task: TokioJoinHandle<()>,
 }
 
-struct PendingExecOpenState {
-    cancel_requested: Arc<AtomicBool>,
-    child_pid: Arc<Mutex<Option<u32>>>,
-}
-
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct TunnelExchangeResponse {
     bootstrap_token: String,
     tunnel_exchange_token: String,
-}
-
-struct ExecCommandResult {
-    exit_code: i32,
-    stdout: String,
-    stderr: String,
-    truncated: bool,
 }
 
 impl TunnelSession {
@@ -1483,18 +1459,10 @@ async fn run_connected_tunnel_session(
             for pending_agent_open in session_state.pending_agent_opens.values() {
                 pending_agent_open.task.abort();
             }
-            for pending_exec_open in session_state.pending_exec_opens.values() {
-                pending_exec_open
-                    .cancel_requested
-                    .store(true, Ordering::Relaxed);
-                let child_pid = pending_exec_open
-                    .child_pid
-                    .lock()
-                    .expect("exec child pid lock should not be poisoned")
-                    .to_owned();
-                if let Some(child_pid) = child_pid {
-                    let _ = kill_exec_child_process(child_pid);
-                }
+            for pending_exec_open in
+                std::mem::take(&mut session_state.pending_exec_opens).into_values()
+            {
+                cancel_pending_exec_open(pending_exec_open);
             }
             if let Ok(frames) = session_state.telemetry_relay.detach_tunnel_connection() {
                 let _ = send_telemetry_frames(&tunnel_writer_sender, frames);
@@ -2456,273 +2424,6 @@ fn spawn_agent_dial_task(
     })
 }
 
-fn spawn_exec_task(
-    message: crate::tunnel::protocol::ExecStreamOpen,
-    runtime_env: BTreeMap<String, String>,
-    cancel_requested: Arc<AtomicBool>,
-    child_pid: Arc<Mutex<Option<u32>>>,
-    event_sender: mpsc::UnboundedSender<TunnelSessionEvent>,
-) {
-    tokio::task::spawn_blocking(move || {
-        let result = run_exec_command(
-            &message,
-            &runtime_env,
-            &cancel_requested,
-            Arc::clone(&child_pid),
-        );
-        let _ = event_sender.send(TunnelSessionEvent::ExecCompleted {
-            stream_id: message.stream_id,
-            result: Box::new(result),
-        });
-    });
-}
-
-struct BoundedOutput {
-    text: String,
-    truncated: bool,
-}
-
-fn run_exec_command(
-    message: &crate::tunnel::protocol::ExecStreamOpen,
-    runtime_env: &BTreeMap<String, String>,
-    cancel_requested: &AtomicBool,
-    child_pid: Arc<Mutex<Option<u32>>>,
-) -> Result<ExecCommandResult, String> {
-    let max_output_bytes = message
-        .channel
-        .max_output_bytes
-        .unwrap_or(DEFAULT_EXEC_MAX_OUTPUT_BYTES);
-    let timeout_ms = message
-        .channel
-        .timeout_ms
-        .unwrap_or(DEFAULT_EXEC_TIMEOUT_MS);
-    let mut child_command = Command::new(&message.channel.command);
-    if let Some(args) = message.channel.args.as_ref() {
-        child_command.args(args);
-    }
-    child_command.stdin(if message.channel.stdin.is_some() {
-        Stdio::piped()
-    } else {
-        Stdio::null()
-    });
-    child_command.stdout(Stdio::piped());
-    child_command.stderr(Stdio::piped());
-    child_command.envs(runtime_env);
-    if let Some(cwd) = message.channel.cwd.as_deref() {
-        child_command.current_dir(cwd);
-    }
-
-    let mut child = child_command
-        .spawn()
-        .map_err(|error| format!("failed to spawn command: {error}"))?;
-    {
-        let mut stored_pid = child_pid
-            .lock()
-            .expect("exec child pid lock should not be poisoned");
-        *stored_pid = Some(child.id());
-    }
-    let foreground_process_exited = Arc::new(AtomicBool::new(false));
-    let stdin_thread = if let Some(stdin) = message.channel.stdin.clone() {
-        let child_stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| "command stdin pipe was not available".to_string())?;
-        let stdin_foreground_process_exited = Arc::clone(&foreground_process_exited);
-        Some(thread::spawn(move || {
-            write_exec_stdin(child_stdin, stdin, stdin_foreground_process_exited)
-        }))
-    } else {
-        None
-    };
-    if cancel_requested.load(Ordering::Relaxed) {
-        kill_exec_child_process(child.id())?;
-    }
-    let stdout_reader = child
-        .stdout
-        .take()
-        .ok_or_else(|| "command stdout pipe was not available".to_string())?;
-    let stderr_reader = child
-        .stderr
-        .take()
-        .ok_or_else(|| "command stderr pipe was not available".to_string())?;
-    let shared_budget = Arc::new(Mutex::new(max_output_bytes));
-    let stdout_budget = Arc::clone(&shared_budget);
-    let stderr_budget = Arc::clone(&shared_budget);
-    let stdout_thread = thread::spawn(move || read_bounded_output(stdout_reader, stdout_budget));
-    let stderr_thread = thread::spawn(move || read_bounded_output(stderr_reader, stderr_budget));
-    let status_result = wait_for_exec_child(&mut child, timeout_ms, cancel_requested);
-    foreground_process_exited.store(true, Ordering::Relaxed);
-    if let Some(stdin_thread) = stdin_thread {
-        stdin_thread
-            .join()
-            .map_err(|_| "command stdin writer panicked".to_string())??;
-    }
-    let status = status_result?;
-    let stdout = stdout_thread
-        .join()
-        .map_err(|_| "command stdout reader panicked".to_string())??;
-    let stderr = stderr_thread
-        .join()
-        .map_err(|_| "command stderr reader panicked".to_string())??;
-
-    Ok(ExecCommandResult {
-        exit_code: status.code().unwrap_or(-1),
-        stdout: stdout.text,
-        stderr: stderr.text,
-        truncated: stdout.truncated || stderr.truncated,
-    })
-}
-
-fn write_exec_stdin(
-    mut child_stdin: std::process::ChildStdin,
-    stdin: String,
-    foreground_process_exited: Arc<AtomicBool>,
-) -> Result<(), String> {
-    set_exec_stdin_nonblocking(&child_stdin)?;
-
-    let bytes = stdin.as_bytes();
-    let mut bytes_written = 0;
-    while bytes_written < bytes.len() {
-        match child_stdin.write(&bytes[bytes_written..]) {
-            Ok(0) if foreground_process_exited.load(Ordering::Relaxed) => return Ok(()),
-            Ok(0) => thread::sleep(std::time::Duration::from_millis(10)),
-            Ok(count) => bytes_written += count,
-            Err(error) if error.kind() == ErrorKind::BrokenPipe => return Ok(()),
-            Err(error) if error.kind() == ErrorKind::WouldBlock => {
-                if foreground_process_exited.load(Ordering::Relaxed) {
-                    return Ok(());
-                }
-                thread::sleep(std::time::Duration::from_millis(10));
-            }
-            Err(error) => return Err(format!("failed to write command stdin: {error}")),
-        }
-    }
-
-    Ok(())
-}
-
-fn set_exec_stdin_nonblocking(child_stdin: &std::process::ChildStdin) -> Result<(), String> {
-    let flags_bits = fcntl(child_stdin.as_fd(), FcntlArg::F_GETFL)
-        .map_err(|error| format!("failed to read command stdin flags: {error}"))?;
-    let flags = OFlag::from_bits_truncate(flags_bits);
-    fcntl(
-        child_stdin.as_fd(),
-        FcntlArg::F_SETFL(flags | OFlag::O_NONBLOCK),
-    )
-    .map_err(|error| format!("failed to set command stdin non-blocking: {error}"))?;
-    Ok(())
-}
-
-fn wait_for_exec_child(
-    child: &mut std::process::Child,
-    timeout_ms: u64,
-    cancel_requested: &AtomicBool,
-) -> Result<std::process::ExitStatus, String> {
-    let deadline = Instant::now() + std::time::Duration::from_millis(timeout_ms);
-    loop {
-        match child
-            .try_wait()
-            .map_err(|error| format!("failed to poll command: {error}"))?
-        {
-            Some(status) => return Ok(status),
-            None if cancel_requested.load(Ordering::Relaxed) => {
-                kill_exec_child_process(child.id())?;
-                let _ = child
-                    .wait()
-                    .map_err(|error| format!("failed to wait for cancelled command: {error}"))?;
-                return Err("command was cancelled".to_string());
-            }
-            None if Instant::now() >= deadline => {
-                kill_exec_child_process(child.id())?;
-                let _ = child
-                    .wait()
-                    .map_err(|error| format!("failed to wait for timed out command: {error}"))?;
-                return Err(format!("command timed out after {timeout_ms}ms"));
-            }
-            None => thread::sleep(std::time::Duration::from_millis(10)),
-        }
-    }
-}
-
-fn kill_exec_child_process(child_pid: u32) -> Result<(), String> {
-    match kill(Pid::from_raw(child_pid as i32), Signal::SIGKILL) {
-        Ok(()) | Err(Errno::ESRCH) => Ok(()),
-        Err(error) => Err(format!("failed to kill exec command: {error}")),
-    }
-}
-
-fn read_bounded_output<R>(
-    mut reader: R,
-    remaining_bytes: Arc<Mutex<usize>>,
-) -> Result<BoundedOutput, String>
-where
-    R: Read,
-{
-    let mut buffer = [0_u8; EXEC_OUTPUT_READ_BUFFER_BYTES];
-    let mut output = Vec::new();
-    let mut truncated = false;
-
-    loop {
-        let bytes_read = reader
-            .read(&mut buffer)
-            .map_err(|error| format!("failed to read command output: {error}"))?;
-        if bytes_read == 0 {
-            break;
-        }
-
-        let allowed_bytes = {
-            let mut remaining = remaining_bytes
-                .lock()
-                .expect("remaining exec output budget lock should not be poisoned");
-            let allowed = (*remaining).min(bytes_read);
-            *remaining -= allowed;
-            allowed
-        };
-
-        if allowed_bytes > 0 {
-            output.extend_from_slice(&buffer[..allowed_bytes]);
-        }
-        if allowed_bytes < bytes_read {
-            truncated = true;
-        }
-    }
-
-    decode_bounded_output(output, truncated)
-}
-
-fn decode_bounded_output(output: Vec<u8>, truncated: bool) -> Result<BoundedOutput, String> {
-    match String::from_utf8(output) {
-        Ok(text) => Ok(BoundedOutput { text, truncated }),
-        Err(error) if truncated => {
-            let valid_up_to = error.utf8_error().valid_up_to();
-            let bytes = error.into_bytes();
-            let text =
-                String::from_utf8(bytes[..valid_up_to].to_vec()).map_err(|decode_error| {
-                    format!("command output was not valid utf-8: {decode_error}")
-                })?;
-            Ok(BoundedOutput {
-                text,
-                truncated: true,
-            })
-        }
-        Err(error) => Err(format!("command output was not valid utf-8: {error}")),
-    }
-}
-
-fn cancel_pending_exec_open(pending_exec_open: PendingExecOpenState) {
-    pending_exec_open
-        .cancel_requested
-        .store(true, Ordering::Relaxed);
-    let child_pid = pending_exec_open
-        .child_pid
-        .lock()
-        .expect("exec child pid lock should not be poisoned")
-        .to_owned();
-    if let Some(child_pid) = child_pid {
-        let _ = kill_exec_child_process(child_pid);
-    }
-}
-
 fn sync_pty_scope_keepalive(
     keepalive_manager: &Mutex<KeepaliveManager>,
     cgroup_root: &Path,
@@ -3009,8 +2710,9 @@ async fn handle_tunnel_session_event(
                         handle_pty_session_control_message(
                             message,
                             tunnel_writer_sender,
-                            context,
-                            session_state,
+                            context.cgroup_root,
+                            &session_state.runtime_env,
+                            context.sandbox_instance_id,
                         )?;
                         return Ok(TunnelSessionControlFlow::Continue);
                     }
@@ -3389,20 +3091,14 @@ async fn handle_tunnel_control_message(
             )? {
                 return Ok(());
             }
-            let cancel_requested = Arc::new(AtomicBool::new(false));
-            let child_pid = Arc::new(Mutex::new(None));
-            session_state.pending_exec_opens.insert(
-                message.stream_id,
-                PendingExecOpenState {
-                    cancel_requested: Arc::clone(&cancel_requested),
-                    child_pid: Arc::clone(&child_pid),
-                },
-            );
+            let pending_exec_open = PendingExecOpenState::new();
+            session_state
+                .pending_exec_opens
+                .insert(message.stream_id, pending_exec_open.clone());
             spawn_exec_task(
                 message.clone(),
                 session_state.runtime_env.clone(),
-                cancel_requested,
-                child_pid,
+                &pending_exec_open,
                 event_sender.clone(),
             );
             write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
@@ -3846,271 +3542,6 @@ fn handle_tunnel_binary_frame(
     Ok(())
 }
 
-fn handle_pty_session_control_message(
-    message: PtySessionControlMessage,
-    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
-    context: &TunnelSessionLoopContext<'_>,
-    session_state: &TunnelSessionMutableState,
-) -> Result<(), TunnelSessionError> {
-    let PtySessionControlMessage::Open(message) = message else {
-        return Ok(());
-    };
-
-    let request = DirectPtyTransportRequest {
-        cgroup_root: context.cgroup_root.to_path_buf(),
-        runtime_env: session_state.runtime_env.clone(),
-        sandbox_instance_id: context.sandbox_instance_id.to_string(),
-        message,
-    };
-    let writer_sender = tunnel_writer_sender.clone();
-
-    thread::spawn(move || {
-        if let Err(error) = run_direct_pty_transport(request, writer_sender) {
-            eprintln!("sandboxd direct pty transport failed: {error}");
-        }
-    });
-
-    Ok(())
-}
-
-struct DirectPtyTransportRequest {
-    cgroup_root: PathBuf,
-    runtime_env: BTreeMap<String, String>,
-    sandbox_instance_id: String,
-    message: PtySessionOpen,
-}
-
-fn run_direct_pty_transport(
-    request: DirectPtyTransportRequest,
-    tunnel_writer_sender: mpsc::UnboundedSender<TunnelWriterMessage>,
-) -> Result<(), TunnelSessionError> {
-    let runtime = Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|error| TunnelSessionError::Pty(error.to_string()))?;
-
-    runtime.block_on(run_direct_pty_transport_async(
-        request,
-        tunnel_writer_sender,
-    ))
-}
-
-async fn run_direct_pty_transport_async(
-    request: DirectPtyTransportRequest,
-    tunnel_writer_sender: mpsc::UnboundedSender<TunnelWriterMessage>,
-) -> Result<(), TunnelSessionError> {
-    if request.message.launch.session != PtySessionLaunchMode::Create {
-        write_tunnel_text(
-            &tunnel_writer_sender,
-            pty_session_error(
-                &request.message.request_id,
-                &request.message.pty_session_id,
-                PTY_SESSION_ERROR_CODE_ATTACH_FAILED,
-                "direct PTY transport does not support attaching to an existing PTY session",
-            ),
-        )?;
-        return Ok(());
-    }
-
-    let session = match start_scoped_pty_session(
-        PtySpawnRequest {
-            cwd: request.message.launch.cwd.clone(),
-            cols: request.message.launch.cols,
-            rows: request.message.launch.rows,
-            command: request.message.launch.command.clone(),
-            args: request.message.launch.args.clone(),
-            env: request.runtime_env,
-        },
-        &request.cgroup_root,
-        &request.sandbox_instance_id,
-        &crate::time::SystemClock,
-        &crate::time::ThreadSleeper,
-    ) {
-        Ok(session) => session,
-        Err(error) => {
-            write_tunnel_text(
-                &tunnel_writer_sender,
-                pty_session_error(
-                    &request.message.request_id,
-                    &request.message.pty_session_id,
-                    PTY_SESSION_ERROR_CODE_CREATE_FAILED,
-                    error.to_string(),
-                ),
-            )?;
-            return Ok(());
-        }
-    };
-
-    let (socket, _) = match connect_async(request.message.transport_url.as_str())
-        .await
-        .map_err(|error| TunnelSessionError::Pty(error.to_string()))
-    {
-        Ok(result) => result,
-        Err(error) => {
-            let _ = session.terminate(
-                &crate::time::SystemClock,
-                &crate::time::ThreadSleeper,
-                DEFAULT_PTY_TERMINATE_POLL_INTERVAL,
-                DEFAULT_PTY_TERMINATE_TIMEOUT_MS,
-            );
-            write_tunnel_text(
-                &tunnel_writer_sender,
-                pty_session_error(
-                    &request.message.request_id,
-                    &request.message.pty_session_id,
-                    PTY_SESSION_ERROR_CODE_ATTACH_FAILED,
-                    error.to_string(),
-                ),
-            )?;
-            return Ok(());
-        }
-    };
-
-    write_tunnel_text(
-        &tunnel_writer_sender,
-        pty_session_opened(&request.message.request_id, &request.message.pty_session_id),
-    )?;
-
-    let (mut socket_writer, mut socket_reader) = socket.split();
-    let mut poll_interval = tokio::time::interval(DEFAULT_PTY_EVENT_POLL_INTERVAL);
-
-    loop {
-        tokio::select! {
-            maybe_message = socket_reader.next() => {
-                match maybe_message {
-                    Some(Ok(Message::Binary(payload))) => {
-                        session
-                            .write(payload.as_ref())
-                            .map_err(|error| TunnelSessionError::Pty(error.to_string()))?;
-                    }
-                    Some(Ok(Message::Text(payload))) => {
-                        match parse_pty_control_message(payload.as_ref()) {
-                            Ok(PtyControlMessage::Signal(message)) => {
-                                session
-                                    .resize(message.signal.cols, message.signal.rows)
-                                    .map_err(|error| TunnelSessionError::Pty(error.to_string()))?;
-                            }
-                            Ok(PtyControlMessage::Close(_)) => {
-                                let exit_code = session
-                                    .terminate(
-                                        &crate::time::SystemClock,
-                                        &crate::time::ThreadSleeper,
-                                        DEFAULT_PTY_TERMINATE_POLL_INTERVAL,
-                                        DEFAULT_PTY_TERMINATE_TIMEOUT_MS,
-                                    )
-                                    .or_else(|_| {
-                                        session.exit_code().ok_or_else(|| {
-                                            TunnelSessionError::Pty(
-                                                "PTY session did not report an exit code after close"
-                                                    .to_string(),
-                                            )
-                                        })
-                                    })?;
-                                socket_writer
-                                    .send(Message::Text(
-                                        pty_exit_event(DIRECT_PTY_STREAM_ID, exit_code).into(),
-                                    ))
-                                    .await
-                                    .map_err(|error| TunnelSessionError::Pty(error.to_string()))?;
-                                return Ok(());
-                            }
-                            Ok(PtyControlMessage::Window(_)) => {}
-                            Err(error) => {
-                                socket_writer
-                                    .send(Message::Text(
-                                        stream_reset(
-                                            DIRECT_PTY_STREAM_ID,
-                                            STREAM_RESET_CODE_INVALID_STREAM_SIGNAL,
-                                            error.to_string(),
-                                        )
-                                        .into(),
-                                    ))
-                                    .await
-                                    .map_err(|error| TunnelSessionError::Pty(error.to_string()))?;
-                            }
-                        }
-                    }
-                    Some(Ok(Message::Ping(payload))) => {
-                        socket_writer
-                            .send(Message::Pong(payload))
-                            .await
-                            .map_err(|error| TunnelSessionError::Pty(error.to_string()))?;
-                    }
-                    Some(Ok(Message::Close(_))) | None => {
-                        let _ = session.terminate(
-                            &crate::time::SystemClock,
-                            &crate::time::ThreadSleeper,
-                            DEFAULT_PTY_TERMINATE_POLL_INTERVAL,
-                            DEFAULT_PTY_TERMINATE_TIMEOUT_MS,
-                        );
-                        return Ok(());
-                    }
-                    Some(Ok(Message::Pong(_))) => {}
-                    Some(Ok(_)) => {}
-                    Some(Err(error)) => {
-                        let _ = session.terminate(
-                            &crate::time::SystemClock,
-                            &crate::time::ThreadSleeper,
-                            DEFAULT_PTY_TERMINATE_POLL_INTERVAL,
-                            DEFAULT_PTY_TERMINATE_TIMEOUT_MS,
-                        );
-                        return Err(TunnelSessionError::Pty(error.to_string()));
-                    }
-                }
-            }
-            _ = poll_interval.tick() => {
-                while let Some(event) = session
-                    .next_event_timeout(Duration::from_millis(0))
-                    .map_err(|error| TunnelSessionError::Pty(error.to_string()))?
-                {
-                    match event {
-                        PtyEvent::Output(chunk) => {
-                            socket_writer
-                                .send(Message::Binary(chunk.into()))
-                                .await
-                                .map_err(|error| TunnelSessionError::Pty(error.to_string()))?;
-                        }
-                        PtyEvent::Exit(exit_code) => {
-                            socket_writer
-                                .send(Message::Text(
-                                    pty_exit_event(DIRECT_PTY_STREAM_ID, exit_code).into(),
-                                ))
-                                .await
-                                .map_err(|error| TunnelSessionError::Pty(error.to_string()))?;
-                            return Ok(());
-                        }
-                        PtyEvent::Closed => {
-                            if let Some(exit_code) = session.exit_code() {
-                                socket_writer
-                                    .send(Message::Text(
-                                        pty_exit_event(DIRECT_PTY_STREAM_ID, exit_code).into(),
-                                    ))
-                                    .await
-                                    .map_err(|error| TunnelSessionError::Pty(error.to_string()))?;
-                                return Ok(());
-                            }
-                        }
-                        PtyEvent::Error(message) => {
-                            socket_writer
-                                .send(Message::Text(
-                                    stream_reset(
-                                        DIRECT_PTY_STREAM_ID,
-                                        STREAM_RESET_CODE_TARGET_CLOSED,
-                                        message,
-                                    )
-                                    .into(),
-                                ))
-                                .await
-                                .map_err(|error| TunnelSessionError::Pty(error.to_string()))?;
-                            return Ok(());
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 pub(crate) fn derive_sandbox_instance_id(
     gateway_ws_url: &str,
 ) -> Result<String, TunnelSessionError> {
@@ -4312,7 +3743,6 @@ mod tests {
     };
     use crate::tunnel::session::{
         GatewayEgressTokenProvider, TunnelSession, TunnelSigningRequest, TunnelSigningResponse,
-        decode_bounded_output,
     };
     use crate::tunnel::telemetry::{
         SANDBOX_TELEMETRY_LOG_STREAM_ID, TelemetryRelay, decode_telemetry_data_frame,
@@ -5855,18 +5285,6 @@ mod tests {
             !temp_path.exists(),
             "oversized upload payloads should remove the partial file",
         );
-    }
-
-    #[test]
-    fn trims_truncated_exec_output_to_a_valid_utf8_boundary() {
-        let mut truncated_output = b"prefix ".to_vec();
-        truncated_output.extend_from_slice(&"€".as_bytes()[..2]);
-
-        let decoded = decode_bounded_output(truncated_output, true)
-            .expect("truncated output should decode to the last valid utf-8 boundary");
-
-        assert_eq!(decoded.text, "prefix ");
-        assert!(decoded.truncated);
     }
 
     #[test]
