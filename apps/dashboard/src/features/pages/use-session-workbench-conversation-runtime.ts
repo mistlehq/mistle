@@ -284,7 +284,6 @@ export function useSessionWorkbenchConversationRuntime(input: {
     : input.isOpenCodeRuntime
       ? openCodeRuntime
       : codexRuntime;
-  const activeConversationId = activeRuntime.conversation.activeConversationId;
   const attachmentTargetId = activeRuntime.conversation.attachmentTargetId;
   const attachmentControl = useSessionComposerAttachmentControl({
     attachmentTarget:
