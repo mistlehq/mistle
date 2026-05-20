@@ -474,10 +474,10 @@ async function connectOpenCodeSessionForTest(input: {
   if (input.initialCwd !== undefined) {
     const sandboxSessionsRequest = await input.server.nextRequest();
     expectOpenCodeSandboxSessionsRequest(sandboxSessionsRequest);
-    input.server.sendJsonResponse({
-      request: sandboxSessionsRequest,
-      body: input.sandboxSessionListBody ?? [],
-    });
+  input.server.sendJsonResponse({
+    request: sandboxSessionsRequest,
+    body: input.sandboxSessionListBody ?? [],
+  });
   }
 
   const getSessionRequest = await input.server.nextRequest();
