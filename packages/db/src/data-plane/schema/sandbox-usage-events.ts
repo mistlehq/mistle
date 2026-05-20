@@ -24,8 +24,6 @@ export const SandboxUsageEventTypes = {
   SANDBOX_STOPPED: "sandbox_stopped",
   SANDBOX_FAILED: "sandbox_failed",
   SANDBOX_REPLACED: "sandbox_replaced",
-  STORAGE_PROVISIONED: "storage_provisioned",
-  STORAGE_DEPROVISIONED: "storage_deprovisioned",
 } as const;
 
 export type SandboxUsageEventType =
