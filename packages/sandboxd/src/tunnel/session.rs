@@ -7902,6 +7902,7 @@ mod tests {
         let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
         let (operation_open_sender, operation_open_receiver) = mpsc::channel::<()>();
         let (operation_record_sender, operation_record_receiver) = mpsc::channel::<()>();
+        let (close_flush_sender, close_flush_receiver) = mpsc::channel::<()>();
         let gateway_thread = thread::spawn(move || {
             let (stream, _) = bootstrap_listener
                 .accept()
@@ -7962,6 +7963,9 @@ mod tests {
             gateway_done_sender
                 .send(())
                 .expect("gateway should signal the operation stream was closed");
+            close_flush_receiver
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .expect("test should wait for operation close flush before closing websocket");
             websocket
                 .close(None)
                 .expect("gateway websocket should close cleanly");
@@ -8035,10 +8039,13 @@ mod tests {
         gateway_done_receiver
             .recv()
             .expect("gateway should observe the operation stream close");
-        close_response_receiver
+        let close_response = close_response_receiver
             .recv()
-            .expect("operation close response should be sent")
-            .expect("operation close should flush");
+            .expect("operation close response should be sent");
+        close_flush_sender
+            .send(())
+            .expect("test should release gateway websocket close");
+        close_response.expect("operation close should flush");
         tunnel_session.close();
         gateway_thread
             .join()
@@ -8059,6 +8066,7 @@ mod tests {
         let (operation_open_sender, operation_open_receiver) = mpsc::channel::<()>();
         let (ack_operation_open_sender, ack_operation_open_receiver) = mpsc::channel::<()>();
         let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
+        let (close_flush_sender, close_flush_receiver) = mpsc::channel::<()>();
         let gateway_thread = thread::spawn(move || {
             let (stream, _) = bootstrap_listener
                 .accept()
@@ -8107,6 +8115,9 @@ mod tests {
             gateway_done_sender
                 .send(())
                 .expect("gateway should signal operation stream close");
+            close_flush_receiver
+                .recv_timeout(std::time::Duration::from_secs(5))
+                .expect("test should wait for operation close flush before closing websocket");
             websocket
                 .close(None)
                 .expect("gateway websocket should close cleanly");
@@ -8180,10 +8191,13 @@ mod tests {
         gateway_done_receiver
             .recv()
             .expect("gateway should observe record before close");
-        close_response_receiver
+        let close_response = close_response_receiver
             .recv()
-            .expect("operation close response should be sent")
-            .expect("operation close should flush");
+            .expect("operation close response should be sent");
+        close_flush_sender
+            .send(())
+            .expect("test should release gateway websocket close");
+        close_response.expect("operation close should flush");
         tunnel_session.close();
         gateway_thread
             .join()
