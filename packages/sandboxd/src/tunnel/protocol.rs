@@ -38,6 +38,9 @@ pub const CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED: &str = "agent_endpoint_
 pub const CONNECT_ERROR_CODE_EXEC_COMMAND_START_FAILED: &str = "exec_command_start_failed";
 /// `stream.open.error` code for processes streams that cannot be serviced.
 pub const CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE: &str = "processes_stream_unavailable";
+/// `stream.open.error` code for file-search streams that cannot be serviced.
+pub const CONNECT_ERROR_CODE_FILE_SEARCH_STREAM_UNAVAILABLE: &str =
+    "file_search_stream_unavailable";
 
 /// `stream.reset` code for invalid `stream.signal` messages.
 pub const STREAM_RESET_CODE_INVALID_STREAM_SIGNAL: &str = "invalid_stream_signal";
@@ -131,6 +134,14 @@ pub struct ExecStreamChannel {
     pub max_output_bytes: Option<usize>,
 }
 
+/// File-search channel payload accepted by `stream.open`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileSearchStreamChannel {
+    pub kind: String,
+    pub cwd: String,
+}
+
 /// Agent `stream.open` message accepted by the relay.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -169,6 +180,16 @@ pub struct ExecStreamOpen {
     pub message_type: String,
     pub stream_id: u32,
     pub channel: ExecStreamChannel,
+}
+
+/// File-search `stream.open` message accepted by the relay.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileSearchStreamOpen {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub stream_id: u32,
+    pub channel: FileSearchStreamChannel,
 }
 
 /// PTY resize payload carried in `stream.signal`.
@@ -217,6 +238,7 @@ pub enum StreamControlMessage {
     OpenProcesses(ProcessesStreamOpen),
     OpenFileUpload(FileUploadStreamOpen),
     OpenExec(ExecStreamOpen),
+    OpenFileSearch(FileSearchStreamOpen),
     Signal(PtyStreamSignal),
     Close(StreamClose),
     Window(StreamWindow),
@@ -262,6 +284,76 @@ pub struct ProcessesSnapshot {
 pub enum ProcessesStreamMessage {
     Refresh(ProcessesRefresh),
     Snapshot(ProcessesSnapshot),
+}
+
+/// Inbound query request accepted on a `fileSearch` stream.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileSearchQuery {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub request_id: String,
+    pub query: String,
+    pub limit: Option<usize>,
+}
+
+/// Kind of one `fileSearch.results` item.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FileSearchResultKind {
+    #[serde(rename = "file")]
+    File,
+    #[serde(rename = "directory")]
+    Directory,
+}
+
+/// One `fileSearch.results` item.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileSearchResultItem {
+    pub path: String,
+    pub kind: FileSearchResultKind,
+}
+
+/// Outbound search results sent on a `fileSearch` stream.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileSearchResults {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub request_id: String,
+    pub query: String,
+    pub items: Vec<FileSearchResultItem>,
+}
+
+/// File-search error sent on a `fileSearch` stream.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileSearchError {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub request_id: String,
+    pub code: String,
+    pub message: String,
+}
+
+/// File selection notification accepted on a `fileSearch` stream.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileSearchSelect {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub query: String,
+    pub path: String,
+}
+
+/// Application messages carried over a `fileSearch` stream's text data frames.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FileSearchStreamMessage {
+    Query(FileSearchQuery),
+    Results(FileSearchResults),
+    Error(FileSearchError),
+    Select(FileSearchSelect),
 }
 
 /// Exact port target carried by `ports.*` control and transport messages.
@@ -903,6 +995,12 @@ pub fn parse_stream_control_message(
                     validate_exec_stream_open(&message)?;
                     Ok(StreamControlMessage::OpenExec(message))
                 }
+                "fileSearch" => {
+                    let message: FileSearchStreamOpen = serde_json::from_value(parsed_payload)
+                        .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+                    validate_file_search_stream_open(&message)?;
+                    Ok(StreamControlMessage::OpenFileSearch(message))
+                }
                 _ => Err(TunnelProtocolError::new(format!(
                     "stream.open request channel.kind '{channel_kind}' is not supported"
                 ))),
@@ -941,7 +1039,8 @@ pub fn parse_pty_control_message(payload: &str) -> Result<PtyControlMessage, Tun
         StreamControlMessage::OpenAgent(_)
         | StreamControlMessage::OpenProcesses(_)
         | StreamControlMessage::OpenFileUpload(_)
-        | StreamControlMessage::OpenExec(_) => Err(TunnelProtocolError::new(
+        | StreamControlMessage::OpenExec(_)
+        | StreamControlMessage::OpenFileSearch(_) => Err(TunnelProtocolError::new(
             "expected PTY control message, got a different channel kind",
         )),
     }
@@ -974,6 +1073,51 @@ pub fn parse_processes_stream_message(
         }
         _ => Err(TunnelProtocolError::new(format!(
             "unsupported processes stream message type '{message_type}'"
+        ))),
+    }
+}
+
+/// Parses one inbound `fileSearch` stream text payload.
+pub fn parse_file_search_stream_message(
+    payload: &str,
+) -> Result<FileSearchStreamMessage, TunnelProtocolError> {
+    let parsed_payload: serde_json::Value = serde_json::from_str(payload).map_err(|error| {
+        TunnelProtocolError::new(format!(
+            "fileSearch stream message must be valid json: {error}"
+        ))
+    })?;
+    let message_type = parsed_payload
+        .get("type")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| TunnelProtocolError::new("fileSearch stream message type is required"))?;
+
+    match message_type {
+        "fileSearch.query" => {
+            let message: FileSearchQuery = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_file_search_query(&message)?;
+            Ok(FileSearchStreamMessage::Query(message))
+        }
+        "fileSearch.results" => {
+            let message: FileSearchResults = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_file_search_results(&message)?;
+            Ok(FileSearchStreamMessage::Results(message))
+        }
+        "fileSearch.error" => {
+            let message: FileSearchError = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_file_search_error(&message)?;
+            Ok(FileSearchStreamMessage::Error(message))
+        }
+        "fileSearch.select" => {
+            let message: FileSearchSelect = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_file_search_select(&message)?;
+            Ok(FileSearchStreamMessage::Select(message))
+        }
+        _ => Err(TunnelProtocolError::new(format!(
+            "unsupported fileSearch stream message type '{message_type}'"
         ))),
     }
 }
@@ -1596,6 +1740,109 @@ fn validate_exec_stream_open(message: &ExecStreamOpen) -> Result<(), TunnelProto
     if matches!(message.channel.max_output_bytes, Some(0)) {
         return Err(TunnelProtocolError::new(
             "exec stream.open request maxOutputBytes must be a positive integer",
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_file_search_stream_open(
+    message: &FileSearchStreamOpen,
+) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "stream.open" {
+        return Err(TunnelProtocolError::new(
+            "file search stream.open request type must be 'stream.open'",
+        ));
+    }
+    validate_stream_id(message.stream_id)?;
+    if message.channel.kind != "fileSearch" {
+        return Err(TunnelProtocolError::new(
+            "file search stream.open request channel.kind must be 'fileSearch'",
+        ));
+    }
+    if message.channel.cwd.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "file search stream.open request channel.cwd is required",
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_file_search_query(message: &FileSearchQuery) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "fileSearch.query" {
+        return Err(TunnelProtocolError::new(
+            "fileSearch.query type must be 'fileSearch.query'",
+        ));
+    }
+    if message.request_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "fileSearch.query requestId is required",
+        ));
+    }
+    if matches!(message.limit, Some(0)) {
+        return Err(TunnelProtocolError::new(
+            "fileSearch.query limit must be a positive integer",
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_file_search_results(message: &FileSearchResults) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "fileSearch.results" {
+        return Err(TunnelProtocolError::new(
+            "fileSearch.results type must be 'fileSearch.results'",
+        ));
+    }
+    if message.request_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "fileSearch.results requestId is required",
+        ));
+    }
+    if message.items.iter().any(|item| item.path.trim().is_empty()) {
+        return Err(TunnelProtocolError::new(
+            "fileSearch.results items must contain only non-empty paths",
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_file_search_error(message: &FileSearchError) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "fileSearch.error" {
+        return Err(TunnelProtocolError::new(
+            "fileSearch.error type must be 'fileSearch.error'",
+        ));
+    }
+    if message.request_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "fileSearch.error requestId is required",
+        ));
+    }
+    if message.code.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "fileSearch.error code is required",
+        ));
+    }
+    if message.message.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "fileSearch.error message is required",
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_file_search_select(message: &FileSearchSelect) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "fileSearch.select" {
+        return Err(TunnelProtocolError::new(
+            "fileSearch.select type must be 'fileSearch.select'",
+        ));
+    }
+    if message.path.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "fileSearch.select path is required",
         ));
     }
 
@@ -2261,12 +2508,13 @@ fn validate_pty_session_error(message: &PtySessionError) -> Result<(), TunnelPro
 mod tests {
     use crate::tunnel::protocol::{
         BootstrapTelemetryControlMessage, EgressTokenControlMessage, EgressTokenRequest,
-        FileUploadCompletedEventInput, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT,
-        ProcessesStreamMessage, PtyControlMessage, PtySessionControlMessage, SigningControlMessage,
-        SigningRequest, StreamControlMessage, StreamSendWindow, decode_stream_data_frame,
-        egress_token_request, encode_stream_data_frame, exec_result_event,
-        file_upload_completed_event, parse_bootstrap_telemetry_control_message,
-        parse_egress_token_control_message, parse_ports_control_message,
+        FileSearchResultKind, FileSearchStreamMessage, FileUploadCompletedEventInput,
+        PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT, ProcessesStreamMessage,
+        PtyControlMessage, PtySessionControlMessage, SigningControlMessage, SigningRequest,
+        StreamControlMessage, StreamSendWindow, decode_stream_data_frame, egress_token_request,
+        encode_stream_data_frame, exec_result_event, file_upload_completed_event,
+        parse_bootstrap_telemetry_control_message, parse_egress_token_control_message,
+        parse_file_search_stream_message, parse_ports_control_message,
         parse_ports_transport_message, parse_processes_stream_message, parse_pty_control_message,
         parse_pty_session_control_message, parse_signing_control_message,
         parse_stream_control_message, ports_target_authorize_failure_result,
@@ -2300,6 +2548,15 @@ mod tests {
         )
         .expect("exec stream.open should parse");
         assert!(matches!(exec, StreamControlMessage::OpenExec(_)));
+
+        let file_search = parse_stream_control_message(
+            r#"{"type":"stream.open","streamId":31,"channel":{"kind":"fileSearch","cwd":"/workspace/repo"}}"#,
+        )
+        .expect("file search stream.open should parse");
+        assert!(matches!(
+            file_search,
+            StreamControlMessage::OpenFileSearch(_)
+        ));
     }
 
     #[test]
@@ -2334,6 +2591,16 @@ mod tests {
         };
         assert_eq!(snapshot.processes[0].pid, 7);
         assert_eq!(snapshot.processes[0].listeners[0].port, 5173);
+
+        let file_search_query = parse_file_search_stream_message(
+            r#"{"type":"fileSearch.query","requestId":"file_search_req_123","query":"protocol","limit":20,"ignored":true}"#,
+        )
+        .expect("fileSearch.query should parse with unknown fields");
+        let FileSearchStreamMessage::Query(query) = file_search_query else {
+            panic!("expected fileSearch query");
+        };
+        assert_eq!(query.request_id, "file_search_req_123");
+        assert_eq!(query.limit, Some(20));
 
         let ports_open = parse_ports_transport_message(
             r#"{"type":"ports.http.open","streamId":41,"ignored":true,"target":{"kind":"port","port":5173,"ignored":true},"upstreamProtocol":"https","request":{"method":"GET","path":"/src/main.ts","query":"import=1","headers":{"accept":["text/plain"]},"ignored":true}}"#,
@@ -2374,6 +2641,86 @@ mod tests {
         )
         .expect("processes.snapshot should parse");
         assert!(matches!(snapshot, ProcessesStreamMessage::Snapshot(_)));
+    }
+
+    #[test]
+    fn parses_valid_file_search_stream_messages() {
+        let query = parse_file_search_stream_message(
+            r#"{"type":"fileSearch.query","requestId":"file_search_req_123","query":"src tunnel","limit":20}"#,
+        )
+        .expect("fileSearch.query should parse");
+        let FileSearchStreamMessage::Query(query) = query else {
+            panic!("expected fileSearch query");
+        };
+        assert_eq!(query.request_id, "file_search_req_123");
+        assert_eq!(query.query, "src tunnel");
+        assert_eq!(query.limit, Some(20));
+
+        let empty_query = parse_file_search_stream_message(
+            r#"{"type":"fileSearch.query","requestId":"file_search_req_123","query":""}"#,
+        )
+        .expect("empty fileSearch.query should parse");
+        let FileSearchStreamMessage::Query(empty_query) = empty_query else {
+            panic!("expected fileSearch query");
+        };
+        assert_eq!(empty_query.query, "");
+        assert_eq!(empty_query.limit, None);
+
+        let results = parse_file_search_stream_message(
+            r#"{"type":"fileSearch.results","requestId":"file_search_req_123","query":"protocol","items":[{"path":"packages/sandbox-session-protocol/src/stream-protocol.ts","kind":"file"},{"path":"packages/sandboxd/src/tunnel","kind":"directory"}]}"#,
+        )
+        .expect("fileSearch.results should parse");
+        let FileSearchStreamMessage::Results(results) = results else {
+            panic!("expected fileSearch results");
+        };
+        assert_eq!(results.items.len(), 2);
+        assert_eq!(results.items[0].kind, FileSearchResultKind::File);
+        assert_eq!(results.items[1].kind, FileSearchResultKind::Directory);
+
+        let error = parse_file_search_stream_message(
+            r#"{"type":"fileSearch.error","requestId":"file_search_req_123","code":"search_failed","message":"file search failed"}"#,
+        )
+        .expect("fileSearch.error should parse");
+        assert!(matches!(error, FileSearchStreamMessage::Error(_)));
+
+        let select = parse_file_search_stream_message(
+            r#"{"type":"fileSearch.select","query":"protocol","path":"packages/sandbox-session-protocol/src/stream-protocol.ts"}"#,
+        )
+        .expect("fileSearch.select should parse");
+        assert!(matches!(select, FileSearchStreamMessage::Select(_)));
+    }
+
+    #[test]
+    fn rejects_invalid_file_search_stream_messages() {
+        let invalid_limit = parse_file_search_stream_message(
+            r#"{"type":"fileSearch.query","requestId":"file_search_req_123","query":"protocol","limit":0}"#,
+        );
+        assert!(
+            invalid_limit
+                .expect_err("zero fileSearch.query limit should fail validation")
+                .to_string()
+                .contains("fileSearch.query limit must be a positive integer")
+        );
+
+        let invalid_result_kind = parse_file_search_stream_message(
+            r#"{"type":"fileSearch.results","requestId":"file_search_req_123","query":"protocol","items":[{"path":"packages/sandbox-session-protocol/src/stream-protocol.ts","kind":"symlink"}]}"#,
+        );
+        assert!(
+            invalid_result_kind
+                .expect_err("invalid fileSearch.results item kind should fail parsing")
+                .to_string()
+                .contains("unknown variant")
+        );
+
+        let invalid_open = parse_stream_control_message(
+            r#"{"type":"stream.open","streamId":31,"channel":{"kind":"fileSearch","cwd":""}}"#,
+        );
+        assert!(
+            invalid_open
+                .expect_err("empty fileSearch cwd should fail validation")
+                .to_string()
+                .contains("file search stream.open request channel.cwd is required")
+        );
     }
 
     #[test]

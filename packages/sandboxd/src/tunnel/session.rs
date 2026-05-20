@@ -66,6 +66,7 @@ use crate::tunnel::port_access_transport::{
 };
 use crate::tunnel::protocol::{
     AGENT_STREAM_WINDOW_BYTES, CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
+    CONNECT_ERROR_CODE_FILE_SEARCH_STREAM_UNAVAILABLE,
     CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE, EgressTokenControlMessage, EgressTokenRequest,
     FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH,
     FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE, FileUploadCompletedEventInput,
@@ -4732,6 +4733,16 @@ async fn handle_tunnel_control_message(
                 event_sender.clone(),
             );
             write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
+        }
+        StreamControlMessage::OpenFileSearch(message) => {
+            write_tunnel_text(
+                tunnel_writer_sender,
+                stream_open_error(
+                    message.stream_id,
+                    CONNECT_ERROR_CODE_FILE_SEARCH_STREAM_UNAVAILABLE,
+                    "file search streams are not implemented yet",
+                ),
+            )?;
         }
         StreamControlMessage::Signal(message) => {
             write_tunnel_text(
