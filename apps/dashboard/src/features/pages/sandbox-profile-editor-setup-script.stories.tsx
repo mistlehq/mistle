@@ -40,6 +40,33 @@ export const SetupAssistantEntry: Story = {
   },
 };
 
+export const SetupAssistantUnsavedChangesChoice: Story = {
+  args: {
+    initialBindings: [StoryBindings[0], StoryBindings[1]],
+    setupScript: "pnpm install\npnpm dev:bootstrap",
+    setupScriptDraft: "pnpm install\npnpm test\npnpm dev:bootstrap",
+    setupAssistantStartDialogState: "choice",
+  },
+};
+
+export const SetupAssistantSaveRequired: Story = {
+  args: {
+    initialBindings: [StoryBindings[1]],
+    setupScript: "pnpm install\npnpm dev:bootstrap",
+    setupScriptDraft: "pnpm install\npnpm test\npnpm dev:bootstrap",
+    setupAssistantStartDialogState: "save-required",
+  },
+};
+
+export const SetupAssistantUseSavedDraftRequired: Story = {
+  args: {
+    initialBindings: [StoryBindings[0], StoryBindings[1]],
+    setupScript: "pnpm install\npnpm dev:bootstrap",
+    setupScriptDraft: "pnpm install\npnpm test\npnpm dev:bootstrap",
+    setupAssistantStartDialogState: "use-saved-required",
+  },
+};
+
 export const SetupAssistantStarting: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],

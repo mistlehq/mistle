@@ -222,7 +222,11 @@ type SetupScriptAssistantControl = {
   disabled: boolean;
   errorMessage: string | null;
   isStarting: boolean;
-  onToggle: (input: { script: string; scriptKind: SetupAssistantScriptKind }) => void;
+  onToggle: (input: {
+    savedScript: string | null;
+    script: string;
+    scriptKind: SetupAssistantScriptKind;
+  }) => void;
   title: string;
 };
 type SetupScriptAssistantPanelState = {
@@ -240,6 +244,14 @@ type SetupAssistantStartupOperation = {
 type SetupAssistantCloseDialogState = {
   sandboxInstanceId: string;
   errorMessage: string | null;
+} | null;
+type SetupAssistantStartDialogVariant = "choice" | "save-required" | "use-saved-required";
+type SetupAssistantStartDialogState = {
+  script: string;
+  savedScript: string | null;
+  scriptKind: SetupAssistantScriptKind;
+  version: number;
+  variant: SetupAssistantStartDialogVariant;
 } | null;
 
 function createIdleSandboxProfileDraftSectionState(): SandboxProfileDraftSectionState {
@@ -296,6 +308,17 @@ function hasSetupAssistantAgentBinding(
   }
 
   return integrationRows.some((row) => row.kind === "agent");
+}
+
+export function resolveSetupAssistantStartDialogVariant(input: {
+  latestSavedDraftHasAgentRuntime: boolean;
+  localDraftHasAgentRuntime: boolean;
+}): SetupAssistantStartDialogVariant {
+  if (!input.latestSavedDraftHasAgentRuntime) {
+    return "save-required";
+  }
+
+  return input.localDraftHasAgentRuntime ? "choice" : "use-saved-required";
 }
 
 const SetupScriptPlaceholder = `#!/usr/bin/env bash
@@ -1330,6 +1353,8 @@ function ReadySandboxProfileEditorPage(input: {
     useState<SetupScriptAssistantPanelState | null>(null);
   const [setupAssistantCloseDialogState, setSetupAssistantCloseDialogState] =
     useState<SetupAssistantCloseDialogState>(null);
+  const [setupAssistantStartDialogState, setSetupAssistantStartDialogState] =
+    useState<SetupAssistantStartDialogState>(null);
   const activeSectionId = input.routeSectionId;
   const draftFieldsAreReadOnly =
     input.mode.kind !== "draft" || publishRequestIsPending || saveDraftRequestIsPending;
@@ -1343,8 +1368,15 @@ function ReadySandboxProfileEditorPage(input: {
     integrationsLoader.initialRows,
     integrationDraftState.integrationRows,
   );
-  const setupAssistantHasAgentRuntime =
+  const setupAssistantLatestSavedDraftHasAgentRuntime =
+    input.mode.kind === "draft" && hasSetupAssistantAgentBinding(integrationsLoader.initialRows);
+  const setupAssistantLocalDraftHasAgentRuntime =
     input.mode.kind === "draft" && hasSetupAssistantAgentBinding(setupAssistantIntegrationRows);
+  const setupAssistantHasVersionDraftChanges =
+    integrationDraftState.hasUnpersistedChanges ||
+    setupScriptDraftState.hasUnpersistedChanges ||
+    persistenceDraftState.hasUnpersistedChanges ||
+    runtimeDraftState.hasUnpersistedChanges;
   const metaState = useEditSandboxProfileMetaState({
     profileId: input.profileId,
     loadedProfile: input.profile,
@@ -1461,12 +1493,82 @@ function ReadySandboxProfileEditorPage(input: {
     stopSetupAssistantMutation.mutate(setupAssistantCloseDialogState.sandboxInstanceId);
   }
 
+  function startSetupAssistantWithScript(inputValue: {
+    script: string;
+    scriptKind: SetupAssistantScriptKind;
+    version: number;
+  }): void {
+    if (setupAssistantPanelState?.isOpen === true) {
+      return;
+    }
+
+    setSetupAssistantError(null);
+    const initialComposerText = buildSetupAssistantInitialComposerText(
+      inputValue.script,
+      inputValue.scriptKind,
+    );
+
+    setSetupAssistantPanelState((currentState) => ({
+      initialComposerText,
+      isOpen: true,
+      sandboxInstanceId: currentState?.sandboxInstanceId ?? null,
+      scriptKind: inputValue.scriptKind,
+      startupOperationId: currentState?.startupOperationId ?? null,
+    }));
+
+    if (
+      (setupAssistantPanelState !== null && setupAssistantPanelState.sandboxInstanceId !== null) ||
+      startSetupAssistantMutation.isPending
+    ) {
+      return;
+    }
+
+    startSetupAssistantMutation.mutate({
+      scriptKind: inputValue.scriptKind,
+      version: inputValue.version,
+    });
+  }
+
+  async function saveDraftAndStartSetupAssistant(
+    dialogState: Exclude<SetupAssistantStartDialogState, null>,
+  ): Promise<void> {
+    setSaveDraftRequestIsPending(true);
+    setDraftTriggerImpactAffectedTriggers(null);
+    setDraftTriggerImpactError(null);
+    try {
+      const draftSaved = await saveDraftChanges();
+      if (!draftSaved) {
+        return;
+      }
+
+      setSetupAssistantStartDialogState(null);
+      startSetupAssistantWithScript({
+        script: dialogState.script,
+        scriptKind: dialogState.scriptKind,
+        version: dialogState.version,
+      });
+    } finally {
+      setSaveDraftRequestIsPending(false);
+    }
+  }
+
+  function handleUseLatestSavedDraftSetupAssistant(
+    dialogState: Exclude<SetupAssistantStartDialogState, null>,
+  ): void {
+    setSetupAssistantStartDialogState(null);
+    startSetupAssistantWithScript({
+      script: dialogState.savedScript ?? "",
+      scriptKind: dialogState.scriptKind,
+      version: dialogState.version,
+    });
+  }
+
   const setupAssistantDisabledReason =
     input.mode.kind !== "draft"
       ? "Setup Assistant is only available while editing a draft."
       : setupAssistantIntegrationRows === null
         ? "Integration bindings are still loading."
-        : !setupAssistantHasAgentRuntime
+        : !setupAssistantLatestSavedDraftHasAgentRuntime && !setupAssistantLocalDraftHasAgentRuntime
           ? SetupAssistantAgentRuntimeRequiredMessage
           : draftFieldsAreReadOnly
             ? "Setup Assistant is unavailable while draft changes are saving."
@@ -1484,12 +1586,13 @@ function ReadySandboxProfileEditorPage(input: {
     defaultTitle: string;
     disabledReason: string | null;
     resolveVersion: () => number | null;
+    scriptKind: SetupAssistantScriptKind;
   }): SetupScriptAssistantControl {
     return {
       disabled: setupAssistantPanelIsOpen || inputValue.disabledReason !== null,
       errorMessage: setupAssistantError,
       isStarting: !setupAssistantPanelIsOpen && startSetupAssistantMutation.isPending,
-      onToggle: ({ script, scriptKind }) => {
+      onToggle: ({ savedScript, script, scriptKind }) => {
         if (setupAssistantPanelState?.isOpen === true) {
           return;
         }
@@ -1499,41 +1602,47 @@ function ReadySandboxProfileEditorPage(input: {
           return;
         }
 
-        setSetupAssistantError(null);
-        const initialComposerText = buildSetupAssistantInitialComposerText(script, scriptKind);
-
-        setSetupAssistantPanelState((currentState) => ({
-          initialComposerText,
-          isOpen: true,
-          sandboxInstanceId: currentState?.sandboxInstanceId ?? null,
-          scriptKind,
-          startupOperationId: currentState?.startupOperationId ?? null,
-        }));
-
-        if (
-          (setupAssistantPanelState !== null &&
-            setupAssistantPanelState.sandboxInstanceId !== null) ||
-          startSetupAssistantMutation.isPending
-        ) {
+        if (scriptKind === "setup" && setupAssistantHasVersionDraftChanges) {
+          setSetupAssistantStartDialogState({
+            savedScript,
+            script,
+            scriptKind,
+            version,
+            variant: resolveSetupAssistantStartDialogVariant({
+              latestSavedDraftHasAgentRuntime: setupAssistantLatestSavedDraftHasAgentRuntime,
+              localDraftHasAgentRuntime: setupAssistantLocalDraftHasAgentRuntime,
+            }),
+          });
           return;
         }
 
-        startSetupAssistantMutation.mutate({ scriptKind, version });
+        startSetupAssistantWithScript({
+          script: scriptKind === "maintenance" ? script : (savedScript ?? ""),
+          scriptKind,
+          version,
+        });
       },
       title: setupAssistantPanelIsOpen
         ? "Setup Assistant is open in the right panel."
-        : (inputValue.disabledReason ?? inputValue.defaultTitle),
+        : (inputValue.disabledReason ??
+          (inputValue.scriptKind === "setup" && setupAssistantHasVersionDraftChanges
+            ? setupAssistantLatestSavedDraftHasAgentRuntime
+              ? "Choose whether to save changes before opening Setup Assistant."
+              : "Save this draft before opening Setup Assistant."
+            : inputValue.defaultTitle)),
     };
   }
   const setupAssistantControl = createSetupAssistantControl({
     defaultTitle: "Open the right panel to write this setup script.",
     disabledReason: setupAssistantDisabledReason,
     resolveVersion: () => input.mode.version,
+    scriptKind: "setup",
   });
   const maintenanceAssistantControl = createSetupAssistantControl({
     defaultTitle: "Open the right panel to write this snapshot maintenance script.",
     disabledReason: maintenanceAssistantDisabledReason,
     resolveVersion: () => snapshotVersion?.version ?? null,
+    scriptKind: "maintenance",
   });
 
   useEffect(() => {
@@ -1795,9 +1904,40 @@ function ReadySandboxProfileEditorPage(input: {
       sections={editorSections}
     />
   );
+  const setupAssistantStartDialog = (
+    <SetupAssistantStartDialog
+      isOpen={setupAssistantStartDialogState !== null}
+      isPending={saveDraftRequestIsPending}
+      variant={setupAssistantStartDialogState?.variant ?? "choice"}
+      onOpenChange={(open) => {
+        if (!open && !saveDraftRequestIsPending) {
+          setSetupAssistantStartDialogState(null);
+        }
+      }}
+      onSaveAndOpen={() => {
+        if (setupAssistantStartDialogState === null || saveDraftRequestIsPending) {
+          return;
+        }
+
+        void saveDraftAndStartSetupAssistant(setupAssistantStartDialogState);
+      }}
+      onUseLatestSavedDraft={() => {
+        if (setupAssistantStartDialogState === null || saveDraftRequestIsPending) {
+          return;
+        }
+
+        handleUseLatestSavedDraftSetupAssistant(setupAssistantStartDialogState);
+      }}
+    />
+  );
 
   if (setupAssistantPanelState === null || !setupAssistantPanelState.isOpen) {
-    return editorView;
+    return (
+      <>
+        {editorView}
+        {setupAssistantStartDialog}
+      </>
+    );
   }
 
   return (
@@ -1832,7 +1972,58 @@ function ReadySandboxProfileEditorPage(input: {
         onCancel={cancelSetupAssistantPanelClose}
         onConfirm={confirmSetupAssistantPanelClose}
       />
+      {setupAssistantStartDialog}
     </div>
+  );
+}
+
+export function SetupAssistantStartDialog(input: {
+  isOpen: boolean;
+  isPending: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSaveAndOpen: () => void;
+  onUseLatestSavedDraft: () => void;
+  variant: SetupAssistantStartDialogVariant;
+}): React.JSX.Element {
+  const isChoice = input.variant === "choice";
+  const isUseSavedRequired = input.variant === "use-saved-required";
+
+  return (
+    <Dialog open={input.isOpen} onOpenChange={input.onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {input.variant === "save-required"
+              ? "Save draft to use Setup Assistant"
+              : "Unsaved changes"}
+          </DialogTitle>
+          <DialogDescription>
+            {input.variant === "choice"
+              ? "Setup Assistant uses the latest saved draft. Save your current changes before opening it, or open it with the latest saved draft instead. Your unsaved editor changes will stay in the editor."
+              : isUseSavedRequired
+                ? "Setup Assistant needs a saved draft with an agent integration. Your current changes remove the saved agent integration, so open it with the latest saved draft instead. Your unsaved editor changes will stay in the editor."
+                : "Setup Assistant needs a saved draft with an agent integration. Save your current changes before opening it."}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          {isChoice || isUseSavedRequired ? (
+            <Button
+              disabled={input.isPending}
+              onClick={input.onUseLatestSavedDraft}
+              type="button"
+              variant="outline"
+            >
+              Use latest saved draft
+            </Button>
+          ) : null}
+          {isUseSavedRequired ? null : (
+            <Button disabled={input.isPending} onClick={input.onSaveAndOpen} type="button">
+              {input.isPending ? "Saving..." : "Save and open"}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -3207,6 +3398,7 @@ function ReadySandboxProfileSetupScriptSection(input: {
           isStarting: input.setupAssistantControl.isStarting,
           onClick: () => {
             input.setupAssistantControl.onToggle({
+              savedScript: setupScriptState.savedValue,
               script: setupScriptState.draftValue,
               scriptKind: "setup",
             });

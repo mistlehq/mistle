@@ -42,6 +42,7 @@ import {
   SandboxProfileEditorView,
   SandboxProfilePanelSection,
   SandboxProfileSetupScriptPanel,
+  SetupAssistantStartDialog,
 } from "./sandbox-profile-editor-page.js";
 import type { SandboxProfileEditorSection } from "./sandbox-profile-editor-sections.js";
 import {
@@ -118,6 +119,7 @@ export type SandboxProfileEditorPageStoryArgs = {
   }[];
   setupScript: string | null;
   setupScriptDraft?: string;
+  setupAssistantStartDialogState?: "choice" | "save-required" | "use-saved-required";
   setupAssistantPanelState?: "closed" | "starting" | "ready" | "proposed-script";
   setupAssistantErrorMessage?: string;
   setupAssistantState?: "available" | "starting" | "disabled";
@@ -746,6 +748,10 @@ function SandboxProfileEditorPageStoryView(
   const [setupAssistantPanelOpen, setSetupAssistantPanelOpen] = useState(
     initialSetupAssistantPanelState !== "closed",
   );
+  const [setupAssistantStartDialogOpen, setSetupAssistantStartDialogOpen] = useState(
+    input.setupAssistantStartDialogState !== undefined,
+  );
+  const [setupAssistantPanelScript, setSetupAssistantPanelScript] = useState(setupScriptDraft);
 
   async function handleProfileNameSave(nextValue: string): Promise<void> {
     setProfileName(nextValue);
@@ -800,7 +806,28 @@ function SandboxProfileEditorPageStoryView(
       return;
     }
 
+    if (input.setupAssistantStartDialogState !== undefined) {
+      setSetupAssistantStartDialogOpen(true);
+      return;
+    }
+
+    setSetupAssistantPanelScript(setupScriptDraft);
     setSetupAssistantPanelState(input.setupAssistantState === "starting" ? "starting" : "ready");
+    setSetupAssistantPanelOpen(true);
+  }
+
+  function handleSaveAndOpenSetupAssistant(): void {
+    setPersistedSetupScript(setupScriptDraft);
+    setSetupAssistantPanelScript(setupScriptDraft);
+    setSetupAssistantStartDialogOpen(false);
+    setSetupAssistantPanelState("ready");
+    setSetupAssistantPanelOpen(true);
+  }
+
+  function handleUseLatestSavedDraftSetupAssistant(): void {
+    setSetupAssistantPanelScript(persistedSetupScript);
+    setSetupAssistantStartDialogOpen(false);
+    setSetupAssistantPanelState("ready");
     setSetupAssistantPanelOpen(true);
   }
 
@@ -1013,7 +1040,17 @@ function SandboxProfileEditorPageStoryView(
   return (
     <QueryClientProvider client={queryClient}>
       {!setupAssistantPanelOpen ? (
-        editorView
+        <>
+          {editorView}
+          <SetupAssistantStartDialog
+            isOpen={setupAssistantStartDialogOpen}
+            isPending={false}
+            onOpenChange={setSetupAssistantStartDialogOpen}
+            onSaveAndOpen={handleSaveAndOpenSetupAssistant}
+            onUseLatestSavedDraft={handleUseLatestSavedDraftSetupAssistant}
+            variant={input.setupAssistantStartDialogState ?? "choice"}
+          />
+        </>
       ) : (
         <div className="fixed inset-0 overflow-hidden">
           <ResizablePanelGroup
@@ -1030,7 +1067,7 @@ function SandboxProfileEditorPageStoryView(
                 onClose={() => {
                   setSetupAssistantPanelOpen(false);
                 }}
-                setupScript={setupScriptDraft}
+                setupScript={setupAssistantPanelScript}
                 state={setupAssistantPanelState}
               />
             </ResizablePanel>

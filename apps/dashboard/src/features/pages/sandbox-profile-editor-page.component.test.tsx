@@ -63,12 +63,14 @@ import {
 import {
   SandboxProfileDefaultRedirect,
   SetupAssistantCloseDialog,
+  SetupAssistantStartDialog,
   SetupAssistantStartupProgress,
   SandboxProfileEditorPage,
   SandboxProfileEditorShell,
   SandboxProfileEditorView,
   SandboxProfileSetupScriptPanel,
   resolveSelectedSandboxProfileAgentRuntimeId,
+  resolveSetupAssistantStartDialogVariant,
 } from "./sandbox-profile-editor-page.js";
 
 beforeAll(() => {
@@ -2620,6 +2622,161 @@ describe("SandboxProfileEditorPage", () => {
         name: "Close Setup Assistant panel",
       }),
     ).toBeTruthy();
+  });
+
+  it("asks whether to save before opening Setup Assistant when the saved draft is startable", () => {
+    renderSandboxProfileEditor({
+      bindings: [
+        {
+          id: "binding-agent",
+          connectionId: "connection-agent",
+          kind: "agent",
+          config: {},
+        },
+      ],
+      routeSection: "sandbox-profile",
+      setupScript: "pnpm install\npnpm dev:bootstrap",
+      versionState: "draft",
+    });
+
+    const configurationsPanel = screen.getByRole("tabpanel", {
+      name: "Sandbox Profile",
+      hidden: false,
+    });
+    updateSetupScriptEditor({
+      editor: within(configurationsPanel).getByRole("textbox", {
+        name: "Setup script",
+      }),
+      value: "pnpm install\npnpm test\npnpm dev:bootstrap",
+    });
+
+    const setupAssistantButton = screen.getByRole("button", {
+      name: "Setup Assistant",
+    });
+    expect(setupAssistantButton.getAttribute("title")).toBe(
+      "Choose whether to save changes before opening Setup Assistant.",
+    );
+
+    fireEvent.click(setupAssistantButton);
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getByText("Unsaved changes")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Setup Assistant uses the latest saved draft. Save your current changes before opening it, or open it with the latest saved draft instead. Your unsaved editor changes will stay in the editor.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save and open" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Use latest saved draft" })).toBeTruthy();
+  });
+
+  it("resolves the save-required Setup Assistant dialog when only local changes add an agent", () => {
+    expect(
+      resolveSetupAssistantStartDialogVariant({
+        latestSavedDraftHasAgentRuntime: false,
+        localDraftHasAgentRuntime: true,
+      }),
+    ).toBe("save-required");
+  });
+
+  it("uses the latest saved draft when local changes remove the saved agent", () => {
+    renderSandboxProfileEditor({
+      bindings: [
+        {
+          id: "binding-agent",
+          connectionId: "missing-agent-connection",
+          kind: "agent",
+          config: {},
+        },
+      ],
+      routeSection: "sandbox-profile",
+      setupScript: "pnpm install\npnpm dev:bootstrap",
+      versionState: "draft",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove agent provider" }));
+
+    const setupAssistantButton = screen.getByRole("button", {
+      name: "Setup Assistant",
+    });
+    expect(setupAssistantButton.getAttribute("title")).toBe(
+      "Choose whether to save changes before opening Setup Assistant.",
+    );
+
+    fireEvent.click(setupAssistantButton);
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getByText("Unsaved changes")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Use latest saved draft" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Save and open" })).toBeNull();
+  });
+
+  it("renders the save-required Setup Assistant dialog without the saved-draft action", () => {
+    let saved = false;
+    let usedLatestSavedDraft = false;
+
+    render(
+      <SetupAssistantStartDialog
+        isOpen
+        isPending={false}
+        onOpenChange={() => {}}
+        onSaveAndOpen={() => {
+          saved = true;
+        }}
+        onUseLatestSavedDraft={() => {
+          usedLatestSavedDraft = true;
+        }}
+        variant="save-required"
+      />,
+    );
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getByText("Save draft to use Setup Assistant")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Setup Assistant needs a saved draft with an agent integration. Save your current changes before opening it.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Use latest saved draft" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save and open" }));
+
+    expect(saved).toBe(true);
+    expect(usedLatestSavedDraft).toBe(false);
+  });
+
+  it("renders the latest-saved-draft-only Setup Assistant dialog without the save action", () => {
+    let saved = false;
+    let usedLatestSavedDraft = false;
+
+    render(
+      <SetupAssistantStartDialog
+        isOpen
+        isPending={false}
+        onOpenChange={() => {}}
+        onSaveAndOpen={() => {
+          saved = true;
+        }}
+        onUseLatestSavedDraft={() => {
+          usedLatestSavedDraft = true;
+        }}
+        variant="use-saved-required"
+      />,
+    );
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getByText("Unsaved changes")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Setup Assistant needs a saved draft with an agent integration. Your current changes remove the saved agent integration, so open it with the latest saved draft instead. Your unsaved editor changes will stay in the editor.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Save and open" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Use latest saved draft" }));
+
+    expect(saved).toBe(false);
+    expect(usedLatestSavedDraft).toBe(true);
   });
 
   it("shows operation timeline progress while Setup Assistant startup is active", () => {

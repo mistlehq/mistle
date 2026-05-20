@@ -24,6 +24,14 @@ _Avoid_: Profile image
 The full initialization script for preparing a **Snapshot** from a **Base image**.
 _Avoid_: Bootstrap script, init script
 
+**Latest saved draft**:
+The saved state of a draft **Sandbox profile version**, excluding unsaved editor changes.
+_Avoid_: Current draft, local draft
+
+**Setup Assistant**:
+A guided agent workspace for helping author a **Setup script** or **Snapshot maintenance script** for a **Sandbox profile version**.
+_Avoid_: Setup script test, setup check
+
 **Snapshot maintenance script**:
 The version-scoped, publish-free script for **Automatic snapshot refresh** from an existing usable **Snapshot**.
 _Avoid_: Maintenance script, setup script variant, refresh script, update script
@@ -189,6 +197,8 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Sandbox profile version** may have one usable **Snapshot**.
 - A session, trigger, or other profile-backed object may have a **Referenced sandbox profile version** that differs from the profile's latest published **Sandbox profile version**.
 - A **Setup script** prepares a **Snapshot** from a **Base image**.
+- **Setup Assistant** starts from a **Latest saved draft** unless the user saves current edits first.
+- **Setup Assistant** requires the **Latest saved draft** to have a saved agent integration.
 - A **Snapshot maintenance script** prepares a replacement **Snapshot** from an existing usable **Snapshot**.
 - A **Snapshot maintenance script** belongs to one **Sandbox profile version** but may be edited without publishing a new version.
 - **Automatic snapshot refresh** uses the latest saved **Snapshot maintenance script** at execution time when one is present; otherwise it uses the **Setup script**.

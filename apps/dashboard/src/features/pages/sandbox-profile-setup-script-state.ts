@@ -45,6 +45,7 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
   draftValue: string;
   errorMessage: string | null;
   hasUnsavedChanges: boolean;
+  savedValue: string;
   applyDraftSaveError: (error: unknown) => void;
   applySavedSetupScript: (setupScript: string | null) => void;
   buildDraftChanges: () => string | null;
@@ -102,6 +103,7 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
     draftValue,
     errorMessage,
     hasUnsavedChanges: draftValue !== persistedValue,
+    savedValue: persistedValue,
     applyDraftSaveError,
     applySavedSetupScript,
     buildDraftChanges,

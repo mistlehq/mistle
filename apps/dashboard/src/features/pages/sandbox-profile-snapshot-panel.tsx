@@ -102,7 +102,11 @@ type SnapshotOperationProgressState = {
 type SnapshotMaintenanceScriptAssistantControl = {
   disabled: boolean;
   isStarting: boolean;
-  onToggle: (input: { script: string; scriptKind: SetupAssistantScriptKind }) => void;
+  onToggle: (input: {
+    savedScript: string | null;
+    script: string;
+    scriptKind: SetupAssistantScriptKind;
+  }) => void;
   title: string;
 };
 
@@ -1043,6 +1047,7 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
                           isStarting: input.setupAssistantControl.isStarting,
                           onClick: () => {
                             input.setupAssistantControl.onToggle({
+                              savedScript: input.savedMaintenanceScript,
                               script: input.maintenanceScriptDraft,
                               scriptKind: "maintenance",
                             });
