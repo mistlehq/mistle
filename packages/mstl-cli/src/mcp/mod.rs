@@ -1,15 +1,26 @@
+mod auth;
+mod client;
+mod tools;
+
 use std::fmt;
 use std::io::Write;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 
 use axum::Router;
+use rmcp::ErrorData as McpError;
 use rmcp::ServerHandler;
-use rmcp::model::{Implementation, ServerCapabilities, ServerInfo};
+use rmcp::model::{
+    CallToolRequestParams, CallToolResult, Implementation, ListToolsResult, PaginatedRequestParams,
+    ServerCapabilities, ServerInfo,
+};
+use rmcp::service::{RequestContext, RoleServer};
 use rmcp::transport::streamable_http_server::{
     StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
 };
 use tokio::net::TcpListener;
+
+use crate::config::control_plane_api_public_url;
 
 const MCP_PATH: &str = "/mcp";
 
@@ -32,9 +43,10 @@ where
     W: Write,
 {
     let bind_addr = bind_addr(host, port)?;
+    let base_url = control_plane_api_public_url().map_err(McpServerError::Configure)?;
     let service: StreamableHttpService<MistleMcpServer, LocalSessionManager> =
         StreamableHttpService::new(
-            || Ok(MistleMcpServer),
+            move || Ok(MistleMcpServer::new(base_url.clone())),
             Arc::new(LocalSessionManager::default()),
             StreamableHttpServerConfig::default(),
         );
@@ -69,12 +81,38 @@ fn bind_addr(host: &str, port: u16) -> Result<SocketAddr, McpServerError> {
 }
 
 #[derive(Clone)]
-struct MistleMcpServer;
+struct MistleMcpServer {
+    base_url: String,
+}
+
+impl MistleMcpServer {
+    fn new(base_url: String) -> Self {
+        Self { base_url }
+    }
+}
 
 impl ServerHandler for MistleMcpServer {
     fn get_info(&self) -> ServerInfo {
-        ServerInfo::new(ServerCapabilities::default())
+        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("mistle", env!("CARGO_PKG_VERSION")))
+    }
+
+    fn list_tools(
+        &self,
+        _request: Option<PaginatedRequestParams>,
+        _context: RequestContext<RoleServer>,
+    ) -> impl Future<Output = Result<ListToolsResult, McpError>> + Send + '_ {
+        std::future::ready(Ok(ListToolsResult::with_all_items(
+            tools::tool_definitions(),
+        )))
+    }
+
+    async fn call_tool(
+        &self,
+        request: CallToolRequestParams,
+        context: RequestContext<RoleServer>,
+    ) -> Result<CallToolResult, McpError> {
+        tools::call_tool(request, context, &self.base_url).await
     }
 }
 
@@ -91,6 +129,7 @@ enum McpServerError {
     ReadLocalAddr(std::io::Error),
     WriteStatus(std::io::Error),
     Serve(std::io::Error),
+    Configure(crate::error::CliError),
 }
 
 impl fmt::Display for McpServerError {
@@ -116,6 +155,9 @@ impl fmt::Display for McpServerError {
             }
             Self::Serve(source) => {
                 write!(formatter, "MCP server failed: {source}")
+            }
+            Self::Configure(source) => {
+                write!(formatter, "failed to configure MCP server: {source}")
             }
         }
     }

@@ -7,12 +7,16 @@ use crate::error::CliError;
 
 pub(crate) fn mistle_client() -> Result<MistleClient, CliError> {
     let api_key = required_env_var(API_KEY_ENV_VAR)?;
-    let base_url = required_env_var(CONTROL_PLANE_API_PUBLIC_URL_ENV_VAR)?;
+    let base_url = control_plane_api_public_url()?;
 
     MistleClient::new(MistleClientConfig { base_url, api_key }).map_err(|source| CliError::Client {
         action: "configure Mistle client",
         source,
     })
+}
+
+pub(crate) fn control_plane_api_public_url() -> Result<String, CliError> {
+    required_env_var(CONTROL_PLANE_API_PUBLIC_URL_ENV_VAR)
 }
 
 fn required_env_var(name: &'static str) -> Result<String, CliError> {

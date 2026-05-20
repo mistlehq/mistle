@@ -6,7 +6,7 @@ use url::Url;
 
 #[derive(Debug, Clone)]
 pub struct MistleClient {
-    api_key: String,
+    authorization_header: String,
     base_url: Url,
 }
 
@@ -14,8 +14,27 @@ impl MistleClient {
     pub fn new(config: MistleClientConfig) -> Result<Self, MistleClientError> {
         let base_url = parse_base_url(&config.base_url)?;
         let api_key = validate_required_string("api key is required", config.api_key)?;
+        let authorization_header = format!("Bearer {api_key}");
 
-        Ok(Self { api_key, base_url })
+        Ok(Self {
+            authorization_header,
+            base_url,
+        })
+    }
+
+    pub fn new_with_authorization_header(
+        config: MistleClientAuthorizationHeaderConfig,
+    ) -> Result<Self, MistleClientError> {
+        let base_url = parse_base_url(&config.base_url)?;
+        let authorization_header = validate_required_string(
+            "authorization header is required",
+            config.authorization_header,
+        )?;
+
+        Ok(Self {
+            authorization_header,
+            base_url,
+        })
     }
 
     pub fn current_actor(&self) -> Result<CurrentActor, MistleClientError> {
@@ -142,7 +161,7 @@ impl MistleClient {
         TResponse: for<'de> Deserialize<'de>,
     {
         let mut response = ureq::get(url)
-            .header("authorization", format!("Bearer {}", self.api_key))
+            .header("authorization", self.authorization_header.clone())
             .call()
             .map_err(MistleClientError::Request)?;
 
@@ -165,7 +184,7 @@ impl MistleClient {
     {
         let request_body = serde_json::to_string(body).map_err(MistleClientError::EncodeRequest)?;
         let mut response = ureq::put(url)
-            .header("authorization", format!("Bearer {}", self.api_key))
+            .header("authorization", self.authorization_header.clone())
             .content_type("application/json")
             .send(request_body)
             .map_err(MistleClientError::Request)?;
@@ -189,7 +208,7 @@ impl MistleClient {
     {
         let request_body = serde_json::to_string(body).map_err(MistleClientError::EncodeRequest)?;
         let mut response = ureq::post(url)
-            .header("authorization", format!("Bearer {}", self.api_key))
+            .header("authorization", self.authorization_header.clone())
             .content_type("application/json")
             .send(request_body)
             .map_err(MistleClientError::Request)?;
@@ -321,6 +340,12 @@ impl MistleClient {
 pub struct MistleClientConfig {
     pub base_url: String,
     pub api_key: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct MistleClientAuthorizationHeaderConfig {
+    pub base_url: String,
+    pub authorization_header: String,
 }
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
@@ -774,11 +799,12 @@ mod tests {
     use crate::client::{
         CurrentActor, CurrentActorApiKey, CurrentActorAuthentication, CurrentActorIdentity,
         CurrentActorOrganization, ListSandboxInstancesRequest, ListSandboxInstancesResponse,
-        ListSandboxProfileVersionsResponse, MistleClient, MistleClientConfig, SandboxInstance,
-        SandboxInstanceAgentRuntimeId, SandboxInstanceConnectionToken, SandboxInstanceListItem,
-        SandboxInstanceRuntimeContext, SandboxInstanceSource, SandboxInstanceStartedBy,
-        SandboxInstanceStartupOperation, SandboxInstanceStartupOperationKind,
-        SandboxInstanceStatus, SandboxInstanceTriggerConversation, SandboxProfileVersion,
+        ListSandboxProfileVersionsResponse, MistleClient, MistleClientAuthorizationHeaderConfig,
+        MistleClientConfig, SandboxInstance, SandboxInstanceAgentRuntimeId,
+        SandboxInstanceConnectionToken, SandboxInstanceListItem, SandboxInstanceRuntimeContext,
+        SandboxInstanceSource, SandboxInstanceStartedBy, SandboxInstanceStartupOperation,
+        SandboxInstanceStartupOperationKind, SandboxInstanceStatus,
+        SandboxInstanceTriggerConversation, SandboxProfileVersion,
         SandboxProfileVersionAgentRuntimeId, SandboxProfileVersionDefaultPersistenceMode,
         SandboxProfileVersionState, StartSandboxProfileInstanceResponse,
         StartSandboxProfileInstanceStatus, UpdateSandboxProfileVersionDraftRequest,
@@ -1091,6 +1117,7 @@ mod tests {
             client.current_actor_url().as_str(),
             "https://api.example.test/v1/me"
         );
+        assert_eq!(client.authorization_header, "Bearer mstl_test_key");
     }
 
     #[test]
@@ -1113,6 +1140,30 @@ mod tests {
         .expect_err("blank api key should fail");
 
         assert_eq!(error.to_string(), "api key is required");
+    }
+
+    #[test]
+    fn accepts_explicit_authorization_header_config() {
+        let client =
+            MistleClient::new_with_authorization_header(MistleClientAuthorizationHeaderConfig {
+                base_url: "https://api.example.test".to_owned(),
+                authorization_header: "Basic token".to_owned(),
+            })
+            .expect("authorization header config should be valid");
+
+        assert_eq!(client.authorization_header, "Basic token");
+    }
+
+    #[test]
+    fn rejects_blank_authorization_header() {
+        let error =
+            MistleClient::new_with_authorization_header(MistleClientAuthorizationHeaderConfig {
+                base_url: "https://api.example.test".to_owned(),
+                authorization_header: " ".to_owned(),
+            })
+            .expect_err("blank authorization header should fail");
+
+        assert_eq!(error.to_string(), "authorization header is required");
     }
 
     #[test]

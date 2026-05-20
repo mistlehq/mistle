@@ -8,6 +8,12 @@ pub struct ArgumentMetadata {
     pub description: &'static str,
 }
 
+pub struct ToolMetadata {
+    pub name: &'static str,
+    pub title: &'static str,
+    pub description: &'static str,
+}
+
 pub const ROOT: CommandMetadata = CommandMetadata {
     name: "mistle",
     description: "Mistle command line interface",
@@ -136,4 +142,16 @@ pub const MCP_HOST: ArgumentMetadata = ArgumentMetadata {
 pub const MCP_PORT: ArgumentMetadata = ArgumentMetadata {
     name: "port",
     description: "MCP server port to bind",
+};
+
+pub const MCP_PROFILE_LIST_TOOL: ToolMetadata = ToolMetadata {
+    name: "profile_list",
+    title: "List sandbox profiles",
+    description: "List sandbox profiles available to the current Mistle API key",
+};
+
+pub const MCP_PROFILE_GET_TOOL: ToolMetadata = ToolMetadata {
+    name: "profile_get",
+    title: "Get a sandbox profile",
+    description: "Get a sandbox profile by id using the current Mistle API key",
 };
