@@ -13,6 +13,7 @@ use tungstenite::{Message, WebSocket, connect};
 use url::Url;
 
 pub mod agent_stream;
+pub mod file_search;
 pub mod file_upload;
 pub mod port_access;
 pub mod port_access_transport;

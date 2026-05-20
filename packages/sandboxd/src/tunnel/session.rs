@@ -59,6 +59,10 @@ use crate::supervision::{
     SandboxdSupervisorHandle, SupervisedComponent, encode_forwarded_lifecycle_event_log_line,
 };
 use crate::time::{Clock, Duration, Sleeper};
+use crate::tunnel::file_search::{
+    FileSearchQueryMetrics, FileSearchWorker, FileSearchWorkerCommand, FileSearchWorkerEvent,
+    spawn_file_search_worker,
+};
 use crate::tunnel::port_access::{PortAccessAuthorizeDecision, authorize_target_port};
 use crate::tunnel::port_access_transport::{
     PortAccessHttpCommand, PortAccessTcpCommand, PortAccessTransportEvent, spawn_http_transport,
@@ -66,12 +70,11 @@ use crate::tunnel::port_access_transport::{
 };
 use crate::tunnel::protocol::{
     AGENT_STREAM_WINDOW_BYTES, CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
-    CONNECT_ERROR_CODE_FILE_SEARCH_STREAM_UNAVAILABLE,
     CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE, EgressTokenControlMessage, EgressTokenRequest,
     FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH,
-    FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE, FileUploadCompletedEventInput,
-    PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
-    PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
+    FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE, FileSearchError, FileSearchResults,
+    FileUploadCompletedEventInput, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY,
+    PAYLOAD_KIND_WEBSOCKET_TEXT, PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
     PORT_ACCESS_AUTHORIZE_REASON_UNSUPPORTED_PROTOCOL, PtyControlMessage, PtySessionControlMessage,
     PtySessionLaunchMode, PtySessionOpen, STREAM_RESET_CODE_EXEC_COMMAND_FAILED,
     STREAM_RESET_CODE_INVALID_STREAM_CLOSE, STREAM_RESET_CODE_INVALID_STREAM_DATA,
@@ -80,12 +83,12 @@ use crate::tunnel::protocol::{
     STREAM_RESET_CODE_TARGET_CLOSED, SigningControlMessage, SigningRequest, StreamControlMessage,
     StreamSendWindow, decode_stream_data_frame, egress_token_request, encode_stream_data_frame,
     exec_result_event, file_upload_completed_event, parse_egress_token_control_message,
-    parse_ports_control_message, parse_ports_transport_message, parse_processes_stream_message,
-    parse_pty_control_message, parse_pty_session_control_message, parse_signing_control_message,
-    parse_stream_control_message, ports_target_authorize_failure_result,
-    ports_target_authorize_success_result, pty_exit_event, pty_session_error, pty_session_opened,
-    signing_request, stream_complete, stream_open_error, stream_open_ok, stream_reset,
-    stream_window,
+    parse_file_search_stream_message, parse_ports_control_message, parse_ports_transport_message,
+    parse_processes_stream_message, parse_pty_control_message, parse_pty_session_control_message,
+    parse_signing_control_message, parse_stream_control_message,
+    ports_target_authorize_failure_result, ports_target_authorize_success_result, pty_exit_event,
+    pty_session_error, pty_session_opened, signing_request, stream_complete, stream_open_error,
+    stream_open_ok, stream_reset, stream_window,
 };
 use crate::tunnel::runtime_processes::collect_processes_snapshot;
 use crate::tunnel::telemetry::{SandboxTelemetryLogLevel, TelemetryRelay, TelemetryRelayFrame};
@@ -137,6 +140,21 @@ const AGENT_STREAM_OUTCOME_BOOTSTRAP_CLOSED: &str = "bootstrap_closed";
 const AGENT_STREAM_CLOSE_SOURCE_GATEWAY: &str = "gateway";
 const AGENT_STREAM_CLOSE_SOURCE_RUNTIME: &str = "runtime";
 const AGENT_STREAM_CLOSE_SOURCE_BOOTSTRAP: &str = "bootstrap";
+const FILE_SEARCH_STREAM_CHANNEL_KIND: &str = "fileSearch";
+const FILE_SEARCH_EVENT_STREAM_OPENED: &str = "file_search_stream_opened";
+const FILE_SEARCH_EVENT_STREAM_SUMMARY: &str = "file_search_stream_summary";
+const FILE_SEARCH_EVENT_QUERY_COMPLETED: &str = "file_search_query_completed";
+const FILE_SEARCH_EVENT_QUERY_FAILED: &str = "file_search_query_failed";
+const FILE_SEARCH_OUTCOME_CLOSED: &str = "closed";
+const FILE_SEARCH_OUTCOME_RESET: &str = "reset";
+const FILE_SEARCH_CLOSE_SOURCE_GATEWAY: &str = "gateway";
+const FILE_SEARCH_CLOSE_SOURCE_SANDBOXD: &str = "sandboxd";
+
+struct FileSearchStreamCloseTelemetry {
+    outcome: &'static str,
+    close_source: &'static str,
+    reason: Option<String>,
+}
 const DIRECT_PTY_STREAM_ID: u32 = 1;
 const PTY_SESSION_ERROR_CODE_CREATE_FAILED: &str = "pty_create_failed";
 const PTY_SESSION_ERROR_CODE_ATTACH_FAILED: &str = "pty_attach_failed";
@@ -507,6 +525,7 @@ enum TunnelSessionEvent {
         stream_id: u32,
         result: Box<Result<ExecCommandResult, String>>,
     },
+    FileSearch(FileSearchWorkerEvent),
     Wake,
 }
 
@@ -1024,6 +1043,18 @@ struct PortAccessTcpStreamState {
     response_closed: bool,
 }
 
+struct FileSearchStreamState {
+    worker: FileSearchWorker,
+    send_window: StreamSendWindow,
+    opened_at_ms: u64,
+    query_count: u64,
+    error_count: u64,
+    total_result_count: u64,
+    collapsed_query_count: u64,
+    total_latency_ms: u64,
+    max_latency_ms: u64,
+}
+
 struct TunnelSessionMutableState {
     agent_endpoint_url: Option<String>,
     runtime_env: BTreeMap<String, String>,
@@ -1040,6 +1071,7 @@ struct TunnelSessionMutableState {
     port_access_http_streams: BTreeMap<u32, mpsc::UnboundedSender<PortAccessHttpCommand>>,
     port_access_tcp_streams: BTreeMap<u32, PortAccessTcpStreamState>,
     processes_stream_send_windows: BTreeMap<u32, StreamSendWindow>,
+    file_search_streams: BTreeMap<u32, FileSearchStreamState>,
     last_processes_snapshot_at_ms: Option<u64>,
     operation_stream_requested: bool,
     operation_stream_close_requested: bool,
@@ -1618,6 +1650,7 @@ async fn run_connected_tunnel_session(
         port_access_http_streams: BTreeMap::new(),
         port_access_tcp_streams: BTreeMap::new(),
         processes_stream_send_windows: BTreeMap::new(),
+        file_search_streams: BTreeMap::new(),
         last_processes_snapshot_at_ms: None,
         operation_stream_requested: false,
         operation_stream_close_requested: false,
@@ -3334,6 +3367,294 @@ fn reset_processes_streams(
     Ok(())
 }
 
+fn handle_file_search_worker_event(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    event: FileSearchWorkerEvent,
+    clock: &dyn Clock,
+    session_state: &mut TunnelSessionMutableState,
+) -> Result<(), TunnelSessionError> {
+    let (stream_id, telemetry_event, telemetry_level, telemetry_fields, metrics, is_error, payload) =
+        match event {
+            FileSearchWorkerEvent::Results {
+                stream_id,
+                request_id,
+                query,
+                items,
+                metrics,
+            } => {
+                let payload = serde_json::to_string(&FileSearchResults {
+                    message_type: "fileSearch.results".to_string(),
+                    request_id: request_id.clone(),
+                    query: query.clone(),
+                    items,
+                })
+                .map_err(|error| TunnelSessionError::ParseDataFrame(error.to_string()))?;
+                (
+                    stream_id,
+                    FILE_SEARCH_EVENT_QUERY_COMPLETED,
+                    SandboxTelemetryLogLevel::Info,
+                    file_search_query_telemetry_fields(stream_id, &request_id, &metrics),
+                    metrics,
+                    false,
+                    payload,
+                )
+            }
+            FileSearchWorkerEvent::Error {
+                stream_id,
+                request_id,
+                code,
+                message,
+                metrics,
+            } => {
+                let payload = serde_json::to_string(&FileSearchError {
+                    message_type: "fileSearch.error".to_string(),
+                    request_id: request_id.clone(),
+                    code: code.clone(),
+                    message: message.clone(),
+                })
+                .map_err(|error| TunnelSessionError::ParseDataFrame(error.to_string()))?;
+                let mut fields =
+                    file_search_query_telemetry_fields(stream_id, &request_id, &metrics);
+                fields.push(("code", Value::String(code)));
+                fields.push(("error", Value::String(message)));
+                (
+                    stream_id,
+                    FILE_SEARCH_EVENT_QUERY_FAILED,
+                    SandboxTelemetryLogLevel::Warn,
+                    fields,
+                    metrics,
+                    true,
+                    payload,
+                )
+            }
+        };
+
+    {
+        let Some(stream_state) = session_state.file_search_streams.get_mut(&stream_id) else {
+            return Ok(());
+        };
+        record_file_search_query_metrics(stream_state, &metrics, is_error);
+    }
+    publish_tunnel_telemetry_log(
+        tunnel_writer_sender,
+        &mut session_state.telemetry_relay,
+        clock,
+        telemetry_level,
+        telemetry_event,
+        &telemetry_fields,
+    );
+    let Some(stream_state) = session_state.file_search_streams.get_mut(&stream_id) else {
+        return Ok(());
+    };
+    if !stream_state.send_window.try_consume(payload.len()) {
+        write_tunnel_text(
+            tunnel_writer_sender,
+            stream_reset(
+                stream_id,
+                STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
+                "file search stream send window is exhausted",
+            ),
+        )?;
+        close_file_search_stream(
+            tunnel_writer_sender,
+            session_state,
+            clock,
+            stream_id,
+            FileSearchStreamCloseTelemetry {
+                outcome: FILE_SEARCH_OUTCOME_RESET,
+                close_source: FILE_SEARCH_CLOSE_SOURCE_SANDBOXD,
+                reason: Some("file search stream send window is exhausted".to_string()),
+            },
+        );
+        return Ok(());
+    }
+
+    let encoded =
+        encode_stream_data_frame(stream_id, PAYLOAD_KIND_WEBSOCKET_TEXT, payload.as_bytes())
+            .map_err(|error| TunnelSessionError::ParseDataFrame(error.to_string()))?;
+    write_tunnel_binary(tunnel_writer_sender, encoded)?;
+    Ok(())
+}
+
+fn close_file_search_stream(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    session_state: &mut TunnelSessionMutableState,
+    clock: &dyn Clock,
+    stream_id: u32,
+    close_telemetry: FileSearchStreamCloseTelemetry,
+) {
+    if let Some(stream_state) = session_state.file_search_streams.remove(&stream_id) {
+        publish_file_search_stream_summary(
+            tunnel_writer_sender,
+            &mut session_state.telemetry_relay,
+            clock,
+            stream_id,
+            &stream_state,
+            close_telemetry,
+        );
+        let _ = stream_state
+            .worker
+            .command_sender
+            .send(FileSearchWorkerCommand::Close);
+    }
+}
+
+#[cfg(test)]
+fn terminate_file_search_stream(session_state: &mut TunnelSessionMutableState, stream_id: u32) {
+    if let Some(stream_state) = session_state.file_search_streams.remove(&stream_id) {
+        let _ = stream_state
+            .worker
+            .command_sender
+            .send(FileSearchWorkerCommand::Close);
+    }
+}
+
+fn file_search_query_telemetry_fields(
+    stream_id: u32,
+    request_id: &str,
+    metrics: &FileSearchQueryMetrics,
+) -> Vec<(&'static str, Value)> {
+    let requested_limit = metrics
+        .requested_limit
+        .map(|limit| Value::from(limit as u64))
+        .unwrap_or(Value::Null);
+
+    vec![
+        ("streamId", Value::from(u64::from(stream_id))),
+        (
+            "channelKind",
+            Value::String(FILE_SEARCH_STREAM_CHANNEL_KIND.to_string()),
+        ),
+        ("requestId", Value::String(request_id.to_string())),
+        ("queryLength", Value::from(metrics.query_length as u64)),
+        ("requestedLimit", requested_limit),
+        (
+            "effectiveLimit",
+            Value::from(metrics.effective_limit as u64),
+        ),
+        (
+            "collapsedQueryCount",
+            Value::from(metrics.collapsed_query_count),
+        ),
+        ("debounceWaitMs", Value::from(metrics.debounce_wait_ms)),
+        ("scanWaitMs", Value::from(metrics.scan_wait_ms)),
+        ("searchMs", Value::from(metrics.search_ms)),
+        ("latencyMs", Value::from(metrics.total_latency_ms)),
+        ("resultCount", Value::from(metrics.result_count as u64)),
+        ("limited", Value::Bool(metrics.limited)),
+    ]
+}
+
+fn record_file_search_query_metrics(
+    stream_state: &mut FileSearchStreamState,
+    metrics: &FileSearchQueryMetrics,
+    is_error: bool,
+) {
+    stream_state.query_count = stream_state.query_count.saturating_add(1);
+    if is_error {
+        stream_state.error_count = stream_state.error_count.saturating_add(1);
+    }
+    stream_state.total_result_count = stream_state
+        .total_result_count
+        .saturating_add(metrics.result_count as u64);
+    stream_state.collapsed_query_count = stream_state
+        .collapsed_query_count
+        .saturating_add(metrics.collapsed_query_count);
+    stream_state.total_latency_ms = stream_state
+        .total_latency_ms
+        .saturating_add(metrics.total_latency_ms);
+    stream_state.max_latency_ms = stream_state.max_latency_ms.max(metrics.total_latency_ms);
+}
+
+fn publish_file_search_stream_summary(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    telemetry_relay: &mut TelemetryRelay,
+    clock: &dyn Clock,
+    stream_id: u32,
+    stream_state: &FileSearchStreamState,
+    close_telemetry: FileSearchStreamCloseTelemetry,
+) {
+    let mut fields = vec![
+        ("streamId", Value::from(u64::from(stream_id))),
+        (
+            "channelKind",
+            Value::String(FILE_SEARCH_STREAM_CHANNEL_KIND.to_string()),
+        ),
+        (
+            "outcome",
+            Value::String(close_telemetry.outcome.to_string()),
+        ),
+        (
+            "closeSource",
+            Value::String(close_telemetry.close_source.to_string()),
+        ),
+        (
+            "durationMs",
+            Value::from(clock.now_ms().saturating_sub(stream_state.opened_at_ms)),
+        ),
+        ("queryCount", Value::from(stream_state.query_count)),
+        ("errorCount", Value::from(stream_state.error_count)),
+        (
+            "totalResultCount",
+            Value::from(stream_state.total_result_count),
+        ),
+        (
+            "collapsedQueryCount",
+            Value::from(stream_state.collapsed_query_count),
+        ),
+        ("totalLatencyMs", Value::from(stream_state.total_latency_ms)),
+        ("maxLatencyMs", Value::from(stream_state.max_latency_ms)),
+    ];
+    if let Some(reason) = close_telemetry.reason {
+        fields.push(("reason", Value::String(reason)));
+    }
+
+    publish_tunnel_telemetry_log(
+        tunnel_writer_sender,
+        telemetry_relay,
+        clock,
+        SandboxTelemetryLogLevel::Info,
+        FILE_SEARCH_EVENT_STREAM_SUMMARY,
+        &fields,
+    );
+}
+
+fn send_file_search_command(
+    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    session_state: &mut TunnelSessionMutableState,
+    clock: &dyn Clock,
+    stream_id: u32,
+    command: FileSearchWorkerCommand,
+) -> Result<(), TunnelSessionError> {
+    let Some(stream_state) = session_state.file_search_streams.get(&stream_id) else {
+        return Ok(());
+    };
+
+    if stream_state.worker.command_sender.send(command).is_err() {
+        write_tunnel_text(
+            tunnel_writer_sender,
+            stream_reset(
+                stream_id,
+                STREAM_RESET_CODE_TARGET_CLOSED,
+                "file search worker closed",
+            ),
+        )?;
+        close_file_search_stream(
+            tunnel_writer_sender,
+            session_state,
+            clock,
+            stream_id,
+            FileSearchStreamCloseTelemetry {
+                outcome: FILE_SEARCH_OUTCOME_RESET,
+                close_source: FILE_SEARCH_CLOSE_SOURCE_SANDBOXD,
+                reason: Some("file search worker closed".to_string()),
+            },
+        );
+    }
+
+    Ok(())
+}
+
 async fn handle_tunnel_session_event(
     event: TunnelSessionEvent,
     tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
@@ -3383,6 +3704,15 @@ async fn handle_tunnel_session_event(
                     error.to_string(),
                 )?;
             }
+            Ok(TunnelSessionControlFlow::Continue)
+        }
+        TunnelSessionEvent::FileSearch(event) => {
+            handle_file_search_worker_event(
+                tunnel_writer_sender,
+                event,
+                context.clock,
+                session_state,
+            )?;
             Ok(TunnelSessionControlFlow::Continue)
         }
         TunnelSessionEvent::AgentDialed { stream_id, result } => {
@@ -4735,14 +5065,74 @@ async fn handle_tunnel_control_message(
             write_tunnel_text(tunnel_writer_sender, stream_open_ok(message.stream_id))?;
         }
         StreamControlMessage::OpenFileSearch(message) => {
-            write_tunnel_text(
+            let event_sender = event_sender.clone();
+            let stream_id = message.stream_id;
+            let open_started_at = Instant::now();
+            let worker =
+                match spawn_file_search_worker(stream_id, &message.channel.cwd, move |event| {
+                    let _ = event_sender.send(TunnelSessionEvent::FileSearch(event));
+                }) {
+                    Ok(worker) => worker,
+                    Err(error) => {
+                        publish_tunnel_telemetry_log(
+                            tunnel_writer_sender,
+                            &mut session_state.telemetry_relay,
+                            context.clock,
+                            SandboxTelemetryLogLevel::Warn,
+                            "file_search_stream_open_failed",
+                            &[
+                                ("streamId", Value::from(u64::from(stream_id))),
+                                (
+                                    "channelKind",
+                                    Value::String(FILE_SEARCH_STREAM_CHANNEL_KIND.to_string()),
+                                ),
+                                (
+                                    "latencyMs",
+                                    Value::from(open_started_at.elapsed().as_millis() as u64),
+                                ),
+                                ("error", Value::String(error.clone())),
+                            ],
+                        );
+                        write_tunnel_text(
+                            tunnel_writer_sender,
+                            stream_open_error(stream_id, "file_search_open_failed", error),
+                        )?;
+                        return Ok(());
+                    }
+                };
+            session_state.file_search_streams.insert(
+                stream_id,
+                FileSearchStreamState {
+                    worker,
+                    send_window: StreamSendWindow::default(),
+                    opened_at_ms: context.clock.now_ms(),
+                    query_count: 0,
+                    error_count: 0,
+                    total_result_count: 0,
+                    collapsed_query_count: 0,
+                    total_latency_ms: 0,
+                    max_latency_ms: 0,
+                },
+            );
+            publish_tunnel_telemetry_log(
                 tunnel_writer_sender,
-                stream_open_error(
-                    message.stream_id,
-                    CONNECT_ERROR_CODE_FILE_SEARCH_STREAM_UNAVAILABLE,
-                    "file search streams are not implemented yet",
-                ),
-            )?;
+                &mut session_state.telemetry_relay,
+                context.clock,
+                SandboxTelemetryLogLevel::Info,
+                FILE_SEARCH_EVENT_STREAM_OPENED,
+                &[
+                    ("streamId", Value::from(u64::from(stream_id))),
+                    (
+                        "channelKind",
+                        Value::String(FILE_SEARCH_STREAM_CHANNEL_KIND.to_string()),
+                    ),
+                    (
+                        "latencyMs",
+                        Value::from(open_started_at.elapsed().as_millis() as u64),
+                    ),
+                ],
+            );
+            write_tunnel_text(tunnel_writer_sender, stream_open_ok(stream_id))?;
         }
         StreamControlMessage::Signal(message) => {
             write_tunnel_text(
@@ -4781,6 +5171,23 @@ async fn handle_tunnel_control_message(
                 .remove(&message.stream_id)
                 .is_some()
             {
+                return Ok(());
+            }
+            if session_state
+                .file_search_streams
+                .contains_key(&message.stream_id)
+            {
+                close_file_search_stream(
+                    tunnel_writer_sender,
+                    session_state,
+                    context.clock,
+                    message.stream_id,
+                    FileSearchStreamCloseTelemetry {
+                        outcome: FILE_SEARCH_OUTCOME_CLOSED,
+                        close_source: FILE_SEARCH_CLOSE_SOURCE_GATEWAY,
+                        reason: None,
+                    },
+                );
                 return Ok(());
             }
             if let Some(pending_exec_open) =
@@ -4822,6 +5229,16 @@ async fn handle_tunnel_control_message(
                 .get_mut(&message.stream_id)
             {
                 send_window
+                    .add(message.bytes)
+                    .map_err(|error| TunnelSessionError::ParseControl(error.to_string()))?;
+                return Ok(());
+            }
+            if let Some(stream_state) = session_state
+                .file_search_streams
+                .get_mut(&message.stream_id)
+            {
+                stream_state
+                    .send_window
                     .add(message.bytes)
                     .map_err(|error| TunnelSessionError::ParseControl(error.to_string()))?;
                 return Ok(());
@@ -5084,6 +5501,7 @@ fn tunnel_stream_is_active(session_state: &TunnelSessionMutableState, stream_id:
         || session_state
             .processes_stream_send_windows
             .contains_key(&stream_id)
+        || session_state.file_search_streams.contains_key(&stream_id)
         || session_state.file_uploads.contains_key(&stream_id)
 }
 
@@ -5216,6 +5634,115 @@ fn handle_tunnel_binary_frame(
                 session_state
                     .processes_stream_send_windows
                     .remove(&frame.stream_id);
+            }
+        }
+        return Ok(());
+    }
+
+    if session_state
+        .file_search_streams
+        .contains_key(&frame.stream_id)
+    {
+        if frame.payload_kind != PAYLOAD_KIND_WEBSOCKET_TEXT {
+            write_tunnel_text(
+                tunnel_writer_sender,
+                stream_reset(
+                    frame.stream_id,
+                    STREAM_RESET_CODE_INVALID_STREAM_DATA,
+                    "file search stream only accepts websocket text payloads",
+                ),
+            )?;
+            close_file_search_stream(
+                tunnel_writer_sender,
+                session_state,
+                clock,
+                frame.stream_id,
+                FileSearchStreamCloseTelemetry {
+                    outcome: FILE_SEARCH_OUTCOME_RESET,
+                    close_source: FILE_SEARCH_CLOSE_SOURCE_SANDBOXD,
+                    reason: Some(
+                        "file search stream only accepts websocket text payloads".to_string(),
+                    ),
+                },
+            );
+            return Ok(());
+        }
+
+        let payload = String::from_utf8(frame.payload)
+            .map_err(|error| TunnelSessionError::ParseDataFrame(error.to_string()))?;
+        match parse_file_search_stream_message(&payload) {
+            Ok(crate::tunnel::protocol::FileSearchStreamMessage::Query(message)) => {
+                write_tunnel_text(
+                    tunnel_writer_sender,
+                    stream_window(frame.stream_id, payload.len()),
+                )?;
+                send_file_search_command(
+                    tunnel_writer_sender,
+                    session_state,
+                    clock,
+                    frame.stream_id,
+                    FileSearchWorkerCommand::Query(message),
+                )?;
+            }
+            Ok(crate::tunnel::protocol::FileSearchStreamMessage::Select(message)) => {
+                write_tunnel_text(
+                    tunnel_writer_sender,
+                    stream_window(frame.stream_id, payload.len()),
+                )?;
+                send_file_search_command(
+                    tunnel_writer_sender,
+                    session_state,
+                    clock,
+                    frame.stream_id,
+                    FileSearchWorkerCommand::Select(message),
+                )?;
+            }
+            Ok(crate::tunnel::protocol::FileSearchStreamMessage::Results(_))
+            | Ok(crate::tunnel::protocol::FileSearchStreamMessage::Error(_)) => {
+                write_tunnel_text(
+                    tunnel_writer_sender,
+                    stream_reset(
+                        frame.stream_id,
+                        STREAM_RESET_CODE_INVALID_STREAM_DATA,
+                        "file search stream does not accept result payloads from the gateway",
+                    ),
+                )?;
+                close_file_search_stream(
+                    tunnel_writer_sender,
+                    session_state,
+                    clock,
+                    frame.stream_id,
+                    FileSearchStreamCloseTelemetry {
+                        outcome: FILE_SEARCH_OUTCOME_RESET,
+                        close_source: FILE_SEARCH_CLOSE_SOURCE_SANDBOXD,
+                        reason: Some(
+                            "file search stream does not accept result payloads from the gateway"
+                                .to_string(),
+                        ),
+                    },
+                );
+            }
+            Err(error) => {
+                let reason = error.to_string();
+                write_tunnel_text(
+                    tunnel_writer_sender,
+                    stream_reset(
+                        frame.stream_id,
+                        STREAM_RESET_CODE_INVALID_STREAM_DATA,
+                        reason.clone(),
+                    ),
+                )?;
+                close_file_search_stream(
+                    tunnel_writer_sender,
+                    session_state,
+                    clock,
+                    frame.stream_id,
+                    FileSearchStreamCloseTelemetry {
+                        outcome: FILE_SEARCH_OUTCOME_RESET,
+                        close_source: FILE_SEARCH_CLOSE_SOURCE_SANDBOXD,
+                        reason: Some(reason),
+                    },
+                );
             }
         }
         return Ok(());
@@ -5909,12 +6436,12 @@ mod tests {
         SANDBOX_OPERATION_STREAM_ID, TunnelSessionError, TunnelSessionEvent,
         TunnelSessionLoopContext, TunnelSessionMutableState, TunnelSessionRequest,
         TunnelSessionRuntime, TunnelSessionRuntimeConnectionState, TunnelWriterMessage,
-        connect_bootstrap_websocket, handle_ports_transport_message, handle_tunnel_control_message,
-        handle_tunnel_session_event, handle_tunnel_session_request,
+        connect_bootstrap_websocket, handle_ports_transport_message, handle_tunnel_binary_frame,
+        handle_tunnel_control_message, handle_tunnel_session_event, handle_tunnel_session_request,
         prioritize_ipv4_socket_addresses, record_egress_token_event, resolve_bootstrap_tunnel_url,
         resolve_tunnel_exchange_url, run_connected_tunnel_session_catching_panics,
         snapshot_runtime_connection_state, startup_transparent_passthrough_socket_mark,
-        sync_pty_scope_keepalive,
+        sync_pty_scope_keepalive, terminate_file_search_stream,
     };
 
     use std::collections::{BTreeMap, BTreeSet};
@@ -5932,6 +6459,7 @@ mod tests {
     #[cfg(target_os = "linux")]
     use base64::Engine;
     use serde_json::{Value, json};
+    use tokio::time::timeout;
     use tungstenite::{
         Error as WebSocketError, Message, WebSocket, accept, accept_hdr,
         handshake::server::{Request, Response},
@@ -6050,6 +6578,19 @@ mod tests {
         serde_json::from_str::<Value>(&payload).expect("writer text payload should be json")
     }
 
+    async fn read_writer_binary_frame(
+        receiver: &mut tokio::sync::mpsc::UnboundedReceiver<TunnelWriterMessage>,
+    ) -> StreamDataFrame {
+        let writer_message = receiver
+            .recv()
+            .await
+            .expect("writer binary frame should be queued");
+        let TunnelWriterMessage::Binary(payload) = writer_message else {
+            panic!("expected a tunnel writer binary frame");
+        };
+        decode_stream_data_frame(payload.as_ref()).expect("writer binary frame should decode")
+    }
+
     fn empty_tunnel_session_state() -> TunnelSessionMutableState {
         TunnelSessionMutableState {
             agent_endpoint_url: None,
@@ -6063,6 +6604,7 @@ mod tests {
             port_access_http_streams: BTreeMap::new(),
             port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
+            file_search_streams: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
             operation_stream_requested: false,
             operation_stream_close_requested: false,
@@ -6167,6 +6709,158 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn file_search_stream_returns_results_from_open_cwd() {
+        let temp_dir = tempfile::TempDir::new().expect("temp dir should be created");
+        fs::create_dir(temp_dir.path().join("src")).expect("src directory should be created");
+        fs::write(temp_dir.path().join("src").join("protocol.rs"), "")
+            .expect("protocol file should be written");
+
+        let (tunnel_writer_sender, mut tunnel_writer_receiver) =
+            tokio::sync::mpsc::unbounded_channel();
+        let (event_sender, mut event_receiver) = tokio::sync::mpsc::unbounded_channel();
+        let clock = SystemClock;
+        let supervisor_handle = test_tunnel_supervisor_handle("sbi_test", Arc::new(SystemClock));
+        let context = TunnelSessionLoopContext {
+            attachment_root: std::path::Path::new("/tmp"),
+            cgroup_root: std::path::Path::new("/tmp"),
+            sandbox_instance_id: "sbi_test",
+            gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
+            clock: &clock,
+            supervisor_handle: &supervisor_handle,
+        };
+        let mut session_state = empty_tunnel_session_state();
+        let open_payload = json!({
+            "type": "stream.open",
+            "streamId": 31,
+            "channel": {
+                "kind": "fileSearch",
+                "cwd": temp_dir.path(),
+            }
+        })
+        .to_string();
+
+        handle_tunnel_control_message(
+            &tunnel_writer_sender,
+            &event_sender,
+            parse_stream_control_message(&open_payload)
+                .expect("file search stream.open should parse"),
+            &context,
+            &mut session_state,
+        )
+        .await
+        .expect("file search stream should open");
+        assert_eq!(
+            read_writer_text_json(&mut tunnel_writer_receiver).await,
+            json!({
+                "type": "stream.open.ok",
+                "streamId": 31,
+            }),
+        );
+
+        let query_payload = json!({
+            "type": "fileSearch.query",
+            "requestId": "file_search_req_1",
+            "query": "protocol",
+            "limit": 10,
+        })
+        .to_string();
+        handle_tunnel_binary_frame(
+            &tunnel_writer_sender,
+            StreamDataFrame {
+                stream_id: 31,
+                payload_kind: PAYLOAD_KIND_WEBSOCKET_TEXT,
+                payload: query_payload.as_bytes().to_vec(),
+            },
+            &mut session_state,
+            &clock,
+        )
+        .expect("file search query should route to worker");
+        assert_eq!(
+            read_writer_text_json(&mut tunnel_writer_receiver).await,
+            json!({
+                "type": "stream.window",
+                "streamId": 31,
+                "bytes": query_payload.len(),
+            }),
+        );
+
+        let event = timeout(Duration::from_secs(2), event_receiver.recv())
+            .await
+            .expect("file search worker should emit an event")
+            .expect("file search worker event channel should stay open");
+        handle_tunnel_session_event(
+            event,
+            &tunnel_writer_sender,
+            &event_sender,
+            &context,
+            &mut session_state,
+        )
+        .await
+        .expect("file search results should be written");
+        let frame = read_writer_binary_frame(&mut tunnel_writer_receiver).await;
+        assert_eq!(frame.stream_id, 31);
+        assert_eq!(frame.payload_kind, PAYLOAD_KIND_WEBSOCKET_TEXT);
+        let results: Value =
+            serde_json::from_slice(&frame.payload).expect("file search results should be json");
+        assert_eq!(results["type"], "fileSearch.results");
+        assert_eq!(results["requestId"], "file_search_req_1");
+        assert!(
+            results["items"]
+                .as_array()
+                .expect("file search results should include items")
+                .iter()
+                .any(|item| item
+                    == &json!({
+                        "path": "src/protocol.rs",
+                        "kind": "file",
+                    }))
+        );
+
+        terminate_file_search_stream(&mut session_state, 31);
+    }
+
+    #[test]
+    fn file_search_query_telemetry_fields_include_latency_and_limit_signals() {
+        let fields = super::file_search_query_telemetry_fields(
+            31,
+            "file_search_req_1",
+            &crate::tunnel::file_search::FileSearchQueryMetrics {
+                query_length: 8,
+                requested_limit: Some(500),
+                effective_limit: 100,
+                collapsed_query_count: 2,
+                debounce_wait_ms: 101,
+                scan_wait_ms: 7,
+                search_ms: 3,
+                total_latency_ms: 111,
+                result_count: 100,
+                limited: true,
+            },
+        );
+        let field_map = fields.into_iter().collect::<BTreeMap<_, _>>();
+
+        assert_eq!(field_map["streamId"], Value::from(31));
+        assert_eq!(
+            field_map["channelKind"],
+            Value::String("fileSearch".to_string())
+        );
+        assert_eq!(
+            field_map["requestId"],
+            Value::String("file_search_req_1".to_string())
+        );
+        assert_eq!(field_map["queryLength"], Value::from(8));
+        assert_eq!(field_map["requestedLimit"], Value::from(500));
+        assert_eq!(field_map["effectiveLimit"], Value::from(100));
+        assert_eq!(field_map["collapsedQueryCount"], Value::from(2));
+        assert_eq!(field_map["debounceWaitMs"], Value::from(101));
+        assert_eq!(field_map["scanWaitMs"], Value::from(7));
+        assert_eq!(field_map["searchMs"], Value::from(3));
+        assert_eq!(field_map["latencyMs"], Value::from(111));
+        assert_eq!(field_map["resultCount"], Value::from(100));
+        assert_eq!(field_map["limited"], Value::Bool(true));
+    }
+
+    #[tokio::test]
     async fn egress_token_diagnostics_write_lifecycle_operation_records() {
         let (tunnel_writer_sender, mut tunnel_writer_receiver) =
             tokio::sync::mpsc::unbounded_channel();
@@ -6246,6 +6940,7 @@ mod tests {
             port_access_http_streams: BTreeMap::new(),
             port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
+            file_search_streams: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
             operation_stream_requested: false,
             operation_stream_close_requested: false,
@@ -6322,6 +7017,7 @@ mod tests {
                 },
             )]),
             processes_stream_send_windows: BTreeMap::new(),
+            file_search_streams: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
             operation_stream_requested: false,
             operation_stream_close_requested: false,
@@ -6463,6 +7159,7 @@ mod tests {
                 },
             )]),
             processes_stream_send_windows: BTreeMap::new(),
+            file_search_streams: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
             operation_stream_requested: false,
             operation_stream_close_requested: false,
@@ -6517,6 +7214,7 @@ mod tests {
                 },
             )]),
             processes_stream_send_windows: BTreeMap::new(),
+            file_search_streams: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
             operation_stream_requested: false,
             operation_stream_close_requested: false,
@@ -6562,6 +7260,7 @@ mod tests {
             port_access_http_streams: BTreeMap::new(),
             port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
+            file_search_streams: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
             operation_stream_requested: false,
             operation_stream_close_requested: false,
@@ -6624,6 +7323,7 @@ mod tests {
                 },
             )]),
             processes_stream_send_windows: BTreeMap::new(),
+            file_search_streams: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
             operation_stream_requested: false,
             operation_stream_close_requested: false,
@@ -6715,6 +7415,7 @@ mod tests {
                 },
             )]),
             processes_stream_send_windows: BTreeMap::new(),
+            file_search_streams: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
             operation_stream_requested: false,
             operation_stream_close_requested: false,
@@ -6793,6 +7494,7 @@ mod tests {
             port_access_http_streams: BTreeMap::new(),
             port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
+            file_search_streams: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
             operation_stream_requested: false,
             operation_stream_close_requested: false,
@@ -6883,6 +7585,7 @@ mod tests {
             port_access_http_streams: BTreeMap::new(),
             port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
+            file_search_streams: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
             operation_stream_requested: false,
             operation_stream_close_requested: false,
