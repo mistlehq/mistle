@@ -12,6 +12,8 @@ export {
   verifyEgressToken,
 } from "./egress-token.js";
 export type { EgressTokenClaims, EgressTokenConfig, VerifiedEgressToken } from "./egress-token.js";
+export { McpTokenError, McpTokenErrorCode, mintMcpToken, verifyMcpToken } from "./mcp-token.js";
+export type { McpTokenClaims, McpTokenConfig, VerifiedMcpToken } from "./mcp-token.js";
 export {
   PtyTransportTokenError,
   PtyTransportTokenErrorCode,
