@@ -34,7 +34,10 @@ import {
   listComposerCommands,
   readLeadingSlashCommandName,
 } from "./session-composer-trigger-detection.js";
-import type { SessionComposerAttachmentControl } from "./use-session-composer-attachment-control.js";
+import type {
+  PreparedComposerAttachments,
+  SessionComposerAttachmentControl,
+} from "./use-session-composer-attachment-control.js";
 import type { SessionComposerConfigControl } from "./use-session-composer-config-control.js";
 
 type PendingComposerAttachment = {
@@ -50,6 +53,21 @@ type QueuedComposerPrompt = {
   pendingDiffComments: readonly PendingSessionDiffComment[];
   status: "failed" | "queued" | "submitting";
 };
+
+type PreparedComposerTurnSubmission = {
+  preparedAttachments: PreparedComposerAttachments;
+  submittedPrompt: string;
+};
+
+type ComposerTurnSubmissionPreparationResult =
+  | {
+      status: "blocked";
+      message: string | null;
+    }
+  | {
+      status: "ready";
+      submission: PreparedComposerTurnSubmission;
+    };
 
 export type QueuedComposerPromptViewModel = {
   id: string;
@@ -264,6 +282,68 @@ export function useSessionComposerState(input: {
     [clearSessionErrorMessage],
   );
 
+  const prepareComposerTurnSubmission = useCallback(
+    async (prepareInput: {
+      attachments: readonly PendingComposerAttachment[];
+      composerText: string;
+      pendingDiffComments: readonly PendingSessionDiffComment[];
+    }): Promise<ComposerTurnSubmissionPreparationResult> => {
+      if (composerStateInput.bootstrap.phase.status !== "ready") {
+        return {
+          status: "blocked",
+          message:
+            composerStateInput.bootstrap.phase.status === "failed"
+              ? composerStateInput.bootstrap.phase.message
+              : null,
+        };
+      }
+
+      if (requiresModelSelection && activeComposerModel === null) {
+        return {
+          status: "blocked",
+          message:
+            composerStateInput.configControl.selectedModel === null
+              ? buildModelSelectionRequiredMessage()
+              : buildUnavailableModelErrorMessage(composerStateInput.configControl.selectedModel),
+        };
+      }
+
+      const submittedPrompt = buildSessionComposerPrompt({
+        composerText: prepareInput.composerText,
+        pendingDiffComments: prepareInput.pendingDiffComments,
+      });
+
+      try {
+        const preparedAttachments = await composerStateInput.attachmentControl.prepareAttachments({
+          files: prepareInput.attachments.map((attachment) => attachment.file),
+          prompt: submittedPrompt,
+          supportsImageInspection:
+            activeComposerModel !== null && supportsImageInspection(activeComposerModel),
+        });
+
+        return {
+          status: "ready",
+          submission: {
+            preparedAttachments,
+            submittedPrompt,
+          },
+        };
+      } catch (error) {
+        return {
+          status: "blocked",
+          message: error instanceof Error ? error.message : "Could not upload attachments.",
+        };
+      }
+    },
+    [
+      activeComposerModel,
+      composerStateInput.attachmentControl,
+      composerStateInput.bootstrap.phase,
+      composerStateInput.configControl.selectedModel,
+      requiresModelSelection,
+    ],
+  );
+
   const submitAction = useMemo(
     () =>
       resolveComposerSubmitAction({
@@ -323,42 +403,20 @@ export function useSessionComposerState(input: {
       setIsSubmittingNativeQueuedPrompt(true);
       void (async (): Promise<void> => {
         try {
-          if (composerStateInput.bootstrap.phase.status !== "ready") {
-            if (composerStateInput.bootstrap.phase.status === "failed") {
-              setComposerErrorMessage(composerStateInput.bootstrap.phase.message);
-            }
-            return;
-          }
-
-          if (requiresModelSelection && activeComposerModel === null) {
-            const missingModelMessage =
-              composerStateInput.configControl.selectedModel === null
-                ? buildModelSelectionRequiredMessage()
-                : buildUnavailableModelErrorMessage(composerStateInput.configControl.selectedModel);
-            setComposerErrorMessage(missingModelMessage);
-            return;
-          }
-
-          const submittedPrompt = buildSessionComposerPrompt({
+          const preparationResult = await prepareComposerTurnSubmission({
+            attachments: pendingComposerAttachments,
             composerText: trimmedComposerText,
             pendingDiffComments: draftState.pendingDiffComments,
           });
 
-          let preparedAttachments;
-          try {
-            preparedAttachments = await composerStateInput.attachmentControl.prepareAttachments({
-              files: pendingComposerAttachments.map((attachment) => attachment.file),
-              prompt: submittedPrompt,
-              supportsImageInspection:
-                activeComposerModel !== null && supportsImageInspection(activeComposerModel),
-            });
-          } catch (error) {
-            setComposerErrorMessage(
-              error instanceof Error ? error.message : "Could not upload attachments.",
-            );
+          if (preparationResult.status === "blocked") {
+            if (preparationResult.message !== null) {
+              setComposerErrorMessage(preparationResult.message);
+            }
             return;
           }
 
+          const { preparedAttachments, submittedPrompt } = preparationResult.submission;
           try {
             await queueTurn({
               submittedPrompt: preparedAttachments.prompt,
@@ -408,7 +466,7 @@ export function useSessionComposerState(input: {
     draftState,
     isSubmittingNativeQueuedPrompt,
     pendingComposerAttachments,
-    requiresModelSelection,
+    prepareComposerTurnSubmission,
     typedRuntimeCommand,
     unavailableTypedRuntimeCommand,
   ]);
@@ -434,14 +492,15 @@ export function useSessionComposerState(input: {
         ),
       );
 
-      const submittedPrompt = buildSessionComposerPrompt({
+      const preparationResult = await prepareComposerTurnSubmission({
+        attachments: queuedPrompt.attachments,
         composerText: queuedPrompt.prompt,
         pendingDiffComments: queuedPrompt.pendingDiffComments,
       });
 
-      if (composerStateInput.bootstrap.phase.status !== "ready") {
-        if (composerStateInput.bootstrap.phase.status === "failed") {
-          setComposerErrorMessage(composerStateInput.bootstrap.phase.message);
+      if (preparationResult.status === "blocked") {
+        if (preparationResult.message !== null) {
+          setComposerErrorMessage(preparationResult.message);
         }
         setQueuedPrompts((currentQueuedPrompts) =>
           currentQueuedPrompts.map((currentQueuedPrompt) =>
@@ -456,50 +515,7 @@ export function useSessionComposerState(input: {
         return;
       }
 
-      if (requiresModelSelection && activeComposerModel === null) {
-        const missingModelMessage =
-          composerStateInput.configControl.selectedModel === null
-            ? buildModelSelectionRequiredMessage()
-            : buildUnavailableModelErrorMessage(composerStateInput.configControl.selectedModel);
-        setComposerErrorMessage(missingModelMessage);
-        setQueuedPrompts((currentQueuedPrompts) =>
-          currentQueuedPrompts.map((currentQueuedPrompt) =>
-            currentQueuedPrompt.id !== queuedPrompt.id
-              ? currentQueuedPrompt
-              : {
-                  ...currentQueuedPrompt,
-                  status: "failed",
-                },
-          ),
-        );
-        return;
-      }
-
-      let preparedAttachments;
-      try {
-        preparedAttachments = await composerStateInput.attachmentControl.prepareAttachments({
-          files: queuedPrompt.attachments.map((attachment) => attachment.file),
-          prompt: submittedPrompt,
-          supportsImageInspection:
-            activeComposerModel !== null && supportsImageInspection(activeComposerModel),
-        });
-      } catch (error) {
-        setComposerErrorMessage(
-          error instanceof Error ? error.message : "Could not upload attachments.",
-        );
-        setQueuedPrompts((currentQueuedPrompts) =>
-          currentQueuedPrompts.map((currentQueuedPrompt) =>
-            currentQueuedPrompt.id !== queuedPrompt.id
-              ? currentQueuedPrompt
-              : {
-                  ...currentQueuedPrompt,
-                  status: "failed",
-                },
-          ),
-        );
-        return;
-      }
-
+      const { preparedAttachments, submittedPrompt } = preparationResult.submission;
       try {
         await composerStateInput.turnControl.startTurn({
           submittedPrompt: preparedAttachments.prompt,
@@ -536,13 +552,9 @@ export function useSessionComposerState(input: {
       setComposerErrorMessage(null);
     },
     [
-      activeComposerModel,
       clearSessionErrorMessage,
-      composerStateInput.attachmentControl,
-      composerStateInput.bootstrap.phase,
-      composerStateInput.configControl.selectedModel,
       composerStateInput.turnControl,
-      requiresModelSelection,
+      prepareComposerTurnSubmission,
       turnCollaborationModeSettings,
     ],
   );
@@ -600,42 +612,20 @@ export function useSessionComposerState(input: {
         return;
       }
 
-      if (composerStateInput.bootstrap.phase.status !== "ready") {
-        if (composerStateInput.bootstrap.phase.status === "failed") {
-          setComposerErrorMessage(composerStateInput.bootstrap.phase.message);
-        }
-        return;
-      }
-
-      if (requiresModelSelection && activeComposerModel === null) {
-        const missingModelMessage =
-          composerStateInput.configControl.selectedModel === null
-            ? buildModelSelectionRequiredMessage()
-            : buildUnavailableModelErrorMessage(composerStateInput.configControl.selectedModel);
-        setComposerErrorMessage(missingModelMessage);
-        return;
-      }
-
-      const submittedPrompt = buildSessionComposerPrompt({
+      const preparationResult = await prepareComposerTurnSubmission({
+        attachments: pendingComposerAttachments,
         composerText: submitAction.prompt,
         pendingDiffComments: draftState.pendingDiffComments,
       });
 
-      let preparedAttachments;
-      try {
-        preparedAttachments = await composerStateInput.attachmentControl.prepareAttachments({
-          files: pendingComposerAttachments.map((attachment) => attachment.file),
-          prompt: submittedPrompt,
-          supportsImageInspection:
-            activeComposerModel !== null && supportsImageInspection(activeComposerModel),
-        });
-      } catch (error) {
-        setComposerErrorMessage(
-          error instanceof Error ? error.message : "Could not upload attachments.",
-        );
+      if (preparationResult.status === "blocked") {
+        if (preparationResult.message !== null) {
+          setComposerErrorMessage(preparationResult.message);
+        }
         return;
       }
 
+      const { preparedAttachments, submittedPrompt } = preparationResult.submission;
       try {
         if (submitAction.type === "steer_turn") {
           await composerStateInput.turnControl.steerTurn({
@@ -670,17 +660,13 @@ export function useSessionComposerState(input: {
       setPendingComposerAttachments([]);
     })();
   }, [
-    activeComposerModel,
     clearSessionErrorMessage,
-    composerStateInput.attachmentControl,
-    composerStateInput.bootstrap.phase,
-    composerStateInput.configControl.selectedModel,
     composerStateInput.executeTypedRuntimeCommand,
     composerStateInput.turnControl,
     composerText,
     draftState,
     pendingComposerAttachments,
-    requiresModelSelection,
+    prepareComposerTurnSubmission,
     submitAction,
     turnCollaborationModeSettings,
     typedRuntimeCommand,
