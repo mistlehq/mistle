@@ -67,21 +67,19 @@ use crate::tunnel::port_access_transport::{
 use crate::tunnel::protocol::{
     AGENT_STREAM_WINDOW_BYTES, CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
     CONNECT_ERROR_CODE_INVALID_CONNECT_REQUEST, CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE,
-    EgressTokenControlMessage, EgressTokenRequest, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED,
-    PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
-    PtyControlMessage, PtySessionControlMessage, PtySessionLaunchMode, PtySessionOpen,
+    FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED, PAYLOAD_KIND_RAW_BYTES,
+    PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT, PtyControlMessage,
+    PtySessionControlMessage, PtySessionLaunchMode, PtySessionOpen,
     STREAM_RESET_CODE_EXEC_COMMAND_FAILED, STREAM_RESET_CODE_INVALID_STREAM_CLOSE,
     STREAM_RESET_CODE_INVALID_STREAM_DATA, STREAM_RESET_CODE_INVALID_STREAM_SIGNAL,
     STREAM_RESET_CODE_INVALID_STREAM_WINDOW, STREAM_RESET_CODE_PROCESSES_SNAPSHOT_FAILED,
     STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED, STREAM_RESET_CODE_TARGET_CLOSED,
-    SigningControlMessage, SigningRequest, StreamControlMessage, StreamSendWindow,
-    decode_stream_data_frame, egress_token_request, encode_stream_data_frame, exec_result_event,
-    parse_egress_token_control_message, parse_file_search_stream_message,
+    StreamControlMessage, StreamSendWindow, decode_stream_data_frame, encode_stream_data_frame,
+    exec_result_event, parse_egress_token_control_message, parse_file_search_stream_message,
     parse_ports_control_message, parse_ports_transport_message, parse_processes_stream_message,
     parse_pty_control_message, parse_pty_session_control_message, parse_signing_control_message,
     parse_stream_control_message, pty_exit_event, pty_session_error, pty_session_opened,
-    signing_request, stream_complete, stream_open_error, stream_open_ok, stream_reset,
-    stream_window,
+    stream_complete, stream_open_error, stream_open_ok, stream_reset, stream_window,
 };
 use crate::tunnel::runtime_processes::collect_processes_snapshot;
 use crate::tunnel::session::agent_stream::{
@@ -100,12 +98,18 @@ use crate::tunnel::session::file_search::{
 use crate::tunnel::session::file_upload::{
     FileUploadState, create_file_upload_state, finalize_file_upload,
 };
+use crate::tunnel::session::gateway_requests::{
+    fail_pending_egress_token_requests, fail_pending_signing_requests,
+    handle_egress_token_control_message, handle_egress_token_session_request,
+    handle_signing_control_message, handle_signing_session_request,
+};
 #[cfg(test)]
 use crate::tunnel::session::operation::SANDBOX_OPERATION_STREAM_FORMAT;
+#[cfg(test)]
+use crate::tunnel::session::operation::record_egress_token_event;
 use crate::tunnel::session::operation::{
     OPERATION_RECORD_CHANNEL_CAPACITY, close_operation_stream, enqueue_operation_record,
     flush_pending_operation_records, handle_operation_control_message, operation_open,
-    record_egress_token_event,
 };
 #[cfg(test)]
 use crate::tunnel::session::port_access::mark_port_access_tcp_direction_closed;
@@ -127,6 +131,7 @@ use crate::tunnel::telemetry::{SandboxTelemetryLogLevel, TelemetryRelay, Telemet
 mod agent_stream;
 mod file_search;
 mod file_upload;
+mod gateway_requests;
 mod operation;
 mod port_access;
 mod telemetry;
@@ -927,24 +932,6 @@ struct TunnelSessionMutableState {
     operation_stream_send_window: Option<StreamSendWindow>,
     pending_operation_records: VecDeque<String>,
     file_uploads: BTreeMap<u32, FileUploadState>,
-}
-
-fn fail_pending_signing_requests(session_state: &mut TunnelSessionMutableState, message: &str) {
-    for response_sender in std::mem::take(&mut session_state.pending_signing_requests).into_values()
-    {
-        let _ = response_sender.send(Err(TunnelSessionError::Signing(message.to_string())));
-    }
-}
-
-fn fail_pending_egress_token_requests(
-    session_state: &mut TunnelSessionMutableState,
-    message: &str,
-) {
-    for response_sender in
-        std::mem::take(&mut session_state.pending_egress_token_requests).into_values()
-    {
-        let _ = response_sender.send(Err(TunnelSessionError::EgressToken(message.to_string())));
-    }
 }
 
 fn continue_with(
@@ -3584,117 +3571,23 @@ fn handle_tunnel_session_request(
         TunnelSessionRequest::Signing {
             request,
             response_sender,
-        } => {
-            if request.request_id.trim().is_empty() {
-                let _ = response_sender.send(Err(TunnelSessionError::Signing(
-                    "signing request id is required".to_string(),
-                )));
-                return Ok(TunnelSessionControlFlow::Continue);
-            }
-
-            if session_state
-                .pending_signing_requests
-                .contains_key(&request.request_id)
-            {
-                let _ = response_sender.send(Err(TunnelSessionError::Signing(
-                    "duplicate signing request id".to_string(),
-                )));
-                return Ok(TunnelSessionControlFlow::Continue);
-            }
-
-            session_state
-                .pending_signing_requests
-                .insert(request.request_id.clone(), response_sender);
-            let request_id = request.request_id.clone();
-
-            let payload = signing_request(&SigningRequest {
-                message_type: "signing.request".to_string(),
-                request_id: request.request_id,
-                organization_id: request.organization_id,
-                sandbox_instance_id: request.sandbox_instance_id,
-                acting_user_id: request.acting_user_id,
-                provider_family: request.provider_family,
-                format: request.format,
-                key_ref: request.key_ref,
-                grant: request.grant,
-                payload: request.payload_base64,
-                encoding: "base64".to_string(),
-            });
-
-            match write_tunnel_text(tunnel_writer_sender, payload) {
-                Ok(()) => Ok(TunnelSessionControlFlow::Continue),
-                Err(error) => {
-                    if let Some(response_sender) =
-                        session_state.pending_signing_requests.remove(&request_id)
-                    {
-                        let _ = response_sender
-                            .send(Err(TunnelSessionError::Signing(error.to_string())));
-                    }
-                    Err(error)
-                }
-            }
-        }
+        } => continue_with(handle_signing_session_request(
+            tunnel_writer_sender,
+            session_state,
+            request,
+            response_sender,
+        )),
         TunnelSessionRequest::EgressToken {
             request_id,
             response_sender,
-        } => {
-            if request_id.trim().is_empty() {
-                let _ = response_sender.send(Err(TunnelSessionError::EgressToken(
-                    "egress token request id is required".to_string(),
-                )));
-                return Ok(TunnelSessionControlFlow::Continue);
-            }
-
-            if session_state
-                .pending_egress_token_requests
-                .contains_key(&request_id)
-            {
-                let _ = response_sender.send(Err(TunnelSessionError::EgressToken(
-                    "duplicate egress token request id".to_string(),
-                )));
-                return Ok(TunnelSessionControlFlow::Continue);
-            }
-
-            record_egress_token_event(
-                tunnel_writer_sender,
-                session_state,
-                runtime.clock.as_ref(),
-                runtime.sandbox_instance_id.as_str(),
-                "egress_token_request_started",
-                &request_id,
-                &[],
-            );
-            session_state
-                .pending_egress_token_requests
-                .insert(request_id.clone(), response_sender);
-            let payload = egress_token_request(&EgressTokenRequest {
-                message_type: "egress.token.request".to_string(),
-                request_id: request_id.clone(),
-            });
-
-            match write_tunnel_text(tunnel_writer_sender, payload) {
-                Ok(()) => Ok(TunnelSessionControlFlow::Continue),
-                Err(error) => {
-                    if let Some(response_sender) = session_state
-                        .pending_egress_token_requests
-                        .remove(&request_id)
-                    {
-                        let _ = response_sender
-                            .send(Err(TunnelSessionError::EgressToken(error.to_string())));
-                    }
-                    record_egress_token_event(
-                        tunnel_writer_sender,
-                        session_state,
-                        runtime.clock.as_ref(),
-                        runtime.sandbox_instance_id.as_str(),
-                        "egress_token_request_failed",
-                        &request_id,
-                        &[("error", Value::String(error.to_string()))],
-                    );
-                    Err(error)
-                }
-            }
-        }
+        } => continue_with(handle_egress_token_session_request(
+            tunnel_writer_sender,
+            session_state,
+            runtime.clock.as_ref(),
+            runtime.sandbox_instance_id.as_str(),
+            request_id,
+            response_sender,
+        )),
         TunnelSessionRequest::OperationRecord { line } => {
             enqueue_operation_record(session_state, line);
             flush_pending_operation_records(tunnel_writer_sender, session_state);
@@ -3722,110 +3615,6 @@ fn derive_startup_operation_id(tunnel_gateway_ws_url: &str) -> Option<String> {
             None
         }
     })
-}
-
-fn handle_signing_control_message(
-    session_state: &mut TunnelSessionMutableState,
-    message: SigningControlMessage,
-) {
-    match message {
-        SigningControlMessage::Request(request) => {
-            eprintln!(
-                "sandboxd dropped unexpected signing request '{}' from the gateway",
-                request.request_id
-            );
-        }
-        SigningControlMessage::ResultSuccess(result) => {
-            if let Some(response_sender) = session_state
-                .pending_signing_requests
-                .remove(&result.request_id)
-            {
-                let _ = response_sender.send(Ok(TunnelSigningResponse::Success {
-                    request_id: result.request_id,
-                    signature_base64: result.signature,
-                }));
-            }
-        }
-        SigningControlMessage::ResultFailure(result) => {
-            if let Some(response_sender) = session_state
-                .pending_signing_requests
-                .remove(&result.request_id)
-            {
-                let _ = response_sender.send(Ok(TunnelSigningResponse::Failure {
-                    request_id: result.request_id,
-                    code: result.code,
-                    message: result.message,
-                }));
-            }
-        }
-    }
-}
-
-fn handle_egress_token_control_message(
-    session_state: &mut TunnelSessionMutableState,
-    tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
-    clock: &dyn Clock,
-    sandbox_instance_id: &str,
-    message: EgressTokenControlMessage,
-) {
-    match message {
-        EgressTokenControlMessage::Request(request) => {
-            eprintln!(
-                "sandboxd dropped unexpected egress token request '{}' from the gateway",
-                request.request_id
-            );
-        }
-        EgressTokenControlMessage::Response(response) => {
-            if let Some(response_sender) = session_state
-                .pending_egress_token_requests
-                .remove(&response.request_id)
-            {
-                let request_id = response.request_id;
-                let expires_at = response.expires_at;
-                let ttl_ms = response.ttl_ms;
-                let _ = response_sender.send(Ok(TunnelEgressToken {
-                    token: response.token,
-                    expires_at: expires_at.clone(),
-                    ttl_ms,
-                }));
-                record_egress_token_event(
-                    tunnel_writer_sender,
-                    session_state,
-                    clock,
-                    sandbox_instance_id,
-                    "egress_token_request_completed",
-                    &request_id,
-                    &[
-                        ("expiresAt", Value::String(expires_at)),
-                        ("ttlMs", Value::from(ttl_ms)),
-                    ],
-                );
-            }
-        }
-        EgressTokenControlMessage::Error(error) => {
-            if let Some(response_sender) = session_state
-                .pending_egress_token_requests
-                .remove(&error.request_id)
-            {
-                let _ = response_sender.send(Err(TunnelSessionError::EgressToken(format!(
-                    "{}: {}",
-                    error.code, error.message
-                ))));
-                record_egress_token_event(
-                    tunnel_writer_sender,
-                    session_state,
-                    clock,
-                    sandbox_instance_id,
-                    "egress_token_request_failed",
-                    &error.request_id,
-                    &[
-                        ("code", Value::String(error.code)),
-                        ("error", Value::String(error.message)),
-                    ],
-                );
-            }
-        }
-    }
 }
 
 fn report_dropped_bootstrap_text_message(
