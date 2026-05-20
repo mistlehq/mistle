@@ -105,6 +105,10 @@ use crate::tunnel::session::file_search::{
 use crate::tunnel::session::file_upload::{
     FileUploadState, create_file_upload_state, finalize_file_upload,
 };
+use crate::tunnel::session::port_access::{
+    PortAccessTcpStreamState, close_port_access_tcp_streams, mark_port_access_tcp_direction_closed,
+    port_access_stream_is_active,
+};
 use crate::tunnel::session::telemetry::{
     AGENT_STREAM_CLOSE_SOURCE_GATEWAY, AGENT_STREAM_CLOSE_SOURCE_RUNTIME,
     AGENT_STREAM_OUTCOME_CLOSED, AGENT_STREAM_OUTCOME_RESET, AgentStreamTermination,
@@ -118,6 +122,7 @@ use crate::tunnel::telemetry::{SandboxTelemetryLogLevel, TelemetryRelay, Telemet
 mod agent_stream;
 mod file_search;
 mod file_upload;
+mod port_access;
 mod telemetry;
 
 /// Default attachment root for file uploads received over the bootstrap tunnel.
@@ -893,13 +898,6 @@ struct TunnelSessionLoopContext<'a> {
     gateway_ws_url: &'a str,
     clock: &'a dyn Clock,
     supervisor_handle: &'a SandboxdSupervisorHandle,
-}
-
-struct PortAccessTcpStreamState {
-    sender: mpsc::UnboundedSender<PortAccessTcpCommand>,
-    request_window: StreamSendWindow,
-    request_closed: bool,
-    response_closed: bool,
 }
 
 struct TunnelSessionMutableState {
@@ -4628,12 +4626,7 @@ fn handle_ports_transport_message(
             let stream_sender = spawn_tcp_transport(message.clone(), transport_event_sender);
             session_state.port_access_tcp_streams.insert(
                 message.stream_id,
-                PortAccessTcpStreamState {
-                    sender: stream_sender,
-                    request_window: StreamSendWindow::default(),
-                    request_closed: false,
-                    response_closed: false,
-                },
+                PortAccessTcpStreamState::new(stream_sender),
             );
         }
         crate::tunnel::protocol::PortsTransportMessage::TcpConnected(message) => {
@@ -4767,16 +4760,6 @@ fn handle_ports_transport_message(
     Ok(())
 }
 
-fn port_access_stream_is_active(session_state: &TunnelSessionMutableState, stream_id: u32) -> bool {
-    session_state
-        .port_access_http_streams
-        .contains_key(&stream_id)
-        || session_state
-            .port_access_tcp_streams
-            .contains_key(&stream_id)
-        || tunnel_stream_is_active(session_state, stream_id)
-}
-
 fn reject_duplicate_tunnel_stream_open(
     tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     session_state: &TunnelSessionMutableState,
@@ -4806,30 +4789,6 @@ fn tunnel_stream_is_active(session_state: &TunnelSessionMutableState, stream_id:
             .contains_key(&stream_id)
         || session_state.file_search_streams.contains_key(&stream_id)
         || session_state.file_uploads.contains_key(&stream_id)
-}
-
-fn mark_port_access_tcp_direction_closed(
-    session_state: &mut TunnelSessionMutableState,
-    stream_id: u32,
-    direction: &str,
-) {
-    let Some(stream_state) = session_state.port_access_tcp_streams.get_mut(&stream_id) else {
-        return;
-    };
-    match direction {
-        "request" => stream_state.request_closed = true,
-        "response" => stream_state.response_closed = true,
-        _ => return,
-    }
-    if stream_state.request_closed && stream_state.response_closed {
-        session_state.port_access_tcp_streams.remove(&stream_id);
-    }
-}
-
-fn close_port_access_tcp_streams(session_state: &mut TunnelSessionMutableState) {
-    for (_, stream_state) in std::mem::take(&mut session_state.port_access_tcp_streams) {
-        let _ = stream_state.sender.send(PortAccessTcpCommand::Terminate);
-    }
 }
 
 fn handle_tunnel_binary_frame(
