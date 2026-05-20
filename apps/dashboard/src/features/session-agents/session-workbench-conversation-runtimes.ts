@@ -326,7 +326,7 @@ export function buildPiConversationRuntime(input: {
     displayName: capabilities.displayName,
     cliTerminalContentInset: capabilities.cliTerminalContentInset,
     conversation: {
-      activeConversationId: input.sessionSnapshot?.activeSessionFile ?? null,
+      activeConversationId: input.sessionSnapshot?.activeConversationId ?? null,
       attachmentTargetId:
         input.sessionSnapshot === null
           ? null

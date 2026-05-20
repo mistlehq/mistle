@@ -113,6 +113,116 @@ function mapPiConversationToRuntimeConversationSummary(
   };
 }
 
+function mapRuntimeConversationCwdInput(input?: { cwd?: string | null }): {
+  directory?: string | null;
+} {
+  return input?.cwd === undefined ? {} : { directory: input.cwd };
+}
+
+function mapRuntimeConversationStartOrResumeInput(input?: { cwd?: string }): {
+  directory?: string;
+} {
+  return input?.cwd === undefined ? {} : { directory: input.cwd };
+}
+
+function buildCodexRuntimeConversationNavigatorState(input: {
+  sessionState: UseCodexSessionStateResult;
+}): RuntimeConversationNavigatorState {
+  return {
+    activeConversationCwd: input.sessionState.lifecycle.sessionSnapshot?.activeThreadCwd ?? null,
+    activeConversationId: input.sessionState.lifecycle.sessionSnapshot?.activeThreadId ?? null,
+    providerConversationId: input.sessionState.lifecycle.sessionSnapshot?.providerThreadId ?? null,
+    availableConversations: input.sessionState.threads.availableThreads.map(
+      mapCodexThreadToRuntimeConversationSummary,
+    ),
+    hasMoreAvailableConversations: input.sessionState.threads.hasMoreAvailableThreads,
+    originalConversationId: input.sessionState.threads.originalThreadId,
+    pendingConversationId: input.sessionState.threads.pendingThreadId,
+    clearContextImplementationConversationId:
+      input.sessionState.plans.clearContextImplementationThreadId,
+    acknowledgeClearContextImplementationConversation:
+      input.sessionState.plans.acknowledgeClearContextImplementationThread,
+    isStartingNewConversation: input.sessionState.threads.isStartingNewThread,
+    refreshConversationList: () => {
+      input.sessionState.threads.refreshThreadList();
+    },
+    resumeConversation: input.sessionState.threads.resumeThread,
+    startNewConversation: input.sessionState.threads.startNewThread,
+  };
+}
+
+function buildOpenCodeRuntimeConversationNavigatorState(input: {
+  openCodeSessionState: UseOpenCodeSessionStateResult;
+}): RuntimeConversationNavigatorState {
+  return {
+    activeConversationCwd: input.openCodeSessionState.sessions.activeSessionDirectory,
+    activeConversationId: input.openCodeSessionState.sessions.activeSessionId,
+    providerConversationId:
+      input.openCodeSessionState.lifecycle.sessionSnapshot?.providerSessionId ?? null,
+    availableConversations: input.openCodeSessionState.sessions.availableSessions.map(
+      mapOpenCodeSessionToRuntimeConversationSummary,
+    ),
+    hasMoreAvailableConversations: input.openCodeSessionState.sessions.hasMoreAvailableSessions,
+    originalConversationId: input.openCodeSessionState.sessions.originalSessionId,
+    pendingConversationId: input.openCodeSessionState.sessions.pendingSessionId,
+    clearContextImplementationConversationId: null,
+    acknowledgeClearContextImplementationConversation: () => {
+      return;
+    },
+    isStartingNewConversation: input.openCodeSessionState.sessions.isStartingNewSession,
+    refreshConversationList: async (refreshInput) => {
+      await input.openCodeSessionState.sessions.refreshSessionList(
+        mapRuntimeConversationCwdInput(refreshInput),
+      );
+    },
+    resumeConversation: async (conversationId, resumeInput) =>
+      await input.openCodeSessionState.sessions.resumeSession(
+        conversationId,
+        mapRuntimeConversationStartOrResumeInput(resumeInput),
+      ),
+    startNewConversation: async (startInput) =>
+      await input.openCodeSessionState.sessions.startNewSession(
+        mapRuntimeConversationStartOrResumeInput(startInput),
+      ),
+  };
+}
+
+function buildPiRuntimeConversationNavigatorState(input: {
+  piSessionState: UsePiSessionStateResult;
+}): RuntimeConversationNavigatorState {
+  return {
+    activeConversationCwd: input.piSessionState.conversations.activeConversationDirectory,
+    activeConversationId: input.piSessionState.conversations.activeConversationId,
+    providerConversationId:
+      input.piSessionState.lifecycle.sessionSnapshot?.providerConversationId ?? null,
+    availableConversations: input.piSessionState.conversations.availableConversations.map(
+      mapPiConversationToRuntimeConversationSummary,
+    ),
+    hasMoreAvailableConversations: input.piSessionState.conversations.hasMoreAvailableConversations,
+    originalConversationId: input.piSessionState.conversations.originalConversationId,
+    pendingConversationId: input.piSessionState.conversations.pendingConversationId,
+    clearContextImplementationConversationId: null,
+    acknowledgeClearContextImplementationConversation: () => {
+      return;
+    },
+    isStartingNewConversation: input.piSessionState.conversations.isStartingNewConversation,
+    refreshConversationList: async (refreshInput) => {
+      await input.piSessionState.conversations.refreshConversationList(
+        mapRuntimeConversationCwdInput(refreshInput),
+      );
+    },
+    resumeConversation: async (conversationId, resumeInput) =>
+      await input.piSessionState.conversations.resumeConversation(
+        conversationId,
+        mapRuntimeConversationStartOrResumeInput(resumeInput),
+      ),
+    startNewConversation: async (startInput) =>
+      await input.piSessionState.conversations.startNewConversation(
+        mapRuntimeConversationStartOrResumeInput(startInput),
+      ),
+  };
+}
+
 export function useSessionWorkbenchConversationRuntime(input: {
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
   isOpenCodeRuntime: boolean;
@@ -343,6 +453,17 @@ export function useSessionWorkbenchConversationRuntime(input: {
     : input.isOpenCodeRuntime
       ? openCodeRuntime
       : codexRuntime;
+  const runtimeConversationNavigator = input.isPiRuntime
+    ? buildPiRuntimeConversationNavigatorState({
+        piSessionState: input.piSessionState,
+      })
+    : input.isOpenCodeRuntime
+      ? buildOpenCodeRuntimeConversationNavigatorState({
+          openCodeSessionState,
+        })
+      : buildCodexRuntimeConversationNavigatorState({
+          sessionState,
+        });
   const attachmentTargetId = activeRuntime.conversation.attachmentTargetId;
   const attachmentControl = useSessionComposerAttachmentControl({
     attachmentTarget:
@@ -372,88 +493,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
         attachmentControl,
         repositoryStatus: input.repositoryStatus,
       },
-      runtimeConversationNavigator: input.isPiRuntime
-        ? {
-            activeConversationCwd: input.piSessionState.conversations.activeConversationDirectory,
-            activeConversationId: input.piSessionState.conversations.activeConversationId,
-            providerConversationId:
-              input.piSessionState.lifecycle.sessionSnapshot?.providerConversationId ?? null,
-            availableConversations: input.piSessionState.conversations.availableConversations.map(
-              mapPiConversationToRuntimeConversationSummary,
-            ),
-            hasMoreAvailableConversations:
-              input.piSessionState.conversations.hasMoreAvailableConversations,
-            originalConversationId: input.piSessionState.conversations.originalConversationId,
-            pendingConversationId: input.piSessionState.conversations.pendingConversationId,
-            isStartingNewConversation: input.piSessionState.conversations.isStartingNewConversation,
-            refreshConversationList: async (refreshInput) => {
-              await input.piSessionState.conversations.refreshConversationList(
-                refreshInput?.cwd === undefined ? {} : { directory: refreshInput.cwd },
-              );
-            },
-            resumeConversation: async (conversationId, resumeInput) =>
-              await input.piSessionState.conversations.resumeConversation(conversationId, {
-                ...(resumeInput?.cwd === undefined ? {} : { directory: resumeInput.cwd }),
-              }),
-            startNewConversation: async (startInput) =>
-              await input.piSessionState.conversations.startNewConversation({
-                ...(startInput?.cwd === undefined ? {} : { directory: startInput.cwd }),
-              }),
-          }
-        : input.isOpenCodeRuntime
-          ? {
-              activeConversationCwd: openCodeSessionState.sessions.activeSessionDirectory,
-              activeConversationId: openCodeSessionState.sessions.activeSessionId,
-              providerConversationId:
-                openCodeSessionState.lifecycle.sessionSnapshot?.providerSessionId ?? null,
-              availableConversations: openCodeSessionState.sessions.availableSessions.map(
-                mapOpenCodeSessionToRuntimeConversationSummary,
-              ),
-              hasMoreAvailableConversations: openCodeSessionState.sessions.hasMoreAvailableSessions,
-              originalConversationId: openCodeSessionState.sessions.originalSessionId,
-              pendingConversationId: openCodeSessionState.sessions.pendingSessionId,
-              clearContextImplementationConversationId: null,
-              acknowledgeClearContextImplementationConversation: () => {
-                return;
-              },
-              isStartingNewConversation: openCodeSessionState.sessions.isStartingNewSession,
-              refreshConversationList: async (refreshInput) => {
-                await openCodeSessionState.sessions.refreshSessionList(
-                  refreshInput?.cwd === undefined ? {} : { directory: refreshInput.cwd },
-                );
-              },
-              resumeConversation: async (conversationId, resumeInput) =>
-                await openCodeSessionState.sessions.resumeSession(conversationId, {
-                  ...(resumeInput?.cwd === undefined ? {} : { directory: resumeInput.cwd }),
-                }),
-              startNewConversation: async (startInput) =>
-                await openCodeSessionState.sessions.startNewSession({
-                  ...(startInput?.cwd === undefined ? {} : { directory: startInput.cwd }),
-                }),
-            }
-          : {
-              activeConversationCwd:
-                sessionState.lifecycle.sessionSnapshot?.activeThreadCwd ?? null,
-              activeConversationId: sessionState.lifecycle.sessionSnapshot?.activeThreadId ?? null,
-              providerConversationId:
-                sessionState.lifecycle.sessionSnapshot?.providerThreadId ?? null,
-              availableConversations: sessionState.threads.availableThreads.map(
-                mapCodexThreadToRuntimeConversationSummary,
-              ),
-              hasMoreAvailableConversations: sessionState.threads.hasMoreAvailableThreads,
-              originalConversationId: sessionState.threads.originalThreadId,
-              pendingConversationId: sessionState.threads.pendingThreadId,
-              clearContextImplementationConversationId:
-                sessionState.plans.clearContextImplementationThreadId,
-              acknowledgeClearContextImplementationConversation:
-                sessionState.plans.acknowledgeClearContextImplementationThread,
-              isStartingNewConversation: sessionState.threads.isStartingNewThread,
-              refreshConversationList: () => {
-                sessionState.threads.refreshThreadList();
-              },
-              resumeConversation: sessionState.threads.resumeThread,
-              startNewConversation: sessionState.threads.startNewThread,
-            },
+      runtimeConversationNavigator,
       serverRequestsState: activeRuntime.serverRequestsState,
     },
   };

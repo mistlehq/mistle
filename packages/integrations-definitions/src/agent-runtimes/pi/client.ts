@@ -44,7 +44,6 @@ const PiProviderConversationResultSchema = z.object({
 
 const PiRecentConversationResultSchema = z.object({
   providerConversationId: z.string().nullable(),
-  sessionFile: z.string().nullable(),
 });
 
 const PiConversationSummarySchema = z.object({
@@ -56,7 +55,7 @@ const PiConversationSummarySchema = z.object({
   updatedAt: z.number().nullable(),
 });
 
-const PiResumeConversationResultSchema = z.object({
+const PiSessionFileResultSchema = z.object({
   sessionFile: z.string(),
 });
 
@@ -90,7 +89,6 @@ export type PiSessionClient = {
   }>;
   findRecentConversation(input?: { cwd?: string | null }): Promise<{
     providerConversationId: string | null;
-    sessionFile: string | null;
   }>;
   listConversations(input: {
     cwd?: string | null;
@@ -236,7 +234,6 @@ export function createPiSessionClient(input: PiSessionClientInput): PiSessionCli
       const recent = PiRecentConversationResultSchema.parse(result);
       return {
         providerConversationId: recent.providerConversationId,
-        sessionFile: recent.sessionFile,
       };
     },
     async listConversations(listInput) {
@@ -279,14 +276,14 @@ export function createPiSessionClient(input: PiSessionClientInput): PiSessionCli
         method: "pi/resolveConversation",
         params: resolveInput,
       });
-      return PiResumeConversationResultSchema.parse(result);
+      return PiSessionFileResultSchema.parse(result);
     },
     async resumeConversation(resumeInput) {
       const result = await request({
         method: "pi/resumeConversation",
         params: resumeInput,
       });
-      return PiResumeConversationResultSchema.parse(result);
+      return PiSessionFileResultSchema.parse(result);
     },
     async setModel(setModelInput) {
       const result = await request({

@@ -423,7 +423,7 @@ describe("buildPiConversationRuntime", () => {
     );
 
     expect(runtime.displayName).toBe("Pi");
-    expect(runtime.conversation.activeConversationId).toBe("pi-session.json");
+    expect(runtime.conversation.activeConversationId).toBe("pi-session");
     expect(runtime.conversation.attachmentTargetId).toBe(
       resolvePiAttachmentTargetId("pi-session.json"),
     );

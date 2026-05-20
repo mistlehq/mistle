@@ -83,8 +83,7 @@ function shouldAttemptRequestedRuntimeConversationResume(input: {
 
   if (
     input.providerConversationId !== null &&
-    (input.activeConversationId === null ||
-      input.activeConversationId === input.providerConversationId)
+    input.requestedRuntimeConversationId === input.providerConversationId
   ) {
     return false;
   }

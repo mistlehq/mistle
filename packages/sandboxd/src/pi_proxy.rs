@@ -488,22 +488,24 @@ impl PiProxyState {
         let candidates = self
             .collect_session_candidates(cwd)?
             .into_iter()
-            .filter(|candidate| candidate.cwd.is_some())
+            .filter_map(|candidate| {
+                let candidate_cwd = candidate.cwd.clone()?;
+                Some((candidate, candidate_cwd))
+            })
             .collect::<Vec<_>>();
         let has_more = candidates.len() > limit;
         let conversations = candidates
             .into_iter()
             .take(limit)
-            .filter_map(|candidate| {
-                let cwd = candidate.cwd?;
-                Some(json!({
+            .map(|(candidate, candidate_cwd)| {
+                json!({
                     "id": candidate.id,
                     "sessionFile": candidate.path.to_string_lossy().to_string(),
-                    "cwd": cwd,
+                    "cwd": candidate_cwd,
                     "title": candidate.title,
                     "createdAt": candidate.created_at,
                     "updatedAt": system_time_to_unix_millis(candidate.modified),
-                }))
+                })
             })
             .collect::<Vec<_>>();
 
@@ -939,11 +941,9 @@ fn handle_pi_method(
             Ok(match conversation {
                 Some(conversation) => json!({
                     "providerConversationId": conversation.id,
-                    "sessionFile": conversation.path.to_string_lossy().to_string(),
                 }),
                 None => json!({
                     "providerConversationId": Value::Null,
-                    "sessionFile": Value::Null,
                 }),
             })
         }
@@ -1484,14 +1484,6 @@ mod tests {
         assert_eq!(
             response["result"]["providerConversationId"],
             json!("recent")
-        );
-        assert_eq!(
-            response["result"]["sessionFile"],
-            json!(
-                recent_session
-                    .to_str()
-                    .expect("recent session path should be UTF-8")
-            )
         );
     }
 

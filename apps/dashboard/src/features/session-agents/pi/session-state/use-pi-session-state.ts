@@ -509,7 +509,7 @@ export function usePiSessionState(input: {
               ? await client.findRecentConversation({
                   cwd: connectInput.initialCwd ?? null,
                 })
-              : { providerConversationId: null, sessionFile: null };
+              : { providerConversationId: null };
           const conversationSelection = resolvePiConversationSelection({
             targetConversationId,
             recentProviderConversationId: recentConversation.providerConversationId,
