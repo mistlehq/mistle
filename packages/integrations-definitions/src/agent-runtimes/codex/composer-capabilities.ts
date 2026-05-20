@@ -4,7 +4,7 @@ export const CodexRuntimeCommandIds = {
   COMPACT_THREAD: "codex.compact",
 } as const;
 
-export const CodexInlineCommandIds = {
+export const CodexComposerCommandIds = {
   REVIEW: "codex.review",
   PLAN: "codex.plan",
   GOAL: "codex.goal",
@@ -17,19 +17,22 @@ export const CodexComposerCapabilities = [
     source: "runtimeCommand",
     commands: [
       {
-        id: CodexInlineCommandIds.REVIEW,
+        id: CodexComposerCommandIds.REVIEW,
         name: "review",
         description: "Review the current changes",
         submitAs: "inlineText",
       },
       {
-        id: CodexInlineCommandIds.PLAN,
+        id: CodexComposerCommandIds.PLAN,
         name: "plan",
         description: "Plan before making changes",
-        submitAs: "inlineText",
+        availability: {
+          duringActiveTurn: "disabled",
+        },
+        submitAs: "typedRuntimeCommand",
       },
       {
-        id: CodexInlineCommandIds.GOAL,
+        id: CodexComposerCommandIds.GOAL,
         name: "goal",
         description: "Set or update the current goal",
         availability: {
@@ -61,7 +64,7 @@ export function resolveCodexComposerCapabilities(input: {
     return {
       ...capability,
       commands: capability.commands.filter(
-        (command) => input.goalsEnabled || command.id !== CodexInlineCommandIds.GOAL,
+        (command) => input.goalsEnabled || command.id !== CodexComposerCommandIds.GOAL,
       ),
     };
   });

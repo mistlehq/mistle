@@ -16,6 +16,7 @@ import { ErrorNotice } from "../auth/error-notice.js";
 import { noop } from "../chat/components/chat-story-support.js";
 import { SessionsNavToggleItem } from "../navigation/sessions-nav-toggle-item.js";
 import {
+  SessionComposerFixtureProps,
   SessionComposerFixturePropsForLoadingModel,
   SessionComposerFixturePropsForNonImageCapableModel,
   SessionComposerFixturePropsForUnavailableModel,
@@ -23,7 +24,11 @@ import {
   SessionComposerFixtureStatusMessageForNonImageCapableModel,
   SessionComposerFixtureStatusMessageForUnavailableModel,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
-import { RuntimeConversationNavigatorWorkbenchStoryRows } from "../session-agents/runtime-conversations/runtime-conversation-navigator-story-support.js";
+import type { RuntimeConversationNavigatorRow } from "../session-agents/runtime-conversations/runtime-conversation-navigator-model.js";
+import {
+  RuntimeConversationNavigatorPlanImplementationStoryRows,
+  RuntimeConversationNavigatorWorkbenchStoryRows,
+} from "../session-agents/runtime-conversations/runtime-conversation-navigator-story-support.js";
 import { RuntimeConversationNavigatorPanel } from "../session-agents/runtime-conversations/runtime-conversation-navigator.js";
 import { ActionTile } from "../shared/action-tile.js";
 import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
@@ -62,7 +67,9 @@ function RuntimeConversationNavigationHeaderTitle(): React.JSX.Element {
   return <span className="block min-w-0 truncate text-sm font-medium">Storybook session</span>;
 }
 
-function RuntimeConversationNavigationPanel(): React.JSX.Element {
+function RuntimeConversationNavigationPanel(input?: {
+  rows?: readonly RuntimeConversationNavigatorRow[] | undefined;
+}): React.JSX.Element {
   return (
     <RuntimeConversationNavigatorPanel
       isConversationListLimited={false}
@@ -70,13 +77,15 @@ function RuntimeConversationNavigationPanel(): React.JSX.Element {
       onRefreshConversations={noop}
       onSelectConversation={noop}
       onStartConversation={noop}
-      rows={RuntimeConversationNavigatorWorkbenchStoryRows}
+      rows={input?.rows ?? RuntimeConversationNavigatorWorkbenchStoryRows}
     />
   );
 }
 
 function RuntimeConversationNavigationWorkbenchStory(input?: {
   defaultConversationNavigatorOpen?: boolean;
+  navigatorRows?: readonly RuntimeConversationNavigatorRow[];
+  primaryBottomPanel?: React.ReactNode;
 }): React.JSX.Element {
   const [isConversationNavigatorOpen, setConversationNavigatorOpen] = useState(
     input?.defaultConversationNavigatorOpen ?? false,
@@ -101,12 +110,12 @@ function RuntimeConversationNavigationWorkbenchStory(input?: {
         isBottomPanelVisible={false}
         isSecondaryPanelVisible={isConversationNavigatorOpen}
         mainContent={createStorySessionMainContent()}
-        primaryBottomPanel={createStorySessionBottomPanel()}
+        primaryBottomPanel={input?.primaryBottomPanel ?? createStorySessionBottomPanel()}
         sandboxInstanceId={StorySandboxInstanceId}
         secondaryPanelDefaultSize="20%"
         secondaryPanelLayoutKey="right-panel"
         secondaryPanelMinSize="16rem"
-        secondaryPanel={<RuntimeConversationNavigationPanel />}
+        secondaryPanel={<RuntimeConversationNavigationPanel rows={input?.navigatorRows} />}
       />
     </SessionWorkbenchStoryChrome>
   );
@@ -155,6 +164,8 @@ function StoryAppSidebarContent(): React.JSX.Element {
 
 function RuntimeConversationNavigationAppShellStory(input?: {
   defaultConversationNavigatorOpen?: boolean;
+  navigatorRows?: readonly RuntimeConversationNavigatorRow[];
+  primaryBottomPanel?: React.ReactNode;
 }): React.JSX.Element {
   const [isConversationNavigatorOpen, setConversationNavigatorOpen] = useState(
     input?.defaultConversationNavigatorOpen ?? false,
@@ -183,12 +194,12 @@ function RuntimeConversationNavigationAppShellStory(input?: {
               isBottomPanelVisible={false}
               isSecondaryPanelVisible={isConversationNavigatorOpen}
               mainContent={createStorySessionMainContent()}
-              primaryBottomPanel={createStorySessionBottomPanel()}
+              primaryBottomPanel={input?.primaryBottomPanel ?? createStorySessionBottomPanel()}
               sandboxInstanceId={StorySandboxInstanceId}
               secondaryPanelDefaultSize="20%"
               secondaryPanelLayoutKey="right-panel"
               secondaryPanelMinSize="16rem"
-              secondaryPanel={<RuntimeConversationNavigationPanel />}
+              secondaryPanel={<RuntimeConversationNavigationPanel rows={input?.navigatorRows} />}
             />
           </ConversationWorkspaceFrame>
         }
@@ -412,6 +423,79 @@ export const WithRuntimeConversationNavigationAppShellOpen: Story = {
     sessionWorkbenchChrome: false,
   },
   render: () => <RuntimeConversationNavigationAppShellStory defaultConversationNavigatorOpen />,
+};
+
+export const WithPlanModeComposer: Story = {
+  args: {
+    primaryBottomPanel: createStorySessionBottomPanel({
+      composerViewModel: {
+        ...SessionComposerFixtureProps,
+        collaborationModeStatus: {
+          label: "Plan mode",
+          title: "Codex is planning. Submissions stay in Plan mode until implementation starts.",
+          onSwitchToDefault: noop,
+        },
+        composerText: "Trace the current implementation and propose a patch plan.",
+        gitBranchLabel: "feature/codex-plan-command",
+      },
+    }),
+  },
+};
+
+export const WithPlanImplementationConfirmation: Story = {
+  args: {
+    primaryBottomPanel: createStorySessionBottomPanel({
+      composerViewModel: {
+        ...SessionComposerFixtureProps,
+        collaborationModeStatus: {
+          label: "Plan mode",
+          title: "Codex proposed a plan and is waiting for an implementation choice.",
+          onSwitchToDefault: noop,
+        },
+        commandPanel: {
+          kind: "choice",
+          title: "Implement this plan?",
+          choices: [
+            {
+              label: "Implement",
+              onSelect: noop,
+              variant: "default",
+            },
+            {
+              label: "More actions",
+              onSelect: noop,
+              variant: "default",
+            },
+          ],
+        },
+        composerText: "",
+        gitBranchLabel: "feature/codex-plan-command",
+      },
+    }),
+  },
+};
+
+export const WithClearContextPlanImplementation: Story = {
+  name: "With clear-context plan implementation",
+  parameters: {
+    sessionWorkbenchChrome: false,
+  },
+  render: () => (
+    <RuntimeConversationNavigationAppShellStory
+      defaultConversationNavigatorOpen
+      navigatorRows={RuntimeConversationNavigatorPlanImplementationStoryRows}
+      primaryBottomPanel={createStorySessionBottomPanel({
+        composerViewModel: {
+          ...SessionComposerFixtureProps,
+          composerText: "Implement the plan.",
+          gitBranchLabel: "feature/codex-plan-command",
+          submitDisabled: true,
+          submitLabel: "Sending...",
+          isSubmitPending: true,
+        },
+      })}
+    />
+  ),
 };
 
 export const WithNonImageCapableModelWarning: Story = {

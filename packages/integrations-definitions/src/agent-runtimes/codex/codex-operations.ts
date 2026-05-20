@@ -222,6 +222,8 @@ export type CodexTurnCollaborationModeSettings = {
   developerInstructions: string | null;
 };
 
+export type CodexTurnCollaborationModeKind = "default" | "plan";
+
 export type CodexThreadSessionResult = {
   threadId: string;
   cwd: string;
@@ -250,7 +252,7 @@ type CodexTurnStartRequest = {
   input: readonly CodexTurnInputItem[];
   cwd?: string;
   collaborationMode?: {
-    mode: "default";
+    mode: CodexTurnCollaborationModeKind;
     settings: {
       model: string;
       reasoning_effort: string | null;
@@ -287,6 +289,7 @@ export function buildCodexTurnStartRequest(input: {
   threadId: string;
   input: readonly CodexTurnInputItem[];
   cwd?: string;
+  collaborationMode?: CodexTurnCollaborationModeKind | undefined;
   collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
 }): CodexTurnStartRequest {
   return {
@@ -297,7 +300,7 @@ export function buildCodexTurnStartRequest(input: {
       ? {}
       : {
           collaborationMode: {
-            mode: "default",
+            mode: input.collaborationMode ?? "default",
             settings: {
               model: input.collaborationModeSettings.model,
               reasoning_effort: input.collaborationModeSettings.reasoningEffort,
@@ -312,10 +315,14 @@ export async function startCodexThread(input: {
   rpcClient: CodexJsonRpcClient;
   cwd?: string;
   model?: string;
+  sessionStartSource?: "clear" | undefined;
 }): Promise<CodexThreadSessionResult> {
   const requestParameters = {
     ...(input.model === undefined ? {} : { model: input.model }),
     ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
+    ...(input.sessionStartSource === undefined
+      ? {}
+      : { sessionStartSource: input.sessionStartSource }),
   };
   const response = await input.rpcClient.call("thread/start", requestParameters);
 
@@ -336,6 +343,7 @@ export async function startCodexTurn(input: {
   threadId: string;
   input: readonly CodexTurnInputItem[];
   cwd?: string;
+  collaborationMode?: CodexTurnCollaborationModeKind | undefined;
   collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
 }): Promise<{ turnId: string; status: string; response: unknown }> {
   const response = await input.rpcClient.call("turn/start", buildCodexTurnStartRequest(input));

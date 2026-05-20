@@ -2,7 +2,7 @@ import {
   archiveCodexThread,
   clearCodexThreadGoal,
   compactCodexThread,
-  CodexInlineCommandIds,
+  CodexComposerCommandIds,
   forkCodexThread,
   getCodexThreadGoal,
   rollbackCodexThread,
@@ -18,6 +18,7 @@ import {
   type CodexThreadGoal,
   type CodexThreadGoalStatus,
   type CodexThreadSummary,
+  type CodexTurnCollaborationModeKind,
   type CodexTurnCollaborationModeSettings,
   type CodexTurnInputLocalImageItem,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
@@ -33,7 +34,8 @@ import {
   type RefObject,
 } from "react";
 
-import type { ChatAttachment } from "../../../chat/chat-types.js";
+import type { ChatAttachment, ChatEntry, ChatPlanEntry } from "../../../chat/chat-types.js";
+import type { ChatComposerCommandPanel } from "../../../chat/components/chat-composer.js";
 import { hasComposerCommand } from "../../../pages/session-composer/session-composer-trigger-detection.js";
 import {
   createInitialCodexApprovalRequestsState,
@@ -114,12 +116,77 @@ type ThreadNavigationMutationContext = {
   requestId: number;
 };
 
+type CodexPlanImplementationPrompt = {
+  threadId: string;
+  turnId: string;
+  planEntryId: string;
+  planMarkdown: string;
+};
+
+const CodexPlanImplementationMessage = "Implement the plan.";
+const CodexPlanImplementationClearContextPrefix =
+  "A previous agent produced the plan below to accomplish the user's task. " +
+  "Implement the plan in a fresh context. Treat the plan as the source of " +
+  "user intent, re-read files as needed, and carry the work through " +
+  "implementation and verification.";
+
+function findLatestProposedPlanEntry(entries: readonly ChatEntry[]): ChatPlanEntry | null {
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const entry = entries[index];
+    if (
+      entry?.kind === "plan" &&
+      entry.text !== null &&
+      entry.text.trim().length > 0 &&
+      entry.steps === null
+    ) {
+      return entry;
+    }
+  }
+
+  return null;
+}
+
+function hasUserEntryAfterPlan(input: {
+  entries: readonly ChatEntry[];
+  planEntryId: string;
+}): boolean {
+  const planIndex = input.entries.findIndex((entry) => entry.id === input.planEntryId);
+  if (planIndex < 0) {
+    return false;
+  }
+
+  return input.entries.slice(planIndex + 1).some((entry) => entry.kind === "user-message");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function readCompletedTurnId(notification: CodexJsonRpcNotification): string | null {
+  if (notification.method !== "turn/completed" || !isRecord(notification.params)) {
+    return null;
+  }
+
+  const turn = notification.params.turn;
+  if (!isRecord(turn) || typeof turn.id !== "string" || turn.status !== "completed") {
+    return null;
+  }
+
+  const turnError = turn.error;
+  if (turnError !== undefined && turnError !== null) {
+    return null;
+  }
+
+  return turn.id;
+}
+
 type CodexSessionChatState = {
   chatState: CodexChatState;
   isStartingTurn: boolean;
   isReloadingChat: boolean;
   isInterruptingTurn: boolean;
   isSteeringTurn: boolean;
+  hasPendingFollowUp: boolean;
   canInterruptTurn: boolean;
   canSteerTurn: boolean;
   hydrateChatFromThread: () => Promise<void>;
@@ -129,6 +196,7 @@ type CodexSessionChatState = {
     transcriptPrompt?: string;
     displayAttachments?: readonly ChatAttachment[];
     cwd?: string;
+    collaborationMode?: CodexTurnCollaborationModeKind | undefined;
     collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
   }) => Promise<void>;
   interruptTurn: () => void;
@@ -165,6 +233,15 @@ type CodexSessionGoalState = {
   executeTypedComposerCommand: (input: { commandId: string; text: string }) => boolean;
 };
 
+type CodexSessionPlanState = {
+  activeMode: "default" | "plan";
+  clearContextImplementationThreadId: string | null;
+  acknowledgeClearContextImplementationThread: (threadId: string) => void;
+  commandPanel: ChatComposerCommandPanel | null;
+  executeTypedComposerCommand: (input: { commandId: string; text: string }) => boolean;
+  switchActiveThreadToDefault: () => void;
+};
+
 export type UseCodexSessionStateResult = {
   lifecycle: CodexSessionConnectionLifecycleState;
   repositoryStatusRefreshEpoch: number;
@@ -182,6 +259,7 @@ export type UseCodexSessionStateResult = {
   serverRequests: CodexSessionServerRequestState;
   sessionMessage: CodexSessionMessageState;
   goals: CodexSessionGoalState;
+  plans: CodexSessionPlanState;
 };
 
 export function useCodexSessionState(input: {
@@ -211,6 +289,13 @@ export function useCodexSessionState(input: {
     () => new Set(),
   );
   const [goalCommandPanel, setGoalCommandPanel] = useState<CodexGoalPanel | null>(null);
+  const [planModeThreadIds, setPlanModeThreadIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [planImplementationPrompt, setPlanImplementationPrompt] =
+    useState<CodexPlanImplementationPrompt | null>(null);
+  const [liveCompletedTurnId, setLiveCompletedTurnId] = useState<string | null>(null);
+  const [clearContextImplementationThreadId, setClearContextImplementationThreadId] = useState<
+    string | null
+  >(null);
 
   const recordLoadedGoal = useCallback((goal: CodexThreadGoal): void => {
     setGoalByThreadId((currentGoals) => {
@@ -275,6 +360,7 @@ export function useCodexSessionState(input: {
     isReloadingChat,
     isInterruptingTurn,
     isSteeringTurn,
+    hasPendingFollowUp,
     canInterruptTurn,
     canSteerTurn,
     startTurn,
@@ -340,6 +426,11 @@ export function useCodexSessionState(input: {
       const clearedGoalThreadId = parseThreadGoalClearedNotification(notification);
       if (clearedGoalThreadId !== null) {
         recordNoGoalForThread(clearedGoalThreadId);
+      }
+
+      const completedTurnId = readCompletedTurnId(notification);
+      if (completedTurnId !== null) {
+        setLiveCompletedTurnId(completedTurnId);
       }
 
       handleNotificationReceived(notification);
@@ -415,7 +506,7 @@ export function useCodexSessionState(input: {
     () =>
       hasComposerCommand({
         composerCapabilities: bootstrap.composerCapabilities,
-        commandId: CodexInlineCommandIds.GOAL,
+        commandId: CodexComposerCommandIds.GOAL,
       }),
     [bootstrap.composerCapabilities],
   );
@@ -928,6 +1019,85 @@ export function useCodexSessionState(input: {
     [activeGoal],
   );
 
+  const activePlanMode = useMemo<"default" | "plan">(() => {
+    const activeThreadId = lifecycle.sessionSnapshot?.activeThreadId ?? null;
+    return activeThreadId !== null && planModeThreadIds.has(activeThreadId) ? "plan" : "default";
+  }, [lifecycle.sessionSnapshot?.activeThreadId, planModeThreadIds]);
+
+  const switchThreadToPlanMode = useCallback((threadId: string): void => {
+    setPlanModeThreadIds((currentThreadIds) => {
+      const nextThreadIds = new Set(currentThreadIds);
+      nextThreadIds.add(threadId);
+      return nextThreadIds;
+    });
+  }, []);
+
+  const switchThreadToDefaultMode = useCallback((threadId: string): void => {
+    setPlanModeThreadIds((currentThreadIds) => {
+      const nextThreadIds = new Set(currentThreadIds);
+      nextThreadIds.delete(threadId);
+      return nextThreadIds;
+    });
+    setPlanImplementationPrompt((currentPrompt) =>
+      currentPrompt?.threadId === threadId ? null : currentPrompt,
+    );
+  }, []);
+
+  const switchActiveThreadToPlanMode = useCallback((): void => {
+    const activeThreadId = lifecycle.sessionSnapshot?.activeThreadId ?? null;
+    if (activeThreadId === null) {
+      setSessionErrorMessage("Choose a Codex thread before switching to Plan mode.");
+      return;
+    }
+
+    switchThreadToPlanMode(activeThreadId);
+  }, [lifecycle.sessionSnapshot?.activeThreadId, switchThreadToPlanMode]);
+
+  const switchActiveThreadToDefaultMode = useCallback((): void => {
+    const activeThreadId = lifecycle.sessionSnapshot?.activeThreadId ?? null;
+    if (activeThreadId === null) {
+      setSessionErrorMessage("Choose a Codex thread before switching to Default mode.");
+      return;
+    }
+
+    switchThreadToDefaultMode(activeThreadId);
+  }, [lifecycle.sessionSnapshot?.activeThreadId, switchThreadToDefaultMode]);
+
+  useEffect(() => {
+    if (liveCompletedTurnId === null || activePlanMode !== "plan" || hasPendingFollowUp) {
+      return;
+    }
+
+    const activeThreadId = lifecycle.sessionSnapshot?.activeThreadId ?? null;
+    if (activeThreadId === null) {
+      return;
+    }
+
+    const proposedPlan = findLatestProposedPlanEntry(chatState.entries);
+    if (
+      proposedPlan === null ||
+      proposedPlan.turnId !== liveCompletedTurnId ||
+      proposedPlan.text === null ||
+      hasUserEntryAfterPlan({ entries: chatState.entries, planEntryId: proposedPlan.id })
+    ) {
+      return;
+    }
+
+    setPlanImplementationPrompt({
+      threadId: activeThreadId,
+      turnId: proposedPlan.turnId,
+      planEntryId: proposedPlan.id,
+      planMarkdown: proposedPlan.text,
+    });
+    setLiveCompletedTurnId(null);
+  }, [
+    activePlanMode,
+    chatState.entries,
+    hasPendingFollowUp,
+    lifecycle.sessionSnapshot?.activeThreadId,
+    liveCompletedTurnId,
+  ]);
+
   useEffect(() => {
     if (goalCommandPanel === null) {
       return;
@@ -940,6 +1110,147 @@ export function useCodexSessionState(input: {
       setGoalCommandPanel(null);
     }
   }, [goalCommandPanel, lifecycle.sessionSnapshot?.activeThreadId]);
+
+  useEffect(() => {
+    if (planImplementationPrompt === null) {
+      return;
+    }
+
+    const activeThreadId = lifecycle.sessionSnapshot?.activeThreadId ?? null;
+    if (
+      planImplementationPrompt.threadId !== activeThreadId ||
+      hasUserEntryAfterPlan({
+        entries: chatState.entries,
+        planEntryId: planImplementationPrompt.planEntryId,
+      })
+    ) {
+      setPlanImplementationPrompt(null);
+    }
+  }, [chatState.entries, lifecycle.sessionSnapshot?.activeThreadId, planImplementationPrompt]);
+
+  const implementPlanInCurrentThread = useCallback((): void => {
+    const prompt = planImplementationPrompt;
+    if (prompt === null) {
+      return;
+    }
+
+    switchThreadToDefaultMode(prompt.threadId);
+    setPlanImplementationPrompt(null);
+    void startTurn({
+      submittedPrompt: CodexPlanImplementationMessage,
+      transcriptPrompt: CodexPlanImplementationMessage,
+      collaborationMode: "default",
+    }).catch((error: unknown) => {
+      setSessionErrorMessage(
+        error instanceof Error ? error.message : "Could not submit plan implementation turn.",
+      );
+    });
+  }, [planImplementationPrompt, startTurn, switchThreadToDefaultMode]);
+
+  const clearContextAndImplementPlan = useCallback((): void => {
+    const prompt = planImplementationPrompt;
+    const activeThreadCwd = lifecycle.sessionSnapshot?.activeThreadCwd ?? null;
+    const rpcClient = rpcClientRef.current;
+    if (prompt === null) {
+      return;
+    }
+
+    if (activeThreadCwd === null) {
+      setSessionErrorMessage("The active Codex thread does not have a working directory.");
+      return;
+    }
+
+    if (rpcClient === null) {
+      setSessionErrorMessage("Connect to a sandbox session before starting a fresh Codex thread.");
+      return;
+    }
+
+    setPlanImplementationPrompt(null);
+    void (async (): Promise<void> => {
+      try {
+        const startedThread = await startCodexThread({
+          rpcClient,
+          cwd: activeThreadCwd,
+          model: "gpt-5.3-codex",
+          sessionStartSource: "clear",
+        });
+        setClearContextImplementationThreadId(startedThread.threadId);
+        switchThreadToDefaultMode(prompt.threadId);
+        updateActiveThread({
+          threadId: startedThread.threadId,
+          cwd: startedThread.cwd,
+        });
+        resetChat();
+        refreshThreadCollectionsWithErrorHandling();
+
+        const submittedPrompt = `${CodexPlanImplementationClearContextPrefix}\n\n${prompt.planMarkdown}`;
+        await startTurn({
+          submittedPrompt,
+          transcriptPrompt: submittedPrompt,
+          collaborationMode: "default",
+        });
+      } catch (error) {
+        setSessionErrorMessage(
+          error instanceof Error ? error.message : "Could not start fresh implementation thread.",
+        );
+      }
+    })();
+  }, [
+    lifecycle.sessionSnapshot?.activeThreadCwd,
+    planImplementationPrompt,
+    refreshThreadCollectionsWithErrorHandling,
+    resetChat,
+    rpcClientRef,
+    startTurn,
+    switchThreadToDefaultMode,
+    updateActiveThread,
+  ]);
+
+  const stayInPlanMode = useCallback((): void => {
+    setPlanImplementationPrompt(null);
+  }, []);
+
+  const planCommandPanel = useMemo<ChatComposerCommandPanel | null>(() => {
+    const activeThreadId = lifecycle.sessionSnapshot?.activeThreadId ?? null;
+    if (
+      planImplementationPrompt === null ||
+      activeThreadId === null ||
+      planImplementationPrompt.threadId !== activeThreadId ||
+      activePlanMode !== "plan"
+    ) {
+      return null;
+    }
+
+    return {
+      kind: "choice",
+      title: "Implement this plan?",
+      suppressWhenQueuedPrompts: true,
+      choices: [
+        {
+          label: "Clear context and implement",
+          onSelect: clearContextAndImplementPlan,
+          variant: "secondary",
+        },
+        {
+          label: "Dismiss",
+          onSelect: stayInPlanMode,
+          variant: "ghost",
+        },
+        {
+          label: "Implement",
+          onSelect: implementPlanInCurrentThread,
+          variant: "default",
+        },
+      ],
+    };
+  }, [
+    clearContextAndImplementPlan,
+    activePlanMode,
+    implementPlanInCurrentThread,
+    lifecycle.sessionSnapshot?.activeThreadId,
+    planImplementationPrompt,
+    stayInPlanMode,
+  ]);
 
   const setGoalForThread = useCallback(
     async (input: {
@@ -1114,7 +1425,7 @@ export function useCodexSessionState(input: {
 
   const executeTypedComposerCommand = useCallback(
     (inputValue: { commandId: string; text: string }): boolean => {
-      if (inputValue.commandId !== CodexInlineCommandIds.GOAL) {
+      if (inputValue.commandId !== CodexComposerCommandIds.GOAL) {
         setSessionErrorMessage(`Unsupported Codex runtime command '${inputValue.commandId}'.`);
         return false;
       }
@@ -1315,6 +1626,7 @@ export function useCodexSessionState(input: {
       isReloadingChat,
       isInterruptingTurn,
       isSteeringTurn,
+      hasPendingFollowUp,
       canInterruptTurn,
       canSteerTurn,
       hydrateChatFromThread,
@@ -1327,6 +1639,7 @@ export function useCodexSessionState(input: {
   }, [
     canInterruptTurn,
     canSteerTurn,
+    hasPendingFollowUp,
     hydrateChatFromThread,
     dismissUserMessageAction,
     interruptTurn,
@@ -1419,6 +1732,40 @@ export function useCodexSessionState(input: {
     saveEditedGoal,
   ]);
 
+  const plans = useMemo<CodexSessionPlanState>(() => {
+    return {
+      activeMode: activePlanMode,
+      clearContextImplementationThreadId,
+      acknowledgeClearContextImplementationThread: (threadId) => {
+        setClearContextImplementationThreadId((currentThreadId) =>
+          currentThreadId === threadId ? null : currentThreadId,
+        );
+      },
+      commandPanel: planCommandPanel,
+      executeTypedComposerCommand: (commandInput) => {
+        if (commandInput.commandId !== CodexComposerCommandIds.PLAN) {
+          setSessionErrorMessage(`Unsupported Codex runtime command '${commandInput.text}'.`);
+          return false;
+        }
+
+        if (commandInput.text.trim() !== "/plan") {
+          setSessionErrorMessage(`Unsupported Codex runtime command '${commandInput.text}'.`);
+          return false;
+        }
+
+        switchActiveThreadToPlanMode();
+        return true;
+      },
+      switchActiveThreadToDefault: switchActiveThreadToDefaultMode,
+    };
+  }, [
+    activePlanMode,
+    clearContextImplementationThreadId,
+    planCommandPanel,
+    switchActiveThreadToDefaultMode,
+    switchActiveThreadToPlanMode,
+  ]);
+
   return {
     lifecycle,
     repositoryStatusRefreshEpoch,
@@ -1432,5 +1779,6 @@ export function useCodexSessionState(input: {
     serverRequests,
     sessionMessage,
     goals,
+    plans,
   };
 }

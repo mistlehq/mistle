@@ -95,6 +95,42 @@ describe("buildCodexTurnStartRequest", () => {
     });
   });
 
+  it("can request Plan collaboration mode with settings", () => {
+    expect(
+      buildCodexTurnStartRequest({
+        threadId: "thread_123",
+        input: [
+          {
+            type: "text",
+            text: "Design the rollout",
+          },
+        ],
+        collaborationMode: "plan",
+        collaborationModeSettings: {
+          model: "gpt-5.5",
+          reasoningEffort: "medium",
+          developerInstructions: null,
+        },
+      }),
+    ).toEqual({
+      threadId: "thread_123",
+      input: [
+        {
+          type: "text",
+          text: "Design the rollout",
+        },
+      ],
+      collaborationMode: {
+        mode: "plan",
+        settings: {
+          model: "gpt-5.5",
+          reasoning_effort: "medium",
+          developer_instructions: null,
+        },
+      },
+    });
+  });
+
   it("omits collaboration mode settings for ordinary turns", () => {
     expect(
       buildCodexTurnStartRequest({

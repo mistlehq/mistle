@@ -100,6 +100,18 @@ _Avoid_: Chat session when referring to runtime tools or sandbox state
 A Codex **Runtime conversation**.
 _Avoid_: Session, chat tab
 
+**Codex Plan mode**:
+A Codex collaboration mode that changes how the next Codex turn plans work before implementation. Bare `/plan` switches the active **Codex thread** composer into this mode for future submissions; `/plan <prompt>` submits `<prompt>` immediately in this mode. Plan mode is unavailable during active turns, is scoped to the active **Codex thread**, and remains active until an explicit implementation or mode-switch action returns the thread to Default mode.
+_Avoid_: update_plan, plan checklist, generic plan
+
+**Codex clear-context implementation**:
+A fresh **Codex thread** started from a completed **Codex Plan mode** proposed plan, seeded with the approved plan as the implementation prompt, and preserving the previous active **Codex thread** working directory.
+_Avoid_: compact, same-thread implementation turn, reusing prior model context
+
+**Codex plan implementation confirmation**:
+A live, thread-scoped prompt shown after a **Codex Plan mode** turn completes with a proposed plan. It is not shown for hydrated history, for `turn/plan/updated` checklist snapshots, or when queued/pending follow-up work has already superseded the proposed plan.
+_Avoid_: replay prompt, checklist approval, cross-thread implementation prompt
+
 **OpenCode session**:
 An OpenCode **Runtime conversation**.
 _Avoid_: OpenCode thread, sandbox session

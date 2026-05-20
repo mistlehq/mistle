@@ -31,6 +31,7 @@ export type SessionComposerSubmittedLocalImageAttachment = {
 };
 
 export type SessionComposerCollaborationModeSettings = {
+  mode: "default" | "plan";
   model: string;
   reasoningEffort: string | null;
   developerInstructions: string | null;

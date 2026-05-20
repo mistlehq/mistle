@@ -230,6 +230,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
         startTurn: startCodexTurn,
         compactThread: sessionState.threads.compactThread,
         goals: sessionState.goals,
+        plans: sessionState.plans,
       }),
     [
       activeRuntimeConversationId,
@@ -253,6 +254,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
       codexBootstrap,
       sessionState.threads.compactThread,
       sessionState.goals,
+      sessionState.plans,
       startCodexTurn,
     ],
   );
@@ -363,6 +365,10 @@ export function useSessionWorkbenchConversationRuntime(input: {
               hasMoreAvailableConversations: openCodeSessionState.sessions.hasMoreAvailableSessions,
               originalConversationId: openCodeSessionState.sessions.originalSessionId,
               pendingConversationId: openCodeSessionState.sessions.pendingSessionId,
+              clearContextImplementationConversationId: null,
+              acknowledgeClearContextImplementationConversation: () => {
+                return;
+              },
               isStartingNewConversation: openCodeSessionState.sessions.isStartingNewSession,
               refreshConversationList: async (refreshInput) => {
                 await openCodeSessionState.sessions.refreshSessionList(
@@ -390,6 +396,10 @@ export function useSessionWorkbenchConversationRuntime(input: {
               hasMoreAvailableConversations: sessionState.threads.hasMoreAvailableThreads,
               originalConversationId: sessionState.threads.originalThreadId,
               pendingConversationId: sessionState.threads.pendingThreadId,
+              clearContextImplementationConversationId:
+                sessionState.plans.clearContextImplementationThreadId,
+              acknowledgeClearContextImplementationConversation:
+                sessionState.plans.acknowledgeClearContextImplementationThread,
               isStartingNewConversation: sessionState.threads.isStartingNewThread,
               refreshConversationList: () => {
                 sessionState.threads.refreshThreadList();

@@ -90,6 +90,7 @@ export type SessionTurnControl = {
     uploadedAttachments?: readonly UploadedSandboxFile[];
     transcriptPrompt?: string;
     displayAttachments?: readonly ChatAttachment[];
+    collaborationMode?: SessionComposerCollaborationModeSettings["mode"] | undefined;
     collaborationModeSettings?: SessionComposerCollaborationModeSettings | undefined;
   }) => Promise<void>;
   steerTurn: (input: {
@@ -121,6 +122,11 @@ export type SessionComposerRuntimeInput = {
   contextUsage: ChatComposerViewModel["contextUsage"];
   goalStatus?: ChatComposerViewModel["goalStatus"];
   commandPanel?: ChatComposerViewModel["commandPanel"];
+  collaborationMode?: {
+    mode: SessionComposerCollaborationModeSettings["mode"];
+    onSwitchToPlan?: () => void;
+    onSwitchToDefault: () => void;
+  };
   collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
   modelSelection: SessionComposerModelSelectionInput;
   executeRuntimeCommand?: (commandId: string) => boolean;
@@ -198,12 +204,14 @@ export function useSessionComposerState(input: {
     }
 
     return {
+      mode: composerStateInput.collaborationMode?.mode ?? "default",
       model: activeComposerModel.model,
       reasoningEffort: composerStateInput.configControl.selectedReasoningEffort,
       developerInstructions: composerStateInput.collaborationModeSettings.developerInstructions,
     };
   }, [
     activeComposerModel,
+    composerStateInput.collaborationMode?.mode,
     composerStateInput.collaborationModeSettings,
     composerStateInput.configControl.selectedReasoningEffort,
   ]);
@@ -521,6 +529,9 @@ export function useSessionComposerState(input: {
           transcriptPrompt: submittedPrompt,
           ...(turnCollaborationModeSettings === undefined
             ? {}
+            : { collaborationMode: turnCollaborationModeSettings.mode }),
+          ...(turnCollaborationModeSettings === undefined
+            ? {}
             : { collaborationModeSettings: turnCollaborationModeSettings }),
         });
       } catch (error) {
@@ -555,6 +566,74 @@ export function useSessionComposerState(input: {
     ],
   );
 
+  const submitPlanTypedRuntimeCommand = useCallback(
+    async (command: ComposerCommandDescriptor): Promise<void> => {
+      const trimmedComposerText = composerText.trim();
+      const planPrompt = trimmedComposerText.slice(`/${command.name}`.length).trim();
+      if (planPrompt.length === 0) {
+        if (composerStateInput.collaborationMode?.onSwitchToPlan === undefined) {
+          setComposerErrorMessage(`/${command.name} is not supported.`);
+          return;
+        }
+
+        composerStateInput.collaborationMode.onSwitchToPlan();
+        draftState.setComposerText("");
+        return;
+      }
+
+      const preparationResult = await prepareComposerTurnSubmission({
+        attachments: [],
+        composerText: planPrompt,
+        pendingDiffComments: [],
+      });
+
+      if (preparationResult.status === "blocked") {
+        if (preparationResult.message !== null) {
+          setComposerErrorMessage(preparationResult.message);
+        }
+        return;
+      }
+
+      if (activeComposerModel === null) {
+        setComposerErrorMessage(buildModelSelectionRequiredMessage());
+        return;
+      }
+
+      try {
+        await composerStateInput.turnControl.startTurn({
+          submittedPrompt: planPrompt,
+          transcriptPrompt: planPrompt,
+          collaborationMode: "plan",
+          collaborationModeSettings: {
+            mode: "plan",
+            model: activeComposerModel.model,
+            reasoningEffort: composerStateInput.configControl.selectedReasoningEffort,
+            developerInstructions:
+              composerStateInput.collaborationModeSettings?.developerInstructions ?? null,
+          },
+        });
+      } catch (error) {
+        setComposerErrorMessage(
+          error instanceof Error ? error.message : "Could not submit chat message.",
+        );
+        return;
+      }
+
+      composerStateInput.collaborationMode?.onSwitchToPlan?.();
+      draftState.setComposerText("");
+    },
+    [
+      activeComposerModel,
+      composerStateInput.collaborationMode,
+      composerStateInput.collaborationModeSettings?.developerInstructions,
+      composerStateInput.configControl.selectedReasoningEffort,
+      composerStateInput.turnControl,
+      composerText,
+      draftState,
+      prepareComposerTurnSubmission,
+    ],
+  );
+
   const submitComposer = useCallback((): void => {
     void (async () => {
       clearSessionErrorMessage();
@@ -580,6 +659,11 @@ export function useSessionComposerState(input: {
           if (composerStateInput.bootstrap.phase.status === "failed") {
             setComposerErrorMessage(composerStateInput.bootstrap.phase.message);
           }
+          return;
+        }
+
+        if (typedRuntimeCommand.name === "plan") {
+          await submitPlanTypedRuntimeCommand(typedRuntimeCommand);
           return;
         }
 
@@ -640,6 +724,9 @@ export function useSessionComposerState(input: {
             transcriptPrompt: submittedPrompt,
             ...(turnCollaborationModeSettings === undefined
               ? {}
+              : { collaborationMode: turnCollaborationModeSettings.mode }),
+            ...(turnCollaborationModeSettings === undefined
+              ? {}
               : { collaborationModeSettings: turnCollaborationModeSettings }),
           });
         }
@@ -664,6 +751,7 @@ export function useSessionComposerState(input: {
     pendingComposerAttachments,
     prepareComposerTurnSubmission,
     submitAction,
+    submitPlanTypedRuntimeCommand,
     turnCollaborationModeSettings,
     typedRuntimeCommand,
     unavailableTypedRuntimeCommand,

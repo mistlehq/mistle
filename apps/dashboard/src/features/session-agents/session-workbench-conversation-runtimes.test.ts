@@ -69,6 +69,7 @@ function createCodexRuntimeInput(input: {
       isReloadingChat: false,
       isInterruptingTurn: false,
       isSteeringTurn: false,
+      hasPendingFollowUp: false,
       canInterruptTurn: false,
       canSteerTurn: false,
       hydrateChatFromThread: async () => {
@@ -109,6 +110,21 @@ function createCodexRuntimeInput(input: {
         return;
       },
       executeTypedComposerCommand: () => false,
+    },
+    plans: {
+      activeMode: "default",
+      clearContextImplementationThreadId: null,
+      acknowledgeClearContextImplementationThread:
+        function acknowledgeClearContextImplementationThread() {
+          throw new Error(
+            "Unexpected clear-context implementation acknowledgement in conversation runtime test",
+          );
+        },
+      commandPanel: null,
+      executeTypedComposerCommand: () => false,
+      switchActiveThreadToDefault: () => {
+        return;
+      },
     },
     serverRequests: {
       pendingServerRequests: [],
@@ -328,7 +344,7 @@ describe("buildCodexConversationRuntime", () => {
     expect(reportedMessages).toEqual(["Unsupported Codex runtime command 'codex.unsupported'."]);
   });
 
-  it("reserves the goal typed runtime command when the runtime reports goals disabled", () => {
+  it("reserves typed runtime commands when the runtime reports them disabled", () => {
     const runtime = buildCodexConversationRuntime(
       createCodexRuntimeInput({
         activeConversationId: "thread_123",
@@ -338,6 +354,10 @@ describe("buildCodexConversationRuntime", () => {
     );
 
     expect(runtime.composerRuntimeInput.unavailableTypedRuntimeCommands).toEqual([
+      {
+        name: "plan",
+        message: "/plan is not enabled for this Codex runtime.",
+      },
       {
         name: "goal",
         message: "/goal is not enabled for this Codex runtime.",
@@ -355,6 +375,14 @@ describe("buildCodexConversationRuntime", () => {
             trigger: "/",
             source: "runtimeCommand",
             commands: [
+              {
+                id: "codex.plan",
+                name: "plan",
+                availability: {
+                  duringActiveTurn: "disabled",
+                },
+                submitAs: "typedRuntimeCommand",
+              },
               {
                 id: "codex.goal",
                 name: "goal",

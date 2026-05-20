@@ -166,6 +166,21 @@ export function useSessionWorkbenchRuntimeConversationNavigation(
     [input.searchParams, input.setSearchParams],
   );
 
+  useEffect(() => {
+    const clearContextConversationId =
+      input.runtimeConversationNavigator?.clearContextImplementationConversationId ?? null;
+    if (clearContextConversationId === null) {
+      return;
+    }
+
+    input.closeDiffPanel();
+    setExplicitPanelVisibility(true);
+    pushConversationSearchParams(clearContextConversationId);
+    input.runtimeConversationNavigator?.acknowledgeClearContextImplementationConversation(
+      clearContextConversationId,
+    );
+  }, [input.closeDiffPanel, input.runtimeConversationNavigator, pushConversationSearchParams]);
+
   const handleSelectConversation = useCallback(
     (conversationId: string): void => {
       if (input.runtimeConversationNavigator === null) {

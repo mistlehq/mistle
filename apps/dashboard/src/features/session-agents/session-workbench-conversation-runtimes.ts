@@ -1,5 +1,5 @@
 import {
-  CodexInlineCommandIds,
+  CodexComposerCommandIds,
   CodexRuntimeCommandIds,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 
@@ -99,6 +99,7 @@ export function buildCodexConversationRuntime(input: {
   startTurn: SessionTurnControl["startTurn"];
   compactThread: UseCodexSessionStateResult["threads"]["compactThread"];
   goals: UseCodexSessionStateResult["goals"];
+  plans: UseCodexSessionStateResult["plans"];
 }): SessionWorkbenchRuntimeAdapter {
   const capabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
 
@@ -131,18 +132,41 @@ export function buildCodexConversationRuntime(input: {
       clearSessionErrorMessage: input.sessionMessage.clearSessionErrorMessage,
       contextUsage: capabilities.hasContextUsage ? input.contextUsage : null,
       goalStatus: input.goals.activeGoalStatus,
-      commandPanel: mapCodexGoalPanel(input.goals),
-      unavailableTypedRuntimeCommands: hasComposerCommand({
-        composerCapabilities: input.bootstrap.composerCapabilities,
-        commandId: CodexInlineCommandIds.GOAL,
-      })
-        ? []
-        : [
-            {
-              name: "goal",
-              message: "/goal is not enabled for this Codex runtime.",
-            },
-          ],
+      commandPanel: input.plans.commandPanel ?? mapCodexGoalPanel(input.goals),
+      collaborationMode: {
+        mode: input.plans.activeMode,
+        onSwitchToPlan: () => {
+          input.plans.executeTypedComposerCommand({
+            commandId: CodexComposerCommandIds.PLAN,
+            text: "/plan",
+          });
+        },
+        onSwitchToDefault: input.plans.switchActiveThreadToDefault,
+      },
+      unavailableTypedRuntimeCommands: [
+        ...(hasComposerCommand({
+          composerCapabilities: input.bootstrap.composerCapabilities,
+          commandId: CodexComposerCommandIds.PLAN,
+        })
+          ? []
+          : [
+              {
+                name: "plan",
+                message: "/plan is not enabled for this Codex runtime.",
+              },
+            ]),
+        ...(hasComposerCommand({
+          composerCapabilities: input.bootstrap.composerCapabilities,
+          commandId: CodexComposerCommandIds.GOAL,
+        })
+          ? []
+          : [
+              {
+                name: "goal",
+                message: "/goal is not enabled for this Codex runtime.",
+              },
+            ]),
+      ],
       executeRuntimeCommand: (commandId) => {
         if (commandId !== CodexRuntimeCommandIds.COMPACT_THREAD) {
           input.sessionMessage.reportSessionErrorMessage(
@@ -161,7 +185,13 @@ export function buildCodexConversationRuntime(input: {
         input.compactThread(input.activeConversationId);
         return true;
       },
-      executeTypedRuntimeCommand: input.goals.executeTypedComposerCommand,
+      executeTypedRuntimeCommand: (commandInput) => {
+        if (commandInput.commandId === CodexComposerCommandIds.PLAN) {
+          return input.plans.executeTypedComposerCommand(commandInput);
+        }
+
+        return input.goals.executeTypedComposerCommand(commandInput);
+      },
       modelSelection: capabilities.composerModelSelection,
     },
     serverRequestsState: {

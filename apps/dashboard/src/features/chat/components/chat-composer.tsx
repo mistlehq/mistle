@@ -2,10 +2,13 @@ import type { ComposerCapability, ComposerCommandDescriptor } from "@mistle/inte
 import { OpenAiReasoningEffortLabelByValue } from "@mistle/integrations-definitions/openai";
 import {
   Button,
+  ButtonGroup,
+  DropdownMenuItem,
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
   Kbd,
+  MoreActionsMenu,
   Select,
   SelectContent,
   SelectItem,
@@ -82,7 +85,7 @@ export type ChatComposerCommandPanel =
   | {
       kind: "confirm";
       title: string;
-      description: string;
+      description?: string;
       confirmLabel: string;
       cancelLabel: string;
       onConfirm: () => void;
@@ -91,12 +94,23 @@ export type ChatComposerCommandPanel =
   | {
       kind: "textInput";
       title: string;
-      description: string;
+      description?: string;
       initialValue: string;
       submitLabel: string;
       cancelLabel: string;
       onSubmit: (value: string) => void;
       onCancel: () => void;
+    }
+  | {
+      kind: "choice";
+      title: string;
+      description?: string;
+      suppressWhenQueuedPrompts?: boolean;
+      choices: readonly {
+        label: string;
+        onSelect: () => void;
+        variant?: "default" | "secondary" | "ghost";
+      }[];
     };
 
 export type ChatComposerViewModel = {
@@ -117,6 +131,11 @@ export type ChatComposerViewModel = {
   goalStatus?: {
     label: string;
     title: string;
+  } | null;
+  collaborationModeStatus?: {
+    label: string;
+    title: string;
+    onSwitchToDefault?: () => void;
   } | null;
   commandPanel?: ChatComposerCommandPanel | null;
   pendingDiffCommentSummary: {
@@ -160,6 +179,60 @@ export type ChatComposerViewModel = {
   onRemovePendingAttachment: (attachmentId: string) => void;
 };
 
+type ChoiceCommandPanelChoice = Extract<
+  ChatComposerCommandPanel,
+  { kind: "choice" }
+>["choices"][number];
+
+function ChoiceCommandPanelActions(input: {
+  choices: readonly ChoiceCommandPanelChoice[];
+  title: string;
+}): React.JSX.Element {
+  const primaryChoice =
+    input.choices.find((choice) => choice.variant === "default") ?? input.choices[0];
+  const secondaryChoices = input.choices.filter((choice) => choice !== primaryChoice);
+
+  if (primaryChoice === undefined) {
+    return <></>;
+  }
+
+  if (secondaryChoices.length === 0) {
+    return (
+      <Button
+        className="shrink-0"
+        onClick={primaryChoice.onSelect}
+        size="sm"
+        type="button"
+        variant={primaryChoice.variant ?? "secondary"}
+      >
+        {primaryChoice.label}
+      </Button>
+    );
+  }
+
+  return (
+    <ButtonGroup aria-label={input.title} className="shrink-0">
+      <Button onClick={primaryChoice.onSelect} size="sm" type="button" variant="default">
+        {primaryChoice.label}
+      </Button>
+      <MoreActionsMenu
+        contentClassName="w-56"
+        sideOffset={6}
+        triggerIconVariant="chevron-down"
+        triggerLabel="More actions"
+        triggerSize="icon-sm"
+        triggerVariant="default"
+      >
+        {secondaryChoices.map((choice) => (
+          <DropdownMenuItem key={choice.label} onClick={choice.onSelect}>
+            {choice.label}
+          </DropdownMenuItem>
+        ))}
+      </MoreActionsMenu>
+    </ButtonGroup>
+  );
+}
+
 export function ChatComposer({
   composerCapabilities,
   composerText,
@@ -167,6 +240,7 @@ export function ChatComposer({
   pullRequest,
   contextUsage,
   goalStatus = null,
+  collaborationModeStatus = null,
   commandPanel = null,
   pendingDiffCommentSummary,
   pendingAttachments,
@@ -339,6 +413,71 @@ export function ChatComposer({
         addPendingFiles(Array.from(event.dataTransfer.files));
       }}
     >
+      {commandPanel === null ? null : (
+        <div className="mb-2 rounded-md border bg-card px-3 py-2 text-sm shadow-xs">
+          {commandPanel.kind === "confirm" ? (
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0">
+                <p className="font-medium text-foreground">{commandPanel.title}</p>
+                {commandPanel.description === undefined ? null : (
+                  <p className="text-muted-foreground">{commandPanel.description}</p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button onClick={commandPanel.onCancel} size="sm" type="button" variant="ghost">
+                  {commandPanel.cancelLabel}
+                </Button>
+                <Button onClick={commandPanel.onConfirm} size="sm" type="button">
+                  {commandPanel.confirmLabel}
+                </Button>
+              </div>
+            </div>
+          ) : commandPanel.kind === "textInput" ? (
+            <div className="flex flex-col gap-2">
+              <div>
+                <p className="font-medium text-foreground">{commandPanel.title}</p>
+                {commandPanel.description === undefined ? null : (
+                  <p className="text-muted-foreground">{commandPanel.description}</p>
+                )}
+              </div>
+              <Textarea
+                className="min-h-20 resize-none"
+                onChange={(event) => {
+                  setCommandPanelText(event.target.value);
+                }}
+                value={commandPanelText}
+              />
+              <div className="flex justify-end gap-2">
+                <Button onClick={commandPanel.onCancel} size="sm" type="button" variant="ghost">
+                  {commandPanel.cancelLabel}
+                </Button>
+                <Button
+                  onClick={() => {
+                    commandPanel.onSubmit(commandPanelText);
+                  }}
+                  size="sm"
+                  type="button"
+                >
+                  {commandPanel.submitLabel}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0">
+                <p className="font-medium text-foreground">{commandPanel.title}</p>
+                {commandPanel.description === undefined ? null : (
+                  <p className="text-muted-foreground">{commandPanel.description}</p>
+                )}
+              </div>
+              <ChoiceCommandPanelActions
+                choices={commandPanel.choices}
+                title={commandPanel.title}
+              />
+            </div>
+          )}
+        </div>
+      )}
       <div className="bg-card flex flex-col gap-3 rounded-md border p-1.5 shadow-xs">
         <input
           className="hidden"
@@ -661,58 +800,11 @@ export function ChatComposer({
           )}
         </div>
       </div>
-      {commandPanel === null ? null : (
-        <div className="mt-2 rounded-md border bg-card px-3 py-2 text-sm shadow-xs">
-          {commandPanel.kind === "confirm" ? (
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <div className="min-w-0">
-                <p className="font-medium text-foreground">{commandPanel.title}</p>
-                <p className="text-muted-foreground">{commandPanel.description}</p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <Button onClick={commandPanel.onCancel} size="sm" type="button" variant="ghost">
-                  {commandPanel.cancelLabel}
-                </Button>
-                <Button onClick={commandPanel.onConfirm} size="sm" type="button">
-                  {commandPanel.confirmLabel}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <div>
-                <p className="font-medium text-foreground">{commandPanel.title}</p>
-                <p className="text-muted-foreground">{commandPanel.description}</p>
-              </div>
-              <Textarea
-                className="min-h-20 resize-none"
-                onChange={(event) => {
-                  setCommandPanelText(event.target.value);
-                }}
-                value={commandPanelText}
-              />
-              <div className="flex justify-end gap-2">
-                <Button onClick={commandPanel.onCancel} size="sm" type="button" variant="ghost">
-                  {commandPanel.cancelLabel}
-                </Button>
-                <Button
-                  onClick={() => {
-                    commandPanel.onSubmit(commandPanelText);
-                  }}
-                  size="sm"
-                  type="button"
-                >
-                  {commandPanel.submitLabel}
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
       {gitBranchLabel === null &&
       pullRequest === null &&
       contextUsage === null &&
-      goalStatus === null ? null : (
+      goalStatus === null &&
+      collaborationModeStatus === null ? null : (
         <div className="text-muted-foreground flex items-center justify-between gap-4 px-1.5 pt-2 text-sm">
           <div className="flex min-w-0 items-center gap-4">
             {gitBranchLabel === null ? null : (
@@ -741,6 +833,22 @@ export function ChatComposer({
             )}
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-4">
+            {collaborationModeStatus === null ? null : (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      className="flex cursor-default items-center gap-1.5 rounded-sm outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      onClick={collaborationModeStatus.onSwitchToDefault}
+                      type="button"
+                    />
+                  }
+                >
+                  <span>{collaborationModeStatus.label}</span>
+                </TooltipTrigger>
+                <TooltipContent side="top">{collaborationModeStatus.title}</TooltipContent>
+              </Tooltip>
+            )}
             {goalStatus === null ? null : (
               <Tooltip>
                 <TooltipTrigger

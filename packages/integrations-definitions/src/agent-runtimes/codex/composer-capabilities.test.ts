@@ -23,7 +23,10 @@ describe("Codex composer capabilities", () => {
         id: "codex.plan",
         name: "plan",
         description: "Plan before making changes",
-        submitAs: "inlineText",
+        availability: {
+          duringActiveTurn: "disabled",
+        },
+        submitAs: "typedRuntimeCommand",
       },
       {
         id: "codex.goal",

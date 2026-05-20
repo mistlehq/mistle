@@ -205,6 +205,71 @@ export const WithRepositoryStatusAndContextUsage: Story = {
   },
 };
 
+export const PlanModeActive: Story = {
+  args: {
+    collaborationModeStatus: {
+      label: "Plan mode",
+      title: "Codex is planning. Submissions stay in Plan mode until implementation starts.",
+      onSwitchToDefault: noop,
+    },
+    composerText: "Audit the current implementation before changing code.",
+    gitBranchLabel: "feature/codex-plan-command",
+    pullRequest: {
+      isDraft: true,
+      number: 231,
+      state: "OPEN",
+      title: "Add Codex plan command",
+      url: "https://github.com/mistlehq/mistle/pull/231",
+    },
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByText("Plan mode")).toBeVisible();
+    await expect(canvas.getByText("PR #231 Draft")).toBeVisible();
+  },
+};
+
+export const PlanImplementationConfirmation: Story = {
+  args: {
+    collaborationModeStatus: {
+      label: "Plan mode",
+      title: "Codex proposed a plan and is waiting for an implementation choice.",
+      onSwitchToDefault: noop,
+    },
+    commandPanel: {
+      kind: "choice",
+      title: "Implement this plan?",
+      choices: [
+        {
+          label: "Clear context and implement",
+          onSelect: noop,
+          variant: "secondary",
+        },
+        {
+          label: "Dismiss",
+          onSelect: noop,
+          variant: "ghost",
+        },
+        {
+          label: "Implement",
+          onSelect: noop,
+          variant: "default",
+        },
+      ],
+    },
+    composerText: "",
+    gitBranchLabel: "feature/codex-plan-command",
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByText("Implement this plan?")).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Implement" })).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "More actions" })).toBeVisible();
+  },
+};
+
 export const OpenCodeDefaultModel: Story = {
   args: {
     composerText: "Review the failing setup script and propose a minimal patch.",

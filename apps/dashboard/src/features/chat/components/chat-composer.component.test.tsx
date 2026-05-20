@@ -294,6 +294,78 @@ describe("ChatComposer", () => {
     expect(screen.getByText("Context 82% left")).toBeTruthy();
   });
 
+  it("renders Plan mode status and lets the user switch back to Default", () => {
+    let switchedToDefault = false;
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        collaborationModeStatus={{
+          label: "Plan mode",
+          title: "Codex will plan before implementation.",
+          onSwitchToDefault: () => {
+            switchedToDefault = true;
+          },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Plan mode" }));
+
+    expect(switchedToDefault).toBe(true);
+  });
+
+  it("renders a choice command panel", () => {
+    const selectedChoices: string[] = [];
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        commandPanel={{
+          kind: "choice",
+          title: "Implement this plan?",
+          choices: [
+            {
+              label: "Clear context and implement",
+              onSelect: () => {
+                selectedChoices.push("clear");
+              },
+              variant: "secondary",
+            },
+            {
+              label: "Dismiss",
+              onSelect: () => {
+                selectedChoices.push("dismiss");
+              },
+              variant: "ghost",
+            },
+            {
+              label: "Implement",
+              onSelect: () => {
+                selectedChoices.push("implement");
+              },
+              variant: "default",
+            },
+          ],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Dismiss" }));
+
+    expect(screen.getByText("Implement this plan?")).toBeTruthy();
+    expect(
+      screen.getByText("Implement this plan?").compareDocumentPosition(getComposerTextarea()) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "Implement" })
+        .compareDocumentPosition(screen.getByRole("button", { name: "More actions" })) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(selectedChoices).toEqual(["dismiss"]);
+  });
+
   it("accepts dropped files on the git branch footer row", () => {
     const droppedFiles: File[][] = [];
     render(

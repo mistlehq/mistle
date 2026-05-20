@@ -30,7 +30,14 @@ function createRuntimeConversationNavigator(input: {
   return {
     activeConversationCwd: input.activeConversationCwd ?? "/workspace/repo",
     activeConversationId: input.activeConversationId ?? null,
+    acknowledgeClearContextImplementationConversation:
+      function acknowledgeClearContextImplementationConversation() {
+        throw new Error(
+          "Unexpected clear-context implementation acknowledgement in conversation navigation visibility test",
+        );
+      },
     availableConversations: input.availableConversations,
+    clearContextImplementationConversationId: null,
     hasMoreAvailableConversations: false,
     isStartingNewConversation: false,
     originalConversationId: input.originalConversationId ?? null,

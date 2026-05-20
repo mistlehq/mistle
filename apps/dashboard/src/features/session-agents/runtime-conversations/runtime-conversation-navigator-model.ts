@@ -14,6 +14,8 @@ export type RuntimeConversationNavigatorState = {
   hasMoreAvailableConversations: boolean;
   originalConversationId: string | null;
   pendingConversationId: string | null;
+  clearContextImplementationConversationId: string | null;
+  acknowledgeClearContextImplementationConversation: (conversationId: string) => void;
   isStartingNewConversation: boolean;
   refreshConversationList: (input?: { cwd?: string | null }) => void | Promise<void>;
   resumeConversation: (conversationId: string, input?: { cwd?: string }) => Promise<string>;

@@ -80,6 +80,9 @@ function SessionComposerStateHarness(input: {
   enableNativeQueueTurn?: boolean;
   executeRuntimeCommand?: (commandId: string) => boolean;
   executeTypedRuntimeCommand?: (input: { commandId: string; text: string }) => boolean;
+  initialCollaborationMode?: "default" | "plan";
+  onSwitchToPlan?: () => void;
+  onSwitchToDefault?: () => void;
   pendingDiffComments: readonly PendingSessionDiffComment[];
   selectedModel?: string | null;
   shouldFailSubmit?: boolean;
@@ -96,6 +99,7 @@ function SessionComposerStateHarness(input: {
   const [transcriptPrompt, setTranscriptPrompt] = useState<string | null>(null);
   const [collaborationModeSettings, setCollaborationModeSettings] =
     useState<SessionComposerCollaborationModeSettings | null>(null);
+  const [collaborationMode, setCollaborationMode] = useState<"default" | "plan" | null>(null);
   const [resolveSubmit, setResolveSubmit] = useState<(() => void) | null>(null);
   const [resolveNativeQueue, setResolveNativeQueue] = useState<(() => void) | null>(null);
 
@@ -144,6 +148,17 @@ function SessionComposerStateHarness(input: {
         required: true,
         showControls: true,
       },
+      collaborationMode: {
+        mode: input.initialCollaborationMode ?? "default",
+        onSwitchToPlan: () => {
+          setCollaborationMode("plan");
+          input.onSwitchToPlan?.();
+        },
+        onSwitchToDefault: () => {
+          setCollaborationMode("default");
+          input.onSwitchToDefault?.();
+        },
+      },
       ...(input.collaborationDeveloperInstructions === undefined
         ? {}
         : {
@@ -160,13 +175,19 @@ function SessionComposerStateHarness(input: {
         isSteering: false,
         isInterrupting: false,
         completedTurnErrorMessage: null,
-        startTurn: async ({ submittedPrompt, transcriptPrompt, collaborationModeSettings }) => {
+        startTurn: async ({
+          submittedPrompt,
+          transcriptPrompt,
+          collaborationMode,
+          collaborationModeSettings,
+        }) => {
           if (input.shouldFailSubmit) {
             throw new Error("Could not submit chat message.");
           }
 
           setSubmittedPrompt(submittedPrompt);
           setTranscriptPrompt(transcriptPrompt ?? null);
+          setCollaborationMode(collaborationMode ?? null);
           setCollaborationModeSettings(collaborationModeSettings ?? null);
           if (input.deferSubmit) {
             await new Promise<void>((resolve) => {
@@ -271,6 +292,7 @@ function SessionComposerStateHarness(input: {
       <div data-testid="collaboration-mode-settings">
         {collaborationModeSettings === null ? "" : JSON.stringify(collaborationModeSettings)}
       </div>
+      <div data-testid="collaboration-mode">{collaborationMode ?? ""}</div>
       <div data-testid="composer-text">{composerText}</div>
       <div data-testid="pending-attachments">
         {composerState.composerViewModel.pendingAttachments
@@ -457,6 +479,85 @@ describe("useSessionComposerState", () => {
       },
     ]);
     expect(screen.getByTestId("submitted-prompt").textContent).toBe("");
+    expect(screen.getByTestId("composer-text").textContent).toBe("");
+  });
+
+  it("switches to Plan mode for a bare plan command", () => {
+    let switchedToPlan = false;
+
+    render(
+      <SessionComposerStateHarness
+        composerCapabilities={[
+          {
+            kind: "composerCommand",
+            trigger: "/",
+            source: "runtimeCommand",
+            commands: [
+              {
+                id: "codex.plan",
+                name: "plan",
+                availability: {
+                  duringActiveTurn: "disabled",
+                },
+                submitAs: "typedRuntimeCommand",
+              },
+            ],
+          },
+        ]}
+        composerText="/plan"
+        onSwitchToPlan={() => {
+          switchedToPlan = true;
+        }}
+        pendingDiffComments={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(switchedToPlan).toBe(true);
+    expect(screen.getByTestId("submitted-prompt").textContent).toBe("");
+    expect(screen.getByTestId("composer-text").textContent).toBe("");
+  });
+
+  it("submits plan command text in Plan mode", async () => {
+    render(
+      <SessionComposerStateHarness
+        composerCapabilities={[
+          {
+            kind: "composerCommand",
+            trigger: "/",
+            source: "runtimeCommand",
+            commands: [
+              {
+                id: "codex.plan",
+                name: "plan",
+                availability: {
+                  duringActiveTurn: "disabled",
+                },
+                submitAs: "typedRuntimeCommand",
+              },
+            ],
+          },
+        ]}
+        composerText="/plan design the rollout"
+        pendingDiffComments={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("submitted-prompt").textContent).toBe("design the rollout");
+    });
+    expect(screen.getByTestId("collaboration-mode").textContent).toBe("plan");
+    expect(screen.getByTestId("collaboration-mode-settings").textContent).toBe(
+      JSON.stringify({
+        mode: "plan",
+        model: "gpt-5.4",
+        reasoningEffort: "medium",
+        developerInstructions: null,
+      }),
+    );
     expect(screen.getByTestId("composer-text").textContent).toBe("");
   });
 
@@ -709,6 +810,7 @@ describe("useSessionComposerState", () => {
     });
     expect(screen.getByTestId("collaboration-mode-settings").textContent).toBe(
       JSON.stringify({
+        mode: "default",
         model: "gpt-5.4",
         reasoningEffort: "medium",
         developerInstructions: "You are Setup Assistant.",

@@ -6,9 +6,13 @@ import {
   IntegrationDefinitionRegistryError,
 } from "../errors/index.js";
 import { AgentRuntimeRegistry } from "./registry.js";
-import type { AgentRuntimeDefinition } from "./types.js";
+import type { AgentRuntimeDefinition, ComposerCommandSubmitAs } from "./types.js";
 
 const RuntimeConfigSchema = z.object({});
+const RuntimeComposerCommandSubmitModes: readonly ComposerCommandSubmitAs[] = [
+  "runtimeCommand",
+  "typedRuntimeCommand",
+];
 
 function createRuntime(
   input: Partial<AgentRuntimeDefinition<typeof RuntimeConfigSchema>> = {},
@@ -290,63 +294,37 @@ describe("agent runtime registry", () => {
     );
   });
 
-  it("requires availability for runtime composer commands", () => {
-    const registry = new AgentRuntimeRegistry();
+  it.each(RuntimeComposerCommandSubmitModes)(
+    "requires availability for %s composer commands",
+    (submitAs) => {
+      const registry = new AgentRuntimeRegistry();
 
-    expect(() =>
-      registry.register(
-        createRuntime({
-          composerCapabilities: [
-            {
-              kind: "composerCommand",
-              trigger: "/",
-              source: "runtimeCommand",
-              commands: [
-                {
-                  id: "codex.compact",
-                  name: "compact",
-                  submitAs: "runtimeCommand",
-                },
-              ],
-            },
-          ],
+      expect(() =>
+        registry.register(
+          createRuntime({
+            composerCapabilities: [
+              {
+                kind: "composerCommand",
+                trigger: "/",
+                source: "runtimeCommand",
+                commands: [
+                  {
+                    id: "codex.command",
+                    name: "command",
+                    submitAs,
+                  },
+                ],
+              },
+            ],
+          }),
+        ),
+      ).toThrow(
+        expect.objectContaining({
+          code: DefinitionRegistryErrorCodes.INVALID_DEFINITION,
         }),
-      ),
-    ).toThrow(
-      expect.objectContaining({
-        code: DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-      }),
-    );
-  });
-
-  it("requires availability for typed runtime composer commands", () => {
-    const registry = new AgentRuntimeRegistry();
-
-    expect(() =>
-      registry.register(
-        createRuntime({
-          composerCapabilities: [
-            {
-              kind: "composerCommand",
-              trigger: "/",
-              source: "runtimeCommand",
-              commands: [
-                {
-                  id: "codex.goal",
-                  name: "goal",
-                  submitAs: "typedRuntimeCommand",
-                },
-              ],
-            },
-          ],
-        }),
-      ),
-    ).toThrow(
-      expect.objectContaining({
-        code: DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-      }),
-    );
-  });
+      );
+    },
+  );
 
   it("rejects invalid active-turn availability for runtime composer commands", () => {
     const submitModes = ["runtimeCommand", "typedRuntimeCommand"];

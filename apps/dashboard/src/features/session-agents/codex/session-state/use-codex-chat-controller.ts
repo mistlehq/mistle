@@ -4,6 +4,7 @@ import {
   normalizeCodexLocalImageAttachment,
   startCodexTurn,
   steerCodexTurn,
+  type CodexTurnCollaborationModeKind,
   type CodexTurnCollaborationModeSettings,
   type CodexTurnInputLocalImageItem,
   type CodexJsonRpcClient,
@@ -57,6 +58,7 @@ function buildTurnRequest(input: {
   transcriptPrompt?: string;
   displayAttachments?: readonly ChatAttachment[];
   cwd?: string;
+  collaborationMode?: CodexTurnCollaborationModeKind | undefined;
   collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
 }): {
   submittedPrompt: string;
@@ -65,6 +67,7 @@ function buildTurnRequest(input: {
   displayAttachments: readonly ChatAttachment[];
   items: ReturnType<typeof buildCodexTurnInputItems>;
   cwd?: string;
+  collaborationMode?: CodexTurnCollaborationModeKind | undefined;
   collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
 } {
   const submittedPrompt = input.submittedPrompt.trim();
@@ -84,6 +87,9 @@ function buildTurnRequest(input: {
       attachments: submittedAttachments,
     }),
     ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
+    ...(input.collaborationMode === undefined
+      ? {}
+      : { collaborationMode: input.collaborationMode }),
     ...(input.collaborationModeSettings === undefined
       ? {}
       : { collaborationModeSettings: input.collaborationModeSettings }),
@@ -205,6 +211,7 @@ export function useCodexChatController(input: {
       displayAttachments?: readonly ChatAttachment[];
       cwd?: string;
       collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
+      collaborationMode?: CodexTurnCollaborationModeKind | undefined;
     }) => {
       const rpcClient = input.rpcClientRef.current;
       const threadId = input.threadIdRef.current;
@@ -223,6 +230,9 @@ export function useCodexChatController(input: {
         ...(turnRequest.collaborationModeSettings === undefined
           ? {}
           : { collaborationModeSettings: turnRequest.collaborationModeSettings }),
+        ...(turnRequest.collaborationMode === undefined
+          ? {}
+          : { collaborationMode: turnRequest.collaborationMode }),
       });
       dispatchChatAction({
         type: "turn_started",
@@ -384,6 +394,7 @@ export function useCodexChatController(input: {
     isReloadingChat: reloadChatMutation.isPending,
     isInterruptingTurn: interruptTurnMutation.isPending,
     isSteeringTurn: pendingSteerCount > 0,
+    hasPendingFollowUp: pendingSteerCount > 0,
     canInterruptTurn,
     canSteerTurn,
     startTurn: useCallback(
@@ -393,6 +404,7 @@ export function useCodexChatController(input: {
         transcriptPrompt?: string;
         displayAttachments?: readonly ChatAttachment[];
         collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
+        collaborationMode?: CodexTurnCollaborationModeKind | undefined;
       }): Promise<void> => {
         await startTurnMutation.mutateAsync(turnInput);
       },
