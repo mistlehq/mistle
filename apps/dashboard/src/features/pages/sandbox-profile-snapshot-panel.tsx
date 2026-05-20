@@ -55,7 +55,6 @@ import {
   useSandboxProfileMaintenanceScriptTestRun,
   type SetupScriptTestButtonProps,
 } from "./sandbox-profile-setup-script-test.js";
-import type { SetupAssistantScriptKind } from "./setup-assistant-instructions.js";
 
 export type SnapshotPanelState =
   | {
@@ -102,11 +101,7 @@ type SnapshotOperationProgressState = {
 type SnapshotMaintenanceScriptAssistantControl = {
   disabled: boolean;
   isStarting: boolean;
-  onToggle: (input: {
-    savedScript: string | null;
-    script: string;
-    scriptKind: SetupAssistantScriptKind;
-  }) => void;
+  onToggle: (input: { savedScript: string | null; script: string }) => void;
   title: string;
 };
 
@@ -1049,7 +1044,6 @@ export function SandboxProfileSnapshotRefreshScheduleForm(input: {
                             input.setupAssistantControl.onToggle({
                               savedScript: input.savedMaintenanceScript,
                               script: input.maintenanceScriptDraft,
-                              scriptKind: "maintenance",
                             });
                           },
                           title: input.setupAssistantControl.title,

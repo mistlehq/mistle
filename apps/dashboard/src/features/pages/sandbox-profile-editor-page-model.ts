@@ -25,6 +25,8 @@ export type SandboxProfileEditorVersionMode =
       draftVersion: number | null;
     };
 
+export type SetupAssistantStartDialogVariant = "choice" | "save-required" | "use-saved-required";
+
 type ResolveEditorVersionModeResult =
   | {
       ok: true;
@@ -192,6 +194,17 @@ export function applyPublishedSandboxProfileVersionToProfile(input: {
     ...input.profile,
     activeVersion: input.result.activeVersion,
   };
+}
+
+export function resolveSetupAssistantStartDialogVariant(input: {
+  latestSavedDraftHasAgentRuntime: boolean;
+  localDraftHasAgentRuntime: boolean;
+}): SetupAssistantStartDialogVariant {
+  if (!input.latestSavedDraftHasAgentRuntime) {
+    return "save-required";
+  }
+
+  return input.localDraftHasAgentRuntime ? "choice" : "use-saved-required";
 }
 
 export function applyPublishedSandboxProfileVersionToVersions(input: {

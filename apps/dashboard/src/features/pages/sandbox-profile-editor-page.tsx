@@ -118,12 +118,14 @@ import {
   applyDiscardedSandboxProfileVersionDraftToVersions,
   applyPublishedSandboxProfileVersionToProfile,
   applyPublishedSandboxProfileVersionToVersions,
+  resolveSetupAssistantStartDialogVariant,
   resolveSandboxProfileEditorVersionMode,
   resolveSandboxProfileSetupScriptIntegrationRows,
   shouldPollSandboxProfileSnapshotJobs,
   shouldRedirectDraftSandboxProfileViewToPublished,
   type SandboxProfileEditorVersionMode,
   type SandboxProfileRouteView,
+  type SetupAssistantStartDialogVariant,
 } from "./sandbox-profile-editor-page-model.js";
 import {
   SandboxProfileEditorHorizontalTabContent,
@@ -222,11 +224,7 @@ type SetupScriptAssistantControl = {
   disabled: boolean;
   errorMessage: string | null;
   isStarting: boolean;
-  onToggle: (input: {
-    savedScript: string | null;
-    script: string;
-    scriptKind: SetupAssistantScriptKind;
-  }) => void;
+  onToggle: (input: { savedScript: string | null; script: string }) => void;
   title: string;
 };
 type SetupScriptAssistantPanelState = {
@@ -245,7 +243,6 @@ type SetupAssistantCloseDialogState = {
   sandboxInstanceId: string;
   errorMessage: string | null;
 } | null;
-type SetupAssistantStartDialogVariant = "choice" | "save-required" | "use-saved-required";
 type SetupAssistantStartDialogState = {
   script: string;
   savedScript: string | null;
@@ -308,17 +305,6 @@ function hasSetupAssistantAgentBinding(
   }
 
   return integrationRows.some((row) => row.kind === "agent");
-}
-
-export function resolveSetupAssistantStartDialogVariant(input: {
-  latestSavedDraftHasAgentRuntime: boolean;
-  localDraftHasAgentRuntime: boolean;
-}): SetupAssistantStartDialogVariant {
-  if (!input.latestSavedDraftHasAgentRuntime) {
-    return "save-required";
-  }
-
-  return input.localDraftHasAgentRuntime ? "choice" : "use-saved-required";
 }
 
 const SetupScriptPlaceholder = `#!/usr/bin/env bash
@@ -1592,7 +1578,7 @@ function ReadySandboxProfileEditorPage(input: {
       disabled: setupAssistantPanelIsOpen || inputValue.disabledReason !== null,
       errorMessage: setupAssistantError,
       isStarting: !setupAssistantPanelIsOpen && startSetupAssistantMutation.isPending,
-      onToggle: ({ savedScript, script, scriptKind }) => {
+      onToggle: ({ savedScript, script }) => {
         if (setupAssistantPanelState?.isOpen === true) {
           return;
         }
@@ -1602,11 +1588,11 @@ function ReadySandboxProfileEditorPage(input: {
           return;
         }
 
-        if (scriptKind === "setup" && setupAssistantHasVersionDraftChanges) {
+        if (inputValue.scriptKind === "setup" && setupAssistantHasVersionDraftChanges) {
           setSetupAssistantStartDialogState({
             savedScript,
             script,
-            scriptKind,
+            scriptKind: inputValue.scriptKind,
             version,
             variant: resolveSetupAssistantStartDialogVariant({
               latestSavedDraftHasAgentRuntime: setupAssistantLatestSavedDraftHasAgentRuntime,
@@ -1617,8 +1603,8 @@ function ReadySandboxProfileEditorPage(input: {
         }
 
         startSetupAssistantWithScript({
-          script: scriptKind === "maintenance" ? script : (savedScript ?? ""),
-          scriptKind,
+          script: inputValue.scriptKind === "maintenance" ? script : (savedScript ?? ""),
+          scriptKind: inputValue.scriptKind,
           version,
         });
       },
@@ -1931,39 +1917,52 @@ function ReadySandboxProfileEditorPage(input: {
     />
   );
 
-  if (setupAssistantPanelState === null || !setupAssistantPanelState.isOpen) {
-    return (
-      <>
-        {editorView}
-        {setupAssistantStartDialog}
-      </>
-    );
-  }
-
+  const setupAssistantPanelIsClosed =
+    setupAssistantPanelState === null || !setupAssistantPanelState.isOpen;
   return (
-    <div className="sticky top-0 h-svh overflow-hidden">
+    <div
+      className={
+        setupAssistantPanelIsClosed ? undefined : "sticky top-0 h-svh min-h-0 overflow-hidden"
+      }
+    >
       <ResizablePanelGroup
-        className="h-full min-h-0 overflow-hidden"
+        className={setupAssistantPanelIsClosed ? undefined : "h-full min-h-0 overflow-hidden"}
         id="sandbox-profile-setup-assistant-panel-group"
         orientation="horizontal"
       >
-        <ResizablePanel defaultSize="72%" id="sandbox-profile-editor-main-panel" minSize="45%">
-          <div className="h-full min-h-0 overflow-y-auto overscroll-contain">{editorView}</div>
-        </ResizablePanel>
-        <ResizableHandle id="sandbox-profile-setup-assistant-resize-handle" />
         <ResizablePanel
-          defaultSize="28%"
-          id="sandbox-profile-setup-assistant-panel"
-          minSize="360px"
+          defaultSize={setupAssistantPanelIsClosed ? "100%" : "72%"}
+          id="sandbox-profile-editor-main-panel"
+          minSize={setupAssistantPanelIsClosed ? "100%" : "45%"}
         >
-          <SetupScriptAssistantPanel
-            onClose={requestSetupAssistantPanelClose}
-            sandboxInstanceId={setupAssistantPanelState.sandboxInstanceId}
-            scriptKind={setupAssistantPanelState.scriptKind}
-            startupOperationId={setupAssistantPanelState.startupOperationId}
-            initialComposerText={setupAssistantPanelState.initialComposerText}
-          />
+          <div
+            className={
+              setupAssistantPanelIsClosed
+                ? undefined
+                : "h-full min-h-0 overflow-y-auto overscroll-contain"
+            }
+          >
+            {editorView}
+          </div>
         </ResizablePanel>
+        {setupAssistantPanelIsClosed ? null : (
+          <>
+            <ResizableHandle id="sandbox-profile-setup-assistant-resize-handle" />
+            <ResizablePanel
+              defaultSize="28%"
+              id="sandbox-profile-setup-assistant-panel"
+              minSize="360px"
+            >
+              <SetupScriptAssistantPanel
+                onClose={requestSetupAssistantPanelClose}
+                sandboxInstanceId={setupAssistantPanelState.sandboxInstanceId}
+                scriptKind={setupAssistantPanelState.scriptKind}
+                startupOperationId={setupAssistantPanelState.startupOperationId}
+                initialComposerText={setupAssistantPanelState.initialComposerText}
+              />
+            </ResizablePanel>
+          </>
+        )}
       </ResizablePanelGroup>
       <SetupAssistantCloseDialog
         errorMessage={setupAssistantCloseDialogState?.errorMessage ?? null}
@@ -3400,7 +3399,6 @@ function ReadySandboxProfileSetupScriptSection(input: {
             input.setupAssistantControl.onToggle({
               savedScript: setupScriptState.savedValue,
               script: setupScriptState.draftValue,
-              scriptKind: "setup",
             });
           },
           title: input.setupAssistantControl.title,

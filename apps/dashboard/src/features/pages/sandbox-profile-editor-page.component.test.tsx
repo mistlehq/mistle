@@ -56,6 +56,7 @@ import {
   resolveCronExpressionBreakdown,
   resolveSandboxProfileEditorVersionMode,
   resolveSandboxProfileSetupScriptIntegrationRows,
+  resolveSetupAssistantStartDialogVariant,
   resolveSnapshotRefreshScheduleBehaviorDescription,
   shouldPollSandboxProfileSnapshotJobs,
   shouldRedirectDraftSandboxProfileViewToPublished,
@@ -70,7 +71,6 @@ import {
   SandboxProfileEditorView,
   SandboxProfileSetupScriptPanel,
   resolveSelectedSandboxProfileAgentRuntimeId,
-  resolveSetupAssistantStartDialogVariant,
 } from "./sandbox-profile-editor-page.js";
 
 beforeAll(() => {
@@ -1002,16 +1002,7 @@ function renderDraftActionsHarness(input?: {
 }
 
 function updateSetupScriptEditor(input: { editor: HTMLElement; value: string }): void {
-  const editorElement = input.editor.closest(".cm-editor");
-  if (!(editorElement instanceof HTMLElement)) {
-    throw new Error("CodeMirror editor element was not found.");
-  }
-
-  const editorView = EditorView.findFromDOM(editorElement);
-  if (editorView === null) {
-    throw new Error("CodeMirror editor view was not found.");
-  }
-
+  const editorView = getSetupScriptEditorView(input.editor);
   act(() => {
     editorView.dispatch({
       changes: {
@@ -1021,6 +1012,24 @@ function updateSetupScriptEditor(input: { editor: HTMLElement; value: string }):
       },
     });
   });
+}
+
+function readSetupScriptEditorValue(editor: HTMLElement): string {
+  return getSetupScriptEditorView(editor).state.doc.toString();
+}
+
+function getSetupScriptEditorView(editor: HTMLElement): EditorView {
+  const editorElement = editor.closest(".cm-editor");
+  if (!(editorElement instanceof HTMLElement)) {
+    throw new Error("CodeMirror editor element was not found.");
+  }
+
+  const editorView = EditorView.findFromDOM(editorElement);
+  if (editorView === null) {
+    throw new Error("CodeMirror editor view was not found.");
+  }
+
+  return editorView;
 }
 
 describe("SandboxProfileEditorPage", () => {
@@ -1433,6 +1442,59 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByRole("button", { name: "Setup Assistant" }).hasAttribute("disabled")).toBe(
       false,
     );
+  });
+
+  it("keeps automatic snapshot refresh editing open when maintenance Setup Assistant opens", async () => {
+    renderSandboxProfileEditor({
+      maintenanceScript: "echo maintain",
+      routeSection: "snapshot",
+      versionState: "published",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Refresh enabled" }));
+    fireEvent.change(screen.getByLabelText("Cron expression"), {
+      target: { value: "0 10 * * *" },
+    });
+    const timezoneInput = screen.getByLabelText("Timezone");
+    fireEvent.focus(timezoneInput);
+    const timezoneListbox = await screen.findByRole("listbox");
+    fireEvent.click(within(timezoneListbox).getByText("Asia/Singapore"));
+    updateSetupScriptEditor({
+      editor: screen.getByRole("textbox", { name: "Snapshot maintenance script" }),
+      value: "pnpm update\npnpm test",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Setup Assistant" }));
+
+    const closeButton = await screen.findByRole("button", {
+      name: "Close Setup Assistant panel",
+    });
+    expect(closeButton).toBeDefined();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDefined();
+    expect(screen.getByLabelText("Cron expression")).toHaveProperty("value", "0 10 * * *");
+    expect(screen.getByLabelText("Timezone")).toHaveProperty("value", "Asia/Singapore");
+    expect(
+      readSetupScriptEditorValue(
+        screen.getByRole("textbox", { name: "Snapshot maintenance script" }),
+      ),
+    ).toBe("pnpm update\npnpm test");
+    expect(screen.getByText("Snapshot maintenance script")).toBeDefined();
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Close Setup Assistant panel" })).toBeNull();
+    });
+
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDefined();
+    expect(screen.getByLabelText("Cron expression")).toHaveProperty("value", "0 10 * * *");
+    expect(screen.getByLabelText("Timezone")).toHaveProperty("value", "Asia/Singapore");
+    expect(
+      readSetupScriptEditorValue(
+        screen.getByRole("textbox", { name: "Snapshot maintenance script" }),
+      ),
+    ).toBe("pnpm update\npnpm test");
   });
 
   it("shows automatic snapshot refresh as disabled when it is not configured", () => {

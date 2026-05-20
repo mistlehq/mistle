@@ -205,6 +205,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - Unsaved **Snapshot maintenance script** edits do not affect **Automatic snapshot refresh**.
 - Saving **Automatic snapshot refresh** also saves **Snapshot maintenance script** edits.
 - Disabling **Automatic snapshot refresh** does not delete the saved **Snapshot maintenance script**.
+- Opening **Setup Assistant** does not save, discard, or exit **Automatic snapshot refresh** edits.
 - A manual **Snapshot maintenance script** refresh is available only when **Automatic snapshot refresh** is enabled, a saved **Snapshot maintenance script** is present, and the **Sandbox profile version** has a usable **Snapshot**.
 - A **Snapshot preparation script** is either the **Setup script** or the **Snapshot maintenance script** used by a refresh execution.
 - A **Snapshot maintenance script** test run starts from an existing usable **Snapshot** but does not replace it.
