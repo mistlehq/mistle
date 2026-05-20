@@ -29,6 +29,9 @@ const sandboxPublishAccessTokenSecret = "fixture-publish-token-secret";
 const sandboxPublishAccessTokenIssuer = "control-plane-api";
 const sandboxPublishAccessTokenAudience = "data-plane-gateway";
 const sandboxPublishSessionCookieSigningSecret = "fixture-publish-cookie-secret";
+const mcpAuthSecret = "fixture-mcp-auth-secret";
+const mcpAuthIssuer = "control-plane-api";
+const mcpAuthAudience = "mistle-mcp";
 const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
 
 const globalDevelopmentConfig = {
@@ -183,6 +186,13 @@ const controlPlaneApiEnvConfig = {
     otpLength: 6,
     otpExpiresInSeconds: 300,
     otpAllowedAttempts: 3,
+  },
+  mcp: {
+    auth: {
+      secret: mcpAuthSecret,
+      issuer: mcpAuthIssuer,
+      audience: mcpAuthAudience,
+    },
   },
   dashboard: {
     baseUrl: "http://127.0.0.1:5173",

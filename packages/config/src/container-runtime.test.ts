@@ -141,6 +141,9 @@ describe("generateContainerRuntimeConfig", () => {
       ).toEqual(
         getValueAtPath(secondConfig, ["sandbox", "publish", "session", "cookie_signing_secret"]),
       );
+      expect(getValueAtPath(firstConfig, ["services", "control_plane_api", "mcp", "auth"])).toEqual(
+        getValueAtPath(secondConfig, ["services", "control_plane_api", "mcp", "auth"]),
+      );
     } finally {
       cleanupTempDir(tempDir);
     }

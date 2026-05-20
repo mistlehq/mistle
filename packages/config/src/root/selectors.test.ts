@@ -53,6 +53,13 @@ function createRootConfig(input: {
           },
           ...(input.google === undefined ? {} : { google: input.google }),
         },
+        mcp: {
+          auth: {
+            secret: "mcp-auth-secret",
+            issuer: "control-plane-api",
+            audience: "mistle-mcp",
+          },
+        },
         integrations: {
           active_master_encryption_key_version: 1,
           master_encryption_keys: {
@@ -239,6 +246,16 @@ describe("selectControlPlaneApiConfig", () => {
     const config = selectControlPlaneApiConfig(createRootConfig({ allowSignups: false }));
 
     expect(config.auth.allowSignups).toBe(false);
+  });
+
+  it("selects MCP auth config for runtime credential validation", () => {
+    const config = selectControlPlaneApiConfig(createRootConfig({}));
+
+    expect(config.mcp.auth).toEqual({
+      secret: "mcp-auth-secret",
+      issuer: "control-plane-api",
+      audience: "mistle-mcp",
+    });
   });
 
   it("selects disabled Stripe billing for the control-plane API", () => {

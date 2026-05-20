@@ -45,6 +45,14 @@ const TokenConfigSchema = z
   })
   .strict();
 
+const ControlPlaneApiMcpAuthSchema = z
+  .object({
+    secret: z.string().trim().min(1),
+    issuer: z.string().trim().min(1),
+    audience: z.string().trim().min(1),
+  })
+  .strict();
+
 const ObjectStoreSchema = z
   .object({
     bucket_name: z.string().trim().min(1),
@@ -273,6 +281,11 @@ export const ConfigSchema = z
         control_plane_api: ServiceEndpointSchema.extend({
           public_url: UrlSchema,
           auth: ControlPlaneApiAuthSchema,
+          mcp: z
+            .object({
+              auth: ControlPlaneApiMcpAuthSchema,
+            })
+            .strict(),
           integrations: z
             .object({
               active_master_encryption_key_version: z.number().int().min(1),

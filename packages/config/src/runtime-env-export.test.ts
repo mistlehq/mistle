@@ -59,6 +59,18 @@ describe("exportServiceConfigToEnv", () => {
       value: true,
     });
     expectEntry(entries, {
+      name: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_SECRET",
+      value: "replace-with-mcp-runtime-token-secret",
+    });
+    expectEntry(entries, {
+      name: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_ISSUER",
+      value: "control-plane-api",
+    });
+    expectEntry(entries, {
+      name: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_AUDIENCE",
+      value: "mistle-mcp",
+    });
+    expectEntry(entries, {
       name: "MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON",
       value: {
         "1": "replace-with-master-encryption-key",

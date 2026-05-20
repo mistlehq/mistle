@@ -234,6 +234,13 @@ export function buildDevelopmentTomlConfig(): ConfigRecord {
             allowed_attempts: 3,
           },
         },
+        mcp: {
+          auth: {
+            secret: createSecret(),
+            issuer: "control-plane-api",
+            audience: "mistle-mcp",
+          },
+        },
         integrations: {
           active_master_encryption_key_version: 1,
           master_encryption_keys: {

@@ -15,6 +15,7 @@ export const DefaultGeneratedSecretsPath = "/var/lib/mistle/generated-secrets.en
 
 const GeneratedSecretEnvVars = [
   "MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_SECRET",
+  "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_SECRET",
   "MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON",
   "MISTLE_INTERNAL_AUTH_SHARED_TOKEN",
   "MISTLE_SANDBOX_TOKENS_CONNECT_SECRET",
@@ -141,6 +142,7 @@ function requireRuntimeEnv(env: NodeJS.ProcessEnv): void {
 function buildGeneratedSecretsEnv(): Record<string, string> {
   return {
     MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_SECRET: createSecret(),
+    MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_SECRET: createSecret(),
     MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON: JSON.stringify({
       "1": createSecret(),
     }),
@@ -241,6 +243,12 @@ function buildCommonBaseConfig(env: NodeJS.ProcessEnv): ConfigRecord {
             length: 6,
             expires_in_seconds: 300,
             allowed_attempts: 3,
+          },
+        },
+        mcp: {
+          auth: {
+            issuer: "control-plane-api",
+            audience: "mistle-mcp",
           },
         },
         integrations: {
@@ -348,6 +356,11 @@ function buildGeneratedSecretsConfig(env: Record<string, string>): ConfigRecord 
       control_plane_api: {
         auth: {
           secret: readGeneratedEnv("MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_SECRET"),
+        },
+        mcp: {
+          auth: {
+            secret: readGeneratedEnv("MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_SECRET"),
+          },
         },
         integrations: {
           master_encryption_keys: JSON.parse(

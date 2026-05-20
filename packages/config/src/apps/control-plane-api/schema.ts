@@ -91,6 +91,20 @@ export const ControlPlaneApiAuthConfigSchema = z
   })
   .strict();
 
+export const ControlPlaneApiMcpAuthConfigSchema = z
+  .object({
+    secret: z.string().trim().min(1),
+    issuer: z.string().trim().min(1),
+    audience: z.string().trim().min(1),
+  })
+  .strict();
+
+export const ControlPlaneApiMcpConfigSchema = z
+  .object({
+    auth: ControlPlaneApiMcpAuthConfigSchema,
+  })
+  .strict();
+
 export const ControlPlaneApiDashboardConfigSchema = z
   .object({
     baseUrl: z.string().min(1),
@@ -209,6 +223,7 @@ export const ControlPlaneApiConfigSchema = z
     database: ControlPlaneApiDatabaseConfigSchema,
     objectStore: ControlPlaneApiObjectStoreConfigSchema,
     auth: ControlPlaneApiAuthConfigSchema,
+    mcp: ControlPlaneApiMcpConfigSchema,
     dashboard: ControlPlaneApiDashboardConfigSchema,
     billing: ControlPlaneApiBillingConfigSchema,
     workflow: ControlPlaneApiWorkflowConfigSchema,
@@ -240,6 +255,7 @@ export const PartialControlPlaneApiConfigSchema = z
     database: ControlPlaneApiDatabaseConfigSchema.partial().optional(),
     objectStore: ControlPlaneApiObjectStoreConfigSchema.partial().optional(),
     auth: ControlPlaneApiAuthConfigSchema.partial().optional(),
+    mcp: z.object({ auth: ControlPlaneApiMcpAuthConfigSchema.partial() }).strict().optional(),
     dashboard: ControlPlaneApiDashboardConfigSchema.partial().optional(),
     billing: ControlPlaneApiBillingConfigObjectSchema.partial().optional(),
     workflow: ControlPlaneApiWorkflowConfigObjectSchema.partial().optional(),

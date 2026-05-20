@@ -216,6 +216,13 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
             },
           }),
     },
+    mcp: {
+      auth: {
+        secret: config.services.control_plane_api.mcp.auth.secret,
+        issuer: config.services.control_plane_api.mcp.auth.issuer,
+        audience: config.services.control_plane_api.mcp.auth.audience,
+      },
+    },
     dashboard: {
       baseUrl: config.services.dashboard.public_url,
     },

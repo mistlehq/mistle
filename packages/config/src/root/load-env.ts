@@ -343,6 +343,18 @@ const RootEnvDescriptors = [
     path: ["services", "control_plane_api", "auth", "google", "client_secret"],
   },
   {
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_SECRET",
+    path: ["services", "control_plane_api", "mcp", "auth", "secret"],
+  },
+  {
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_ISSUER",
+    path: ["services", "control_plane_api", "mcp", "auth", "issuer"],
+  },
+  {
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_MCP_AUTH_AUDIENCE",
+    path: ["services", "control_plane_api", "mcp", "auth", "audience"],
+  },
+  {
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION",
     path: ["services", "control_plane_api", "integrations", "active_master_encryption_key_version"],
     parse: parseNumberEnv,

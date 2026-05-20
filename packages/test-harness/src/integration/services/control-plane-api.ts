@@ -326,6 +326,13 @@ function config(input: {
           }
         : {}),
     },
+    mcp: {
+      auth: {
+        secret: "integration-new-mcp-auth-secret",
+        issuer: "integration-new-control-plane-api",
+        audience: "integration-new-mistle-mcp",
+      },
+    },
     commitSign: {
       binaryPath: CommitSignBinaryPath,
     },
