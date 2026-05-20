@@ -20,7 +20,6 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration as StdDuration, Instant};
 
-use base64::Engine;
 use bytes::Bytes;
 use futures_util::{FutureExt, Sink, SinkExt, StreamExt};
 use http_body_util::{BodyExt, Empty};
@@ -64,8 +63,7 @@ use crate::tunnel::file_search::{
 };
 use crate::tunnel::port_access::{PortAccessAuthorizeDecision, authorize_target_port};
 use crate::tunnel::port_access_transport::{
-    PortAccessHttpCommand, PortAccessTcpCommand, PortAccessTransportEvent, spawn_http_transport,
-    spawn_tcp_transport,
+    PortAccessHttpCommand, PortAccessTcpCommand, PortAccessTransportEvent,
 };
 use crate::tunnel::protocol::{
     AGENT_STREAM_WINDOW_BYTES, CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
@@ -105,8 +103,11 @@ use crate::tunnel::session::file_search::{
 use crate::tunnel::session::file_upload::{
     FileUploadState, create_file_upload_state, finalize_file_upload,
 };
+#[cfg(test)]
+use crate::tunnel::session::port_access::mark_port_access_tcp_direction_closed;
 use crate::tunnel::session::port_access::{
-    PortAccessTcpStreamState, close_port_access_tcp_streams, mark_port_access_tcp_direction_closed,
+    PortAccessTcpStreamState, close_port_access_tcp_streams, handle_port_access_tcp_data_frame,
+    handle_port_access_transport_event, handle_ports_transport_message,
     port_access_stream_is_active,
 };
 use crate::tunnel::session::telemetry::{
@@ -3485,73 +3486,8 @@ async fn handle_tunnel_session_event(
             ))
         }
         TunnelSessionEvent::PortAccessTransport(event) => {
-            match &event {
-                PortAccessTransportEvent::HttpBodyEnd(message) => {
-                    session_state
-                        .port_access_http_streams
-                        .remove(&message.stream_id);
-                }
-                PortAccessTransportEvent::TcpClose(message) => {
-                    mark_port_access_tcp_direction_closed(
-                        session_state,
-                        message.stream_id,
-                        &message.direction,
-                    );
-                }
-                PortAccessTransportEvent::TcpError(message) => {
-                    session_state
-                        .port_access_tcp_streams
-                        .remove(&message.stream_id);
-                }
-                PortAccessTransportEvent::StreamError(message) => {
-                    session_state
-                        .port_access_http_streams
-                        .remove(&message.stream_id);
-                    session_state
-                        .port_access_tcp_streams
-                        .remove(&message.stream_id);
-                }
-                PortAccessTransportEvent::HttpResponseStart(_)
-                | PortAccessTransportEvent::HttpBodyChunk(_)
-                | PortAccessTransportEvent::TcpConnected(_)
-                | PortAccessTransportEvent::TcpData { .. }
-                | PortAccessTransportEvent::TcpInputWindow { .. } => {}
-            }
-
-            let payload = match event {
-                PortAccessTransportEvent::HttpResponseStart(message) => {
-                    serde_json::to_string(&message)
-                }
-                PortAccessTransportEvent::HttpBodyChunk(message) => serde_json::to_string(&message),
-                PortAccessTransportEvent::HttpBodyEnd(message) => serde_json::to_string(&message),
-                PortAccessTransportEvent::TcpConnected(message) => serde_json::to_string(&message),
-                PortAccessTransportEvent::TcpData { stream_id, bytes } => {
-                    let encoded =
-                        encode_stream_data_frame(stream_id, PAYLOAD_KIND_RAW_BYTES, &bytes)
-                            .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
-                    return continue_with(write_tunnel_binary(tunnel_writer_sender, encoded));
-                }
-                PortAccessTransportEvent::TcpInputWindow { stream_id, bytes } => {
-                    let Some(stream_state) =
-                        session_state.port_access_tcp_streams.get_mut(&stream_id)
-                    else {
-                        return Ok(TunnelSessionControlFlow::Continue);
-                    };
-                    stream_state
-                        .request_window
-                        .add(bytes)
-                        .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
-                    return continue_with(write_tunnel_text(
-                        tunnel_writer_sender,
-                        stream_window(stream_id, bytes),
-                    ));
-                }
-                PortAccessTransportEvent::TcpClose(message) => serde_json::to_string(&message),
-                PortAccessTransportEvent::TcpError(message) => serde_json::to_string(&message),
-                PortAccessTransportEvent::StreamError(message) => serde_json::to_string(&message),
-            }
-            .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
-            continue_with(write_tunnel_text(tunnel_writer_sender, payload))
+            handle_port_access_transport_event(tunnel_writer_sender, event, session_state)?;
+            Ok(TunnelSessionControlFlow::Continue)
         }
         TunnelSessionEvent::AgentClosed { stream_id, reason } => {
             if remove_agent_stream_and_publish_summary(
@@ -4609,157 +4545,6 @@ async fn handle_ports_control_message(
     }
 }
 
-fn handle_ports_transport_message(
-    message: crate::tunnel::protocol::PortsTransportMessage,
-    event_sender: &mpsc::UnboundedSender<TunnelSessionEvent>,
-    session_state: &mut TunnelSessionMutableState,
-) -> Result<(), TunnelSessionError> {
-    match message {
-        crate::tunnel::protocol::PortsTransportMessage::TcpOpen(message) => {
-            if port_access_stream_is_active(session_state, message.stream_id) {
-                return Err(TunnelSessionError::PortAccess(format!(
-                    "ports.tcp.open streamId {} already exists",
-                    message.stream_id
-                )));
-            }
-            let transport_event_sender = spawn_port_access_transport_event_sender(event_sender);
-            let stream_sender = spawn_tcp_transport(message.clone(), transport_event_sender);
-            session_state.port_access_tcp_streams.insert(
-                message.stream_id,
-                PortAccessTcpStreamState::new(stream_sender),
-            );
-        }
-        crate::tunnel::protocol::PortsTransportMessage::TcpConnected(message) => {
-            return Err(TunnelSessionError::PortAccess(format!(
-                "ports.tcp.connected streamId {} must not be sent from the gateway to sandboxd",
-                message.stream_id
-            )));
-        }
-        crate::tunnel::protocol::PortsTransportMessage::TcpClose(message) => {
-            if message.direction != "request" {
-                return Err(TunnelSessionError::PortAccess(format!(
-                    "ports.tcp.close streamId {} must use request direction when sent to sandboxd",
-                    message.stream_id
-                )));
-            }
-            let Some(stream_state) = session_state
-                .port_access_tcp_streams
-                .get(&message.stream_id)
-            else {
-                return Err(TunnelSessionError::PortAccess(format!(
-                    "ports.tcp.close streamId {} is not bound to an active port access tcp stream",
-                    message.stream_id
-                )));
-            };
-            stream_state
-                .sender
-                .send(PortAccessTcpCommand::Close {
-                    direction: message.direction.clone(),
-                })
-                .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
-        }
-        crate::tunnel::protocol::PortsTransportMessage::TcpError(message) => {
-            return Err(TunnelSessionError::PortAccess(format!(
-                "ports.tcp.error streamId {} must not be sent from the gateway to sandboxd",
-                message.stream_id
-            )));
-        }
-        crate::tunnel::protocol::PortsTransportMessage::HttpOpen(message) => {
-            if port_access_stream_is_active(session_state, message.stream_id) {
-                return Err(TunnelSessionError::PortAccess(format!(
-                    "ports.http.open streamId {} already exists",
-                    message.stream_id
-                )));
-            }
-            let transport_event_sender = spawn_port_access_transport_event_sender(event_sender);
-            let stream_sender = spawn_http_transport(message.clone(), transport_event_sender);
-            session_state
-                .port_access_http_streams
-                .insert(message.stream_id, stream_sender);
-        }
-        crate::tunnel::protocol::PortsTransportMessage::HttpBodyChunk(message) => {
-            if message.direction != "request" {
-                return Err(TunnelSessionError::PortAccess(format!(
-                    "ports.http.body.chunk streamId {} must use request direction when sent to sandboxd",
-                    message.stream_id
-                )));
-            }
-            let Some(stream_sender) = session_state
-                .port_access_http_streams
-                .get(&message.stream_id)
-            else {
-                return Err(TunnelSessionError::PortAccess(format!(
-                    "ports.http.body.chunk streamId {} is not bound to an active port access http stream",
-                    message.stream_id
-                )));
-            };
-            let bytes = base64::engine::general_purpose::STANDARD
-                .decode(message.bytes.as_bytes())
-                .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
-            stream_sender
-                .send(PortAccessHttpCommand::RequestBodyChunk { bytes })
-                .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
-        }
-        crate::tunnel::protocol::PortsTransportMessage::HttpBodyEnd(message) => {
-            if message.direction != "request" {
-                return Err(TunnelSessionError::PortAccess(format!(
-                    "ports.http.body.end streamId {} must use request direction when sent to sandboxd",
-                    message.stream_id
-                )));
-            }
-            let Some(stream_sender) = session_state
-                .port_access_http_streams
-                .get(&message.stream_id)
-            else {
-                return Err(TunnelSessionError::PortAccess(format!(
-                    "ports.http.body.end streamId {} is not bound to an active port access http stream",
-                    message.stream_id
-                )));
-            };
-            stream_sender
-                .send(PortAccessHttpCommand::RequestBodyEnd)
-                .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
-        }
-        crate::tunnel::protocol::PortsTransportMessage::StreamClose(message) => {
-            if let Some(stream_sender) = session_state
-                .port_access_http_streams
-                .remove(&message.stream_id)
-            {
-                stream_sender
-                    .send(PortAccessHttpCommand::Close)
-                    .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
-            } else if let Some(stream_state) = session_state
-                .port_access_tcp_streams
-                .remove(&message.stream_id)
-            {
-                stream_state
-                    .sender
-                    .send(PortAccessTcpCommand::Terminate)
-                    .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
-            } else {
-                return Err(TunnelSessionError::PortAccess(format!(
-                    "ports.stream.close streamId {} is not bound to an active port access transport stream",
-                    message.stream_id
-                )));
-            }
-        }
-        crate::tunnel::protocol::PortsTransportMessage::HttpResponseStart(message) => {
-            return Err(TunnelSessionError::PortAccess(format!(
-                "ports.http.response.start streamId {} must not be sent from the gateway to sandboxd",
-                message.stream_id
-            )));
-        }
-        crate::tunnel::protocol::PortsTransportMessage::StreamError(message) => {
-            return Err(TunnelSessionError::PortAccess(format!(
-                "ports.stream.error streamId {} must not be sent from the gateway to sandboxd",
-                message.stream_id
-            )));
-        }
-    }
-
-    Ok(())
-}
-
 fn reject_duplicate_tunnel_stream_open(
     tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
     session_state: &TunnelSessionMutableState,
@@ -5037,53 +4822,7 @@ fn handle_tunnel_binary_frame(
         .port_access_tcp_streams
         .contains_key(&frame.stream_id)
     {
-        if frame.payload_kind != PAYLOAD_KIND_RAW_BYTES {
-            write_tunnel_text(
-                tunnel_writer_sender,
-                stream_reset(
-                    frame.stream_id,
-                    STREAM_RESET_CODE_INVALID_STREAM_DATA,
-                    "port access tcp stream only accepts raw byte data frames",
-                ),
-            )?;
-            if let Some(stream_state) = session_state
-                .port_access_tcp_streams
-                .remove(&frame.stream_id)
-            {
-                let _ = stream_state.sender.send(PortAccessTcpCommand::Terminate);
-            }
-            return Ok(());
-        }
-
-        let Some(stream_state) = session_state
-            .port_access_tcp_streams
-            .get_mut(&frame.stream_id)
-        else {
-            return Ok(());
-        };
-        if !stream_state.request_window.try_consume(frame.payload.len()) {
-            write_tunnel_text(
-                tunnel_writer_sender,
-                stream_reset(
-                    frame.stream_id,
-                    STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
-                    "port access tcp request stream window is exhausted",
-                ),
-            )?;
-            if let Some(stream_state) = session_state
-                .port_access_tcp_streams
-                .remove(&frame.stream_id)
-            {
-                let _ = stream_state.sender.send(PortAccessTcpCommand::Terminate);
-            }
-            return Ok(());
-        }
-        stream_state
-            .sender
-            .send(PortAccessTcpCommand::Data {
-                bytes: frame.payload,
-            })
-            .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
+        handle_port_access_tcp_data_frame(tunnel_writer_sender, frame, session_state)?;
         return Ok(());
     }
 
