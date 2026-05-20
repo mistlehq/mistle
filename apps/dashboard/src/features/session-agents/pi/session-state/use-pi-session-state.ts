@@ -3,17 +3,20 @@ import {
   type PiAgentMessage,
   type PiEvent,
   type PiEventSubscription,
+  type PiModel,
   type PiSessionClient,
   type PiSessionState,
 } from "@mistle/integrations-definitions/agent-runtimes/pi/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useCallback, useEffect, useReducer, useRef, useState, type Dispatch } from "react";
 
-import type {
-  SessionComposerBootstrapResult,
-  SessionComposerBootstrapPhase,
-} from "../../../pages/session-composer/session-composer-runtime-contracts.js";
+import type { SessionComposerBootstrapResult } from "../../../pages/session-composer/session-composer-runtime-contracts.js";
 import { createInitialPiChatState, reducePiChatState, type PiChatState } from "./pi-chat-state.js";
+import {
+  buildReadyPiComposerBootstrap,
+  buildUnavailablePiComposerBootstrap,
+  type PiModelSelection,
+} from "./pi-workbench-composer.js";
 
 export type ConnectedPiConversation = {
   activeDirectory: string | null;
@@ -64,26 +67,15 @@ export type UsePiSessionStateResult = {
     sendPrompt: (input: { submittedPrompt: string }) => Promise<void>;
     steerTurn: (input: { submittedPrompt: string }) => Promise<void>;
   };
+  modelControl: {
+    setActiveModel: (selection: PiModelSelection) => Promise<PiModel>;
+  };
   lifecycle: PiSessionLifecycleState;
   sessionMessage: {
     clearSessionErrorMessage: () => void;
     reportSessionErrorMessage: (message: string) => void;
     sessionErrorMessage: string | null;
   };
-};
-
-const EmptyPiComposerConfig = {
-  model: null,
-  modelReasoningEffort: null,
-};
-
-const ReadyPiBootstrap: SessionComposerBootstrapResult = {
-  phase: { status: "ready" },
-  composerCapabilities: [],
-  establishedSnapshot: {
-    availableModels: [],
-    configSnapshot: EmptyPiComposerConfig,
-  },
 };
 
 export function resolvePiConversationSelection(input: {
@@ -106,19 +98,6 @@ export function resolvePiConversationSelection(input: {
 
   return {
     kind: "create",
-  };
-}
-
-function createUnavailablePiBootstrap(
-  phase: SessionComposerBootstrapPhase,
-): SessionComposerBootstrapResult {
-  return {
-    phase,
-    composerCapabilities: [],
-    establishedSnapshot: {
-      availableModels: [],
-      configSnapshot: EmptyPiComposerConfig,
-    },
   };
 }
 
@@ -146,6 +125,26 @@ async function hydrateConnectedPiChat(input: {
   return messages;
 }
 
+async function loadConnectedPiComposerBootstrap(input: {
+  activeSessionState: PiSessionState;
+  client: PiSessionClient;
+  sessionFile: string;
+}): Promise<{
+  availableModels: readonly PiModel[];
+  bootstrap: SessionComposerBootstrapResult;
+}> {
+  const availableModels = await input.client.getAvailableModels({
+    sessionFile: input.sessionFile,
+  });
+  return {
+    availableModels,
+    bootstrap: buildReadyPiComposerBootstrap({
+      activeModel: input.activeSessionState.model ?? null,
+      availableModels,
+    }),
+  };
+}
+
 function resolvePiChatStatusFromSessionState(sessionState: PiSessionState): "busy" | "idle" {
   return sessionState.isStreaming ||
     sessionState.isCompacting ||
@@ -163,6 +162,7 @@ export function usePiSessionState(input: {
   const ensureTransportConnected = input.ensureTransportConnected;
   const clientRef = useRef<PiSessionClient | null>(null);
   const eventSubscriptionRef = useRef<PiEventSubscription | null>(null);
+  const availablePiModelsRef = useRef<readonly PiModel[]>([]);
   const generationRef = useRef(0);
   const [step, setStep] = useState<PiSessionLifecycleState["step"]>("idle");
   const [sessionSnapshot, setSessionSnapshot] = useState<ConnectedPiConversation | null>(null);
@@ -171,7 +171,7 @@ export function usePiSessionState(input: {
   const [lifecycleErrorMessage, setLifecycleErrorMessage] = useState<string | null>(null);
   const [sessionErrorMessage, setSessionErrorMessage] = useState<string | null>(null);
   const [bootstrap, setBootstrap] = useState<SessionComposerBootstrapResult>(
-    createUnavailablePiBootstrap({ status: "unavailable" }),
+    buildUnavailablePiComposerBootstrap({ status: "unavailable" }),
   );
   const [chatState, dispatchChatAction] = useReducer(
     reducePiChatState,
@@ -205,7 +205,8 @@ export function usePiSessionState(input: {
     clearEventSubscription();
     clientRef.current?.close();
     clientRef.current = null;
-    setBootstrap(createUnavailablePiBootstrap({ status: "unavailable" }));
+    availablePiModelsRef.current = [];
+    setBootstrap(buildUnavailablePiComposerBootstrap({ status: "unavailable" }));
     setSessionSnapshot(null);
     setSessionConnectionState("detached");
     setStep("idle");
@@ -237,7 +238,8 @@ export function usePiSessionState(input: {
       clearEventSubscription();
       clientRef.current?.close();
       clientRef.current = null;
-      setBootstrap(createUnavailablePiBootstrap({ status: "bootstrapping" }));
+      availablePiModelsRef.current = [];
+      setBootstrap(buildUnavailablePiComposerBootstrap({ status: "bootstrapping" }));
       setStep("securing");
       setSessionConnectionState("connecting");
       setLifecycleErrorMessage(null);
@@ -306,6 +308,16 @@ export function usePiSessionState(input: {
             client.close();
             return;
           }
+          const composerBootstrap = await loadConnectedPiComposerBootstrap({
+            activeSessionState,
+            client,
+            sessionFile: activeSessionFile,
+          });
+          if (generationRef.current !== generation) {
+            client.close();
+            return;
+          }
+          availablePiModelsRef.current = composerBootstrap.availableModels;
           await hydrateConnectedPiChat({
             bufferedEvents,
             client,
@@ -325,7 +337,7 @@ export function usePiSessionState(input: {
             connectedAtIso: new Date().toISOString(),
             sandboxInstanceId: connectInput.sandboxInstanceId,
           });
-          setBootstrap(ReadyPiBootstrap);
+          setBootstrap(composerBootstrap.bootstrap);
           setStep("connected");
           setSessionConnectionState("connected");
         } catch (error) {
@@ -337,7 +349,8 @@ export function usePiSessionState(input: {
           clientRef.current = null;
           const message =
             error instanceof Error ? error.message : "Could not connect Pi conversation.";
-          setBootstrap(createUnavailablePiBootstrap({ status: "failed", message }));
+          availablePiModelsRef.current = [];
+          setBootstrap(buildUnavailablePiComposerBootstrap({ status: "failed", message }));
           setSessionSnapshot(null);
           setLifecycleErrorMessage(message);
           setSessionConnectionState("detached");
@@ -457,6 +470,30 @@ export function usePiSessionState(input: {
     }
   }, [sessionSnapshot?.activeSessionFile]);
 
+  const setActiveModel = useCallback(
+    async (selection: PiModelSelection): Promise<PiModel> => {
+      const client = clientRef.current;
+      const sessionFile = sessionSnapshot?.activeSessionFile ?? null;
+      if (client === null || sessionFile === null) {
+        throw new Error("Connect Pi before changing models.");
+      }
+      const selectedModel = await client.setModel({
+        sessionFile,
+        provider: selection.provider,
+        modelId: selection.modelId,
+      });
+      setBootstrap(
+        buildReadyPiComposerBootstrap({
+          activeModel: selectedModel,
+          availableModels: availablePiModelsRef.current,
+        }),
+      );
+      setSessionErrorMessage(null);
+      return selectedModel;
+    },
+    [sessionSnapshot?.activeSessionFile],
+  );
+
   const recoverSession = useCallback(
     (recoverInput: { sandboxInstanceId: string; targetSessionFile: string | null }): void => {
       connectSession(recoverInput);
@@ -491,6 +528,9 @@ export function usePiSessionState(input: {
       followUpTurn,
       sendPrompt,
       steerTurn,
+    },
+    modelControl: {
+      setActiveModel,
     },
     sessionMessage: {
       clearSessionErrorMessage,

@@ -829,6 +829,15 @@ fn handle_pi_method(
                 captured_events,
             )
         }
+        "pi/getAvailableModels" => {
+            let session_file = require_param_string(&request.params, "sessionFile")?;
+            state.ensure_child(None)?;
+            state.switch_session(&session_file, captured_events)?;
+            state.send_pi_command_with_captured_events(
+                json!({ "type": "get_available_models" }),
+                captured_events,
+            )
+        }
         "pi/readMetadata" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
             state.ensure_child(None)?;
@@ -858,6 +867,17 @@ fn handle_pi_method(
             state.switch_session(&session_file, captured_events)?;
             PiProxyState::mark_active_and_start_activity_monitor(state);
             Ok(Value::Null)
+        }
+        "pi/setModel" => {
+            let session_file = require_param_string(&request.params, "sessionFile")?;
+            let provider = require_param_string(&request.params, "provider")?;
+            let model_id = require_param_string(&request.params, "modelId")?;
+            state.ensure_child(None)?;
+            state.switch_session(&session_file, captured_events)?;
+            state.send_pi_command_with_captured_events(
+                json!({ "type": "set_model", "provider": provider, "modelId": model_id }),
+                captured_events,
+            )
         }
         "pi/setSessionName" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
@@ -1191,6 +1211,71 @@ mod tests {
     }
 
     #[test]
+    fn forwards_pi_model_catalog_and_selection_for_session() {
+        let simulated_pi = SimulatedPiRpcProcess::start_without_initial_session();
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let state = Arc::new(PiProxyState {
+            config: PiProxyConfig {
+                pi_cli_path: simulated_pi.path(),
+                env: BTreeMap::new(),
+            },
+            child: Mutex::new(None),
+            command_lock: Mutex::new(()),
+            event_subscribers: Mutex::new(Vec::new()),
+            keepalive_manager,
+            active: std::sync::atomic::AtomicBool::new(false),
+            activity_monitor_running: std::sync::atomic::AtomicBool::new(false),
+            next_id: AtomicU64::new(1),
+        });
+
+        let catalog_responses = handle_json_rpc_request(
+            &state,
+            &json!({
+                "jsonrpc": "2.0",
+                "id": "models",
+                "method": "pi/getAvailableModels",
+                "params": {
+                    "sessionFile": simulated_pi.session_file()
+                }
+            })
+            .to_string(),
+        );
+        let catalog_response = parse_json_rpc_message(
+            catalog_responses
+                .last()
+                .expect("model catalog request should produce a response"),
+        );
+        assert_eq!(
+            catalog_response["result"]["models"][0]["id"],
+            json!("gpt-5")
+        );
+
+        let set_model_responses = handle_json_rpc_request(
+            &state,
+            &json!({
+                "jsonrpc": "2.0",
+                "id": "set-model",
+                "method": "pi/setModel",
+                "params": {
+                    "sessionFile": simulated_pi.session_file(),
+                    "provider": "openai",
+                    "modelId": "gpt-5"
+                }
+            })
+            .to_string(),
+        );
+        let set_model_response = parse_json_rpc_message(
+            set_model_responses
+                .last()
+                .expect("set model request should produce a response"),
+        );
+        assert_eq!(set_model_response["result"]["provider"], json!("openai"));
+        assert_eq!(set_model_response["result"]["id"], json!("gpt-5"));
+
+        state.shutdown_child();
+    }
+
+    #[test]
     fn finds_recent_pi_conversation_from_configured_session_dir() {
         let directory = tempdir().expect("temporary directory should be created");
         let session_dir = directory.path().join("sessions");
@@ -1334,6 +1419,12 @@ while IFS= read -r line; do
     *'"type":"switch_session"'*)
       rm -f "$no_initial_session_marker"
       printf '{{"type":"response","command":"switch_session","id":"%s","success":true,"data":{{}}}}\n' "$id"
+      ;;
+    *'"type":"get_available_models"'*)
+      printf '{{"type":"response","command":"get_available_models","id":"%s","success":true,"data":{{"models":[{{"provider":"openai","id":"gpt-5","name":"GPT-5","input":["text","image"]}}]}}}}\n' "$id"
+      ;;
+    *'"type":"set_model"'*)
+      printf '{{"type":"response","command":"set_model","id":"%s","success":true,"data":{{"provider":"openai","id":"gpt-5","name":"GPT-5","input":["text","image"]}}}}\n' "$id"
       ;;
     *'"type":"prompt"'*)
       printf '{{"type":"agent_start"}}\n'

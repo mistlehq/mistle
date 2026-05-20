@@ -4,6 +4,14 @@ import { z } from "zod";
 const PiSessionStateSchema = z.looseObject({
   isStreaming: z.boolean(),
   isCompacting: z.boolean(),
+  model: z
+    .looseObject({
+      id: z.string(),
+      input: z.array(z.string()),
+      name: z.string(),
+      provider: z.string(),
+    })
+    .optional(),
   sessionFile: z.string().optional(),
   sessionId: z.string(),
   sessionName: z.string().optional(),
@@ -11,10 +19,21 @@ const PiSessionStateSchema = z.looseObject({
   pendingMessageCount: z.number(),
 });
 
+const PiModelSchema = z.looseObject({
+  id: z.string(),
+  input: z.array(z.string()),
+  name: z.string(),
+  provider: z.string(),
+});
+
 const PiAgentMessageSchema = z.looseObject({
   role: z.string(),
   content: z.unknown().optional(),
   timestamp: z.number().optional(),
+});
+
+const PiAvailableModelsResultSchema = z.object({
+  models: z.array(PiModelSchema),
 });
 
 const PiAgentMessagesResultSchema = z.object({
@@ -39,6 +58,7 @@ const PiReadMetadataResultSchema = z.object({
 });
 
 export type PiSessionState = z.output<typeof PiSessionStateSchema>;
+export type PiModel = z.output<typeof PiModelSchema>;
 export type PiAgentMessage = z.output<typeof PiAgentMessageSchema>;
 export type PiEvent = z.output<typeof PiEventSchema>;
 
@@ -53,12 +73,14 @@ export type PiSessionClient = {
   findRecentConversation(input?: { cwd?: string | null }): Promise<{
     providerConversationId: string | null;
   }>;
+  getAvailableModels(input: { sessionFile: string }): Promise<readonly PiModel[]>;
   getState(input?: { sessionFile?: string }): Promise<PiSessionState>;
   getMessages(input: { sessionFile: string }): Promise<readonly PiAgentMessage[]>;
   readMetadata(input: {
     sessionFile: string;
   }): Promise<{ name: string | null; preview: string | null }>;
   resumeConversation(input: { sessionFile: string }): Promise<void>;
+  setModel(input: { modelId: string; provider: string; sessionFile: string }): Promise<PiModel>;
   setSessionName(input: { name: string; sessionFile: string }): Promise<void>;
   prompt(input: { message: string; sessionFile: string }): Promise<void>;
   steer(input: { message: string; sessionFile: string }): Promise<void>;
@@ -198,6 +220,13 @@ export function createPiSessionClient(input: PiSessionClientInput): PiSessionCli
       });
       return PiSessionStateSchema.parse(result);
     },
+    async getAvailableModels(getAvailableModelsInput) {
+      const result = await request({
+        method: "pi/getAvailableModels",
+        params: getAvailableModelsInput,
+      });
+      return PiAvailableModelsResultSchema.parse(result).models;
+    },
     async getMessages(getMessagesInput) {
       const result = await request({
         method: "pi/getMessages",
@@ -217,6 +246,13 @@ export function createPiSessionClient(input: PiSessionClientInput): PiSessionCli
         method: "pi/resumeConversation",
         params: resumeInput,
       });
+    },
+    async setModel(setModelInput) {
+      const result = await request({
+        method: "pi/setModel",
+        params: setModelInput,
+      });
+      return PiModelSchema.parse(result);
     },
     async setSessionName(setSessionNameInput) {
       await request({

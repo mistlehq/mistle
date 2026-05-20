@@ -108,6 +108,10 @@ _Avoid_: Pi file content, Pi file attachment
 A user message queued for a **Pi conversation** after the current **Working agent turn** finishes.
 _Avoid_: Pi steer, Codex queued steer
 
+**Pi active model selection**:
+The selected Pi model for a **Pi conversation**, changed through Pi's own runtime model controls.
+_Avoid_: Pi prompt model override, Codex config model
+
 **Working agent turn**:
 An active agent turn within a runtime conversation, shown while the agent runtime reports that it is processing a user request.
 _Avoid_: Working chat group, semantic group
@@ -203,6 +207,16 @@ _Avoid_: Local queued prompt, deferred start turn
 - The current Mistle Pi adapter may expose a narrower subset than Pi itself; chat UI behavior should follow the adapter contract it has actually wired rather than assuming every upstream Pi RPC command is available.
 - Pi composer controls should be Pi-owned controls, not Codex-owned **Composer commands** or Codex context controls.
 - A **Session workbench** keeps sandbox-scoped tools stable while the **Active runtime conversation** changes.
+- **Pi active model selection** should change Pi runtime state before a prompt is submitted rather than attaching a model override to the prompt.
+- **Pi active model selection** belongs to the active **Pi conversation** in the **Session workbench**.
+- Mistle displays **Pi active model selection** as a snapshot of Pi runtime state, refreshed when the **Pi conversation** is connected or changed through Mistle.
+- The Pi model catalog shown by Mistle should come from Pi's live model controls, not from Mistle's runtime setup files.
+- Mistle requests the Pi model catalog for the active **Pi conversation**, not as a workspace-global catalog.
+- A **Pi active model selection** is identified by its provider and model id using Pi's canonical provider/model reference.
+- In Mistle's composer, the default marker for Pi model options means the model is the current **Pi active model selection**.
+- **Pi active model selection** should not change while the **Pi conversation** has a **Working agent turn**.
+- Pi thinking controls are separate from **Pi active model selection** and should not be represented as Codex reasoning effort.
+- A **Session workbench** keeps sandbox-scoped tools stable while the **Active Codex thread** changes.
 - Opening **Codex thread** navigation does not change the **Session bottom panel** state.
 - A **Default Codex thread** is used only when the **Session workbench** has no explicit **Active Codex thread** request.
 - The **Original Codex thread** and **Default Codex thread** may be different **Codex threads**.

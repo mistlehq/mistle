@@ -405,7 +405,7 @@ describe("buildPiConversationRuntime", () => {
     expect(runtime.composerRuntimeInput.turnControl.canSteer).toBe(true);
     expect(runtime.composerRuntimeInput.modelSelection).toEqual({
       required: false,
-      showControls: false,
+      showControls: true,
     });
   });
 

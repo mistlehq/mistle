@@ -13,6 +13,7 @@ import {
   type UseOpenCodeSessionStateResult,
 } from "./opencode/session-state/index.js";
 import type { UsePiSessionStateResult } from "./pi/session-state/index.js";
+import { usePiSessionComposerConfigControl } from "./pi/session-state/pi-workbench-composer.js";
 
 export function useCodexWorkbenchComposerState(input: {
   sessionState: UseCodexSessionStateResult;
@@ -136,15 +137,18 @@ export function usePiWorkbenchComposerState(input: {
   configControl: SessionComposerConfigControl;
 } {
   const bootstrap = input.sessionState.bootstrap;
-  const configControl = useLocalSessionComposerConfigControl({
+  const modelWriter = useMemo(
+    () => ({
+      setModel: input.sessionState.modelControl.setActiveModel,
+    }),
+    [input.sessionState.modelControl.setActiveModel],
+  );
+  const configControl = usePiSessionComposerConfigControl({
     bootstrap,
     clearSessionErrorMessage: input.sessionState.sessionMessage.clearSessionErrorMessage,
-    canChangeReasoningEffort: false,
-    resetKey: [
-      "pi",
-      input.sandboxInstanceId,
-      input.sessionState.lifecycle.sessionSnapshot?.activeSessionFile ?? null,
-    ].join(":"),
+    isTurnRunning: input.sessionState.chat.chatState.status === "busy",
+    reportSessionErrorMessage: input.sessionState.sessionMessage.reportSessionErrorMessage,
+    writer: modelWriter,
   });
 
   return {
