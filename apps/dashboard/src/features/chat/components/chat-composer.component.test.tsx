@@ -747,7 +747,12 @@ describe("ChatComposer", () => {
       expect(scrolledElementIds.some((elementId) => elementId.endsWith("-1"))).toBe(true);
     } finally {
       if (originalScrollIntoViewDescriptor === undefined) {
-        delete Element.prototype.scrollIntoView;
+        Object.defineProperty(Element.prototype, "scrollIntoView", {
+          configurable: true,
+          value(): void {
+            return;
+          },
+        });
       } else {
         Object.defineProperty(
           Element.prototype,
