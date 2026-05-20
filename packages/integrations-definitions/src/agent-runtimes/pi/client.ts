@@ -99,6 +99,14 @@ export function createPiSessionClient(input: PiSessionClientInput): PiSessionCli
   const eventListeners = new Set<(event: PiEvent) => void>();
   let nextRequestId = 1;
   const unsubscribe = agentStream.onEvent((event) => {
+    if (event.type === "connection_state_changed" && event.state === "closed") {
+      rejectPending(event.errorMessage ?? "Pi agent stream closed.");
+      return;
+    }
+    if (event.type === "stream_reset") {
+      rejectPending(event.resetInfo.message);
+      return;
+    }
     if (event.type !== "response") {
       if (event.type === "notification" && event.notification.method === "pi/event") {
         const parsedEvent = PiEventSchema.safeParse(event.notification.params);
@@ -153,21 +161,13 @@ export function createPiSessionClient(input: PiSessionClientInput): PiSessionCli
     pendingRequests.clear();
   }
 
-  agentStream.onEvent((event) => {
-    if (event.type === "connection_state_changed" && event.state === "closed") {
-      rejectPending(event.errorMessage ?? "Pi agent stream closed.");
-    }
-    if (event.type === "stream_reset") {
-      rejectPending(event.resetInfo.message);
-    }
-  });
-
   return {
     async connect() {
       await agentStream.connect();
     },
     close() {
       unsubscribe();
+      eventListeners.clear();
       rejectPending("Pi session client closed.");
       agentStream.dispose();
     },

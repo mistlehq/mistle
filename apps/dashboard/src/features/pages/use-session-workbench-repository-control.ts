@@ -17,7 +17,6 @@ const OpenCodeWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.OPENCO
 const PiWorkbenchCapabilities = SessionRuntimeWorkbenchCapabilities.PI;
 
 type SessionWorkbenchRepositoryControlState = {
-  activeRuntimeId: SessionMainPanelRuntimeId;
   isOpenCodeRuntime: boolean;
   isPiRuntime: boolean;
   primaryRepositoryControlState: {
@@ -90,7 +89,6 @@ export function useSessionWorkbenchRepositoryControl(input: {
   );
 
   return {
-    activeRuntimeId: activeRuntimeCapabilities.runtimeId,
     isOpenCodeRuntime,
     isPiRuntime,
     primaryRepositoryControlState: {
