@@ -1,3 +1,4 @@
+import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import type { QueryClient } from "@tanstack/react-query";
 
 import type {
@@ -6,7 +7,10 @@ import type {
 } from "../pages/session-composer/index.js";
 import { resolvePrimaryRepositoryTurnStartCwd } from "../pages/session-primary-repository-policy.js";
 import { applyPatchedSessionTitleToCache } from "../sessions/session-header-title-model.js";
-import { generateSessionTitleWithSandboxCodexExec } from "../sessions/session-title-generation.js";
+import {
+  generateSessionTitleWithSandboxCodexExec,
+  generateSessionTitleWithSandboxPiExec,
+} from "../sessions/session-title-generation.js";
 import {
   patchSandboxInstanceTitle,
   type PatchSandboxInstanceTitleResult,
@@ -21,9 +25,10 @@ import {
 import type { UsePiSessionStateResult } from "./pi/session-state/index.js";
 import { buildPiSourceReferencePrompt } from "./pi/session-state/pi-attachment-presentation.js";
 
-type EnsureSessionTransportConnected = Parameters<
-  typeof generateSessionTitleWithSandboxCodexExec
->[0]["ensureTransportConnected"];
+type EnsureSessionTransportConnected = (input: { sandboxInstanceId: string }) => Promise<{
+  sandboxInstanceId: string;
+  transport: SandboxSessionTransport;
+}>;
 
 type OpenCodeTurnStarterModelSelection = Pick<
   SessionComposerConfigControl,
@@ -133,11 +138,40 @@ export function buildOpenCodeTurnStarter(input: {
 }
 
 export function buildPiTurnStarter(input: {
-  chat: Pick<UsePiSessionStateResult["chat"], "sendPrompt">;
+  cachedTitle: string | null | undefined;
+  chat: Pick<UsePiSessionStateResult["chat"], "chatState" | "sendPrompt">;
+  ensureTransportConnected: EnsureSessionTransportConnected;
+  generateSessionTitle?: typeof generateSessionTitleWithSandboxPiExec;
+  queryClient: QueryClient;
+  sandboxInstanceId: string | null;
+  selectedRepositoryPath: string | null;
 }): SessionTurnControl["startTurn"] {
   return async (turnInput): Promise<void> => {
+    const sandboxInstanceId = input.sandboxInstanceId;
+    const messagePayload = turnInput.transcriptPrompt ?? turnInput.submittedPrompt;
+    const shouldGenerateSessionTitle = shouldGenerateInitialSessionTitle({
+      sandboxInstanceId,
+      cachedTitle: input.cachedTitle,
+      messageCount: input.chat.chatState.messages.length,
+    });
+
     await input.chat.sendPrompt({
       submittedPrompt: buildPiSubmittedPrompt(turnInput),
+    });
+
+    if (!shouldGenerateSessionTitle || sandboxInstanceId === null) {
+      return;
+    }
+
+    applyGeneratedSessionTitlePatch({
+      patchTitle: () =>
+        (input.generateSessionTitle ?? generateSessionTitleWithSandboxPiExec)({
+          cwd: input.selectedRepositoryPath,
+          ensureTransportConnected: input.ensureTransportConnected,
+          messagePayload,
+          sandboxInstanceId,
+        }),
+      queryClient: input.queryClient,
     });
   };
 }

@@ -105,6 +105,13 @@
       "import": "./src/agent-runtimes/pi/pty-launch.ts",
       "default": "./src/agent-runtimes/pi/pty-launch.ts"
     },
+    "./agent-runtimes/pi/title-generation-command": {
+      "types": "./src/agent-runtimes/pi/title-generation-command.ts",
+      "workspace-src": "./src/agent-runtimes/pi/title-generation-command.ts",
+      "node": "./dist/agent-runtimes/pi/title-generation-command.js",
+      "import": "./src/agent-runtimes/pi/title-generation-command.ts",
+      "default": "./src/agent-runtimes/pi/title-generation-command.ts"
+    },
     "./openai": {
       "types": "./src/openai/index.ts",
       "workspace-src": "./src/openai/index.ts",

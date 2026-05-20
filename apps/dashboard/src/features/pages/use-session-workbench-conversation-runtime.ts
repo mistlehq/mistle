@@ -312,9 +312,21 @@ export function useSessionWorkbenchConversationRuntime(input: {
   const startPiTurn = useMemo<SessionTurnControl["startTurn"]>(
     () =>
       buildPiTurnStarter({
+        cachedTitle: input.sandboxStatus?.title,
         chat: input.piSessionState.chat,
+        ensureTransportConnected: input.ensureTransportConnected,
+        queryClient: input.queryClient,
+        sandboxInstanceId: input.sandboxInstanceId,
+        selectedRepositoryPath: input.selectedRepositoryPath,
       }),
-    [input.piSessionState.chat],
+    [
+      input.ensureTransportConnected,
+      input.piSessionState.chat,
+      input.queryClient,
+      input.sandboxInstanceId,
+      input.sandboxStatus?.title,
+      input.selectedRepositoryPath,
+    ],
   );
   const steerPiTurn = useMemo<SessionTurnControl["steerTurn"]>(
     () =>

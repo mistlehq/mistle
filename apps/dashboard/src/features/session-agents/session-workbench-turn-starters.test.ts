@@ -1,10 +1,25 @@
+import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 
+import { createInitialPiChatState, type PiChatState } from "./pi/session-state/pi-chat-state.js";
 import {
   buildPiTurnQueuer,
   buildPiTurnStarter,
   shouldGenerateInitialSessionTitle,
 } from "./session-workbench-turn-starters.js";
+
+function createPiChatState(input?: { messages?: PiChatState["messages"] }): PiChatState {
+  return {
+    ...createInitialPiChatState(),
+    messages: input?.messages ?? [],
+    sessionFile: "/root/.pi/agent/sessions/session.jsonl",
+    status: "idle",
+  };
+}
+
+async function unusedEnsureTransportConnected(): Promise<never> {
+  throw new Error("Test title generator should not connect to the sandbox.");
+}
 
 describe("shouldGenerateInitialSessionTitle", () => {
   it("generates an initial session title only for the first message while the title is unset", () => {
@@ -54,11 +69,17 @@ describe("buildPiTurnStarter", () => {
   it("submits Pi prompts with uploaded attachments as Pi source file references", async () => {
     let submittedPrompt: string | null = null;
     const startTurn = buildPiTurnStarter({
+      cachedTitle: "Existing title",
       chat: {
+        chatState: createPiChatState(),
         sendPrompt: async (input) => {
           submittedPrompt = input.submittedPrompt;
         },
       },
+      ensureTransportConnected: unusedEnsureTransportConnected,
+      queryClient: new QueryClient(),
+      sandboxInstanceId: "sbi_test",
+      selectedRepositoryPath: null,
     });
 
     await startTurn({
@@ -81,6 +102,70 @@ describe("buildPiTurnStarter", () => {
     expect(submittedPrompt).toBe(
       'Review this\n\n<file name="/root/.local/attachments/ses_test/screen shot.png"></file>',
     );
+  });
+
+  it("generates the sandbox title only for the first Pi prompt when the sandbox title is unset", async () => {
+    const generationInputs: string[] = [];
+    const startTurn = buildPiTurnStarter({
+      cachedTitle: null,
+      chat: {
+        chatState: createPiChatState(),
+        sendPrompt: async () => {},
+      },
+      ensureTransportConnected: unusedEnsureTransportConnected,
+      generateSessionTitle: async (input) => {
+        generationInputs.push(input.messagePayload);
+        return {
+          id: input.sandboxInstanceId,
+          title: "Customer Refund Review",
+          updatedAt: "2026-05-20T00:00:00.000Z",
+        };
+      },
+      queryClient: new QueryClient(),
+      sandboxInstanceId: "sbi_test",
+      selectedRepositoryPath: "/workspace/app",
+    });
+
+    await startTurn({
+      submittedPrompt: "Review customer refund screenshots",
+      transcriptPrompt: "Review customer refund",
+      uploadedAttachments: [],
+    });
+
+    expect(generationInputs).toEqual(["Review customer refund"]);
+  });
+
+  it("does not seed the sandbox title after Pi already has messages", async () => {
+    const generationInputs: string[] = [];
+    const startTurn = buildPiTurnStarter({
+      cachedTitle: null,
+      chat: {
+        chatState: createPiChatState({
+          messages: [{ role: "user", content: "Existing message" }],
+        }),
+        sendPrompt: async () => {},
+      },
+      ensureTransportConnected: unusedEnsureTransportConnected,
+      generateSessionTitle: async (input) => {
+        generationInputs.push(input.messagePayload);
+        return {
+          id: input.sandboxInstanceId,
+          title: "Second Prompt",
+          updatedAt: "2026-05-20T00:00:00.000Z",
+        };
+      },
+      queryClient: new QueryClient(),
+      sandboxInstanceId: "sbi_test",
+      selectedRepositoryPath: null,
+    });
+
+    await startTurn({
+      submittedPrompt: "Second prompt",
+      transcriptPrompt: "Second prompt",
+      uploadedAttachments: [],
+    });
+
+    expect(generationInputs).toEqual([]);
   });
 });
 

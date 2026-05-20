@@ -104,6 +104,10 @@ _Avoid_: Jira org, Jira organization, site URL when referring only to the editab
 A live sandbox execution environment for an agent session.
 _Avoid_: Chat session when referring to runtime tools or sandbox state
 
+**Sandbox session title**:
+The Mistle-owned display title for a **Sandbox session**.
+_Avoid_: Conversation name, provider title
+
 **Codex thread**:
 A Codex **Runtime conversation**.
 _Avoid_: Session, chat tab
@@ -249,6 +253,10 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Sandbox session** may contain multiple **Codex threads**.
 - A **Sandbox session** may contain multiple **OpenCode sessions** when its **Agent runtime** is OpenCode.
 - A **Sandbox session** may contain **Pi conversations** when its **Agent runtime** is Pi.
+- For Pi, the initial **Sandbox session title** should follow the same Mistle-generated title behavior as other dashboard-started **Sandbox sessions**.
+- A **Pi follow-up message** should not seed the **Sandbox session title**.
+- Seeding a **Sandbox session title** is a secondary display update and should not block starting the first **Working agent turn**.
+- Seeding a **Sandbox session title** should not require renaming the selected **Pi conversation**.
 - A **Pi conversation** should remain the selected chat object when the user switches between chat and the Pi CLI.
 - A **Pi conversation** is identified in Mistle by the provider session file Pi uses to resume that conversation.
 - A listed **Pi conversation** should come from Pi session file metadata rather than from switching the active Pi runtime into that conversation.

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildSandboxPiTitleGenerationShellScript,
   buildSessionTitleGenerationPrompt,
   normalizeGeneratedSessionTitle,
   parseSessionTitleGenerationOutput,
@@ -34,5 +35,11 @@ describe("session title generation", () => {
         "Investigate the unexpectedly long sandbox session startup failure title",
       ),
     ).toBe("Investigate the unexpectedly long sandbox session");
+  });
+
+  it("runs Pi title generation through non-interactive print mode", () => {
+    expect(buildSandboxPiTitleGenerationShellScript()).toBe(
+      "PI_SKIP_VERSION_CHECK=1 PI_TELEMETRY=0 pi --no-session --no-tools --no-context-files --no-skills --no-prompt-templates --no-extensions -p",
+    );
   });
 });

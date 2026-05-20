@@ -1,10 +1,84 @@
 import type { AgentConversationGenerateTitleResult } from "@mistle/integrations-core";
-import { SandboxSessionTransport } from "@mistle/sandbox-session-client";
+import { ExecStreamClient, SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { createNodeSandboxSessionRuntime } from "@mistle/sandbox-session-client/node";
+import { z } from "zod";
 
-import { createPiSessionClient } from "./client.js";
+import { buildPiTitleGenerationShellScript } from "./title-generation-command.js";
 
-const MaxPiGeneratedTitleLength = 64;
+const PiConversationTitleGenerationCommandTimeoutMs = 180_000;
+const PiConversationTitleGenerationResultWaitTimeoutMs =
+  PiConversationTitleGenerationCommandTimeoutMs + 10_000;
+const PiConversationTitleGenerationMaxOutputBytes = 4096;
+const ConversationTitleMaxLength = 50;
+
+const ConversationTitleGenerationOutputSchema = z
+  .object({
+    title: z.string().min(1),
+  })
+  .strict();
+
+export function buildPiConversationTitleGenerationPrompt(inputText: string): string {
+  return [
+    "You write concise titles for agent sessions.",
+    "",
+    'Return only a JSON object with this exact shape: {"title":"..."}',
+    "",
+    "Rules:",
+    "- Interpret the message or payload that started the session.",
+    "- Summarize the concrete task, trigger, issue, workflow, or intent.",
+    "- Do not restate the message or payload verbatim.",
+    "- Use 3-8 words.",
+    "- No quotes, prefixes, trailing punctuation, or markdown.",
+    `- Max ${String(ConversationTitleMaxLength)} characters.`,
+    "",
+    "Message:",
+    inputText,
+  ].join("\n");
+}
+
+export function buildPiConversationTitleGenerationShellScript(): string {
+  return buildPiTitleGenerationShellScript();
+}
+
+export function normalizeGeneratedPiConversationTitle(title: string): string {
+  const normalizedTitle = title.replace(/\s+/g, " ").trim();
+  if (normalizedTitle.length === 0) {
+    throw new Error("Generated Pi conversation title is empty.");
+  }
+
+  const cappedTitle =
+    normalizedTitle.length <= ConversationTitleMaxLength
+      ? normalizedTitle
+      : normalizedTitle.slice(0, ConversationTitleMaxLength).trimEnd();
+  const titleWithoutTrailingPunctuation = cappedTitle.replace(/[.,;:!?]+$/u, "").trim();
+  if (titleWithoutTrailingPunctuation.length === 0) {
+    throw new Error("Generated Pi conversation title is empty after normalization.");
+  }
+
+  return titleWithoutTrailingPunctuation;
+}
+
+export function parsePiConversationTitleGenerationOutput(output: string): string {
+  const trimmedOutput = output.trim();
+  if (trimmedOutput.length === 0) {
+    throw new Error("Pi conversation title generation returned empty output.");
+  }
+
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(trimmedOutput);
+  } catch (error) {
+    throw new Error("Pi conversation title generation returned output that is not valid JSON.", {
+      cause: error,
+    });
+  }
+  const parsedOutput = ConversationTitleGenerationOutputSchema.safeParse(parsedJson);
+  if (!parsedOutput.success) {
+    throw new Error("Pi conversation title generation returned an invalid JSON payload.");
+  }
+
+  return normalizeGeneratedPiConversationTitle(parsedOutput.data.title);
+}
 
 export async function generatePiConversationTitle(input: {
   connectionUrl: string;
@@ -14,59 +88,39 @@ export async function generatePiConversationTitle(input: {
   const runtime = createNodeSandboxSessionRuntime();
   const transport = new SandboxSessionTransport({
     runtime,
+    connectTimeoutMs: 30_000,
   });
 
   await transport.connect({
     connectionUrl: input.connectionUrl,
   });
 
-  const client = createPiSessionClient({
-    transport,
-  });
   try {
-    await client.connect();
-    const resolvedConversation = await client.resolveConversation({
-      providerConversationId: input.providerConversationId,
+    const exec = new ExecStreamClient({
+      idleTimeoutMs: PiConversationTitleGenerationResultWaitTimeoutMs,
+      transport,
     });
-    const metadata = await client.readMetadata({
-      sessionFile: resolvedConversation.sessionFile,
+    const result = await exec.run({
+      args: ["-euc", buildPiConversationTitleGenerationShellScript()],
+      command: "sh",
+      maxOutputBytes: PiConversationTitleGenerationMaxOutputBytes,
+      stdin: buildPiConversationTitleGenerationPrompt(input.inputText),
+      timeoutMs: PiConversationTitleGenerationCommandTimeoutMs,
     });
-    if (metadata.name !== null && metadata.name.trim().length > 0) {
-      return { title: metadata.name };
+
+    if (result.exitCode !== 0) {
+      const detail = [result.stderr.trim(), result.stdout.trim()].find((value) => value.length > 0);
+      throw new Error(
+        detail === undefined
+          ? "Pi conversation title generation failed."
+          : `Pi conversation title generation failed: ${detail}`,
+      );
     }
 
-    const title = derivePiConversationTitle(input.inputText);
-    await client.setSessionName({
-      sessionFile: resolvedConversation.sessionFile,
-      name: title,
-    });
-
-    return { title };
+    return {
+      title: parsePiConversationTitleGenerationOutput(result.stdout),
+    };
   } finally {
-    client.close();
-    transport.disconnect(1000, "Pi title generation completed");
+    transport.disconnect(1000, "Pi conversation title generated");
   }
-}
-
-function derivePiConversationTitle(inputText: string): string {
-  const normalized = inputText
-    .replaceAll("`", "")
-    .split(/\s+/u)
-    .filter((part) => part.length > 0)
-    .join(" ");
-  if (normalized.length === 0) {
-    throw new Error("Cannot generate Pi conversation title from empty input.");
-  }
-
-  if (normalized.length <= MaxPiGeneratedTitleLength) {
-    return normalized;
-  }
-
-  const truncated = normalized.slice(0, MaxPiGeneratedTitleLength + 1);
-  const lastSpaceIndex = truncated.lastIndexOf(" ");
-  if (lastSpaceIndex <= 0) {
-    return normalized.slice(0, MaxPiGeneratedTitleLength);
-  }
-
-  return truncated.slice(0, lastSpaceIndex);
 }

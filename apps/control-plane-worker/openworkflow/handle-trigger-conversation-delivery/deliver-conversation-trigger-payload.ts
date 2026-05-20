@@ -303,7 +303,6 @@ export async function deliverConversationTriggerPayload(
         workflowRunId: input.workflowRunId,
       },
     });
-    throw error;
   }
 }
 

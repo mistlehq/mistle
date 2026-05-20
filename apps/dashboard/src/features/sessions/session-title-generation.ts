@@ -1,3 +1,4 @@
+import { buildPiTitleGenerationShellScript } from "@mistle/integrations-definitions/agent-runtimes/pi/title-generation-command";
 import { ExecStreamClient, type SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { z } from "zod";
 
@@ -76,6 +77,10 @@ export function parseSessionTitleGenerationOutput(output: string): string {
   return normalizeGeneratedSessionTitle(parsedOutput.data.title);
 }
 
+export function buildSandboxPiTitleGenerationShellScript(): string {
+  return buildPiTitleGenerationShellScript();
+}
+
 export async function generateSessionTitleWithSandboxCodexExec(input: {
   cwd: string | null;
   ensureTransportConnected: (input: { sandboxInstanceId: string }) => Promise<{
@@ -84,6 +89,47 @@ export async function generateSessionTitleWithSandboxCodexExec(input: {
   }>;
   messagePayload: string;
   sandboxInstanceId: string;
+}): Promise<PatchSandboxInstanceTitleResult> {
+  return generateSessionTitleWithSandboxExec({
+    ...input,
+    failureLabel: "Codex title generation",
+    shellScript: [
+      "schema=$(mktemp)",
+      "output=$(mktemp)",
+      'trap \'rm -f "$schema" "$output"\' EXIT',
+      'printf \'%s\\n\' \'{"type":"object","properties":{"title":{"type":"string","minLength":1}},"required":["title"],"additionalProperties":false}\' > "$schema"',
+      'codex exec --ephemeral --skip-git-repo-check --sandbox read-only --model gpt-5.4-mini -c model_reasoning_effort=\\"low\\" --output-schema "$schema" -o "$output" - >/dev/null',
+      'cat "$output"',
+    ].join("; "),
+  });
+}
+
+export async function generateSessionTitleWithSandboxPiExec(input: {
+  cwd: string | null;
+  ensureTransportConnected: (input: { sandboxInstanceId: string }) => Promise<{
+    sandboxInstanceId: string;
+    transport: SandboxSessionTransport;
+  }>;
+  messagePayload: string;
+  sandboxInstanceId: string;
+}): Promise<PatchSandboxInstanceTitleResult> {
+  return generateSessionTitleWithSandboxExec({
+    ...input,
+    failureLabel: "Pi title generation",
+    shellScript: buildSandboxPiTitleGenerationShellScript(),
+  });
+}
+
+async function generateSessionTitleWithSandboxExec(input: {
+  cwd: string | null;
+  ensureTransportConnected: (input: { sandboxInstanceId: string }) => Promise<{
+    sandboxInstanceId: string;
+    transport: SandboxSessionTransport;
+  }>;
+  failureLabel: string;
+  messagePayload: string;
+  sandboxInstanceId: string;
+  shellScript: string;
 }): Promise<PatchSandboxInstanceTitleResult> {
   const { transport } = await input.ensureTransportConnected({
     sandboxInstanceId: input.sandboxInstanceId,
@@ -94,17 +140,7 @@ export async function generateSessionTitleWithSandboxCodexExec(input: {
   });
   const prompt = buildSessionTitleGenerationPrompt(input.messagePayload);
   const result = await exec.run({
-    args: [
-      "-euc",
-      [
-        "schema=$(mktemp)",
-        "output=$(mktemp)",
-        'trap \'rm -f "$schema" "$output"\' EXIT',
-        'printf \'%s\\n\' \'{"type":"object","properties":{"title":{"type":"string","minLength":1}},"required":["title"],"additionalProperties":false}\' > "$schema"',
-        'codex exec --ephemeral --skip-git-repo-check --sandbox read-only --model gpt-5.4-mini -c model_reasoning_effort=\\"low\\" --output-schema "$schema" -o "$output" - >/dev/null',
-        'cat "$output"',
-      ].join("; "),
-    ],
+    args: ["-euc", input.shellScript],
     command: "sh",
     ...(input.cwd === null ? {} : { cwd: input.cwd }),
     maxOutputBytes: SessionTitleGenerationMaxOutputBytes,
@@ -114,11 +150,11 @@ export async function generateSessionTitleWithSandboxCodexExec(input: {
 
   if (result.exitCode !== 0) {
     const detail = [result.stderr.trim(), result.stdout.trim()].find((value) => value.length > 0);
-    throw new Error(
+    const message =
       detail === undefined
-        ? "Codex title generation failed."
-        : `Codex title generation failed: ${detail}`,
-    );
+        ? `${input.failureLabel} failed.`
+        : `${input.failureLabel} failed: ${detail}`;
+    throw new Error(message);
   }
 
   const title = parseSessionTitleGenerationOutput(result.stdout);
