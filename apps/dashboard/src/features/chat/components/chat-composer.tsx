@@ -46,6 +46,14 @@ function formatSlashCommandOptionLabel(command: ComposerCommandDescriptor): stri
   return `/${command.name} ${command.description}`;
 }
 
+function formatContextMentionInsertion(path: string): string {
+  if (!/\s/.test(path)) {
+    return path;
+  }
+
+  return `"${path.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
+}
+
 function isApplePlatform(): boolean {
   if (typeof navigator === "undefined") {
     return false;
@@ -118,6 +126,17 @@ export type ChatComposerCommandPanel =
       }[];
     };
 
+export type ChatComposerContextMentionControl = {
+  status: "idle" | "loading" | "ready" | "unavailable";
+  results: readonly {
+    kind: "file" | "directory";
+    path: string;
+  }[];
+  onQueryChange: (query: string) => void;
+  onSelect: (input: { path: string; query: string }) => void;
+  onDismiss: () => void;
+};
+
 export type ChatComposerViewModel = {
   composerCapabilities: readonly ComposerCapability[];
   composerText: string;
@@ -143,6 +162,7 @@ export type ChatComposerViewModel = {
     onSwitchToDefault?: () => void;
   } | null;
   commandPanel?: ChatComposerCommandPanel | null;
+  contextMentionControl?: ChatComposerContextMentionControl | null;
   pendingDiffCommentSummary: {
     count: number;
     label: string;
@@ -251,6 +271,7 @@ export function ChatComposer({
   goalStatus = null,
   collaborationModeStatus = null,
   commandPanel = null,
+  contextMentionControl = null,
   pendingDiffCommentSummary,
   pendingAttachments,
   modelOptions,
@@ -282,12 +303,14 @@ export function ChatComposer({
   const commandPanelSearchInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const commandListId = useId();
+  const contextMentionListId = useId();
   const commandPanelListId = useId();
   const [composerSelection, setComposerSelection] = useState({
     start: composerText.length,
     end: composerText.length,
   });
   const [activeSlashCommandIndex, setActiveSlashCommandIndex] = useState(0);
+  const [activeContextMentionIndex, setActiveContextMentionIndex] = useState(0);
   const [activeCommandPanelOptionIndex, setActiveCommandPanelOptionIndex] = useState(0);
   const [commandPanelSearchText, setCommandPanelSearchText] = useState(
     commandPanel?.kind === "picker" ? (commandPanel.initialSearch ?? "") : "",
@@ -326,12 +349,13 @@ export function ChatComposer({
     [composerCapabilities],
   );
   const filteredSlashCommandOptions =
-    activeComposerTrigger === null
+    activeComposerTrigger === null || activeComposerTrigger.capabilityKind !== "composerCommand"
       ? []
       : slashCommandOptions.filter((command) =>
           command.name.startsWith(activeComposerTrigger.query),
         );
-  const showSlashCommandMenu = activeComposerTrigger !== null;
+  const showSlashCommandMenu =
+    activeComposerTrigger !== null && activeComposerTrigger.capabilityKind === "composerCommand";
   const activeSlashCommandIndexWithinBounds =
     filteredSlashCommandOptions.length === 0
       ? null
@@ -340,6 +364,21 @@ export function ChatComposer({
     activeSlashCommandIndexWithinBounds === null
       ? null
       : (filteredSlashCommandOptions[activeSlashCommandIndexWithinBounds] ?? null);
+  const contextMentionResults = contextMentionControl?.results ?? [];
+  const showContextMentionMenu =
+    activeComposerTrigger !== null &&
+    activeComposerTrigger.capabilityKind === "contextMention" &&
+    contextMentionControl !== null;
+  const activeContextMentionIndexWithinBounds =
+    contextMentionResults.length === 0
+      ? null
+      : Math.min(activeContextMentionIndex, contextMentionResults.length - 1);
+  const activeContextMention =
+    activeContextMentionIndexWithinBounds === null
+      ? null
+      : (contextMentionResults[activeContextMentionIndexWithinBounds] ?? null);
+  const activeContextMentionQuery =
+    activeComposerTrigger?.capabilityKind === "contextMention" ? activeComposerTrigger.query : null;
   const filteredCommandPanelOptions = useMemo(() => {
     if (commandPanel?.kind !== "picker") {
       return [];
@@ -388,6 +427,27 @@ export function ChatComposer({
     (option) => option.value === selectedReasoningEffortValue,
   )?.label;
 
+  useEffect(() => {
+    if (contextMentionControl === null || activeContextMentionQuery === null) {
+      contextMentionControl?.onDismiss();
+      return;
+    }
+
+    contextMentionControl.onQueryChange(activeContextMentionQuery);
+  }, [activeContextMentionQuery, contextMentionControl]);
+
+  useEffect(() => {
+    if (!showContextMentionMenu || activeContextMentionIndexWithinBounds === null) {
+      return;
+    }
+
+    document
+      .getElementById(`${contextMentionListId}-${String(activeContextMentionIndexWithinBounds)}`)
+      ?.scrollIntoView?.({
+        block: "nearest",
+      });
+  }, [activeContextMentionIndexWithinBounds, contextMentionListId, showContextMentionMenu]);
+
   function addPendingFiles(files: readonly File[]): void {
     if (files.length === 0) {
       return;
@@ -404,7 +464,10 @@ export function ChatComposer({
   }
 
   function insertSlashCommand(command: ComposerCommandDescriptor): void {
-    if (activeComposerTrigger === null) {
+    if (
+      activeComposerTrigger === null ||
+      activeComposerTrigger.capabilityKind !== "composerCommand"
+    ) {
       return;
     }
 
@@ -421,6 +484,35 @@ export function ChatComposer({
       start: nextCursorIndex,
       end: nextCursorIndex,
     });
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(nextCursorIndex, nextCursorIndex);
+    });
+  }
+
+  function insertContextMentionPath(path: string, query: string): void {
+    if (
+      activeComposerTrigger === null ||
+      activeComposerTrigger.capabilityKind !== "contextMention"
+    ) {
+      return;
+    }
+
+    const insertedText = formatContextMentionInsertion(path);
+    const nextComposerText = [
+      composerText.slice(0, activeComposerTrigger.range.start),
+      insertedText,
+      composerText.slice(activeComposerTrigger.range.end),
+    ].join("");
+    const nextCursorIndex = activeComposerTrigger.range.start + insertedText.length;
+
+    contextMentionControl?.onSelect({ path, query });
+    onComposerTextChange(nextComposerText);
+    setComposerSelection({
+      start: nextCursorIndex,
+      end: nextCursorIndex,
+    });
+    setActiveContextMentionIndex(0);
     requestAnimationFrame(() => {
       textareaRef.current?.focus();
       textareaRef.current?.setSelectionRange(nextCursorIndex, nextCursorIndex);
@@ -456,6 +548,17 @@ export function ChatComposer({
       (currentIndex) =>
         (currentIndex + delta + filteredSlashCommandOptions.length) %
         filteredSlashCommandOptions.length,
+    );
+  }
+
+  function moveActiveContextMention(delta: number): void {
+    if (contextMentionResults.length === 0) {
+      return;
+    }
+
+    setActiveContextMentionIndex(
+      (currentIndex) =>
+        (currentIndex + delta + contextMentionResults.length) % contextMentionResults.length,
     );
   }
 
@@ -704,6 +807,56 @@ export function ChatComposer({
           </div>
         )}
         <div className="relative">
+          {showContextMentionMenu ? (
+            <div
+              aria-label="Search files"
+              className="absolute right-0 bottom-full left-0 z-20 mb-2 max-h-64 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+              id={contextMentionListId}
+              role="listbox"
+            >
+              {contextMentionControl?.status === "unavailable" ? (
+                <div className="px-3 py-2 text-sm text-muted-foreground">
+                  File search is unavailable
+                </div>
+              ) : activeContextMentionQuery === "" ? (
+                <div className="px-3 py-2 text-sm text-muted-foreground">Search files</div>
+              ) : contextMentionResults.length === 0 ? (
+                <div className="px-3 py-2 text-sm text-muted-foreground">
+                  {contextMentionControl?.status === "loading"
+                    ? "Searching..."
+                    : "No matching paths"}
+                </div>
+              ) : (
+                contextMentionResults.map((result, resultIndex) => {
+                  const isActiveResult = result.path === activeContextMention?.path;
+
+                  return (
+                    <button
+                      aria-label={result.path}
+                      aria-selected={isActiveResult}
+                      className={[
+                        "flex w-full rounded-sm px-3 py-2 text-left font-mono text-xs leading-5 outline-none",
+                        isActiveResult ? "bg-muted text-foreground" : "hover:bg-muted/70",
+                      ].join(" ")}
+                      id={`${contextMentionListId}-${String(resultIndex)}`}
+                      key={result.path}
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        insertContextMentionPath(result.path, activeContextMentionQuery ?? "");
+                      }}
+                      onMouseEnter={() => {
+                        setActiveContextMentionIndex(resultIndex);
+                      }}
+                      role="option"
+                      type="button"
+                    >
+                      <span className="min-w-0 whitespace-normal break-all">{result.path}</span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          ) : null}
           {showSlashCommandMenu ? (
             <div
               aria-label="Slash commands"
@@ -756,10 +909,20 @@ export function ChatComposer({
           ) : null}
           <Textarea
             aria-activedescendant={
-              activeSlashCommand === null ? undefined : `${commandListId}-${activeSlashCommand.id}`
+              activeContextMentionIndexWithinBounds !== null
+                ? `${contextMentionListId}-${String(activeContextMentionIndexWithinBounds)}`
+                : activeSlashCommand === null
+                  ? undefined
+                  : `${commandListId}-${activeSlashCommand.id}`
             }
-            aria-controls={showSlashCommandMenu ? commandListId : undefined}
-            aria-expanded={showSlashCommandMenu}
+            aria-controls={
+              showContextMentionMenu
+                ? contextMentionListId
+                : showSlashCommandMenu
+                  ? commandListId
+                  : undefined
+            }
+            aria-expanded={showSlashCommandMenu || showContextMentionMenu}
             aria-haspopup="listbox"
             className="max-h-48 min-h-12 resize-none overflow-y-auto border-0 bg-transparent p-1.5 shadow-none placeholder:text-muted-foreground/60 focus-visible:border-transparent focus-visible:ring-0"
             id="session-composer"
@@ -767,11 +930,45 @@ export function ChatComposer({
               onComposerTextChange(event.target.value);
               updateComposerSelection(event.currentTarget);
               setActiveSlashCommandIndex(0);
+              setActiveContextMentionIndex(0);
             }}
             onClick={(event) => {
               updateComposerSelection(event.currentTarget);
             }}
             onKeyDown={(event) => {
+              if (showContextMentionMenu) {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  contextMentionControl?.onDismiss();
+                  return;
+                }
+
+                if (contextMentionResults.length > 0) {
+                  if (event.key === "ArrowDown") {
+                    event.preventDefault();
+                    moveActiveContextMention(1);
+                    return;
+                  }
+
+                  if (event.key === "ArrowUp") {
+                    event.preventDefault();
+                    moveActiveContextMention(-1);
+                    return;
+                  }
+
+                  if (event.key === "Tab" || event.key === "Enter") {
+                    event.preventDefault();
+                    if (activeContextMention !== null) {
+                      insertContextMentionPath(
+                        activeContextMention.path,
+                        activeContextMentionQuery ?? "",
+                      );
+                    }
+                    return;
+                  }
+                }
+              }
+
               if (showSlashCommandMenu && filteredSlashCommandOptions.length > 0) {
                 if (event.key === "ArrowDown") {
                   event.preventDefault();

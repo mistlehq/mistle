@@ -55,6 +55,16 @@ const ComposerCommandCapabilityFixture: React.ComponentProps<
   ],
 };
 
+const ContextMentionCapabilityFixture: React.ComponentProps<
+  typeof ChatComposer
+>["composerCapabilities"][number] = {
+  kind: "contextMention",
+  trigger: "@",
+  source: "workspacePath",
+  insertAs: "relativePathText",
+  submitAs: "inlineText",
+};
+
 function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
   return {
     composerCapabilities: [],
@@ -594,6 +604,118 @@ describe("ChatComposer", () => {
     fireEvent.mouseDown(screen.getByRole("option", { name: "/rewrite Rewrite with constraints" }));
 
     expect(getComposerTextarea().value).toBe("/rewrite ");
+  });
+
+  it("shows context mention file search results for inline @ queries", () => {
+    const observedQueries: string[] = [];
+
+    render(
+      <ControlledChatComposer
+        composerCapabilities={[ContextMentionCapabilityFixture]}
+        composerText="review @src"
+        contextMentionControl={{
+          status: "ready",
+          results: [
+            { kind: "directory", path: "src/features" },
+            { kind: "file", path: "src/index.ts" },
+          ],
+          onQueryChange: (query) => {
+            observedQueries.push(query);
+          },
+          onSelect: () => {},
+          onDismiss: () => {},
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("listbox", { name: "Search files" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "src/features" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "src/index.ts" })).toBeTruthy();
+    expect(observedQueries).toEqual(["src"]);
+  });
+
+  it("inserts selected context mention results as editable prompt text", () => {
+    const selectedPaths: string[] = [];
+
+    render(
+      <ControlledChatComposer
+        composerCapabilities={[ContextMentionCapabilityFixture]}
+        composerText="/review @src"
+        contextMentionControl={{
+          status: "ready",
+          results: [
+            { kind: "file", path: "src/index.ts" },
+            { kind: "file", path: "src/file with space.ts" },
+          ],
+          onQueryChange: () => {},
+          onSelect: (input) => {
+            selectedPaths.push(input.path);
+          },
+          onDismiss: () => {},
+        }}
+      />,
+    );
+
+    const composer = getComposerTextarea();
+    fireEvent.keyDown(composer, { key: "ArrowDown" });
+    fireEvent.keyDown(composer, { key: "Enter" });
+
+    expect(composer.value).toBe('/review "src/file with space.ts"');
+    expect(selectedPaths).toEqual(["src/file with space.ts"]);
+  });
+
+  it("keeps keyboard-selected context mention results scrolled into view", () => {
+    const scrolledElementIds: string[] = [];
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function scrollIntoView(): void {
+      if (this.id.length > 0) {
+        scrolledElementIds.push(this.id);
+      }
+    };
+
+    try {
+      render(
+        <ControlledChatComposer
+          composerCapabilities={[ContextMentionCapabilityFixture]}
+          composerText="@src"
+          contextMentionControl={{
+            status: "ready",
+            results: [
+              { kind: "file", path: "src/alpha.ts" },
+              { kind: "file", path: "src/beta.ts" },
+              { kind: "file", path: "src/gamma.ts" },
+            ],
+            onQueryChange: () => {},
+            onSelect: () => {},
+            onDismiss: () => {},
+          }}
+        />,
+      );
+
+      fireEvent.keyDown(getComposerTextarea(), { key: "ArrowDown" });
+
+      expect(scrolledElementIds.some((elementId) => elementId.endsWith("-1"))).toBe(true);
+    } finally {
+      Element.prototype.scrollIntoView = originalScrollIntoView;
+    }
+  });
+
+  it("surfaces unavailable context mention file search", () => {
+    render(
+      <ControlledChatComposer
+        composerCapabilities={[ContextMentionCapabilityFixture]}
+        composerText="@src"
+        contextMentionControl={{
+          status: "unavailable",
+          results: [],
+          onQueryChange: () => {},
+          onSelect: () => {},
+          onDismiss: () => {},
+        }}
+      />,
+    );
+
+    expect(screen.getByText("File search is unavailable")).toBeTruthy();
   });
 
   it("executes a runtime slash command with keyboard selection", () => {

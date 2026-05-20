@@ -1,3 +1,5 @@
+import type { ComposerCapability, ContextMentionCapability } from "@mistle/integrations-core";
+
 export type ComposerSubmitAction =
   | {
       type: "interrupt_turn";
@@ -8,6 +10,29 @@ export type ComposerSubmitAction =
       prompt: string;
       submitMode: "start" | "steer";
     };
+
+export const SandboxWorkspacePathContextMentionCapability: ContextMentionCapability = {
+  kind: "contextMention",
+  trigger: "@",
+  source: "workspacePath",
+  insertAs: "relativePathText",
+  submitAs: "inlineText",
+};
+
+export function mergeWorkbenchComposerCapabilities(input: {
+  composerCapabilities: readonly ComposerCapability[];
+  enableSandboxWorkspacePathContextMention: boolean;
+}): readonly ComposerCapability[] {
+  if (!input.enableSandboxWorkspacePathContextMention) {
+    return input.composerCapabilities;
+  }
+
+  if (input.composerCapabilities.some((capability) => capability.kind === "contextMention")) {
+    return input.composerCapabilities;
+  }
+
+  return [...input.composerCapabilities, SandboxWorkspacePathContextMentionCapability];
+}
 
 export function resolveComposerSubmitAction(input: {
   composerText: string;

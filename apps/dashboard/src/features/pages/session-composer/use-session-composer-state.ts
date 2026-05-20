@@ -39,6 +39,7 @@ import type {
   SessionComposerAttachmentControl,
 } from "./use-session-composer-attachment-control.js";
 import type { SessionComposerConfigControl } from "./use-session-composer-config-control.js";
+import type { SessionComposerContextMentionControl } from "./use-session-composer-context-mention-control.js";
 
 type PendingComposerAttachment = {
   id: string;
@@ -122,6 +123,7 @@ export type SessionComposerRuntimeInput = {
   contextUsage: ChatComposerViewModel["contextUsage"];
   goalStatus?: ChatComposerViewModel["goalStatus"];
   commandPanel?: ChatComposerViewModel["commandPanel"];
+  contextMentionControl?: SessionComposerContextMentionControl | null;
   collaborationMode?: {
     mode: SessionComposerCollaborationModeSettings["mode"];
     onSwitchToPlan?: () => void;
@@ -970,6 +972,7 @@ export function useSessionComposerState(input: {
       composerCapabilities: composerStateInput.bootstrap.composerCapabilities,
       composerText,
       commandPanel: composerStateInput.commandPanel ?? null,
+      contextMentionControl: composerStateInput.contextMentionControl ?? null,
       pendingDiffCommentSummary:
         draftState.pendingDiffComments.length === 0
           ? null

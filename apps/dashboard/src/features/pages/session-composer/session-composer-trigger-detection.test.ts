@@ -177,7 +177,57 @@ describe("detectActiveComposerTrigger", () => {
     ).toBeNull();
   });
 
-  it("does not detect unsupported trigger families in the slash-first phase", () => {
+  it("detects context mention queries inline", () => {
+    expect(
+      detect({
+        composerCapabilities: [ComposerCommandCapabilityFixture, ContextMentionCapabilityFixture],
+        composerText: "@src",
+      }),
+    ).toEqual({
+      capabilityKind: "contextMention",
+      trigger: "@",
+      query: "src",
+      range: {
+        start: 0,
+        end: 4,
+      },
+    });
+
+    expect(
+      detect({
+        composerCapabilities: [ContextMentionCapabilityFixture],
+        composerText: "review @packages/db please",
+        selectionStart: 19,
+      }),
+    ).toEqual({
+      capabilityKind: "contextMention",
+      trigger: "@",
+      query: "packages/db",
+      range: {
+        start: 7,
+        end: 19,
+      },
+    });
+  });
+
+  it("detects context mention arguments inside slash commands", () => {
+    expect(
+      detect({
+        composerCapabilities: [ComposerCommandCapabilityFixture, ContextMentionCapabilityFixture],
+        composerText: "/review @src",
+      }),
+    ).toEqual({
+      capabilityKind: "contextMention",
+      trigger: "@",
+      query: "src",
+      range: {
+        start: 8,
+        end: 12,
+      },
+    });
+  });
+
+  it("does not detect unsupported trigger families", () => {
     expect(
       detect({
         composerText: "@src",
@@ -186,6 +236,7 @@ describe("detectActiveComposerTrigger", () => {
 
     expect(
       detect({
+        composerCapabilities: [ComposerCommandCapabilityFixture, ContextMentionCapabilityFixture],
         composerText: "$grill-with-docs",
       }),
     ).toBeNull();

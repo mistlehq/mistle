@@ -177,8 +177,16 @@ The sandbox-scoped lower workbench area used for terminal-style tools within a *
 _Avoid_: Thread panel, Codex thread panel
 
 **Composer capability**:
-A special composer interaction available for a session, including how the input is represented while editing and how it is submitted, determined by the session's **Agent runtime**.
+A special composer interaction available for a session, including how the input is represented while editing and how it is submitted.
 _Avoid_: Autocomplete feature, composer shortcut
+
+**Context mention**:
+A **Session workbench** **Composer capability** selected with `@` that inserts a referenced sandbox workspace path into the composer as prompt text.
+_Avoid_: File attachment, uploaded file, file reference
+
+**Sandbox workspace path**:
+A file or directory path inside a **Sandbox session** filesystem that can be inserted through a **Context mention**.
+_Avoid_: Workspace search result, local file, host path
 
 **Composer command**:
 A composer input selected with `/` that submits a command owned by the session's **Agent runtime**.
@@ -353,9 +361,14 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - The Codex session state owns **Active Codex thread** changes for the **Session workbench**.
 - Cached **Codex thread** transcripts are ephemeral **Session workbench** state.
 - A cached **Codex thread** transcript does not become visible as active until Codex confirms the thread is resumable.
-- An **Agent runtime** determines which **Composer capabilities** are available for a session.
-- An **Agent runtime** is the source of truth for its baseline **Composer capabilities**.
+- **Composer capabilities** may be owned by the **Agent runtime** or by the **Session workbench**.
+- An **Agent runtime** is the source of truth for runtime-owned **Composer capabilities**.
+- A **Session workbench** is the source of truth for sandbox-scoped **Composer capabilities**.
 - A **Composer capability** defines both the editing representation and the submission behavior, not just whether a feature is enabled.
+- A **Context mention** belongs to the **Active runtime conversation** when one exists, and otherwise belongs to the **Session workbench**.
+- A **Context mention** may appear inline within ordinary composer text or as an argument to a **Composer command**.
+- A selected **Context mention** remains editable prompt text after insertion.
+- A **Context mention** may refer to a **Sandbox workspace path**.
 - A **Runtime queued message** is available only when the **Agent runtime** exposes native queue submission.
 - A **Pi follow-up message** is a **Runtime queued message**.
 - **Dashboard build drift** can occur while a user keeps the dashboard open across a Mistle deployment.

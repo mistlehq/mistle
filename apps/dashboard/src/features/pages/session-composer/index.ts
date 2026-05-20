@@ -11,7 +11,10 @@ export {
 } from "./use-session-composer-state.js";
 export { ComposerStatusBanner } from "./composer-status-banner.js";
 export { SessionComposerActivityRow } from "./session-composer-activity-row.js";
-export { resolveComposerSubmitAction } from "./session-composer-capabilities.js";
+export {
+  mergeWorkbenchComposerCapabilities,
+  resolveComposerSubmitAction,
+} from "./session-composer-capabilities.js";
 export {
   detectActiveComposerTrigger,
   type ActiveComposerTrigger,
@@ -24,6 +27,10 @@ export {
   type SessionComposerAttachmentControlDependencies,
   type PreparedComposerAttachments,
 } from "./use-session-composer-attachment-control.js";
+export {
+  useSessionComposerContextMentionControl,
+  type SessionComposerContextMentionControl,
+} from "./use-session-composer-context-mention-control.js";
 export {
   useLocalSessionComposerConfigControl,
   usePersistedSessionComposerConfigControl,

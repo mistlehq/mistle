@@ -1,5 +1,6 @@
 export * from "./agent-stream-client.js";
 export * from "./exec-stream-client.js";
+export * from "./file-search-client.js";
 export * from "./file-upload-client.js";
 export * from "./pty-transport-client.js";
 export * from "./pty-types.js";

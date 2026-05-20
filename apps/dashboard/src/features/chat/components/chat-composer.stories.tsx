@@ -10,7 +10,11 @@ import {
   SessionComposerFixturePropsWithPendingAttachments,
   CodexFixtureSessionModelOptions,
 } from "../../session-agents/codex/fixtures/session-fixtures.js";
-import { ChatComposer, type ChatComposerCommandPanel } from "./chat-composer.js";
+import {
+  ChatComposer,
+  type ChatComposerCommandPanel,
+  type ChatComposerContextMentionControl,
+} from "./chat-composer.js";
 import { noop } from "./chat-story-support.js";
 
 type ShortcutPreviewPlatform = "linux" | "macos" | "windows";
@@ -98,6 +102,57 @@ const OpenCodePromptCommandCapabilities = mapOpenCodePromptCommandsToComposerCap
     description: "write targeted tests",
   },
 ]);
+
+const ContextMentionCapability: React.ComponentProps<
+  typeof ChatComposer
+>["composerCapabilities"][number] = {
+  kind: "contextMention",
+  trigger: "@",
+  source: "workspacePath",
+  insertAs: "relativePathText",
+  submitAs: "inlineText",
+};
+
+const ContextMentionSearchResults: ChatComposerContextMentionControl = {
+  status: "ready",
+  results: [
+    {
+      kind: "directory",
+      path: "apps/dashboard/src/features/chat/components",
+    },
+    {
+      kind: "file",
+      path: "apps/dashboard/src/features/chat/components/context-mention-search-menu.tsx",
+    },
+    {
+      kind: "file",
+      path: "apps/dashboard/src/features/pages/session-composer/use-session-composer-context-mention-control.ts",
+    },
+    {
+      kind: "directory",
+      path: "packages/sandboxd/src/tunnel/file_search.rs",
+    },
+  ],
+  onQueryChange: noop,
+  onSelect: noop,
+  onDismiss: noop,
+};
+
+const ContextMentionNoMatchesControl: ChatComposerContextMentionControl = {
+  status: "ready",
+  results: [],
+  onQueryChange: noop,
+  onSelect: noop,
+  onDismiss: noop,
+};
+
+const ContextMentionUnavailableControl: ChatComposerContextMentionControl = {
+  status: "unavailable",
+  results: [],
+  onQueryChange: noop,
+  onSelect: noop,
+  onDismiss: noop,
+};
 
 function detectShortcutPreviewPlatform(): ShortcutPreviewPlatform {
   if (typeof navigator === "undefined") {
@@ -262,6 +317,72 @@ export const SlashCommandAutocomplete: Story = {
     await expect(
       canvas.getByRole("option", { name: "/compact Compact the current context" }),
     ).toBeVisible();
+  },
+};
+
+export const ContextMentionFileSearch: Story = {
+  args: {
+    composerCapabilities: [ContextMentionCapability],
+    composerText: "Review @apps/dashboard/src/features/chat",
+    contextMentionControl: ContextMentionSearchResults,
+  },
+  render: (args) => (
+    <div className="flex min-h-[420px] items-end">
+      <PlatformAwareChatComposerStory {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByRole("listbox", { name: "Search files" })).toBeVisible();
+    await expect(
+      canvas.getByRole("option", {
+        name: "apps/dashboard/src/features/chat/components/context-mention-search-menu.tsx",
+      }),
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole("option", {
+        name: "apps/dashboard/src/features/pages/session-composer/use-session-composer-context-mention-control.ts",
+      }),
+    ).toBeVisible();
+  },
+};
+
+export const ContextMentionNoMatches: Story = {
+  args: {
+    composerCapabilities: [ContextMentionCapability],
+    composerText: "Review @zzzz",
+    contextMentionControl: ContextMentionNoMatchesControl,
+  },
+  render: (args) => (
+    <div className="flex min-h-[420px] items-end">
+      <PlatformAwareChatComposerStory {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByRole("listbox", { name: "Search files" })).toBeVisible();
+    await expect(canvas.getByText("No matching paths")).toBeVisible();
+  },
+};
+
+export const ContextMentionUnavailable: Story = {
+  args: {
+    composerCapabilities: [ContextMentionCapability],
+    composerText: "Review @apps",
+    contextMentionControl: ContextMentionUnavailableControl,
+  },
+  render: (args) => (
+    <div className="flex min-h-[420px] items-end">
+      <PlatformAwareChatComposerStory {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByRole("listbox", { name: "Search files" })).toBeVisible();
+    await expect(canvas.getByText("File search is unavailable")).toBeVisible();
   },
 };
 

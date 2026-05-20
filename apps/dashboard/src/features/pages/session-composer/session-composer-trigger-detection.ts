@@ -4,8 +4,8 @@ const SlashCommandQueryPattern = /^[a-z0-9-]*$/;
 const WhitespacePattern = /\s/;
 
 export type ActiveComposerTrigger = {
-  capabilityKind: "composerCommand";
-  trigger: "/";
+  capabilityKind: "composerCommand" | "contextMention";
+  trigger: "/" | "@";
   query: string;
   range: {
     start: number;
@@ -19,11 +19,25 @@ export function detectActiveComposerTrigger(input: {
   selectionStart: number;
   selectionEnd: number;
 }): ActiveComposerTrigger | null {
-  if (!hasComposerCommandCapability(input.composerCapabilities)) {
+  if (input.selectionStart !== input.selectionEnd) {
     return null;
   }
 
-  if (input.selectionStart !== input.selectionEnd) {
+  const contextMentionTrigger = detectContextMentionTrigger(input);
+  if (contextMentionTrigger !== null) {
+    return contextMentionTrigger;
+  }
+
+  return detectComposerCommandTrigger(input);
+}
+
+function detectComposerCommandTrigger(input: {
+  composerCapabilities: readonly ComposerCapability[];
+  composerText: string;
+  selectionStart: number;
+  selectionEnd: number;
+}): ActiveComposerTrigger | null {
+  if (!hasComposerCommandCapability(input.composerCapabilities)) {
     return null;
   }
 
@@ -54,6 +68,37 @@ export function detectActiveComposerTrigger(input: {
       start: 0,
       end: commandTokenEnd,
     },
+  };
+}
+
+function detectContextMentionTrigger(input: {
+  composerCapabilities: readonly ComposerCapability[];
+  composerText: string;
+  selectionStart: number;
+  selectionEnd: number;
+}): ActiveComposerTrigger | null {
+  if (!hasContextMentionCapability(input.composerCapabilities)) {
+    return null;
+  }
+
+  const tokenRange = findWhitespaceDelimitedTokenRange({
+    composerText: input.composerText,
+    cursorIndex: input.selectionStart,
+  });
+  if (tokenRange === null) {
+    return null;
+  }
+
+  const tokenText = input.composerText.slice(tokenRange.start, tokenRange.end);
+  if (!tokenText.startsWith("@")) {
+    return null;
+  }
+
+  return {
+    capabilityKind: "contextMention",
+    trigger: "@",
+    query: input.composerText.slice(tokenRange.start + 1, input.selectionStart),
+    range: tokenRange,
   };
 }
 
@@ -90,6 +135,37 @@ function hasComposerCommandCapability(
   composerCapabilities: readonly ComposerCapability[],
 ): boolean {
   return composerCapabilities.some((capability) => capability.kind === "composerCommand");
+}
+
+function hasContextMentionCapability(composerCapabilities: readonly ComposerCapability[]): boolean {
+  return composerCapabilities.some((capability) => capability.kind === "contextMention");
+}
+
+function findWhitespaceDelimitedTokenRange(input: {
+  composerText: string;
+  cursorIndex: number;
+}): ActiveComposerTrigger["range"] | null {
+  if (input.cursorIndex < 1 || input.cursorIndex > input.composerText.length) {
+    return null;
+  }
+
+  let start = input.cursorIndex - 1;
+  while (start > 0 && !WhitespacePattern.test(input.composerText.charAt(start - 1))) {
+    start -= 1;
+  }
+
+  let end = input.cursorIndex;
+  while (
+    end < input.composerText.length &&
+    !WhitespacePattern.test(input.composerText.charAt(end))
+  ) {
+    end += 1;
+  }
+
+  return {
+    start,
+    end,
+  };
 }
 
 function findCommandTokenEnd(composerText: string): number {
