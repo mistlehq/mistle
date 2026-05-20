@@ -25,8 +25,11 @@ export async function generatePiConversationTitle(input: {
   });
   try {
     await client.connect();
+    const resolvedConversation = await client.resolveConversation({
+      providerConversationId: input.providerConversationId,
+    });
     const metadata = await client.readMetadata({
-      sessionFile: input.providerConversationId,
+      sessionFile: resolvedConversation.sessionFile,
     });
     if (metadata.name !== null && metadata.name.trim().length > 0) {
       return { title: metadata.name };
@@ -34,7 +37,7 @@ export async function generatePiConversationTitle(input: {
 
     const title = derivePiConversationTitle(input.inputText);
     await client.setSessionName({
-      sessionFile: input.providerConversationId,
+      sessionFile: resolvedConversation.sessionFile,
       name: title,
     });
 

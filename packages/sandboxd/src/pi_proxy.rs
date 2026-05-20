@@ -151,6 +151,7 @@ struct PiRpcChild {
 struct PiRecentSessionCandidate {
     created_at: Option<String>,
     cwd: Option<String>,
+    id: String,
     modified: std::time::SystemTime,
     title: Option<String>,
     path: PathBuf,
@@ -160,6 +161,7 @@ struct PiRecentSessionCandidate {
 struct PiSessionFileHeader {
     created_at: Option<String>,
     cwd: Option<String>,
+    id: String,
     title: Option<String>,
 }
 
@@ -442,6 +444,7 @@ impl PiProxyState {
                 candidates.push(PiRecentSessionCandidate {
                     created_at: header.created_at,
                     cwd: header.cwd,
+                    id: header.id,
                     modified,
                     title: header.title,
                     path,
@@ -453,11 +456,26 @@ impl PiProxyState {
         Ok(candidates)
     }
 
-    fn find_recent_conversation(&self, cwd: Option<&str>) -> Result<Option<String>, PiProxyError> {
+    fn find_recent_conversation(
+        &self,
+        cwd: Option<&str>,
+    ) -> Result<Option<PiRecentSessionCandidate>, PiProxyError> {
         let candidates = self.collect_session_candidates(cwd)?;
-        Ok(candidates
-            .first()
-            .map(|candidate| candidate.path.to_string_lossy().to_string()))
+        Ok(candidates.into_iter().next())
+    }
+
+    fn find_conversation_by_id(
+        &self,
+        provider_conversation_id: &str,
+    ) -> Result<PiRecentSessionCandidate, PiProxyError> {
+        self.collect_session_candidates(None)?
+            .into_iter()
+            .find(|candidate| candidate.id == provider_conversation_id)
+            .ok_or_else(|| {
+                PiProxyError::InvalidRequest(format!(
+                    "Pi conversation '{provider_conversation_id}' was not found"
+                ))
+            })
     }
 
     fn list_conversations(&self, cwd: Option<&str>, limit: usize) -> Result<Value, PiProxyError> {
@@ -479,6 +497,7 @@ impl PiProxyState {
             .filter_map(|candidate| {
                 let cwd = candidate.cwd?;
                 Some(json!({
+                    "id": candidate.id,
                     "sessionFile": candidate.path.to_string_lossy().to_string(),
                     "cwd": cwd,
                     "title": candidate.title,
@@ -854,13 +873,15 @@ fn read_pi_session_file_header(path: &Path) -> Option<PiSessionFileHeader> {
         Ok(header) => header,
         Err(_) => return None,
     };
-    if header["type"].as_str() != Some("session") || header["id"].as_str().is_none() {
+    let id = header["id"].as_str()?;
+    if header["type"].as_str() != Some("session") {
         return None;
     }
 
     Some(PiSessionFileHeader {
         created_at: header["timestamp"].as_str().map(ToString::to_string),
         cwd: header["cwd"].as_str().map(ToString::to_string),
+        id: id.to_string(),
         title: header["sessionName"]
             .as_str()
             .or_else(|| header["title"].as_str())
@@ -904,17 +925,38 @@ fn handle_pi_method(
                 captured_events,
             )?;
             let session_file = PiProxyState::read_session_file(&state_value)?;
-            Ok(json!({ "providerConversationId": session_file }))
+            let provider_conversation_id = state_value["sessionId"].as_str().ok_or_else(|| {
+                PiProxyError::InvalidRequest("Pi did not report sessionId".to_string())
+            })?;
+            Ok(json!({
+                "providerConversationId": provider_conversation_id,
+                "sessionFile": session_file,
+            }))
         }
         "pi/findRecentConversation" => {
             let cwd = read_param_string(&request.params, "cwd");
-            let provider_conversation_id = state.find_recent_conversation(cwd.as_deref())?;
-            Ok(json!({ "providerConversationId": provider_conversation_id }))
+            let conversation = state.find_recent_conversation(cwd.as_deref())?;
+            Ok(match conversation {
+                Some(conversation) => json!({
+                    "providerConversationId": conversation.id,
+                    "sessionFile": conversation.path.to_string_lossy().to_string(),
+                }),
+                None => json!({
+                    "providerConversationId": Value::Null,
+                    "sessionFile": Value::Null,
+                }),
+            })
         }
         "pi/listConversations" => {
             let cwd = read_param_string(&request.params, "cwd");
             let limit = require_param_usize(&request.params, "limit")?;
             state.list_conversations(cwd.as_deref(), limit)
+        }
+        "pi/resolveConversation" => {
+            let provider_conversation_id =
+                require_param_string(&request.params, "providerConversationId")?;
+            let conversation = state.find_conversation_by_id(&provider_conversation_id)?;
+            Ok(json!({ "sessionFile": conversation.path.to_string_lossy().to_string() }))
         }
         "pi/getState" => {
             let session_file = read_param_string(&request.params, "sessionFile");
@@ -960,11 +1002,14 @@ fn handle_pi_method(
             Ok(messages_value)
         }
         "pi/resumeConversation" => {
-            let session_file = require_param_string(&request.params, "sessionFile")?;
+            let provider_conversation_id =
+                require_param_string(&request.params, "providerConversationId")?;
+            let conversation = state.find_conversation_by_id(&provider_conversation_id)?;
+            let session_file = conversation.path.to_string_lossy().to_string();
             state.ensure_child(None)?;
             state.switch_session(&session_file, captured_events)?;
             PiProxyState::mark_active_and_start_activity_monitor(state);
-            Ok(Value::Null)
+            Ok(json!({ "sessionFile": session_file }))
         }
         "pi/setModel" => {
             let session_file = require_param_string(&request.params, "sessionFile")?;
@@ -1109,6 +1154,10 @@ mod tests {
         );
         assert_eq!(
             create_response["result"]["providerConversationId"],
+            json!(simulated_pi.session_id())
+        );
+        assert_eq!(
+            create_response["result"]["sessionFile"],
             json!(simulated_pi.session_file())
         );
 
@@ -1177,7 +1226,7 @@ mod tests {
         let state = Arc::new(PiProxyState {
             config: PiProxyConfig {
                 pi_cli_path: simulated_pi.path(),
-                env: BTreeMap::new(),
+                env: simulated_pi.session_env(),
             },
             child: Mutex::new(None),
             command_lock: Mutex::new(()),
@@ -1196,7 +1245,7 @@ mod tests {
                 "id": "resume",
                 "method": "pi/resumeConversation",
                 "params": {
-                    "sessionFile": simulated_pi.session_file()
+                    "providerConversationId": simulated_pi.session_id()
                 }
             })
             .to_string(),
@@ -1208,7 +1257,10 @@ mod tests {
                 .expect("resume conversation should produce a response"),
         );
         assert_eq!(resume_response["id"], json!("resume"));
-        assert_eq!(resume_response["result"], Value::Null);
+        assert_eq!(
+            resume_response["result"]["sessionFile"],
+            json!(simulated_pi.session_file())
+        );
         assert!(
             keepalive_manager
                 .lock()
@@ -1273,7 +1325,7 @@ mod tests {
         let state = Arc::new(PiProxyState {
             config: PiProxyConfig {
                 pi_cli_path: simulated_pi.path(),
-                env: BTreeMap::new(),
+                env: simulated_pi.session_env(),
             },
             child: Mutex::new(None),
             command_lock: Mutex::new(()),
@@ -1291,7 +1343,7 @@ mod tests {
                 "id": "resume",
                 "method": "pi/resumeConversation",
                 "params": {
-                    "sessionFile": simulated_pi.session_file()
+                    "providerConversationId": simulated_pi.session_id()
                 }
             })
             .to_string(),
@@ -1303,7 +1355,10 @@ mod tests {
                 .expect("resume conversation should produce a response"),
         );
         assert_eq!(resume_response["id"], json!("resume"));
-        assert_eq!(resume_response["result"], Value::Null);
+        assert_eq!(
+            resume_response["result"]["sessionFile"],
+            json!(simulated_pi.session_file())
+        );
 
         state.shutdown_child();
     }
@@ -1428,6 +1483,10 @@ mod tests {
         );
         assert_eq!(
             response["result"]["providerConversationId"],
+            json!("recent")
+        );
+        assert_eq!(
+            response["result"]["sessionFile"],
             json!(
                 recent_session
                     .to_str()
@@ -1505,6 +1564,7 @@ mod tests {
                 .expect("conversation list lookup should produce a response"),
         );
         assert_eq!(response["result"]["hasMore"], json!(true));
+        assert_eq!(response["result"]["conversations"][0]["id"], json!("newer"));
         assert_eq!(
             response["result"]["conversations"][0]["sessionFile"],
             json!(
@@ -1563,7 +1623,9 @@ mod tests {
         _directory: tempfile::TempDir,
         script_path: String,
         cwd: String,
+        session_dir: String,
         session_file: String,
+        session_id: String,
     }
 
     impl SimulatedPiRpcProcess {
@@ -1584,7 +1646,15 @@ mod tests {
             let script_path = directory.path().join("simulated-pi-rpc");
             let cwd = directory.path().join("workspace");
             fs::create_dir(&cwd).expect("workspace directory should be created");
-            let session_file = directory.path().join("session.json");
+            let session_dir = directory.path().join("sessions");
+            fs::create_dir(&session_dir).expect("session directory should be created");
+            let session_file = session_dir.join("session.jsonl");
+            let session_id = "simulated-session";
+            write_session_file(
+                &session_file,
+                session_id,
+                cwd.to_str().expect("cwd should be UTF-8"),
+            );
             let active_marker = directory.path().join("active");
             let no_initial_session_marker = directory.path().join("no-initial-session");
             if active_session {
@@ -1609,11 +1679,11 @@ while IFS= read -r line; do
         printf '{{"type":"response","command":"get_state","id":"%s","success":false,"error":"no active session"}}\n' "$id"
       elif [ -f "$active_marker" ]; then
         rm "$active_marker"
-        printf '{{"type":"response","command":"get_state","id":"%s","success":true,"data":{{"sessionFile":"{}","sessionName":"Simulated session","isStreaming":true,"isCompacting":false,"pendingMessageCount":0}}}}\n' "$id"
+        printf '{{"type":"response","command":"get_state","id":"%s","success":true,"data":{{"sessionFile":"{}","sessionId":"{}","sessionName":"Simulated session","isStreaming":true,"isCompacting":false,"pendingMessageCount":0}}}}\n' "$id"
         sleep 0.1
         printf '{{"type":"agent_end"}}\n'
       else
-        printf '{{"type":"response","command":"get_state","id":"%s","success":true,"data":{{"sessionFile":"{}","sessionName":"Simulated session","isStreaming":false,"isCompacting":false,"pendingMessageCount":0}}}}\n' "$id"
+        printf '{{"type":"response","command":"get_state","id":"%s","success":true,"data":{{"sessionFile":"{}","sessionId":"{}","sessionName":"Simulated session","isStreaming":false,"isCompacting":false,"pendingMessageCount":0}}}}\n' "$id"
       fi
       ;;
     *'"type":"switch_session"'*)
@@ -1655,7 +1725,9 @@ done
                 active_marker.display(),
                 no_initial_session_marker.display(),
                 session_file.display(),
-                session_file.display()
+                session_id,
+                session_file.display(),
+                session_id
             );
             fs::write(&script_path, script).expect("simulated Pi RPC script should be written");
             let mut permissions = fs::metadata(&script_path)
@@ -1672,10 +1744,15 @@ done
                     .expect("script path should be UTF-8")
                     .to_string(),
                 cwd: cwd.to_str().expect("cwd path should be UTF-8").to_string(),
+                session_dir: session_dir
+                    .to_str()
+                    .expect("session dir should be UTF-8")
+                    .to_string(),
                 session_file: session_file
                     .to_str()
                     .expect("session path should be UTF-8")
                     .to_string(),
+                session_id: session_id.to_string(),
             }
         }
 
@@ -1689,6 +1766,17 @@ done
 
         fn session_file(&self) -> &str {
             &self.session_file
+        }
+
+        fn session_id(&self) -> &str {
+            &self.session_id
+        }
+
+        fn session_env(&self) -> BTreeMap<String, String> {
+            BTreeMap::from([(
+                "PI_CODING_AGENT_SESSION_DIR".to_string(),
+                self.session_dir.clone(),
+            )])
         }
     }
 }

@@ -105,7 +105,7 @@ function mapPiConversationToRuntimeConversationSummary(
   conversation: UsePiSessionStateResult["conversations"]["availableConversations"][number],
 ): RuntimeConversationSummary {
   return {
-    id: conversation.sessionFile,
+    id: conversation.id,
     title: conversation.title ?? "",
     cwd: conversation.cwd,
     createdAt: parseOptionalIsoDateTimeMs(conversation.createdAt),
@@ -375,7 +375,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
       runtimeConversationNavigator: input.isPiRuntime
         ? {
             activeConversationCwd: input.piSessionState.conversations.activeConversationDirectory,
-            activeConversationId: input.piSessionState.conversations.activeSessionFile,
+            activeConversationId: input.piSessionState.conversations.activeConversationId,
             providerConversationId:
               input.piSessionState.lifecycle.sessionSnapshot?.providerConversationId ?? null,
             availableConversations: input.piSessionState.conversations.availableConversations.map(

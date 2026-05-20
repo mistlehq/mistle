@@ -275,6 +275,7 @@ function createPiRuntimeInput(input: {
       input.queuedPrompts?.push(turnInput.transcriptPrompt ?? turnInput.submittedPrompt);
     },
     sessionSnapshot: {
+      activeConversationId: "pi-session",
       activeDirectory: null,
       activeSessionFile: "pi-session.json",
       connectedAtIso: "2026-05-19T00:00:00.000Z",

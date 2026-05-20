@@ -21,6 +21,7 @@ import {
 } from "./pi-workbench-composer.js";
 
 export type ConnectedPiConversation = {
+  activeConversationId: string;
   activeDirectory: string | null;
   activeSessionFile: string;
   connectedAtIso: string;
@@ -34,13 +35,16 @@ export type PiSessionLifecycleState = {
     initialCwd?: string | null;
     providerConversationId?: string | null;
     sandboxInstanceId: string;
-    targetSessionFile?: string | null;
+    targetConversationId?: string | null;
   }) => void;
   detachSessionConnection: () => void;
   disconnectSession: () => void;
   isStartingSession: boolean;
   lifecycleErrorMessage: string | null;
-  recoverSession: (input: { sandboxInstanceId: string; targetSessionFile: string | null }) => void;
+  recoverSession: (input: {
+    sandboxInstanceId: string;
+    targetConversationId: string | null;
+  }) => void;
   recoverableDisconnect: null;
   sessionConnectionState: "connected" | "connecting" | "detached";
   sessionSnapshot: ConnectedPiConversation | null;
@@ -49,6 +53,7 @@ export type PiSessionLifecycleState = {
 
 export type PiConversationNavigatorState = {
   activeConversationDirectory: string | null;
+  activeConversationId: string | null;
   activeSessionFile: string | null;
   availableConversations: readonly PiConversationSummary[];
   hasMoreAvailableConversations: boolean;
@@ -58,7 +63,7 @@ export type PiConversationNavigatorState = {
   refreshConversationList: (input?: {
     directory?: string | null;
   }) => Promise<readonly PiConversationSummary[]>;
-  resumeConversation: (sessionFile: string, input?: { directory?: string }) => Promise<string>;
+  resumeConversation: (conversationId: string, input?: { directory?: string }) => Promise<string>;
   startNewConversation: (input?: { directory?: string }) => Promise<string>;
 };
 
@@ -68,7 +73,7 @@ export type PiConversationSelection =
     }
   | {
       kind: "resume";
-      sessionFile: string;
+      providerConversationId: string;
     };
 
 export type UsePiSessionStateResult = {
@@ -100,19 +105,19 @@ export type UsePiSessionStateResult = {
 
 export function resolvePiConversationSelection(input: {
   recentProviderConversationId: string | null;
-  targetSessionFile: string | null;
+  targetConversationId: string | null;
 }): PiConversationSelection {
-  if (input.targetSessionFile !== null) {
+  if (input.targetConversationId !== null) {
     return {
       kind: "resume",
-      sessionFile: input.targetSessionFile,
+      providerConversationId: input.targetConversationId,
     };
   }
 
   if (input.recentProviderConversationId !== null) {
     return {
       kind: "resume",
-      sessionFile: input.recentProviderConversationId,
+      providerConversationId: input.recentProviderConversationId,
     };
   }
 
@@ -167,7 +172,7 @@ export function resolveOriginalPiConversationId(input: {
     return null;
   }
 
-  let originalSessionFile: string | null = null;
+  let originalConversationId: string | null = null;
   let originalCreatedAt: number | null = null;
   for (const conversation of input.sandboxConversations) {
     const createdAt = parsePiConversationCreatedAt(conversation);
@@ -179,28 +184,39 @@ export function resolveOriginalPiConversationId(input: {
       originalCreatedAt === null ||
       createdAt < originalCreatedAt ||
       (createdAt === originalCreatedAt &&
-        (originalSessionFile === null || conversation.sessionFile < originalSessionFile))
+        (originalConversationId === null || conversation.id < originalConversationId))
     ) {
-      originalSessionFile = conversation.sessionFile;
+      originalConversationId = conversation.id;
       originalCreatedAt = createdAt;
     }
   }
 
-  return originalSessionFile;
+  return originalConversationId;
 }
 
 export function resolvePiConversationDirectory(input: {
   conversations: readonly PiConversationSummary[];
+  conversationId: string;
   preferredDirectory: string | null | undefined;
-  sessionFile: string;
 }): string | null {
   if (input.preferredDirectory !== undefined && input.preferredDirectory !== null) {
     return input.preferredDirectory;
   }
 
   return (
+    input.conversations.find((conversation) => conversation.id === input.conversationId)?.cwd ??
+    null
+  );
+}
+
+export function resolveListedPiConversationId(input: {
+  conversations: readonly PiConversationSummary[];
+  fallbackConversationId: string;
+  sessionFile: string;
+}): string {
+  return (
     input.conversations.find((conversation) => conversation.sessionFile === input.sessionFile)
-      ?.cwd ?? null
+      ?.id ?? input.fallbackConversationId
   );
 }
 
@@ -365,6 +381,30 @@ export function usePiSessionState(input: {
           client,
         }),
       ]);
+      const activeSessionFile = sessionSnapshot?.activeSessionFile ?? null;
+      const activeConversationId = sessionSnapshot?.activeConversationId ?? null;
+      if (activeSessionFile !== null && activeConversationId !== null) {
+        const listedConversationId = resolveListedPiConversationId({
+          conversations: [
+            ...conversationPage.conversations,
+            ...sandboxConversationPage.conversations,
+          ],
+          fallbackConversationId: activeConversationId,
+          sessionFile: activeSessionFile,
+        });
+        if (listedConversationId !== activeConversationId) {
+          setSessionSnapshot((currentSnapshot) =>
+            currentSnapshot === null ||
+            currentSnapshot.activeSessionFile !== activeSessionFile ||
+            currentSnapshot.activeConversationId !== activeConversationId
+              ? currentSnapshot
+              : {
+                  ...currentSnapshot,
+                  activeConversationId: listedConversationId,
+                },
+          );
+        }
+      }
       setAvailableConversations(conversationPage.conversations);
       setHasMoreAvailableConversations(conversationPage.hasMore);
       setOriginalConversationId(
@@ -376,19 +416,24 @@ export function usePiSessionState(input: {
       );
       return conversationPage.conversations;
     },
-    [sessionSnapshot?.activeDirectory, sessionSnapshot?.providerConversationId],
+    [
+      sessionSnapshot?.activeConversationId,
+      sessionSnapshot?.activeDirectory,
+      sessionSnapshot?.activeSessionFile,
+      sessionSnapshot?.providerConversationId,
+    ],
   );
 
   useEffect(() => {
     const previousStatus = previousChatStatusRef.current;
     previousChatStatusRef.current = chatState.status;
 
-    const activeSessionFile = sessionSnapshot?.activeSessionFile ?? null;
+    const activeConversationId = sessionSnapshot?.activeConversationId ?? null;
     if (
       previousStatus !== "busy" ||
       chatState.status !== "idle" ||
-      activeSessionFile === null ||
-      availableConversations.some((conversation) => conversation.sessionFile === activeSessionFile)
+      activeConversationId === null ||
+      availableConversations.some((conversation) => conversation.id === activeConversationId)
     ) {
       return;
     }
@@ -407,9 +452,7 @@ export function usePiSessionState(input: {
           directory: sessionSnapshot?.activeDirectory ?? null,
         });
         if (
-          refreshedConversations.some(
-            (conversation) => conversation.sessionFile === activeSessionFile,
-          )
+          refreshedConversations.some((conversation) => conversation.id === activeConversationId)
         ) {
           return;
         }
@@ -420,7 +463,7 @@ export function usePiSessionState(input: {
     chatState.status,
     refreshConversationList,
     sessionSnapshot?.activeDirectory,
-    sessionSnapshot?.activeSessionFile,
+    sessionSnapshot?.activeConversationId,
   ]);
 
   const connectSession = useCallback(
@@ -428,7 +471,7 @@ export function usePiSessionState(input: {
       initialCwd?: string | null;
       providerConversationId?: string | null;
       sandboxInstanceId: string;
-      targetSessionFile?: string | null;
+      targetConversationId?: string | null;
     }): void => {
       const generation = generationRef.current + 1;
       generationRef.current = generation;
@@ -460,30 +503,33 @@ export function usePiSessionState(input: {
           });
           clientRef.current = client;
           await client.connect();
-          const targetSessionFile = connectInput.targetSessionFile ?? null;
+          const targetConversationId = connectInput.targetConversationId ?? null;
           const recentConversation =
-            targetSessionFile === null
+            targetConversationId === null
               ? await client.findRecentConversation({
                   cwd: connectInput.initialCwd ?? null,
                 })
-              : { providerConversationId: null };
+              : { providerConversationId: null, sessionFile: null };
           const conversationSelection = resolvePiConversationSelection({
-            targetSessionFile,
+            targetConversationId,
             recentProviderConversationId: recentConversation.providerConversationId,
           });
+          let activeConversationId: string;
           let activeSessionFile: string;
           if (conversationSelection.kind === "resume") {
-            await client.resumeConversation({
-              sessionFile: conversationSelection.sessionFile,
+            const resumedConversation = await client.resumeConversation({
+              providerConversationId: conversationSelection.providerConversationId,
             });
-            activeSessionFile = conversationSelection.sessionFile;
+            activeConversationId = conversationSelection.providerConversationId;
+            activeSessionFile = resumedConversation.sessionFile;
           } else {
             const session = await client.createConversation({
               ...(connectInput.initialCwd === undefined || connectInput.initialCwd === null
                 ? {}
                 : { cwd: connectInput.initialCwd }),
             });
-            activeSessionFile = session.providerConversationId;
+            activeConversationId = session.providerConversationId;
+            activeSessionFile = session.sessionFile;
           }
           if (generationRef.current !== generation) {
             client.close();
@@ -550,8 +596,8 @@ export function usePiSessionState(input: {
               ...conversationPage.conversations,
               ...sandboxConversationPage.conversations,
             ],
+            conversationId: activeConversationId,
             preferredDirectory: connectInput.initialCwd,
-            sessionFile: activeSessionFile,
           });
           hydrationHasCompleted = true;
           setAvailableConversations(conversationPage.conversations);
@@ -564,6 +610,7 @@ export function usePiSessionState(input: {
             }),
           );
           setSessionSnapshot({
+            activeConversationId,
             activeDirectory: directory,
             activeSessionFile,
             connectedAtIso: new Date().toISOString(),
@@ -733,7 +780,12 @@ export function usePiSessionState(input: {
   );
 
   const activateConversation = useCallback(
-    async (input: { client: PiSessionClient; directory: string | null; sessionFile: string }) => {
+    async (input: {
+      client: PiSessionClient;
+      conversationId: string;
+      directory: string | null;
+      sessionFile: string;
+    }) => {
       const activeSessionState = await input.client.getState({
         sessionFile: input.sessionFile,
       });
@@ -755,6 +807,7 @@ export function usePiSessionState(input: {
           ? currentSnapshot
           : {
               ...currentSnapshot,
+              activeConversationId: input.conversationId,
               activeDirectory: input.directory,
               activeSessionFile: input.sessionFile,
               connectedAtIso: new Date().toISOString(),
@@ -766,31 +819,32 @@ export function usePiSessionState(input: {
   );
 
   const resumeConversation = useCallback(
-    async (sessionFile: string, resumeInput?: { directory?: string }): Promise<string> => {
+    async (conversationId: string, resumeInput?: { directory?: string }): Promise<string> => {
       const client = clientRef.current;
       if (client === null) {
         throw new Error("Connect Pi before resuming a conversation.");
       }
 
-      setPendingConversationId(sessionFile);
+      setPendingConversationId(conversationId);
       try {
-        await client.resumeConversation({
-          sessionFile,
+        const resumedConversation = await client.resumeConversation({
+          providerConversationId: conversationId,
         });
         const directory = resolvePiConversationDirectory({
           conversations: availableConversations,
+          conversationId,
           preferredDirectory: resumeInput?.directory,
-          sessionFile,
         });
         await activateConversation({
           client,
+          conversationId,
           directory,
-          sessionFile,
+          sessionFile: resumedConversation.sessionFile,
         });
         await refreshConversationList({
           directory,
         });
-        return sessionFile;
+        return conversationId;
       } finally {
         setPendingConversationId(null);
       }
@@ -806,8 +860,8 @@ export function usePiSessionState(input: {
       }
       const directory = resolvePiConversationDirectory({
         conversations: availableConversations,
+        conversationId: sessionSnapshot?.activeConversationId ?? "",
         preferredDirectory: startInput?.directory ?? sessionSnapshot?.activeDirectory,
-        sessionFile: sessionSnapshot?.activeSessionFile ?? "",
       });
 
       setIsStartingNewConversation(true);
@@ -817,8 +871,9 @@ export function usePiSessionState(input: {
         });
         await activateConversation({
           client,
+          conversationId: createdConversation.providerConversationId,
           directory,
-          sessionFile: createdConversation.providerConversationId,
+          sessionFile: createdConversation.sessionFile,
         });
         await refreshConversationList({
           directory,
@@ -832,7 +887,7 @@ export function usePiSessionState(input: {
   );
 
   const recoverSession = useCallback(
-    (recoverInput: { sandboxInstanceId: string; targetSessionFile: string | null }): void => {
+    (recoverInput: { sandboxInstanceId: string; targetConversationId: string | null }): void => {
       connectSession(recoverInput);
     },
     [connectSession],
@@ -871,6 +926,7 @@ export function usePiSessionState(input: {
     },
     conversations: {
       activeConversationDirectory: sessionSnapshot?.activeDirectory ?? null,
+      activeConversationId: sessionSnapshot?.activeConversationId ?? null,
       activeSessionFile: sessionSnapshot?.activeSessionFile ?? null,
       availableConversations,
       hasMoreAvailableConversations,
