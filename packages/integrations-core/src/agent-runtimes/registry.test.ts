@@ -88,7 +88,18 @@ describe("agent runtime registry", () => {
               {
                 id: "codex.grill-with-docs",
                 name: "grill-with-docs",
+                availability: {
+                  duringActiveTurn: "disabled",
+                },
                 submitAs: "runtimeCommand",
+              },
+              {
+                id: "codex.goal",
+                name: "goal",
+                availability: {
+                  duringActiveTurn: "enabled",
+                },
+                submitAs: "typedRuntimeCommand",
               },
             ],
           },
@@ -277,6 +288,102 @@ describe("agent runtime registry", () => {
         code: DefinitionRegistryErrorCodes.INVALID_DEFINITION,
       }),
     );
+  });
+
+  it("requires availability for runtime composer commands", () => {
+    const registry = new AgentRuntimeRegistry();
+
+    expect(() =>
+      registry.register(
+        createRuntime({
+          composerCapabilities: [
+            {
+              kind: "composerCommand",
+              trigger: "/",
+              source: "runtimeCommand",
+              commands: [
+                {
+                  id: "codex.compact",
+                  name: "compact",
+                  submitAs: "runtimeCommand",
+                },
+              ],
+            },
+          ],
+        }),
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        code: DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+      }),
+    );
+  });
+
+  it("requires availability for typed runtime composer commands", () => {
+    const registry = new AgentRuntimeRegistry();
+
+    expect(() =>
+      registry.register(
+        createRuntime({
+          composerCapabilities: [
+            {
+              kind: "composerCommand",
+              trigger: "/",
+              source: "runtimeCommand",
+              commands: [
+                {
+                  id: "codex.goal",
+                  name: "goal",
+                  submitAs: "typedRuntimeCommand",
+                },
+              ],
+            },
+          ],
+        }),
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        code: DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+      }),
+    );
+  });
+
+  it("rejects invalid active-turn availability for runtime composer commands", () => {
+    const submitModes = ["runtimeCommand", "typedRuntimeCommand"];
+
+    for (const submitAs of submitModes) {
+      const registry = new AgentRuntimeRegistry();
+
+      expect(() =>
+        registry.register(
+          parseRuntimeDefinition(`{
+          "runtimeId": "codex",
+          "displayName": "Codex",
+          "composerCapabilities": [
+            {
+              "kind": "composerCommand",
+              "trigger": "/",
+              "source": "runtimeCommand",
+              "commands": [
+                {
+                  "id": "codex.goal",
+                  "name": "goal",
+                  "availability": {
+                    "duringActiveTurn": "sometimes"
+                  },
+                  "submitAs": "${submitAs}"
+                }
+              ]
+            }
+          ]
+        }`),
+        ),
+      ).toThrow(
+        expect.objectContaining({
+          code: DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+        }),
+      );
+    }
   });
 
   it("rejects malformed composer command names", () => {

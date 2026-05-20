@@ -3,7 +3,7 @@ import type { SessionBootstrapPhase } from "./use-session-bootstrap.js";
 export function resolveSessionBootstrapState(input: {
   activeConnectionKey: string | null;
   activeThreadSyncKey: string | null;
-  configError: Error | null;
+  bootstrapDataError: Error | null;
   isCurrentConnectionBootstrapping: boolean;
   modelsError: Error | null;
   threadSyncFailureMessage: string | null;
@@ -19,10 +19,10 @@ export function resolveSessionBootstrapState(input: {
     };
   }
 
-  if (input.configError !== null) {
+  if (input.bootstrapDataError !== null) {
     return {
       status: "failed",
-      message: input.configError.message,
+      message: input.bootstrapDataError.message,
     };
   }
 

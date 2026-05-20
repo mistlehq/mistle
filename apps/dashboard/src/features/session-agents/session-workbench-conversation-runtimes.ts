@@ -1,10 +1,15 @@
-import { CodexRuntimeCommandIds } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
+import {
+  CodexInlineCommandIds,
+  CodexRuntimeCommandIds,
+} from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 
 import type { ChatState } from "../chat/chat-state.js";
+import type { ChatComposerCommandPanel } from "../chat/components/chat-composer.js";
 import type {
   SessionComposerRuntimeInput,
   SessionTurnControl,
 } from "../pages/session-composer/index.js";
+import { hasComposerCommand } from "../pages/session-composer/session-composer-trigger-detection.js";
 import type { SessionTerminalContentInset } from "../pages/session-terminal-surface.js";
 import type { UseCodexSessionStateResult } from "./codex/session-state/index.js";
 import {
@@ -93,6 +98,7 @@ export function buildCodexConversationRuntime(input: {
   sessionMessage: UseCodexSessionStateResult["sessionMessage"];
   startTurn: SessionTurnControl["startTurn"];
   compactThread: UseCodexSessionStateResult["threads"]["compactThread"];
+  goals: UseCodexSessionStateResult["goals"];
 }): SessionWorkbenchRuntimeAdapter {
   const capabilities = SessionRuntimeWorkbenchCapabilities.CODEX;
 
@@ -124,6 +130,19 @@ export function buildCodexConversationRuntime(input: {
       sessionErrorMessage: input.sessionMessage.sessionErrorMessage,
       clearSessionErrorMessage: input.sessionMessage.clearSessionErrorMessage,
       contextUsage: capabilities.hasContextUsage ? input.contextUsage : null,
+      goalStatus: input.goals.activeGoalStatus,
+      commandPanel: mapCodexGoalPanel(input.goals),
+      unavailableTypedRuntimeCommands: hasComposerCommand({
+        composerCapabilities: input.bootstrap.composerCapabilities,
+        commandId: CodexInlineCommandIds.GOAL,
+      })
+        ? []
+        : [
+            {
+              name: "goal",
+              message: "/goal is not enabled for this Codex runtime.",
+            },
+          ],
       executeRuntimeCommand: (commandId) => {
         if (commandId !== CodexRuntimeCommandIds.COMPACT_THREAD) {
           input.sessionMessage.reportSessionErrorMessage(
@@ -142,6 +161,7 @@ export function buildCodexConversationRuntime(input: {
         input.compactThread(input.activeConversationId);
         return true;
       },
+      executeTypedRuntimeCommand: input.goals.executeTypedComposerCommand,
       modelSelection: capabilities.composerModelSelection,
     },
     serverRequestsState: {
@@ -149,6 +169,38 @@ export function buildCodexConversationRuntime(input: {
       pendingServerRequests: input.serverRequests.pendingServerRequests,
       respondToServerRequest: input.serverRequests.respondToServerRequest,
     },
+  };
+}
+
+function mapCodexGoalPanel(
+  goals: UseCodexSessionStateResult["goals"],
+): ChatComposerCommandPanel | null {
+  const panel = goals.commandPanel;
+  if (panel === null) {
+    return null;
+  }
+
+  if (panel.kind === "replaceConfirmation") {
+    return {
+      kind: "confirm",
+      title: "Replace goal?",
+      description: "Set the new objective and start it now.",
+      confirmLabel: "Replace goal",
+      cancelLabel: "Cancel",
+      onConfirm: goals.confirmReplaceGoal,
+      onCancel: goals.clearCommandPanel,
+    };
+  }
+
+  return {
+    kind: "textInput",
+    title: "Edit goal",
+    description: "Type a goal objective and save it.",
+    initialValue: panel.goal.objective,
+    submitLabel: "Save",
+    cancelLabel: "Cancel",
+    onSubmit: goals.saveEditedGoal,
+    onCancel: goals.clearCommandPanel,
   };
 }
 

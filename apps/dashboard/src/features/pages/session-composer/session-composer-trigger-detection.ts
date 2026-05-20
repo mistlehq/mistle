@@ -57,11 +57,32 @@ export function detectActiveComposerTrigger(input: {
   };
 }
 
+export function readLeadingSlashCommandName(value: string): string | null {
+  const trimmedText = value.trimStart();
+  if (!trimmedText.startsWith("/")) {
+    return null;
+  }
+
+  const commandTokenEnd = findCommandTokenEnd(trimmedText);
+  return trimmedText.slice(1, commandTokenEnd);
+}
+
 export function listComposerCommands(
   composerCapabilities: readonly ComposerCapability[],
 ): readonly ComposerCommandDescriptor[] {
   return composerCapabilities.flatMap((capability) =>
     capability.kind === "composerCommand" ? capability.commands : [],
+  );
+}
+
+export function hasComposerCommand(input: {
+  composerCapabilities: readonly ComposerCapability[];
+  commandId: string;
+}): boolean {
+  return input.composerCapabilities.some(
+    (capability) =>
+      capability.kind === "composerCommand" &&
+      capability.commands.some((command) => command.id === input.commandId),
   );
 }
 

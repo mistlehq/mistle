@@ -32,14 +32,37 @@ export const CodexComposerCapabilities = [
         id: CodexInlineCommandIds.GOAL,
         name: "goal",
         description: "Set or update the current goal",
-        submitAs: "inlineText",
+        availability: {
+          duringActiveTurn: "enabled",
+        },
+        submitAs: "typedRuntimeCommand",
       },
       {
         id: CodexRuntimeCommandIds.COMPACT_THREAD,
         name: "compact",
         description: "Compact the current context",
+        availability: {
+          duringActiveTurn: "disabled",
+        },
         submitAs: "runtimeCommand",
       },
     ],
   },
 ] as const satisfies readonly ComposerCapability[];
+
+export function resolveCodexComposerCapabilities(input: {
+  goalsEnabled: boolean;
+}): readonly ComposerCapability[] {
+  return CodexComposerCapabilities.map((capability) => {
+    if (capability.kind !== "composerCommand") {
+      return capability;
+    }
+
+    return {
+      ...capability,
+      commands: capability.commands.filter(
+        (command) => input.goalsEnabled || command.id !== CodexInlineCommandIds.GOAL,
+      ),
+    };
+  });
+}

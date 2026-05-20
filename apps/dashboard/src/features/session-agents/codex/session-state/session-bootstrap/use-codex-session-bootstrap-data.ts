@@ -1,8 +1,10 @@
 import {
   batchWriteCodexConfig,
+  listCodexExperimentalFeatures,
   listCodexModels,
   readCodexConfig,
   writeCodexConfigValue,
+  type CodexExperimentalFeatureSummary,
   type CodexJsonRpcClient,
   type CodexModelSummary,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
@@ -30,6 +32,10 @@ export type CodexSessionBootstrapDataState = {
   isReadingConfig: boolean;
   loadModelsAsync: () => Promise<{ models: readonly CodexModelSummary[]; response: unknown }>;
   readConfigAsync: (includeLayers: boolean) => Promise<{ config: unknown; response: unknown }>;
+  listFeaturesAsync: (input: { threadId: string }) => Promise<{
+    features: readonly CodexExperimentalFeatureSummary[];
+    response: unknown;
+  }>;
 };
 export type CodexSessionConfigState = {
   isWritingConfigValue: boolean;
@@ -207,6 +213,21 @@ export function useCodexSessionBootstrapData(input: {
           setConfigStatus("error");
           throw error;
         }
+      },
+      [input.rpcClientRef],
+    ),
+    listFeaturesAsync: useCallback(
+      async (inputValue: { threadId: string }) => {
+        const rpcClient = input.rpcClientRef.current;
+        if (rpcClient === null) {
+          throw new Error("Connect to a sandbox session before listing experimental features.");
+        }
+
+        return await listCodexExperimentalFeatures({
+          rpcClient,
+          limit: 100,
+          threadId: inputValue.threadId,
+        });
       },
       [input.rpcClientRef],
     ),

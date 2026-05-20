@@ -70,6 +70,8 @@ const PendingDiffCommentsFixture: readonly PendingSessionDiffComment[] = [
 
 function SessionComposerStateHarness(input: {
   activeTurnState?: "idle" | "running";
+  canInterrupt?: boolean;
+  canSteer?: boolean;
   collaborationDeveloperInstructions?: string;
   composerCapabilities?: readonly ComposerCapability[];
   composerText: string;
@@ -77,8 +79,14 @@ function SessionComposerStateHarness(input: {
   deferSubmit?: boolean;
   enableNativeQueueTurn?: boolean;
   executeRuntimeCommand?: (commandId: string) => boolean;
+  executeTypedRuntimeCommand?: (input: { commandId: string; text: string }) => boolean;
   pendingDiffComments: readonly PendingSessionDiffComment[];
+  selectedModel?: string | null;
   shouldFailSubmit?: boolean;
+  unavailableTypedRuntimeCommands?: readonly {
+    name: string;
+    message: string;
+  }[];
 }): React.JSX.Element {
   const [composerText, setComposerText] = useState(input.composerText);
   const [pendingDiffComments, setPendingDiffComments] = useState(input.pendingDiffComments);
@@ -104,7 +112,7 @@ function SessionComposerStateHarness(input: {
         return;
       },
       configControl: {
-        selectedModel: "gpt-5.4",
+        selectedModel: input.selectedModel ?? "gpt-5.4",
         selectedReasoningEffort: "medium",
         hasExplicitModelSelection: true,
         modelOptions: [{ value: "gpt-5.4", label: "GPT-5.4" }],
@@ -146,8 +154,8 @@ function SessionComposerStateHarness(input: {
       sessionErrorMessage: null,
       turnControl: {
         activeTurnState: input.activeTurnState ?? "idle",
-        canSteer: input.activeTurnState === "running",
-        canInterrupt: false,
+        canSteer: input.canSteer ?? input.activeTurnState === "running",
+        canInterrupt: input.canInterrupt ?? false,
         isStarting: false,
         isSteering: false,
         isInterrupting: false,
@@ -191,6 +199,12 @@ function SessionComposerStateHarness(input: {
       ...(input.executeRuntimeCommand === undefined
         ? {}
         : { executeRuntimeCommand: input.executeRuntimeCommand }),
+      ...(input.executeTypedRuntimeCommand === undefined
+        ? {}
+        : { executeTypedRuntimeCommand: input.executeTypedRuntimeCommand }),
+      ...(input.unavailableTypedRuntimeCommands === undefined
+        ? {}
+        : { unavailableTypedRuntimeCommands: input.unavailableTypedRuntimeCommands }),
     },
     draftState: {
       composerText,
@@ -247,6 +261,9 @@ function SessionComposerStateHarness(input: {
       <div data-testid="submit-disabled">
         {composerState.composerViewModel.submitDisabled ? "true" : "false"}
       </div>
+      <div data-testid="secondary-submit-disabled">
+        {composerState.composerViewModel.secondarySubmitDisabled ? "true" : "false"}
+      </div>
       <div data-testid="submitted-prompt">{submittedPrompt ?? ""}</div>
       <div data-testid="queued-prompt">{queuedPrompt ?? ""}</div>
       <div data-testid="native-queue-submission-count">{String(nativeQueueSubmissionCount)}</div>
@@ -262,6 +279,9 @@ function SessionComposerStateHarness(input: {
       </div>
       <div data-testid="pending-diff-comments">{String(pendingDiffComments.length)}</div>
       <div data-testid="queued-prompt-count">{String(composerState.queuedPrompts.length)}</div>
+      <div data-testid="queued-prompts">
+        {composerState.queuedPrompts.map((queuedPrompt) => queuedPrompt.text).join("|")}
+      </div>
       <div data-testid="status-message">{composerState.statusMessage?.message ?? ""}</div>
     </div>
   );
@@ -395,6 +415,158 @@ describe("useSessionComposerState", () => {
     expect(submittedRuntimeCommands).toEqual(["codex.compact"]);
     expect(screen.getByTestId("submitted-prompt").textContent).toBe("");
     expect(screen.getByTestId("composer-text").textContent).toBe("/compact");
+  });
+
+  it("executes typed runtime commands instead of submitting them as prompt text", () => {
+    const submittedRuntimeCommands: { commandId: string; text: string }[] = [];
+
+    render(
+      <SessionComposerStateHarness
+        composerCapabilities={[
+          {
+            kind: "composerCommand",
+            trigger: "/",
+            source: "runtimeCommand",
+            commands: [
+              {
+                id: "codex.goal",
+                name: "goal",
+                availability: {
+                  duringActiveTurn: "enabled",
+                },
+                submitAs: "typedRuntimeCommand",
+              },
+            ],
+          },
+        ]}
+        composerText="/goal ship the command"
+        executeTypedRuntimeCommand={(command) => {
+          submittedRuntimeCommands.push(command);
+          return true;
+        }}
+        pendingDiffComments={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(submittedRuntimeCommands).toEqual([
+      {
+        commandId: "codex.goal",
+        text: "/goal ship the command",
+      },
+    ]);
+    expect(screen.getByTestId("submitted-prompt").textContent).toBe("");
+    expect(screen.getByTestId("composer-text").textContent).toBe("");
+  });
+
+  it("keeps typed runtime commands submittable when the selected model is unavailable", () => {
+    const submittedRuntimeCommands: { commandId: string; text: string }[] = [];
+
+    render(
+      <SessionComposerStateHarness
+        composerCapabilities={[
+          {
+            kind: "composerCommand",
+            trigger: "/",
+            source: "runtimeCommand",
+            commands: [
+              {
+                id: "codex.goal",
+                name: "goal",
+                availability: {
+                  duringActiveTurn: "enabled",
+                },
+                submitAs: "typedRuntimeCommand",
+              },
+            ],
+          },
+        ]}
+        composerText="/goal ship the command"
+        executeTypedRuntimeCommand={(command) => {
+          submittedRuntimeCommands.push(command);
+          return true;
+        }}
+        pendingDiffComments={[]}
+        selectedModel="missing-model"
+      />,
+    );
+
+    expect(screen.getByTestId("submit-disabled").textContent).toBe("false");
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(submittedRuntimeCommands).toEqual([
+      {
+        commandId: "codex.goal",
+        text: "/goal ship the command",
+      },
+    ]);
+  });
+
+  it("blocks unavailable typed runtime commands before prompt submission", () => {
+    render(
+      <SessionComposerStateHarness
+        composerText="/goal ship the command"
+        pendingDiffComments={[]}
+        unavailableTypedRuntimeCommands={[
+          {
+            name: "goal",
+            message: "/goal is not enabled for this Codex runtime.",
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(screen.getByTestId("status-message").textContent).toBe(
+      "/goal is not enabled for this Codex runtime.",
+    );
+    expect(screen.getByTestId("submitted-prompt").textContent).toBe("");
+    expect(screen.getByTestId("composer-text").textContent).toBe("/goal ship the command");
+  });
+
+  it("does not queue typed runtime commands during an active turn", () => {
+    const submittedRuntimeCommands: { commandId: string; text: string }[] = [];
+
+    render(
+      <SessionComposerStateHarness
+        activeTurnState="running"
+        canSteer
+        composerCapabilities={[
+          {
+            kind: "composerCommand",
+            trigger: "/",
+            source: "runtimeCommand",
+            commands: [
+              {
+                id: "codex.goal",
+                name: "goal",
+                availability: {
+                  duringActiveTurn: "enabled",
+                },
+                submitAs: "typedRuntimeCommand",
+              },
+            ],
+          },
+        ]}
+        composerText="/goal ship the command"
+        executeTypedRuntimeCommand={(command) => {
+          submittedRuntimeCommands.push(command);
+          return true;
+        }}
+        pendingDiffComments={[]}
+      />,
+    );
+
+    expect(screen.getByTestId("secondary-submit-disabled").textContent).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+
+    expect(screen.getByTestId("queued-prompts").textContent).toBe("");
+    expect(screen.getByTestId("composer-text").textContent).toBe("/goal ship the command");
+    expect(submittedRuntimeCommands).toEqual([]);
   });
 
   it("submits diff comments even when the composer text is blank and clears them on success", async () => {

@@ -1,9 +1,10 @@
 import type { ComposerCapability } from "@mistle/integrations-core";
-import { CodexComposerCapabilities } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import type {
+  CodexExperimentalFeatureSummary,
   CodexJsonRpcClient,
   CodexModelSummary,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
+import { resolveCodexComposerCapabilities } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
@@ -37,6 +38,8 @@ const EmptyComposerConfig: ComposerConfigSnapshot = {
   model: null,
   modelReasoningEffort: null,
 };
+const EmptyModels: readonly CodexModelSummary[] = [];
+const EmptyFeatures: readonly CodexExperimentalFeatureSummary[] = [];
 
 export function ensureCurrentThreadSyncGeneration(input: {
   currentGeneration: number;
@@ -54,6 +57,11 @@ type LoadModelsResult = {
 
 type ReadConfigResult = {
   config: unknown;
+  response: unknown;
+};
+
+type ListFeaturesResult = {
+  features: readonly CodexExperimentalFeatureSummary[];
   response: unknown;
 };
 
@@ -75,6 +83,20 @@ function createConfigQueryKey(
   return ["codex-session-bootstrap", "config", connectionKey];
 }
 
+function createFeaturesQueryKey(
+  connectionKey: string,
+  threadId: string,
+): readonly ["codex-session-bootstrap", "features", string, string] {
+  return ["codex-session-bootstrap", "features", connectionKey, threadId];
+}
+
+function featureIsEnabled(input: {
+  features: readonly CodexExperimentalFeatureSummary[];
+  name: string;
+}): boolean {
+  return input.features.some((feature) => feature.name === input.name && feature.enabled === true);
+}
+
 export function useSessionBootstrap(input: {
   bootstrapConnectionContext: BootstrapConnectionContext | null;
   hydrateInitialThread: (input?: {
@@ -85,6 +107,10 @@ export function useSessionBootstrap(input: {
   }) => Promise<"empty" | "hydrated">;
   loadModelsAsync: () => Promise<{ models: readonly CodexModelSummary[]; response: unknown }>;
   readConfigAsync: (includeLayers: boolean) => Promise<{ config: unknown; response: unknown }>;
+  listFeaturesAsync: (input: { threadId: string }) => Promise<{
+    features: readonly CodexExperimentalFeatureSummary[];
+    response: unknown;
+  }>;
   rpcClientRef: RefObject<CodexJsonRpcClient | null>;
 }) {
   const queryClient = useQueryClient();
@@ -129,6 +155,25 @@ export function useSessionBootstrap(input: {
       return await input.readConfigAsync(false);
     },
     enabled: activeConnectionKey !== null && shouldLoadBootstrapData,
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: Number.POSITIVE_INFINITY,
+    refetchOnWindowFocus: false,
+  });
+
+  const featuresQuery = useQuery<ListFeaturesResult>({
+    queryKey:
+      activeConnectionKey === null || activeThreadId === null
+        ? ["codex-session-bootstrap", "features", "disconnected"]
+        : createFeaturesQueryKey(activeConnectionKey, activeThreadId),
+    queryFn: async () => {
+      if (activeThreadId === null) {
+        throw new Error("Choose a Codex thread before listing experimental features.");
+      }
+
+      return await input.listFeaturesAsync({ threadId: activeThreadId });
+    },
+    enabled: activeConnectionKey !== null && activeThreadId !== null,
     retry: false,
     staleTime: Number.POSITIVE_INFINITY,
     gcTime: Number.POSITIVE_INFINITY,
@@ -190,7 +235,7 @@ export function useSessionBootstrap(input: {
 
   const establishedModels = useMemo(() => {
     if (establishedConnectionKey === null) {
-      return [] as readonly CodexModelSummary[];
+      return EmptyModels;
     }
 
     return (
@@ -214,6 +259,18 @@ export function useSessionBootstrap(input: {
     return readComposerConfigSnapshot(JSON.stringify(cachedConfig.config));
   }, [establishedConnectionKey, queryClient]);
 
+  const establishedFeatures = useMemo(() => {
+    if (establishedConnectionKey === null || activeThreadId === null) {
+      return EmptyFeatures;
+    }
+
+    return (
+      queryClient.getQueryData<ListFeaturesResult>(
+        createFeaturesQueryKey(establishedConnectionKey, activeThreadId),
+      )?.features ?? []
+    );
+  }, [activeThreadId, establishedConnectionKey, queryClient]);
+
   const availableModels = useMemo(() => {
     if (shouldLoadBootstrapData) {
       return modelsQuery.data?.models ?? establishedModels;
@@ -234,6 +291,21 @@ export function useSessionBootstrap(input: {
     return establishedConfigSnapshot;
   }, [configQuery.data, establishedConfigSnapshot, shouldLoadBootstrapData]);
 
+  const features = useMemo(() => {
+    return featuresQuery.data?.features ?? establishedFeatures;
+  }, [establishedFeatures, featuresQuery.data?.features]);
+
+  const composerCapabilities = useMemo(
+    () =>
+      resolveCodexComposerCapabilities({
+        goalsEnabled: featureIsEnabled({
+          features,
+          name: "goals",
+        }),
+      }),
+    [features],
+  );
+
   const threadSyncFailedForCurrentThread =
     activeThreadSyncKey !== null &&
     threadSyncState.threadSyncKey === activeThreadSyncKey &&
@@ -246,15 +318,20 @@ export function useSessionBootstrap(input: {
     activeConnectionKey !== null &&
     activeThreadSyncKey !== null &&
     (!threadSyncReadyForCurrentThread ||
-      (shouldLoadBootstrapData && (modelsQuery.isPending || configQuery.isPending)));
+      (shouldLoadBootstrapData && (modelsQuery.isPending || configQuery.isPending)) ||
+      featuresQuery.isPending);
 
   const state = useMemo(
     (): SessionBootstrapPhase =>
       resolveSessionBootstrapState({
         activeConnectionKey,
         activeThreadSyncKey,
-        configError:
-          configQuery.isError && configQuery.error instanceof Error ? configQuery.error : null,
+        bootstrapDataError:
+          configQuery.isError && configQuery.error instanceof Error
+            ? configQuery.error
+            : featuresQuery.isError && featuresQuery.error instanceof Error
+              ? featuresQuery.error
+              : null,
         isCurrentConnectionBootstrapping,
         modelsError:
           modelsQuery.isError && modelsQuery.error instanceof Error ? modelsQuery.error : null,
@@ -268,6 +345,8 @@ export function useSessionBootstrap(input: {
       activeThreadSyncKey,
       configQuery.error,
       configQuery.isError,
+      featuresQuery.error,
+      featuresQuery.isError,
       isCurrentConnectionBootstrapping,
       modelsQuery.error,
       modelsQuery.isError,
@@ -288,7 +367,7 @@ export function useSessionBootstrap(input: {
 
   return {
     phase: state,
-    composerCapabilities: CodexComposerCapabilities,
+    composerCapabilities,
     establishedSnapshot: {
       availableModels,
       configSnapshot,

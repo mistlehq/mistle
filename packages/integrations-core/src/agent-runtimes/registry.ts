@@ -215,17 +215,50 @@ function validateComposerCommandDescriptor(input: {
     );
   }
 
-  if (input.command.submitAs !== "inlineText" && input.command.submitAs !== "runtimeCommand") {
+  if (
+    input.command.submitAs !== "inlineText" &&
+    input.command.submitAs !== "runtimeCommand" &&
+    input.command.submitAs !== "typedRuntimeCommand"
+  ) {
     throwInvalidComposerCapability(
       input.runtimeId,
       `composer command '${input.command.id}' has invalid submitAs '${String(input.command.submitAs)}'.`,
     );
   }
 
+  if (
+    input.command.submitAs === "runtimeCommand" ||
+    input.command.submitAs === "typedRuntimeCommand"
+  ) {
+    validateRuntimeComposerCommandAvailability(input);
+  }
+
   return {
     id: input.command.id,
     name: input.command.name,
   };
+}
+
+function validateRuntimeComposerCommandAvailability(input: {
+  runtimeId: string;
+  command: Record<string, unknown>;
+}): void {
+  if (!isRecord(input.command.availability)) {
+    throwInvalidComposerCapability(
+      input.runtimeId,
+      `composer command '${String(input.command.id)}' must declare availability for runtime command submission.`,
+    );
+  }
+
+  if (
+    input.command.availability.duringActiveTurn !== "enabled" &&
+    input.command.availability.duringActiveTurn !== "disabled"
+  ) {
+    throwInvalidComposerCapability(
+      input.runtimeId,
+      `composer command '${String(input.command.id)}' has invalid active-turn availability '${String(input.command.availability.duringActiveTurn)}'.`,
+    );
+  }
 }
 
 function throwInvalidComposerCapability(runtimeId: string, message: string): never {

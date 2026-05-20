@@ -30,7 +30,10 @@ import {
   resolveComposerStatusMessage,
   type ComposerStatusMessage,
 } from "./session-composer-status.js";
-import { listComposerCommands } from "./session-composer-trigger-detection.js";
+import {
+  listComposerCommands,
+  readLeadingSlashCommandName,
+} from "./session-composer-trigger-detection.js";
 import type { SessionComposerAttachmentControl } from "./use-session-composer-attachment-control.js";
 import type { SessionComposerConfigControl } from "./use-session-composer-config-control.js";
 
@@ -98,9 +101,16 @@ export type SessionComposerRuntimeInput = {
   clearSessionErrorMessage: () => void;
   configControl: SessionComposerConfigControl;
   contextUsage: ChatComposerViewModel["contextUsage"];
+  goalStatus?: ChatComposerViewModel["goalStatus"];
+  commandPanel?: ChatComposerViewModel["commandPanel"];
   collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
   modelSelection: SessionComposerModelSelectionInput;
   executeRuntimeCommand?: (commandId: string) => boolean;
+  executeTypedRuntimeCommand?: (input: { commandId: string; text: string }) => boolean;
+  unavailableTypedRuntimeCommands?: readonly {
+    name: string;
+    message: string;
+  }[];
   sessionErrorMessage: string | null;
   turnControl: SessionTurnControl;
 };
@@ -270,7 +280,29 @@ export function useSessionComposerState(input: {
     ],
   );
 
+  const typedRuntimeCommand = useMemo(
+    () =>
+      findTypedRuntimeComposerCommand({
+        composerText,
+        commands: listComposerCommands(composerStateInput.bootstrap.composerCapabilities),
+      }),
+    [composerStateInput.bootstrap.composerCapabilities, composerText],
+  );
+
+  const unavailableTypedRuntimeCommand = useMemo(
+    () =>
+      findUnavailableTypedRuntimeCommand({
+        composerText,
+        commands: composerStateInput.unavailableTypedRuntimeCommands ?? [],
+      }),
+    [composerStateInput.unavailableTypedRuntimeCommands, composerText],
+  );
+
   const queuePrompt = useCallback((): void => {
+    if (typedRuntimeCommand !== null || unavailableTypedRuntimeCommand !== null) {
+      return;
+    }
+
     const trimmedComposerText = composerText.trim();
     const hasSubmissionContent =
       trimmedComposerText.length > 0 ||
@@ -377,6 +409,8 @@ export function useSessionComposerState(input: {
     isSubmittingNativeQueuedPrompt,
     pendingComposerAttachments,
     requiresModelSelection,
+    typedRuntimeCommand,
+    unavailableTypedRuntimeCommand,
   ]);
 
   const removeQueuedPrompt = useCallback((queuedPromptId: string): void => {
@@ -518,6 +552,49 @@ export function useSessionComposerState(input: {
       clearSessionErrorMessage();
       setComposerErrorMessage(null);
 
+      if (typedRuntimeCommand !== null) {
+        if (
+          composerStateInput.turnControl.activeTurnState === "running" &&
+          typedRuntimeCommand.availability?.duringActiveTurn === "disabled"
+        ) {
+          setComposerErrorMessage(
+            `/${typedRuntimeCommand.name} is disabled while a task is in progress.`,
+          );
+          return;
+        }
+
+        if (pendingComposerAttachments.length > 0 || draftState.pendingDiffComments.length > 0) {
+          setComposerErrorMessage(`/${typedRuntimeCommand.name} does not support attachments.`);
+          return;
+        }
+
+        if (composerStateInput.bootstrap.phase.status !== "ready") {
+          if (composerStateInput.bootstrap.phase.status === "failed") {
+            setComposerErrorMessage(composerStateInput.bootstrap.phase.message);
+          }
+          return;
+        }
+
+        if (composerStateInput.executeTypedRuntimeCommand === undefined) {
+          setComposerErrorMessage(`/${typedRuntimeCommand.name} is not supported.`);
+          return;
+        }
+
+        const commandAccepted = composerStateInput.executeTypedRuntimeCommand({
+          commandId: typedRuntimeCommand.id,
+          text: composerText,
+        });
+        if (commandAccepted) {
+          draftState.setComposerText("");
+        }
+        return;
+      }
+
+      if (unavailableTypedRuntimeCommand !== null) {
+        setComposerErrorMessage(unavailableTypedRuntimeCommand.message);
+        return;
+      }
+
       if (submitAction.type === "interrupt_turn") {
         composerStateInput.turnControl.interruptTurn();
         return;
@@ -598,12 +675,16 @@ export function useSessionComposerState(input: {
     composerStateInput.attachmentControl,
     composerStateInput.bootstrap.phase,
     composerStateInput.configControl.selectedModel,
+    composerStateInput.executeTypedRuntimeCommand,
     composerStateInput.turnControl,
+    composerText,
     draftState,
     pendingComposerAttachments,
     requiresModelSelection,
     submitAction,
     turnCollaborationModeSettings,
+    typedRuntimeCommand,
+    unavailableTypedRuntimeCommand,
   ]);
 
   const submitRuntimeCommand = useCallback(
@@ -671,6 +752,13 @@ export function useSessionComposerState(input: {
   ]);
 
   const submitDisabled = useMemo(() => {
+    if (typedRuntimeCommand !== null || unavailableTypedRuntimeCommand !== null) {
+      return (
+        composerStateInput.attachmentControl.isUploadingAttachments ||
+        composerStateInput.bootstrap.phase.status !== "ready"
+      );
+    }
+
     if (submitAction.submitMode === "interrupt") {
       return !composerStateInput.turnControl.canInterrupt;
     }
@@ -707,6 +795,8 @@ export function useSessionComposerState(input: {
     pendingComposerAttachments.length,
     requiresModelSelection,
     submitAction.submitMode,
+    typedRuntimeCommand,
+    unavailableTypedRuntimeCommand,
   ]);
 
   const queuePromptDisabled = useMemo(
@@ -715,6 +805,8 @@ export function useSessionComposerState(input: {
       composerStateInput.attachmentControl.isUploadingAttachments ||
       isSubmittingNativeQueuedPrompt ||
       composerStateInput.bootstrap.phase.status !== "ready" ||
+      typedRuntimeCommand !== null ||
+      unavailableTypedRuntimeCommand !== null ||
       (requiresModelSelection && activeComposerModel === null) ||
       (composerText.trim().length === 0 &&
         pendingComposerAttachments.length === 0 &&
@@ -729,6 +821,8 @@ export function useSessionComposerState(input: {
       isSubmittingNativeQueuedPrompt,
       pendingComposerAttachments.length,
       requiresModelSelection,
+      typedRuntimeCommand,
+      unavailableTypedRuntimeCommand,
     ],
   );
 
@@ -784,6 +878,7 @@ export function useSessionComposerState(input: {
     composerViewModel: {
       composerCapabilities: composerStateInput.bootstrap.composerCapabilities,
       composerText,
+      commandPanel: composerStateInput.commandPanel ?? null,
       pendingDiffCommentSummary:
         draftState.pendingDiffComments.length === 0
           ? null
@@ -810,6 +905,7 @@ export function useSessionComposerState(input: {
       gitBranchLabel: composerStateInput.repositoryStatus.branchLabel,
       pullRequest: composerStateInput.repositoryStatus.pullRequest,
       contextUsage: composerStateInput.contextUsage,
+      goalStatus: composerStateInput.goalStatus ?? null,
       isUploadingAttachments: composerStateInput.attachmentControl.isUploadingAttachments,
       keyboardShortcuts:
         composerStateInput.turnControl.activeTurnState === "running" &&
@@ -853,5 +949,35 @@ function findRuntimeComposerCommand(input: {
       candidateCommand.id === input.commandId && candidateCommand.submitAs === "runtimeCommand",
   );
 
+  return command ?? null;
+}
+
+function findTypedRuntimeComposerCommand(input: {
+  composerText: string;
+  commands: readonly ComposerCommandDescriptor[];
+}): ComposerCommandDescriptor | null {
+  const commandName = readLeadingSlashCommandName(input.composerText);
+  if (commandName === null) {
+    return null;
+  }
+
+  const command = input.commands.find(
+    (candidateCommand) =>
+      candidateCommand.name === commandName && candidateCommand.submitAs === "typedRuntimeCommand",
+  );
+
+  return command ?? null;
+}
+
+function findUnavailableTypedRuntimeCommand(input: {
+  composerText: string;
+  commands: readonly { name: string; message: string }[];
+}): { name: string; message: string } | null {
+  const commandName = readLeadingSlashCommandName(input.composerText);
+  if (commandName === null) {
+    return null;
+  }
+
+  const command = input.commands.find((candidateCommand) => candidateCommand.name === commandName);
   return command ?? null;
 }

@@ -94,6 +94,7 @@ function renderCodexConfig(input: { providerMetadata?: CodexProviderMetadata }):
     sandbox_mode: "danger-full-access",
     features: {
       apps: false,
+      goals: true,
       plugins: false,
       tool_search: true,
     },

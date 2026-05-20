@@ -692,6 +692,8 @@ function createEmptyComposerViewModel(): ChatComposerViewModel {
     gitBranchLabel: null,
     pullRequest: null,
     contextUsage: null,
+    goalStatus: null,
+    commandPanel: null,
     pendingDiffCommentSummary: null,
     isSubmitPending: false,
     pendingAttachments: [],

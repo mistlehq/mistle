@@ -38,7 +38,11 @@ export type AgentPtyLaunchSpec = {
   resumeLaunch: AgentPtyLaunchTemplate;
 };
 
-export type ComposerCommandSubmitAs = "inlineText" | "runtimeCommand";
+export type ComposerRuntimeCommandAvailability = {
+  duringActiveTurn: "disabled" | "enabled";
+};
+
+export type ComposerCommandSubmitAs = "inlineText" | "runtimeCommand" | "typedRuntimeCommand";
 
 export type ContextMentionCapability = {
   kind: "contextMention";
@@ -59,6 +63,7 @@ export type ComposerCommandDescriptor = {
   id: string;
   name: string;
   description?: string;
+  availability?: ComposerRuntimeCommandAvailability;
   submitAs: ComposerCommandSubmitAs;
 };
 

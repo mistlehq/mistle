@@ -261,6 +261,7 @@ describe("compileCodexRuntime", () => {
     expect(configFile.content).toContain("supports_websockets = true");
     expect(configFile.content).toContain("[features]");
     expect(configFile.content).toContain("apps = false");
+    expect(configFile.content).toContain("goals = true");
     expect(configFile.content).toContain("plugins = false");
     expect(configFile.content).toContain("tool_search = true");
     expect(agentsFile.content).toContain("Mistle-managed sandbox context:");
@@ -372,6 +373,7 @@ describe("compileCodexRuntime", () => {
     expect(configContent).not.toContain("model_reasoning_effort");
     expect(configContent).toContain("[features]");
     expect(configContent).toContain("apps = false");
+    expect(configContent).toContain("goals = true");
     expect(configContent).toContain("plugins = false");
     expect(configContent).toContain("tool_search = true");
   });
@@ -410,6 +412,7 @@ describe("compileCodexRuntime", () => {
     expect(configContent).toContain('sandbox_mode = "danger-full-access"');
     expect(configContent).toContain("[features]");
     expect(configContent).toContain("apps = false");
+    expect(configContent).toContain("goals = true");
     expect(configContent).toContain("plugins = false");
     expect(configContent).toContain("tool_search = true");
   });

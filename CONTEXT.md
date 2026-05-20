@@ -213,6 +213,7 @@ _Avoid_: Local queued prompt, deferred start turn
 - An explicit **Active Codex thread** request does not redefine the **Original Codex thread**.
 - Ports, terminal access, runtime status, repository filesystem state, and sandbox-level diffs belong to the **Sandbox session**.
 - Transcript, active turn state, context usage, and Codex thread actions belong to the **Codex thread**.
+- Goal status belongs to the **Active Codex thread** and is shown with composer-adjacent thread context, not in **Codex thread** navigation.
 - Opening a different **Codex thread** is a thread-scoped transition; the previous **Active Codex thread** remains authoritative until the next thread is ready.
 - Starting a new **Codex thread** does not create a new **Active Codex thread** until Codex confirms the thread exists.
 - The default **Codex thread** navigator scope is the selected primary repository path when one is selected.
@@ -259,6 +260,10 @@ _Avoid_: Local queued prompt, deferred start turn
 - A **Pi follow-up message** is a **Runtime queued message**.
 - The first **Composer commands** are runtime-owned; dashboard UI controls are not **Composer commands**.
 - A **Composer command** declares its editing representation separately from whether submission becomes inline prompt text or a typed runtime command.
+- A **Composer command** that depends on an optional runtime feature is available only when the **Agent runtime** confirms that feature is enabled.
+- A **Composer command** entered before an **Active Codex thread** exists remains a command action until the **Agent runtime** can handle it; it does not become ordinary prompt text.
+- Replacing an existing Codex goal is a confirmed **Composer command** action.
+- Editing an existing Codex goal preserves goal state unless the current goal has already reached a terminal state.
 
 ## Example Dialogue
 

@@ -1,9 +1,13 @@
 import {
   archiveCodexThread,
+  clearCodexThreadGoal,
   compactCodexThread,
+  CodexInlineCommandIds,
   forkCodexThread,
+  getCodexThreadGoal,
   rollbackCodexThread,
   resumeCodexThread,
+  setCodexThreadGoal,
   startCodexThread,
   unarchiveCodexThread,
   unsubscribeCodexThread,
@@ -11,20 +15,39 @@ import {
   type CodexJsonRpcNotification,
   type CodexJsonRpcServerRequest,
   type AgentStreamClient,
+  type CodexThreadGoal,
+  type CodexThreadGoalStatus,
   type CodexThreadSummary,
   type CodexTurnCollaborationModeSettings,
   type CodexTurnInputLocalImageItem,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useMutation } from "@tanstack/react-query";
-import { useCallback, useMemo, useReducer, useRef, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 
 import type { ChatAttachment } from "../../../chat/chat-types.js";
+import { hasComposerCommand } from "../../../pages/session-composer/session-composer-trigger-detection.js";
 import {
   createInitialCodexApprovalRequestsState,
   reduceCodexApprovalRequestsState,
   type CodexApprovalRequestEntry,
 } from "../approvals/codex-approval-requests-state.js";
+import {
+  editedGoalStatus,
+  formatCodexGoalStatus,
+  parseCodexGoalCommand,
+  parseThreadGoalClearedNotification,
+  parseThreadGoalUpdatedNotification,
+  type CodexGoalPanel,
+} from "./codex-goal-state.js";
 import { parseThreadTokenUsageSnapshot } from "./codex-session-events.js";
 import {
   type CodexThreadTokenUsageSnapshot,
@@ -132,6 +155,16 @@ type CodexSessionMessageState = {
   sessionErrorMessage: string | null;
 };
 
+type CodexSessionGoalState = {
+  activeGoal: CodexThreadGoal | null;
+  activeGoalStatus: { label: string; title: string } | null;
+  commandPanel: CodexGoalPanel | null;
+  clearCommandPanel: () => void;
+  confirmReplaceGoal: () => void;
+  saveEditedGoal: (objective: string) => void;
+  executeTypedComposerCommand: (input: { commandId: string; text: string }) => boolean;
+};
+
 export type UseCodexSessionStateResult = {
   lifecycle: CodexSessionConnectionLifecycleState;
   repositoryStatusRefreshEpoch: number;
@@ -148,6 +181,7 @@ export type UseCodexSessionStateResult = {
   codexConfig: CodexSessionConfigState;
   serverRequests: CodexSessionServerRequestState;
   sessionMessage: CodexSessionMessageState;
+  goals: CodexSessionGoalState;
 };
 
 export function useCodexSessionState(input: {
@@ -170,6 +204,39 @@ export function useCodexSessionState(input: {
   const [pendingThreadId, setPendingThreadId] = useState<string | null>(null);
   const [threadTokenUsageSnapshot, setThreadTokenUsageSnapshot] =
     useState<CodexThreadTokenUsageSnapshot | null>(null);
+  const [goalByThreadId, setGoalByThreadId] = useState<ReadonlyMap<string, CodexThreadGoal>>(
+    () => new Map(),
+  );
+  const [loadedGoalThreadIds, setLoadedGoalThreadIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const [goalCommandPanel, setGoalCommandPanel] = useState<CodexGoalPanel | null>(null);
+
+  const recordLoadedGoal = useCallback((goal: CodexThreadGoal): void => {
+    setGoalByThreadId((currentGoals) => {
+      const nextGoals = new Map(currentGoals);
+      nextGoals.set(goal.threadId, goal);
+      return nextGoals;
+    });
+    setLoadedGoalThreadIds((currentThreadIds) => {
+      const nextThreadIds = new Set(currentThreadIds);
+      nextThreadIds.add(goal.threadId);
+      return nextThreadIds;
+    });
+  }, []);
+
+  const recordNoGoalForThread = useCallback((threadId: string): void => {
+    setGoalByThreadId((currentGoals) => {
+      const nextGoals = new Map(currentGoals);
+      nextGoals.delete(threadId);
+      return nextGoals;
+    });
+    setLoadedGoalThreadIds((currentThreadIds) => {
+      const nextThreadIds = new Set(currentThreadIds);
+      nextThreadIds.add(threadId);
+      return nextThreadIds;
+    });
+  }, []);
 
   const [serverRequestsState, dispatchServerRequestsAction] = useReducer(
     reduceCodexApprovalRequestsState,
@@ -237,6 +304,7 @@ export function useCodexSessionState(input: {
     isReadingConfig,
     isWritingConfigValue,
     isBatchWritingConfig,
+    listFeaturesAsync,
     loadModelsAsync,
     readConfigAsync,
     writeConfigValue,
@@ -264,9 +332,19 @@ export function useCodexSessionState(input: {
         setThreadTokenUsageSnapshot(tokenUsageSnapshot);
       }
 
+      const updatedGoal = parseThreadGoalUpdatedNotification(notification);
+      if (updatedGoal !== null) {
+        recordLoadedGoal(updatedGoal);
+      }
+
+      const clearedGoalThreadId = parseThreadGoalClearedNotification(notification);
+      if (clearedGoalThreadId !== null) {
+        recordNoGoalForThread(clearedGoalThreadId);
+      }
+
       handleNotificationReceived(notification);
     },
-    [handleNotificationReceived],
+    [handleNotificationReceived, recordLoadedGoal, recordNoGoalForThread],
   );
 
   const { lifecycle, updateActiveThread } = useCodexSessionConnection({
@@ -327,10 +405,68 @@ export function useCodexSessionState(input: {
   const bootstrap = useSessionBootstrap({
     bootstrapConnectionContext,
     hydrateInitialThread,
+    listFeaturesAsync,
     loadModelsAsync,
     readConfigAsync,
     rpcClientRef: input.rpcClientRef,
   });
+
+  const codexGoalsEnabled = useMemo(
+    () =>
+      hasComposerCommand({
+        composerCapabilities: bootstrap.composerCapabilities,
+        commandId: CodexInlineCommandIds.GOAL,
+      }),
+    [bootstrap.composerCapabilities],
+  );
+
+  useEffect(() => {
+    const activeThreadId = lifecycle.sessionSnapshot?.activeThreadId ?? null;
+    if (activeThreadId === null || bootstrap.phase.status !== "ready" || !codexGoalsEnabled) {
+      return;
+    }
+
+    const rpcClient = rpcClientRef.current;
+    if (rpcClient === null) {
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await getCodexThreadGoal({
+          rpcClient,
+          threadId: activeThreadId,
+        });
+        if (cancelled) {
+          return;
+        }
+
+        if (result.goal === null) {
+          recordNoGoalForThread(activeThreadId);
+        } else {
+          recordLoadedGoal(result.goal);
+        }
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        setSessionErrorMessage(error instanceof Error ? error.message : "Could not read goal.");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    bootstrap.phase.status,
+    codexGoalsEnabled,
+    lifecycle.sessionSnapshot?.activeThreadId,
+    recordLoadedGoal,
+    recordNoGoalForThread,
+    rpcClientRef,
+  ]);
 
   const handleThreadMutationFailure = useCallback(
     (fallbackMessage: string, error: unknown): void => {
@@ -769,6 +905,279 @@ export function useCodexSessionState(input: {
     });
   }, []);
 
+  const activeGoal = useMemo(() => {
+    if (!codexGoalsEnabled) {
+      return null;
+    }
+
+    const activeThreadId = lifecycle.sessionSnapshot?.activeThreadId ?? null;
+    return activeThreadId === null ? null : (goalByThreadId.get(activeThreadId) ?? null);
+  }, [codexGoalsEnabled, goalByThreadId, lifecycle.sessionSnapshot?.activeThreadId]);
+
+  const activeGoalIsLoaded = useMemo(() => {
+    if (!codexGoalsEnabled) {
+      return true;
+    }
+
+    const activeThreadId = lifecycle.sessionSnapshot?.activeThreadId ?? null;
+    return activeThreadId === null || loadedGoalThreadIds.has(activeThreadId);
+  }, [codexGoalsEnabled, lifecycle.sessionSnapshot?.activeThreadId, loadedGoalThreadIds]);
+
+  const activeGoalStatus = useMemo(
+    () => (activeGoal === null ? null : formatCodexGoalStatus(activeGoal)),
+    [activeGoal],
+  );
+
+  useEffect(() => {
+    if (goalCommandPanel === null) {
+      return;
+    }
+
+    const activeThreadId = lifecycle.sessionSnapshot?.activeThreadId ?? null;
+    const panelThreadId =
+      goalCommandPanel.kind === "edit" ? goalCommandPanel.goal.threadId : goalCommandPanel.threadId;
+    if (panelThreadId !== activeThreadId) {
+      setGoalCommandPanel(null);
+    }
+  }, [goalCommandPanel, lifecycle.sessionSnapshot?.activeThreadId]);
+
+  const setGoalForThread = useCallback(
+    async (input: {
+      threadId: string;
+      objective?: string;
+      status?: CodexThreadGoalStatus;
+      tokenBudget?: number | null;
+    }): Promise<CodexThreadGoal> => {
+      const rpcClient = rpcClientRef.current;
+      if (rpcClient === null) {
+        throw new Error("The session must start before you can change a goal.");
+      }
+
+      const result = await setCodexThreadGoal({
+        rpcClient,
+        threadId: input.threadId,
+        ...(input.objective === undefined ? {} : { objective: input.objective }),
+        ...(input.status === undefined ? {} : { status: input.status }),
+        ...(input.tokenBudget === undefined ? {} : { tokenBudget: input.tokenBudget }),
+      });
+      recordLoadedGoal(result.goal);
+      return result.goal;
+    },
+    [recordLoadedGoal, rpcClientRef],
+  );
+
+  const setGoalForActiveThread = useCallback(
+    async (input: {
+      objective?: string;
+      status?: CodexThreadGoalStatus;
+      tokenBudget?: number | null;
+    }): Promise<CodexThreadGoal> => {
+      const activeThreadId = lifecycle.sessionSnapshot?.activeThreadId ?? null;
+      if (activeThreadId === null) {
+        throw new Error("The session must start before you can change a goal.");
+      }
+
+      return await setGoalForThread({
+        threadId: activeThreadId,
+        ...input,
+      });
+    },
+    [lifecycle.sessionSnapshot?.activeThreadId, setGoalForThread],
+  );
+
+  const clearGoalForThread = useCallback(
+    async (threadId: string): Promise<boolean> => {
+      const rpcClient = rpcClientRef.current;
+      if (rpcClient === null) {
+        throw new Error("The session must start before you can clear a goal.");
+      }
+
+      const result = await clearCodexThreadGoal({
+        rpcClient,
+        threadId,
+      });
+      recordNoGoalForThread(threadId);
+      return result.cleared;
+    },
+    [recordNoGoalForThread, rpcClientRef],
+  );
+
+  const clearGoalForActiveThread = useCallback(async (): Promise<boolean> => {
+    const activeThreadId = lifecycle.sessionSnapshot?.activeThreadId ?? null;
+    if (activeThreadId === null) {
+      throw new Error("The session must start before you can clear a goal.");
+    }
+
+    return await clearGoalForThread(activeThreadId);
+  }, [clearGoalForThread, lifecycle.sessionSnapshot?.activeThreadId]);
+
+  const runGoalCommand = useCallback(
+    (commandText: string): boolean => {
+      const parsedCommand = parseCodexGoalCommand(commandText);
+      if (parsedCommand.status === "notGoalCommand") {
+        setSessionErrorMessage(`Unsupported Codex runtime command '${commandText}'.`);
+        return false;
+      }
+      if (parsedCommand.status === "invalid") {
+        setSessionErrorMessage(parsedCommand.message);
+        return false;
+      }
+
+      const command = parsedCommand.command;
+      if (command.kind === "show") {
+        if (!activeGoalIsLoaded) {
+          setSessionErrorMessage("Goal state is still loading.");
+          return false;
+        }
+
+        setSessionErrorMessage(
+          activeGoal === null
+            ? "No goal is currently set. Usage: /goal <objective>"
+            : formatCodexGoalStatus(activeGoal).title,
+        );
+        return true;
+      }
+
+      if (command.kind === "edit") {
+        if (!activeGoalIsLoaded) {
+          setSessionErrorMessage("Goal state is still loading.");
+          return false;
+        }
+
+        if (activeGoal === null) {
+          setSessionErrorMessage("No goal is currently set.");
+          return false;
+        }
+        setGoalCommandPanel({
+          kind: "edit",
+          goal: activeGoal,
+        });
+        return true;
+      }
+
+      if (command.kind === "setObjective") {
+        if (!activeGoalIsLoaded) {
+          setSessionErrorMessage("Goal state is still loading.");
+          return false;
+        }
+
+        if (activeGoal !== null) {
+          setGoalCommandPanel({
+            kind: "replaceConfirmation",
+            threadId: activeGoal.threadId,
+            objective: command.objective,
+          });
+          return true;
+        }
+
+        void setGoalForActiveThread({
+          objective: command.objective,
+          status: "active",
+        }).catch((error: unknown) => {
+          setSessionErrorMessage(error instanceof Error ? error.message : "Could not set goal.");
+        });
+        return true;
+      }
+
+      if (command.kind === "clear") {
+        void clearGoalForActiveThread()
+          .then((cleared) => {
+            setSessionErrorMessage(cleared ? "Goal cleared." : "No goal to clear.");
+          })
+          .catch((error: unknown) => {
+            setSessionErrorMessage(
+              error instanceof Error ? error.message : "Could not clear goal.",
+            );
+          });
+        return true;
+      }
+
+      if (!activeGoalIsLoaded) {
+        setSessionErrorMessage("Goal state is still loading.");
+        return false;
+      }
+
+      if (activeGoal === null) {
+        setSessionErrorMessage("No goal is currently set.");
+        return false;
+      }
+
+      void setGoalForActiveThread({
+        status: command.status,
+      }).catch((error: unknown) => {
+        setSessionErrorMessage(error instanceof Error ? error.message : "Could not update goal.");
+      });
+      return true;
+    },
+    [activeGoal, activeGoalIsLoaded, clearGoalForActiveThread, setGoalForActiveThread],
+  );
+
+  const executeTypedComposerCommand = useCallback(
+    (inputValue: { commandId: string; text: string }): boolean => {
+      if (inputValue.commandId !== CodexInlineCommandIds.GOAL) {
+        setSessionErrorMessage(`Unsupported Codex runtime command '${inputValue.commandId}'.`);
+        return false;
+      }
+
+      return runGoalCommand(inputValue.text);
+    },
+    [runGoalCommand],
+  );
+
+  const clearGoalCommandPanel = useCallback((): void => {
+    setGoalCommandPanel(null);
+  }, []);
+
+  const confirmReplaceGoal = useCallback((): void => {
+    if (goalCommandPanel?.kind !== "replaceConfirmation") {
+      return;
+    }
+
+    const nextObjective = goalCommandPanel.objective;
+    const threadId = goalCommandPanel.threadId;
+    setGoalCommandPanel(null);
+    void (async () => {
+      try {
+        // Codex TUI replacement clears before setting so accounting and budget
+        // state reset instead of editing the existing goal in place.
+        await clearGoalForThread(threadId);
+        await setGoalForThread({
+          threadId,
+          objective: nextObjective,
+          status: "active",
+        });
+      } catch (error) {
+        setSessionErrorMessage(error instanceof Error ? error.message : "Could not replace goal.");
+      }
+    })();
+  }, [clearGoalForThread, goalCommandPanel, setGoalForThread]);
+
+  const saveEditedGoal = useCallback(
+    (objective: string): void => {
+      if (goalCommandPanel?.kind !== "edit") {
+        return;
+      }
+
+      const trimmedObjective = objective.trim();
+      if (trimmedObjective.length === 0) {
+        setSessionErrorMessage("Goal objective must not be empty.");
+        return;
+      }
+
+      const goal = goalCommandPanel.goal;
+      setGoalCommandPanel(null);
+      void setGoalForThread({
+        threadId: goal.threadId,
+        objective: trimmedObjective,
+        status: editedGoalStatus(goal.status),
+        tokenBudget: goal.tokenBudget,
+      }).catch((error: unknown) => {
+        setSessionErrorMessage(error instanceof Error ? error.message : "Could not edit goal.");
+      });
+    },
+    [goalCommandPanel, setGoalForThread],
+  );
+
   const resolveCliLaunchTarget = useCallback(async (): Promise<CodexCliLaunchTarget> => {
     const activeThreadId = threadIdRef.current;
     const providerThreadId = lifecycle.sessionSnapshot?.providerThreadId ?? null;
@@ -939,6 +1348,7 @@ export function useCodexSessionState(input: {
       configStatus,
       isLoadingModels,
       isReadingConfig,
+      listFeaturesAsync,
       loadModelsAsync,
       readConfigAsync,
     };
@@ -948,6 +1358,7 @@ export function useCodexSessionState(input: {
     configStatus,
     isLoadingModels,
     isReadingConfig,
+    listFeaturesAsync,
     loadModelsAsync,
     readConfigAsync,
     modelCatalogStatus,
@@ -988,6 +1399,26 @@ export function useCodexSessionState(input: {
     };
   }, [sessionErrorMessage]);
 
+  const goals = useMemo<CodexSessionGoalState>(() => {
+    return {
+      activeGoal,
+      activeGoalStatus,
+      commandPanel: goalCommandPanel,
+      clearCommandPanel: clearGoalCommandPanel,
+      confirmReplaceGoal,
+      saveEditedGoal,
+      executeTypedComposerCommand,
+    };
+  }, [
+    activeGoal,
+    activeGoalStatus,
+    clearGoalCommandPanel,
+    confirmReplaceGoal,
+    executeTypedComposerCommand,
+    goalCommandPanel,
+    saveEditedGoal,
+  ]);
+
   return {
     lifecycle,
     repositoryStatusRefreshEpoch,
@@ -1000,5 +1431,6 @@ export function useCodexSessionState(input: {
     codexConfig,
     serverRequests,
     sessionMessage,
+    goals,
   };
 }

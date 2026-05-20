@@ -73,6 +73,38 @@ const ThreadUnsubscribeResponseSchema = z.object({
 
 const EmptyObjectResponseSchema = z.object({});
 
+const ThreadGoalStatusSchema = z.enum([
+  "active",
+  "paused",
+  "blocked",
+  "usageLimited",
+  "budgetLimited",
+  "complete",
+]);
+
+const ThreadGoalSchema = z.object({
+  threadId: z.string().min(1),
+  objective: z.string(),
+  status: ThreadGoalStatusSchema,
+  tokenBudget: z.number().nullable(),
+  tokensUsed: z.number(),
+  timeUsedSeconds: z.number(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+});
+
+const ThreadGoalGetResponseSchema = z.object({
+  goal: ThreadGoalSchema.nullable(),
+});
+
+const ThreadGoalSetResponseSchema = z.object({
+  goal: ThreadGoalSchema,
+});
+
+const ThreadGoalClearResponseSchema = z.object({
+  cleared: z.boolean(),
+});
+
 const ModelListResponseSchema = z.object({
   data: z.array(
     z.looseObject({
@@ -161,6 +193,10 @@ export type CodexExperimentalFeatureSummary = {
   enabled: boolean | null;
   defaultEnabled: boolean | null;
 };
+
+export type CodexThreadGoalStatus = z.infer<typeof ThreadGoalStatusSchema>;
+
+export type CodexThreadGoal = z.infer<typeof ThreadGoalSchema>;
 
 export type CodexExternalAgentMigrationItem = {
   itemType: string;
@@ -571,6 +607,75 @@ export async function compactCodexThread(input: {
   };
 }
 
+export async function getCodexThreadGoal(input: {
+  rpcClient: CodexJsonRpcClient;
+  threadId: string;
+}): Promise<{ goal: CodexThreadGoal | null; response: unknown }> {
+  const response = await input.rpcClient.call("thread/goal/get", {
+    threadId: input.threadId,
+  });
+
+  const parsedResponse = ThreadGoalGetResponseSchema.safeParse(response);
+  if (!parsedResponse.success) {
+    throw new Error(
+      `thread/goal/get response payload is invalid. Payload: ${JSON.stringify(response)}`,
+    );
+  }
+
+  return {
+    goal: parsedResponse.data.goal,
+    response,
+  };
+}
+
+export async function setCodexThreadGoal(input: {
+  rpcClient: CodexJsonRpcClient;
+  threadId: string;
+  objective?: string;
+  status?: CodexThreadGoalStatus;
+  tokenBudget?: number | null;
+}): Promise<{ goal: CodexThreadGoal; response: unknown }> {
+  const response = await input.rpcClient.call("thread/goal/set", {
+    threadId: input.threadId,
+    ...(input.objective === undefined ? {} : { objective: input.objective }),
+    ...(input.status === undefined ? {} : { status: input.status }),
+    ...(input.tokenBudget === undefined ? {} : { tokenBudget: input.tokenBudget }),
+  });
+
+  const parsedResponse = ThreadGoalSetResponseSchema.safeParse(response);
+  if (!parsedResponse.success) {
+    throw new Error(
+      `thread/goal/set response payload is invalid. Payload: ${JSON.stringify(response)}`,
+    );
+  }
+
+  return {
+    goal: parsedResponse.data.goal,
+    response,
+  };
+}
+
+export async function clearCodexThreadGoal(input: {
+  rpcClient: CodexJsonRpcClient;
+  threadId: string;
+}): Promise<{ cleared: boolean; response: unknown }> {
+  const response = await input.rpcClient.call("thread/goal/clear", {
+    threadId: input.threadId,
+  });
+
+  const parsedResponse = ThreadGoalClearResponseSchema.safeParse(response);
+  if (!parsedResponse.success) {
+    throw new Error(
+      `thread/goal/clear response payload is invalid. Payload: ${JSON.stringify(response)}`,
+    );
+  }
+
+  return {
+    cleared: parsedResponse.data.cleared,
+    response,
+  };
+}
+
 export async function rollbackCodexThread(input: {
   rpcClient: CodexJsonRpcClient;
   threadId: string;
@@ -635,6 +740,7 @@ export async function listCodexExperimentalFeatures(input: {
   rpcClient: CodexJsonRpcClient;
   cursor?: string | null;
   limit?: number;
+  threadId?: string;
 }): Promise<{
   features: readonly CodexExperimentalFeatureSummary[];
   nextCursor: string | null;
@@ -643,6 +749,7 @@ export async function listCodexExperimentalFeatures(input: {
   const response = await input.rpcClient.call("experimentalFeature/list", {
     cursor: input.cursor ?? null,
     ...(input.limit === undefined ? {} : { limit: input.limit }),
+    ...(input.threadId === undefined ? {} : { threadId: input.threadId }),
   });
 
   const parsedResponse = ExperimentalFeatureListResponseSchema.safeParse(response);

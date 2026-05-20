@@ -8,7 +8,7 @@ describe("session bootstrap state", () => {
       resolveSessionBootstrapState({
         activeConnectionKey: null,
         activeThreadSyncKey: null,
-        configError: null,
+        bootstrapDataError: null,
         isCurrentConnectionBootstrapping: false,
         modelsError: null,
         threadSyncFailureMessage: null,
@@ -23,7 +23,7 @@ describe("session bootstrap state", () => {
       resolveSessionBootstrapState({
         activeConnectionKey: "sandbox_123:2026-03-28T00:00:00.000Z",
         activeThreadSyncKey: "sandbox_123:2026-03-28T00:00:00.000Z:thread_123",
-        configError: new Error("Could not read config."),
+        bootstrapDataError: new Error("Could not read config."),
         isCurrentConnectionBootstrapping: false,
         modelsError: null,
         threadSyncFailureMessage: null,
@@ -39,7 +39,7 @@ describe("session bootstrap state", () => {
       resolveSessionBootstrapState({
         activeConnectionKey: "sandbox_123:2026-03-28T00:00:00.000Z",
         activeThreadSyncKey: "sandbox_123:2026-03-28T00:00:00.000Z:thread_123",
-        configError: null,
+        bootstrapDataError: null,
         isCurrentConnectionBootstrapping: false,
         modelsError: null,
         threadSyncFailureMessage: null,

@@ -62,6 +62,8 @@ export const SessionComposerFixtureProps: ChatComposerViewModel = {
   gitBranchLabel: null,
   pullRequest: null,
   contextUsage: null,
+  goalStatus: null,
+  commandPanel: null,
   pendingDiffCommentSummary: null,
   pendingAttachments: [],
   modelOptions: CodexFixtureSessionModelOptions,

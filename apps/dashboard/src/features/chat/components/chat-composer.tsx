@@ -28,7 +28,7 @@ import {
   StopCircleIcon,
   XIcon,
 } from "@phosphor-icons/react";
-import { useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import {
   detectActiveComposerTrigger,
@@ -78,6 +78,27 @@ export type ChatComposerStatusMessage = {
   presentation?: "loading" | "notice";
 };
 
+export type ChatComposerCommandPanel =
+  | {
+      kind: "confirm";
+      title: string;
+      description: string;
+      confirmLabel: string;
+      cancelLabel: string;
+      onConfirm: () => void;
+      onCancel: () => void;
+    }
+  | {
+      kind: "textInput";
+      title: string;
+      description: string;
+      initialValue: string;
+      submitLabel: string;
+      cancelLabel: string;
+      onSubmit: (value: string) => void;
+      onCancel: () => void;
+    };
+
 export type ChatComposerViewModel = {
   composerCapabilities: readonly ComposerCapability[];
   composerText: string;
@@ -93,6 +114,11 @@ export type ChatComposerViewModel = {
     label: string;
     title: string;
   } | null;
+  goalStatus?: {
+    label: string;
+    title: string;
+  } | null;
+  commandPanel?: ChatComposerCommandPanel | null;
   pendingDiffCommentSummary: {
     count: number;
     label: string;
@@ -140,6 +166,8 @@ export function ChatComposer({
   gitBranchLabel,
   pullRequest,
   contextUsage,
+  goalStatus = null,
+  commandPanel = null,
   pendingDiffCommentSummary,
   pendingAttachments,
   modelOptions,
@@ -174,6 +202,14 @@ export function ChatComposer({
     end: composerText.length,
   });
   const [activeSlashCommandIndex, setActiveSlashCommandIndex] = useState(0);
+  const [commandPanelText, setCommandPanelText] = useState(
+    commandPanel?.kind === "textInput" ? commandPanel.initialValue : "",
+  );
+  useEffect(() => {
+    if (commandPanel?.kind === "textInput") {
+      setCommandPanelText(commandPanel.initialValue);
+    }
+  }, [commandPanel?.kind, commandPanel?.kind === "textInput" ? commandPanel.initialValue : null]);
   const activeComposerTrigger = detectActiveComposerTrigger({
     composerCapabilities,
     composerText,
@@ -261,12 +297,23 @@ export function ChatComposer({
   }
 
   function selectSlashCommand(command: ComposerCommandDescriptor): void {
+    if (commandIsDisabledDuringActiveTurn(command)) {
+      return;
+    }
+
     if (command.submitAs === "runtimeCommand") {
       onRuntimeCommandSubmit(command.id);
       return;
     }
 
     insertSlashCommand(command);
+  }
+
+  function commandIsDisabledDuringActiveTurn(command: ComposerCommandDescriptor): boolean {
+    return (
+      (submitMode === "steer" || submitMode === "interrupt") &&
+      command.availability?.duringActiveTurn === "disabled"
+    );
   }
 
   function moveActiveSlashCommand(delta: number): void {
@@ -359,14 +406,17 @@ export function ChatComposer({
               ) : (
                 filteredSlashCommandOptions.map((command, commandIndex) => {
                   const isActiveCommand = command.id === activeSlashCommand?.id;
+                  const isDisabledCommand = commandIsDisabledDuringActiveTurn(command);
 
                   return (
                     <button
                       aria-label={formatSlashCommandOptionLabel(command)}
+                      aria-disabled={isDisabledCommand}
                       aria-selected={isActiveCommand}
                       className={[
                         "flex w-full items-start gap-3 rounded-sm px-3 py-2 text-left text-sm outline-none",
                         isActiveCommand ? "bg-muted text-foreground" : "hover:bg-muted/70",
+                        isDisabledCommand ? "cursor-not-allowed opacity-50" : null,
                       ].join(" ")}
                       id={`${commandListId}-${command.id}`}
                       key={command.id}
@@ -611,7 +661,58 @@ export function ChatComposer({
           )}
         </div>
       </div>
-      {gitBranchLabel === null && pullRequest === null && contextUsage === null ? null : (
+      {commandPanel === null ? null : (
+        <div className="mt-2 rounded-md border bg-card px-3 py-2 text-sm shadow-xs">
+          {commandPanel.kind === "confirm" ? (
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0">
+                <p className="font-medium text-foreground">{commandPanel.title}</p>
+                <p className="text-muted-foreground">{commandPanel.description}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button onClick={commandPanel.onCancel} size="sm" type="button" variant="ghost">
+                  {commandPanel.cancelLabel}
+                </Button>
+                <Button onClick={commandPanel.onConfirm} size="sm" type="button">
+                  {commandPanel.confirmLabel}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <div>
+                <p className="font-medium text-foreground">{commandPanel.title}</p>
+                <p className="text-muted-foreground">{commandPanel.description}</p>
+              </div>
+              <Textarea
+                className="min-h-20 resize-none"
+                onChange={(event) => {
+                  setCommandPanelText(event.target.value);
+                }}
+                value={commandPanelText}
+              />
+              <div className="flex justify-end gap-2">
+                <Button onClick={commandPanel.onCancel} size="sm" type="button" variant="ghost">
+                  {commandPanel.cancelLabel}
+                </Button>
+                <Button
+                  onClick={() => {
+                    commandPanel.onSubmit(commandPanelText);
+                  }}
+                  size="sm"
+                  type="button"
+                >
+                  {commandPanel.submitLabel}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {gitBranchLabel === null &&
+      pullRequest === null &&
+      contextUsage === null &&
+      goalStatus === null ? null : (
         <div className="text-muted-foreground flex items-center justify-between gap-4 px-1.5 pt-2 text-sm">
           <div className="flex min-w-0 items-center gap-4">
             {gitBranchLabel === null ? null : (
@@ -639,22 +740,39 @@ export function ChatComposer({
               </TextLink>
             )}
           </div>
-          {contextUsage === null ? null : (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <span
-                    className="ml-auto flex shrink-0 cursor-default items-center gap-1.5 outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                    tabIndex={0}
-                  />
-                }
-              >
-                <GaugeIcon aria-hidden="true" className="size-4" />
-                <span>{contextUsage.label}</span>
-              </TooltipTrigger>
-              <TooltipContent side="top">{contextUsage.title}</TooltipContent>
-            </Tooltip>
-          )}
+          <div className="ml-auto flex shrink-0 items-center gap-4">
+            {goalStatus === null ? null : (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <span
+                      className="flex cursor-default items-center gap-1.5 outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      tabIndex={0}
+                    />
+                  }
+                >
+                  <span>{goalStatus.label}</span>
+                </TooltipTrigger>
+                <TooltipContent side="top">{goalStatus.title}</TooltipContent>
+              </Tooltip>
+            )}
+            {contextUsage === null ? null : (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <span
+                      className="flex cursor-default items-center gap-1.5 outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                      tabIndex={0}
+                    />
+                  }
+                >
+                  <GaugeIcon aria-hidden="true" className="size-4" />
+                  <span>{contextUsage.label}</span>
+                </TooltipTrigger>
+                <TooltipContent side="top">{contextUsage.title}</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
         </div>
       )}
     </div>

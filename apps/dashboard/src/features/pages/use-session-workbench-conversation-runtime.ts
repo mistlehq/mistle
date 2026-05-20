@@ -195,6 +195,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
         sessionMessage,
         startTurn: startCodexTurn,
         compactThread: sessionState.threads.compactThread,
+        goals: sessionState.goals,
       }),
     [
       activeRuntimeConversationId,
@@ -217,6 +218,7 @@ export function useSessionWorkbenchConversationRuntime(input: {
       sessionMessage.sessionErrorMessage,
       codexBootstrap,
       sessionState.threads.compactThread,
+      sessionState.goals,
       startCodexTurn,
     ],
   );

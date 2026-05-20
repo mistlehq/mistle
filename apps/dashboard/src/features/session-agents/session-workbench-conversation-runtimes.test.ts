@@ -41,12 +41,19 @@ const ComposerConfigControl: CodexRuntimeInput["configControl"] = {
 
 function createCodexRuntimeInput(input: {
   activeConversationId: string | null;
+  composerCapabilities?: CodexRuntimeInput["bootstrap"]["composerCapabilities"];
   compactedThreadIds: string[];
   reportedMessages: string[];
 }): CodexRuntimeInput {
   return {
     activeConversationId: input.activeConversationId,
-    bootstrap: ReadyBootstrap,
+    bootstrap:
+      input.composerCapabilities === undefined
+        ? ReadyBootstrap
+        : {
+            ...ReadyBootstrap,
+            composerCapabilities: input.composerCapabilities,
+          },
     chat: {
       chatState: {
         activeTurnId: null,
@@ -88,6 +95,21 @@ function createCodexRuntimeInput(input: {
     },
     configControl: ComposerConfigControl,
     contextUsage: null,
+    goals: {
+      activeGoal: null,
+      activeGoalStatus: null,
+      commandPanel: null,
+      clearCommandPanel: () => {
+        return;
+      },
+      confirmReplaceGoal: () => {
+        return;
+      },
+      saveEditedGoal: () => {
+        return;
+      },
+      executeTypedComposerCommand: () => false,
+    },
     serverRequests: {
       pendingServerRequests: [],
       isRespondingToServerRequest: false,
@@ -304,6 +326,52 @@ describe("buildCodexConversationRuntime", () => {
     expect(accepted).toBe(false);
     expect(compactedThreadIds).toEqual([]);
     expect(reportedMessages).toEqual(["Unsupported Codex runtime command 'codex.unsupported'."]);
+  });
+
+  it("reserves the goal typed runtime command when the runtime reports goals disabled", () => {
+    const runtime = buildCodexConversationRuntime(
+      createCodexRuntimeInput({
+        activeConversationId: "thread_123",
+        compactedThreadIds: [],
+        reportedMessages: [],
+      }),
+    );
+
+    expect(runtime.composerRuntimeInput.unavailableTypedRuntimeCommands).toEqual([
+      {
+        name: "goal",
+        message: "/goal is not enabled for this Codex runtime.",
+      },
+    ]);
+  });
+
+  it("does not reserve the goal typed runtime command when the command is available", () => {
+    const runtime = buildCodexConversationRuntime(
+      createCodexRuntimeInput({
+        activeConversationId: "thread_123",
+        composerCapabilities: [
+          {
+            kind: "composerCommand",
+            trigger: "/",
+            source: "runtimeCommand",
+            commands: [
+              {
+                id: "codex.goal",
+                name: "goal",
+                availability: {
+                  duringActiveTurn: "enabled",
+                },
+                submitAs: "typedRuntimeCommand",
+              },
+            ],
+          },
+        ],
+        compactedThreadIds: [],
+        reportedMessages: [],
+      }),
+    );
+
+    expect(runtime.composerRuntimeInput.unavailableTypedRuntimeCommands).toEqual([]);
   });
 });
 
