@@ -63,6 +63,15 @@ export function readApiErrorMessage(value: unknown): string | null {
 }
 
 export function readHttpErrorStatus(value: unknown): number | null {
+  if (
+    value instanceof Error &&
+    "status" in value &&
+    typeof value.status === "number" &&
+    Number.isInteger(value.status)
+  ) {
+    return value.status;
+  }
+
   const record = parseHttpErrorRecord(value);
   if (record === null) {
     return null;
@@ -92,6 +101,10 @@ export function readHttpErrorBody(value: unknown): unknown {
   }
 
   return record.body ?? record.data ?? record.error;
+}
+
+export function isUnavailableResourceError(value: unknown): boolean {
+  return readHttpErrorStatus(value) === 404;
 }
 
 export type HttpApiErrorInput = {

@@ -2,11 +2,13 @@
 
 import { GitHubCloudBrowserDefinition } from "@mistle/integrations-definitions/browser";
 import { QueryClientProvider } from "@tanstack/react-query";
+import type { QueryKey } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
+import { HttpApiError } from "../api/http-api-error.js";
 import { createStoryWebhookTriggerCapabilitiesProviderMetadata } from "../integrations/integration-story-harness.js";
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import { sandboxProfileVersionTriggerConfigQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
@@ -258,32 +260,124 @@ function seedWebhookTriggerEditor(
 function createEditorQueryClient(): ReturnType<typeof createTestQueryClient> {
   return createTestQueryClient({
     refetchOnMount: false,
+    retryOnMount: false,
     staleTime: Number.POSITIVE_INFINITY,
   });
+}
+
+function seedHttpQueryError(input: {
+  queryClient: ReturnType<typeof createTestQueryClient>;
+  queryKey: QueryKey;
+  operation: string;
+  status: number;
+}): void {
+  const error = new HttpApiError({
+    operation: input.operation,
+    status: input.status,
+    body: null,
+    message: "Could not load trigger.",
+  });
+  const query = input.queryClient.getQueryCache().build(input.queryClient, {
+    queryKey: input.queryKey,
+    queryFn: async (): Promise<unknown> => {
+      throw error;
+    },
+  });
+
+  query.setState({
+    ...query.state,
+    error,
+    fetchStatus: "idle",
+    status: "error",
+  });
+}
+
+function seedTriggerDetailError(input: {
+  queryClient: ReturnType<typeof createTestQueryClient>;
+  status: number;
+  triggerId: string;
+}): void {
+  seedHttpQueryError({
+    queryClient: input.queryClient,
+    queryKey: triggerDetailQueryKey(input.triggerId),
+    operation: "getTrigger",
+    status: input.status,
+  });
+}
+
+function seedScheduledTriggerDetailError(input: {
+  queryClient: ReturnType<typeof createTestQueryClient>;
+  status: number;
+  triggerId: string;
+}): void {
+  input.queryClient.setQueryData(
+    triggerDetailQueryKey(input.triggerId),
+    createScheduleTriggerSummary(),
+  );
+  input.queryClient.setQueryData(TRIGGER_SANDBOX_PROFILES_QUERY_KEY, [
+    {
+      id: SandboxProfileId,
+      displayName: "Schedule Profile",
+      activeVersion: 3,
+    },
+  ]);
+
+  seedHttpQueryError({
+    queryClient: input.queryClient,
+    queryKey: scheduledTriggerDetailQueryKey(input.triggerId),
+    operation: "getScheduledTrigger",
+    status: input.status,
+  });
+}
+
+function seedWebhookTriggerDetailError(input: {
+  queryClient: ReturnType<typeof createTestQueryClient>;
+  status: number;
+  triggerId: string;
+}): void {
+  input.queryClient.setQueryData(
+    triggerDetailQueryKey(input.triggerId),
+    createWebhookTriggerSummary(),
+  );
+
+  seedHttpQueryError({
+    queryClient: input.queryClient,
+    queryKey: webhookTriggerDetailQueryKey(input.triggerId),
+    operation: "getWebhookTrigger",
+    status: input.status,
+  });
+}
+
+function renderTriggerEditorPage(input: {
+  queryClient: ReturnType<typeof createTestQueryClient>;
+  triggerId: string;
+}): void {
+  const router = createMemoryRouter(
+    createRoutesFromElements(
+      <Route
+        element={<TriggerEditorPage />}
+        handle={ROUTE_HANDLES.triggersDetail}
+        path="/triggers/:triggerId"
+      />,
+    ),
+    {
+      initialEntries: [`/triggers/${input.triggerId}`],
+    },
+  );
+
+  render(
+    <QueryClientProvider client={input.queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
 }
 
 describe("TriggerEditorPage", () => {
   it("uses the loaded trigger summary to render the scheduled trigger editor", async () => {
     const queryClient = createEditorQueryClient();
     seedScheduledTriggerEditor(queryClient, createScheduleTriggerSummary());
-    const router = createMemoryRouter(
-      createRoutesFromElements(
-        <Route
-          element={<TriggerEditorPage />}
-          handle={ROUTE_HANDLES.triggersDetail}
-          path="/triggers/:triggerId"
-        />,
-      ),
-      {
-        initialEntries: [`/triggers/${ScheduleTriggerId}`],
-      },
-    );
 
-    render(
-      <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>,
-    );
+    renderTriggerEditorPage({ queryClient, triggerId: ScheduleTriggerId });
 
     expect(await screen.findByDisplayValue("0 9 * * 1-5")).toBeDefined();
     expect(screen.getByText("Trigger source")).toBeDefined();
@@ -294,29 +388,72 @@ describe("TriggerEditorPage", () => {
   it("uses the loaded trigger summary to render the webhook trigger editor", async () => {
     const queryClient = createEditorQueryClient();
     seedWebhookTriggerEditor(queryClient, createWebhookTriggerSummary());
-    const router = createMemoryRouter(
-      createRoutesFromElements(
-        <Route
-          element={<TriggerEditorPage />}
-          handle={ROUTE_HANDLES.triggersDetail}
-          path="/triggers/:triggerId"
-        />,
-      ),
-      {
-        initialEntries: [`/triggers/${WebhookTriggerId}`],
-      },
-    );
 
-    render(
-      <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} />
-      </QueryClientProvider>,
-    );
+    renderTriggerEditorPage({ queryClient, triggerId: WebhookTriggerId });
 
     expect(await screen.findByDisplayValue("Webhook trigger")).toBeDefined();
     expect(screen.getByText("Trigger source")).toBeDefined();
     expect(screen.getAllByText("Event").length).toBeGreaterThan(0);
     expect(screen.getByText("Schedule Profile v1")).toBeDefined();
+  });
+
+  it("shows standalone trigger 404 as the unavailable page without the edit header", async () => {
+    const queryClient = createEditorQueryClient();
+    seedTriggerDetailError({
+      queryClient,
+      status: 404,
+      triggerId: ScheduleTriggerId,
+    });
+
+    renderTriggerEditorPage({ queryClient, triggerId: ScheduleTriggerId });
+
+    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "Edit trigger" })).toBeNull();
+  });
+
+  it("keeps the edit page notice for standalone non-404 trigger failures", async () => {
+    const queryClient = createEditorQueryClient();
+    seedTriggerDetailError({
+      queryClient,
+      status: 500,
+      triggerId: ScheduleTriggerId,
+    });
+
+    renderTriggerEditorPage({ queryClient, triggerId: ScheduleTriggerId });
+
+    expect(screen.getByText("Could not load trigger")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Back to triggers" })).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "Page not found" })).toBeNull();
+  });
+
+  it("shows standalone scheduled trigger detail 404 as the unavailable page", async () => {
+    const queryClient = createEditorQueryClient();
+    seedScheduledTriggerDetailError({
+      queryClient,
+      status: 404,
+      triggerId: ScheduleTriggerId,
+    });
+
+    renderTriggerEditorPage({ queryClient, triggerId: ScheduleTriggerId });
+
+    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "Edit trigger" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Back to triggers" })).toBeNull();
+  });
+
+  it("shows standalone webhook trigger detail 404 as the unavailable page", async () => {
+    const queryClient = createEditorQueryClient();
+    seedWebhookTriggerDetailError({
+      queryClient,
+      status: 404,
+      triggerId: WebhookTriggerId,
+    });
+
+    renderTriggerEditorPage({ queryClient, triggerId: WebhookTriggerId });
+
+    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "Edit trigger" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Back to triggers" })).toBeNull();
   });
 });
 
@@ -348,6 +485,9 @@ describe("TriggerEditorContent", () => {
       </QueryClientProvider>,
     );
 
-    expect(await screen.findByText("Trigger not found for this sandbox profile")).toBeDefined();
+    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeDefined();
+    expect(
+      screen.getByText("This page does not exist or you do not have access to it."),
+    ).toBeDefined();
   });
 });

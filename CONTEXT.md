@@ -48,6 +48,10 @@ _Avoid_: Generic script
 A top-level page that lists existing product objects and offers the primary action for creating the first one.
 _Avoid_: Detail tab, filtered results view
 
+**Resource detail page**:
+A page whose primary purpose is viewing or editing one product resource.
+_Avoid_: Nested tab, child resource view
+
 **Filtered collection view**:
 A narrowed view of a **Collection landing page** based on user-entered criteria.
 _Avoid_: Empty state, local table filter
@@ -95,6 +99,18 @@ _Avoid_: Thread navigator when speaking across providers
 **Billing customer**:
 The external billing-provider customer associated with a Mistle organization.
 _Avoid_: Billing org
+
+**Mistle organization**:
+A tenant boundary containing the product resources its members may use.
+_Avoid_: Org when the tenant boundary could be confused with an external organization
+
+**Unavailable resource**:
+A user-visible resource that is missing, deleted, or outside the user's accessible **Mistle organization** scope.
+_Avoid_: Cross-org resource, unauthorized resource
+
+**Permission-denied action**:
+An action on an accessible **Mistle organization** resource that the current actor is not allowed to perform.
+_Avoid_: Unavailable resource, missing resource
 
 **Jira site name**:
 The Atlassian Cloud site subdomain for a Jira Cloud connection.
@@ -244,6 +260,7 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A **Snapshot maintenance script** test run starts from an existing usable **Snapshot** but does not replace it.
 - When a new **Sandbox profile version** is published, the **Snapshot maintenance script** and **Automatic snapshot refresh** definition should be copied forward from the previous version.
 - A **Collection landing page** may list **Sandbox profile version** families, triggers, sessions, or organization members.
+- A **Resource detail page** has one primary resource that determines whether the page is available.
 - A **Filtered collection view** narrows a **Collection landing page** without changing whether the underlying collection exists.
 - A **Deleted session** is excluded from ordinary session collection views but is still part of the organization's historical record.
 - Any ordinary user-visible session may become a **Deleted session**, regardless of whether it is pending, starting, running, stopped, or failed.
@@ -254,6 +271,9 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - A pending or starting **Deleted session** must not complete startup into a hidden running sandbox.
 - Deleting a session does not delete the **Trigger** run or **Trigger conversation** that may have created or used it.
 - Deleting an existing **Deleted session** again is still considered a successful deletion request.
+- A resource outside the user's accessible **Mistle organization** scope is an **Unavailable resource**.
+- A **Permission-denied action** is distinct from an **Unavailable resource** because the resource remains visible while the action is blocked.
+- An **Unavailable resource** should use the same user-facing pattern across resource types.
 - A **Trigger** may select one or more **Trigger events**.
 - A **Trigger** may start from a webhook event or a schedule.
 - A **Trigger** run may create or reuse one **Trigger conversation**.
@@ -424,7 +444,18 @@ _Avoid_: Schema mismatch prompt, refresh modal
 - The automation-to-trigger rename was considered as a staged compatibility migration — resolved: ship it as one atomic rename, except for explicit durable workflow compatibility requirements.
 - "version" was used ambiguously to mean the latest published **Sandbox profile version** or an object's **Referenced sandbox profile version** — resolved: when describing a session, trigger, or other profile-backed object, use the object's referenced version.
 - "billing org" could mean a Mistle organization, a Better Auth organization, or an external billing-provider customer — resolved: use **Billing customer** for the billing-provider customer associated with an existing Mistle organization.
-- "org" could mean a Mistle organization, an Atlassian organization, or the editable Jira Cloud URL subdomain — resolved: use **Jira site name** for the editable Jira Cloud subdomain.
+- "org" could mean a **Mistle organization**, an Atlassian organization, or the editable Jira Cloud URL subdomain — resolved: use **Mistle organization** for the tenant boundary and **Jira site name** for the editable Jira Cloud subdomain.
+- "no access" could expose that another **Mistle organization** owns a resource — resolved: present missing, deleted, and cross-organization detail links as an **Unavailable resource**.
+- "wrong org" could imply that a user should be prompted to switch organizations — resolved: an **Unavailable resource** does not disclose whether another **Mistle organization** would make the resource available.
+- "page access error" could imply a global application failure — resolved: an authenticated **Unavailable resource** remains in the product context with ordinary product navigation available.
+- "not found" copy alone can be confusing for shared links, while "no access" copy can disclose resource existence — resolved: an **Unavailable resource** may say the page does not exist or the user does not have access.
+- Resource-detail pages and settings pages can both fail from access limits — resolved: use **Unavailable resource** for inaccessible resource details and **Permission-denied action** for visible organization areas where the actor lacks a capability.
+- Child data on a detail page can fail separately from the primary resource — resolved: when the primary resource is an **Unavailable resource**, the **Resource detail page** shows one unavailable answer rather than child-data failures.
+- Deleted resources can be known to the system — resolved: ordinary **Resource detail pages** still present deleted resources as an **Unavailable resource**.
+- Shared, deleted, or cross-organization links may resolve to unavailable pages — resolved: visiting an **Unavailable resource** is an ordinary navigation outcome, not an application failure.
+- A resource can become unavailable after a **Resource detail page** loads — resolved: the page should converge on the same **Unavailable resource** state.
+- An **Unavailable resource** reached through a deep link should keep the attempted location and rely on ordinary product navigation for recovery.
+- Unauthenticated deep links may become available after sign-in — resolved: **Unavailable resource** is an authenticated product state, not a replacement for sign-in.
 - "chat session" could mean either the live sandbox environment or a Codex conversation — resolved: use **Sandbox session** for the live environment and **Codex thread** for the conversation.
 - "Pi thread" could imply Codex-style thread navigation — resolved: use **Pi conversation** for Pi's runtime-owned chat object.
 - "active thread" could imply a different sandbox — resolved: use **Active Codex thread** for the selected chat conversation inside the same **Sandbox session**.

@@ -7,6 +7,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
+import { HttpApiError } from "../api/http-api-error.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
 import { SessionWorkbenchPage } from "./session-workbench-page.js";
@@ -21,6 +22,7 @@ function renderSessionWorkbenchPage(input?: {
   const queryClient = createTestQueryClient({
     gcTime: Infinity,
     refetchOnMount: false,
+    retryOnMount: false,
     staleTime: Infinity,
     ...input?.queryClientOptions,
   });
@@ -55,6 +57,36 @@ function renderSessionWorkbenchPage(input?: {
   };
 }
 
+async function setSandboxStatusError(input: {
+  queryClient: ReturnType<typeof createTestQueryClient>;
+  sandboxInstanceId: string;
+  status: number;
+  message: string;
+}): Promise<void> {
+  const error = new HttpApiError({
+    operation: "getSandboxInstanceStatus",
+    status: input.status,
+    body: null,
+    message: input.message,
+  });
+  const query = input.queryClient.getQueryCache().find({
+    queryKey: sandboxInstanceStatusQueryKey(input.sandboxInstanceId),
+  });
+
+  if (query === undefined) {
+    throw new Error("Expected sandbox status query to exist.");
+  }
+
+  await act(async () => {
+    query.setState({
+      ...query.state,
+      error,
+      fetchStatus: "idle",
+      status: "error",
+    });
+  });
+}
+
 describe("SessionWorkbenchPage", () => {
   beforeAll(() => {
     Object.defineProperty(globalThis, "ResizeObserver", {
@@ -79,6 +111,47 @@ describe("SessionWorkbenchPage", () => {
     renderSessionWorkbenchPage();
 
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("shows unavailable resource state when sandbox status becomes a 404", async () => {
+    const sandboxInstanceId = "sbi_test";
+    const view = renderSessionWorkbenchPage({
+      sandboxInstanceId,
+      sidebarDefaultOpen: false,
+      seededStatus: "running",
+    });
+
+    await setSandboxStatusError({
+      queryClient: view.queryClient,
+      sandboxInstanceId,
+      status: 404,
+      message: "Could not check sandbox session status.",
+    });
+
+    expect(await screen.findByRole("heading", { name: "Page not found" })).toBeTruthy();
+    expect(
+      screen.getByText("This page does not exist or you do not have access to it."),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Open processes" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Toggle Sidebar" })).toBeTruthy();
+  });
+
+  it("keeps the workbench error notice for non-404 sandbox status failures", async () => {
+    const sandboxInstanceId = "sbi_test";
+    const view = renderSessionWorkbenchPage({
+      sandboxInstanceId,
+      seededStatus: "running",
+    });
+
+    await setSandboxStatusError({
+      queryClient: view.queryClient,
+      sandboxInstanceId,
+      status: 500,
+      message: "Could not check sandbox session status.",
+    });
+
+    expect(await screen.findByText("Could not load sandbox status")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Page not found" })).toBeNull();
   });
 
   it("renders the processes header action in the session workspace header", async () => {

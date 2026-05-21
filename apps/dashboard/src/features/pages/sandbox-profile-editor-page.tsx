@@ -52,6 +52,7 @@ import {
 } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { isUnavailableResourceError } from "../api/http-api-error.js";
 import { useAppPageBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { NavigationBlockerDialog } from "../navigation/navigation-blocker-dialog.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
@@ -107,6 +108,7 @@ import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { NoLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { SettingsSwitchField } from "../shared/settings-switch-field.js";
+import { UnavailableResourceState } from "../shared/unavailable-resource-state.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import {
   listWebhookTriggersForSandboxProfile,
@@ -639,27 +641,27 @@ export function SandboxProfileEditorShell(): React.JSX.Element {
     retry: false,
   });
 
+  if (profileQuery.isError && isUnavailableResourceError(profileQuery.error)) {
+    return (
+      <PageFrame width="normal">
+        <UnavailableResourceState />
+      </PageFrame>
+    );
+  }
+
   if (profileQuery.isPending || profileVersionsQuery.isPending) {
     return <PageFrame width="normal">{null}</PageFrame>;
   }
 
   if (profileQuery.isError || profileQuery.data === undefined) {
-    const isNotFoundError =
-      profileQuery.error instanceof SandboxProfilesApiError && profileQuery.error.status === 404;
-
     return (
       <PageFrame width="normal" title="Edit profile">
         <Card>
           <CardContent className="gap-3 flex flex-col pt-4">
-            <Notice
-              title={isNotFoundError ? "Sandbox profile not found" : "Could not load profile"}
-              variant="alert"
-            >
+            <Notice title="Could not load profile" variant="alert">
               {resolveApiErrorMessage({
                 error: profileQuery.error,
-                fallbackMessage: isNotFoundError
-                  ? "The sandbox profile was not found."
-                  : "Could not load sandbox profile.",
+                fallbackMessage: "Could not load sandbox profile.",
               })}
             </Notice>
             <div>
@@ -675,6 +677,14 @@ export function SandboxProfileEditorShell(): React.JSX.Element {
             </div>
           </CardContent>
         </Card>
+      </PageFrame>
+    );
+  }
+
+  if (profileVersionsQuery.isError && isUnavailableResourceError(profileVersionsQuery.error)) {
+    return (
+      <PageFrame width="normal">
+        <UnavailableResourceState />
       </PageFrame>
     );
   }

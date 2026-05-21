@@ -19,6 +19,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { cleanupTestQueryClients, createTestQueryClient } from "../../test-support/query-client.js";
+import { HttpApiError } from "../api/http-api-error.js";
 import { createStoryWebhookTriggerCapabilitiesProviderMetadata } from "../integrations/integration-story-harness.js";
 import type {
   IntegrationConnection,
@@ -572,6 +573,9 @@ function renderSandboxProfileEditor(input?: {
   persistentSandboxesEnabled?: boolean;
   maintenanceScript?: string | null;
   profileTriggersListResult?: TriggersListResult;
+  profileDetailErrorStatus?: number;
+  profileVersionsErrorStatus?: number;
+  profileVersionsLoading?: boolean;
   routeSearch?: string;
   routeState?: unknown;
   routeSection?: SandboxProfileEditorTestRouteSection;
@@ -581,6 +585,7 @@ function renderSandboxProfileEditor(input?: {
 }) {
   const queryClient = createTestQueryClient({
     refetchOnMount: false,
+    retryOnMount: false,
     staleTime: Number.POSITIVE_INFINITY,
   });
   const profileId = "sbp_test";
@@ -668,15 +673,37 @@ function renderSandboxProfileEditor(input?: {
       ],
     });
   }
-  queryClient.setQueryData(sandboxProfileDetailQueryKey(profileId), {
-    id: profileId,
-    displayName: "Prototype Profile",
-    activeVersion,
-    status: "active",
-    latestVersion: version,
-    createdAt: "2026-04-23T00:00:00.000Z",
-    updatedAt: "2026-04-23T00:00:00.000Z",
-  });
+  if (input?.profileDetailErrorStatus === undefined) {
+    queryClient.setQueryData(sandboxProfileDetailQueryKey(profileId), {
+      id: profileId,
+      displayName: "Prototype Profile",
+      activeVersion,
+      status: "active",
+      latestVersion: version,
+      createdAt: "2026-04-23T00:00:00.000Z",
+      updatedAt: "2026-04-23T00:00:00.000Z",
+    });
+  } else {
+    const error = new HttpApiError({
+      operation: "getSandboxProfile",
+      status: input.profileDetailErrorStatus,
+      body: null,
+      message: "Could not load sandbox profile.",
+    });
+    const profileQuery = queryClient.getQueryCache().build(queryClient, {
+      queryKey: sandboxProfileDetailQueryKey(profileId),
+      queryFn: async () => {
+        throw error;
+      },
+    });
+
+    profileQuery.setState({
+      ...profileQuery.state,
+      error,
+      fetchStatus: "idle",
+      status: "error",
+    });
+  }
   const triggerRouteSearchParams = new URLSearchParams(input?.routeSearch ?? "");
   const triggerAfter = triggerRouteSearchParams.get("after");
   const triggerBefore = triggerAfter === null ? triggerRouteSearchParams.get("before") : null;
@@ -694,7 +721,41 @@ function renderSandboxProfileEditor(input?: {
       totalResults: 0,
     },
   );
-  if (input?.integrationBindingsError !== undefined) {
+  if (input?.profileVersionsErrorStatus !== undefined) {
+    const error = new HttpApiError({
+      operation: "listSandboxProfileVersions",
+      status: input.profileVersionsErrorStatus,
+      body: null,
+      message: "Could not load sandbox profile versions.",
+    });
+    const versionsQuery = queryClient.getQueryCache().build(queryClient, {
+      queryKey: sandboxProfileVersionsQueryKey(profileId),
+      queryFn: async () => {
+        throw error;
+      },
+    });
+
+    versionsQuery.setState({
+      ...versionsQuery.state,
+      error,
+      fetchStatus: "idle",
+      status: "error",
+    });
+  } else if (input?.profileVersionsLoading === true) {
+    const versionsQuery = queryClient.getQueryCache().build(queryClient, {
+      queryKey: sandboxProfileVersionsQueryKey(profileId),
+      queryFn: async () => ({
+        versions,
+      }),
+    });
+
+    versionsQuery.setState({
+      ...versionsQuery.state,
+      data: undefined,
+      fetchStatus: "fetching",
+      status: "pending",
+    });
+  } else if (input?.integrationBindingsError !== undefined) {
     queryClient.setQueryData(sandboxProfileVersionsQueryKey(profileId), {
       versions,
     });
@@ -1305,6 +1366,40 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.queryByRole("heading", { name: "Resources & Tools" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Configurations" })).toBeNull();
     expect(screen.getByRole("textbox", { name: "Setup script" })).toBeDefined();
+  });
+
+  it("shows unavailable resource state for profile 404 without waiting for child data", () => {
+    renderSandboxProfileEditor({
+      profileDetailErrorStatus: 404,
+      profileVersionsLoading: true,
+    });
+
+    expect(screen.getByRole("heading", { name: "Page not found" })).toBeDefined();
+    expect(
+      screen.getByText("This page does not exist or you do not have access to it."),
+    ).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "Edit profile" })).toBeNull();
+  });
+
+  it("shows unavailable resource state for profile versions 404 after profile detail loads", () => {
+    renderSandboxProfileEditor({
+      profileVersionsErrorStatus: 404,
+    });
+
+    expect(screen.getByRole("heading", { name: "Page not found" })).toBeDefined();
+    expect(
+      screen.getByText("This page does not exist or you do not have access to it."),
+    ).toBeDefined();
+    expect(screen.queryByText("Could not load profile versions")).toBeNull();
+  });
+
+  it("keeps the profile versions notice for non-404 versions failures", () => {
+    renderSandboxProfileEditor({
+      profileVersionsErrorStatus: 500,
+    });
+
+    expect(screen.getByText("Could not load profile versions")).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "Page not found" })).toBeNull();
   });
 
   it("shows snapshot creation feedback while initial materialization is running", () => {

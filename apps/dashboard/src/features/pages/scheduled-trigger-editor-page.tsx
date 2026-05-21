@@ -3,7 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { isUnavailableResourceError } from "../api/http-api-error.js";
 import { FormPageSection } from "../shared/form-page.js";
+import { UnavailableResourceState } from "../shared/unavailable-resource-state.js";
 import { DeleteTriggerDialog } from "../triggers/delete-trigger-dialog.js";
 import { toScheduledTriggerFormValues } from "../triggers/scheduled-trigger-form-helpers.js";
 import { ScheduledTriggerForm } from "../triggers/scheduled-trigger-form.js";
@@ -13,6 +15,10 @@ import { TriggerTypeDisplayField } from "../triggers/trigger-type-field.js";
 import { scheduledTriggerDetailQueryKey } from "../triggers/triggers-query-keys.js";
 import { useLoadedScheduledTriggerEditorState } from "../triggers/use-scheduled-trigger-editor-state.js";
 import { useTriggerSandboxProfileOptions } from "../triggers/use-trigger-sandbox-profile-options.js";
+import {
+  renderTriggerEditorFrameContent,
+  type TriggerEditorFrameRenderer,
+} from "./trigger-editor-frame.js";
 
 function renderScheduledTriggerEditorError(input: {
   title: string;
@@ -81,6 +87,7 @@ export function EditScheduledTriggerEditor(input: {
   navigate: (to: string) => void | Promise<void>;
   backPath?: string | undefined;
   deleteSuccessPath?: string | undefined;
+  renderFrame?: TriggerEditorFrameRenderer;
 }): React.JSX.Element | null {
   const triggerQuery = useQuery({
     queryKey: scheduledTriggerDetailQueryKey(input.triggerId),
@@ -93,38 +100,58 @@ export function EditScheduledTriggerEditor(input: {
   });
   const prerequisites = useTriggerSandboxProfileOptions();
 
+  if (triggerQuery.isError && isUnavailableResourceError(triggerQuery.error)) {
+    return renderTriggerEditorFrameContent({
+      content: <UnavailableResourceState />,
+      renderFrame: input.renderFrame,
+      state: "unavailable",
+    });
+  }
+
   if (prerequisites.errorMessage !== null || triggerQuery.isError) {
-    return renderScheduledTriggerEditorError({
-      title: "Could not load trigger",
-      description: resolveApiErrorMessage({
-        error: triggerQuery.error,
-        fallbackMessage: prerequisites.errorMessage ?? "Could not load trigger.",
+    return renderTriggerEditorFrameContent({
+      content: renderScheduledTriggerEditorError({
+        title: "Could not load trigger",
+        description: resolveApiErrorMessage({
+          error: triggerQuery.error,
+          fallbackMessage: prerequisites.errorMessage ?? "Could not load trigger.",
+        }),
+        onBack: () => {
+          void input.navigate(input.backPath ?? "/triggers");
+        },
       }),
-      onBack: () => {
-        void input.navigate(input.backPath ?? "/triggers");
-      },
+      renderFrame: input.renderFrame,
+      state: "editor",
     });
   }
 
   if (prerequisites.isPending || triggerQuery.isPending || triggerQuery.data === undefined) {
-    return null;
+    return renderTriggerEditorFrameContent({
+      content: null,
+      renderFrame: input.renderFrame,
+      state: "editor",
+    });
   }
 
-  return (
-    <LoadedScheduledTriggerEditor
-      key={input.triggerId}
-      mode="edit"
-      triggerId={input.triggerId}
-      triggerTypeField={<TriggerTypeDisplayField value="scheduled" />}
-      navigate={input.navigate}
-      {...(input.deleteSuccessPath === undefined
-        ? {}
-        : { deleteSuccessPath: input.deleteSuccessPath })}
-      initialValues={toScheduledTriggerFormValues(triggerQuery.data)}
-      sandboxProfileOptions={prerequisites.sandboxProfileOptions}
-      initialSandboxProfileVersion={triggerQuery.data.target.sandboxProfileVersion}
-    />
-  );
+  return renderTriggerEditorFrameContent({
+    content: (
+      <LoadedScheduledTriggerEditor
+        key={input.triggerId}
+        mode="edit"
+        triggerId={input.triggerId}
+        triggerTypeField={<TriggerTypeDisplayField value="scheduled" />}
+        navigate={input.navigate}
+        {...(input.deleteSuccessPath === undefined
+          ? {}
+          : { deleteSuccessPath: input.deleteSuccessPath })}
+        initialValues={toScheduledTriggerFormValues(triggerQuery.data)}
+        sandboxProfileOptions={prerequisites.sandboxProfileOptions}
+        initialSandboxProfileVersion={triggerQuery.data.target.sandboxProfileVersion}
+      />
+    ),
+    renderFrame: input.renderFrame,
+    state: "editor",
+  });
 }
 
 function LoadedScheduledTriggerEditor(input: {

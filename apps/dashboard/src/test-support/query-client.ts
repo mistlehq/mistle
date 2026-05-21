@@ -7,6 +7,7 @@ export function createTestQueryClient(input?: {
   gcTime?: number;
   refetchOnMount?: boolean;
   retry?: boolean;
+  retryOnMount?: boolean;
   staleTime?: number;
 }): QueryClient {
   const queryClient = new QueryClient({
@@ -15,6 +16,7 @@ export function createTestQueryClient(input?: {
         ...(input?.gcTime === undefined ? {} : { gcTime: input.gcTime }),
         ...(input?.refetchOnMount === undefined ? {} : { refetchOnMount: input.refetchOnMount }),
         retry: input?.retry ?? false,
+        ...(input?.retryOnMount === undefined ? {} : { retryOnMount: input.retryOnMount }),
         ...(input?.staleTime === undefined ? {} : { staleTime: input.staleTime }),
       },
     },

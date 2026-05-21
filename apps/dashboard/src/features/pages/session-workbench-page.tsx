@@ -2,6 +2,7 @@ import { SidebarTrigger, useSidebar } from "@mistle/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 
+import { isUnavailableResourceError } from "../api/http-api-error.js";
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
 import {
   RuntimeConversationNavigatorPanel,
@@ -9,7 +10,9 @@ import {
 } from "../session-agents/runtime-conversations/runtime-conversation-navigator.js";
 import { SessionHeaderTitle } from "../sessions/session-header-title.js";
 import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
+import { PageFrame } from "../shared/page-frame.js";
 import { shouldRenderSidebarTrigger } from "../shared/sidebar-trigger-visibility.js";
+import { UnavailableResourceState } from "../shared/unavailable-resource-state.js";
 import { SandboxOperationProgress } from "./sandbox-operation-progress.js";
 import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
@@ -424,6 +427,7 @@ function SessionWorkbenchPageContent(input: {
                 : `Could not start ${cliRuntimeDisplayName} TUI.`),
           }
         : null;
+
   useEffect(() => {
     if (
       workbench.connectionReadiness.canConnect &&
@@ -436,6 +440,20 @@ function SessionWorkbenchPageContent(input: {
     !hasEnteredReadyWorkbench && alert === null ? workbench.initialEntryStartupState : null;
   const isConversationTurnRunning =
     conversationPane.composerStateInput.turnControl.activeTurnState === "running";
+
+  if (isUnavailableResourceError(workbench.sandboxStatusQuery.error)) {
+    return (
+      <ConversationWorkspaceFrame
+        title="Session"
+        leadingControl={<SessionWorkspaceSidebarTrigger />}
+      >
+        <PageFrame width="normal">
+          <UnavailableResourceState />
+        </PageFrame>
+      </ConversationWorkspaceFrame>
+    );
+  }
+
   if (input.sandboxInstanceId === null) {
     return (
       <ConversationWorkspaceFrame

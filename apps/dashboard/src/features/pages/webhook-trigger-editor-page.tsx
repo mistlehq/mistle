@@ -3,7 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { isUnavailableResourceError } from "../api/http-api-error.js";
 import { FormPageSection } from "../shared/form-page.js";
+import { UnavailableResourceState } from "../shared/unavailable-resource-state.js";
 import { DeleteTriggerDialog } from "../triggers/delete-trigger-dialog.js";
 import type { TriggerCreateSuccessPath } from "../triggers/trigger-editor-navigation.js";
 import { TriggerTypeDisplayField } from "../triggers/trigger-type-field.js";
@@ -16,6 +18,10 @@ import { useWebhookTriggerPrerequisites } from "../triggers/use-webhook-trigger-
 import { toWebhookTriggerFormValues } from "../triggers/webhook-trigger-form-helpers.js";
 import { WebhookTriggerForm } from "../triggers/webhook-trigger-form.js";
 import { getWebhookTrigger } from "../triggers/webhook-triggers-service.js";
+import {
+  renderTriggerEditorFrameContent,
+  type TriggerEditorFrameRenderer,
+} from "./trigger-editor-frame.js";
 
 function renderWebhookTriggerEditorError(input: {
   title: string;
@@ -88,6 +94,7 @@ export function EditWebhookTriggerEditor(input: {
   navigate: (to: string) => void | Promise<void>;
   backPath?: string | undefined;
   deleteSuccessPath?: string | undefined;
+  renderFrame?: TriggerEditorFrameRenderer;
 }): React.JSX.Element | null {
   const triggerQuery = useQuery({
     queryKey: webhookTriggerDetailQueryKey(input.triggerId),
@@ -106,16 +113,28 @@ export function EditWebhookTriggerEditor(input: {
         },
   );
 
+  if (triggerQuery.isError && isUnavailableResourceError(triggerQuery.error)) {
+    return renderTriggerEditorFrameContent({
+      content: <UnavailableResourceState />,
+      renderFrame: input.renderFrame,
+      state: "unavailable",
+    });
+  }
+
   if (prerequisites.errorMessage !== null || triggerQuery.isError) {
-    return renderWebhookTriggerEditorError({
-      title: "Could not load trigger",
-      description: resolveApiErrorMessage({
-        error: triggerQuery.error,
-        fallbackMessage: prerequisites.errorMessage ?? "Could not load trigger.",
+    return renderTriggerEditorFrameContent({
+      content: renderWebhookTriggerEditorError({
+        title: "Could not load trigger",
+        description: resolveApiErrorMessage({
+          error: triggerQuery.error,
+          fallbackMessage: prerequisites.errorMessage ?? "Could not load trigger.",
+        }),
+        onBack: () => {
+          void input.navigate(input.backPath ?? "/triggers");
+        },
       }),
-      onBack: () => {
-        void input.navigate(input.backPath ?? "/triggers");
-      },
+      renderFrame: input.renderFrame,
+      state: "editor",
     });
   }
 
@@ -125,7 +144,11 @@ export function EditWebhookTriggerEditor(input: {
     triggerQuery.data === undefined ||
     prerequisites.directoryData === undefined
   ) {
-    return null;
+    return renderTriggerEditorFrameContent({
+      content: null,
+      renderFrame: input.renderFrame,
+      state: "editor",
+    });
   }
 
   let initialValues: ReturnType<typeof toWebhookTriggerFormValues>;
@@ -135,36 +158,44 @@ export function EditWebhookTriggerEditor(input: {
       directoryData: prerequisites.directoryData,
     });
   } catch (error) {
-    return renderWebhookTriggerEditorError({
-      title: "Could not load trigger",
-      description: resolveApiErrorMessage({
-        error,
-        fallbackMessage: "Could not load trigger.",
+    return renderTriggerEditorFrameContent({
+      content: renderWebhookTriggerEditorError({
+        title: "Could not load trigger",
+        description: resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not load trigger.",
+        }),
+        onBack: () => {
+          void input.navigate(input.backPath ?? "/triggers");
+        },
       }),
-      onBack: () => {
-        void input.navigate(input.backPath ?? "/triggers");
-      },
+      renderFrame: input.renderFrame,
+      state: "editor",
     });
   }
 
-  return (
-    <LoadedWebhookTriggerEditor
-      key={input.triggerId}
-      mode="edit"
-      triggerId={input.triggerId}
-      triggerTypeField={<TriggerTypeDisplayField value="trigger" />}
-      navigate={input.navigate}
-      {...(input.deleteSuccessPath === undefined
-        ? {}
-        : { deleteSuccessPath: input.deleteSuccessPath })}
-      initialValues={initialValues}
-      preservedWebhookSourceId={triggerQuery.data.integrationWebhookSourceId}
-      connectionOptions={prerequisites.connectionOptions}
-      sandboxProfileOptions={prerequisites.sandboxProfileOptions}
-      directoryData={prerequisites.directoryData}
-      initialSandboxProfileVersion={triggerQuery.data.target.sandboxProfileVersion}
-    />
-  );
+  return renderTriggerEditorFrameContent({
+    content: (
+      <LoadedWebhookTriggerEditor
+        key={input.triggerId}
+        mode="edit"
+        triggerId={input.triggerId}
+        triggerTypeField={<TriggerTypeDisplayField value="trigger" />}
+        navigate={input.navigate}
+        {...(input.deleteSuccessPath === undefined
+          ? {}
+          : { deleteSuccessPath: input.deleteSuccessPath })}
+        initialValues={initialValues}
+        preservedWebhookSourceId={triggerQuery.data.integrationWebhookSourceId}
+        connectionOptions={prerequisites.connectionOptions}
+        sandboxProfileOptions={prerequisites.sandboxProfileOptions}
+        directoryData={prerequisites.directoryData}
+        initialSandboxProfileVersion={triggerQuery.data.target.sandboxProfileVersion}
+      />
+    ),
+    renderFrame: input.renderFrame,
+    state: "editor",
+  });
 }
 
 function LoadedWebhookTriggerEditor(input: {
